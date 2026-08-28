@@ -1,0 +1,35 @@
+{
+  "extends": ["stylelint-config-standard-scss", "stylelint-config-recommended-vue/scss"],
+  "rules": {
+    "color-no-hex": [
+      true,
+      {
+        "message": "Colours live in styles/_tokens.scss. Use var(--\u2026)."
+      }
+    ],
+    "color-named": [
+      "never",
+      {
+        "message": "Colours live in styles/_tokens.scss. Use var(--\u2026)."
+      }
+    ],
+    "declaration-property-value-allowed-list": {
+      "/^(margin|padding|gap|inset|top|right|bottom|left)/": [
+        "/^(0|auto|inherit|initial|unset|var\\(--space-[a-z0-9]+\\))( (0|auto|var\\(--space-[a-z0-9]+\\))){0,3}$/"
+      ]
+    },
+    "no-descending-specificity": null,
+    "custom-property-empty-line-before": null
+  },
+  "overrides": [
+    {
+      "files": ["**/styles/_tokens.scss"],
+      "rules": {
+        "color-no-hex": null,
+        "color-named": null,
+        "declaration-property-value-allowed-list": null
+      }
+    }
+  ],
+  "ignoreFiles": ["**/dist/**", "**/dev-dist/**", "**/node_modules/**"]
+}
