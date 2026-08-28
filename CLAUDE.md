@@ -1,301 +1,309 @@
 # Molvia · Молвия
 
-**Читай первым делом:** `.scratch/docs/product-plan.md` — там весь продуктовый план целиком,
-с обоснованиями каждого решения. Всё, что ниже, — только опорные точки, чтобы понять
-контекст за минуту, плюс правила работы над кодом.
+**Read this first:** `.scratch/docs/product-plan.md` — the full product plan with the
+reasoning behind every decision. Everything below is only anchor points to get the
+context in a minute, plus the rules for working on the code.
 
-## Что за проект
+## What this is
 
-Приложение для эмигрантов: **что стоит покупать и где** в незнакомой стране.
-Не трекер расходов — эта ниша занята (Toshl, Spendee, Groceries Tracker).
-Свободна только субъективная оценка: все считают деньги, никто не отвечает,
-съедобен ли этот сыр.
+An app for emigrants: **what is worth buying, and where**, in an unfamiliar country.
+Not an expense tracker — that niche is taken (Toshl, Spendee, Groceries Tracker).
+What is free is the subjective judgement: everyone counts money, nobody answers
+whether this cheese is edible.
 
-Правило, которое держит весь продукт:
-**дешёвое, но плохое не рекомендуется нигде; хорошее ищется по минимальной цене.**
+The rule that holds the whole product together:
+**cheap but bad is never recommended anywhere; good is looked up at its lowest price.**
 
-Автор живёт в Гюмри, зарплата в рублях, траты в драмах. Первый рынок —
-Гюмри и Ереван, русскоязычная диаспора.
+The author lives in Gyumri, earns in rubles, spends in drams. First market —
+Gyumri and Yerevan, the Russian-speaking diaspora.
 
-## Ключевые решения, которые легко нарушить по незнанию
+## Decisions that are easy to break unknowingly
 
-- **Два потока данных нельзя смешивать.** Вердикт — редкий, один раз на пару
-  «позиция + место», это ядро. Трата — частая, слой учёта. Оценка не требуется
-  в момент покупки, напоминание приходит на следующий день.
-- **Ключ схемы — «позиция + место»**, чтобы блюда в кафе влезли без миграции.
-- **Ввод товара — это поиск по справочнику**, а не пустое текстовое поле.
-  Штрихкод лишь ускоритель: на развес его нет, а там максимальный разброс цен.
-- **Релизы нарезаны по гипотезам, а не по фичам.** У каждого — вопрос и цифра,
-  при которой работа останавливается. Порядок нарочно неочевиден: штрихкоды в 0.2,
-  агрегаты в 0.3. Не «улучшать» этот порядок, не свериваясь с планом.
-- **Рекламы и платных мест в выдаче нет никогда** — доверие к вердикту
-  единственный несписываемый актив.
+- **The two data streams must not be mixed.** A verdict is rare — one per
+  «item + place» pair, and it is the core. An expense is frequent, an accounting layer.
+  A rating is not required at the moment of purchase; the reminder arrives the next day.
+- **The schema key is «item + place»**, so that restaurant dishes fit without a migration.
+- **Entering an item is a lookup in a catalogue**, not an empty text field.
+  The barcode is only an accelerator: loose goods have none, and that is exactly where
+  the price spread is widest.
+- **Releases are cut by hypothesis, not by feature.** Each has a question and a number
+  at which work stops. The order is deliberately counter-intuitive: barcodes in 0.2,
+  aggregates in 0.3. Do not "improve" that order without checking against the plan.
+- **There are never ads or paid placements in results** — trust in the verdict is the
+  one asset that cannot be written off.
 
-## Ворота с порогами провала
+## Gates with kill thresholds
 
-| | Вопрос | Стоп |
+| | Question | Stop |
 |---|---|---|
-| 0.1 | Я сам буду этим пользоваться? | сам не вносил 2 недели подряд |
-| 0.2 | Незнакомцы наполняют базу? | <20% дошли до 5 оценок за 2 недели |
-| 0.3 | Возвращаются за чужими данными? | <15% возврата на 4-й неделе, **раздельно** по продуктам и заведениям |
-| 1.0 | — | масштабирование доказанного |
+| 0.1 | Will I use this myself? | I stop entering data 2 weeks in a row |
+| 0.2 | Do strangers fill the base? | <20% reach 5 ratings within 2 weeks |
+| 0.3 | Do they come back for other people's data? | <15% week-4 return, **measured separately** for products and venues |
+| 1.0 | — | scaling what is proven |
 
-Счётчики для этих порогов должны появиться **до первой фичи 0.2**, иначе ворота
-декоративны и проект теряет способность провалиться вовремя.
+The counters for these thresholds must exist **before the first 0.2 feature**, otherwise
+the gates are decorative and the project loses the ability to fail on time.
 
-## Деньги
+## Money
 
-Доступ — ресурс на месяц: ~10 оценок = месяц, либо $1. Вклад не сгорает
-и списывается раньше денег, автосписаний нет. Чаевые через Telegram Stars с 0.3.
-Принято, что первые два года дохода нет.
+Access is a monthly resource: ~10 ratings = a month, or $1. Contribution does not expire
+and is spent before money; there are no auto-charges. Tips via Telegram Stars from 0.3.
+It is accepted that there is no revenue for the first two years.
 
 ---
 
-# Техника
+# Engineering
 
-## Стек
+## Stack
 
-TypeScript везде — **единственная причина выбора языка**: общие типы модели товара,
-вердикта и сессии между PWA, API и ботом. Производительность критерием не была,
-нагрузка I/O-bound, запас три порядка.
+TypeScript everywhere — **the only reason the language was chosen**: shared types for the
+item, verdict and session models across PWA, API and bot. Performance was not a criterion:
+the load is I/O-bound, with three orders of magnitude of headroom.
 
-| Слой | Выбор | Почему именно так |
+| Layer | Choice | Why this one |
 |---|---|---|
-| PWA | Vue 3 + Vite + Pinia + vue-router + vite-plugin-pwa | меньше церемонии и меньше бандл, чем React; цель — телефон у полки |
-| Стилизация | Tailwind 4 + токены в `styles/tokens.css` | |
-| Сканер | `zxing-wasm`, живой видоискатель через `getUserMedia` | нужен EAN, не QR |
-| API | Fastify + Zod | схемы Zod общие с фронтом и ботом |
-| БД | PostgreSQL + Drizzle | схема на TS, миграции генерируются, честный спуск в сырой SQL |
-| Бот | grammY | раздача, авторизация, напоминания об оценке |
-| OCR чеков (1.0) | отдельный сервис на Python | в TS экосистемы нет |
+| PWA | Vue 3 + Vite + Pinia + vue-router + vite-plugin-pwa | less ceremony and a smaller bundle than React; the target is a phone at the shelf |
+| Styling | Tailwind 4 + tokens in `styles/tokens.css` | |
+| Scanner | `zxing-wasm`, live viewfinder via `getUserMedia` | we need EAN, not QR |
+| API | Fastify + Zod | Zod schemas shared with the frontend and the bot |
+| DB | PostgreSQL + Drizzle | schema in TS, generated migrations, honest drop into raw SQL |
+| Bot | grammY | distribution, auth, rating reminders |
+| Receipt OCR (1.0) | separate Python service | the TS ecosystem has nothing here |
 
-**Postgres делает тяжёлую работу:** `pg_trgm` для опечаток, `unaccent` для транслита,
-GIN-индекс; агрегаты (средние оценки, минимальная цена, индекс магазина) — обычный SQL.
-Отсюда и Drizzle: Prisma прячет ровно то, на чём здесь всё держится.
+**Postgres does the heavy lifting:** `pg_trgm` for typos, `unaccent` for transliteration,
+GIN index; aggregates (average ratings, minimum price, store index) are plain SQL.
+Hence Drizzle: Prisma hides exactly what everything here rests on.
 
-**Telegram Mini App отпал:** `getUserMedia` сломан на обеих платформах, родной сканер
-умеет только QR. Нативное — вопрос 1.0.
+**Telegram Mini App was dropped:** `getUserMedia` is broken on both platforms and the
+native scanner only reads QR. Native is a 1.0 question.
 
-**Курсы:** официальные из открытого API CBA; реальные курсы обмена — от пользователей.
-Парсинг rate.am отвергнут.
+**Exchange rates:** official ones from the open CBA API; real exchange rates from users.
+Scraping rate.am was rejected.
 
-## Архитектура
+## Architecture
 
-Монорепо на npm workspaces. Чистое ядро + тонкие адаптеры, без DI-контейнера
-и без слоя портов: ядро тестируется напрямую.
+npm workspaces monorepo. A pure core with thin adapters — no DI container and no ports
+layer: the core is tested directly.
 
 ```
 apps/
   api/          Fastify
-    src/routes/     HTTP: разобрать → вызвать сценарий → отдать. Ноль бизнес-логики
-    src/usecases/   сценарии: оркестрация домена и репозиториев
-    src/db/         Drizzle-схема, миграции, репозитории — единственное место с SQL
+    src/routes/     HTTP: parse -> call the use case -> respond. Zero business logic
+    src/usecases/   scenarios: orchestrate domain and repositories
+    src/db/         Drizzle schema, migrations, repositories — the only place with SQL
   pwa/          Vue 3
-  bot/          grammY, клиент к API
+  bot/          grammY, a client of the API
 packages/
-  model/        домен: типы, Zod-схемы, чистые правила (вердикт, нормализация,
-                цена за единицу, конвертация). Зависимости: только zod
-  client/       типизированный клиент к API поверх схем model
+  model/        domain: types, Zod schemas, pure rules (verdict, normalization,
+                unit price, conversion). Dependencies: zod only
+  client/       typed API client built on the model schemas
 ```
 
-**Правила границ — проверяются линтером, а не на глаз:**
+**Boundary rules — enforced by the linter, not by eye:**
 
-- `packages/model` не импортирует ничего, кроме `zod`. Ни fastify, ни drizzle,
-  ни vue, ни `node:*`. Если правило тянет ввод-вывод — это не правило домена.
-- `usecases` не знают про HTTP: внутри нет `request`, `reply`, кодов ответа.
-- `routes` не содержат бизнес-логики и не ходят в базу мимо репозиториев.
-- SQL живёт только в `src/db`. Ни одной строки SQL в роутах и сценариях.
+- `packages/model` imports nothing but `zod`. Not fastify, not drizzle, not vue,
+  not `node:*`. If a rule needs I/O, it is not a domain rule.
+- `usecases` know nothing about HTTP: no `request`, no `reply`, no status codes inside.
+- `routes` contain no business logic and never reach the database except via repositories.
+- SQL lives only in `src/db`. Not a single line of SQL in routes or use cases.
 
-**Единственный путь записи — API.** Бот и PWA — его клиенты, прямого доступа к базе
-у них нет. Два пути записи в продукте про целостность данных разойдутся молча.
+**The API is the only write path.** The bot and the PWA are its clients and have no direct
+database access. In a product about data integrity, two write paths will silently diverge.
 
-## Правила денег и величин
+## Money and quantity rules
 
-- **Никогда `float`.** Сумма — целое в минорных единицах: `amount_minor bigint` +
-  `currency char(3)`, минорная = 1/100 для всех валют. Драмы дробные на практике
-  (чек на 5403,12 ֏), «драмы целые» — ложное упрощение.
-- **Курс сохраняется вместе с транзакцией**, задним числом не пересчитывается.
-  Иначе прошлый месяц меняет сумму от сегодняшнего курса.
-- **Сравнение только по цене за единицу** (за кг / л / шт). Цена за единицу —
-  вычисляемая, не вводимая. 520 ֏ за 0,9 л дороже, чем 570 ֏ за литр, и пользователь
-  не должен считать это в уме.
-- Округление — только на выводе, никогда в хранении и промежуточных расчётах.
+- **Never `float`.** An amount is an integer in minor units: `amount_minor bigint` +
+  `currency char(3)`, minor unit = 1/100 for every currency. Drams are fractional in
+  practice (a receipt for 5403.12 ֏) — "drams are whole" is a false simplification.
+- **The rate is stored with the transaction** and never recomputed retroactively.
+  Otherwise last month's total changes with today's rate.
+- **Compare by unit price only** (per kg / l / piece). Unit price is computed, never
+  entered. 520 ֏ for 0.9 l is more expensive than 570 ֏ for a litre, and the user must
+  not have to work that out in their head.
+- Rounding happens on output only — never in storage or in intermediate results.
 
-## Правила данных
+## Data rules
 
-- **Вердикт и трата — разные таблицы и разные пути записи.** Не сводить их
-  в один экран ввода: это разные частоты и разные мотивации.
-- **Обязательное поле ровно одно — позиция.** Всё остальное можно не заполнять.
-- **Ввод позиции — поиск по справочнику** с транслитом и опечатками, не свободный текст.
-  Свободный текст порождает «МОЛОКО МАРИАН 1Л», которое к канону не привязать.
-- **В сортировке выдачи не может быть поля вроде `sponsored`, `boost`, `promoted`.**
-  Если такое поле появилось в схеме или в `ORDER BY` — это нарушение продукта,
-  а не оптимизация.
-- **Приватность:** траты приватны всегда. Цены и оценки публичны только в агрегате,
-  и агрегат не показывается, пока в нём меньше нескольких независимых вкладов —
-  иначе по «средней цене» вычисляется чужая корзина.
-- Страна и город — часть ключа с самого начала, не «добавим потом».
+- **Verdict and expense are separate tables with separate write paths.** Do not merge
+  them into one input screen: they have different frequencies and different motivations.
+- **Exactly one field is required — the item.** Everything else may be left empty.
+- **Entering an item is a catalogue lookup** with transliteration and typo tolerance,
+  not free text. Free text produces `МОЛОКО МАРИАН 1Л`, which cannot be tied to the canon.
+- **Result ordering must never contain a field like `sponsored`, `boost`, `promoted`.**
+  If such a field appears in the schema or in an `ORDER BY`, that is a product violation,
+  not an optimization.
+- **Privacy:** expenses are always private. Prices and ratings are public only in
+  aggregate, and an aggregate is not shown until it holds several independent
+  contributions — otherwise someone's basket can be derived from the "average price".
+- Country and city are part of the key from the start, not "we'll add it later".
 
-## Правила фронта и стилизации
+## Frontend and styling rules
 
-- **Целевое устройство — телефон в одной руке, у полки, при плохом свете.**
-  Всё проектируется от него; десктоп — производное.
-- **Токены в одном файле.** В компонентах — только переменные: ни одного хардкод-хекса,
-  ни одного магического отступа мимо шкалы.
-- Тач-цель ≥ 44px. Основное действие достижимо большой пальцем.
-- **У каждого экрана четыре состояния:** загрузка, пусто, ошибка, офлайн.
-  Пустое состояние — не «нет данных», а предложение действия.
-- **Только `<script setup>` и Composition API.** Логика с состоянием — в composables,
-  не в компонентах.
-- **Ни одной строки текста в разметке — всё через ключи i18n, с первого дня.**
-  План предполагает выход на другие языки без ребрендинга; вшитые строки — самая
-  дешёвая ошибка сегодня и самая дорогая через год.
-- **Бизнес-логики на фронте нет.** Вердикт, цену за единицу и конвертацию считает
-  сервер. Валидация на клиенте — только ради UX; источник правды — бэкенд.
-- Компоненты дробить так, чтобы не были перегружены, но без пяти обёрток вокруг
-  одного тега. Один хорошо очерченный компонент лучше пяти тривиальных.
+- **The target device is a phone in one hand, at the shelf, in bad light.**
+  Everything is designed from there; desktop is derived.
+- **Tokens live in one file.** Components use variables only: not a single hardcoded hex,
+  not a single magic spacing off the scale.
+- Touch target >= 44px. The primary action is reachable with a thumb.
+- **Every screen has four states:** loading, empty, error, offline. The empty state is not
+  "no data" but an offer to act.
+- **`<script setup>` and the Composition API only.** Stateful logic goes into composables,
+  not into components.
+- **Not a single string of text in the markup — everything through i18n keys, from day one.**
+  The plan assumes expanding to other languages without rebranding; hardcoded strings are
+  the cheapest mistake today and the most expensive one a year from now.
+- **No business logic on the frontend.** The verdict, the unit price and the conversion are
+  computed by the server. Client-side validation is for UX only; the backend is the source
+  of truth.
+- Split components so they are not overloaded, but without five wrappers around one tag.
+  One well-scoped component beats five trivial ones.
 
-## Правила кода
+## Code rules
 
-- **Минимальный диф** — менять только то, чего требует задача. Никакого попутного
-  рефакторинга и переименований «по дороге».
-- **DRY / KISS** — не дублировать, переиспользовать существующее. Но и не абстрагировать
-  заранее: три понятные строки лучше преждевременного хелпера.
-- **Комментарии** — без шума. Короткое «почему» для неочевидной бизнес-логики,
-  а не пересказ кода.
-- **Ошибки домена** — из общего реестра сообщений, не строками по месту.
-  HTTP-коды назначает центральный обработчик ошибок; `try/catch → 400` в роуте не писать.
-- **IDOR** — любой идентификатор из запроса сверяется с аутентифицированным субъектом.
-- **Секретов в коде и коммитах нет** — только `.env`, который в `.gitignore`.
-- **Новая зависимость обсуждается.** Каждая — это бандл у полки и цепочка поставки.
-- **Если правило мешает — менять правило явно**, обсудив, а не обходить молча.
+- **Minimal diff** — change only what the task requires. No drive-by refactoring, no
+  renaming "along the way".
+- **DRY / KISS** — do not duplicate, reuse what exists. But do not abstract ahead of time:
+  three clear lines beat a premature helper.
+- **Comments** — no noise. A short "why" for non-obvious business logic, never a retelling
+  of the code.
+- **Domain errors** come from a shared message registry, not from strings written in place.
+  HTTP status codes are assigned by the central error handler; never write
+  `try/catch -> 400` in a route.
+- **IDOR** — every identifier taken from a request is verified against the authenticated
+  subject.
+- **No secrets in code or commits** — only `.env`, which is in `.gitignore`.
+- **A new dependency is discussed.** Each one is bundle size at the shelf and supply chain.
+- **If a rule gets in the way, change the rule explicitly** — discuss it, do not silently
+  work around it.
 
-## Тесты
+## Testing
 
-| Слой | Что проверяет | Зависимости |
+| Layer | What it covers | Dependencies |
 |---|---|---|
-| Юнит | чистые правила из `packages/model` | ничего, кроме домена |
-| Сценарии | `usecases` | фейковые репозитории, без БД |
-| Интеграционные | схема, поиск, агрегаты, HTTP-контракт | настоящий Postgres |
+| Unit | pure rules from `packages/model` | nothing but the domain |
+| Use case | `usecases` | fake repositories, no DB |
+| Integration | schema, search, aggregates, HTTP contract | a real Postgres |
 
-- **Поиск по справочнику тестируется только на настоящем Postgres.** `pg_trgm`
-  и `unaccent` не имитируются, а именно они и ломаются.
-- **Упал тест — сначала ищи баг в коде,** а не правь тест под поведение.
-  Тест доказывает, что приложение работает, а не наоборот.
-- **Максимум краевых случаев.** Обязательный чек-лист:
-  - NULL / легаси — поле пустое, но сущность под правило подпадает
-  - альтернативный путь записи — тот же итог другим маршрутом
-  - граница — ровно N, N−1, N+1
-  - «не должно сработать» — состояние, где действие обязано не сработать
-  - молвия-специфичное: транслит и опечатка в поиске, вес против штук, валюта
-    не локальная, товар без штрихкода, вторая цена на ту же пару «позиция + место»
+- **Catalogue search is tested only against a real Postgres.** `pg_trgm` and `unaccent`
+  cannot be faked, and they are exactly what breaks.
+- **When a test fails, look for the bug in the code first** — do not adjust the test to
+  match the behaviour. A test proves the app works, not the other way round.
+- **Maximize corner cases.** Mandatory checklist:
+  - NULL / legacy — the field is empty but the entity still falls under the rule
+  - alternative write path — the same outcome reached by a different route
+  - boundary — exactly N, N-1, N+1
+  - "must not fire" — a state where the action is required not to trigger
+  - Molvia-specific: transliteration and a typo in search, weight vs pieces, a non-local
+    currency, an item without a barcode, a second price for the same «item + place» pair
 
-## Рабочий процесс
+## Workflow
 
-### Перед задачей
+### Before a task
 
-1. **План перед кодом для всего крупного** — фича из релизной нарезки или миграция
-   схемы. Файл в `.scratch/tasks/plans/<релиз>-<слаг>.md`, до первой строки кода.
-   Мелкие правки — сразу код.
-2. **Требования собираем сами** — спек нет. Источник — `.scratch/docs/product-plan.md`;
-   если в нём ответа нет, требование формулируется в плане явно и проговаривается.
-3. **Сверяться с релизной нарезкой.** Прежде чем делать фичу, проверить, к какому
-   релизу она относится и какую гипотезу проверяет. Фича без гипотезы не делается.
+1. **A plan before code for anything large** — a feature from the release cut, or a schema
+   migration. The file goes to `.scratch/tasks/plans/<release>-<slug>.md`, before the first
+   line of code. Small fixes go straight to code.
+2. **We gather requirements ourselves** — there are no specs. The source is
+   `.scratch/docs/product-plan.md`; if it has no answer, the requirement is stated
+   explicitly in the plan and talked through.
+3. **Check against the release cut.** Before building a feature, work out which release it
+   belongs to and which hypothesis it tests. A feature without a hypothesis is not built.
 
-### После задачи
+### After a task
 
-**Definition of Done:** `make format` → `make lint` → `make typecheck` → `make test`,
-все зелёные. Запускать один раз после всего плана, а не после каждого шага:
-format мутирует файлы и иначе прячет настоящие ошибки линтера.
+**Definition of Done:** `make format` -> `make lint` -> `make typecheck` -> `make test`,
+all green. Run them once after the entire plan, not after each step: `format` mutates files
+and would otherwise hide real lint errors.
 
-Если решение по ходу изменилось — **сразу обновить `.scratch/docs/product-plan.md`.**
-Расхождение плана и кода обесценивает план, а он здесь важнее кода.
+If a decision changed along the way — **update `.scratch/docs/product-plan.md` immediately.**
+A plan that diverges from the code is worthless, and here the plan matters more than the code.
 
-### Коммиты
+### Commits
 
-- **Коммиты агент делает сам**, разрешения на каждый спрашивать не нужно. Разбивка
-  на коммиты планируется заранее и предлагается вместе с планом; не копить всё в один
-  финальный. «Готов» = кусок самодостаточен (миграция + схема; отдельно экран;
-  отдельно тесты).
-- **Пуш — когда сделано всё по задаче**, а не после каждого коммита.
-- **Единственный автор — владелец репозитория.** Строка `Co-Authored-By:` в любой
-  формулировке запрещена — не добавлять ни автоматически, ни по умолчанию инструмента.
-- **Формат — Conventional Commits со скоупом-приложением:** `feat(pwa): ...`,
-  `fix(api): ...`, `chore(db): ...`. Заголовок в императиве, тело — про «почему».
-- **Ветки:** `<релиз>/<короткое-описание>`, например `0.1/verdict-input`.
+- **The agent commits on its own**; no need to ask permission for each one. The split into
+  commits is planned in advance and proposed together with the plan; do not pile everything
+  into one final commit. "Ready" = the piece is self-contained (migration + schema; the
+  screen separately; the tests separately).
+- **Push when everything for the task is done**, not after every commit.
+- **The only author is the repository owner.** A `Co-Authored-By:` line in any form is
+  forbidden — do not add it automatically or as a tool default.
+- **Format — Conventional Commits with the app as scope:** `feat(pwa): ...`,
+  `fix(api): ...`, `chore(db): ...`. Imperative subject line, body for the "why".
+- **Branches:** `<release>/<short-description>`, e.g. `0.1/verdict-input`.
 
-### Спрашивать до, а не после
+### Ask before, not after
 
-Миграции с потерей данных, смена элемента стека, правки CI, рефакторинг вне задачи.
+Migrations that lose data, swapping a stack element, CI changes, refactoring outside the task.
 
-## Состояние
+## State
 
-Каркаса ещё нет: в репозитории только правила. Первые шаги — в конце
-`.scratch/docs/product-plan.md`. Цели `make` в Definition of Done — контракт на момент,
-когда каркас появится; самого Makefile пока нет.
+There is no scaffold yet: the repository holds only the rules. The first steps are at the
+end of `.scratch/docs/product-plan.md`. The `make` targets in the Definition of Done are a
+contract for when the scaffold appears; the Makefile itself does not exist yet.
 
-## Несколько клонов параллельно
+## Several clones in parallel
 
-Проект рассчитан на несколько рабочих копий рядом: `pets/molvia`, `pets/molvia2`, …
-Каждая ведёт свою задачу на своей ветке.
+The project is meant to have several working copies side by side: `pets/molvia`,
+`pets/molvia2`, … Each one runs its own task on its own branch.
 
-**Заводить копию воркtree, а не клоном:** `git worktree add ../molvia2 -b 0.1/имя` —
-общая база объектов, ничего не выкачивается заново, и одна ветка физически не может
-оказаться открытой в двух копиях. Полный клон нужен, только если требуется независимый
-`.git` (например, эксперимент с историей).
+**Create a copy as a worktree, not a clone:** `git worktree add ../molvia2 -b 0.1/name` —
+a shared object store, nothing is re-fetched, and one branch physically cannot be checked
+out in two copies. A full clone is only needed when an independent `.git` is required
+(an experiment with history, for instance).
 
-**После каждой новой копии — два скрипта:**
+**After every new copy — two scripts:**
 
 ```bash
-bin/link-shared.sh   # .scratch и .lavish -> общий каталог. Идемпотентно
-bin/init-env.sh      # .env с непересекающимися портами и своей базой
+bin/link-shared.sh   # .scratch and .lavish -> the shared directory. Idempotent
+bin/init-env.sh      # .env with non-overlapping ports and its own database
 ```
 
-`init-env.sh` берёт индекс из имени каталога (`molvia` → 0, `molvia2` → 2) или из
-аргумента, считает порты и предупреждает, если они уже заняты. Существующий `.env`
-не перезаписывает без `--force`.
+`init-env.sh` takes the index from the directory name (`molvia` -> 0, `molvia2` -> 2) or
+from an argument, computes the ports and warns if they are already taken. It does not
+overwrite an existing `.env` without `--force`.
 
-**Что общее, а что своё:**
+**What is shared and what is per-copy:**
 
-| | Где | Почему так |
+| | Where | Why |
 |---|---|---|
-| План, планы задач, lavish | общее, `../_shared/molvia/` | одна правда на все копии; переживает удаление любой |
-| Ветка, `node_modules`, `.env` | своё в каждой копии | иначе копии не независимы |
-| Порты, база, бот | своё, разводится `CLONE_INDEX` | см. ниже |
+| Plan, task plans, lavish | shared, `../_shared/molvia/` | one truth for all copies; survives deleting any of them |
+| Branch, `node_modules`, `.env` | per-copy | otherwise the copies are not independent |
+| Ports, database, bot | per-copy, spread by `CLONE_INDEX` | see below |
 
-**Изоляция копий держится на `CLONE_INDEX` из `.env`.** Порты — база плюс
-`CLONE_INDEX*10`, имя базы и compose-проекта — с суффиксом. Основная копия — `0`.
+**Isolation between copies rests on `CLONE_INDEX` from `.env`.** Ports are base plus
+`CLONE_INDEX*10`; the database and compose project names get a suffix. The main copy is `0`.
 
-| | Копия 0 | Копия 2 |
+| | Copy 0 | Copy 2 |
 |---|---|---|
 | API | 3300 | 3320 |
 | PWA | 5300 | 5320 |
 | Postgres | 5500 | 5520 |
-| База | `molvia_0` | `molvia_2` |
+| Database | `molvia_0` | `molvia_2` |
 
-Полоса портов у молвии своя, а не дефолтная: на машине уже слушают постгрес и Vite
-рабочего проекта на 5432 и 5173, и с дефолтов молвия дралась бы с работой, а не только
-копия с копией.
+Molvia has its own port band rather than the defaults: the machine already has the work
+project's Postgres and Vite listening on 5432 and 5173, so with the defaults Molvia would
+fight with work, not just copy with copy.
 
-**В `.env` только литералы, никаких `${...}`.** Compose такую подстановку делает,
-а `dotenv` в Node — нет; файл, который выглядит вычисляемым, тихо работает не так,
-как написан. Поэтому `.env` не правится руками, а генерируется `bin/init-env.sh`.
+**`.env` holds literals only, no `${...}`.** Compose does perform that substitution but
+`dotenv` in Node does not; a file that looks computed would silently behave differently
+from how it reads. That is why `.env` is generated by `bin/init-env.sh` and not edited
+by hand.
 
-- **База у каждой копии своя.** Общая база и параллельные миграции убивают друг друга;
-  причём тихо: вторая копия видит чужую схему и считает, что миграция уже применена.
-- **Бот у каждой копии свой.** Два процесса на одном токене воруют друг у друга апдейты
-  через long polling — молча и невоспроизводимо. Заводить отдельного бота в BotFather.
+- **Each copy gets its own database.** A shared database plus parallel migrations kill each
+  other, and silently: the second copy sees a foreign schema and assumes the migration is
+  already applied.
+- **Each copy gets its own bot.** Two processes on one token steal each other's updates via
+  long polling — silently and unreproducibly. Register a separate bot in BotFather.
 
-**Планы задач в общем каталоге называются по задаче, а не по копии** —
-`.scratch/tasks/plans/<релиз>-<слаг>.md`. Копия временна, задача нет.
+**Task plans in the shared directory are named after the task, not the copy** —
+`.scratch/tasks/plans/<release>-<slug>.md`. A copy is temporary, a task is not.
 
-`.scratch` и `.lavish` — симлинки на `../_shared/molvia/{scratch,lavish}`, вне репозитория
-и в `.gitignore`. Ссылки относительные: всё дерево `projects/` можно перенести целиком.
-Каталог `_shared` в гит не входит по замыслу — в свежем клоне его восстанавливает
-`bin/link-shared.sh`.
+`.scratch` and `.lavish` are symlinks to `../_shared/molvia/{scratch,lavish}`, outside the
+repository and in `.gitignore`. The links are relative, so the whole `projects/` tree can be
+moved at once. The `_shared` directory is deliberately not in git — in a fresh clone
+`bin/link-shared.sh` restores it.
 
-## Связанное
+## Related
 
-Google-таблицы, из которых вырос проект, лежат в папке Drive «Жизнь»
-и доступны через MCP-сервер `google-sheets` (см. память в ветке `~/`).
-Учёт в драмах при зарплате в рублях там уже работает.
+The Google Sheets the project grew out of live in the Drive folder «Жизнь» and are reachable
+through the `google-sheets` MCP server (see the memory in the `~/` branch). Accounting in
+drams on a ruble salary already works there.
