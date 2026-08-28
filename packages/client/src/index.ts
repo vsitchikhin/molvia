@@ -22,10 +22,9 @@ export function createClient({ baseUrl, fetch = globalThis.fetch }: ClientOption
 
     if (!response.ok) {
       const failure = errorResponseSchema.safeParse(body)
-      throw new DomainError(
-        failure.success ? (failure.data.code as never) : ERROR.NOT_FOUND,
-        failure.success ? failure.data.details : `HTTP ${response.status}`,
-      )
+      throw failure.success
+        ? new DomainError(failure.data.code, failure.data.details)
+        : new DomainError(ERROR.INTERNAL, `HTTP ${String(response.status)}`)
     }
 
     return schema.parse(body)

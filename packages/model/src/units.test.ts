@@ -14,7 +14,7 @@ describe('parseQuantity', () => {
 
   it('rejects zero, negatives and junk', () => {
     for (const bad of ['0', '-1', '', 'kg', '1.2345']) {
-      expect(() => parseQuantity(bad, 'kg')).toThrowError(
+      expect(() => parseQuantity(bad, 'kg')).toThrow(
         expect.objectContaining({ code: ERROR.INVALID_QUANTITY }),
       )
     }
@@ -38,16 +38,16 @@ describe('unitPrice', () => {
     const amd = unitPrice(money(100n, 'AMD'), parseQuantity('1', 'kg'))
     const rub = unitPrice(money(100n, 'RUB'), parseQuantity('1', 'kg'))
     const litres = unitPrice(money(100n, 'AMD'), parseQuantity('1', 'l'))
-    expect(() => compareUnitPrice(amd, rub)).toThrowError(
+    expect(() => compareUnitPrice(amd, rub)).toThrow(
       expect.objectContaining({ code: ERROR.CURRENCY_MISMATCH }),
     )
-    expect(() => compareUnitPrice(amd, litres)).toThrowError(
+    expect(() => compareUnitPrice(amd, litres)).toThrow(
       expect.objectContaining({ code: ERROR.UNIT_MISMATCH }),
     )
   })
 
   it('rejects a zero quantity instead of dividing by it', () => {
-    expect(() => unitPrice(money(1n, 'AMD'), { milli: 0n, unit: 'kg' })).toThrowError(
+    expect(() => unitPrice(money(1n, 'AMD'), { milli: 0n, unit: 'kg' })).toThrow(
       expect.objectContaining({ code: ERROR.INVALID_QUANTITY }),
     )
   })

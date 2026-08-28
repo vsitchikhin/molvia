@@ -24,12 +24,12 @@ describe('parseMoney', () => {
 
   it('rejects what is not an amount', () => {
     for (const bad of ['', ' ', 'abc', '1.234', '1..2', '1,2,3', '--1']) {
-      expect(() => parseMoney(bad, 'AMD')).toThrowError(DomainError)
+      expect(() => parseMoney(bad, 'AMD')).toThrow(DomainError)
     }
   })
 
   it('reports the registry code, not a message written in place', () => {
-    expect(() => parseMoney('abc', 'AMD')).toThrowError(
+    expect(() => parseMoney('abc', 'AMD')).toThrow(
       expect.objectContaining({ code: ERROR.INVALID_AMOUNT }),
     )
   })
@@ -46,10 +46,10 @@ describe('arithmetic', () => {
   it('refuses to mix currencies rather than guessing a rate', () => {
     const amd = money(1n, 'AMD')
     const rub = money(1n, 'RUB')
-    expect(() => addMoney(amd, rub)).toThrowError(
+    expect(() => addMoney(amd, rub)).toThrow(
       expect.objectContaining({ code: ERROR.CURRENCY_MISMATCH }),
     )
-    expect(() => compareMoney(amd, rub)).toThrowError(DomainError)
+    expect(() => compareMoney(amd, rub)).toThrow(DomainError)
   })
 
   it('orders amounts', () => {

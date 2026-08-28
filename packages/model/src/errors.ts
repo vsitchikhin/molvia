@@ -8,6 +8,7 @@ export const ERROR = {
   CURRENCY_MISMATCH: 'error.currency_mismatch',
   UNIT_MISMATCH: 'error.unit_mismatch',
   NOT_FOUND: 'error.not_found',
+  INTERNAL: 'error.internal',
 } as const
 
 export type ErrorCode = (typeof ERROR)[keyof typeof ERROR]

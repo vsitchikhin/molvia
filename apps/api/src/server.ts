@@ -19,11 +19,12 @@ export function buildServer(): FastifyInstance {
     }
 
     app.log.error(error)
-    return reply.status(error.statusCode ?? 500).send({ code: 'error.internal' })
+    return reply.status(error.statusCode ?? 500).send({ code: ERROR.INTERNAL })
   })
 
-  app.register(async (instance) => {
+  app.register((instance, _options, done) => {
     healthRoutes(instance)
+    done()
   })
 
   return app
