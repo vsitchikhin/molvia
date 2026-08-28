@@ -1,0 +1,27 @@
+# TLS is issued and renewed automatically for {$DOMAIN}. Set DOMAIN to a hostname that
+# resolves to this machine; use `localhost` to try the production stack locally, and
+# Caddy will issue an internal certificate instead.
+{$DOMAIN:localhost} {
+	encode zstd gzip
+
+	# The PWA calls /api/... so that the origin is never hardcoded in the client — the
+	# same shape the Vite dev proxy has, so nothing differs between dev and production.
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy api:3300
+	}
+
+	handle {
+		root * /srv
+		# A single-page app: unknown paths are routes, not missing files.
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Content-Type-Options nosniff
+		# The scanner needs the camera; nothing else here needs any of it.
+		Permissions-Policy "camera=(self), geolocation=(), microphone=()"
+	}
+}

@@ -1,0 +1,87 @@
+# Production stack for a single VPS. Everything is on one machine and one network;
+# only Caddy is reachable from outside, and it is the only thing holding a certificate.
+#
+#   cp .env.prod.example .env.prod   # then fill it in on the server
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+name: molvia
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    # Deliberately not published: the database is reachable only over the compose
+    # network, so the only way in is through a container.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    # Built by CI and pulled on the server, so the machine needs neither the source nor
+    # a toolchain. `build` stays for building the same image locally.
+    image: ghcr.io/vsitchikhin/molvia-api:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_PORT: 3300
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  bot:
+    # Built by CI and pulled on the server, so the machine needs neither the source nor
+    # a toolchain. `build` stays for building the same image locally.
+    image: ghcr.io/vsitchikhin/molvia-bot:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/bot/Dockerfile
+    # on-failure, not unless-stopped: with no token the bot exits 0 on purpose, and it
+    # should then stay down instead of being restarted forever.
+    restart: on-failure
+    environment:
+      NODE_ENV: production
+      API_PORT: 3300
+      API_BASE_URL: http://api:3300
+      # Optional: a stack without a bot is a valid deployment, and the bot exits
+      # cleanly when the token is empty rather than crash-looping.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    depends_on:
+      - api
+
+  web:
+    # Built by CI and pulled on the server, so the machine needs neither the source nor
+    # a toolchain. `build` stays for building the same image locally.
+    image: ghcr.io/vsitchikhin/molvia-web:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/pwa/Dockerfile
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN}
+    ports:
+      # Overridable so the whole production stack can be tried on a machine where 80 or
+      # 443 are already taken, without editing this file.
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
