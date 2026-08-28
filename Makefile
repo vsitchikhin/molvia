@@ -15,7 +15,7 @@ endif
 REQUIRE_ENV = @test -f .env || { echo "no .env in this copy — run: make setup"; exit 1; }
 NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json is missing) — this target goes live once the workspaces land"; exit 1; }
 
-.PHONY: help setup up down reup ps logs psql migrate db-reset dev format lint typecheck test check ports
+.PHONY: help setup up down reup ps logs psql migrate db-reset dev format lint typecheck test e2e check ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -83,6 +83,10 @@ typecheck: ## Check types across the workspaces
 test: ## Run the tests
 	$(NEED_SCAFFOLD)
 	npm run test
+
+e2e: ## Run the end-to-end tests in a phone-sized browser
+	$(NEED_SCAFFOLD)
+	npm run test:e2e
 
 check: format lint typecheck test ## Definition of Done, in order
 

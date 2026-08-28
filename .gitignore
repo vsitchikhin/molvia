@@ -17,5 +17,11 @@ dist/
 dev-dist/
 *.tsbuildinfo
 
+# playwright artifacts
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
 # os / editor
 .DS_Store
