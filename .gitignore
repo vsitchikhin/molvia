@@ -1,6 +1,15 @@
+# env
+.env
+.env.*
+!.env.example
+
+# scratches for agents or smth (symlink to ../_shared/molvia/scratch)
 .scratch/
 .scratch
-.env
+
+# lavish review artifacts (symlink to ../_shared/molvia/lavish)
 .lavish/
 .lavish
 
+# os / editor
+.DS_Store
