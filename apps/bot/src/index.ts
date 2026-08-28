@@ -10,7 +10,9 @@ if (!env.TELEGRAM_BOT_TOKEN) {
   process.exit(0)
 }
 
-const api = createClient({ baseUrl: `http://127.0.0.1:${String(env.API_PORT)}` })
+const api = createClient({
+  baseUrl: env.API_BASE_URL ?? `http://127.0.0.1:${String(env.API_PORT)}`,
+})
 const bot = new Bot(env.TELEGRAM_BOT_TOKEN)
 
 bot.command('start', async (ctx) => {

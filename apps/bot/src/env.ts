@@ -10,6 +10,9 @@ try {
 
 const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3300),
+  // In production the API is a sibling container addressed by service name; locally it
+  // is a port on the loopback. One variable instead of a branch on NODE_ENV.
+  API_BASE_URL: z.url().optional(),
   TELEGRAM_BOT_TOKEN: z.string().default(''),
 })
 

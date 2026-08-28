@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "migrate": "node scripts/migrate.mjs"
+    "migrate": "tsx src/db/migrate-cli.ts",
+    "bundle": "node ../../bin/bundle.mjs api"
   },
   "dependencies": {
     "@molvia/model": "*",

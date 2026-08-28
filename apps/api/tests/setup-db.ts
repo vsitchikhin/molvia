@@ -1,11 +1,9 @@
 import process from 'node:process'
-import { fileURLToPath } from 'node:url'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import postgres from 'postgres'
+import { MIGRATIONS } from '../src/db/migrate'
 import { testDatabaseUrl } from './db'
-
-const MIGRATIONS = fileURLToPath(new URL('../drizzle', import.meta.url))
 
 /**
  * Creates the test database if it is missing and brings it up to the current migrations.
