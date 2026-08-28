@@ -3,6 +3,7 @@ import type { FastifyError, FastifyInstance } from 'fastify'
 import { DomainError, ERROR } from '@molvia/model'
 import type { ErrorCode } from '@molvia/model'
 import { healthRoutes } from './routes/health'
+import { databaseIsReachable } from './db'
 
 // The one place where a domain error becomes an HTTP status. Routes never map errors
 // themselves, so a code cannot mean 400 in one place and 404 in another.
@@ -22,8 +23,9 @@ export function buildServer(): FastifyInstance {
     return reply.status(error.statusCode ?? 500).send({ code: ERROR.INTERNAL })
   })
 
+  // The composition point: routes are handed what they need instead of importing it.
   app.register((instance, _options, done) => {
-    healthRoutes(instance)
+    healthRoutes(instance, { databaseIsReachable })
     done()
   })
 

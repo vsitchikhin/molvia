@@ -46,7 +46,7 @@ describe('HomeView', () => {
     online(true)
     health
       .mockRejectedValueOnce(new Error('boom'))
-      .mockResolvedValue({ status: 'ok', version: '1.2.3' })
+      .mockResolvedValue({ status: 'ok', version: '1.2.3', database: 'up' })
     const view = render()
     await vi.waitFor(() => {
       expect(view.text()).toContain(en.state.error)
