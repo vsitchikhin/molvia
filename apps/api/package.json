@@ -1,0 +1,22 @@
+{
+  "name": "@molvia/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "migrate": "node scripts/migrate.mjs"
+  },
+  "dependencies": {
+    "@molvia/model": "*",
+    "drizzle-orm": "^0.45.2",
+    "fastify": "^5.12.1",
+    "postgres": "^3.4.9",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.12"
+  }
+}
