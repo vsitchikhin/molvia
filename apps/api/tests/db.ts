@@ -1,7 +1,9 @@
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
+import * as schema from '../src/db/schema'
 
 // The test database is a separate database on the same server, so a test run can never
 // truncate the data entered by hand in the dev one.
@@ -22,4 +24,13 @@ export function testDatabaseUrl(): string {
 /** One short-lived connection per test file; the caller closes it in afterAll. */
 export function connect(): Sql {
   return postgres(testDatabaseUrl(), { max: 1, onnotice: () => undefined })
+}
+
+/** The same drizzle handle the app uses, pointed at the test database. */
+export function connectDrizzle(): {
+  db: ReturnType<typeof drizzle<typeof schema>>
+  close: () => Promise<void>
+} {
+  const client = connect()
+  return { db: drizzle(client, { schema }), close: () => client.end() }
 }

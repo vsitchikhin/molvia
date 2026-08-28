@@ -4,7 +4,7 @@ import type { Sql } from 'postgres'
 import { env } from '../env'
 import * as schema from './schema'
 
-type Db = ReturnType<typeof drizzle<typeof schema>>
+export type Db = ReturnType<typeof drizzle<typeof schema>>
 
 let client: Sql | undefined
 let db: Db | undefined

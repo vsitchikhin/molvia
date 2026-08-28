@@ -1,4 +1,5 @@
 export * from './errors'
 export * from './money'
 export * from './units'
+export * from './events'
 export * from './contracts'
