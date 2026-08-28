@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.prod.example
 
 # scratches for agents or smth (symlink to ../_shared/molvia/scratch)
 .scratch/
@@ -15,6 +16,8 @@
 node_modules/
 dist/
 coverage/
+certs/
+*.pem
 dev-dist/
 *.tsbuildinfo
 

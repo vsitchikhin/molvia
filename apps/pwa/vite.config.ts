@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -6,6 +8,23 @@ import Icons from 'unplugin-icons/vite'
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
 const src = fileURLToPath(new URL('./src', import.meta.url))
+
+// getUserMedia only runs in a secure context. On a desktop localhost counts, but the
+// scanner has to be tried on a real phone over the LAN, and there it does not — a
+// self-signed certificate is refused just like plain http. `make certs` issues one from
+// a locally trusted authority; without it the dev server stays on http, which is right
+// for everything except the camera.
+const certDir = fileURLToPath(new URL('./certs', import.meta.url))
+const key = `${certDir}/dev-key.pem`
+const cert = `${certDir}/dev-cert.pem`
+const https =
+  existsSync(key) && existsSync(cert)
+    ? { key: readFileSync(key), cert: readFileSync(cert) }
+    : undefined
+
+// The dev server answers on the loopback only, unless it is deliberately exposed to the
+// network for a phone to reach it: PWA_EXPOSE=1 make dev
+const exposed = process.env.PWA_EXPOSE === '1'
 
 // Ports come from the working copy's .env, so two copies never fight over one port.
 export default defineConfig(({ mode }) => {
@@ -50,7 +69,8 @@ export default defineConfig(({ mode }) => {
     server: {
       // Bound to 127.0.0.1, not to `localhost`, which may resolve to ::1 only — the API
       // and the e2e config both address this copy by its IPv4 loopback.
-      host: '127.0.0.1',
+      host: exposed ? '0.0.0.0' : '127.0.0.1',
+      ...(https ? { https } : {}),
       port: Number(env.PWA_PORT ?? 5300),
       // Without this Vite silently moves to the next free port when one is taken, and a
       // second working copy would quietly stop matching its own .env.

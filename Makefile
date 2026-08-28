@@ -15,7 +15,7 @@ endif
 REQUIRE_ENV = @test -f .env || { echo "no .env in this copy — run: make setup"; exit 1; }
 NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json is missing) — this target goes live once the workspaces land"; exit 1; }
 
-.PHONY: help setup hooks up down reup ps logs psql migrate db-reset dev format lint typecheck test e2e check icons ports
+.PHONY: help setup hooks up down reup ps logs psql migrate db-reset dev format lint typecheck test e2e check prod-build certs icons ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -97,6 +97,22 @@ e2e: ## Run the end-to-end tests in a phone-sized browser
 check: format lint typecheck test ## Definition of Done, in order
 
 ## --- misc ----------------------------------------------------------------
+
+prod-build: ## Build the production images without deploying them
+	@# The compose file demands real secrets before it will start anything, which is
+	@# right at deploy time and pointless when only building. Placeholders satisfy the
+	@# interpolation; nothing here reaches an image.
+	DOMAIN=localhost POSTGRES_DB=molvia POSTGRES_USER=molvia POSTGRES_PASSWORD=build \
+	TELEGRAM_BOT_TOKEN=build docker compose -f docker-compose.prod.yml build
+
+certs: ## Issue a locally trusted dev certificate, for testing the camera on a phone
+	@command -v mkcert >/dev/null || { \
+		echo "mkcert is not installed. brew install mkcert, then mkcert -install"; exit 1; }
+	@mkdir -p apps/pwa/certs
+	cd apps/pwa/certs && mkcert -key-file dev-key.pem -cert-file dev-cert.pem \
+		localhost 127.0.0.1 $$(ipconfig getifaddr en0 2>/dev/null || echo 127.0.0.1)
+	@echo "run the dev server on the network: PWA_EXPOSE=1 make dev"
+	@echo "the phone must trust the same authority: mkcert -CAROOT, install rootCA.pem on it"
 
 icons: ## Regenerate the app icons from the mark in favicon.svg
 	python3 bin/make-icons.py
