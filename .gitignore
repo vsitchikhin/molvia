@@ -11,5 +11,11 @@
 .lavish/
 .lavish
 
+# deps and build output
+node_modules/
+dist/
+dev-dist/
+*.tsbuildinfo
+
 # os / editor
 .DS_Store
