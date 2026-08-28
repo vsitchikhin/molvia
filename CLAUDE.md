@@ -60,15 +60,20 @@ TypeScript everywhere — **the only reason the language was chosen**: shared ty
 item, verdict and session models across PWA, API and bot. Performance was not a criterion:
 the load is I/O-bound, with three orders of magnitude of headroom.
 
-| Layer             | Choice                                              | Why this one                                                                      |
-| ----------------- | --------------------------------------------------- | --------------------------------------------------------------------------------- |
-| PWA               | Vue 3 + Vite + Pinia + vue-router + vite-plugin-pwa | less ceremony and a smaller bundle than React; the target is a phone at the shelf |
-| Styling           | Tailwind 4 + tokens in `styles/tokens.css`          |                                                                                   |
-| Scanner           | `zxing-wasm`, live viewfinder via `getUserMedia`    | we need EAN, not QR                                                               |
-| API               | Fastify + Zod                                       | Zod schemas shared with the frontend and the bot                                  |
-| DB                | PostgreSQL + Drizzle                                | schema in TS, generated migrations, honest drop into raw SQL                      |
-| Bot               | grammY                                              | distribution, auth, rating reminders                                              |
-| Receipt OCR (1.0) | separate Python service                             | the TS ecosystem has nothing here                                                 |
+| Layer             | Choice                                                  | Why this one                                                                               |
+| ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| PWA               | Vue 3 + Vite + Pinia + vue-router + vite-plugin-pwa     | less ceremony and a smaller bundle than React; the target is a phone at the shelf          |
+| Styling           | SCSS, tokens in `styles/_tokens.scss`                   | no plain CSS anywhere; tokens stay custom properties, so the dark scheme is a runtime swap |
+| Scanner           | `zxing-wasm`, live viewfinder via `getUserMedia`        | we need EAN, not QR                                                                        |
+| API               | Fastify + Zod                                           | Zod schemas shared with the frontend and the bot                                           |
+| DB                | PostgreSQL + Drizzle                                    | schema in TS, generated migrations, honest drop into raw SQL                               |
+| Bot               | grammY                                                  | distribution, auth, rating reminders                                                       |
+| Receipt OCR (1.0) | separate Python service                                 | the TS ecosystem has nothing here                                                          |
+| Tests             | Vitest (domain, use case, component) + Playwright (e2e) | three vitest projects, so the domain keeps running without a DOM                           |
+| Lint              | ESLint 9 type-aware + Stylelint + Prettier              | strictest tier; SFCs go through the same type checker as `.ts`                             |
+
+**Tailwind was dropped.** Not one utility class was in use — everything is styled with
+scoped SCSS through tokens — and its CSS-first `@import` cannot pass through Sass.
 
 **Postgres does the heavy lifting:** `pg_trgm` for typos, `unaccent` for transliteration,
 GIN index; aggregates (average ratings, minimum price, store index) are plain SQL.
@@ -93,6 +98,7 @@ make down        # stop the stack, keeping the data
 make psql        # psql inside this copy's database
 make db-reset    # drop this copy's volume and start clean (DESTRUCTIVE)
 make dev         # run api, pwa and bot
+make e2e         # end-to-end tests in a phone-sized browser
 make check       # format -> lint -> typecheck -> test, in order
 make ports       # this copy's index and ports
 ```
@@ -172,13 +178,17 @@ database access. In a product about data integrity, two write paths will silentl
 
 - **The target device is a phone in one hand, at the shelf, in bad light.**
   Everything is designed from there; desktop is derived.
-- **Tokens live in one file.** Components use variables only: not a single hardcoded hex,
-  not a single magic spacing off the scale.
+- **Tokens live in one file** (`styles/_tokens.scss`). Components use variables only:
+  not a single hardcoded hex, not a single magic spacing off the scale. Stylelint enforces
+  both — a literal colour or an off-scale padding fails `make lint`.
+- **Everything is SCSS.** There is no plain CSS in the project.
 - Touch target >= 44px. The primary action is reachable with a thumb.
 - **Every screen has four states:** loading, empty, error, offline. The empty state is not
   "no data" but an offer to act.
-- **`<script setup>` and the Composition API only.** Stateful logic goes into composables,
-  not into components.
+- **Every SFC is one file in one fixed order:** `<template>`, then `<script lang="ts">`
+  exporting a `defineComponent`, then `<style scoped lang="scss">`. The linter keeps the
+  order, both languages and the `scoped` attribute; none of it is left to memory.
+  Stateful logic goes into composables, not into components.
 - **Not a single string of text in the markup — everything through i18n keys, from day one.**
   The plan assumes expanding to other languages without rebranding; hardcoded strings are
   the cheapest mistake today and the most expensive one a year from now.
@@ -208,11 +218,16 @@ database access. In a product about data integrity, two write paths will silentl
 
 ## Testing
 
-| Layer       | What it covers                            | Dependencies             |
-| ----------- | ----------------------------------------- | ------------------------ |
-| Unit        | pure rules from `packages/model`          | nothing but the domain   |
-| Use case    | `usecases`                                | fake repositories, no DB |
-| Integration | schema, search, aggregates, HTTP contract | a real Postgres          |
+| Layer       | Where                   | What it covers                            | Dependencies                             |
+| ----------- | ----------------------- | ----------------------------------------- | ---------------------------------------- |
+| Unit        | `packages/**/*.test.ts` | pure rules from `packages/model`          | nothing but the domain                   |
+| Use case    | `apps/api/**/*.test.ts` | `usecases`                                | fake repositories, no DB                 |
+| Component   | `apps/pwa/**/*.test.ts` | rendering and the four screen states      | happy-dom, `@vue/test-utils`, API mocked |
+| Integration | `apps/api/**/*.test.ts` | schema, search, aggregates, HTTP contract | a real Postgres                          |
+| End-to-end  | `e2e/**/*.spec.ts`      | the whole stack through a browser         | Playwright starts api and pwa itself     |
+
+**End-to-end runs in a phone profile only.** The product is designed for a phone at a
+shelf, so a desktop-only pass would prove nothing about the screen that matters.
 
 - **Catalogue search is tested only against a real Postgres.** `pg_trgm` and `unaccent`
   cannot be faked, and they are exactly what breaks.
