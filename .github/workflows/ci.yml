@@ -17,6 +17,25 @@ jobs:
   check:
     name: format, lint, types, tests
     runs-on: ubuntu-latest
+
+    # Integration tests run against a real Postgres: pg_trgm and unaccent cannot be
+    # faked, and they are exactly what catalogue search will stand on. The port and the
+    # credentials match what bin/init-env.sh writes, so CI and a working copy agree.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: molvia_0
+          POSTGRES_USER: molvia
+          POSTGRES_PASSWORD: molvia
+        ports:
+          - 5500:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
