@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--surface);
+  -webkit-font-smoothing: antialiased;
+}

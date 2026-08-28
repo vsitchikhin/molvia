@@ -1,0 +1,23 @@
+{
+  "app": { "name": "Molvia" },
+  "state": {
+    "loading": "Loading…",
+    "offline": "No connection. Data will appear once you are back online",
+    "error": "The server did not answer",
+    "retry": "Try again"
+  },
+  "home": {
+    "title": "What to buy",
+    "empty": "Nothing rated yet. Start with your first purchase",
+    "empty_action": "Add a verdict",
+    "connected": "Server is up, version {version}"
+  },
+  "error": {
+    "invalid_amount": "That does not look like an amount",
+    "invalid_quantity": "That does not look like a quantity",
+    "currency_mismatch": "Amounts in different currencies cannot be added",
+    "unit_mismatch": "Prices in different units cannot be compared",
+    "not_found": "Not found",
+    "internal": "Something went wrong"
+  }
+}

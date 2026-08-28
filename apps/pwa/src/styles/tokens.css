@@ -1,0 +1,42 @@
+/*
+ * The only place a colour, a radius or a step of the spacing scale is defined.
+ * Components reference variables and never a literal: a hardcoded hex is a lint-level
+ * mistake here, not a matter of taste.
+ *
+ * The target device is a phone in one hand, at a shelf, in bad light — hence the
+ * contrast, the 44px touch target and the dark scheme carrying equal weight.
+ */
+:root {
+  --surface: #ffffff;
+  --surface-sunken: #f4f4f6;
+  --border: #dcdce2;
+  --text: #1b1b1f;
+  --text-muted: #63636b;
+  --accent: #2a78d6;
+  --good: #1baf7a;
+  --warn: #d99100;
+  --bad: #d64545;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  --radius: 0.75rem;
+  --touch-target: 2.75rem; /* 44px — the smallest thing a thumb hits reliably */
+
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #16161a;
+    --surface-sunken: #1e1e24;
+    --border: #33333c;
+    --text: #f2f2f5;
+    --text-muted: #a0a0aa;
+    --accent: #5fa3ec;
+  }
+}
