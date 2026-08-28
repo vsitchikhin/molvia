@@ -80,6 +80,29 @@ native scanner only reads QR. Native is a 1.0 question.
 **Exchange rates:** official ones from the open CBA API; real exchange rates from users.
 Scraping rate.am was rejected.
 
+## Commands
+
+**The Makefile is the canonical entry point** — prefer a `make` target over a raw script.
+`bin/` only holds sub-operations the Makefile does not cover. `make` with no target
+prints the list.
+
+```bash
+make setup       # fresh copy: symlinks, .env, dependencies
+make up          # start Postgres and apply migrations
+make down        # stop the stack, keeping the data
+make psql        # psql inside this copy's database
+make db-reset    # drop this copy's volume and start clean (DESTRUCTIVE)
+make dev         # run api, pwa and bot
+make check       # format -> lint -> typecheck -> test, in order
+make ports       # this copy's index and ports
+```
+
+Ports, database name and compose project all come from `.env`, so `make` behaves
+differently in every working copy by design.
+
+Targets that need the scaffold report that it is missing instead of failing obscurely —
+the repository has no `package.json` yet.
+
 ## Architecture
 
 npm workspaces monorepo. A pure core with thin adapters — no DI container and no ports
@@ -210,7 +233,7 @@ database access. In a product about data integrity, two write paths will silentl
 
 ### After a task
 
-**Definition of Done:** `make format` -> `make lint` -> `make typecheck` -> `make test`,
+**Definition of Done:** `make check` — `format` -> `lint` -> `typecheck` -> `test`,
 all green. Run them once after the entire plan, not after each step: `format` mutates files
 and would otherwise hide real lint errors.
 
@@ -236,9 +259,14 @@ Migrations that lose data, swapping a stack element, CI changes, refactoring out
 
 ## State
 
-There is no scaffold yet: the repository holds only the rules. The first steps are at the
-end of `.scratch/docs/product-plan.md`. The `make` targets in the Definition of Done are a
-contract for when the scaffold appears; the Makefile itself does not exist yet.
+There is no application code yet: the repository holds the rules, the Makefile and the
+dev stack. The first steps are at the end of `.scratch/docs/product-plan.md`.
+
+`docker-compose.yml` runs Postgres only. The api / pwa / bot services join it once the
+scaffold exists; in development they are meant to run natively anyway — HMR and a debugger
+attached to a host process beat a rebuild inside a container. Extensions (`pg_trgm`,
+`unaccent`) are deliberately not created by an init script: the schema belongs to
+migrations, and a second source of truth for it would drift.
 
 ## Several clones in parallel
 
@@ -250,14 +278,14 @@ a shared object store, nothing is re-fetched, and one branch physically cannot b
 out in two copies. A full clone is only needed when an independent `.git` is required
 (an experiment with history, for instance).
 
-**After every new copy — two scripts:**
+**After every new copy — one command:**
 
 ```bash
-bin/link-shared.sh   # .scratch and .lavish -> the shared directory. Idempotent
-bin/init-env.sh      # .env with non-overlapping ports and its own database
+make setup   # bin/link-shared.sh, then bin/init-env.sh, then npm install
 ```
 
-`init-env.sh` takes the index from the directory name (`molvia` -> 0, `molvia2` -> 2) or
+`bin/link-shared.sh` points `.scratch` and `.lavish` at the shared directory and is
+idempotent. `bin/init-env.sh` takes the index from the directory name (`molvia` -> 0, `molvia2` -> 2) or
 from an argument, computes the ports and warns if they are already taken. It does not
 overwrite an existing `.env` without `--force`.
 
