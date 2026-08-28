@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { ERROR } from './errors'
 import { money, parseMoney } from './money'
-import { UNIT_PRICE_SCALE, compareUnitPrice, parseQuantity, unitPrice } from './units'
+import {
+  UNIT_PRICE_SCALE,
+  compareUnitPrice,
+  formatUnitPrice,
+  parseQuantity,
+  unitPrice,
+} from './units'
 
 describe('parseQuantity', () => {
   it('reduces every unit to thousandths of its base unit', () => {
@@ -50,5 +56,22 @@ describe('unitPrice', () => {
     expect(() => unitPrice(money(1n, 'AMD'), { milli: 0n, unit: 'kg' })).toThrow(
       expect.objectContaining({ code: ERROR.INVALID_QUANTITY }),
     )
+  })
+})
+
+describe('formatUnitPrice', () => {
+  const digits = (text: string): string => text.replace(/[\s\u00a0\u202f]/g, '')
+
+  it('reads back the shelf price per unit', () => {
+    const price = unitPrice(parseMoney('5403.12', 'AMD'), parseQuantity('1.128', 'kg'))
+    const text = formatUnitPrice(price)
+    expect(digits(text)).toContain('4790,00')
+    expect(text.endsWith('/kg')).toBe(true)
+  })
+
+  it('rounds only here, and only to the minor unit', () => {
+    // 520 for 0.9 l is 577.77… per litre; the repeating tail must not reach the user.
+    const price = unitPrice(parseMoney('520', 'AMD'), parseQuantity('0.9', 'l'))
+    expect(digits(formatUnitPrice(price))).toContain('577,78')
   })
 })

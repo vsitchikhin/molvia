@@ -9,6 +9,23 @@ const pwaSrc = fileURLToPath(new URL('./apps/pwa/src', import.meta.url))
 // and a component test must not be able to reach a real database by accident.
 export default defineConfig({
   test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary', 'html'],
+      include: ['apps/*/src/**', 'packages/*/src/**'],
+      exclude: ['**/*.test.ts', '**/main.ts', '**/index.html'],
+      // A threshold only where coverage means something. The domain is pure functions
+      // with no excuse for an untested branch; a Vue view or a bootstrap file would just
+      // be gamed into compliance.
+      thresholds: {
+        'packages/model/src/**': {
+          statements: 90,
+          branches: 85,
+          functions: 90,
+          lines: 90,
+        },
+      },
+    },
     projects: [
       {
         test: { name: 'domain', include: ['packages/**/*.test.ts'], environment: 'node' },

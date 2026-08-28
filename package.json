@@ -20,6 +20,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit && vue-tsc --noEmit -p apps/pwa/tsconfig.json",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "migrate": "npm run migrate -w @molvia/api"
   },
@@ -27,6 +28,7 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@types/node": "^26.4.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "@vue/eslint-config-typescript": "^14.9.0",
     "@vue/test-utils": "^2.5.0",
     "concurrently": "^10.0.5",
