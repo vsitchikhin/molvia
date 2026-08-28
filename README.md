@@ -71,6 +71,11 @@ cd ../molvia2 && make setup
 Each copy needs its own Telegram bot: two processes on one token steal each other's
 updates silently.
 
+## Deployment
+
+One VPS, one compose file, Caddy holding the certificate. CI publishes three images to
+GHCR on a tag; the deploy is two commands on the machine. See `deploy/README.md`.
+
 ## Where the documents are
 
 `CLAUDE.md` — architecture and rules, in the repository.

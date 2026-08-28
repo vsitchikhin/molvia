@@ -100,6 +100,8 @@ make db-reset    # drop this copy's volume and start clean (DESTRUCTIVE)
 make dev         # run api, pwa and bot
 make e2e         # end-to-end tests in a phone-sized browser
 make icons       # regenerate the app icons from favicon.svg
+make certs       # locally trusted dev certificate, for the camera on a real phone
+make prod-build  # build the production images without deploying them
 make check       # format -> lint -> typecheck -> test, in order
 make ports       # this copy's index and ports
 ```
@@ -313,6 +315,33 @@ scaffold exists; in development they are meant to run natively anyway — HMR an
 attached to a host process beat a rebuild inside a container. Extensions (`pg_trgm`,
 `unaccent`) are deliberately not created by an init script: the schema belongs to
 migrations, and a second source of truth for it would drift.
+
+## Deployment
+
+One VPS, one compose file, Caddy holding the certificate — see `deploy/README.md`.
+The shape worth knowing here:
+
+- **`api` and `bot` ship as a single bundled file each** (`bin/bundle.mjs`, esbuild). The
+  runtime image carries no `node_modules` at all: nothing to audit and nothing that can
+  drift from the lockfile it was built with. It also sidesteps the fact that the workspace
+  packages export TypeScript source, which a runtime image could not read.
+- **Migrations run when the API starts.** There is one instance, and a schema that lags
+  the code deployed against it is the worse of the two failures. `make migrate`, the test
+  setup and the boot path all go through the same code, so a migration cannot behave one
+  way locally and another in production.
+- **Postgres publishes no port.** It is reachable only over the compose network.
+- **The PWA calls `/api/...`** and Caddy strips the prefix — the same shape the Vite dev
+  proxy has, so nothing about the origin differs between development and production.
+- **No deploy workflow.** Images are published to GHCR on a tag; the deploy itself is two
+  commands on the machine. A deploy job with no machine to deploy to would look like a
+  safety net without being one.
+
+## Camera on a real phone
+
+`getUserMedia` only runs in a secure context, and over the LAN a self-signed certificate
+is refused exactly like plain http. `make certs` issues one from a locally trusted
+authority (mkcert); `PWA_EXPOSE=1 make dev` puts the dev server on the network. Without a
+certificate the dev server stays on http, which is right for everything except the camera.
 
 ## Several clones in parallel
 
