@@ -34,12 +34,12 @@ Gyumri and Yerevan, the Russian-speaking diaspora.
 
 ## Gates with kill thresholds
 
-| | Question | Stop |
-|---|---|---|
-| 0.1 | Will I use this myself? | I stop entering data 2 weeks in a row |
-| 0.2 | Do strangers fill the base? | <20% reach 5 ratings within 2 weeks |
+|     | Question                                   | Stop                                                                |
+| --- | ------------------------------------------ | ------------------------------------------------------------------- |
+| 0.1 | Will I use this myself?                    | I stop entering data 2 weeks in a row                               |
+| 0.2 | Do strangers fill the base?                | <20% reach 5 ratings within 2 weeks                                 |
 | 0.3 | Do they come back for other people's data? | <15% week-4 return, **measured separately** for products and venues |
-| 1.0 | — | scaling what is proven |
+| 1.0 | —                                          | scaling what is proven                                              |
 
 The counters for these thresholds must exist **before the first 0.2 feature**, otherwise
 the gates are decorative and the project loses the ability to fail on time.
@@ -60,15 +60,15 @@ TypeScript everywhere — **the only reason the language was chosen**: shared ty
 item, verdict and session models across PWA, API and bot. Performance was not a criterion:
 the load is I/O-bound, with three orders of magnitude of headroom.
 
-| Layer | Choice | Why this one |
-|---|---|---|
-| PWA | Vue 3 + Vite + Pinia + vue-router + vite-plugin-pwa | less ceremony and a smaller bundle than React; the target is a phone at the shelf |
-| Styling | Tailwind 4 + tokens in `styles/tokens.css` | |
-| Scanner | `zxing-wasm`, live viewfinder via `getUserMedia` | we need EAN, not QR |
-| API | Fastify + Zod | Zod schemas shared with the frontend and the bot |
-| DB | PostgreSQL + Drizzle | schema in TS, generated migrations, honest drop into raw SQL |
-| Bot | grammY | distribution, auth, rating reminders |
-| Receipt OCR (1.0) | separate Python service | the TS ecosystem has nothing here |
+| Layer             | Choice                                              | Why this one                                                                      |
+| ----------------- | --------------------------------------------------- | --------------------------------------------------------------------------------- |
+| PWA               | Vue 3 + Vite + Pinia + vue-router + vite-plugin-pwa | less ceremony and a smaller bundle than React; the target is a phone at the shelf |
+| Styling           | Tailwind 4 + tokens in `styles/tokens.css`          |                                                                                   |
+| Scanner           | `zxing-wasm`, live viewfinder via `getUserMedia`    | we need EAN, not QR                                                               |
+| API               | Fastify + Zod                                       | Zod schemas shared with the frontend and the bot                                  |
+| DB                | PostgreSQL + Drizzle                                | schema in TS, generated migrations, honest drop into raw SQL                      |
+| Bot               | grammY                                              | distribution, auth, rating reminders                                              |
+| Receipt OCR (1.0) | separate Python service                             | the TS ecosystem has nothing here                                                 |
 
 **Postgres does the heavy lifting:** `pg_trgm` for typos, `unaccent` for transliteration,
 GIN index; aggregates (average ratings, minimum price, store index) are plain SQL.
@@ -109,18 +109,26 @@ npm workspaces monorepo. A pure core with thin adapters — no DI container and 
 layer: the core is tested directly.
 
 ```
-apps/
+apps/                     TypeScript workspaces
   api/          Fastify
     src/routes/     HTTP: parse -> call the use case -> respond. Zero business logic
     src/usecases/   scenarios: orchestrate domain and repositories
     src/db/         Drizzle schema, migrations, repositories — the only place with SQL
-  pwa/          Vue 3
+  pwa/          Vue 3 + Vite: views, composables, styles/tokens.css, i18n
   bot/          grammY, a client of the API
 packages/
-  model/        domain: types, Zod schemas, pure rules (verdict, normalization,
-                unit price, conversion). Dependencies: zod only
+  model/        domain: types, Zod schemas, pure rules (money, units, errors,
+                and the verdict once it exists). Dependencies: zod only
   client/       typed API client built on the model schemas
+services/                 anything that is not a TypeScript workspace
+  receipt-ocr/  Python, 1.0, not started
 ```
+
+`services/` is separate from `apps/` on purpose: a different runtime is a different
+boundary, and it should be visible in the tree rather than only in the docs.
+
+Packages export their TypeScript source (`"exports": "./src/index.ts"`), so there is no
+build step between a change in the domain and the app that uses it.
 
 **Boundary rules — enforced by the linter, not by eye:**
 
@@ -200,11 +208,11 @@ database access. In a product about data integrity, two write paths will silentl
 
 ## Testing
 
-| Layer | What it covers | Dependencies |
-|---|---|---|
-| Unit | pure rules from `packages/model` | nothing but the domain |
-| Use case | `usecases` | fake repositories, no DB |
-| Integration | schema, search, aggregates, HTTP contract | a real Postgres |
+| Layer       | What it covers                            | Dependencies             |
+| ----------- | ----------------------------------------- | ------------------------ |
+| Unit        | pure rules from `packages/model`          | nothing but the domain   |
+| Use case    | `usecases`                                | fake repositories, no DB |
+| Integration | schema, search, aggregates, HTTP contract | a real Postgres          |
 
 - **Catalogue search is tested only against a real Postgres.** `pg_trgm` and `unaccent`
   cannot be faked, and they are exactly what breaks.
@@ -259,8 +267,10 @@ Migrations that lose data, swapping a stack element, CI changes, refactoring out
 
 ## State
 
-There is no application code yet: the repository holds the rules, the Makefile and the
-dev stack. The first steps are at the end of `.scratch/docs/product-plan.md`.
+The scaffold exists and `make check` is green on it; there are no features yet. The domain
+already holds the two rules everything else will lean on — money in minor units and unit
+price — with tests written from real receipts. The first steps are at the end of
+`.scratch/docs/product-plan.md`.
 
 `docker-compose.yml` runs Postgres only. The api / pwa / bot services join it once the
 scaffold exists; in development they are meant to run natively anyway — HMR and a debugger
@@ -291,20 +301,20 @@ overwrite an existing `.env` without `--force`.
 
 **What is shared and what is per-copy:**
 
-| | Where | Why |
-|---|---|---|
-| Plan, task plans, lavish | shared, `../_shared/molvia/` | one truth for all copies; survives deleting any of them |
-| Branch, `node_modules`, `.env` | per-copy | otherwise the copies are not independent |
-| Ports, database, bot | per-copy, spread by `CLONE_INDEX` | see below |
+|                                | Where                             | Why                                                     |
+| ------------------------------ | --------------------------------- | ------------------------------------------------------- |
+| Plan, task plans, lavish       | shared, `../_shared/molvia/`      | one truth for all copies; survives deleting any of them |
+| Branch, `node_modules`, `.env` | per-copy                          | otherwise the copies are not independent                |
+| Ports, database, bot           | per-copy, spread by `CLONE_INDEX` | see below                                               |
 
 **Isolation between copies rests on `CLONE_INDEX` from `.env`.** Ports are base plus
 `CLONE_INDEX*10`; the database and compose project names get a suffix. The main copy is `0`.
 
-| | Copy 0 | Copy 2 |
-|---|---|---|
-| API | 3300 | 3320 |
-| PWA | 5300 | 5320 |
-| Postgres | 5500 | 5520 |
+|          | Copy 0     | Copy 2     |
+| -------- | ---------- | ---------- |
+| API      | 3300       | 3320       |
+| PWA      | 5300       | 5320       |
+| Postgres | 5500       | 5520       |
 | Database | `molvia_0` | `molvia_2` |
 
 Molvia has its own port band rather than the defaults: the machine already has the work
