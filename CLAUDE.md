@@ -44,6 +44,12 @@ Gyumri and Yerevan, the Russian-speaking diaspora.
 The counters for these thresholds must exist **before the first 0.2 feature**, otherwise
 the gates are decorative and the project loses the ability to fail on time.
 
+The `events` table is that groundwork, and it holds only what no domain table can answer:
+whether someone came back, and to look at what. The 0.2 threshold is a query over
+verdicts, not an event — anything a domain table already knows must never be duplicated
+into the log. Nothing updates or deletes from it, the gate queries are its only readers,
+and each is pinned by an integration test, boundary days included.
+
 ## Money
 
 Access is a monthly resource: ~10 ratings = a month, or $1. Contribution does not expire
