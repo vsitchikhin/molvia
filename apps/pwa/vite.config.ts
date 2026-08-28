@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
+import Icons from 'unplugin-icons/vite'
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
 const src = fileURLToPath(new URL('./src', import.meta.url))
@@ -13,6 +14,10 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       vue(),
+      // MDI through Iconify: icons are inlined as components at build time, so only the
+      // ones actually used ship, no icon font is downloaded, and colour comes from
+      // currentColor — which means they obey the tokens like any other element.
+      Icons({ compiler: 'vue3' }),
       VitePWA({
         registerType: 'autoUpdate',
         manifest: {
@@ -22,6 +27,16 @@ export default defineConfig(({ mode }) => {
           display: 'standalone',
           theme_color: '#1b1b1f',
           background_color: '#ffffff',
+          icons: [
+            { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+            { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+            {
+              src: 'maskable-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+          ],
         },
       }),
     ],

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Molvia">
+  <!-- Placeholder mark until there is real branding. The check is the verdict: the one
+       thing the product exists to give. Colours are the tokens --surface and --good. -->
+  <rect width="512" height="512" rx="112" fill="#1b1b1f" />
+  <path
+    d="M140 268 L212 340 L372 180"
+    fill="none"
+    stroke="#1baf7a"
+    stroke-width="56"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

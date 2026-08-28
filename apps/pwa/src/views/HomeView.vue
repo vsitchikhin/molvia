@@ -6,7 +6,10 @@
 
     <template v-else-if="state === 'offline' || state === 'error'">
       <p class="muted">{{ state === 'offline' ? t('state.offline') : t('state.error') }}</p>
-      <button class="button" type="button" @click="load">{{ t('state.retry') }}</button>
+      <button class="button" type="button" @click="load">
+        <IconRefresh class="icon" aria-hidden="true" />
+        {{ t('state.retry') }}
+      </button>
     </template>
 
     <template v-else>
@@ -20,6 +23,7 @@
 <script lang="ts">
 import { defineComponent, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconRefresh from '~icons/mdi/refresh'
 import { api } from '@/api'
 
 // Every screen has four states, offline included: the target is a phone at a shelf,
@@ -28,6 +32,7 @@ type State = 'loading' | 'offline' | 'error' | 'ready'
 
 export default defineComponent({
   name: 'HomeView',
+  components: { IconRefresh },
   setup() {
     const { t } = useI18n()
     const state = ref<State>('loading')
@@ -70,6 +75,7 @@ export default defineComponent({
 .button {
   @include touch-target;
 
+  gap: var(--space-2);
   padding: 0 var(--space-4);
   border: none;
   border-radius: var(--radius);
@@ -77,5 +83,10 @@ export default defineComponent({
   color: var(--surface);
   font: inherit;
   font-weight: 600;
+}
+
+.icon {
+  width: 1.25em;
+  height: 1.25em;
 }
 </style>
