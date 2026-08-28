@@ -1,0 +1,36 @@
+# Dev stack for one working copy. The project name and every port come from .env,
+# so parallel copies never collide: containers, network and volume are all namespaced
+# by COMPOSE_PROJECT, and the volume therefore holds a separate database per copy.
+#
+# Only Postgres lives here for now. The api / pwa / bot services join once the scaffold
+# exists; in development they are meant to run natively anyway — HMR and a debugger
+# attached to a process on the host beat a rebuild inside a container.
+#
+# Extensions (pg_trgm, unaccent) are NOT created here: the schema belongs to migrations,
+# and an init script would quietly become a second source of truth.
+
+name: ${COMPOSE_PROJECT:-molvia_0}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: ${COMPOSE_PROJECT:-molvia_0}-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-molvia_0}
+      POSTGRES_USER: ${POSTGRES_USER:-molvia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-molvia}
+    ports:
+      # bound to loopback on purpose — the dev database is not exposed to the network
+      - "127.0.0.1:${POSTGRES_PORT:-5500}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-molvia} -d $${POSTGRES_DB:-molvia_0}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  pgdata:
