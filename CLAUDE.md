@@ -92,7 +92,7 @@ Scraping rate.am was rejected.
 prints the list.
 
 ```bash
-make setup       # fresh copy: symlinks, .env, dependencies
+make setup       # fresh copy: symlinks, .env, dependencies, git hooks
 make up          # start Postgres and apply migrations
 make down        # stop the stack, keeping the data
 make psql        # psql inside this copy's database
@@ -106,8 +106,18 @@ make ports       # this copy's index and ports
 Ports, database name and compose project all come from `.env`, so `make` behaves
 differently in every working copy by design.
 
-Targets that need the scaffold report that it is missing instead of failing obscurely —
-the repository has no `package.json` yet.
+### Gates that run without being asked
+
+- **Hooks** (`.githooks`, wired by `make setup`, no husky). `pre-commit` refuses a commit
+  whose formatting or lint is dirty; `pre-push` refuses a push whose types or tests —
+  end-to-end included — are not green. The slow checks sit at push because that is when
+  the work leaves the machine. A deliberate bypass is `--no-verify`; needing it twice in a
+  row means the rule is wrong and should be changed, not dodged.
+- **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, in two
+  jobs: checks and e2e. CI **checks** formatting rather than fixing it — `make format`
+  mutates files, and a diff must fail rather than be silently repaired. It generates its
+  `.env` with the same `bin/init-env.sh` every working copy uses, so CI cannot drift from
+  local setup.
 
 ## Architecture
 
