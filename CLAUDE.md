@@ -99,6 +99,7 @@ make psql        # psql inside this copy's database
 make db-reset    # drop this copy's volume and start clean (DESTRUCTIVE)
 make dev         # run api, pwa and bot
 make e2e         # end-to-end tests in a phone-sized browser
+make icons       # regenerate the app icons from favicon.svg
 make check       # format -> lint -> typecheck -> test, in order
 make ports       # this copy's index and ports
 ```
@@ -192,6 +193,11 @@ database access. In a product about data integrity, two write paths will silentl
   not a single hardcoded hex, not a single magic spacing off the scale. Stylelint enforces
   both — a literal colour or an off-scale padding fails `make lint`.
 - **Everything is SCSS.** There is no plain CSS in the project.
+- **Interface icons come from MDI** through `unplugin-icons`: inlined as components at
+  build time, so only what is used ships, no icon font is fetched, and colour comes from
+  `currentColor` — they obey the tokens like anything else. The app icon is different:
+  `apps/pwa/public/favicon.svg` is the source, `make icons` rasterises the manifest PNGs,
+  and the mark is a placeholder until there is real branding.
 - Touch target >= 44px. The primary action is reachable with a thumb.
 - **Every screen has four states:** loading, empty, error, offline. The empty state is not
   "no data" but an offer to act.
@@ -228,19 +234,22 @@ database access. In a product about data integrity, two write paths will silentl
 
 ## Testing
 
-| Layer       | Where                   | What it covers                            | Dependencies                             |
-| ----------- | ----------------------- | ----------------------------------------- | ---------------------------------------- |
-| Unit        | `packages/**/*.test.ts` | pure rules from `packages/model`          | nothing but the domain                   |
-| Use case    | `apps/api/**/*.test.ts` | `usecases`                                | fake repositories, no DB                 |
-| Component   | `apps/pwa/**/*.test.ts` | rendering and the four screen states      | happy-dom, `@vue/test-utils`, API mocked |
-| Integration | `apps/api/**/*.test.ts` | schema, search, aggregates, HTTP contract | a real Postgres                          |
-| End-to-end  | `e2e/**/*.spec.ts`      | the whole stack through a browser         | Playwright starts api and pwa itself     |
+| Layer       | Where                               | What it covers                            | Dependencies                             |
+| ----------- | ----------------------------------- | ----------------------------------------- | ---------------------------------------- |
+| Unit        | `packages/**/*.test.ts`             | pure rules from `packages/model`          | nothing but the domain                   |
+| Use case    | `apps/api/**/*.test.ts`             | `usecases`                                | fake repositories, no DB                 |
+| Component   | `apps/pwa/**/*.test.ts`             | rendering and the four screen states      | happy-dom, `@vue/test-utils`, API mocked |
+| Integration | `apps/api/**/*.integration.test.ts` | schema, search, aggregates, HTTP contract | a real Postgres                          |
+| End-to-end  | `e2e/**/*.spec.ts`                  | the whole stack through a browser         | Playwright starts api and pwa itself     |
 
 **End-to-end runs in a phone profile only.** The product is designed for a phone at a
 shelf, so a desktop-only pass would prove nothing about the screen that matters.
 
 - **Catalogue search is tested only against a real Postgres.** `pg_trgm` and `unaccent`
-  cannot be faked, and they are exactly what breaks.
+  cannot be faked, and they are exactly what breaks. Integration tests run against a
+  **separate database** on the same server (`molvia_<index>_test`), created and migrated
+  by the vitest global setup — a test run can never truncate data entered by hand. This is
+  why `make check` needs `make up` first, and why CI runs a Postgres service.
 - **When a test fails, look for the bug in the code first** — do not adjust the test to
   match the behaviour. A test proves the app works, not the other way round.
 - **Maximize corner cases.** Mandatory checklist:
@@ -292,7 +301,9 @@ Migrations that lose data, swapping a stack element, CI changes, refactoring out
 
 ## State
 
-The scaffold exists and `make check` is green on it; there are no features yet. The domain
+The scaffold exists and `make check` is green on it; there are no features yet. The one
+migration enables `pg_trgm` and `unaccent` — extensions belong to migrations, so a fresh
+database is identical everywhere. The domain
 already holds the two rules everything else will lean on — money in minor units and unit
 price — with tests written from real receipts. The first steps are at the end of
 `.scratch/docs/product-plan.md`.
