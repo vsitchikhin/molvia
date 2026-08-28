@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Refuses a push whose types or tests are not green — every layer, end-to-end included.
+# The push is the moment the work leaves this machine, so it is the right place for the
+# slow checks; the fast ones already ran at commit time.
+#
+# Deliberate bypass: git push --no-verify
+
+set -euo pipefail
+
+echo "pre-push: types"
+npm run --silent typecheck
+
+echo "pre-push: unit and component tests"
+npm run --silent test
+
+echo "pre-push: end-to-end"
+npm run --silent test:e2e
+
+echo "pre-push: green"

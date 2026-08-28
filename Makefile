@@ -15,7 +15,7 @@ endif
 REQUIRE_ENV = @test -f .env || { echo "no .env in this copy — run: make setup"; exit 1; }
 NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json is missing) — this target goes live once the workspaces land"; exit 1; }
 
-.PHONY: help setup up down reup ps logs psql migrate db-reset dev format lint typecheck test e2e check ports
+.PHONY: help setup hooks up down reup ps logs psql migrate db-reset dev format lint typecheck test e2e check ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -27,6 +27,12 @@ setup: ## Prepare a fresh working copy: symlinks, .env, dependencies
 	./bin/link-shared.sh
 	@test -f .env && echo ".env already exists, keeping it" || ./bin/init-env.sh
 	@if [ -f package.json ]; then npm install; else echo "no scaffold yet — skipping npm install"; fi
+	$(MAKE) --no-print-directory hooks
+
+hooks: ## Point git at the repository's hooks (per clone; worktrees share it)
+	git config core.hooksPath .githooks
+	@echo "hooks: pre-commit checks format and lint, pre-push runs types and every test"
+	@echo "       bypass a single run with --no-verify"
 
 ## --- dev stack -----------------------------------------------------------
 

@@ -15,12 +15,13 @@
     "dev:pwa": "npm run dev -w @molvia/pwa",
     "dev:bot": "npm run dev -w @molvia/bot",
     "lint": "eslint . && stylelint \"**/*.{css,scss,vue}\"",
+    "lint:style": "stylelint \"**/*.{css,scss,vue}\"",
     "format": "prettier --write . && eslint . --fix && stylelint \"**/*.{css,scss,vue}\" --fix",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit && vue-tsc --noEmit -p apps/pwa/tsconfig.json",
     "test": "vitest run",
-    "migrate": "npm run migrate -w @molvia/api",
-    "lint:style": "stylelint \"**/*.{css,scss,vue}\"",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "migrate": "npm run migrate -w @molvia/api"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
