@@ -7,7 +7,7 @@
  * contrast, the 44px touch target and the dark scheme carrying equal weight.
  */
 :root {
-  --surface: #ffffff;
+  --surface: #fff;
   --surface-sunken: #f4f4f6;
   --border: #dcdce2;
   --text: #1b1b1f;
@@ -27,7 +27,7 @@
   --radius: 0.75rem;
   --touch-target: 2.75rem; /* 44px — the smallest thing a thumb hits reliably */
 
-  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font: system-ui, -apple-system, 'Segoe UI', 'Roboto', sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {

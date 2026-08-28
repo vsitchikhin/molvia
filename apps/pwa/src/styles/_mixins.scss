@@ -1,0 +1,26 @@
+// Injected into every component's <style lang="scss"> by vite.config.ts, so a component
+// never has to remember to import it. Tokens stay CSS custom properties: they must be
+// swappable at runtime for the dark scheme, which a Sass variable cannot do.
+
+/// Anything a thumb has to hit at a shelf, in bad light.
+@mixin touch-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-target);
+  min-width: var(--touch-target);
+}
+
+/// The one surface every card, sheet and list row is built from.
+@mixin surface {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/// The target device is a phone; anything wider is the exception, so it is opt-in.
+@mixin wider-than-phone {
+  @media (width >= 40rem) {
+    @content;
+  }
+}

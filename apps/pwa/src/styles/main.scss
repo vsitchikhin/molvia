@@ -1,0 +1,18 @@
+// The single entry point. Tokens first: everything below, and every component, reads
+// them as CSS custom properties, which is what makes the dark scheme a runtime swap
+// rather than a rebuild.
+@use 'tokens';
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--surface);
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
