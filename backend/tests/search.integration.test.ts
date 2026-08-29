@@ -22,10 +22,10 @@ describe('the migrated database', () => {
     expect(row?.close ?? 0).toBeGreaterThan(row?.far ?? 1)
   })
 
-  it('does not transliterate Cyrillic — the reason search is still an open question', async () => {
-    // unaccent strips diacritics, nothing more. Pinned here so the limitation is a fact
-    // the suite states rather than something rediscovered when search is built:
-    // "malako" cannot reach "молоко" through unaccent alone.
+  it('does not transliterate Cyrillic — which is why the domain does it instead', async () => {
+    // unaccent strips diacritics, nothing more. Pinned so the limitation stays a stated
+    // fact rather than something rediscovered: "moloko" cannot reach "молоко" through
+    // unaccent, so items carry a search_key normalised to Latin in packages/model.
     const [row] = await sql<{ cyrillic: string; latin: string }[]>`
       select unaccent('Ереван') as cyrillic, unaccent('café') as latin
     `

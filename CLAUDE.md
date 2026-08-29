@@ -81,9 +81,40 @@ the load is I/O-bound, with three orders of magnitude of headroom.
 **Tailwind was dropped.** Not one utility class was in use — everything is styled with
 scoped SCSS through tokens — and its CSS-first `@import` cannot pass through Sass.
 
-**Postgres does the heavy lifting:** `pg_trgm` for typos, `unaccent` for transliteration,
+**Postgres does the heavy lifting:** trigram matching and edit distance for search,
 GIN index; aggregates (average ratings, minimum price, store index) are plain SQL.
 Hence Drizzle: Prisma hides exactly what everything here rests on.
+
+### How catalogue search works, and why
+
+Measured, not assumed — the numbers below come from a probe against a real database.
+
+- **Transliteration happens in `packages/model`, not in Postgres.** `unaccent` strips
+  diacritics; it does **not** turn Cyrillic into Latin, so `moloko` scores exactly 0.000
+  against `молоко`. Items carry a `search_key`: the whole name normalised to Latin by a
+  pure function in the domain. Against that column the same query scores 0.500.
+  A custom `unaccent` rules file inside Postgres would buy only this half and cost us
+  ownership of the database image — CI can pull a service image but cannot build one.
+- **Candidates come from `word_similarity`, never `similarity`.** `similarity` compares
+  whole strings, so a long name dilutes the match: «малако» scored 0.158 against
+  «Молоко «Ашхар»» and ranked «Марианна» above it. `word_similarity` compares against the
+  best-matching part: 1.000 on a correct spelling, 0.600 on one swapped vowel.
+- **Ranking is by minimum Levenshtein across the words**, via `fuzzystrmatch`. Two swapped
+  vowels in a six-letter word defeat every trigram measure; edit distance puts «малако» at
+  2 from `moloko` with the nearest wrong answer at 3. Across words, not the first word:
+  «чанах» is a brand, and matching only the head noun missed it.
+- **What the user picked is remembered.** A query and the item chosen after it are stored
+  and boost that pairing next time. No model, no image change, and it compounds from the
+  first day — it is also the labelled set anything smarter would later need.
+
+Thresholds (`word_similarity` > 0.3, accept edit distance <= 2) are a first estimate from
+twenty names. They must be retuned on a real catalogue.
+
+**Embeddings are a 0.2 question, not a 0.1 one.** They answer what trigrams cannot —
+«молочка» reaching kefir and curd, and the duplicate merging the canonical catalogue needs.
+They are not the answer to typos or transliteration, both of which are already solved
+deterministically above. The cost is real: `vector` is not in `postgres:17-alpine`, so it
+means owning the image, plus a model resident in memory on a cheap VPS.
 
 **Telegram Mini App was dropped:** `getUserMedia` is broken on both platforms and the
 native scanner only reads QR. Native is a 1.0 question.
@@ -313,8 +344,8 @@ database access. In a product about data integrity, two write paths will silentl
 **End-to-end runs in a phone profile only.** The product is designed for a phone at a
 shelf, so a desktop-only pass would prove nothing about the screen that matters.
 
-- **Catalogue search is tested only against a real Postgres.** `pg_trgm` and `unaccent`
-  cannot be faked, and they are exactly what breaks. Integration tests run against a
+- **Catalogue search is tested only against a real Postgres.** `pg_trgm`, `unaccent` and
+  `fuzzystrmatch` cannot be faked, and they are exactly what breaks. Integration tests run against a
   **separate database** on the same server (`molvia_<index>_test`), created and migrated
   by the vitest global setup — a test run can never truncate data entered by hand. This is
   why `make check` needs `make up` first, and why CI runs a Postgres service.
