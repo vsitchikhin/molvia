@@ -65,7 +65,9 @@ export default defineComponent({
 <style scoped lang="scss">
 .heading {
   margin: 0 0 var(--space-4);
-  font-size: 1.5rem;
+  font-family: var(--font-display);
+  font-size: var(--text-display);
+  line-height: var(--leading-tight);
 }
 
 .muted {
@@ -79,10 +81,13 @@ export default defineComponent({
   padding: 0 var(--space-4);
   border: none;
   border-radius: var(--radius);
-  background: var(--accent);
-  color: var(--surface);
+
+  /* --accent is marked non-text use only; a filled control carrying a label takes
+     --accent-solid, which is 6.5:1 against --on-accent. */
+  background: var(--accent-solid);
+  color: var(--on-accent);
   font: inherit;
-  font-weight: 600;
+  font-weight: var(--weight-medium);
 }
 
 .icon {

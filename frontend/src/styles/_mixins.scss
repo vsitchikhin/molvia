@@ -11,10 +11,11 @@
   min-width: var(--touch-target);
 }
 
-/// The one surface every card, sheet and list row is built from.
+/// The one surface every card, sheet and list row is built from. Cards sit on --sunken,
+/// which is the page ground; they are --surface themselves.
 @mixin surface {
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
 }
 

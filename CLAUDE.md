@@ -241,6 +241,15 @@ database access. In a product about data integrity, two write paths will silentl
   not a single hardcoded hex, not a single magic spacing off the scale. Stylelint enforces
   both — a literal colour or an off-scale padding fails `make lint`.
 - **Everything is SCSS.** There is no plain CSS in the project.
+- **Two faces, both self-hosted:** Nunito for titles and figures (`--font-display`), Onest
+  for text (`--font`). The design prototype used Caprasimo and Figtree; neither has a
+  single Cyrillic glyph, so its Russian mockups were rendered by a system fallback the
+  whole time. Fonts live in the repository and are precached — the app is opened where the
+  connection drops, and a request to someone else's CDN is one more thing that can hang.
+- **The dram sign `֏` comes from a face of its own,** scoped to `unicode-range: U+058F`.
+  Of the 321 Google fonts covering Cyrillic, four also cover Armenian and none is usable
+  here. Without this the glyph falls back to a system font and shifts the baseline in the
+  one place it must not: the prices.
 - **Native HTML first, then Reka UI, never a styled kit.** On a phone `<select>`,
   `<input type="date">` and `<input inputmode="decimal">` open the system pickers, which
   beat anything a library renders; `<dialog>` already brings a focus trap and a backdrop.

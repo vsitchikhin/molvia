@@ -1,22 +1,59 @@
 /*
- * The only place a colour, a radius or a step of the spacing scale is defined.
- * Components reference variables and never a literal: a hardcoded hex is a lint-level
- * mistake here, not a matter of taste.
+ * The only place a colour, a size, a radius or a duration is defined. Components
+ * reference variables and never a literal: a hardcoded hex or an off-scale padding is a
+ * lint-level mistake here, not a matter of taste.
  *
- * The target device is a phone in one hand, at a shelf, in bad light — hence the
- * contrast, the 44px touch target and the dark scheme carrying equal weight.
+ * Values come from the 0.1 design handoff. Two schemes carry equal weight — the dark one
+ * is not an inversion, it is the scheme the app is read in during an evening shop.
  */
-:root {
-  --surface: #fff;
-  --surface-sunken: #f4f4f6;
-  --border: #dcdce2;
-  --text: #1b1b1f;
-  --text-muted: #63636b;
-  --accent: #2a78d6;
-  --good: #1baf7a;
-  --warn: #d99100;
-  --bad: #d64545;
 
+/*
+ * Molvia — the only place a colour, a size, a radius or a duration is defined.
+ * Components reference variables and never a literal.
+ *
+ * The target device is a phone in one hand, at a shelf, in bad light. The ground is warm
+ * rather than white: at 20:00 under shop lighting a cold white sheet is the brightest
+ * object in the aisle, and the dark scheme is a real warm-ink scheme, not an inversion.
+ *
+ * Two overrides are supported on purpose:
+ *   @media (prefers-color-scheme: dark)  — the system decides
+ *   [data-scheme="light" | "dark"]       — the user decided, stored in localStorage
+ * The manual selector wins because it is more specific.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* ── Type ─────────────────────────────────────────────────────────────── */
+
+  /* 'Dram' first: it carries U+058F only, everything else falls straight through.
+     Nunito and Onest were chosen over the prototype's Caprasimo and Figtree because
+     neither of those has a single Cyrillic glyph — the mockups were rendered by a
+     system fallback the whole time. */
+  --font: 'Dram', 'Onest', system-ui, -apple-system, 'Segoe UI', roboto, sans-serif;
+  --font-display: 'Dram', 'Nunito', var(--font);
+
+  /* Scale anchored on 17px body — the smallest size that stays readable at arm's length
+     in bad light. Nothing in the interface is allowed below --text-caption. */
+  --text-display: 2.125rem; /* 34 — large title, collapses to --text-headline */
+  --text-title: 1.5rem; /* 24 — section title, sheet title */
+  --text-figure: 1.75rem; /* 28 — money that is the answer to the screen */
+  --text-headline: 1.0625rem; /* 17 semibold — row title, collapsed nav title */
+  --text-body: 1.0625rem; /* 17 */
+  --text-callout: 0.9375rem; /* 15 — secondary row line */
+  --text-footnote: 0.8125rem; /* 13 — unit price, meta */
+  --text-caption: 0.6875rem; /* 11 — tab label, section caption */
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-body: 1.45;
+  --tracking-caps: 0.06em;
+
+  --weight-regular: 400;
+  --weight-medium: 600;
+  --weight-bold: 700;
+
+  /* ── Space ────────────────────────────────────────────────────────────── */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -24,19 +61,107 @@
   --space-6: 1.5rem;
   --space-8: 2rem;
 
-  --radius: 0.75rem;
+  /* ── Shape ────────────────────────────────────────────────────────────── */
+  --radius-sm: 0.5rem;
+  --radius: 0.875rem;
+  --radius-lg: 1.25rem;
+  --radius-sheet: 1.5rem;
+  --radius-pill: 999px;
+  --hairline: 1px;
+
   --touch-target: 2.75rem; /* 44px — the smallest thing a thumb hits reliably */
 
-  --font: system-ui, -apple-system, 'Segoe UI', 'Roboto', sans-serif;
+  /* ── Motion ───────────────────────────────────────────────────────────── */
+  --dur-fast: 120ms; /* state change on a control */
+  --dur: 220ms; /* sheet, push, tab */
+  --dur-slow: 320ms; /* first paint of a list */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.3, 1);
+
+  /* ── Colour · light ───────────────────────────────────────────────────── */
+  --sunken: #f3e8d6; /* the page ground; cards sit on it */
+  --surface: #fffaf2;
+  --surface-2: #f7efe1; /* input wells, sunken rows inside a card */
+  --border: #e0d3bd;
+  --border-strong: #cbbb9f;
+
+  --text: #1f1c19;
+  --text-muted: #6c6152;
+  --on-accent: #fffaf2;
+
+  --accent: #b2622d; /* non-text use only: rules, active chrome, indicators */
+  --accent-solid: #8c491a; /* filled controls that carry text — 6.5:1 with --on-accent */
+  --accent-ink: #8c491a; /* the accent at body-text size — 4.5:1 on --surface */
+  --accent-tint: #ffe1d0;
+
+  --good: #5d7239;
+  --good-ink: #3f4f24;
+  --good-tint: #e5efd2;
+
+  --warn: #a2761c;
+  --warn-ink: #6d4d0a;
+  --warn-tint: #f9ecc9;
+
+  --bad: #a5352a;
+  --bad-ink: #742018;
+  --bad-tint: #f8ddd6;
+
+  /* Shadows are warm and shallow: a phone held at 30 cm shows banding in anything deeper. */
+  --shadow-sm: 0 1px 2px rgb(63 46 26 / 10%);
+  --shadow-md: 0 4px 14px rgb(63 46 26 / 14%);
+  --shadow-lg: 0 -8px 32px rgb(46 33 18 / 22%); /* sheets rise from the bottom edge */
+
+  /* Pinned bars are slightly translucent — a token, not an effect. No blur beyond this. */
+  --chrome: rgb(255 250 242 / 88%);
+  --scrim: rgb(38 27 16 / 40%);
+}
+
+@mixin dark-scheme {
+  --sunken: #14110f;
+  --surface: #201c19;
+  --surface-2: #2a2521;
+  --border: #3b342c;
+  --border-strong: #524940;
+
+  --text: #f5ece0;
+  --text-muted: #a99a87;
+  --on-accent: #1a120c;
+
+  --accent: #e8925a;
+  --accent-solid: #e8925a; /* on a dark ground the ink is dark, so the base tone already clears AA */
+  --accent-ink: #f2ad7e;
+  --accent-tint: #3a2417;
+
+  --good: #a6c077;
+  --good-ink: #bdd493;
+  --good-tint: #2a3320;
+
+  --warn: #dfae4f;
+  --warn-ink: #edc673;
+  --warn-tint: #372b13;
+
+  --bad: #e8836f;
+  --bad-ink: #f2a494;
+  --bad-tint: #3b201b;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-md: 0 4px 14px rgb(0 0 0 / 45%);
+  --shadow-lg: 0 -8px 32px rgb(0 0 0 / 55%);
+
+  --chrome: rgb(32 28 25 / 88%);
+  --scrim: rgb(0 0 0 / 55%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --surface: #16161a;
-    --surface-sunken: #1e1e24;
-    --border: #33333c;
-    --text: #f2f2f5;
-    --text-muted: #a0a0aa;
-    --accent: #5fa3ec;
+    @include dark-scheme;
   }
+}
+
+[data-scheme='dark'] {
+  @include dark-scheme;
+}
+
+[data-scheme='light'] {
+  color-scheme: light;
 }

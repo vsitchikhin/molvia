@@ -1,13 +1,16 @@
-// The single entry point. Tokens first: everything below, and every component, reads
-// them as CSS custom properties, which is what makes the dark scheme a runtime swap
-// rather than a rebuild.
+// The single entry point. Fonts first, then tokens: everything below, and every
+// component, reads them as CSS custom properties, which is what makes the dark scheme a
+// runtime swap rather than a rebuild.
+@use 'fonts';
 @use 'tokens';
 
 body {
   margin: 0;
   font-family: var(--font);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
   color: var(--text);
-  background: var(--surface);
+  background: var(--sunken);
   -webkit-font-smoothing: antialiased;
 }
 

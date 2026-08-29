@@ -39,6 +39,13 @@ export default defineConfig(({ mode }) => {
       Icons({ compiler: 'vue3' }),
       VitePWA({
         registerType: 'autoUpdate',
+        workbox: {
+          // woff2 is not in the default pattern, so without this the first offline open
+          // falls back to a system font. Offline is a state this app is designed for, not
+          // an edge case. Digits live in the Latin subset, so both subsets are needed even
+          // for a fully Russian screen.
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        },
         manifest: {
           name: 'Molvia',
           short_name: 'Molvia',

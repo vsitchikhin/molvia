@@ -23,13 +23,14 @@ export default defineComponent({
 <style scoped lang="scss">
 .header {
   padding: var(--space-4);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--border);
 }
 
 .title {
   margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  font-weight: var(--weight-bold);
 }
 
 .main {
