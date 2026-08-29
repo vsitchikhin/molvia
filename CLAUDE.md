@@ -201,6 +201,17 @@ database access. In a product about data integrity, two write paths will silentl
   not a single hardcoded hex, not a single magic spacing off the scale. Stylelint enforces
   both — a literal colour or an off-scale padding fails `make lint`.
 - **Everything is SCSS.** There is no plain CSS in the project.
+- **Native HTML first, then Reka UI, never a styled kit.** On a phone `<select>`,
+  `<input type="date">` and `<input inputmode="decimal">` open the system pickers, which
+  beat anything a library renders; `<dialog>` already brings a focus trap and a backdrop.
+  Reka is for the few things native cannot do — the catalogue combobox above all, which is
+  the main screen and is full of subtleties (async results, keyboard navigation,
+  `aria-activedescendant`, a virtual keyboard covering the list). It ships unstyled
+  primitives that tree-shake, so importing `ComboboxRoot` costs only the combobox.
+  A styled kit (PrimeVue, Vuetify, Naive) is rejected on purpose: its theme and our tokens
+  would be two sources of truth about colour, which empties the rule about hardcoded
+  values. shadcn-vue is rejected for the same reason in a different shape — it copies
+  components written in Tailwind utility classes, and Tailwind is gone.
 - **Interface icons come from MDI** through `unplugin-icons`: inlined as components at
   build time, so only what is used ships, no icon font is fetched, and colour comes from
   `currentColor` — they obey the tokens like anything else. The app icon is different:

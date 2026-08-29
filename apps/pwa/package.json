@@ -12,6 +12,7 @@
     "@molvia/client": "*",
     "@molvia/model": "*",
     "pinia": "^4.0.3",
+    "reka-ui": "^2.10.4",
     "vue": "^3.5.42",
     "vue-i18n": "^11.4.10",
     "vue-router": "^5.3.0"
