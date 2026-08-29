@@ -18,9 +18,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: api, dockerfile: apps/api/Dockerfile }
-          - { name: bot, dockerfile: apps/bot/Dockerfile }
-          - { name: web, dockerfile: apps/pwa/Dockerfile }
+          - { name: backend, dockerfile: backend/Dockerfile }
+          - { name: bot, dockerfile: bot/Dockerfile }
+          - { name: frontend, dockerfile: frontend/Dockerfile }
 
     steps:
       - uses: actions/checkout@v5

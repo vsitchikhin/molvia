@@ -4,7 +4,7 @@
 // source, so a runtime image would otherwise need the whole toolchain to read them. One
 // file also means the image carries no dependency tree to audit or to drift.
 //
-//   node bin/bundle.mjs api
+//   node bin/bundle.mjs backend
 //   node bin/bundle.mjs bot
 
 import process from 'node:process'
@@ -12,16 +12,16 @@ import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 
 const app = process.argv[2]
-if (!['api', 'bot'].includes(app)) {
-  console.error('usage: node bin/bundle.mjs <api|bot>')
+if (!['backend', 'bot'].includes(app)) {
+  console.error('usage: node bin/bundle.mjs <backend|bot>')
   process.exit(1)
 }
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 
 await build({
-  entryPoints: [`${root}apps/${app}/src/index.ts`],
-  outfile: `${root}apps/${app}/dist/index.js`,
+  entryPoints: [`${root}${app}/src/index.ts`],
+  outfile: `${root}${app}/dist/index.js`,
   bundle: true,
   platform: 'node',
   target: 'node22',
@@ -37,4 +37,4 @@ await build({
   },
 })
 
-console.log(`bundled apps/${app}/dist/index.js`)
+console.log(`bundled ${app}/dist/index.js`)

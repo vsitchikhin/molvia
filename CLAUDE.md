@@ -134,13 +134,13 @@ npm workspaces monorepo. A pure core with thin adapters — no DI container and 
 layer: the core is tested directly.
 
 ```
-apps/                     TypeScript workspaces
-  api/          Fastify
-    src/routes/     HTTP: parse -> call the use case -> respond. Zero business logic
-    src/usecases/   scenarios: orchestrate domain and repositories
-    src/db/         Drizzle schema, migrations, repositories — the only place with SQL
-  pwa/          Vue 3 + Vite: views, composables, styles/tokens.css, i18n
-  bot/          grammY, a client of the API
+backend/        Fastify
+  src/routes/     HTTP: parse -> call the use case -> respond. Zero business logic
+  src/usecases/   scenarios: orchestrate domain and repositories
+  src/db/         Drizzle schema, migrations, repositories — the only place with SQL
+  tests/          integration tests and their fixtures — they need a database
+frontend/       Vue 3 + Vite: views, composables, styles/_tokens.scss, i18n
+bot/            grammY, a client of the API
 packages/
   model/        domain: types, Zod schemas, pure rules (money, units, errors,
                 and the verdict once it exists). Dependencies: zod only
@@ -154,6 +154,46 @@ boundary, and it should be visible in the tree rather than only in the docs.
 
 Packages export their TypeScript source (`"exports": "./src/index.ts"`), so there is no
 build step between a change in the domain and the app that uses it.
+
+### Three applications that happen to share a repository
+
+`frontend`, `backend` and `bot` are treated as separate applications — as if they were
+three repositories that live together only because it is convenient — and each must stay
+deployable on its own. Each owns its `package.json`, `tsconfig.json`, `eslint.config.js`,
+`vitest.config.ts` and `Dockerfile`, and each lints, type-checks and tests standalone:
+
+```bash
+npm run lint -w @molvia/backend     # its own config, from its own directory
+npm run test -w @molvia/frontend
+```
+
+The root only gathers them. `eslint.config.base.js` is a shared preset a module opts into,
+the way separate repositories share a company config; it knows nothing about the modules'
+names. The root `eslint.config.js` ignores the module directories entirely and covers only
+`e2e/` and the repository's own config files. The root `vitest.config.ts` lists the
+modules' configs as projects rather than defining suites itself.
+
+`@/` is configured per module, so it can point somewhere different in each. Today all of
+them point at that module's `src/`, because in all of them that is where importable code
+lives — not because a shared rule decided it.
+
+**What deliberately stays at the root**, with the reason:
+
+|                                         | Why                                                                                                                                                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Prettier, `.editorconfig`, `.gitignore` | repository hygiene, not application config; five copies would only drift                                                                                                       |
+| `.env` (development)                    | the three must agree on ports here — the frontend proxies to the backend's port and the bot calls it. In production nothing is shared: each container gets its own environment |
+| `Makefile`                              | the entry point to the repository                                                                                                                                              |
+| `playwright.config.ts`                  | end-to-end spans the whole stack and belongs to no single application                                                                                                          |
+
+**Imports are either an alias or a sibling** — checked by the linter:
+
+- `@/…` to reach anything outside the current directory,
+- `./thing` only for a file in the same directory,
+- never `../…`, and never `./sub/thing`.
+
+A path that climbs out of its own folder hides where a thing lives and breaks the moment
+a file moves. `./sub/thing` hides it half as much and breaks just as readily.
 
 **Boundary rules — enforced by the linter, not by eye:**
 
@@ -215,7 +255,7 @@ database access. In a product about data integrity, two write paths will silentl
 - **Interface icons come from MDI** through `unplugin-icons`: inlined as components at
   build time, so only what is used ships, no icon font is fetched, and colour comes from
   `currentColor` — they obey the tokens like anything else. The app icon is different:
-  `apps/pwa/public/favicon.svg` is the source, `make icons` rasterises the manifest PNGs,
+  `frontend/public/favicon.svg` is the source, `make icons` rasterises the manifest PNGs,
   and the mark is a placeholder until there is real branding.
 - Touch target >= 44px. The primary action is reachable with a thumb.
 - **Every screen has four states:** loading, empty, error, offline. The empty state is not
@@ -253,13 +293,13 @@ database access. In a product about data integrity, two write paths will silentl
 
 ## Testing
 
-| Layer       | Where                               | What it covers                            | Dependencies                             |
-| ----------- | ----------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| Unit        | `packages/**/*.test.ts`             | pure rules from `packages/model`          | nothing but the domain                   |
-| Use case    | `apps/api/**/*.test.ts`             | `usecases`                                | fake repositories, no DB                 |
-| Component   | `apps/pwa/**/*.test.ts`             | rendering and the four screen states      | happy-dom, `@vue/test-utils`, API mocked |
-| Integration | `apps/api/**/*.integration.test.ts` | schema, search, aggregates, HTTP contract | a real Postgres                          |
-| End-to-end  | `e2e/**/*.spec.ts`                  | the whole stack through a browser         | Playwright starts api and pwa itself     |
+| Layer       | Where                              | What it covers                            | Dependencies                             |
+| ----------- | ---------------------------------- | ----------------------------------------- | ---------------------------------------- |
+| Unit        | `packages/**/*.test.ts`            | pure rules from `packages/model`          | nothing but the domain                   |
+| Use case    | `backend/**/*.test.ts`             | `usecases`                                | fake repositories, no DB                 |
+| Component   | `frontend/**/*.test.ts`            | rendering and the four screen states      | happy-dom, `@vue/test-utils`, API mocked |
+| Integration | `backend/**/*.integration.test.ts` | schema, search, aggregates, HTTP contract | a real Postgres                          |
+| End-to-end  | `e2e/**/*.spec.ts`                 | the whole stack through a browser         | Playwright starts api and pwa itself     |
 
 **End-to-end runs in a phone profile only.** The product is designed for a phone at a
 shelf, so a desktop-only pass would prove nothing about the screen that matters.

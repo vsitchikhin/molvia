@@ -6,23 +6,24 @@
     "node": ">=22"
   },
   "workspaces": [
-    "apps/*",
+    "frontend",
+    "backend",
+    "bot",
     "packages/*"
   ],
   "scripts": {
     "dev": "concurrently -n api,pwa,bot -c blue,green,magenta \"npm:dev:api\" \"npm:dev:pwa\" \"npm:dev:bot\"",
-    "dev:api": "npm run dev -w @molvia/api",
-    "dev:pwa": "npm run dev -w @molvia/pwa",
+    "dev:api": "npm run dev -w @molvia/backend",
+    "dev:pwa": "npm run dev -w @molvia/frontend",
     "dev:bot": "npm run dev -w @molvia/bot",
-    "lint": "eslint . && stylelint \"**/*.{css,scss,vue}\"",
-    "lint:style": "stylelint \"**/*.{css,scss,vue}\"",
-    "format": "prettier --write . && eslint . --fix && stylelint \"**/*.{css,scss,vue}\" --fix",
+    "lint": "npm run lint --workspaces --if-present && eslint . && npm run lint:style -w @molvia/frontend",
+    "format": "prettier --write . && npm run lint:fix --workspaces --if-present && eslint . --fix && npm run lint:style -w @molvia/frontend -- --fix",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit && vue-tsc --noEmit -p apps/pwa/tsconfig.json",
+    "typecheck": "tsc --noEmit -p packages/model && tsc --noEmit -p packages/client && tsc --noEmit -p backend && tsc --noEmit -p bot && vue-tsc --noEmit -p frontend && tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "migrate": "npm run migrate -w @molvia/api"
+    "migrate": "npm run migrate -w @molvia/backend"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

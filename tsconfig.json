@@ -4,5 +4,5 @@
     "lib": ["ES2023"],
     "types": ["node"]
   },
-  "include": ["apps/api/**/*.ts", "apps/bot/**/*.ts", "packages/**/*.ts", "e2e/**/*.ts", "*.ts"]
+  "include": ["e2e/**/*.ts", "*.ts"]
 }

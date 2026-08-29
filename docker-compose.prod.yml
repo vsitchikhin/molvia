@@ -24,13 +24,13 @@ services:
       timeout: 5s
       retries: 10
 
-  api:
+  backend:
     # Built by CI and pulled on the server, so the machine needs neither the source nor
     # a toolchain. `build` stays for building the same image locally.
-    image: ghcr.io/vsitchikhin/molvia-api:${IMAGE_TAG:-latest}
+    image: ghcr.io/vsitchikhin/molvia-backend:${IMAGE_TAG:-latest}
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -46,27 +46,27 @@ services:
     image: ghcr.io/vsitchikhin/molvia-bot:${IMAGE_TAG:-latest}
     build:
       context: .
-      dockerfile: apps/bot/Dockerfile
+      dockerfile: bot/Dockerfile
     # on-failure, not unless-stopped: with no token the bot exits 0 on purpose, and it
     # should then stay down instead of being restarted forever.
     restart: on-failure
     environment:
       NODE_ENV: production
       API_PORT: 3300
-      API_BASE_URL: http://api:3300
+      API_BASE_URL: http://backend:3300
       # Optional: a stack without a bot is a valid deployment, and the bot exits
       # cleanly when the token is empty rather than crash-looping.
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     depends_on:
-      - api
+      - backend
 
-  web:
+  frontend:
     # Built by CI and pulled on the server, so the machine needs neither the source nor
     # a toolchain. `build` stays for building the same image locally.
-    image: ghcr.io/vsitchikhin/molvia-web:${IMAGE_TAG:-latest}
+    image: ghcr.io/vsitchikhin/molvia-frontend:${IMAGE_TAG:-latest}
     build:
       context: .
-      dockerfile: apps/pwa/Dockerfile
+      dockerfile: frontend/Dockerfile
     restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN:?set DOMAIN}
@@ -79,7 +79,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - api
+      - backend
 
 volumes:
   pgdata:

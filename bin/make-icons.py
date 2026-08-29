@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rasterises the app icon from the same geometry as apps/pwa/public/favicon.svg.
+"""Rasterises the app icon from the same geometry as frontend/public/favicon.svg.
 
 The SVG is the source of truth; these PNGs exist only because a web app manifest cannot
 use one. Regenerate with `make icons` after changing the mark, and commit the result —

@@ -28,13 +28,13 @@ export default defineConfig({
 
   webServer: [
     {
-      command: 'npm run start -w @molvia/api',
+      command: 'npm run start -w @molvia/backend',
       url: `http://127.0.0.1:${apiPort}/health`,
       reuseExistingServer: !ci,
       stdout: 'pipe',
     },
     {
-      command: 'npm run dev -w @molvia/pwa',
+      command: 'npm run dev -w @molvia/frontend',
       url: baseURL,
       reuseExistingServer: !ci,
       stdout: 'pipe',

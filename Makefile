@@ -108,8 +108,8 @@ prod-build: ## Build the production images without deploying them
 certs: ## Issue a locally trusted dev certificate, for testing the camera on a phone
 	@command -v mkcert >/dev/null || { \
 		echo "mkcert is not installed. brew install mkcert, then mkcert -install"; exit 1; }
-	@mkdir -p apps/pwa/certs
-	cd apps/pwa/certs && mkcert -key-file dev-key.pem -cert-file dev-cert.pem \
+	@mkdir -p frontend/certs
+	cd frontend/certs && mkcert -key-file dev-key.pem -cert-file dev-cert.pem \
 		localhost 127.0.0.1 $$(ipconfig getifaddr en0 2>/dev/null || echo 127.0.0.1)
 	@echo "run the dev server on the network: PWA_EXPOSE=1 make dev"
 	@echo "the phone must trust the same authority: mkcert -CAROOT, install rootCA.pem on it"

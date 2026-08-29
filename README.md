@@ -45,9 +45,9 @@ refuses failing types or tests, and CI repeats all of it on every push and pull 
 ## Layout
 
 ```
-apps/api       Fastify: routes -> use cases -> db. The only write path
-apps/pwa       Vue 3 + Vite, SCSS with design tokens, i18n from day one
-apps/bot       grammY, a client of the API
+backend       Fastify: routes -> use cases -> db. The only write path
+frontend       Vue 3 + Vite, SCSS with design tokens, i18n from day one
+bot       grammY, a client of the API
 packages/model Domain: money, units, errors. Depends on zod and nothing else
 packages/client Typed API client over the shared schemas
 services/      Non-TypeScript services. Receipt OCR lands here at 1.0
@@ -86,6 +86,6 @@ creates. One copy of them serves every working copy, and they survive deleting a
 
 ## Icon
 
-The mark in `apps/pwa/public/favicon.svg` is a placeholder until there is real branding.
+The mark in `frontend/public/favicon.svg` is a placeholder until there is real branding.
 The PNGs are generated from it with `make icons` and committed, so neither CI nor a build
 needs a rasteriser.
