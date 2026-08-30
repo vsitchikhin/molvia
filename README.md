@@ -78,11 +78,9 @@ GHCR on a tag; the deploy is two commands on the machine. See `deploy/README.md`
 
 ## Where the documents are
 
-`CLAUDE.md` — architecture and rules, in the repository.
-
-The product plan and task plans live **outside** the repository, in
-`../_shared/molvia/scratch`, reached through the `.scratch` symlink that `make setup`
-creates. One copy of them serves every working copy, and they survive deleting any of it.
+See [`docs/README.md`](docs/README.md) for the map. In short: rules live in `CLAUDE.md`
+here, the product plan and the design live in Confluence, and the tasks live in Jira —
+all three reachable through the `jira-confluence` MCP server configured for this copy.
 
 ## Icon
 
