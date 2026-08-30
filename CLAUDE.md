@@ -1,9 +1,18 @@
 # Molvia · Молвия
 
-**Read this first:** the [product plan](https://molvi.atlassian.net/wiki/spaces/MOL/pages/327681)
-in Confluence — the full plan with the reasoning behind every decision. Read it through the
-`jira-confluence` MCP server (page id `327681`). Everything below is only anchor points to
-get the context in a minute, plus the rules for working on the code.
+**Read these first, before anything else.** They are short and they carry the context this
+file assumes:
+
+|                      |                                                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `docs/onboarding.md` | What the product is, what already exists, where the work comes from, and which decisions must not be reopened |
+| `docs/tracker.md`    | Jira and Confluence: what the MCP server can and cannot do, field ids, the traps                              |
+| `docs/README.md`     | The map: what lives where and why                                                                             |
+
+The full product plan, with the reasoning behind every decision, is in Confluence — page
+`327681`, read it through the `jira-confluence` MCP server.
+
+Everything below is the rules for working on the code.
 
 ## What this is
 
@@ -142,6 +151,9 @@ must survive a lost disk, so they belong in Confluence, which keeps versions and
 **An epic carries the why, a task carries the what.** Descriptions in Jira are written to
 answer why a thing is done the way it is, not to restate the title — so a later session
 does not reopen a settled question.
+
+The operational side — what the MCP server cannot do, the field ids and the traps —
+is in `docs/tracker.md`.
 
 ## Commands
 
@@ -442,18 +454,13 @@ Migrations that lose data, swapping a stack element, CI changes, refactoring out
 
 ## State
 
-The scaffold exists and `make check` is green on it; there are no features yet. The one
-migration enables `pg_trgm` and `unaccent` — extensions belong to migrations, so a fresh
-database is identical everywhere. The domain
-already holds the two rules everything else will lean on — money in minor units and unit
-price — with tests written from real receipts. The first steps are at the end of
-the product plan in Confluence.
+**Scaffolded, no product features yet**, and release 0.1 is already broken into epics and
+tasks in Jira. What exists, what is decided and what is still open — `docs/onboarding.md`.
 
-`docker-compose.yml` runs Postgres only. The api / pwa / bot services join it once the
-scaffold exists; in development they are meant to run natively anyway — HMR and a debugger
-attached to a host process beat a rebuild inside a container. Extensions (`pg_trgm`,
-`unaccent`) are deliberately not created by an init script: the schema belongs to
-migrations, and a second source of truth for it would drift.
+`docker-compose.yml` runs Postgres only; the applications run natively in development,
+because HMR and a debugger attached to a host process beat a rebuild inside a container.
+The production stack is a separate file. Extensions are deliberately not created by an init
+script: the schema belongs to migrations, and a second source of truth for it would drift.
 
 ## Deployment
 
@@ -502,6 +509,10 @@ make setup   # bin/link-shared.sh, then bin/init-env.sh, then npm install
 idempotent. `bin/init-env.sh` takes the index from the directory name (`molvia` -> 0, `molvia2` -> 2) or
 from an argument, computes the ports and warns if they are already taken. It does not
 overwrite an existing `.env` without `--force`.
+
+**A new copy also needs the tracker.** The `jira-confluence` MCP server is configured per
+directory and does not come with the checkout; without it a session cannot read the plan or
+the tasks. The command is in `docs/tracker.md`.
 
 **What is shared and what is per-copy:**
 
