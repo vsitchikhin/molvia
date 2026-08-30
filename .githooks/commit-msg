@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Keeps commit messages in the format CLAUDE.md documents: Conventional Commits with the
-# app as scope. A regex rather than commitlint — the format is four lines of grammar and
-# does not justify a dependency tree.
+# Jira key as scope. A regex rather than commitlint — the format is four lines of grammar
+# and does not justify a dependency tree.
 #
 # Deliberate bypass: git commit --no-verify
 
@@ -14,19 +14,21 @@ case "$subject" in
   Merge\ * | Revert\ * | fixup!* | squash!* | amend!*) exit 0 ;;
 esac
 
-pattern='^(feat|fix|refactor|perf|test|docs|chore|ci|style|build)(\([a-z0-9.-]+\))?!?: [^ ].{0,79}$'
+pattern='^(feat|fix|refactor|perf|test|docs|chore|ci|style|build)(\(MOL-[0-9]+\))?!?: [^ ].{0,79}$'
 
 if [[ ! $subject =~ $pattern ]]; then
   cat >&2 <<'MSG'
 commit-msg: the subject line does not match the house format.
 
-  <type>(<scope>): <imperative summary>
+  <type>(MOL-<n>): <imperative summary>
 
   type   feat fix refactor perf test docs chore ci style build
-  scope  optional, the app or package: pwa, api, bot, model, client, db, deps
+  scope  the Jira key of the task, e.g. (MOL-6). The tracker is a separate
+         system and this key is the only link between a commit and its task.
+         Omit it only for work that has no task at all.
   limit  80 characters after the colon
 
-  e.g.   feat(pwa): show the unit price next to every verdict
+  e.g.   feat(MOL-6): add the catalogue schema and its index
 MSG
   echo "  got    $subject" >&2
   exit 1

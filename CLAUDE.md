@@ -1,8 +1,9 @@
 # Molvia · Молвия
 
-**Read this first:** `.scratch/docs/product-plan.md` — the full product plan with the
-reasoning behind every decision. Everything below is only anchor points to get the
-context in a minute, plus the rules for working on the code.
+**Read this first:** the [product plan](https://molvi.atlassian.net/wiki/spaces/MOL/pages/327681)
+in Confluence — the full plan with the reasoning behind every decision. Read it through the
+`jira-confluence` MCP server (page id `327681`). Everything below is only anchor points to
+get the context in a minute, plus the rules for working on the code.
 
 ## What this is
 
@@ -121,6 +122,25 @@ native scanner only reads QR. Native is a 1.0 question.
 
 **Exchange rates:** official ones from the open CBA API; real exchange rates from users.
 Scraping rate.am was rejected.
+
+## Tracker and documentation
+
+They live outside the repository, on the same Atlassian site, reachable through the
+`jira-confluence` MCP server configured for this working copy.
+
+|                                 | Where                                                                            |
+| ------------------------------- | -------------------------------------------------------------------------------- |
+| Tasks, epics, sprints           | Jira, project **MOL** — `https://molvi.atlassian.net/jira/software/projects/MOL` |
+| Product plan, design, decisions | Confluence, space **MOL** — page `294930` is the root                            |
+| Rules for writing code          | `CLAUDE.md`, in the repository                                                   |
+
+The split is deliberate. Rules change together with the code and must be reviewed in the
+same commit, so they belong in git. The plan and the decisions do not follow the code and
+must survive a lost disk, so they belong in Confluence, which keeps versions and backups.
+
+**An epic carries the why, a task carries the what.** Descriptions in Jira are written to
+answer why a thing is done the way it is, not to restate the title — so a later session
+does not reopen a settled question.
 
 ## Commands
 
@@ -363,12 +383,14 @@ shelf, so a desktop-only pass would prove nothing about the screen that matters.
 
 ### Before a task
 
-1. **A plan before code for anything large** — a feature from the release cut, or a schema
-   migration. The file goes to `.scratch/tasks/plans/<release>-<slug>.md`, before the first
-   line of code. Small fixes go straight to code.
-2. **We gather requirements ourselves** — there are no specs. The source is
-   `.scratch/docs/product-plan.md`; if it has no answer, the requirement is stated
-   explicitly in the plan and talked through.
+1. **Requirements, then a plan, then approval, then code — per Jira task.** Before writing
+   anything, work out what the task actually requires; then write the implementation plan
+   as a comment on that task. **Code starts only after the owner approves the plan.** The
+   plan lives on the task rather than in a file, so it cannot drift away from the work it
+   describes.
+2. **We gather requirements ourselves** — there are no specs. The source is the product
+   plan in Confluence; if it has no answer, the requirement is stated explicitly in the
+   plan and talked through.
 3. **Check against the release cut.** Before building a feature, work out which release it
    belongs to and which hypothesis it tests. A feature without a hypothesis is not built.
 
@@ -378,7 +400,7 @@ shelf, so a desktop-only pass would prove nothing about the screen that matters.
 all green. Run them once after the entire plan, not after each step: `format` mutates files
 and would otherwise hide real lint errors.
 
-If a decision changed along the way — **update `.scratch/docs/product-plan.md` immediately.**
+If a decision changed along the way — **update the product plan in Confluence immediately.**
 A plan that diverges from the code is worthless, and here the plan matters more than the code.
 
 ### Commits
@@ -390,9 +412,28 @@ A plan that diverges from the code is worthless, and here the plan matters more 
 - **Push when everything for the task is done**, not after every commit.
 - **The only author is the repository owner.** A `Co-Authored-By:` line in any form is
   forbidden — do not add it automatically or as a tool default.
-- **Format — Conventional Commits with the app as scope:** `feat(pwa): ...`,
-  `fix(api): ...`, `chore(db): ...`. Imperative subject line, body for the "why".
-- **Branches:** `<release>/<short-description>`, e.g. `0.1/verdict-input`.
+- **Format — Conventional Commits with the Jira key as scope:** `feat(MOL-1): schema for
+the catalogue`. The tracker is a separate system, and the key in the subject is the only
+  thing linking a commit to the task it belongs to. After the subject, a blank line, then
+  an optional bullet list of what was done — points, not prose.
+- **Branches:** `MOL-<n>-<short-description>`, e.g. `MOL-6-schema`.
+
+### Estimating (story points)
+
+Tasks are estimated on the **1..21** Fibonacci scale: 1, 2, 3, 5, 8, 13, 21. Anchors:
+
+| SP     | What it is                                 |
+| ------ | ------------------------------------------ |
+| **1**  | A micro-fix, 1–50 lines                    |
+| **5**  | A small task                               |
+| **21** | A hard, unclear task spanning several days |
+
+For calibration: an integration task — client, adapter, trigger and tests — is 8; a large
+use case with thresholds and a workflow is 13. The agent estimates when filing the task and
+proposes the number together with the plan.
+
+The Jira field is `customfield_10016` ("Story point estimate"). The MCP server does not
+write it — set it over REST.
 
 ### Ask before, not after
 
@@ -405,7 +446,7 @@ migration enables `pg_trgm` and `unaccent` — extensions belong to migrations, 
 database is identical everywhere. The domain
 already holds the two rules everything else will lean on — money in minor units and unit
 price — with tests written from real receipts. The first steps are at the end of
-`.scratch/docs/product-plan.md`.
+the product plan in Confluence.
 
 `docker-compose.yml` runs Postgres only. The api / pwa / bot services join it once the
 scaffold exists; in development they are meant to run natively anyway — HMR and a debugger
@@ -494,8 +535,8 @@ by hand.
 - **Each copy gets its own bot.** Two processes on one token steal each other's updates via
   long polling — silently and unreproducibly. Register a separate bot in BotFather.
 
-**Task plans in the shared directory are named after the task, not the copy** —
-`.scratch/tasks/plans/<release>-<slug>.md`. A copy is temporary, a task is not.
+**Plans live on the Jira task, not in the working copy.** A copy is temporary and a task is
+not, and a plan sitting in one copy is invisible from the others.
 
 `.scratch` and `.lavish` are symlinks to `../_shared/molvia/{scratch,lavish}`, outside the
 repository and in `.gitignore`. The links are relative, so the whole `projects/` tree can be
