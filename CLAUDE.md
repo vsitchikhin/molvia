@@ -109,6 +109,15 @@ obvious enough to leave unwritten:
   to buy". Raw SQL exists through `$queryRaw` but loses its types, and here raw SQL is the
   main instrument rather than an escape hatch.
 
+**Quasar was rejected for the same reason**, with one addition. It bundles a component kit
+with a build layer for SPA, PWA, Capacitor and Electron. The second half is useful one day;
+the first brings its own theme and Sass variables, which would become a second source of
+truth about colour. And the second half is available on its own: if native happens at 1.0,
+**Capacitor** wraps the existing web app for the stores without a component kit or a CLI of
+its own. Until then `vite-plugin-pwa` already ships the manifest, the service worker and
+the precache — a PWA that installs to the home screen and works offline is the mobile
+build.
+
 **Postgres does the heavy lifting:** trigram matching and edit distance for search,
 GIN index; aggregates (average ratings, minimum price, store index) are plain SQL.
 Hence Drizzle: Prisma hides exactly what everything here rests on.
