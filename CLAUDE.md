@@ -133,6 +133,7 @@ They live outside the repository, on the same Atlassian site, reachable through 
 | Tasks, epics, sprints           | Jira, project **MOL** — `https://molvi.atlassian.net/jira/software/projects/MOL` |
 | Product plan, design, decisions | Confluence, space **MOL** — page `294930` is the root                            |
 | Rules for writing code          | `CLAUDE.md`, in the repository                                                   |
+| The map of all three            | `docs/README.md`, in the repository                                              |
 
 The split is deliberate. Rules change together with the code and must be reviewed in the
 same commit, so they belong in git. The plan and the decisions do not follow the code and
