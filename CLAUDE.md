@@ -91,6 +91,24 @@ the load is I/O-bound, with three orders of magnitude of headroom.
 **Tailwind was dropped.** Not one utility class was in use — everything is styled with
 scoped SCSS through tokens — and its CSS-first `@import` cannot pass through Sass.
 
+**Nest, Prisma and TypeORM were considered and rejected**, each for a reason that is not
+obvious enough to leave unwritten:
+
+- **Nest** is Fastify plus a DI container, decorators and modules. That superstructure
+  solves a team problem — imposing one shape on ten people. Here the shape is imposed by
+  these rules and by the linter's import boundaries, for free. Worse, it works against the
+  core decision: in Nest the business logic lives in `@Injectable()` classes, so the domain
+  would import the framework, and "the domain imports nothing but zod" could not hold.
+- **TypeORM** makes an entity a decorated class, so a table becomes a framework object;
+  its migration generator has a long history of being unreliable, and the query builder
+  returns `any` down many paths — typed on paper, untyped where it matters.
+- **Prisma** has the best developer experience of the three. It breaks on exactly this
+  project: its schema is its own DSL, and everything the DSL lacks is hand-written into
+  generated migrations. Nearly all of the plan sits outside it — the `pg_trgm` and
+  `unaccent` extensions, GIN indexes, `similarity()` queries, the aggregates behind "what
+  to buy". Raw SQL exists through `$queryRaw` but loses its types, and here raw SQL is the
+  main instrument rather than an escape hatch.
+
 **Postgres does the heavy lifting:** trigram matching and edit distance for search,
 GIN index; aggregates (average ratings, minimum price, store index) are plain SQL.
 Hence Drizzle: Prisma hides exactly what everything here rests on.
