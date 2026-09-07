@@ -9,7 +9,7 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@molvia/model": "*",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "scripts": {
     "lint": "eslint .",
