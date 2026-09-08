@@ -33,9 +33,15 @@ export const exchangeRateSchema = z
   })
 export type ExchangeRate = z.infer<typeof exchangeRateSchema>
 
-export function parseRate(input: string): bigint {
+/** The non-throwing core, shared by parseRate and the codec. */
+function scaledFromRate(input: string): bigint | null {
   const scaled = scaledFromDecimal(input, RATE_DIGITS)
-  if (scaled === null || scaled <= 0n) throw new DomainError(ERROR.INVALID_AMOUNT, input)
+  return scaled === null || scaled <= 0n ? null : scaled
+}
+
+export function parseRate(input: string): bigint {
+  const scaled = scaledFromRate(input)
+  if (scaled === null) throw new DomainError(ERROR.INVALID_AMOUNT, input)
   return scaled
 }
 
@@ -56,14 +62,20 @@ export const exchangeRateWireSchema = z.object({
 })
 export type ExchangeRateWire = z.infer<typeof exchangeRateWireSchema>
 
+/** Reports through the payload rather than throwing — see the note on moneyCodec. */
 export const rateCodec = z.codec(exchangeRateWireSchema, exchangeRateSchema, {
-  decode: ({ base, quote, rate, source, asOf }) => ({
-    base,
-    quote,
-    scaled: parseRate(rate),
-    source,
-    asOf: new Date(asOf),
-  }),
+  decode: ({ base, quote, rate, source, asOf }, payload) => {
+    const scaled = scaledFromRate(rate)
+    if (scaled === null) {
+      payload.issues.push({
+        code: 'custom',
+        input: rate,
+        path: ['rate'],
+        message: ERROR.INVALID_AMOUNT,
+      })
+    }
+    return { base, quote, scaled: scaled ?? 1n, source, asOf: new Date(asOf) }
+  },
   encode: (value) => ({
     base: value.base,
     quote: value.quote,

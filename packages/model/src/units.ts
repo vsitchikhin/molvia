@@ -39,14 +39,21 @@ export const quantitySchema = z.object({
   unit: baseUnitSchema,
 })
 
-export function parseQuantity(input: string, unit: Unit): Quantity {
+/** The non-throwing core, shared by parseQuantity and the codec so they cannot disagree. */
+function quantityFromDecimal(input: string, unit: Unit): Quantity | null {
   const thousandths = scaledFromDecimal(input, 3)
-  if (thousandths === null) throw new DomainError(ERROR.INVALID_QUANTITY, input)
+  if (thousandths === null) return null
 
   const milli = (thousandths * MILLI_PER_UNIT[unit]) / 1000n
-  if (milli <= 0n) throw new DomainError(ERROR.INVALID_QUANTITY, input)
+  if (milli <= 0n) return null
 
   return { milli, unit: BASE_OF[unit] }
+}
+
+export function parseQuantity(input: string, unit: Unit): Quantity {
+  const quantity = quantityFromDecimal(input, unit)
+  if (quantity === null) throw new DomainError(ERROR.INVALID_QUANTITY, input)
+  return quantity
 }
 
 /** The inverse of parseQuantity for a base unit: 1128n -> "1.128". */
@@ -61,8 +68,21 @@ export const quantityWireSchema = z.object({
 })
 export type QuantityWire = z.infer<typeof quantityWireSchema>
 
+/** Reports through the payload rather than throwing — see the note on moneyCodec. */
 export const quantityCodec = z.codec(quantityWireSchema, quantitySchema, {
-  decode: ({ amount, unit }) => parseQuantity(amount, unit),
+  decode: ({ amount, unit }, payload) => {
+    const quantity = quantityFromDecimal(amount, unit)
+    if (quantity === null) {
+      payload.issues.push({
+        code: 'custom',
+        input: amount,
+        path: ['amount'],
+        message: ERROR.INVALID_QUANTITY,
+      })
+      return { milli: 1n, unit }
+    }
+    return quantity
+  },
   encode: (value) => ({ amount: decimalFromMilli(value), unit: value.unit }),
 })
 

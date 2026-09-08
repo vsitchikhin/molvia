@@ -74,6 +74,19 @@ describe('rateCodec', () => {
     expect(() => rateCodec.parse(wire)).toThrow()
   })
 
+  it('reports a bad rate through safeParse rather than escaping it', () => {
+    const parsed = rateCodec.safeParse({
+      base: 'RUB',
+      quote: 'AMD',
+      rate: 'abc',
+      source: 'official',
+      asOf: asOf.toISOString(),
+    })
+    expect(parsed.success).toBe(false)
+    if (parsed.success) return
+    expect(parsed.error.issues[0]).toMatchObject({ path: ['rate'] })
+  })
+
   it('refuses a date that is not ISO', () => {
     const wire = {
       base: 'RUB',

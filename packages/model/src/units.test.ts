@@ -99,6 +99,16 @@ describe('quantityCodec', () => {
   it('refuses a non-positive quantity rather than letting unitPrice divide by it', () => {
     expect(() => quantityCodec.parse({ amount: '0', unit: 'kg' })).toThrow()
   })
+
+  it('reports it through safeParse rather than escaping it', () => {
+    const parsed = quantityCodec.safeParse({ amount: '0', unit: 'kg' })
+    expect(parsed.success).toBe(false)
+    if (parsed.success) return
+    expect(parsed.error.issues[0]).toMatchObject({
+      path: ['amount'],
+      message: ERROR.INVALID_QUANTITY,
+    })
+  })
 })
 
 describe('decimalFromMilli', () => {

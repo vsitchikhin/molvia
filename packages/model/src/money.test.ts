@@ -157,4 +157,16 @@ describe('moneyCodec', () => {
     expect(() => moneyCodec.parse({ amount: '1.234', currency: 'AMD' })).toThrow()
     expect(() => moneyCodec.parse({ amount: 'abc', currency: 'AMD' })).toThrow()
   })
+
+  it('reports a bad amount through safeParse rather than escaping it', () => {
+    // safeParse exists so it does not throw. A transform that throws would fly past the
+    // `if (!parsed.success) return 400` branch of every route written the canonical way.
+    const parsed = moneyCodec.safeParse({ amount: 'abc', currency: 'AMD' })
+    expect(parsed.success).toBe(false)
+    if (parsed.success) return
+    expect(parsed.error.issues[0]).toMatchObject({
+      path: ['amount'],
+      message: ERROR.INVALID_AMOUNT,
+    })
+  })
 })

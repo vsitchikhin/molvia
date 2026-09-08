@@ -52,9 +52,17 @@ export function money(minor: bigint, currency: Currency): Money {
   return { minor, currency }
 }
 
+/**
+ * The non-throwing core. Everything that decides whether a string is an amount lives
+ * here, so the codec and parseMoney can never disagree about it.
+ */
+function minorFromDecimal(input: string, currency: Currency): bigint | null {
+  return scaledFromDecimal(input, MINOR_EXPONENT[currency])
+}
+
 /** Parses "5403.12", "5 403,12" and "5403" — anything a receipt or a keyboard produces. */
 export function parseMoney(input: string, currency: Currency): Money {
-  const minor = scaledFromDecimal(input, MINOR_EXPONENT[currency])
+  const minor = minorFromDecimal(input, currency)
   if (minor === null) throw new DomainError(ERROR.INVALID_AMOUNT, input)
   return { minor, currency }
 }
@@ -76,8 +84,27 @@ export const moneyWireSchema = z.object({
 })
 export type MoneyWire = z.infer<typeof moneyWireSchema>
 
+/**
+ * A transform must not throw: zod checks `payload.issues` after running it and aborts,
+ * so an issue pushed here comes back as a normal `success: false`. Throwing instead would
+ * escape `safeParse` — the one method whose whole purpose is not to — and a route written
+ * as `if (!parsed.success) return 400` would fail past its own branch.
+ */
 export const moneyCodec = z.codec(moneyWireSchema, moneySchema, {
-  decode: ({ amount, currency }) => parseMoney(amount, currency),
+  decode: ({ amount, currency }, payload) => {
+    const minor = minorFromDecimal(amount, currency)
+    if (minor === null) {
+      payload.issues.push({
+        code: 'custom',
+        input: amount,
+        path: ['amount'],
+        message: ERROR.INVALID_AMOUNT,
+      })
+      // Discarded: zod sees the issue and stops before the output schema runs.
+      return { minor: 0n, currency }
+    }
+    return { minor, currency }
+  },
   encode: (value) => ({ amount: decimalFromMinor(value), currency: value.currency }),
 })
 
