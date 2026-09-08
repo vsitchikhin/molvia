@@ -424,10 +424,26 @@ shelf, so a desktop-only pass would prove nothing about the screen that matters.
 ### Before a task
 
 1. **Requirements, then a plan, then approval, then code — per Jira task.** Before writing
-   anything, work out what the task actually requires; then write the implementation plan
-   as a comment on that task. **Code starts only after the owner approves the plan.** The
-   plan lives on the task rather than in a file, so it cannot drift away from the work it
-   describes.
+   anything, work out what the task actually requires; write that up, then write the
+   implementation plan. **Code starts only after the owner approves the plan.**
+
+   **Both are files, at fixed paths — never a comment on the Jira issue:**
+
+   |                                          |                     |
+   | ---------------------------------------- | ------------------- |
+   | `.scratch/tasks/requirements/MOL-<n>.md` | requirements        |
+   | `.scratch/tasks/plans/MOL-<n>.md`        | implementation plan |
+
+   The paths are fixed; do not move them. A Jira comment cannot be edited alongside the
+   work, cannot be diffed, and is unreachable when the tracker is down — and the MCP
+   server times out often enough for that to matter. `.scratch` is shared across every
+   working copy, so a plan there is visible from all of them and outlives any one copy.
+
+   **Everything else the work produces goes under `.scratch` too**, unless a location was
+   named: self-reviews, self-tests, questions for people, status notes, drafts. The layout
+   and the rules are in `.scratch/README.md`. Nothing lands in the repository that was not
+   asked for there.
+
 2. **We gather requirements ourselves** — there are no specs. The source is the product
    plan in Confluence; if it has no answer, the requirement is stated explicitly in the
    plan and talked through.
@@ -574,8 +590,9 @@ by hand.
 - **Each copy gets its own bot.** Two processes on one token steal each other's updates via
   long polling — silently and unreproducibly. Register a separate bot in BotFather.
 
-**Plans live on the Jira task, not in the working copy.** A copy is temporary and a task is
-not, and a plan sitting in one copy is invisible from the others.
+**Plans and requirements live in `.scratch/tasks/`, not in the working copy and not on the
+Jira issue.** A copy is temporary and a task is not; `.scratch` is the shared directory, so
+the same file is visible from every copy and survives deleting any of them.
 
 `.scratch` and `.lavish` are symlinks to `../_shared/molvia/{scratch,lavish}`, outside the
 repository and in `.gitignore`. The links are relative, so the whole `projects/` tree can be
