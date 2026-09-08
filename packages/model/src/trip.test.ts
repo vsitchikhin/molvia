@@ -130,12 +130,14 @@ describe('convertMoney', () => {
     expect(digits(formatMoney(convertMoney(total, rate('4.60', 'personal'))))).toContain('1411,55')
   })
 
-  it('rounds a half up rather than away, the way a till does', () => {
-    // 0,01 ֏ at exactly 2 ֏ per rouble is 0,005 ₽ — the boundary case.
+  it('rounds a half away from zero, the way a till does', () => {
+    // 0,01 ֏ at exactly 2 ֏ per rouble is 0,005 ₽ — the boundary case. "Half up" would
+    // name a different rule for negatives, and the next test is the one that tells them
+    // apart: away from zero gives −1, up would give 0.
     expect(convertMoney(money(1n, 'AMD'), rate('2')).minor).toBe(1n)
   })
 
-  it('keeps the sign of a refund', () => {
+  it('and away from zero on a difference, which is the only negative money there is', () => {
     expect(convertMoney(money(-1n, 'AMD'), rate('2')).minor).toBe(-1n)
   })
 

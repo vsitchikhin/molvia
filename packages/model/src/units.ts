@@ -139,9 +139,15 @@ export function compareUnitPrice(a: UnitPrice, b: UnitPrice): number {
   return a.scaledMinor < b.scaledMinor ? -1 : 1
 }
 
-/** Rounding happens here and nowhere else: this is output. */
+/**
+ * Rounding happens here and nowhere else: this is output.
+ *
+ * At least two digits, whatever the currency keeps. A unit price is a computed ratio, not
+ * an amount anyone pays, and the whole reason to show it is to tell 570,00 from 577,78 —
+ * which a currency with no minor unit would have rounded into the same number.
+ */
 export function formatUnitPrice(price: UnitPrice, locale = 'ru-RU'): string {
-  const exponent = MINOR_EXPONENT[price.currency]
+  const exponent = Math.max(MINOR_EXPONENT[price.currency], 2)
   const major = Number(price.scaledMinor) / Number(UNIT_PRICE_SCALE * minorPerMajor(price.currency))
   const amount = new Intl.NumberFormat(locale, {
     style: 'currency',

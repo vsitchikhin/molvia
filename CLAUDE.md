@@ -506,8 +506,10 @@ Migrations that lose data, swapping a stack element, CI changes, refactoring out
 
 ## State
 
-**Scaffolded, no product features yet**, and release 0.1 is already broken into epics and
-tasks in Jira. What exists, what is decided and what is still open — `docs/onboarding.md`.
+**Scaffolded, and the domain model is in** — MOL-4: seven entities, eight write inputs and
+three rules in `packages/model`, with the wire codecs that money and quantity need to cross
+it at all. No table, route or screen yet. Release 0.1 is broken into epics and tasks in
+Jira. What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 `docker-compose.yml` runs Postgres only; the applications run natively in development,
 because HMR and a debugger attached to a host process beat a rebuild inside a container.
