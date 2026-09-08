@@ -33,7 +33,7 @@ describe('newExpenseSchema', () => {
     const parsed = newExpenseSchema.parse({
       tripId: ids.tripId,
       itemId: ids.itemId,
-      quantity: { amount: '1.128', unit: 'kg' },
+      quantity: { value: '1.128', unit: 'kg' },
       amount: { amount: '5403.12', currency: 'AMD' },
     })
     expect(parsed.quantity).toEqual({ milli: 1128n, unit: 'kg' })

@@ -57,7 +57,7 @@ describe('newItemSchema', () => {
   it('decodes the quantity from the wire in the same parse', () => {
     const parsed = newItemSchema.parse({
       ...input,
-      typicalQuantity: { amount: '1.000', unit: 'l' },
+      typicalQuantity: { value: '1.000', unit: 'l' },
     })
     expect(parsed.typicalQuantity).toEqual({ milli: 1000n, unit: 'l' })
   })

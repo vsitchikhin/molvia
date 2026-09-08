@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { ERROR } from './errors'
+import { DomainError, ERROR } from './errors'
 import { money, parseMoney } from './money'
 import {
   UNIT_PRICE_SCALE,
@@ -26,6 +26,32 @@ describe('parseQuantity', () => {
       expect(() => parseQuantity(bad, 'kg')).toThrow(
         expect.objectContaining({ code: ERROR.INVALID_QUANTITY }),
       )
+    }
+  })
+
+  it('refuses precision below the resolution of the unit instead of dropping it', () => {
+    // 1.9 g used to become 1 g without a word, while 0.5 g was an error: the same loss
+    // gave two different answers depending on whether it crossed a whole unit.
+    for (const bad of ['1.9', '0.5', '1.001']) {
+      expect(() => parseQuantity(bad, 'g')).toThrow(
+        expect.objectContaining({ code: ERROR.INVALID_QUANTITY }),
+      )
+    }
+    expect(() => parseQuantity('1.5', 'ml')).toThrow(DomainError)
+  })
+
+  it('refuses «1,500» rather than reading it as 1 g', () => {
+    // A Russian keyboard and an Armenian price tag both write 1500 that way, and it used
+    // to parse as a thousandth of it — a thousandfold error straight into a unit price.
+    expect(parseQuantity('1 500', 'g').milli).toBe(1500n)
+    expect(parseQuantity('1500', 'g').milli).toBe(1500n)
+    expect(() => parseQuantity('1,500', 'g')).toThrow(DomainError)
+  })
+
+  it('refuses half a piece, because a piece does not divide', () => {
+    expect(parseQuantity('2', 'piece').milli).toBe(2000n)
+    for (const bad of ['1.5', '0.001']) {
+      expect(() => parseQuantity(bad, 'piece')).toThrow(DomainError)
     }
   })
 })
@@ -85,27 +111,27 @@ describe('quantityCodec', () => {
     expect(() => JSON.stringify(value)).toThrow(TypeError)
 
     const wire = z.encode(quantityCodec, value)
-    expect(wire).toEqual({ amount: '1.128', unit: 'kg' })
+    expect(wire).toEqual({ value: '1.128', unit: 'kg' })
     expect(quantityCodec.parse(JSON.parse(JSON.stringify(wire)))).toEqual(value)
   })
 
   it('travels in the base unit, so grams come back as kilograms', () => {
     expect(z.encode(quantityCodec, parseQuantity('900', 'g'))).toEqual({
-      amount: '0.900',
+      value: '0.900',
       unit: 'kg',
     })
   })
 
   it('refuses a non-positive quantity rather than letting unitPrice divide by it', () => {
-    expect(() => quantityCodec.parse({ amount: '0', unit: 'kg' })).toThrow()
+    expect(() => quantityCodec.parse({ value: '0', unit: 'kg' })).toThrow()
   })
 
   it('reports it through safeParse rather than escaping it', () => {
-    const parsed = quantityCodec.safeParse({ amount: '0', unit: 'kg' })
+    const parsed = quantityCodec.safeParse({ value: '0', unit: 'kg' })
     expect(parsed.success).toBe(false)
     if (parsed.success) return
     expect(parsed.error.issues[0]).toMatchObject({
-      path: ['amount'],
+      path: ['value'],
       message: ERROR.INVALID_QUANTITY,
     })
   })

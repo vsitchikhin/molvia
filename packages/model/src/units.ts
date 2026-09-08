@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { decimalFromScaled, scaledFromDecimal } from './decimal'
+import { INT8_MAX, decimalFromScaled, divideRounded, scaledFromDecimal } from './decimal'
 import { DomainError, ERROR } from './errors'
 import { MINOR_EXPONENT, minorPerMajor } from './money'
 import type { Currency, Money } from './money'
@@ -44,8 +44,18 @@ function quantityFromDecimal(input: string, unit: Unit): Quantity | null {
   const thousandths = scaledFromDecimal(input, 3)
   if (thousandths === null) return null
 
-  const milli = (thousandths * MILLI_PER_UNIT[unit]) / 1000n
-  if (milli <= 0n) return null
+  const scaled = thousandths * MILLI_PER_UNIT[unit]
+  // Precision below the resolution of the unit is refused, not dropped. Truncating here
+  // was silent in one direction and an error in the other — 1.9 g became 1 g without a
+  // word, 0.5 g was rejected — and it turned «1,500» g, which is how a Russian keyboard
+  // and an Armenian price tag both write 1500, into 1 g: a thousandfold error in a price.
+  if (scaled % 1000n !== 0n) return null
+
+  const milli = scaled / 1000n
+  if (milli <= 0n || milli > INT8_MAX) return null
+
+  // A piece does not divide. BASE_OF makes it a base unit precisely so pieces are counted.
+  if (BASE_OF[unit] === 'piece' && milli % 1000n !== 0n) return null
 
   return { milli, unit: BASE_OF[unit] }
 }
@@ -63,27 +73,29 @@ export function decimalFromMilli({ milli }: Quantity): string {
 
 /** Same reason as money: milli is a bigint, and JSON.stringify throws on those. */
 export const quantityWireSchema = z.object({
-  amount: z.string(),
+  // `value`, not `amount`: an amount is money. One name for both would freeze into the
+  // HTTP contract in MOL-7 and cost a client migration to undo.
+  value: z.string().max(40),
   unit: baseUnitSchema,
 })
 export type QuantityWire = z.infer<typeof quantityWireSchema>
 
 /** Reports through the payload rather than throwing — see the note on moneyCodec. */
 export const quantityCodec = z.codec(quantityWireSchema, quantitySchema, {
-  decode: ({ amount, unit }, payload) => {
-    const quantity = quantityFromDecimal(amount, unit)
+  decode: ({ value, unit }, payload) => {
+    const quantity = quantityFromDecimal(value, unit)
     if (quantity === null) {
       payload.issues.push({
         code: 'custom',
-        input: amount,
-        path: ['amount'],
+        input: value,
+        path: ['value'],
         message: ERROR.INVALID_QUANTITY,
       })
       return { milli: 1n, unit }
     }
     return quantity
   },
-  encode: (value) => ({ amount: decimalFromMilli(value), unit: value.unit }),
+  encode: (quantity) => ({ value: decimalFromMilli(quantity), unit: quantity.unit }),
 })
 
 /**
@@ -108,7 +120,9 @@ export function unitPrice(amount: Money, quantity: Quantity): UnitPrice {
     throw new DomainError(ERROR.INVALID_AMOUNT, String(amount.minor))
   }
   return {
-    scaledMinor: (amount.minor * 1000n * UNIT_PRICE_SCALE) / quantity.milli,
+    // Rounded, not truncated — the same rule convertMoney uses. Two different divisions
+    // in one domain read as an accident six months later, not as a decision.
+    scaledMinor: divideRounded(amount.minor * 1000n * UNIT_PRICE_SCALE, quantity.milli),
     currency: amount.currency,
     unit: quantity.unit,
   }
