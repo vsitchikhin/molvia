@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ERROR } from '#model/support/errors'
-import { errorResponseSchema, healthResponseSchema } from '#model/contracts/contracts'
+import { errorResponseSchema, healthResponseSchema } from '#model/contracts/wire'
 
 describe('the wire contract', () => {
   it('accepts a healthy and a degraded answer', () => {

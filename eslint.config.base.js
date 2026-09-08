@@ -64,11 +64,15 @@ export function base({ tsconfigRootDir, browser = false }) {
 export const IMPORT_SHAPE = [
   {
     group: ['../*', '../**'],
-    message: "Reach across directories with the module's own alias: '@/…' instead of '../…'.",
+    message:
+      "Reach across directories with the module's own alias instead of '../…': '@/…' in an " +
+      "application, '#<package>/…' in a package that ships its source.",
   },
   {
     group: ['./*/*', './*/**'],
-    message: "'./' is for a file in the same directory. For a subdirectory use the alias: '@/…'.",
+    message:
+      "'./' is for a file in the same directory. For a subdirectory use the module's alias: " +
+      "'@/…' in an application, '#<package>/…' in a package that ships its source.",
   },
 ]
 

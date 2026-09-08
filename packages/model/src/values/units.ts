@@ -5,8 +5,7 @@ import {
   divideRounded,
   scaledFromDecimal,
 } from '#model/support/decimal'
-import { ISSUE } from '#model/support/errors'
-import { DomainError, ERROR } from '#model/support/errors'
+import { DomainError, ERROR, ISSUE } from '#model/support/errors'
 import { MINOR_EXPONENT } from './money'
 import type { Currency, Money } from './money'
 

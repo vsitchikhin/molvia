@@ -25,7 +25,7 @@ import {
   quantitySchema,
   unitPrice,
 } from '#model/values/units'
-import { verdictLevel } from '#model/entities/verdict'
+import { newVerdictSchema, verdictLevel } from '#model/entities/verdict'
 
 /**
  * The adversarial pass on this model found twenty ways to make it answer wrongly, silently
@@ -233,7 +233,9 @@ describe('round two: the same classes, found again on the new code', () => {
 
   it('lets a night trip carry the rate of its own day', () => {
     // N5. The official rate is published at UTC midnight, Armenia is UTC+4, so every trip
-    // before 04:00 local was «earlier» than the rate it was snapshotted with.
+    // before 04:00 local was «earlier» than the rate it was snapshotted with. Timing the
+    // rate against the trip needs the trip's timezone, which the model does not have, so
+    // the check belongs to the use case that takes the snapshot — see MOL-7.
     const rate = {
       base: 'RUB' as const,
       quote: 'AMD' as const,
@@ -243,8 +245,6 @@ describe('round two: the same classes, found again on the new code', () => {
     }
     const night = { ...trip, rate, startedAt: new Date('2026-09-07T22:00:00Z') }
     expect(tripSchema.safeParse(night).success).toBe(true)
-    const tomorrow = { ...trip, rate: { ...rate, asOf: new Date('2026-09-10T00:00:00Z') } }
-    expect(tripSchema.safeParse(tomorrow).success).toBe(false)
   })
 
   it('prints a unit price exactly, the way an amount is printed', () => {
@@ -268,5 +268,46 @@ describe('round two: the same classes, found again on the new code', () => {
     expect(() =>
       z.encode(moneyCodec, subtractMoney(money(100n, 'AMD'), money(500n, 'AMD'))),
     ).toThrow()
+  })
+})
+
+describe('round three: a rule that was too narrow became too wide', () => {
+  it('takes an emoji joined by a zero-width joiner, in a name and in a review', () => {
+    // R1. Forbidding \p{C} outright caught U+200D, which joins every composite emoji —
+    // and a review is free text typed on a phone.
+    for (const name of ['Kafe \u{1F468}\u200d\u{1F373}', 'Bar \u{1F3F3}\ufe0f\u200d\u{1F308}']) {
+      expect(newPlaceSchema.safeParse({ ...place, name }).success).toBe(true)
+    }
+    expect(
+      newVerdictSchema.safeParse({
+        itemId: ids.item,
+        score: 5,
+        review: 'vkusno \u{1F468}\u200d\u{1F373}',
+      }).success,
+    ).toBe(true)
+  })
+
+  it('takes a name made only of symbols', () => {
+    // R2. «Должна быть буква» refused a shop sign of one emoji and a review of three.
+    for (const name of ['&', '+++', '\u{1F37A}']) {
+      expect(newPlaceSchema.safeParse({ ...place, name }).success).toBe(true)
+    }
+  })
+
+  it('holds a search key to the same rule as a name, with room for transliteration', () => {
+    // R3/R4. The key is the column search runs on, and it was the one string that never
+    // went through visibleLine. Its cap is 800 because «щ» becomes «shch».
+    for (const searchKey of ['a\u0000b', '\u2800', 'a\nb']) {
+      expect(itemSchema.safeParse({ ...item, searchKey }).success).toBe(false)
+    }
+    expect(itemSchema.safeParse({ ...item, searchKey: 'shch'.repeat(200) }).success).toBe(true)
+  })
+
+  it('holds a city to the same rule as the name standing next to it', () => {
+    // R5. Same schema, same request, two different checks — and the city is typed by hand.
+    for (const city of ['Gyu\u0000mri', '\u2800', 'Gyu\nmri']) {
+      expect(newPlaceSchema.safeParse({ ...place, city }).success).toBe(false)
+    }
+    expect(newPlaceSchema.safeParse({ ...place, city: 'Гюмри' }).success).toBe(true)
   })
 })

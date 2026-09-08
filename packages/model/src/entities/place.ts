@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { citySchema, countrySchema } from '#model/values/geo'
 import { visibleLine } from '#model/support/text'
 
+// 'venue' for the same reason as an item's 'dish': the 0.3 gate is measured separately.
 export const placeKindSchema = z.enum(['store', 'venue'])
 export type PlaceKind = z.infer<typeof placeKindSchema>
 

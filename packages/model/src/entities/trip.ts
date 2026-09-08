@@ -7,8 +7,6 @@ import type { Currency, Money } from '#model/values/money'
 import { RATE_DIGITS, exchangeRateSchema } from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000
-
 const tripFields = z.object({
   id: z.uuid(),
   actorId: z.uuid(),
@@ -23,13 +21,6 @@ export const tripSchema = tripFields
   .refine((trip) => trip.rate === null || trip.rate.quote === trip.currency, {
     error: ISSUE.RATE_NOT_OF_TRIP_CURRENCY,
   })
-  // A day of slack: the official rate is published at UTC midnight and Armenia is UTC+4,
-  // so any trip before 04:00 local is «earlier» than the rate of its own day.
-  .refine(
-    (trip) =>
-      trip.rate === null || trip.rate.asOf.getTime() <= trip.startedAt.getTime() + ONE_DAY_MS,
-    { error: ISSUE.RATE_AFTER_TRIP_START },
-  )
   .refine((trip) => trip.finishedAt === null || trip.finishedAt >= trip.startedAt, {
     error: ISSUE.TRIP_FINISHED_BEFORE_START,
   })
@@ -54,7 +45,7 @@ export function tripTotal(expenses: readonly Expense[]): readonly Money[] {
   }
   return [...byCurrency]
     .map(([currency, minor]) => ({ minor, currency }))
-    .sort((a, b) => (a.currency < b.currency ? -1 : 1))
+    .sort((a, b) => (a.currency === b.currency ? 0 : a.currency < b.currency ? -1 : 1))
 }
 
 /** Display only. The rate lives in the trip as a snapshot; last month must not move. */

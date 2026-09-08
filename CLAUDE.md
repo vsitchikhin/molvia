@@ -268,9 +268,10 @@ names. The root `eslint.config.js` ignores the module directories entirely and c
 `e2e/` and the repository's own config files. The root `vitest.config.ts` lists the
 modules' configs as projects rather than defining suites itself.
 
-`@/` is configured per module, so it can point somewhere different in each. Today all of
-them point at that module's `src/`, because in all of them that is where importable code
-lives — not because a shared rule decided it.
+`@/` is configured per module, so it can point somewhere different in each. In the three
+applications it points at that module's `src/`, because that is where importable code
+lives — not because a shared rule decided it. The packages under `packages/` have no `@/`
+at all: they ship their source, so they use `#<name>/…` instead, for the reason below.
 
 **What deliberately stays at the root**, with the reason:
 

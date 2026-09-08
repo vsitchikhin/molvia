@@ -38,7 +38,6 @@ export const ISSUE = {
   RATE_SAME_CURRENCY: 'issue.rate_same_currency',
   RATE_NOT_OF_TRIP_CURRENCY: 'issue.rate_not_of_trip_currency',
   RATE_IMPLAUSIBLE_DATE: 'issue.rate_implausible_date',
-  RATE_AFTER_TRIP_START: 'issue.rate_after_trip_start',
   TRIP_FINISHED_BEFORE_START: 'issue.trip_finished_before_start',
   VERDICT_UPDATED_BEFORE_RATED: 'issue.verdict_updated_before_rated',
 } as const
