@@ -102,6 +102,11 @@ export function unitPrice(amount: Money, quantity: Quantity): UnitPrice {
   if (quantity.milli <= 0n) {
     throw new DomainError(ERROR.INVALID_QUANTITY, String(quantity.milli))
   }
+  // A negative amount here would win every comparison and sit at the top of "where is it
+  // cheaper" for good, with nothing on the card to show what it was built from.
+  if (amount.minor < 0n) {
+    throw new DomainError(ERROR.INVALID_AMOUNT, String(amount.minor))
+  }
   return {
     scaledMinor: (amount.minor * 1000n * UNIT_PRICE_SCALE) / quantity.milli,
     currency: amount.currency,

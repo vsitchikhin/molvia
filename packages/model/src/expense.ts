@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { moneyCodec, moneySchema } from './money'
+import { moneyCodec, priceSchema } from './money'
 import { quantityCodec, quantitySchema } from './units'
 
 /**
@@ -15,7 +15,7 @@ export const expenseSchema = z.object({
   /** The one thing that is required by meaning: everything else may be left empty. */
   itemId: z.uuid(),
   quantity: quantitySchema.nullable(),
-  amount: moneySchema.nullable(),
+  amount: priceSchema.nullable(),
   createdAt: z.date(),
 })
 export type Expense = z.infer<typeof expenseSchema>

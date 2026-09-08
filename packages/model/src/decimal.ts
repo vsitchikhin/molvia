@@ -8,12 +8,21 @@
  * Returns null rather than throwing so each caller keeps its own registry code.
  */
 export function scaledFromDecimal(input: string, digits: number): bigint | null {
-  const text = input.trim().replace(/\s/g, '').replace(',', '.')
-  const shape = digits === 0 ? /^-?\d+$/ : new RegExp(String.raw`^-?\d+(\.\d{1,${digits}})?$`)
+  const text = input.trim().replace(',', '.')
+
+  // A space is a group separator, not a character to be ignored. "5 403,12" is what a
+  // receipt prints; "5 4 0 3.1 2" and "- 5" are typos, and stripping every space first
+  // turned both of them into numbers the person never typed.
+  const wholePart = String.raw`(?:\d+|\d{1,3}(?:\s\d{3})+)`
+  const shape =
+    digits === 0
+      ? new RegExp(String.raw`^-?${wholePart}$`)
+      : new RegExp(String.raw`^-?${wholePart}(?:\.\d{1,${digits}})?$`)
   if (!shape.test(text)) return null
 
-  const negative = text.startsWith('-')
-  const body = negative ? text.slice(1) : text
+  const bare = text.replace(/\s/g, '')
+  const negative = bare.startsWith('-')
+  const body = negative ? bare.slice(1) : bare
   const dot = body.indexOf('.')
   const whole = dot === -1 ? body : body.slice(0, dot)
   const fraction = dot === -1 ? '' : body.slice(dot + 1)
@@ -22,13 +31,28 @@ export function scaledFromDecimal(input: string, digits: number): bigint | null 
   return negative ? -scaled : scaled
 }
 
-/** The inverse: 540312n at 2 digits is "5403.12". */
-export function decimalFromScaled(value: bigint, digits: number): string {
+/**
+ * The largest value a Postgres `bigint` column holds. The model refuses anything past it
+ * rather than letting the INSERT fail: an amount that cannot be stored is a bad amount,
+ * and `22003` from the driver is not an error this project is allowed to surface.
+ */
+export const INT8_MAX = 9_223_372_036_854_775_807n
+
+/**
+ * The inverse: 540312n at 2 digits is "5403.12".
+ *
+ * Typed as a numeric literal because `Intl.NumberFormat.format` accepts one and formats
+ * it without going through a float. The shape is guaranteed by construction here — sign,
+ * digits, one point — and this is the only place in the model where a shape is asserted
+ * rather than proven, precisely so that no caller has to assert it again.
+ */
+export function decimalFromScaled(value: bigint, digits: number): `${number}` {
   const negative = value < 0n
   const body = (negative ? -value : value).toString().padStart(digits + 1, '0')
   const sign = negative ? '-' : ''
-  if (digits === 0) return sign + body
-  return `${sign}${body.slice(0, -digits)}.${body.slice(-digits)}`
+  const decimal =
+    digits === 0 ? sign + body : `${sign}${body.slice(0, -digits)}.${body.slice(-digits)}`
+  return decimal as `${number}`
 }
 
 /**

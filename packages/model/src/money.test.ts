@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
+import { INT8_MAX } from './decimal'
 import { DomainError, ERROR } from './errors'
 import {
   MINOR_EXPONENT,
@@ -34,9 +35,25 @@ describe('parseMoney', () => {
     expect(parseMoney('12.5', 'RUB').minor).toBe(1250n)
   })
 
-  it('handles a whole amount and a negative one', () => {
+  it('handles a whole amount', () => {
     expect(parseMoney('570', 'AMD').minor).toBe(57000n)
-    expect(parseMoney('-40.50', 'RUB').minor).toBe(-4050n)
+  })
+
+  it('refuses a negative amount: a price is not a difference', () => {
+    expect(() => parseMoney('-40.50', 'RUB')).toThrow(
+      expect.objectContaining({ code: ERROR.INVALID_AMOUNT }),
+    )
+  })
+
+  it('refuses an amount the bigint column could not hold', () => {
+    expect(() => parseMoney('9'.repeat(20), 'AMD')).toThrow(DomainError)
+  })
+
+  it('takes a space as a group separator and nothing else', () => {
+    expect(parseMoney('5 403,12', 'AMD').minor).toBe(540312n)
+    for (const typo of ['5 4 0 3.1 2', '- 5', '5 40,12', '5 4033']) {
+      expect(() => parseMoney(typo, 'AMD')).toThrow(DomainError)
+    }
   })
 
   it('rejects what is not an amount', () => {
@@ -88,8 +105,27 @@ describe('formatMoney', () => {
   })
 
   it('keeps the sign of a negative amount', () => {
+    // Not a price — a difference, which is the one shape allowed to be negative.
     expect(digits(formatMoney(money(-4050n, 'RUB')))).toContain('40,50')
     expect(formatMoney(money(-4050n, 'RUB'))).toMatch(/-|−/)
+  })
+
+  it('prints the dram sign, which is what the separate font face exists for', () => {
+    expect(formatMoney(money(540312n, 'AMD'))).toContain('֏')
+    expect(formatMoney(money(540312n, 'AMD'))).not.toContain('AMD')
+  })
+
+  it('stays exact past 2^53 instead of drifting or printing infinity', () => {
+    // The only bridge from bigint to float used to be here, and it failed quietly.
+    const huge = money(9_007_199_254_740_993n, 'USD')
+    // en-US groups with commas, so strip those too before reading the digits back.
+    const bare = formatMoney(huge, 'en-US').replace(/[\s\u00a0\u202f,]/g, '')
+    expect(bare).toContain('90071992547409.93')
+    expect(bare).not.toContain('90071992547409.92')
+
+    // Exact all the way to the ceiling the model accepts, which is the bigint column.
+    const ceiling = formatMoney(money(INT8_MAX, 'USD'), 'en-US').replace(/[\s,]/g, '')
+    expect(ceiling).toContain('92233720368547758.07')
   })
 })
 

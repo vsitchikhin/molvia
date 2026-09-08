@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { decimalFromScaled, scaledFromDecimal } from './decimal'
+import { INT8_MAX, decimalFromScaled, scaledFromDecimal } from './decimal'
 import { DomainError, ERROR } from './errors'
 
 export const currencySchema = z.enum(['AMD', 'RUB', 'USD', 'EUR'])
@@ -48,6 +48,15 @@ export const moneySchema = z.object({
   currency: currencySchema,
 })
 
+/**
+ * A price, as opposed to a difference. `Money` itself may hold a negative — that is what
+ * subtractMoney returns and it is a legitimate value — but nothing a person enters or a
+ * client sends may be one.
+ */
+export const priceSchema = moneySchema.refine((value) => value.minor >= 0n, {
+  error: ERROR.INVALID_AMOUNT,
+})
+
 export function money(minor: bigint, currency: Currency): Money {
   return { minor, currency }
 }
@@ -57,7 +66,12 @@ export function money(minor: bigint, currency: Currency): Money {
  * here, so the codec and parseMoney can never disagree about it.
  */
 function minorFromDecimal(input: string, currency: Currency): bigint | null {
-  return scaledFromDecimal(input, MINOR_EXPONENT[currency])
+  const minor = scaledFromDecimal(input, MINOR_EXPONENT[currency])
+  // A price is never negative. The neighbours already knew this — parseQuantity and
+  // parseRate cut negatives — and money was the one place it was not enforced, which is
+  // why a single minus took first place in "where is it cheaper" for good.
+  if (minor === null || minor < 0n || minor > INT8_MAX) return null
+  return minor
 }
 
 /** Parses "5403.12", "5 403,12" and "5403" — anything a receipt or a keyboard produces. */
@@ -68,7 +82,7 @@ export function parseMoney(input: string, currency: Currency): Money {
 }
 
 /** The inverse of parseMoney: minor units back to the canonical decimal string. */
-export function decimalFromMinor({ minor, currency }: Money): string {
+export function decimalFromMinor({ minor, currency }: Money): `${number}` {
   return decimalFromScaled(minor, MINOR_EXPONENT[currency])
 }
 
@@ -130,16 +144,24 @@ export function compareMoney(a: Money, b: Money): number {
   return a.minor < b.minor ? -1 : 1
 }
 
-/** Rounding happens here and nowhere else: this is output. */
-export function formatMoney({ minor, currency }: Money, locale = 'ru-RU'): string {
-  const exponent = MINOR_EXPONENT[currency]
-  const major = Number(minor) / Number(minorPerMajor(currency))
+/**
+ * Rounding happens here and nowhere else: this is output.
+ *
+ * Formats the decimal string rather than a Number. That was the only bridge from bigint
+ * to float left in the model, and it did not fail loudly: past 2^53 it rewrote the last
+ * digits, and far enough out it printed "∞" where a price belongs.
+ */
+export function formatMoney(value: Money, locale = 'ru-RU'): string {
+  const exponent = MINOR_EXPONENT[value.currency]
   return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency,
+    currency: value.currency,
+    // Without this Intl renders AMD as three Latin letters in ru-RU, and the dram sign —
+    // the reason a separate face is carried for U+058F — never reached a price at all.
+    currencyDisplay: 'narrowSymbol',
     // Intl takes the digit count from its own ISO table, which agrees with ours for all
     // four currencies today. Relying on that agreement is the same mistake as the constant.
     minimumFractionDigits: exponent,
     maximumFractionDigits: exponent,
-  }).format(major)
+  }).format(decimalFromMinor(value))
 }
