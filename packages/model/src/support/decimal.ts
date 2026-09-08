@@ -5,14 +5,12 @@
 export function scaledFromDecimal(input: string, digits: number): bigint | null {
   const text = input.trim().replace(',', '.')
 
-  const wholePart = String.raw`(?:\d+|\d{1,3}(?:\s\d{3})+)`
-  const shape =
-    digits === 0
-      ? new RegExp(String.raw`^-?${wholePart}$`)
-      : new RegExp(String.raw`^-?${wholePart}(?:\.\d{1,${digits}})?$`)
+  const wholePart = String.raw`(?:\d+|\d{1,3}(?:[ \u00a0\u202f]\d{3})+)`
+  const fractionPart = digits === 0 ? '' : String.raw`(?:\.\d{1,${digits}})?`
+  const shape = new RegExp(String.raw`^-?${wholePart}${fractionPart}$`)
   if (!shape.test(text)) return null
 
-  const bare = text.replace(/\s/g, '')
+  const bare = text.replace(/[ \u00a0\u202f]/g, '')
   const negative = bare.startsWith('-')
   const body = negative ? bare.slice(1) : bare
   const dot = body.indexOf('.')

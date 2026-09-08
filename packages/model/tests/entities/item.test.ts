@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { itemSchema, newItemSchema } from './item'
+import { itemSchema, newItemSchema } from '#model/entities/item'
 
 const item = {
   id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',

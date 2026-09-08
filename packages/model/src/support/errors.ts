@@ -34,6 +34,7 @@ export const ISSUE = {
   PATCH_EMPTY: 'issue.patch_empty',
   TEXT_NOT_VISIBLE: 'issue.text_not_visible',
   BARCODE_DUPLICATED: 'issue.barcode_duplicated',
+  QUANTITY_FRACTIONAL_PIECE: 'issue.quantity_fractional_piece',
   RATE_SAME_CURRENCY: 'issue.rate_same_currency',
   RATE_NOT_OF_TRIP_CURRENCY: 'issue.rate_not_of_trip_currency',
   RATE_IMPLAUSIBLE_DATE: 'issue.rate_implausible_date',

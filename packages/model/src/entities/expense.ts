@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { moneyCodec, priceSchema } from './money'
-import { PATCH_EMPTY, changesSomething } from './patch'
-import { quantityCodec, quantitySchema } from './units'
+import { moneyCodec, priceSchema } from '#model/values/money'
+import { PATCH_EMPTY, changesSomething } from '#model/support/patch'
+import { quantityCodec, quantitySchema } from '#model/values/units'
 
 /**
  * The currency is prefilled from the trip and may differ from it, so the amount carries
@@ -25,10 +25,10 @@ export const newExpenseSchema = z.strictObject({
 })
 export type NewExpense = z.infer<typeof newExpenseSchema>
 
-export const expensePatchSchema = z
-  .strictObject({
-    quantity: quantityCodec.nullable().optional(),
-    amount: moneyCodec.nullable().optional(),
-  })
-  .refine(changesSomething, PATCH_EMPTY)
+const expensePatchFields = z.strictObject({
+  quantity: quantityCodec.nullable().optional(),
+  amount: moneyCodec.nullable().optional(),
+})
+
+export const expensePatchSchema = expensePatchFields.refine(changesSomething, PATCH_EMPTY)
 export type ExpensePatch = z.infer<typeof expensePatchSchema>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { expensePatchSchema, expenseSchema, newExpenseSchema } from './expense'
+import { expensePatchSchema, expenseSchema, newExpenseSchema } from '#model/entities/expense'
 
 const ids = {
   id: 'aa11bb22-cc33-4d44-8e55-ff6677889900',

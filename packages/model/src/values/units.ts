@@ -1,7 +1,13 @@
 import { z } from 'zod'
-import { INT8_MAX, decimalFromScaled, divideRounded, scaledFromDecimal } from './decimal'
-import { DomainError, ERROR } from './errors'
-import { MINOR_EXPONENT, minorPerMajor } from './money'
+import {
+  INT8_MAX,
+  decimalFromScaled,
+  divideRounded,
+  scaledFromDecimal,
+} from '#model/support/decimal'
+import { ISSUE } from '#model/support/errors'
+import { DomainError, ERROR } from '#model/support/errors'
+import { MINOR_EXPONENT } from './money'
 import type { Currency, Money } from './money'
 
 export const baseUnitSchema = z.enum(['kg', 'l', 'piece'])
@@ -31,11 +37,17 @@ export interface Quantity {
   readonly unit: BaseUnit
 }
 
-export const quantitySchema = z.object({
-  milli: z.bigint().positive(),
+const quantityFields = z.object({
+  milli: z.bigint().positive().max(INT8_MAX),
   unit: baseUnitSchema,
 })
 
+export const quantitySchema = quantityFields.refine(
+  (quantity) => quantity.unit !== 'piece' || quantity.milli % 1000n === 0n,
+  {
+    error: ISSUE.QUANTITY_FRACTIONAL_PIECE,
+  },
+)
 /**
  * Precision below the resolution of the unit is refused, not dropped: truncating made
  * «1,500» г — how a Russian keyboard writes 1500 — into 1 g, a thousandfold error.
@@ -61,7 +73,7 @@ export function parseQuantity(input: string, unit: Unit): Quantity {
   return quantity
 }
 
-export function decimalFromMilli({ milli }: Quantity): string {
+export function decimalFromMilli({ milli }: Quantity): `${number}` {
   return decimalFromScaled(milli, 3)
 }
 
@@ -81,14 +93,15 @@ export const quantityCodec = z.codec(quantityWireSchema, quantitySchema, {
         path: ['value'],
         message: ERROR.INVALID_QUANTITY,
       })
-      return { milli: 1n, unit }
+      return { milli: 0n, unit }
     }
     return quantity
   },
   encode: (quantity) => ({ value: decimalFromMilli(quantity), unit: quantity.unit }),
 })
 
-export const UNIT_PRICE_SCALE = 1_000_000n
+export const UNIT_PRICE_DIGITS = 6
+export const UNIT_PRICE_SCALE = 10n ** BigInt(UNIT_PRICE_DIGITS)
 
 export interface UnitPrice {
   readonly scaledMinor: bigint
@@ -124,7 +137,10 @@ export function compareUnitPrice(a: UnitPrice, b: UnitPrice): number {
 /** At least two digits whatever the currency keeps: the point is telling 570,00 from 577,78. */
 export function formatUnitPrice(price: UnitPrice, locale = 'ru-RU'): string {
   const exponent = Math.max(MINOR_EXPONENT[price.currency], 2)
-  const major = Number(price.scaledMinor) / Number(UNIT_PRICE_SCALE * minorPerMajor(price.currency))
+  const major = decimalFromScaled(
+    price.scaledMinor,
+    UNIT_PRICE_DIGITS + MINOR_EXPONENT[price.currency],
+  )
   const amount = new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: price.currency,

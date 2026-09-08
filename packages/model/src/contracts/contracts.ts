@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { ERROR } from './errors'
+import { ERROR } from '#model/support/errors'
 
 /** Shared between the API, the PWA and the bot — the only reason the language is TypeScript. */
 export const healthResponseSchema = z.object({

@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { INT8_MAX, decimalFromScaled, scaledFromDecimal } from './decimal'
-import { DomainError, ERROR } from './errors'
+import { INT8_MAX, decimalFromScaled, scaledFromDecimal } from '#model/support/decimal'
+import { DomainError, ERROR } from '#model/support/errors'
 
 export const currencySchema = z.enum(['AMD', 'RUB', 'USD', 'EUR'])
 export type Currency = z.infer<typeof currencySchema>
@@ -67,7 +67,7 @@ export const moneyWireSchema = z.object({
 export type MoneyWire = z.infer<typeof moneyWireSchema>
 
 /** decode must not throw: zod checks payload.issues after it and safeParse must not either. */
-export const moneyCodec = z.codec(moneyWireSchema, moneySchema, {
+export const moneyCodec = z.codec(moneyWireSchema, priceSchema, {
   decode: ({ amount, currency }, payload) => {
     const minor = minorFromDecimal(amount, currency)
     if (minor === null) {
@@ -77,7 +77,7 @@ export const moneyCodec = z.codec(moneyWireSchema, moneySchema, {
         path: ['amount'],
         message: ERROR.INVALID_AMOUNT,
       })
-      return { minor: 0n, currency }
+      return { minor: -1n, currency }
     }
     return { minor, currency }
   },
@@ -92,7 +92,9 @@ function sameCurrency(a: Money, b: Money): void {
 
 export function addMoney(a: Money, b: Money): Money {
   sameCurrency(a, b)
-  return { minor: a.minor + b.minor, currency: a.currency }
+  const minor = a.minor + b.minor
+  if (minor > INT8_MAX) throw new DomainError(ERROR.INVALID_AMOUNT, String(minor))
+  return { minor, currency: a.currency }
 }
 
 export function subtractMoney(a: Money, b: Money): Money {

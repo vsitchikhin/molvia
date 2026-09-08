@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actorPatchSchema, actorSchema } from './actor'
+import { actorPatchSchema, actorSchema } from '#model/entities/actor'
 
 const actor = {
   id: '3f2b1c6e-9a4d-4c1b-8f7e-2d5a6b8c9e01',

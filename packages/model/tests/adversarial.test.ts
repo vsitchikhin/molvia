@@ -1,12 +1,31 @@
 import { describe, expect, it } from 'vitest'
-import { actorPatchSchema } from './actor'
-import { ERROR } from './errors'
-import type { Expense } from './expense'
-import { newExpenseSchema } from './expense'
-import { MINOR_EXPONENT, decimalFromMinor, formatMoney, money, parseMoney } from './money'
-import { tripTotal } from './trip'
-import { compareUnitPrice, formatUnitPrice, parseQuantity, unitPrice } from './units'
-import { verdictLevel } from './verdict'
+import { z } from 'zod'
+import { actorPatchSchema } from '#model/entities/actor'
+import { INT8_MAX } from '#model/support/decimal'
+import { ERROR } from '#model/support/errors'
+import type { Expense } from '#model/entities/expense'
+import { newExpenseSchema } from '#model/entities/expense'
+import { itemSchema } from '#model/entities/item'
+import {
+  MINOR_EXPONENT,
+  decimalFromMinor,
+  formatMoney,
+  money,
+  moneyCodec,
+  parseMoney,
+  subtractMoney,
+} from '#model/values/money'
+import { newPlaceSchema } from '#model/entities/place'
+import { tripSchema, tripTotal } from '#model/entities/trip'
+import {
+  compareUnitPrice,
+  formatUnitPrice,
+  parseQuantity,
+  quantityCodec,
+  quantitySchema,
+  unitPrice,
+} from '#model/values/units'
+import { verdictLevel } from '#model/entities/verdict'
 
 /**
  * The adversarial pass on this model found twenty ways to make it answer wrongly, silently
@@ -20,6 +39,31 @@ const ids = {
   trip: 'd2f1a3b4-5c6d-4e7f-8a9b-0c1d2e3f4a5b',
   item: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
   expense: 'aa11bb22-cc33-4d44-8e55-ff6677889900',
+}
+
+const place = { kind: 'store', name: 'SAS', country: 'AM', city: 'Гюмри' }
+
+const item = {
+  id: ids.item,
+  kind: 'product',
+  name: 'Молоко «Ашхар»',
+  searchKey: 'moloko ashkhar',
+  barcodes: [],
+  note: null,
+  defaultUnit: 'l',
+  typicalQuantity: null,
+  createdBy: null,
+  createdAt: new Date('2026-09-08T10:00:00Z'),
+}
+
+const trip = {
+  id: ids.trip,
+  actorId: '3f2b1c6e-9a4d-4c1b-8f7e-2d5a6b8c9e01',
+  placeId: 'b1e0f2a4-5c6d-4e8f-9a0b-1c2d3e4f5a6b',
+  currency: 'AMD',
+  rate: null,
+  startedAt: new Date('2026-09-08T10:00:00Z'),
+  finishedAt: null,
 }
 
 const expense = (amount: Expense['amount']): Expense => ({
@@ -156,5 +200,73 @@ describe('a price reaches a person the way the design asks for it', () => {
     expect(
       formatUnitPrice(unitPrice(parseMoney('520', 'AMD'), parseQuantity('0.9', 'l'))),
     ).toContain('577,78')
+  })
+})
+
+describe('round two: the same classes, found again on the new code', () => {
+  it('refuses a name that is invisible by any means, not by a listed one', () => {
+    // N1/N2. The blocklist missed U+2800, which is a Symbol and renders as nothing, and
+    // NUL, which Postgres text cannot store at all — the class INT8_MAX exists for.
+    for (const name of ['\u2800', '\u3164', 'a\u0000b', 'a\u0007b', 'a\u2028b', 'a\u202eb']) {
+      expect(newPlaceSchema.safeParse({ ...place, name }).success).toBe(false)
+    }
+    expect(newPlaceSchema.safeParse({ ...place, name: 'SAS' }).success).toBe(true)
+  })
+
+  it('refuses half a piece on the way out as well as on the way in', () => {
+    // N3. The rule lived in the parser only, so the codec encoded a value it then
+    // refused to decode — and a round trip through the client lost the edit.
+    const half = { milli: 1500n, unit: 'piece' as const }
+    expect(quantitySchema.safeParse(half).success).toBe(false)
+    expect(() => z.encode(quantityCodec, half)).toThrow()
+    const whole = parseQuantity('2', 'piece')
+    expect(quantityCodec.parse(z.encode(quantityCodec, whole))).toEqual(whole)
+  })
+
+  it('refuses a search key that is blank or a megabyte long', () => {
+    // N4. `.min(1)` without `.trim()` counts characters, not meaning; and the key goes
+    // into the GIN index the whole search is built on.
+    for (const searchKey of ['', ' ', '\n', 'x'.repeat(1_000_000)]) {
+      expect(itemSchema.safeParse({ ...item, searchKey }).success).toBe(false)
+    }
+  })
+
+  it('lets a night trip carry the rate of its own day', () => {
+    // N5. The official rate is published at UTC midnight, Armenia is UTC+4, so every trip
+    // before 04:00 local was «earlier» than the rate it was snapshotted with.
+    const rate = {
+      base: 'RUB' as const,
+      quote: 'AMD' as const,
+      scaled: 4_820_000n,
+      source: 'official' as const,
+      asOf: new Date('2026-09-08T00:00:00Z'),
+    }
+    const night = { ...trip, rate, startedAt: new Date('2026-09-07T22:00:00Z') }
+    expect(tripSchema.safeParse(night).success).toBe(true)
+    const tomorrow = { ...trip, rate: { ...rate, asOf: new Date('2026-09-10T00:00:00Z') } }
+    expect(tripSchema.safeParse(tomorrow).success).toBe(false)
+  })
+
+  it('prints a unit price exactly, the way an amount is printed', () => {
+    // N6. The bridge to float was removed from formatMoney and left in the function the
+    // whole module exists for — the one that prints the comparison.
+    const price = unitPrice(money(INT8_MAX, 'USD'), parseQuantity('1', 'kg'))
+    expect(formatUnitPrice(price, 'en-US').replace(/[\s,]/g, '')).toContain('92233720368547758.07')
+  })
+
+  it('does not treat a line break as a group separator', () => {
+    // N8. Two lines of pasted text glued into one number.
+    for (const pasted of ['5\n403', '5\t403']) {
+      expect(() => parseMoney(pasted, 'AMD')).toThrow()
+    }
+    expect(parseMoney('5 403', 'AMD').minor).toBe(540300n)
+  })
+
+  it('will not encode money it would refuse to decode', () => {
+    // The circle the codec exists for: a difference from subtractMoney is a legitimate
+    // value and has no business on the wire, so encode refuses it too.
+    expect(() =>
+      z.encode(moneyCodec, subtractMoney(money(100n, 'AMD'), money(500n, 'AMD'))),
+    ).toThrow()
   })
 })

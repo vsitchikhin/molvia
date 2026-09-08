@@ -233,8 +233,12 @@ backend/        Fastify
 frontend/       Vue 3 + Vite: views, composables, styles/_tokens.scss, i18n
 bot/            grammY, a client of the API
 packages/
-  model/        domain: types, Zod schemas, pure rules (money, units, errors,
-                and the verdict once it exists). Dependencies: zod only
+  model/        domain: types, Zod schemas, pure rules. Dependencies: zod only
+    src/support/    errors, fixed-point decimals, text and patch helpers
+    src/values/     money, units, exchange rates, geography
+    src/entities/   actor, item, place, trip, expense, verdict
+    src/contracts/  what crosses the wire whole: health, errors, events
+    tests/          mirrors src, so src holds only what ships
   client/       typed API client built on the model schemas
 services/                 anything that is not a TypeScript workspace
   receipt-ocr/  Python, 1.0, not started
@@ -285,6 +289,14 @@ lives — not because a shared rule decided it.
 
 A path that climbs out of its own folder hides where a thing lives and breaks the moment
 a file moves. `./sub/thing` hides it half as much and breaks just as readily.
+
+**A package that ships TypeScript source uses `#<name>/…`, not `@/…`.** `@` is configured
+per module, so inside `packages/model` it would resolve against whichever module is doing
+the compiling — `backend/src`, `frontend/src` — and the import would silently point at
+someone else's file. Node's package subpath imports are resolved by the package that
+declares them, whoever is building, and `tsc`, `vue-tsc`, Vite and esbuild all honour
+them. `packages/model/package.json` declares `"imports": { "#model/*": "./src/*.ts" }`;
+the same shape applies to any other package under `packages/`.
 
 **Boundary rules — enforced by the linter, not by eye:**
 

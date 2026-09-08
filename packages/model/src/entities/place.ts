@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { citySchema, countrySchema } from './geo'
-import { visibleLine } from './text'
+import { citySchema, countrySchema } from '#model/values/geo'
+import { visibleLine } from '#model/support/text'
 
 export const placeKindSchema = z.enum(['store', 'venue'])
 export type PlaceKind = z.infer<typeof placeKindSchema>

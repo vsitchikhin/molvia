@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { ISSUE } from './errors'
-import { visibleLine } from './text'
-import { baseUnitSchema, quantityCodec, quantitySchema } from './units'
+import { ISSUE } from '#model/support/errors'
+import { visibleLine } from '#model/support/text'
+import { baseUnitSchema, quantityCodec, quantitySchema } from '#model/values/units'
 
 export const itemKindSchema = z.enum(['product', 'dish'])
 export type ItemKind = z.infer<typeof itemKindSchema>
@@ -22,7 +22,7 @@ export const itemSchema = z.object({
   kind: itemKindSchema,
   name: nameSchema,
   /** Latin, filled by MOL-5 — which is why no input carries it. */
-  searchKey: z.string().min(1),
+  searchKey: z.string().trim().min(1).max(200),
   /** Several per item: one product comes in different packaging, and loose goods have none. */
   barcodes: barcodesSchema,
   note: noteSchema.nullable(),

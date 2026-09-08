@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { ERROR } from './errors'
-import type { Expense } from './expense'
-import { formatMoney, money, parseMoney } from './money'
-import { parseRate } from './rates'
-import type { ExchangeRate } from './rates'
-import { convertMoney, newTripSchema, tripSchema, tripTotal } from './trip'
-import { formatUnitPrice, parseQuantity, unitPrice } from './units'
+import { ERROR } from '#model/support/errors'
+import type { Expense } from '#model/entities/expense'
+import { formatMoney, money, parseMoney } from '#model/values/money'
+import { parseRate } from '#model/values/rates'
+import type { ExchangeRate } from '#model/values/rates'
+import { convertMoney, newTripSchema, tripSchema, tripTotal } from '#model/entities/trip'
+import { formatUnitPrice, parseQuantity, unitPrice } from '#model/values/units'
 
 const digits = (text: string): string => text.replace(/[\s\u00a0\u202f]/g, '')
 

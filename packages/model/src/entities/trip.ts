@@ -1,28 +1,35 @@
 import { z } from 'zod'
-import { convertScaled } from './decimal'
-import { DomainError, ERROR, ISSUE } from './errors'
+import { INT8_MAX, convertScaled } from '#model/support/decimal'
+import { DomainError, ERROR, ISSUE } from '#model/support/errors'
 import type { Expense } from './expense'
-import { MINOR_EXPONENT, currencySchema } from './money'
-import type { Currency, Money } from './money'
-import { RATE_DIGITS, exchangeRateSchema } from './rates'
-import type { ExchangeRate } from './rates'
+import { MINOR_EXPONENT, currencySchema } from '#model/values/money'
+import type { Currency, Money } from '#model/values/money'
+import { RATE_DIGITS, exchangeRateSchema } from '#model/values/rates'
+import type { ExchangeRate } from '#model/values/rates'
 
-export const tripSchema = z
-  .object({
-    id: z.uuid(),
-    actorId: z.uuid(),
-    placeId: z.uuid(),
-    currency: currencySchema,
-    rate: exchangeRateSchema.nullable(),
-    startedAt: z.date(),
-    finishedAt: z.date().nullable(),
-  })
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
+
+const tripFields = z.object({
+  id: z.uuid(),
+  actorId: z.uuid(),
+  placeId: z.uuid(),
+  currency: currencySchema,
+  rate: exchangeRateSchema.nullable(),
+  startedAt: z.date(),
+  finishedAt: z.date().nullable(),
+})
+
+export const tripSchema = tripFields
   .refine((trip) => trip.rate === null || trip.rate.quote === trip.currency, {
     error: ISSUE.RATE_NOT_OF_TRIP_CURRENCY,
   })
-  .refine((trip) => trip.rate === null || trip.rate.asOf <= trip.startedAt, {
-    error: ISSUE.RATE_AFTER_TRIP_START,
-  })
+  // A day of slack: the official rate is published at UTC midnight and Armenia is UTC+4,
+  // so any trip before 04:00 local is «earlier» than the rate of its own day.
+  .refine(
+    (trip) =>
+      trip.rate === null || trip.rate.asOf.getTime() <= trip.startedAt.getTime() + ONE_DAY_MS,
+    { error: ISSUE.RATE_AFTER_TRIP_START },
+  )
   .refine((trip) => trip.finishedAt === null || trip.finishedAt >= trip.startedAt, {
     error: ISSUE.TRIP_FINISHED_BEFORE_START,
   })
@@ -41,11 +48,13 @@ export function tripTotal(expenses: readonly Expense[]): readonly Money[] {
   const byCurrency = new Map<Currency, bigint>()
   for (const { amount } of expenses) {
     if (amount === null) continue
-    byCurrency.set(amount.currency, (byCurrency.get(amount.currency) ?? 0n) + amount.minor)
+    const total = (byCurrency.get(amount.currency) ?? 0n) + amount.minor
+    if (total > INT8_MAX) throw new DomainError(ERROR.INVALID_AMOUNT, String(total))
+    byCurrency.set(amount.currency, total)
   }
   return [...byCurrency]
     .map(([currency, minor]) => ({ minor, currency }))
-    .sort((a, b) => a.currency.localeCompare(b.currency))
+    .sort((a, b) => (a.currency < b.currency ? -1 : 1))
 }
 
 /** Display only. The rate lives in the trip as a snapshot; last month must not move. */

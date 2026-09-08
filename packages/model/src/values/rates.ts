@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { INT8_MAX, decimalFromScaled, scaledFromDecimal } from './decimal'
-import { DomainError, ERROR, ISSUE } from './errors'
+import { decimalFromScaled, scaledFromDecimal } from '#model/support/decimal'
+import { DomainError, ERROR, ISSUE } from '#model/support/errors'
 import { currencySchema } from './money'
 
 export const RATE_DIGITS = 6
@@ -12,32 +12,30 @@ const RATE_MIN = RATE_SCALE / 10_000n
 const RATE_MAX = RATE_SCALE * 1_000_000n
 
 const RATE_EPOCH = new Date('2000-01-01T00:00:00.000Z')
-const CLOCK_SKEW_MS = 24 * 60 * 60 * 1000
 
 export const rateSourceSchema = z.enum(['personal', 'official'])
 export type RateSource = z.infer<typeof rateSourceSchema>
 
-export const exchangeRateSchema = z
-  .object({
-    base: currencySchema,
-    quote: currencySchema,
-    scaled: z.bigint().min(RATE_MIN).max(RATE_MAX),
-    source: rateSourceSchema,
-    asOf: z.date(),
-  })
+const exchangeRateFields = z.object({
+  base: currencySchema,
+  quote: currencySchema,
+  scaled: z.bigint().min(RATE_MIN).max(RATE_MAX),
+  source: rateSourceSchema,
+  asOf: z.date(),
+})
+
+export const exchangeRateSchema = exchangeRateFields
   .refine((rate) => rate.base !== rate.quote, {
     error: ISSUE.RATE_SAME_CURRENCY,
   })
-  .refine((rate) => rate.asOf >= RATE_EPOCH && rate.asOf.getTime() <= Date.now() + CLOCK_SKEW_MS, {
-    error: ISSUE.RATE_IMPLAUSIBLE_DATE,
-  })
+  // No Date.now() here: a schema that answers differently depending on the clock is not
+  // a schema. «Not from the future» belongs to the use case that snapshots the rate.
+  .refine((rate) => rate.asOf >= RATE_EPOCH, { error: ISSUE.RATE_IMPLAUSIBLE_DATE })
 export type ExchangeRate = z.infer<typeof exchangeRateSchema>
 
 function scaledFromRate(input: string): bigint | null {
   const scaled = scaledFromDecimal(input, RATE_DIGITS)
-  if (scaled === null || scaled < RATE_MIN || scaled > RATE_MAX || scaled > INT8_MAX) {
-    return null
-  }
+  if (scaled === null || scaled < RATE_MIN || scaled > RATE_MAX) return null
   return scaled
 }
 

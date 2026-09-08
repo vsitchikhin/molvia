@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { DomainError, ERROR } from './errors'
-import { money, parseMoney } from './money'
+import { DomainError, ERROR } from '#model/support/errors'
+import { money, parseMoney } from '#model/values/money'
 import {
   UNIT_PRICE_SCALE,
   compareUnitPrice,
@@ -10,7 +10,7 @@ import {
   parseQuantity,
   quantityCodec,
   unitPrice,
-} from './units'
+} from '#model/values/units'
 
 describe('parseQuantity', () => {
   it('reduces every unit to thousandths of its base unit', () => {

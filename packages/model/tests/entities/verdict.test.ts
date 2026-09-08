@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { ERROR } from './errors'
-import { newVerdictSchema, verdictLevel, verdictPatchSchema, verdictSchema } from './verdict'
+import { ERROR } from '#model/support/errors'
+import {
+  newVerdictSchema,
+  verdictLevel,
+  verdictPatchSchema,
+  verdictSchema,
+} from '#model/entities/verdict'
 
 const verdict = {
   id: 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a8b',

@@ -5,7 +5,7 @@ import {
   decimalFromScaled,
   divideRounded,
   scaledFromDecimal,
-} from './decimal'
+} from '#model/support/decimal'
 
 describe('scaledFromDecimal', () => {
   it('works at every scale the model uses, not only at two digits', () => {

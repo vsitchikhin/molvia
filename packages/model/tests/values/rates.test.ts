@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { ERROR } from './errors'
-import { RATE_SCALE, decimalFromRate, exchangeRateSchema, parseRate, rateCodec } from './rates'
+import { ERROR } from '#model/support/errors'
+import {
+  RATE_SCALE,
+  decimalFromRate,
+  exchangeRateSchema,
+  parseRate,
+  rateCodec,
+} from '#model/values/rates'
 
 const asOf = new Date('2026-09-08T10:00:00Z')
 

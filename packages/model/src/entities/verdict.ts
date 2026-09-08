@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { DomainError, ERROR, ISSUE } from './errors'
-import { PATCH_EMPTY, changesSomething } from './patch'
-import { visibleLine } from './text'
+import { DomainError, ERROR, ISSUE } from '#model/support/errors'
+import { PATCH_EMPTY, changesSomething } from '#model/support/patch'
+import { visibleLine } from '#model/support/text'
 
 const reviewSchema = visibleLine(500)
 
@@ -10,20 +10,23 @@ const reviewSchema = visibleLine(500)
  * differs. placeId is null for a product and filled for a dish in 0.3, so MOL-6 needs
  * UNIQUE NULLS NOT DISTINCT — without it two nulls count as different and let duplicates in.
  */
-export const verdictSchema = z
-  .object({
-    id: z.uuid(),
-    actorId: z.uuid(),
-    itemId: z.uuid(),
-    placeId: z.uuid().nullable(),
-    score: z.int().min(1).max(5),
-    review: reviewSchema.nullable(),
-    ratedAt: z.date(),
-    updatedAt: z.date(),
-  })
-  .refine((verdict) => verdict.updatedAt >= verdict.ratedAt, {
+const verdictFields = z.object({
+  id: z.uuid(),
+  actorId: z.uuid(),
+  itemId: z.uuid(),
+  placeId: z.uuid().nullable(),
+  score: z.int().min(1).max(5),
+  review: reviewSchema.nullable(),
+  ratedAt: z.date(),
+  updatedAt: z.date(),
+})
+
+export const verdictSchema = verdictFields.refine(
+  (verdict) => verdict.updatedAt >= verdict.ratedAt,
+  {
     error: ISSUE.VERDICT_UPDATED_BEFORE_RATED,
-  })
+  },
+)
 export type Verdict = z.infer<typeof verdictSchema>
 
 export const newVerdictSchema = z.strictObject({
@@ -34,12 +37,12 @@ export const newVerdictSchema = z.strictObject({
 })
 export type NewVerdict = z.infer<typeof newVerdictSchema>
 
-export const verdictPatchSchema = z
-  .strictObject({
-    score: z.int().min(1).max(5).optional(),
-    review: reviewSchema.nullable().optional(),
-  })
-  .refine(changesSomething, PATCH_EMPTY)
+const verdictPatchFields = z.strictObject({
+  score: z.int().min(1).max(5).optional(),
+  review: reviewSchema.nullable().optional(),
+})
+
+export const verdictPatchSchema = verdictPatchFields.refine(changesSomething, PATCH_EMPTY)
 export type VerdictPatch = z.infer<typeof verdictPatchSchema>
 
 export const VERDICT_LEVEL = {

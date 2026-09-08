@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { newPlaceSchema, placeSchema } from './place'
+import { newPlaceSchema, placeSchema } from '#model/entities/place'
 
 const place = {
   id: 'b1e0f2a4-5c6d-4e8f-9a0b-1c2d3e4f5a6b',

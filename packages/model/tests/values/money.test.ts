@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { INT8_MAX } from './decimal'
-import { DomainError, ERROR } from './errors'
+import { INT8_MAX } from '#model/support/decimal'
+import { DomainError, ERROR } from '#model/support/errors'
 import {
   MINOR_EXPONENT,
   addMoney,
@@ -14,7 +14,7 @@ import {
   moneyCodec,
   parseMoney,
   subtractMoney,
-} from './money'
+} from '#model/values/money'
 
 // Digits are asserted with spaces stripped: the grouping separator Intl picks differs
 // between ICU builds and is not what is under test.
