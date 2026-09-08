@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { decimalFromScaled, scaledFromDecimal } from './decimal'
 import { DomainError, ERROR } from './errors'
 import { MINOR_EXPONENT, minorPerMajor } from './money'
 import type { Currency, Money } from './money'
@@ -39,15 +40,8 @@ export const quantitySchema = z.object({
 })
 
 export function parseQuantity(input: string, unit: Unit): Quantity {
-  const text = input.trim().replace(/\s/g, '').replace(',', '.')
-  if (!/^\d+(\.\d{1,3})?$/.test(text)) {
-    throw new DomainError(ERROR.INVALID_QUANTITY, input)
-  }
-
-  const dot = text.indexOf('.')
-  const whole = dot === -1 ? text : text.slice(0, dot)
-  const fraction = dot === -1 ? '' : text.slice(dot + 1)
-  const thousandths = BigInt(whole) * 1000n + BigInt(fraction.padEnd(3, '0'))
+  const thousandths = scaledFromDecimal(input, 3)
+  if (thousandths === null) throw new DomainError(ERROR.INVALID_QUANTITY, input)
 
   const milli = (thousandths * MILLI_PER_UNIT[unit]) / 1000n
   if (milli <= 0n) throw new DomainError(ERROR.INVALID_QUANTITY, input)
@@ -57,8 +51,7 @@ export function parseQuantity(input: string, unit: Unit): Quantity {
 
 /** The inverse of parseQuantity for a base unit: 1128n -> "1.128". */
 export function decimalFromMilli({ milli }: Quantity): string {
-  const digits = milli.toString().padStart(4, '0')
-  return `${digits.slice(0, -3)}.${digits.slice(-3)}`
+  return decimalFromScaled(milli, 3)
 }
 
 /** Same reason as money: milli is a bigint, and JSON.stringify throws on those. */

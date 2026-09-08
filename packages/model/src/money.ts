@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { decimalFromScaled, scaledFromDecimal } from './decimal'
 import { DomainError, ERROR } from './errors'
 
 export const currencySchema = z.enum(['AMD', 'RUB', 'USD', 'EUR'])
@@ -51,39 +52,16 @@ export function money(minor: bigint, currency: Currency): Money {
   return { minor, currency }
 }
 
-const AMOUNT_SHAPE: Record<MinorExponent, RegExp> = {
-  0: /^-?\d+$/,
-  2: /^-?\d+(\.\d{1,2})?$/,
-  3: /^-?\d+(\.\d{1,3})?$/,
-}
-
 /** Parses "5403.12", "5 403,12" and "5403" — anything a receipt or a keyboard produces. */
 export function parseMoney(input: string, currency: Currency): Money {
-  const exponent = MINOR_EXPONENT[currency]
-  const text = input.trim().replace(/\s/g, '').replace(',', '.')
-  if (!AMOUNT_SHAPE[exponent].test(text)) {
-    throw new DomainError(ERROR.INVALID_AMOUNT, input)
-  }
-
-  const negative = text.startsWith('-')
-  const digits = negative ? text.slice(1) : text
-  const dot = digits.indexOf('.')
-  const whole = dot === -1 ? digits : digits.slice(0, dot)
-  const fraction = dot === -1 ? '' : digits.slice(dot + 1)
-
-  const minor =
-    BigInt(whole) * minorPerMajor(currency) + BigInt(fraction.padEnd(exponent, '0') || '0')
-  return { minor: negative ? -minor : minor, currency }
+  const minor = scaledFromDecimal(input, MINOR_EXPONENT[currency])
+  if (minor === null) throw new DomainError(ERROR.INVALID_AMOUNT, input)
+  return { minor, currency }
 }
 
 /** The inverse of parseMoney: minor units back to the canonical decimal string. */
 export function decimalFromMinor({ minor, currency }: Money): string {
-  const exponent = MINOR_EXPONENT[currency]
-  const negative = minor < 0n
-  const digits = (negative ? -minor : minor).toString().padStart(exponent + 1, '0')
-  const sign = negative ? '-' : ''
-  if (exponent === 0) return sign + digits
-  return `${sign}${digits.slice(0, -exponent)}.${digits.slice(-exponent)}`
+  return decimalFromScaled(minor, MINOR_EXPONENT[currency])
 }
 
 /**
