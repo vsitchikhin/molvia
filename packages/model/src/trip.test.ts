@@ -61,19 +61,14 @@ describe('tripSchema', () => {
 })
 
 describe('newTripSchema', () => {
-  it('decodes the rate snapshot in the same parse', () => {
-    const parsed = newTripSchema.parse({
-      placeId: trip.placeId,
-      rate: {
-        base: 'RUB',
-        quote: 'AMD',
-        rate: '4.820000',
-        source: 'personal',
-        asOf: '2026-09-08T10:00:00.000Z',
-      },
-    })
-    expect(parsed.rate?.scaled).toBe(4_820_000n)
-    expect(parsed.rate?.asOf).toBeInstanceOf(Date)
+  it('takes the place and nothing else', () => {
+    expect(newTripSchema.parse({ placeId: trip.placeId })).toEqual({ placeId: trip.placeId })
+  })
+
+  it('refuses the rate: the server snapshots it, so there is no pair to get wrong', () => {
+    // The "rate must be quoted in the currency of the trip" rule sat on the read schema
+    // only, so a rate between any two currencies used to pass on write.
+    expect(() => newTripSchema.parse({ placeId: trip.placeId, rate: rate('4.82') })).toThrow()
   })
 
   it('refuses the currency and the owner: the server knows both', () => {

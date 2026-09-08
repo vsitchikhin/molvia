@@ -56,6 +56,25 @@ export function decimalFromScaled(value: bigint, digits: number): `${number}` {
 }
 
 /**
+ * Converts a scaled integer through a rate, between two fixed-point scales.
+ *
+ * Kept apart from convertMoney so the two exponents can be exercised against each other:
+ * all four supported currencies keep two digits today, the factors cancel, and a formula
+ * with them swapped would look correct in every test that used real currencies.
+ */
+export function convertScaled(
+  amount: bigint,
+  rateScaled: bigint,
+  rateDigits: number,
+  fromExponent: number,
+  toExponent: number,
+): bigint {
+  const numerator = amount * 10n ** BigInt(rateDigits) * 10n ** BigInt(toExponent)
+  const denominator = rateScaled * 10n ** BigInt(fromExponent)
+  return divideRounded(numerator, denominator)
+}
+
+/**
  * Integer division that rounds to nearest, half away from zero — the way a till rounds.
  * Truncation would be a one-sided bias rather than noise, and there is no exact answer to
  * pick instead: a conversion rarely lands on a whole minor unit.

@@ -47,6 +47,17 @@ describe('actorPatchSchema', () => {
     expect(() => actorPatchSchema.parse({})).toThrow()
   })
 
+  it('refuses a patch whose only field is an explicit undefined', () => {
+    // `{ city: form.city }` from an unfilled form. Unreachable from JSON, ordinary from
+    // the bot and the PWA, and it bumped updatedAt exactly as an empty patch would.
+    expect(() => actorPatchSchema.parse({ city: undefined })).toThrow()
+    expect(() => actorPatchSchema.parse({ country: undefined, city: undefined })).toThrow()
+  })
+
+  it('caps the city the same way a place does — one city, one width', () => {
+    expect(() => actorSchema.parse({ ...actor, city: 'а'.repeat(121) })).toThrow()
+  })
+
   it('refuses fields the server owns, so a client cannot smuggle them in', () => {
     for (const smuggled of [
       { id: actor.id },

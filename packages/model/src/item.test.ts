@@ -38,6 +38,10 @@ describe('itemSchema', () => {
     }
   })
 
+  it('refuses an empty search key: an item nothing can find is not in the catalogue', () => {
+    expect(() => itemSchema.parse({ ...item, searchKey: '' })).toThrow()
+  })
+
   it('allows an item with neither note nor typical quantity', () => {
     expect(() => itemSchema.parse({ ...item, note: null, typicalQuantity: null })).not.toThrow()
   })
@@ -72,5 +76,22 @@ describe('newItemSchema', () => {
 
   it('refuses a blank name instead of storing whitespace', () => {
     expect(() => newItemSchema.parse({ ...input, name: '   ' })).toThrow()
+  })
+
+  it('refuses a name made of characters that do not show', () => {
+    // Two zero-width spaces passed trim().min(1) and produced a catalogue row invisible
+    // in the list it appears in.
+    for (const name of ['\u200b\u200b', '\u00ad', 'Молоко\nАшхар']) {
+      expect(() => newItemSchema.parse({ ...input, name })).toThrow()
+    }
+  })
+
+  it('refuses duplicate barcodes and an unbounded pile of them', () => {
+    expect(() =>
+      newItemSchema.parse({ ...input, barcodes: ['4850001234567', '4850001234567'] }),
+    ).toThrow()
+    expect(() =>
+      newItemSchema.parse({ ...input, barcodes: Array.from({ length: 21 }, () => '12345678') }),
+    ).toThrow()
   })
 })

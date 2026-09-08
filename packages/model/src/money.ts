@@ -19,12 +19,12 @@ export type MinorExponent = 0 | 2 | 3
  * would narrow every read to the literal 2 and call the zero-digit branch dead code,
  * which is the same blind spot the constant had, moved into the type.
  */
-export const MINOR_EXPONENT: Record<Currency, MinorExponent> = {
+export const MINOR_EXPONENT: Readonly<Record<Currency, MinorExponent>> = Object.freeze({
   AMD: 2,
   RUB: 2,
   USD: 2,
   EUR: 2,
-}
+})
 
 const POW10 = [1n, 10n, 100n, 1000n] as const
 
@@ -93,7 +93,7 @@ export function decimalFromMinor({ minor, currency }: Money): `${number}` {
  * TypeScript in the first place.
  */
 export const moneyWireSchema = z.object({
-  amount: z.string(),
+  amount: z.string().max(40),
   currency: currencySchema,
 })
 export type MoneyWire = z.infer<typeof moneyWireSchema>

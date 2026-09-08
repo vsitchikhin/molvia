@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { moneyCodec, priceSchema } from './money'
+import { PATCH_EMPTY, changesSomething } from './patch'
 import { quantityCodec, quantitySchema } from './units'
 
 /**
@@ -37,7 +38,5 @@ export const expensePatchSchema = z
     quantity: quantityCodec.nullable().optional(),
     amount: moneyCodec.nullable().optional(),
   })
-  .refine((patch) => Object.keys(patch).length > 0, {
-    error: 'at least one field must be present',
-  })
+  .refine(changesSomething, PATCH_EMPTY)
 export type ExpensePatch = z.infer<typeof expensePatchSchema>

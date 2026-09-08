@@ -136,21 +136,15 @@ describe('the minor-unit exponent', () => {
     }
   })
 
-  it('is read from the currency at call time, not baked into the code', () => {
-    // Every supported currency uses two digits today, so nothing here would notice a
-    // hardcoded 100n coming back. Borrowing one currency for the length of this test is
-    // the only way to pin what the table is for: a currency with no fractional part.
-    const original = MINOR_EXPONENT.AMD
-    MINOR_EXPONENT.AMD = 0
-    try {
-      expect(parseMoney('5403', 'AMD').minor).toBe(5403n)
-      expect(() => parseMoney('5403.12', 'AMD')).toThrow(DomainError)
-      expect(decimalFromMinor(money(5403n, 'AMD'))).toBe('5403')
-      expect(digits(formatMoney(money(5403n, 'AMD')))).toContain('5403')
-      expect(digits(formatMoney(money(5403n, 'AMD')))).not.toContain('5403,00')
-    } finally {
-      MINOR_EXPONENT.AMD = original
-    }
+  it('is frozen, so nothing can rewrite what an already stored amount means', () => {
+    // `const` holds the binding, not the contents. A write here would leave every stored
+    // minor unit exactly as it is and change the price it reads as — and a value outside
+    // the union made minorPerMajor undefined, which printed NaN where a price belongs.
+    expect(Object.isFrozen(MINOR_EXPONENT)).toBe(true)
+    expect(() => {
+      // @ts-expect-error readonly in the type as well as at runtime — this is the point
+      MINOR_EXPONENT.AMD = 0
+    }).toThrow(TypeError)
   })
 
   it('rejects one digit more than the currency keeps', () => {

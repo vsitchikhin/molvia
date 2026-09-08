@@ -1,8 +1,7 @@
 import { z } from 'zod'
+import { citySchema, countrySchema } from './geo'
 import { currencySchema } from './money'
-
-/** ISO 3166-1 alpha-2. The country is part of the key from the start, not "we'll add it later". */
-export const countrySchema = z.string().regex(/^[A-Z]{2}$/)
+import { PATCH_EMPTY, changesSomething } from './patch'
 
 /**
  * Whoever the records belong to. Identity and settings are one entity rather than two:
@@ -16,7 +15,7 @@ export const countrySchema = z.string().regex(/^[A-Z]{2}$/)
 export const actorSchema = z.object({
   id: z.uuid(),
   country: countrySchema,
-  city: z.string().trim().min(1),
+  city: citySchema,
   /**
    * What the person spends in, defaulted from the country and changeable afterwards:
    * moving again is an ordinary scenario, not an exception. A trip copies this value
@@ -37,13 +36,9 @@ export type Actor = z.infer<typeof actorSchema>
 export const actorPatchSchema = z
   .strictObject({
     country: countrySchema.optional(),
-    city: z.string().trim().min(1).optional(),
+    city: citySchema.optional(),
     spendCurrency: currencySchema.optional(),
     incomeCurrency: currencySchema.optional(),
   })
-  .refine((patch) => Object.keys(patch).length > 0, {
-    // An empty patch is a bug on the caller's side, not a no-op worth committing: it would
-    // still bump updatedAt and look like a change in any history built on that column.
-    error: 'at least one field must be present',
-  })
+  .refine(changesSomething, PATCH_EMPTY)
 export type ActorPatch = z.infer<typeof actorPatchSchema>

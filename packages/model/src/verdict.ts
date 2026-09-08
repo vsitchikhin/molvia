@@ -1,7 +1,9 @@
 import { z } from 'zod'
-import { DomainError, ERROR } from './errors'
+import { DomainError, ERROR, ISSUE } from './errors'
+import { PATCH_EMPTY, changesSomething } from './patch'
+import { visibleLine } from './text'
 
-const reviewSchema = z.string().trim().min(1).max(500)
+const reviewSchema = visibleLine(500)
 
 /**
  * The rare half of the product, and the core of it. The key is the item, not the pair
@@ -13,19 +15,25 @@ const reviewSchema = z.string().trim().min(1).max(500)
  * no migration is needed. For MOL-6 that means UNIQUE NULLS NOT DISTINCT on the triple:
  * without it two nulls would count as different and let duplicates through.
  */
-export const verdictSchema = z.object({
-  id: z.uuid(),
-  actorId: z.uuid(),
-  itemId: z.uuid(),
-  placeId: z.uuid().nullable(),
-  /** Whole. Not 3.5 and not a float: there is no half star on screen, and an average is computed above this. */
-  score: z.int().min(1).max(5),
-  /** One line of "why". Optional — a rating takes a second, a sentence does not always follow. */
-  review: reviewSchema.nullable(),
-  ratedAt: z.date(),
-  /** Re-rating is ordinary: a different batch, a changed recipe. */
-  updatedAt: z.date(),
-})
+export const verdictSchema = z
+  .object({
+    id: z.uuid(),
+    actorId: z.uuid(),
+    itemId: z.uuid(),
+    placeId: z.uuid().nullable(),
+    /** Whole. Not 3.5 and not a float: there is no half star on screen, and an average is computed above this. */
+    score: z.int().min(1).max(5),
+    /** One line of "why". Optional — a rating takes a second, a sentence does not always follow. */
+    review: reviewSchema.nullable(),
+    ratedAt: z.date(),
+    /** Re-rating is ordinary: a different batch, a changed recipe. */
+    updatedAt: z.date(),
+  })
+  // A trip is already forbidden from finishing before it starts; the same pair on a
+  // verdict was checked by nothing.
+  .refine((verdict) => verdict.updatedAt >= verdict.ratedAt, {
+    error: ISSUE.VERDICT_UPDATED_BEFORE_RATED,
+  })
 export type Verdict = z.infer<typeof verdictSchema>
 
 export const newVerdictSchema = z.strictObject({
@@ -42,9 +50,7 @@ export const verdictPatchSchema = z
     /** null deletes the sentence and keeps the rating; absent leaves it alone. */
     review: reviewSchema.nullable().optional(),
   })
-  .refine((patch) => Object.keys(patch).length > 0, {
-    error: 'at least one field must be present',
-  })
+  .refine(changesSomething, PATCH_EMPTY)
 export type VerdictPatch = z.infer<typeof verdictPatchSchema>
 
 export const VERDICT_LEVEL = {
@@ -63,11 +69,20 @@ export type VerdictLevel = (typeof VERDICT_LEVEL)[keyof typeof VERDICT_LEVEL]
  * float cannot be trusted to land on.
  */
 export function verdictLevel(sum: number, count: number): VerdictLevel {
-  if (!Number.isInteger(sum) || !Number.isInteger(count)) {
-    throw new DomainError(ERROR.INVALID_SCORE, `${String(sum)}/${String(count)}`)
+  const details = `${String(sum)}/${String(count)}`
+  // Safe integers, not merely integers: the multiplications below are doubles, so past
+  // 2^53 the "integer comparison" this function promises would stop being one.
+  if (!Number.isSafeInteger(sum) || !Number.isSafeInteger(count)) {
+    throw new DomainError(ERROR.INVALID_SCORE, details)
   }
   if (count <= 0) {
-    throw new DomainError(ERROR.INVALID_SCORE, 'count must be positive')
+    throw new DomainError(ERROR.INVALID_SCORE, details)
+  }
+  // Every score is between 1 and 5, so a sum outside these bounds is not a low rating —
+  // it is a broken aggregate. A join that multiplied rows, or a NULL counted as zero,
+  // used to come back as a confident «take» instead of an error.
+  if (sum < count || sum > 5 * count) {
+    throw new DomainError(ERROR.INVALID_SCORE, details)
   }
   if (sum >= 4 * count) return VERDICT_LEVEL.TAKE
   if (2 * sum < 5 * count) return VERDICT_LEVEL.NEVER

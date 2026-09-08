@@ -62,8 +62,9 @@ describe('expensePatchSchema', () => {
     })
   })
 
-  it('refuses an empty patch', () => {
+  it('refuses an empty patch, explicit undefined included', () => {
     expect(() => expensePatchSchema.parse({})).toThrow()
+    expect(() => expensePatchSchema.parse({ amount: undefined })).toThrow()
   })
 
   it('refuses to move a line to another trip or another item', () => {

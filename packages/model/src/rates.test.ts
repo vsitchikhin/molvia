@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { ERROR } from './errors'
-import { decimalFromRate, exchangeRateSchema, parseRate, rateCodec } from './rates'
+import { RATE_SCALE, decimalFromRate, exchangeRateSchema, parseRate, rateCodec } from './rates'
 
 const asOf = new Date('2026-09-08T10:00:00Z')
 
@@ -23,8 +23,21 @@ describe('parseRate', () => {
 
   it('rejects a rate that is zero, negative or too precise to be one', () => {
     for (const bad of ['0', '-4.82', '4.8200001', 'abc', '']) {
-      expect(() => parseRate(bad)).toThrow(expect.objectContaining({ code: ERROR.INVALID_AMOUNT }))
+      expect(() => parseRate(bad)).toThrow(expect.objectContaining({ code: ERROR.INVALID_RATE }))
     }
+  })
+
+  it('has its own code: «invalid amount» is the wrong sentence under «мой курс»', () => {
+    expect(() => parseRate('abc')).toThrow(expect.objectContaining({ code: ERROR.INVALID_RATE }))
+  })
+
+  it('rejects a rate outside any plausible band', () => {
+    // A millionth of a dram per rouble turned a 1 000 ֏ trip into ten million roubles.
+    for (const bad of ['0.000001', '0.00001', '9999999']) {
+      expect(() => parseRate(bad)).toThrow(expect.objectContaining({ code: ERROR.INVALID_RATE }))
+    }
+    expect(parseRate('0.0001')).toBe(100n)
+    expect(parseRate('1000000')).toBe(RATE_SCALE * 1_000_000n)
   })
 
   it('round-trips through the decimal form', () => {

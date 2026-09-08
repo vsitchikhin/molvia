@@ -39,6 +39,12 @@ describe('verdictSchema', () => {
   it('refuses half a star: there is none on screen', () => {
     expect(() => verdictSchema.parse({ ...verdict, score: 3.5 })).toThrow()
   })
+
+  it('refuses a verdict updated before it was rated', () => {
+    expect(() =>
+      verdictSchema.parse({ ...verdict, updatedAt: new Date('2026-09-08T09:00:00Z') }),
+    ).toThrow()
+  })
 })
 
 describe('newVerdictSchema', () => {
@@ -64,8 +70,9 @@ describe('verdictPatchSchema', () => {
     expect(verdictPatchSchema.parse({ review: null })).toEqual({ review: null })
   })
 
-  it('refuses an empty patch', () => {
+  it('refuses an empty patch, explicit undefined included', () => {
     expect(() => verdictPatchSchema.parse({})).toThrow()
+    expect(() => verdictPatchSchema.parse({ score: undefined })).toThrow()
   })
 
   it('refuses to move a verdict to another item', () => {
@@ -89,6 +96,34 @@ describe('verdictLevel', () => {
     expect(verdictLevel(5, 2)).toBe('if_cheap') // 2.5
     expect(verdictLevel(249, 100)).toBe('never') // 2.49
     expect(verdictLevel(9, 2)).toBe('take') // 4.5
+  })
+
+  it('refuses an aggregate that no set of ratings could produce', () => {
+    // Every score is between 1 and 5. A sum outside those bounds is not a low rating but
+    // a broken aggregate — a join that multiplied rows, a NULL counted as zero — and it
+    // used to come back as a confident verdict instead of an error.
+    for (const [sum, count] of [
+      [100, 1],
+      [0, 1],
+      [-50, 1],
+      [3, 10],
+      [51, 10],
+    ] as const) {
+      expect(() => verdictLevel(sum, count)).toThrow(
+        expect.objectContaining({ code: ERROR.INVALID_SCORE }),
+      )
+    }
+    expect(verdictLevel(1, 1)).toBe('never')
+    expect(verdictLevel(5, 1)).toBe('take')
+    expect(verdictLevel(50, 10)).toBe('take')
+  })
+
+  it('refuses arguments past the safe integer range, where the comparison stops being integer', () => {
+    // Written as arithmetic, not a literal: a literal that big is already rounded by the
+    // parser, which is the very thing being guarded against.
+    expect(() => verdictLevel(Number.MAX_SAFE_INTEGER + 10, 2)).toThrow(
+      expect.objectContaining({ code: ERROR.INVALID_SCORE }),
+    )
   })
 
   it('refuses a count of zero rather than dividing by it', () => {

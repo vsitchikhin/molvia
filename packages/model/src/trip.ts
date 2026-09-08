@@ -1,10 +1,10 @@
 import { z } from 'zod'
-import { divideRounded } from './decimal'
-import { DomainError, ERROR } from './errors'
+import { convertScaled } from './decimal'
+import { DomainError, ERROR, ISSUE } from './errors'
 import type { Expense } from './expense'
-import { addMoney, currencySchema, minorPerMajor } from './money'
+import { MINOR_EXPONENT, addMoney, currencySchema } from './money'
 import type { Money } from './money'
-import { RATE_SCALE, exchangeRateSchema, rateCodec } from './rates'
+import { RATE_DIGITS, exchangeRateSchema } from './rates'
 import type { ExchangeRate } from './rates'
 
 export const tripSchema = z
@@ -27,20 +27,28 @@ export const tripSchema = z
   .refine((trip) => trip.rate === null || trip.rate.quote === trip.currency, {
     // The snapshot converts out of what is being spent here. A rate quoted in anything
     // else would convert the trip total into a number about some other trip.
-    error: 'the rate must be quoted in the currency of the trip',
+    error: ISSUE.RATE_NOT_OF_TRIP_CURRENCY,
+  })
+  // A snapshot taken when the trip started cannot be dated after it.
+  .refine((trip) => trip.rate === null || trip.rate.asOf <= trip.startedAt, {
+    error: ISSUE.RATE_AFTER_TRIP_START,
   })
   .refine((trip) => trip.finishedAt === null || trip.finishedAt >= trip.startedAt, {
-    error: 'a trip cannot finish before it starts',
+    error: ISSUE.TRIP_FINISHED_BEFORE_START,
   })
 export type Trip = z.infer<typeof tripSchema>
 
 /**
- * The client picks the place and, when it has one, the rate to freeze. Everything else —
- * who, in what currency, from when — is the server's to know.
+ * The client picks the place. Everything else — who, in what currency, at what rate, from
+ * when — is the server's to know.
+ *
+ * The rate used to arrive from the client, and the rule "the rate must be quoted in the
+ * currency of the trip" sat on the read schema only, so a rate between any two currencies
+ * passed on write. Removing the field removes the hole rather than guarding it: the
+ * server has the owner's setting and the cache, and snapshots the current rate itself.
  */
 export const newTripSchema = z.strictObject({
   placeId: z.uuid(),
-  rate: rateCodec.optional(),
 })
 export type NewTrip = z.infer<typeof newTripSchema>
 
@@ -68,7 +76,12 @@ export function convertMoney(amount: Money, rate: ExchangeRate): Money {
     throw new DomainError(ERROR.CURRENCY_MISMATCH, `${amount.currency} vs ${rate.quote}`)
   }
 
-  const numerator = amount.minor * RATE_SCALE * minorPerMajor(rate.base)
-  const denominator = rate.scaled * minorPerMajor(amount.currency)
-  return { minor: divideRounded(numerator, denominator), currency: rate.base }
+  const minor = convertScaled(
+    amount.minor,
+    rate.scaled,
+    RATE_DIGITS,
+    MINOR_EXPONENT[amount.currency],
+    MINOR_EXPONENT[rate.base],
+  )
+  return { minor, currency: rate.base }
 }

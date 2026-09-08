@@ -1,6 +1,7 @@
 export * from './errors'
 export * from './money'
 export * from './units'
+export * from './geo'
 export * from './actor'
 export * from './item'
 export * from './place'

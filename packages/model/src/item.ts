@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { ISSUE } from './errors'
+import { visibleLine } from './text'
 import { baseUnitSchema, quantityCodec, quantitySchema } from './units'
 
 /**
@@ -15,21 +17,35 @@ export type ItemKind = z.infer<typeof itemKindSchema>
  */
 export const barcodeSchema = z.string().regex(/^(\d{8}|\d{12,14})$/)
 
-const nameSchema = z.string().trim().min(1).max(200)
-const noteSchema = z.string().trim().min(1).max(300)
+const nameSchema = visibleLine(200)
+const noteSchema = visibleLine(300)
+
+/**
+ * Capped and deduplicated: a catalogue row is not a list. Without either, five thousand
+ * copies of one code were a valid item.
+ */
+const barcodesSchema = z
+  .array(barcodeSchema)
+  .max(20)
+  .refine((codes) => new Set(codes).size === codes.length, { error: ISSUE.BARCODE_DUPLICATED })
+  .readonly()
 
 export const itemSchema = z.object({
   id: z.uuid(),
   kind: itemKindSchema,
   /** The brand lives inside the name — «Молоко „Ашхар“» — because that is how a shelf reads. */
   name: nameSchema,
-  /** The name normalised to Latin. Filled by MOL-5, which is why no input carries it. */
-  searchKey: z.string(),
+  /**
+   * The name normalised to Latin. Filled by MOL-5, which is why no input carries it —
+   * but never empty: entering an item is a catalogue lookup, so an item nothing can find
+   * is an item that does not exist.
+   */
+  searchKey: z.string().min(1),
   /**
    * Several per item on purpose: one product comes in different packaging, and a loose
    * good has none at all — which is exactly where the price spread is widest.
    */
-  barcodes: z.array(barcodeSchema).readonly(),
+  barcodes: barcodesSchema,
   /** «пастеризованное, 3,2%», «на развес» — the second line of a search result. */
   note: noteSchema.nullable(),
   defaultUnit: baseUnitSchema,
@@ -47,7 +63,7 @@ export type Item = z.infer<typeof itemSchema>
 export const newItemSchema = z.strictObject({
   kind: itemKindSchema,
   name: nameSchema,
-  barcodes: z.array(barcodeSchema).readonly().default([]),
+  barcodes: barcodesSchema.default([]),
   note: noteSchema.optional(),
   defaultUnit: baseUnitSchema,
   typicalQuantity: quantityCodec.optional(),

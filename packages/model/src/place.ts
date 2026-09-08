@@ -1,12 +1,12 @@
 import { z } from 'zod'
-import { countrySchema } from './actor'
+import { citySchema, countrySchema } from './geo'
+import { visibleLine } from './text'
 
 /** Same reason as an item's kind: the 0.3 gate is measured separately for the two. */
 export const placeKindSchema = z.enum(['store', 'venue'])
 export type PlaceKind = z.infer<typeof placeKindSchema>
 
-const nameSchema = z.string().trim().min(1).max(200)
-const citySchema = z.string().trim().min(1).max(120)
+const nameSchema = visibleLine(200)
 
 /**
  * No currency here, deliberately. Money follows the person, not the shop: what someone
