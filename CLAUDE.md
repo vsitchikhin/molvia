@@ -300,8 +300,17 @@ database access. In a product about data integrity, two write paths will silentl
 ## Money and quantity rules
 
 - **Never `float`.** An amount is an integer in minor units: `amount_minor bigint` +
-  `currency char(3)`, minor unit = 1/100 for every currency. Drams are fractional in
-  practice (a receipt for 5403.12 ֏) — "drams are whole" is a false simplification.
+  `currency char(3)`.
+- **The minor-unit exponent is a property of the currency, never a constant.** Today all
+  four supported currencies happen to use 1/100 — drams included: an Armenian receipt
+  prints hundredths (`5 403,12 ֏`), even though a shop usually rounds them away at the
+  till, by ordinary half-up. That coincidence is not a licence to hardcode `100n`: a
+  constant is what breaks first on a currency with three digits or none, and it hides
+  where the fact actually belongs. Checked with the owner on 2026-09-08 — the earlier
+  wording "1/100 for every currency" was right about today's value and wrong about where
+  it lives.
+- **A unit price is not money and keeps its own scale.** It is a computed ratio, so it may
+  carry more precision than any amount in that currency does.
 - **The rate is stored with the transaction** and never recomputed retroactively.
   Otherwise last month's total changes with today's rate.
 - **Compare by unit price only** (per kg / l / piece). Unit price is computed, never

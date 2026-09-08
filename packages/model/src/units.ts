@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { DomainError, ERROR } from './errors'
+import { MINOR_EXPONENT, minorPerMajor } from './money'
 import type { Currency, Money } from './money'
 
 /** What everything is compared in. Prices only ever meet after being reduced to these. */
@@ -31,6 +32,12 @@ export interface Quantity {
   readonly unit: BaseUnit
 }
 
+/** Positive on purpose: zero is what unitPrice would divide by, and negative weight is not a thing. */
+export const quantitySchema = z.object({
+  milli: z.bigint().positive(),
+  unit: baseUnitSchema,
+})
+
 export function parseQuantity(input: string, unit: Unit): Quantity {
   const text = input.trim().replace(/\s/g, '').replace(',', '.')
   if (!/^\d+(\.\d{1,3})?$/.test(text)) {
@@ -47,6 +54,24 @@ export function parseQuantity(input: string, unit: Unit): Quantity {
 
   return { milli, unit: BASE_OF[unit] }
 }
+
+/** The inverse of parseQuantity for a base unit: 1128n -> "1.128". */
+export function decimalFromMilli({ milli }: Quantity): string {
+  const digits = milli.toString().padStart(4, '0')
+  return `${digits.slice(0, -3)}.${digits.slice(-3)}`
+}
+
+/** Same reason as money: milli is a bigint, and JSON.stringify throws on those. */
+export const quantityWireSchema = z.object({
+  amount: z.string(),
+  unit: baseUnitSchema,
+})
+export type QuantityWire = z.infer<typeof quantityWireSchema>
+
+export const quantityCodec = z.codec(quantityWireSchema, quantitySchema, {
+  decode: ({ amount, unit }) => parseQuantity(amount, unit),
+  encode: (value) => ({ amount: decimalFromMilli(value), unit: value.unit }),
+})
 
 /**
  * Price per base unit, scaled so that comparison stays exact where a float would drift.
@@ -84,10 +109,13 @@ export function compareUnitPrice(a: UnitPrice, b: UnitPrice): number {
 
 /** Rounding happens here and nowhere else: this is output. */
 export function formatUnitPrice(price: UnitPrice, locale = 'ru-RU'): string {
-  const major = Number(price.scaledMinor) / Number(UNIT_PRICE_SCALE * 100n)
+  const exponent = MINOR_EXPONENT[price.currency]
+  const major = Number(price.scaledMinor) / Number(UNIT_PRICE_SCALE * minorPerMajor(price.currency))
   const amount = new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: price.currency,
+    minimumFractionDigits: exponent,
+    maximumFractionDigits: exponent,
   }).format(major)
   return `${amount}/${price.unit}`
 }

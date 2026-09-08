@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { ERROR } from './errors'
 import { money, parseMoney } from './money'
 import {
   UNIT_PRICE_SCALE,
   compareUnitPrice,
+  decimalFromMilli,
   formatUnitPrice,
   parseQuantity,
+  quantityCodec,
   unitPrice,
 } from './units'
 
@@ -73,5 +76,35 @@ describe('formatUnitPrice', () => {
     // 520 for 0.9 l is 577.77… per litre; the repeating tail must not reach the user.
     const price = unitPrice(parseMoney('520', 'AMD'), parseQuantity('0.9', 'l'))
     expect(digits(formatUnitPrice(price))).toContain('577,78')
+  })
+})
+
+describe('quantityCodec', () => {
+  it('carries the quantity over a wire that a bigint cannot cross on its own', () => {
+    const value = parseQuantity('1.128', 'kg')
+    expect(() => JSON.stringify(value)).toThrow(TypeError)
+
+    const wire = z.encode(quantityCodec, value)
+    expect(wire).toEqual({ amount: '1.128', unit: 'kg' })
+    expect(quantityCodec.parse(JSON.parse(JSON.stringify(wire)))).toEqual(value)
+  })
+
+  it('travels in the base unit, so grams come back as kilograms', () => {
+    expect(z.encode(quantityCodec, parseQuantity('900', 'g'))).toEqual({
+      amount: '0.900',
+      unit: 'kg',
+    })
+  })
+
+  it('refuses a non-positive quantity rather than letting unitPrice divide by it', () => {
+    expect(() => quantityCodec.parse({ amount: '0', unit: 'kg' })).toThrow()
+  })
+})
+
+describe('decimalFromMilli', () => {
+  it('is the inverse of parseQuantity for a base unit', () => {
+    expect(decimalFromMilli(parseQuantity('1.128', 'kg'))).toBe('1.128')
+    expect(decimalFromMilli(parseQuantity('0.9', 'l'))).toBe('0.900')
+    expect(decimalFromMilli(parseQuantity('2', 'piece'))).toBe('2.000')
   })
 })
