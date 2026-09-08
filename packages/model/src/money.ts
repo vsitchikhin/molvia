@@ -5,19 +5,13 @@ import { DomainError, ERROR } from './errors'
 export const currencySchema = z.enum(['AMD', 'RUB', 'USD', 'EUR'])
 export type Currency = z.infer<typeof currencySchema>
 
-/** Digits after the point. Every exponent ISO 4217 actually uses, minus the unused 1. */
 export type MinorExponent = 0 | 2 | 3
 
 /**
- * How many digits the currency keeps. This belongs to the currency, not to the project:
- * all four supported ones happen to use two today — drams included, an Armenian receipt
- * prints hundredths even though a till usually rounds them away — and that coincidence is
- * exactly what makes a hardcoded 100n look correct until the first currency with three
- * digits or none arrives.
- *
- * Declared as the union rather than inferred `as const`: with all four on 2 the compiler
- * would narrow every read to the literal 2 and call the zero-digit branch dead code,
- * which is the same blind spot the constant had, moved into the type.
+ * All four currencies keep two digits today — drams included, an Armenian receipt prints
+ * hundredths — and that coincidence is what makes a hardcoded 100n look right until a
+ * currency with three digits or none arrives. Frozen because a write here would leave
+ * every stored minor unit as it is and change the price it reads as.
  */
 export const MINOR_EXPONENT: Readonly<Record<Currency, MinorExponent>> = Object.freeze({
   AMD: 2,
@@ -32,27 +26,16 @@ export function minorPerMajor(currency: Currency): bigint {
   return POW10[MINOR_EXPONENT[currency]]
 }
 
-/** An amount is an integer in minor units. Never a float, at any point. */
 export interface Money {
   readonly minor: bigint
   readonly currency: Currency
 }
 
-/**
- * Strict on purpose: coercion here would quietly accept a JSON number, and 5403.12 as a
- * double is the precision loss this type exists to prevent. Anything arriving from
- * outside goes through moneyCodec instead.
- */
 export const moneySchema = z.object({
   minor: z.bigint(),
   currency: currencySchema,
 })
 
-/**
- * A price, as opposed to a difference. `Money` itself may hold a negative — that is what
- * subtractMoney returns and it is a legitimate value — but nothing a person enters or a
- * client sends may be one.
- */
 export const priceSchema = moneySchema.refine((value) => value.minor >= 0n, {
   error: ERROR.INVALID_AMOUNT,
 })
@@ -61,49 +44,29 @@ export function money(minor: bigint, currency: Currency): Money {
   return { minor, currency }
 }
 
-/**
- * The non-throwing core. Everything that decides whether a string is an amount lives
- * here, so the codec and parseMoney can never disagree about it.
- */
 function minorFromDecimal(input: string, currency: Currency): bigint | null {
   const minor = scaledFromDecimal(input, MINOR_EXPONENT[currency])
-  // A price is never negative. The neighbours already knew this — parseQuantity and
-  // parseRate cut negatives — and money was the one place it was not enforced, which is
-  // why a single minus took first place in "where is it cheaper" for good.
   if (minor === null || minor < 0n || minor > INT8_MAX) return null
   return minor
 }
 
-/** Parses "5403.12", "5 403,12" and "5403" — anything a receipt or a keyboard produces. */
 export function parseMoney(input: string, currency: Currency): Money {
   const minor = minorFromDecimal(input, currency)
   if (minor === null) throw new DomainError(ERROR.INVALID_AMOUNT, input)
   return { minor, currency }
 }
 
-/** The inverse of parseMoney: minor units back to the canonical decimal string. */
 export function decimalFromMinor({ minor, currency }: Money): `${number}` {
   return decimalFromScaled(minor, MINOR_EXPONENT[currency])
 }
 
-/**
- * Money crosses the wire as a decimal string, because JSON.stringify throws on a bigint
- * and a JSON number is a double. Without this pair no schema holding an amount can travel
- * between the PWA, the API and the bot — which is the only reason the language is
- * TypeScript in the first place.
- */
 export const moneyWireSchema = z.object({
   amount: z.string().max(40),
   currency: currencySchema,
 })
 export type MoneyWire = z.infer<typeof moneyWireSchema>
 
-/**
- * A transform must not throw: zod checks `payload.issues` after running it and aborts,
- * so an issue pushed here comes back as a normal `success: false`. Throwing instead would
- * escape `safeParse` — the one method whose whole purpose is not to — and a route written
- * as `if (!parsed.success) return 400` would fail past its own branch.
- */
+/** decode must not throw: zod checks payload.issues after it and safeParse must not either. */
 export const moneyCodec = z.codec(moneyWireSchema, moneySchema, {
   decode: ({ amount, currency }, payload) => {
     const minor = minorFromDecimal(amount, currency)
@@ -114,7 +77,6 @@ export const moneyCodec = z.codec(moneyWireSchema, moneySchema, {
         path: ['amount'],
         message: ERROR.INVALID_AMOUNT,
       })
-      // Discarded: zod sees the issue and stops before the output schema runs.
       return { minor: 0n, currency }
     }
     return { minor, currency }
@@ -144,23 +106,13 @@ export function compareMoney(a: Money, b: Money): number {
   return a.minor < b.minor ? -1 : 1
 }
 
-/**
- * Rounding happens here and nowhere else: this is output.
- *
- * Formats the decimal string rather than a Number. That was the only bridge from bigint
- * to float left in the model, and it did not fail loudly: past 2^53 it rewrote the last
- * digits, and far enough out it printed "∞" where a price belongs.
- */
+/** Formats the decimal string, not a Number: that bridge rewrote digits past 2^53. */
 export function formatMoney(value: Money, locale = 'ru-RU'): string {
   const exponent = MINOR_EXPONENT[value.currency]
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: value.currency,
-    // Without this Intl renders AMD as three Latin letters in ru-RU, and the dram sign —
-    // the reason a separate face is carried for U+058F — never reached a price at all.
     currencyDisplay: 'narrowSymbol',
-    // Intl takes the digit count from its own ISO table, which agrees with ours for all
-    // four currencies today. Relying on that agreement is the same mistake as the constant.
     minimumFractionDigits: exponent,
     maximumFractionDigits: exponent,
   }).format(decimalFromMinor(value))

@@ -26,9 +26,9 @@ export class DomainError extends Error {
 }
 
 /**
- * Keys for zod issues. An issue is a shape error, not a domain one — it never becomes a
- * DomainError, and the central handler turns it into a 400 — but it still reaches a person
- * and still needs translating, so it may no more be prose written in place than the other.
+ * The same, for zod issues — shape errors, which never become a DomainError. A shape the
+ * domain already has a name for reuses that name: a malformed amount is ERROR.INVALID_AMOUNT
+ * wherever it is found, and one fact with two keys would be worse than the split is good.
  */
 export const ISSUE = {
   PATCH_EMPTY: 'issue.patch_empty',
