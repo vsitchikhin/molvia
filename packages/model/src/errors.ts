@@ -5,6 +5,7 @@
 export const ERROR = {
   INVALID_AMOUNT: 'error.invalid_amount',
   INVALID_QUANTITY: 'error.invalid_quantity',
+  INVALID_SCORE: 'error.invalid_score',
   CURRENCY_MISMATCH: 'error.currency_mismatch',
   UNIT_MISMATCH: 'error.unit_mismatch',
   NOT_FOUND: 'error.not_found',
