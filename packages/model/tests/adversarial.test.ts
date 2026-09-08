@@ -311,3 +311,26 @@ describe('round three: a rule that was too narrow became too wide', () => {
     expect(newPlaceSchema.safeParse({ ...place, city: 'Гюмри' }).success).toBe(true)
   })
 })
+
+describe('round four: both halves of the text rule had moved too far', () => {
+  it('refuses a lone surrogate, which Postgres answers the same as NUL', () => {
+    // S1. \p{C} held \p{Cs} and the rewrite dropped it: half a surrogate pair does not
+    // encode to UTF-8, so the error arrives as 22021 on INSERT rather than as a 400.
+    expect(newPlaceSchema.safeParse({ ...place, name: 'Molo\ud800ko' }).success).toBe(false)
+    expect(newPlaceSchema.safeParse({ ...place, city: 'Gyu\ud800mri' }).success).toBe(false)
+    expect(itemSchema.safeParse({ ...item, searchKey: 'molo\ud800ko' }).success).toBe(false)
+  })
+
+  it('refuses a private-use character, drawn differently by every font', () => {
+    expect(newPlaceSchema.safeParse({ ...place, name: '\ue000' }).success).toBe(false)
+  })
+
+  it('refuses a name of combining marks alone, and keeps one on a letter', () => {
+    // S2. A mark with nothing to combine with draws nothing — the invisible name again,
+    // in a new shape — but «Молокó» is ordinary text and has to stay.
+    for (const name of ['\u0301\u0301', '\u20dd', '\u0300'.repeat(30)]) {
+      expect(newPlaceSchema.safeParse({ ...place, name }).success).toBe(false)
+    }
+    expect(newPlaceSchema.safeParse({ ...place, name: 'Molok\u043e\u0301' }).success).toBe(true)
+  })
+})
