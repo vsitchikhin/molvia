@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { convertScaled } from './decimal'
 import { DomainError, ERROR, ISSUE } from './errors'
 import type { Expense } from './expense'
-import { MINOR_EXPONENT, addMoney, currencySchema } from './money'
-import type { Money } from './money'
+import { MINOR_EXPONENT, currencySchema } from './money'
+import type { Currency, Money } from './money'
 import { RATE_DIGITS, exchangeRateSchema } from './rates'
 import type { ExchangeRate } from './rates'
 
@@ -16,6 +16,10 @@ export const tripSchema = z
     /**
      * A copy of the owner's spending currency at the time, not a reference to it. Moving
      * changes the setting, and it must not rewrite the currency of trips already recorded.
+     *
+     * It is what an expense is prefilled with, not what an expense is limited to: paying
+     * for one thing by card in roubles inside a dram shop is an ordinary afternoon, and
+     * the model has no business calling it an error.
      */
     currency: currencySchema,
     /** null when there is nothing to convert into: spending and income are the same currency. */
@@ -53,13 +57,27 @@ export const newTripSchema = z.strictObject({
 export type NewTrip = z.infer<typeof newTripSchema>
 
 /**
- * Expenses with no price are skipped rather than counted as zero, and an empty trip is
- * null rather than zero: zero means "went and spent nothing", which is a different fact.
+ * One total per currency, ordered by currency code so the same trip always reads the same
+ * way.
+ *
+ * Not a single sum: an expense carries its own currency and may legitimately differ from
+ * the trip's, so there is nothing to add them into without a rate — and refusing the whole
+ * total because one line was paid by card in another currency would break the ordinary
+ * case rather than catch a broken one.
+ *
+ * Expenses with no price are skipped rather than counted as zero, and a trip with nothing
+ * priced gives an empty list rather than a zero: zero means "went and spent nothing",
+ * which is a different fact.
  */
-export function tripTotal(expenses: readonly Expense[]): Money | null {
-  const priced = expenses.flatMap((expense) => (expense.amount === null ? [] : [expense.amount]))
-  if (priced.length === 0) return null
-  return priced.reduce((total, amount) => addMoney(total, amount))
+export function tripTotal(expenses: readonly Expense[]): readonly Money[] {
+  const byCurrency = new Map<Currency, bigint>()
+  for (const { amount } of expenses) {
+    if (amount === null) continue
+    byCurrency.set(amount.currency, (byCurrency.get(amount.currency) ?? 0n) + amount.minor)
+  }
+  return [...byCurrency]
+    .map(([currency, minor]) => ({ minor, currency }))
+    .sort((a, b) => a.currency.localeCompare(b.currency))
 }
 
 /**

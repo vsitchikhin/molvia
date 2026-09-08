@@ -4,8 +4,10 @@ import { PATCH_EMPTY, changesSomething } from './patch'
 import { quantityCodec, quantitySchema } from './units'
 
 /**
- * The frequent half of the product. Place, currency and owner all come from the trip:
- * an expense carries none of them, so there is nowhere for them to disagree.
+ * The frequent half of the product. Place and owner come from the trip; the currency does
+ * not. It is prefilled from the trip and may differ from it — paying for one thing by card
+ * in another currency is an ordinary afternoon — so the amount carries its own, and the
+ * trip total is read per currency rather than as one number.
  *
  * There is no unit-price field and there will not be one — unitPrice() computes it. A
  * stored computed column drifts from what it was computed from, sooner or later.
@@ -15,6 +17,7 @@ export const expenseSchema = z.object({
   tripId: z.uuid(),
   /** The one thing that is required by meaning: everything else may be left empty. */
   itemId: z.uuid(),
+  // The currency the client prefills from the trip and may change on the spot.
   quantity: quantitySchema.nullable(),
   amount: priceSchema.nullable(),
   createdAt: z.date(),

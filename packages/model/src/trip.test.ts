@@ -84,24 +84,28 @@ describe('tripTotal', () => {
   const beef = expense(parseMoney('5403.12', 'AMD'))
 
   it('adds up the trip from the handoff', () => {
-    const total = tripTotal([milk, small, beef])
-    expect(total?.minor).toBe(649312n)
+    const [total] = tripTotal([milk, small, beef])
+    expect(total).toEqual({ minor: 649312n, currency: 'AMD' })
     expect(digits(formatMoney(total ?? money(0n, 'AMD')))).toContain('6493,12')
   })
 
   it('skips a line with no price instead of counting it as zero', () => {
-    expect(tripTotal([milk, expense(null), small, beef])?.minor).toBe(649312n)
+    expect(tripTotal([milk, expense(null), small, beef])[0]?.minor).toBe(649312n)
   })
 
-  it('gives null for an empty trip, because zero means something else', () => {
-    expect(tripTotal([])).toBeNull()
-    expect(tripTotal([expense(null)])).toBeNull()
+  it('gives nothing for an empty trip, because zero means something else', () => {
+    expect(tripTotal([])).toEqual([])
+    expect(tripTotal([expense(null)])).toEqual([])
   })
 
-  it('refuses to add across currencies rather than guessing a rate', () => {
-    expect(() => tripTotal([milk, expense(money(100n, 'RUB'))])).toThrow(
-      expect.objectContaining({ code: ERROR.CURRENCY_MISMATCH }),
-    )
+  it('splits by currency instead of refusing the whole total', () => {
+    // Paying for one thing by card in roubles inside a dram shop is an ordinary
+    // afternoon. Refusing to total the trip over it would break the common case in
+    // order to catch nothing.
+    expect(tripTotal([milk, expense(money(50000n, 'RUB')), small])).toEqual([
+      { minor: 109000n, currency: 'AMD' },
+      { minor: 50000n, currency: 'RUB' },
+    ])
   })
 
   it('reads back the shelf prices the comparison is made on', () => {
