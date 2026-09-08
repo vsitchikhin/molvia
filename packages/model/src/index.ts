@@ -1,5 +1,6 @@
 export * from './errors'
 export * from './money'
 export * from './units'
+export * from './actor'
 export * from './events'
 export * from './contracts'
