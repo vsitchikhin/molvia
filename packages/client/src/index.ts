@@ -1,5 +1,5 @@
 import type { ZodType } from 'zod'
-import { ERROR, errorResponseSchema, healthResponseSchema } from '@molvia/model'
+import { ERROR, ISSUE, errorResponseSchema, healthResponseSchema } from '@molvia/model'
 import type { HealthResponse, WireCode } from '@molvia/model'
 
 /**
@@ -15,6 +15,10 @@ export class ApiError extends Error {
     this.code = code
   }
 }
+
+const CODE_BY_STATUS: Readonly<Record<number, WireCode>> = Object.freeze({
+  404: ERROR.NOT_FOUND,
+})
 
 export interface ClientOptions {
   readonly baseUrl: string
@@ -36,12 +40,21 @@ export function createClient({ baseUrl, fetch = globalThis.fetch }: ClientOption
 
     if (!response.ok) {
       const failure = errorResponseSchema.safeParse(body)
-      throw failure.success
-        ? new ApiError(failure.data.code, failure.data.details)
-        : new ApiError(ERROR.INTERNAL, `HTTP ${String(response.status)}`)
+      if (failure.success) throw new ApiError(failure.data.code, failure.data.details)
+      // The body says nothing usable, so the status is all there is — and «not found» is
+      // a code the registry has, not something to be read back out of a message.
+      throw new ApiError(
+        CODE_BY_STATUS[response.status] ?? ERROR.INTERNAL,
+        `HTTP ${String(response.status)}`,
+      )
     }
 
-    return schema.parse(body)
+    // A reply that does not match the schema is still the API's answer, so it leaves here
+    // as an ApiError like everything else: `catch (e) { e instanceof ApiError }` is the
+    // only way callers are meant to need.
+    const parsed = schema.safeParse(body)
+    if (parsed.success) return parsed.data
+    throw new ApiError(ISSUE.RESPONSE_INVALID, parsed.error.issues[0]?.path.join('.'))
   }
 
   return {

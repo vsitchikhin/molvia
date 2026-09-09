@@ -10,10 +10,11 @@ const healthFields = z.object({
   database: z.enum(['up', 'down']),
 })
 
-// The comment above says a live process with a dead database must not pretend to be fine.
-// Until this refine, { status: 'ok', database: 'down' } was a valid answer.
+// One-directional on purpose. A dead database may not be reported as fine; a live one
+// does not oblige the process to say it is fine, because the next dependency — the rate
+// cache of MOL-39 — degrades without the database noticing.
 export const healthResponseSchema = healthFields.refine(
-  (health) => (health.status === 'ok') === (health.database === 'up'),
+  (health) => health.database === 'up' || health.status !== 'ok',
   { error: ISSUE.HEALTH_CONTRADICTS_ITSELF },
 )
 export type HealthResponse = z.infer<typeof healthResponseSchema>

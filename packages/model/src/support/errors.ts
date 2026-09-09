@@ -32,6 +32,7 @@ export class DomainError extends Error {
  */
 export const ISSUE = {
   BODY_INVALID: 'issue.body_invalid',
+  RESPONSE_INVALID: 'issue.response_invalid',
   HEALTH_CONTRADICTS_ITSELF: 'issue.health_contradicts_itself',
   PATCH_EMPTY: 'issue.patch_empty',
   TEXT_NOT_VISIBLE: 'issue.text_not_visible',

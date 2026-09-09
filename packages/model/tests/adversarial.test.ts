@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { actorPatchSchema } from '#model/entities/actor'
 import { INT8_MAX } from '#model/support/decimal'
-import { SUBJECT_OF_ITEM, SUBJECT_OF_PLACE, eventSchema } from '#model/contracts/events'
-import { errorResponseSchema, healthResponseSchema } from '#model/contracts/wire'
+import { eventSchema } from '#model/contracts/events'
+import { SUBJECT_OF_ITEM, SUBJECT_OF_PLACE } from '#model/entities/catalogue'
+import { errorResponseSchema, healthResponseSchema, isWireCode } from '#model/contracts/wire'
 import { ERROR, ISSUE } from '#model/support/errors'
 import type { Expense } from '#model/entities/expense'
 import { newExpenseSchema } from '#model/entities/expense'
@@ -357,9 +358,9 @@ describe('round five: the seams the model is bolted to', () => {
       eventSchema.safeParse({ type: 'catalogue_viewed', payload: { subject: 'venue' } }).success,
     ).toBe(true)
     expect(eventSchema.safeParse({ type: 'session_started' }).success).toBe(true)
-    expect(
-      eventSchema.safeParse({ type: 'session_started', payload: { subject: 'venue' } }).success,
-    ).toBe(false)
+    // One fact, one spelling: an empty payload used to be a second way to write it, in a
+    // log that is only ever appended to.
+    expect(eventSchema.safeParse({ type: 'session_started', payload: {} }).success).toBe(false)
   })
 
   it('writes down which half of the gate each kind counts towards', () => {
@@ -367,6 +368,10 @@ describe('round five: the seams the model is bolted to', () => {
     // a year, unless it is written where the query will look.
     expect(SUBJECT_OF_ITEM).toEqual({ product: 'product', dish: 'venue' })
     expect(SUBJECT_OF_PLACE).toEqual({ store: 'product', venue: 'venue' })
+    // Frozen for the reason MINOR_EXPONENT is: a write here moves every recorded view of
+    // a dish into the other half of the gate, and the gate cannot be measured again.
+    expect(Object.isFrozen(SUBJECT_OF_ITEM)).toBe(true)
+    expect(Object.isFrozen(SUBJECT_OF_PLACE)).toBe(true)
   })
 
   it('refuses a health answer that contradicts itself', () => {
@@ -374,14 +379,38 @@ describe('round five: the seams the model is bolted to', () => {
     expect(
       healthResponseSchema.safeParse({ status: 'ok', version: '1', database: 'down' }).success,
     ).toBe(false)
+    // The other direction is legitimate and stays: something else may be degraded while
+    // the database is fine — the rate cache of MOL-39 is the first such thing.
     expect(
       healthResponseSchema.safeParse({ status: 'degraded', version: '1', database: 'up' }).success,
-    ).toBe(false)
+    ).toBe(true)
     expect(
       healthResponseSchema.safeParse({ status: 'ok', version: '', database: 'up' }).success,
     ).toBe(false)
     expect(
       healthResponseSchema.safeParse({ status: 'ok', version: '1', database: 'up' }).success,
     ).toBe(true)
+  })
+})
+
+describe('round six: the last step is asking who else reads this', () => {
+  it('keeps the two registries from silently swallowing each other', () => {
+    // wireCodeSchema merges them by spreading, and a spread merges by key: the same key
+    // in both registries would drop one code off the wire, and no test would say so.
+    const shared = Object.keys(ERROR).filter((key) => key in ISSUE)
+    expect(shared).toEqual([])
+    for (const code of [...Object.values(ERROR), ...Object.values(ISSUE)]) {
+      expect(isWireCode(code)).toBe(true)
+    }
+  })
+
+  it('lets a process degrade for a reason other than the database', () => {
+    // MOL-39 brings a rate cache that can go stale while the database is perfectly fine.
+    // The refine used to be an equality and forbade exactly that.
+    const answer = { status: 'degraded', version: '1', database: 'up' }
+    expect(healthResponseSchema.safeParse(answer).success).toBe(true)
+    expect(
+      healthResponseSchema.safeParse({ status: 'ok', version: '1', database: 'down' }).success,
+    ).toBe(false)
   })
 })

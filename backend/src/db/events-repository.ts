@@ -31,7 +31,7 @@ export function createEventRepository(db: Db): EventRepository {
       await db.insert(events).values({
         actorId: event.actorId,
         type: event.type,
-        payload: event.payload ?? {},
+        payload: 'payload' in event ? event.payload : {},
         ...(event.occurredAt ? { occurredAt: event.occurredAt } : {}),
       })
     },

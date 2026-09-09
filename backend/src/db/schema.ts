@@ -15,7 +15,7 @@ export const events = pgTable(
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
     actorId: uuid('actor_id').notNull(),
     type: text('type').notNull(),
-    payload: jsonb('payload').$type<EventPayload>().notNull().default({}),
+    payload: jsonb('payload').$type<EventPayload | Record<string, never>>().notNull().default({}),
   },
   (table) => [
     // The gate queries walk one actor's history, then filter a type over a window.
