@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { actorPatchSchema } from '#model/entities/actor'
 import { INT8_MAX } from '#model/support/decimal'
-import { ERROR } from '#model/support/errors'
+import { SUBJECT_OF_ITEM, SUBJECT_OF_PLACE, eventSchema } from '#model/contracts/events'
+import { errorResponseSchema, healthResponseSchema } from '#model/contracts/wire'
+import { ERROR, ISSUE } from '#model/support/errors'
 import type { Expense } from '#model/entities/expense'
 import { newExpenseSchema } from '#model/entities/expense'
 import { itemSchema } from '#model/entities/item'
@@ -332,5 +334,54 @@ describe('round four: both halves of the text rule had moved too far', () => {
       expect(newPlaceSchema.safeParse({ ...place, name }).success).toBe(false)
     }
     expect(newPlaceSchema.safeParse({ ...place, name: 'Molok\u043e\u0301' }).success).toBe(true)
+  })
+})
+
+describe('round five: the seams the model is bolted to', () => {
+  it('lets a shape error cross the wire, not only a domain one', () => {
+    // W3. The response could name only ERROR, so the nine ISSUE codes introduced by this
+    // same review had nowhere to be reported — the commonest failure an API has.
+    expect(errorResponseSchema.safeParse({ code: ISSUE.BODY_INVALID }).success).toBe(true)
+    expect(errorResponseSchema.safeParse({ code: ERROR.NOT_FOUND }).success).toBe(true)
+    expect(errorResponseSchema.safeParse({ code: 'нечто своё' }).success).toBe(false)
+    expect(
+      errorResponseSchema.safeParse({ code: ERROR.NOT_FOUND, details: 'x'.repeat(201) }).success,
+    ).toBe(false)
+  })
+
+  it('will not record a catalogue view without the axis the gate splits on', () => {
+    // W1. The log is append-only, so a view recorded without a subject falls out of both
+    // halves of the 0.3 gate and cannot be backfilled.
+    expect(eventSchema.safeParse({ type: 'catalogue_viewed', payload: {} }).success).toBe(false)
+    expect(
+      eventSchema.safeParse({ type: 'catalogue_viewed', payload: { subject: 'venue' } }).success,
+    ).toBe(true)
+    expect(eventSchema.safeParse({ type: 'session_started' }).success).toBe(true)
+    expect(
+      eventSchema.safeParse({ type: 'session_started', payload: { subject: 'venue' } }).success,
+    ).toBe(false)
+  })
+
+  it('writes down which half of the gate each kind counts towards', () => {
+    // W2. Four kinds, two halves, and the mapping decided the gate — from memory, in half
+    // a year, unless it is written where the query will look.
+    expect(SUBJECT_OF_ITEM).toEqual({ product: 'product', dish: 'venue' })
+    expect(SUBJECT_OF_PLACE).toEqual({ store: 'product', venue: 'venue' })
+  })
+
+  it('refuses a health answer that contradicts itself', () => {
+    // W4. The comment forbids pretending to be fine; the schema allowed it.
+    expect(
+      healthResponseSchema.safeParse({ status: 'ok', version: '1', database: 'down' }).success,
+    ).toBe(false)
+    expect(
+      healthResponseSchema.safeParse({ status: 'degraded', version: '1', database: 'up' }).success,
+    ).toBe(false)
+    expect(
+      healthResponseSchema.safeParse({ status: 'ok', version: '', database: 'up' }).success,
+    ).toBe(false)
+    expect(
+      healthResponseSchema.safeParse({ status: 'ok', version: '1', database: 'up' }).success,
+    ).toBe(true)
   })
 })

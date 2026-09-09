@@ -1,6 +1,20 @@
 import type { ZodType } from 'zod'
-import { DomainError, ERROR, errorResponseSchema, healthResponseSchema } from '@molvia/model'
-import type { HealthResponse } from '@molvia/model'
+import { ERROR, errorResponseSchema, healthResponseSchema } from '@molvia/model'
+import type { HealthResponse, WireCode } from '@molvia/model'
+
+/**
+ * What the API answered with. Not a DomainError: the wire carries shape errors too — a
+ * malformed body is the commonest failure there is — and those are not domain rules.
+ */
+export class ApiError extends Error {
+  readonly code: WireCode
+
+  constructor(code: WireCode, details?: string) {
+    super(details ? `${code}: ${details}` : code)
+    this.name = 'ApiError'
+    this.code = code
+  }
+}
 
 export interface ClientOptions {
   readonly baseUrl: string
@@ -23,8 +37,8 @@ export function createClient({ baseUrl, fetch = globalThis.fetch }: ClientOption
     if (!response.ok) {
       const failure = errorResponseSchema.safeParse(body)
       throw failure.success
-        ? new DomainError(failure.data.code, failure.data.details)
-        : new DomainError(ERROR.INTERNAL, `HTTP ${String(response.status)}`)
+        ? new ApiError(failure.data.code, failure.data.details)
+        : new ApiError(ERROR.INTERNAL, `HTTP ${String(response.status)}`)
     }
 
     return schema.parse(body)

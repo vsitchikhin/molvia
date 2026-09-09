@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import type { FastifyError, FastifyInstance } from 'fastify'
-import { DomainError, ERROR } from '@molvia/model'
+import { ZodError } from 'zod'
+import { DomainError, ERROR, ISSUE, isWireCode } from '@molvia/model'
 import type { ErrorCode } from '@molvia/model'
 import { healthRoutes } from '@/routes/health'
 import { databaseIsReachable } from '@/db'
@@ -17,6 +18,16 @@ export function buildServer(): FastifyInstance {
   app.setErrorHandler((error: FastifyError, _request, reply) => {
     if (error instanceof DomainError) {
       return reply.status(STATUS_BY_CODE[error.code] ?? 400).send({ code: error.code })
+    }
+
+    // A body that did not parse is the commonest failure an API has, and it is the client's
+    // to fix. Without this branch it fell through as 500 error.internal and was logged as a
+    // server fault, so the log filled with other people's typos.
+    if (error instanceof ZodError) {
+      const issue = error.issues[0]
+      const code = isWireCode(issue?.message) ? issue.message : ISSUE.BODY_INVALID
+      const details = issue?.path.join('.')
+      return reply.status(400).send({ code, ...(details ? { details } : {}) })
     }
 
     app.log.error(error)

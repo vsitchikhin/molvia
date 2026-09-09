@@ -31,6 +31,8 @@ export class DomainError extends Error {
  * wherever it is found, and one fact with two keys would be worse than the split is good.
  */
 export const ISSUE = {
+  BODY_INVALID: 'issue.body_invalid',
+  HEALTH_CONTRADICTS_ITSELF: 'issue.health_contradicts_itself',
   PATCH_EMPTY: 'issue.patch_empty',
   TEXT_NOT_VISIBLE: 'issue.text_not_visible',
   BARCODE_DUPLICATED: 'issue.barcode_duplicated',

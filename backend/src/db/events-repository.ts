@@ -1,12 +1,12 @@
 import { sql } from 'drizzle-orm'
-import type { CatalogueSubject, EventPayload, EventType } from '@molvia/model'
+import type { CatalogueSubject, EventInput } from '@molvia/model'
 import type { Db } from './index'
 import { events } from './schema'
 
-export interface RecordedEvent {
+// The type and its payload travel together, so a catalogue view cannot be recorded
+// without the axis the 0.3 gate splits on.
+export type RecordedEvent = EventInput & {
   readonly actorId: string
-  readonly type: EventType
-  readonly payload?: EventPayload
   /** Only ever passed by tests, which have to place events in the past. */
   readonly occurredAt?: Date
 }
