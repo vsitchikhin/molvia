@@ -14,5 +14,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run"
+  },
+  "imports": {
+    "#model/*": "./src/*.ts"
   }
 }

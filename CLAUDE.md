@@ -233,8 +233,12 @@ backend/        Fastify
 frontend/       Vue 3 + Vite: views, composables, styles/_tokens.scss, i18n
 bot/            grammY, a client of the API
 packages/
-  model/        domain: types, Zod schemas, pure rules (money, units, errors,
-                and the verdict once it exists). Dependencies: zod only
+  model/        domain: types, Zod schemas, pure rules. Dependencies: zod only
+    src/support/    errors, fixed-point decimals, text and patch helpers
+    src/values/     money, units, exchange rates, geography
+    src/entities/   actor, item, place, trip, expense, verdict
+    src/contracts/  what crosses the wire whole: health, errors, events
+    tests/          mirrors src, so src holds only what ships
   client/       typed API client built on the model schemas
 services/                 anything that is not a TypeScript workspace
   receipt-ocr/  Python, 1.0, not started
@@ -264,9 +268,10 @@ names. The root `eslint.config.js` ignores the module directories entirely and c
 `e2e/` and the repository's own config files. The root `vitest.config.ts` lists the
 modules' configs as projects rather than defining suites itself.
 
-`@/` is configured per module, so it can point somewhere different in each. Today all of
-them point at that module's `src/`, because in all of them that is where importable code
-lives — not because a shared rule decided it.
+`@/` is configured per module, so it can point somewhere different in each. In the three
+applications it points at that module's `src/`, because that is where importable code
+lives — not because a shared rule decided it. The packages under `packages/` have no `@/`
+at all: they ship their source, so they use `#<name>/…` instead, for the reason below.
 
 **What deliberately stays at the root**, with the reason:
 
@@ -286,6 +291,14 @@ lives — not because a shared rule decided it.
 A path that climbs out of its own folder hides where a thing lives and breaks the moment
 a file moves. `./sub/thing` hides it half as much and breaks just as readily.
 
+**A package that ships TypeScript source uses `#<name>/…`, not `@/…`.** `@` is configured
+per module, so inside `packages/model` it would resolve against whichever module is doing
+the compiling — `backend/src`, `frontend/src` — and the import would silently point at
+someone else's file. Node's package subpath imports are resolved by the package that
+declares them, whoever is building, and `tsc`, `vue-tsc`, Vite and esbuild all honour
+them. `packages/model/package.json` declares `"imports": { "#model/*": "./src/*.ts" }`;
+the same shape applies to any other package under `packages/`.
+
 **Boundary rules — enforced by the linter, not by eye:**
 
 - `packages/model` imports nothing but `zod`. Not fastify, not drizzle, not vue,
@@ -300,8 +313,17 @@ database access. In a product about data integrity, two write paths will silentl
 ## Money and quantity rules
 
 - **Never `float`.** An amount is an integer in minor units: `amount_minor bigint` +
-  `currency char(3)`, minor unit = 1/100 for every currency. Drams are fractional in
-  practice (a receipt for 5403.12 ֏) — "drams are whole" is a false simplification.
+  `currency char(3)`.
+- **The minor-unit exponent is a property of the currency, never a constant.** Today all
+  four supported currencies happen to use 1/100 — drams included: an Armenian receipt
+  prints hundredths (`5 403,12 ֏`), even though a shop usually rounds them away at the
+  till, by ordinary half-up. That coincidence is not a licence to hardcode `100n`: a
+  constant is what breaks first on a currency with three digits or none, and it hides
+  where the fact actually belongs. Checked with the owner on 2026-09-08 — the earlier
+  wording "1/100 for every currency" was right about today's value and wrong about where
+  it lives.
+- **A unit price is not money and keeps its own scale.** It is a computed ratio, so it may
+  carry more precision than any amount in that currency does.
 - **The rate is stored with the transaction** and never recomputed retroactively.
   Otherwise last month's total changes with today's rate.
 - **Compare by unit price only** (per kg / l / piece). Unit price is computed, never
@@ -497,8 +519,10 @@ Migrations that lose data, swapping a stack element, CI changes, refactoring out
 
 ## State
 
-**Scaffolded, no product features yet**, and release 0.1 is already broken into epics and
-tasks in Jira. What exists, what is decided and what is still open — `docs/onboarding.md`.
+**Scaffolded, and the domain model is in** — MOL-4: seven entities, eight write inputs and
+three rules in `packages/model`, with the wire codecs that money and quantity need to cross
+it at all. No table, route or screen yet. Release 0.1 is broken into epics and tasks in
+Jira. What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 `docker-compose.yml` runs Postgres only; the applications run natively in development,
 because HMR and a debugger attached to a host process beat a rebuild inside a container.
