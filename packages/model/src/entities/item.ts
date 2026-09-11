@@ -25,7 +25,7 @@ export const itemSchema = z.object({
   id: z.uuid(),
   kind: itemKindSchema,
   name: nameSchema,
-  /** Latin, filled by MOL-5 — which is why no input carries it. */
+  /** Latin, filled by toSearchKey on write — which is why no input carries it. */
   // 800, not 200: transliteration grows a name — «щ» becomes «shch» — so a valid name
   // would otherwise produce a key this same schema refuses.
   searchKey: visibleLine(800),
