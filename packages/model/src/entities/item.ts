@@ -26,8 +26,11 @@ export const itemSchema = z.object({
   kind: itemKindSchema,
   name: nameSchema,
   /** Latin, filled by toSearchKey on write — which is why no input carries it. */
-  // 800, not 200: transliteration grows a name — «щ» becomes «shch» — so a valid name
-  // would otherwise produce a key this same schema refuses.
+  // 800, not 200: transliteration grows a name, and by more than the alphabet suggests.
+  // The tables at most double it («щ» becomes «sh», «я» becomes «ia»), but NFD decomposes
+  // one Hangul syllable into three letters that nothing strips, so the real ceiling is
+  // threefold — 200 × 3 = 600. Without the headroom a valid name would produce a key this
+  // same schema refuses.
   searchKey: visibleLine(800),
   /** Several per item: one product comes in different packaging, and loose goods have none. */
   barcodes: barcodesSchema,

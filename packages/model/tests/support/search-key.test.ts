@@ -154,13 +154,16 @@ describe('toSearchKey', () => {
   })
 
   it('stays inside visibleLine(800) at the longest name the schema allows', () => {
-    // 200 is the name limit; «щ» and «ч» expand twofold, which is the widest the table
-    // goes, so the key of the longest possible name is 400 — half the headroom the item
-    // schema reserves.
-    const key = toSearchKey('щ'.repeat(200))
-    expect(key).toHaveLength(400)
-    expect(() => visibleLine(800).parse(key)).not.toThrow()
+    // 200 is the name limit. The tables double at most — but they are not the widest path:
+    // NFD decomposes a precomposed Hangul syllable into three jamo, and jamo are letters,
+    // so nothing strips them. The real ceiling is threefold, and the headroom the item
+    // schema reserves is 200 characters rather than the 400 the alphabet alone suggests.
+    expect(toSearchKey('щ'.repeat(200))).toHaveLength(400)
     expect(toSearchKey('ч'.repeat(200))).toHaveLength(400)
+
+    const widest = toSearchKey('각'.repeat(200))
+    expect(widest).toHaveLength(600)
+    expect(() => visibleLine(800).parse(widest)).not.toThrow()
   })
 
   it('handles a one-character name', () => {

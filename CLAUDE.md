@@ -143,7 +143,11 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   with `ц`, `ш` with `щ` — wins no query and loses the distinction, so it was rejected.
   One fork stays open on purpose: `к`/`c`, where «Кока-кола» against `Coca-Cola` spends the
   whole budget of 2. `c` is already the target for `ц`, so folding it to `k` would turn
-  «цена» into `kena`. That pair is what the remembered pick exists for.
+  «цена» into `kena`. That pair is what the remembered pick exists for. The fold also fires
+  on what the alphabet itself produced, not only on Latin someone typed — `тс` becomes `ts`
+  becomes `c` — which is what makes «счёт» and «щёт» one key, and also what merges
+  «Советский» into `soveki` and «Ицхак» with «Ичак». A false merge costs a candidate, a miss
+  costs the answer; the trade is deliberate, and it is a trade.
 - **Armenian is in the table, not passed through.** The first market is Gyumri and Yerevan,
   so an Armenian label is the norm on the shelf. With the table «Գյումրի», «Гюмри» and
   `Gyumri` all become `giumri`, and an Armenian name is reachable from all three keyboards;
@@ -164,11 +168,16 @@ Measured, not assumed — the numbers below come from a probe against a real dat
 - **Ranking is by minimum Levenshtein across the words**, via `fuzzystrmatch`. Two swapped
   vowels in a six-letter word defeat every trigram measure; edit distance puts «малако» at
   2 from `moloko` with the nearest wrong answer at 3. Across words, not the first word:
-  «чанах» is a brand, and matching only the head noun missed it. **Word against word, in
-  both directions**: comparing the whole query to the words of a name put «Հաց Կաթ» and
-  `Hats Kat` at distance 4 while their keys are identical character for character — an
-  artefact of the metric, not of the transliteration. Words shorter than two characters are
-  skipped, or `Молоко 3,2%` drags its `3` and `2` into the candidates of any numeric query.
+  «чанах» is a brand, and matching only the head noun missed it. **Word against word**, never
+  the whole query against a name's words: that put «Հաց Կաթ» and `Hats Kat` at distance 4
+  while their keys are identical character for character — an artefact of the metric, not of
+  the transliteration. How the per-word distances then combine across a multi-word query is
+  MOL-10's to settle, and two traps are already known. Taking the worst query word loses an
+  item to a _correct_ extra word: «молоко ашхар пастеризованное» scores 11 against «Молоко
+  Ашхар 3.2%», and the extra word is the one printed on the package. And skipping words
+  shorter than two characters — which `Молоко 3,2%` needs, or its `3` and `2` join the
+  candidates of every numeric query — has to be conditional on longer words remaining, or a
+  query that is nothing but `3,2%` reduces to an empty set and outscores every real answer.
 - **What the user picked is remembered.** A query and the item chosen after it are stored
   and boost that pairing next time. No model, no image change, and it compounds from the
   first day — it is also the labelled set anything smarter would later need.

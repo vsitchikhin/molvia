@@ -66,9 +66,10 @@ const CYRILLIC: Readonly<Record<string, string>> = Object.freeze({
  * by a Russian query and by a Latin one alike: «Գյումրի», «Гюмри» and «Gyumri» all become
  * `giumri`.
  *
- * The aspirated pairs are collapsed on purpose — պ/փ, կ/ք, տ/թ, ծ/ց, ճ/չ, ռ/ր. A Russian
- * speaker does not hear that distinction and will not write it in Latin either; this is
- * the same trade as ш/щ both becoming sh.
+ * Letters are collapsed on purpose, and by more than the aspirated pairs: պ/փ, կ/ք, տ/թ,
+ * ծ/ց, ճ/չ and ռ/ր merge pairwise, ժ/ջ/ձ all give j, խ/հ give h, ե/է/ը give e, ի/յ give i,
+ * վ/ւ give v. A Russian speaker does not hear most of these and will not write them in
+ * Latin either; this is the same trade as ш/щ both becoming sh.
  */
 const ARMENIAN: Readonly<Record<string, string>> = Object.freeze({
   ա: 'a',
@@ -128,13 +129,17 @@ const ARMENIAN_DIGRAPHS: readonly (readonly [string, string])[] = Object.freeze(
  * without the fold four of them miss the distance threshold outright, with it none do,
  * at a cost of 0.26 extra candidates per query.
  *
- * Order matters and is safe at the same time: after the alphabet table the string holds
- * neither `ts` nor `shch`, so the fold only ever fires on Latin the person typed. That is
- * also why the whole function is idempotent.
+ * It fires on everything the alphabet produced, not only on Latin the person typed. The
+ * table hands out multi-letter values, so Cyrillic feeds the fold by itself: `тс` → `ts`
+ * → `c`, `сч` → `sch` → `sh`, `кх` → `kh` → `h`, `цк` → `ck` → `k`, `пх` → `ph` → `f`.
+ * That is deliberate and useful — «счёт» and «щёт» become one key.
  *
- * The fold is deliberately blunt — it runs across morpheme boundaries too, so «отступ» and
- * «оцуп» collapse together. In a catalogue of product names a false merge costs a candidate
- * and a miss costs the answer, so bluntness is the cheap side of the trade.
+ * The cost is merges across morpheme boundaries. «Советский» loses `цк` twice over and
+ * becomes `soveki`; `ц` + `х` gives `ch`, the same as `ч`, so «Ицхак» and «Ичак» are one
+ * key; `с` + `х` gives `sh`, the same as `ш`, so «исход» and «ишод» are one key. In a
+ * catalogue of product names a false merge costs a candidate and a miss costs the answer,
+ * so this is the cheap side of the trade — but it is a trade, not a free win, and none of
+ * it says anything about the order being safe. That is what foldToFixedPoint is for.
  */
 const LATIN_FOLDS: readonly (readonly [string, string])[] = Object.freeze([
   ['shch', 'sh'],
