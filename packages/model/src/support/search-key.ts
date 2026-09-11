@@ -50,12 +50,14 @@ const CYRILLIC: Readonly<Record<string, string>> = Object.freeze({
   э: 'e',
   ю: 'iu',
   я: 'ia',
-  // Ukrainian and Belarusian, so a name carrying them does not leak through untranslated.
+  // Ukrainian, so a name carrying these does not leak through untranslated. Belarusian «ў»
+  // is deliberately absent: NFD decomposes it to «у» plus a breve and the mark is stripped
+  // before this table is consulted, so a row for it could never fire. It lands on `u`,
+  // which is also where Latin `Vaukavysk` lands — the shadowing costs nothing here.
   і: 'i',
   ї: 'i',
   є: 'e',
   ґ: 'g',
-  ў: 'v',
 })
 
 /**
@@ -157,6 +159,37 @@ const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u
 // Doubling is a spelling fork of its own: «Анна», «Anna» and «Ана» are one name.
 const DOUBLED = /(\p{L})\1+/gu
 const SPACES = / +/g
+const FORMATTING = /\p{Cf}/gu
+const WHITESPACE = /\s+/gu
+
+/**
+ * Folding is run to a fixed point, not once. A single pass is not idempotent, and that is
+ * not cosmetic: `replaceAll` never re-reads what it just wrote, so a replacement and the
+ * character before it can spell the pattern again — `kkh` gives `k` + `h`, which is `kh`
+ * all over again. The expanding rules make it worse from the other side: `x → ks` produces
+ * the input that `ck → k` has already walked past.
+ *
+ * It terminates. Every rule either shortens the string or keeps its length, and the
+ * length-preserving ones (`q → k`, `w → v`, `y → i`, `qu → kv`) produce nothing any rule
+ * matches, so they fire at most once. After that each pass strictly shortens or changes
+ * nothing. Four passes cover every input reachable from these tables — the enumeration test
+ * is what holds that claim, so a new rule needing a fifth turns it red instead of quietly
+ * returning a string that is not a fixed point.
+ */
+const FOLD_PASSES = 4
+
+function foldToFixedPoint(text: string): string {
+  let folded = text
+  for (let pass = 0; pass < FOLD_PASSES; pass += 1) {
+    const before = folded
+    for (const [from, to] of LATIN_FOLDS) {
+      folded = folded.replaceAll(from, to)
+    }
+    folded = folded.replace(DOUBLED, '$1')
+    if (folded === before) break
+  }
+  return folded
+}
 
 /**
  * Runs over both ends of the wire: the name on write and the query on read. There cannot be
@@ -165,8 +198,13 @@ const SPACES = / +/g
  *
  * A character the table does not know keeps itself, lowercased and stripped of marks.
  * Dropping it instead would be worse: a name written entirely in an unknown script would
- * produce an empty key, and `visibleLine` refuses that — the item would become unbuildable
- * inside the server rather than at the user's input.
+ * produce an empty key. The flip side is that such a name is then reachable only from its
+ * own script — `ბორჯომი` is 7 away from `borjomi`, well past any threshold.
+ *
+ * **The key is empty for input that carries nothing but separators**, and that is on
+ * purpose: the function cannot invent content. What keeps an unbuildable item out of the
+ * server is the order of two calls — `visibleLine` refuses such a name first. Every caller
+ * that writes an item has to validate the name before taking its key.
  */
 export function toSearchKey(text: string): string {
   const plain = text.toLowerCase().normalize('NFD').replace(MARK, '')
@@ -181,11 +219,12 @@ export function toSearchKey(text: string): string {
     mapped += LETTERS[char] ?? (LETTER_OR_DIGIT.test(char) ? char : ' ')
   }
 
-  for (const [from, to] of LATIN_FOLDS) {
-    mapped = mapped.replaceAll(from, to)
-  }
+  const key = foldToFixedPoint(mapped).trim().replace(SPACES, ' ')
+  if (key !== '') return key
 
-  const key = mapped.replace(DOUBLED, '$1').trim().replace(SPACES, ' ')
   // Nothing survived: the name was punctuation only, which `visibleLine` lets through.
-  return key === '' ? plain.trim() : key
+  // The fallback still goes through the same tidying as the main path — otherwise this one
+  // key in the whole catalogue would carry zero-width characters and uncollapsed runs of
+  // whitespace, and sit in the column under different rules than every row beside it.
+  return plain.replace(FORMATTING, '').replace(WHITESPACE, ' ').trim()
 }

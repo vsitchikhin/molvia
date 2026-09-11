@@ -59,10 +59,63 @@ describe('toSearchKey', () => {
 
   it('is idempotent: a query normalised twice is the query normalised once', () => {
     // The query passes through the route and then through the repository; neither may
-    // change the answer of the other.
+    // change the answer of the other. A migration that recomputes the column reads the
+    // stored key, so the same property is what keeps that from rewriting half the rows.
     for (const text of ['Молоко Ашхар 3,2%', 'shcherbet', 'Цыплёнок', 'Coca-Cola', '!!!']) {
       expect(toSearchKey(toSearchKey(text))).toBe(toSearchKey(text))
     }
+  })
+
+  it('is idempotent by enumeration, not by a handful of literals', () => {
+    // Five stable literals passed while `Bakkhus`, `CX-5` and «ккх» did not: a replacement
+    // and the character before it spelled the pattern again, and the expanding rules fed
+    // the ones that had already run. Enumeration is what makes this a property test, and
+    // it is also what pins FOLD_PASSES — a rule needing a fifth pass turns this red.
+    // Written out rather than spread from a string: the letters that make forks, on both
+    // sides of the table.
+    const alphabet = [
+      'c',
+      'k',
+      'h',
+      'q',
+      'x',
+      'w',
+      'y',
+      'z',
+      's',
+      'g',
+      't',
+      'p',
+      'ц',
+      'к',
+      'х',
+      'ш',
+      'ч',
+      'щ',
+      'ж',
+      'т',
+      'с',
+      'г',
+      'п',
+      'з',
+    ]
+    for (const a of alphabet) {
+      for (const b of alphabet) {
+        for (const c of alphabet) {
+          const once = toSearchKey(a + b + c)
+          expect(toSearchKey(once), a + b + c).toBe(once)
+        }
+      }
+    }
+  })
+
+  it('closes the counterexamples that the literal list missed', () => {
+    for (const text of ['Bakkhus', 'ккх', 'цx', 'cck', 'qh', 'CX-5', 'Mazda CX-30', 'ццк']) {
+      const once = toSearchKey(text)
+      expect(toSearchKey(once), text).toBe(once)
+    }
+    expect(toSearchKey('Bakkhus')).toBe('bahus')
+    expect(toSearchKey('Mazda CX-30')).toBe('mazda ks 30')
   })
 
   it('never returns empty for a name visibleLine accepts', () => {
@@ -75,8 +128,29 @@ describe('toSearchKey', () => {
   })
 
   it('returns empty for empty input rather than inventing something', () => {
+    // Including the separators that do not look like ones. The guarantee «a key is never
+    // empty» lives in the order of two calls, not in this function: `visibleLine` refuses
+    // such a name first, and every write path has to run it before taking the key.
     expect(toSearchKey('')).toBe('')
     expect(toSearchKey('   ')).toBe('')
+    expect(toSearchKey(' ')).toBe('')
+    expect(toSearchKey('　 ')).toBe('')
+  })
+
+  it('tidies the fallback the same way it tidies a real key', () => {
+    // Otherwise this one key in the whole catalogue would carry zero-width characters and
+    // uncollapsed whitespace, and sit in the column under different rules than its
+    // neighbours: «а   б» gives `a b`, so «!   ?» has to give `! ?`.
+    expect(toSearchKey('!   ?')).toBe('! ?')
+    expect(toSearchKey('!​!')).toBe('!!')
+  })
+
+  it('has no row that NFD makes unreachable', () => {
+    // «ў» decomposes into «у» plus a breve, and the mark is stripped before the table is
+    // consulted — a row for it could never fire, so it is not in the table. It lands on
+    // the same `u` Latin does.
+    expect(toSearchKey('ў')).toBe('u')
+    expect(toSearchKey('Ваўкавыск')).toBe(toSearchKey('Vaukavysk'))
   })
 
   it('stays inside visibleLine(800) at the longest name the schema allows', () => {
