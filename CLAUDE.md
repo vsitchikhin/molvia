@@ -132,6 +132,31 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   pure function in the domain. Against that column the same query scores 0.500.
   A custom `unaccent` rules file inside Postgres would buy only this half and cost us
   ownership of the database image — CI can pull a service image but cannot build one.
+- **The alphabet folds the forks rather than preserving them.** A transliteration fork is
+  one letter with two spellings in common use — `ж` is zh or j, `ц` is ts or c, `х` is kh or
+  h, `щ` is shch or sch — and the product plan already named them when it picked the name
+  Molvia. `search_key` keeps one spelling per fork and folds the other half of each into it,
+  on **both** ends: the name on write and the query on read go through the same function.
+  Measured over 46 queries: without the fold four miss the distance threshold outright
+  (`jem` against `dzhem` is 3, `Grand Candy` against «Гранд Кенди» is 3), with it none do,
+  at a cost of 0.26 extra candidates per query. Folding harder than that — collapsing `ч`
+  with `ц`, `ш` with `щ` — wins no query and loses the distinction, so it was rejected.
+  One fork stays open on purpose: `к`/`c`, where «Кока-кола» against `Coca-Cola` spends the
+  whole budget of 2. `c` is already the target for `ц`, so folding it to `k` would turn
+  «цена» into `kena`. That pair is what the remembered pick exists for.
+- **Armenian is in the table, not passed through.** The first market is Gyumri and Yerevan,
+  so an Armenian label is the norm on the shelf. With the table «Գյումրի», «Гюмри» and
+  `Gyumri` all become `giumri`, and an Armenian name is reachable from all three keyboards;
+  worst distance across a corpus of sixteen names in three scripts is 1. Two mechanics are
+  easy to get wrong: `ու` and `և` are single letters written with two code points and must
+  be resolved before the per-character pass, and the aspirated pairs (`պ`/`փ`, `կ`/`ք`,
+  `տ`/`թ`) are collapsed deliberately — the same trade as `ш`/`щ`. A letter no table knows
+  keeps itself: dropping it would produce an empty key, and `visibleLine` refuses that, so
+  the item would become unbuildable inside the server.
+- **The tables are frozen, and changing one is a migration.** The key is stored, so an edit
+  after the first row is written makes every accumulated key foreign — silently, with no
+  error and no log line. Same standing as `MINOR_EXPONENT`. Retuning the thresholds is a
+  different thing and does not touch the alphabet.
 - **Candidates come from `word_similarity`, never `similarity`.** `similarity` compares
   whole strings, so a long name dilutes the match: «малако» scored 0.158 against
   «Молоко «Ашхар»» and ranked «Марианна» above it. `word_similarity` compares against the
@@ -139,7 +164,11 @@ Measured, not assumed — the numbers below come from a probe against a real dat
 - **Ranking is by minimum Levenshtein across the words**, via `fuzzystrmatch`. Two swapped
   vowels in a six-letter word defeat every trigram measure; edit distance puts «малако» at
   2 from `moloko` with the nearest wrong answer at 3. Across words, not the first word:
-  «чанах» is a brand, and matching only the head noun missed it.
+  «чанах» is a brand, and matching only the head noun missed it. **Word against word, in
+  both directions**: comparing the whole query to the words of a name put «Հաց Կաթ» and
+  `Hats Kat` at distance 4 while their keys are identical character for character — an
+  artefact of the metric, not of the transliteration. Words shorter than two characters are
+  skipped, or `Молоко 3,2%` drags its `3` and `2` into the candidates of any numeric query.
 - **What the user picked is remembered.** A query and the item chosen after it are stored
   and boost that pairing next time. No model, no image change, and it compounds from the
   first day — it is also the labelled set anything smarter would later need.
