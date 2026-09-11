@@ -59,6 +59,68 @@ const CYRILLIC: Readonly<Record<string, string>> = Object.freeze({
 })
 
 /**
+ * Armenian. The first market is Gyumri and Yerevan, so an Armenian label on the shelf is
+ * the norm rather than an exception, and the table is what lets an Armenian name be found
+ * by a Russian query and by a Latin one alike: «Գյումրի», «Гюмри» and «Gyumri» all become
+ * `giumri`.
+ *
+ * The aspirated pairs are collapsed on purpose — պ/փ, կ/ք, տ/թ, ծ/ց, ճ/չ, ռ/ր. A Russian
+ * speaker does not hear that distinction and will not write it in Latin either; this is
+ * the same trade as ш/щ both becoming sh.
+ */
+const ARMENIAN: Readonly<Record<string, string>> = Object.freeze({
+  ա: 'a',
+  բ: 'b',
+  գ: 'g',
+  դ: 'd',
+  ե: 'e',
+  զ: 'z',
+  է: 'e',
+  ը: 'e',
+  թ: 't',
+  ժ: 'j',
+  ի: 'i',
+  լ: 'l',
+  խ: 'h',
+  ծ: 'c',
+  կ: 'k',
+  հ: 'h',
+  ձ: 'j',
+  ղ: 'g',
+  ճ: 'ch',
+  մ: 'm',
+  յ: 'i',
+  ն: 'n',
+  շ: 'sh',
+  ո: 'o',
+  չ: 'ch',
+  պ: 'p',
+  ջ: 'j',
+  ռ: 'r',
+  ս: 's',
+  վ: 'v',
+  տ: 't',
+  ր: 'r',
+  ց: 'c',
+  ւ: 'v',
+  փ: 'p',
+  ք: 'k',
+  օ: 'o',
+  ֆ: 'f',
+})
+
+const LETTERS: Readonly<Record<string, string>> = Object.freeze({ ...CYRILLIC, ...ARMENIAN })
+
+/**
+ * One letter written with two code points, so it is resolved before the per-character pass:
+ * left to that pass «ու» would come out as `ov` and the word would be unreachable.
+ */
+const ARMENIAN_DIGRAPHS: readonly (readonly [string, string])[] = Object.freeze([
+  ['ու', 'u'],
+  ['և', 'ev'],
+] as const)
+
+/**
  * A transliteration fork is one letter with two spellings in common use: ж is zh or j,
  * ц is ts or c, х is kh or h, щ is shch or sch. Measured over a corpus of 46 queries:
  * without the fold four of them miss the distance threshold outright, with it none do,
@@ -75,6 +137,9 @@ const CYRILLIC: Readonly<Record<string, string>> = Object.freeze({
 const LATIN_FOLDS: readonly (readonly [string, string])[] = Object.freeze([
   ['shch', 'sh'],
   ['sch', 'sh'],
+  // ղ becomes g, and Latin spells it gh — without this Ghapama and Tsaghkunk each cost an
+  // extra edit. Measured: the Russian corpus did not move, 46 of 46 as before.
+  ['gh', 'g'],
   ['zh', 'j'],
   ['kh', 'h'],
   ['ts', 'c'],
@@ -106,9 +171,14 @@ const SPACES = / +/g
 export function toSearchKey(text: string): string {
   const plain = text.toLowerCase().normalize('NFD').replace(MARK, '')
 
+  let joined = plain
+  for (const [from, to] of ARMENIAN_DIGRAPHS) {
+    joined = joined.replaceAll(from, to)
+  }
+
   let mapped = ''
-  for (const char of plain) {
-    mapped += CYRILLIC[char] ?? (LETTER_OR_DIGIT.test(char) ? char : ' ')
+  for (const char of joined) {
+    mapped += LETTERS[char] ?? (LETTER_OR_DIGIT.test(char) ? char : ' ')
   }
 
   for (const [from, to] of LATIN_FOLDS) {

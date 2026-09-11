@@ -99,3 +99,48 @@ describe('toSearchKey', () => {
     expect(toSearchKey('ხაჭაპური')).toBe('ხაჭაპური')
   })
 })
+
+describe('toSearchKey · армянский', () => {
+  it('brings all three scripts of one name to the same key', () => {
+    // The point of the Armenian table: a label on the shelf is found by a Russian query
+    // and by a Latin one without the person knowing which script the catalogue holds.
+    expect(toSearchKey('Գյումրի')).toBe('giumri')
+    expect(toSearchKey('Гюмри')).toBe('giumri')
+    expect(toSearchKey('Gyumri')).toBe('giumri')
+
+    expect(toSearchKey('Չանախ')).toBe(toSearchKey('Чанах'))
+    expect(toSearchKey('Չանախ')).toBe(toSearchKey('Chanakh'))
+    expect(toSearchKey('Մածուն')).toBe(toSearchKey('Мацун'))
+    expect(toSearchKey('Մածուն')).toBe(toSearchKey('Matsun'))
+  })
+
+  it('resolves the two-code-point letters before the per-character pass', () => {
+    // Left to that pass «ու» would come out as `ov`, and «և» as a letter nothing knows.
+    expect(toSearchKey('ու')).toBe('u')
+    expect(toSearchKey('Երևան')).toBe('erevan')
+    expect(toSearchKey('Երևան')).toBe(toSearchKey('Ереван'))
+  })
+
+  it('folds the Armenian case, including the uppercase digraph', () => {
+    expect(toSearchKey('ՄԱԾՈՒՆ')).toBe(toSearchKey('Մածուն'))
+  })
+
+  it('lands gh on the same key, which is why the fold learned it', () => {
+    expect(toSearchKey('Ղափամա')).toBe(toSearchKey('Ghapama'))
+    expect(toSearchKey('Ղափամա')).toBe('gapama')
+  })
+
+  it('collapses the aspirated pairs on purpose', () => {
+    // A Russian speaker does not hear the distinction and will not type it either.
+    for (const [plain, aspirated] of [
+      ['պ', 'փ'],
+      ['կ', 'ք'],
+      ['տ', 'թ'],
+      ['ծ', 'ց'],
+      ['ճ', 'չ'],
+      ['ռ', 'ր'],
+    ]) {
+      expect(toSearchKey(plain!)).toBe(toSearchKey(aspirated!))
+    }
+  })
+})
