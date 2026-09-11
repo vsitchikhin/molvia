@@ -1,6 +1,7 @@
 export * from '#model/support/errors'
 export * from '#model/support/decimal'
 export * from '#model/support/text'
+export * from '#model/support/search-key'
 export * from '#model/support/patch'
 export * from '#model/values/money'
 export * from '#model/values/units'
