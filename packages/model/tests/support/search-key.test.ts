@@ -221,3 +221,144 @@ describe('toSearchKey · армянский', () => {
     }
   })
 })
+
+/**
+ * The tables are frozen: an edit after the first row is written is a migration with a
+ * recompute, so a wrong line does not live until the next sprint, it lives forever. This
+ * block is the second copy that has to agree — a change to the alphabet then shows up in
+ * the diff of a test, not only in the diff of the data.
+ */
+describe('полнота таблиц', () => {
+  // Wrapped in digits: they are never folded and never collapsed, so the wrapper cannot
+  // take part in the answer. An empty value is a real expectation — «ъ» carries none.
+  const through = (letter: string) => toSearchKey(`7${letter}7`).slice(1, -1)
+
+  const CYRILLIC: readonly (readonly [string, string])[] = [
+    ['а', 'a'],
+    ['б', 'b'],
+    ['в', 'v'],
+    ['г', 'g'],
+    ['д', 'd'],
+    ['е', 'e'],
+    ['ё', 'e'],
+    ['ж', 'j'],
+    ['з', 'z'],
+    ['и', 'i'],
+    ['й', 'i'],
+    ['к', 'k'],
+    ['л', 'l'],
+    ['м', 'm'],
+    ['н', 'n'],
+    ['о', 'o'],
+    ['п', 'p'],
+    ['р', 'r'],
+    ['с', 's'],
+    ['т', 't'],
+    ['у', 'u'],
+    ['ф', 'f'],
+    ['х', 'h'],
+    ['ц', 'c'],
+    ['ч', 'ch'],
+    ['ш', 'sh'],
+    ['щ', 'sh'],
+    ['ъ', ''],
+    ['ы', 'i'],
+    ['ь', ''],
+    ['э', 'e'],
+    ['ю', 'iu'],
+    ['я', 'ia'],
+    ['і', 'i'],
+    ['ї', 'i'],
+    ['є', 'e'],
+    ['ґ', 'g'],
+  ]
+
+  const ARMENIAN: readonly (readonly [string, string])[] = [
+    ['ա', 'a'],
+    ['բ', 'b'],
+    ['գ', 'g'],
+    ['դ', 'd'],
+    ['ե', 'e'],
+    ['զ', 'z'],
+    ['է', 'e'],
+    ['ը', 'e'],
+    ['թ', 't'],
+    ['ժ', 'j'],
+    ['ի', 'i'],
+    ['լ', 'l'],
+    ['խ', 'h'],
+    ['ծ', 'c'],
+    ['կ', 'k'],
+    ['հ', 'h'],
+    ['ձ', 'j'],
+    ['ղ', 'g'],
+    ['ճ', 'ch'],
+    ['մ', 'm'],
+    ['յ', 'i'],
+    ['ն', 'n'],
+    ['շ', 'sh'],
+    ['ո', 'o'],
+    ['չ', 'ch'],
+    ['պ', 'p'],
+    ['ջ', 'j'],
+    ['ռ', 'r'],
+    ['ս', 's'],
+    ['վ', 'v'],
+    ['տ', 't'],
+    ['ր', 'r'],
+    ['ց', 'c'],
+    ['ւ', 'v'],
+    ['փ', 'p'],
+    ['ք', 'k'],
+    ['օ', 'o'],
+    ['ֆ', 'f'],
+  ]
+
+  it.each(CYRILLIC)('кириллица: «%s» даёт «%s»', (letter, expected) => {
+    expect(through(letter)).toBe(expected)
+  })
+
+  it.each(ARMENIAN)('армянский: «%s» даёт «%s»', (letter, expected) => {
+    expect(through(letter)).toBe(expected)
+  })
+
+  it('не держит букву в обеих таблицах сразу', () => {
+    // The two are merged into one record, so a key in both would silently take the second
+    // value. This is the same remark that closed MOL-4 about merging two ISSUE registries.
+    const cyrillic = new Set(CYRILLIC.map(([letter]) => letter))
+    const shared = ARMENIAN.filter(([letter]) => cyrillic.has(letter))
+    expect(shared).toEqual([])
+  })
+
+  it('держит значения уже сведёнными', () => {
+    // A row written as `zh` or `ts` would work by accident — the fold would clean it up on
+    // the way out. It must not be written that way: the table is the statement of record.
+    for (const [letter, value] of [...CYRILLIC, ...ARMENIAN]) {
+      for (const fork of ['zh', 'ts', 'kh', 'shch', 'sch', 'gh', 'ck', 'ph', 'x', 'q', 'w', 'y']) {
+        expect(value, `«${letter}»`).not.toContain(fork)
+      }
+    }
+  })
+})
+
+describe('пределы, записанные явно', () => {
+  it('склеивает пары, которые на полке различаются', () => {
+    // The corpus invariant «no two names share a key» is a statement about those 24 names,
+    // not a property of the key. These are real confectionery brands, and they collide.
+    expect(toSearchKey('Мишка')).toBe(toSearchKey('Мышка'))
+    // Not the fold: the table alone sends ц+х and ч to the same `ch`.
+    expect(toSearchKey('Ицхак')).toBe(toSearchKey('Ичак'))
+  })
+
+  it('схлопывает серию повторов без предела', () => {
+    // A 200-character name becomes a one-character key, and a one-character key sits inside
+    // the radius of most of the catalogue. Unreachable from a real shelf, pinned so that
+    // nobody meets it by surprise while retuning the thresholds in MOL-14.
+    expect(toSearchKey('ц'.repeat(200))).toBe('c')
+  })
+
+  it('не переходит границу слова', () => {
+    // Typing a name without the space is ordinary on a phone, and the key keeps the space.
+    expect(toSearchKey('кокакола')).not.toBe(toSearchKey('Кока-кола'))
+  })
+})

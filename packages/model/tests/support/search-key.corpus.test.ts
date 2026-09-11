@@ -25,15 +25,32 @@ function levenshtein(a: string, b: string): number {
 }
 
 /**
- * Every word of the query against every word of the name, worst word wins. Measured the
- * other way round — the whole query against the words of the name — «Հաց Կաթ» and «Hats Kat»
- * came out at distance 4 while holding identical keys. That is an artefact of the metric,
- * not of the transliteration, and MOL-10 has to compute it this way.
+ * Words shorter than two characters are dropped — `moloko ashar 3 2` must not offer its
+ * `3` to every numeric query — but only while longer ones remain. A query that is nothing
+ * but `3,2%` would otherwise reduce to an empty list, and `Math.max()` of nothing is
+ * -Infinity: a perfect match against the entire catalogue, better than any real answer.
+ */
+function words(key: string): readonly string[] {
+  const all = key.split(' ')
+  const long = all.filter((word) => word.length >= 2)
+  return long.length > 0 ? long : all
+}
+
+/**
+ * Every word of the query against every word of the name. Measured the other way round —
+ * the whole query against the words of the name — «Հաց Կաթ» and «Hats Kat» came out at
+ * distance 4 while holding identical keys; that is an artefact of the metric, not of the
+ * transliteration.
+ *
+ * Taking the worst query word is the strict reading, and it has a known cost: a correct
+ * extra word loses the item, because «молоко ашхар пастеризованное» is what the package
+ * says and the catalogue holds «Молоко Ашхар 3.2%». How the per-word distances combine is
+ * MOL-10's decision, not this corpus's — what the corpus pins is the transliteration.
  */
 function distance(query: string, name: string): number {
-  const words = name.split(' ')
+  const parts = words(name)
   return Math.max(
-    ...query.split(' ').map((word) => Math.min(...words.map((part) => levenshtein(word, part)))),
+    ...words(query).map((word) => Math.min(...parts.map((part) => levenshtein(word, part)))),
   )
 }
 
@@ -165,7 +182,9 @@ describe('корпус развилок', () => {
     expect(tied).toEqual(['moloko', 'малако', 'malako'])
   })
 
-  it('не склеивает два разных названия в один ключ', () => {
+  it('не склеивает в один ключ ни одну пару из этих двадцати четырёх', () => {
+    // Says what it can: a statement about this list, not a property of the key. The key
+    // does collide — «Мишка» и «Мышка» — and that is pinned in the unit tests instead.
     expect(new Set(keys.values()).size).toBe(ITEMS.length)
   })
 })
@@ -188,5 +207,58 @@ describe('известный предел', () => {
     // day this stops being the limit, and a test that silently worsens would hide the day
     // the pair stops being findable at all.
     expect(distance(toSearchKey('Coca-Cola'), toSearchKey('Кока-кола'))).toBe(2)
+  })
+})
+
+describe('многословный запрос', () => {
+  it('сводит «Հաց Կաթ» и «Hats Kat» в один ключ, слово к слову', () => {
+    // The pair the metric was written for, and the only two-word case in either corpus:
+    // on a single word the two readings of «minimum across the words» are the same
+    // function, so nothing below it would have caught the difference.
+    expect(toSearchKey('Հաց Կաթ')).toBe(toSearchKey('Hats Kat'))
+    expect(distance(toSearchKey('Hats Kat'), toSearchKey('Հաց Կաթ'))).toBe(0)
+  })
+
+  it('не даёт запросу из одних коротких слов совпасть со всем подряд', () => {
+    // -Infinity would beat every real answer. The rule that drops short words has to be
+    // conditional on longer ones remaining, and this is what says so.
+    const key = toSearchKey('3,2%')
+    expect(key).toBe('3 2')
+    expect(distance(key, toSearchKey('Молоко Ашхар 3.2%'))).toBeGreaterThan(0)
+  })
+
+  it('теряет позицию на верном лишнем слове — цена строгого прочтения', () => {
+    // Not a defect of the key: this is how the worst-word reading behaves, and MOL-10 has
+    // to choose knowingly. The extra word is the one printed on the package.
+    const name = toSearchKey('Молоко Ашхар 3.2%')
+    expect(distance(toSearchKey('молоко ашхар'), name)).toBe(0)
+    expect(distance(toSearchKey('молоко ашхар пастеризованное'), name)).toBeGreaterThan(ACCEPTED)
+  })
+})
+
+describe('класс, которого в корпусе нет', () => {
+  /**
+   * Every one of the 46 queries above is a transliterated spelling of a Cyrillic name.
+   * English orthography is a different class, it is on the shelf constantly — `dish` is in
+   * the schema from 0.1 and a coffee-shop menu is written in Latin — and the key does not
+   * cover it: the fold works on transliteration forks, not on the gap between how English
+   * is written and how it is heard. Numbers pinned so MOL-14 retunes against them rather
+   * than rediscovering them.
+   */
+  const PAIRS: readonly (readonly [string, string, number])[] = [
+    ['Cheesecake', 'Чизкейк', 6],
+    ['Sprite', 'Спрайт', 2],
+    ['Jacobs', 'Якобс', 2],
+    ['Cappuccino', 'Капучино', 2],
+  ]
+
+  it.each(PAIRS)('«%s» против «%s» стоит %i', (latin, cyrillic, expected) => {
+    expect(distance(toSearchKey(latin), toSearchKey(cyrillic))).toBe(expected)
+  })
+
+  it('все четыре тратят весь бюджет ещё до первой опечатки', () => {
+    // Three sit exactly at the threshold and one is past it outright: whatever MOL-14 does
+    // with the numbers, this class has no room left for a typo on top.
+    expect(PAIRS.filter(([, , d]) => d >= ACCEPTED)).toHaveLength(4)
   })
 })
