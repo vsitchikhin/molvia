@@ -60,6 +60,13 @@ verdicts, not an event — anything a domain table already knows must never be d
 into the log. Nothing updates or deletes from it, the gate queries are its only readers,
 and each is pinned by an integration test, boundary days included.
 
+One consequence of MOL-6 is open and worth knowing before it is met: the log now points at
+`actors` with a real foreign key, so an actor with any event cannot be deleted — and every
+actor has one, `session_started` is written on the first visit. When «delete my account»
+arrives, either the log outlives the actor (`actor_id` becomes nullable, and the gate
+queries lose the half they measure by) or that deletion becomes the single written
+exception to append-only. It is a product decision, not a schema detail.
+
 ## Money
 
 Access is a monthly resource: ~10 ratings = a month, or $1. Contribution does not expire
