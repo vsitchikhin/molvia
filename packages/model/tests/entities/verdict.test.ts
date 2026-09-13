@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { ERROR } from '#model/support/errors'
+import { ERROR, ISSUE } from '#model/support/errors'
 import {
   newVerdictSchema,
+  newVerdictSchemaFor,
+  placeMatchesKind,
   verdictLevel,
   verdictPatchSchema,
   verdictSchema,
@@ -143,5 +145,41 @@ describe('verdictLevel', () => {
     expect(() => verdictLevel(3.5, 1)).toThrow(
       expect.objectContaining({ code: ERROR.INVALID_SCORE }),
     )
+  })
+})
+
+describe('a place belongs to a dish and never to a product', () => {
+  const itemId = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+  const placeId = '3f2b1c6e-9a4d-4c1b-8f7e-2d5a6b8c9e01'
+
+  it('answers the rule the database holds, both ways round', () => {
+    expect(placeMatchesKind('product', null)).toBe(true)
+    expect(placeMatchesKind('product', placeId)).toBe(false)
+    expect(placeMatchesKind('dish', placeId)).toBe(true)
+    expect(placeMatchesKind('dish', null)).toBe(false)
+  })
+
+  it('refuses a product rated «in a place» — that is one opinion counted twice', () => {
+    const parsed = newVerdictSchemaFor('product').safeParse({ itemId, placeId, score: 4 })
+
+    expect(parsed.success).toBe(false)
+    expect(parsed.error?.issues[0]?.message).toBe(ISSUE.VERDICT_PLACE_NOT_FOR_KIND)
+    expect(parsed.error?.issues[0]?.path).toEqual(['placeId'])
+  })
+
+  it('refuses a dish rated nowhere — that carbonara is only there', () => {
+    const parsed = newVerdictSchemaFor('dish').safeParse({ itemId, score: 4 })
+
+    expect(parsed.success).toBe(false)
+    expect(parsed.error?.issues[0]?.message).toBe(ISSUE.VERDICT_PLACE_NOT_FOR_KIND)
+  })
+
+  it('takes both of the shapes the product actually has', () => {
+    expect(newVerdictSchemaFor('product').safeParse({ itemId, score: 4 }).success).toBe(true)
+    expect(newVerdictSchemaFor('dish').safeParse({ itemId, placeId, score: 4 }).success).toBe(true)
+  })
+
+  it('still refuses what the plain input schema refuses', () => {
+    expect(newVerdictSchemaFor('product').safeParse({ itemId, score: 0 }).success).toBe(false)
   })
 })

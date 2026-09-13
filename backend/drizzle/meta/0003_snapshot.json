@@ -1,0 +1,380 @@
+{
+  "id": "2be597f3-69b5-4e6d-b7e1-5595722f9e11",
+  "prevId": "895a3476-c8dc-479b-acf8-9f0d2adc2571",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.actors": {
+      "name": "actors",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "country": {
+          "name": "country",
+          "type": "char(2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "city": {
+          "name": "city",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "spend_currency": {
+          "name": "spend_currency",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "income_currency": {
+          "name": "income_currency",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "actors_country_iso": {
+          "name": "actors_country_iso",
+          "value": "\"actors\".\"country\" ~ '^[A-Z]{2}$'"
+        },
+        "actors_spend_currency_known": {
+          "name": "actors_spend_currency_known",
+          "value": "\"actors\".\"spend_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+        },
+        "actors_income_currency_known": {
+          "name": "actors_income_currency_known",
+          "value": "\"actors\".\"income_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.events": {
+      "name": "events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "events_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        }
+      },
+      "indexes": {
+        "events_actor_occurred_idx": {
+          "name": "events_actor_occurred_idx",
+          "columns": [
+            {
+              "expression": "actor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "events_type_occurred_idx": {
+          "name": "events_type_occurred_idx",
+          "columns": [
+            {
+              "expression": "type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "events_actor_id_actors_id_fk": {
+          "name": "events_actor_id_actors_id_fk",
+          "tableFrom": "events",
+          "tableTo": "actors",
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.item_barcodes": {
+      "name": "item_barcodes",
+      "schema": "",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "varchar(14)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "item_barcodes_item_idx": {
+          "name": "item_barcodes_item_idx",
+          "columns": [
+            {
+              "expression": "item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "item_barcodes_item_id_items_id_fk": {
+          "name": "item_barcodes_item_id_items_id_fk",
+          "tableFrom": "item_barcodes",
+          "tableTo": "items",
+          "columnsFrom": ["item_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "item_barcodes_gtin_shape": {
+          "name": "item_barcodes_gtin_shape",
+          "value": "\"item_barcodes\".\"code\" ~ '^([0-9]{8}|[0-9]{12,14})$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.items": {
+      "name": "items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "search_key": {
+          "name": "search_key",
+          "type": "varchar(800)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_unit": {
+          "name": "default_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "typical_qty_milli": {
+          "name": "typical_qty_milli",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "typical_qty_unit": {
+          "name": "typical_qty_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "items_search_key_trgm_idx": {
+          "name": "items_search_key_trgm_idx",
+          "columns": [
+            {
+              "expression": "search_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "items_created_by_actors_id_fk": {
+          "name": "items_created_by_actors_id_fk",
+          "tableFrom": "items",
+          "tableTo": "actors",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "items_kind_known": {
+          "name": "items_kind_known",
+          "value": "\"items\".\"kind\" in ('product', 'dish')"
+        },
+        "items_default_unit_known": {
+          "name": "items_default_unit_known",
+          "value": "\"items\".\"default_unit\" in ('kg', 'l', 'piece')"
+        },
+        "items_typical_quantity_paired": {
+          "name": "items_typical_quantity_paired",
+          "value": "(\"items\".\"typical_qty_milli\" is null) = (\"items\".\"typical_qty_unit\" is null)"
+        },
+        "items_typical_quantity_positive": {
+          "name": "items_typical_quantity_positive",
+          "value": "\"items\".\"typical_qty_milli\" is null or \"items\".\"typical_qty_milli\" > 0"
+        },
+        "items_typical_quantity_unit_known": {
+          "name": "items_typical_quantity_unit_known",
+          "value": "\"items\".\"typical_qty_unit\" is null or \"items\".\"typical_qty_unit\" in ('kg', 'l', 'piece')"
+        },
+        "items_typical_quantity_whole_pieces": {
+          "name": "items_typical_quantity_whole_pieces",
+          "value": "\"items\".\"typical_qty_unit\" is distinct from 'piece' or \"items\".\"typical_qty_milli\" % 1000 = 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

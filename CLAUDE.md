@@ -60,6 +60,13 @@ verdicts, not an event — anything a domain table already knows must never be d
 into the log. Nothing updates or deletes from it, the gate queries are its only readers,
 and each is pinned by an integration test, boundary days included.
 
+One consequence of MOL-6 is open and worth knowing before it is met: the log now points at
+`actors` with a real foreign key, so an actor with any event cannot be deleted — and every
+actor has one, `session_started` is written on the first visit. When «delete my account»
+arrives, either the log outlives the actor (`actor_id` becomes nullable, and the gate
+queries lose the half they measure by) or that deletion becomes the single written
+exception to append-only. It is a product decision, not a schema detail.
+
 ## Money
 
 Access is a monthly resource: ~10 ratings = a month, or $1. Contribution does not expire
@@ -560,10 +567,19 @@ Migrations that lose data, swapping a stack element, CI changes, refactoring out
 
 ## State
 
-**Scaffolded, and the domain model is in** — MOL-4: seven entities, eight write inputs and
-three rules in `packages/model`, with the wire codecs that money and quantity need to cross
-it at all. No table, route or screen yet. Release 0.1 is broken into epics and tasks in
-Jira. What exists, what is decided and what is still open — `docs/onboarding.md`.
+**Scaffolded, the domain model is in, and the schema is under it** — MOL-4: seven entities,
+eight write inputs and three rules in `packages/model`, with the wire codecs that money and
+quantity need to cross it at all. MOL-5 added the search key; MOL-6 the nine tables of 0.1,
+the GIN index over `search_key` and the constraints that hold the product's key. No route or
+screen yet. Release 0.1 is broken into epics and tasks in Jira. What exists, what is decided
+and what is still open — `docs/onboarding.md`.
+
+**What the database guarantees and what it leaves to the domain** is a line, not a habit:
+the schema refuses what makes a row unreadable or breaks the product's core — a currency
+beside every amount, a quantity with its unit, a whole rate snapshot or none, one verdict
+per «actor + item + place», references that lead somewhere. Everything else — plausibility
+bands, «no more than twenty barcodes», visible text, `search_key = toSearchKey(name)` —
+stays in `packages/model`, because a second place that decides is a second place to drift.
 
 `docker-compose.yml` runs Postgres only; the applications run natively in development,
 because HMR and a debugger attached to a host process beat a rebuild inside a container.

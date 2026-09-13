@@ -31,8 +31,15 @@ export interface Money {
   readonly currency: Currency
 }
 
+/**
+ * The ceiling is part of the type, not of the wire: until MOL-6 it lived only in
+ * `moneyCodec`, so the domain accepted `INT8_MAX + 1n` and `amount_minor bigint` answered
+ * `22003` — the one place where the database was stricter than the domain, and the only way
+ * to hit it was a path that does not cross the wire. `quantitySchema` was bounded from the
+ * start; this is the same rule, applied to the other half of a price.
+ */
 export const moneySchema = z.object({
-  minor: z.bigint(),
+  minor: z.bigint().min(-INT8_MAX).max(INT8_MAX),
   currency: currencySchema,
 })
 
@@ -101,7 +108,14 @@ export function addMoney(a: Money, b: Money): Money {
 
 export function subtractMoney(a: Money, b: Money): Money {
   sameCurrency(a, b)
-  return { minor: a.minor - b.minor, currency: a.currency }
+  const minor = a.minor - b.minor
+  // The same bound `addMoney` has kept from the start. Once `moneySchema` grew a ceiling,
+  // this was the only way left to build a Money the schema itself refuses — a difference
+  // of two extremes is twice the range.
+  if (minor > INT8_MAX || minor < -INT8_MAX) {
+    throw new DomainError(ERROR.INVALID_AMOUNT, String(minor))
+  }
+  return { minor, currency: a.currency }
 }
 
 export function compareMoney(a: Money, b: Money): number {

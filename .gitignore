@@ -29,3 +29,6 @@ blob-report/
 
 # os / editor
 .DS_Store
+
+# adversarial attack files: copied into backend/tests to run, they belong to .scratch
+backend/tests/*.attack.*

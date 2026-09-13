@@ -1,9 +1,8 @@
-import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { EVENT } from '@molvia/model'
 import { connectDrizzle } from './db'
+import { clearAll, insertActor } from './fixtures'
 import { createEventRepository } from '@/db/events-repository'
-import { events } from '@/db/schema'
 
 const { db, close } = connectDrizzle()
 const repository = createEventRepository(db)
@@ -16,17 +15,20 @@ const daysAgo = (days: number): Date => new Date(now - days * DAY)
 const from = daysAgo(40)
 const to = daysAgo(30)
 
+// The whole graph, not just these two tables: `actors` is protected by RESTRICT from trips,
+// verdicts and picks, so a leftover trip from any other file would make this one fail with
+// 23503 and look like a schema defect.
 beforeEach(async () => {
-  await db.delete(events)
+  await clearAll(db)
 })
 
 afterAll(async () => {
-  await db.delete(events)
+  await clearAll(db)
   await close()
 })
 
 async function actorSeenAt(started: Date): Promise<string> {
-  const actorId = randomUUID()
+  const actorId = await insertActor(db)
   await repository.record({ actorId, type: EVENT.SESSION_STARTED, occurredAt: started })
   return actorId
 }
