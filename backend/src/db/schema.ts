@@ -12,8 +12,8 @@ import {
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
-import { currencySchema } from '@molvia/model'
-import type { Currency, EventPayload } from '@molvia/model'
+import { baseUnitSchema, currencySchema, itemKindSchema } from '@molvia/model'
+import type { BaseUnit, Currency, EventPayload, ItemKind } from '@molvia/model'
 
 /**
  * The lists live in `packages/model` as zod enums; here they become the text of a CHECK.
@@ -23,6 +23,16 @@ import type { Currency, EventPayload } from '@molvia/model'
 function oneOf(column: AnyPgColumn, values: readonly string[]) {
   const literals = values.map((value) => `'${value}'`).join(', ')
   return sql`${column} in (${sql.raw(literals)})`
+}
+
+/** A quantity unit is nullable in several tables; the list is the same everywhere. */
+function unitKnownOrNull(column: AnyPgColumn) {
+  return sql`${column} is null or ${oneOf(column, baseUnitSchema.options)}`
+}
+
+/** Pieces do not come in halves — the same rule `quantitySchema` refuses in the domain. */
+function wholePieces(unit: AnyPgColumn, milli: AnyPgColumn) {
+  return sql`${unit} is distinct from 'piece' or ${milli} % 1000 = 0`
 }
 
 /**
@@ -72,5 +82,74 @@ export const actors = pgTable(
     check('actors_country_iso', sql`${table.country} ~ '^[A-Z]{2}$'`),
     check('actors_spend_currency_known', oneOf(table.spendCurrency, currencySchema.options)),
     check('actors_income_currency_known', oneOf(table.incomeCurrency, currencySchema.options)),
+  ],
+)
+
+/**
+ * The catalogue is shared by everyone: a verdict travels with the person, only prices are
+ * tied to a city. `search_key` is the Latin form from `toSearchKey` (MOL-5) and it, not
+ * `name`, carries the index — «moloko» scores 0.000 against «молоко».
+ *
+ * There is deliberately no unique index on `search_key`: the fork fold of MOL-5 merges
+ * genuinely different names on purpose, and merging duplicate entries is a 0.2 question.
+ */
+export const items = pgTable(
+  'items',
+  {
+    id: uuid('id').primaryKey(),
+    kind: text('kind').$type<ItemKind>().notNull(),
+    name: varchar('name', { length: 200 }).notNull(),
+    searchKey: varchar('search_key', { length: 800 }).notNull(),
+    note: varchar('note', { length: 300 }),
+    defaultUnit: text('default_unit').$type<BaseUnit>().notNull(),
+    typicalQtyMilli: bigint('typical_qty_milli', { mode: 'bigint' }),
+    typicalQtyUnit: text('typical_qty_unit').$type<BaseUnit>(),
+    /** null for a seeded item — it belongs to nobody. */
+    createdBy: uuid('created_by').references((): AnyPgColumn => actors.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('items_search_key_trgm_idx').using('gin', table.searchKey.op('gin_trgm_ops')),
+    check('items_kind_known', oneOf(table.kind, itemKindSchema.options)),
+    check('items_default_unit_known', oneOf(table.defaultUnit, baseUnitSchema.options)),
+    // A number without its unit means nothing, so the two travel together or not at all.
+    check(
+      'items_typical_quantity_paired',
+      sql`(${table.typicalQtyMilli} is null) = (${table.typicalQtyUnit} is null)`,
+    ),
+    check(
+      'items_typical_quantity_positive',
+      sql`${table.typicalQtyMilli} is null or ${table.typicalQtyMilli} > 0`,
+    ),
+    check('items_typical_quantity_unit_known', unitKnownOrNull(table.typicalQtyUnit)),
+    check(
+      'items_typical_quantity_whole_pieces',
+      wholePieces(table.typicalQtyUnit, table.typicalQtyMilli),
+    ),
+  ],
+)
+
+/**
+ * A table rather than a column: one item comes in several packagings, and a repeating
+ * group inside a column breaks first normal form. The code is the key — one barcode
+ * belongs to one item — so a surrogate id would only add a second uniqueness over the
+ * first. «No more than twenty per item» stays a domain rule: it needs a trigger, and a
+ * trigger for 0.2 is not worth owning.
+ */
+export const itemBarcodes = pgTable(
+  'item_barcodes',
+  {
+    code: varchar('code', { length: 14 }).primaryKey(),
+    itemId: uuid('item_id')
+      .notNull()
+      .references(() => items.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    index('item_barcodes_item_idx').on(table.itemId),
+    // The four lengths a GTIN has — EAN-8, UPC-A, EAN-13, GTIN-14, the same shape the
+    // domain schema checks. A range of 8..14 quietly accepts a mistyped nine digits.
+    check('item_barcodes_gtin_shape', sql`${table.code} ~ '^([0-9]{8}|[0-9]{12,14})$'`),
   ],
 )
