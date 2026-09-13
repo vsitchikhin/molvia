@@ -178,7 +178,8 @@ export const items = pgTable(
     // An empty key is a row the catalogue cannot reach: search compares against this column
     // and nothing else. The blanks are listed rather than left to plain `btrim`, which only
     // strips the ASCII space — a key of one no-break space would pass and the item would be
-    // unfindable forever. `visibleLine` stays the domain's; this is only the floor.
+    // unfindable forever. The rule is a floor, not a normalisation: `'   k   '` passes,
+    // because the middle of a key is content. `visibleLine` stays the domain's.
     check(
       'items_search_key_present',
       sql`btrim(${table.searchKey}, E' \\t\\r\\n\\u00A0\\u200B\\u200C\\u200D\\uFEFF') <> ''`,
