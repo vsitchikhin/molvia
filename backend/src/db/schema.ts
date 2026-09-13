@@ -5,6 +5,7 @@ import {
   index,
   jsonb,
   pgTable,
+  smallint,
   text,
   timestamp,
   unique,
@@ -302,5 +303,39 @@ export const expenses = pgTable(
       sql`${table.amountMinor} is null or ${table.amountMinor} >= 0`,
     ),
     check('expenses_amount_currency_known', currencyKnownOrNull(table.amountCurrency)),
+  ],
+)
+
+/**
+ * Keyed on the item, not on «item + place»: the same milk in every shop, only the price
+ * differs. `place_id` is null for a product and filled for a dish in 0.3 — which is why
+ * the uniqueness is NULLS NOT DISTINCT. A plain UNIQUE counts two nulls as different and
+ * would let a second verdict on the same product in, silently, so a re-rating would
+ * become a second vote instead of replacing the first.
+ */
+export const verdicts = pgTable(
+  'verdicts',
+  {
+    id: uuid('id').primaryKey(),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id),
+    itemId: uuid('item_id')
+      .notNull()
+      .references(() => items.id),
+    placeId: uuid('place_id').references(() => places.id),
+    score: smallint('score').notNull(),
+    review: varchar('review', { length: 500 }),
+    ratedAt: timestamp('rated_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('verdicts_actor_item_place_key')
+      .on(table.actorId, table.itemId, table.placeId)
+      .nullsNotDistinct(),
+    // The average score of an item is read across everyone's verdicts.
+    index('verdicts_item_idx').on(table.itemId),
+    check('verdicts_score_range', sql`${table.score} between 1 and 5`),
+    check('verdicts_updated_after_rated', sql`${table.updatedAt} >= ${table.ratedAt}`),
   ],
 )

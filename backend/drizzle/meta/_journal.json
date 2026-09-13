@@ -36,6 +36,13 @@
       "when": 1789297171336,
       "tag": "0004_trips",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789297243155,
+      "tag": "0005_verdicts",
+      "breakpoints": true
     }
   ]
 }
