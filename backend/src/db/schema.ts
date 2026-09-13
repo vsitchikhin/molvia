@@ -247,15 +247,17 @@ export const places = pgTable(
      * identical on screen, and with them two price histories for one shop, which is the
      * product's key splitting in half. NFKC rather than NFC so that «ＳＡＳ» in fullwidth
      * folds too; homoglyphs («SАS» with a Cyrillic А) are the one spelling left, and the
-     * only one where the difference can be deliberate. `lower` and `normalize` are
-     * immutable, so the uniqueness lives in the index and no column is added: the
-     * transliterated key («Гюмри» against `Gyumri`) stays Р-15's.
+     * only one where the difference can be deliberate. `btrim` comes after `normalize`
+     * on purpose: NFKC turns a no-break space into an ordinary one, which plain `btrim`
+     * then strips — so « SAS » stops being a second shop on the paths that bypass the
+     * domain's own `.trim()`. All three are immutable, so the uniqueness lives in the index
+     * and no column is added: the transliterated key («Гюмри» against `Gyumri`) stays Р-15's.
      */
     uniqueIndex('places_identity_key').on(
       table.kind,
       table.country,
-      sql`lower(normalize(${table.city}, NFKC))`,
-      sql`lower(normalize(${table.name}, NFKC))`,
+      sql`btrim(lower(normalize(${table.city}, NFKC)))`,
+      sql`btrim(lower(normalize(${table.name}, NFKC)))`,
     ),
     check('places_kind_known', oneOf(table.kind, placeKindSchema.options)),
     check('places_country_iso', sql`${table.country} ~ '^[A-Z]{2}$'`),

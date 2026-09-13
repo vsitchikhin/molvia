@@ -588,13 +588,13 @@
               "nulls": "last"
             },
             {
-              "expression": "lower(normalize(\"city\", NFKC))",
+              "expression": "btrim(lower(normalize(\"city\", NFKC)))",
               "asc": true,
               "isExpression": true,
               "nulls": "last"
             },
             {
-              "expression": "lower(normalize(\"name\", NFKC))",
+              "expression": "btrim(lower(normalize(\"name\", NFKC)))",
               "asc": true,
               "isExpression": true,
               "nulls": "last"

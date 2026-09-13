@@ -68,6 +68,7 @@ describe('the migration chain on a database that already holds rows', () => {
     const actorId = randomUUID()
     const itemId = randomUUID()
     const blankItemId = randomUUID()
+    const dishId = randomUUID()
     const keptPlaceId = randomUUID()
     const duplicatePlaceId = randomUUID()
     const tripId = randomUUID()
@@ -79,7 +80,8 @@ describe('the migration chain on a database that already holds rows', () => {
     await sql`
       insert into items (id, kind, name, search_key, default_unit)
       values (${itemId}, 'product', 'Молоко', 'moloko', 'l'),
-             (${blankItemId}, 'product', 'Сыр', '   ', 'kg')
+             (${blankItemId}, 'product', 'Сыр', '   ', 'kg'),
+             (${dishId}, 'dish', 'Карбонара', 'karbonara', 'piece')
     `
     await sql`
       insert into places (id, kind, name, country, city, created_at)
@@ -90,9 +92,19 @@ describe('the migration chain on a database that already holds rows', () => {
       insert into trips (id, actor_id, place_id, currency, rate_base, rate_quote, rate_scaled, rate_source, rate_as_of)
       values (${tripId}, ${actorId}, ${duplicatePlaceId}, 'AMD', 'RUB', 'AMD', 0, 'personal', now())
     `
+    // One person, one product, two places — legal under 0006, because the rows differ in
+    // place_id and NULLS NOT DISTINCT cannot see it. That was the hole A1 described, and
+    // taking the place off both would turn them into the same triple.
     await sql`
-      insert into verdicts (id, actor_id, item_id, place_id, score)
-      values (${randomUUID()}, ${actorId}, ${itemId}, ${keptPlaceId}, 2)
+      insert into verdicts (id, actor_id, item_id, place_id, score, rated_at)
+      values (${randomUUID()}, ${actorId}, ${itemId}, ${keptPlaceId}, 2, now() - interval '1 day'),
+             (${randomUUID()}, ${actorId}, ${itemId}, ${duplicatePlaceId}, 5, now())
+    `
+    // A dish rated nowhere: legal under 0006 and unrepairable — the place is half of what
+    // such a verdict means, and there is nowhere to take it from.
+    await sql`
+      insert into verdicts (id, actor_id, item_id, score)
+      values (${randomUUID()}, ${actorId}, ${dishId}, 4)
     `
     await sql`insert into events (actor_id, type) values (${actorId}, 'catalogue_viewed')`
     await sql`
@@ -108,10 +120,12 @@ describe('the migration chain on a database that already holds rows', () => {
     // The trip survives; only the rate that could never convert anything is gone.
     expect(trip?.rate_scaled).toBeNull()
 
-    const [verdict] = await sql<{ place_id: string | null; item_kind: string }[]>`
-      select place_id, item_kind from verdicts
+    const survivors = await sql<{ place_id: string | null; item_kind: string; score: number }[]>`
+      select place_id, item_kind, score from verdicts
     `
-    expect(verdict).toEqual({ place_id: null, item_kind: 'product' })
+    // One verdict left: the earliest of the two votes on the product, without its place.
+    // The dish rated nowhere is gone.
+    expect(survivors).toEqual([{ place_id: null, item_kind: 'product', score: 2 }])
 
     const places = await sql<{ id: string }[]>`select id from places`
     expect(places.map((row) => row.id)).toEqual([keptPlaceId])

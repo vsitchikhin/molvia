@@ -616,6 +616,45 @@ describe('a verdict knows what kind of thing it rates', () => {
     expect(row?.updatedAt.getTime()).toBeGreaterThan(ratedAt.getTime())
   })
 
+  it('lets a verdict be written and re-rated inside one transaction', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+    const id = randomUUID()
+
+    // The trap this pins: `now()` is the timestamp of the transaction's *start*, so a
+    // `rated_at` stamped by the application after BEGIN is later than it, and
+    // `verdicts_updated_after_rated` refuses the update — always, not sometimes. The
+    // timestamp is read from the database inside the transaction to model exactly that,
+    // without depending on how the two clocks happen to round.
+    await db.transaction(async (tx) => {
+      const stamped = await tx.execute<{ ts: string }>(sql`select clock_timestamp() as ts`)
+      const ratedAt = new Date(stamped[0]?.ts ?? Date.now())
+      await tx
+        .insert(verdicts)
+        .values({ id, actorId, itemId, itemKind, score: 2, ratedAt, updatedAt: ratedAt })
+      await tx.update(verdicts).set({ score: 5 }).where(eq(verdicts.id, id))
+    })
+
+    const [row] = await db.select().from(verdicts)
+    expect(row?.score).toBe(5)
+    expect(row?.updatedAt.getTime()).toBeGreaterThanOrEqual(row?.ratedAt.getTime() ?? 0)
+  })
+
+  it('leaves updated_at alone when the update changes nothing', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+    const id = randomUUID()
+    await db.insert(verdicts).values({ id, actorId, itemId, itemKind, score: 2 })
+    const [before] = await db.select().from(verdicts)
+
+    // A repeated request, a review edited to the same text, a repair migration walking every
+    // row: the column says the row changed, not that something passed over it.
+    await db.execute(sql`update verdicts set score = score where id = ${id}`)
+
+    const [after] = await db.select().from(verdicts)
+    expect(after?.updatedAt.getTime()).toBe(before?.updatedAt.getTime())
+  })
+
   it("moves an actor's updated_at when their settings change", async () => {
     const actorId = await insertActor(db)
     const [before] = await db.select().from(actors)
@@ -650,6 +689,14 @@ describe('a place is its name, not its spelling', () => {
     await insertPlace(db, { kind: 'store', name: 'SAS', city: 'Ереван' })
 
     await refuses(() => insertPlace(db, { kind: 'store', name: 'ＳＡＳ', city: 'Ереван' }), UNIQUE)
+  })
+
+  it('refuses the same shop written with padding around it', async () => {
+    // The domain trims, so this only happens on the paths that bypass it — a seed, an
+    // import, a hand-written UPDATE — which is exactly what the identity index is for.
+    await insertPlace(db, { kind: 'store', name: 'SAS', city: 'Ереван' })
+
+    await refuses(() => insertPlace(db, { kind: 'store', name: ' SAS ', city: 'Ереван' }), UNIQUE)
   })
 
   it('refuses a country written in lower case or in one letter', async () => {
