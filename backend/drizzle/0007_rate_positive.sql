@@ -1,0 +1,1 @@
+ALTER TABLE "trips" ADD CONSTRAINT "trips_rate_positive" CHECK ("trips"."rate_scaled" is null or "trips"."rate_scaled" > 0);

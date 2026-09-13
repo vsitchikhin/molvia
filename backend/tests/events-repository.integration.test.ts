@@ -1,9 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { EVENT } from '@molvia/model'
 import { connectDrizzle } from './db'
-import { insertActor } from './fixtures'
+import { clearAll, insertActor } from './fixtures'
 import { createEventRepository } from '@/db/events-repository'
-import { actors, events } from '@/db/schema'
 
 const { db, close } = connectDrizzle()
 const repository = createEventRepository(db)
@@ -16,15 +15,15 @@ const daysAgo = (days: number): Date => new Date(now - days * DAY)
 const from = daysAgo(40)
 const to = daysAgo(30)
 
-// Events are deleted before actors: the log points at them with a real foreign key now.
+// The whole graph, not just these two tables: `actors` is protected by RESTRICT from trips,
+// verdicts and picks, so a leftover trip from any other file would make this one fail with
+// 23503 and look like a schema defect.
 beforeEach(async () => {
-  await db.delete(events)
-  await db.delete(actors)
+  await clearAll(db)
 })
 
 afterAll(async () => {
-  await db.delete(events)
-  await db.delete(actors)
+  await clearAll(db)
   await close()
 })
 

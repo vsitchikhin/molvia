@@ -3,7 +3,17 @@ import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
-import { events, expenses, itemBarcodes, items, places, trips, verdicts } from '@/db/schema'
+import {
+  actors,
+  events,
+  expenses,
+  itemBarcodes,
+  items,
+  places,
+  searchPicks,
+  trips,
+  verdicts,
+} from '@/db/schema'
 
 const { db, close } = connectDrizzle()
 
@@ -39,16 +49,20 @@ afterAll(async () => {
   await close()
 })
 
+// Every verdict carries the kind of the item it points at, held true by a composite
+// foreign key; the fixtures below say it out loud so the corner stays visible.
+const itemKind = 'product' as const
+
 describe('one verdict per «actor + item + place»', () => {
   it('refuses a second verdict on the same product, where place is empty', async () => {
     const actorId = await insertActor(db)
     const itemId = await insertItem(db)
-    await db.insert(verdicts).values({ id: randomUUID(), actorId, itemId, score: 5 })
+    await db.insert(verdicts).values({ id: randomUUID(), actorId, itemId, itemKind, score: 5 })
 
     // The whole reason the constraint is NULLS NOT DISTINCT: a plain UNIQUE counts two
     // nulls as different values and lets this row in.
     await refuses(
-      () => db.insert(verdicts).values({ id: randomUUID(), actorId, itemId, score: 2 }),
+      () => db.insert(verdicts).values({ id: randomUUID(), actorId, itemId, itemKind, score: 2 }),
       UNIQUE,
     )
   })
@@ -58,8 +72,10 @@ describe('one verdict per «actor + item + place»', () => {
     const one = await insertActor(db)
     const other = await insertActor(db)
 
-    await db.insert(verdicts).values({ id: randomUUID(), actorId: one, itemId, score: 5 })
-    await db.insert(verdicts).values({ id: randomUUID(), actorId: other, itemId, score: 2 })
+    await db.insert(verdicts).values({ id: randomUUID(), actorId: one, itemId, itemKind, score: 5 })
+    await db
+      .insert(verdicts)
+      .values({ id: randomUUID(), actorId: other, itemId, itemKind, score: 2 })
 
     await expect(db.select().from(verdicts)).resolves.toHaveLength(2)
   })
@@ -70,10 +86,12 @@ describe('one verdict per «actor + item + place»', () => {
     const here = await insertPlace(db, { kind: 'venue', name: 'Пиццерия' })
     const there = await insertPlace(db, { kind: 'venue', name: 'Кафе' })
 
-    await db.insert(verdicts).values({ id: randomUUID(), actorId, itemId, placeId: here, score: 5 })
     await db
       .insert(verdicts)
-      .values({ id: randomUUID(), actorId, itemId, placeId: there, score: 2 })
+      .values({ id: randomUUID(), actorId, itemId, itemKind: 'dish', placeId: here, score: 5 })
+    await db
+      .insert(verdicts)
+      .values({ id: randomUUID(), actorId, itemId, itemKind: 'dish', placeId: there, score: 2 })
 
     await expect(db.select().from(verdicts)).resolves.toHaveLength(2)
   })
@@ -85,13 +103,15 @@ describe('one verdict per «actor + item + place»', () => {
 
     for (const score of [0, 6]) {
       await refuses(
-        () => db.insert(verdicts).values({ id: randomUUID(), actorId, itemId, score }),
+        () => db.insert(verdicts).values({ id: randomUUID(), actorId, itemId, itemKind, score }),
         CHECK,
       )
     }
 
-    await db.insert(verdicts).values({ id: randomUUID(), actorId, itemId, score: 1 })
-    await db.insert(verdicts).values({ id: randomUUID(), actorId, itemId: other, score: 5 })
+    await db.insert(verdicts).values({ id: randomUUID(), actorId, itemId, itemKind, score: 1 })
+    await db
+      .insert(verdicts)
+      .values({ id: randomUUID(), actorId, itemId: other, itemKind, score: 5 })
     await expect(db.select().from(verdicts)).resolves.toHaveLength(2)
   })
 
@@ -106,6 +126,7 @@ describe('one verdict per «actor + item + place»', () => {
           id: randomUUID(),
           actorId,
           itemId,
+          itemKind,
           score: 4,
           ratedAt,
           updatedAt: new Date(ratedAt.getTime() - 1000),
@@ -113,9 +134,15 @@ describe('one verdict per «actor + item + place»', () => {
       CHECK,
     )
 
-    await db
-      .insert(verdicts)
-      .values({ id: randomUUID(), actorId, itemId, score: 4, ratedAt, updatedAt: ratedAt })
+    await db.insert(verdicts).values({
+      id: randomUUID(),
+      actorId,
+      itemId,
+      itemKind,
+      score: 4,
+      ratedAt,
+      updatedAt: ratedAt,
+    })
     await expect(db.select().from(verdicts)).resolves.toHaveLength(1)
   })
 })
@@ -285,6 +312,20 @@ describe('the rate snapshot of a trip', () => {
     )
   })
 
+  it('refuses a rate of zero or less', async () => {
+    const actorId = await insertActor(db)
+    const placeId = await insertPlace(db)
+
+    for (const rateScaled of [0n, -4_820_000n]) {
+      await refuses(() => insertTrip(db, { actorId, placeId, ...rate, rateScaled }), CHECK)
+    }
+
+    // The floor is zero, not the domain's plausibility band: dividing by zero throws and a
+    // negative rate flips the sign of last month, both as arithmetic rather than an error.
+    await insertTrip(db, { actorId, placeId, ...rate, rateScaled: 1n })
+    await expect(db.select().from(trips)).resolves.toHaveLength(1)
+  })
+
   it('takes the whole snapshot', async () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
@@ -351,6 +392,20 @@ describe('the catalogue', () => {
   it('takes a search key of 800 characters — transliteration grows a name', async () => {
     await insertItem(db, { name: 'a'.repeat(200), searchKey: 'k'.repeat(800) })
     await refuses(() => insertItem(db, { searchKey: 'k'.repeat(801) }), TOO_LONG)
+  })
+
+  it('refuses a search key of nothing but space — the row would be unreachable', async () => {
+    await refuses(() => insertItem(db, { searchKey: '   ' }), CHECK)
+    await refuses(() => insertItem(db, { searchKey: '' }), CHECK)
+  })
+
+  it('takes the barcodes of a deleted item with it', async () => {
+    const itemId = await insertItem(db)
+    await db.insert(itemBarcodes).values({ code: '4850001234567', itemId })
+
+    await db.delete(items).where(eq(items.id, itemId))
+
+    await expect(db.select().from(itemBarcodes)).resolves.toHaveLength(0)
   })
 
   it('refuses a kind and a unit the domain does not know', async () => {
@@ -437,6 +492,267 @@ describe('references lead somewhere', () => {
 
     const [row] = await db.select().from(items)
     expect(row?.createdBy).toBeNull()
+  })
+})
+
+describe('a verdict knows what kind of thing it rates', () => {
+  it('refuses a product rated «in a place» — that is how one person votes twice', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+    const placeId = await insertPlace(db)
+    await db.insert(verdicts).values({ id: randomUUID(), actorId, itemId, itemKind, score: 5 })
+
+    // The uniqueness cannot see this pair: the rows differ in place_id. Without the check
+    // the average of the item counts one person's opinion twice.
+    await refuses(
+      () =>
+        db
+          .insert(verdicts)
+          .values({ id: randomUUID(), actorId, itemId, itemKind, placeId, score: 1 }),
+      CHECK,
+    )
+  })
+
+  it('refuses a dish rated nowhere', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db, { kind: 'dish', name: 'Карбонара' })
+
+    await refuses(
+      () =>
+        db
+          .insert(verdicts)
+          .values({ id: randomUUID(), actorId, itemId, itemKind: 'dish', score: 5 }),
+      CHECK,
+    )
+  })
+
+  it('refuses a kind that disagrees with the item itself', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+    const placeId = await insertPlace(db, { kind: 'venue', name: 'Кафе' })
+
+    // The kind is a copy, and the composite foreign key is what keeps a copy honest.
+    await refuses(
+      () =>
+        db
+          .insert(verdicts)
+          .values({ id: randomUUID(), actorId, itemId, itemKind: 'dish', placeId, score: 5 }),
+      FOREIGN_KEY,
+    )
+  })
+
+  it('refuses to reclassify an item that has already been rated', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db, { kind: 'dish', name: 'Карбонара' })
+    const placeId = await insertPlace(db, { kind: 'venue', name: 'Пиццерия' })
+    await db
+      .insert(verdicts)
+      .values({ id: randomUUID(), actorId, itemId, itemKind: 'dish', placeId, score: 5 })
+
+    // The kind cascades into the verdict, and there it meets the place rule: a dish rated
+    // in a café cannot quietly become a product whose verdict belongs nowhere. Reclassifying
+    // is therefore a decision about the verdicts too, and the database says so.
+    await refuses(
+      () => db.update(items).set({ kind: 'product' }).where(eq(items.id, itemId)),
+      CHECK,
+    )
+  })
+
+  it('carries the kind along while nothing has been rated yet', async () => {
+    const itemId = await insertItem(db, { kind: 'dish', name: 'Карбонара' })
+    const actorId = await insertActor(db)
+
+    await db.update(items).set({ kind: 'product' }).where(eq(items.id, itemId))
+    await db.insert(verdicts).values({ id: randomUUID(), actorId, itemId, itemKind, score: 4 })
+
+    await expect(db.select().from(verdicts)).resolves.toHaveLength(1)
+  })
+
+  it('moves updated_at when a verdict is re-rated', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+    const id = randomUUID()
+    const ratedAt = new Date('2026-09-01T10:00:00.000Z')
+    await db
+      .insert(verdicts)
+      .values({ id, actorId, itemId, itemKind, score: 2, ratedAt, updatedAt: ratedAt })
+
+    await db.update(verdicts).set({ score: 5 }).where(eq(verdicts.id, id))
+
+    const [row] = await db.select().from(verdicts)
+    // Without this the column never moves, and «a re-rating is visible» is a tautology.
+    expect(row?.updatedAt.getTime()).toBeGreaterThan(ratedAt.getTime())
+  })
+})
+
+describe('a place is its name, not its spelling', () => {
+  it('refuses the same shop written in another case', async () => {
+    await insertPlace(db, { kind: 'store', name: 'SAS', city: 'Ереван' })
+
+    await refuses(() => insertPlace(db, { kind: 'store', name: 'sas', city: 'Ереван' }), UNIQUE)
+  })
+
+  it('refuses the same shop written in another Unicode normalisation', async () => {
+    // «Ёлки» with U+0401 against the same word with U+0415 U+0308: identical on screen,
+    // different bytes, and two price histories for one shop if they both get in.
+    await insertPlace(db, { kind: 'store', name: '\u0401\u043b\u043a\u0438' })
+
+    await refuses(
+      () => insertPlace(db, { kind: 'store', name: '\u0415\u0308\u043b\u043a\u0438' }),
+      UNIQUE,
+    )
+  })
+
+  it('refuses a country written in lower case or in one letter', async () => {
+    for (const country of ['am', 'A']) {
+      await refuses(() => insertPlace(db, { country }), CHECK)
+    }
+  })
+})
+
+describe('the actor', () => {
+  it('refuses a currency the project does not support', async () => {
+    await refuses(
+      () =>
+        db.execute(sql`
+        insert into ${actors} (id, country, city, spend_currency, income_currency)
+        values (${randomUUID()}, 'AM', 'Гюмри', 'GBP', 'RUB')
+      `),
+      CHECK,
+    )
+  })
+
+  it('refuses a country that is not two capitals', async () => {
+    for (const country of ['am', 'A']) {
+      await refuses(() => insertActor(db, { country }), CHECK)
+    }
+  })
+})
+
+describe('the gate log refuses what the gates cannot count', () => {
+  it('refuses a type nobody declared', async () => {
+    const actorId = await insertActor(db)
+
+    for (const type of ['сессия_началась', '']) {
+      await refuses(
+        () =>
+          db.execute(sql`
+        insert into ${events} (actor_id, type) values (${actorId}, ${type})
+      `),
+        CHECK,
+      )
+    }
+  })
+
+  it('refuses a catalogue view with no axis to split on', async () => {
+    const actorId = await insertActor(db)
+
+    // Exactly what `contracts/events.ts` calls impossible in the domain, and what
+    // `DEFAULT '{}'` handed back to the database.
+    await refuses(
+      () =>
+        db.execute(sql`
+      insert into ${events} (actor_id, type) values (${actorId}, 'catalogue_viewed')
+    `),
+      CHECK,
+    )
+
+    await refuses(
+      () =>
+        db.execute(sql`
+      insert into ${events} (actor_id, type, payload)
+      values (${actorId}, 'catalogue_viewed', '{"subject":"recipes"}'::jsonb)
+    `),
+      CHECK,
+    )
+
+    await db.execute(sql`
+      insert into ${events} (actor_id, type, payload)
+      values (${actorId}, 'catalogue_viewed', '{"subject":"venue"}'::jsonb)
+    `)
+    await expect(db.select().from(events)).resolves.toHaveLength(1)
+  })
+
+  it('refuses a payload that is not an object, and a session that carries one', async () => {
+    const actorId = await insertActor(db)
+
+    for (const payload of ['null', '[1,2,3]', '"product"']) {
+      await refuses(
+        () =>
+          db.execute(sql`
+        insert into ${events} (actor_id, type, payload)
+        values (${actorId}, 'session_started', ${payload}::jsonb)
+      `),
+        CHECK,
+      )
+    }
+
+    await refuses(
+      () =>
+        db.execute(sql`
+      insert into ${events} (actor_id, type, payload)
+      values (${actorId}, 'session_started', '{"subject":"product"}'::jsonb)
+    `),
+      CHECK,
+    )
+  })
+})
+
+describe('the remembered pick', () => {
+  const queryKey = 'moloko'
+
+  it('refuses a second row for the same «actor + query + item»', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+    await db.insert(searchPicks).values({ actorId, queryKey, itemId })
+
+    await refuses(() => db.insert(searchPicks).values({ actorId, queryKey, itemId }), UNIQUE)
+  })
+
+  it('keeps the pick personal: two people, one query, one item, two rows', async () => {
+    const itemId = await insertItem(db)
+    const one = await insertActor(db)
+    const other = await insertActor(db)
+
+    await db.insert(searchPicks).values({ actorId: one, queryKey, itemId })
+    await db.insert(searchPicks).values({ actorId: other, queryKey, itemId })
+
+    // The counter is part of a key that starts with the actor. A shared sum would be
+    // popularity in the results — indistinguishable from the promotion the product forbids.
+    await expect(db.select().from(searchPicks)).resolves.toHaveLength(2)
+  })
+
+  it('refuses a count of zero', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+
+    await refuses(
+      () => db.insert(searchPicks).values({ actorId, queryKey, itemId, picks: 0 }),
+      CHECK,
+    )
+  })
+
+  it('refuses to delete an actor who has picks', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+    await db.insert(searchPicks).values({ actorId, queryKey, itemId })
+
+    await refuses(() => db.execute(sql`delete from actors where id = ${actorId}`), FOREIGN_KEY)
+  })
+
+  it('refuses a query too wide for its own index, and says why', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+
+    // 700 four-byte characters overflow the btree row and Postgres answers 54000 — an error
+    // about index internals. The check turns it into a refusal that names the column.
+    await refuses(
+      () => db.insert(searchPicks).values({ actorId, queryKey: '😀'.repeat(700), itemId }),
+      CHECK,
+    )
+
+    await db.insert(searchPicks).values({ actorId, queryKey: 'k'.repeat(600), itemId })
+    await expect(db.select().from(searchPicks)).resolves.toHaveLength(1)
   })
 })
 

@@ -2,23 +2,28 @@ import {
   bigint,
   char,
   check,
+  foreignKey,
   index,
-  jsonb,
   integer,
+  jsonb,
   pgTable,
+  primaryKey,
   smallint,
   text,
-  primaryKey,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import {
+  EVENT,
   baseUnitSchema,
+  catalogueSubjectSchema,
   currencySchema,
+  eventTypeSchema,
   itemKindSchema,
   placeKindSchema,
   rateSourceSchema,
@@ -38,8 +43,16 @@ import type {
  * literals instead of parameters — a migration cannot bind them.
  */
 function oneOf(column: AnyPgColumn, values: readonly string[]) {
-  const literals = values.map((value) => `'${value}'`).join(', ')
-  return sql`${column} in (${sql.raw(literals)})`
+  return sql`${column} in (${list(values)})`
+}
+
+/** Values as SQL text. Interpolating them directly would emit `$1` into the migration. */
+function list(values: readonly string[]) {
+  return sql.raw(values.map((value) => `'${value}'`).join(', '))
+}
+
+function literal(value: string) {
+  return sql.raw(`'${value}'`)
 }
 
 /** A quantity unit is nullable in several tables; the list is the same everywhere. */
@@ -78,6 +91,24 @@ export const events = pgTable(
     // The gate queries walk one actor's history, then filter a type over a window.
     index('events_actor_occurred_idx').on(table.actorId, table.occurredAt),
     index('events_type_occurred_idx').on(table.type, table.occurredAt),
+    // The domain ties the payload to the type with a discriminated union, for a reason
+    // written down in `contracts/events.ts`: the log is append-only, so one event recorded
+    // without the axis the gate splits on is a gate measuring less than happened, silently
+    // and with nothing to backfill from. `DEFAULT '{}'` handed that hole back — these three
+    // take it away again, on the one table CLAUDE.md calls the groundwork of the gates.
+    check('events_type_known', oneOf(table.type, eventTypeSchema.options)),
+    check('events_payload_is_object', sql`jsonb_typeof(${table.payload}) = 'object'`),
+    check(
+      'events_payload_matches_type',
+      // `payload ->> 'subject'` on an empty object is NULL, and `NULL in (...)` is NULL,
+      // which a CHECK lets through — the hole this constraint exists to close. The key has
+      // to be asserted to be there before its value is compared.
+      sql`(${table.type} <> ${literal(EVENT.CATALOGUE_VIEWED)}
+             or (jsonb_exists(${table.payload}, 'subject')
+                 and ${table.payload} ->> 'subject' in (${list(catalogueSubjectSchema.options)})))
+          and (${table.type} <> ${literal(EVENT.SESSION_STARTED)}
+             or ${table.payload} = '{}'::jsonb)`,
+    ),
   ],
 )
 
@@ -98,7 +129,10 @@ export const actors = pgTable(
     spendCurrency: char('spend_currency', { length: 3 }).$type<Currency>().notNull(),
     incomeCurrency: char('income_currency', { length: 3 }).$type<Currency>().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [
     check('actors_country_iso', sql`${table.country} ~ '^[A-Z]{2}$'`),
@@ -134,7 +168,15 @@ export const items = pgTable(
   },
   (table) => [
     index('items_search_key_trgm_idx').using('gin', table.searchKey.op('gin_trgm_ops')),
+    // Redundant as a key — `id` is already unique — and required as one: a verdict points
+    // at the pair, so that «a product is rated without a place» is checkable by the
+    // database rather than by whoever writes the next use case.
+    unique('items_id_kind_key').on(table.id, table.kind),
     check('items_kind_known', oneOf(table.kind, itemKindSchema.options)),
+    // An empty key is a row the catalogue cannot reach: search compares against this
+    // column and nothing else. `visibleLine` stays the domain's — this is only the floor
+    // under which the item stops existing for the one path the product has.
+    check('items_search_key_present', sql`btrim(${table.searchKey}) <> ''`),
     check('items_default_unit_known', oneOf(table.defaultUnit, baseUnitSchema.options)),
     // A number without its unit means nothing, so the two travel together or not at all.
     check(
@@ -192,11 +234,19 @@ export const places = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    unique('places_kind_country_city_name_key').on(
+    /**
+     * Identity, not spelling. Exact uniqueness let «SAS» and «sas» — and «Ёлки» written
+     * with U+0401 against the same word with U+0415 U+0308 — become two places that look
+     * identical on screen, and with them two price histories for one shop, which is the
+     * product's key splitting in half. `lower` and `normalize` are immutable, so the
+     * uniqueness lives in the index and no column is added: the transliterated key
+     * («Гюмри» against `Gyumri`) is a different question and stays Р-15's.
+     */
+    uniqueIndex('places_identity_key').on(
       table.kind,
       table.country,
-      table.city,
-      table.name,
+      sql`lower(normalize(${table.city}, NFC))`,
+      sql`lower(normalize(${table.name}, NFC))`,
     ),
     check('places_kind_known', oneOf(table.kind, placeKindSchema.options)),
     check('places_country_iso', sql`${table.country} ~ '^[A-Z]{2}$'`),
@@ -232,6 +282,9 @@ export const trips = pgTable(
     // The list of trips, the running one, and «what is still unrated» all walk one actor
     // in time order.
     index('trips_actor_started_idx').on(table.actorId, table.startedAt),
+    // «Where is it cheaper» joins expenses to trips to places and filters by city: this is
+    // the one foreign key of 0.1 that a product query walks, not merely a delete.
+    index('trips_place_idx').on(table.placeId),
     check('trips_currency_known', oneOf(table.currency, currencySchema.options)),
     // Half a snapshot is worse than none: it reads as a rate and converts by nothing.
     check(
@@ -252,6 +305,11 @@ export const trips = pgTable(
       'trips_rate_source_known',
       sql`${table.rateSource} is null or ${oneOf(table.rateSource, rateSourceSchema.options)}`,
     ),
+    // Not a plausibility band — that one is MOL-39's, and its numbers stay in the domain.
+    // Zero and negative are outside any band there could be: a snapshot is written once and
+    // never recomputed, so a zero makes last month free and a negative flips its sign, both
+    // as arithmetic rather than as an error.
+    check('trips_rate_positive', sql`${table.rateScaled} is null or ${table.rateScaled} > 0`),
     check(
       'trips_finished_after_start',
       sql`${table.finishedAt} is null or ${table.finishedAt} >= ${table.startedAt}`,
@@ -322,19 +380,40 @@ export const verdicts = pgTable(
     actorId: uuid('actor_id')
       .notNull()
       .references(() => actors.id),
-    itemId: uuid('item_id')
-      .notNull()
-      .references(() => items.id),
+    itemId: uuid('item_id').notNull(),
+    /**
+     * A copy of `items.kind`, held true by the composite foreign key below. Not a new fact
+     * and not a domain field: the only way to say «this place belongs to this kind of
+     * item» inside one row, and a CHECK cannot look at another table.
+     */
+    itemKind: text('item_kind').$type<ItemKind>().notNull(),
     placeId: uuid('place_id').references(() => places.id),
     score: smallint('score').notNull(),
     review: varchar('review', { length: 500 }),
     ratedAt: timestamp('rated_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    // Moves on its own on every update: the column exists so that a re-rating leaves a
+    // trace, and `verdicts_updated_after_rated` is a tautology while it never moves.
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [
+    foreignKey({
+      columns: [table.itemId, table.itemKind],
+      foreignColumns: [items.id, items.kind],
+      name: 'verdicts_item_id_kind_fk',
+    }).onUpdate('cascade'),
     unique('verdicts_actor_item_place_key')
       .on(table.actorId, table.itemId, table.placeId)
       .nullsNotDistinct(),
+    // Without this, one person rates the same product twice — once with an empty place and
+    // once with a place — and the average counts both. The uniqueness above cannot see it:
+    // the two rows differ in `place_id`.
+    check(
+      'verdicts_place_matches_kind',
+      sql`(${table.itemKind} = 'product') = (${table.placeId} is null)`,
+    ),
     // The average score of an item is read across everyone's verdicts.
     index('verdicts_item_idx').on(table.itemId),
     check('verdicts_score_range', sql`${table.score} between 1 and 5`),
@@ -367,5 +446,10 @@ export const searchPicks = pgTable(
   (table) => [
     primaryKey({ columns: [table.actorId, table.queryKey, table.itemId] }),
     check('search_picks_counted', sql`${table.picks} > 0`),
+    // The key is a btree row, and a btree row stops at 2704 bytes: 800 four-byte code
+    // points would overflow it with `54000`, an error about index internals rather than
+    // about the query. The cap makes the refusal say what it is — and MOL-11, which writes
+    // here, is the one that decides how long a query is worth remembering.
+    check('search_picks_query_key_indexable', sql`octet_length(${table.queryKey}) <= 600`),
   ],
 )
