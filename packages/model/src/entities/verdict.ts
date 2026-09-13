@@ -30,6 +30,12 @@ export const verdictSchema = verdictFields.refine(
 )
 export type Verdict = z.infer<typeof verdictSchema>
 
+/**
+ * Shape only: whether a place belongs here depends on the kind of the item, which is not in
+ * the input and cannot be — the client must not be the one to say it. A use case that has
+ * loaded the item parses with `newVerdictSchemaFor(kind)` instead; this schema alone will
+ * take both shapes, and the database will then refuse one of them.
+ */
 export const newVerdictSchema = z.strictObject({
   itemId: z.uuid(),
   placeId: z.uuid().optional(),
