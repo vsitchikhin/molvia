@@ -10,5 +10,8 @@ export default defineConfig({
     include: ['tests/**/*.integration.test.ts'],
     environment: 'node',
     globalSetup: ['./tests/setup-db.ts'],
+    // One database, shared by every file: run them in turn. In parallel they delete each
+    // other's rows in `beforeEach` and fail in a way that looks like a schema bug.
+    fileParallelism: false,
   },
 })
