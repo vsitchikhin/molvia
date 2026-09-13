@@ -395,8 +395,14 @@ describe('the catalogue', () => {
   })
 
   it('refuses a search key of nothing but space — the row would be unreachable', async () => {
-    await refuses(() => insertItem(db, { searchKey: '   ' }), CHECK)
-    await refuses(() => insertItem(db, { searchKey: '' }), CHECK)
+    // The invisible ones are the point: plain `btrim` strips only the ASCII space, so a key
+    // of one no-break space would pass and the item would never be found again.
+    for (const searchKey of ['', '   ', '\u00A0', '\u200B\u200B', '\uFEFF']) {
+      await refuses(() => insertItem(db, { searchKey }), CHECK)
+    }
+
+    await insertItem(db, { searchKey: '   k   ' })
+    await expect(db.select().from(items)).resolves.toHaveLength(1)
   })
 
   it('takes the barcodes of a deleted item with it', async () => {
@@ -541,20 +547,29 @@ describe('a verdict knows what kind of thing it rates', () => {
     )
   })
 
-  it('refuses to reclassify an item that has already been rated', async () => {
+  it('refuses to reclassify an item that has already been rated, either way round', async () => {
     const actorId = await insertActor(db)
-    const itemId = await insertItem(db, { kind: 'dish', name: 'Карбонара' })
+    const dishId = await insertItem(db, { kind: 'dish', name: 'Карбонара' })
+    const productId = await insertItem(db, { name: 'Молоко' })
     const placeId = await insertPlace(db, { kind: 'venue', name: 'Пиццерия' })
     await db
       .insert(verdicts)
-      .values({ id: randomUUID(), actorId, itemId, itemKind: 'dish', placeId, score: 5 })
+      .values({ id: randomUUID(), actorId, itemId: dishId, itemKind: 'dish', placeId, score: 5 })
+    await db
+      .insert(verdicts)
+      .values({ id: randomUUID(), actorId, itemId: productId, itemKind, score: 4 })
 
-    // The kind cascades into the verdict, and there it meets the place rule: a dish rated
-    // in a café cannot quietly become a product whose verdict belongs nowhere. Reclassifying
-    // is therefore a decision about the verdicts too, and the database says so.
+    // The kind of a rated item is immutable, and in both directions: a dish rated in a café
+    // cannot become a product whose verdict belongs nowhere, and a product rated nowhere
+    // cannot become a dish that has to belong somewhere. That is why the key is NO ACTION
+    // and not a cascade — a cascade here could never arrive.
     await refuses(
-      () => db.update(items).set({ kind: 'product' }).where(eq(items.id, itemId)),
-      CHECK,
+      () => db.update(items).set({ kind: 'product' }).where(eq(items.id, dishId)),
+      FOREIGN_KEY,
+    )
+    await refuses(
+      () => db.update(items).set({ kind: 'dish' }).where(eq(items.id, productId)),
+      FOREIGN_KEY,
     )
   })
 
@@ -583,6 +598,33 @@ describe('a verdict knows what kind of thing it rates', () => {
     // Without this the column never moves, and «a re-rating is visible» is a tautology.
     expect(row?.updatedAt.getTime()).toBeGreaterThan(ratedAt.getTime())
   })
+
+  it('moves updated_at from raw SQL too — the trigger is in the database', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+    const id = randomUUID()
+    const ratedAt = new Date('2026-09-01T10:00:00.000Z')
+    await db
+      .insert(verdicts)
+      .values({ id, actorId, itemId, itemKind, score: 2, ratedAt, updatedAt: ratedAt })
+
+    // The point of putting it in the database: SQL lives in `src/db` and is the main
+    // instrument here, so a mechanism the query builder owns would miss every second path.
+    await db.execute(sql`update verdicts set score = 5 where id = ${id}`)
+
+    const [row] = await db.select().from(verdicts)
+    expect(row?.updatedAt.getTime()).toBeGreaterThan(ratedAt.getTime())
+  })
+
+  it("moves an actor's updated_at when their settings change", async () => {
+    const actorId = await insertActor(db)
+    const [before] = await db.select().from(actors)
+
+    await db.execute(sql`update actors set city = 'Ереван' where id = ${actorId}`)
+
+    const [after] = await db.select().from(actors)
+    expect(after?.updatedAt.getTime()).toBeGreaterThan(before?.updatedAt.getTime() ?? 0)
+  })
 })
 
 describe('a place is its name, not its spelling', () => {
@@ -601,6 +643,13 @@ describe('a place is its name, not its spelling', () => {
       () => insertPlace(db, { kind: 'store', name: '\u0415\u0308\u043b\u043a\u0438' }),
       UNIQUE,
     )
+  })
+
+  it('refuses the same shop written in fullwidth letters', async () => {
+    // NFKC rather than NFC: «ＳＡＳ» is the same shop with the same letters in another width.
+    await insertPlace(db, { kind: 'store', name: 'SAS', city: 'Ереван' })
+
+    await refuses(() => insertPlace(db, { kind: 'store', name: 'ＳＡＳ', city: 'Ереван' }), UNIQUE)
   })
 
   it('refuses a country written in lower case or in one letter', async () => {
@@ -662,6 +711,17 @@ describe('the gate log refuses what the gates cannot count', () => {
         db.execute(sql`
       insert into ${events} (actor_id, type, payload)
       values (${actorId}, 'catalogue_viewed', '{"subject":"recipes"}'::jsonb)
+    `),
+      CHECK,
+    )
+
+    // The domain says `strictObject` here, and an append-only log has nothing to clean an
+    // extra key out with.
+    await refuses(
+      () =>
+        db.execute(sql`
+      insert into ${events} (actor_id, type, payload)
+      values (${actorId}, 'catalogue_viewed', '{"subject":"venue","whose":"someone"}'::jsonb)
     `),
       CHECK,
     )
@@ -744,10 +804,17 @@ describe('the remembered pick', () => {
     const actorId = await insertActor(db)
     const itemId = await insertItem(db)
 
-    // 700 four-byte characters overflow the btree row and Postgres answers 54000 — an error
-    // about index internals. The check turns it into a refusal that names the column.
+    // The column now says what it takes, so a long Latin key is refused by the type itself.
     await refuses(
-      () => db.insert(searchPicks).values({ actorId, queryKey: '😀'.repeat(700), itemId }),
+      () => db.insert(searchPicks).values({ actorId, queryKey: 'k'.repeat(700), itemId }),
+      TOO_LONG,
+    )
+
+    // An alphabet `toSearchKey` keeps as it is costs four octets per character, so 200 of
+    // them fit the type and overflow the btree row: without the check Postgres answers
+    // 54000, an error about index internals rather than about the query.
+    await refuses(
+      () => db.insert(searchPicks).values({ actorId, queryKey: '😀'.repeat(200), itemId }),
       CHECK,
     )
 

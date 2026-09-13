@@ -100,12 +100,15 @@ export const events = pgTable(
     check('events_payload_is_object', sql`jsonb_typeof(${table.payload}) = 'object'`),
     check(
       'events_payload_matches_type',
-      // `payload ->> 'subject'` on an empty object is NULL, and `NULL in (...)` is NULL,
-      // which a CHECK lets through — the hole this constraint exists to close. The key has
-      // to be asserted to be there before its value is compared.
+      // Two traps, both met in the making. `payload ->> 'subject'` on an empty object is
+      // NULL, and `NULL in (...)` is NULL, which a CHECK lets through — so the key is
+      // asserted to be there before its value is compared. And the domain's `strictObject`
+      // has to hold here too: `payload - 'subject'` must leave nothing, or an extra key
+      // lands in an append-only log with nothing to clean it out with.
       sql`(${table.type} <> ${literal(EVENT.CATALOGUE_VIEWED)}
              or (jsonb_exists(${table.payload}, 'subject')
-                 and ${table.payload} ->> 'subject' in (${list(catalogueSubjectSchema.options)})))
+                 and ${table.payload} ->> 'subject' in (${list(catalogueSubjectSchema.options)})
+                 and ${table.payload} - 'subject' = '{}'::jsonb))
           and (${table.type} <> ${literal(EVENT.SESSION_STARTED)}
              or ${table.payload} = '{}'::jsonb)`,
     ),
@@ -129,10 +132,9 @@ export const actors = pgTable(
     spendCurrency: char('spend_currency', { length: 3 }).$type<Currency>().notNull(),
     incomeCurrency: char('income_currency', { length: 3 }).$type<Currency>().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow()
-      .$onUpdate(() => new Date()),
+    // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
+    // SQL — the main instrument in this directory — would leave the column behind.
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     check('actors_country_iso', sql`${table.country} ~ '^[A-Z]{2}$'`),
@@ -173,10 +175,14 @@ export const items = pgTable(
     // database rather than by whoever writes the next use case.
     unique('items_id_kind_key').on(table.id, table.kind),
     check('items_kind_known', oneOf(table.kind, itemKindSchema.options)),
-    // An empty key is a row the catalogue cannot reach: search compares against this
-    // column and nothing else. `visibleLine` stays the domain's — this is only the floor
-    // under which the item stops existing for the one path the product has.
-    check('items_search_key_present', sql`btrim(${table.searchKey}) <> ''`),
+    // An empty key is a row the catalogue cannot reach: search compares against this column
+    // and nothing else. The blanks are listed rather than left to plain `btrim`, which only
+    // strips the ASCII space — a key of one no-break space would pass and the item would be
+    // unfindable forever. `visibleLine` stays the domain's; this is only the floor.
+    check(
+      'items_search_key_present',
+      sql`btrim(${table.searchKey}, E' \\t\\r\\n\\u00A0\\u200B\\u200C\\u200D\\uFEFF') <> ''`,
+    ),
     check('items_default_unit_known', oneOf(table.defaultUnit, baseUnitSchema.options)),
     // A number without its unit means nothing, so the two travel together or not at all.
     check(
@@ -238,15 +244,17 @@ export const places = pgTable(
      * Identity, not spelling. Exact uniqueness let «SAS» and «sas» — and «Ёлки» written
      * with U+0401 against the same word with U+0415 U+0308 — become two places that look
      * identical on screen, and with them two price histories for one shop, which is the
-     * product's key splitting in half. `lower` and `normalize` are immutable, so the
-     * uniqueness lives in the index and no column is added: the transliterated key
-     * («Гюмри» against `Gyumri`) is a different question and stays Р-15's.
+     * product's key splitting in half. NFKC rather than NFC so that «ＳＡＳ» in fullwidth
+     * folds too; homoglyphs («SАS» with a Cyrillic А) are the one spelling left, and the
+     * only one where the difference can be deliberate. `lower` and `normalize` are
+     * immutable, so the uniqueness lives in the index and no column is added: the
+     * transliterated key («Гюмри» against `Gyumri`) stays Р-15's.
      */
     uniqueIndex('places_identity_key').on(
       table.kind,
       table.country,
-      sql`lower(normalize(${table.city}, NFC))`,
-      sql`lower(normalize(${table.name}, NFC))`,
+      sql`lower(normalize(${table.city}, NFKC))`,
+      sql`lower(normalize(${table.name}, NFKC))`,
     ),
     check('places_kind_known', oneOf(table.kind, placeKindSchema.options)),
     check('places_country_iso', sql`${table.country} ~ '^[A-Z]{2}$'`),
@@ -391,19 +399,26 @@ export const verdicts = pgTable(
     score: smallint('score').notNull(),
     review: varchar('review', { length: 500 }),
     ratedAt: timestamp('rated_at', { withTimezone: true }).notNull().defaultNow(),
-    // Moves on its own on every update: the column exists so that a re-rating leaves a
-    // trace, and `verdicts_updated_after_rated` is a tautology while it never moves.
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow()
-      .$onUpdate(() => new Date()),
+    /**
+     * Moved by `verdicts_touch_updated_at`, a trigger, so every write path moves it — the
+     * column exists so a re-rating leaves a trace, and `verdicts_updated_after_rated` is a
+     * tautology while it stands still. Triggers are invisible to drizzle-kit and live in a
+     * hand-written part of the migration.
+     */
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    /**
+     * `NO ACTION`, deliberately, where a cascade would read better and lie: the kind
+     * travelling into a verdict always meets the place rule below — a product's verdict has
+     * no place, a dish's has one — so it can never arrive. An item with even one verdict has
+     * an immutable kind, and that is a decision about the verdicts, not about the catalogue.
+     */
     foreignKey({
       columns: [table.itemId, table.itemKind],
       foreignColumns: [items.id, items.kind],
       name: 'verdicts_item_id_kind_fk',
-    }).onUpdate('cascade'),
+    }),
     unique('verdicts_actor_item_place_key')
       .on(table.actorId, table.itemId, table.placeId)
       .nullsNotDistinct(),
@@ -436,7 +451,10 @@ export const searchPicks = pgTable(
     actorId: uuid('actor_id')
       .notNull()
       .references(() => actors.id),
-    queryKey: varchar('query_key', { length: 800 }).notNull(),
+    // 600, not 800 like `items.search_key`: the primary key is a btree row and stops at
+    // 2704 bytes. The column now says what it actually takes; the CHECK below stays for the
+    // alphabets `toSearchKey` keeps as they are, where one character is four octets.
+    queryKey: varchar('query_key', { length: 600 }).notNull(),
     itemId: uuid('item_id')
       .notNull()
       .references(() => items.id),

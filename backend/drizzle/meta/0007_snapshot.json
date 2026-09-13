@@ -1,5 +1,5 @@
 {
-  "id": "eb267ab1-3b6d-4c8a-88ef-4f6e6199d12f",
+  "id": "4cb0d5fb-f42f-44d1-b0dc-5483e8019773",
   "prevId": "bbb9f5e9-7639-4ff5-aae8-858ebb903613",
   "version": "7",
   "dialect": "postgresql",
@@ -180,7 +180,20 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "events_type_known": {
+          "name": "events_type_known",
+          "value": "\"events\".\"type\" in ('session_started', 'catalogue_viewed')"
+        },
+        "events_payload_is_object": {
+          "name": "events_payload_is_object",
+          "value": "jsonb_typeof(\"events\".\"payload\") = 'object'"
+        },
+        "events_payload_matches_type": {
+          "name": "events_payload_matches_type",
+          "value": "(\"events\".\"type\" <> 'catalogue_viewed'\n             or (jsonb_exists(\"events\".\"payload\", 'subject')\n                 and \"events\".\"payload\" ->> 'subject' in ('product', 'venue')\n                 and \"events\".\"payload\" - 'subject' = '{}'::jsonb))\n          and (\"events\".\"type\" <> 'session_started'\n             or \"events\".\"payload\" = '{}'::jsonb)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.expenses": {
@@ -476,12 +489,22 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "items_id_kind_key": {
+          "name": "items_id_kind_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "kind"]
+        }
+      },
       "policies": {},
       "checkConstraints": {
         "items_kind_known": {
           "name": "items_kind_known",
           "value": "\"items\".\"kind\" in ('product', 'dish')"
+        },
+        "items_search_key_present": {
+          "name": "items_search_key_present",
+          "value": "btrim(\"items\".\"search_key\", E' \\t\\r\\n\\u00A0\\u200B\\u200C\\u200D\\uFEFF') <> ''"
         },
         "items_default_unit_known": {
           "name": "items_default_unit_known",
@@ -548,16 +571,44 @@
           "default": "now()"
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "places_kind_country_city_name_key": {
-          "name": "places_kind_country_city_name_key",
-          "nullsNotDistinct": false,
-          "columns": ["kind", "country", "city", "name"]
+      "indexes": {
+        "places_identity_key": {
+          "name": "places_identity_key",
+          "columns": [
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "country",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(normalize(\"city\", NFKC))",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(normalize(\"name\", NFKC))",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
         "places_kind_known": {
@@ -583,7 +634,7 @@
         },
         "query_key": {
           "name": "query_key",
-          "type": "varchar(800)",
+          "type": "varchar(600)",
           "primaryKey": false,
           "notNull": true
         },
@@ -641,6 +692,10 @@
         "search_picks_counted": {
           "name": "search_picks_counted",
           "value": "\"search_picks\".\"picks\" > 0"
+        },
+        "search_picks_query_key_indexable": {
+          "name": "search_picks_query_key_indexable",
+          "value": "octet_length(\"search_picks\".\"query_key\") <= 600"
         }
       },
       "isRLSEnabled": false
@@ -738,6 +793,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "trips_place_idx": {
+          "name": "trips_place_idx",
+          "columns": [
+            {
+              "expression": "place_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -825,6 +895,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "item_kind": {
+          "name": "item_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "place_id": {
           "name": "place_id",
           "type": "uuid",
@@ -885,21 +961,21 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "verdicts_item_id_items_id_fk": {
-          "name": "verdicts_item_id_items_id_fk",
-          "tableFrom": "verdicts",
-          "tableTo": "items",
-          "columnsFrom": ["item_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
         "verdicts_place_id_places_id_fk": {
           "name": "verdicts_place_id_places_id_fk",
           "tableFrom": "verdicts",
           "tableTo": "places",
           "columnsFrom": ["place_id"],
           "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "verdicts_item_id_kind_fk": {
+          "name": "verdicts_item_id_kind_fk",
+          "tableFrom": "verdicts",
+          "tableTo": "items",
+          "columnsFrom": ["item_id", "item_kind"],
+          "columnsTo": ["id", "kind"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -914,6 +990,10 @@
       },
       "policies": {},
       "checkConstraints": {
+        "verdicts_place_matches_kind": {
+          "name": "verdicts_place_matches_kind",
+          "value": "(\"verdicts\".\"item_kind\" = 'product') = (\"verdicts\".\"place_id\" is null)"
+        },
         "verdicts_score_range": {
           "name": "verdicts_score_range",
           "value": "\"verdicts\".\"score\" between 1 and 5"

@@ -54,29 +54,8 @@
     {
       "idx": 7,
       "version": "7",
-      "when": 1789323658951,
-      "tag": "0007_rate_positive",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1789323674895,
-      "tag": "0008_verdict_kind",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1789323706088,
-      "tag": "0009_place_identity",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1789323905596,
-      "tag": "0010_gate_log_and_guards",
+      "when": 1789326270207,
+      "tag": "0007_review_fixes",
       "breakpoints": true
     }
   ]

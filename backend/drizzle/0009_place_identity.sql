@@ -1,2 +1,0 @@
-ALTER TABLE "places" DROP CONSTRAINT "places_kind_country_city_name_key";--> statement-breakpoint
-CREATE UNIQUE INDEX "places_identity_key" ON "places" USING btree ("kind","country",lower(normalize("city", NFC)),lower(normalize("name", NFC)));
