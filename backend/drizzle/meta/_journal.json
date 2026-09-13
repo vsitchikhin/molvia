@@ -43,6 +43,13 @@
       "when": 1789297243155,
       "tag": "0005_verdicts",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789297304644,
+      "tag": "0006_search_picks",
+      "breakpoints": true
     }
   ]
 }

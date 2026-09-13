@@ -4,9 +4,11 @@ import {
   check,
   index,
   jsonb,
+  integer,
   pgTable,
   smallint,
   text,
+  primaryKey,
   timestamp,
   unique,
   uuid,
@@ -337,5 +339,33 @@ export const verdicts = pgTable(
     index('verdicts_item_idx').on(table.itemId),
     check('verdicts_score_range', sql`${table.score} between 1 and 5`),
     check('verdicts_updated_after_rated', sql`${table.updatedAt} >= ${table.ratedAt}`),
+  ],
+)
+
+/**
+ * A query and the item chosen after it, so the pair comes up first next time. No domain
+ * type: it never crosses the wire and takes part in no rule — it is server-side ranking
+ * machinery, and the labelled set anything smarter would later need.
+ *
+ * The stored column is the search key, not the raw query: the same question typed in
+ * another script or with the other half of a transliteration fork is a different string
+ * and would never match itself. Writing and reading it is MOL-11; here it is only a place.
+ */
+export const searchPicks = pgTable(
+  'search_picks',
+  {
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id),
+    queryKey: varchar('query_key', { length: 800 }).notNull(),
+    itemId: uuid('item_id')
+      .notNull()
+      .references(() => items.id),
+    picks: integer('picks').notNull().default(1),
+    lastPickedAt: timestamp('last_picked_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.actorId, table.queryKey, table.itemId] }),
+    check('search_picks_counted', sql`${table.picks} > 0`),
   ],
 )
