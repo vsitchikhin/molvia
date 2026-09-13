@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run && vitest run -c vitest.integration.config.ts",
-    "test:integration": "vitest run -c vitest.integration.config.ts"
+    "test:integration": "vitest run -c vitest.integration.config.ts",
+    "test:attack": "vitest run -c vitest.attack.config.ts"
   },
   "dependencies": {
     "@molvia/model": "*",

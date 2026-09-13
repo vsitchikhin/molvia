@@ -640,23 +640,28 @@ describe('a verdict knows what kind of thing it rates', () => {
     expect(row?.updatedAt.getTime()).toBeGreaterThanOrEqual(row?.ratedAt.getTime() ?? 0)
   })
 
-  it('re-rates a verdict whose rating is dated in the future', async () => {
+  it('refuses a rating dated in the future — no CHECK can say that, a trigger can', async () => {
     const actorId = await insertActor(db)
     const itemId = await insertItem(db)
-    const id = randomUUID()
     const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
-    await db
-      .insert(verdicts)
-      .values({ id, actorId, itemId, itemKind, score: 2, ratedAt: tomorrow, updatedAt: tomorrow })
 
-    // The database cannot forbid a future rating — a CHECK may not call now() — so the
-    // trigger must not lock the row: with a plain clock_timestamp() every later update would
-    // land before rated_at and be refused, and the verdict would be unchangeable forever.
-    await db.update(verdicts).set({ score: 5 }).where(eq(verdicts.id, id))
-
-    const [row] = await db.select().from(verdicts)
-    expect(row?.score).toBe(5)
-    expect(row?.updatedAt.getTime()).toBeGreaterThanOrEqual(row?.ratedAt.getTime() ?? 0)
+    // Left alone, such a row has no good end: with the trace pinned to the rating it lets a
+    // client hold `updated_at` a century ahead, and without pinning it locks the row, since
+    // every later update would land before `rated_at`. The server stamps this value itself,
+    // microseconds before the insert, so a date from the future is a broken row.
+    await refuses(
+      () =>
+        db.insert(verdicts).values({
+          id: randomUUID(),
+          actorId,
+          itemId,
+          itemKind,
+          score: 4,
+          ratedAt: tomorrow,
+          updatedAt: tomorrow,
+        }),
+      CHECK,
+    )
   })
 
   it('leaves updated_at alone when the update changes nothing', async () => {
@@ -708,6 +713,16 @@ describe('a place is its name, not its spelling', () => {
     await insertPlace(db, { kind: 'store', name: 'SAS', city: 'Ереван' })
 
     await refuses(() => insertPlace(db, { kind: 'store', name: 'ＳＡＳ', city: 'Ереван' }), UNIQUE)
+  })
+
+  it('refuses the same shop padded with invisible characters', async () => {
+    // The same list of blanks the search key uses: one definition of «invisible» for the
+    // whole schema, or a zero-width space makes a second shop where a plain space would not.
+    await insertPlace(db, { kind: 'store', name: 'SAS', city: 'Ереван' })
+
+    for (const name of ['\u200BSAS', 'SAS\uFEFF', '\u00A0SAS\u00A0']) {
+      await refuses(() => insertPlace(db, { kind: 'store', name, city: 'Ереван' }), UNIQUE)
+    }
   })
 
   it('refuses the same shop written with padding around it', async () => {

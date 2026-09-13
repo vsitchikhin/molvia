@@ -70,6 +70,7 @@ describe('the migration chain on a database that already holds rows', () => {
     const blankItemId = randomUUID()
     const dishId = randomUUID()
     const twiceRatedDishId = randomUUID()
+    const futureVerdictId = randomUUID()
     const keptPlaceId = randomUUID()
     const duplicatePlaceId = randomUUID()
     const tripId = randomUUID()
@@ -116,6 +117,13 @@ describe('the migration chain on a database that already holds rows', () => {
       values (${randomUUID()}, ${actorId}, ${twiceRatedDishId}, ${keptPlaceId}, 3, now() - interval '1 day'),
              (${randomUUID()}, ${actorId}, ${twiceRatedDishId}, ${duplicatePlaceId}, 5, now())
     `
+    // A rating dated a century ahead: legal under 0006, and afterwards either a locked row
+    // or a client-pinned trace. The chain pulls it back to the present.
+    await sql`
+      insert into verdicts (id, actor_id, item_id, place_id, score, rated_at, updated_at)
+      values (${futureVerdictId}, ${actorId}, ${dishId}, ${keptPlaceId}, 5,
+              now() + interval '100 years', now() + interval '100 years')
+    `
     await sql`insert into events (actor_id, type) values (${actorId}, 'catalogue_viewed')`
     await sql`
       insert into search_picks (actor_id, query_key, item_id)
@@ -133,12 +141,19 @@ describe('the migration chain on a database that already holds rows', () => {
     const survivors = await sql<{ place_id: string | null; item_kind: string; score: number }[]>`
       select place_id, item_kind, score from verdicts order by item_kind
     `
-    // Two verdicts left: the earliest vote on the product without its place, and the
-    // earliest of the two on the dish, on the surviving card. The dish rated nowhere is gone.
+    // Three verdicts left, and each is the person's latest opinion: the vote on the product
+    // without its place, the later of the two on the twice-rated dish on the surviving card,
+    // and the century-ahead one pulled back to the present. The dish rated nowhere is gone.
     expect(survivors).toEqual([
-      { place_id: keptPlaceId, item_kind: 'dish', score: 3 },
-      { place_id: null, item_kind: 'product', score: 2 },
+      { place_id: keptPlaceId, item_kind: 'dish', score: 5 },
+      { place_id: keptPlaceId, item_kind: 'dish', score: 5 },
+      { place_id: null, item_kind: 'product', score: 5 },
     ])
+
+    const [future] = await sql<{ ahead: boolean }[]>`
+      select rated_at > now() as ahead from verdicts where id = ${futureVerdictId}
+    `
+    expect(future?.ahead).toBe(false)
 
     const places = await sql<{ id: string }[]>`select id from places`
     expect(places.map((row) => row.id)).toEqual([keptPlaceId])

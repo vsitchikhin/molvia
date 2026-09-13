@@ -16,6 +16,16 @@
 ALTER TABLE "places" DROP CONSTRAINT "places_kind_country_city_name_key";--> statement-breakpoint
 ALTER TABLE "verdicts" DROP CONSTRAINT "verdicts_item_id_items_id_fk";--> statement-breakpoint
 
+-- Оценка, датированная будущим: под 0006 законна, а дальше ломает смысл `updated_at` —
+-- любая правка ставила бы след раньше оценки. Дата подтягивается к настоящему, обе колонки
+-- сразу, чтобы «переоценка не раньше оценки» осталось верным.
+UPDATE "verdicts"
+SET "rated_at" = clock_timestamp(),
+    "updated_at" = greatest("updated_at", clock_timestamp())
+WHERE "rated_at" > clock_timestamp();--> statement-breakpoint
+UPDATE "verdicts" SET "updated_at" = clock_timestamp()
+WHERE "updated_at" > clock_timestamp();--> statement-breakpoint
+
 -- Курс, который не может быть курсом: снимок снимается целиком, поход остаётся.
 UPDATE "trips"
 SET "rate_base" = NULL, "rate_quote" = NULL, "rate_scaled" = NULL,
@@ -49,11 +59,13 @@ ALTER TABLE "search_picks" ALTER COLUMN "query_key" SET DATA TYPE varchar(600);-
 --
 -- Товар, оценённый «в месте», — это второй голос одного человека, и снять место у обоих
 -- мало: две строки стали бы одной и той же тройкой, а уникальность ответила бы 23505.
--- Поэтому пара «владелец + позиция» сводится к одному голосу — старейшему по дате оценки,
--- как и дубли мест ниже. Вид позиции берётся из справочника: колонки `item_kind` ещё нет.
+-- Поэтому пара «владелец + позиция» сводится к одному голосу — **последнему** по дате
+-- оценки: в продукте переоценка заменяет прежнее мнение, а не спорит с ним. (У мест
+-- наоборот выживает старейшая карточка: там ценна накопленная история, а не свежесть.)
+-- Вид позиции берётся из справочника: колонки `item_kind` на этом шаге ещё нет.
 WITH ranked AS (
   SELECT v."id", row_number() OVER (
-    PARTITION BY v."actor_id", v."item_id" ORDER BY v."rated_at", v."id"
+    PARTITION BY v."actor_id", v."item_id" ORDER BY v."rated_at" DESC, v."id" DESC
   ) AS n
   FROM "verdicts" v JOIN "items" i ON i."id" = v."item_id"
   WHERE i."kind" = 'product'
@@ -69,17 +81,17 @@ WHERE i."id" = v."item_id" AND i."kind" = 'dish' AND v."place_id" IS NULL;--> st
 -- Слияние мест сталкивает и вердикты: блюдо, оценённое в двух карточках одного заведения,
 -- после перевода на старейшую станет одной и той же тройкой «владелец + позиция + место»,
 -- и уникальность ответит 23505 прямо на UPDATE. Поэтому вердикты сводятся по их будущему
--- месту заранее — снова по старейшему голосу.
+-- месту заранее — снова по последнему мнению.
 WITH ranked AS (
   SELECT "id", first_value("id") OVER (
-    PARTITION BY "kind", "country", btrim(lower(normalize("city", NFKC))), btrim(lower(normalize("name", NFKC)))
+    PARTITION BY "kind", "country", btrim(lower(normalize("city", NFKC)), E' \t\r\n\u00A0\u200B\u200C\u200D\uFEFF'), btrim(lower(normalize("name", NFKC)), E' \t\r\n\u00A0\u200B\u200C\u200D\uFEFF')
     ORDER BY "created_at", "id"
   ) AS keeper
   FROM "places"
 ), collapsed AS (
   SELECT v."id", row_number() OVER (
     PARTITION BY v."actor_id", v."item_id", coalesce(r.keeper, v."place_id")
-    ORDER BY v."rated_at", v."id"
+    ORDER BY v."rated_at" DESC, v."id" DESC
   ) AS n
   FROM "verdicts" v LEFT JOIN ranked r ON r."id" = v."place_id"
 )
@@ -90,7 +102,7 @@ DELETE FROM "verdicts" v USING collapsed c WHERE v."id" = c."id" AND c.n > 1;-->
 -- обратно в одно место, ради чего уникальность и переписывается.
 WITH ranked AS (
   SELECT "id", first_value("id") OVER (
-    PARTITION BY "kind", "country", btrim(lower(normalize("city", NFKC))), btrim(lower(normalize("name", NFKC)))
+    PARTITION BY "kind", "country", btrim(lower(normalize("city", NFKC)), E' \t\r\n\u00A0\u200B\u200C\u200D\uFEFF'), btrim(lower(normalize("name", NFKC)), E' \t\r\n\u00A0\u200B\u200C\u200D\uFEFF')
     ORDER BY "created_at", "id"
   ) AS keeper
   FROM "places"
@@ -99,7 +111,7 @@ UPDATE "trips" t SET "place_id" = r.keeper
 FROM ranked r WHERE t."place_id" = r."id" AND r.keeper <> r."id";--> statement-breakpoint
 WITH ranked AS (
   SELECT "id", first_value("id") OVER (
-    PARTITION BY "kind", "country", btrim(lower(normalize("city", NFKC))), btrim(lower(normalize("name", NFKC)))
+    PARTITION BY "kind", "country", btrim(lower(normalize("city", NFKC)), E' \t\r\n\u00A0\u200B\u200C\u200D\uFEFF'), btrim(lower(normalize("name", NFKC)), E' \t\r\n\u00A0\u200B\u200C\u200D\uFEFF')
     ORDER BY "created_at", "id"
   ) AS keeper
   FROM "places"
@@ -108,7 +120,7 @@ UPDATE "verdicts" v SET "place_id" = r.keeper
 FROM ranked r WHERE v."place_id" = r."id" AND r.keeper <> r."id";--> statement-breakpoint
 WITH ranked AS (
   SELECT "id", first_value("id") OVER (
-    PARTITION BY "kind", "country", btrim(lower(normalize("city", NFKC))), btrim(lower(normalize("name", NFKC)))
+    PARTITION BY "kind", "country", btrim(lower(normalize("city", NFKC)), E' \t\r\n\u00A0\u200B\u200C\u200D\uFEFF'), btrim(lower(normalize("name", NFKC)), E' \t\r\n\u00A0\u200B\u200C\u200D\uFEFF')
     ORDER BY "created_at", "id"
   ) AS keeper
   FROM "places"
@@ -125,7 +137,7 @@ UPDATE "verdicts" SET "place_id" = NULL WHERE "place_id" IS NOT NULL AND "item_k
 -- выдал их в обратном порядке, и Postgres на это отвечает отказом.
 ALTER TABLE "items" ADD CONSTRAINT "items_id_kind_key" UNIQUE("id","kind");--> statement-breakpoint
 ALTER TABLE "verdicts" ADD CONSTRAINT "verdicts_item_id_kind_fk" FOREIGN KEY ("item_id","item_kind") REFERENCES "public"."items"("id","kind") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "places_identity_key" ON "places" USING btree ("kind","country",btrim(lower(normalize("city", NFKC))),btrim(lower(normalize("name", NFKC))));--> statement-breakpoint
+CREATE UNIQUE INDEX "places_identity_key" ON "places" USING btree ("kind","country",btrim(lower(normalize("city", NFKC)), E' \t\r\n\u00A0\u200B\u200C\u200D\uFEFF'),btrim(lower(normalize("name", NFKC)), E' \t\r\n\u00A0\u200B\u200C\u200D\uFEFF'));--> statement-breakpoint
 CREATE INDEX "trips_place_idx" ON "trips" USING btree ("place_id");--> statement-breakpoint
 ALTER TABLE "events" ADD CONSTRAINT "events_type_known" CHECK ("events"."type" in ('session_started', 'catalogue_viewed'));--> statement-breakpoint
 ALTER TABLE "events" ADD CONSTRAINT "events_payload_is_object" CHECK (jsonb_typeof("events"."payload") = 'object');--> statement-breakpoint
@@ -151,21 +163,28 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;--> statement-breakpoint
--- У вердикта своя функция: дата оценки приходит снаружи и может оказаться в будущем —
--- база её не запрещает и запретить не может, CHECK не умеет звать now(). С обычным
--- clock_timestamp() такая строка запиралась бы навсегда: любая правка ставила бы
--- updated_at раньше rated_at и отбивалась бы constraint'ом. greatest() оставляет
--- инвариант «переоценка не раньше оценки» верным и не делает строку неизменяемой.
-CREATE OR REPLACE FUNCTION "set_verdict_updated_at"() RETURNS trigger AS $$
+-- Дата оценки приходит снаружи, и в будущем она не бывает. CHECK этого сказать не может —
+-- ему нельзя звать now(), — а триггеру можно, и это единственное место, где такое правило
+-- вообще выразимо. Без него строка с датой на век вперёд либо запирается навсегда (любая
+-- правка ставит след раньше оценки), либо, если след подтягивать к оценке, позволяет
+-- клиенту прижать `updated_at` к тому же веку: «переоценено» и «не трогали» становятся
+-- неразличимы. Сервер и база стоят на одной машине и метка снимается прямо перед вставкой,
+-- поэтому запас на расхождение часов не нужен: дата из будущего — сломанная строка.
+CREATE OR REPLACE FUNCTION "refuse_future_rating"() RETURNS trigger AS $$
 BEGIN
-  NEW."updated_at" = greatest(clock_timestamp(), NEW."rated_at");
+  IF NEW."rated_at" > clock_timestamp() THEN
+    RAISE EXCEPTION 'verdict rated in the future: %', NEW."rated_at"
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'verdicts_rated_at_not_future';
+  END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;--> statement-breakpoint
+CREATE TRIGGER "verdicts_rated_at_not_future" BEFORE INSERT OR UPDATE ON "verdicts"
+  FOR EACH ROW EXECUTE FUNCTION "refuse_future_rating"();--> statement-breakpoint
 -- WHEN: колонка отмечает, что строка изменилась, а не что по ней прошли. Пустой UPDATE —
 -- повтор запроса, правка отзыва на тот же текст, ремонтная миграция по всем вердиктам —
 -- иначе переписал бы «когда переоценили» всем подряд.
 CREATE TRIGGER "verdicts_touch_updated_at" BEFORE UPDATE ON "verdicts"
-  FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*) EXECUTE FUNCTION "set_verdict_updated_at"();--> statement-breakpoint
+  FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*) EXECUTE FUNCTION "set_updated_at"();--> statement-breakpoint
 CREATE TRIGGER "actors_touch_updated_at" BEFORE UPDATE ON "actors"
   FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*) EXECUTE FUNCTION "set_updated_at"();

@@ -55,6 +55,13 @@ function literal(value: string) {
   return sql.raw(`'${value}'`)
 }
 
+/**
+ * What counts as blank, in one place. Plain `btrim` strips only the ASCII space, so a name
+ * padded with a zero-width space or a BOM would slip past it — and the schema would hold two
+ * different definitions of «invisible», one for the search key and another for a place.
+ */
+const BLANKS = String.raw` \t\r\n\u00A0\u200B\u200C\u200D\uFEFF`
+
 /** A quantity unit is nullable in several tables; the list is the same everywhere. */
 function unitKnownOrNull(column: AnyPgColumn) {
   return sql`${column} is null or ${oneOf(column, baseUnitSchema.options)}`
@@ -180,10 +187,7 @@ export const items = pgTable(
     // strips the ASCII space — a key of one no-break space would pass and the item would be
     // unfindable forever. The rule is a floor, not a normalisation: `'   k   '` passes,
     // because the middle of a key is content. `visibleLine` stays the domain's.
-    check(
-      'items_search_key_present',
-      sql`btrim(${table.searchKey}, E' \\t\\r\\n\\u00A0\\u200B\\u200C\\u200D\\uFEFF') <> ''`,
-    ),
+    check('items_search_key_present', sql`btrim(${table.searchKey}, E'${sql.raw(BLANKS)}') <> ''`),
     check('items_default_unit_known', oneOf(table.defaultUnit, baseUnitSchema.options)),
     // A number without its unit means nothing, so the two travel together or not at all.
     check(
@@ -248,16 +252,17 @@ export const places = pgTable(
      * product's key splitting in half. NFKC rather than NFC so that «ＳＡＳ» in fullwidth
      * folds too; homoglyphs («SАS» with a Cyrillic А) are the one spelling left, and the
      * only one where the difference can be deliberate. `btrim` comes after `normalize`
-     * on purpose: NFKC turns a no-break space into an ordinary one, which plain `btrim`
-     * then strips — so « SAS » stops being a second shop on the paths that bypass the
+     * on purpose and takes the same `BLANKS` the search key does: NFKC turns a no-break
+     * space into an ordinary one, and the zero-width ones it leaves alone — so « SAS »,
+     * «\u200BSAS» and «SAS\uFEFF» all stop being second shops on the paths that bypass the
      * domain's own `.trim()`. All three are immutable, so the uniqueness lives in the index
      * and no column is added: the transliterated key («Гюмри» against `Gyumri`) stays Р-15's.
      */
     uniqueIndex('places_identity_key').on(
       table.kind,
       table.country,
-      sql`btrim(lower(normalize(${table.city}, NFKC)))`,
-      sql`btrim(lower(normalize(${table.name}, NFKC)))`,
+      sql`btrim(lower(normalize(${table.city}, NFKC)), E'${sql.raw(BLANKS)}')`,
+      sql`btrim(lower(normalize(${table.name}, NFKC)), E'${sql.raw(BLANKS)}')`,
     ),
     check('places_kind_known', oneOf(table.kind, placeKindSchema.options)),
     check('places_country_iso', sql`${table.country} ~ '^[A-Z]{2}$'`),
