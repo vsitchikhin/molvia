@@ -15,6 +15,13 @@
       "when": 1787936666955,
       "tag": "0001_events",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789296930995,
+      "tag": "0002_actors",
+      "breakpoints": true
     }
   ]
 }

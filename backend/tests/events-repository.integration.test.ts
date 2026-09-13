@@ -1,9 +1,9 @@
-import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { EVENT } from '@molvia/model'
 import { connectDrizzle } from './db'
+import { insertActor } from './fixtures'
 import { createEventRepository } from '@/db/events-repository'
-import { events } from '@/db/schema'
+import { actors, events } from '@/db/schema'
 
 const { db, close } = connectDrizzle()
 const repository = createEventRepository(db)
@@ -16,17 +16,20 @@ const daysAgo = (days: number): Date => new Date(now - days * DAY)
 const from = daysAgo(40)
 const to = daysAgo(30)
 
+// Events are deleted before actors: the log points at them with a real foreign key now.
 beforeEach(async () => {
   await db.delete(events)
+  await db.delete(actors)
 })
 
 afterAll(async () => {
   await db.delete(events)
+  await db.delete(actors)
   await close()
 })
 
 async function actorSeenAt(started: Date): Promise<string> {
-  const actorId = randomUUID()
+  const actorId = await insertActor(db)
   await repository.record({ actorId, type: EVENT.SESSION_STARTED, occurredAt: started })
   return actorId
 }
