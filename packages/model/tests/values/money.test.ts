@@ -12,7 +12,9 @@ import {
   minorPerMajor,
   money,
   moneyCodec,
+  moneySchema,
   parseMoney,
+  priceSchema,
   subtractMoney,
 } from '#model/values/money'
 
@@ -198,5 +200,19 @@ describe('moneyCodec', () => {
       path: ['amount'],
       message: ERROR.INVALID_AMOUNT,
     })
+  })
+})
+
+describe('the ceiling of an amount', () => {
+  it('takes the largest amount a bigint column holds and refuses the next one', () => {
+    // The bound used to live only in the wire codec, so a Money built inside the server
+    // passed the schema and the database answered 22003. Found by the MOL-6 review.
+    expect(priceSchema.safeParse({ minor: INT8_MAX, currency: 'AMD' }).success).toBe(true)
+    expect(priceSchema.safeParse({ minor: INT8_MAX + 1n, currency: 'AMD' }).success).toBe(false)
+  })
+
+  it('bounds the negative side too — a difference is still a Money', () => {
+    expect(moneySchema.safeParse({ minor: -INT8_MAX, currency: 'AMD' }).success).toBe(true)
+    expect(moneySchema.safeParse({ minor: -INT8_MAX - 1n, currency: 'AMD' }).success).toBe(false)
   })
 })

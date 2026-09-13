@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { DomainError, ERROR, ISSUE } from '#model/support/errors'
+import type { ItemKind } from './item'
 import { PATCH_EMPTY, changesSomething } from '#model/support/patch'
 import { visibleLine } from '#model/support/text'
 
@@ -44,6 +45,28 @@ const verdictPatchFields = z.strictObject({
 
 export const verdictPatchSchema = verdictPatchFields.refine(changesSomething, PATCH_EMPTY)
 export type VerdictPatch = z.infer<typeof verdictPatchSchema>
+
+/**
+ * A product is rated as itself — the same milk in every shop, only the price differs — and
+ * a dish only where it is served. Two verdicts of one person on one product, one with a
+ * place and one without, are one opinion counted twice, and the uniqueness cannot see it:
+ * the rows differ in `place_id`.
+ *
+ * The database holds this since MOL-6; the rule lives here because the input alone cannot
+ * answer it — the kind belongs to the item, not to the verdict — and a use case that loads
+ * the item has to refuse before the insert does, or a form error arrives as a 500.
+ */
+export function placeMatchesKind(kind: ItemKind, placeId: string | null): boolean {
+  return (kind === 'product') === (placeId === null)
+}
+
+/** The input schema of a verdict, once the kind of the item it points at is known. */
+export function newVerdictSchemaFor(kind: ItemKind): z.ZodType<NewVerdict> {
+  return newVerdictSchema.refine((input) => placeMatchesKind(kind, input.placeId ?? null), {
+    error: ISSUE.VERDICT_PLACE_NOT_FOR_KIND,
+    path: ['placeId'],
+  })
+}
 
 export const VERDICT_LEVEL = {
   TAKE: 'take',
