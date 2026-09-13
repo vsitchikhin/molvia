@@ -108,7 +108,14 @@ export function addMoney(a: Money, b: Money): Money {
 
 export function subtractMoney(a: Money, b: Money): Money {
   sameCurrency(a, b)
-  return { minor: a.minor - b.minor, currency: a.currency }
+  const minor = a.minor - b.minor
+  // The same bound `addMoney` has kept from the start. Once `moneySchema` grew a ceiling,
+  // this was the only way left to build a Money the schema itself refuses — a difference
+  // of two extremes is twice the range.
+  if (minor > INT8_MAX || minor < -INT8_MAX) {
+    throw new DomainError(ERROR.INVALID_AMOUNT, String(minor))
+  }
+  return { minor, currency: a.currency }
 }
 
 export function compareMoney(a: Money, b: Money): number {

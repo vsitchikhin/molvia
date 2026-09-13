@@ -69,6 +69,7 @@ describe('the migration chain on a database that already holds rows', () => {
     const itemId = randomUUID()
     const blankItemId = randomUUID()
     const dishId = randomUUID()
+    const twiceRatedDishId = randomUUID()
     const keptPlaceId = randomUUID()
     const duplicatePlaceId = randomUUID()
     const tripId = randomUUID()
@@ -81,7 +82,8 @@ describe('the migration chain on a database that already holds rows', () => {
       insert into items (id, kind, name, search_key, default_unit)
       values (${itemId}, 'product', 'Молоко', 'moloko', 'l'),
              (${blankItemId}, 'product', 'Сыр', '   ', 'kg'),
-             (${dishId}, 'dish', 'Карбонара', 'karbonara', 'piece')
+             (${dishId}, 'dish', 'Карбонара', 'karbonara', 'piece'),
+             (${twiceRatedDishId}, 'dish', 'Хашлама', 'hashlama', 'piece')
     `
     await sql`
       insert into places (id, kind, name, country, city, created_at)
@@ -106,6 +108,14 @@ describe('the migration chain on a database that already holds rows', () => {
       insert into verdicts (id, actor_id, item_id, score)
       values (${randomUUID()}, ${actorId}, ${dishId}, 4)
     `
+    // The same dish rated in both cards of one venue: merging the places would push both
+    // verdicts onto the survivor and make them one triple, which the uniqueness refuses
+    // right there in the UPDATE.
+    await sql`
+      insert into verdicts (id, actor_id, item_id, place_id, score, rated_at)
+      values (${randomUUID()}, ${actorId}, ${twiceRatedDishId}, ${keptPlaceId}, 3, now() - interval '1 day'),
+             (${randomUUID()}, ${actorId}, ${twiceRatedDishId}, ${duplicatePlaceId}, 5, now())
+    `
     await sql`insert into events (actor_id, type) values (${actorId}, 'catalogue_viewed')`
     await sql`
       insert into search_picks (actor_id, query_key, item_id)
@@ -121,11 +131,14 @@ describe('the migration chain on a database that already holds rows', () => {
     expect(trip?.rate_scaled).toBeNull()
 
     const survivors = await sql<{ place_id: string | null; item_kind: string; score: number }[]>`
-      select place_id, item_kind, score from verdicts
+      select place_id, item_kind, score from verdicts order by item_kind
     `
-    // One verdict left: the earliest of the two votes on the product, without its place.
-    // The dish rated nowhere is gone.
-    expect(survivors).toEqual([{ place_id: null, item_kind: 'product', score: 2 }])
+    // Two verdicts left: the earliest vote on the product without its place, and the
+    // earliest of the two on the dish, on the surviving card. The dish rated nowhere is gone.
+    expect(survivors).toEqual([
+      { place_id: keptPlaceId, item_kind: 'dish', score: 3 },
+      { place_id: null, item_kind: 'product', score: 2 },
+    ])
 
     const places = await sql<{ id: string }[]>`select id from places`
     expect(places.map((row) => row.id)).toEqual([keptPlaceId])

@@ -66,6 +66,25 @@ DELETE FROM "verdicts" v USING ranked r WHERE v."id" = r."id" AND r.n > 1;--> st
 DELETE FROM "verdicts" v USING "items" i
 WHERE i."id" = v."item_id" AND i."kind" = 'dish' AND v."place_id" IS NULL;--> statement-breakpoint
 
+-- Слияние мест сталкивает и вердикты: блюдо, оценённое в двух карточках одного заведения,
+-- после перевода на старейшую станет одной и той же тройкой «владелец + позиция + место»,
+-- и уникальность ответит 23505 прямо на UPDATE. Поэтому вердикты сводятся по их будущему
+-- месту заранее — снова по старейшему голосу.
+WITH ranked AS (
+  SELECT "id", first_value("id") OVER (
+    PARTITION BY "kind", "country", btrim(lower(normalize("city", NFKC))), btrim(lower(normalize("name", NFKC)))
+    ORDER BY "created_at", "id"
+  ) AS keeper
+  FROM "places"
+), collapsed AS (
+  SELECT v."id", row_number() OVER (
+    PARTITION BY v."actor_id", v."item_id", coalesce(r.keeper, v."place_id")
+    ORDER BY v."rated_at", v."id"
+  ) AS n
+  FROM "verdicts" v LEFT JOIN ranked r ON r."id" = v."place_id"
+)
+DELETE FROM "verdicts" v USING collapsed c WHERE v."id" = c."id" AND c.n > 1;--> statement-breakpoint
+
 -- Дубли мест сливаются в старейшую карточку: сначала на неё переводятся походы и вердикты,
 -- потом лишние строки уходят. Это слияние, а не удаление данных: история цен сходится
 -- обратно в одно место, ради чего уникальность и переписывается.
@@ -132,10 +151,21 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;--> statement-breakpoint
+-- У вердикта своя функция: дата оценки приходит снаружи и может оказаться в будущем —
+-- база её не запрещает и запретить не может, CHECK не умеет звать now(). С обычным
+-- clock_timestamp() такая строка запиралась бы навсегда: любая правка ставила бы
+-- updated_at раньше rated_at и отбивалась бы constraint'ом. greatest() оставляет
+-- инвариант «переоценка не раньше оценки» верным и не делает строку неизменяемой.
+CREATE OR REPLACE FUNCTION "set_verdict_updated_at"() RETURNS trigger AS $$
+BEGIN
+  NEW."updated_at" = greatest(clock_timestamp(), NEW."rated_at");
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;--> statement-breakpoint
 -- WHEN: колонка отмечает, что строка изменилась, а не что по ней прошли. Пустой UPDATE —
 -- повтор запроса, правка отзыва на тот же текст, ремонтная миграция по всем вердиктам —
 -- иначе переписал бы «когда переоценили» всем подряд.
 CREATE TRIGGER "verdicts_touch_updated_at" BEFORE UPDATE ON "verdicts"
-  FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*) EXECUTE FUNCTION "set_updated_at"();--> statement-breakpoint
+  FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*) EXECUTE FUNCTION "set_verdict_updated_at"();--> statement-breakpoint
 CREATE TRIGGER "actors_touch_updated_at" BEFORE UPDATE ON "actors"
   FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*) EXECUTE FUNCTION "set_updated_at"();

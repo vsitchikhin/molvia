@@ -211,6 +211,15 @@ describe('the ceiling of an amount', () => {
     expect(priceSchema.safeParse({ minor: INT8_MAX + 1n, currency: 'AMD' }).success).toBe(false)
   })
 
+  it('refuses a difference wider than the range, the way addition does', () => {
+    // A difference of two extremes is twice the range, and once the schema grew a ceiling
+    // this was the only way left to build a Money the schema itself refuses.
+    expect(() => subtractMoney(money(-INT8_MAX, 'AMD'), money(INT8_MAX, 'AMD'))).toThrow(
+      DomainError,
+    )
+    expect(subtractMoney(money(INT8_MAX, 'AMD'), money(1n, 'AMD')).minor).toBe(INT8_MAX - 1n)
+  })
+
   it('bounds the negative side too — a difference is still a Money', () => {
     expect(moneySchema.safeParse({ minor: -INT8_MAX, currency: 'AMD' }).success).toBe(true)
     expect(moneySchema.safeParse({ minor: -INT8_MAX - 1n, currency: 'AMD' }).success).toBe(false)

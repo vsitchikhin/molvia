@@ -640,6 +640,25 @@ describe('a verdict knows what kind of thing it rates', () => {
     expect(row?.updatedAt.getTime()).toBeGreaterThanOrEqual(row?.ratedAt.getTime() ?? 0)
   })
 
+  it('re-rates a verdict whose rating is dated in the future', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+    const id = randomUUID()
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    await db
+      .insert(verdicts)
+      .values({ id, actorId, itemId, itemKind, score: 2, ratedAt: tomorrow, updatedAt: tomorrow })
+
+    // The database cannot forbid a future rating — a CHECK may not call now() — so the
+    // trigger must not lock the row: with a plain clock_timestamp() every later update would
+    // land before rated_at and be refused, and the verdict would be unchangeable forever.
+    await db.update(verdicts).set({ score: 5 }).where(eq(verdicts.id, id))
+
+    const [row] = await db.select().from(verdicts)
+    expect(row?.score).toBe(5)
+    expect(row?.updatedAt.getTime()).toBeGreaterThanOrEqual(row?.ratedAt.getTime() ?? 0)
+  })
+
   it('leaves updated_at alone when the update changes nothing', async () => {
     const actorId = await insertActor(db)
     const itemId = await insertItem(db)
