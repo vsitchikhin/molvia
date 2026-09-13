@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toSearchKey } from '#model/support/search-key'
+import { SEARCH_KEY_TABLES, toSearchKey } from '#model/support/search-key'
 import { visibleLine } from '#model/support/text'
 
 describe('toSearchKey', () => {
@@ -109,6 +109,26 @@ describe('toSearchKey', () => {
     }
   })
 
+  it('reaches a fixed point on runs that need more than a handful of passes', () => {
+    // The three-character enumeration cannot reach this: the shortest string that fails a
+    // capped loop is eight characters, and the depth grows with the length of the name.
+    // `с` + six `ч` becomes `s` + `chchchch`, and `shch → sh` takes one bite per pass.
+    for (const text of [
+      'xcqhchch',
+      'scqhchch',
+      'xчччч',
+      'сччччч',
+      'xцhчччw',
+      'сччччччч',
+      `с${'ч'.repeat(12)}`,
+      `с${'ч'.repeat(60)}`,
+      `x${'ч'.repeat(99)}`,
+    ]) {
+      const once = toSearchKey(text)
+      expect(toSearchKey(once), text).toBe(once)
+    }
+  })
+
   it('closes the counterexamples that the literal list missed', () => {
     for (const text of ['Bakkhus', 'ккх', 'цx', 'cck', 'qh', 'CX-5', 'Mazda CX-30', 'ццк']) {
       const once = toSearchKey(text)
@@ -135,6 +155,20 @@ describe('toSearchKey', () => {
     expect(toSearchKey('   ')).toBe('')
     expect(toSearchKey(' ')).toBe('')
     expect(toSearchKey('　 ')).toBe('')
+  })
+
+  it('agrees with visibleLine about what counts as content', () => {
+    // Four Hangul fillers are letters *and* default-ignorable. `visibleLine` strips them
+    // before asking whether anything is left, so «ㅤ!» is a valid name — while the key kept
+    // the filler and nothing else, and the same `visibleLine` refused it at 800. A valid
+    // name whose key its own schema rejects is the unbuildable item, arriving through the
+    // front door rather than through the empty key this fallback was built for.
+    for (const filler of ['ᅟ', 'ᅠ', 'ㅤ', 'ﾠ']) {
+      const name = `${filler}!`
+      expect(visibleLine(200).safeParse(name).success, name).toBe(true)
+      expect(toSearchKey(name)).toBe('!')
+      expect(visibleLine(800).safeParse(toSearchKey(name)).success, name).toBe(true)
+    }
   })
 
   it('tidies the fallback the same way it tidies a real key', () => {
@@ -320,6 +354,17 @@ describe('полнота таблиц', () => {
 
   it.each(ARMENIAN)('армянский: «%s» даёт «%s»', (letter, expected) => {
     expect(through(letter)).toBe(expected)
+  })
+
+  it('перечисляет ровно те буквы, что лежат в исходнике', () => {
+    // Walking the real keys, not this list: with a copied list a row *added* to the table
+    // stays invisible, and the table is frozen — an addition is a migration too.
+    expect(Object.keys(SEARCH_KEY_TABLES.cyrillic).sort()).toEqual(
+      CYRILLIC.map(([letter]) => letter).sort(),
+    )
+    expect(Object.keys(SEARCH_KEY_TABLES.armenian).sort()).toEqual(
+      ARMENIAN.map(([letter]) => letter).sort(),
+    )
   })
 
   it('не держит букву в обеих таблицах сразу', () => {

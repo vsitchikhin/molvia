@@ -172,12 +172,15 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   the whole query against a name's words: that put «Հաց Կաթ» and `Hats Kat` at distance 4
   while their keys are identical character for character — an artefact of the metric, not of
   the transliteration. How the per-word distances then combine across a multi-word query is
-  MOL-10's to settle, and two traps are already known. Taking the worst query word loses an
+  MOL-10's to settle, and three traps are already known. Taking the worst query word loses an
   item to a _correct_ extra word: «молоко ашхар пастеризованное» scores 11 against «Молоко
-  Ашхар 3.2%», and the extra word is the one printed on the package. And skipping words
-  shorter than two characters — which `Молоко 3,2%` needs, or its `3` and `2` join the
-  candidates of every numeric query — has to be conditional on longer words remaining, or a
-  query that is nothing but `3,2%` reduces to an empty set and outscores every real answer.
+  Ашхар 3.2%», and the extra word is the one printed on the package. Keeping every word lets
+  a query of nothing but digits match every name that carries them. And **dropping words
+  shorter than two characters is not the cure** — those words are the packaging size: it
+  makes «Молоко 1 л» and «Молоко 2 л» identical for ranking while «Молоко 1л» written
+  without the space stays distinct, so two shops' labels for one product rank by different
+  rules. The third way — let a short word contribute but never be the sole ground of a
+  match — is the one that has not been ruled out.
 - **What the user picked is remembered.** A query and the item chosen after it are stored
   and boost that pairing next time. No model, no image change, and it compounds from the
   first day — it is also the labelled set anything smarter would later need.

@@ -164,36 +164,48 @@ const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u
 // Doubling is a spelling fork of its own: «Анна», «Anna» and «Ана» are one name.
 const DOUBLED = /(\p{L})\1+/gu
 const SPACES = / +/g
-const FORMATTING = /\p{Cf}/gu
 const WHITESPACE = /\s+/gu
 
 /**
- * Folding is run to a fixed point, not once. A single pass is not idempotent, and that is
- * not cosmetic: `replaceAll` never re-reads what it just wrote, so a replacement and the
- * character before it can spell the pattern again — `kkh` gives `k` + `h`, which is `kh`
- * all over again. The expanding rules make it worse from the other side: `x → ks` produces
- * the input that `ck → k` has already walked past.
- *
- * It terminates. Every rule either shortens the string or keeps its length, and the
- * length-preserving ones (`q → k`, `w → v`, `y → i`, `qu → kv`) produce nothing any rule
- * matches, so they fire at most once. After that each pass strictly shortens or changes
- * nothing. Four passes cover every input reachable from these tables — the enumeration test
- * is what holds that claim, so a new rule needing a fifth turns it red instead of quietly
- * returning a string that is not a fixed point.
+ * Exactly what `visibleLine` calls blank before it asks whether anything is left. The two
+ * definitions of «content» have to be the same one, and they were not: four Hangul fillers
+ * — U+115F, U+1160, U+3164, U+FFA0 — are letters *and* default-ignorable, so «ㅤ!» passed
+ * `visibleLine` as a name while its key came out as the filler alone, which the very same
+ * `visibleLine` then refused. That is an item the server cannot parse back after building
+ * it — the failure this whole fallback exists to prevent, arriving through the front door.
  */
-const FOLD_PASSES = 4
+const IGNORABLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}⠀]/gu
 
+/**
+ * Folding runs to a fixed point, and the loop has no ceiling on purpose. A single pass is
+ * not idempotent: `replaceAll` never re-reads what it just wrote, so a replacement and the
+ * character before it can spell the pattern again — `kkh` gives `k` + `h`, which is `kh`
+ * all over again. Overlapping runs need one pass each: `с` + six `ч` gives `s` + `chchchch`,
+ * and `shch → sh` can only take one bite per pass. The depth grows with the length of the
+ * name, so no constant is the right constant — a ceiling would return a string that is not
+ * a fixed point, silently, which is the original defect one size up.
+ *
+ * It terminates, and the argument is this. `x → ks` is the only rule that lengthens, and
+ * nothing produces `x`, so it fires at most once per `x` in the input; the same holds for
+ * the length-preserving `q → k`, `w → v`, `y → i` and `qu → kv`, since nothing produces
+ * `q`, `w` or `y` either. After the first pass the string therefore never grows, and every
+ * pass that changes it makes it shorter. A finite string bounds a decreasing sequence.
+ *
+ * **A new rule must not produce its own left-hand side**, or this loop stops terminating.
+ * The property test that runs one more pass over adversarial inputs is what stands behind
+ * the claim; the three-character enumeration on its own never could, because a fixed point
+ * needs five characters to fail.
+ */
 function foldToFixedPoint(text: string): string {
   let folded = text
-  for (let pass = 0; pass < FOLD_PASSES; pass += 1) {
+  for (;;) {
     const before = folded
     for (const [from, to] of LATIN_FOLDS) {
       folded = folded.replaceAll(from, to)
     }
     folded = folded.replace(DOUBLED, '$1')
-    if (folded === before) break
+    if (folded === before) return folded
   }
-  return folded
 }
 
 /**
@@ -212,7 +224,7 @@ function foldToFixedPoint(text: string): string {
  * that writes an item has to validate the name before taking its key.
  */
 export function toSearchKey(text: string): string {
-  const plain = text.toLowerCase().normalize('NFD').replace(MARK, '')
+  const plain = text.toLowerCase().normalize('NFD').replace(MARK, '').replace(IGNORABLE, '')
 
   let joined = plain
   for (const [from, to] of ARMENIAN_DIGRAPHS) {
@@ -229,7 +241,20 @@ export function toSearchKey(text: string): string {
 
   // Nothing survived: the name was punctuation only, which `visibleLine` lets through.
   // The fallback still goes through the same tidying as the main path — otherwise this one
-  // key in the whole catalogue would carry zero-width characters and uncollapsed runs of
-  // whitespace, and sit in the column under different rules than every row beside it.
-  return plain.replace(FORMATTING, '').replace(WHITESPACE, ' ').trim()
+  // key in the whole catalogue would carry uncollapsed runs of whitespace and sit in the
+  // column under different rules than every row beside it.
+  return plain.replace(WHITESPACE, ' ').trim()
 }
+
+/**
+ * Exported for exactly one reason: the tables are frozen, so an edit to them is a migration
+ * with a recompute, and the test that holds them has to walk the real keys instead of a list
+ * copied beside it. With a copied list a row *added* to the source is invisible — only a
+ * changed or deleted one shows. Nothing in the applications reads this.
+ */
+export const SEARCH_KEY_TABLES = Object.freeze({
+  cyrillic: CYRILLIC,
+  armenian: ARMENIAN,
+  latinFolds: LATIN_FOLDS,
+  armenianDigraphs: ARMENIAN_DIGRAPHS,
+})

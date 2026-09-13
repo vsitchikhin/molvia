@@ -25,32 +25,28 @@ function levenshtein(a: string, b: string): number {
 }
 
 /**
- * Words shorter than two characters are dropped — `moloko ashar 3 2` must not offer its
- * `3` to every numeric query — but only while longer ones remain. A query that is nothing
- * but `3,2%` would otherwise reduce to an empty list, and `Math.max()` of nothing is
- * -Infinity: a perfect match against the entire catalogue, better than any real answer.
- */
-function words(key: string): readonly string[] {
-  const all = key.split(' ')
-  const long = all.filter((word) => word.length >= 2)
-  return long.length > 0 ? long : all
-}
-
-/**
  * Every word of the query against every word of the name. Measured the other way round —
  * the whole query against the words of the name — «Հաց Կաթ» and «Hats Kat» came out at
  * distance 4 while holding identical keys; that is an artefact of the metric, not of the
  * transliteration.
  *
- * Taking the worst query word is the strict reading, and it has a known cost: a correct
+ * **No word is dropped for being short.** An earlier version skipped words under two
+ * characters so that `moloko ashar 3 2` would not offer its `3` to every numeric query —
+ * and that quietly erased the packaging size, which is the one thing those words carry:
+ * «Молоко 1 л» and «Молоко 2 л» came out identical, while «Молоко 1л» written without the
+ * space did not. Two positions in the catalogue, indistinguishable for ranking, depending
+ * on how a shop printed the label.
+ *
+ * Taking the worst query word is the strict reading, and it too has a known cost: a correct
  * extra word loses the item, because «молоко ашхар пастеризованное» is what the package
- * says and the catalogue holds «Молоко Ашхар 3.2%». How the per-word distances combine is
- * MOL-10's decision, not this corpus's — what the corpus pins is the transliteration.
+ * says and the catalogue holds «Молоко Ашхар 3.2%». Neither question belongs to this file:
+ * how the per-word distances combine is MOL-10's to settle, and what the corpus pins is the
+ * transliteration. Both traps are written down in §8.1 of the requirements instead.
  */
 function distance(query: string, name: string): number {
-  const parts = words(name)
+  const parts = name.split(' ')
   return Math.max(
-    ...words(query).map((word) => Math.min(...parts.map((part) => levenshtein(word, part)))),
+    ...query.split(' ').map((word) => Math.min(...parts.map((part) => levenshtein(word, part)))),
   )
 }
 
@@ -219,12 +215,14 @@ describe('многословный запрос', () => {
     expect(distance(toSearchKey('Hats Kat'), toSearchKey('Հաց Կաթ'))).toBe(0)
   })
 
-  it('не даёт запросу из одних коротких слов совпасть со всем подряд', () => {
-    // -Infinity would beat every real answer. The rule that drops short words has to be
-    // conditional on longer ones remaining, and this is what says so.
-    const key = toSearchKey('3,2%')
-    expect(key).toBe('3 2')
-    expect(distance(key, toSearchKey('Молоко Ашхар 3.2%'))).toBeGreaterThan(0)
+  it('оставляет размер фасовки различимым — и показывает цену этого', () => {
+    // The reason no word is dropped for being short: those words are the packaging size.
+    expect(distance(toSearchKey('Молоко 1 л'), toSearchKey('Молоко 2 л'))).toBe(1)
+
+    // The price of keeping them: a query of nothing but digits matches every name that
+    // carries them. A trap for MOL-10, recorded rather than papered over here — the cure
+    // that dropped short words was worse than the disease.
+    expect(distance(toSearchKey('3,2%'), toSearchKey('Молоко Ашхар 3.2%'))).toBe(0)
   })
 
   it('теряет позицию на верном лишнем слове — цена строгого прочтения', () => {
@@ -233,6 +231,25 @@ describe('многословный запрос', () => {
     const name = toSearchKey('Молоко Ашхар 3.2%')
     expect(distance(toSearchKey('молоко ашхар'), name)).toBe(0)
     expect(distance(toSearchKey('молоко ашхар пастеризованное'), name)).toBeGreaterThan(ACCEPTED)
+  })
+})
+
+describe('повороты ранжирования, о которых MOL-10 и MOL-14 должны знать', () => {
+  it('одна опечатка рядом с такой же буквой уводит к чужой позиции', () => {
+    // «Сааар» is one substitution away from «Сахар». The repeat collapse then turns it into
+    // `sar`, and `sar` is closer to «Сыр» than to the name it came from. Not a limit of the
+    // key — a turn in the ranking, and it stays invisible unless it is written down.
+    const typo = toSearchKey('Сааар')
+    expect(distance(typo, toSearchKey('Сахар'))).toBe(2)
+    expect(distance(typo, toSearchKey('Сыр'))).toBe(1)
+  })
+
+  it('латинское CX и кириллическое СХ расходятся на весь бюджет', () => {
+    // A fork the fold creates rather than closes: `c`+`x` goes through `x → ks`, «с»+«х»
+    // through the table into `sh`. Two apart — inside the budget with nothing to spare,
+    // the same shape as «Кока-кола»/`Coca-Cola`. Harmless for groceries, not for a dish or
+    // a brand written in Latin.
+    expect(distance(toSearchKey('Mazda CX-30'), toSearchKey('Мазда СХ-30'))).toBe(2)
   })
 })
 
