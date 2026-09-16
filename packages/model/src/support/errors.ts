@@ -19,6 +19,18 @@ export const ERROR = {
    * first visit after a timeout.
    */
   CONFLICT: 'error.conflict',
+  /**
+   * The request did not name a subject the server could find. Added in MOL-8, and the line
+   * between it and CONFLICT is worth keeping: CONFLICT is about *other rows of the table*,
+   * which the domain cannot see; NO_ACTOR is about a subject that is absent altogether,
+   * which neither the domain nor the database can know — it is a fact of the request.
+   *
+   * Three cases answer with it and deliberately look identical: no header at all, a header
+   * that is not a uuid, and a well-formed uuid with no row behind it. A difference between
+   * them is how someone else's identifiers get guessed by comparing replies. It is also what
+   * the first visit answers when the invite code is missing or wrong.
+   */
+  NO_ACTOR: 'error.no_actor',
   INTERNAL: 'error.internal',
 } as const
 
