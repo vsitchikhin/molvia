@@ -1,0 +1,79 @@
+import { randomUUID } from 'node:crypto'
+import { and, eq } from 'drizzle-orm'
+import { tripSchema } from '@molvia/model'
+import type { Currency, ExchangeRate, NewTrip, Trip } from '@molvia/model'
+import { rateFrom, rateTo } from './columns'
+import { translateFailures } from './failure'
+import type { Conn } from './index'
+import { theRow } from './rows'
+import { trips } from './schema'
+
+export interface TripRepository {
+  /**
+   * The currency is a snapshot of the person's setting and the rate a snapshot of the
+   * moment: neither is looked up again later, or last month's total would move with
+   * today's rate. Whether that rate is plausible — and that its `asOf` is not from the
+   * future — belongs to the use case, which is the only place with a clock.
+   */
+  start(
+    actorId: string,
+    input: NewTrip,
+    currency: Currency,
+    rate: ExchangeRate | null,
+  ): Promise<Trip>
+  byId(id: string, actorId: string): Promise<Trip | null>
+  finish(id: string, actorId: string, at: Date): Promise<Trip | null>
+}
+
+type TripRow = typeof trips.$inferSelect
+
+function toTrip(row: TripRow): Trip {
+  return tripSchema.parse({
+    id: row.id,
+    actorId: row.actorId,
+    placeId: row.placeId,
+    currency: row.currency,
+    rate: rateFrom(row),
+    startedAt: row.startedAt,
+    finishedAt: row.finishedAt,
+  })
+}
+
+/** A trip belongs to one person, so the owner is a condition and never a later check. */
+function ownedBy(id: string, actorId: string) {
+  return and(eq(trips.id, id), eq(trips.actorId, actorId))
+}
+
+export function createTripRepository(db: Conn): TripRepository {
+  return {
+    async start(actorId, input, currency, rate) {
+      return translateFailures(async () => {
+        const [row] = await db
+          .insert(trips)
+          .values({ id: randomUUID(), actorId, placeId: input.placeId, currency, ...rateTo(rate) })
+          .returning()
+        return toTrip(theRow(row, 'trips'))
+      })
+    },
+
+    async byId(id, actorId) {
+      const [row] = await db.select().from(trips).where(ownedBy(id, actorId)).limit(1)
+      return row ? toTrip(row) : null
+    },
+
+    async finish(id, actorId, at) {
+      // Someone else's trip and a trip that never existed answer the same `null`: telling
+      // them apart is how an identifier gets guessed by the difference in the reply.
+      //
+      // Finishing before the start is refused by `trips_finished_after_start` and is left to
+      // fall through as a 500 on purpose — the moment comes from the server, so a trip that
+      // ends before it began is a defect here, not something to report to a client.
+      const [row] = await db
+        .update(trips)
+        .set({ finishedAt: at })
+        .where(ownedBy(id, actorId))
+        .returning()
+      return row ? toTrip(row) : null
+    },
+  }
+}

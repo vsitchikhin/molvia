@@ -3,10 +3,21 @@ import { DomainError, ERROR } from '@molvia/model'
 /** A row pointed at something that is not there. */
 const FOREIGN_KEY_VIOLATION = '23503'
 
-/** `postgres` throws its own error class; only the code is ever looked at here. */
+/**
+ * `postgres` throws its own error class and drizzle wraps it: `DrizzleQueryError` carries the
+ * query and its parameters, with the driver error underneath in `cause`. So the chain is
+ * walked rather than the top level read — measured, not assumed. Looking only at the wrapper
+ * made every foreign-key violation a 500, which is precisely what this file exists to stop.
+ */
 function codeOf(error: unknown): string | undefined {
-  if (typeof error !== 'object' || error === null || !('code' in error)) return undefined
-  return typeof error.code === 'string' ? error.code : undefined
+  let current: unknown = error
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (typeof current !== 'object' || current === null) return undefined
+    if ('code' in current && typeof current.code === 'string') return current.code
+    if (!('cause' in current)) return undefined
+    current = current.cause
+  }
+  return undefined
 }
 
 /**

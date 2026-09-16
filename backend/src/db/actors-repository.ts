@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { actorSchema } from '@molvia/model'
 import type { Actor, ActorPatch, NewActor } from '@molvia/model'
 import type { Conn } from './index'
+import { theRow } from './rows'
 import { actors } from './schema'
 
 export interface ActorRepository {
@@ -21,12 +22,6 @@ function toActor(row: typeof actors.$inferSelect): Actor {
   return actorSchema.parse(row)
 }
 
-/** `RETURNING` on a successful write always yields the row; its absence is a defect here. */
-function theRow(row: typeof actors.$inferSelect | undefined): typeof actors.$inferSelect {
-  if (row === undefined) throw new Error('a write to actors returned no row')
-  return row
-}
-
 // A repository is a function over a connection, not a module-level singleton: the
 // integration tests point it at their own database, and the composition point in
 // server.ts points it at the real one.
@@ -37,7 +32,7 @@ export function createActorRepository(db: Conn): ActorRepository {
         .insert(actors)
         .values({ id, ...input })
         .returning()
-      return toActor(theRow(row))
+      return toActor(theRow(row, 'actors'))
     },
 
     async byId(id) {

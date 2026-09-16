@@ -5,6 +5,7 @@ import type { Item, NewItem } from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
+import { theRow } from './rows'
 import { itemBarcodes, items } from './schema'
 
 export interface ItemRepository {
@@ -33,12 +34,6 @@ function toItem(row: ItemRow, barcodes: readonly string[]): Item {
     barcodes,
     typicalQuantity: quantityFrom(row.typicalQtyMilli, row.typicalQtyUnit),
   })
-}
-
-/** `RETURNING` on a successful write always yields the row; its absence is a defect here. */
-function theRow(row: ItemRow | undefined): ItemRow {
-  if (row === undefined) throw new Error('a write to items returned no row')
-  return row
 }
 
 export function createItemRepository(db: Conn): ItemRepository {
@@ -106,7 +101,7 @@ export function createItemRepository(db: Conn): ItemRepository {
           }
 
           // Sorted the way a later read returns them, so create and read agree.
-          return toItem(theRow(row), [...input.barcodes].sort())
+          return toItem(theRow(row, 'items'), [...input.barcodes].sort())
         }),
       )
     },
