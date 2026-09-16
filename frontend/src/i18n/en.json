@@ -6,6 +6,13 @@
     "error": "The server did not answer",
     "retry": "Try again"
   },
+  "identity": {
+    "lost_title": "This device's data is out of reach",
+    "lost_body": "The browser seems to have cleared its storage. Your earlier trips and ratings still exist, but nothing on this device can open them any more — we are starting over.",
+    "lost_action": "Got it",
+    "uninvited_title": "An invite link is needed",
+    "uninvited_body": "Open the app through the link you were sent: it carries a code, and without it nothing can be saved."
+  },
   "home": {
     "title": "What to buy",
     "empty": "Nothing rated yet. Start with your first purchase",
@@ -18,6 +25,7 @@
     "currency_mismatch": "Amounts in different currencies cannot be added",
     "unit_mismatch": "Prices in different units cannot be compared",
     "not_found": "Not found",
+    "no_actor": "This device is no longer recognised",
     "internal": "Something went wrong"
   }
 }
