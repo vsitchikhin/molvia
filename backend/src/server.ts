@@ -4,12 +4,19 @@ import { DomainError, ERROR, ISSUE, errorResponseSchema, isWireCode } from '@mol
 import type { ErrorCode, ErrorResponse } from '@molvia/model'
 import { InvalidBody } from '@/routes/body'
 import { healthRoutes } from '@/routes/health'
-import { databaseIsReachable } from '@/db'
+import { actorRoutes } from '@/routes/actors'
+import { createActor } from '@/usecases/create-actor'
+import { getActor } from '@/usecases/get-actor'
+import { createActorRepository } from '@/db/actors-repository'
+import { databaseIsReachable, getDb } from '@/db'
 
 // The one place where a domain error becomes an HTTP status. Routes never map errors
 // themselves, so a code cannot mean 400 in one place and 404 in another.
 const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.NOT_FOUND]: 404,
+  // Not 400: the request is well formed, it simply names no subject the server can find.
+  // The PWA reads exactly this to decide that its stored identity is gone (MOL-8, Р-4).
+  [ERROR.NO_ACTOR]: 401,
 }
 
 // The handler answers with the contract the client parses, so it checks its own reply
@@ -40,9 +47,17 @@ export function buildServer(): FastifyInstance {
     return reply.status(error.statusCode ?? 500).send({ code: ERROR.INTERNAL })
   })
 
-  // The composition point: routes are handed what they need instead of importing it.
+  // The composition point: routes are handed what they need instead of importing it. Binding
+  // the repository into the use cases happens here and nowhere else — a route that could
+  // name a repository would be a route that could reach the database.
   app.register((instance, _options, done) => {
+    const actors = createActorRepository(getDb())
+
     healthRoutes(instance, { databaseIsReachable })
+    actorRoutes(instance, {
+      create: () => createActor(actors),
+      byId: (id) => getActor(actors, id),
+    })
     done()
   })
 
