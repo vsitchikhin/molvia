@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actorPatchSchema, actorSchema } from '#model/entities/actor'
+import { actorPatchSchema, actorSchema, newActorSchema } from '#model/entities/actor'
 
 const actor = {
   id: '3f2b1c6e-9a4d-4c1b-8f7e-2d5a6b8c9e01',
@@ -30,6 +30,37 @@ describe('actorSchema', () => {
 
   it('rejects an empty city rather than storing a blank one', () => {
     expect(() => actorSchema.parse({ ...actor, city: '   ' })).toThrow()
+  })
+})
+
+describe('newActorSchema', () => {
+  const settings = {
+    country: 'AM' as const,
+    city: 'Гюмри',
+    spendCurrency: 'AMD' as const,
+    incomeCurrency: 'RUB' as const,
+  }
+
+  it('takes the four settings a person arrives with', () => {
+    expect(newActorSchema.parse(settings)).toEqual(settings)
+  })
+
+  it('has no place for an id — the device brings it, the server writes it', () => {
+    expect(() => newActorSchema.parse({ ...settings, id: actor.id })).toThrow()
+  })
+
+  it('refuses the timestamps the server owns', () => {
+    expect(() => newActorSchema.parse({ ...settings, createdAt: new Date() })).toThrow()
+    expect(() => newActorSchema.parse({ ...settings, updatedAt: new Date() })).toThrow()
+  })
+
+  it('refuses a half-filled screen: all four travel together or none do', () => {
+    for (const missing of ['country', 'city', 'spendCurrency', 'incomeCurrency'] as const) {
+      const partial = Object.fromEntries(
+        Object.entries(settings).filter(([field]) => field !== missing),
+      )
+      expect(() => newActorSchema.parse(partial)).toThrow()
+    }
   })
 })
 

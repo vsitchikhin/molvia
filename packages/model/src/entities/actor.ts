@@ -14,6 +14,20 @@ export const actorSchema = z.object({
 })
 export type Actor = z.infer<typeof actorSchema>
 
+/**
+ * The four settings a person arrives with. No `id` here on purpose: the device brings it
+ * (MOL-8) and the server writes it, so a client cannot name its own identifier — or
+ * someone else's. Strict for the reason the patch is strict: `createdAt` and `updatedAt`
+ * belong to the server, and a shape that merely ignored them would accept the attempt.
+ */
+export const newActorSchema = z.strictObject({
+  country: countrySchema,
+  city: citySchema,
+  spendCurrency: currencySchema,
+  incomeCurrency: currencySchema,
+})
+export type NewActor = z.infer<typeof newActorSchema>
+
 const actorPatchFields = z.strictObject({
   country: countrySchema.optional(),
   city: citySchema.optional(),
