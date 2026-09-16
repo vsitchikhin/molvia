@@ -7,7 +7,12 @@ import { idOrNull, theRow } from './rows'
 import { actors } from './schema'
 
 export interface ActorRepository {
-  /** The identifier comes from the device (MOL-8); `actors.id` has no default on purpose. */
+  /**
+   * The identifier is issued by the use case, not by this file and not by the device
+   * (MOL-8): it is the only proof of identity the release has, so a client allowed to name
+   * its own could name someone else's. `actors.id` has no default for the same reason —
+   * a database default would be a second place that decides.
+   */
   create(id: string, input: NewActor): Promise<Actor>
   byId(id: string): Promise<Actor | null>
   update(id: string, patch: ActorPatch): Promise<Actor | null>
@@ -29,9 +34,11 @@ function toActor(row: typeof actors.$inferSelect): Actor {
 export function createActorRepository(db: Conn): ActorRepository {
   return {
     async create(id, input) {
-      // The identifier comes from the device, so a repeat is an ordinary day rather than a
-      // defect: a retry after a timeout, a second tab, a restart carrying the same id.
-      // Unwrapped, `23505` went up untouched and became a 500.
+      // A repeat is vanishingly unlikely now that the identifier is a fresh `randomUUID()`
+      // from the use case rather than something a device brought back after a timeout — but
+      // the translation stays: unwrapped, `23505` went up untouched and became a 500, and
+      // the other unique constraint this repository can meet (a barcode already owned by
+      // another item) is an ordinary day rather than a defect.
       return translateFailures(async () => {
         const [row] = await db
           .insert(actors)

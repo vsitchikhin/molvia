@@ -60,12 +60,18 @@ verdicts, not an event — anything a domain table already knows must never be d
 into the log. Nothing updates or deletes from it, the gate queries are its only readers,
 and each is pinned by an integration test, boundary days included.
 
-One consequence of MOL-6 is open and worth knowing before it is met: the log now points at
-`actors` with a real foreign key, so an actor with any event cannot be deleted — and every
-actor has one, `session_started` is written on the first visit. When «delete my account»
-arrives, either the log outlives the actor (`actor_id` becomes nullable, and the gate
-queries lose the half they measure by) or that deletion becomes the single written
-exception to append-only. It is a product decision, not a schema detail.
+**The log has no writer yet, and that is deliberate.** MOL-8 was going to record
+`session_started` on the first visit, and the promise was withdrawn when it was examined:
+written once, its timestamp is `actors.created_at` and the row duplicates what a domain
+table already knows — the very thing the rule above forbids; written on every launch, it
+answers a question no threshold asks, since 0.2 is counted over verdicts and 0.3 over
+`catalogue_viewed`. The first writer is MOL-12, with the event the gate actually reads.
+
+One consequence of MOL-6 is open and worth knowing before it is met: the log points at
+`actors` with a real foreign key, so an actor that has events cannot be deleted. When
+«delete my account» arrives, either the log outlives the actor (`actor_id` becomes nullable,
+and the gate queries lose the half they measure by) or that deletion becomes the single
+written exception to append-only. It is a product decision, not a schema detail.
 
 ## Money
 
