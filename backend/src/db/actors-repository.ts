@@ -34,11 +34,11 @@ function toActor(row: typeof actors.$inferSelect): Actor {
 export function createActorRepository(db: Conn): ActorRepository {
   return {
     async create(id, input) {
-      // A repeat is vanishingly unlikely now that the identifier is a fresh `randomUUID()`
-      // from the use case rather than something a device brought back after a timeout — but
-      // the translation stays: unwrapped, `23505` went up untouched and became a 500, and
-      // the other unique constraint this repository can meet (a barcode already owned by
-      // another item) is an ordinary day rather than a defect.
+      // The identifier is a fresh `randomUUID()` from the use case, so a collision here is
+      // vanishingly unlikely — `actors` has no unique constraint but its primary key. The
+      // wrapper stays because the alternative is a 500 with no name on it: unwrapped,
+      // `23505` went up untouched, and a repeat would look like a broken server rather than
+      // a refused write.
       return translateFailures(async () => {
         const [row] = await db
           .insert(actors)

@@ -13,11 +13,17 @@ function clientAnswering(status: number, body: unknown) {
   return createClient({ baseUrl: 'http://api', fetch })
 }
 
+/** Raw bytes rather than `JSON.stringify` — what a proxy, a gateway or a cut-off reply sends. */
+function clientServing(body: BodyInit | null, init: ResponseInit = {}) {
+  return createClient({
+    baseUrl: 'http://api',
+    fetch: () => Promise.resolve(new Response(body, init)),
+  })
+}
+
 /** Keeps what the client actually sent, which is the half a mocked reply cannot show. */
 function clientRecording(options: { actorId?: () => string | null } = {}) {
   const calls: { url: string; method: string; headers: Headers }[] = []
-  // The client always calls with a string url; `Request` would stringify to «[object
-  // Object]» and quietly compare against nothing, so it is narrowed rather than coerced.
   const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     calls.push({
       url: input instanceof URL ? input.href : typeof input === 'string' ? input : input.url,
@@ -72,18 +78,38 @@ describe('everything the client throws is an ApiError', () => {
     expect(await codeOf(client.health())).toBe(ISSUE.BODY_INVALID)
   })
 
-  it('and telling «not found» apart from «the server broke» without reading a message', async () => {
-    const client = clientAnswering(404, '<html>nginx</html>')
-    expect(await codeOf(client.health())).toBe(ERROR.NOT_FOUND)
-    const broken = clientAnswering(500, '<html>nginx</html>')
-    expect(await codeOf(broken.health())).toBe(ERROR.INTERNAL)
+  it('including a body that is not JSON at all: a proxy page, empty, or cut off', async () => {
+    // The earlier test for this corner passed a string through `JSON.stringify`, so what
+    // reached the client was valid JSON. Real bytes are not, `.json()` throws, and every
+    // line below it — including the one that tells a dead identity from a broken server —
+    // was skipped entirely.
+    const proxy = clientServing('<html>\n<head><title>401</title></head>\n</html>', {
+      status: 401,
+      headers: { 'content-type': 'text/html' },
+    })
+    expect(await codeOf(proxy.me())).toBe(ISSUE.RESPONSE_INVALID)
+
+    const empty = clientServing(null, { status: 401 })
+    expect(await codeOf(empty.me())).toBe(ISSUE.RESPONSE_INVALID)
+
+    const truncated = clientServing('', { status: 200, headers: { 'content-type': 'text/plain' } })
+    expect(await codeOf(truncated.me())).toBe(ISSUE.RESPONSE_INVALID)
+
+    const gateway = clientServing('<html>502 Bad Gateway</html>', { status: 502 })
+    expect(await codeOf(gateway.health())).toBe(ISSUE.RESPONSE_INVALID)
   })
 
-  it('and reading a bodyless 401 as «no actor», which is what the PWA acts on', async () => {
-    // The identity is gone — cleared storage, a recreated database — and the PWA decides to
-    // start a new one from exactly this code. A bare 500 would send it down the wrong path.
-    const client = clientAnswering(401, '<html>nginx</html>')
-    expect(await codeOf(client.me())).toBe(ERROR.NO_ACTOR)
+  it('and a dropped connection, which is fetch’s own TypeError', async () => {
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: () => Promise.reject(new TypeError('Failed to fetch')),
+    })
+    expect(await codeOf(client.me())).toBe(ERROR.INTERNAL)
+  })
+
+  it('and telling «not found» apart from the rest without reading a message', async () => {
+    const client = clientServing('<html>nginx</html>', { status: 404 })
+    expect(await codeOf(client.me())).toBe(ERROR.NOT_FOUND)
   })
 
   it('and passes a good answer through', async () => {
@@ -93,6 +119,24 @@ describe('everything the client throws is an ApiError', () => {
       version: '1.0.0',
       database: 'up',
     })
+  })
+})
+
+describe('a 401 only means «this identity is gone» when the API says so', () => {
+  it('reads NO_ACTOR from the body, which is the one thing that can say it', async () => {
+    const client = clientAnswering(401, { code: ERROR.NO_ACTOR })
+    expect(await codeOf(client.me())).toBe(ERROR.NO_ACTOR)
+  })
+
+  it('refuses to infer it from a 401 nobody in this project sent', async () => {
+    // Basic auth on Caddy, an API gateway, a captive portal on shop wifi: none of them know
+    // what an actor is. The PWA acts on NO_ACTOR by replacing the identity, so inferring it
+    // from a status alone hands a stranger's 401 the power to end someone's data.
+    const proxy = clientAnswering(401, { error: 'unauthorized' })
+    expect(await codeOf(proxy.me())).toBe(ISSUE.RESPONSE_INVALID)
+
+    const bare = clientServing(null, { status: 401 })
+    expect(await codeOf(bare.me())).toBe(ISSUE.RESPONSE_INVALID)
   })
 })
 
@@ -124,6 +168,19 @@ describe('the identity the client speaks for', () => {
 
     expect(calls[0]?.headers.has(ACTOR_HEADER)).toBe(false)
   })
+
+  it('is refused rather than crashing the call when it cannot become a header', async () => {
+    // `localStorage` is a string bucket anyone can write to. A value with a line break used
+    // to take the whole call down as a TypeError from `Headers.set`, which the store reads
+    // as «the server did not answer» — a value that cannot be sent names no subject.
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: () => Promise.resolve(new Response(JSON.stringify(actorWire), { status: 200 })),
+      actorId: () => 'abc\r\nX-Molvia-Actor: 9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f',
+    })
+
+    expect(await codeOf(client.me())).toBe(ERROR.NO_ACTOR)
+  })
 })
 
 describe('the first visit', () => {
@@ -145,6 +202,15 @@ describe('the first visit', () => {
     expect(actor.createdAt).toBeInstanceOf(Date)
     expect(actor.createdAt.toISOString()).toBe(actorWire.createdAt)
     expect(actor.spendCurrency).toBe('AMD')
+  })
+
+  it('refuses a code that cannot be sent, instead of throwing a TypeError', async () => {
+    // molvia.com/?c=код — a code that came out of a keyboard rather than out of
+    // `openssl rand -hex`. The door would refuse it anyway; what matters is that the person
+    // is told it is the link, not the server.
+    const { client } = clientRecording()
+
+    expect(await codeOf(client.createActor('приглашение'))).toBe(ERROR.NO_ACTOR)
   })
 
   it('refuses an answer whose shape is not the contract', async () => {

@@ -13,6 +13,10 @@ import type { Actor, HealthResponse, WireCode } from '@molvia/model'
 /**
  * What the API answered with. Not a DomainError: the wire carries shape errors too — a
  * malformed body is the commonest failure there is — and those are not domain rules.
+ *
+ * Everything this module throws is one of these, and the claim is load-bearing: the PWA
+ * decides that its identity is gone by reading `error.code`, so anything escaping as a
+ * `SyntaxError` or a `TypeError` is silently read as «the server did not answer».
  */
 export class ApiError extends Error {
   readonly code: WireCode
@@ -24,10 +28,26 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Codes that may be inferred from a status alone, when the body carries nothing usable.
+ *
+ * **401 is deliberately absent.** A 401 is the one status the PWA acts on destructively —
+ * it means «this identity is gone», and the store replaces it. Anything in front of the API
+ * can answer 401 without knowing what an actor is: basic auth on Caddy, an API gateway, a
+ * captive portal on shop wifi. Only a body that parses as this project's own error shape
+ * may say NO_ACTOR; a bare 401 is reported as an answer that did not match the contract.
+ */
 const CODE_BY_STATUS: Readonly<Record<number, WireCode>> = Object.freeze({
-  401: ERROR.NO_ACTOR,
   404: ERROR.NOT_FOUND,
 })
+
+/**
+ * A header value has to survive `Headers.set`, which throws a TypeError on anything outside
+ * Latin-1 or containing a line break. Both values here come from outside the code — the
+ * identifier from storage anyone can write to, the invite code from a link someone typed —
+ * so they are checked rather than trusted.
+ */
+const HEADER_SAFE = /^[ -~]+$/
 
 export interface ClientOptions {
   readonly baseUrl: string
@@ -60,23 +80,48 @@ export function createClient({
   fetch = globalThis.fetch,
   actorId,
 }: ClientOptions): MolviaClient {
+  function header(name: string, value: string, headers: Headers): void {
+    // A stored identifier with a newline in it would otherwise take the whole call down as
+    // a TypeError from `Headers.set` — and a value that cannot be sent names no subject, so
+    // it is refused with the code that means exactly that.
+    if (!HEADER_SAFE.test(value)) throw new ApiError(ERROR.NO_ACTOR, name)
+    headers.set(name, value)
+  }
+
   async function request<T>(path: string, schema: ZodType<T>, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers)
     const id = actorId?.()
     // Set only when there is one: `X-Molvia-Actor: null` is the string «null», which the
     // server refuses for a reason the caller cannot act on.
-    if (id) headers.set(ACTOR_HEADER, id)
+    if (id) header(ACTOR_HEADER, id, headers)
 
-    const response = await fetch(`${baseUrl}${path}`, { ...init, headers })
-    const body: unknown = await response.json()
+    let response: Response
+    try {
+      response = await fetch(`${baseUrl}${path}`, { ...init, headers })
+    } catch (error) {
+      // A dropped connection is `fetch`'s own TypeError. Whether that reads as «offline» or
+      // as «broken» is the caller's call — what matters here is that it arrives as an
+      // ApiError like everything else.
+      throw new ApiError(ERROR.INTERNAL, error instanceof Error ? error.message : 'transport')
+    }
+
+    // A proxy page, an empty body, a reply cut off mid-flight: `.json()` throws, and every
+    // line below — including the one that tells a dead identity from a broken server — used
+    // to be skipped entirely.
+    let body: unknown
+    try {
+      body = await response.json()
+    } catch {
+      body = undefined
+    }
 
     if (!response.ok) {
       const failure = errorResponseSchema.safeParse(body)
       if (failure.success) throw new ApiError(failure.data.code, failure.data.details)
-      // The body says nothing usable, so the status is all there is — and «not found» and
-      // «no actor» are codes the registry has, not something to be read back out of a message.
+      // The body says nothing this project would recognise, so only the status is left —
+      // and it is never allowed to mean NO_ACTOR (see CODE_BY_STATUS).
       throw new ApiError(
-        CODE_BY_STATUS[response.status] ?? ERROR.INTERNAL,
+        CODE_BY_STATUS[response.status] ?? ISSUE.RESPONSE_INVALID,
         `HTTP ${String(response.status)}`,
       )
     }
@@ -94,11 +139,14 @@ export function createClient({
 
     // The entity arrives with its timestamps as ISO strings and leaves this call as the
     // domain object: the codec is the only place that border is crossed.
-    createActor: (inviteCode) =>
-      request('/actors', actorCodec, {
-        method: 'POST',
-        headers: { [INVITE_HEADER]: inviteCode },
-      }),
+    // `async` so that a refused code arrives as a rejection rather than a synchronous
+    // throw: a caller writing `createActor(code).catch(…)` would never see the latter, and
+    // «everything this module throws is an ApiError» has to mean «through the promise».
+    createActor: async (inviteCode) => {
+      const headers = new Headers()
+      header(INVITE_HEADER, inviteCode, headers)
+      return request('/actors', actorCodec, { method: 'POST', headers })
+    },
 
     me: () => request('/actors/me', actorCodec),
   }
