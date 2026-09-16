@@ -17,6 +17,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import {
   EVENT,
@@ -61,6 +62,17 @@ function literal(value: string) {
  * different definitions of «invisible», one for the search key and another for a place.
  */
 const BLANKS = String.raw` \t\r\n\u00A0\u200B\u200C\u200D\uFEFF`
+
+/**
+ * The identity of a place as the unique index below computes it. Exported because the
+ * repository has to repeat it word for word: `ON CONFLICT` infers an index over expressions
+ * only from the very same expressions, and naming the columns instead answers `42P10` on the
+ * first duplicate \u2014 measured in the review of MOL-6. One definition, two call sites, so the
+ * index and the conflict target cannot drift apart.
+ */
+export function placeIdentity(value: AnyPgColumn | SQL): SQL {
+  return sql`btrim(lower(normalize(${value}, NFKC)), E'${sql.raw(BLANKS)}')`
+}
 
 /** A quantity unit is nullable in several tables; the list is the same everywhere. */
 function unitKnownOrNull(column: AnyPgColumn) {
@@ -261,8 +273,8 @@ export const places = pgTable(
     uniqueIndex('places_identity_key').on(
       table.kind,
       table.country,
-      sql`btrim(lower(normalize(${table.city}, NFKC)), E'${sql.raw(BLANKS)}')`,
-      sql`btrim(lower(normalize(${table.name}, NFKC)), E'${sql.raw(BLANKS)}')`,
+      placeIdentity(table.city),
+      placeIdentity(table.name),
     ),
     check('places_kind_known', oneOf(table.kind, placeKindSchema.options)),
     check('places_country_iso', sql`${table.country} ~ '^[A-Z]{2}$'`),
