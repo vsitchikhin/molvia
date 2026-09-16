@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 import { tripSchema } from '@molvia/model'
 import type { Currency, ExchangeRate, NewTrip, Trip } from '@molvia/model'
 import { rateFrom, rateTo } from './columns'
@@ -22,6 +22,13 @@ export interface TripRepository {
     rate: ExchangeRate | null,
   ): Promise<Trip>
   byId(id: string, actorId: string): Promise<Trip | null>
+  /**
+   * The most recent trip that has not been finished — a row, not a verdict on which trip is
+   * «current». Several trips in one day is an open product question (the market in the
+   * morning, the supermarket in the evening) and MOL-22 is the one that answers it.
+   */
+  latestUnfinishedFor(actorId: string): Promise<Trip | null>
+  listFor(actorId: string, limit: number): Promise<Trip[]>
   finish(id: string, actorId: string, at: Date): Promise<Trip | null>
 }
 
@@ -59,6 +66,28 @@ export function createTripRepository(db: Conn): TripRepository {
     async byId(id, actorId) {
       const [row] = await db.select().from(trips).where(ownedBy(id, actorId)).limit(1)
       return row ? toTrip(row) : null
+    },
+
+    async latestUnfinishedFor(actorId) {
+      const [row] = await db
+        .select()
+        .from(trips)
+        .where(and(eq(trips.actorId, actorId), isNull(trips.finishedAt)))
+        // `id` settles two trips started in the same moment, so two loads of one screen
+        // cannot disagree about which of them came last.
+        .orderBy(desc(trips.startedAt), desc(trips.id))
+        .limit(1)
+      return row ? toTrip(row) : null
+    },
+
+    async listFor(actorId, limit) {
+      const rows = await db
+        .select()
+        .from(trips)
+        .where(eq(trips.actorId, actorId))
+        .orderBy(desc(trips.startedAt), desc(trips.id))
+        .limit(limit)
+      return rows.map(toTrip)
     },
 
     async finish(id, actorId, at) {

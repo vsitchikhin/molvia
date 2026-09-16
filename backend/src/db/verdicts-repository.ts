@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { DomainError, ERROR, verdictSchema } from '@molvia/model'
 import type { NewVerdict, Verdict } from '@molvia/model'
 import { translateFailures } from './failure'
@@ -10,6 +10,11 @@ export interface VerdictRepository {
   /** Rating and re-rating are the same call: the second one replaces the first opinion. */
   put(actorId: string, input: NewVerdict): Promise<Verdict>
   forItem(actorId: string, itemId: string, placeId: string | null): Promise<Verdict | null>
+  /**
+   * Everything this person has rated. «Что брать» groups these into three by `verdictLevel`
+   * — the thresholds stay in the domain, so the query carries no product decision.
+   */
+  listFor(actorId: string, limit: number): Promise<Verdict[]>
 }
 
 /**
@@ -117,6 +122,16 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         )
         .limit(1)
       return row ? toVerdict(row) : null
+    },
+
+    async listFor(actorId, limit) {
+      const rows = await db
+        .select()
+        .from(verdicts)
+        .where(eq(verdicts.actorId, actorId))
+        .orderBy(desc(verdicts.updatedAt), desc(verdicts.id))
+        .limit(limit)
+      return rows.map(toVerdict)
     },
   }
 }
