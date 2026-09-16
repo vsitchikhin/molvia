@@ -9,6 +9,7 @@ import { createActor } from '@/usecases/create-actor'
 import { getActor } from '@/usecases/get-actor'
 import { createActorRepository } from '@/db/actors-repository'
 import { databaseIsReachable, getDb } from '@/db'
+import type { Db } from '@/db'
 import { env } from '@/env'
 
 // The one place where a domain error becomes an HTTP status. Routes never map errors
@@ -27,7 +28,17 @@ function answer(response: ErrorResponse): ErrorResponse {
   return parsed.success ? parsed.data : { code: response.code }
 }
 
-export function buildServer(): FastifyInstance {
+export interface ServerOptions {
+  /**
+   * The connection the repositories are built on. Integration tests point it at their own
+   * database: without this the server under test writes into the database a person has been
+   * entering data into by hand, and the test reads an empty one — every assertion about
+   * rows passes while proving nothing.
+   */
+  readonly db?: Db
+}
+
+export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const app = Fastify({ logger: true })
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
@@ -52,7 +63,7 @@ export function buildServer(): FastifyInstance {
   // the repository into the use cases happens here and nowhere else — a route that could
   // name a repository would be a route that could reach the database.
   app.register((instance, _options, done) => {
-    const actors = createActorRepository(getDb())
+    const actors = createActorRepository(options.db ?? getDb())
 
     healthRoutes(instance, { databaseIsReachable })
     actorRoutes(instance, {
