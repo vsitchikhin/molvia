@@ -303,7 +303,15 @@ export const trips = pgTable(
     rateScaled: bigint('rate_scaled', { mode: 'bigint' }),
     rateSource: text('rate_source').$type<RateSource>(),
     rateAsOf: timestamp('rate_as_of', { withTimezone: true }),
-    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    // `clock_timestamp()`, not `now()`: `now()` is the moment the *transaction* started, one
+    // value shared by every row written inside it. `Conn` exists so a caller can write a trip
+    // and its first expense together (MOL-21), and under `now()` those rows would carry the
+    // same instant exactly — leaving the order to the tie-break, which is a random uuid. The
+    // screen then shows a list in an order unrelated to the one things were added in, and it
+    // does so *stably*, so the wrong order never flickers and never gets noticed.
+    startedAt: timestamp('started_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
   },
   (table) => [
@@ -367,7 +375,12 @@ export const expenses = pgTable(
     qtyUnit: text('qty_unit').$type<BaseUnit>(),
     amountMinor: bigint('amount_minor', { mode: 'bigint' }),
     amountCurrency: char('amount_currency', { length: 3 }).$type<Currency>(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    // `clock_timestamp()` for the same reason `trips.started_at` has it: this column is the
+    // sort key of the trip screen, and under `now()` every expense written in one
+    // transaction would share one instant, leaving the order to a random uuid.
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
   },
   (table) => [
     index('expenses_trip_idx').on(table.tripId),
@@ -418,14 +431,22 @@ export const verdicts = pgTable(
     placeId: uuid('place_id').references(() => places.id),
     score: smallint('score').notNull(),
     review: varchar('review', { length: 500 }),
-    ratedAt: timestamp('rated_at', { withTimezone: true }).notNull().defaultNow(),
+    ratedAt: timestamp('rated_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
     /**
      * Moved by `verdicts_touch_updated_at`, a trigger, so every write path moves it — the
      * column exists so a re-rating leaves a trace, and `verdicts_updated_after_rated` is a
      * tautology while it stands still. Triggers are invisible to drizzle-kit and live in a
      * hand-written part of the migration.
+     *
+     * The default is `clock_timestamp()` — the trigger already uses it, and this column is
+     * the sort key of «Что брать». Under `now()` verdicts written in one transaction would
+     * all carry one instant and be ordered by a random uuid.
      */
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
   },
   (table) => [
     /**

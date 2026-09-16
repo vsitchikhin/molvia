@@ -4,6 +4,7 @@ import type { SQL } from 'drizzle-orm'
 import { placeSchema } from '@molvia/model'
 import type { NewPlace, Place } from '@molvia/model'
 import type { Conn } from './index'
+import { idOrNull, rowLimit } from './rows'
 import { placeIdentity, places, trips } from './schema'
 
 export interface PlaceRepository {
@@ -67,21 +68,27 @@ export function createPlaceRepository(db: Conn): PlaceRepository {
     },
 
     async byId(id) {
+      if (idOrNull(id) === null) return null
+
       const [row] = await db.select().from(places).where(eq(places.id, id)).limit(1)
       return row ? toPlace(row) : null
     },
 
     async byIds(ids) {
-      if (ids.length === 0) return []
+      const known = ids.map(idOrNull).filter((id): id is string => id !== null)
+      if (known.length === 0) return []
+
       const rows = await db
         .select()
         .from(places)
-        .where(inArray(places.id, [...ids]))
+        .where(inArray(places.id, known))
         .orderBy(asc(places.id))
       return rows.map(toPlace)
     },
 
     async recentFor(actorId, limit) {
+      if (idOrNull(actorId) === null) return []
+
       // Grouped by place rather than listing trips: a person who shops in the same three
       // places wants those three, not the same name four times. The tie-break by id keeps
       // two places last visited in the same second from swapping between two loads.
@@ -92,7 +99,7 @@ export function createPlaceRepository(db: Conn): PlaceRepository {
         .where(eq(trips.actorId, actorId))
         .groupBy(places.id)
         .orderBy(desc(max(trips.startedAt)), asc(places.id))
-        .limit(limit)
+        .limit(rowLimit(limit))
       return rows.map((row) => toPlace(row.place))
     },
   }

@@ -4,6 +4,7 @@ import { DomainError, ERROR, verdictSchema } from '@molvia/model'
 import type { NewVerdict, Verdict } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
+import { idOrNull, rowLimit } from './rows'
 import { items, verdicts } from './schema'
 
 export interface VerdictRepository {
@@ -85,7 +86,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
           from ${items}
           where ${items.id} = ${input.itemId}::uuid
           on conflict (actor_id, item_id, place_id) do update
-            set score = excluded.score, review = excluded.review
+            set score = excluded.score,
+                review = coalesce(excluded.review, ${verdicts}.review)
           returning
             id,
             actor_id as "actorId",
@@ -98,6 +100,17 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         `),
       )
 
+      /*
+       * `coalesce` above, and not `excluded.review`, because `review` is optional in the
+       * input: a person who changes the score and says nothing about the text sends no
+       * review at all, and `excluded.review` is then NULL. Overwriting with it erased what
+       * they had written — silently, with no error and nothing to restore it from.
+       *
+       * The cost is that `put` cannot clear a review, only replace it. That is the truth of
+       * the input rather than a limitation invented here: `NewVerdict.review` is optional,
+       * not nullable, so «no text» and «erase the text» are the same message. Clearing needs
+       * a patch method, and 0.1 has no screen that asks for one.
+       */
       const row = rows[0]
       // No rows means the catalogue has no such item — the select found nothing to copy the
       // kind from. A mismatch between kind and place is a different thing: the CHECK refuses
@@ -108,6 +121,12 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
     },
 
     async forItem(actorId, itemId, placeId) {
+      // A malformed identifier can match no row, and Postgres would answer `22P02` — a 500
+      // for what is plainly «nothing found», and a third distinct reply where the whole
+      // point is that a stranger's row and a missing row look the same.
+      if (idOrNull(actorId) === null || idOrNull(itemId) === null) return null
+      if (placeId !== null && idOrNull(placeId) === null) return null
+
       const [row] = await db
         .select()
         .from(verdicts)
@@ -125,12 +144,13 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
     },
 
     async listFor(actorId, limit) {
+      if (idOrNull(actorId) === null) return []
       const rows = await db
         .select()
         .from(verdicts)
         .where(eq(verdicts.actorId, actorId))
         .orderBy(desc(verdicts.updatedAt), desc(verdicts.id))
-        .limit(limit)
+        .limit(rowLimit(limit))
       return rows.map(toVerdict)
     },
   }

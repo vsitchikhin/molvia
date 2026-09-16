@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { DomainError, moneySchema, newItemSchema, toSearchKey } from '@molvia/model'
-import type { Money, Quantity } from '@molvia/model'
+import type { ExchangeRate, Money, Quantity } from '@molvia/model'
 import { INT8_MAX } from '@molvia/model'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace } from './fixtures'
@@ -152,6 +152,17 @@ describe('места', () => {
     expect(await places.byId(first.id)).toEqual(first)
   })
 
+  it('регистр, пробелы и полноширинные буквы не заводят второй карточки', async () => {
+    const first = await places.ensure({ kind: 'store', name: 'SAS', country: 'AM', city: 'Гюмри' })
+
+    for (const name of [' sas ', 'ＳＡＳ', 'SAS\ufeff', '\u200bSAS']) {
+      const again = await places.ensure({ kind: 'store', name, country: 'AM', city: 'Гюмри' })
+      expect(again.id).toBe(first.id)
+      // Написание остаётся тем, каким место завели: DO UPDATE переписал бы его чужим вводом.
+      expect(again.name).toBe('SAS')
+    }
+  })
+
   it('byIds отдаёт только запрошенные', async () => {
     const one = await places.ensure({ kind: 'store', name: 'SAS', country: 'AM', city: 'Гюмри' })
     await places.ensure({ kind: 'store', name: 'Рынок', country: 'AM', city: 'Гюмри' })
@@ -168,6 +179,33 @@ describe('походы и траты', () => {
 
     expect(trip.rate).toBeNull()
     expect((await trips.byId(trip.id, actorId))?.rate).toBeNull()
+  })
+
+  it('курс уходит пятью колонками и возвращается объектом до последней цифры', async () => {
+    const rate: ExchangeRate = {
+      base: 'RUB',
+      quote: 'AMD',
+      scaled: 4_500_000n,
+      source: 'personal',
+      asOf: new Date('2026-09-10T09:00:00Z'),
+    }
+    const actorId = await insertActor(db)
+    const placeId = await insertPlace(db)
+
+    const trip = await trips.start(actorId, { placeId }, 'AMD', rate)
+    expect(trip.rate).toEqual(rate)
+    expect((await trips.byId(trip.id, actorId))?.rate).toEqual(rate)
+  })
+
+  it('свой поход завершается, и время завершения сохраняется', async () => {
+    const actorId = await insertActor(db)
+    const placeId = await insertPlace(db)
+    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+
+    const at = new Date()
+    const finished = await trips.finish(trip.id, actorId, at)
+    expect(finished?.finishedAt).toEqual(at)
+    expect((await trips.byId(trip.id, actorId))?.finishedAt).toEqual(at)
   })
 
   it('трата без количества и без суммы — это null, а не ноль', async () => {
@@ -208,6 +246,22 @@ describe('походы и траты', () => {
     ).toThrow()
   })
 
+  it('патч без полей до базы не доходит и говорит, где искать', async () => {
+    const actorId = await insertActor(db)
+    const placeId = await insertPlace(db)
+    const itemId = await insertItem(db)
+    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+    const added = await expenses.add(actorId, { tripId: trip.id, itemId, amount: price })
+
+    // Разобранный патч пустым не бывает — expensePatchSchema его отвергает, — поэтому
+    // пустой здесь означает, что вызывающий обошёл домен. Это дефект сервера (Р-11), но
+    // он обязан называть себя, а не отвечать «No values to set» из недр drizzle.
+    await expect(expenses.update(added.id, actorId, {})).rejects.toThrow(/patch with no fields/)
+
+    // И трата при этом не тронута.
+    expect((await expenses.forTrip(trip.id, actorId))[0]?.amount).toEqual(price)
+  })
+
   it('трата правится и удаляется', async () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
@@ -240,6 +294,22 @@ describe('вердикты', () => {
     expect((await verdicts.put(actorId, { itemId: dish, placeId: cafe, score: 4 })).placeId).toBe(
       cafe,
     )
+  })
+
+  it('товар с местом и блюдо без места база не принимает', async () => {
+    const actorId = await insertActor(db)
+    const product = await insertItem(db)
+    const dish = await insertItem(db, { kind: 'dish', name: 'Карбонара', searchKey: 'karbonara' })
+    const cafe = await insertPlace(db, { kind: 'venue', name: 'Кафе' })
+
+    // Р-11: сценарий обязан отказать раньше, через newVerdictSchemaFor(kind). Если дошло
+    // сюда — это дефект сервера, поэтому отказ базы намеренно не переводится в доменный.
+    await expect(
+      verdicts.put(actorId, { itemId: product, placeId: cafe, score: 4 }),
+    ).rejects.toThrow()
+    await expect(verdicts.put(actorId, { itemId: dish, score: 4 })).rejects.toThrow()
+
+    expect(await verdicts.listFor(actorId, 10)).toEqual([])
   })
 
   it('вердикт без отзыва читается', async () => {

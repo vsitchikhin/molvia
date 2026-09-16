@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import type { CatalogueSubject, EventInput } from '@molvia/model'
-import type { Db } from './index'
+import type { Conn } from './index'
 import { events } from './schema'
 
 // The type and its payload travel together, so a catalogue view cannot be recorded
@@ -25,7 +25,7 @@ export interface EventRepository {
 // A repository is a function over a connection, not a module-level singleton: the
 // integration tests point it at their own database, and the composition point in
 // server.ts points it at the real one.
-export function createEventRepository(db: Db): EventRepository {
+export function createEventRepository(db: Conn): EventRepository {
   return {
     async record(event) {
       await db.insert(events).values({

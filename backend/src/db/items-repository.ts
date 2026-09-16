@@ -5,7 +5,7 @@ import type { Item, NewItem } from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
-import { theRow } from './rows'
+import { idOrNull, theRow } from './rows'
 import { itemBarcodes, items } from './schema'
 
 export interface ItemRepository {
@@ -39,14 +39,17 @@ function toItem(row: ItemRow, barcodes: readonly string[]): Item {
 export function createItemRepository(db: Conn): ItemRepository {
   /** One query for the items and one for every barcode of them — never one per item. */
   async function load(ids: readonly string[]): Promise<Item[]> {
-    if (ids.length === 0) return []
+    // A malformed identifier matches nothing and would meet `22P02` — a 500 where «nothing
+    // found» is the honest answer — so it is dropped before the query rather than sent.
+    const known = ids.map(idOrNull).filter((id): id is string => id !== null)
+    if (known.length === 0) return []
 
     // Ordered by id rather than left to the planner: a read whose order depends on the
     // physical layout is a test that passes until it does not.
     const rows = await db
       .select()
       .from(items)
-      .where(inArray(items.id, [...ids]))
+      .where(inArray(items.id, known))
       .orderBy(asc(items.id))
     if (rows.length === 0) return []
 
@@ -107,6 +110,8 @@ export function createItemRepository(db: Conn): ItemRepository {
     },
 
     async byId(id) {
+      if (idOrNull(id) === null) return null
+
       const [row] = await db.select().from(items).where(eq(items.id, id)).limit(1)
       if (!row) return null
 

@@ -5,7 +5,7 @@ import type { Currency, ExchangeRate, NewTrip, Trip } from '@molvia/model'
 import { rateFrom, rateTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
-import { theRow } from './rows'
+import { idOrNull, rowLimit, theRow } from './rows'
 import { trips } from './schema'
 
 export interface TripRepository {
@@ -64,11 +64,18 @@ export function createTripRepository(db: Conn): TripRepository {
     },
 
     async byId(id, actorId) {
+      // A malformed identifier matches nothing, and Postgres would say so with `22P02` — a
+      // 500, and a third distinct answer where a stranger's row and a missing row are
+      // deliberately indistinguishable.
+      if (idOrNull(id) === null || idOrNull(actorId) === null) return null
+
       const [row] = await db.select().from(trips).where(ownedBy(id, actorId)).limit(1)
       return row ? toTrip(row) : null
     },
 
     async latestUnfinishedFor(actorId) {
+      if (idOrNull(actorId) === null) return null
+
       const [row] = await db
         .select()
         .from(trips)
@@ -81,12 +88,16 @@ export function createTripRepository(db: Conn): TripRepository {
     },
 
     async listFor(actorId, limit) {
+      if (idOrNull(actorId) === null) return []
+
       const rows = await db
         .select()
         .from(trips)
         .where(eq(trips.actorId, actorId))
         .orderBy(desc(trips.startedAt), desc(trips.id))
-        .limit(limit)
+        // Through `rowLimit`, because a negative one made drizzle print no `LIMIT` clause at
+        // all — handing back everything, the exact thing a limit exists to prevent.
+        .limit(rowLimit(limit))
       return rows.map(toTrip)
     },
 
@@ -94,9 +105,13 @@ export function createTripRepository(db: Conn): TripRepository {
       // Someone else's trip and a trip that never existed answer the same `null`: telling
       // them apart is how an identifier gets guessed by the difference in the reply.
       //
-      // Finishing before the start is refused by `trips_finished_after_start` and is left to
-      // fall through as a 500 on purpose — the moment comes from the server, so a trip that
-      // ends before it began is a defect here, not something to report to a client.
+      // Finishing before the start is refused by `trips_finished_after_start` and falls
+      // through as a 500 on purpose. Note what that asks of the caller: `at` is an argument,
+      // so the moment is *theirs* to supply, and supplying one earlier than the start is the
+      // caller's defect rather than this repository's. It has no clock of its own to correct
+      // them with — the use case that finishes a trip is the one holding the clock.
+      if (idOrNull(id) === null || idOrNull(actorId) === null) return null
+
       const [row] = await db
         .update(trips)
         .set({ finishedAt: at })

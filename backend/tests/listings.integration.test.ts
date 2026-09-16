@@ -40,6 +40,21 @@ describe('пустые выборки', () => {
 })
 
 describe('порядок и предел', () => {
+  it('незавершённым считается самый свежий, а завершённые не в счёт', async () => {
+    const actorId = await insertActor(db)
+    const placeId = await insertPlace(db)
+
+    const older = await trips.start(actorId, { placeId }, 'AMD', null)
+    const newer = await trips.start(actorId, { placeId }, 'AMD', null)
+    expect((await trips.latestUnfinishedFor(actorId))?.id).toBe(newer.id)
+
+    await trips.finish(newer.id, actorId, new Date())
+    expect((await trips.latestUnfinishedFor(actorId))?.id).toBe(older.id)
+
+    await trips.finish(older.id, actorId, new Date())
+    expect(await trips.latestUnfinishedFor(actorId)).toBeNull()
+  })
+
   it('предел соблюдается на нуле, единице и за границей набора', async () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
@@ -161,6 +176,29 @@ describe('где дешевле', () => {
     expect(rows).toHaveLength(2)
     expect(drams?.scaledMinor).toBe(unitPrice(cheaper, litre).scaledMinor)
     expect(drams?.observations).toBe(2)
+  })
+
+  it('порядок задан полным ключом: валюты одного места не меняются местами', async () => {
+    const actorId = await insertActor(db)
+    const placeId = await insertPlace(db)
+    const itemId = await insertItem(db)
+    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+
+    for (const currency of ['USD', 'AMD', 'EUR', 'RUB'] as const) {
+      await expenses.add(actorId, {
+        tripId: trip.id,
+        itemId,
+        quantity: litre,
+        amount: { minor: 57_000n, currency },
+      })
+    }
+
+    // Сортировки по позиции и месту мало: строки одного места остаются связанными, а
+    // связанные строки планировщик вправе отдать в любом порядке.
+    for (let load = 0; load < 4; load += 1) {
+      const rows = await expenses.cheapestFor(actorId, [itemId])
+      expect(rows.map((row) => row.currency)).toEqual(['AMD', 'EUR', 'RUB', 'USD'])
+    }
   })
 
   it('наблюдение без цены или без количества в расчёт не идёт', async () => {

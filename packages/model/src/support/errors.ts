@@ -10,6 +10,15 @@ export const ERROR = {
   CURRENCY_MISMATCH: 'error.currency_mismatch',
   UNIT_MISMATCH: 'error.unit_mismatch',
   NOT_FOUND: 'error.not_found',
+  /**
+   * Someone else's row already holds what this one claims. Added in MOL-7: a unique
+   * constraint speaks about *other rows* of the table, and the domain — which sees only the
+   * input in front of it — has no way to check that. Without this code such a collision came
+   * back as a 500, and the two paths that meet it are ordinary days rather than defects:
+   * a scanned barcode that already belongs to another item, and a device repeating its
+   * first visit after a timeout.
+   */
+  CONFLICT: 'error.conflict',
   INTERNAL: 'error.internal',
 } as const
 
