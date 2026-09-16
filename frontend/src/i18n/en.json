@@ -11,7 +11,11 @@
     "lost_body": "The browser seems to have cleared its storage. Your earlier trips and ratings still exist, but nothing on this device can open them any more — we are starting over.",
     "lost_action": "Got it",
     "uninvited_title": "An invite link is needed",
-    "uninvited_body": "Open the app through the link you were sent: it carries a code, and without it nothing can be saved."
+    "uninvited_body": "Open the app through the link you were sent: it carries a code, and without it nothing can be saved.",
+    "error_title": "This device could not be identified",
+    "error_body": "Until that works, the app cannot save anything — there is nowhere to put it.",
+    "offline_title": "No connection",
+    "offline_body": "We will identify this device as soon as you are back online. Until then nothing new can be saved."
   },
   "home": {
     "title": "What to buy",

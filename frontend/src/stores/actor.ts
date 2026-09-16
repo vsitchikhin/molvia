@@ -4,98 +4,115 @@ import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { Actor } from '@molvia/model'
 import { api } from '@/api'
+import {
+  IDENTITY_KEY,
+  currentIdentity,
+  forgetInviteCode,
+  inviteCode,
+  isIdentifier,
+  rememberIdentity,
+  setAsideIdentity,
+} from '@/stores/identity'
 
-const KEY = 'molvia.actor'
-const INVITE_KEY = 'molvia.invite'
-const LOCK_KEY = 'molvia.actor.claiming'
+/** Only used where `navigator.locks` is missing: Firefox before 96, older WebViews. */
+const CLAIM_KEY = 'molvia.actor.claiming'
 
-/**
- * How long a tab may hold the claim before another one decides it is gone. A tab closed
- * mid-request would otherwise leave every other tab waiting forever, and «the app never
- * loads in the second window» is a bug nobody would connect to the first one.
- */
-const LOCK_TIMEOUT_MS = 10_000
+const CLAIM_TIMEOUT_MS = 30_000
 
 /**
  * What the identity is doing, so a screen can show the right one of four states.
  *
  * `lost` and `uninvited` are kept apart although both end in «you cannot use this yet»: one
  * means the data of this device is unreachable and a new identity has already been started,
- * the other that the app was opened without the link that carries the code. One sentence
- * would be wrong for whichever case it was not written for.
+ * the other that the app cannot get one at all — no link, or a code the door refused. One
+ * sentence would be wrong for whichever case it was not written for.
  */
 export type IdentityState =
   'idle' | 'loading' | 'ready' | 'offline' | 'error' | 'lost' | 'uninvited'
 
+function isMissingActor(error: unknown): boolean {
+  return error instanceof ApiError && error.code === ERROR.NO_ACTOR
+}
+
 /**
- * Storage throws rather than returning null in Safari's private mode, and the app has to
- * keep working in that session — the identity simply lives in memory and dies with the tab.
+ * One tab creates the identity, the others wait for it: both would otherwise read an empty
+ * storage and create one each, splitting a person's data in two without a trace.
+ *
+ * `navigator.locks` is the honest tool — atomic, and released by the browser when a tab is
+ * closed mid-request, which no timeout can imitate. The fallback keeps a stamped claim for
+ * browsers without it; its deadline is long because the case it guards is a slow first
+ * request on a cold server, and giving up early is the very split it exists to prevent.
  */
-function read(key: string): string | null {
+async function claiming<T>(run: () => Promise<T>): Promise<T> {
+  // The DOM types promise `navigator.locks` is always there; Firefox before 96 and older
+  // WebViews say otherwise, and a phone at a shelf is exactly where an old WebView turns
+  // up. Read through a record rather than through the typed property, so the check is
+  // honest instead of being argued away as unnecessary.
+  const locks = (navigator as unknown as Record<string, unknown>).locks as LockManager | undefined
+  if (locks) return locks.request(IDENTITY_KEY, run)
+
+  const claimed = Number(localStorage.getItem(CLAIM_KEY))
+  if (claimed && Date.now() - claimed < CLAIM_TIMEOUT_MS) {
+    // Waited, and that is all: whether the other tab succeeded is for the runner to see —
+    // it re-reads the identity before creating one, so a published identifier is adopted
+    // instead of being duplicated.
+    await waitForAnotherTab()
+  }
+
   try {
-    return localStorage.getItem(key)
+    localStorage.setItem(CLAIM_KEY, String(Date.now()))
   } catch {
-    return null
+    // Without storage there is nothing to coordinate through; one tab is the common case.
+  }
+  try {
+    return await run()
+  } finally {
+    try {
+      localStorage.removeItem(CLAIM_KEY)
+    } catch {
+      // Nothing was written.
+    }
   }
 }
 
-function write(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value)
-  } catch {
-    console.warn('[molvia] хранилище недоступно, личность живёт только в этой вкладке')
-  }
-}
-
-function forget(key: string): void {
-  try {
-    localStorage.removeItem(key)
-  } catch {
-    // Nothing to do: the value was never stored in the first place.
-  }
-}
-
-/** The invite code travels in the link once; after that it lives on the device. */
-function inviteCode(): string | null {
-  const fromLink = new URLSearchParams(window.location.search).get('c')
-  if (fromLink) write(INVITE_KEY, fromLink)
-  return fromLink ?? read(INVITE_KEY)
-}
-
-function claimIsStale(): boolean {
-  const claimed = Number(read(LOCK_KEY))
-  return !claimed || Date.now() - claimed > LOCK_TIMEOUT_MS
-}
-
-/** Waits for the tab that is creating the identity to publish it, or gives up. */
-async function identityFromAnotherTab(): Promise<string | null> {
+/** Resolves when another tab publishes an identifier, or when waiting stops being useful. */
+async function waitForAnotherTab(): Promise<boolean> {
   return new Promise((resolve) => {
-    const done = (id: string | null) => {
+    const done = (published: boolean) => {
       window.removeEventListener('storage', onStorage)
       clearTimeout(timer)
-      resolve(id)
+      resolve(published)
     }
     const onStorage = (event: StorageEvent) => {
-      if (event.key === KEY && event.newValue) done(event.newValue)
+      // Whatever arrives here becomes this device's identity, so it has to look like one.
+      if (event.key === IDENTITY_KEY && isIdentifier(event.newValue)) done(true)
     }
 
     window.addEventListener('storage', onStorage)
     const timer = setTimeout(() => {
-      done(read(KEY))
-    }, LOCK_TIMEOUT_MS)
+      done(false)
+    }, CLAIM_TIMEOUT_MS)
   })
 }
 
 export const useActorStore = defineStore('actor', () => {
   const actor = ref<Actor | null>(null)
-  const id = ref<string | null>(read(KEY))
+  const id = ref<string | null>(currentIdentity())
   const state = ref<IdentityState>('idle')
+  /** True while `start` is in flight, so a retry button cannot queue a second one. */
+  let running = false
 
-  function remember(created: Actor): void {
-    actor.value = created
-    id.value = created.id
-    write(KEY, created.id)
-    forget(LOCK_KEY)
+  function settle(loaded: Actor): void {
+    actor.value = loaded
+    id.value = loaded.id
+    // The success path writes back too: a tab that adopted an identifier from another one
+    // would otherwise hold it only in memory, and storage and memory would disagree.
+    rememberIdentity(loaded.id)
+  }
+
+  function fail(error: unknown): void {
+    state.value = navigator.onLine ? 'error' : 'offline'
+    console.error('[molvia] личность не поднялась', error)
   }
 
   async function create(): Promise<void> {
@@ -107,41 +124,64 @@ export const useActorStore = defineStore('actor', () => {
       return
     }
 
-    // One tab creates, the others wait: both would otherwise read an empty storage and
-    // create an identity each, splitting one person's data in two without a trace.
-    if (!claimIsStale()) {
-      const fromOther = await identityFromAnotherTab()
-      if (fromOther) {
-        id.value = fromOther
-        await load()
-        return
-      }
-    }
-
-    write(LOCK_KEY, String(Date.now()))
     try {
-      remember(await api.createActor(code))
+      settle(await api.createActor(code))
       state.value = 'ready'
     } catch (error) {
-      forget(LOCK_KEY)
+      if (isMissingActor(error)) {
+        // The door refused this code — rotated, mistyped, or from another deployment.
+        // Keeping it would make every retry the same 401 with the same wrong explanation.
+        forgetInviteCode()
+        state.value = 'uninvited'
+        return
+      }
       fail(error)
     }
   }
 
+  /**
+   * Runs under the claim, and re-reads the identity first: between asking for the claim and
+   * getting it, another tab may have created one. Creating a second here is exactly the
+   * split the claim exists to prevent.
+   */
+  async function createOrAdopt(): Promise<void> {
+    const adopted = currentIdentity()
+    if (isIdentifier(adopted) && adopted !== id.value) {
+      id.value = adopted
+      try {
+        settle(await api.me())
+        state.value = 'ready'
+        return
+      } catch (error) {
+        if (!isMissingActor(error)) {
+          fail(error)
+          return
+        }
+        // Published, but the server does not know it either — fall through and create.
+        setAsideIdentity()
+        id.value = null
+      }
+    }
+
+    return create()
+  }
+
   async function load(): Promise<void> {
     const stored = id.value
-    if (!stored) return create()
+    if (!stored) return claiming(createOrAdopt)
 
     try {
-      actor.value = await api.me()
+      settle(await api.me())
       state.value = 'ready'
     } catch (error) {
-      // The identity is gone — storage cleared, or the database recreated in development.
-      // A new one is started, and MOL-8 Ш-8 tells the person instead of swallowing it.
-      if (error instanceof ApiError && error.code === ERROR.NO_ACTOR) {
-        forget(KEY)
+      if (isMissingActor(error)) {
+        // The identifier is set aside rather than deleted: a 401 is not proof that the row
+        // is gone, and after a server-side mistake is fixed it would work again.
+        setAsideIdentity()
         id.value = null
-        await create()
+        await claiming(createOrAdopt)
+        // Said out loud only once a replacement exists — «lost» describes what happened to
+        // the old data, and there is nothing to say it to until the app works again.
         if (state.value === 'ready') state.value = 'lost'
         return
       }
@@ -149,20 +189,36 @@ export const useActorStore = defineStore('actor', () => {
     }
   }
 
-  function fail(error: unknown): void {
-    state.value = navigator.onLine ? 'error' : 'offline'
-    console.error('[molvia] личность не поднялась', error)
+  /** Called once after the app mounts, and again by the retry control. */
+  async function start(): Promise<void> {
+    if (running) return
+    running = true
+    state.value = 'loading'
+    try {
+      if (!navigator.onLine) {
+        // An identifier already on the device needs no network to be used: a PWA precached
+        // for the shelf can show its cached screens as this person. Only a device that has
+        // no identity at all is actually stuck, because getting one is a request.
+        const known = currentIdentity()
+        if (isIdentifier(known)) {
+          id.value = known
+          state.value = 'ready'
+          return
+        }
+        state.value = 'offline'
+        return
+      }
+      await load()
+    } finally {
+      running = false
+    }
   }
 
-  /** Called once before the app mounts; every screen after that reads `id`. */
-  async function start(): Promise<void> {
-    state.value = 'loading'
-    if (!navigator.onLine) {
-      state.value = 'offline'
-      return
-    }
-    await load()
-  }
+  // A connection that came back is the commonest recovery there is, and until now it took a
+  // reload: nothing listened, so `offline` was terminal.
+  window.addEventListener('online', () => {
+    if (state.value === 'offline') void start()
+  })
 
   return { actor, id, state, start, retry: start }
 })

@@ -1,16 +1,22 @@
 <template>
-  <aside v-if="notice && !dismissed" class="notice" role="status">
+  <aside v-if="notice && !dismissed" class="notice" :class="tone" role="status">
     <h2 class="title">{{ t(`identity.${notice}_title`) }}</h2>
     <p class="body">{{ t(`identity.${notice}_body`) }}</p>
+
     <button v-if="notice === 'lost'" class="action" type="button" @click="dismissed = true">
       {{ t('identity.lost_action') }}
+    </button>
+    <button v-else-if="canRetry" class="action" type="button" @click="retry">
+      <IconRefresh class="icon" aria-hidden="true" />
+      {{ t('state.retry') }}
     </button>
   </aside>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconRefresh from '~icons/mdi/refresh'
 import { useActorStore } from '@/stores/actor'
 
 /**
@@ -19,23 +25,40 @@ import { useActorStore } from '@/stores/actor'
  * that quietly reappeared empty would look broken rather than honest — the owner chose this
  * over silence when the plan was reviewed (MOL-8, В-7).
  *
- * Deliberately not a fourth «state» block: those belong to whatever a screen is loading.
- * MOL-19 builds the shared set, and this becomes one of its cases.
+ * `error` and `offline` are here too, and they are the reason this is not a courtesy: while
+ * the identity is not up, every request the app makes goes out without an owner. Showing
+ * nothing left a person with an app that looked normal and could not save a thing.
+ *
+ * MOL-19 builds the shared set of four states; these become its cases rather than a second
+ * implementation of them.
  */
+const NOTICES = ['lost', 'uninvited', 'error', 'offline'] as const
+type Notice = (typeof NOTICES)[number]
+
+function noticeFor(state: string): Notice | null {
+  return (NOTICES as readonly string[]).includes(state) ? (state as Notice) : null
+}
+
 export default defineComponent({
   name: 'IdentityNotice',
+  components: { IconRefresh },
   setup() {
     const { t } = useI18n()
     const actor = useActorStore()
     const dismissed = ref(false)
 
-    // «Lost» can be dismissed: a new identity already works, and the message is a
-    // courtesy. «Uninvited» cannot — there is nothing behind it to get on with.
-    const notice = computed(() =>
-      actor.state === 'lost' || actor.state === 'uninvited' ? actor.state : null,
-    )
+    const notice = computed(() => noticeFor(actor.state))
+    // Retrying is only useful where the app might succeed next time. «Uninvited» needs a
+    // different link, not another attempt, and a button there would promise otherwise.
+    const canRetry = computed(() => notice.value === 'error' || notice.value === 'offline')
+    const tone = computed(() => (canRetry.value ? 'plain' : 'warn'))
 
-    return { t, notice, dismissed }
+    // A message dismissed for one situation must not hide the next one.
+    watch(notice, () => {
+      dismissed.value = false
+    })
+
+    return { t, notice, dismissed, canRetry, tone, retry: () => void actor.retry() }
   },
 })
 </script>
@@ -44,10 +67,22 @@ export default defineComponent({
 .notice {
   margin: var(--space-4) var(--space-4) 0;
   padding: var(--space-4);
-  border: var(--hairline) solid var(--warn);
+  border: var(--hairline) solid;
   border-radius: var(--radius);
+}
+
+/* Something a person has to act on — a lost identity, a link that does not work. */
+.warn {
+  border-color: var(--warn);
   background: var(--warn-tint);
   color: var(--warn-ink);
+}
+
+/* Something that may pass on its own: no connection, a server that did not answer. */
+.plain {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .title {
@@ -67,13 +102,19 @@ export default defineComponent({
 .action {
   @include touch-target;
 
+  gap: var(--space-2);
   margin-top: var(--space-3);
   padding: 0 var(--space-4);
-  border: var(--hairline) solid var(--warn-ink);
+  border: var(--hairline) solid currentcolor;
   border-radius: var(--radius);
   background: transparent;
-  color: var(--warn-ink);
+  color: inherit;
   font: inherit;
   font-weight: var(--weight-medium);
+}
+
+.icon {
+  width: 1.25em;
+  height: 1.25em;
 }
 </style>

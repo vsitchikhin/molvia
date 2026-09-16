@@ -1,18 +1,9 @@
 import { createClient } from '@molvia/client'
+import { currentIdentity } from '@/stores/identity'
 
-// Read straight from storage rather than from the store: the client is built when the module
-// loads, and the store that owns the identity is created after Pinia is installed. A getter
-// that reached for the store here would run before there is one.
-const KEY = 'molvia.actor'
-
+// The identifier comes from one place in memory, not from storage: a device that cannot
+// write `localStorage` still has an identity for this session, and reading storage here
+// would send every request without it while the app believed it was fine.
+//
 // Vite proxies /api to this copy's API port, so the origin is never hardcoded.
-export const api = createClient({
-  baseUrl: '/api',
-  actorId: () => {
-    try {
-      return localStorage.getItem(KEY)
-    } catch {
-      return null
-    }
-  },
-})
+export const api = createClient({ baseUrl: '/api', actorId: currentIdentity })
