@@ -6,6 +6,16 @@ import * as schema from './schema'
 
 export type Db = ReturnType<typeof drizzle<typeof schema>>
 
+/**
+ * What a repository is handed: the connection, or a transaction on it. A repository that
+ * only took `Db` would silently leave the transaction its caller opened — an item written
+ * with its barcodes would commit in halves.
+ *
+ * Spelled through `Parameters` rather than as `PgTransaction<…>` so the schema generics are
+ * taken from `Db` itself and cannot drift away from it.
+ */
+export type Conn = Db | Parameters<Parameters<Db['transaction']>[0]>[0]
+
 let client: Sql | undefined
 let db: Db | undefined
 
