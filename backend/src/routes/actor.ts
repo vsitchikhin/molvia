@@ -1,24 +1,6 @@
-import { DomainError, ERROR } from '@molvia/model'
+import { ACTOR_HEADER, DomainError, ERROR } from '@molvia/model'
 import type { Actor } from '@molvia/model'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
-
-/**
- * The header a request names its owner with. Not the path and not a query parameter: both
- * land in Caddy's access log, in browser history and in `Referer`, and this identifier is a
- * bearer key — whoever reads it is the owner. Not a cookie either: a cookie travels on
- * requests started by other sites, which is CSRF, and the bot has no cookie jar at all.
- */
-export const ACTOR_HEADER = 'x-molvia-actor'
-
-/**
- * The door of the first visit. A header rather than a body field: `POST /actors` has no body
- * on purpose — the only thing a client could send is the four settings, and no screen sets
- * them in 0.1 — so adding one to carry a code would break the decision it protects.
- *
- * It is not a second identity. It says «you were invited», the actor identifier says «you
- * are this person», and only the second is checked on every later request.
- */
-export const INVITE_HEADER = 'x-molvia-invite'
 
 /** Turning an identifier into an owner, or refusing — the use case, already bound. */
 export type ActorLookup = (id: string) => Promise<Actor>

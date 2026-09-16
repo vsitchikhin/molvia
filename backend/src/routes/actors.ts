@@ -1,8 +1,8 @@
 import { z } from 'zod'
-import { DomainError, ERROR, actorCodec } from '@molvia/model'
+import { DomainError, ERROR, INVITE_HEADER, actorCodec } from '@molvia/model'
 import type { Actor } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { INVITE_HEADER, withActor } from '@/routes/actor'
+import { withActor } from '@/routes/actor'
 import type { ActorLookup } from '@/routes/actor'
 
 /**

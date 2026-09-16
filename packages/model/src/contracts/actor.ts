@@ -11,6 +11,28 @@ import { currencySchema } from '#model/values/money'
  * unchanged would fail `actorSchema.parse` in `packages/client` on its very first field —
  * which is why money and quantity already cross this border through codecs.
  */
+/**
+ * The header a request names its owner with. Part of the contract rather than of the route,
+ * because both ends need it: the API reads it, the client writes it, and a name spelled twice
+ * is a name that can drift.
+ *
+ * Not the path and not a query parameter: both land in the access log, in browser history and
+ * in `Referer`, and this identifier is a bearer key — whoever reads it is the owner. Not a
+ * cookie either: a cookie travels on requests started by other sites, which is CSRF, and the
+ * bot has no cookie jar at all.
+ */
+export const ACTOR_HEADER = 'x-molvia-actor'
+
+/**
+ * The door of the first visit. A header rather than a body field: creating an identity has no
+ * body on purpose — the only thing a client could send is the four settings, and no screen
+ * sets them in 0.1 — so adding one to carry a code would break the decision it protects.
+ *
+ * It is not a second identity. It says «you were invited»; the actor header says «you are
+ * this person», and only the second is checked on every later request.
+ */
+export const INVITE_HEADER = 'x-molvia-invite'
+
 export const actorWireSchema = z.object({
   id: z.uuid(),
   country: countrySchema,
