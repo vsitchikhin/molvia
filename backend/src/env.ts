@@ -14,6 +14,14 @@ try {
 const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3300),
   DATABASE_URL: z.string().min(1),
+  /**
+   * The door of the first visit (MOL-8). Required rather than optional-with-a-default on
+   * purpose: a default would mean every deployment that forgot to set it shares one publicly
+   * guessable code, and an empty string would open the door to everyone. Failing at boot is
+   * the honest failure — a server nobody can sign into is easier to diagnose than one
+   * anybody can.
+   */
+  SIGNUP_CODE: z.string().min(1),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 })
 

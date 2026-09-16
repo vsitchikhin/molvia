@@ -38,6 +38,11 @@ api_port=$(( 3300 + offset ))
 pwa_port=$(( 5300 + offset ))
 pg_port=$((  5500 + offset ))
 
+# Код приглашения: случайный и разный у каждой копии. openssl есть везде, где есть
+# докер, но подстраховка нужна — без кода файл был бы сгенерирован неполным, а
+# сервер с пустым SIGNUP_CODE не стартует вовсе.
+signup_code="$(openssl rand -hex 8 2>/dev/null || date +%s | shasum | cut -c1-16)"
+
 busy=""
 for p in "$api_port" "$pwa_port" "$pg_port"; do
   if lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then busy="$busy $p"; fi
@@ -68,8 +73,15 @@ TELEGRAM_BOT_TOKEN=
 
 # Открытый API ЦБ Армении, ключа не требует
 CBA_RATES_URL=https://cb.am/latest.json.php
+
+# Дверь первого визита (MOL-8). Без кода POST /actors отвечает 401 и не пишет
+# ни строки: ручка открыта всему интернету, а каждый вызов заводит личность.
+# Ссылка знакомым несёт его в ?c=..., дальше код живёт на устройстве.
+# Свой у каждой копии, чтобы ссылка от одной не открывала дверь другой.
+SIGNUP_CODE=${signup_code}
 ENV
 
 echo ".env создан: CLONE_INDEX=$index, api=$api_port pwa=$pwa_port postgres=$pg_port, база molvia_$index"
 [ -n "$busy" ] && echo "ВНИМАНИЕ порты заняты:$busy — другая копия уже поднята или индекс совпал" >&2
 echo "Осталось вписать TELEGRAM_BOT_TOKEN."
+echo "Ссылка для первого визита: http://127.0.0.1:$pwa_port/?c=$signup_code"

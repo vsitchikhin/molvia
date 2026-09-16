@@ -10,6 +10,16 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
  */
 export const ACTOR_HEADER = 'x-molvia-actor'
 
+/**
+ * The door of the first visit. A header rather than a body field: `POST /actors` has no body
+ * on purpose — the only thing a client could send is the four settings, and no screen sets
+ * them in 0.1 — so adding one to carry a code would break the decision it protects.
+ *
+ * It is not a second identity. It says «you were invited», the actor identifier says «you
+ * are this person», and only the second is checked on every later request.
+ */
+export const INVITE_HEADER = 'x-molvia-invite'
+
 /** Turning an identifier into an owner, or refusing — the use case, already bound. */
 export type ActorLookup = (id: string) => Promise<Actor>
 

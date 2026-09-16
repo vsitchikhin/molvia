@@ -9,6 +9,7 @@ import { createActor } from '@/usecases/create-actor'
 import { getActor } from '@/usecases/get-actor'
 import { createActorRepository } from '@/db/actors-repository'
 import { databaseIsReachable, getDb } from '@/db'
+import { env } from '@/env'
 
 // The one place where a domain error becomes an HTTP status. Routes never map errors
 // themselves, so a code cannot mean 400 in one place and 404 in another.
@@ -57,6 +58,7 @@ export function buildServer(): FastifyInstance {
     actorRoutes(instance, {
       create: () => createActor(actors),
       byId: (id) => getActor(actors, id),
+      signupCode: env.SIGNUP_CODE,
     })
     done()
   })

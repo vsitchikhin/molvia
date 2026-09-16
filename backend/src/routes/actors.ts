@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { DomainError, ERROR, actorCodec } from '@molvia/model'
 import type { Actor } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { withActor } from '@/routes/actor'
+import { INVITE_HEADER, withActor } from '@/routes/actor'
 import type { ActorLookup } from '@/routes/actor'
 
 /**
@@ -15,6 +15,12 @@ export interface ActorApi {
   create(): Promise<Actor>
   /** An identifier presented by a device, or a refusal. */
   byId: ActorLookup
+  /**
+   * What the invite header has to match. Handed in rather than read from the environment
+   * here, so a test can stand the server up with a code it knows without touching
+   * `process.env`.
+   */
+  signupCode: string
 }
 
 /**
@@ -29,7 +35,15 @@ function answer(actor: Actor) {
 export function actorRoutes(app: FastifyInstance, api: ActorApi): void {
   // The first visit has no owner by definition, so it is registered outside the scope that
   // demands one. `/health` stays outside for the same reason.
-  app.post('/actors', async (_request, reply) => reply.code(201).send(answer(await api.create())))
+  app.post('/actors', async (request, reply) => {
+    // Checked before the use case runs: a refusal should not cost a trip to the database,
+    // and this route is the one thing in the product the whole internet can reach.
+    // «No code» and «wrong code» answer identically — a difference would confirm to a
+    // stranger that a code is what they are missing.
+    if (request.headers[INVITE_HEADER] !== api.signupCode) throw new DomainError(ERROR.NO_ACTOR)
+
+    return reply.code(201).send(answer(await api.create()))
+  })
 
   // Everything below is inside a scope whose every request has already been turned into an
   // owner. New routes land here by default, which is the point: the safe place is the one
