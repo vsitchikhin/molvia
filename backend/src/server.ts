@@ -4,7 +4,8 @@ import { DomainError, ERROR, ISSUE, errorResponseSchema, isWireCode } from '@mol
 import type { ErrorCode, ErrorResponse } from '@molvia/model'
 import { InvalidBody } from '@/routes/body'
 import { healthRoutes } from '@/routes/health'
-import { actorRoutes } from '@/routes/actors'
+import { withActor } from '@/routes/actor'
+import { actorMeRoute, firstVisitRoute } from '@/routes/actors'
 import { createActor } from '@/usecases/create-actor'
 import { getActor } from '@/usecases/get-actor'
 import { createActorRepository } from '@/db/actors-repository'
@@ -28,6 +29,16 @@ function answer(response: ErrorResponse): ErrorResponse {
   return parsed.success ? parsed.data : { code: response.code }
 }
 
+/**
+ * A body Fastify itself refused: malformed JSON, an empty body announced as JSON, a media
+ * type nothing can parse. It is the caller's mistake and has to read as one — it used to
+ * come back as 400 carrying `error.internal`, so the status said «your request» while the
+ * body said «our fault», and every typo was filed through `log.error` as a server failure.
+ */
+function isBodyFault(error: FastifyError): boolean {
+  return typeof error.code === 'string' && error.code.startsWith('FST_ERR_CTP_')
+}
+
 export interface ServerOptions {
   /**
    * The connection the repositories are built on. Integration tests point it at their own
@@ -43,7 +54,15 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
     if (error instanceof DomainError) {
-      return reply.status(STATUS_BY_CODE[error.code] ?? 400).send({ code: error.code })
+      const status = STATUS_BY_CODE[error.code] ?? 400
+      // RFC 9110 §15.5.2 makes a challenge mandatory on a 401. The scheme is this project's
+      // own: the credential is a header carrying an identifier, not Basic or Bearer.
+      if (status === 401) void reply.header('www-authenticate', 'Molvia realm="molvia"')
+      return reply.status(status).send({ code: error.code })
+    }
+
+    if (isBodyFault(error)) {
+      return reply.status(400).send(answer({ code: ISSUE.BODY_INVALID }))
     }
 
     // Only a body parsed at the seam, never any ZodError: a row that stopped matching its
@@ -66,11 +85,21 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const actors = createActorRepository(options.db ?? getDb())
 
     healthRoutes(instance, { databaseIsReachable })
-    actorRoutes(instance, {
+    firstVisitRoute(instance, {
       create: () => createActor(actors),
-      byId: (id) => getActor(actors, id),
       signupCode: env.SIGNUP_CODE,
     })
+
+    // Everything that needs an owner is registered inside this scope, and the scope is here
+    // rather than inside a route module: «new routes land in the guarded place by default»
+    // is only true if the guarded place is where routes are actually added. MOL-12, MOL-21
+    // and MOL-27 add theirs next to `actorMeRoute`.
+    void instance.register((guarded, _guardedOptions, guardedDone) => {
+      withActor(guarded, (id) => getActor(actors, id))
+      actorMeRoute(guarded)
+      guardedDone()
+    })
+
     done()
   })
 

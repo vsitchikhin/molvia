@@ -1,67 +1,67 @@
-import { z } from 'zod'
-import { DomainError, ERROR, INVITE_HEADER, actorCodec } from '@molvia/model'
+import { ZodError, z } from 'zod'
+import { DomainError, ERROR, ISSUE, actorCodec } from '@molvia/model'
 import type { Actor } from '@molvia/model'
-import type { FastifyInstance } from 'fastify'
-import { withActor } from '@/routes/actor'
-import type { ActorLookup } from '@/routes/actor'
-
-/**
- * What these routes need, not where it comes from — the same shape `HealthProbe` has, and
- * the reason is the same: a route reaches the database through a use case or not at all.
- * The composition point binds the repository into both of these.
- */
-export interface ActorApi {
-  /** The first visit: the server issues the identifier and the four defaults. */
-  create(): Promise<Actor>
-  /** An identifier presented by a device, or a refusal. */
-  byId: ActorLookup
-  /**
-   * What the invite header has to match. Handed in rather than read from the environment
-   * here, so a test can stand the server up with a code it knows without touching
-   * `process.env`.
-   */
-  signupCode: string
-}
+import type { FastifyInstance, FastifyReply } from 'fastify'
+import { withInvite } from '@/routes/actor'
+import { InvalidBody } from '@/routes/body'
 
 /**
  * The entity leaves through its codec rather than as the object the repository built: in the
  * domain the timestamps are `Date`, and JSON would turn them into strings silently — the
  * client would then parse a shape nothing promised it.
+ *
+ * `no-store` travels with it. In 0.1 the identifier *is* the proof of identity — whoever
+ * reads it is the owner — so a shared cache or a disk cache holding this reply is the whole
+ * account sitting in a file nobody meant to write.
  */
-function answer(actor: Actor) {
-  return z.encode(actorCodec, actor)
+function answer(reply: FastifyReply, actor: Actor) {
+  return reply.header('cache-control', 'no-store').send(z.encode(actorCodec, actor))
 }
 
-export function actorRoutes(app: FastifyInstance, api: ActorApi): void {
-  // The first visit has no owner by definition, so it is registered outside the scope that
-  // demands one. `/health` stays outside for the same reason.
-  app.post('/actors', async (request, reply) => {
-    // Checked before the use case runs: a refusal should not cost a trip to the database,
-    // and this route is the one thing in the product the whole internet can reach.
-    // «No code» and «wrong code» answer identically — a difference would confirm to a
-    // stranger that a code is what they are missing.
-    if (request.headers[INVITE_HEADER] !== api.signupCode) throw new DomainError(ERROR.NO_ACTOR)
-
-    return reply.code(201).send(answer(await api.create()))
-  })
-
-  // Everything below is inside a scope whose every request has already been turned into an
-  // owner. New routes land here by default, which is the point: the safe place is the one
-  // that needs no remembering.
+/**
+ * The first visit. Registered in its own scope because that scope carries the door, and
+ * because an identity cannot be required of a request whose whole purpose is to get one.
+ */
+export function firstVisitRoute(
+  app: FastifyInstance,
+  api: { create(): Promise<Actor>; signupCode: string },
+): void {
   void app.register((scope, _options, done) => {
-    withActor(scope, api.byId)
+    withInvite(scope, api.signupCode)
 
-    scope.get('/actors/me', (request) => {
-      // The row the hook already read: asking for it again would be a second trip to the
-      // database for an answer this request is already holding. Checked rather than
-      // asserted — the hook guarantees it, and a reader should not have to know that to
-      // trust this line.
-      const actor = request.actor
-      if (!actor) throw new DomainError(ERROR.NO_ACTOR)
+    scope.post('/actors', async (request, reply) => {
+      // Documented as having no body, so a body is refused rather than dropped in silence:
+      // accepting `{"country":"RU"}` and answering «AM» tells the caller their input was
+      // understood when it was discarded. Refused through the body seam, which is what
+      // turns it into a 400 naming the field — the route assigns no status itself.
+      if (request.body !== undefined && request.body !== null) {
+        throw new InvalidBody(
+          new ZodError([
+            { code: 'custom', path: ['body'], message: ISSUE.BODY_INVALID, input: request.body },
+          ]),
+        )
+      }
 
-      return answer(actor)
+      return answer(reply.code(201), await api.create())
     })
 
     done()
+  })
+}
+
+/**
+ * «Who am I». Registered by the composition point **inside the guarded scope**, next to
+ * every other route that needs an owner — which is the point: the safe place has to be the
+ * one routes are added to anyway, not one hidden inside another module.
+ */
+export function actorMeRoute(app: FastifyInstance): void {
+  app.get('/actors/me', (request, reply) => {
+    // The row the hook already read: asking for it again would be a second trip to the
+    // database for an answer this request is already holding. Checked rather than asserted
+    // — the hook guarantees it, and a reader should not have to know that to trust this.
+    const actor = request.actor
+    if (!actor) throw new DomainError(ERROR.NO_ACTOR)
+
+    return answer(reply, actor)
   })
 }
