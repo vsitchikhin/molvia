@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { sql } from 'drizzle-orm'
 import { DomainError, moneySchema, newItemSchema, toSearchKey } from '@molvia/model'
 import type { ExchangeRate, Money, Quantity } from '@molvia/model'
 import { INT8_MAX } from '@molvia/model'
@@ -57,7 +58,11 @@ describe('владелец', () => {
     const updated = await actors.update(id, { city: 'Ереван' })
 
     expect(updated?.city).toBe('Ереван')
-    expect(updated?.updatedAt.getTime()).toBeGreaterThan(before?.updatedAt.getTime() ?? 0)
+    // По той же причине, что и у вердикта: сравнение идёт там, где метки не теряют точность.
+    const [row] = await db.execute<{ apart: boolean }>(sql`
+      select updated_at > created_at as apart from actors where id = ${id}::uuid
+    `)
+    expect(row?.apart).toBe(true)
     expect(updated?.createdAt).toEqual(before?.createdAt)
   })
 })
@@ -337,6 +342,16 @@ describe('вердикты', () => {
 
     expect(second.id).toBe(first.id)
     expect(second.score).toBe(2)
-    expect(second.updatedAt.getTime()).toBeGreaterThan(second.ratedAt.getTime())
+
+    // След ищется в базе, а не через `Date`. Postgres хранит микросекунды, `Date` —
+    // миллисекунды, и две метки внутри одной миллисекунды складываются в одну: замер дал
+    // 10 таких случаев из 300. Домен это и не запрещает — `verdictSchema` требует
+    // `updatedAt >= ratedAt`, — так что проверка строгого «>» через `Date` была строже
+    // домена и краснела бы по расписанию часов, а не по состоянию кода.
+    const [row] = await db.execute<{ apart: boolean }>(sql`
+      select updated_at > rated_at as apart from verdicts where id = ${second.id}::uuid
+    `)
+    expect(row?.apart).toBe(true)
+    expect(second.updatedAt.getTime()).toBeGreaterThanOrEqual(second.ratedAt.getTime())
   })
 })
