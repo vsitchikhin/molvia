@@ -36,6 +36,18 @@ export function createPlaceRepository(db: Conn): PlaceRepository {
         // the spelling of a place someone else already created — «SAS» would become «sas»
         // because the next person typed it in lower case.
         //
+        // The insert and the read are two statements, which looks like a window: under
+        // `READ COMMITTED` another transaction's uncommitted row is invisible, so the read
+        // could find nothing and reach the throw below. It cannot, and the reason is worth
+        // writing down because the next reader will walk the same path. `ON CONFLICT DO
+        // NOTHING` *waits* for a competing speculative insert instead of stepping past it,
+        // and the following statement takes a fresh snapshot. Measured from two connections:
+        // when the rival commits, `ensure` blocks (~1.5 s) and then returns the rival's row;
+        // when it rolls back, `ensure` writes its own. Twenty rounds, zero failures.
+        //
+        // The correctness rests on the default isolation level. Under `REPEATABLE READ` the
+        // second statement would keep the first snapshot, and the window would open.
+        //
         // Raw SQL because the builder cannot express this. In drizzle 0.45.2 the conflict
         // target is `IndexColumn = PgColumn` — columns only — and this uniqueness lives in
         // an index over expressions, so naming the columns answers `42P10` on the first
