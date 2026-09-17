@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createI18n } from 'vue-i18n'
+import { ERROR, ISSUE } from '@molvia/model'
+import en from '@/i18n/en.json'
+import ru from '@/i18n/ru.json'
 import { pickLocale } from '@/i18n/locale'
 import { pluralRu } from '@/i18n/plural-ru'
 
@@ -12,6 +15,86 @@ function russian() {
     pluralRules: { ru: pluralRu },
   }).global
 }
+
+/** `{ a: { b: 'x' } }` → `{ 'a.b': 'x' }`, so a key can be addressed the way `t()` addresses it. */
+function flatten(messages: object, prefix = ''): Record<string, string> {
+  return Object.entries(messages).reduce<Record<string, string>>((flat, [key, value]) => {
+    const path = prefix ? `${prefix}.${key}` : key
+    if (typeof value === 'object' && value !== null) return { ...flat, ...flatten(value, path) }
+    return { ...flat, [path]: String(value) }
+  }, {})
+}
+
+const RU = flatten(ru)
+const EN = flatten(en)
+
+/** `{n}`, `{place}`, `{version}` — what a message expects to be handed at render time. */
+function placeholders(message: string): string[] {
+  return [...message.matchAll(/\{(\w+)\}/g)].map((match) => match[1] ?? '').sort()
+}
+
+describe('словарь: два языка', () => {
+  it('зеркальны ключ в ключ', () => {
+    // Русский первичен, английский вторым — но пропуск ловится здесь, а не на экране:
+    // компонентные тесты монтируются с `en`, и дыра в нём видна не сразу.
+    expect(Object.keys(RU).sort()).toEqual(Object.keys(EN).sort())
+  })
+
+  it('ни одного пустого значения', () => {
+    // Пустая строка — это пропущенный перевод, а не текст. Заглушка запрещена здесь,
+    // поэтому ключа, для которого текста ещё нет, в словаре не заводится вовсе.
+    for (const [key, value] of [...Object.entries(RU), ...Object.entries(EN)]) {
+      expect(value.trim(), key).not.toBe('')
+    }
+  })
+
+  it('у одного ключа одинаковый набор подстановок в обоих языках', () => {
+    // Перевод, потерявший {version}, молчит: vue-i18n отдаст строку без числа, и это
+    // заметят на экране, а не в сборке.
+    for (const key of Object.keys(RU)) {
+      expect(placeholders(EN[key] ?? ''), key).toEqual(placeholders(RU[key] ?? ''))
+    }
+  })
+})
+
+describe('словарь: реестр ошибок', () => {
+  it('каждый доменный код переводится', () => {
+    // Коды реестра работают ключами i18n — так написано в докблоке errors.ts. Перебираем
+    // сам реестр: список, переписанный сюда руками, разойдётся с ним молча.
+    for (const code of Object.values(ERROR)) {
+      expect(RU, code).toHaveProperty(code)
+      expect(EN, code).toHaveProperty(code)
+    }
+  })
+
+  it('не должно сработать: issue.* не переводится', () => {
+    // «Тело запроса не прошло схему» — сообщение разработчику, а не человеку у полки.
+    // Незнакомый код сводит к error.internal отображение из MOL-18; тринадцать строк в двух
+    // языках были бы обещанием, что интерфейс объяснит непонятное.
+    for (const code of Object.values(ISSUE)) {
+      expect(RU, code).not.toHaveProperty(code)
+      expect(EN, code).not.toHaveProperty(code)
+    }
+  })
+})
+
+describe('словарь: чего в нём нет намеренно', () => {
+  it('нет ключа под свёрнутую группу «не брать»', () => {
+    // Сворачивание отвергнуто в решениях дизайна: «свернули читается как спрятали, а
+    // пользователю иногда нужно вспомнить именно то, что брать не надо». Ключ из выжимки
+    // не заводится, и тест держит это решение — иначе он вернётся.
+    expect(RU).not.toHaveProperty('advice.group_never_collapsed')
+    expect(EN).not.toHaveProperty('advice.group_never_collapsed')
+  })
+
+  it('нет слова «Назад» подписью кнопки возврата', () => {
+    // Подпись — название предыдущего экрана («‹ Поход»), это прямо записано в макете.
+    // Остаётся только nav.back_label — слово для скринридера, которому нужен глагол, а не
+    // заголовок соседнего экрана.
+    expect(RU).not.toHaveProperty('nav.back')
+    expect(RU).toHaveProperty('nav.back_label')
+  })
+})
 
 describe('русская плюрализация', () => {
   it('выбирает форму по последней цифре', () => {

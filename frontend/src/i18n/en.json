@@ -1,5 +1,11 @@
 {
   "app": { "name": "Molvia" },
+  "nav": {
+    "trip": "Trip",
+    "advice": "What to buy",
+    "verdicts": "Ratings",
+    "back_label": "Back"
+  },
   "state": {
     "loading": "Loading…",
     "offline": "No connection. Data will appear once you are back online",
@@ -28,9 +34,12 @@
   "error": {
     "invalid_amount": "That does not look like an amount",
     "invalid_quantity": "That does not look like a quantity",
+    "invalid_rate": "That does not look like a rate",
+    "invalid_score": "A rating runs from 1 to 5",
     "currency_mismatch": "Amounts in different currencies cannot be added",
     "unit_mismatch": "Prices in different units cannot be compared",
     "not_found": "Not found",
+    "conflict": "That barcode already belongs to another item",
     "no_actor": "This device is no longer recognised",
     "internal": "Something went wrong"
   }
