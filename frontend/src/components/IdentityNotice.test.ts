@@ -7,17 +7,18 @@ import IdentityNotice from '@/components/IdentityNotice.vue'
 import { useActorStore } from '@/stores/actor'
 import type { IdentityState } from '@/stores/actor'
 
-function render(state: IdentityState, options: { recoverable?: boolean } = {}) {
+const LOST_ID = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+
+function render(state: IdentityState, options: { lost?: string[]; failed?: boolean } = {}) {
   const store = useActorStore()
   store.state = state
-  if (options.recoverable) localStorage.setItem('molvia.actor.lost', LOST_ID)
+  store.lost = options.lost ?? []
+  store.restoreFailed = options.failed ?? false
 
   const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
   const view = mount(IdentityNotice, { global: { plugins: [i18n] } })
   return { view, store }
 }
-
-const LOST_ID = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -76,7 +77,7 @@ describe('IdentityNotice', () => {
   it('offers to bring the old data back when there is something to bring back', async () => {
     // Keeping the identifier «so a server-side mistake stays recoverable» means nothing
     // until a person can act on it — and until then the message is simply untrue.
-    const { view, store } = render('lost', { recoverable: true })
+    const { view, store } = render('lost', { lost: [LOST_ID] })
     const restore = vi.spyOn(store, 'restore').mockResolvedValue(undefined)
 
     await view.get('button').trigger('click')
@@ -87,6 +88,15 @@ describe('IdentityNotice', () => {
 
   it('does not offer it when nothing was set aside', () => {
     expect(render('lost').view.text()).not.toContain(en.identity.lost_restore)
+  })
+
+  it('says so when the restore was refused, instead of leaving the press unanswered', () => {
+    // The button is likeliest to be pressed right after the server refused, so «it did not
+    // work, and nothing changed» is the outcome a person most needs spelled out.
+    const { view } = render('lost', { lost: [LOST_ID], failed: true })
+
+    expect(view.text()).toContain(en.identity.lost_restore_failed)
+    expect(view.text()).toContain(en.identity.lost_restore)
   })
 
   it('interrupts for a lost identity and stays polite for a dropped connection', () => {

@@ -8,14 +8,16 @@ import type { Actor } from '@molvia/model'
 // test never wrote.
 
 const createActor = vi.fn<(code: string) => Promise<Actor>>()
-const me = vi.fn<() => Promise<Actor>>()
+const me = vi.fn<(identifier?: string) => Promise<Actor>>()
 vi.mock('@/api', () => ({
-  api: { createActor: (code: string) => createActor(code), me: () => me() },
+  api: {
+    createActor: (code: string) => createActor(code),
+    me: (identifier?: string) => me(identifier),
+  },
 }))
 
 const KEY = 'molvia.actor'
 const INVITE_KEY = 'molvia.invite'
-const LOST_KEY = 'molvia.actor.lost'
 
 function actorWith(id: string): Actor {
   return {
@@ -31,6 +33,7 @@ function actorWith(id: string): Actor {
 
 const FIRST = actorWith('9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f')
 const SECOND = actorWith('2c4e6a80-1111-4222-8333-444455556666')
+const THIRD = actorWith('7a5b3c10-2222-4333-8444-555566667777')
 
 function openedWith(search: string): void {
   window.history.replaceState({}, '', `/${search}`)
@@ -166,7 +169,10 @@ describe('the first launch', () => {
     openedWith('')
     await store.retry()
 
-    expect(localStorage.getItem(INVITE_KEY)).toBeNull()
+    // Read through the module rather than the key: an emptied value and a removed one are
+    // the same thing to everything that asks, and only one of them survives a shelf that
+    // refuses writes.
+    expect(localStorage.getItem(INVITE_KEY)).toBeFalsy()
     expect(createActor).toHaveBeenCalledTimes(1)
   })
 
@@ -298,14 +304,14 @@ describe('a launch with an identity already stored', () => {
 
   it('sets the old identifier aside rather than deleting it, and says what happened', async () => {
     localStorage.setItem(KEY, FIRST.id)
-    const { store } = await freshStore()
+    const { store, identity } = await freshStore()
     me.mockRejectedValue(await refusal())
     createActor.mockResolvedValue(SECOND)
 
     await store.start()
 
     expect(localStorage.getItem(KEY)).toBe(SECOND.id)
-    expect(localStorage.getItem(LOST_KEY)).toBe(FIRST.id)
+    expect(identity.lostIdentities()).toContain(FIRST.id)
     expect(store.state).toBe('lost')
   })
 
@@ -321,7 +327,7 @@ describe('a launch with an identity already stored', () => {
     await store.start()
 
     expect(store.state).toBe('error')
-    expect(identity.lostIdentity()).toBe(FIRST.id)
+    expect(identity.lostIdentities()).toContain(FIRST.id)
   })
 
   it('does not throw the identity away when the network is at fault', async () => {
@@ -411,12 +417,12 @@ describe('two tabs that both meet a dead identity', () => {
     await store.start()
 
     expect(localStorage.getItem(KEY)).toBe(SECOND.id)
-    expect(identity.lostIdentity()).toBe(FIRST.id)
+    expect(identity.lostIdentities()).toContain(FIRST.id)
   })
 })
 
 describe('a set-aside identity', () => {
-  it('can be brought back, which is what «recoverable» has to mean', async () => {
+  it('can be brought back, and the one it replaces is set aside in its turn', async () => {
     // The old identifier was kept so a server-side mistake stays recoverable — and nothing
     // read it. The person was told their data was out of reach while it sat on the device.
     localStorage.setItem(KEY, FIRST.id)
@@ -426,14 +432,85 @@ describe('a set-aside identity', () => {
 
     await store.start()
     expect(store.state).toBe('lost')
-    expect(store.recoverable()).toBe(true)
+    expect(store.lost).toContain(FIRST.id)
 
     me.mockResolvedValue(FIRST)
     await store.restore()
 
+    expect(me).toHaveBeenLastCalledWith(FIRST.id)
     expect(store.id).toBe(FIRST.id)
     expect(store.state).toBe('ready')
     expect(identity.currentIdentity()).toBe(FIRST.id)
+    // Nothing is thrown away by a restore either: the identity it displaced is recoverable
+    // in its turn, and anything written under it is still reachable.
+    expect(store.lost).toContain(SECOND.id)
+  })
+
+  it('changes nothing when the server does not know the old identifier either', async () => {
+    // The likeliest press of this button is right after the server refused — so the case
+    // where it refuses again cannot be the one that costs a person the identity they have.
+    localStorage.setItem(KEY, FIRST.id)
+    const { store, identity } = await freshStore()
+    me.mockRejectedValueOnce(await refusal())
+    createActor.mockResolvedValue(SECOND)
+
+    await store.start()
+
+    me.mockRejectedValue(await refusal())
+    await store.restore()
+
+    expect(store.restoreFailed).toBe(true)
+    expect(store.state).toBe('lost')
+    expect(identity.currentIdentity()).toBe(SECOND.id)
+    // Still offered: the key was not spent on a failed attempt.
+    expect(store.lost).toContain(FIRST.id)
+  })
+
+  it('is not spent by a press that lands while another attempt is running', async () => {
+    // `start()` bails out on `running`, and the earlier restore wrote storage before
+    // calling it — so a press in that window consumed the only copy for nothing: the
+    // button vanished and the data could never be brought back (Р-1).
+    localStorage.setItem(KEY, FIRST.id)
+    const { store, identity } = await freshStore()
+    me.mockRejectedValueOnce(await refusal())
+    createActor.mockResolvedValue(SECOND)
+
+    await store.start()
+
+    let release: (actor: Actor) => void = () => undefined
+    me.mockReturnValue(
+      new Promise<Actor>((resolve) => {
+        release = resolve
+      }),
+    )
+    void store.retry()
+    await Promise.resolve()
+
+    await store.restore()
+
+    expect(store.lost).toContain(FIRST.id)
+    // And nothing was signed with the refused key in the meantime.
+    expect(identity.currentIdentity()).toBe(SECOND.id)
+    release(SECOND)
+  })
+
+  it('keeps every identifier it has had to set aside, not only the last one', async () => {
+    // Two resets in a week — `make db-reset`, or a database restored from backup twice —
+    // used to leave only the second identity recoverable, and the first, with the real
+    // trips behind it, gone for good (Р-2).
+    localStorage.setItem(KEY, FIRST.id)
+    const { store } = await freshStore()
+    me.mockRejectedValueOnce(await refusal())
+    createActor.mockResolvedValueOnce(SECOND)
+
+    await store.start()
+
+    me.mockRejectedValue(await refusal())
+    createActor.mockResolvedValueOnce(THIRD)
+    await store.retry()
+
+    expect(store.lost).toContain(FIRST.id)
+    expect(store.lost).toContain(SECOND.id)
   })
 })
 
@@ -446,7 +523,7 @@ describe('the identity module', () => {
 
     await store.start()
 
-    expect(identity.lostIdentity()).toBe(FIRST.id)
+    expect(identity.lostIdentities()).toContain(FIRST.id)
     expect(identity.currentIdentity()).not.toBe(FIRST.id)
   })
 })

@@ -2,6 +2,7 @@
   <aside v-if="notice && !dismissed" class="notice" :class="tone" :role="role">
     <h2 class="title">{{ t(`identity.${notice}_title`) }}</h2>
     <p class="body">{{ t(`identity.${notice}_body`) }}</p>
+    <p v-if="restoreFailed" class="body failed">{{ t('identity.lost_restore_failed') }}</p>
 
     <div class="actions">
       <button v-if="canRetry" class="action" type="button" @click="retry">
@@ -56,9 +57,10 @@ export default defineComponent({
     // Retrying is only useful where the app might succeed next time. «Uninvited» needs a
     // different link, not another attempt, and a button there would promise otherwise.
     const canRetry = computed(() => notice.value === 'error' || notice.value === 'offline')
-    // The old identifier is kept precisely so that a server-side mistake stays recoverable —
-    // which means nothing at all unless a person can act on it (Н-5).
-    const canRestore = computed(() => notice.value === 'lost' && actor.recoverable())
+    // Read from a ref rather than by asking storage: a list that changed while the state
+    // stayed `lost` — which is exactly what a failed restore does — left the button showing
+    // a stale answer (М-23).
+    const canRestore = computed(() => notice.value === 'lost' && actor.lost.length > 0)
     const tone = computed(() => (canRetry.value ? 'plain' : 'warn'))
     // Losing an identity interrupts what someone was doing; a dropped connection does not.
     const role = computed(() => (canRetry.value ? 'status' : 'alert'))
@@ -76,6 +78,7 @@ export default defineComponent({
       canRestore,
       tone,
       role,
+      restoreFailed: computed(() => actor.restoreFailed),
       retry: () => void actor.retry(),
       restore: () => void actor.restore(),
     }
@@ -117,6 +120,11 @@ export default defineComponent({
   margin: 0;
   font-size: var(--text-callout);
   line-height: var(--leading-body);
+}
+
+.failed {
+  margin-top: var(--space-2);
+  font-weight: var(--weight-medium);
 }
 
 .actions {

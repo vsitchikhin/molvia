@@ -6,19 +6,17 @@ import type { Actor } from '@molvia/model'
 import { api } from '@/api'
 import {
   IDENTITY_KEY,
+  commitRestore,
   currentIdentity,
-  forget,
   forgetInviteCode,
   inviteCode,
   isIdentifier,
-  lostIdentity,
-  read,
+  lostIdentities,
   rememberIdentity,
-  restoreIdentity,
   setAsideIdentity,
   takeInviteCodeFromUrl,
-  write,
 } from '@/stores/identity'
+import { forget, read, write } from '@/stores/storage'
 
 /** Only used where `navigator.locks` is missing: Firefox before 96, older WebViews. */
 const CLAIM_KEY = 'molvia.actor.claiming'
@@ -50,6 +48,11 @@ function isMissingActor(error: unknown): boolean {
  * closed mid-request, which no timeout can imitate. The fallback is for browsers without it,
  * and it keeps a claim **that is refreshed while the work runs**: a fixed deadline could not
  * tell a tab waiting on a slow first request from a tab that died, and gave up on both.
+ *
+ * **The fallback narrows the race, it does not close it.** Two tabs starting in the same
+ * millisecond both read an empty claim and both proceed — «read, then write» over storage
+ * cannot be made atomic. That is accepted because the path exists only for browsers without
+ * Web Locks, and saying so here is cheaper than rediscovering it (М-26).
  */
 async function claiming<T>(run: () => Promise<T>): Promise<T> {
   // The DOM types promise `navigator.locks` is always there; Firefox before 96 and older
@@ -110,6 +113,10 @@ export const useActorStore = defineStore('actor', () => {
   const actor = ref<Actor | null>(null)
   const id = ref<string | null>(currentIdentity())
   const state = ref<IdentityState>('idle')
+  /** Identifiers that can still be brought back. A ref, so a screen sees it change (М-23). */
+  const lost = ref<string[]>(lostIdentities())
+  /** Set when a restore was attempted and the server refused the old identifier too. */
+  const restoreFailed = ref(false)
   /** True while `start` is in flight, so a retry button cannot queue a second one. */
   let running = false
 
@@ -119,6 +126,12 @@ export const useActorStore = defineStore('actor', () => {
     // The success path writes back too: a tab that adopted an identifier from another one
     // would otherwise hold it only in memory, and storage and memory would disagree.
     rememberIdentity(loaded.id)
+    lost.value = lostIdentities()
+  }
+
+  function setAside(stale: string): void {
+    setAsideIdentity(stale)
+    lost.value = lostIdentities()
   }
 
   function fail(error: unknown): void {
@@ -169,7 +182,7 @@ export const useActorStore = defineStore('actor', () => {
           return
         }
         // Published, but the server does not know it either — fall through and create.
-        setAsideIdentity(adopted)
+        setAside(adopted)
         id.value = null
       }
     }
@@ -183,7 +196,7 @@ export const useActorStore = defineStore('actor', () => {
       // Inside the claim, and only clearing the stored key if it still holds this value:
       // two tabs meeting the same 401 would otherwise have the slower one delete the
       // identifier the faster one had just created (С-9).
-      setAsideIdentity(stale)
+      setAside(stale)
       id.value = null
       await createOrAdopt()
     })
@@ -232,17 +245,45 @@ export const useActorStore = defineStore('actor', () => {
     }
   }
 
-  /** Puts a set-aside identifier back and checks it, for when the server was at fault. */
+  /**
+   * Brings a set-aside identifier back — **asking first, writing after**.
+   *
+   * The earlier version wrote storage before it knew anything: it claimed the old key, then
+   * called `start()`, which bails out while another attempt is in flight. A press landing in
+   * that window spent the only copy for nothing — the button disappeared, the identifier was
+   * gone, and every later request went out signed with a key the server had already refused
+   * (Р-1, С-11). Now nothing moves until the server has agreed.
+   */
   async function restore(): Promise<void> {
-    const restored = restoreIdentity()
-    if (!restored) return
+    if (running) return
+    const candidate = lost.value.at(-1) ?? null
+    if (!isIdentifier(candidate)) return
 
-    id.value = restored
-    actor.value = null
-    await start()
+    running = true
+    restoreFailed.value = false
+    state.value = 'loading'
+    try {
+      // Asked about explicitly, so neither storage nor the in-memory identity is touched
+      // until the answer is in.
+      const restored = await api.me(candidate)
+
+      commitRestore(candidate)
+      settle(restored)
+      state.value = 'ready'
+    } catch (error) {
+      if (isMissingActor(error)) {
+        // The server does not know it either. Nothing is changed and nothing is thrown
+        // away: this is the case where a person would otherwise lose the identity they are
+        // using now to chase one that no longer exists.
+        restoreFailed.value = true
+        state.value = 'lost'
+        return
+      }
+      fail(error)
+    } finally {
+      running = false
+    }
   }
-
-  const recoverable = () => isIdentifier(lostIdentity())
 
   // A connection that came back is the commonest recovery there is, and until now it took a
   // reload. `error` is listened for too: `navigator.onLine` is true on a captive portal and
@@ -251,5 +292,5 @@ export const useActorStore = defineStore('actor', () => {
     if (state.value === 'offline' || state.value === 'error') void start()
   })
 
-  return { actor, id, state, start, retry: start, restore, recoverable }
+  return { actor, id, state, lost, restoreFailed, start, retry: start, restore }
 })

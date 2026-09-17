@@ -1,16 +1,20 @@
 /**
- * Where the identifier lives while the app is running, and the only place anything reads it
- * from. The client needs it at request time, the store owns its lifecycle, and the two used
- * to reach for `localStorage` separately — so a device that could not write storage kept a
- * perfectly good identifier in memory and sent every request without it (adversarial О-3).
+ * Who this device is, and the only place anything reads it from. The client needs the
+ * identifier at request time, the store owns its lifecycle, and the two used to reach for
+ * storage separately — so a device that could not write kept a perfectly good identifier in
+ * memory and sent every request without it (adversarial О-3).
  *
- * Storage is a cache of this value, not the value itself.
+ * Storage is a cache of these values, not the values themselves: `stores/storage.ts` holds
+ * the guarded access, and nothing outside this module needs it.
  */
+import { read, readList, write, writeList } from '@/stores/storage'
 
 const KEY = 'molvia.actor'
 const INVITE_KEY = 'molvia.invite'
-/** Kept when an identifier stops being recognised, so a server-side mistake is recoverable. */
+/** Identifiers the server stopped recognising. A list: a second loss must not erase the first. */
 const LOST_KEY = 'molvia.actor.lost'
+/** How many are worth keeping — enough for a week of mistakes, not a log. */
+const LOST_LIMIT = 5
 
 /** What this device is right now. `null` until the first visit succeeds. */
 let current: string | null = null
@@ -22,66 +26,6 @@ let current: string | null = null
  * holding one, and could never create an identity at all.
  */
 let invite: string | null = null
-
-/**
- * Storage throws rather than returning null in Safari's private mode, and reaching for the
- * property itself throws when storage is blocked outright — disabled cookies, an embedded
- * WebView, a corporate policy. **Every** access goes through here for that reason: one
- * unguarded `localStorage.getItem` was enough to make the app reject on start and sit on a
- * blank screen for the whole class of browsers the fallback path exists for (Н-1).
- *
- * `sessionStorage` is tried second: it survives a reload in the same tab, which is the
- * difference between one identity per launch and one per session (О-7).
- */
-function stores(): Storage[] {
-  const found: Storage[] = []
-  try {
-    found.push(window.localStorage)
-  } catch {
-    // Blocked entirely — nothing to add.
-  }
-  try {
-    found.push(window.sessionStorage)
-  } catch {
-    // Same.
-  }
-  return found
-}
-
-export function read(key: string): string | null {
-  for (const store of stores()) {
-    try {
-      const value = store.getItem(key)
-      if (value) return value
-    } catch {
-      // Try the next one.
-    }
-  }
-  return null
-}
-
-export function write(key: string, value: string): boolean {
-  let written = false
-  for (const store of stores()) {
-    try {
-      store.setItem(key, value)
-      written = true
-    } catch {
-      // Try the next one.
-    }
-  }
-  return written
-}
-
-export function forget(key: string): void {
-  for (const store of stores()) {
-    try {
-      store.removeItem(key)
-    } catch {
-      // Nothing to do: the value was never stored in the first place.
-    }
-  }
-}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -105,36 +49,58 @@ export function rememberIdentity(id: string): boolean {
   return write(KEY, id)
 }
 
+/** Identifiers set aside, newest last. */
+export function lostIdentities(): string[] {
+  return readList(LOST_KEY).filter((value) => isIdentifier(value))
+}
+
 /**
- * Sets aside an identifier the server stopped recognising instead of deleting it. A 401 is
- * not proof that the row is gone — a database restored from the wrong backup, an API
- * pointed at the wrong place, a proxy in front of it — and after such a mistake is fixed
- * the identifier would work again, if anything still held it (О-2).
+ * Sets an identifier aside instead of deleting it. A 401 is not proof that the row is gone
+ * — a database restored from the wrong backup, an API pointed at the wrong place, a proxy
+ * in front of it — and after such a mistake is fixed the identifier would work again, if
+ * anything still held it (О-2).
  *
- * The stored key is cleared **only if it still holds the value being set aside**. Two tabs
- * that both meet a 401 would otherwise race: the slower one would delete the identifier the
- * faster one had already created, and the person would end the session with a third one and
- * the second unreachable (С-9).
+ * Appended to a list rather than written over the previous one: two resets in a week used
+ * to leave only the second identity recoverable, and the first — the one with the real
+ * trips behind it — gone for good (Р-2).
+ *
+ * The stored key is cleared **only if it still holds this value**. Two tabs that both meet
+ * a 401 would otherwise race: the slower would delete the identifier the faster had just
+ * created, and the person would end the session with a third one (С-9).
  */
 export function setAsideIdentity(id: string): void {
-  write(LOST_KEY, id)
+  const kept = lostIdentities().filter((value) => value !== id)
+  writeList(LOST_KEY, [...kept, id].slice(-LOST_LIMIT))
+
   if (current === id) current = null
-  if (read(KEY) === id) forget(KEY)
+  if (read(KEY) === id) forgetStoredIdentity(id)
 }
 
-export function lostIdentity(): string | null {
-  return read(LOST_KEY)
+function forgetStoredIdentity(id: string): void {
+  if (read(KEY) === id) write(KEY, '')
+  // An empty string is what `read` treats as absent, and writing it is safer than removing
+  // the key: a shelf that refused the write leaves the old value, and a half-forgotten
+  // identity is better than one silently resurrected on the next read.
 }
 
-/** Puts a set-aside identifier back, so «recoverable» is something a person can act on. */
-export function restoreIdentity(): string | null {
-  const id = lostIdentity()
-  if (!isIdentifier(id)) return null
+/**
+ * Makes a set-aside identifier the current one. Called **only after** the server has agreed
+ * that it is alive: the previous identity is set aside in its place, so nothing is thrown
+ * away by a restore that turns out to be wrong (Р-1, С-11).
+ */
+export function commitRestore(id: string): void {
+  const previous = currentIdentity()
+  if (previous && previous !== id) {
+    const kept = lostIdentities().filter((value) => value !== previous)
+    writeList(LOST_KEY, [...kept, previous].slice(-LOST_LIMIT))
+  }
 
+  writeList(
+    LOST_KEY,
+    lostIdentities().filter((value) => value !== id),
+  )
   current = id
   write(KEY, id)
-  forget(LOST_KEY)
-  return id
 }
 
 /**
@@ -164,7 +130,7 @@ export function inviteCode(): string | null {
 /** A code the door refused is worse than no code: it turns every retry into the same 401. */
 export function forgetInviteCode(): void {
   invite = null
-  forget(INVITE_KEY)
+  write(INVITE_KEY, '')
 }
 
 export const IDENTITY_KEY = KEY
