@@ -38,8 +38,8 @@ describe('IdentityNotice', () => {
     // reappears empty looks broken, and the trips behind the old identifier are gone.
     const { view } = render('lost')
 
-    expect(view.text()).toContain(en.identity.lost_title)
-    expect(view.text()).toContain(en.identity.lost_body)
+    expect(view.text()).toContain(en.identity.lost.title)
+    expect(view.text()).toContain(en.identity.lost.body)
   })
 
   it('lets that message be dismissed: a new identity already works', async () => {
@@ -54,15 +54,15 @@ describe('IdentityNotice', () => {
     // Nothing is behind this one to get on with, so a «got it» button would be a lie.
     const { view } = render('uninvited')
 
-    expect(view.text()).toContain(en.identity.uninvited_title)
+    expect(view.text()).toContain(en.identity.uninvited.title)
     expect(view.find('button').exists()).toBe(false)
   })
 
   it('does not stay silent when the identity could not be loaded at all', () => {
     // While it is not up, every request the app makes goes out without an owner — an app
     // that looked normal and could not save a thing was the worst of the options.
-    expect(render('error').view.text()).toContain(en.identity.error_title)
-    expect(render('offline').view.text()).toContain(en.identity.offline_title)
+    expect(render('error').view.text()).toContain(en.identity.error.title)
+    expect(render('offline').view.text()).toContain(en.identity.offline.title)
   })
 
   it('offers a retry in exactly the two states where trying again can work', async () => {
@@ -84,12 +84,12 @@ describe('IdentityNotice', () => {
 
     await view.get('button').trigger('click')
 
-    expect(view.text()).toContain(en.identity.lost_restore)
+    expect(view.text()).toContain(en.identity.restore)
     expect(restore).toHaveBeenCalled()
   })
 
   it('does not offer it when nothing was set aside', () => {
-    expect(render('lost').view.text()).not.toContain(en.identity.lost_restore)
+    expect(render('lost').view.text()).not.toContain(en.identity.restore)
   })
 
   it('says so when the restore was refused, instead of leaving the press unanswered', () => {
@@ -97,8 +97,8 @@ describe('IdentityNotice', () => {
     // work, and nothing changed» is the outcome a person most needs spelled out.
     const { view } = render('lost', { lost: [LOST_ID], failed: true })
 
-    expect(view.text()).toContain(en.identity.lost_restore_failed)
-    expect(view.text()).toContain(en.identity.lost_restore)
+    expect(view.text()).toContain(en.identity.restore_failed)
+    expect(view.text()).toContain(en.identity.restore)
   })
 
   it('interrupts for a lost identity and stays polite for a dropped connection', () => {

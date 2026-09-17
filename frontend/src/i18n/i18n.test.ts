@@ -84,6 +84,37 @@ describe('словарь: два языка', () => {
   })
 })
 
+describe('словарь: повторяющиеся тексты', () => {
+  it('один и тот же текст повторяется только там, где это решено', () => {
+    // Пер-экранные состояния (Р-2) стоят трёх копий «Сервер не ответил»: правка в одной
+    // разойдётся с двумя другими молча. Сводить их в общий ключ нельзя — это отменит само
+    // решение, за которое заплачено. Поэтому цена закреплена снимком: новый незаявленный
+    // дубль уронит тест, а заявленные видно списком.
+    const byValue = new Map<string, string[]>()
+    for (const [key, value] of Object.entries(RU)) {
+      byValue.set(value, [...(byValue.get(value) ?? []), key])
+    }
+
+    const duplicated = Object.fromEntries(
+      [...byValue.entries()]
+        .filter(([, keys]) => keys.length > 1)
+        .map(([value, keys]) => [value, keys.sort()]),
+    )
+
+    expect(duplicated).toEqual({
+      // Подпись таба и заголовок экрана — разные роли одного слова, живут отдельно осознанно.
+      Поход: ['nav.trip', 'trip.title'],
+      'Что брать': ['advice.title', 'nav.advice'],
+      Оценки: ['nav.verdicts', 'verdict.title'],
+      // Цена Р-2: одно состояние, написанное для трёх экранов.
+      'Сервер не ответил': ['advice.error.title', 'item.error.title', 'trip.error.title'],
+      'Нет сети': ['identity.offline.title', 'item.offline.title'],
+      // Кнопка в двух местах похода: в списке и в офлайне.
+      'Добавить позицию': ['trip.add_item', 'trip.offline.action'],
+    })
+  })
+})
+
 describe('словарь: плюральные формы', () => {
   const pluralised = (messages: Record<string, string>): [string, string][] =>
     Object.entries(messages).filter(([, value]) => value.includes('|'))

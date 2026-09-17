@@ -1,8 +1,8 @@
 <template>
   <aside v-if="notice && !dismissed" class="notice" :class="tone" :role="role">
-    <h2 class="title">{{ t(`identity.${notice}_title`) }}</h2>
-    <p class="body">{{ t(`identity.${notice}_body`) }}</p>
-    <p v-if="restoreFailed" class="body failed">{{ t('identity.lost_restore_failed') }}</p>
+    <h2 class="title">{{ t(`identity.${notice}.title`) }}</h2>
+    <p class="body">{{ t(`identity.${notice}.body`) }}</p>
+    <p v-if="restoreFailed" class="body failed">{{ t('identity.restore_failed') }}</p>
 
     <div class="actions">
       <button v-if="canRetry" class="action" type="button" @click="retry">
@@ -10,10 +10,10 @@
         {{ t('state.retry') }}
       </button>
       <button v-if="canRestore" class="action" type="button" @click="restore">
-        {{ t('identity.lost_restore') }}
+        {{ t('identity.restore') }}
       </button>
       <button v-if="notice === 'lost'" class="action" type="button" @click="dismissed = true">
-        {{ t('identity.lost_action') }}
+        {{ t('identity.action') }}
       </button>
     </div>
   </aside>
