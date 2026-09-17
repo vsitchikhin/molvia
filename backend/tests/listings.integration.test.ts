@@ -48,10 +48,12 @@ describe('порядок и предел', () => {
     const newer = await trips.start(actorId, { placeId }, 'AMD', null)
     expect((await trips.latestUnfinishedFor(actorId))?.id).toBe(newer.id)
 
-    await trips.finish(newer.id, actorId, new Date())
+    // Без момента: этому тесту важен факт завершения, а не его время, и `new Date()` здесь
+    // нёс ту же ловушку — поход, завершённый в миллисекунду своего старта, база отвергает.
+    await trips.finish(newer.id, actorId)
     expect((await trips.latestUnfinishedFor(actorId))?.id).toBe(older.id)
 
-    await trips.finish(older.id, actorId, new Date())
+    await trips.finish(older.id, actorId)
     expect(await trips.latestUnfinishedFor(actorId)).toBeNull()
   })
 

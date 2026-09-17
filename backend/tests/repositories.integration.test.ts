@@ -202,13 +202,29 @@ describe('походы и траты', () => {
     expect((await trips.byId(trip.id, actorId))?.rate).toEqual(rate)
   })
 
-  it('свой поход завершается, и время завершения сохраняется', async () => {
+  it('свой поход завершается, и время завершения ставит база', async () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const trip = await trips.start(actorId, { placeId }, 'AMD', null)
 
-    const at = new Date()
+    const finished = await trips.finish(trip.id, actorId)
+
+    // Обе отметки приходят из одних часов, поэтому «завершение не раньше начала» выполняется
+    // по построению. Раньше здесь стоял `new Date()`, и проверка держалась на удаче: старт и
+    // финиш должны были попасть в разные миллисекунды. В CI они попадали в одну.
+    expect(finished?.finishedAt).not.toBeNull()
+    expect(finished?.finishedAt?.getTime()).toBeGreaterThanOrEqual(trip.startedAt.getTime())
+    expect((await trips.byId(trip.id, actorId))?.finishedAt).toEqual(finished?.finishedAt)
+  })
+
+  it('момент можно передать явно — так закрывают поход задним числом', async () => {
+    const actorId = await insertActor(db)
+    const placeId = await insertPlace(db)
+    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+
+    const at = new Date(trip.startedAt.getTime() + 60_000)
     const finished = await trips.finish(trip.id, actorId, at)
+
     expect(finished?.finishedAt).toEqual(at)
     expect((await trips.byId(trip.id, actorId))?.finishedAt).toEqual(at)
   })
