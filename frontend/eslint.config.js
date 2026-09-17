@@ -28,6 +28,27 @@ export default defineConfigWithVueTs(
       'vue/prefer-true-attribute-shorthand': 'error',
       'vue/enforce-style-attribute': ['error', { allow: ['scoped'] }],
       'vue/block-lang': ['error', { script: { lang: 'ts' }, style: { lang: 'scss' } }],
+
+      // «Not a single string of text in the markup» is written in CLAUDE.md, repeated in the
+      // design foundations and listed in the handoff's acceptance checklist — and until now it
+      // was kept by memory alone. The plugin is already here, so the rule costs no dependency.
+      //
+      // Attributes are listed separately because text in an aria-label is no different from
+      // text in a node, yet it slips past a check that only walks text nodes. What the rule
+      // cannot see is a string built in <script> and handed to the template through a
+      // variable: it closes carelessness, not intent, and that is the cheap mistake worth
+      // closing.
+      //
+      // The allowlist is separators and signs rather than words — they are not text and are
+      // not translated.
+      'vue/no-bare-strings-in-template': [
+        'error',
+        {
+          allowlist: ['·', '≈', '×', '—', '–', '֏', '/', '(', ')', ',', '.', ':', '|'],
+          attributes: { '/.+/': ['placeholder', 'aria-label', 'title', 'alt', 'label'] },
+          directives: ['v-text'],
+        },
+      ],
     },
   },
   prettier,
