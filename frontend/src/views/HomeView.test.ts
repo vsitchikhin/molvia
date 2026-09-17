@@ -27,7 +27,7 @@ describe('HomeView', () => {
     online(false)
     const view = render()
     await vi.waitFor(() => {
-      expect(view.text()).toContain(en.state.offline)
+      expect(view.text()).toContain(en.advice.offline.title)
     })
     expect(health).not.toHaveBeenCalled()
   })
@@ -37,7 +37,7 @@ describe('HomeView', () => {
     health.mockRejectedValue(new Error('boom'))
     const view = render()
     await vi.waitFor(() => {
-      expect(view.text()).toContain(en.state.error)
+      expect(view.text()).toContain(en.advice.error.title)
     })
     expect(view.find('button').text()).toBe(en.state.retry)
   })
@@ -49,13 +49,13 @@ describe('HomeView', () => {
       .mockResolvedValue({ status: 'ok', version: '1.2.3', database: 'up' })
     const view = render()
     await vi.waitFor(() => {
-      expect(view.text()).toContain(en.state.error)
+      expect(view.text()).toContain(en.advice.error.title)
     })
 
     await view.find('button').trigger('click')
     await vi.waitFor(() => {
       expect(view.text()).toContain('1.2.3')
     })
-    expect(view.text()).toContain(en.home.empty)
+    expect(view.text()).toContain(en.advice.empty.body)
   })
 })

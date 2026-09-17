@@ -1,11 +1,13 @@
 <template>
   <section>
-    <h2 class="heading">{{ t('home.title') }}</h2>
+    <h2 class="heading">{{ t('advice.title') }}</h2>
 
     <p v-if="state === 'loading'" class="muted">{{ t('state.loading') }}</p>
 
     <template v-else-if="state === 'offline' || state === 'error'">
-      <p class="muted">{{ state === 'offline' ? t('state.offline') : t('state.error') }}</p>
+      <p class="muted">
+        {{ state === 'offline' ? t('advice.offline.title') : t('advice.error.title') }}
+      </p>
       <button class="button" type="button" @click="load">
         <IconRefresh class="icon" aria-hidden="true" />
         {{ t('state.retry') }}
@@ -13,9 +15,9 @@
     </template>
 
     <template v-else>
-      <p class="muted">{{ t('home.connected', { version }) }}</p>
-      <p>{{ t('home.empty') }}</p>
-      <button class="button" type="button">{{ t('home.empty_action') }}</button>
+      <p class="muted">{{ t('dev.connected', { version }) }}</p>
+      <p>{{ t('advice.empty.body') }}</p>
+      <button class="button" type="button">{{ t('advice.empty.action') }}</button>
     </template>
   </section>
 </template>
@@ -30,6 +32,17 @@ import { api } from '@/api'
 // where the connection drops more often than anything else fails.
 type State = 'loading' | 'offline' | 'error' | 'ready'
 
+/**
+ * Still the scaffold it has been since the repository was set up, now speaking the 0.1
+ * dictionary: MOL-32 replaces it with the real «what to buy» screen, and MOL-19 gives every
+ * screen the shared four-state block this one only gestures at.
+ *
+ * Two seams are deliberate. `dev.connected` is a liveness probe rather than product copy —
+ * the name says it is temporary, and MOL-32 deletes it with this file. And the offline text
+ * here is `advice.offline.*`, which speaks of stale data this scaffold does not actually
+ * have; the dictionary is the thing being built, and a screen that outlives the sprint is
+ * not worth a key of its own.
+ */
 export default defineComponent({
   name: 'HomeView',
   components: { IconRefresh },

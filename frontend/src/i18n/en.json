@@ -8,8 +8,6 @@
   },
   "state": {
     "loading": "Loading…",
-    "offline": "No connection. Data will appear once you are back online",
-    "error": "The server did not answer",
     "retry": "Try again"
   },
   "trip": {
@@ -85,6 +83,36 @@
       "body": "Searching your recent items only. The full catalogue is back once you are online"
     }
   },
+  "advice": {
+    "title": "What to buy",
+    "own_data_only": "Your own ratings only, for now",
+    "group_take": "Buy it",
+    "group_if_cheap": "Only if it is cheap",
+    "group_never": "Not worth buying anywhere",
+    "badge_take": "BUY",
+    "badge_if_cheap": "IF CHEAP",
+    "badge_never": "DO NOT",
+    "cheapest_at": "Cheapest at {place}",
+    "also_at": "Also: {places}",
+    "threshold": "Worth buying below {price}",
+    "no_price_shown": "The price is left out on purpose: there is nothing to compare",
+    "rating": "{value} out of 5",
+    "ratings_count": "{n} rating | {n} ratings",
+    "empty": {
+      "title": "Nothing to advise yet",
+      "body": "Rate your first purchase — and what to buy will show up here",
+      "action": "Rate a purchase"
+    },
+    "error": {
+      "title": "The server did not answer",
+      "body": "Verdicts are worked out on the server, there is no local copy"
+    },
+    "offline": {
+      "title": "Showing yesterday's data",
+      "body": "{count}, loaded {when}. We will refresh once you are back online",
+      "action": "Show it as is"
+    }
+  },
   "identity": {
     "lost_title": "The server did not recognise this device",
     "lost_body": "Your earlier trips and ratings are still there, but the server no longer counts them as this device's — so a new record has been started. The old key is kept: if this was a mistake on the server, the data can be brought back.",
@@ -98,10 +126,7 @@
     "offline_title": "No connection",
     "offline_body": "We will identify this device as soon as you are back online. Until then nothing new can be saved."
   },
-  "home": {
-    "title": "What to buy",
-    "empty": "Nothing rated yet. Start with your first purchase",
-    "empty_action": "Add a verdict",
+  "dev": {
     "connected": "Server is up, version {version}"
   },
   "error": {
