@@ -27,6 +27,17 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 Migrations run when the API starts, so there is no separate step to remember and no
 window where the schema lags the code deployed against it.
 
+## `SIGNUP_CODE` is required, and the API refuses to start without it
+
+The first visit has a door: `POST /actors` creates an identity, and without a code it would
+do that for the whole internet — each call a row, and the 0.2 gate counts arrivals as its
+denominator. The code lives in `.env.prod`, and the link handed to people carries it:
+`https://<domain>/?c=<code>`. After the first open it lives on the device, so the parameter
+is needed once per person.
+
+The API validates it at boot and exits if it is missing. That is deliberate: a server nobody
+can sign into is easier to notice than one anybody can.
+
 ## Trying the production stack locally
 
 ```bash

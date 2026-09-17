@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ERROR, ISSUE } from '@molvia/model'
+import { ACTOR_HEADER, ERROR, INVITE_HEADER, ISSUE } from '@molvia/model'
 import { ApiError, createClient } from '#client/index'
 
 function clientAnswering(status: number, body: unknown) {
@@ -11,6 +11,43 @@ function clientAnswering(status: number, body: unknown) {
       }),
     )
   return createClient({ baseUrl: 'http://api', fetch })
+}
+
+/** Raw bytes rather than `JSON.stringify` — what a proxy, a gateway or a cut-off reply sends. */
+function clientServing(body: BodyInit | null, init: ResponseInit = {}) {
+  return createClient({
+    baseUrl: 'http://api',
+    fetch: () => Promise.resolve(new Response(body, init)),
+  })
+}
+
+/** Keeps what the client actually sent, which is the half a mocked reply cannot show. */
+function clientRecording(options: { actorId?: () => string | null } = {}) {
+  const calls: { url: string; method: string; headers: Headers }[] = []
+  const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    calls.push({
+      url: input instanceof URL ? input.href : typeof input === 'string' ? input : input.url,
+      method: init?.method ?? 'GET',
+      headers: new Headers(init?.headers),
+    })
+    return Promise.resolve(
+      new Response(JSON.stringify(actorWire), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+  }
+  return { client: createClient({ baseUrl: 'http://api', fetch, ...options }), calls }
+}
+
+const actorWire = {
+  id: '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f',
+  country: 'AM',
+  city: 'Гюмри',
+  spendCurrency: 'AMD',
+  incomeCurrency: 'RUB',
+  createdAt: '2026-09-16T10:00:00.123Z',
+  updatedAt: '2026-09-16T10:00:00.456Z',
 }
 
 async function codeOf(promise: Promise<unknown>): Promise<string> {
@@ -41,11 +78,91 @@ describe('everything the client throws is an ApiError', () => {
     expect(await codeOf(client.health())).toBe(ISSUE.BODY_INVALID)
   })
 
-  it('and telling «not found» apart from «the server broke» without reading a message', async () => {
-    const client = clientAnswering(404, '<html>nginx</html>')
-    expect(await codeOf(client.health())).toBe(ERROR.NOT_FOUND)
-    const broken = clientAnswering(500, '<html>nginx</html>')
-    expect(await codeOf(broken.health())).toBe(ERROR.INTERNAL)
+  it('including a body that is not JSON at all: a proxy page, empty, or cut off', async () => {
+    // The earlier test for this corner passed a string through `JSON.stringify`, so what
+    // reached the client was valid JSON. Real bytes are not, `.json()` throws, and every
+    // line below it — including the one that tells a dead identity from a broken server —
+    // was skipped entirely.
+    const proxy = clientServing('<html>\n<head><title>401</title></head>\n</html>', {
+      status: 401,
+      headers: { 'content-type': 'text/html' },
+    })
+    expect(await codeOf(proxy.me())).toBe(ISSUE.RESPONSE_INVALID)
+
+    const empty = clientServing(null, { status: 401 })
+    expect(await codeOf(empty.me())).toBe(ISSUE.RESPONSE_INVALID)
+
+    const truncated = clientServing('', { status: 200, headers: { 'content-type': 'text/plain' } })
+    expect(await codeOf(truncated.me())).toBe(ISSUE.RESPONSE_INVALID)
+  })
+
+  it('calls a 5xx what it is — the server down, not an answer off-contract', async () => {
+    // Caddy's 502 during a deploy carries an HTML page. Reporting it as a malformed reply
+    // sends whoever reads the code looking at the contract instead of at the server.
+    const gateway = clientServing('<html>502 Bad Gateway</html>', { status: 502 })
+    expect(await codeOf(gateway.health())).toBe(ERROR.INTERNAL)
+
+    const unavailable = clientServing(null, { status: 503 })
+    expect(await codeOf(unavailable.me())).toBe(ERROR.INTERNAL)
+  })
+
+  it('gives up on a request that hangs, instead of waiting for a network that is gone', async () => {
+    // A captive portal or a half-dead mobile network holds a call open indefinitely. The
+    // PWA would sit on «loading» — no message, no retry — while the identity lock it holds
+    // keeps every other tab waiting with it.
+    //
+    // Ten milliseconds rather than the real fifteen seconds: the limit is an option
+    // precisely so that a suite proving it does not have to wait for it (М-24).
+    const client = createClient({
+      baseUrl: 'http://api',
+      timeoutMs: 10,
+      fetch: (_input, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted', 'AbortError'))
+          })
+        }),
+    })
+
+    expect(await codeOf(client.me())).toBe(ERROR.INTERNAL)
+  })
+
+  it('does not put a deadline on the first visit, where an abort would orphan a row', async () => {
+    // An abort on this side says nothing about whether the INSERT landed, so a retry after
+    // one creates a **second** identity — and rows in `actors` are the denominator of the
+    // 0.2 gate. A cold VPS answering slowly is the ordinary case, not the failure.
+    let aborted = false
+    const client = createClient({
+      baseUrl: 'http://api',
+      timeoutMs: 10,
+      fetch: (_input, init) =>
+        new Promise((resolve) => {
+          init?.signal?.addEventListener('abort', () => {
+            aborted = true
+          })
+          setTimeout(() => {
+            resolve(new Response(JSON.stringify(actorWire), { status: 201 }))
+          }, 40)
+        }),
+    })
+
+    const actor = await client.createActor('let-me-in')
+
+    expect(aborted).toBe(false)
+    expect(actor.id).toBe(actorWire.id)
+  })
+
+  it('and a dropped connection, which is fetch’s own TypeError', async () => {
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: () => Promise.reject(new TypeError('Failed to fetch')),
+    })
+    expect(await codeOf(client.me())).toBe(ERROR.INTERNAL)
+  })
+
+  it('and telling «not found» apart from the rest without reading a message', async () => {
+    const client = clientServing('<html>nginx</html>', { status: 404 })
+    expect(await codeOf(client.me())).toBe(ERROR.NOT_FOUND)
   })
 
   it('and passes a good answer through', async () => {
@@ -55,5 +172,115 @@ describe('everything the client throws is an ApiError', () => {
       version: '1.0.0',
       database: 'up',
     })
+  })
+})
+
+describe('a 401 only means «this identity is gone» when the API says so', () => {
+  it('reads NO_ACTOR from the body, which is the one thing that can say it', async () => {
+    const client = clientAnswering(401, { code: ERROR.NO_ACTOR })
+    expect(await codeOf(client.me())).toBe(ERROR.NO_ACTOR)
+  })
+
+  it('refuses to infer it from a 401 nobody in this project sent', async () => {
+    // Basic auth on Caddy, an API gateway, a captive portal on shop wifi: none of them know
+    // what an actor is. The PWA acts on NO_ACTOR by replacing the identity, so inferring it
+    // from a status alone hands a stranger's 401 the power to end someone's data.
+    const proxy = clientAnswering(401, { error: 'unauthorized' })
+    expect(await codeOf(proxy.me())).toBe(ISSUE.RESPONSE_INVALID)
+
+    const bare = clientServing(null, { status: 401 })
+    expect(await codeOf(bare.me())).toBe(ISSUE.RESPONSE_INVALID)
+  })
+})
+
+describe('the identity the client speaks for', () => {
+  it('is read at call time, not captured when the client is built', async () => {
+    // The PWA builds the client before it has an identity; a value captured here would be
+    // null for the rest of the session.
+    let id: string | null = null
+    const { client, calls } = clientRecording({ actorId: () => id })
+
+    id = actorWire.id
+    await client.me()
+
+    expect(calls[0]?.headers.get(ACTOR_HEADER)).toBe(actorWire.id)
+  })
+
+  it('is left off entirely when there is none, rather than sent as «null»', async () => {
+    const { client, calls } = clientRecording({ actorId: () => null })
+
+    await client.me()
+
+    expect(calls[0]?.headers.has(ACTOR_HEADER)).toBe(false)
+  })
+
+  it('is never stored here: without a getter there is no header at all', async () => {
+    const { client, calls } = clientRecording()
+
+    await client.me()
+
+    expect(calls[0]?.headers.has(ACTOR_HEADER)).toBe(false)
+  })
+
+  it('can be asked about one identifier without adopting it', async () => {
+    // "Is this old key still alive?" has to be answerable without touching what the client
+    // currently speaks for — otherwise checking and committing are the same act, and a
+    // check that fails has already thrown away the identity in use (Р-1).
+    const { client, calls } = clientRecording({
+      actorId: () => 'b1b1b1b1-1111-4111-8111-111111111111',
+    })
+
+    await client.me(actorWire.id)
+
+    expect(calls[0]?.headers.get(ACTOR_HEADER)).toBe(actorWire.id)
+  })
+
+  it('is refused rather than crashing the call when it cannot become a header', async () => {
+    // `localStorage` is a string bucket anyone can write to. A value with a line break used
+    // to take the whole call down as a TypeError from `Headers.set`, which the store reads
+    // as «the server did not answer» — a value that cannot be sent names no subject.
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: () => Promise.resolve(new Response(JSON.stringify(actorWire), { status: 200 })),
+      actorId: () => 'abc\r\nX-Molvia-Actor: 9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f',
+    })
+
+    expect(await codeOf(client.me())).toBe(ERROR.NO_ACTOR)
+  })
+})
+
+describe('the first visit', () => {
+  it('posts with the invite code and no body at all', async () => {
+    const { client, calls } = clientRecording()
+
+    await client.createActor('let-me-in')
+
+    expect(calls[0]?.method).toBe('POST')
+    expect(calls[0]?.url).toBe('http://api/actors')
+    expect(calls[0]?.headers.get(INVITE_HEADER)).toBe('let-me-in')
+  })
+
+  it('hands back the domain entity, with dates rather than the strings on the wire', async () => {
+    const { client } = clientRecording()
+
+    const actor = await client.createActor('let-me-in')
+
+    expect(actor.createdAt).toBeInstanceOf(Date)
+    expect(actor.createdAt.toISOString()).toBe(actorWire.createdAt)
+    expect(actor.spendCurrency).toBe('AMD')
+  })
+
+  it('refuses a code that cannot be sent, instead of throwing a TypeError', async () => {
+    // molvia.com/?c=код — a code that came out of a keyboard rather than out of
+    // `openssl rand -hex`. The door would refuse it anyway; what matters is that the person
+    // is told it is the link, not the server.
+    const { client } = clientRecording()
+
+    expect(await codeOf(client.createActor('приглашение'))).toBe(ERROR.NO_ACTOR)
+  })
+
+  it('refuses an answer whose shape is not the contract', async () => {
+    const client = clientAnswering(200, { ...actorWire, createdAt: '16.09.2026' })
+    expect(await codeOf(client.me())).toBe(ISSUE.RESPONSE_INVALID)
   })
 })

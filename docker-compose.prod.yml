@@ -36,6 +36,9 @@ services:
       NODE_ENV: production
       API_PORT: 3300
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # The door of the first visit (MOL-8). Unset means the API exits at boot instead of
+      # letting the whole internet create identities — see deploy/README.md.
+      SIGNUP_CODE: ${SIGNUP_CODE}
     depends_on:
       postgres:
         condition: service_healthy

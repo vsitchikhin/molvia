@@ -34,9 +34,11 @@ function codeOf(error: unknown): string | undefined {
  * reference «means the domain let past what it was supposed to catch». The argument holds
  * only while the domain has something to catch it *with*, and for a unique constraint it does
  * not: uniqueness is a statement about **other rows of the table**, and the domain sees one
- * input at a time. Two paths reach it on an ordinary day — a scanned barcode that already
- * belongs to another item, and a device repeating its first visit after a timeout — and
- * neither is a defect in this server. Hence `CONFLICT`.
+ * input at a time. One path reaches it on an ordinary day — a scanned barcode that already
+ * belongs to another item — and it is not a defect in this server. Hence `CONFLICT`.
+ *
+ * An actor identifier is no longer such a path: it is a fresh `randomUUID()` issued by the
+ * use case (MOL-8, Р-1) rather than something a device brings back after a timeout.
  *
  * Everything else — `23514`, `22003`, `54000`, `22P02` — still falls through. Those the
  * domain genuinely can check on the input in front of it, so meeting one here means a caller

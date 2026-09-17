@@ -4,12 +4,22 @@ import { DomainError, ERROR, ISSUE, errorResponseSchema, isWireCode } from '@mol
 import type { ErrorCode, ErrorResponse } from '@molvia/model'
 import { InvalidBody } from '@/routes/body'
 import { healthRoutes } from '@/routes/health'
-import { databaseIsReachable } from '@/db'
+import { withActor } from '@/routes/actor'
+import { actorMeRoute, firstVisitRoute } from '@/routes/actors'
+import { createActor } from '@/usecases/create-actor'
+import { getActor } from '@/usecases/get-actor'
+import { createActorRepository } from '@/db/actors-repository'
+import { databaseIsReachable, getDb } from '@/db'
+import type { Db } from '@/db'
+import { env } from '@/env'
 
 // The one place where a domain error becomes an HTTP status. Routes never map errors
 // themselves, so a code cannot mean 400 in one place and 404 in another.
 const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.NOT_FOUND]: 404,
+  // Not 400: the request is well formed, it simply names no subject the server can find.
+  // The PWA reads exactly this to decide that its stored identity is gone (MOL-8, Р-4).
+  [ERROR.NO_ACTOR]: 401,
 }
 
 // The handler answers with the contract the client parses, so it checks its own reply
@@ -19,12 +29,43 @@ function answer(response: ErrorResponse): ErrorResponse {
   return parsed.success ? parsed.data : { code: response.code }
 }
 
-export function buildServer(): FastifyInstance {
+/**
+ * A body Fastify itself refused: malformed JSON, an empty body announced as JSON, a media
+ * type nothing can parse. It is the caller's mistake and has to read as one — it used to
+ * come back as 400 carrying `error.internal`, so the status said «your request» while the
+ * body said «our fault», and every typo was filed through `log.error` as a server failure.
+ */
+function isBodyFault(error: FastifyError): boolean {
+  return typeof error.code === 'string' && error.code.startsWith('FST_ERR_CTP_')
+}
+
+export interface ServerOptions {
+  /**
+   * The connection the repositories are built on. Integration tests point it at their own
+   * database: without this the server under test writes into the database a person has been
+   * entering data into by hand, and the test reads an empty one — every assertion about
+   * rows passes while proving nothing.
+   */
+  readonly db?: Db
+}
+
+export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const app = Fastify({ logger: true })
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
     if (error instanceof DomainError) {
-      return reply.status(STATUS_BY_CODE[error.code] ?? 400).send({ code: error.code })
+      const status = STATUS_BY_CODE[error.code] ?? 400
+      // RFC 9110 §15.5.2 makes a challenge mandatory on a 401. The scheme is this project's
+      // own: the credential is a header carrying an identifier, not Basic or Bearer.
+      if (status === 401) void reply.header('www-authenticate', 'Molvia realm="molvia"')
+      return reply.status(status).send({ code: error.code })
+    }
+
+    if (isBodyFault(error)) {
+      // The status comes from the error itself: `FST_ERR_CTP_*` covers a body too large
+      // (413) and an unsupported media type (415) as well as malformed JSON, and flattening
+      // all of them to 400 would leave a caller unable to tell «too big» from «broken».
+      return reply.status(error.statusCode ?? 400).send(answer({ code: ISSUE.BODY_INVALID }))
     }
 
     // Only a body parsed at the seam, never any ZodError: a row that stopped matching its
@@ -40,9 +81,28 @@ export function buildServer(): FastifyInstance {
     return reply.status(error.statusCode ?? 500).send({ code: ERROR.INTERNAL })
   })
 
-  // The composition point: routes are handed what they need instead of importing it.
+  // The composition point: routes are handed what they need instead of importing it. Binding
+  // the repository into the use cases happens here and nowhere else — a route that could
+  // name a repository would be a route that could reach the database.
   app.register((instance, _options, done) => {
+    const actors = createActorRepository(options.db ?? getDb())
+
     healthRoutes(instance, { databaseIsReachable })
+    firstVisitRoute(instance, {
+      create: () => createActor(actors),
+      signupCode: env.SIGNUP_CODE,
+    })
+
+    // Everything that needs an owner is registered inside this scope, and the scope is here
+    // rather than inside a route module: «new routes land in the guarded place by default»
+    // is only true if the guarded place is where routes are actually added. MOL-12, MOL-21
+    // and MOL-27 add theirs next to `actorMeRoute`.
+    void instance.register((guarded, _guardedOptions, guardedDone) => {
+      withActor(guarded, (id) => getActor(actors, id))
+      actorMeRoute(guarded)
+      guardedDone()
+    })
+
     done()
   })
 

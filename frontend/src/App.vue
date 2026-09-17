@@ -2,6 +2,7 @@
   <header class="header">
     <h1 class="title">{{ t('app.name') }}</h1>
   </header>
+  <IdentityNotice />
   <main class="main">
     <RouterView />
   </main>
@@ -10,9 +11,11 @@
 <script lang="ts">
 import { defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IdentityNotice from '@/components/IdentityNotice.vue'
 
 export default defineComponent({
   name: 'AppRoot',
+  components: { IdentityNotice },
   setup() {
     const { t } = useI18n()
     return { t }

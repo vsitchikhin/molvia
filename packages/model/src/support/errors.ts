@@ -14,11 +14,22 @@ export const ERROR = {
    * Someone else's row already holds what this one claims. Added in MOL-7: a unique
    * constraint speaks about *other rows* of the table, and the domain — which sees only the
    * input in front of it — has no way to check that. Without this code such a collision came
-   * back as a 500, and the two paths that meet it are ordinary days rather than defects:
-   * a scanned barcode that already belongs to another item, and a device repeating its
-   * first visit after a timeout.
+   * back as a 500, and the path that meets it is an ordinary day rather than a defect:
+   * a scanned barcode that already belongs to another item.
    */
   CONFLICT: 'error.conflict',
+  /**
+   * The request did not name a subject the server could find. Added in MOL-8, and the line
+   * between it and CONFLICT is worth keeping: CONFLICT is about *other rows of the table*,
+   * which the domain cannot see; NO_ACTOR is about a subject that is absent altogether,
+   * which neither the domain nor the database can know — it is a fact of the request.
+   *
+   * Three cases answer with it and deliberately look identical: no header at all, a header
+   * that is not a uuid, and a well-formed uuid with no row behind it. A difference between
+   * them is how someone else's identifiers get guessed by comparing replies. It is also what
+   * the first visit answers when the invite code is missing or wrong.
+   */
+  NO_ACTOR: 'error.no_actor',
   INTERNAL: 'error.internal',
 } as const
 

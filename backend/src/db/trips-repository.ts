@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, desc, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { tripSchema } from '@molvia/model'
 import type { Currency, ExchangeRate, NewTrip, Trip } from '@molvia/model'
 import { rateFrom, rateTo } from './columns'
@@ -29,7 +29,19 @@ export interface TripRepository {
    */
   latestUnfinishedFor(actorId: string): Promise<Trip | null>
   listFor(actorId: string, limit: number): Promise<Trip[]>
-  finish(id: string, actorId: string, at: Date): Promise<Trip | null>
+  /**
+   * The moment comes from the database unless one is handed in, and that default is the
+   * whole point: `started_at` is stamped by `clock_timestamp()` in microseconds, while a
+   * `Date` out of JS can only name the start of a millisecond. A trip finished inside the
+   * millisecond it started therefore landed *before* its own start, and
+   * `trips_finished_after_start` refused it — rarely on a laptop, almost always on a CI
+   * runner, where nothing slows the two calls apart.
+   *
+   * `at` stays for the case that genuinely has its own moment: a trip closed after the
+   * fact. A moment earlier than the start is still refused, and that is still the caller's
+   * defect rather than this repository's.
+   */
+  finish(id: string, actorId: string, at?: Date): Promise<Trip | null>
 }
 
 type TripRow = typeof trips.$inferSelect
@@ -106,15 +118,14 @@ export function createTripRepository(db: Conn): TripRepository {
       // them apart is how an identifier gets guessed by the difference in the reply.
       //
       // Finishing before the start is refused by `trips_finished_after_start` and falls
-      // through as a 500 on purpose. Note what that asks of the caller: `at` is an argument,
-      // so the moment is *theirs* to supply, and supplying one earlier than the start is the
-      // caller's defect rather than this repository's. It has no clock of its own to correct
-      // them with — the use case that finishes a trip is the one holding the clock.
+      // through as a 500 on purpose — a moment someone supplies can be wrong. Without one,
+      // the row is stamped by the same clock that stamped its start, so the two are
+      // comparable by construction rather than by luck.
       if (idOrNull(id) === null || idOrNull(actorId) === null) return null
 
       const [row] = await db
         .update(trips)
-        .set({ finishedAt: at })
+        .set({ finishedAt: at ?? sql`clock_timestamp()` })
         .where(ownedBy(id, actorId))
         .returning()
       return row ? toTrip(row) : null
