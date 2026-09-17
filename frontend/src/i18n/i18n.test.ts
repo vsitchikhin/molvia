@@ -1,19 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { createI18n } from 'vue-i18n'
 import { ERROR, ISSUE } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
+import { createAppI18n } from '@/i18n'
 import { pickLocale } from '@/i18n/locale'
 import { pluralRu } from '@/i18n/plural-ru'
 
 /** The real thing rather than the rule alone: the bug this guards against is vue-i18n's own. */
 function russian() {
-  return createI18n({
-    legacy: false,
-    locale: 'ru',
-    messages: { ru: { items: '{n} позиция | {n} позиции | {n} позиций' } },
-    pluralRules: { ru: pluralRu },
-  }).global
+  return createAppI18n('ru').global
 }
 
 /** `{ a: { b: 'x' } }` → `{ 'a.b': 'x' }`, so a key can be addressed the way `t()` addresses it. */
@@ -55,11 +50,102 @@ describe('словарь: два языка', () => {
     }
   })
 
+  it('ни одной заглушки вместо текста', () => {
+    // Единственной проверкой содержания была непустота: словарь, где все десять текстов
+    // ошибок заменены на «TODO», проходил и её, и зеркальность, и перебор реестра.
+    for (const [key, value] of [...Object.entries(RU), ...Object.entries(EN)]) {
+      expect(value.trim(), key).not.toMatch(/^(TODO|FIXME|XXX|TBD|\?+|-+)$/i)
+    }
+  })
+
   it('у одного ключа одинаковый набор подстановок в обоих языках', () => {
     // Перевод, потерявший {version}, молчит: vue-i18n отдаст строку без числа, и это
     // заметят на экране, а не в сборке.
     for (const key of Object.keys(RU)) {
       expect(placeholders(EN[key] ?? ''), key).toEqual(placeholders(RU[key] ?? ''))
+    }
+  })
+
+  it('ни одного плоского ключа с точкой в имени', () => {
+    // `{"trip.title": "…"}` рядом с `{"trip": {"title": "…"}}` схлопывается тестом в один
+    // путь, а vue-i18n берёт вложенный: плоский не доезжает до экрана никогда. Словарь
+    // правится руками, и это ровно тот способ, которым такой ключ появляется.
+    const flatKeys = (messages: object): string[] =>
+      Object.entries(messages).flatMap(([key, value]) =>
+        key.includes('.')
+          ? [key]
+          : typeof value === 'object' && value !== null
+            ? flatKeys(value)
+            : [],
+      )
+
+    expect(flatKeys(ru)).toEqual([])
+    expect(flatKeys(en)).toEqual([])
+  })
+})
+
+describe('словарь: плюральные формы', () => {
+  const pluralised = (messages: Record<string, string>): [string, string][] =>
+    Object.entries(messages).filter(([, value]) => value.includes('|'))
+
+  it('в русском — ровно три формы у каждого ключа с плюрализацией', () => {
+    // Ключ, записанный с двумя формами (скопировали английский, потеряли среднюю), проходит
+    // зеркальность, непустоту и совпадение подстановок — и возвращает «2 позиций», ровно ту
+    // ошибку, ради которой в задаче появилось своё правило. Зажим в `pluralRu` превращает
+    // пропуск в молчащую неверную форму, поэтому стережёт её этот тест, а не рантайм.
+    for (const [key, value] of pluralised(RU)) {
+      expect(value.split('|'), key).toHaveLength(3)
+    }
+  })
+
+  it('в английском — ровно две', () => {
+    for (const [key, value] of pluralised(EN)) {
+      expect(value.split('|'), key).toHaveLength(2)
+    }
+  })
+
+  it('плюрализованы одни и те же ключи в обоих языках', () => {
+    // Английское значение, потерявшее `|` вовсе, тоже проходило все проверки словаря и
+    // отдавало «1 items».
+    expect(pluralised(RU).map(([key]) => key)).toEqual(pluralised(EN).map(([key]) => key))
+  })
+})
+
+describe('словарь: каждое сообщение компилируется', () => {
+  it('ни одно значение не падает при подстановке', () => {
+    // `@` делает из текста ссылку на другой ключ, `|` — плюрализацию, `{` без пары роняет
+    // компиляцию. Сегодня словари чистые, но ошибка такого рода всплывает в рантайме на
+    // экране, а не в сборке.
+    const ruT = createAppI18n('ru').global
+    const enT = createAppI18n('en').global
+    const params = {
+      n: 1,
+      count: '1',
+      when: 'вчера',
+      place: 'SAS',
+      query: 'молоко',
+      version: '1',
+      amount: '1',
+      unit: 'л',
+      price: '1',
+      rate: '1',
+      currency: '₽',
+      value: '5',
+      places: 'SAS',
+      item: 'Сыр',
+    }
+
+    for (const key of Object.keys(RU)) {
+      expect(() => ruT.t(key, params), key).not.toThrow()
+      expect(() => enT.t(key, params), key).not.toThrow()
+    }
+  })
+
+  it('ни одно сообщение не ссылается на другой ключ через @', () => {
+    // Связанное сообщение — рабочая возможность vue-i18n, но здесь её нет ни в одном ключе,
+    // и появление `@:` означало бы, что текст потерял самостоятельность незаметно.
+    for (const [key, value] of [...Object.entries(RU), ...Object.entries(EN)]) {
+      expect(value, key).not.toMatch(/@[:.]/)
     }
   })
 })
@@ -98,64 +184,83 @@ describe('словарь: чего в нём нет намеренно', () => {
     // Подпись — название предыдущего экрана («‹ Поход»), это прямо записано в макете.
     // Остаётся только nav.back_label — слово для скринридера, которому нужен глагол, а не
     // заголовок соседнего экрана.
-    expect(RU).not.toHaveProperty('nav.back')
-    expect(RU).toHaveProperty('nav.back_label')
+    for (const dictionary of [RU, EN]) {
+      expect(dictionary).not.toHaveProperty('nav.back')
+      expect(dictionary).toHaveProperty('nav.back_label')
+    }
   })
 })
 
 describe('русская плюрализация', () => {
   it('выбирает форму по последней цифре', () => {
     const t = russian().t
-    expect(t('items', 1)).toBe('1 позиция')
-    expect(t('items', 2)).toBe('2 позиции')
-    expect(t('items', 5)).toBe('5 позиций')
+    expect(t('trip.items_count', 1)).toBe('1 позиция')
+    expect(t('trip.items_count', 2)).toBe('2 позиции')
+    expect(t('trip.items_count', 5)).toBe('5 позиций')
   })
 
   it('держит второй десяток: 11–14 всегда третья форма', () => {
     // Здесь ошибается встроенное правило и почти всякое написанное наспех: «11 позиция».
     const t = russian().t
-    expect(t('items', 11)).toBe('11 позиций')
-    expect(t('items', 12)).toBe('12 позиций')
-    expect(t('items', 14)).toBe('14 позиций')
+    expect(t('trip.items_count', 11)).toBe('11 позиций')
+    expect(t('trip.items_count', 12)).toBe('12 позиций')
+    expect(t('trip.items_count', 14)).toBe('14 позиций')
   })
 
   it('за вторым десятком считает снова по последней цифре', () => {
     const t = russian().t
-    expect(t('items', 21)).toBe('21 позиция')
-    expect(t('items', 22)).toBe('22 позиции')
-    expect(t('items', 25)).toBe('25 позиций')
-    expect(t('items', 101)).toBe('101 позиция')
-    expect(t('items', 111)).toBe('111 позиций')
+    expect(t('trip.items_count', 21)).toBe('21 позиция')
+    expect(t('trip.items_count', 22)).toBe('22 позиции')
+    expect(t('trip.items_count', 25)).toBe('25 позиций')
+    expect(t('trip.items_count', 101)).toBe('101 позиция')
+    expect(t('trip.items_count', 111)).toBe('111 позиций')
   })
 
   it('ноль — третья форма, а не первая', () => {
-    expect(russian().t('items', 0)).toBe('0 позиций')
+    expect(russian().t('trip.items_count', 0)).toBe('0 позиций')
+  })
+
+  it('отрицательное считается по модулю, как во встроенном правиле', () => {
+    // Замена, ведущая себя иначе, чем заменяемое, — ловушка: «-1 позиций» неверно.
+    expect(pluralRu(-1, 3)).toBe(0)
+    expect(pluralRu(-2, 3)).toBe(1)
+    expect(pluralRu(-5, 3)).toBe(2)
+  })
+
+  it('дробное количество — вторая форма', () => {
+    // Взвешенные товары это килограммы и литры: «1,5 позиции», а не «1,5 позиций».
+    expect(pluralRu(1.5, 3)).toBe(1)
+    expect(pluralRu(0.5, 3)).toBe(1)
+    expect(pluralRu(2.5, 3)).toBe(1)
+  })
+
+  it('NaN и Infinity не стирают число из фразы молча', () => {
+    // Счётчик, посчитанный из пустого ответа, раньше рисовал « позиций» — существительное
+    // без числа. Форма теперь определена, а само число остаётся заботой вызывающей стороны.
+    expect(pluralRu(Number.NaN, 3)).toBe(2)
+    expect(pluralRu(Number.POSITIVE_INFINITY, 3)).toBe(2)
   })
 
   it('не выходит за пределы ключа с двумя формами', () => {
-    // Иначе индекс 2 отдал бы undefined вместо текста — ради этого правило и берёт
-    // choicesLength вторым аргументом.
+    // Страховка рантайма: индекс 2 отдал бы undefined вместо текста. От написания такого
+    // ключа защищает тест на число форм, а не эта строка.
     expect(pluralRu(5, 2)).toBe(1)
     expect(pluralRu(11, 2)).toBe(1)
     expect(pluralRu(1, 2)).toBe(0)
   })
 
   it('не ломает английский: две формы выбираются встроенным правилом', () => {
-    const t = createI18n({
-      legacy: false,
-      locale: 'en',
-      messages: { en: { items: '{n} item | {n} items' } },
-      pluralRules: { ru: pluralRu },
-    }).global.t
+    const t = createAppI18n('en').global.t
 
-    expect(t('items', 1)).toBe('1 item')
-    expect(t('items', 2)).toBe('2 items')
+    expect(t('trip.items_count', 1)).toBe('1 item')
+    expect(t('trip.items_count', 2)).toBe('2 items')
   })
 })
 
 describe('выбор языка', () => {
   it('русский язык браузера — русский', () => {
     expect(pickLocale('ru-RU')).toBe('ru')
+    expect(pickLocale(['ru-RU', 'en-US'])).toBe('ru')
   })
 
   it('английский язык браузера — английский', () => {
@@ -170,10 +275,26 @@ describe('выбор языка', () => {
     expect(pickLocale('hy-AM')).toBe('ru')
   })
 
+  it('читается весь список предпочтений, а не только первый язык', () => {
+    // Армянский с английским вторым — это человек, читающий по-английски; армянский с
+    // русским вторым — человек из Гюмри. `navigator.language` их не различает.
+    expect(pickLocale(['hy-AM', 'en-US'])).toBe('en')
+    expect(pickLocale(['hy-AM', 'ru-RU'])).toBe('ru')
+    expect(pickLocale(['de-DE', 'fr-FR'])).toBe('ru')
+  })
+
+  it('похожий на английский тег английским не считается', () => {
+    // `enm` — среднеанглийский, `en-nonsense` — мусор. Совпадение по префиксу делало
+    // английским любой тег, начинающийся с «en».
+    expect(pickLocale('enm')).toBe('ru')
+    expect(pickLocale('en-nonsense')).toBe('en')
+  })
+
   it('неизвестный или отсутствующий язык — тоже русский', () => {
     expect(pickLocale('')).toBe('ru')
     expect(pickLocale(undefined)).toBe('ru')
     expect(pickLocale(null)).toBe('ru')
+    expect(pickLocale([])).toBe('ru')
     expect(pickLocale('de-DE')).toBe('ru')
   })
 })
@@ -189,5 +310,14 @@ describe('атрибут lang', () => {
 
     applyDocumentLang('ru')
     expect(document.documentElement.lang).toBe('ru')
+  })
+
+  it('импорт модуля сам по себе документ не трогает', () => {
+    // Побочный эффект на верхнем уровне делал порядок импортов значимым там, где он обычно
+    // не значим: любой импорт `@/i18n` переписывал `<html lang>`. Теперь это делает main.ts.
+    document.documentElement.lang = 'xx'
+    return import('@/i18n').then(() => {
+      expect(document.documentElement.lang).toBe('xx')
+    })
   })
 })

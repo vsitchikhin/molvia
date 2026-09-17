@@ -1,8 +1,8 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { createI18n } from 'vue-i18n'
 import en from '@/i18n/en.json'
+import { createAppI18n } from '@/i18n'
 import IdentityNotice from '@/components/IdentityNotice.vue'
 import { useActorStore } from '@/stores/actor'
 import type { IdentityState } from '@/stores/actor'
@@ -15,8 +15,10 @@ function render(state: IdentityState, options: { lost?: string[]; failed?: boole
   store.lost = options.lost ?? []
   store.restoreFailed = options.failed ?? false
 
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
-  const view = mount(IdentityNotice, { global: { plugins: [i18n] } })
+  // Через фабрику приложения, а не руками: собранный вручную i18n молча расходится с продом
+  // (без `pluralRules` счётчик считает по-английски, без `fallbackLocale` пропущенный ключ
+  // печатает своё имя вместо английского текста).
+  const view = mount(IdentityNotice, { global: { plugins: [createAppI18n('en')] } })
   return { view, store }
 }
 
