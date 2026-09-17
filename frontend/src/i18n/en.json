@@ -141,6 +141,18 @@
       "body": "It will go on its own once you are back online. You can close the app"
     }
   },
+  "money": {
+    "approx": "≈ {amount}",
+    "converted_package": "≈ {amount} per pack",
+    "converted_note": "the conversion is approximate, we always compare in drams",
+    "rate_official": "rate {rate} · CBA",
+    "rate_mine": "my rate {rate}",
+    "rate_frozen": "The rate is saved with the trip. Last month does not change with today's rate",
+    "rate_label": "1 {currency} =",
+    "source_mine": "mine",
+    "source_official": "official",
+    "home_currency": "My currency"
+  },
   "identity": {
     "lost_title": "The server did not recognise this device",
     "lost_body": "Your earlier trips and ratings are still there, but the server no longer counts them as this device's — so a new record has been started. The old key is kept: if this was a mistake on the server, the data can be brought back.",
