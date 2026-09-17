@@ -113,6 +113,34 @@
       "action": "Show it as is"
     }
   },
+  "verdict": {
+    "title": "Ratings",
+    "pending_count": "{n} purchase is waiting to be rated | {n} purchases are waiting to be rated",
+    "context": "{when} · {place}",
+    "question_tail": "how was it?",
+    "scale_low": "Poor",
+    "scale_high": "Great",
+    "scale_label": "Rating {n} out of 5",
+    "review_label": "A couple of words — if you have any",
+    "review_placeholder": "Smells of starch, not meat",
+    "save": "Save the rating",
+    "save_disabled": "Pick a rating",
+    "skip": "Not now",
+    "footnote": "Ratings and spending are separate flows. The reminder came the next day — at the till nobody has time for this",
+    "empty": {
+      "title": "Everything is rated",
+      "body": "Thank you — the base is more accurate for it. We will remind you when a new purchase turns up",
+      "action": "Open «What to buy»"
+    },
+    "error": {
+      "title": "The rating did not go through",
+      "body": "The draft is saved, we will try sending it again"
+    },
+    "offline": {
+      "title": "The rating is saved",
+      "body": "It will go on its own once you are back online. You can close the app"
+    }
+  },
   "identity": {
     "lost_title": "The server did not recognise this device",
     "lost_body": "Your earlier trips and ratings are still there, but the server no longer counts them as this device's — so a new record has been started. The old key is kept: if this was a mistake on the server, the data can be brought back.",
