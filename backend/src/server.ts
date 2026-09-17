@@ -62,7 +62,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     }
 
     if (isBodyFault(error)) {
-      return reply.status(400).send(answer({ code: ISSUE.BODY_INVALID }))
+      // The status comes from the error itself: `FST_ERR_CTP_*` covers a body too large
+      // (413) and an unsupported media type (415) as well as malformed JSON, and flattening
+      // all of them to 400 would leave a caller unable to tell «too big» from «broken».
+      return reply.status(error.statusCode ?? 400).send(answer({ code: ISSUE.BODY_INVALID }))
     }
 
     // Only a body parsed at the seam, never any ZodError: a row that stopped matching its

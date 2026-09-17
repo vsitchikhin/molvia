@@ -159,10 +159,15 @@ describe('the door itself', () => {
     expect(await db.select().from(actors)).toHaveLength(0)
   })
 
-  it('requires a code long enough to be worth having', () => {
-    // There is no counter, no delay and no lockout behind this door — a hundred wrong codes
-    // cost an attacker nothing, and the IP limit is MOL-37's. The length is what is left,
-    // so it is a rule in the schema rather than a habit of the generator.
-    expect(env.SIGNUP_CODE.length).toBeGreaterThanOrEqual(16)
+  it('refuses a code that is right except for its last character', async () => {
+    // The length rule lives in the env schema, so asserting it here could not fail — the
+    // process would not have started. What is worth pinning is that a near miss is a miss:
+    // the comparison is over digests, so it neither stops early nor leaks how much matched.
+    const almost = `${env.SIGNUP_CODE.slice(0, -1)}${env.SIGNUP_CODE.endsWith('a') ? 'b' : 'a'}`
+
+    const response = await firstVisit(almost)
+
+    expect(response.statusCode).toBe(401)
+    expect(await db.select().from(actors)).toHaveLength(0)
   })
 })

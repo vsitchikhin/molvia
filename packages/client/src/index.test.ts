@@ -94,10 +94,34 @@ describe('everything the client throws is an ApiError', () => {
 
     const truncated = clientServing('', { status: 200, headers: { 'content-type': 'text/plain' } })
     expect(await codeOf(truncated.me())).toBe(ISSUE.RESPONSE_INVALID)
-
-    const gateway = clientServing('<html>502 Bad Gateway</html>', { status: 502 })
-    expect(await codeOf(gateway.health())).toBe(ISSUE.RESPONSE_INVALID)
   })
+
+  it('calls a 5xx what it is — the server down, not an answer off-contract', async () => {
+    // Caddy's 502 during a deploy carries an HTML page. Reporting it as a malformed reply
+    // sends whoever reads the code looking at the contract instead of at the server.
+    const gateway = clientServing('<html>502 Bad Gateway</html>', { status: 502 })
+    expect(await codeOf(gateway.health())).toBe(ERROR.INTERNAL)
+
+    const unavailable = clientServing(null, { status: 503 })
+    expect(await codeOf(unavailable.me())).toBe(ERROR.INTERNAL)
+  })
+
+  it('gives up on a request that hangs, instead of waiting for a network that is gone', async () => {
+    // A captive portal or a half-dead mobile network holds a call open indefinitely. The
+    // PWA would sit on «loading» — no message, no retry — while the identity lock it holds
+    // keeps every other tab waiting with it.
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: (_input, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted', 'TimeoutError'))
+          })
+        }),
+    })
+
+    expect(await codeOf(client.me())).toBe(ERROR.INTERNAL)
+  }, 20_000)
 
   it('and a dropped connection, which is fetch’s own TypeError', async () => {
     const client = createClient({

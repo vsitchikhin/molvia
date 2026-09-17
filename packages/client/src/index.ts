@@ -49,6 +49,16 @@ const CODE_BY_STATUS: Readonly<Record<number, WireCode>> = Object.freeze({
  */
 const HEADER_SAFE = /^[ -~]+$/
 
+/**
+ * How long a request may hang before it is called a failure.
+ *
+ * Without it a captive portal or a half-dead mobile network holds the call open forever, and
+ * the PWA stays on «loading» — a screen with no message and no retry, while the identity
+ * lock it is holding keeps every other tab waiting too. A refusal the caller can act on
+ * beats a wait nobody can end.
+ */
+const REQUEST_TIMEOUT_MS = 15_000
+
 export interface ClientOptions {
   readonly baseUrl: string
   readonly fetch?: typeof globalThis.fetch
@@ -97,7 +107,11 @@ export function createClient({
 
     let response: Response
     try {
-      response = await fetch(`${baseUrl}${path}`, { ...init, headers })
+      response = await fetch(`${baseUrl}${path}`, {
+        ...init,
+        headers,
+        signal: init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
     } catch (error) {
       // A dropped connection is `fetch`'s own TypeError. Whether that reads as «offline» or
       // as «broken» is the caller's call — what matters here is that it arrives as an
@@ -119,9 +133,13 @@ export function createClient({
       const failure = errorResponseSchema.safeParse(body)
       if (failure.success) throw new ApiError(failure.data.code, failure.data.details)
       // The body says nothing this project would recognise, so only the status is left —
-      // and it is never allowed to mean NO_ACTOR (see CODE_BY_STATUS).
+      // and it is never allowed to mean NO_ACTOR (see CODE_BY_STATUS). A 5xx is the server
+      // being down rather than answering off-contract: Caddy's 502 during a deploy is «the
+      // server broke», and calling it a malformed reply would send the caller looking in
+      // the wrong place.
+      const fallback = response.status >= 500 ? ERROR.INTERNAL : ISSUE.RESPONSE_INVALID
       throw new ApiError(
-        CODE_BY_STATUS[response.status] ?? ISSUE.RESPONSE_INVALID,
+        CODE_BY_STATUS[response.status] ?? fallback,
         `HTTP ${String(response.status)}`,
       )
     }
