@@ -7,17 +7,25 @@ import { api } from '@/api'
 import {
   IDENTITY_KEY,
   currentIdentity,
+  forget,
   forgetInviteCode,
   inviteCode,
   isIdentifier,
+  lostIdentity,
+  read,
   rememberIdentity,
+  restoreIdentity,
   setAsideIdentity,
+  takeInviteCodeFromUrl,
+  write,
 } from '@/stores/identity'
 
 /** Only used where `navigator.locks` is missing: Firefox before 96, older WebViews. */
 const CLAIM_KEY = 'molvia.actor.claiming'
-
-const CLAIM_TIMEOUT_MS = 30_000
+/** How stale a claim has to look before another tab decides the one holding it is gone. */
+const CLAIM_STALE_MS = 15_000
+/** How often the holder proves it is still alive, so a slow request is not mistaken for death. */
+const CLAIM_HEARTBEAT_MS = 5_000
 
 /**
  * What the identity is doing, so a screen can show the right one of four states.
@@ -39,9 +47,9 @@ function isMissingActor(error: unknown): boolean {
  * storage and create one each, splitting a person's data in two without a trace.
  *
  * `navigator.locks` is the honest tool — atomic, and released by the browser when a tab is
- * closed mid-request, which no timeout can imitate. The fallback keeps a stamped claim for
- * browsers without it; its deadline is long because the case it guards is a slow first
- * request on a cold server, and giving up early is the very split it exists to prevent.
+ * closed mid-request, which no timeout can imitate. The fallback is for browsers without it,
+ * and it keeps a claim **that is refreshed while the work runs**: a fixed deadline could not
+ * tell a tab waiting on a slow first request from a tab that died, and gave up on both.
  */
 async function claiming<T>(run: () => Promise<T>): Promise<T> {
   // The DOM types promise `navigator.locks` is always there; Firefox before 96 and older
@@ -51,36 +59,36 @@ async function claiming<T>(run: () => Promise<T>): Promise<T> {
   const locks = (navigator as unknown as Record<string, unknown>).locks as LockManager | undefined
   if (locks) return locks.request(IDENTITY_KEY, run)
 
-  const claimed = Number(localStorage.getItem(CLAIM_KEY))
-  if (claimed && Date.now() - claimed < CLAIM_TIMEOUT_MS) {
+  // Storage may be blocked outright, and reaching for it throws — every access goes through
+  // the guarded helpers for that reason. Unguarded, this line rejected `start()` for the
+  // whole class of browsers this fallback exists for, leaving a blank screen (Н-1).
+  const claimed = Number(read(CLAIM_KEY))
+  if (claimed && Date.now() - claimed < CLAIM_STALE_MS) {
     // Waited, and that is all: whether the other tab succeeded is for the runner to see —
     // it re-reads the identity before creating one, so a published identifier is adopted
     // instead of being duplicated.
     await waitForAnotherTab()
   }
 
-  try {
-    localStorage.setItem(CLAIM_KEY, String(Date.now()))
-  } catch {
-    // Without storage there is nothing to coordinate through; one tab is the common case.
-  }
+  write(CLAIM_KEY, String(Date.now()))
+  const heartbeat = setInterval(() => {
+    write(CLAIM_KEY, String(Date.now()))
+  }, CLAIM_HEARTBEAT_MS)
+
   try {
     return await run()
   } finally {
-    try {
-      localStorage.removeItem(CLAIM_KEY)
-    } catch {
-      // Nothing was written.
-    }
+    clearInterval(heartbeat)
+    forget(CLAIM_KEY)
   }
 }
 
-/** Resolves when another tab publishes an identifier, or when waiting stops being useful. */
+/** Resolves when another tab publishes an identifier, or when its claim goes stale. */
 async function waitForAnotherTab(): Promise<boolean> {
   return new Promise((resolve) => {
     const done = (published: boolean) => {
       window.removeEventListener('storage', onStorage)
-      clearTimeout(timer)
+      clearInterval(watch)
       resolve(published)
     }
     const onStorage = (event: StorageEvent) => {
@@ -89,9 +97,12 @@ async function waitForAnotherTab(): Promise<boolean> {
     }
 
     window.addEventListener('storage', onStorage)
-    const timer = setTimeout(() => {
-      done(false)
-    }, CLAIM_TIMEOUT_MS)
+    // Watched rather than timed out once: the holder refreshes its claim while it works, so
+    // «still alive» and «gone» are told apart by whether the stamp moves.
+    const watch = setInterval(() => {
+      const claimed = Number(read(CLAIM_KEY))
+      if (!claimed || Date.now() - claimed > CLAIM_STALE_MS) done(isIdentifier(read(IDENTITY_KEY)))
+    }, CLAIM_HEARTBEAT_MS)
   })
 }
 
@@ -158,12 +169,28 @@ export const useActorStore = defineStore('actor', () => {
           return
         }
         // Published, but the server does not know it either — fall through and create.
-        setAsideIdentity()
+        setAsideIdentity(adopted)
         id.value = null
       }
     }
 
     return create()
+  }
+
+  /** The 401 path: set the old identifier aside and replace it, both under the claim. */
+  async function replace(stale: string): Promise<void> {
+    await claiming(async () => {
+      // Inside the claim, and only clearing the stored key if it still holds this value:
+      // two tabs meeting the same 401 would otherwise have the slower one delete the
+      // identifier the faster one had just created (С-9).
+      setAsideIdentity(stale)
+      id.value = null
+      await createOrAdopt()
+    })
+
+    // Said out loud only once a replacement exists — «lost» describes what happened to the
+    // old data, and there is nothing to say it to until the app works again.
+    if (state.value === 'ready') state.value = 'lost'
   }
 
   async function load(): Promise<void> {
@@ -174,17 +201,7 @@ export const useActorStore = defineStore('actor', () => {
       settle(await api.me())
       state.value = 'ready'
     } catch (error) {
-      if (isMissingActor(error)) {
-        // The identifier is set aside rather than deleted: a 401 is not proof that the row
-        // is gone, and after a server-side mistake is fixed it would work again.
-        setAsideIdentity()
-        id.value = null
-        await claiming(createOrAdopt)
-        // Said out loud only once a replacement exists — «lost» describes what happened to
-        // the old data, and there is nothing to say it to until the app works again.
-        if (state.value === 'ready') state.value = 'lost'
-        return
-      }
+      if (isMissingActor(error)) return replace(stored)
       fail(error)
     }
   }
@@ -195,16 +212,17 @@ export const useActorStore = defineStore('actor', () => {
     running = true
     state.value = 'loading'
     try {
+      // Scrubbed on every start, not only while creating an identity: a device that already
+      // has one, opened from the same link again, kept the code in its address bar (М-20).
+      takeInviteCodeFromUrl()
+
       if (!navigator.onLine) {
-        // An identifier already on the device needs no network to be used: a PWA precached
-        // for the shelf can show its cached screens as this person. Only a device that has
-        // no identity at all is actually stuck, because getting one is a request.
+        // An identifier already on the device is usable without a network — a PWA precached
+        // for the shelf shows its cached screens as this person — but it has not been
+        // checked, and saying «ready» would promise an entity nothing has fetched. The
+        // state stays «offline», which is both true and the one the offline text belongs to.
         const known = currentIdentity()
-        if (isIdentifier(known)) {
-          id.value = known
-          state.value = 'ready'
-          return
-        }
+        if (isIdentifier(known)) id.value = known
         state.value = 'offline'
         return
       }
@@ -214,11 +232,24 @@ export const useActorStore = defineStore('actor', () => {
     }
   }
 
+  /** Puts a set-aside identifier back and checks it, for when the server was at fault. */
+  async function restore(): Promise<void> {
+    const restored = restoreIdentity()
+    if (!restored) return
+
+    id.value = restored
+    actor.value = null
+    await start()
+  }
+
+  const recoverable = () => isIdentifier(lostIdentity())
+
   // A connection that came back is the commonest recovery there is, and until now it took a
-  // reload: nothing listened, so `offline` was terminal.
+  // reload. `error` is listened for too: `navigator.onLine` is true on a captive portal and
+  // on wifi with no route out, so the commonest way to lose the network lands there (Н-3).
   window.addEventListener('online', () => {
-    if (state.value === 'offline') void start()
+    if (state.value === 'offline' || state.value === 'error') void start()
   })
 
-  return { actor, id, state, start, retry: start }
+  return { actor, id, state, start, retry: start, restore, recoverable }
 })

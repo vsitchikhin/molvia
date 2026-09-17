@@ -16,9 +16,22 @@ const LOST_KEY = 'molvia.actor.lost'
 let current: string | null = null
 
 /**
- * Storage throws rather than returning null in Safari's private mode, and both reads and
- * writes can fail. `sessionStorage` is tried second: it survives a reload in the same tab,
- * which is the difference between one identity per launch and one per session (О-7).
+ * The invite code, in memory, for the same reason the identifier is: when storage refuses
+ * every write, a code that arrived in the link has nowhere to be kept — and reading it back
+ * a moment later returns nothing. The device would then be told it needs an invite while
+ * holding one, and could never create an identity at all.
+ */
+let invite: string | null = null
+
+/**
+ * Storage throws rather than returning null in Safari's private mode, and reaching for the
+ * property itself throws when storage is blocked outright — disabled cookies, an embedded
+ * WebView, a corporate policy. **Every** access goes through here for that reason: one
+ * unguarded `localStorage.getItem` was enough to make the app reject on start and sit on a
+ * blank screen for the whole class of browsers the fallback path exists for (Н-1).
+ *
+ * `sessionStorage` is tried second: it survives a reload in the same tab, which is the
+ * difference between one identity per launch and one per session (О-7).
  */
 function stores(): Storage[] {
   const found: Storage[] = []
@@ -35,7 +48,7 @@ function stores(): Storage[] {
   return found
 }
 
-function read(key: string): string | null {
+export function read(key: string): string | null {
   for (const store of stores()) {
     try {
       const value = store.getItem(key)
@@ -47,7 +60,7 @@ function read(key: string): string | null {
   return null
 }
 
-function write(key: string, value: string): boolean {
+export function write(key: string, value: string): boolean {
   let written = false
   for (const store of stores()) {
     try {
@@ -60,7 +73,7 @@ function write(key: string, value: string): boolean {
   return written
 }
 
-function forget(key: string): void {
+export function forget(key: string): void {
   for (const store of stores()) {
     try {
       store.removeItem(key)
@@ -97,39 +110,60 @@ export function rememberIdentity(id: string): boolean {
  * not proof that the row is gone — a database restored from the wrong backup, an API
  * pointed at the wrong place, a proxy in front of it — and after such a mistake is fixed
  * the identifier would work again, if anything still held it (О-2).
+ *
+ * The stored key is cleared **only if it still holds the value being set aside**. Two tabs
+ * that both meet a 401 would otherwise race: the slower one would delete the identifier the
+ * faster one had already created, and the person would end the session with a third one and
+ * the second unreachable (С-9).
  */
-export function setAsideIdentity(): void {
-  const id = currentIdentity()
-  if (id) write(LOST_KEY, id)
-  current = null
-  forget(KEY)
+export function setAsideIdentity(id: string): void {
+  write(LOST_KEY, id)
+  if (current === id) current = null
+  if (read(KEY) === id) forget(KEY)
 }
 
 export function lostIdentity(): string | null {
   return read(LOST_KEY)
 }
 
+/** Puts a set-aside identifier back, so «recoverable» is something a person can act on. */
+export function restoreIdentity(): string | null {
+  const id = lostIdentity()
+  if (!isIdentifier(id)) return null
+
+  current = id
+  write(KEY, id)
+  forget(LOST_KEY)
+  return id
+}
+
 /**
- * The invite code travels in the link once and then lives on the device. It is scrubbed
- * from the address bar straight away: the query lands in history, in screenshots, in the
- * `start_url` of an installed PWA and in every `Referer` the page sends (О-17).
+ * The invite code travels in the link once and then lives on the device. The query is
+ * scrubbed on every start rather than only while creating an identity: a device that
+ * already has one, opened from the same link again, used to keep `?c=` in the address bar —
+ * and from there it goes into history, into screenshots, into the `start_url` of an
+ * installed PWA and into every `Referer` the page sends (О-17, М-20).
  */
-export function inviteCode(): string | null {
+export function takeInviteCodeFromUrl(): void {
   const url = new URL(window.location.href)
   const fromLink = url.searchParams.get('c')
+  if (!fromLink) return
 
-  if (fromLink) {
-    write(INVITE_KEY, fromLink)
-    url.searchParams.delete('c')
-    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
-    return fromLink
-  }
+  invite = fromLink
+  write(INVITE_KEY, fromLink)
+  url.searchParams.delete('c')
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+}
 
-  return read(INVITE_KEY)
+export function inviteCode(): string | null {
+  takeInviteCodeFromUrl()
+  invite ??= read(INVITE_KEY)
+  return invite
 }
 
 /** A code the door refused is worse than no code: it turns every retry into the same 401. */
 export function forgetInviteCode(): void {
+  invite = null
   forget(INVITE_KEY)
 }
 

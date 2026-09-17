@@ -185,6 +185,49 @@ describe('the first launch', () => {
       expect(store.state).toBe('ready')
     })
   })
+
+  it('recovers from «error» too, which is what a captive portal produces', async () => {
+    // `navigator.onLine` is true on a captive portal and on wifi with no route out, so the
+    // commonest way to have no internet lands in `error` — and the listener used to watch
+    // only `offline`, the state that case never reaches.
+    localStorage.setItem(KEY, FIRST.id)
+    const { store } = await freshStore()
+    me.mockRejectedValue(new Error('fetch failed'))
+
+    await store.start()
+    expect(store.state).toBe('error')
+
+    me.mockResolvedValue(FIRST)
+    window.dispatchEvent(new Event('online'))
+    await vi.waitFor(() => {
+      expect(store.state).toBe('ready')
+    })
+  })
+
+  it('starts on a device whose storage is blocked outright, instead of rejecting', async () => {
+    // Disabled cookies, an embedded WebView, a corporate policy: reaching for the property
+    // throws, not just writing to it. One unguarded read left `start()` rejecting into
+    // `void` in main.ts — a screen stuck on «loading», which draws nothing at all.
+    const descriptor = Object.getOwnPropertyDescriptor(window, 'localStorage')
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new Error('SecurityError: access to localStorage is denied')
+      },
+    })
+
+    try {
+      createActor.mockResolvedValue(FIRST)
+      const { store } = await freshStore()
+
+      await expect(store.start()).resolves.toBeUndefined()
+
+      expect(store.state).toBe('ready')
+      expect(store.id).toBe(FIRST.id)
+    } finally {
+      if (descriptor) Object.defineProperty(window, 'localStorage', descriptor)
+    }
+  })
 })
 
 describe('a device whose storage refuses writes', () => {
@@ -218,6 +261,25 @@ describe('a device whose storage refuses writes', () => {
       expect(createActor).toHaveBeenCalledTimes(1)
       expect(store.id).toBe(FIRST.id)
     })
+  })
+})
+
+describe('an offline launch with an identity already stored', () => {
+  it('does not call itself ready for an identity nothing has checked', async () => {
+    // «Ready» used to mean two things: «the server confirmed, here is the entity» and «a
+    // row exists, nothing could be asked». Everything reading `actor` — the settings screen
+    // of MOL-41, a trip's currency — got null where the state promised otherwise.
+    localStorage.setItem(KEY, FIRST.id)
+    online(false)
+    const { store } = await freshStore()
+
+    await store.start()
+
+    expect(store.state).toBe('offline')
+    expect(store.actor).toBeNull()
+    // Usable all the same: the identifier is there, and a precached screen can be shown as
+    // this person. What is missing is the confirmation, not the identity.
+    expect(store.id).toBe(FIRST.id)
   })
 })
 
@@ -329,6 +391,49 @@ describe('two tabs opened at once', () => {
 
     expect(createActor).toHaveBeenCalledTimes(1)
     expect(store.state).toBe('ready')
+  })
+})
+
+describe('two tabs that both meet a dead identity', () => {
+  it('does not let the slower one delete what the faster one just created', async () => {
+    // Both tabs were reloaded after `make db-reset` and both hold X. A deletes X, creates Y
+    // and stores it. B's 401 arrives later: it used to clear the key that already held Y,
+    // then create Z — one person, three identifiers, the middle one unreachable.
+    localStorage.setItem(KEY, FIRST.id)
+    const { store, identity } = await freshStore()
+    me.mockRejectedValue(await refusal())
+    createActor.mockImplementation(() => {
+      // The other tab finished while this one was between the 401 and its own claim.
+      localStorage.setItem(KEY, SECOND.id)
+      return Promise.resolve(SECOND)
+    })
+
+    await store.start()
+
+    expect(localStorage.getItem(KEY)).toBe(SECOND.id)
+    expect(identity.lostIdentity()).toBe(FIRST.id)
+  })
+})
+
+describe('a set-aside identity', () => {
+  it('can be brought back, which is what «recoverable» has to mean', async () => {
+    // The old identifier was kept so a server-side mistake stays recoverable — and nothing
+    // read it. The person was told their data was out of reach while it sat on the device.
+    localStorage.setItem(KEY, FIRST.id)
+    const { store, identity } = await freshStore()
+    me.mockRejectedValueOnce(await refusal())
+    createActor.mockResolvedValue(SECOND)
+
+    await store.start()
+    expect(store.state).toBe('lost')
+    expect(store.recoverable()).toBe(true)
+
+    me.mockResolvedValue(FIRST)
+    await store.restore()
+
+    expect(store.id).toBe(FIRST.id)
+    expect(store.state).toBe('ready')
+    expect(identity.currentIdentity()).toBe(FIRST.id)
   })
 })
 

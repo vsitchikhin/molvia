@@ -1,15 +1,20 @@
 <template>
-  <aside v-if="notice && !dismissed" class="notice" :class="tone" role="status">
+  <aside v-if="notice && !dismissed" class="notice" :class="tone" :role="role">
     <h2 class="title">{{ t(`identity.${notice}_title`) }}</h2>
     <p class="body">{{ t(`identity.${notice}_body`) }}</p>
 
-    <button v-if="notice === 'lost'" class="action" type="button" @click="dismissed = true">
-      {{ t('identity.lost_action') }}
-    </button>
-    <button v-else-if="canRetry" class="action" type="button" @click="retry">
-      <IconRefresh class="icon" aria-hidden="true" />
-      {{ t('state.retry') }}
-    </button>
+    <div class="actions">
+      <button v-if="canRetry" class="action" type="button" @click="retry">
+        <IconRefresh class="icon" aria-hidden="true" />
+        {{ t('state.retry') }}
+      </button>
+      <button v-if="canRestore" class="action" type="button" @click="restore">
+        {{ t('identity.lost_restore') }}
+      </button>
+      <button v-if="notice === 'lost'" class="action" type="button" @click="dismissed = true">
+        {{ t('identity.lost_action') }}
+      </button>
+    </div>
   </aside>
 </template>
 
@@ -51,14 +56,29 @@ export default defineComponent({
     // Retrying is only useful where the app might succeed next time. «Uninvited» needs a
     // different link, not another attempt, and a button there would promise otherwise.
     const canRetry = computed(() => notice.value === 'error' || notice.value === 'offline')
+    // The old identifier is kept precisely so that a server-side mistake stays recoverable —
+    // which means nothing at all unless a person can act on it (Н-5).
+    const canRestore = computed(() => notice.value === 'lost' && actor.recoverable())
     const tone = computed(() => (canRetry.value ? 'plain' : 'warn'))
+    // Losing an identity interrupts what someone was doing; a dropped connection does not.
+    const role = computed(() => (canRetry.value ? 'status' : 'alert'))
 
     // A message dismissed for one situation must not hide the next one.
     watch(notice, () => {
       dismissed.value = false
     })
 
-    return { t, notice, dismissed, canRetry, tone, retry: () => void actor.retry() }
+    return {
+      t,
+      notice,
+      dismissed,
+      canRetry,
+      canRestore,
+      tone,
+      role,
+      retry: () => void actor.retry(),
+      restore: () => void actor.restore(),
+    }
   },
 })
 </script>
@@ -99,11 +119,17 @@ export default defineComponent({
   line-height: var(--leading-body);
 }
 
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
 .action {
   @include touch-target;
 
   gap: var(--space-2);
-  margin-top: var(--space-3);
   padding: 0 var(--space-4);
   border: var(--hairline) solid currentcolor;
   border-radius: var(--radius);

@@ -7,14 +7,17 @@ import IdentityNotice from '@/components/IdentityNotice.vue'
 import { useActorStore } from '@/stores/actor'
 import type { IdentityState } from '@/stores/actor'
 
-function render(state: IdentityState) {
+function render(state: IdentityState, options: { recoverable?: boolean } = {}) {
   const store = useActorStore()
   store.state = state
+  if (options.recoverable) localStorage.setItem('molvia.actor.lost', LOST_ID)
 
   const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
   const view = mount(IdentityNotice, { global: { plugins: [i18n] } })
   return { view, store }
 }
+
+const LOST_ID = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -68,6 +71,29 @@ describe('IdentityNotice', () => {
     expect(retry).toHaveBeenCalled()
     expect(render('offline').view.find('button').exists()).toBe(true)
     expect(render('uninvited').view.find('button').exists()).toBe(false)
+  })
+
+  it('offers to bring the old data back when there is something to bring back', async () => {
+    // Keeping the identifier «so a server-side mistake stays recoverable» means nothing
+    // until a person can act on it — and until then the message is simply untrue.
+    const { view, store } = render('lost', { recoverable: true })
+    const restore = vi.spyOn(store, 'restore').mockResolvedValue(undefined)
+
+    await view.get('button').trigger('click')
+
+    expect(view.text()).toContain(en.identity.lost_restore)
+    expect(restore).toHaveBeenCalled()
+  })
+
+  it('does not offer it when nothing was set aside', () => {
+    expect(render('lost').view.text()).not.toContain(en.identity.lost_restore)
+  })
+
+  it('interrupts for a lost identity and stays polite for a dropped connection', () => {
+    // A lost identity interrupts what someone was doing; no connection does not, and a
+    // screen reader should be told the difference.
+    expect(render('lost').view.get('aside').attributes('role')).toBe('alert')
+    expect(render('offline').view.get('aside').attributes('role')).toBe('status')
   })
 
   it('takes every word from i18n, not from the markup', () => {
