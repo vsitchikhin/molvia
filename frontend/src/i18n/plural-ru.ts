@@ -7,22 +7,25 @@
  * always take the third form, however the number ends.
  */
 export function pluralRu(choice: number, choicesLength: number): number {
-  // The rule this replaces takes `Math.abs`, and a replacement that behaves differently from
-  // what it replaces is a trap. A negative count is not a real case today, but «-1 позиций»
-  // would be wrong the day it appears.
-  const count = Math.abs(choice)
+  // «Unknown how many» — the third form, and this branch is what the runtime actually hits.
+  //
+  // vue-i18n coerces a non-number to -1 *before* calling the rule, so `NaN` and `Infinity`
+  // never reach here: what arrives is -1. A counter divided by an empty answer therefore
+  // renders the noun with no number — « позиций» — and the plural form at least stays
+  // impersonal instead of claiming «одна». `Math.abs` alone turned that into « позиция»,
+  // which reads like a real count of one.
+  //
+  // A genuine -1 is not a case in 0.1 either, so treating both the same costs nothing.
+  if (!Number.isFinite(choice) || choice < 0) return clamp(2, choicesLength)
 
   // A fraction is not exotic here: loose goods are kilograms and litres, so «1,5 кг» arrives
   // long before the fortieth screen. Russian treats any fractional amount as the second form
   // («1,5 позиции»), which is what the remainder below cannot express on its own.
-  // NaN and Infinity are the shape a counter takes when it was divided by an empty answer —
-  // without this they render the noun with no number at all: « позиций».
-  if (!Number.isFinite(count)) return clamp(2, choicesLength)
-  if (!Number.isInteger(count)) return clamp(1, choicesLength)
+  if (!Number.isInteger(choice)) return clamp(1, choicesLength)
 
-  const teen = count % 100 >= 11 && count % 100 <= 14
-  const last = count % 10
-  const form = count !== 0 && !teen && last === 1 ? 0 : !teen && last >= 2 && last <= 4 ? 1 : 2
+  const teen = choice % 100 >= 11 && choice % 100 <= 14
+  const last = choice % 10
+  const form = choice !== 0 && !teen && last === 1 ? 0 : !teen && last >= 2 && last <= 4 ? 1 : 2
 
   return clamp(form, choicesLength)
 }

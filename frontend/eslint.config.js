@@ -96,8 +96,9 @@ export default defineConfigWithVueTs(
         {
           // Separators and signs rather than words: not text, and not translated.
           //
-          // The allowlist matches a whole text node, not the characters inside it: «−» passes,
-          // «−12 %» does not, because the digits are not on the list. That is the right
+          // The rule cuts every listed entry out of the node and looks at what is left
+          // (`getBareString` → `result.replace(allowlistRe, '')`), so «−» passes while «−12 %»
+          // does not: after «−» and «%» are removed the digits remain. That is the right
           // behaviour rather than a gap — a number written into the markup is as untranslatable
           // as a word, and every real one arrives through interpolation, which the rule ignores.
           allowlist: [...BARE_STRING_DEFAULTS.allowlist, '≈', '×', '֏', '₽', '…'],

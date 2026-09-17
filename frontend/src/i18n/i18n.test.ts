@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ERROR, ISSUE } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
@@ -85,23 +85,24 @@ describe('словарь: два языка', () => {
 })
 
 describe('словарь: повторяющиеся тексты', () => {
-  it('один и тот же текст повторяется только там, где это решено', () => {
-    // Пер-экранные состояния (Р-2) стоят трёх копий «Сервер не ответил»: правка в одной
-    // разойдётся с двумя другими молча. Сводить их в общий ключ нельзя — это отменит само
-    // решение, за которое заплачено. Поэтому цена закреплена снимком: новый незаявленный
-    // дубль уронит тест, а заявленные видно списком.
+  const duplicates = (messages: Record<string, string>): Record<string, string[]> => {
     const byValue = new Map<string, string[]>()
-    for (const [key, value] of Object.entries(RU)) {
+    for (const [key, value] of Object.entries(messages)) {
       byValue.set(value, [...(byValue.get(value) ?? []), key])
     }
-
-    const duplicated = Object.fromEntries(
+    return Object.fromEntries(
       [...byValue.entries()]
         .filter(([, keys]) => keys.length > 1)
         .map(([value, keys]) => [value, keys.sort()]),
     )
+  }
 
-    expect(duplicated).toEqual({
+  it('в русском повторяется только то, что решено', () => {
+    // Пер-экранные состояния (Р-2) стоят трёх копий «Сервер не ответил»: правка в одной
+    // разойдётся с двумя другими молча. Сводить их в общий ключ нельзя — это отменит само
+    // решение, за которое заплачено. Поэтому цена закреплена снимком: новый незаявленный
+    // дубль уронит тест, а заявленные видно списком.
+    expect(duplicates(RU)).toEqual({
       // Подпись таба и заголовок экрана — разные роли одного слова, живут отдельно осознанно.
       Поход: ['nav.trip', 'trip.title'],
       'Что брать': ['advice.title', 'nav.advice'],
@@ -111,6 +112,23 @@ describe('словарь: повторяющиеся тексты', () => {
       'Нет сети': ['identity.offline.title', 'item.offline.title'],
       // Кнопка в двух местах похода: в списке и в офлайне.
       'Добавить позицию': ['trip.add_item', 'trip.offline.action'],
+    })
+  })
+
+  it('и в английском тоже — он склеивает там, где русский различает', () => {
+    // Снимок только по первичному языку пропускал «Cancel»: по-русски это «Отмена» в диалоге
+    // и «Отменить» в шторке — два разных слова, поэтому русский дубль их не видел. Язык, где
+    // текстов меньше, расходится там, где первичный разведён, и заметить это может только
+    // проверка по обоим.
+    expect(duplicates(EN)).toEqual({
+      Trip: ['nav.trip', 'trip.title'],
+      'What to buy': ['advice.title', 'nav.advice'],
+      Ratings: ['nav.verdicts', 'verdict.title'],
+      'The server did not answer': ['advice.error.title', 'item.error.title', 'trip.error.title'],
+      'No connection': ['identity.offline.title', 'item.offline.title'],
+      'Add an item': ['trip.add_item', 'trip.offline.action'],
+      // Английский не различает отмену диалога и отмену ввода; русский различает.
+      Cancel: ['item.cancel', 'trip.finish_confirm.cancel'],
     })
   })
 })
@@ -140,6 +158,19 @@ describe('словарь: плюральные формы', () => {
     // отдавало «1 items».
     expect(pluralised(RU).map(([key]) => key)).toEqual(pluralised(EN).map(([key]) => key))
   })
+
+  it('вертикальная черта стоит только у заявленных счётчиков', () => {
+    // Счёт частей ловит недостачу формы, но принимает лишнее: «Итого | НДС | чаевые» — тоже
+    // «ровно три», а `t()` без счётчика вернёт от фразы первую треть. Плюральные ключи здесь
+    // наперечёт, поэтому список закреплён: `|` в любом другом тексте — почти наверняка
+    // разделитель, поставленный по недосмотру.
+    expect(pluralised(RU).map(([key]) => key)).toEqual([
+      'trip.items_count',
+      'item.results_announced',
+      'advice.ratings_count',
+      'verdict.pending_count',
+    ])
+  })
 })
 
 describe('словарь: каждое сообщение компилируется', () => {
@@ -149,26 +180,40 @@ describe('словарь: каждое сообщение компилирует
     // экране, а не в сборке.
     const ruT = createAppI18n('ru').global
     const enT = createAppI18n('en').global
-    const params = {
-      n: 1,
-      count: '1',
-      when: 'вчера',
-      place: 'SAS',
-      query: 'молоко',
-      version: '1',
-      amount: '1',
-      unit: 'л',
-      price: '1',
-      rate: '1',
-      currency: '₽',
-      value: '5',
-      places: 'SAS',
-      item: 'Сыр',
-    }
+
+    // Параметры собираются из самих значений, а не перечисляются руками: список, записанный
+    // однажды, не узнает о ключе, заведённом завтра с именем `{limit}` — тот пройдёт проверку
+    // и нарисует дыру на экране.
+    const params = Object.fromEntries(
+      [...Object.values(RU), ...Object.values(EN)]
+        .flatMap((value) => placeholders(value))
+        .map((name) => [name, name === 'n' ? 1 : `‹${name}›`]),
+    )
 
     for (const key of Object.keys(RU)) {
       expect(() => ruT.t(key, params), key).not.toThrow()
       expect(() => enT.t(key, params), key).not.toThrow()
+    }
+  })
+
+  it('каждая подстановка получила значение — ни одной дыры в собранной фразе', () => {
+    // Сама сборка параметров из значений даёт и проверку: если имя подстановки не попало в
+    // список, `t()` подставит пустую строку, и в тексте появится «дешевле  за ». Ищем
+    // именно это — фразу, потерявшую кусок.
+    const t = createAppI18n('ru').global
+    const params = Object.fromEntries(
+      Object.values(RU)
+        .flatMap((value) => placeholders(value))
+        .map((name) => [name, name === 'n' ? 1 : `‹${name}›`]),
+    )
+
+    for (const [key, value] of Object.entries(RU)) {
+      if (value.includes('|')) continue
+      const rendered = t.t(key, params)
+      expect(rendered, key).not.toMatch(/\s{2,}/)
+      for (const name of placeholders(value)) {
+        expect(rendered, `${key} ← {${name}}`).toContain(name === 'n' ? '1' : `‹${name}›`)
+      }
     }
   })
 
@@ -251,11 +296,12 @@ describe('русская плюрализация', () => {
     expect(russian().t('trip.items_count', 0)).toBe('0 позиций')
   })
 
-  it('отрицательное считается по модулю, как во встроенном правиле', () => {
-    // Замена, ведущая себя иначе, чем заменяемое, — ловушка: «-1 позиций» неверно.
-    expect(pluralRu(-1, 3)).toBe(0)
-    expect(pluralRu(-2, 3)).toBe(1)
-    expect(pluralRu(-5, 3)).toBe(2)
+  it('отрицательное — «неизвестно сколько», третья форма', () => {
+    // vue-i18n отдаёт правилу -1 вместо NaN, и это единственный способ, каким отрицательное
+    // сюда приходит. Считать его настоящим счётчиком («минус одна позиция») смысла нет:
+    // это авария, и безличная форма честнее.
+    expect(pluralRu(-1, 3)).toBe(2)
+    expect(pluralRu(-2, 3)).toBe(2)
   })
 
   it('дробное количество — вторая форма', () => {
@@ -265,11 +311,16 @@ describe('русская плюрализация', () => {
     expect(pluralRu(2.5, 3)).toBe(1)
   })
 
-  it('NaN и Infinity не стирают число из фразы молча', () => {
-    // Счётчик, посчитанный из пустого ответа, раньше рисовал « позиций» — существительное
-    // без числа. Форма теперь определена, а само число остаётся заботой вызывающей стороны.
-    expect(pluralRu(Number.NaN, 3)).toBe(2)
-    expect(pluralRu(Number.POSITIVE_INFINITY, 3)).toBe(2)
+  it('счётчик из пустого ответа остаётся безличным', () => {
+    // Проверяется через `t()`, а не через голую функцию: vue-i18n приводит нечисло к -1 ещё
+    // до вызова правила, поэтому `pluralRu(NaN, 3)` описывает вход, до которого рантайм не
+    // доживает. Число из фразы всё равно исчезает — это забота вызывающей стороны, — но
+    // форма не должна притворяться, что позиция ровно одна.
+    const t = russian().t
+
+    expect(t('trip.items_count', Number.NaN)).toBe(' позиций')
+    expect(t('trip.items_count', Number.POSITIVE_INFINITY)).toBe(' позиций')
+    expect(t('trip.items_count', -1)).toBe('-1 позиций')
   })
 
   it('не выходит за пределы ключа с двумя формами', () => {
@@ -343,12 +394,19 @@ describe('атрибут lang', () => {
     expect(document.documentElement.lang).toBe('ru')
   })
 
-  it('импорт модуля сам по себе документ не трогает', () => {
+  it('импорт модуля сам по себе документ не трогает', async () => {
     // Побочный эффект на верхнем уровне делал порядок импортов значимым там, где он обычно
     // не значим: любой импорт `@/i18n` переписывал `<html lang>`. Теперь это делает main.ts.
+    //
+    // `resetModules` здесь несущий, а не украшение: модуль импортирован статически первой
+    // строкой файла, то есть уже выполнен, и `await import(...)` попал бы в кеш. Без сброса
+    // проверка проходит даже тогда, когда эффект вернули на верхний уровень, — то есть не
+    // может упасть, а тест, который не может упасть, хуже отсутствующего.
+    vi.resetModules()
     document.documentElement.lang = 'xx'
-    return import('@/i18n').then(() => {
-      expect(document.documentElement.lang).toBe('xx')
-    })
+
+    await import('@/i18n')
+
+    expect(document.documentElement.lang).toBe('xx')
   })
 })
