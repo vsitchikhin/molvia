@@ -110,18 +110,47 @@ describe('everything the client throws is an ApiError', () => {
     // A captive portal or a half-dead mobile network holds a call open indefinitely. The
     // PWA would sit on «loading» — no message, no retry — while the identity lock it holds
     // keeps every other tab waiting with it.
+    //
+    // Ten milliseconds rather than the real fifteen seconds: the limit is an option
+    // precisely so that a suite proving it does not have to wait for it (М-24).
     const client = createClient({
       baseUrl: 'http://api',
+      timeoutMs: 10,
       fetch: (_input, init) =>
         new Promise((_resolve, reject) => {
           init?.signal?.addEventListener('abort', () => {
-            reject(new DOMException('The operation was aborted', 'TimeoutError'))
+            reject(new DOMException('The operation was aborted', 'AbortError'))
           })
         }),
     })
 
     expect(await codeOf(client.me())).toBe(ERROR.INTERNAL)
-  }, 20_000)
+  })
+
+  it('does not put a deadline on the first visit, where an abort would orphan a row', async () => {
+    // An abort on this side says nothing about whether the INSERT landed, so a retry after
+    // one creates a **second** identity — and rows in `actors` are the denominator of the
+    // 0.2 gate. A cold VPS answering slowly is the ordinary case, not the failure.
+    let aborted = false
+    const client = createClient({
+      baseUrl: 'http://api',
+      timeoutMs: 10,
+      fetch: (_input, init) =>
+        new Promise((resolve) => {
+          init?.signal?.addEventListener('abort', () => {
+            aborted = true
+          })
+          setTimeout(() => {
+            resolve(new Response(JSON.stringify(actorWire), { status: 201 }))
+          }, 40)
+        }),
+    })
+
+    const actor = await client.createActor('let-me-in')
+
+    expect(aborted).toBe(false)
+    expect(actor.id).toBe(actorWire.id)
+  })
 
   it('and a dropped connection, which is fetch’s own TypeError', async () => {
     const client = createClient({
@@ -191,6 +220,19 @@ describe('the identity the client speaks for', () => {
     await client.me()
 
     expect(calls[0]?.headers.has(ACTOR_HEADER)).toBe(false)
+  })
+
+  it('can be asked about one identifier without adopting it', async () => {
+    // "Is this old key still alive?" has to be answerable without touching what the client
+    // currently speaks for — otherwise checking and committing are the same act, and a
+    // check that fails has already thrown away the identity in use (Р-1).
+    const { client, calls } = clientRecording({
+      actorId: () => 'b1b1b1b1-1111-4111-8111-111111111111',
+    })
+
+    await client.me(actorWire.id)
+
+    expect(calls[0]?.headers.get(ACTOR_HEADER)).toBe(actorWire.id)
   })
 
   it('is refused rather than crashing the call when it cannot become a header', async () => {

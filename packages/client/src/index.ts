@@ -49,15 +49,8 @@ const CODE_BY_STATUS: Readonly<Record<number, WireCode>> = Object.freeze({
  */
 const HEADER_SAFE = /^[ -~]+$/
 
-/**
- * How long a request may hang before it is called a failure.
- *
- * Without it a captive portal or a half-dead mobile network holds the call open forever, and
- * the PWA stays on «loading» — a screen with no message and no retry, while the identity
- * lock it is holding keeps every other tab waiting too. A refusal the caller can act on
- * beats a wait nobody can end.
- */
-const REQUEST_TIMEOUT_MS = 15_000
+/** How long a request may hang before it is called a failure. */
+const DEFAULT_TIMEOUT_MS = 15_000
 
 export interface ClientOptions {
   readonly baseUrl: string
@@ -71,14 +64,23 @@ export interface ClientOptions {
    * and has neither `localStorage` nor, in 0.1, an identity at all.
    */
   readonly actorId?: () => string | null
+  /**
+   * How long a request may hang. A test sets it to milliseconds; nothing else should need
+   * to — a constant here would make every suite that covers the timeout wait for it.
+   */
+  readonly timeoutMs?: number
 }
 
 export interface MolviaClient {
   health(): Promise<HealthResponse>
   /** The first visit. The code comes from the link the person opened, once per device. */
   createActor(inviteCode: string): Promise<Actor>
-  /** Whether the identity this client carries is still alive. */
-  me(): Promise<Actor>
+  /**
+   * Whether an identity is still alive. With no argument it asks about the one this client
+   * speaks for; with one, about that identifier and **without touching anything else** —
+   * which is what makes «check before restoring» possible instead of «replace and hope».
+   */
+  me(identifier?: string): Promise<Actor>
 }
 
 /**
@@ -89,6 +91,7 @@ export function createClient({
   baseUrl,
   fetch = globalThis.fetch,
   actorId,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
 }: ClientOptions): MolviaClient {
   function header(name: string, value: string, headers: Headers): void {
     // A stored identifier with a newline in it would otherwise take the whole call down as
@@ -98,25 +101,49 @@ export function createClient({
     headers.set(name, value)
   }
 
-  async function request<T>(path: string, schema: ZodType<T>, init: RequestInit = {}): Promise<T> {
-    const headers = new Headers(init.headers)
-    const id = actorId?.()
+  interface Options {
+    readonly method?: string
+    readonly headers?: Headers
+    /** The identity to speak as, when it is not the one the client carries. */
+    readonly as?: string
+    /** `null` means «wait as long as it takes» — see `createActor`. */
+    readonly timeout?: number | null
+  }
+
+  async function request<T>(path: string, schema: ZodType<T>, options: Options = {}): Promise<T> {
+    const headers = new Headers(options.headers)
+    const id = options.as ?? actorId?.()
     // Set only when there is one: `X-Molvia-Actor: null` is the string «null», which the
     // server refuses for a reason the caller cannot act on.
     if (id) header(ACTOR_HEADER, id, headers)
 
+    // `AbortController` and a timer rather than `AbortSignal.timeout`, which Safari only
+    // learned in 16.0: on iOS 15 the call itself threw, inside the try below, and turned
+    // **every** request into a failure — an app permanently in «error», retrying into the
+    // same wall.
+    const limit = options.timeout === undefined ? timeoutMs : options.timeout
+    const controller = new AbortController()
+    const timer =
+      limit === null
+        ? undefined
+        : setTimeout(() => {
+            controller.abort()
+          }, limit)
+
     let response: Response
     try {
       response = await fetch(`${baseUrl}${path}`, {
-        ...init,
+        ...(options.method === undefined ? {} : { method: options.method }),
         headers,
-        signal: init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: controller.signal,
       })
     } catch (error) {
       // A dropped connection is `fetch`'s own TypeError. Whether that reads as «offline» or
       // as «broken» is the caller's call — what matters here is that it arrives as an
       // ApiError like everything else.
       throw new ApiError(ERROR.INTERNAL, error instanceof Error ? error.message : 'transport')
+    } finally {
+      if (timer !== undefined) clearTimeout(timer)
     }
 
     // A proxy page, an empty body, a reply cut off mid-flight: `.json()` throws, and every
@@ -155,17 +182,21 @@ export function createClient({
   return {
     health: () => request('/health', healthResponseSchema),
 
-    // The entity arrives with its timestamps as ISO strings and leaves this call as the
-    // domain object: the codec is the only place that border is crossed.
     // `async` so that a refused code arrives as a rejection rather than a synchronous
     // throw: a caller writing `createActor(code).catch(…)` would never see the latter, and
     // «everything this module throws is an ApiError» has to mean «through the promise».
     createActor: async (inviteCode) => {
       const headers = new Headers()
       header(INVITE_HEADER, inviteCode, headers)
-      return request('/actors', actorCodec, { method: 'POST', headers })
+
+      // No timeout on the first visit, and this is the one place it is right to wait. An
+      // abort here says nothing about whether the INSERT landed, so a retry after one
+      // creates a **second** identity — and rows in `actors` are the denominator of the
+      // 0.2 gate. A cold VPS answering slowly is the ordinary case, not the failure.
+      return request('/actors', actorCodec, { method: 'POST', headers, timeout: null })
     },
 
-    me: () => request('/actors/me', actorCodec),
+    me: (identifier) =>
+      request('/actors/me', actorCodec, identifier === undefined ? {} : { as: identifier }),
   }
 }
