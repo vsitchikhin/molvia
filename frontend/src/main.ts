@@ -1,12 +1,17 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from '@/App.vue'
-import { i18n } from '@/i18n'
+import { applyDocumentLang, i18n } from '@/i18n'
 import { router } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import '@/styles/main.scss'
 
 const app = createApp(App)
+
+// `index.html` ships `lang="ru"`, which is right until the app boots and wrong the moment the
+// chosen locale is anything else. Done here rather than as a side effect of importing i18n:
+// a module that rewrites the document on import makes import order matter where it should not.
+applyDocumentLang()
 
 // Nothing swallows a render error otherwise, and on a phone at a shelf a blank screen
 // is indistinguishable from a slow one. The console is the honest destination until
