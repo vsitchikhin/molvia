@@ -28,9 +28,16 @@ function flatten(messages: object, prefix = ''): Record<string, string> {
 const RU = flatten(ru)
 const EN = flatten(en)
 
-/** `{n}`, `{place}`, `{version}` — what a message expects to be handed at render time. */
+/**
+ * `{n}`, `{place}`, `{version}` — what a message expects to be handed at render time.
+ *
+ * Unique names rather than every occurrence: a pluralised key carries `{n}` once per form,
+ * and Russian has three forms where English has two. Counting occurrences would compare the
+ * number of plural forms — which is meant to differ — instead of a lost placeholder.
+ */
 function placeholders(message: string): string[] {
-  return [...message.matchAll(/\{(\w+)\}/g)].map((match) => match[1] ?? '').sort()
+  const names = [...message.matchAll(/\{(\w+)\}/g)].map((match) => match[1] ?? '')
+  return [...new Set(names)].sort()
 }
 
 describe('словарь: два языка', () => {
