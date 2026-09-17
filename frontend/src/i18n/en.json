@@ -48,6 +48,43 @@
       "action": "Start a trip"
     }
   },
+  "item": {
+    "search_title": "What did you pick up?",
+    "search_placeholder": "Milk, matsun, cheese…",
+    "search_hint": "Typos and Latin spelling are fine",
+    "group_recent": "You buy these often",
+    "group_found": "Found",
+    "results_announced": "Found {n} item | Found {n} items",
+    "quantity": "How much",
+    "unit": "Unit",
+    "unit_kg": "kg",
+    "unit_g": "g",
+    "unit_l": "l",
+    "unit_ml": "ml",
+    "unit_piece": "pc",
+    "price": "Price as on the tag",
+    "unit_price_label": "Per unit",
+    "unit_price_pending": "Worked out for you — nothing to type",
+    "save": "Add to the trip",
+    "save_edit": "Save",
+    "delete": "Remove the item",
+    "cancel": "Cancel",
+    "close": "Close",
+    "offline_note": "Saved on the phone, sent once you are back online",
+    "empty": {
+      "body": "Nothing found for «{query}». We will add it to the catalogue — tell us what the price tag calls it",
+      "action": "Suggest an item"
+    },
+    "error": {
+      "title": "The server did not answer",
+      "body": "Catalogue search lives on the server, there is no local copy",
+      "fallback": "Pick from recent"
+    },
+    "offline": {
+      "title": "No connection",
+      "body": "Searching your recent items only. The full catalogue is back once you are online"
+    }
+  },
   "identity": {
     "lost_title": "The server did not recognise this device",
     "lost_body": "Your earlier trips and ratings are still there, but the server no longer counts them as this device's — so a new record has been started. The old key is kept: if this was a mistake on the server, the data can be brought back.",
