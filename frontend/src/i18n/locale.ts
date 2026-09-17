@@ -14,20 +14,23 @@ export type AppLocale = (typeof LOCALES)[number]
  * A missing or unknown language is Russian too, for the same reason — this is not a guess
  * about the world, it is a guess about who opens this app.
  *
- * The whole preference list is read, not just the first entry: a phone set to Armenian with
- * English second is a different person from one set to Armenian with Russian second, and
- * `navigator.language` alone cannot tell them apart. The first tag the app actually speaks
- * wins; if it speaks none of them, Russian does.
+ * **Only the first tag is read, deliberately.** Walking the whole preference list looks more
+ * thoughtful and quietly reverses this decision: Android and iOS append `en-US` themselves
+ * when the system language is not English, so a phone set to Armenian arrives as
+ * `['hy-AM', 'en-US']`. Taking the first tag the app understands hands English to exactly the
+ * person this rule exists for — and does so even when Russian is in the list, merely lower.
+ * The list cannot separate «an Armenian who reads English» from «a Russian speaker in
+ * Gyumri», because English gets there without anyone choosing it.
+ *
+ * The asymmetry decides: showing Russian to someone who would prefer English is an
+ * inconvenience; showing English to all six users of 0.1 is the product in a language it is
+ * not written in.
  */
 export function pickLocale(languages: string | readonly string[] | null | undefined): AppLocale {
-  const list = typeof languages === 'string' ? [languages] : (languages ?? [])
+  const first = typeof languages === 'string' ? languages : (languages?.[0] ?? '')
 
-  for (const tag of list) {
-    // `en-nonsense` and `enm` are not English: the subtag has to end, not merely start the
-    // same way. Matching by prefix alone made every tag beginning with «en» English.
-    if (/^en(-|$)/i.test(tag)) return 'en'
-    if (/^ru(-|$)/i.test(tag)) return 'ru'
-  }
-
-  return 'ru'
+  // `enm` (Middle English) and `en-nonsense` are not English: the subtag has to end, not
+  // merely start the same way. Matching by prefix alone made every tag beginning with «en»
+  // English. Underscores are accepted because system layers sometimes write `en_US`.
+  return /^en([-_]|$)/i.test(first) ? 'en' : 'ru'
 }
