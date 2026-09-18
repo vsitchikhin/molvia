@@ -6,9 +6,13 @@ import { InvalidBody } from '@/routes/body'
 import { healthRoutes } from '@/routes/health'
 import { withActor } from '@/routes/actor'
 import { actorMeRoute, firstVisitRoute } from '@/routes/actors'
+import { catalogueRoutes } from '@/routes/catalogue'
 import { createActor } from '@/usecases/create-actor'
 import { getActor } from '@/usecases/get-actor'
+import { searchCatalogue } from '@/usecases/search-catalogue'
 import { createActorRepository } from '@/db/actors-repository'
+import { createEventRepository } from '@/db/events-repository'
+import { createItemRepository } from '@/db/items-repository'
 import { databaseIsReachable, getDb } from '@/db'
 import type { Db } from '@/db'
 import { env } from '@/env'
@@ -85,7 +89,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   // the repository into the use cases happens here and nowhere else — a route that could
   // name a repository would be a route that could reach the database.
   app.register((instance, _options, done) => {
-    const actors = createActorRepository(options.db ?? getDb())
+    const db = options.db ?? getDb()
+    const actors = createActorRepository(db)
+    const items = createItemRepository(db)
+    const events = createEventRepository(db)
 
     healthRoutes(instance, { databaseIsReachable })
     firstVisitRoute(instance, {
@@ -95,11 +102,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
 
     // Everything that needs an owner is registered inside this scope, and the scope is here
     // rather than inside a route module: «new routes land in the guarded place by default»
-    // is only true if the guarded place is where routes are actually added. MOL-12, MOL-21
-    // and MOL-27 add theirs next to `actorMeRoute`.
+    // is only true if the guarded place is where routes are actually added. MOL-21 and MOL-27
+    // add theirs next to these.
     void instance.register((guarded, _guardedOptions, guardedDone) => {
       withActor(guarded, (id) => getActor(actors, id))
       actorMeRoute(guarded)
+      catalogueRoutes(guarded, {
+        search: (actorId, query) => searchCatalogue({ items, events }, actorId, query),
+      })
       guardedDone()
     })
 

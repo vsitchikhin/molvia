@@ -23,3 +23,12 @@ export function parseBody<T>(schema: ZodType<T>, body: unknown): T {
   if (!parsed.success) throw new InvalidBody(parsed.error)
   return parsed.data
 }
+
+/**
+ * The same seam for a query string. It throws `InvalidBody` too: what the class separates is
+ * «parsed from the request» from «a row that stopped matching its schema», and a query string
+ * is parsed from the request. The code the reply carries comes from the schema, not the name.
+ */
+export function parseQuery<T>(schema: ZodType<T>, query: unknown): T {
+  return parseBody(schema, query)
+}

@@ -18,6 +18,13 @@ export interface CohortReturn {
 
 export interface EventRepository {
   record(event: RecordedEvent): Promise<void>
+  /**
+   * Records the event unless this actor already has one of this type within the window —
+   * `true` when a row was written. One statement, measured by the database's clock, the same
+   * clock `occurred_at` is stamped with. Two calls in the same instant may both write; the
+   * gates count distinct actors, so that costs them nothing.
+   */
+  recordUnlessWithin(event: RecordedEvent, windowMs: number): Promise<boolean>
   /** Gate 0.3: of those first seen in a window, how many came back in their fourth week. */
   weekFourReturn(subject: CatalogueSubject, from: Date, to: Date): Promise<CohortReturn>
 }
@@ -34,6 +41,22 @@ export function createEventRepository(db: Conn): EventRepository {
         payload: 'payload' in event ? event.payload : {},
         ...(event.occurredAt ? { occurredAt: event.occurredAt } : {}),
       })
+    },
+
+    async recordUnlessWithin(event, windowMs) {
+      const payload = 'payload' in event ? event.payload : {}
+      const rows = await db.execute<{ id: string }>(sql`
+        insert into ${events} (actor_id, type, payload)
+        select ${event.actorId}::uuid, ${event.type}, ${JSON.stringify(payload)}::jsonb
+        where not exists (
+          select 1 from ${events}
+          where actor_id = ${event.actorId}::uuid
+            and type = ${event.type}
+            and occurred_at > now() - make_interval(secs => ${windowMs / 1000})
+        )
+        returning id
+      `)
+      return rows.length > 0
     },
 
     async weekFourReturn(subject, from, to) {
