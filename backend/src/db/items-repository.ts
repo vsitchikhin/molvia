@@ -74,8 +74,9 @@ const HAS_CONTENT = /[\p{L}\p{N}]/u
  * typed is still the start of a word of the item taken. Below this many characters the
  * shorter one has to match exactly: «мо» starts half the catalogue. The same three MOL-10
  * holds the last word to an exact start. Typed letter by letter on MOL-14's shelf a pick lifts
- * its item 18 times at 2, 9 at 3, 5 at 4; at 2 it also harms 4 times — a pick for Coca-Cola
- * on «ко» tops «Колбаса» on «кол». Nothing harmed at 3; real picks measure it again (MOL-47).
+ * its item 18 times at 2, 9 at 3, 5 at 4; at 2 it also harms 5 times — a pick for Coca-Cola
+ * on «ко» tops «Колбаса» on «кол». Once at 3 too, but through the equal key, not this prefix:
+ * a sausage picked on «кол» tops the cola the owner's «кол» means. Real picks decide (MOL-47).
  */
 const REMEMBERED_PREFIX = 3
 
