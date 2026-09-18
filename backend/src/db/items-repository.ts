@@ -334,8 +334,8 @@ export function createItemRepository(db: Conn): ItemRepository {
       return translateFailures(async () =>
         db.transaction(async (tx) => {
           // Per kind and key rather than per name: every name that is the same by
-          // `nameIdentity` has the same key, so they all meet at this lock, and the lookup
-          // below is the same equality the GIN index already serves.
+          // `nameIdentity` has the same key — built so, and held by a property test — so they
+          // all meet at this lock, and the lookup below is an equality the GIN index serves.
           await tx.execute(
             sql`select pg_advisory_xact_lock(hashtext('items'), hashtext(${`${input.kind} ${key}`}))`,
           )

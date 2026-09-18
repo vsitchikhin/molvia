@@ -27,14 +27,3 @@ export function visibleLine(max: number): z.ZodType<string, string> {
       },
     )
 }
-
-/**
- * What makes two names the same item when one is proposed: case and spacing aside, nothing
- * else. Deliberately narrower than `toSearchKey`, which folds scripts, forks and punctuation so
- * that a search finds more — «Milo» and «Мыло» share a key, and a false merge that costs the
- * search a candidate would cost «Предложить товар» the item itself. «3.2%» and «3,2%» stay two
- * names here; merging what is merely similar is 0.2's.
- */
-export function nameIdentity(name: string): string {
-  return name.normalize('NFC').toLowerCase().replace(/\s+/gu, ' ').trim()
-}

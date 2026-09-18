@@ -289,3 +289,28 @@ export const SEARCH_KEY_TABLES = Object.freeze({
   latinFolds: LATIN_FOLDS,
   armenianDigraphs: ARMENIAN_DIGRAPHS,
 })
+
+/**
+ * What makes two names the same item when one is proposed: case, spacing and what cannot be
+ * seen aside, nothing else. Deliberately narrower than `toSearchKey`, which folds scripts,
+ * forks and punctuation so that a search finds more — «Milo» and «Мыло» share a key, and a
+ * false merge that costs the search a candidate would cost «Предложить товар» the item itself.
+ * «3.2%» and «3,2%» stay two names here; merging what is merely similar is 0.2's.
+ *
+ * **Two names with the same identity always have the same key**, and `createUnlessNamed`
+ * rests on it: it locks and looks up by key, then compares identities. So this is built from
+ * the key's own first steps rather than beside them — the same lowercasing, the same set of
+ * invisible characters dropped rather than read as a space (a byte-order mark inside a name
+ * glues its words in the key, and has to glue them here too), and `և` spelled out, because
+ * it has no capital: a label in capitals writes «ԵՎ», which lowercases to «եվ», not «և».
+ * A property test holds the two together; a change to either has to keep it green.
+ */
+export function nameIdentity(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFC')
+    .replace(IGNORABLE, '')
+    .replaceAll('և', 'եվ')
+    .replace(WHITESPACE, ' ')
+    .trim()
+}
