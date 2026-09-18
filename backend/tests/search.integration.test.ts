@@ -2,15 +2,20 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { toSearchKey } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { sql as raw } from 'drizzle-orm'
+import { PgDialect } from 'drizzle-orm/pg-core'
 import { createItemRepository, rankedCandidates } from '@/db/items-repository'
+import { createSearchPickRepository } from '@/db/search-picks-repository'
 import type { Conn } from '@/db/index'
 import { itemBarcodes, items } from '@/db/schema'
 import { connect, connectDrizzle } from './db'
-import { clearAll, insertItem } from './fixtures'
+import { clearAll, insertActor, insertItem } from './fixtures'
 
 const sql = connect()
 const { db, close } = connectDrizzle()
 const repo = createItemRepository(db)
+
+/** An owner with no remembered picks: empty memory is the order of MOL-10, unchanged. */
+const nobody = randomUUID()
 
 /** An item whose key is taken the way the repository takes it on write. */
 async function named(name: string): Promise<string> {
@@ -18,7 +23,7 @@ async function named(name: string): Promise<string> {
 }
 
 async function names(query: string, limit = 20): Promise<string[]> {
-  return (await repo.search(query, limit)).map((item) => item.name)
+  return (await repo.search(query, limit, nobody)).map((item) => item.name)
 }
 
 beforeEach(async () => {
@@ -123,14 +128,16 @@ describe('search — the shape of the query', () => {
     await named('Молоко «Ашхар»')
     const plan = await db.transaction(async (tx) => {
       await tx.execute(raw`set local enable_seqscan = off`)
-      return tx.execute<{ 'QUERY PLAN': string }>(raw`explain ${rankedCandidates('malako', 10)}`)
+      return tx.execute<{ 'QUERY PLAN': string }>(
+        raw`explain ${rankedCandidates('malako', 10, nobody)}`,
+      )
     })
     expect(plan.map((row) => row['QUERY PLAN']).join('\n')).toContain('items_search_key_trgm_idx')
   })
 
   it('keeps its threshold to itself: the next statement on its connection sees the default', async () => {
     await named('Молоко «Ашхар»')
-    await repo.search('малако', 10)
+    await repo.search('малако', 10, nobody)
     // Read through the drizzle handle the repository used — a pool of one, so this is the
     // very connection. The file's other client would pass with a plain SET as well.
     const [row] = await db.execute<{ threshold: string }>(
@@ -145,7 +152,7 @@ describe('search — the shape of the query', () => {
     await named('Молоко Ашхар')
     const seen = await db.transaction(async (tx) => {
       const before = await tx.execute(raw`select 1 from items where search_key %> 'malako'`)
-      await createItemRepository(tx).search('малако', 10)
+      await createItemRepository(tx).search('малако', 10, nobody)
       const after = await tx.execute(raw`select 1 from items where search_key %> 'malako'`)
       const [row] = await tx.execute<{ threshold: string }>(
         raw`select current_setting('pg_trgm.word_similarity_threshold') as threshold`,
@@ -335,7 +342,7 @@ describe('search — what it must not find', () => {
       },
     }) as Conn
     const spied = createItemRepository(counted)
-    for (const query of ['', '   ', '!!!', '«»']) await spied.search(query, 10)
+    for (const query of ['', '   ', '!!!', '«»']) await spied.search(query, 10, nobody)
     expect(transactions).toBe(0)
   })
 
@@ -357,8 +364,8 @@ describe('search — edges', () => {
     // one word of up to 600 characters, and levenshtein refuses anything past 255.
     const word = 'a'.repeat(300)
     await insertItem(db, { name: 'Длинное', searchKey: word })
-    await expect(repo.search(word, 10)).resolves.toBeInstanceOf(Array)
-    await expect(repo.search('щ'.repeat(150), 10)).resolves.toBeInstanceOf(Array)
+    await expect(repo.search(word, 10, nobody)).resolves.toBeInstanceOf(Array)
+    await expect(repo.search('щ'.repeat(150), 10, nobody)).resolves.toBeInstanceOf(Array)
   })
 
   it('does not lose the newest item: two thousand older candidates do not push it out', async () => {
@@ -409,8 +416,8 @@ describe('search — edges', () => {
     // reach levenshtein whole and answer a 500 to everyone, once such an item existed.
     await named('щ'.repeat(200))
     await named('Сыр Лори')
-    await expect(repo.search('щ'.repeat(130), 10)).resolves.toBeInstanceOf(Array)
-    await expect(repo.search(`сыр ${'щ'.repeat(150)}`, 10)).resolves.toBeInstanceOf(Array)
+    await expect(repo.search('щ'.repeat(130), 10, nobody)).resolves.toBeInstanceOf(Array)
+    await expect(repo.search(`сыр ${'щ'.repeat(150)}`, 10, nobody)).resolves.toBeInstanceOf(Array)
   })
 
   it('returns exactly as many as asked: 0, 1, N, N+1', async () => {
@@ -437,7 +444,7 @@ describe('search — edges', () => {
 describe('search — the items it returns', () => {
   it('carries an item without barcodes as an empty list', async () => {
     await named('Лаваш')
-    const [item] = await repo.search('lavash', 10)
+    const [item] = await repo.search('lavash', 10, nobody)
     expect(item?.barcodes).toEqual([])
   })
 
@@ -445,7 +452,7 @@ describe('search — the items it returns', () => {
     const id = await named('Джермук')
     const codes = Array.from({ length: 20 }, (_, index) => String(4850000000000 + index))
     await db.insert(itemBarcodes).values([...codes].reverse().map((code) => ({ code, itemId: id })))
-    const [item] = await repo.search('джермук', 10)
+    const [item] = await repo.search('джермук', 10, nobody)
     expect(item?.barcodes).toEqual(codes)
   })
 
@@ -453,6 +460,160 @@ describe('search — the items it returns', () => {
     // The column accepts a blank note; the domain does not. Reading it must be a 500 with a
     // log line, not garbage on the screen (Р-3 of MOL-7).
     await insertItem(db, { name: 'Мацун', searchKey: toSearchKey('Мацун'), note: '   ' })
-    await expect(repo.search('мацун', 10)).rejects.toThrow()
+    await expect(repo.search('мацун', 10, nobody)).rejects.toThrow()
+  })
+})
+
+describe('search — what the person took before (MOL-11)', () => {
+  const picks = createSearchPickRepository(db)
+
+  /** The order with nobody's memory, taken before anything is remembered. */
+  async function plain(query: string): Promise<string[]> {
+    return names(query)
+  }
+
+  async function namesFor(actorId: string, query: string): Promise<string[]> {
+    return (await repo.search(query, 20, actorId)).map((item) => item.name)
+  }
+
+  /** Two milks that tie on «молоко»; `second` is the one the id puts below. */
+  async function twoMilks(): Promise<{ first: string; second: string; secondId: string }> {
+    const ids = new Map([
+      ['Молоко Ашхар', await named('Молоко Ашхар')],
+      ['Молоко Марианна', await named('Молоко Марианна')],
+    ])
+    const [first = '', second = ''] = await plain('молоко')
+    return { first, second, secondId: ids.get(second) ?? '' }
+  }
+
+  it('puts what was taken first, even out of a tie the id used to settle', async () => {
+    const actorId = await insertActor(db)
+    const { first, second, secondId } = await twoMilks()
+
+    await picks.remember(actorId, 'молоко', secondId)
+
+    expect(await namesFor(actorId, 'молоко')).toEqual([second, first])
+  })
+
+  it('puts what was taken above a closer spelling', async () => {
+    // «кока» is Coca-Cola word for word since the hard c, and «Какао» only by the start of a
+    // word with one edit — the person who takes cocoa still sees cocoa first.
+    const actorId = await insertActor(db)
+    await named('Coca-Cola')
+    const cocoa = await named('Какао Nesquik')
+    expect(await plain('кока')).toEqual(['Coca-Cola', 'Какао Nesquik'])
+
+    await picks.remember(actorId, 'кока', cocoa)
+
+    expect(await namesFor(actorId, 'кока')).toEqual(['Какао Nesquik', 'Coca-Cola'])
+  })
+
+  it("does not lift for someone else: another person's pick leaves the order as it was", async () => {
+    const actorId = await insertActor(db)
+    const stranger = await insertActor(db)
+    const { first, second, secondId } = await twoMilks()
+
+    await picks.remember(stranger, 'молоко', secondId)
+
+    expect(await namesFor(actorId, 'молоко')).toEqual([first, second])
+  })
+
+  it('never lets in what the search did not find', async () => {
+    const actorId = await insertActor(db)
+    await named('Молоко Ашхар')
+    const matsun = await named('Мацун')
+
+    await picks.remember(actorId, 'молоко', matsun)
+
+    expect(await namesFor(actorId, 'молоко')).toEqual(['Молоко Ашхар'])
+  })
+
+  it.each([
+    ['мол', 'моло', true],
+    ['мол', 'молоко', true],
+    ['молоко', 'мол', true],
+    ['мо', 'мо', true],
+    ['молоко', 'мо', false],
+    ['мо', 'мол', false],
+    ['молоко', 'молоко молоко', false],
+  ])('remembered «%s», typing «%s» — lifted: %s', async (stored, typing, lifted) => {
+    const actorId = await insertActor(db)
+    const ids = new Map([
+      ['Молоко Ашхар', await named('Молоко Ашхар')],
+      ['Молоко Марианна', await named('Молоко Марианна')],
+    ])
+    const before = await plain(typing)
+    // Both milks have to be there, or a lift would have nothing to reorder and pass unseen.
+    expect(before).toHaveLength(2)
+    const lower = before.at(-1) ?? ''
+
+    await picks.remember(actorId, stored, ids.get(lower) ?? '')
+
+    const expected = lifted ? [lower, ...before.slice(0, -1)] : before
+    expect(await namesFor(actorId, typing)).toEqual(expected)
+  })
+
+  it('matches the words before the last one exactly and the last one by its start', async () => {
+    const actorId = await insertActor(db)
+    const ids = new Map([
+      ['Молоко Ашхар 1 л', await named('Молоко Ашхар 1 л')],
+      ['Молоко Ашхар 2 л', await named('Молоко Ашхар 2 л')],
+    ])
+    const before = await plain('молоко ашхар')
+    expect(before).toHaveLength(2)
+    const lower = before.at(-1) ?? ''
+
+    await picks.remember(actorId, 'молоко аш', ids.get(lower) ?? '')
+
+    expect((await namesFor(actorId, 'молоко ашхар'))[0]).toBe(lower)
+    expect(await namesFor(actorId, 'молоко')).toEqual(await plain('молоко'))
+  })
+
+  it('puts the latest pick first, over the more frequent one', async () => {
+    const actorId = await insertActor(db)
+    const ashkhar = await named('Молоко Ашхар')
+    const marianna = await named('Молоко Марианна')
+
+    for (let n = 0; n < 3; n += 1) await picks.remember(actorId, 'молоко', ashkhar)
+    await picks.remember(actorId, 'молоко', marianna)
+
+    expect(await namesFor(actorId, 'молоко')).toEqual(['Молоко Марианна', 'Молоко Ашхар'])
+  })
+
+  it('answers with one row for an item remembered under two keys', async () => {
+    const actorId = await insertActor(db)
+    const { first, second, secondId } = await twoMilks()
+
+    await picks.remember(actorId, 'мол', secondId)
+    await picks.remember(actorId, 'моло', secondId)
+
+    expect(await namesFor(actorId, 'молоко')).toEqual([second, first])
+  })
+
+  it('treats a malformed owner as one with no memory, not as a 500', async () => {
+    const { first, second } = await twoMilks()
+
+    expect(await namesFor('not-a-uuid', 'молоко')).toEqual([first, second])
+  })
+
+  it('reaches the index with the memory joined in', async () => {
+    const actorId = await insertActor(db)
+    const item = await named('Молоко «Ашхар»')
+    await picks.remember(actorId, 'малако', item)
+
+    const plan = await db.transaction(async (tx) => {
+      await tx.execute(raw`set local enable_seqscan = off`)
+      return tx.execute<{ 'QUERY PLAN': string }>(
+        raw`explain ${rankedCandidates('malako', 10, actorId)}`,
+      )
+    })
+    expect(plan.map((row) => row['QUERY PLAN']).join('\n')).toContain('items_search_key_trgm_idx')
+  })
+
+  it('carries no word of paid placement in its order', () => {
+    // The product rule in CLAUDE.md: a result order holds nothing named like a promotion.
+    // The lift is personal memory, and the query says so in its own words.
+    const text = new PgDialect().sqlToQuery(rankedCandidates('moloko', 10, nobody)).sql
+    expect(text).not.toMatch(/boost|promot|sponsor/i)
   })
 })
