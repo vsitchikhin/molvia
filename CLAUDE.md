@@ -69,10 +69,10 @@ it answers a question no threshold asks, since 0.2 is counted over verdicts and 
 `catalogue_viewed` with `subject: product`, after the search has answered, at most once per
 owner and payload in each **day of the person's own life** — days counted from their first
 event, as the gate counts its weeks, and both in hours rather than calendar days, so a
-`timezone` set on the database later cannot pull them apart. Not a rolling 24 hours from the last row: that window
-slid over the week line and swallowed a visit early in week four. Overlapping searches are
-serialised by an advisory lock per actor, and a failure to record is not swallowed, because a
-lost row lowers the gate with nothing to backfill from.
+`timezone` set on the database later cannot pull them apart. Not a rolling 24 hours from the
+last row: that window slid over the week line and swallowed a visit early in week four.
+Overlapping searches are serialised by an advisory lock per actor, and a failure to record is
+not swallowed, because a lost row lowers the gate with nothing to backfill from.
 
 **This measures entering, not reading, and that was chosen knowingly.** In 0.1 and 0.2 a
 search is a purchase being entered; the plan hides other people's data until 0.3 precisely so
@@ -185,9 +185,9 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   `ts` becomes `ц` — which is what makes «счёт» and «щёт» one key, and also what reads the
   `тс` of «Советский» as `ц`. A false merge costs a candidate, a miss costs the answer; the
   trade is deliberate, and it is a trade. **That is why the key is never an identity:**
-  «Предложить товар» decides a duplicate by `nameIdentity` — case, spacing and invisible
-  characters only — because there a false merge costs the item itself: «Milo» would be
-  answered with «Мыло» (MOL-12). The identity is built from the key's own first steps, and a
+  «Предложить товар» decides a duplicate by `nameIdentity` — case, spacing, invisible
+  characters and the three Armenian spellings «և» / «եւ» / «եվ» only — because there a false
+  merge costs the item itself: «Milo» would be answered with «Мыло» (MOL-12). The identity is built from the key's own first steps, and a
   property test holds that one identity is always one key: the lookup is by key.
 - **Armenian is in the table, not passed through.** The first market is Gyumri and Yerevan,
   so an Armenian label is the norm on the shelf. With the table «Գյումրի», «Гюмри» and
