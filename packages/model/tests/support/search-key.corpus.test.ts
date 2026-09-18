@@ -10,7 +10,8 @@ import { ITEMS, QUERIES, TRIPLES } from './search-corpus'
  * What it measures is the alphabet, not the search: `distance` below is a model of the
  * ranking, and no longer the rule MOL-10 settled on — there are no candidates here, no mean
  * over grounding words, no start of the last word. The same corpus goes through the real
- * search in `backend/tests/search-corpus.integration.test.ts` (MOL-13); `distance` is not
+ * search in `backend/tests/search-corpus.integration.test.ts` (MOL-13), and the rules
+ * themselves are held one case each in `search.integration.test.ts`. `distance` is not
  * brought up to MOL-10's rule, because that would be a second place where ranking lives.
  *
  * Levenshtein lives here rather than in `src`: in production Postgres computes it through
