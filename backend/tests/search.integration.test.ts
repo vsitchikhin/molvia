@@ -581,6 +581,91 @@ describe('search — what the person took before (MOL-11)', () => {
     expect(await namesFor(actorId, 'молоко')).toEqual(await plain('молоко'))
   })
 
+  it.each([
+    ['Сыр Чанах', 'сыр', 'Сырок глазированный', 'сырок'],
+    ['Молоко Ашхар', 'мол', 'Молоток', 'молоток'],
+    ['Молоко', 'мол', 'Молотый', 'молотый'],
+  ])(
+    'does not lift «%s», taken on «%s», over «%s» typed in full',
+    async (taken, on, other, typed) => {
+      // Another word, not the same query: the typed word no longer leads to the item taken.
+      // MOL-11 adversarial review, section А.
+      const actorId = await insertActor(db)
+      const id = await named(taken)
+      await named(other)
+      const before = await plain(typed)
+      expect(before[0]).toBe(other)
+
+      await picks.remember(actorId, on, id)
+
+      expect(await namesFor(actorId, typed)).toEqual(before)
+    },
+  )
+
+  it('still lifts a pick on the way to the item: «мол» taken, «моло» and «молоко» typed', async () => {
+    const actorId = await insertActor(db)
+    const { first, second, secondId } = await twoMilks()
+
+    await picks.remember(actorId, 'мол', secondId)
+
+    for (const typed of ['моло', 'молоко']) {
+      expect(await namesFor(actorId, typed), typed).toEqual([second, first])
+    }
+  })
+
+  it('lifts on the same query of thirteen words — cut the same way on both ends', async () => {
+    const actorId = await insertActor(db)
+    const { first, second, secondId } = await twoMilks()
+    const query = Array.from({ length: 13 }, () => 'молоко').join(' ')
+    expect(await plain(query)).toEqual([first, second])
+
+    await picks.remember(actorId, query, secondId)
+
+    expect(await namesFor(actorId, query)).toEqual([second, first])
+  })
+
+  it('lifts a pick made in another script: the key is one', async () => {
+    const actorId = await insertActor(db)
+    const { first, second, secondId } = await twoMilks()
+
+    await picks.remember(actorId, 'moloko', secondId)
+
+    expect(await namesFor(actorId, 'молоко')).toEqual([second, first])
+    expect(await namesFor(actorId, 'Մոլոկո')).toEqual([second, first])
+  })
+
+  it('breaks a tie in freshness by the count, summed over every matching key', async () => {
+    // One transaction gives every write the same `now()`: the only way two picks are equally
+    // fresh, and exactly what lets the second step of the order be seen.
+    const actorId = await insertActor(db)
+    const { first, second, secondId } = await twoMilks()
+    const firstId =
+      (await repo.search('молоко', 20, actorId)).find((item) => item.name === first)?.id ?? ''
+
+    await db.transaction(async (tx) => {
+      const inTx = createSearchPickRepository(tx)
+      await inTx.remember(actorId, 'молоко', firstId)
+      await inTx.remember(actorId, 'мол', secondId)
+      await inTx.remember(actorId, 'моло', secondId)
+    })
+
+    expect(await namesFor(actorId, 'молоко')).toEqual([second, first])
+  })
+
+  it('keeps memory to the query: a brand taken through its own name does not move another query', async () => {
+    // A limit, stated rather than fixed: «Марианна» found by «марианна» leaves «Ашхар» on top
+    // of «молоко» until «Марианна» is taken on «молоко» itself. Section Г of the review.
+    const actorId = await insertActor(db)
+    const ashkhar = await named('Молоко Ашхар')
+    const marianna = await named('Молоко Марианна')
+
+    await picks.remember(actorId, 'молоко', ashkhar)
+    await picks.remember(actorId, 'марианна', marianna)
+    await picks.remember(actorId, 'марианна', marianna)
+
+    expect((await namesFor(actorId, 'молоко'))[0]).toBe('Молоко Ашхар')
+  })
+
   it('puts the latest pick first, over the more frequent one', async () => {
     const actorId = await insertActor(db)
     const ashkhar = await named('Молоко Ашхар')

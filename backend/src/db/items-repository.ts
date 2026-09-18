@@ -54,9 +54,10 @@ const HAS_CONTENT = /[\p{L}\p{N}]/u
 /**
  * A remembered query counts as the one being typed when every word but the last is equal and
  * one last word is the start of the other — the screen searches while the person types, so
- * the pick was made on «мол» and the next search may fire on «моло». Below this many
- * characters the shorter one has to match exactly: «мо» starts half the catalogue. The same
- * three MOL-10 holds the last word to an exact start; MOL-14 retunes both.
+ * the pick was made on «мол» and the next search may fire on «моло» — and the word being
+ * typed is still the start of a word of the item taken. Below this many characters the
+ * shorter one has to match exactly: «мо» starts half the catalogue. The same three MOL-10
+ * holds the last word to an exact start; MOL-14 retunes both.
  */
 const REMEMBERED_PREFIX = 3
 
@@ -181,6 +182,7 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              max(sp.last_picked_at) as last_picked_at,
              sum(sp.picks) as picks
       from ${searchPicks} sp
+      join ${items} i on i.id = sp.item_id
       cross join lateral (
         select string_to_array(sp.query_key, ' ') as s,
                string_to_array(${key}, ' ') as q
@@ -192,7 +194,16 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              or least(length(k.s[cardinality(k.s)]), length(k.q[cardinality(k.q)]))
                   >= ${REMEMBERED_PREFIX}
                 and (starts_with(k.s[cardinality(k.s)], k.q[cardinality(k.q)])
-                     or starts_with(k.q[cardinality(k.q)], k.s[cardinality(k.s)])))
+                     or starts_with(k.q[cardinality(k.q)], k.s[cardinality(k.s)]))
+                -- And what is being typed still leads to the item that was taken: its last
+                -- word is the start of a word of that name. Without this a pick made on
+                -- «мол» for milk stood above «Молоток» typed in full, and one made on the
+                -- finished «сыр» above «Сырок» — another word, not the same query.
+                and exists (
+                  select 1
+                  from unnest(string_to_array(i.search_key, ' ')) as w(word)
+                  where starts_with(w.word, k.q[cardinality(k.q)])
+                ))
       group by sp.item_id
     )
     select r.id
