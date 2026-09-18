@@ -286,3 +286,114 @@ export const SHELF_ABSENT: readonly string[] = [
   'овощи',
   'специи',
 ]
+
+/**
+ * Not the owner's words — the adversarial pass's (MOL-14): fifty everyday purchases the shelf
+ * does not carry. The owner's nineteen absent words find something twice; these, at the same
+ * thresholds, find something in about half — a taste printed on another item («сметана» is
+ * in the chips' name), a unit word («шт»), the absolute budget. Pinned as they are.
+ */
+export const SHELF_EVERYDAY_ABSENT: readonly string[] = [
+  'яйца',
+  'сахар',
+  'соль',
+  'масло',
+  'чай',
+  'сыр',
+  'кефир',
+  'йогурт',
+  'бананы',
+  'яблоки',
+  'апельсины',
+  'томаты',
+  'помидоры',
+  'чеснок',
+  'кукуруза',
+  'печень',
+  'лук',
+  'сметана',
+  'сосиски',
+  'макароны',
+  'гречка',
+  'огурцы',
+  'зелень',
+  'суп',
+  'ложка',
+  'лезвия',
+  'щётка',
+  'зубная паста',
+  'шампунь',
+  'мыло',
+  'губка',
+  'пакеты',
+  'фольга',
+  'плов',
+  'шаурма',
+  'тоник',
+  'сироп',
+  'вино',
+  'коньяк',
+  'водка',
+  'сигареты',
+  'жвачка',
+  'шоколад',
+  'конфеты',
+  'мороженое',
+  'торт',
+  'пирог',
+  'сухарики',
+  'семечки',
+  'печенье',
+]
+
+/**
+ * The same shelf typed another way — not the owner's words either: Latin, as a keyboard
+ * without Cyrillic types it, and Latin brands spelled in Cyrillic («хаггис», «лейс»).
+ */
+export const SHELF_TYPED_OTHERWISE: readonly (readonly [string, readonly string[]])[] = [
+  ['kola', ['Coca-Cola 1 л', 'Coca-Cola 0,5 л']],
+  ['cola', ['Coca-Cola 1 л', 'Coca-Cola 0,5 л']],
+  ['coca cola', ['Coca-Cola 1 л', 'Coca-Cola 0,5 л']],
+  ['moloko', ['Молоко Марианна 3,2% 1 л', 'Молоко Ашхар 2,5% 1 л']],
+  ['pivo', ['Пиво Kilikia 0,5 л', 'Пиво Gyumri 0,5 л']],
+  ['hleb', ['Хлеб Матнакаш', "Хлеб тостовый Harry's 470 г"]],
+  ['jacobs', ['Кофе Jacobs Monarch молотый 230 г']],
+  ['gyumri', ['Пиво Gyumri 0,5 л']],
+  ['kilikia', ['Пиво Kilikia 0,5 л']],
+  ['zewa', ['Салфетки бумажные Zewa 100 шт', 'Туалетная бумага Zewa Plus 4 рулона']],
+  ['ariel', ['Стиральный порошок Ariel 3 кг']],
+  ['finish', ['Таблетки для посудомоечной машины Finish 40 шт']],
+  ['pedigree', ['Корм для собак Pedigree 400 г']],
+  ['duracell', ['Батарейки Duracell AA 4 шт']],
+  ['gillette', ['Станки Gillette Blue II 5 шт']],
+  ['mr proper', ['Средство для мытья пола Mr. Proper 1 л']],
+  ['хаггис', ['Салфетки влажные Huggies 56 шт']],
+  ['лейс', ["Чипсы Lay's сметана и лук 150 г"]],
+]
+
+/** Armenian labels on the same shelf, and how a Russian or Latin keyboard reaches them. */
+export const SHELF_ARMENIAN = [
+  'Մածուն Մարիաննա',
+  'Ջերմուկ',
+  'Պանիր Լոռի',
+  'Լավաշ',
+  'Թան Բժնի',
+  'Հաց Մատնաքաշ',
+  'Թթվասեր Աշխարհ',
+] as const
+
+export const SHELF_ARMENIAN_QUERIES: readonly (readonly [string, readonly string[]])[] = [
+  ['мацун', ['Մածուն Մարիաննա']],
+  ['matsun', ['Մածուն Մարիաննա']],
+  ['джермук', ['Ջերմուկ', 'Вода Джермук 0,5 л']],
+  ['jermuk', ['Ջերմուկ', 'Вода Джермук 0,5 л']],
+  ['лори', ['Պանիր Լոռի']],
+  ['lori', ['Պանիր Լոռի']],
+  ['лаваш', ['Լավաշ']],
+  ['lavash', ['Լավաշ']],
+  ['тан', ['Թան Բժնի']],
+  ['tan', ['Թան Բժնի']],
+  ['бжни', ['Թան Բժնի', 'Вода Бжни 1,5 л']],
+  ['матнакаш', ['Հաց Մատնաքաշ', 'Хлеб Матнакаш']],
+  ['ашхар', ['Թթվասեր Աշխարհ', 'Молоко Ашхар 2,5% 1 л', 'Творог Ашхар 9% 400 г']],
+]
