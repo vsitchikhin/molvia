@@ -4,16 +4,16 @@ import {
   catalogueEntryOf,
   catalogueSearchQuerySchema,
   catalogueSearchResponseSchema,
-  newItemSchema,
+  proposedItemSchema,
 } from '@molvia/model'
-import type { Item, NewItem } from '@molvia/model'
+import type { Item, ProposedItem } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { parseBody, parseQuery } from '@/routes/body'
 
 export interface CatalogueApi {
   /** The use case, already bound to its repositories by the composition point. */
   search(actorId: string, query: string): Promise<Item[]>
-  propose(actorId: string, input: NewItem): Promise<{ item: Item; created: boolean }>
+  propose(actorId: string, input: ProposedItem): Promise<{ item: Item; created: boolean }>
 }
 
 /**
@@ -40,7 +40,7 @@ export function catalogueRoutes(app: FastifyInstance, api: CatalogueApi): void {
    * sheet on it exactly as it would after picking a row.
    */
   app.post('/catalogue/items', async (request, reply) => {
-    const input = parseBody(newItemSchema, request.body)
+    const input = parseBody(proposedItemSchema, request.body)
     const { item, created } = await api.propose(request.actorId, input)
 
     return reply

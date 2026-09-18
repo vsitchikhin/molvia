@@ -6,6 +6,7 @@ import {
   catalogueEntryOf,
   catalogueSearchQuerySchema,
   catalogueSearchResponseSchema,
+  proposedItemSchema,
 } from '#model/contracts/catalogue'
 import { itemSchema } from '#model/entities/item'
 import { ISSUE } from '#model/support/errors'
@@ -139,5 +140,32 @@ describe('catalogueSearchQuerySchema', () => {
     const parsed = catalogueSearchQuerySchema.safeParse({ q: ['a', 'b'] })
 
     expect(parsed.success ? null : parsed.error.issues[0]?.path).toEqual(['q'])
+  })
+})
+
+describe('proposedItemSchema', () => {
+  const cheese = { kind: 'product', name: 'Сыр чанах', defaultUnit: 'kg' }
+  // The field that failed, or the kind of failure when it has no field — an unknown key.
+  const pathOf = (input: unknown) => {
+    const parsed = proposedItemSchema.safeParse(input)
+    if (parsed.success) return null
+    const [issue] = parsed.error.issues
+    return issue && issue.path.length > 0 ? issue.path.join('.') : issue?.code
+  }
+
+  it('takes a product with a name and a unit, and the quantity from the wire', () => {
+    expect(
+      proposedItemSchema.parse({ ...cheese, typicalQuantity: { value: '0.3', unit: 'kg' } }),
+    ).toEqual({ ...cheese, typicalQuantity: { milli: 300n, unit: 'kg' } })
+  })
+
+  it('refuses a dish until 0.3, and barcodes until 0.2', () => {
+    expect(pathOf({ ...cheese, kind: 'dish' })).toBe('kind')
+    expect(pathOf({ ...cheese, barcodes: ['4850001234567'] })).toBe('unrecognized_keys')
+  })
+
+  it('stays as strict as the input it narrows: no author and no key from the body', () => {
+    expect(pathOf({ ...cheese, createdBy: CREATOR })).toBe('unrecognized_keys')
+    expect(pathOf({ ...cheese, searchKey: 'sir' })).toBe('unrecognized_keys')
   })
 })

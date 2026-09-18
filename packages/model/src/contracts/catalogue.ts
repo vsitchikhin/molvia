@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { ISSUE } from '#model/support/errors'
-import { itemSchema } from '#model/entities/item'
+import { itemSchema, newItemSchema } from '#model/entities/item'
 import type { Item } from '#model/entities/item'
 import { quantityCodec } from '#model/values/units'
 
@@ -63,6 +63,20 @@ export const catalogueSearchResponseSchema = z.strictObject({
   items: z.array(catalogueEntryCodec),
 })
 export type CatalogueSearchResponse = z.infer<typeof catalogueSearchResponseSchema>
+
+/**
+ * The body of «Предложить товар» in 0.1: products only, and no barcodes.
+ *
+ * Venues and dishes arrive with 0.3, and until then the search records every visit on the
+ * product half of the gate — a dish added now would be counted as a product forever, in a
+ * log nothing may correct. Barcodes arrive with the scanner in 0.2; until then a barcode sent
+ * beside a name the catalogue already holds would be dropped in silence, or turn a 409 into a
+ * 200. Both are refused rather than half-handled, and both lift with the release that needs them.
+ */
+export const proposedItemSchema = newItemSchema.omit({ barcodes: true }).extend({
+  kind: z.literal('product'),
+})
+export type ProposedItem = z.infer<typeof proposedItemSchema>
 
 /** The one way an item becomes a catalogue entry — by naming what goes, not what stays. */
 export function catalogueEntryOf(item: Item): CatalogueEntry {

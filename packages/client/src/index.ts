@@ -9,9 +9,9 @@ import {
   catalogueSearchResponseSchema,
   errorResponseSchema,
   healthResponseSchema,
-  newItemSchema,
+  proposedItemSchema,
 } from '@molvia/model'
-import type { Actor, CatalogueEntry, HealthResponse, NewItem, WireCode } from '@molvia/model'
+import type { Actor, CatalogueEntry, HealthResponse, ProposedItem, WireCode } from '@molvia/model'
 
 /**
  * What the API answered with. Not a DomainError: the wire carries shape errors too — a
@@ -90,7 +90,7 @@ export interface MolviaClient {
    * «Предложить товар». `created` is `false` when the catalogue already held an item of this
    * kind by the same name — the entry is then that item, and the fields sent were not applied.
    */
-  proposeItem(input: NewItem): Promise<{ entry: CatalogueEntry; created: boolean }>
+  proposeItem(input: ProposedItem): Promise<{ entry: CatalogueEntry; created: boolean }>
 }
 
 /**
@@ -234,7 +234,7 @@ export function createClient({
 
     // `async` so that an input the schema refuses arrives as a rejection, like everything else.
     proposeItem: async (input) => {
-      const encoded = newItemSchema.safeEncode(input)
+      const encoded = proposedItemSchema.safeEncode(input)
       if (!encoded.success) {
         throw new ApiError(ISSUE.BODY_INVALID, encoded.error.issues[0]?.path.join('.'))
       }

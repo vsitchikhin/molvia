@@ -352,7 +352,6 @@ describe('the catalogue', () => {
     const result = await client.proposeItem({
       kind: 'product',
       name: 'Молоко «Ашхар»',
-      barcodes: [],
       defaultUnit: 'l',
       typicalQuantity: { milli: 900n, unit: 'l' },
     })
@@ -364,7 +363,6 @@ describe('the catalogue', () => {
     expect(calls[0]?.body).toEqual({
       kind: 'product',
       name: 'Молоко «Ашхар»',
-      barcodes: [],
       defaultUnit: 'l',
       typicalQuantity: { value: '0.900', unit: 'l' },
     })
@@ -380,25 +378,20 @@ describe('the catalogue', () => {
     const result = await client.proposeItem({
       kind: 'product',
       name: 'молоко «ашхар»',
-      barcodes: [],
       defaultUnit: 'l',
     })
 
     expect(result.created).toBe(false)
   })
 
-  it('reads a taken barcode as a conflict', async () => {
-    const { client } = clientReplying(409, { code: ERROR.CONFLICT })
+  it('refuses a dish before sending it: the catalogue takes products only until 0.3', async () => {
+    const { client, calls } = clientReplying(201, entryWire)
 
     expect(
       await codeOf(
-        client.proposeItem({
-          kind: 'product',
-          name: 'Сыр',
-          barcodes: ['4850001234567'],
-          defaultUnit: 'kg',
-        }),
+        client.proposeItem({ kind: 'dish', name: 'Карбонара', defaultUnit: 'piece' } as never),
       ),
-    ).toBe(ERROR.CONFLICT)
+    ).toBe(ISSUE.BODY_INVALID)
+    expect(calls).toHaveLength(0)
   })
 })

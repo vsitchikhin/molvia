@@ -406,25 +406,59 @@ describe('POST /catalogue/items — «Предложить товар»', () => 
     expect(await db.select().from(items)).toHaveLength(1)
   })
 
-  it('treats the same name of another kind as another item', async () => {
+  it('keeps two products whose search keys merely coincide apart', async () => {
+    // The key folds on purpose — «Milo» and «Мыло» are one key — and a merge that costs the
+    // search a candidate would cost this path the item: the drink could never be added.
     const actor = await insertActor(db)
 
-    await propose(actor, cheese)
-    const dish = await propose(actor, { ...cheese, kind: 'dish', defaultUnit: 'piece' })
+    const soap = await propose(actor, { ...cheese, name: 'Мыло', defaultUnit: 'piece' })
+    const drink = await propose(actor, { ...cheese, name: 'Milo', defaultUnit: 'kg' })
+    const comma = await propose(actor, { ...cheese, name: 'Молоко 3,2%', defaultUnit: 'l' })
+    const point = await propose(actor, { ...cheese, name: 'Молоко 3.2%', defaultUnit: 'l' })
 
-    expect(dish.status).toBe(201)
-    expect(await db.select().from(items)).toHaveLength(2)
+    expect([soap.status, drink.status, comma.status, point.status]).toEqual([201, 201, 201, 201])
+    expect(await db.select().from(items)).toHaveLength(4)
   })
 
-  it('answers 409 when the barcode already belongs to another item, and writes nothing', async () => {
+  it('adds a double tap once: two requests at the same moment, one item', async () => {
     const actor = await insertActor(db)
-    await add({ name: 'Молоко «Ашхар»', barcodes: ['4850001234567'] })
+    const other = connectDrizzle()
+    const second = buildServer({ db: other.db })
+    await second.ready()
+    try {
+      const inject = (server: FastifyInstance) =>
+        server.inject({
+          method: 'POST',
+          url: '/catalogue/items',
+          headers: { 'x-molvia-actor': actor },
+          payload: cheese,
+        })
+      const replies = await Promise.all([inject(app), inject(second)])
 
-    const reply = await propose(actor, { ...cheese, barcodes: ['4850001234567'] })
+      expect(replies.map((reply) => reply.statusCode).sort()).toEqual([200, 201])
+      expect(
+        new Set(replies.map((reply) => (JSON.parse(reply.body) as { id: string }).id)).size,
+      ).toBe(1)
+      expect(await db.select().from(items)).toHaveLength(1)
+    } finally {
+      await second.close()
+      await other.close()
+    }
+  })
 
-    expect(reply.status).toBe(409)
-    expect(reply.body).toEqual({ code: ERROR.CONFLICT })
-    expect(await db.select().from(items)).toHaveLength(1)
+  it('refuses a dish until 0.3 and a barcode until 0.2, and writes nothing', async () => {
+    // A dish would enter the log as a product forever; a barcode beside a known name would be
+    // dropped in silence or turn a 409 into a 200. Both wait for the release that needs them.
+    const actor = await insertActor(db)
+
+    const dish = await propose(actor, { ...cheese, kind: 'dish', defaultUnit: 'piece' })
+    const barcoded = await propose(actor, { ...cheese, barcodes: ['4850001234567'] })
+
+    expect(dish.status).toBe(400)
+    expect(dish.body).toMatchObject({ code: ISSUE.BODY_INVALID, details: 'kind' })
+    expect(barcoded.status).toBe(400)
+    expect(barcoded.body).toMatchObject({ code: ISSUE.BODY_INVALID })
+    expect(await db.select().from(items)).toHaveLength(0)
   })
 
   it('is found by the next search — its own author and anyone else, who never sees the author', async () => {
