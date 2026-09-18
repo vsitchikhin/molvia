@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { asc, eq, inArray, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { itemSchema, toSearchKey } from '@molvia/model'
 import type { Item, NewItem } from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
@@ -28,18 +29,33 @@ export interface ItemRepository {
  */
 const CANDIDATE_THRESHOLD = 0.15
 
-/** How many candidates the trigram pass hands to ranking — a bound on the work, not a result size. */
-const CANDIDATE_CEILING = 200
+/**
+ * A safety bound on the work, not a filter. Candidates are not ordered by similarity before
+ * this cut: similarity and distance disagree — «малако» scores 0.429 against any «Малина»
+ * and 0.167 against «Молоко Ашхар» — so a cut by similarity let two hundred wrong names push
+ * the right one out before ranking ever saw it. Everything that passes `%>` is ranked; the
+ * bound only stops a pathological query from holding a pooled connection. MOL-14 retunes it.
+ */
+const CANDIDATE_CEILING = 2000
 
 /** The edit distance at which a name still counts as the one asked for. MOL-14 retunes it. */
 const ACCEPTED_DISTANCE = 2
 
 /**
- * A query word shorter than this refines a match but cannot ground one. Such words are the
- * packaging size — dropping them made «Молоко 1 л» and «Молоко 2 л» identical — yet letting
- * them ground a match made «3 2» find every name that carries those digits.
+ * A word grounds a match only if it has this many characters and at least one letter. Short
+ * words and numbers are the packaging size: they refine the ranking but never ground it,
+ * otherwise «3 2» or «32» finds every name that carries those digits.
  */
 const SHORT_WORD = 2
+
+/**
+ * How many words of a query are looked at. Every query word is compared with every word of
+ * every candidate, so the cost grows with the query — 42 KB of it held a connection for
+ * three seconds. No name on a shelf needs more words than this to be found.
+ */
+const MAX_QUERY_WORDS = 12
+
+const HAS_CONTENT = /[\p{L}\p{N}]/u
 
 type ItemRow = typeof items.$inferSelect
 
@@ -60,6 +76,85 @@ function toItem(row: ItemRow, barcodes: readonly string[]): Item {
     barcodes,
     typicalQuantity: quantityFrom(row.typicalQtyMilli, row.typicalQtyUnit),
   })
+}
+
+/**
+ * The ranking query, apart from the method so the test that reads its plan runs this very
+ * statement and not a copy that could drift from it.
+ */
+export function rankedCandidates(key: string, limit: number): SQL {
+  return sql`
+    with query_words as (
+      select q,
+             length(q) >= ${SHORT_WORD} and q !~ '^[0-9]+$' as grounds,
+             n = max(n) over () as last
+      from unnest(string_to_array(${key}, ' ')) with ordinality as t(q, n)
+    ),
+    candidates as (
+      -- The column goes first, and that is not style: \`search_key %> $1\` is the only form
+      -- the GIN index serves. \`$1 %> search_key\`, \`search_key <% $1\` and
+      -- \`word_similarity($1, search_key) > t\` mean the same and all fall back to a Seq Scan
+      -- — invisible on a test's handful of rows, fatal on a catalogue. The equality arm is
+      -- served by the same index and finds a name made of short words only («M&M's» is
+      -- \`m m s\`), which has no word to ground a match by distance.
+      select ${items.id} as id,
+             ${items.searchKey} as search_key,
+             word_similarity(${key}, ${items.searchKey}) as ws
+      from ${items}
+      where ${items.searchKey} %> ${key} or ${items.searchKey} = ${key}
+      -- No ORDER BY here, deliberately: \`order by id\` with this limit sent the planner down
+      -- the primary key, filtering every row — a full scan wearing an index. Which candidates
+      -- survive the bound matters only past it; the answer's order is set below.
+      limit ${CANDIDATE_CEILING}
+    ),
+    per_word as (
+      select c.id, qw.grounds,
+             (
+               select min(
+                 -- The screen searches while the person types, so the last word is usually
+                 -- unfinished: it may also match the start of a name word. Exactly at two or
+                 -- three letters, one edit from four, two from seven — a looser prefix of
+                 -- two letters would match every word there is.
+                 case when qw.last
+                        and length(w) > length(qw.q)
+                        and levenshtein(left(qw.q, 255), left(w, length(qw.q)))
+                            <= (length(qw.q) - 1) / 3
+                      then levenshtein(left(qw.q, 255), left(w, length(qw.q)))
+                      -- levenshtein refuses arguments past 255 characters, and one word of a
+                      -- key can reach 600. Cut, not skipped: such a name is still an item.
+                      else levenshtein(left(qw.q, 255), left(w, 255))
+                 end)
+               from unnest(string_to_array(c.search_key, ' ')) as w
+               -- A grounding word is measured against grounding words only: against «л» or
+               -- «1» of a size every two-letter word is two edits away, inside the budget.
+               where not qw.grounds or (length(w) >= ${SHORT_WORD} and w !~ '^[0-9]+$')
+             ) as qd
+      from candidates c
+      cross join query_words qw
+    ),
+    ranked as (
+      select c.id, c.ws,
+             case when c.search_key = ${key} then 0
+                  -- Grounding words by their mean, rounded up: a correct extra word printed
+                  -- on the package («пастеризованное») would cost 11 by the worst, 4 by the
+                  -- mean. A name with no grounding word leaves qd null and never passes.
+                  else ceil(avg(coalesce(pw.qd, 255)) filter (where pw.grounds))
+                       -- Short words by their worst, at most one edit: each has to find its
+                       -- pair, so «1 л» against «2 л» costs one where «л» alone would hide it.
+                       + least(coalesce(max(pw.qd) filter (where not pw.grounds), 0), 1)
+             end as distance
+      from candidates c
+      join per_word pw on pw.id = c.id
+      group by c.id, c.ws, c.search_key
+    )
+    select id
+    from ranked
+    where distance <= ${ACCEPTED_DISTANCE}
+    -- Ties stay ties («moloko» names «Ашхар» and «Марианна» alike); \`id\` only keeps two
+    -- loads of one screen in one order. MOL-11 lifts a remembered pick before \`ws\`.
+    order by distance, ws desc, id
+    limit ${limit}
+  `
 }
 
 export function createItemRepository(db: Conn): ItemRepository {
@@ -157,79 +252,34 @@ export function createItemRepository(db: Conn): ItemRepository {
 
     async search(query, limit) {
       // The same function the name went through on write: the key is compared with itself.
-      const key = toSearchKey(query)
-      // A query of nothing but separators leaves no key, and an empty key would match
-      // every row — the function guarantees content only for names, never for queries.
-      if (key === '') return []
+      const key = toSearchKey(query).split(' ').slice(0, MAX_QUERY_WORDS).join(' ')
+      // Not only the empty key: for punctuation `toSearchKey` falls back to the punctuation
+      // itself, which has no trigrams and no words — nothing to look for, so no round trip.
+      if (!HAS_CONTENT.test(key)) return []
 
       const ids = await db.transaction(async (tx) => {
         /*
          * The threshold of `%>` is a setting of the connection, not a value in the query —
          * `set_limit()` governs `%` and leaves this one at its default of 0.6. Connections
          * live in a pool, so a plain SET would leak into whatever runs on this connection
-         * next. `set_config(…, true)` is SET LOCAL in a form that takes a bound parameter: it
-         * ends with the transaction, which is why a read opens one — outside a transaction
-         * it would end with the statement and the threshold would silently stay at 0.6.
+         * next. `set_config(…, true)` is SET LOCAL in a form that takes a bound parameter.
+         *
+         * Local to the *transaction*, though, not to this block: handed a caller's
+         * transaction, `db.transaction` is a savepoint, and the setting would outlive it and
+         * change the caller's own `%>`. So the previous value is read first and put back.
          */
+        const [previous] = await tx.execute<{ threshold: string }>(
+          sql`select current_setting('pg_trgm.word_similarity_threshold') as threshold`,
+        )
         await tx.execute(
           sql`select set_config('pg_trgm.word_similarity_threshold', ${String(CANDIDATE_THRESHOLD)}, true)`,
         )
 
-        const rows = await tx.execute<{ id: string }>(sql`
-          with candidates as (
-            -- The column goes first, and that is not style: \`search_key %> $1\` is the only
-            -- form the GIN index serves. \`$1 %> search_key\`, \`search_key <% $1\` and
-            -- \`word_similarity($1, search_key) > t\` mean the same and all fall back to a Seq
-            -- Scan — invisible on a test's handful of rows, fatal on a catalogue.
-            select ${items.id} as id,
-                   ${items.searchKey} as search_key,
-                   word_similarity(${key}, ${items.searchKey}) as ws
-            from ${items}
-            where ${items.searchKey} %> ${key}
-            order by ws desc, ${items.id}
-            limit ${CANDIDATE_CEILING}
-          ),
-          scored as (
-            select c.id, c.ws, s.anchor, s.short_best, s.long_words
-            from candidates c
-            cross join lateral (
-              select
-                -- Every word of the query against every word of the name, the best of the
-                -- name for each: «чанах» is a brand, not the head of «Сыр Чанах». Long words
-                -- are averaged rather than taking the worst — a correct extra word printed on
-                -- the package («пастеризованное») would otherwise cost 11 instead of 4.
-                ceil(avg(qd) filter (where length(q) >= ${SHORT_WORD})) as anchor,
-                min(qd) filter (where length(q) < ${SHORT_WORD}) as short_best,
-                count(*) filter (where length(q) >= ${SHORT_WORD}) as long_words
-              from unnest(string_to_array(${key}, ' ')) as q
-              cross join lateral (
-                -- levenshtein refuses arguments past 255 characters, and one word of a key can
-                -- reach 600. Cut, not skipped: such a name is still a legitimate item. The exact
-                -- distance and not levenshtein_less_equal: its capped answer («more than N»)
-                -- is enough to reject a word, but the mean above averages it, and a correct
-                -- extra word capped at 4 instead of ~12 slipped the item inside the budget.
-                select min(levenshtein(left(q, 255), left(w, 255))) as qd
-                from unnest(string_to_array(c.search_key, ' ')) as w
-              ) per_word
-            ) s
-          ),
-          ranked as (
-            -- Short words refine, never ground: a query of digits alone has no anchor and
-            -- finds nothing, while «1 л» against «2 л» still costs one edit.
-            select id, ws,
-                   anchor + case when anchor <= ${ACCEPTED_DISTANCE}
-                                 then least(coalesce(short_best, 0), 1) else 0 end as distance
-            from scored
-            where long_words > 0
-          )
-          select id
-          from ranked
-          where distance <= ${ACCEPTED_DISTANCE}
-          -- Ties stay ties («moloko» names «Ашхар» and «Марианна» alike); \`id\` only keeps two
-          -- loads of one screen in one order. MOL-11 lifts a remembered pick before \`ws\`.
-          order by distance, ws desc, id
-          limit ${rowLimit(limit)}
-        `)
+        const rows = await tx.execute<{ id: string }>(rankedCandidates(key, rowLimit(limit)))
+
+        await tx.execute(
+          sql`select set_config('pg_trgm.word_similarity_threshold', ${previous?.threshold ?? '0.6'}, true)`,
+        )
         return rows.map((row) => row.id)
       })
 
