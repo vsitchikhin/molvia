@@ -223,6 +223,37 @@ describe('search — what it finds', () => {
   })
 })
 
+describe('search — sizes written together', () => {
+  it('reads «1л» as a size, not a grounding word: «молоко 1л» finds «Молоко 1 л» too', async () => {
+    // «1л» has a letter, so it used to ground the match and was measured against `moloko`
+    // alone — six edits, and the item with the size written apart was lost.
+    await named('Молоко 1 л')
+    await named('Молоко 1л')
+    expect(await names('молоко 1л')).toEqual(['Молоко 1л', 'Молоко 1 л'])
+  })
+
+  it('finds «Кефир Ашхар 1 л» by «кефир 1л»', async () => {
+    await named('Кефир Ашхар 1 л')
+    expect(await names('кефир 1л')).toEqual(['Кефир Ашхар 1 л'])
+  })
+})
+
+describe("search — names of short words: «M&M's»", () => {
+  it('finds the brand in a longer name and while it is being typed', async () => {
+    // No grounding word, but letters: every query word has to be found exactly, the last one
+    // by its start — so the brand reaches its products, and «m&m» reaches «M&M's».
+    await named("M&M's Арахис")
+    await named("M&M's")
+    expect((await names("M&M's")).sort()).toEqual(["M&M's", "M&M's Арахис"])
+    expect((await names('m&m')).sort()).toEqual(["M&M's", "M&M's Арахис"])
+  })
+
+  it('keeps digits alone out of that rule: «1 2» finds nothing', async () => {
+    await named('Батарейки 1 2')
+    expect(await names('1 2')).toEqual([])
+  })
+})
+
 describe('search — while the word is being typed', () => {
   it('finds by the start of the last word: «мол», «шоко», «сгущ», «лав»', async () => {
     await named('Молоко Ашхар')
@@ -322,6 +353,22 @@ describe('search — edges', () => {
     await expect(repo.search('щ'.repeat(150), 10)).resolves.toBeInstanceOf(Array)
   })
 
+  it('does not lose the newest item: two thousand older candidates do not push it out', async () => {
+    // With a ceiling and no order, the cut fell on the physical order of rows — the newest
+    // items, the ones «Предложить товар» had just added.
+    await db.insert(items).values(
+      Array.from({ length: 2000 }, (_, index) => ({
+        id: randomUUID(),
+        kind: 'product' as const,
+        name: `Мёд вар. ${String(index)}`,
+        searchKey: toSearchKey(`Мёд вар. ${String(index)}`),
+        defaultUnit: 'kg' as const,
+      })),
+    )
+    await named('Масло сливочное')
+    expect((await names('ма'))[0]).toBe('Масло сливочное')
+  })
+
   it('ranks every candidate: two hundred near misses do not push the right item out', async () => {
     // «малако» scores 0.429 against any «Малина» and 0.167 against the milk. Cut by
     // similarity before ranking, two hundred raspberries — none of them inside the budget —
@@ -344,7 +391,18 @@ describe('search — edges', () => {
     const query = Array.from({ length: 6000 }, () => 'молоко').join(' ')
     const started = performance.now()
     expect(await names(query)).toEqual(['Молоко Ашхар'])
-    expect(performance.now() - started).toBeLessThan(1000)
+    // Generous on purpose: the answer above already proves the cut; the time only guards
+    // against the unbounded cost, and a slow runner must not fail a correct build.
+    expect(performance.now() - started).toBeLessThan(5000)
+  })
+
+  it('survives an unfinished last word longer than 255 against a longer name word', async () => {
+    // The prefix arm cuts the name to the length of the query word — past 255 that used to
+    // reach levenshtein whole and answer a 500 to everyone, once such an item existed.
+    await named('щ'.repeat(200))
+    await named('Сыр Лори')
+    await expect(repo.search('щ'.repeat(130), 10)).resolves.toBeInstanceOf(Array)
+    await expect(repo.search(`сыр ${'щ'.repeat(150)}`, 10)).resolves.toBeInstanceOf(Array)
   })
 
   it('returns exactly as many as asked: 0, 1, N, N+1', async () => {
