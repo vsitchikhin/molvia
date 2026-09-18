@@ -352,9 +352,16 @@ export function createItemRepository(db: Conn): ItemRepository {
          * Local to the *transaction*, though, not to this block: handed a caller's
          * transaction, `db.transaction` is a savepoint, and the setting would outlive it and
          * change the caller's own `%>`. So the previous value is read first and put back.
+         *
+         * Read with `missing_ok`: the setting exists in a session only once the pg_trgm
+         * library is loaded there — by the first trigram operator, not by CREATE EXTENSION in
+         * another session. On a fresh pooled connection the plain read raised, and every
+         * search answered 500 until an insert happened to touch the index (MOL-12). A value
+         * set before the library loads is a placeholder the library adopts, so the local
+         * threshold still holds for the query below, and 0.6 — its default — is put back.
          */
-        const [previous] = await tx.execute<{ threshold: string }>(
-          sql`select current_setting('pg_trgm.word_similarity_threshold') as threshold`,
+        const [previous] = await tx.execute<{ threshold: string | null }>(
+          sql`select current_setting('pg_trgm.word_similarity_threshold', true) as threshold`,
         )
         await tx.execute(
           sql`select set_config('pg_trgm.word_similarity_threshold', ${String(CANDIDATE_THRESHOLD)}, true)`,

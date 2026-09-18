@@ -162,6 +162,25 @@ describe('search — the shape of the query', () => {
     expect(seen).toEqual({ before: 0, after: 0, threshold: '0.6' })
   })
 
+  it('answers on a fresh connection, where pg_trgm is not loaded yet, by its own threshold', async () => {
+    // The setting exists in a session only once the library is loaded there. Reading it
+    // without `missing_ok` raised, and every first search on a new pooled connection was a
+    // 500 — invisible here, where nearly every test inserts an item first on this connection.
+    await named('Молоко «Ашхар»')
+    const fresh = connectDrizzle()
+    try {
+      const found = await createItemRepository(fresh.db).search('малако', 10, nobody)
+      const [row] = await fresh.db.execute<{ threshold: string }>(
+        raw`select current_setting('pg_trgm.word_similarity_threshold') as threshold`,
+      )
+      // «малако» scores 0.167: found only if 0.15 held on the very first query of the session.
+      expect(found.map((item) => item.name)).toEqual(['Молоко «Ашхар»'])
+      expect(row?.threshold).toBe('0.6')
+    } finally {
+      await fresh.close()
+    }
+  })
+
   it('finds a two-vowel typo that the old threshold of 0.3 could not reach', async () => {
     await named('Молоко «Ашхар» 3.2%')
     await named('Марианна')
