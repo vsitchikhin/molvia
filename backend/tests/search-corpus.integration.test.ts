@@ -128,14 +128,14 @@ describe('the corpus of forks, through the search', () => {
 
   it('finds «Чай зелёный» by «пельмени» — the absolute budget, pinned as it is', async () => {
     // `pelmeni` is two edits from `zeleni`: a seven-letter word wrong from end to end passes
-    // where the budget was meant for a typo. The limit MOL-14 already carries; this is its
-    // plainest case.
+    // where the budget was meant for a typo. No threshold separates it from «малако» — MOL-46;
+    // this is its plainest case.
     expect(await names('пельмени')).toEqual(['Чай зелёный'])
   })
 
   it('puts both cheeses above «Сахар» for «Сааар» — a turn of the key, pinned as it is', async () => {
     // One substitution from «Сахар», but the repeat collapse makes it `sar`, one edit from
-    // `sir`. Written down by MOL-5 for MOL-14 to decide, not for this file to fix.
+    // `sir`. Written down by MOL-5, left in place by MOL-14 (MOL-47), not for this file to fix.
     await answers('Сааар', [['Сыр Лори', 'Сыр Чанах'], 'Сахар', 'Молоко Ашхар 3.2%'])
   })
 })
@@ -203,7 +203,7 @@ describe('what is not in the corpus: two words, and English spelling', () => {
   })
 
   it('does not find «Чизкейк» by «Cheesecake» — six edits, the class the key does not cover', async () => {
-    // English orthography is not a transliteration fork; pinned for MOL-14.
+    // English orthography is not a transliteration fork; pinned, and left to MOL-47.
     expect(await names('Cheesecake')).toEqual([])
   })
 })

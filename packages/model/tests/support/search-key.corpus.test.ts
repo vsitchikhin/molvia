@@ -177,7 +177,7 @@ describe('развилка к/c', () => {
 
   it('не узнаёт недописанное латинское слово на c — c решает следующая буква', () => {
     // «Nutric» ends in a hard c, «Nutrici» has a soft one: one keystroke moves the letter.
-    // Narrow — Latin brands with ce/ci — and left to MOL-14.
+    // Narrow — Latin brands with ce/ci — and left to MOL-47.
     expect(toSearchKey('Nutricia').startsWith(toSearchKey('Nutric'))).toBe(false)
   })
 })

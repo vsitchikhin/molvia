@@ -180,9 +180,9 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   the budget. The price of the rule is a Russian word typed with `c` for `ц` in a hard
   position: `otec` and `cukaty` cost an edit, `jajca` left the corpus (45 of 46); `ts`
   spellings are untouched. A Latin word cut right after a `c` — «Nutric» on the way to
-  «Nutricia» — is not the start of the finished one; narrow, left to MOL-14. The fold also
-  fires on what the alphabet itself produced, not only on Latin someone typed — `тс` becomes
-  `ts` becomes `ц` — which is what makes «счёт» and «щёт» one key, and also what reads the
+  «Nutricia» — is not the start of the finished one; narrow, and MOL-14's shelf never met it
+  (MOL-47). The fold also fires on what the alphabet itself produced, not only on Latin
+  someone typed — `тс` becomes `ts` becomes `ц` — which is what makes «счёт» and «щёт» one key, and also what reads the
   `тс` of «Советский» as `ц`. A false merge costs a candidate, a miss costs the answer; the
   trade is deliberate, and it is a trade. **That is why the key is never an identity:**
   «Предложить товар» decides a duplicate by `nameIdentity` — case, spacing, invisible
@@ -244,13 +244,13 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   find nothing. The correct extra word is still lost (4 against a budget of 2) — chosen
   knowingly, and pinned by a test. The distance is exact `levenshtein` on words cut to 255
   characters: past that it raises an error, and `levenshtein_less_equal` is no substitute,
-  because its capped answer distorts the mean. Limits left to MOL-14 on purpose: the budget is
-  absolute, so a short wrong word passes where a long right one does not — «молоко ашхар
-  кефир» finds the milk, and «кока кола 0,5 л» even finds «Вода Джермук 0.5 л», every word
-  wrong by two; the two thresholds disagree — «ыср» is two edits from «сыр» yet shares no
-  trigram with it, so it never becomes a candidate; and a name of punctuation only («???»)
-  has a key but no query reaches it. A name without a size ranks level with a wrong size —
-  unknown is not worse than wrong, which is likely right.
+  because its capped answer distorts the mean. Limits MOL-14 measured and left in place: the
+  budget is absolute (MOL-46), so a short wrong word passes where a long right one does not —
+  «молоко ашхар кефир» finds the milk, and «кока кола 0,5 л» even finds «Вода Джермук 0.5 л»,
+  every word wrong by two; the two thresholds disagree — «ыср» is two edits from «сыр» yet
+  shares no trigram with it, so it never becomes a candidate; and a name of punctuation only
+  («???») has a key but no query reaches it (both MOL-47). A name without a size ranks level
+  with a wrong size — unknown is not worse than wrong, which is likely right.
 - **Every candidate is ranked; there is no ceiling.** Any cut before ranking is wrong one
   way or another. By similarity it drops the typo the low threshold exists for — «малако»
   scores 0.429 against any «Малина» and 0.167 against the milk, and two hundred raspberries
@@ -275,9 +275,22 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   added to a trip, not on a tap — a tap the sheet cancels is a changed mind. It never forgets;
   if a stale pick starts to hurt, decay is a task with a number, not a guess.
 
-Thresholds (`word_similarity` > 0.15, accept edit distance <= 2) are a first estimate — the
-distance from twenty names, the candidate threshold from five thousand synthetic rows. They must be
-retuned on a real catalogue (MOL-14).
+**The thresholds — `word_similarity` > 0.15, edit distance <= 2 — were measured and kept
+(MOL-14).** The set: the owner's own words from the expense log («кола», «дошик», «туалетка»,
+73 queries and 19 for what the shelf does not carry) against 64 names written for the shelf of
+«Ереван Сити», plus the typo corpus of MOL-5, since the log holds no typos. At the kept point
+68 of 73 find their item first, 45 of 45 typos land in the top three, 17 of 19 absent words
+find nothing. **No point of the grid did better on both halves.** A threshold of 0.3 empties
+every false hit but drops «Молоко Ашхар» from «малако» — the case 0.15 exists for; a budget of
+1 empties them too and loses five typos; a budget of 3 wins one query and brings six false
+hits. What no threshold reaches went to tasks with numbers: **synonyms** — «картошка» against
+«Картофель», 5 of 73 — MOL-45; **the absolute budget** — «овощи» finds «Мука … высший сорт»,
+«специи» «Соевый соус», «пельмени» «Чай зелёный», 3 of 25 — MOL-46. Weighting vowel edits below
+consonant ones was tried against it and refuted: `ovoshi`/`vishi` share every consonant, while
+the right `canah`/«Чанах» and `grecka`/«Гречка» differ by two. `REMEMBERED_PREFIX` was not
+measured — that needs real picks — and the whole grid is run again on real input after MOL-38
+(MOL-47). The corpus pins every answer whole, so a change of either threshold shows what it
+moves.
 
 **Embeddings are a 0.2 question, not a 0.1 one.** They answer what trigrams cannot —
 «молочка» reaching kefir and curd, and the duplicate merging the canonical catalogue needs.

@@ -370,7 +370,7 @@ describe('search — how the word distances fold (MOL-10)', () => {
 
   it('never ranks what the trigrams did not accept: «калбеса» is 2 edits and still not found', async () => {
     // Inside the distance budget, but 0.143 by `word_similarity` — below the candidate
-    // threshold, so ranking never sees it. The two thresholds disagree (a limit for MOL-14);
+    // threshold, so ranking never sees it. The two thresholds disagree (a limit, MOL-47);
     // pinned so the candidate threshold is held from below as well as from above.
     await named('Колбаса')
     const [row] = await db.execute<{ ws: number; edits: number }>(
@@ -398,7 +398,7 @@ describe('search — what it must not find', () => {
   it('loses the item on a correct extra word — the price of the mean, pinned (В-1)', async () => {
     // Chosen knowingly: «пастеризованное» is printed on the package, and the mean over the
     // long words puts the item at 4, past the budget of 2. If this starts passing, the
-    // folding rule changed — which is MOL-14's decision to make, not an accident's.
+    // folding rule changed — which is a decision to make (MOL-46), not an accident.
     await named('Молоко Ашхар 3.2%')
     expect(await names('молоко ашхар')).toEqual(['Молоко Ашхар 3.2%'])
     expect(await names('молоко ашхар пастеризованное')).toEqual([])
