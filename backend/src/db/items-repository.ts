@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { asc, eq, inArray } from 'drizzle-orm'
+import { asc, eq, inArray, sql } from 'drizzle-orm'
 import { itemSchema, toSearchKey } from '@molvia/model'
 import type { Item, NewItem } from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
-import { idOrNull, theRow } from './rows'
+import { idOrNull, rowLimit, theRow } from './rows'
 import { itemBarcodes, items } from './schema'
 
 export interface ItemRepository {
@@ -13,7 +13,23 @@ export interface ItemRepository {
   create(input: NewItem, createdBy: string | null): Promise<Item>
   byId(id: string): Promise<Item | null>
   byIds(ids: readonly string[]): Promise<Item[]>
+  /**
+   * The catalogue lookup behind «что взяли?». No owner in the signature on purpose: the
+   * catalogue is shared by everyone, so this is the one listing of 0.1 without an `actorId`.
+   */
+  search(query: string, limit: number): Promise<Item[]>
 }
+
+/**
+ * The lowest `word_similarity` a candidate may score. Not 0.3, which the plan once said: a
+ * two-vowel typo — «малако» against «Молоко Ашхар» — scores 0.167 and at 0.3 never even
+ * becomes a candidate, so ranking has nothing to rank. Measured in MOL-10; tuning it on a
+ * real catalogue is MOL-14's.
+ */
+const CANDIDATE_THRESHOLD = 0.15
+
+/** How many candidates the trigram pass hands to ranking — a bound on the work, not a result size. */
+const CANDIDATE_CEILING = 200
 
 type ItemRow = typeof items.$inferSelect
 
@@ -128,5 +144,46 @@ export function createItemRepository(db: Conn): ItemRepository {
     },
 
     byIds: load,
+
+    async search(query, limit) {
+      // The same function the name went through on write: the key is compared with itself.
+      const key = toSearchKey(query)
+      // A query of nothing but separators leaves no key, and an empty key would match
+      // every row — the function guarantees content only for names, never for queries.
+      if (key === '') return []
+
+      const ids = await db.transaction(async (tx) => {
+        /*
+         * The threshold of `%>` is a setting of the connection, not a value in the query —
+         * `set_limit()` governs `%` and leaves this one at its default of 0.6. Connections
+         * live in a pool, so a plain SET would leak into whatever runs on this connection
+         * next. `set_config(…, true)` is SET LOCAL in a form that takes a bound parameter: it
+         * ends with the transaction, which is why a read opens one — outside a transaction
+         * it would end with the statement and the threshold would silently stay at 0.6.
+         */
+        await tx.execute(
+          sql`select set_config('pg_trgm.word_similarity_threshold', ${String(CANDIDATE_THRESHOLD)}, true)`,
+        )
+
+        /*
+         * The column goes first, and that is not style: `search_key %> $1` is the only form
+         * the GIN index serves. `$1 %> search_key`, `search_key <% $1` and
+         * `word_similarity($1, search_key) > t` mean the same and all fall back to a Seq Scan
+         * — invisible on a test's handful of rows, fatal on a catalogue.
+         */
+        const rows = await tx.execute<{ id: string }>(sql`
+          select ${items.id} as id
+          from ${items}
+          where ${items.searchKey} %> ${key}
+          order by word_similarity(${key}, ${items.searchKey}) desc, ${items.id}
+          limit ${Math.min(rowLimit(limit), CANDIDATE_CEILING)}
+        `)
+        return rows.map((row) => row.id)
+      })
+
+      // `load` answers in id order; the ranking is this query's, so it is restored here.
+      const found = new Map((await load(ids)).map((item) => [item.id, item]))
+      return ids.flatMap((id) => found.get(id) ?? [])
+    },
   }
 }
