@@ -183,8 +183,8 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   «Nutricia» — is not the start of the finished one; narrow, and MOL-14's shelf never met it
   (MOL-47). The fold also fires on what the alphabet itself produced, not only on Latin
   someone typed — `тс` becomes `ts` becomes `ц` — which is what makes «счёт» and «щёт» one
-  key, and also what reads the `тс` of «Советский» as `ц`. A false merge costs a candidate, a miss costs the answer; the
-  trade is deliberate, and it is a trade. **That is why the key is never an identity:**
+  key, and also what reads the `тс` of «Советский» as `ц`. A false merge costs a candidate, a
+  miss costs the answer; the trade is deliberate, and it is a trade. **That is why the key is never an identity:**
   «Предложить товар» decides a duplicate by `nameIdentity` — case, spacing, invisible
   characters and the three Armenian spellings «և» / «եւ» / «եվ» only — because there a false
   merge costs the item itself: «Milo» would be answered with «Мыло» (MOL-12). The identity is built from the key's own first steps, and a
@@ -293,14 +293,18 @@ budget** — «овощи» finds «Мука … высший сорт», «сп
 зелёный», 3 of 25 — MOL-46; **a unit word grounding a match** — «сыр» is two edits from `sht`
 of «4 шт» — MOL-48. Weighting vowel edits below consonant ones was tried against the budget and
 refuted: `ovoshi`/`vishi` share every consonant, while the right `canah`/«Чанах» and
-`grecka`/«Гречка» differ by two. **The owner's absent words flatter the search:** fifty everyday
-purchases the shelf does not carry find something in 24 cases — a taste printed on another item
-(«сметана» is in the chips' name, found exactly) no threshold can remove. With «Предложить
-товар» shown only on an empty answer, that is a question for the screen (MOL-23), not the
-search. `REMEMBERED_PREFIX` was measured by typing letter by letter: a pick lifts the item on
-the next letter 18 times at 2, 9 at 3, 5 at 4, and harms nothing on 64 names — which is too few
-for two letters to collide with anything, so the harm 2 would bring cannot show here; 3 stays
-until real picks decide (MOL-47). The corpus pins every answer whole — the shelf, those fifty
+`grecka`/«Гречка» differ by two. **The owner's absent words flatter the search:** of fifty
+everyday purchases the shelf does not carry, 24 find something, and they are two outcomes. In 12
+the first row carries the word's root — a taste or a property printed on another item
+(«сметана» is in the chips' name, found exactly), which no threshold can remove; with
+«Предложить товар» shown only on an empty answer, that is a question for the screen (MOL-23),
+not the search. The other 12 share nothing but letters — the absolute budget («водка» →
+«Вода») and the unit word («сыр» → «4 шт»), MOL-46 and MOL-48. `REMEMBERED_PREFIX` was
+measured by typing letter by letter: a pick lifts its item on the next letter 18 times at 2, 9
+at 3, 5 at 4 — and at 2 it harms 4 times, where two of the owner's words share two letters: a
+pick for Coca-Cola on «ко» puts it above «Колбаса» on «кол», one for «Креветки» on «кр» above
+«Крекеры» on «кре», and each the other way round. At 3 and 4 nothing is harmed on this shelf;
+3 stays, and real picks measure it again (MOL-47). The corpus pins every answer whole — the shelf, those fifty
 words, Latin and Cyrillic brand spellings, Armenian labels — so a change of either threshold
 shows what it moves.
 
