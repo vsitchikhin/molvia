@@ -24,8 +24,8 @@ import { clearAll, insertItem } from './fixtures'
  * model of the ranking; this one measures what a person sees.
  *
  * Each case pins the whole answer, not only its head: the corpus is what a retune of the
- * thresholds is measured against (MOL-14 kept them, MOL-47 measures again), and a threshold that buries the answer in noise keeps the right
- * item first. When a threshold moves, these lists are expected to move with it — by hand.
+ * thresholds is measured against (MOL-14 kept them, MOL-47 measures again), and a threshold
+ * that buries the answer in noise keeps the right item first. When a threshold moves, these lists are expected to move with it — by hand.
  */
 
 const { db, close } = connectDrizzle()
@@ -428,16 +428,18 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
   /**
    * Found by the letters, not by the meaning: `miaso` is one edit from the start of `miakot`
    * («мякоть»), inside the slack of an unfinished word. A synonym like «картошка», counted a
-   * hit by luck — pinned so nobody reads it as the search knowing that beef is meat (MOL-45).
+   * hit by luck. «Фарш говяжий» is meat just as much and has no such start, so it is not
+   * found — which is what shows the letters, not the meaning, at work (MOL-45).
    */
-  const BY_LETTERS = new Set(['мясо'])
+  const BY_LETTERS: ReadonlyMap<string, string> = new Map([['мясо', 'Фарш говяжий']])
 
   const meantFirst = (
     answer: Answer | undefined,
     meant: readonly string[],
-  ): 'alone' | 'tied' | 'none' => {
+  ): 'alone' | 'tied' | 'not-first' | 'empty' => {
     const head = [answer?.[0] ?? []].flat()
-    if (head.length === 0 || !head.some((name) => meant.includes(name))) return 'none'
+    if (head.length === 0) return 'empty'
+    if (!head.some((name) => meant.includes(name))) return 'not-first'
     return head.every((name) => meant.includes(name)) ? 'alone' : 'tied'
   }
 
@@ -445,14 +447,20 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     // The pinned answers replace nothing in the shared list, so they must still agree with it.
     for (const [query, meant] of SHELF_QUERIES) {
       const expected = SYNONYMS.has(query)
-        ? 'none'
+        ? 'empty'
         : TIED_WITH_FOREIGN.has(query)
           ? 'tied'
           : 'alone'
       expect(meantFirst(ANSWERS[query], meant), query).toBe(expected)
     }
-    expect([...BY_LETTERS].every((query) => ANSWERS[query] !== undefined)).toBe(true)
   })
+
+  it.each([...BY_LETTERS])(
+    'finds by letters only: «%s» does not reach «%s», meant just as much',
+    (query, missed) => {
+      expect([ANSWERS[query] ?? []].flat(2)).not.toContain(missed)
+    },
+  )
 
   it.each(SHELF_QUERIES)('«%s»', async (query) => {
     await answers(query, ANSWERS[query] ?? [])
@@ -485,12 +493,47 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
 
   /**
    * Fifty everyday purchases the shelf does not carry — the adversarial pass's words, not the
-   * owner's. About half find something, and every one that does hides «Предложить товар»,
-   * shown only on an empty answer: a taste printed on another item («сметана», «лук», «томаты»
-   * are in the chips', the ketchup's names — found exactly, no threshold removes that); a unit
-   * word grounding a match («сыр» is two edits from `sht` of «4 шт» — MOL-48); the absolute
-   * budget («водка» → «Вода», «мыло» → «Молоко» — MOL-46). Pinned whole, as they are.
+   * owner's. Twenty-four find something, and every one that does hides «Предложить товар»,
+   * shown only on an empty answer. They are two outcomes, not one:
+   *
+   * - `RELATED` — the first row carries the word's root: a taste or a property printed on
+   *   another item («сметана», «лук» in the chips', «томаты» in the ketchup's name). Found
+   *   exactly or by the start of a word; no threshold removes that — a question for the
+   *   screen (MOL-23), not the search.
+   * - `UNRELATED` — nothing in common but letters: the absolute budget («водка» → «Вода»,
+   *   «мыло» → «Молоко», «торт», «плов» — MOL-46) and a unit word grounding a match («сыр» is
+   *   two edits from `sht` of «4 шт» — MOL-48).
+   *
+   * Pinned whole, as they are.
    */
+  const RELATED = new Set([
+    'соль',
+    'яблоки',
+    'апельсины',
+    'томаты',
+    'чеснок',
+    'кукуруза',
+    'печень',
+    'лук',
+    'сметана',
+    'суп',
+    'вино',
+    'пирог',
+  ])
+  const UNRELATED = new Set([
+    'сахар',
+    'чай',
+    'сыр',
+    'ложка',
+    'мыло',
+    'губка',
+    'пакеты',
+    'плов',
+    'водка',
+    'конфеты',
+    'торт',
+    'печенье',
+  ])
   const EVERYDAY: Readonly<Record<string, Answer>> = {
     яйца: [],
     сахар: [['Молоко Ашхар 2,5% 1 л', 'Творог Ашхар 9% 400 г']],
@@ -606,6 +649,13 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     expect(Object.keys(EVERYDAY).sort()).toEqual([...SHELF_EVERYDAY_ABSENT].sort())
   })
 
+  it('files every everyday word that finds something: 12 related, 12 unrelated', () => {
+    const found = SHELF_EVERYDAY_ABSENT.filter((query) => (EVERYDAY[query] ?? []).length > 0)
+    expect(found.filter((query) => !RELATED.has(query) && !UNRELATED.has(query))).toEqual([])
+    expect([...RELATED, ...UNRELATED].filter((query) => !found.includes(query))).toEqual([])
+    expect([RELATED.size, UNRELATED.size]).toEqual([12, 12])
+  })
+
   it.each(SHELF_EVERYDAY_ABSENT)('everyday «%s», which the shelf does not carry', async (query) => {
     await answers(query, EVERYDAY[query] ?? [])
   })
@@ -668,8 +718,9 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     хаггис: ["Хлеб тостовый Harry's 470 г", 'Салфетки влажные Huggies 56 шт'],
     лейс: [["Чипсы Lay's сметана и лук 150 г", 'Рис длиннозёрный Мистраль 900 г']],
   }
+  /** «хаггис» finds the wipes — second, under the bread; «лейс» ties the chips with the rice. */
   const OTHERWISE_WRONG = new Map([
-    ['хаггис', 'none'],
+    ['хаггис', 'not-first'],
     ['лейс', 'tied'],
   ])
 
