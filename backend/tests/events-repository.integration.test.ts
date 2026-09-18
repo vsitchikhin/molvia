@@ -132,10 +132,11 @@ describe('week-four return', () => {
   })
 })
 
-describe('recording at most once within a window', () => {
-  const MINUTE = 60 * 1000
-  const view = (actorId: string) =>
-    ({ actorId, type: EVENT.CATALOGUE_VIEWED, payload: { subject: 'product' } }) as const
+describe("recording at most once a day of the person's own life", () => {
+  const HOUR = 60 * 60 * 1000
+  const view = (actorId: string, subject: 'product' | 'venue' = 'product') =>
+    ({ actorId, type: EVENT.CATALOGUE_VIEWED, payload: { subject } }) as const
+  const ago = (ms: number) => new Date(Date.now() - ms)
 
   async function viewsOf(actorId: string) {
     return (await db.select().from(events)).filter(
@@ -146,24 +147,40 @@ describe('recording at most once within a window', () => {
   it('writes the first one', async () => {
     const actorId = await insertActor(db)
 
-    await expect(repository.recordUnlessWithin(view(actorId), DAY)).resolves.toBe(true)
+    await expect(repository.recordOncePerDay(view(actorId))).resolves.toBe(true)
     expect(await viewsOf(actorId)).toHaveLength(1)
   })
 
-  it('writes nothing when one is a minute inside the window', async () => {
+  it('writes nothing more in the same day of their life', async () => {
     const actorId = await insertActor(db)
-    await repository.record({ ...view(actorId), occurredAt: new Date(Date.now() - DAY + MINUTE) })
+    // First seen ten days and three hours ago: today of their life began three hours ago.
+    await repository.record({ ...view(actorId), occurredAt: ago(10 * DAY + 3 * HOUR) })
+    await repository.record({ ...view(actorId), occurredAt: ago(2 * HOUR) })
 
-    await expect(repository.recordUnlessWithin(view(actorId), DAY)).resolves.toBe(false)
-    expect(await viewsOf(actorId)).toHaveLength(1)
-  })
-
-  it('writes again once the last one is a minute past the window', async () => {
-    const actorId = await insertActor(db)
-    await repository.record({ ...view(actorId), occurredAt: new Date(Date.now() - DAY - MINUTE) })
-
-    await expect(repository.recordUnlessWithin(view(actorId), DAY)).resolves.toBe(true)
+    await expect(repository.recordOncePerDay(view(actorId))).resolves.toBe(false)
     expect(await viewsOf(actorId)).toHaveLength(2)
+  })
+
+  it('writes a visit in week four even when the last row is under a day old', async () => {
+    // The rolling window lost exactly this: an evening in week three swallowed the next
+    // morning in week four, and the gate saw a person who came back as one who did not.
+    const actorId = await insertActor(db)
+    const started = ago(21 * DAY + HOUR) // week four of their life began an hour ago
+    await repository.record({ ...view(actorId), occurredAt: started })
+    await repository.record({ ...view(actorId), occurredAt: ago(2 * HOUR) }) // still week three
+
+    await expect(repository.recordOncePerDay(view(actorId))).resolves.toBe(true)
+    await expect(
+      repository.weekFourReturn('product', ago(21 * DAY + 2 * HOUR), ago(21 * DAY)),
+    ).resolves.toEqual({ cohortSize: 1, returned: 1 })
+  })
+
+  it('keeps the product and venue halves apart', async () => {
+    const actorId = await insertActor(db)
+    await repository.record(view(actorId, 'product'))
+
+    await expect(repository.recordOncePerDay(view(actorId, 'venue'))).resolves.toBe(true)
+    await expect(repository.recordOncePerDay(view(actorId, 'venue'))).resolves.toBe(false)
   })
 
   it('must not be held back by another type or by another actor', async () => {
@@ -172,19 +189,24 @@ describe('recording at most once within a window', () => {
     await repository.record({ actorId, type: EVENT.SESSION_STARTED })
     await repository.record(view(someoneElse))
 
-    await expect(repository.recordUnlessWithin(view(actorId), DAY)).resolves.toBe(true)
+    await expect(repository.recordOncePerDay(view(actorId))).resolves.toBe(true)
   })
 
-  it('writes the payload the gate splits on', async () => {
+  it('writes one row when two requests overlap on two connections', async () => {
     const actorId = await insertActor(db)
-    await repository.recordUnlessWithin(
-      { actorId, type: EVENT.CATALOGUE_VIEWED, payload: { subject: 'venue' } },
-      DAY,
-    )
+    const one = connectDrizzle()
+    const other = connectDrizzle()
+    try {
+      const written = await Promise.all([
+        createEventRepository(one.db).recordOncePerDay(view(actorId)),
+        createEventRepository(other.db).recordOncePerDay(view(actorId)),
+      ])
 
-    await expect(repository.weekFourReturn('venue', daysAgo(1), daysAgo(-1))).resolves.toEqual({
-      cohortSize: 1,
-      returned: 0,
-    })
+      expect(written.filter(Boolean)).toHaveLength(1)
+      expect(await viewsOf(actorId)).toHaveLength(1)
+    } finally {
+      await one.close()
+      await other.close()
+    }
   })
 })

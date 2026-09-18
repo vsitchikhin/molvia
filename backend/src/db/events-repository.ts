@@ -19,12 +19,20 @@ export interface CohortReturn {
 export interface EventRepository {
   record(event: RecordedEvent): Promise<void>
   /**
-   * Records the event unless this actor already has one of this type within the window —
-   * `true` when a row was written. One statement, measured by the database's clock, the same
-   * clock `occurred_at` is stamped with. Two calls in the same instant may both write; the
-   * gates count distinct actors, so that costs them nothing.
+   * Records the event unless this actor already has the same one — same type, same payload —
+   * in the current day of their own life: days counted from their first event, exactly as
+   * `weekFourReturn` counts weeks. `true` when a row was written.
+   *
+   * Not a rolling 24 hours from the last row: that window slid across the gate's week line, and
+   * a visit early in week four was swallowed by an evening in week three — a person who came
+   * back counted as one who did not. Days of the person's own life never straddle a week of
+   * the gate, so one row per such day loses nothing the gate reads. The payload takes part so
+   * the product and venue halves never hide each other's visits.
+   *
+   * Serialised per actor by a transaction-scoped advisory lock: the screen searches on every
+   * keystroke, and two overlapping requests would otherwise both see no row and both write.
    */
-  recordUnlessWithin(event: RecordedEvent, windowMs: number): Promise<boolean>
+  recordOncePerDay(event: RecordedEvent): Promise<boolean>
   /** Gate 0.3: of those first seen in a window, how many came back in their fourth week. */
   weekFourReturn(subject: CatalogueSubject, from: Date, to: Date): Promise<CohortReturn>
 }
@@ -43,20 +51,30 @@ export function createEventRepository(db: Conn): EventRepository {
       })
     },
 
-    async recordUnlessWithin(event, windowMs) {
-      const payload = 'payload' in event ? event.payload : {}
-      const rows = await db.execute<{ id: string }>(sql`
-        insert into ${events} (actor_id, type, payload)
-        select ${event.actorId}::uuid, ${event.type}, ${JSON.stringify(payload)}::jsonb
-        where not exists (
-          select 1 from ${events}
-          where actor_id = ${event.actorId}::uuid
-            and type = ${event.type}
-            and occurred_at > now() - make_interval(secs => ${windowMs / 1000})
+    async recordOncePerDay(event) {
+      const payload = JSON.stringify('payload' in event ? event.payload : {})
+      return db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext('events'), hashtext(${event.actorId}))`,
         )
-        returning id
-      `)
-      return rows.length > 0
+        const rows = await tx.execute<{ id: string }>(sql`
+          with first_seen as (
+            select min(occurred_at) as started from ${events} where actor_id = ${event.actorId}::uuid
+          )
+          insert into ${events} (actor_id, type, payload)
+          select ${event.actorId}::uuid, ${event.type}, ${payload}::jsonb
+          where not exists (
+            select 1 from ${events} e, first_seen f
+            where e.actor_id = ${event.actorId}::uuid
+              and e.type = ${event.type}
+              and e.payload = ${payload}::jsonb
+              and e.occurred_at >= f.started
+                + floor(extract(epoch from now() - f.started) / 86400) * interval '1 day'
+          )
+          returning id
+        `)
+        return rows.length > 0
+      })
     },
 
     async weekFourReturn(subject, from, to) {

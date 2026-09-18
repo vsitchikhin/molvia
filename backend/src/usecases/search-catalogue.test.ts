@@ -3,7 +3,7 @@ import { EVENT, itemSchema } from '@molvia/model'
 import type { Item } from '@molvia/model'
 import type { EventRepository, RecordedEvent } from '@/db/events-repository'
 import type { ItemRepository } from '@/db/items-repository'
-import { SEARCH_LIMIT, VIEW_RECORDED_ONCE_PER_MS, searchCatalogue } from './search-catalogue'
+import { SEARCH_LIMIT, searchCatalogue } from './search-catalogue'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 
@@ -41,7 +41,7 @@ function fakeItems(overrides: Partial<ItemRepository> = {}): ItemRepository {
 function fakeEvents(overrides: Partial<EventRepository> = {}): EventRepository {
   return {
     record: () => Promise.reject(new Error('record was not expected')),
-    recordUnlessWithin: () => Promise.reject(new Error('recordUnlessWithin was not expected')),
+    recordOncePerDay: () => Promise.reject(new Error('recordOncePerDay was not expected')),
     weekFourReturn: () => Promise.reject(new Error('weekFourReturn was not expected')),
     ...overrides,
   }
@@ -56,7 +56,7 @@ describe('searchCatalogue', () => {
         return Promise.resolve([])
       },
     })
-    const events = fakeEvents({ recordUnlessWithin: () => Promise.resolve(true) })
+    const events = fakeEvents({ recordOncePerDay: () => Promise.resolve(true) })
 
     await searchCatalogue({ items, events }, ACTOR, '  Молоко ')
 
@@ -66,7 +66,7 @@ describe('searchCatalogue', () => {
 
   it('answers in the order the repository ranked, without reshuffling', async () => {
     const items = fakeItems({ search: () => Promise.resolve([first, second]) })
-    const events = fakeEvents({ recordUnlessWithin: () => Promise.resolve(false) })
+    const events = fakeEvents({ recordOncePerDay: () => Promise.resolve(false) })
 
     await expect(searchCatalogue({ items, events }, ACTOR, 'молоко')).resolves.toEqual([
       first,
@@ -75,11 +75,11 @@ describe('searchCatalogue', () => {
   })
 
   it('records one catalogue view a day for the owner, on the product half', async () => {
-    const recorded: [RecordedEvent, number][] = []
+    const recorded: RecordedEvent[] = []
     const items = fakeItems({ search: () => Promise.resolve([]) })
     const events = fakeEvents({
-      recordUnlessWithin: (event, windowMs) => {
-        recorded.push([event, windowMs])
+      recordOncePerDay: (event) => {
+        recorded.push(event)
         return Promise.resolve(true)
       },
     })
@@ -87,17 +87,13 @@ describe('searchCatalogue', () => {
     await searchCatalogue({ items, events }, ACTOR, 'молоко')
 
     expect(recorded).toEqual([
-      [
-        { actorId: ACTOR, type: EVENT.CATALOGUE_VIEWED, payload: { subject: 'product' } },
-        VIEW_RECORDED_ONCE_PER_MS,
-      ],
+      { actorId: ACTOR, type: EVENT.CATALOGUE_VIEWED, payload: { subject: 'product' } },
     ])
-    expect(VIEW_RECORDED_ONCE_PER_MS).toBe(24 * 60 * 60 * 1000)
   })
 
   it('must not record a visit when the search itself failed', async () => {
     const items = fakeItems({ search: () => Promise.reject(new Error('database down')) })
-    // The default fake throws on recordUnlessWithin — reaching it would change the error.
+    // The default fake throws on recordOncePerDay — reaching it would change the error.
     await expect(searchCatalogue({ items, events: fakeEvents() }, ACTOR, 'молоко')).rejects.toThrow(
       'database down',
     )
@@ -105,7 +101,7 @@ describe('searchCatalogue', () => {
 
   it('does not swallow a failure to record: a lost row lowers the gate silently', async () => {
     const items = fakeItems({ search: () => Promise.resolve([first]) })
-    const events = fakeEvents({ recordUnlessWithin: () => Promise.reject(new Error('log down')) })
+    const events = fakeEvents({ recordOncePerDay: () => Promise.reject(new Error('log down')) })
 
     await expect(searchCatalogue({ items, events }, ACTOR, 'молоко')).rejects.toThrow('log down')
   })

@@ -10,9 +10,6 @@ import type { ItemRepository } from '@/db/items-repository'
  */
 export const SEARCH_LIMIT = 20
 
-/** At most one `catalogue_viewed` per owner in this long — the gates count people by week. */
-export const VIEW_RECORDED_ONCE_PER_MS = 24 * 60 * 60 * 1000
-
 export interface CatalogueSearchDeps {
   readonly items: ItemRepository
   readonly events: EventRepository
@@ -36,9 +33,10 @@ export async function searchCatalogue(
   query: string,
 ): Promise<Item[]> {
   const found = await items.search(query, SEARCH_LIMIT, actorId)
-  await events.recordUnlessWithin(
-    { actorId, type: EVENT.CATALOGUE_VIEWED, payload: { subject: 'product' } },
-    VIEW_RECORDED_ONCE_PER_MS,
-  )
+  await events.recordOncePerDay({
+    actorId,
+    type: EVENT.CATALOGUE_VIEWED,
+    payload: { subject: 'product' },
+  })
   return found
 }
