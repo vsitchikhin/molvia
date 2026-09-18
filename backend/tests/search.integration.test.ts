@@ -337,6 +337,53 @@ describe('search — while the word is being typed', () => {
   })
 })
 
+describe('search — how the word distances fold (MOL-10)', () => {
+  /** A candidate by trigrams, so a missing answer below is the distance speaking. */
+  async function candidate(query: string, name: string): Promise<boolean> {
+    const [row] = await db.execute<{ ws: number }>(
+      raw`select word_similarity(${toSearchKey(query)}, ${toSearchKey(name)}) as ws`,
+    )
+    return Number(row?.ws) > 0.15
+  }
+
+  it('folds grounding words by their mean, not their worst: 3 and 0 pass as 2', async () => {
+    // `shakalat` is three edits from `shokolad`, `grand` is exact. The worst word would lose
+    // the item; the mean keeps it — the rule that spares a correct extra word.
+    await named('Шоколад Гранд Кенди')
+    expect(await candidate('шакалат гранд', 'Шоколад Гранд Кенди')).toBe(true)
+    expect(await names('шакалат гранд')).toEqual(['Шоколад Гранд Кенди'])
+  })
+
+  it('rounds the mean up: 3 and 2 make 2.5, which is 3 and out', async () => {
+    await named('Шоколад Гранд Кенди')
+    expect(await candidate('шакалат грамт', 'Шоколад Гранд Кенди')).toBe(true)
+    expect(await names('шакалат грамт')).toEqual([])
+  })
+
+  it('charges a short word at most one edit: «32» against «1 л» costs one, not two', async () => {
+    // `maloko` costs 1, `32` is two from `1` — but a size is a refinement, capped at one, so
+    // the item stays inside the budget at exactly 2.
+    await named('Молоко 1 л')
+    expect(await candidate('малоко 32', 'Молоко 1 л')).toBe(true)
+    expect(await names('малоко 32')).toEqual(['Молоко 1 л'])
+  })
+
+  it('never ranks what the trigrams did not accept: «калбеса» is 2 edits and still not found', async () => {
+    // Inside the distance budget, but 0.143 by `word_similarity` — below the candidate
+    // threshold, so ranking never sees it. The two thresholds disagree (a limit for MOL-14);
+    // pinned so the candidate threshold is held from below as well as from above.
+    await named('Колбаса')
+    const [row] = await db.execute<{ ws: number; edits: number }>(
+      raw`select word_similarity('kalbesa', 'kolbasa') as ws, levenshtein('kalbesa', 'kolbasa') as edits`,
+    )
+    expect(toSearchKey('калбеса')).toBe('kalbesa')
+    expect(toSearchKey('Колбаса')).toBe('kolbasa')
+    expect(row?.edits).toBe(2)
+    expect(Number(row?.ws)).toBeCloseTo(0.143, 3)
+    expect(await names('калбеса')).toEqual([])
+  })
+})
+
 describe('search — what it must not find', () => {
   it('finds nothing for a query of digits alone, however many names carry them', async () => {
     await named('Молоко Ашхар 3.2%')
