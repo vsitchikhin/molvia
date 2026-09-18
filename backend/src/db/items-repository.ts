@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { itemSchema, toSearchKey } from '@molvia/model'
-import type { Item, NewItem } from '@molvia/model'
+import type { Item, ItemKind, NewItem } from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -14,6 +14,13 @@ export interface ItemRepository {
   create(input: NewItem, createdBy: string | null): Promise<Item>
   byId(id: string): Promise<Item | null>
   byIds(ids: readonly string[]): Promise<Item[]>
+  /**
+   * The item of this kind whose name reduces to the same search key — the earliest, if the
+   * catalogue already holds more than one. «Предложить товар» asks it before creating, so a
+   * double tap or a retry does not put a second «Сыр чанах» beside the first. Exact key only:
+   * merging what is merely similar is 0.2's.
+   */
+  byNameKey(kind: ItemKind, name: string): Promise<Item | null>
   /**
    * The catalogue lookup behind «что взяли?». The catalogue is shared by everyone, so the
    * owner filters nothing: it only chooses whose remembered picks take part in the order.
@@ -317,6 +324,19 @@ export function createItemRepository(db: Conn): ItemRepository {
     },
 
     byIds: load,
+
+    async byNameKey(kind, name) {
+      const [row] = await db
+        .select({ id: items.id })
+        .from(items)
+        .where(and(eq(items.kind, kind), eq(items.searchKey, toSearchKey(name))))
+        .orderBy(asc(items.createdAt), asc(items.id))
+        .limit(1)
+      if (!row) return null
+
+      const [item] = await load([row.id])
+      return item ?? null
+    },
 
     async search(query, limit, actorId) {
       const key = searchQueryKey(query)

@@ -9,6 +9,7 @@ import { actorMeRoute, firstVisitRoute } from '@/routes/actors'
 import { catalogueRoutes } from '@/routes/catalogue'
 import { createActor } from '@/usecases/create-actor'
 import { getActor } from '@/usecases/get-actor'
+import { proposeItem } from '@/usecases/propose-item'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { createActorRepository } from '@/db/actors-repository'
 import { createEventRepository } from '@/db/events-repository'
@@ -21,6 +22,9 @@ import { env } from '@/env'
 // themselves, so a code cannot mean 400 in one place and 404 in another.
 const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.NOT_FOUND]: 404,
+  // The request is well formed; another row already holds what it claims — a barcode that
+  // belongs to another item. Not 400: nothing about the request itself is wrong.
+  [ERROR.CONFLICT]: 409,
   // Not 400: the request is well formed, it simply names no subject the server can find.
   // The PWA reads exactly this to decide that its stored identity is gone (MOL-8, Р-4).
   [ERROR.NO_ACTOR]: 401,
@@ -109,6 +113,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       actorMeRoute(guarded)
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items, events }, actorId, query),
+        propose: (actorId, input) => proposeItem(items, actorId, input),
       })
       guardedDone()
     })

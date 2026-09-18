@@ -1,16 +1,19 @@
 import { z } from 'zod'
 import {
+  catalogueEntryCodec,
   catalogueEntryOf,
   catalogueSearchQuerySchema,
   catalogueSearchResponseSchema,
+  newItemSchema,
 } from '@molvia/model'
-import type { Item } from '@molvia/model'
+import type { Item, NewItem } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { parseQuery } from '@/routes/body'
+import { parseBody, parseQuery } from '@/routes/body'
 
 export interface CatalogueApi {
   /** The use case, already bound to its repositories by the composition point. */
   search(actorId: string, query: string): Promise<Item[]>
+  propose(actorId: string, input: NewItem): Promise<{ item: Item; created: boolean }>
 }
 
 /**
@@ -28,5 +31,21 @@ export function catalogueRoutes(app: FastifyInstance, api: CatalogueApi): void {
     return reply
       .header('cache-control', 'no-store')
       .send(z.encode(catalogueSearchResponseSchema, { items: items.map(catalogueEntryOf) }))
+  })
+
+  /**
+   * «Предложить товар». 201 for a new item, 200 for one the catalogue already held: the
+   * request succeeded either way, and the status is how the screen tells «added» from «it was
+   * already there». The answer is the same entry the search returns, so the screen opens the
+   * sheet on it exactly as it would after picking a row.
+   */
+  app.post('/catalogue/items', async (request, reply) => {
+    const input = parseBody(newItemSchema, request.body)
+    const { item, created } = await api.propose(request.actorId, input)
+
+    return reply
+      .code(created ? 201 : 200)
+      .header('cache-control', 'no-store')
+      .send(z.encode(catalogueEntryCodec, catalogueEntryOf(item)))
   })
 }

@@ -32,6 +32,7 @@ function fakeItems(overrides: Partial<ItemRepository> = {}): ItemRepository {
     create: () => Promise.reject(new Error('create was not expected')),
     byId: () => Promise.reject(new Error('byId was not expected')),
     byIds: () => Promise.reject(new Error('byIds was not expected')),
+    byNameKey: () => Promise.reject(new Error('byNameKey was not expected')),
     search: () => Promise.reject(new Error('search was not expected')),
     ...overrides,
   }
