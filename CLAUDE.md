@@ -154,9 +154,14 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   (`jem` against `dzhem` is 3, `Grand Candy` against «Гранд Кенди» is 3), with it none do,
   at a cost of 0.26 extra candidates per query. Folding harder than that — collapsing `ч`
   with `ц`, `ш` with `щ` — wins no query and loses the distinction, so it was rejected.
-  One fork stays open on purpose: `к`/`c`, where «Кока-кола» against `Coca-Cola` spends the
-  whole budget of 2. `c` is already the target for `ц`, so folding it to `k` would turn
-  «цена» into `kena`. That pair is what the remembered pick exists for. The fold also fires
+  The `к`/`c` fork is closed by position, not by folding the letter (MOL-11): `c` is already
+  the target for `ц`, so folding it to `k` outright would turn «цена» into `kena` — but
+  before `e`, `i` and `y` a Latin `c` is soft, and everywhere else it is hard. So the key turns
+  every `c` not before `e`, `i`, `h` into `k`, whatever produced it. «Кока-кола» and `Coca-Cola`
+  are one key where they were 2 apart, the whole budget, and «кока» finds Coca-Cola before
+  «кола» is typed — before, it was not even a candidate. `cena` and `tsena` still find
+  «цена»; the price is `ц` merging with `к` in a hard position, «отец» with «отёк». Memory
+  could not have closed this: the pair was not found until the second word. The fold also fires
   on what the alphabet itself produced, not only on Latin someone typed — `тс` becomes `ts`
   becomes `c` — which is what makes «счёт» and «щёт» one key, and also what merges
   «Советский» into `soveki` and «Ицхак» with «Ичак». A false merge costs a candidate, a miss
@@ -228,9 +233,19 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   товар» just added. `order by id` is worse still: the planner walks the primary key and
   filters every row. The cost is bounded by the catalogue and by taking at most twelve words
   of a query: a two-letter query over 20 000 names answers in about 370 ms.
-- **What the user picked is remembered.** A query and the item chosen after it are stored
-  and boost that pairing next time. No model, no image change, and it compounds from the
-  first day — it is also the labelled set anything smarter would later need.
+- **What the user picked is remembered.** A query and the item that went into a trip after
+  it are stored under the query's search key, and next time that item comes first. No model,
+  no image change, and it compounds from the first day — it is also the labelled set anything
+  smarter would later need. Four rules hold it (MOL-11). **Personal:** only the asker's own
+  picks count; a sum across people would be popularity in the results, indistinguishable from
+  the paid placement forbidden below. **Above distance, but only among what was found:** a
+  pick outranks a closer spelling and never lets in what the search did not accept.
+  **The same query** means every word but the last equal and one last word the start of the
+  other, from three characters — the screen searches while typing, so the pick was made on
+  «мол» and the next search may fire on «моло». **Latest first**, then most frequent: after
+  a switch of brand the new one is on top from the next trip. It is written when the item is
+  added to a trip, not on a tap — a tap the sheet cancels is a changed mind. It never forgets;
+  if a stale pick starts to hurt, decay is a task with a number, not a guess.
 
 Thresholds (`word_similarity` > 0.15, accept edit distance <= 2) are a first estimate — the
 distance from twenty names, the candidate threshold from five thousand synthetic rows. They must be
