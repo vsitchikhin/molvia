@@ -100,7 +100,6 @@ const QUERIES: readonly (readonly [string, (typeof ITEMS)[number]])[] = [
   ['lavash', 'Лаваш'],
   ['yaytsa', 'Яйца'],
   ['yaica', 'Яйца'],
-  ['jajca', 'Яйца'],
   ['grechka', 'Гречка'],
   ['grecka', 'Гречка'],
   ['jiguli', 'Жигули'],
@@ -194,10 +193,17 @@ describe('корпус письменностей', () => {
 })
 
 describe('развилка к/c', () => {
+  /*
+   * Latin c is two letters: soft before e, i and the diphthong ae — that is ц in
+   * transliteration and in Latin itself (`cena`, `Caesar`) — and k everywhere else
+   * (`Coca-Cola`, `Picnic`). ц, ծ, ց and `ts` are one letter of their own in the key, never
+   * c, so their spelling does not depend on the next letter. That is what the first version
+   * of this rule got wrong: it hardened the c that came from ц, and a case ending or the
+   * next keystroke flipped it — MOL-11 adversarial review, sections Б–З.
+   */
   it('сводит «Кока-кола» и «Coca-Cola» в один ключ', () => {
     // Was the known limit: two edits, the whole budget, with nothing left for a typo on top,
-    // and the pair was not even a candidate until «кола» was typed in full. Folding c to k
-    // outright would turn «цена» into kena; the hard c of MOL-11 does it by position instead.
+    // and the pair was not even a candidate until «кола» was typed in full.
     expect(toSearchKey('Coca-Cola')).toBe(toSearchKey('Кока-кола'))
   })
 
@@ -214,24 +220,54 @@ describe('развилка к/c', () => {
   it.each([
     ['cena', 'цена'],
     ['tsena', 'цена'],
-    ['cukaty', 'цукаты'],
+    ['tsukaty', 'цукаты'],
     ['konets', 'конец'],
-    ['otec', 'отец'],
-  ])('не теряет «ц», набранное латиницей: «%s» и «%s» — один ключ', (latin, cyrillic) => {
+  ])('находит «ц», набранное мягким c или через ts: «%s» и «%s» — один ключ', (latin, cyrillic) => {
     expect(toSearchKey(latin)).toBe(toSearchKey(cyrillic))
   })
 
-  it('оставляет c мягким перед e и i и не трогает ch', () => {
-    expect(toSearchKey('цена')).toBe('cena')
-    expect(toSearchKey('цирк')).toBe('cirk')
-    expect(toSearchKey('Чай')).toBe('chai')
+  it('держит «ц» одной буквой, что бы ни шло за ним', () => {
+    // A case ending must not change the letter before it: «курица», «курицы» and the
+    // «куриц» the screen sends halfway are one stem.
+    for (const [typed, finished] of [
+      ['куриц', 'курицы'],
+      ['куриц', 'курица'],
+      ['огурц', 'огурцы'],
+      ['спец', 'специи'],
+      ['ац', 'ацидофилин'],
+    ] as const) {
+      expect(toSearchKey(finished).startsWith(toSearchKey(typed)), typed).toBe(true)
+    }
+    expect(distance(toSearchKey('курицы'), toSearchKey('Курица'))).toBe(1)
+    expect(distance(toSearchKey('огурцов'), toSearchKey('Огурцы'))).toBe(2)
   })
 
-  it('склеивает «ц» с «к» в твёрдой позиции — цена правила', () => {
-    // The same trade as «Советский» becoming soveki: a false merge costs a candidate, a
-    // miss costs the answer. Among names on a grocery shelf such pairs are rare.
-    expect(toSearchKey('отец')).toBe(toSearchKey('отёк'))
-    expect(toSearchKey('конец')).toBe(toSearchKey('конёк'))
+  it('сливает удвоенное «цц» раньше, чем решает про твёрдость', () => {
+    expect(toSearchKey('Пиццерия')).toBe(toSearchKey('Пицерия'))
+    expect(distance(toSearchKey('пицце'), toSearchKey('Пицца'))).toBe(1)
+  })
+
+  it('читает латинское ae после c как мягкое: «Caesar» против «Цезарь» — 2', () => {
+    expect(distance(toSearchKey('Caesar'), toSearchKey('Цезарь'))).toBe(2)
+  })
+
+  it('не трогает ch — это ч', () => {
+    expect(toSearchKey('Чай')).toBe(toSearchKey('chai'))
+  })
+
+  it('теряет «ц», набранное твёрдым c, — цена правила', () => {
+    // Before a, o, u, a consonant or at the end of a word Latin c is read as k, so a Russian
+    // word spelled with c for ц costs an edit per such c. `jajca` left the corpus of 46 for
+    // this — three from «Яйца», past the budget; `ts` spellings are untouched.
+    expect(distance(toSearchKey('otec'), toSearchKey('отец'))).toBe(1)
+    expect(distance(toSearchKey('cukaty'), toSearchKey('цукаты'))).toBe(1)
+    expect(distance(toSearchKey('jajca'), toSearchKey('Яйца'))).toBe(3)
+  })
+
+  it('не узнаёт недописанное латинское слово на c — c решает следующая буква', () => {
+    // «Nutric» ends in a hard c, «Nutrici» has a soft one: one keystroke moves the letter.
+    // Narrow — Latin brands with ce/ci — and left to MOL-14.
+    expect(toSearchKey('Nutricia').startsWith(toSearchKey('Nutric'))).toBe(false)
   })
 })
 
@@ -284,7 +320,7 @@ describe('повороты ранжирования, о которых MOL-10 и
 
 describe('класс, которого в корпусе нет', () => {
   /**
-   * Every one of the 46 queries above is a transliterated spelling of a Cyrillic name.
+   * Every one of the 45 queries above is a transliterated spelling of a Cyrillic name.
    * English orthography is a different class, it is on the shelf constantly — `dish` is in
    * the schema from 0.1 and a coffee-shop menu is written in Latin — and the key does not
    * cover it: the fold works on transliteration forks, not on the gap between how English

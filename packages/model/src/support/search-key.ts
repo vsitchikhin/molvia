@@ -40,7 +40,7 @@ const CYRILLIC: Readonly<Record<string, string>> = Object.freeze({
   у: 'u',
   ф: 'f',
   х: 'h',
-  ц: 'c',
+  ц: 'ц',
   ч: 'ch',
   ш: 'sh',
   щ: 'sh',
@@ -85,7 +85,7 @@ const ARMENIAN: Readonly<Record<string, string>> = Object.freeze({
   ի: 'i',
   լ: 'l',
   խ: 'h',
-  ծ: 'c',
+  ծ: 'ц',
   կ: 'k',
   հ: 'h',
   ձ: 'j',
@@ -104,7 +104,7 @@ const ARMENIAN: Readonly<Record<string, string>> = Object.freeze({
   վ: 'v',
   տ: 't',
   ր: 'r',
-  ց: 'c',
+  ց: 'ц',
   ւ: 'v',
   փ: 'p',
   ք: 'k',
@@ -125,18 +125,18 @@ const ARMENIAN_DIGRAPHS: readonly (readonly [string, string])[] = Object.freeze(
 
 /**
  * A transliteration fork is one letter with two spellings in common use: ж is zh or j,
- * ц is ts or c, х is kh or h, щ is shch or sch. Measured over a corpus of 46 queries:
+ * ц is ts or c, х is kh or h, щ is shch or sch. ц is a letter of its own in the key, `ц`,
+ * since MOL-11: both `ts` and a soft Latin c land on it (see SOFT_C). Measured over a corpus of 46 queries:
  * without the fold four of them miss the distance threshold outright, with it none do,
  * at a cost of 0.26 extra candidates per query.
  *
  * It fires on everything the alphabet produced, not only on Latin the person typed. The
  * table hands out multi-letter values, so Cyrillic feeds the fold by itself: `тс` → `ts`
- * → `c`, `сч` → `sch` → `sh`, `кх` → `kh` → `h`, `цк` → `ck` → `k`, `пх` → `ph` → `f`.
+ * → `ц`, `сч` → `sch` → `sh`, `кх` → `kh` → `h`, `пх` → `ph` → `f`.
  * That is deliberate and useful — «счёт» and «щёт» become one key.
  *
- * The cost is merges across morpheme boundaries. «Советский» loses `цк` twice over and
- * becomes `soveki`; `ц` + `х` gives `ch`, the same as `ч`, so «Ицхак» and «Ичак» are one
- * key; `с` + `х` gives `sh`, the same as `ш`, so «исход» and «ишод» are one key. In a
+ * The cost is merges across morpheme boundaries. «Советский» becomes `soveцki` — `тс` is
+ * read as ц; `с` + `х` gives `sh`, the same as `ш`, so «исход» and «ишод» are one key. In a
  * catalogue of product names a false merge costs a candidate and a miss costs the answer,
  * so this is the cheap side of the trade — but it is a trade, not a free win, and none of
  * it says anything about the order being safe. That is what foldToFixedPoint is for.
@@ -149,7 +149,7 @@ const LATIN_FOLDS: readonly (readonly [string, string])[] = Object.freeze([
   ['gh', 'g'],
   ['zh', 'j'],
   ['kh', 'h'],
-  ['ts', 'c'],
+  ['ts', 'ц'],
   ['ck', 'k'],
   ['ph', 'f'],
   ['qu', 'kv'],
@@ -160,26 +160,31 @@ const LATIN_FOLDS: readonly (readonly [string, string])[] = Object.freeze([
 ] as const)
 
 /**
- * The к/c fork, closed by position rather than by folding the letter. Before `e`, `i` and
- * `y` a Latin `c` is soft — that is `ц` in transliteration (`cena`), and `ch` is `ч`.
- * Everywhere else it is hard: `Coca-Cola`, `Nescafe`, `Picnic`, `Tic Tac`. Folding `c` to
- * `k` outright was rejected because it turns «цена» into `kena`; by position it does not.
+ * The к/c fork, closed by position rather than by folding the letter. Latin c is two
+ * letters: soft before `e`, `i` and the diphthong `ae` — that is ц, in transliteration
+ * (`cena`) and in Latin itself (`Caesar`) — and `k` everywhere else: `Coca-Cola`, `Nescafe`,
+ * `Picnic`, `Tic Tac`. `ch` is ч and is left alone. `y` needs no place in the lookahead:
+ * the fold has already made it `i`.
  *
- * It runs on the key, whatever produced the `c` — Latin, `ц`, `ծ` or `ց` — so a name and
- * its query cannot disagree about which `c` was which. Measured in MOL-11: Coca-Cola against
- * «Кока-Кола» went from 2, the whole budget, to 0; no pair in the probe got worse.
+ * Only Latin c is decided here. ц, ծ, ց and `ts` are the letter `ц` from the start, so
+ * their spelling does not depend on the letter after them. The first version of this rule
+ * hardened every c, whatever produced it, and a case ending or the next keystroke flipped
+ * ц: «куриц» stopped being the start of «курицы», «огурцов» fell out of the budget,
+ * «Пиццерия» split from «Пицерия» — found by the MOL-11 adversarial review. The key is no
+ * longer Latin only; pg_trgm reads `ц` as a letter like any other.
  *
- * The cost is merges of `ц` with `к` before `a`, `o`, `u`, a consonant and at the end of a
- * word: «отец» and «отёк», «конец» and «конёк» are one key. The same trade as «Советский»
- * becoming `soveki` — a false merge costs a candidate, a miss costs the answer.
+ * Doubling is collapsed before the decision, or `cc` before a soft vowel becomes `kц`.
  *
- * `y` is absent from the lookahead because the fold has already made it `i`.
+ * The price is a Russian word typed with c for ц in a hard position: `otec`, `cukaty` cost
+ * an edit each, `jajca` left the MOL-5 corpus. `ts` spellings are untouched. Measured in
+ * MOL-11: Coca-Cola against «Кока-Кола» went from 2, the whole budget, to 0.
  *
  * Frozen like the tables above, and it changed them without a recompute only because no key
  * was stored yet: production was not deployed and no copy held a real catalogue. The next
  * change to it is a migration.
  */
-const HARD_C = /c(?![eih])/g
+const SOFT_C = /c(?=[ei]|ae)/g
+const HARD_C = /c(?!h)/g
 
 const MARK = /\p{M}/gu
 const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u
@@ -212,8 +217,8 @@ const IGNORABLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}⠀]/gu
  * the length-preserving `q → k`, `w → v`, `y → i` and `qu → kv`, since nothing produces
  * `q`, `w` or `y` either. After the first pass the string therefore never grows, and every
  * pass that changes it either makes it shorter or, keeping the length, leaves fewer `c` in
- * it: the hard `c` turns one into `k`, and the only rule that writes a `c` — `ts → c` —
- * shortens the string. A pair of finite counts bounds a decreasing sequence.
+ * it: SOFT_C and HARD_C turn each into `ц` or `k`, and no rule writes a `c`. A pair of
+ * finite counts bounds a decreasing sequence.
  *
  * **A new rule must not produce its own left-hand side**, or this loop stops terminating.
  * The property test that runs one more pass over adversarial inputs is what stands behind
@@ -227,8 +232,9 @@ function foldToFixedPoint(text: string): string {
     for (const [from, to] of LATIN_FOLDS) {
       folded = folded.replaceAll(from, to)
     }
-    folded = folded.replace(HARD_C, 'k')
     folded = folded.replace(DOUBLED, '$1')
+    folded = folded.replace(SOFT_C, 'ц')
+    folded = folded.replace(HARD_C, 'k')
     if (folded === before) return folded
   }
 }

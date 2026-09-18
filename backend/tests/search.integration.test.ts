@@ -188,6 +188,18 @@ describe('search — what it finds', () => {
     expect(await names('Coca-Cola')).toEqual(['Кока-кола'])
   })
 
+  it.each([
+    ['Caesar', 'Салат Цезарь'],
+    ['огурцов', 'Огурцы маринованные'],
+    ['курецы', 'Курица'],
+    ['ац', 'Ацидофилин'],
+  ])('finds «%s» → «%s»: ц keeps one letter whatever follows it', async (query, name) => {
+    // Each of these was lost by the first version of the hard c, which hardened the c that
+    // came from ц — the MOL-11 adversarial review, sections Б and В.
+    await named(name)
+    expect(await names(query)).toEqual([name])
+  })
+
   it('finds a Latin brand from the first Cyrillic word, before the second is typed', async () => {
     // Before the hard c of MOL-11 «кока» scored 0.000 against `coca cola` and was not even a
     // candidate: the name surfaced only once «кола» was typed in full.

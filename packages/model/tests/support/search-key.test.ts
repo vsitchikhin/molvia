@@ -13,7 +13,7 @@ describe('toSearchKey', () => {
     // A mark after a letter is ordinary text — «Молокó» is a name someone types, and café
     // is printed on the package itself.
     expect(toSearchKey('Молокó')).toBe('moloko')
-    // `kafe`, not `cafe`: the mark goes, and then the hard `c` of MOL-11 applies.
+    // `kafe`, not `cafe`: the mark goes, and then the hard c of MOL-11 applies.
     expect(toSearchKey('café')).toBe('kafe')
   })
 
@@ -30,7 +30,9 @@ describe('toSearchKey', () => {
     expect(toSearchKey('Жигули')).toBe(toSearchKey('zhiguli'))
     expect(toSearchKey('Жигули')).toBe(toSearchKey('jiguli'))
     expect(toSearchKey('Цукаты')).toBe(toSearchKey('tsukaty'))
-    expect(toSearchKey('Цукаты')).toBe(toSearchKey('cukati'))
+    // Latin c stands for ц only where it is soft; before a, o, u it is k since MOL-11, and
+    // that half of the fork is pinned as a limit in the corpus file.
+    expect(toSearchKey('Цена')).toBe(toSearchKey('cena'))
     expect(toSearchKey('Ашхар')).toBe(toSearchKey('ashkhar'))
     expect(toSearchKey('Ашхар')).toBe(toSearchKey('ashhar'))
     expect(toSearchKey('Щербет')).toBe(toSearchKey('shcherbet'))
@@ -266,9 +268,6 @@ describe('toSearchKey · армянский', () => {
 describe('полнота таблиц', () => {
   // Wrapped in digits: they are never folded and never collapsed, so the wrapper cannot
   // take part in the answer. An empty value is a real expectation — «ъ» carries none.
-  // One exception: a `c` before a digit stands in a hard position, so the three letters
-  // the tables map to `c` come out as `k` here. Where they stay `c` is pinned below, in
-  // «твёрдое c».
   const through = (letter: string) => toSearchKey(`7${letter}7`).slice(1, -1)
 
   const CYRILLIC: readonly (readonly [string, string])[] = [
@@ -295,7 +294,7 @@ describe('полнота таблиц', () => {
     ['у', 'u'],
     ['ф', 'f'],
     ['х', 'h'],
-    ['ц', 'k'],
+    ['ц', 'ц'],
     ['ч', 'ch'],
     ['ш', 'sh'],
     ['щ', 'sh'],
@@ -325,7 +324,7 @@ describe('полнота таблиц', () => {
     ['ի', 'i'],
     ['լ', 'l'],
     ['խ', 'h'],
-    ['ծ', 'k'],
+    ['ծ', 'ц'],
     ['կ', 'k'],
     ['հ', 'h'],
     ['ձ', 'j'],
@@ -344,7 +343,7 @@ describe('полнота таблиц', () => {
     ['վ', 'v'],
     ['տ', 't'],
     ['ր', 'r'],
-    ['ց', 'k'],
+    ['ց', 'ц'],
     ['ւ', 'v'],
     ['փ', 'p'],
     ['ք', 'k'],
@@ -395,15 +394,16 @@ describe('пределы, записанные явно', () => {
     // The corpus invariant «no two names share a key» is a statement about those 24 names,
     // not a property of the key. These are real confectionery brands, and they collide.
     expect(toSearchKey('Мишка')).toBe(toSearchKey('Мышка'))
-    // Not the fold: the table alone sends ц+х and ч to the same `ch`.
-    expect(toSearchKey('Ицхак')).toBe(toSearchKey('Ичак'))
+    // «Ицхак» and «Ичак» used to be here too — ц+х and ч both gave `ch`. Since MOL-11 ц is
+    // a letter of its own and the pair is apart.
+    expect(toSearchKey('Ицхак')).not.toBe(toSearchKey('Ичак'))
   })
 
   it('схлопывает серию повторов без предела', () => {
     // A 200-character name becomes a one-character key, and a one-character key sits inside
     // the radius of most of the catalogue. Unreachable from a real shelf, pinned so that
     // nobody meets it by surprise while retuning the thresholds in MOL-14.
-    expect(toSearchKey('ц'.repeat(200))).toBe('k')
+    expect(toSearchKey('ц'.repeat(200))).toBe('ц')
   })
 
   it('не переходит границу слова', () => {
