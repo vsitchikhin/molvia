@@ -182,8 +182,8 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   spellings are untouched. A Latin word cut right after a `c` — «Nutric» on the way to
   «Nutricia» — is not the start of the finished one; narrow, and MOL-14's shelf never met it
   (MOL-47). The fold also fires on what the alphabet itself produced, not only on Latin
-  someone typed — `тс` becomes `ts` becomes `ц` — which is what makes «счёт» and «щёт» one key, and also what reads the
-  `тс` of «Советский» as `ц`. A false merge costs a candidate, a miss costs the answer; the
+  someone typed — `тс` becomes `ts` becomes `ц` — which is what makes «счёт» and «щёт» one
+  key, and also what reads the `тс` of «Советский» as `ц`. A false merge costs a candidate, a miss costs the answer; the
   trade is deliberate, and it is a trade. **That is why the key is never an identity:**
   «Предложить товар» decides a duplicate by `nameIdentity` — case, spacing, invisible
   characters and the three Armenian spellings «և» / «եւ» / «եվ» only — because there a false
@@ -279,18 +279,30 @@ Measured, not assumed — the numbers below come from a probe against a real dat
 (MOL-14).** The set: the owner's own words from the expense log («кола», «дошик», «туалетка»,
 73 queries and 19 for what the shelf does not carry) against 64 names written for the shelf of
 «Ереван Сити», plus the typo corpus of MOL-5, since the log holds no typos. At the kept point
-68 of 73 find their item first, 45 of 45 typos land in the top three, 17 of 19 absent words
-find nothing. **No point of the grid did better on both halves.** A threshold of 0.3 empties
-every false hit but drops «Молоко Ашхар» from «малако» — the case 0.15 exists for; a budget of
-1 empties them too and loses five typos; a budget of 3 wins one query and brings six false
-hits. What no threshold reaches went to tasks with numbers: **synonyms** — «картошка» against
-«Картофель», 5 of 73 — MOL-45; **the absolute budget** — «овощи» finds «Мука … высший сорт»,
-«специи» «Соевый соус», «пельмени» «Чай зелёный», 3 of 25 — MOL-46. Weighting vowel edits below
-consonant ones was tried against it and refuted: `ovoshi`/`vishi` share every consonant, while
-the right `canah`/«Чанах» and `grecka`/«Гречка» differ by two. `REMEMBERED_PREFIX` was not
-measured — that needs real picks — and the whole grid is run again on real input after MOL-38
-(MOL-47). The corpus pins every answer whole, so a change of either threshold shows what it
-moves.
+62 of 73 have what they meant first and alone, 6 more share the first place with an item they
+did not mean — a tie the row's uuid breaks: «мол» with «Кофе … молотый», «туалетка» with the
+litter's «туалета»; 45 of 45 typos land in the top three; 17 of 19 absent words find nothing.
+**No point of the grid did better on both halves.** A threshold of 0.3 empties every false hit
+but drops «Молоко Ашхар» from «малако» — the case 0.15 exists for; a budget of 1 empties them
+too and loses five typos and «собачий корм»; a budget of 3 wins one query and brings six false
+hits. The slack on an unfinished word (MOL-10) moves five or six whole answers either way but
+never a first row, so the grid could not tell its three settings apart — kept as it is, not
+chosen. What no threshold reaches went to tasks with numbers: **synonyms** — «картошка» against
+«Картофель», 6 of 73, one of them («мясо») found by letters only — MOL-45; **the absolute
+budget** — «овощи» finds «Мука … высший сорт», «специи» «Соевый соус», «пельмени» «Чай
+зелёный», 3 of 25 — MOL-46; **a unit word grounding a match** — «сыр» is two edits from `sht`
+of «4 шт» — MOL-48. Weighting vowel edits below consonant ones was tried against the budget and
+refuted: `ovoshi`/`vishi` share every consonant, while the right `canah`/«Чанах» and
+`grecka`/«Гречка» differ by two. **The owner's absent words flatter the search:** fifty everyday
+purchases the shelf does not carry find something in 24 cases — a taste printed on another item
+(«сметана» is in the chips' name, found exactly) no threshold can remove. With «Предложить
+товар» shown only on an empty answer, that is a question for the screen (MOL-23), not the
+search. `REMEMBERED_PREFIX` was measured by typing letter by letter: a pick lifts the item on
+the next letter 18 times at 2, 9 at 3, 5 at 4, and harms nothing on 64 names — which is too few
+for two letters to collide with anything, so the harm 2 would bring cannot show here; 3 stays
+until real picks decide (MOL-47). The corpus pins every answer whole — the shelf, those fifty
+words, Latin and Cyrillic brand spellings, Armenian labels — so a change of either threshold
+shows what it moves.
 
 **Embeddings are a 0.2 question, not a 0.1 one.** They answer what trigrams cannot —
 «молочка» reaching kefir and curd, and the duplicate merging the canonical catalogue needs.

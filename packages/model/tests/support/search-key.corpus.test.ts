@@ -210,7 +210,7 @@ describe('многословный запрос', () => {
   })
 })
 
-describe('повороты ранжирования, о которых MOL-10 и MOL-14 должны знать', () => {
+describe('повороты ранжирования, о которых MOL-10 и перенастройка порогов должны знать', () => {
   it('одна опечатка рядом с такой же буквой уводит к чужой позиции', () => {
     // «Сааар» is one substitution away from «Сахар». The repeat collapse then turns it into
     // `sar`, and `sar` is closer to «Сыр» than to the name it came from. Not a limit of the
@@ -235,7 +235,7 @@ describe('класс, которого в корпусе нет', () => {
    * English orthography is a different class, it is on the shelf constantly — `dish` is in
    * the schema from 0.1 and a coffee-shop menu is written in Latin — and the key does not
    * cover it: the fold works on transliteration forks, not on the gap between how English
-   * is written and how it is heard. Numbers pinned so MOL-14 retunes against them rather
+   * is written and how it is heard. Numbers pinned so a retune (MOL-47) starts from them rather
    * than rediscovering them.
    */
   const PAIRS: readonly (readonly [string, string, number])[] = [
@@ -251,7 +251,7 @@ describe('класс, которого в корпусе нет', () => {
   })
 
   it('три из четырёх тратят весь бюджет ещё до первой опечатки', () => {
-    // Two sit exactly at the threshold and one is past it outright: whatever MOL-14 does
+    // Two sit exactly at the threshold and one is past it outright: whatever a retune does
     // with the numbers, this class has no room left for a typo on top. «Jacobs» dropped out
     // of it with the hard c of MOL-11.
     expect(PAIRS.filter(([, , d]) => d >= ACCEPTED)).toHaveLength(3)

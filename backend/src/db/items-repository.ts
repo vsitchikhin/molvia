@@ -45,8 +45,8 @@ const CANDIDATE_THRESHOLD = 0.15
 
 /**
  * The edit distance at which a name still counts as the one asked for. Kept by MOL-14: 1 loses
- * five typos of the MOL-5 corpus, 3 wins one query of the owner's and finds six more wrong
- * items. A word wrong from end to end still fits in two — MOL-46.
+ * five typos of the MOL-5 corpus and «собачий корм», 3 wins one query of the owner's and finds
+ * six more wrong items. A word wrong from end to end still fits in two — MOL-46.
  */
 const ACCEPTED_DISTANCE = 2
 
@@ -73,7 +73,9 @@ const HAS_CONTENT = /[\p{L}\p{N}]/u
  * the pick was made on «мол» and the next search may fire on «моло» — and the word being
  * typed is still the start of a word of the item taken. Below this many characters the
  * shorter one has to match exactly: «мо» starts half the catalogue. The same three MOL-10
- * holds the last word to an exact start. Not measured yet — that needs real picks (MOL-47).
+ * holds the last word to an exact start. Typed letter by letter on MOL-14's shelf a pick lifts
+ * its item 18 times at 2, 9 at 3, 5 at 4, with no harm — but 64 names are too few for two
+ * letters to collide, so 3 stays until real picks decide (MOL-47).
  */
 const REMEMBERED_PREFIX = 3
 

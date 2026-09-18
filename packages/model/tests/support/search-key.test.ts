@@ -402,7 +402,7 @@ describe('пределы, записанные явно', () => {
   it('схлопывает серию повторов без предела', () => {
     // A 200-character name becomes a one-character key, and a one-character key sits inside
     // the radius of most of the catalogue. Unreachable from a real shelf, pinned so that
-    // nobody meets it by surprise while retuning the thresholds in MOL-14.
+    // nobody meets it by surprise while retuning the thresholds (MOL-47).
     expect(toSearchKey('ц'.repeat(200))).toBe('ц')
   })
 
