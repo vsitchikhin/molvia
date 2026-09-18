@@ -60,12 +60,22 @@ verdicts, not an event — anything a domain table already knows must never be d
 into the log. Nothing updates or deletes from it, the gate queries are its only readers,
 and each is pinned by an integration test, boundary days included.
 
-**The log has no writer yet, and that is deliberate.** MOL-8 was going to record
-`session_started` on the first visit, and the promise was withdrawn when it was examined:
-written once, its timestamp is `actors.created_at` and the row duplicates what a domain
-table already knows — the very thing the rule above forbids; written on every launch, it
-answers a question no threshold asks, since 0.2 is counted over verdicts and 0.3 over
-`catalogue_viewed`. The first writer is MOL-12, with the event the gate actually reads.
+**The first writer is the catalogue search, once a day per owner (MOL-12).** MOL-8 was going
+to record `session_started` on the first visit, and the promise was withdrawn when it was
+examined: written once, its timestamp is `actors.created_at` and the row duplicates what a
+domain table already knows — the very thing the rule above forbids; written on every launch,
+it answers a question no threshold asks, since 0.2 is counted over verdicts and 0.3 over
+`catalogue_viewed`. MOL-12 writes that one: every search that parses records
+`catalogue_viewed` with `subject: product`, at most once per owner in a rolling 24 hours, by
+the database's clock, after the search has answered — and a failure to record is not
+swallowed, because a lost row lowers the gate with nothing to backfill from.
+
+**This measures entering, not reading, and that was chosen knowingly.** In 0.1 and 0.2 a
+search is a purchase being entered; the plan hides other people's data until 0.3 precisely so
+that «came to write» and «came to read» stay apart. The owner took the event from the search
+anyway, with that price in view. So **when the screens of 0.3 show other people's data, who
+writes `catalogue_viewed` has to be decided again** — left as it is, the 0.3 gate counts
+someone who only logs purchases as someone who came back for other people's ratings.
 
 One consequence of MOL-6 is open and worth knowing before it is met: the log points at
 `actors` with a real foreign key, so an actor that has events cannot be deleted. When
@@ -636,8 +646,9 @@ Migrations that lose data, swapping a stack element, CI changes, refactoring out
 **Scaffolded, the domain model is in, and the schema is under it** — MOL-4: seven entities,
 eight write inputs and three rules in `packages/model`, with the wire codecs that money and
 quantity need to cross it at all. MOL-5 added the search key; MOL-6 the nine tables of 0.1,
-the GIN index over `search_key` and the constraints that hold the product's key. No route or
-screen yet. Release 0.1 is broken into epics and tasks in Jira. What exists, what is decided
+the GIN index over `search_key` and the constraints that hold the product's key. MOL-8 gave
+the device an identity and the API its first routes; MOL-12 opened the catalogue — search and
+«Предложить товар». No screen yet. Release 0.1 is broken into epics and tasks in Jira. What exists, what is decided
 and what is still open — `docs/onboarding.md`.
 
 **What the database guarantees and what it leaves to the domain** is a line, not a habit:
