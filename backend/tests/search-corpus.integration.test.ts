@@ -29,7 +29,8 @@ async function names(query: string): Promise<string[]> {
 
 /**
  * A tie is a group: equal distance and equal similarity leave the order to the row id, a
- * random uuid, so inside a group the order is not the search's to keep.
+ * random uuid, so inside a group the order is not the search's to keep. Only a real tie is a
+ * group — where the similarity differs, the order is the search's and is pinned as a list.
  */
 type Answer = readonly (string | readonly string[])[]
 
@@ -61,15 +62,19 @@ describe('the corpus of forks, through the search', () => {
   })
 
   /**
-   * Answers that are more than the one expected item. The milks tie: both are two edits from
-   * «малако» and the query names both — breaking that is memory's job (MOL-11). The rest is
-   * noise within the budget, pinned so MOL-14 sees it move.
+   * Answers that are more than the one expected item. On `moloko` the milks tie outright —
+   * distance 0, similarity 1 — and the query names both: breaking that is memory's job
+   * (MOL-11). On «малако» they are not a tie. Both are two edits away, but `malako` shares
+   * more trigrams with `mariana` than with `moloko ashar` (0.429 against 0.167), so the
+   * similarity puts «Марианна» first every time: the typo resembles the brand, not the milk.
+   * Not wrong — the query names both milks — and pinned so the tie-break by similarity is
+   * guarded where it decides the first row. The rest is noise within the budget, pinned so
+   * MOL-14 sees it move.
    */
-  const MILKS = ['Молоко Ашхар 3.2%', 'Молоко Марианна']
   const LONGER: Readonly<Record<string, Answer>> = {
-    moloko: [MILKS],
-    малако: [MILKS],
-    malako: [MILKS],
+    moloko: [['Молоко Ашхар 3.2%', 'Молоко Марианна']],
+    малако: ['Молоко Марианна', 'Молоко Ашхар 3.2%'],
+    malako: ['Молоко Марианна', 'Молоко Ашхар 3.2%'],
     ashhar: ['Молоко Ашхар 3.2%', 'Сахар'],
     ashkhar: ['Молоко Ашхар 3.2%', 'Сахар'],
     sahar: ['Сахар', 'Молоко Ашхар 3.2%'],
@@ -78,9 +83,23 @@ describe('the corpus of forks, through the search', () => {
     chay: ['Чай зелёный', 'Сыр Чанах'],
   }
 
+  /** Where the similarity puts another item above the one the corpus names. */
+  const SECOND = new Set(['малако', 'malako'])
+
   it('names only queries the corpus has', () => {
     const queries = new Set(QUERIES.map(([query]) => query))
     expect(Object.keys(LONGER).filter((query) => !queries.has(query))).toEqual([])
+  })
+
+  it('keeps the corpus item in every longer answer: first, or second where named', () => {
+    // A longer answer replaces the corpus expectation, so it must still carry it — or the one
+    // list both tests read would drift from this file silently.
+    for (const [query, expected] of QUERIES) {
+      const answer = LONGER[query]
+      if (answer === undefined) continue
+      expect(answer.flat().indexOf(expected), query).toBe(SECOND.has(query) ? 1 : 0)
+    }
+    expect([...SECOND].filter((query) => LONGER[query] === undefined)).toEqual([])
   })
 
   it.each(QUERIES)('«%s» → «%s»', async (query, expected) => {
