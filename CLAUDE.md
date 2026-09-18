@@ -199,13 +199,29 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   shorter than two characters is not the cure** — those words are the packaging size: it
   makes «Молоко 1 л» and «Молоко 2 л» identical for ranking while «Молоко 1л» written
   without the space stays distinct, so two shops' labels for one product rank by different
-  rules. MOL-10 took **the third way**: a word shorter than two characters refines a match but
-  never grounds one, and the long words fold by their **mean**, rounded up. Measured: junk
-  queries find nothing, sizes stay distinct, the right item comes first in 18 of 20. The
-  correct extra word is still lost (4 against a budget of 2) — chosen knowingly, and pinned by
-  a test. The distance is exact `levenshtein` on words cut to 255 characters: past that it
-  raises an error, and `levenshtein_less_equal` is no substitute, because its capped answer
-  distorts the mean.
+  rules. MOL-10 took **the third way**, and its review made it hold on both sides. A word
+  **grounds** a match only if it has two characters and a letter — «32» grounds nothing — and
+  it is measured against the grounding words of the name only, never against «л» or «1»,
+  which every two-letter word is within two edits of. Grounding words fold by their **mean**,
+  rounded up; short words by their **worst**, at most one edit, so each has to find its pair
+  and «1 л» against «2 л» costs one. A key equal to the name's key is distance 0, which is how
+  «M&M's» (`m m s`, no grounding word) is found by itself. The screen searches while the
+  person types, so **the last word also matches the start of a name word** — exactly up to
+  three letters, one edit from four, two from seven; any slack on two letters matches every
+  word there is. Measured on the MOL-10 corpus: the right item first in 20 of 20, junk queries
+  find nothing. The correct extra word is still lost (4 against a budget of 2) — chosen
+  knowingly, and pinned by a test. The distance is exact `levenshtein` on words cut to 255
+  characters: past that it raises an error, and `levenshtein_less_equal` is no substitute,
+  because its capped answer distorts the mean. Two limits are left to MOL-14 on purpose: the
+  budget is absolute, so a short wrong word («молоко ашхар кефир») passes where a long right
+  one does not; and the two thresholds disagree — «ыср» is two edits from «сыр» yet shares no
+  trigram with it, so it never becomes a candidate.
+- **Candidates are ranked, not cut by similarity.** Similarity and distance disagree —
+  «малако» scores 0.429 against any «Малина» and 0.167 against the milk — so a cut by
+  similarity before ranking let two hundred wrong names push the right one out. Everything
+  that passes `%>` is ranked; the ceiling of 2000 only bounds the work, as does taking at most
+  twelve words of a query. And no `ORDER BY` next to that ceiling: `order by id` with a limit
+  sent the planner down the primary key, a full scan wearing an index.
 - **What the user picked is remembered.** A query and the item chosen after it are stored
   and boost that pairing next time. No model, no image change, and it compounds from the
   first day — it is also the labelled set anything smarter would later need.
