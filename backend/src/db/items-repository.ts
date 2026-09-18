@@ -29,22 +29,14 @@ export interface ItemRepository {
  */
 const CANDIDATE_THRESHOLD = 0.15
 
-/**
- * A safety bound on the work, not a filter. Candidates are not ordered by similarity before
- * this cut: similarity and distance disagree — «малако» scores 0.429 against any «Малина»
- * and 0.167 against «Молоко Ашхар» — so a cut by similarity let two hundred wrong names push
- * the right one out before ranking ever saw it. Everything that passes `%>` is ranked; the
- * bound only stops a pathological query from holding a pooled connection. MOL-14 retunes it.
- */
-const CANDIDATE_CEILING = 2000
-
 /** The edit distance at which a name still counts as the one asked for. MOL-14 retunes it. */
 const ACCEPTED_DISTANCE = 2
 
 /**
- * A word grounds a match only if it has this many characters and at least one letter. Short
- * words and numbers are the packaging size: they refine the ranking but never ground it,
- * otherwise «3 2» or «32» finds every name that carries those digits.
+ * A word grounds a match only if it has this many characters and no digit. Short words and
+ * anything with a digit are the packaging size — «1 л», «1л», «500г», «3.2%» — they refine
+ * the ranking but never ground it, otherwise «32» finds every name that carries those
+ * digits, and «1л» measured against «moloko» alone costs six and loses «Молоко 1 л».
  */
 const SHORT_WORD = 2
 
@@ -85,10 +77,13 @@ function toItem(row: ItemRow, barcodes: readonly string[]): Item {
 export function rankedCandidates(key: string, limit: number): SQL {
   return sql`
     with query_words as (
-      select q,
-             length(q) >= ${SHORT_WORD} and q !~ '^[0-9]+$' as grounds,
+      -- Cut to 255 here, once: levenshtein refuses longer arguments, and the prefix arm below
+      -- cuts the name to the length of the query word, not to 255.
+      select left(word, 255) as q,
+             length(word) >= ${SHORT_WORD} and word !~ '[0-9]' as grounds,
+             word ~ '[^0-9]' as lettered,
              n = max(n) over () as last
-      from unnest(string_to_array(${key}, ' ')) with ordinality as t(q, n)
+      from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
     ),
     candidates as (
       -- The column goes first, and that is not style: \`search_key %> $1\` is the only form
@@ -102,13 +97,15 @@ export function rankedCandidates(key: string, limit: number): SQL {
              word_similarity(${key}, ${items.searchKey}) as ws
       from ${items}
       where ${items.searchKey} %> ${key} or ${items.searchKey} = ${key}
-      -- No ORDER BY here, deliberately: \`order by id\` with this limit sent the planner down
-      -- the primary key, filtering every row — a full scan wearing an index. Which candidates
-      -- survive the bound matters only past it; the answer's order is set below.
-      limit ${CANDIDATE_CEILING}
+      -- Every candidate is ranked, with no ceiling. Any cut here is wrong in one of two ways:
+      -- ordered by similarity it drops the typo the low threshold exists for (two hundred
+      -- «Малина» pushed out the milk), unordered it drops by row age — the newest items, the
+      -- very ones «Предложить товар» just added. \`order by id\` is worse still: the planner
+      -- walks the primary key and filters every row. The cost is bounded by the catalogue and
+      -- by MAX_QUERY_WORDS; measured in MOL-10, retuned on a real catalogue in MOL-14.
     ),
     per_word as (
-      select c.id, qw.grounds,
+      select c.id, qw.grounds, qw.lettered,
              (
                select min(
                  -- The screen searches while the person types, so the last word is usually
@@ -117,17 +114,16 @@ export function rankedCandidates(key: string, limit: number): SQL {
                  -- two letters would match every word there is.
                  case when qw.last
                         and length(w) > length(qw.q)
-                        and levenshtein(left(qw.q, 255), left(w, length(qw.q)))
-                            <= (length(qw.q) - 1) / 3
-                      then levenshtein(left(qw.q, 255), left(w, length(qw.q)))
-                      -- levenshtein refuses arguments past 255 characters, and one word of a
-                      -- key can reach 600. Cut, not skipped: such a name is still an item.
-                      else levenshtein(left(qw.q, 255), left(w, 255))
+                        and levenshtein(qw.q, left(w, length(qw.q))) <= (length(qw.q) - 1) / 3
+                      then levenshtein(qw.q, left(w, length(qw.q)))
+                      -- One word of a key can reach 600 characters. Cut, not skipped: such a
+                      -- name is still an item.
+                      else levenshtein(qw.q, left(w, 255))
                  end)
                from unnest(string_to_array(c.search_key, ' ')) as w
                -- A grounding word is measured against grounding words only: against «л» or
                -- «1» of a size every two-letter word is two edits away, inside the budget.
-               where not qw.grounds or (length(w) >= ${SHORT_WORD} and w !~ '^[0-9]+$')
+               where not qw.grounds or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]')
              ) as qd
       from candidates c
       cross join query_words qw
@@ -138,10 +134,15 @@ export function rankedCandidates(key: string, limit: number): SQL {
                   -- Grounding words by their mean, rounded up: a correct extra word printed
                   -- on the package («пастеризованное») would cost 11 by the worst, 4 by the
                   -- mean. A name with no grounding word leaves qd null and never passes.
-                  else ceil(avg(coalesce(pw.qd, 255)) filter (where pw.grounds))
+                  when bool_or(pw.grounds)
+                  then ceil(avg(coalesce(pw.qd, 255)) filter (where pw.grounds))
                        -- Short words by their worst, at most one edit: each has to find its
                        -- pair, so «1 л» against «2 л» costs one where «л» alone would hide it.
                        + least(coalesce(max(pw.qd) filter (where not pw.grounds), 0), 1)
+                  -- No grounding word, but letters: «M&M's» is \`m m s\`, «m&m» is what the
+                  -- screen sends halfway through typing it. Every word has to be found
+                  -- exactly (the last one by its start). Digits alone never get here.
+                  when bool_or(pw.lettered) and max(coalesce(pw.qd, 255)) = 0 then 0
              end as distance
       from candidates c
       join per_word pw on pw.id = c.id
