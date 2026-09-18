@@ -177,9 +177,22 @@ describe("recording at most once a day of the person's own life", () => {
   })
 
   it('counts days and weeks the same in any time zone of the session', async () => {
-    // `interval '1 day'` is a calendar day in the session's zone: Chile moved its clocks on
-    // 6 September 2026, so there «21 days» was 503 hours and a visit at hour 503½ fell into
-    // week four, while in UTC it was week three. Both now count hours.
+    // `interval '1 day'` is a calendar day in the session's zone: across a clock change
+    // «21 days» is 503 hours, and a visit at hour 503½ fell into week four there while in UTC
+    // it was week three. Both now count hours.
+    //
+    // The zone is made up around today rather than named: a real one (Chile, 6 September 2026)
+    // put its change inside the last three weeks only for a while, and then this test would
+    // pass on the old arithmetic too. A POSIX rule whose summer time starts ten days ago keeps
+    // the change inside the window on whatever day the test runs.
+    const tenDaysAgo = new Date(Date.now() - 10 * DAY)
+    // `Jn` counts 1..365 and never counts 29 February, so the day is taken in a common year.
+    const julian =
+      (Date.UTC(2001, tenDaysAgo.getUTCMonth(), tenDaysAgo.getUTCDate()) - Date.UTC(2001, 0, 1)) /
+        DAY +
+      1
+    const summerEnds = ((julian + 60 - 1) % 365) + 1
+    const shifting = `XST3XDT,J${String(julian)}/0,J${String(summerEnds)}/0`
     async function scenario(zone: string, withEvening: boolean) {
       const actorId = await insertActor(db)
       return db.transaction(async (tx) => {
@@ -201,8 +214,8 @@ describe("recording at most once a day of the person's own life", () => {
 
     for (const withEvening of [false, true]) {
       const utc = await scenario('UTC', withEvening)
-      const chile = await scenario('America/Santiago', withEvening)
-      expect(chile, `evening before: ${String(withEvening)}`).toEqual(utc)
+      const shifted = await scenario(shifting, withEvening)
+      expect(shifted, `evening before: ${String(withEvening)}`).toEqual(utc)
     }
   })
 
