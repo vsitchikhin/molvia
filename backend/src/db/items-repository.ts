@@ -31,6 +31,16 @@ const CANDIDATE_THRESHOLD = 0.15
 /** How many candidates the trigram pass hands to ranking — a bound on the work, not a result size. */
 const CANDIDATE_CEILING = 200
 
+/** The edit distance at which a name still counts as the one asked for. MOL-14 retunes it. */
+const ACCEPTED_DISTANCE = 2
+
+/**
+ * A query word shorter than this refines a match but cannot ground one. Such words are the
+ * packaging size — dropping them made «Молоко 1 л» and «Молоко 2 л» identical — yet letting
+ * them ground a match made «3 2» find every name that carries those digits.
+ */
+const SHORT_WORD = 2
+
 type ItemRow = typeof items.$inferSelect
 
 /**
@@ -165,18 +175,58 @@ export function createItemRepository(db: Conn): ItemRepository {
           sql`select set_config('pg_trgm.word_similarity_threshold', ${String(CANDIDATE_THRESHOLD)}, true)`,
         )
 
-        /*
-         * The column goes first, and that is not style: `search_key %> $1` is the only form
-         * the GIN index serves. `$1 %> search_key`, `search_key <% $1` and
-         * `word_similarity($1, search_key) > t` mean the same and all fall back to a Seq Scan
-         * — invisible on a test's handful of rows, fatal on a catalogue.
-         */
         const rows = await tx.execute<{ id: string }>(sql`
-          select ${items.id} as id
-          from ${items}
-          where ${items.searchKey} %> ${key}
-          order by word_similarity(${key}, ${items.searchKey}) desc, ${items.id}
-          limit ${Math.min(rowLimit(limit), CANDIDATE_CEILING)}
+          with candidates as (
+            -- The column goes first, and that is not style: \`search_key %> $1\` is the only
+            -- form the GIN index serves. \`$1 %> search_key\`, \`search_key <% $1\` and
+            -- \`word_similarity($1, search_key) > t\` mean the same and all fall back to a Seq
+            -- Scan — invisible on a test's handful of rows, fatal on a catalogue.
+            select ${items.id} as id,
+                   ${items.searchKey} as search_key,
+                   word_similarity(${key}, ${items.searchKey}) as ws
+            from ${items}
+            where ${items.searchKey} %> ${key}
+            order by ws desc, ${items.id}
+            limit ${CANDIDATE_CEILING}
+          ),
+          scored as (
+            select c.id, c.ws, s.anchor, s.short_best, s.long_words
+            from candidates c
+            cross join lateral (
+              select
+                -- Every word of the query against every word of the name, the best of the
+                -- name for each: «чанах» is a brand, not the head of «Сыр Чанах». Long words
+                -- are averaged rather than taking the worst — a correct extra word printed on
+                -- the package («пастеризованное») would otherwise cost 11 instead of 4.
+                ceil(avg(qd) filter (where length(q) >= ${SHORT_WORD})) as anchor,
+                min(qd) filter (where length(q) < ${SHORT_WORD}) as short_best,
+                count(*) filter (where length(q) >= ${SHORT_WORD}) as long_words
+              from unnest(string_to_array(${key}, ' ')) as q
+              cross join lateral (
+                -- levenshtein refuses arguments past 255 characters, and one word of a key can
+                -- reach 600. Cut, not skipped: such a name is still a legitimate item. The
+                -- bound is one past the accepted distance, which is all ordering needs.
+                select min(levenshtein_less_equal(left(q, 255), left(w, 255), ${ACCEPTED_DISTANCE + 1})) as qd
+                from unnest(string_to_array(c.search_key, ' ')) as w
+              ) per_word
+            ) s
+          ),
+          ranked as (
+            -- Short words refine, never ground: a query of digits alone has no anchor and
+            -- finds nothing, while «1 л» against «2 л» still costs one edit.
+            select id, ws,
+                   anchor + case when anchor <= ${ACCEPTED_DISTANCE}
+                                 then least(coalesce(short_best, 0), 1) else 0 end as distance
+            from scored
+            where long_words > 0
+          )
+          select id
+          from ranked
+          where distance <= ${ACCEPTED_DISTANCE}
+          -- Ties stay ties («moloko» names «Ашхар» and «Марианна» alike); \`id\` only keeps two
+          -- loads of one screen in one order. MOL-11 lifts a remembered pick before \`ws\`.
+          order by distance, ws desc, id
+          limit ${rowLimit(limit)}
         `)
         return rows.map((row) => row.id)
       })
