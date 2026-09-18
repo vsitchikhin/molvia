@@ -1,7 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { toSearchKey } from '@molvia/model'
-import { createItemRepository } from '@/db/items-repository'
-import { itemBarcodes } from '@/db/schema'
+import { randomUUID } from 'node:crypto'
+import { sql as raw } from 'drizzle-orm'
+import { createItemRepository, rankedCandidates } from '@/db/items-repository'
+import type { Conn } from '@/db/index'
+import { itemBarcodes, items } from '@/db/schema'
 import { connect, connectDrizzle } from './db'
 import { clearAll, insertItem } from './fixtures'
 
@@ -112,27 +115,44 @@ describe('the search key under its index', () => {
 })
 
 describe('search — the shape of the query', () => {
-  it('reaches the index: the column stands first in `%>`', async () => {
-    // Asserted against the plan rather than the text of the query. Three equivalent spellings
-    // of this condition fall back to a Seq Scan, and on a test's handful of rows all four
-    // answer alike — the difference only shows on a catalogue.
+  it('reaches the index: the statement the repository runs uses it', async () => {
+    // The very builder `search` executes, not a copy: swapping the operands inside the
+    // repository — the regression this guards — has to turn this red. Three equivalent
+    // spellings of the condition fall back to a Seq Scan, and on a test's handful of rows all
+    // four answer alike.
     await named('Молоко «Ашхар»')
-    await sql`set enable_seqscan = off`
-    const plan = await sql<{ 'QUERY PLAN': string }[]>`
-      explain select id from items where search_key %> 'malako'
-    `
-    await sql`reset enable_seqscan`
+    const plan = await db.transaction(async (tx) => {
+      await tx.execute(raw`set local enable_seqscan = off`)
+      return tx.execute<{ 'QUERY PLAN': string }>(raw`explain ${rankedCandidates('malako', 10)}`)
+    })
     expect(plan.map((row) => row['QUERY PLAN']).join('\n')).toContain('items_search_key_trgm_idx')
   })
 
-  it('keeps its threshold to itself: the next statement on the connection sees the default', async () => {
+  it('keeps its threshold to itself: the next statement on its connection sees the default', async () => {
     await named('Молоко «Ашхар»')
     await repo.search('малако', 10)
-    // The test connection is a pool of one, so this is the very connection the search used.
-    const [row] = await sql<{ threshold: string }[]>`
-      select current_setting('pg_trgm.word_similarity_threshold') as threshold
-    `
+    // Read through the drizzle handle the repository used — a pool of one, so this is the
+    // very connection. The file's other client would pass with a plain SET as well.
+    const [row] = await db.execute<{ threshold: string }>(
+      raw`select current_setting('pg_trgm.word_similarity_threshold') as threshold`,
+    )
     expect(row?.threshold).toBe('0.6')
+  })
+
+  it("hands a caller's transaction back its own threshold", async () => {
+    // Inside a caller's transaction `search` runs in a savepoint, and a local setting would
+    // outlive it — the caller's own `%>` would then answer by 0.15.
+    await named('Молоко Ашхар')
+    const seen = await db.transaction(async (tx) => {
+      const before = await tx.execute(raw`select 1 from items where search_key %> 'malako'`)
+      await createItemRepository(tx).search('малако', 10)
+      const after = await tx.execute(raw`select 1 from items where search_key %> 'malako'`)
+      const [row] = await tx.execute<{ threshold: string }>(
+        raw`select current_setting('pg_trgm.word_similarity_threshold') as threshold`,
+      )
+      return { before: before.length, after: after.length, threshold: row?.threshold }
+    })
+    expect(seen).toEqual({ before: 0, after: 0, threshold: '0.6' })
   })
 
   it('finds a two-vowel typo that the old threshold of 0.3 could not reach', async () => {
@@ -168,10 +188,75 @@ describe('search — what it finds', () => {
     expect((await names('moloko')).sort()).toEqual(['Молоко «Ашхар»', 'Молоко Марианна'])
   })
 
-  it('tells packaging sizes apart: the short word refines the ranking', async () => {
+  it('tells packaging sizes apart by the rule, not by similarity', async () => {
+    // The right size carries an extra word, so similarity favours the wrong one (0.789
+    // against 0.765): only the distance can put «1 л» first. Under a minimum over short words
+    // «л» matched and hid the digit, and «2 л» came first.
+    await named('Молоко Ашхар пастеризованное 1 л')
+    await named('Молоко Ашхар 2 л')
+    expect(await names('молоко ашхар 1 л')).toEqual([
+      'Молоко Ашхар пастеризованное 1 л',
+      'Молоко Ашхар 2 л',
+    ])
+  })
+
+  it('makes a wrong size cost an edit: at the edge of the budget it drops out', async () => {
+    // «малако ашхор» already costs 2. «2 л» used to add nothing — a wrong digit weighed as
+    // much as a right one; now it adds one and leaves.
     await named('Молоко Ашхар 1 л')
     await named('Молоко Ашхар 2 л')
-    expect((await names('молоко ашхар 1 л'))[0]).toBe('Молоко Ашхар 1 л')
+    expect(await names('малако ашхор 1 л')).toEqual(['Молоко Ашхар 1 л'])
+  })
+
+  it('puts fat content first by the digits: «кефир 3.2%»', async () => {
+    await named('Кефир Ашхар 3.2%')
+    await named('Кефир 2.5%')
+    expect(await names('кефир 3.2%')).toEqual(['Кефир Ашхар 3.2%', 'Кефир 2.5%'])
+  })
+
+  it("finds a name made of short words only by its own spelling: «M&M's», «H&M»", async () => {
+    await named("M&M's")
+    await named('H&M')
+    expect(await names("M&M's")).toEqual(["M&M's"])
+    expect(await names("m&m's")).toEqual(["M&M's"])
+    expect(await names('H&M')).toEqual(['H&M'])
+  })
+})
+
+describe('search — while the word is being typed', () => {
+  it('finds by the start of the last word: «мол», «шоко», «сгущ», «лав»', async () => {
+    await named('Молоко Ашхар')
+    await named('Шоколад Гранд Кенди')
+    await named('Сгущёнка Рогачёв')
+    await named('Лаваш')
+    expect(await names('мол')).toEqual(['Молоко Ашхар'])
+    expect(await names('шоко')).toEqual(['Шоколад Гранд Кенди'])
+    expect(await names('сгущ')).toEqual(['Сгущёнка Рогачёв'])
+    expect(await names('лав')).toEqual(['Лаваш'])
+  })
+
+  it('takes the start of the last word only: an unfinished word earlier is compared whole', async () => {
+    // «сгущ» is the only grounding word here — «1» refines, it grounds nothing — so its
+    // reading decides. Last, it is a start and costs 0; first, it is a whole word four edits
+    // from `sgushenka`, past the budget.
+    await named('Сгущёнка 1 кг')
+    expect(await names('1 сгущ')).toEqual(['Сгущёнка 1 кг'])
+    expect(await names('сгущ 1')).toEqual([])
+  })
+
+  it('holds a short start exactly: «ма» does not reach «Молоко»', async () => {
+    // A two-letter start with any slack would match every word there is.
+    await named('Молоко Ашхар')
+    await named('Мацун')
+    expect(await names('ма')).toEqual(['Мацун'])
+  })
+
+  it('does not ground a word on a size: «ла» does not bring «Молоко Ашхар 1 л»', async () => {
+    // Against «л» or «1» every two-letter word is two edits away — inside the budget. A
+    // grounding word is now measured against grounding words only.
+    await named('Молоко Ашхар 1 л')
+    await named('Лаваш')
+    expect(await names('ла')).toEqual(['Лаваш'])
   })
 })
 
@@ -181,6 +266,9 @@ describe('search — what it must not find', () => {
     await named('Кефир 3.2%')
     expect(await names('3 2')).toEqual([])
     expect(await names('1')).toEqual([])
+    // Two characters, but no letter: a number grounds nothing either.
+    expect(await names('32')).toEqual([])
+    expect(await names('15')).toEqual([])
   })
 
   it('loses the item on a correct extra word — the price of the mean, pinned (В-1)', async () => {
@@ -190,6 +278,26 @@ describe('search — what it must not find', () => {
     await named('Молоко Ашхар 3.2%')
     expect(await names('молоко ашхар')).toEqual(['Молоко Ашхар 3.2%'])
     expect(await names('молоко ашхар пастеризованное')).toEqual([])
+  })
+
+  it('does not go to the database for a query with no letter or digit', async () => {
+    // `toSearchKey` falls back to the punctuation itself, so an emptiness check alone let
+    // «!!!» open a transaction.
+    let transactions = 0
+    const counted = new Proxy(db, {
+      get(target, property, receiver) {
+        if (property === 'transaction') {
+          return (...args: Parameters<typeof db.transaction>) => {
+            transactions += 1
+            return target.transaction(...args)
+          }
+        }
+        return Reflect.get(target, property, receiver) as unknown
+      },
+    }) as Conn
+    const spied = createItemRepository(counted)
+    for (const query of ['', '   ', '!!!', '«»']) await spied.search(query, 10)
+    expect(transactions).toBe(0)
   })
 
   it('answers an empty list, not every row, to a query with no key', async () => {
@@ -212,6 +320,31 @@ describe('search — edges', () => {
     await insertItem(db, { name: 'Длинное', searchKey: word })
     await expect(repo.search(word, 10)).resolves.toBeInstanceOf(Array)
     await expect(repo.search('щ'.repeat(150), 10)).resolves.toBeInstanceOf(Array)
+  })
+
+  it('ranks every candidate: two hundred near misses do not push the right item out', async () => {
+    // «малако» scores 0.429 against any «Малина» and 0.167 against the milk. Cut by
+    // similarity before ranking, two hundred raspberries — none of them inside the budget —
+    // left the answer empty.
+    await named('Молоко Ашхар 3.2%')
+    await db.insert(items).values(
+      Array.from({ length: 200 }, (_, index) => ({
+        id: randomUUID(),
+        kind: 'product' as const,
+        name: `Малина вар. ${String(index)}`,
+        searchKey: toSearchKey(`Малина вар. ${String(index)}`),
+        defaultUnit: 'kg' as const,
+      })),
+    )
+    expect(await names('малако')).toEqual(['Молоко Ашхар 3.2%'])
+  })
+
+  it('bounds the work by the query: 42 KB of words answers like the first twelve', async () => {
+    await named('Молоко Ашхар')
+    const query = Array.from({ length: 6000 }, () => 'молоко').join(' ')
+    const started = performance.now()
+    expect(await names(query)).toEqual(['Молоко Ашхар'])
+    expect(performance.now() - started).toBeLessThan(1000)
   })
 
   it('returns exactly as many as asked: 0, 1, N, N+1', async () => {
