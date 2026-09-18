@@ -204,9 +204,11 @@ export function createItemRepository(db: Conn): ItemRepository {
               from unnest(string_to_array(${key}, ' ')) as q
               cross join lateral (
                 -- levenshtein refuses arguments past 255 characters, and one word of a key can
-                -- reach 600. Cut, not skipped: such a name is still a legitimate item. The
-                -- bound is one past the accepted distance, which is all ordering needs.
-                select min(levenshtein_less_equal(left(q, 255), left(w, 255), ${ACCEPTED_DISTANCE + 1})) as qd
+                -- reach 600. Cut, not skipped: such a name is still a legitimate item. The exact
+                -- distance and not levenshtein_less_equal: its capped answer («more than N»)
+                -- is enough to reject a word, but the mean above averages it, and a correct
+                -- extra word capped at 4 instead of ~12 slipped the item inside the budget.
+                select min(levenshtein(left(q, 255), left(w, 255))) as qd
                 from unnest(string_to_array(c.search_key, ' ')) as w
               ) per_word
             ) s
