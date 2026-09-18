@@ -13,7 +13,8 @@ describe('toSearchKey', () => {
     // A mark after a letter is ordinary text — «Молокó» is a name someone types, and café
     // is printed on the package itself.
     expect(toSearchKey('Молокó')).toBe('moloko')
-    expect(toSearchKey('café')).toBe('cafe')
+    // `kafe`, not `cafe`: the mark goes, and then the hard `c` of MOL-11 applies.
+    expect(toSearchKey('café')).toBe('kafe')
   })
 
   it('keeps digits and turns everything else into a word boundary', () => {
@@ -265,6 +266,9 @@ describe('toSearchKey · армянский', () => {
 describe('полнота таблиц', () => {
   // Wrapped in digits: they are never folded and never collapsed, so the wrapper cannot
   // take part in the answer. An empty value is a real expectation — «ъ» carries none.
+  // One exception: a `c` before a digit stands in a hard position, so the three letters
+  // the tables map to `c` come out as `k` here. Where they stay `c` is pinned below, in
+  // «твёрдое c».
   const through = (letter: string) => toSearchKey(`7${letter}7`).slice(1, -1)
 
   const CYRILLIC: readonly (readonly [string, string])[] = [
@@ -291,7 +295,7 @@ describe('полнота таблиц', () => {
     ['у', 'u'],
     ['ф', 'f'],
     ['х', 'h'],
-    ['ц', 'c'],
+    ['ц', 'k'],
     ['ч', 'ch'],
     ['ш', 'sh'],
     ['щ', 'sh'],
@@ -321,7 +325,7 @@ describe('полнота таблиц', () => {
     ['ի', 'i'],
     ['լ', 'l'],
     ['խ', 'h'],
-    ['ծ', 'c'],
+    ['ծ', 'k'],
     ['կ', 'k'],
     ['հ', 'h'],
     ['ձ', 'j'],
@@ -340,7 +344,7 @@ describe('полнота таблиц', () => {
     ['վ', 'v'],
     ['տ', 't'],
     ['ր', 'r'],
-    ['ց', 'c'],
+    ['ց', 'k'],
     ['ւ', 'v'],
     ['փ', 'p'],
     ['ք', 'k'],
@@ -399,7 +403,7 @@ describe('пределы, записанные явно', () => {
     // A 200-character name becomes a one-character key, and a one-character key sits inside
     // the radius of most of the catalogue. Unreachable from a real shelf, pinned so that
     // nobody meets it by surprise while retuning the thresholds in MOL-14.
-    expect(toSearchKey('ц'.repeat(200))).toBe('c')
+    expect(toSearchKey('ц'.repeat(200))).toBe('k')
   })
 
   it('не переходит границу слова', () => {

@@ -159,6 +159,24 @@ const LATIN_FOLDS: readonly (readonly [string, string])[] = Object.freeze([
   ['y', 'i'],
 ] as const)
 
+/**
+ * The к/c fork, closed by position rather than by folding the letter. Before `e`, `i` and
+ * `y` a Latin `c` is soft — that is `ц` in transliteration (`cena`), and `ch` is `ч`.
+ * Everywhere else it is hard: `Coca-Cola`, `Nescafe`, `Picnic`, `Tic Tac`. Folding `c` to
+ * `k` outright was rejected because it turns «цена» into `kena`; by position it does not.
+ *
+ * It runs on the key, whatever produced the `c` — Latin, `ц`, `ծ` or `ց` — so a name and
+ * its query cannot disagree about which `c` was which. Measured in MOL-11: Coca-Cola against
+ * «Кока-Кола» went from 2, the whole budget, to 0; no pair in the probe got worse.
+ *
+ * The cost is merges of `ц` with `к` before `a`, `o`, `u`, a consonant and at the end of a
+ * word: «отец» and «отёк», «конец» and «конёк» are one key. The same trade as «Советский»
+ * becoming `soveki` — a false merge costs a candidate, a miss costs the answer.
+ *
+ * `y` is absent from the lookahead because the fold has already made it `i`.
+ */
+const HARD_C = /c(?![eih])/g
+
 const MARK = /\p{M}/gu
 const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u
 // Doubling is a spelling fork of its own: «Анна», «Anna» and «Ана» are one name.
@@ -189,7 +207,9 @@ const IGNORABLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}⠀]/gu
  * nothing produces `x`, so it fires at most once per `x` in the input; the same holds for
  * the length-preserving `q → k`, `w → v`, `y → i` and `qu → kv`, since nothing produces
  * `q`, `w` or `y` either. After the first pass the string therefore never grows, and every
- * pass that changes it makes it shorter. A finite string bounds a decreasing sequence.
+ * pass that changes it either makes it shorter or, keeping the length, leaves fewer `c` in
+ * it: the hard `c` turns one into `k`, and the only rule that writes a `c` — `ts → c` —
+ * shortens the string. A pair of finite counts bounds a decreasing sequence.
  *
  * **A new rule must not produce its own left-hand side**, or this loop stops terminating.
  * The property test that runs one more pass over adversarial inputs is what stands behind
@@ -203,6 +223,7 @@ function foldToFixedPoint(text: string): string {
     for (const [from, to] of LATIN_FOLDS) {
       folded = folded.replaceAll(from, to)
     }
+    folded = folded.replace(HARD_C, 'k')
     folded = folded.replace(DOUBLED, '$1')
     if (folded === before) return folded
   }

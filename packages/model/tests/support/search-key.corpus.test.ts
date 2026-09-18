@@ -193,16 +193,45 @@ describe('корпус письменностей', () => {
   })
 })
 
-describe('известный предел', () => {
-  it('на паре «Кока-кола» / «Coca-Cola» бюджет расстояния исчерпан целиком', () => {
-    // The к/c fork is the one the fold cannot close: c is already the target for ц, so
-    // folding c to k would turn «цена» into kena. Two edits is the whole budget — nothing
-    // left for a real typo on top. MOL-11 is what covers this pair, by remembering the pick.
-    //
-    // Asserted as exactly 2, not «at most 2»: a test that silently improves would hide the
-    // day this stops being the limit, and a test that silently worsens would hide the day
-    // the pair stops being findable at all.
-    expect(distance(toSearchKey('Coca-Cola'), toSearchKey('Кока-кола'))).toBe(2)
+describe('развилка к/c', () => {
+  it('сводит «Кока-кола» и «Coca-Cola» в один ключ', () => {
+    // Was the known limit: two edits, the whole budget, with nothing left for a typo on top,
+    // and the pair was not even a candidate until «кола» was typed in full. Folding c to k
+    // outright would turn «цена» into kena; the hard c of MOL-11 does it by position instead.
+    expect(toSearchKey('Coca-Cola')).toBe(toSearchKey('Кока-кола'))
+  })
+
+  it.each([
+    ['Nescafe', 'Нескафе'],
+    ['Coffee', 'Кофе'],
+    ['Tic Tac', 'Тик Так'],
+    ['Picnic', 'Пикник'],
+    ['Activia', 'Активиа'],
+  ])('сводит «%s» и «%s» в один ключ', (latin, cyrillic) => {
+    expect(toSearchKey(latin)).toBe(toSearchKey(cyrillic))
+  })
+
+  it.each([
+    ['cena', 'цена'],
+    ['tsena', 'цена'],
+    ['cukaty', 'цукаты'],
+    ['konets', 'конец'],
+    ['otec', 'отец'],
+  ])('не теряет «ц», набранное латиницей: «%s» и «%s» — один ключ', (latin, cyrillic) => {
+    expect(toSearchKey(latin)).toBe(toSearchKey(cyrillic))
+  })
+
+  it('оставляет c мягким перед e и i и не трогает ch', () => {
+    expect(toSearchKey('цена')).toBe('cena')
+    expect(toSearchKey('цирк')).toBe('cirk')
+    expect(toSearchKey('Чай')).toBe('chai')
+  })
+
+  it('склеивает «ц» с «к» в твёрдой позиции — цена правила', () => {
+    // The same trade as «Советский» becoming soveki: a false merge costs a candidate, a
+    // miss costs the answer. Among names on a grocery shelf such pairs are rare.
+    expect(toSearchKey('отец')).toBe(toSearchKey('отёк'))
+    expect(toSearchKey('конец')).toBe(toSearchKey('конёк'))
   })
 })
 
@@ -265,7 +294,8 @@ describe('класс, которого в корпусе нет', () => {
   const PAIRS: readonly (readonly [string, string, number])[] = [
     ['Cheesecake', 'Чизкейк', 6],
     ['Sprite', 'Спрайт', 2],
-    ['Jacobs', 'Якобс', 2],
+    // 1 since MOL-11: the hard c made `jacobs` into `jakobs`.
+    ['Jacobs', 'Якобс', 1],
     ['Cappuccino', 'Капучино', 2],
   ]
 
@@ -273,9 +303,10 @@ describe('класс, которого в корпусе нет', () => {
     expect(distance(toSearchKey(latin), toSearchKey(cyrillic))).toBe(expected)
   })
 
-  it('все четыре тратят весь бюджет ещё до первой опечатки', () => {
-    // Three sit exactly at the threshold and one is past it outright: whatever MOL-14 does
-    // with the numbers, this class has no room left for a typo on top.
-    expect(PAIRS.filter(([, , d]) => d >= ACCEPTED)).toHaveLength(4)
+  it('три из четырёх тратят весь бюджет ещё до первой опечатки', () => {
+    // Two sit exactly at the threshold and one is past it outright: whatever MOL-14 does
+    // with the numbers, this class has no room left for a typo on top. «Jacobs» dropped out
+    // of it with the hard c of MOL-11.
+    expect(PAIRS.filter(([, , d]) => d >= ACCEPTED)).toHaveLength(3)
   })
 })

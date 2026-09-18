@@ -176,9 +176,17 @@ describe('search — what it finds', () => {
     expect(await names('чанах')).toEqual(['Сыр Чанах'])
   })
 
-  it('finds a Latin brand across the к/c fork — at the edge of the budget', async () => {
+  it('finds a Latin brand across the к/c fork — one key since the hard c', async () => {
     await named('Кока-кола')
     expect(await names('Coca-Cola')).toEqual(['Кока-кола'])
+  })
+
+  it('finds a Latin brand from the first Cyrillic word, before the second is typed', async () => {
+    // Before the hard c of MOL-11 «кока» scored 0.000 against `coca cola` and was not even a
+    // candidate: the name surfaced only once «кола» was typed in full.
+    await named('Coca-Cola')
+    await named('Какао Nesquik')
+    expect(await names('кока')).toEqual(['Coca-Cola', 'Какао Nesquik'])
   })
 
   it('keeps a tie a tie: «moloko» names both milks', async () => {
