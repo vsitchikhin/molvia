@@ -3,6 +3,7 @@ import { EVENT } from '@molvia/model'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor } from './fixtures'
 import { createEventRepository } from '@/db/events-repository'
+import { events } from '@/db/schema'
 
 const { db, close } = connectDrizzle()
 const repository = createEventRepository(db)
@@ -126,6 +127,63 @@ describe('week-four return', () => {
 
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
       cohortSize: 0,
+      returned: 0,
+    })
+  })
+})
+
+describe('recording at most once within a window', () => {
+  const MINUTE = 60 * 1000
+  const view = (actorId: string) =>
+    ({ actorId, type: EVENT.CATALOGUE_VIEWED, payload: { subject: 'product' } }) as const
+
+  async function viewsOf(actorId: string) {
+    return (await db.select().from(events)).filter(
+      (row) => row.actorId === actorId && row.type === EVENT.CATALOGUE_VIEWED,
+    )
+  }
+
+  it('writes the first one', async () => {
+    const actorId = await insertActor(db)
+
+    await expect(repository.recordUnlessWithin(view(actorId), DAY)).resolves.toBe(true)
+    expect(await viewsOf(actorId)).toHaveLength(1)
+  })
+
+  it('writes nothing when one is a minute inside the window', async () => {
+    const actorId = await insertActor(db)
+    await repository.record({ ...view(actorId), occurredAt: new Date(Date.now() - DAY + MINUTE) })
+
+    await expect(repository.recordUnlessWithin(view(actorId), DAY)).resolves.toBe(false)
+    expect(await viewsOf(actorId)).toHaveLength(1)
+  })
+
+  it('writes again once the last one is a minute past the window', async () => {
+    const actorId = await insertActor(db)
+    await repository.record({ ...view(actorId), occurredAt: new Date(Date.now() - DAY - MINUTE) })
+
+    await expect(repository.recordUnlessWithin(view(actorId), DAY)).resolves.toBe(true)
+    expect(await viewsOf(actorId)).toHaveLength(2)
+  })
+
+  it('must not be held back by another type or by another actor', async () => {
+    const actorId = await insertActor(db)
+    const someoneElse = await insertActor(db)
+    await repository.record({ actorId, type: EVENT.SESSION_STARTED })
+    await repository.record(view(someoneElse))
+
+    await expect(repository.recordUnlessWithin(view(actorId), DAY)).resolves.toBe(true)
+  })
+
+  it('writes the payload the gate splits on', async () => {
+    const actorId = await insertActor(db)
+    await repository.recordUnlessWithin(
+      { actorId, type: EVENT.CATALOGUE_VIEWED, payload: { subject: 'venue' } },
+      DAY,
+    )
+
+    await expect(repository.weekFourReturn('venue', daysAgo(1), daysAgo(-1))).resolves.toEqual({
+      cohortSize: 1,
       returned: 0,
     })
   })
