@@ -174,6 +174,10 @@ const LATIN_FOLDS: readonly (readonly [string, string])[] = Object.freeze([
  * becoming `soveki` — a false merge costs a candidate, a miss costs the answer.
  *
  * `y` is absent from the lookahead because the fold has already made it `i`.
+ *
+ * Frozen like the tables above, and it changed them without a recompute only because no key
+ * was stored yet: production was not deployed and no copy held a real catalogue. The next
+ * change to it is a migration.
  */
 const HARD_C = /c(?![eih])/g
 
