@@ -81,7 +81,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     if (error instanceof InvalidBody) {
       const issue = error.issues[0]
       const code = isWireCode(issue?.message) ? issue.message : ISSUE.BODY_INVALID
-      const details = issue?.path.join('.')
+      // An unknown key has no path of its own — the object it sits in has — so the name that
+      // was refused is taken from the issue: `?actorId=` answers with `details: "actorId"`.
+      const details =
+        issue?.code === 'unrecognized_keys' ? issue.keys.join(',') : issue?.path.join('.')
       return reply.status(400).send(answer({ code, ...(details ? { details } : {}) }))
     }
 

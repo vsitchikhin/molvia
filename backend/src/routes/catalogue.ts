@@ -22,7 +22,9 @@ export interface CatalogueApi {
  * is taken from the hook, never from the request.
  */
 export function catalogueRoutes(app: FastifyInstance, api: CatalogueApi): void {
-  app.get('/catalogue/search', async (request, reply) => {
+  // No HEAD twin: Fastify adds one to every GET by default and runs the whole handler for it,
+  // so a HEAD would search and be recorded as a visit to the catalogue.
+  app.get('/catalogue/search', { exposeHeadRoute: false }, async (request, reply) => {
     const { q } = parseQuery(catalogueSearchQuerySchema, request.query)
     const items = await api.search(request.actorId, q)
 

@@ -127,7 +127,20 @@ describe('GET /catalogue/search — the door', () => {
     const reply = await search(theirs, `${q('молоко')}&actorId=${mine}`)
 
     expect(reply.status).toBe(400)
-    expect(reply.body).toMatchObject({ code: ISSUE.QUERY_INVALID })
+    expect(reply.body).toEqual({ code: ISSUE.QUERY_INVALID, details: 'actorId' })
+  })
+
+  it('has no HEAD twin that would search and count as a visit', async () => {
+    const actor = await insertActor(db)
+
+    const response = await app.inject({
+      method: 'HEAD',
+      url: `/catalogue/search${q('молоко')}`,
+      headers: { 'x-molvia-actor': actor },
+    })
+
+    expect(response.statusCode).toBe(404)
+    expect(await viewsOf(actor)).toHaveLength(0)
   })
 })
 
@@ -457,7 +470,7 @@ describe('POST /catalogue/items — «Предложить товар»', () => 
     expect(dish.status).toBe(400)
     expect(dish.body).toMatchObject({ code: ISSUE.BODY_INVALID, details: 'kind' })
     expect(barcoded.status).toBe(400)
-    expect(barcoded.body).toMatchObject({ code: ISSUE.BODY_INVALID })
+    expect(barcoded.body).toEqual({ code: ISSUE.BODY_INVALID, details: 'barcodes' })
     expect(await db.select().from(items)).toHaveLength(0)
   })
 
