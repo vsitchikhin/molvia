@@ -1,6 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { toSearchKey } from '@molvia/model'
-import { ITEMS, QUERIES, TRIPLES } from '@molvia/model/testing/search-corpus'
+import {
+  ITEMS,
+  QUERIES,
+  SHELF,
+  SHELF_ABSENT,
+  SHELF_ARMENIAN,
+  SHELF_ARMENIAN_QUERIES,
+  SHELF_EVERYDAY_ABSENT,
+  SHELF_QUERIES,
+  SHELF_TYPED_OTHERWISE,
+  TRIPLES,
+} from '@molvia/model/testing/search-corpus'
 import { randomUUID } from 'node:crypto'
 import { sql as raw } from 'drizzle-orm'
 import { createItemRepository } from '@/db/items-repository'
@@ -12,9 +23,10 @@ import { clearAll, insertItem } from './fixtures'
  * `levenshtein`, both in Postgres. The key's own corpus test measures the alphabet with a
  * model of the ranking; this one measures what a person sees.
  *
- * Each case pins the whole answer, not only its head: the corpus is the input MOL-14 retunes
- * the thresholds against, and a threshold that buries the answer in noise keeps the right
- * item first. When a threshold moves, these lists are expected to move with it — by hand.
+ * Each case pins the whole answer, not only its head: the corpus is what a retune of the
+ * thresholds is measured against (MOL-14 kept them, MOL-47 measures again), and a threshold
+ * that buries the answer in noise keeps the right item first. When a threshold moves, these
+ * lists are expected to move with it — by hand.
  */
 
 const { db, close } = connectDrizzle()
@@ -69,7 +81,7 @@ describe('the corpus of forks, through the search', () => {
    * similarity puts «Марианна» first every time: the typo resembles the brand, not the milk.
    * Not wrong — the query names both milks — and pinned so the tie-break by similarity is
    * guarded where it decides the first row. The rest is noise within the budget, pinned so
-   * MOL-14 sees it move.
+   * a retune shows it move.
    */
   const LONGER: Readonly<Record<string, Answer>> = {
     moloko: [['Молоко Ашхар 3.2%', 'Молоко Марианна']],
@@ -121,14 +133,14 @@ describe('the corpus of forks, through the search', () => {
 
   it('finds «Чай зелёный» by «пельмени» — the absolute budget, pinned as it is', async () => {
     // `pelmeni` is two edits from `zeleni`: a seven-letter word wrong from end to end passes
-    // where the budget was meant for a typo. The limit MOL-14 already carries; this is its
-    // plainest case.
+    // where the budget was meant for a typo. No threshold separates it from «малако» — MOL-46;
+    // this is its plainest case.
     expect(await names('пельмени')).toEqual(['Чай зелёный'])
   })
 
   it('puts both cheeses above «Сахар» for «Сааар» — a turn of the key, pinned as it is', async () => {
     // One substitution from «Сахар», but the repeat collapse makes it `sar`, one edit from
-    // `sir`. Written down by MOL-5 for MOL-14 to decide, not for this file to fix.
+    // `sir`. Written down by MOL-5, left in place by MOL-14 (MOL-47), not for this file to fix.
     await answers('Сааар', [['Сыр Лори', 'Сыр Чанах'], 'Сахар', 'Молоко Ашхар 3.2%'])
   })
 })
@@ -196,7 +208,563 @@ describe('what is not in the corpus: two words, and English spelling', () => {
   })
 
   it('does not find «Чизкейк» by «Cheesecake» — six edits, the class the key does not cover', async () => {
-    // English orthography is not a transliteration fork; pinned for MOL-14.
+    // English orthography is not a transliteration fork; pinned, and left to MOL-47.
     expect(await names('Cheesecake')).toEqual([])
+  })
+})
+
+describe("the shelf of MOL-14: the owner's own words, through the search", () => {
+  beforeAll(async () => {
+    await seed(SHELF)
+  })
+
+  /**
+   * What the search answers today, whole, at the thresholds MOL-14 measured and kept:
+   * candidates above 0.15, distance within 2. The noise is pinned with the rest — «мол» ties
+   * the milks with «Кофе … молотый», «туалетка» the paper with the cat litter's «туалета» —
+   * so a change of either threshold shows what it moves, query by query.
+   */
+  const ANSWERS: Readonly<Record<string, Answer>> = {
+    кола: [
+      ['Coca-Cola 1 л', 'Coca-Cola 0,5 л'],
+      ['Колбаса докторская', 'Колбаса сервелат Макур'],
+      'Средство для мытья пола Mr. Proper 1 л',
+      [
+        'Корм для кошек Whiskas 85 г',
+        'Корм для собак Pedigree 400 г',
+        'Кофе Jacobs Monarch молотый 230 г',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+      ],
+    ],
+    кол: [
+      ['Coca-Cola 1 л', 'Coca-Cola 0,5 л', 'Колбаса докторская', 'Колбаса сервелат Макур'],
+      [
+        'Корм для кошек Whiskas 85 г',
+        'Корм для собак Pedigree 400 г',
+        'Кофе Jacobs Monarch молотый 230 г',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+      ],
+      [
+        'Мука пшеничная высший сорт 2 кг',
+        'Соевый соус Kikkoman 150 мл',
+        'Стиральный порошок Ariel 3 кг',
+      ],
+    ],
+    фанта: ['Fanta апельсин 1 л'],
+    фан: ['Fanta апельсин 1 л'],
+    молоко: [
+      ['Молоко Марианна 3,2% 1 л', 'Молоко Ашхар 2,5% 1 л'],
+      'Кофе Jacobs Monarch молотый 230 г',
+    ],
+    мол: [
+      ['Кофе Jacobs Monarch молотый 230 г', 'Молоко Марианна 3,2% 1 л', 'Молоко Ашхар 2,5% 1 л'],
+      ['Соевый соус Kikkoman 150 мл', 'Сливки Марианна 20% 200 мл'],
+      'Средство для мытья пола Mr. Proper 1 л',
+    ],
+    моло: [
+      ['Кофе Jacobs Monarch молотый 230 г', 'Молоко Марианна 3,2% 1 л', 'Молоко Ашхар 2,5% 1 л'],
+      'Полотенце кухонное',
+      [
+        'Соевый соус Kikkoman 150 мл',
+        'Средство для мытья пола Mr. Proper 1 л',
+        'Сливки Марианна 20% 200 мл',
+      ],
+    ],
+    несквик: ['Nesquik какао-напиток 250 г'],
+    неск: ['Nesquik какао-напиток 250 г', 'Хлопья Nestlé Fitness 300 г'],
+    хлопья: [['Хлопья Nestlé Fitness 300 г', "Хлопья кукурузные Kellogg's Corn Flakes 375 г"]],
+    хлоп: [
+      ['Хлопья Nestlé Fitness 300 г', "Хлопья кукурузные Kellogg's Corn Flakes 375 г"],
+      ['Хлеб Матнакаш', "Хлеб тостовый Harry's 470 г"],
+    ],
+    хлеб: [['Хлеб Матнакаш', "Хлеб тостовый Harry's 470 г"]],
+    колбаса: [['Колбаса докторская', 'Колбаса сервелат Макур']],
+    колб: [
+      ['Колбаса докторская', 'Колбаса сервелат Макур'],
+      ['Coca-Cola 1 л', 'Coca-Cola 0,5 л'],
+      [
+        'Корм для кошек Whiskas 85 г',
+        'Корм для собак Pedigree 400 г',
+        'Кофе Jacobs Monarch молотый 230 г',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+      ],
+    ],
+    нутелла: ['Nutella 350 г'],
+    нут: ['Nutella 350 г', 'Сок Noy яблочный 1 л'],
+    пиво: [['Пиво Gyumri 0,5 л', 'Пиво Kilikia 0,5 л'], 'Пирожное Наполеон'],
+    говядина: ['Говядина мякоть'],
+    мясо: ['Говядина мякоть'],
+    говя: [['Фарш говяжий', 'Говядина мякоть']],
+    сок: [
+      ['Сок Rich апельсин 1 л', 'Сок Noy яблочный 1 л'],
+      [
+        'Корм для собак Pedigree 400 г',
+        'Мука пшеничная высший сорт 2 кг',
+        'Соевый соус Kikkoman 150 мл',
+        'Соус чесночный Махеевъ 200 г',
+      ],
+      [
+        "Чипсы Lay's сметана и лук 150 г",
+        'Батарейки Duracell AA 4 шт',
+        'Салфетки бумажные Zewa 100 шт',
+        'Салфетки влажные Huggies 56 шт',
+        'Станки Gillette Blue II 5 шт',
+        'Таблетки для посудомоечной машины Finish 40 шт',
+        'Булочки с кунжутом 4 шт',
+      ],
+    ],
+    чипсы: ["Чипсы Lay's сметана и лук 150 г"],
+    чип: ["Чипсы Lay's сметана и лук 150 г"],
+    принглс: ['Pringles Original 165 г'],
+    прин: ['Pringles Original 165 г'],
+    читос: ['Cheetos кукурузные палочки 55 г'],
+    котлеты: ['Котлеты куриные замороженные'],
+    котл: [
+      'Котлеты куриные замороженные',
+      [
+        'Корм для кошек Whiskas 85 г',
+        'Корм для собак Pedigree 400 г',
+        'Кофе Jacobs Monarch молотый 230 г',
+        'Coca-Cola 1 л',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+        'Coca-Cola 0,5 л',
+      ],
+    ],
+    спагетти: ['Спагетти Barilla №5 500 г'],
+    спаг: ['Спагетти Barilla №5 500 г'],
+    кетчуп: ['Кетчуп Heinz томатный 570 г'],
+    соусы: [['Соевый соус Kikkoman 150 мл', 'Соус чесночный Махеевъ 200 г']],
+    орешки: [],
+    салфетки: [['Салфетки бумажные Zewa 100 шт', 'Салфетки влажные Huggies 56 шт']],
+    салф: [['Салфетки бумажные Zewa 100 шт', 'Салфетки влажные Huggies 56 шт']],
+    'влажные салфетки': ['Салфетки влажные Huggies 56 шт', 'Салфетки бумажные Zewa 100 шт'],
+    картошка: [],
+    виноград: ['Виноград Арарат'],
+    нектарины: ['Нектарины'],
+    перчатки: ['Перчатки хозяйственные Vileda'],
+    батарейки: ['Батарейки Duracell AA 4 шт'],
+    белизна: ['Белизна 1 л'],
+    отбеливатель: [],
+    кофе: [
+      'Кофе Jacobs Monarch молотый 230 г',
+      [
+        'Корм для кошек Whiskas 85 г',
+        'Корм для собак Pedigree 400 г',
+        'Coca-Cola 1 л',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+        'Coca-Cola 0,5 л',
+      ],
+    ],
+    креветки: ['Креветки королевские 500 г'],
+    сливки: ['Сливки Марианна 20% 200 мл'],
+    крекеры: ['Крекеры TUC 100 г'],
+    булочки: ['Булочки с кунжутом 4 шт', 'Cheetos кукурузные палочки 55 г'],
+    булки: [],
+    пирожные: ['Пирожное Наполеон'],
+    вода: [['Вода Бжни 1,5 л', 'Вода Джермук 0,5 л']],
+    дошик: ['Doshirak лапша курица 90 г'],
+    лапша: [['Лапша удон 300 г', 'Doshirak лапша курица 90 г']],
+    паштет: ['Паштет печёночный Hame 105 г'],
+    творог: ['Творог Ашхар 9% 400 г'],
+    твор: ['Творог Ашхар 9% 400 г'],
+    мука: ['Мука пшеничная высший сорт 2 кг', ['Coca-Cola 1 л', 'Coca-Cola 0,5 л']],
+    туалетка: [['Туалетная бумага Zewa Plus 4 рулона', 'Наполнитель для кошачьего туалета 5 л']],
+    бритва: [],
+    'соевый соус': ['Соевый соус Kikkoman 150 мл', 'Соус чесночный Махеевъ 200 г'],
+    рис: ['Рис длиннозёрный Мистраль 900 г', 'Сок Rich апельсин 1 л'],
+    'таблетки для посудомойки': ['Таблетки для посудомоечной машины Finish 40 шт'],
+    курица: [['Курица целая охлаждённая', 'Курица филе', 'Doshirak лапша курица 90 г']],
+    кур: [
+      [
+        'Курица целая охлаждённая',
+        'Котлеты куриные замороженные',
+        'Курица филе',
+        'Doshirak лапша курица 90 г',
+      ],
+      ["Хлопья кукурузные Kellogg's Corn Flakes 375 г", 'Колбаса сервелат Макур'],
+      [
+        'Корм для кошек Whiskas 85 г',
+        'Корм для собак Pedigree 400 г',
+        'Мука пшеничная высший сорт 2 кг',
+        'Стиральный порошок Ariel 3 кг',
+        'Крекеры TUC 100 г',
+      ],
+    ],
+    'средство для полов': ['Средство для мытья пола Mr. Proper 1 л'],
+    'собачий корм': ['Корм для собак Pedigree 400 г'],
+    корм: [
+      ['Корм для кошек Whiskas 85 г', 'Корм для собак Pedigree 400 г'],
+      ['Креветки королевские 500 г', "Хлопья кукурузные Kellogg's Corn Flakes 375 г"],
+      ['Кофе Jacobs Monarch молотый 230 г', 'Coca-Cola 1 л', 'Coca-Cola 0,5 л'],
+      'Мука пшеничная высший сорт 2 кг',
+    ],
+    наполнитель: ['Наполнитель для кошачьего туалета 5 л'],
+    'стиральный порошок': ['Стиральный порошок Ariel 3 кг'],
+    порошок: ['Стиральный порошок Ariel 3 кг'],
+    тарелки: ['Тарелка суповая'],
+    кружки: ['Кружка керамическая'],
+    полотенца: ['Полотенце кухонное'],
+  }
+
+  /**
+   * The owner's word is not the shelf's: «картошка» for «Картофель», «орешки» for «Арахис».
+   * No spelling rule reaches a synonym, and no threshold does either — pinned as misses.
+   */
+  const SYNONYMS = new Set(['орешки', 'картошка', 'отбеливатель', 'булки', 'бритва'])
+
+  it('pins an answer for every query of the shelf, and no other', () => {
+    expect(Object.keys(ANSWERS).sort()).toEqual(SHELF_QUERIES.map(([query]) => query).sort())
+  })
+
+  /**
+   * Where the first place is a tie with an item the query did not mean: equal distance and
+   * similarity, so the row id — a random uuid — decides which one the person sees. «мол» and
+   * «моло» tie the milks with «Кофе … молотый», «кол» the colas with the sausages, «кур» and
+   * «курица» the chicken with «Котлеты куриные» and «Doshirak лапша курица», «туалетка» the
+   * paper with the litter's «туалета». Memory (MOL-11) settles it from the second trip, not the
+   * first. Counted apart from a hit: 62 queries have what they meant first alone, not 68.
+   */
+  const TIED_WITH_FOREIGN = new Set(['кол', 'мол', 'моло', 'кур', 'курица', 'туалетка'])
+
+  /**
+   * Found by the letters, not by the meaning: `miaso` is one edit from the start of `miakot`
+   * («мякоть»), inside the slack of an unfinished word. A synonym like «картошка», counted a
+   * hit by luck. «Фарш говяжий» is meat just as much and has no such start, so it is not
+   * found — which is what shows the letters, not the meaning, at work (MOL-45).
+   */
+  const BY_LETTERS: ReadonlyMap<string, string> = new Map([['мясо', 'Фарш говяжий']])
+
+  const meantFirst = (
+    answer: Answer | undefined,
+    meant: readonly string[],
+  ): 'alone' | 'tied' | 'not-first' | 'empty' => {
+    const head = [answer?.[0] ?? []].flat()
+    if (head.length === 0) return 'empty'
+    if (!head.some((name) => meant.includes(name))) return 'not-first'
+    return head.every((name) => meant.includes(name)) ? 'alone' : 'tied'
+  }
+
+  it('puts what the query meant first alone — apart from the ties and synonyms named above', () => {
+    // The pinned answers replace nothing in the shared list, so they must still agree with it.
+    for (const [query, meant] of SHELF_QUERIES) {
+      const expected = SYNONYMS.has(query)
+        ? 'empty'
+        : TIED_WITH_FOREIGN.has(query)
+          ? 'tied'
+          : 'alone'
+      expect(meantFirst(ANSWERS[query], meant), query).toBe(expected)
+    }
+  })
+
+  it.each([...BY_LETTERS])(
+    'finds by letters only: «%s» does not reach «%s», meant just as much',
+    (query, missed) => {
+      expect([ANSWERS[query] ?? []].flat(2)).not.toContain(missed)
+    },
+  )
+
+  it.each(SHELF_QUERIES)('«%s»', async (query) => {
+    await answers(query, ANSWERS[query] ?? [])
+  })
+
+  /**
+   * Two of the owner's words for what the shelf does not carry still find something: `ovoshi`
+   * is two edits from `vishi` of «высший сорт», `speцi` two from `soevi`. The absolute budget
+   * of MOL-10 — the class of «пельмени» — and with the one button «Предложить товар» shown
+   * only on an empty answer, such an item cannot be added. Pinned as it is.
+   */
+  const FALSE_HITS: Readonly<Record<string, Answer>> = {
+    овощи: ['Мука пшеничная высший сорт 2 кг'],
+    специи: ['Соевый соус Kikkoman 150 мл'],
+  }
+
+  it.each(SHELF_ABSENT.filter((query) => !(query in FALSE_HITS)))(
+    'answers nothing to «%s», which the shelf does not carry',
+    async (query) => {
+      expect(await names(query)).toEqual([])
+    },
+  )
+
+  it.each(Object.entries(FALSE_HITS))(
+    'finds something for «%s» — the absolute budget, pinned as it is',
+    async (query, answer) => {
+      await answers(query, answer)
+    },
+  )
+
+  /**
+   * Fifty everyday purchases the shelf does not carry — the adversarial pass's words, not the
+   * owner's. Twenty-four find something, and every one that does hides «Предложить товар»,
+   * shown only on an empty answer. They are two outcomes, not one:
+   *
+   * - `RELATED` — the first row carries the word's root: a taste or a property printed on
+   *   another item. Six are found exactly or by the start of a word («сметана», «лук» in the
+   *   chips', «печень» in «печёночный») — no threshold removes those, a question for the
+   *   screen (MOL-23), not the search. Six more by an edit of the ending, inside the budget
+   *   («томаты» → «томатный», «яблоки» → «яблочный», two edits, gone at a budget of 1).
+   *   «соль» and «суп» drag a tail of «шт» behind the first row — MOL-48.
+   * - `UNRELATED` — nothing in common but letters: the absolute budget («водка» → «Вода»,
+   *   «мыло» → «Молоко», «торт», «плов» — MOL-46) and a unit word grounding a match («сыр» is
+   *   two edits from `sht` of «4 шт» — MOL-48).
+   *
+   * Pinned whole, as they are.
+   */
+  const RELATED_EXACT = new Set(['соль', 'печень', 'лук', 'сметана', 'суп', 'вино'])
+  const RELATED_BY_EDIT = new Set(['яблоки', 'апельсины', 'томаты', 'чеснок', 'кукуруза', 'пирог'])
+  const RELATED = new Set([...RELATED_EXACT, ...RELATED_BY_EDIT])
+  const UNRELATED = new Set([
+    'сахар',
+    'чай',
+    'сыр',
+    'ложка',
+    'мыло',
+    'губка',
+    'пакеты',
+    'плов',
+    'водка',
+    'конфеты',
+    'торт',
+    'печенье',
+  ])
+  const EVERYDAY: Readonly<Record<string, Answer>> = {
+    яйца: [],
+    сахар: [['Молоко Ашхар 2,5% 1 л', 'Творог Ашхар 9% 400 г']],
+    соль: [
+      'Арахис солёный 150 г',
+      ['Сок Rich апельсин 1 л', 'Сок Noy яблочный 1 л'],
+      [
+        'Мука пшеничная высший сорт 2 кг',
+        'Соус чесночный Махеевъ 200 г',
+        'Соевый соус Kikkoman 150 мл',
+      ],
+      [
+        'Салфетки бумажные Zewa 100 шт',
+        'Станки Gillette Blue II 5 шт',
+        'Таблетки для посудомоечной машины Finish 40 шт',
+        'Булочки с кунжутом 4 шт',
+        'Средство для мытья пола Mr. Proper 1 л',
+        'Салфетки влажные Huggies 56 шт',
+        'Батарейки Duracell AA 4 шт',
+        'Сливки Марианна 20% 200 мл',
+      ],
+    ],
+    масло: [],
+    чай: ["Чипсы Lay's сметана и лук 150 г"],
+    сыр: [
+      [
+        'Салфетки бумажные Zewa 100 шт',
+        'Мука пшеничная высший сорт 2 кг',
+        'Станки Gillette Blue II 5 шт',
+        'Таблетки для посудомоечной машины Finish 40 шт',
+        'Булочки с кунжутом 4 шт',
+        'Средство для мытья пола Mr. Proper 1 л',
+        'Салфетки влажные Huggies 56 шт',
+        'Батарейки Duracell AA 4 шт',
+        'Сок Rich апельсин 1 л',
+        'Сок Noy яблочный 1 л',
+      ],
+    ],
+    кефир: [],
+    йогурт: [],
+    бананы: [],
+    яблоки: ['Сок Noy яблочный 1 л'],
+    апельсины: [['Fanta апельсин 1 л', 'Сок Rich апельсин 1 л']],
+    томаты: ['Кетчуп Heinz томатный 570 г'],
+    помидоры: [],
+    чеснок: ['Соус чесночный Махеевъ 200 г'],
+    кукуруза: [
+      ["Хлопья кукурузные Kellogg's Corn Flakes 375 г", 'Cheetos кукурузные палочки 55 г'],
+    ],
+    печень: ['Паштет печёночный Hame 105 г'],
+    лук: [
+      "Чипсы Lay's сметана и лук 150 г",
+      'Крекеры TUC 100 г',
+      ['Сок Rich апельсин 1 л', 'Сок Noy яблочный 1 л'],
+    ],
+    сметана: ["Чипсы Lay's сметана и лук 150 г"],
+    сосиски: [],
+    макароны: [],
+    гречка: [],
+    огурцы: [],
+    зелень: [],
+    суп: [
+      'Тарелка суповая',
+      [
+        "Чипсы Lay's сметана и лук 150 г",
+        'Салфетки бумажные Zewa 100 шт',
+        'Станки Gillette Blue II 5 шт',
+        'Таблетки для посудомоечной машины Finish 40 шт',
+        'Булочки с кунжутом 4 шт',
+        'Салфетки влажные Huggies 56 шт',
+        'Батарейки Duracell AA 4 шт',
+        'Соус чесночный Махеевъ 200 г',
+        'Сок Rich апельсин 1 л',
+        'Сок Noy яблочный 1 л',
+        'Соевый соус Kikkoman 150 мл',
+      ],
+    ],
+    ложка: [['Coca-Cola 0,5 л', 'Coca-Cola 1 л']],
+    лезвия: [],
+    щётка: [],
+    'зубная паста': [],
+    шампунь: [],
+    мыло: [
+      ['Молоко Ашхар 2,5% 1 л', 'Кофе Jacobs Monarch молотый 230 г', 'Молоко Марианна 3,2% 1 л'],
+      ['Соевый соус Kikkoman 150 мл', 'Сливки Марианна 20% 200 мл'],
+    ],
+    губка: ['Мука пшеничная высший сорт 2 кг'],
+    пакеты: ['Спагетти Barilla №5 500 г'],
+    фольга: [],
+    плов: ['Туалетная бумага Zewa Plus 4 рулона'],
+    шаурма: [],
+    тоник: [],
+    сироп: [],
+    вино: ['Виноград Арарат'],
+    коньяк: [],
+    водка: [
+      ['Вода Джермук 0,5 л', 'Вода Бжни 1,5 л'],
+      ['Coca-Cola 0,5 л', 'Coca-Cola 1 л'],
+    ],
+    сигареты: [],
+    жвачка: [],
+    шоколад: [],
+    конфеты: ['Котлеты куриные замороженные'],
+    мороженое: [],
+    торт: [["Хлеб тостовый Harry's 470 г", 'Мука пшеничная высший сорт 2 кг']],
+    пирог: ['Пирожное Наполеон', ['Пиво Kilikia 0,5 л', 'Пиво Gyumri 0,5 л']],
+    сухарики: [],
+    семечки: [],
+    печенье: ['Паштет печёночный Hame 105 г'],
+  }
+
+  it('pins an answer for every everyday word, and no other', () => {
+    expect(Object.keys(EVERYDAY).sort()).toEqual([...SHELF_EVERYDAY_ABSENT].sort())
+  })
+
+  it('files every everyday word that finds something: 12 related, 12 unrelated', () => {
+    const found = SHELF_EVERYDAY_ABSENT.filter((query) => (EVERYDAY[query] ?? []).length > 0)
+    expect(found.filter((query) => !RELATED.has(query) && !UNRELATED.has(query))).toEqual([])
+    expect([...RELATED, ...UNRELATED].filter((query) => !found.includes(query))).toEqual([])
+    expect([RELATED.size, UNRELATED.size]).toEqual([12, 12])
+  })
+
+  it.each(SHELF_EVERYDAY_ABSENT)('everyday «%s», which the shelf does not carry', async (query) => {
+    await answers(query, EVERYDAY[query] ?? [])
+  })
+
+  /**
+   * The shelf typed another way. Latin finds its item first; two brands spelled in Cyrillic do
+   * not: «хаггис» puts «Хлеб тостовый Harry's» above the Huggies wipes (both two edits, the
+   * bread's similarity 0.333 against 0.167), and «лейс» ties the chips with «Рис» — pinned for
+   * MOL-47.
+   */
+  const OTHERWISE: Readonly<Record<string, Answer>> = {
+    kola: [
+      ['Coca-Cola 0,5 л', 'Coca-Cola 1 л'],
+      ['Колбаса сервелат Макур', 'Колбаса докторская'],
+      'Средство для мытья пола Mr. Proper 1 л',
+      [
+        'Корм для собак Pedigree 400 г',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+        'Кофе Jacobs Monarch молотый 230 г',
+        'Корм для кошек Whiskas 85 г',
+      ],
+    ],
+    cola: [
+      ['Coca-Cola 0,5 л', 'Coca-Cola 1 л'],
+      ['Колбаса сервелат Макур', 'Колбаса докторская'],
+      'Средство для мытья пола Mr. Proper 1 л',
+      [
+        'Корм для собак Pedigree 400 г',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+        'Кофе Jacobs Monarch молотый 230 г',
+        'Корм для кошек Whiskas 85 г',
+      ],
+    ],
+    'coca cola': [
+      ['Coca-Cola 0,5 л', 'Coca-Cola 1 л'],
+      [
+        'Корм для собак Pedigree 400 г',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+        'Кофе Jacobs Monarch молотый 230 г',
+        'Средство для мытья пола Mr. Proper 1 л',
+        'Корм для кошек Whiskas 85 г',
+      ],
+    ],
+    moloko: [
+      ['Молоко Ашхар 2,5% 1 л', 'Молоко Марианна 3,2% 1 л'],
+      'Кофе Jacobs Monarch молотый 230 г',
+    ],
+    pivo: [['Пиво Kilikia 0,5 л', 'Пиво Gyumri 0,5 л'], 'Пирожное Наполеон'],
+    hleb: [["Хлеб тостовый Harry's 470 г", 'Хлеб Матнакаш']],
+    jacobs: ['Кофе Jacobs Monarch молотый 230 г'],
+    gyumri: ['Пиво Gyumri 0,5 л'],
+    kilikia: ['Пиво Kilikia 0,5 л'],
+    zewa: [['Салфетки бумажные Zewa 100 шт', 'Туалетная бумага Zewa Plus 4 рулона']],
+    ariel: ['Стиральный порошок Ariel 3 кг'],
+    finish: ['Таблетки для посудомоечной машины Finish 40 шт'],
+    pedigree: ['Корм для собак Pedigree 400 г'],
+    duracell: ['Батарейки Duracell AA 4 шт'],
+    gillette: ['Станки Gillette Blue II 5 шт'],
+    'mr proper': ['Средство для мытья пола Mr. Proper 1 л'],
+    хаггис: ["Хлеб тостовый Harry's 470 г", 'Салфетки влажные Huggies 56 шт'],
+    лейс: [["Чипсы Lay's сметана и лук 150 г", 'Рис длиннозёрный Мистраль 900 г']],
+  }
+  /** «хаггис» finds the wipes — second, under the bread; «лейс» ties the chips with the rice. */
+  const OTHERWISE_WRONG = new Map([
+    ['хаггис', 'not-first'],
+    ['лейс', 'tied'],
+  ])
+
+  it('puts what a Latin or a Cyrillic brand meant first — apart from «хаггис» and «лейс»', () => {
+    expect(Object.keys(OTHERWISE).sort()).toEqual(SHELF_TYPED_OTHERWISE.map(([q]) => q).sort())
+    for (const [query, meant] of SHELF_TYPED_OTHERWISE) {
+      expect(meantFirst(OTHERWISE[query], meant), query).toBe(OTHERWISE_WRONG.get(query) ?? 'alone')
+    }
+  })
+
+  it.each(SHELF_TYPED_OTHERWISE)('typed otherwise «%s»', async (query) => {
+    await answers(query, OTHERWISE[query] ?? [])
+  })
+})
+
+describe('Armenian labels on the same shelf, reached from Russian and Latin', () => {
+  beforeAll(async () => {
+    await seed([...SHELF, ...SHELF_ARMENIAN])
+  })
+
+  /** The first market's shelf prints Armenian; a Russian or Latin keyboard has to reach it. */
+  const ANSWERS: Readonly<Record<string, Answer>> = {
+    мацун: ['Մածուն Մարիաննա', 'Колбаса сервелат Макур'],
+    matsun: ['Մածուն Մարիաննա', 'Колбаса сервелат Макур'],
+    джермук: ['Вода Джермук 0,5 л', 'Ջերմուկ'],
+    jermuk: ['Ջերմուկ', 'Вода Джермук 0,5 л'],
+    лори: [
+      'Պանիր Լոռի',
+      ["Чипсы Lay's сметана и лук 150 г", 'Сок Noy яблочный 1 л', "Хлеб тостовый Harry's 470 г"],
+    ],
+    lori: [
+      'Պանիր Լոռի',
+      ["Чипсы Lay's сметана и лук 150 г", 'Сок Noy яблочный 1 л', "Хлеб тостовый Harry's 470 г"],
+    ],
+    лаваш: ['Լավաշ'],
+    lavash: ['Լավաշ'],
+    тан: ['Թան Բժնի', ["Чипсы Lay's сметана и лук 150 г", 'Крекеры TUC 100 г']],
+    tan: ['Թան Բժնի', ["Чипсы Lay's сметана и лук 150 г", 'Крекеры TUC 100 г']],
+    бжни: [['Թան Բժնի', 'Вода Бжни 1,5 л']],
+    матнакаш: [['Հաց Մատնաքաշ', 'Хлеб Матнакаш']],
+    ашхар: [['Творог Ашхар 9% 400 г', 'Молоко Ашхар 2,5% 1 л'], 'Թթվասեր Աշխարհ'],
+  }
+
+  it('puts a label the query meant first', () => {
+    expect(Object.keys(ANSWERS).sort()).toEqual(SHELF_ARMENIAN_QUERIES.map(([q]) => q).sort())
+    for (const [query, meant] of SHELF_ARMENIAN_QUERIES) {
+      const head = [ANSWERS[query]?.[0] ?? []].flat()
+      expect(head.length > 0 && head.every((name) => meant.includes(name)), query).toBe(true)
+    }
+  })
+
+  it.each(SHELF_ARMENIAN_QUERIES)('«%s»', async (query) => {
+    await answers(query, ANSWERS[query] ?? [])
   })
 })

@@ -37,12 +37,17 @@ export interface ItemRepository {
 /**
  * The lowest `word_similarity` a candidate may score. Not 0.3, which the plan once said: a
  * two-vowel typo — «малако» against «Молоко Ашхар» — scores 0.167 and at 0.3 never even
- * becomes a candidate, so ranking has nothing to rank. Measured in MOL-10; tuning it on a
- * real catalogue is MOL-14's.
+ * becomes a candidate, so ranking has nothing to rank. Measured in MOL-10 and kept by MOL-14:
+ * 0.3 empties the false hits but loses that milk; 0.2 and 0.25 lose it too for one false hit
+ * less.
  */
 const CANDIDATE_THRESHOLD = 0.15
 
-/** The edit distance at which a name still counts as the one asked for. MOL-14 retunes it. */
+/**
+ * The edit distance at which a name still counts as the one asked for. Kept by MOL-14: 1 loses
+ * five typos of the MOL-5 corpus and «собачий корм», 3 wins one query of the owner's and finds
+ * six more wrong items. A word wrong from end to end still fits in two — MOL-46.
+ */
 const ACCEPTED_DISTANCE = 2
 
 /**
@@ -68,7 +73,10 @@ const HAS_CONTENT = /[\p{L}\p{N}]/u
  * the pick was made on «мол» and the next search may fire on «моло» — and the word being
  * typed is still the start of a word of the item taken. Below this many characters the
  * shorter one has to match exactly: «мо» starts half the catalogue. The same three MOL-10
- * holds the last word to an exact start; MOL-14 retunes both.
+ * holds the last word to an exact start. Typed letter by letter on MOL-14's shelf a pick lifts
+ * its item 18 times at 2, 9 at 3, 5 at 4; at 2 it also harms 5 times — a pick for Coca-Cola
+ * on «ко» tops «Колбаса» on «кол». Once at 3 too, but through the equal key, not this prefix:
+ * a sausage picked on «кол» tops the cola the owner's «кол» means. Real picks decide (MOL-47).
  */
 const REMEMBERED_PREFIX = 3
 
@@ -139,7 +147,7 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       -- «Малина» pushed out the milk), unordered it drops by row age — the newest items, the
       -- very ones «Предложить товар» just added. \`order by id\` is worse still: the planner
       -- walks the primary key and filters every row. The cost is bounded by the catalogue and
-      -- by MAX_QUERY_WORDS; measured in MOL-10, retuned on a real catalogue in MOL-14.
+      -- by MAX_QUERY_WORDS; measured in MOL-10, under 260 ms at every threshold in MOL-14.
     ),
     per_word as (
       select c.id, qw.grounds, qw.lettered,
