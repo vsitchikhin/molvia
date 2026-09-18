@@ -177,7 +177,14 @@ Measured, not assumed — the numbers below come from a probe against a real dat
 - **Candidates come from `word_similarity`, never `similarity`.** `similarity` compares
   whole strings, so a long name dilutes the match: «малако» scored 0.158 against
   «Молоко «Ашхар»» and ranked «Марианна» above it. `word_similarity` compares against the
-  best-matching part: 1.000 on a correct spelling, 0.600 on one swapped vowel.
+  best-matching part: 1.000 on a correct spelling, 0.600 on one swapped vowel — but only
+  0.167 on two, which is the corpus case «малако», so the candidate threshold is 0.15 and
+  not 0.3 (measured in MOL-10). Two traps sit under the operator. **Only `search_key %> $1`
+  reaches the GIN index** — `$1 %> search_key`, `search_key <% $1` and
+  `word_similarity($1, search_key) > t` mean the same and all fall back to a Seq Scan, which
+  a test's handful of rows cannot show. And **the threshold of `%>` is a setting of the
+  connection** (`pg_trgm.word_similarity_threshold`, default 0.6) that `set_limit()` does not
+  touch, so it is set locally inside the query's transaction and never leaks across the pool.
 - **Ranking is by minimum Levenshtein across the words**, via `fuzzystrmatch`. Two swapped
   vowels in a six-letter word defeat every trigram measure; edit distance puts «малако» at
   2 from `moloko` with the nearest wrong answer at 3. Across words, not the first word:
@@ -192,14 +199,42 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   shorter than two characters is not the cure** — those words are the packaging size: it
   makes «Молоко 1 л» and «Молоко 2 л» identical for ranking while «Молоко 1л» written
   without the space stays distinct, so two shops' labels for one product rank by different
-  rules. The third way — let a short word contribute but never be the sole ground of a
-  match — is the one that has not been ruled out.
+  rules. MOL-10 took **the third way**, and its review made it hold on both sides. A word
+  **grounds** a match only if it has two characters and no digit — «32», «1л», «500г» are
+  sizes, not grounds — and it is measured against the grounding words of the name only, never
+  against «л» or «1», which every two-letter word is within two edits of. Grounding words fold by their **mean**,
+  rounded up; short words by their **worst**, at most one edit, so each has to find its pair
+  and «1 л» against «2 л» costs one. A query with no grounding word but with letters — «M&M's» is
+  `m m s`, «m&m» is what the screen sends halfway — finds names in which every one of its words
+  is found exactly; digits alone find nothing. The screen searches while the
+  person types, so **the last word also matches the start of a name word** — exactly up to
+  three letters, one edit from four, two from seven; any slack on two letters matches every
+  word there is. The price is that a finished word matches longer ones too: «сыр» finds
+  «Сырок», «чай» finds «Чайник» — below the exact match, never above it. Measured on the MOL-10 corpus: the right item first in 20 of 20, junk queries
+  find nothing. The correct extra word is still lost (4 against a budget of 2) — chosen
+  knowingly, and pinned by a test. The distance is exact `levenshtein` on words cut to 255
+  characters: past that it raises an error, and `levenshtein_less_equal` is no substitute,
+  because its capped answer distorts the mean. Limits left to MOL-14 on purpose: the budget is
+  absolute, so a short wrong word passes where a long right one does not — «молоко ашхар
+  кефир» finds the milk, and «кока кола 0,5 л» even finds «Вода Джермук 0.5 л», every word
+  wrong by two; the two thresholds disagree — «ыср» is two edits from «сыр» yet shares no
+  trigram with it, so it never becomes a candidate; and a name of punctuation only («???»)
+  has a key but no query reaches it. A name without a size ranks level with a wrong size —
+  unknown is not worse than wrong, which is likely right.
+- **Every candidate is ranked; there is no ceiling.** Any cut before ranking is wrong one
+  way or another. By similarity it drops the typo the low threshold exists for — «малако»
+  scores 0.429 against any «Малина» and 0.167 against the milk, and two hundred raspberries
+  pushed it out. Unordered it drops by row age, that is the newest items, the ones «Предложить
+  товар» just added. `order by id` is worse still: the planner walks the primary key and
+  filters every row. The cost is bounded by the catalogue and by taking at most twelve words
+  of a query: a two-letter query over 20 000 names answers in about 370 ms.
 - **What the user picked is remembered.** A query and the item chosen after it are stored
   and boost that pairing next time. No model, no image change, and it compounds from the
   first day — it is also the labelled set anything smarter would later need.
 
-Thresholds (`word_similarity` > 0.3, accept edit distance <= 2) are a first estimate from
-twenty names. They must be retuned on a real catalogue.
+Thresholds (`word_similarity` > 0.15, accept edit distance <= 2) are a first estimate — the
+distance from twenty names, the candidate threshold from five thousand synthetic rows. They must be
+retuned on a real catalogue (MOL-14).
 
 **Embeddings are a 0.2 question, not a 0.1 one.** They answer what trigrams cannot —
 «молочка» reaching kefir and curd, and the duplicate merging the canonical catalogue needs.
