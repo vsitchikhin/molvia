@@ -49,6 +49,20 @@ const MAX_QUERY_WORDS = 12
 
 const HAS_CONTENT = /[\p{L}\p{N}]/u
 
+/**
+ * A query as the search compares it — and as a remembered pick stores it. One function for
+ * both, or a pick would be written under one key and looked up under another: the thirteenth
+ * word would be kept on write and cut on read, and the pair would never match itself.
+ *
+ * `null` means nothing to look for. Not only the empty key: for punctuation `toSearchKey`
+ * falls back to the punctuation itself, which has no trigrams and no words.
+ */
+export function searchQueryKey(query: string): string | null {
+  // The same function the name went through on write: the key is compared with itself.
+  const key = toSearchKey(query).split(' ').slice(0, MAX_QUERY_WORDS).join(' ')
+  return HAS_CONTENT.test(key) ? key : null
+}
+
 type ItemRow = typeof items.$inferSelect
 
 /**
@@ -252,11 +266,8 @@ export function createItemRepository(db: Conn): ItemRepository {
     byIds: load,
 
     async search(query, limit) {
-      // The same function the name went through on write: the key is compared with itself.
-      const key = toSearchKey(query).split(' ').slice(0, MAX_QUERY_WORDS).join(' ')
-      // Not only the empty key: for punctuation `toSearchKey` falls back to the punctuation
-      // itself, which has no trigrams and no words — nothing to look for, so no round trip.
-      if (!HAS_CONTENT.test(key)) return []
+      const key = searchQueryKey(query)
+      if (key === null) return []
 
       const ids = await db.transaction(async (tx) => {
         /*
