@@ -478,6 +478,12 @@ export const verdicts = pgTable(
 )
 
 /**
+ * How long a remembered query may be, in octets. One number for the column, its CHECK and the
+ * repository that decides a query is not worth remembering — three places that would drift.
+ */
+export const QUERY_KEY_MAX_OCTETS = 600
+
+/**
  * A query and the item chosen after it, so the pair comes up first next time. No domain
  * type: it never crosses the wire and takes part in no rule — it is server-side ranking
  * machinery, and the labelled set anything smarter would later need.
@@ -495,7 +501,7 @@ export const searchPicks = pgTable(
     // 600, not 800 like `items.search_key`: the primary key is a btree row and stops at
     // 2704 bytes. The column now says what it actually takes; the CHECK below stays for the
     // alphabets `toSearchKey` keeps as they are, where one character is four octets.
-    queryKey: varchar('query_key', { length: 600 }).notNull(),
+    queryKey: varchar('query_key', { length: QUERY_KEY_MAX_OCTETS }).notNull(),
     itemId: uuid('item_id')
       .notNull()
       .references(() => items.id),
@@ -509,6 +515,9 @@ export const searchPicks = pgTable(
     // points would overflow it with `54000`, an error about index internals rather than
     // about the query. The cap makes the refusal say what it is — and MOL-11, which writes
     // here, is the one that decides how long a query is worth remembering.
-    check('search_picks_query_key_indexable', sql`octet_length(${table.queryKey}) <= 600`),
+    check(
+      'search_picks_query_key_indexable',
+      sql`octet_length(${table.queryKey}) <= ${sql.raw(String(QUERY_KEY_MAX_OCTETS))}`,
+    ),
   ],
 )

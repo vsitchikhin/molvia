@@ -7,7 +7,7 @@ import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit, theRow } from './rows'
-import { itemBarcodes, items } from './schema'
+import { itemBarcodes, items, searchPicks } from './schema'
 
 export interface ItemRepository {
   /** `createdBy` is null for a seeded item — it belongs to nobody. */
@@ -15,10 +15,12 @@ export interface ItemRepository {
   byId(id: string): Promise<Item | null>
   byIds(ids: readonly string[]): Promise<Item[]>
   /**
-   * The catalogue lookup behind «что взяли?». No owner in the signature on purpose: the
-   * catalogue is shared by everyone, so this is the one listing of 0.1 without an `actorId`.
+   * The catalogue lookup behind «что взяли?». The catalogue is shared by everyone, so the
+   * owner filters nothing: it only chooses whose remembered picks take part in the order.
+   * Required rather than optional — a forgotten argument would switch the lift off silently,
+   * and no test of the results would notice.
    */
-  search(query: string, limit: number): Promise<Item[]>
+  search(query: string, limit: number, actorId: string): Promise<Item[]>
 }
 
 /**
@@ -49,6 +51,30 @@ const MAX_QUERY_WORDS = 12
 
 const HAS_CONTENT = /[\p{L}\p{N}]/u
 
+/**
+ * A remembered query counts as the one being typed when every word but the last is equal and
+ * one last word is the start of the other — the screen searches while the person types, so
+ * the pick was made on «мол» and the next search may fire on «моло» — and the word being
+ * typed is still the start of a word of the item taken. Below this many characters the
+ * shorter one has to match exactly: «мо» starts half the catalogue. The same three MOL-10
+ * holds the last word to an exact start; MOL-14 retunes both.
+ */
+const REMEMBERED_PREFIX = 3
+
+/**
+ * A query as the search compares it — and as a remembered pick stores it. One function for
+ * both, or a pick would be written under one key and looked up under another: the thirteenth
+ * word would be kept on write and cut on read, and the pair would never match itself.
+ *
+ * `null` means nothing to look for. Not only the empty key: for punctuation `toSearchKey`
+ * falls back to the punctuation itself, which has no trigrams and no words.
+ */
+export function searchQueryKey(query: string): string | null {
+  // The same function the name went through on write: the key is compared with itself.
+  const key = toSearchKey(query).split(' ').slice(0, MAX_QUERY_WORDS).join(' ')
+  return HAS_CONTENT.test(key) ? key : null
+}
+
 type ItemRow = typeof items.$inferSelect
 
 /**
@@ -74,7 +100,7 @@ function toItem(row: ItemRow, barcodes: readonly string[]): Item {
  * The ranking query, apart from the method so the test that reads its plan runs this very
  * statement and not a copy that could drift from it.
  */
-export function rankedCandidates(key: string, limit: number): SQL {
+export function rankedCandidates(key: string, limit: number, actorId: string | null): SQL {
   return sql`
     with query_words as (
       -- Cut to 255 here, once: levenshtein refuses longer arguments, and the prefix arm below
@@ -147,13 +173,54 @@ export function rankedCandidates(key: string, limit: number): SQL {
       from candidates c
       join per_word pw on pw.id = c.id
       group by c.id, c.ws, c.search_key
+    ),
+    remembered as (
+      -- The owner's own picks for this query, folded per item. Personal on purpose: a sum
+      -- across owners would be popularity in the results, which nobody could tell apart
+      -- from a paid placement. A null owner — a malformed identifier — matches no row.
+      select sp.item_id,
+             max(sp.last_picked_at) as last_picked_at,
+             sum(sp.picks) as picks
+      from ${searchPicks} sp
+      join ${items} i on i.id = sp.item_id
+      cross join lateral (
+        select string_to_array(sp.query_key, ' ') as s,
+               string_to_array(${key}, ' ') as q
+      ) k
+      where sp.actor_id = ${actorId}
+        and cardinality(k.s) = cardinality(k.q)
+        and k.s[1 : cardinality(k.s) - 1] = k.q[1 : cardinality(k.q) - 1]
+        and (sp.query_key = ${key}
+             or least(length(k.s[cardinality(k.s)]), length(k.q[cardinality(k.q)]))
+                  >= ${REMEMBERED_PREFIX}
+                and (starts_with(k.s[cardinality(k.s)], k.q[cardinality(k.q)])
+                     or starts_with(k.q[cardinality(k.q)], k.s[cardinality(k.s)]))
+                -- And what is being typed still leads to the item that was taken: its last
+                -- word is the start of a word of that name. Without this a pick made on
+                -- «мол» for milk stood above «Молоток» typed in full, and one made on the
+                -- finished «сыр» above «Сырок» — another word, not the same query.
+                and exists (
+                  select 1
+                  from unnest(string_to_array(i.search_key, ' ')) as w(word)
+                  where starts_with(w.word, k.q[cardinality(k.q)])
+                ))
+      group by sp.item_id
     )
-    select id
-    from ranked
-    where distance <= ${ACCEPTED_DISTANCE}
-    -- Ties stay ties («moloko» names «Ашхар» and «Марианна» alike); \`id\` only keeps two
-    -- loads of one screen in one order. MOL-11 lifts a remembered pick before \`ws\`.
-    order by distance, ws desc, id
+    select r.id
+    from ranked r
+    left join remembered m on m.item_id = r.id
+    -- The filter stays on the distance alone: a pick lifts what the search found and never
+    -- lets in what it did not, or memory would become a second search with rules of its own.
+    where r.distance <= ${ACCEPTED_DISTANCE}
+    -- What the person took before comes first, above a closer spelling — their own choice
+    -- says more than a typo metric does. Among several, the latest wins: after switching
+    -- brands the new one is on top from the first trip. Then the order of MOL-10, where ties
+    -- stay ties («moloko» names «Ашхар» and «Марианна» alike) and \`id\` only keeps two loads
+    -- of one screen in one order.
+    order by m.item_id is null,
+             m.last_picked_at desc nulls last,
+             m.picks desc nulls last,
+             r.distance, r.ws desc, r.id
     limit ${limit}
   `
 }
@@ -251,12 +318,9 @@ export function createItemRepository(db: Conn): ItemRepository {
 
     byIds: load,
 
-    async search(query, limit) {
-      // The same function the name went through on write: the key is compared with itself.
-      const key = toSearchKey(query).split(' ').slice(0, MAX_QUERY_WORDS).join(' ')
-      // Not only the empty key: for punctuation `toSearchKey` falls back to the punctuation
-      // itself, which has no trigrams and no words — nothing to look for, so no round trip.
-      if (!HAS_CONTENT.test(key)) return []
+    async search(query, limit, actorId) {
+      const key = searchQueryKey(query)
+      if (key === null) return []
 
       const ids = await db.transaction(async (tx) => {
         /*
@@ -276,7 +340,9 @@ export function createItemRepository(db: Conn): ItemRepository {
           sql`select set_config('pg_trgm.word_similarity_threshold', ${String(CANDIDATE_THRESHOLD)}, true)`,
         )
 
-        const rows = await tx.execute<{ id: string }>(rankedCandidates(key, rowLimit(limit)))
+        const rows = await tx.execute<{ id: string }>(
+          rankedCandidates(key, rowLimit(limit), idOrNull(actorId)),
+        )
 
         await tx.execute(
           sql`select set_config('pg_trgm.word_similarity_threshold', ${previous?.threshold ?? '0.6'}, true)`,

@@ -142,7 +142,7 @@ Measured, not assumed — the numbers below come from a probe against a real dat
 - **Transliteration happens in `packages/model`, not in Postgres.** `unaccent` strips
   diacritics; it does **not** turn Cyrillic into Latin, so `moloko` scores exactly 0.000
   against `молоко`. Items carry a `search_key`: the whole name normalised to Latin by a
-  pure function in the domain. Against that column the same query scores 0.500.
+  pure function in the domain — Latin plus one letter, `ц`, for the reason below. Against that column the same query scores 0.500.
   A custom `unaccent` rules file inside Postgres would buy only this half and cost us
   ownership of the database image — CI can pull a service image but cannot build one.
 - **The alphabet folds the forks rather than preserving them.** A transliteration fork is
@@ -154,13 +154,23 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   (`jem` against `dzhem` is 3, `Grand Candy` against «Гранд Кенди» is 3), with it none do,
   at a cost of 0.26 extra candidates per query. Folding harder than that — collapsing `ч`
   with `ц`, `ш` with `щ` — wins no query and loses the distinction, so it was rejected.
-  One fork stays open on purpose: `к`/`c`, where «Кока-кола» against `Coca-Cola` spends the
-  whole budget of 2. `c` is already the target for `ц`, so folding it to `k` would turn
-  «цена» into `kena`. That pair is what the remembered pick exists for. The fold also fires
-  on what the alphabet itself produced, not only on Latin someone typed — `тс` becomes `ts`
-  becomes `c` — which is what makes «счёт» and «щёт» one key, and also what merges
-  «Советский» into `soveki` and «Ицхак» with «Ичак». A false merge costs a candidate, a miss
-  costs the answer; the trade is deliberate, and it is a trade.
+  **The `к`/`c` fork is closed by position (MOL-11).** Latin `c` is two letters: soft before
+  `e`, `i` and the diphthong `ae` — that is `ц` (`cena`, `Caesar`) — and `k` everywhere else
+  (`Coca-Cola`, `Picnic`); `ch` is `ч` and is left alone. So `ц` is a letter of its own in the
+  key: `ц`, `ծ`, `ց`, `ts` and a soft `c` all become `ц`, a hard `c` becomes `k`, and doubling
+  collapses before the decision. «Кока-кола» and `Coca-Cola` are one key where they were 2
+  apart, and «кока» finds Coca-Cola before «кола» is typed — before, it was not even a
+  candidate; memory could not have closed this. **Only Latin `c` is decided by the next
+  letter, never `ц`:** the first version hardened every `c`, and a case ending or the next
+  keystroke flipped `ц` — «куриц» stopped being the start of «курицы», «огурцов» fell out of
+  the budget. The price of the rule is a Russian word typed with `c` for `ц` in a hard
+  position: `otec` and `cukaty` cost an edit, `jajca` left the corpus (45 of 46); `ts`
+  spellings are untouched. A Latin word cut right after a `c` — «Nutric» on the way to
+  «Nutricia» — is not the start of the finished one; narrow, left to MOL-14. The fold also
+  fires on what the alphabet itself produced, not only on Latin someone typed — `тс` becomes
+  `ts` becomes `ц` — which is what makes «счёт» and «щёт» one key, and also what reads the
+  `тс` of «Советский» as `ц`. A false merge costs a candidate, a miss costs the answer; the
+  trade is deliberate, and it is a trade.
 - **Armenian is in the table, not passed through.** The first market is Gyumri and Yerevan,
   so an Armenian label is the norm on the shelf. With the table «Գյումրի», «Гюмри» and
   `Gyumri` all become `giumri`, and an Armenian name is reachable from all three keyboards;
@@ -170,9 +180,11 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   `տ`/`թ`) are collapsed deliberately — the same trade as `ш`/`щ`. A letter no table knows
   keeps itself: dropping it would produce an empty key, and `visibleLine` refuses that, so
   the item would become unbuildable inside the server.
-- **The tables are frozen, and changing one is a migration.** The key is stored, so an edit
-  after the first row is written makes every accumulated key foreign — silently, with no
-  error and no log line. Same standing as `MINOR_EXPONENT`. Retuning the thresholds is a
+- **The tables are frozen, and changing one is a migration.** So are the rules that fold and
+  decide `c`. The key is stored, so an edit after the first row is written makes every
+  accumulated key foreign — silently, with no error and no log line. MOL-11 changed the
+  alphabet without one only because no key was stored yet — no production, no real catalogue
+  in any copy. Same standing as `MINOR_EXPONENT`. Retuning the thresholds is a
   different thing and does not touch the alphabet.
 - **Candidates come from `word_similarity`, never `similarity`.** `similarity` compares
   whole strings, so a long name dilutes the match: «малако» scored 0.158 against
@@ -228,9 +240,22 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   товар» just added. `order by id` is worse still: the planner walks the primary key and
   filters every row. The cost is bounded by the catalogue and by taking at most twelve words
   of a query: a two-letter query over 20 000 names answers in about 370 ms.
-- **What the user picked is remembered.** A query and the item chosen after it are stored
-  and boost that pairing next time. No model, no image change, and it compounds from the
-  first day — it is also the labelled set anything smarter would later need.
+- **What the user picked is remembered.** A query and the item that went into a trip after
+  it are stored under the query's search key, and next time that item comes first. No model,
+  no image change, and it compounds from the first day — it is also the labelled set anything
+  smarter would later need. Four rules hold it (MOL-11). **Personal:** only the asker's own
+  picks count; a sum across people would be popularity in the results, indistinguishable from
+  the paid placement forbidden below. **Above distance, but only among what was found:** a
+  pick outranks a closer spelling and never lets in what the search did not accept.
+  **The same query** means every word but the last equal, one last word the start of the
+  other from three characters, and the word being typed still the start of a word of the item
+  taken — the screen searches while typing, so the pick was made on «мол» and the next search
+  may fire on «моло», but «молоток» typed in full is another word and lifts nothing.
+  **Latest first**, then most frequent, summed over the keys that match. Memory belongs to
+  the query: a new brand taken on «молоко» is on top of «молоко» from the next trip, but one
+  found and taken by its own name («марианна») does not move «молоко» at all. It is written when the item is
+  added to a trip, not on a tap — a tap the sheet cancels is a changed mind. It never forgets;
+  if a stale pick starts to hurt, decay is a task with a number, not a guess.
 
 Thresholds (`word_similarity` > 0.15, accept edit distance <= 2) are a first estimate — the
 distance from twenty names, the candidate threshold from five thousand synthetic rows. They must be
