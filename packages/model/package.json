@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing/search-corpus": "./tests/support/search-corpus.ts"
   },
   "types": "./src/index.ts",
   "dependencies": {
