@@ -21,9 +21,27 @@ describe('nameIdentity', () => {
     }
   })
 
-  it('reads an Armenian label in capitals as the same name', () => {
-    // «և» has no capital: «ԵՎ» lowercases to «եվ», so the two have to meet explicitly.
-    expect(nameIdentity('ՊԱՆԻՐ ԵՐԵՎԱՆ')).toBe(nameIdentity('Պանիր Երևան'))
+  it('reads an Armenian label in capitals as the same name, whichever capital it uses', () => {
+    // «և» has no capital of its own: `toUpperCase` writes «ԵՒ», a label may write «ԵՎ».
+    const name = nameIdentity('Պանիր Երևան')
+    expect(nameIdentity('ՊԱՆԻՐ ԵՐԵՎԱՆ')).toBe(name)
+    expect(nameIdentity('ՊԱՆԻՐ ԵՐԵՒԱՆ')).toBe(name)
+    expect(nameIdentity('Պանիր Երևան'.toUpperCase())).toBe(name)
+  })
+
+  it('reads «և», «եւ» and «եվ» as one spelling (the owner, MOL-12)', () => {
+    expect(nameIdentity('Պանիր Երեւան')).toBe(nameIdentity('Պանիր Երևան'))
+    expect(nameIdentity('Պանիր Երեվան')).toBe(nameIdentity('Պանիր Երևան'))
+    expect(nameIdentity('Սև սուրճ')).toBe(nameIdentity('ՍԵՒ ՍՈՒՐՃ'))
+  })
+
+  it('must not fold a lone «ւ»: «ու» is a letter of its own', () => {
+    expect(nameIdentity('Թթու')).not.toBe(nameIdentity('Թթով'))
+  })
+
+  it('composes a letter and its mark even with an invisible character between them', () => {
+    // A decomposed «й» from a macOS clipboard, with a zero-width space from a web page.
+    expect(nameIdentity('И\u200b\u0306огурт')).toBe(nameIdentity('Йогурт'))
   })
 
   it('must not merge what only the search key folds together', () => {
@@ -54,6 +72,8 @@ describe('the same identity is always the same key', () => {
     'Հաց Կաթ',
     'Coca-Cola',
     'Йогурт',
+    'Սև սուրճ',
+    'Թթու դրած',
     'Café',
     'M&M’s',
     'ㅤ!',
@@ -71,6 +91,8 @@ describe('the same identity is always the same key', () => {
       name.replaceAll('և', 'ԵՎ'),
     ]
     for (const mark of hidden) {
+      // Between a letter and its combining mark — composing only after dropping it holds this.
+      out.push(name.normalize('NFD').replace(/(\p{L})(\p{M})/u, `$1${mark}$2`))
       out.push(
         name.replace(' ', `${mark} `),
         `${name.slice(0, 2)}${mark}${name.slice(2)}`,
@@ -88,6 +110,15 @@ describe('the same identity is always the same key', () => {
         if (nameIdentity(variant) !== nameIdentity(name)) continue
         expect(toSearchKey(variant), `${JSON.stringify(variant)} ~ ${name}`).toBe(toSearchKey(name))
       }
+    }
+  })
+
+  it('never lets case change the identity — the direction the check above cannot see', () => {
+    // The check above skips a variant whose identity differs, so a case form that silently
+    // became another name would pass it. «ԵՐԵՒԱՆ» from `toUpperCase` did exactly that.
+    for (const name of names) {
+      expect(nameIdentity(name.toUpperCase()), name).toBe(nameIdentity(name))
+      expect(nameIdentity(name.toLowerCase()), name).toBe(nameIdentity(name))
     }
   })
 
