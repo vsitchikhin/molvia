@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { ZodError } from 'zod'
-import { ERROR, ISSUE, newExpenseSchema } from '@molvia/model'
+import { DomainError, ERROR, ISSUE, newExpenseSchema } from '@molvia/model'
 import { parseBody } from '@/routes/body'
 import { buildServer } from '@/server'
 
@@ -70,5 +70,20 @@ describe('a body that did not parse', () => {
 
     expect(response.statusCode).toBe(500)
     expect(JSON.parse(response.body)).toEqual({ code: ERROR.INTERNAL })
+  })
+})
+
+describe('a conflict with another row', () => {
+  it('answers 409: the request is well formed, something else already holds what it claims', async () => {
+    const app = buildServer()
+    app.get('/probe', () => {
+      throw new DomainError(ERROR.CONFLICT)
+    })
+    await app.ready()
+    const response = await app.inject({ method: 'GET', url: '/probe' })
+    await app.close()
+
+    expect(response.statusCode).toBe(409)
+    expect(JSON.parse(response.body)).toEqual({ code: ERROR.CONFLICT })
   })
 })

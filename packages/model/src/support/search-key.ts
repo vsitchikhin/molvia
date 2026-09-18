@@ -289,3 +289,36 @@ export const SEARCH_KEY_TABLES = Object.freeze({
   latinFolds: LATIN_FOLDS,
   armenianDigraphs: ARMENIAN_DIGRAPHS,
 })
+
+/**
+ * What makes two names the same item when one is proposed: case, spacing and what cannot be
+ * seen aside, nothing else. Deliberately narrower than `toSearchKey`, which folds scripts,
+ * forks and punctuation so that a search finds more — «Milo» and «Мыло» share a key, and a
+ * false merge that costs the search a candidate would cost «Предложить товар» the item itself.
+ * «3.2%» and «3,2%» stay two names here; merging what is merely similar is 0.2's.
+ *
+ * **Two names with the same identity always have the same key**, and `createUnlessNamed`
+ * rests on it: it locks and looks up by key, then compares identities. So this is built from
+ * the key's own first steps rather than beside them — the same lowercasing, the same set of
+ * invisible characters dropped rather than read as a space (a byte-order mark inside a name
+ * glues its words in the key, and has to glue them here too), dropped *before* composing, so
+ * that a letter and its mark with an invisible character between them still compose into one.
+ *
+ * Armenian «և», «եւ» and «եվ» are one name (the owner, MOL-12): three spellings of one sound,
+ * and «և» has no capital of its own — `toUpperCase` writes «ԵՒ», a label may write «ԵՎ», and
+ * «Երեւան» is common beside «Երևան». Only the pair «եւ» folds, never a lone «ւ», which would
+ * break «ու». The key already gives all three `ev`.
+ *
+ * Two property tests hold this: one identity is always one key, and case never changes the
+ * identity. A change to either function has to keep both green.
+ */
+export function nameIdentity(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(IGNORABLE, '')
+    .normalize('NFC')
+    .replaceAll('և', 'եվ')
+    .replaceAll('եւ', 'եվ')
+    .replace(WHITESPACE, ' ')
+    .trim()
+}

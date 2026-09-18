@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
-import { itemSchema, toSearchKey } from '@molvia/model'
+import { itemSchema, nameIdentity, toSearchKey } from '@molvia/model'
 import type { Item, NewItem } from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
@@ -14,6 +14,17 @@ export interface ItemRepository {
   create(input: NewItem, createdBy: string | null): Promise<Item>
   byId(id: string): Promise<Item | null>
   byIds(ids: readonly string[]): Promise<Item[]>
+  /**
+   * «Предложить товар»: the item of this kind with the same name (`nameIdentity` — case and
+   * spacing aside), or a new one. Check and insert happen under one lock per name, so a double
+   * tap — two requests at once — cannot put a second «Сыр чанах» beside the first.
+   *
+   * By the name, not by the search key: the key folds on purpose, and a false merge that costs
+   * the search a candidate would cost this path the item itself — «Milo» would be answered
+   * with the «Мыло» already there, and could never be added. Merging what is merely similar
+   * is 0.2's.
+   */
+  createUnlessNamed(input: NewItem, createdBy: string): Promise<{ item: Item; created: boolean }>
   /**
    * The catalogue lookup behind «что взяли?». The catalogue is shared by everyone, so the
    * owner filters nothing: it only chooses whose remembered picks take part in the order.
@@ -227,7 +238,7 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
 
 export function createItemRepository(db: Conn): ItemRepository {
   /** One query for the items and one for every barcode of them — never one per item. */
-  async function load(ids: readonly string[]): Promise<Item[]> {
+  async function load(ids: readonly string[], conn: Conn = db): Promise<Item[]> {
     // A malformed identifier matches nothing and would meet `22P02` — a 500 where «nothing
     // found» is the honest answer — so it is dropped before the query rather than sent.
     const known = ids.map(idOrNull).filter((id): id is string => id !== null)
@@ -235,14 +246,14 @@ export function createItemRepository(db: Conn): ItemRepository {
 
     // Ordered by id rather than left to the planner: a read whose order depends on the
     // physical layout is a test that passes until it does not.
-    const rows = await db
+    const rows = await conn
       .select()
       .from(items)
       .where(inArray(items.id, known))
       .orderBy(asc(items.id))
     if (rows.length === 0) return []
 
-    const codes = await db
+    const codes = await conn
       .select()
       .from(itemBarcodes)
       .where(
@@ -263,39 +274,37 @@ export function createItemRepository(db: Conn): ItemRepository {
     return rows.map((row) => toItem(row, byItem.get(row.id) ?? []))
   }
 
-  return {
-    async create(input, createdBy) {
-      const typical = quantityTo(input.typicalQuantity)
+  /** The one insert of an item, inside the caller's transaction. */
+  async function insert(tx: Conn, input: NewItem, createdBy: string | null): Promise<Item> {
+    const typical = quantityTo(input.typicalQuantity)
+    const id = randomUUID()
+    const [row] = await tx
+      .insert(items)
+      .values({
+        id,
+        kind: input.kind,
+        ...nameColumns(input.name),
+        note: input.note ?? null,
+        defaultUnit: input.defaultUnit,
+        typicalQtyMilli: typical.milli,
+        typicalQtyUnit: typical.unit,
+        createdBy,
+      })
+      .returning()
 
+    if (input.barcodes.length > 0) {
+      await tx.insert(itemBarcodes).values(input.barcodes.map((code) => ({ code, itemId: id })))
+    }
+
+    // Sorted the way a later read returns them, so create and read agree.
+    return toItem(theRow(row, 'items'), [...input.barcodes].sort())
+  }
+
+  return {
+    create(input, createdBy) {
       // Both tables or neither: an item whose barcodes failed to land is an item nobody can
       // scan, and it would look exactly like one that never had any.
-      return translateFailures(async () =>
-        db.transaction(async (tx) => {
-          const id = randomUUID()
-          const [row] = await tx
-            .insert(items)
-            .values({
-              id,
-              kind: input.kind,
-              ...nameColumns(input.name),
-              note: input.note ?? null,
-              defaultUnit: input.defaultUnit,
-              typicalQtyMilli: typical.milli,
-              typicalQtyUnit: typical.unit,
-              createdBy,
-            })
-            .returning()
-
-          if (input.barcodes.length > 0) {
-            await tx
-              .insert(itemBarcodes)
-              .values(input.barcodes.map((code) => ({ code, itemId: id })))
-          }
-
-          // Sorted the way a later read returns them, so create and read agree.
-          return toItem(theRow(row, 'items'), [...input.barcodes].sort())
-        }),
-      )
+      return translateFailures(async () => db.transaction((tx) => insert(tx, input, createdBy)))
     },
 
     async byId(id) {
@@ -318,6 +327,35 @@ export function createItemRepository(db: Conn): ItemRepository {
 
     byIds: load,
 
+    createUnlessNamed(input, createdBy) {
+      const key = toSearchKey(input.name)
+      const wanted = nameIdentity(input.name)
+
+      return translateFailures(async () =>
+        db.transaction(async (tx) => {
+          // Per kind and key rather than per name: every name that is the same by
+          // `nameIdentity` has the same key — built so, and held by a property test — so they
+          // all meet at this lock, and the lookup below is an equality the GIN index serves.
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext('items'), hashtext(${`${input.kind} ${key}`}))`,
+          )
+          const rows = await tx
+            .select({ id: items.id, name: items.name })
+            .from(items)
+            .where(and(eq(items.kind, input.kind), eq(items.searchKey, key)))
+            .orderBy(asc(items.createdAt), asc(items.id))
+
+          const same = rows.find((row) => nameIdentity(row.name) === wanted)
+          if (same) {
+            const [item] = await load([same.id], tx)
+            if (item) return { item, created: false }
+          }
+
+          return { item: await insert(tx, input, createdBy), created: true }
+        }),
+      )
+    },
+
     async search(query, limit, actorId) {
       const key = searchQueryKey(query)
       if (key === null) return []
@@ -332,9 +370,16 @@ export function createItemRepository(db: Conn): ItemRepository {
          * Local to the *transaction*, though, not to this block: handed a caller's
          * transaction, `db.transaction` is a savepoint, and the setting would outlive it and
          * change the caller's own `%>`. So the previous value is read first and put back.
+         *
+         * Read with `missing_ok`: the setting exists in a session only once the pg_trgm
+         * library is loaded there — by the first trigram operator, not by CREATE EXTENSION in
+         * another session. On a fresh pooled connection the plain read raised, and every
+         * search answered 500 until an insert happened to touch the index (MOL-12). A value
+         * set before the library loads is a placeholder the library adopts, so the local
+         * threshold still holds for the query below, and 0.6 — its default — is put back.
          */
-        const [previous] = await tx.execute<{ threshold: string }>(
-          sql`select current_setting('pg_trgm.word_similarity_threshold') as threshold`,
+        const [previous] = await tx.execute<{ threshold: string | null }>(
+          sql`select current_setting('pg_trgm.word_similarity_threshold', true) as threshold`,
         )
         await tx.execute(
           sql`select set_config('pg_trgm.word_similarity_threshold', ${String(CANDIDATE_THRESHOLD)}, true)`,

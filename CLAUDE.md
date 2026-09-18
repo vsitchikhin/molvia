@@ -60,12 +60,26 @@ verdicts, not an event — anything a domain table already knows must never be d
 into the log. Nothing updates or deletes from it, the gate queries are its only readers,
 and each is pinned by an integration test, boundary days included.
 
-**The log has no writer yet, and that is deliberate.** MOL-8 was going to record
-`session_started` on the first visit, and the promise was withdrawn when it was examined:
-written once, its timestamp is `actors.created_at` and the row duplicates what a domain
-table already knows — the very thing the rule above forbids; written on every launch, it
-answers a question no threshold asks, since 0.2 is counted over verdicts and 0.3 over
-`catalogue_viewed`. The first writer is MOL-12, with the event the gate actually reads.
+**The first writer is the catalogue search, once a day per owner (MOL-12).** MOL-8 was going
+to record `session_started` on the first visit, and the promise was withdrawn when it was
+examined: written once, its timestamp is `actors.created_at` and the row duplicates what a
+domain table already knows — the very thing the rule above forbids; written on every launch,
+it answers a question no threshold asks, since 0.2 is counted over verdicts and 0.3 over
+`catalogue_viewed`. MOL-12 writes that one: every search that parses records
+`catalogue_viewed` with `subject: product`, after the search has answered, at most once per
+owner and payload in each **day of the person's own life** — days counted from their first
+event, as the gate counts its weeks, and both in hours rather than calendar days, so a
+`timezone` set on the database later cannot pull them apart. Not a rolling 24 hours from the
+last row: that window slid over the week line and swallowed a visit early in week four.
+Overlapping searches are serialised by an advisory lock per actor, and a failure to record is
+not swallowed, because a lost row lowers the gate with nothing to backfill from.
+
+**This measures entering, not reading, and that was chosen knowingly.** In 0.1 and 0.2 a
+search is a purchase being entered; the plan hides other people's data until 0.3 precisely so
+that «came to write» and «came to read» stay apart. The owner took the event from the search
+anyway, with that price in view. So **when the screens of 0.3 show other people's data, who
+writes `catalogue_viewed` has to be decided again** — left as it is, the 0.3 gate counts
+someone who only logs purchases as someone who came back for other people's ratings.
 
 One consequence of MOL-6 is open and worth knowing before it is met: the log points at
 `actors` with a real foreign key, so an actor that has events cannot be deleted. When
@@ -170,7 +184,11 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   fires on what the alphabet itself produced, not only on Latin someone typed — `тс` becomes
   `ts` becomes `ц` — which is what makes «счёт» and «щёт» one key, and also what reads the
   `тс` of «Советский» as `ц`. A false merge costs a candidate, a miss costs the answer; the
-  trade is deliberate, and it is a trade.
+  trade is deliberate, and it is a trade. **That is why the key is never an identity:**
+  «Предложить товар» decides a duplicate by `nameIdentity` — case, spacing, invisible
+  characters and the three Armenian spellings «և» / «եւ» / «եվ» only — because there a false
+  merge costs the item itself: «Milo» would be answered with «Мыло» (MOL-12). The identity is built from the key's own first steps, and a
+  property test holds that one identity is always one key: the lookup is by key.
 - **Armenian is in the table, not passed through.** The first market is Gyumri and Yerevan,
   so an Armenian label is the norm on the shelf. With the table «Գյումրի», «Гюмри» and
   `Gyumri` all become `giumri`, and an Armenian name is reachable from all three keyboards;
@@ -636,9 +654,10 @@ Migrations that lose data, swapping a stack element, CI changes, refactoring out
 **Scaffolded, the domain model is in, and the schema is under it** — MOL-4: seven entities,
 eight write inputs and three rules in `packages/model`, with the wire codecs that money and
 quantity need to cross it at all. MOL-5 added the search key; MOL-6 the nine tables of 0.1,
-the GIN index over `search_key` and the constraints that hold the product's key. No route or
-screen yet. Release 0.1 is broken into epics and tasks in Jira. What exists, what is decided
-and what is still open — `docs/onboarding.md`.
+the GIN index over `search_key` and the constraints that hold the product's key. MOL-8 gave
+the device an identity and the API its first routes; MOL-12 opened the catalogue — search
+and «Предложить товар». No screen yet. Release 0.1 is broken into epics and tasks in Jira.
+What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 **What the database guarantees and what it leaves to the domain** is a line, not a habit:
 the schema refuses what makes a row unreadable or breaks the product's core — a currency

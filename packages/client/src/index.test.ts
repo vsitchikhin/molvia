@@ -284,3 +284,114 @@ describe('the first visit', () => {
     expect(await codeOf(client.me())).toBe(ISSUE.RESPONSE_INVALID)
   })
 })
+
+describe('the catalogue', () => {
+  const entryWire = {
+    id: '0b6f2c4e-8d1a-4f3b-9c7e-5a2d1e0f3b4c',
+    kind: 'product',
+    name: 'Молоко «Ашхар»',
+    note: 'пастеризованное',
+    defaultUnit: 'l',
+    typicalQuantity: { value: '0.900', unit: 'l' },
+  }
+
+  function clientReplying(status: number, body: unknown) {
+    const calls: { url: string; method: string; headers: Headers; body: unknown }[] = []
+    const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      calls.push({
+        url: input instanceof URL ? input.href : typeof input === 'string' ? input : input.url,
+        method: init?.method ?? 'GET',
+        headers: new Headers(init?.headers),
+        body: typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined,
+      })
+      return Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    }
+    const client = createClient({ baseUrl: 'http://api', fetch, actorId: () => actorWire.id })
+    return { client, calls }
+  }
+
+  it('sends the query exactly as typed, whatever it holds', async () => {
+    for (const text of ['молоко', 'Հաց', 'M&M’s', 'соль #2', 'a+b', '100%', '  с пробелами ']) {
+      const { client, calls } = clientReplying(200, { items: [] })
+      await client.searchCatalogue(text)
+
+      expect(new URL(calls[0]?.url ?? '').searchParams.get('q'), text).toBe(text)
+      expect(new URL(calls[0]?.url ?? '').pathname).toBe('/catalogue/search')
+    }
+  })
+
+  it('hands back entries with the quantity decoded', async () => {
+    const { client } = clientReplying(200, { items: [entryWire] })
+
+    const [entry] = await client.searchCatalogue('молоко')
+
+    expect(entry?.typicalQuantity).toEqual({ milli: 900n, unit: 'l' })
+  })
+
+  it('refuses an answer that carries more than the contract — a leak must not pass unread', async () => {
+    const leaking = { ...entryWire, createdBy: actorWire.id }
+    const { client } = clientReplying(200, { items: [leaking] })
+
+    expect(await codeOf(client.searchCatalogue('молоко'))).toBe(ISSUE.RESPONSE_INVALID)
+  })
+
+  it('reads a dead identity from the body, as every other call does', async () => {
+    const { client } = clientReplying(401, { code: ERROR.NO_ACTOR })
+
+    expect(await codeOf(client.searchCatalogue('молоко'))).toBe(ERROR.NO_ACTOR)
+  })
+
+  it('proposes an item as JSON, with the quantity on the wire as a decimal string', async () => {
+    const { client, calls } = clientReplying(201, entryWire)
+
+    const result = await client.proposeItem({
+      kind: 'product',
+      name: 'Молоко «Ашхар»',
+      defaultUnit: 'l',
+      typicalQuantity: { milli: 900n, unit: 'l' },
+    })
+
+    expect(calls[0]?.method).toBe('POST')
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe('/catalogue/items')
+    expect(calls[0]?.headers.get('content-type')).toBe('application/json')
+    expect(calls[0]?.headers.get(ACTOR_HEADER)).toBe(actorWire.id)
+    expect(calls[0]?.body).toEqual({
+      kind: 'product',
+      name: 'Молоко «Ашхар»',
+      defaultUnit: 'l',
+      typicalQuantity: { value: '0.900', unit: 'l' },
+    })
+    expect(result).toEqual({
+      entry: { ...entryWire, typicalQuantity: { milli: 900n, unit: 'l' } },
+      created: true,
+    })
+  })
+
+  it('tells an item already there from a new one by the status', async () => {
+    const { client } = clientReplying(200, entryWire)
+
+    const result = await client.proposeItem({
+      kind: 'product',
+      name: 'молоко «ашхар»',
+      defaultUnit: 'l',
+    })
+
+    expect(result.created).toBe(false)
+  })
+
+  it('refuses a dish before sending it: the catalogue takes products only until 0.3', async () => {
+    const { client, calls } = clientReplying(201, entryWire)
+
+    expect(
+      await codeOf(
+        client.proposeItem({ kind: 'dish', name: 'Карбонара', defaultUnit: 'piece' } as never),
+      ),
+    ).toBe(ISSUE.BODY_INVALID)
+    expect(calls).toHaveLength(0)
+  })
+})

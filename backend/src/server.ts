@@ -6,9 +6,14 @@ import { InvalidBody } from '@/routes/body'
 import { healthRoutes } from '@/routes/health'
 import { withActor } from '@/routes/actor'
 import { actorMeRoute, firstVisitRoute } from '@/routes/actors'
+import { catalogueRoutes } from '@/routes/catalogue'
 import { createActor } from '@/usecases/create-actor'
 import { getActor } from '@/usecases/get-actor'
+import { proposeItem } from '@/usecases/propose-item'
+import { searchCatalogue } from '@/usecases/search-catalogue'
 import { createActorRepository } from '@/db/actors-repository'
+import { createEventRepository } from '@/db/events-repository'
+import { createItemRepository } from '@/db/items-repository'
 import { databaseIsReachable, getDb } from '@/db'
 import type { Db } from '@/db'
 import { env } from '@/env'
@@ -17,6 +22,9 @@ import { env } from '@/env'
 // themselves, so a code cannot mean 400 in one place and 404 in another.
 const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.NOT_FOUND]: 404,
+  // The request is well formed; another row already holds what it claims — a barcode that
+  // belongs to another item. Not 400: nothing about the request itself is wrong.
+  [ERROR.CONFLICT]: 409,
   // Not 400: the request is well formed, it simply names no subject the server can find.
   // The PWA reads exactly this to decide that its stored identity is gone (MOL-8, Р-4).
   [ERROR.NO_ACTOR]: 401,
@@ -73,7 +81,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     if (error instanceof InvalidBody) {
       const issue = error.issues[0]
       const code = isWireCode(issue?.message) ? issue.message : ISSUE.BODY_INVALID
-      const details = issue?.path.join('.')
+      // An unknown key has no path of its own — the object it sits in has — so the name that
+      // was refused is taken from the issue: `?actorId=` answers with `details: "actorId"`.
+      const details =
+        issue?.code === 'unrecognized_keys' ? issue.keys.join(',') : issue?.path.join('.')
       return reply.status(400).send(answer({ code, ...(details ? { details } : {}) }))
     }
 
@@ -85,7 +96,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   // the repository into the use cases happens here and nowhere else — a route that could
   // name a repository would be a route that could reach the database.
   app.register((instance, _options, done) => {
-    const actors = createActorRepository(options.db ?? getDb())
+    const db = options.db ?? getDb()
+    const actors = createActorRepository(db)
+    const items = createItemRepository(db)
+    const events = createEventRepository(db)
 
     healthRoutes(instance, { databaseIsReachable })
     firstVisitRoute(instance, {
@@ -95,11 +109,15 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
 
     // Everything that needs an owner is registered inside this scope, and the scope is here
     // rather than inside a route module: «new routes land in the guarded place by default»
-    // is only true if the guarded place is where routes are actually added. MOL-12, MOL-21
-    // and MOL-27 add theirs next to `actorMeRoute`.
+    // is only true if the guarded place is where routes are actually added. MOL-21 and MOL-27
+    // add theirs next to these.
     void instance.register((guarded, _guardedOptions, guardedDone) => {
       withActor(guarded, (id) => getActor(actors, id))
       actorMeRoute(guarded)
+      catalogueRoutes(guarded, {
+        search: (actorId, query) => searchCatalogue({ items, events }, actorId, query),
+        propose: (actorId, input) => proposeItem(items, actorId, input),
+      })
       guardedDone()
     })
 

@@ -5,10 +5,13 @@ import {
   INVITE_HEADER,
   ISSUE,
   actorCodec,
+  catalogueEntryCodec,
+  catalogueSearchResponseSchema,
   errorResponseSchema,
   healthResponseSchema,
+  proposedItemSchema,
 } from '@molvia/model'
-import type { Actor, HealthResponse, WireCode } from '@molvia/model'
+import type { Actor, CatalogueEntry, HealthResponse, ProposedItem, WireCode } from '@molvia/model'
 
 /**
  * What the API answered with. Not a DomainError: the wire carries shape errors too — a
@@ -81,6 +84,13 @@ export interface MolviaClient {
    * which is what makes «check before restoring» possible instead of «replace and hope».
    */
   me(identifier?: string): Promise<Actor>
+  /** The catalogue lookup behind «что взяли?», ranked by the server — the query goes as typed. */
+  searchCatalogue(query: string): Promise<CatalogueEntry[]>
+  /**
+   * «Предложить товар». `created` is `false` when the catalogue already held an item of this
+   * kind by the same name — the entry is then that item, and the fields sent were not applied.
+   */
+  proposeItem(input: ProposedItem): Promise<{ entry: CatalogueEntry; created: boolean }>
 }
 
 /**
@@ -108,10 +118,17 @@ export function createClient({
     readonly as?: string
     /** `null` means «wait as long as it takes» — see `createActor`. */
     readonly timeout?: number | null
+    /** Sent as JSON. Already on the wire's side: the caller encodes through the schema. */
+    readonly body?: unknown
   }
 
-  async function request<T>(path: string, schema: ZodType<T>, options: Options = {}): Promise<T> {
+  async function exchange<T>(
+    path: string,
+    schema: ZodType<T>,
+    options: Options = {},
+  ): Promise<{ status: number; data: T }> {
     const headers = new Headers(options.headers)
+    if (options.body !== undefined) headers.set('content-type', 'application/json')
     const id = options.as ?? actorId?.()
     // Set only when there is one: `X-Molvia-Actor: null` is the string «null», which the
     // server refuses for a reason the caller cannot act on.
@@ -134,6 +151,7 @@ export function createClient({
     try {
       response = await fetch(`${baseUrl}${path}`, {
         ...(options.method === undefined ? {} : { method: options.method }),
+        ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
         headers,
         signal: controller.signal,
       })
@@ -175,8 +193,12 @@ export function createClient({
     // as an ApiError like everything else: `catch (e) { e instanceof ApiError }` is the
     // only way callers are meant to need.
     const parsed = schema.safeParse(body)
-    if (parsed.success) return parsed.data
+    if (parsed.success) return { status: response.status, data: parsed.data }
     throw new ApiError(ISSUE.RESPONSE_INVALID, parsed.error.issues[0]?.path.join('.'))
+  }
+
+  async function request<T>(path: string, schema: ZodType<T>, options: Options = {}): Promise<T> {
+    return (await exchange(path, schema, options)).data
   }
 
   return {
@@ -198,5 +220,32 @@ export function createClient({
 
     me: (identifier) =>
       request('/actors/me', actorCodec, identifier === undefined ? {} : { as: identifier }),
+
+    searchCatalogue: async (query) => {
+      // URLSearchParams, not a template: «&», «#», «+» and «%» in a query would otherwise
+      // cut it short or change its meaning on the way.
+      const search = new URLSearchParams({ q: query })
+      const { items } = await request(
+        `/catalogue/search?${search.toString()}`,
+        catalogueSearchResponseSchema,
+      )
+      return items
+    },
+
+    // `async` so that an input the schema refuses arrives as a rejection, like everything else.
+    proposeItem: async (input) => {
+      const encoded = proposedItemSchema.safeEncode(input)
+      if (!encoded.success) {
+        throw new ApiError(ISSUE.BODY_INVALID, encoded.error.issues[0]?.path.join('.'))
+      }
+
+      // An ordinary timeout, unlike the first visit: an abort may leave the item written, and
+      // a retry is still safe — the server answers an exact repeat with the item already there.
+      const { status, data } = await exchange('/catalogue/items', catalogueEntryCodec, {
+        method: 'POST',
+        body: encoded.data,
+      })
+      return { entry: data, created: status === 201 }
+    },
   }
 }

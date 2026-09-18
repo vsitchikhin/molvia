@@ -52,6 +52,8 @@ export class DomainError extends Error {
  */
 export const ISSUE = {
   BODY_INVALID: 'issue.body_invalid',
+  /** A query string that did not parse. Not BODY_INVALID: a `GET` has no body to blame. */
+  QUERY_INVALID: 'issue.query_invalid',
   RESPONSE_INVALID: 'issue.response_invalid',
   HEALTH_CONTRADICTS_ITSELF: 'issue.health_contradicts_itself',
   PATCH_EMPTY: 'issue.patch_empty',
