@@ -25,7 +25,8 @@ import { clearAll, insertItem } from './fixtures'
  *
  * Each case pins the whole answer, not only its head: the corpus is what a retune of the
  * thresholds is measured against (MOL-14 kept them, MOL-47 measures again), and a threshold
- * that buries the answer in noise keeps the right item first. When a threshold moves, these lists are expected to move with it — by hand.
+ * that buries the answer in noise keeps the right item first. When a threshold moves, these
+ * lists are expected to move with it — by hand.
  */
 
 const { db, close } = connectDrizzle()
@@ -497,29 +498,20 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
    * shown only on an empty answer. They are two outcomes, not one:
    *
    * - `RELATED` — the first row carries the word's root: a taste or a property printed on
-   *   another item («сметана», «лук» in the chips', «томаты» in the ketchup's name). Found
-   *   exactly or by the start of a word; no threshold removes that — a question for the
-   *   screen (MOL-23), not the search.
+   *   another item. Six are found exactly or by the start of a word («сметана», «лук» in the
+   *   chips', «печень» in «печёночный») — no threshold removes those, a question for the
+   *   screen (MOL-23), not the search. Six more by an edit of the ending, inside the budget
+   *   («томаты» → «томатный», «яблоки» → «яблочный», two edits, gone at a budget of 1).
+   *   «соль» and «суп» drag a tail of «шт» behind the first row — MOL-48.
    * - `UNRELATED` — nothing in common but letters: the absolute budget («водка» → «Вода»,
    *   «мыло» → «Молоко», «торт», «плов» — MOL-46) and a unit word grounding a match («сыр» is
    *   two edits from `sht` of «4 шт» — MOL-48).
    *
    * Pinned whole, as they are.
    */
-  const RELATED = new Set([
-    'соль',
-    'яблоки',
-    'апельсины',
-    'томаты',
-    'чеснок',
-    'кукуруза',
-    'печень',
-    'лук',
-    'сметана',
-    'суп',
-    'вино',
-    'пирог',
-  ])
+  const RELATED_EXACT = new Set(['соль', 'печень', 'лук', 'сметана', 'суп', 'вино'])
+  const RELATED_BY_EDIT = new Set(['яблоки', 'апельсины', 'томаты', 'чеснок', 'кукуруза', 'пирог'])
+  const RELATED = new Set([...RELATED_EXACT, ...RELATED_BY_EDIT])
   const UNRELATED = new Set([
     'сахар',
     'чай',
