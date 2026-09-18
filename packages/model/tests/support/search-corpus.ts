@@ -6,7 +6,8 @@
  * these already did once: `jajca` left one of them in MOL-11.
  *
  * Test data, not domain: it lives under `tests/` and reaches the backend through the
- * `./testing/search-corpus` export only.
+ * `./testing/search-corpus` export only — from tests, never from `src`, which the shared
+ * lint preset refuses (`TEST_DATA`).
  */
 
 export const ITEMS = [
