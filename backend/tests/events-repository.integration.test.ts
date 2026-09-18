@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { sql } from 'drizzle-orm'
 import { EVENT } from '@molvia/model'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor } from './fixtures'
@@ -173,6 +174,36 @@ describe("recording at most once a day of the person's own life", () => {
     await expect(
       repository.weekFourReturn('product', ago(21 * DAY + 2 * HOUR), ago(21 * DAY)),
     ).resolves.toEqual({ cohortSize: 1, returned: 1 })
+  })
+
+  it('counts days and weeks the same in any time zone of the session', async () => {
+    // `interval '1 day'` is a calendar day in the session's zone: Chile moved its clocks on
+    // 6 September 2026, so there «21 days» was 503 hours and a visit at hour 503½ fell into
+    // week four, while in UTC it was week three. Both now count hours.
+    async function scenario(zone: string, withEvening: boolean) {
+      const actorId = await insertActor(db)
+      return db.transaction(async (tx) => {
+        await tx.execute(sql`select set_config('timezone', ${zone}, true)`)
+        const log = createEventRepository(tx)
+        const started = ago(21 * DAY - HOUR / 2)
+        await log.record({ ...view(actorId), occurredAt: started })
+        if (withEvening) await log.record({ ...view(actorId), occurredAt: ago(23 * HOUR) })
+
+        const written = await log.recordOncePerDay(view(actorId))
+        const gate = await log.weekFourReturn(
+          'product',
+          new Date(started.getTime() - HOUR),
+          new Date(started.getTime() + HOUR),
+        )
+        return { written, returned: gate.returned }
+      })
+    }
+
+    for (const withEvening of [false, true]) {
+      const utc = await scenario('UTC', withEvening)
+      const chile = await scenario('America/Santiago', withEvening)
+      expect(chile, `evening before: ${String(withEvening)}`).toEqual(utc)
+    }
   })
 
   it('keeps the product and venue halves apart', async () => {

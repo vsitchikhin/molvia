@@ -69,7 +69,7 @@ export function createEventRepository(db: Conn): EventRepository {
               and e.type = ${event.type}
               and e.payload = ${payload}::jsonb
               and e.occurred_at >= f.started
-                + floor(extract(epoch from now() - f.started) / 86400) * interval '1 day'
+                + floor(extract(epoch from now() - f.started) / 86400) * interval '24 hours'
           )
           returning id
         `)
@@ -80,7 +80,10 @@ export function createEventRepository(db: Conn): EventRepository {
     async weekFourReturn(subject, from, to) {
       // "Fourth week" is counted from each actor's own first event, not from a calendar
       // week: the threshold asks whether a person came back, and people arrive on
-      // different days.
+      // different days. In hours, not days: `interval '1 day'` is a calendar day in the
+      // session's time zone — 23 or 25 hours across a daylight-saving change — and the days
+      // of `recordOncePerDay` have to fall on exactly these weeks. Hours mean the same in
+      // every zone, so neither depends on a `timezone` someone sets later.
       const rows = await db.execute<{ cohort_size: number; returned: number }>(sql`
         with first_seen as (
           select actor_id, min(occurred_at) as started
@@ -99,8 +102,8 @@ export function createEventRepository(db: Conn): EventRepository {
           join ${events} e on e.actor_id = c.actor_id
           where e.type = 'catalogue_viewed'
             and e.payload ->> 'subject' = ${subject}
-            and e.occurred_at >= c.started + interval '21 days'
-            and e.occurred_at < c.started + interval '28 days'
+            and e.occurred_at >= c.started + interval '504 hours'
+            and e.occurred_at < c.started + interval '672 hours'
         )
         select
           (select count(*) from cohort)::int as cohort_size,
