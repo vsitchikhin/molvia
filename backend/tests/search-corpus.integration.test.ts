@@ -1,6 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { toSearchKey } from '@molvia/model'
-import { ITEMS, QUERIES, TRIPLES } from '@molvia/model/testing/search-corpus'
+import {
+  ITEMS,
+  QUERIES,
+  SHELF,
+  SHELF_ABSENT,
+  SHELF_QUERIES,
+  TRIPLES,
+} from '@molvia/model/testing/search-corpus'
 import { randomUUID } from 'node:crypto'
 import { sql as raw } from 'drizzle-orm'
 import { createItemRepository } from '@/db/items-repository'
@@ -199,4 +206,251 @@ describe('what is not in the corpus: two words, and English spelling', () => {
     // English orthography is not a transliteration fork; pinned for MOL-14.
     expect(await names('Cheesecake')).toEqual([])
   })
+})
+
+describe("the shelf of MOL-14: the owner's own words, through the search", () => {
+  beforeAll(async () => {
+    await seed(SHELF)
+  })
+
+  /**
+   * What the search answers today, whole, at the thresholds MOL-14 measured and kept:
+   * candidates above 0.15, distance within 2. The noise is pinned with the rest — «мол» ties
+   * the milks with «Кофе … молотый», «туалетка» the paper with the cat litter's «туалета» —
+   * so a change of either threshold shows what it moves, query by query.
+   */
+  const ANSWERS: Readonly<Record<string, Answer>> = {
+    кола: [
+      ['Coca-Cola 1 л', 'Coca-Cola 0,5 л'],
+      ['Колбаса докторская', 'Колбаса сервелат Макур'],
+      'Средство для мытья пола Mr. Proper 1 л',
+      [
+        'Корм для кошек Whiskas 85 г',
+        'Корм для собак Pedigree 400 г',
+        'Кофе Jacobs Monarch молотый 230 г',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+      ],
+    ],
+    кол: [
+      ['Coca-Cola 1 л', 'Coca-Cola 0,5 л', 'Колбаса докторская', 'Колбаса сервелат Макур'],
+      [
+        'Корм для кошек Whiskas 85 г',
+        'Корм для собак Pedigree 400 г',
+        'Кофе Jacobs Monarch молотый 230 г',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+      ],
+      [
+        'Мука пшеничная высший сорт 2 кг',
+        'Соевый соус Kikkoman 150 мл',
+        'Стиральный порошок Ariel 3 кг',
+      ],
+    ],
+    фанта: ['Fanta апельсин 1 л'],
+    фан: ['Fanta апельсин 1 л'],
+    молоко: [
+      ['Молоко Марианна 3,2% 1 л', 'Молоко Ашхар 2,5% 1 л'],
+      'Кофе Jacobs Monarch молотый 230 г',
+    ],
+    мол: [
+      ['Кофе Jacobs Monarch молотый 230 г', 'Молоко Марианна 3,2% 1 л', 'Молоко Ашхар 2,5% 1 л'],
+      ['Соевый соус Kikkoman 150 мл', 'Сливки Марианна 20% 200 мл'],
+      'Средство для мытья пола Mr. Proper 1 л',
+    ],
+    моло: [
+      ['Кофе Jacobs Monarch молотый 230 г', 'Молоко Марианна 3,2% 1 л', 'Молоко Ашхар 2,5% 1 л'],
+      'Полотенце кухонное',
+      [
+        'Соевый соус Kikkoman 150 мл',
+        'Средство для мытья пола Mr. Proper 1 л',
+        'Сливки Марианна 20% 200 мл',
+      ],
+    ],
+    несквик: ['Nesquik какао-напиток 250 г'],
+    неск: ['Nesquik какао-напиток 250 г', 'Хлопья Nestlé Fitness 300 г'],
+    хлопья: [['Хлопья Nestlé Fitness 300 г', "Хлопья кукурузные Kellogg's Corn Flakes 375 г"]],
+    хлоп: [
+      ['Хлопья Nestlé Fitness 300 г', "Хлопья кукурузные Kellogg's Corn Flakes 375 г"],
+      ['Хлеб Матнакаш', "Хлеб тостовый Harry's 470 г"],
+    ],
+    хлеб: [['Хлеб Матнакаш', "Хлеб тостовый Harry's 470 г"]],
+    колбаса: [['Колбаса докторская', 'Колбаса сервелат Макур']],
+    колб: [
+      ['Колбаса докторская', 'Колбаса сервелат Макур'],
+      ['Coca-Cola 1 л', 'Coca-Cola 0,5 л'],
+      [
+        'Корм для кошек Whiskas 85 г',
+        'Корм для собак Pedigree 400 г',
+        'Кофе Jacobs Monarch молотый 230 г',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+      ],
+    ],
+    нутелла: ['Nutella 350 г'],
+    нут: ['Nutella 350 г', 'Сок Noy яблочный 1 л'],
+    пиво: [['Пиво Gyumri 0,5 л', 'Пиво Kilikia 0,5 л'], 'Пирожное Наполеон'],
+    говядина: ['Говядина мякоть'],
+    мясо: ['Говядина мякоть'],
+    говя: [['Фарш говяжий', 'Говядина мякоть']],
+    сок: [
+      ['Сок Rich апельсин 1 л', 'Сок Noy яблочный 1 л'],
+      [
+        'Корм для собак Pedigree 400 г',
+        'Мука пшеничная высший сорт 2 кг',
+        'Соевый соус Kikkoman 150 мл',
+        'Соус чесночный Махеевъ 200 г',
+      ],
+      [
+        "Чипсы Lay's сметана и лук 150 г",
+        'Батарейки Duracell AA 4 шт',
+        'Салфетки бумажные Zewa 100 шт',
+        'Салфетки влажные Huggies 56 шт',
+        'Станки Gillette Blue II 5 шт',
+        'Таблетки для посудомоечной машины Finish 40 шт',
+        'Булочки с кунжутом 4 шт',
+      ],
+    ],
+    чипсы: ["Чипсы Lay's сметана и лук 150 г"],
+    чип: ["Чипсы Lay's сметана и лук 150 г"],
+    принглс: ['Pringles Original 165 г'],
+    прин: ['Pringles Original 165 г'],
+    читос: ['Cheetos кукурузные палочки 55 г'],
+    котлеты: ['Котлеты куриные замороженные'],
+    котл: [
+      'Котлеты куриные замороженные',
+      [
+        'Корм для кошек Whiskas 85 г',
+        'Корм для собак Pedigree 400 г',
+        'Кофе Jacobs Monarch молотый 230 г',
+        'Coca-Cola 1 л',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+        'Coca-Cola 0,5 л',
+      ],
+    ],
+    спагетти: ['Спагетти Barilla №5 500 г'],
+    спаг: ['Спагетти Barilla №5 500 г'],
+    кетчуп: ['Кетчуп Heinz томатный 570 г'],
+    соусы: [['Соевый соус Kikkoman 150 мл', 'Соус чесночный Махеевъ 200 г']],
+    орешки: [],
+    салфетки: [['Салфетки бумажные Zewa 100 шт', 'Салфетки влажные Huggies 56 шт']],
+    салф: [['Салфетки бумажные Zewa 100 шт', 'Салфетки влажные Huggies 56 шт']],
+    'влажные салфетки': ['Салфетки влажные Huggies 56 шт', 'Салфетки бумажные Zewa 100 шт'],
+    картошка: [],
+    виноград: ['Виноград Арарат'],
+    нектарины: ['Нектарины'],
+    перчатки: ['Перчатки хозяйственные Vileda'],
+    батарейки: ['Батарейки Duracell AA 4 шт'],
+    белизна: ['Белизна 1 л'],
+    отбеливатель: [],
+    кофе: [
+      'Кофе Jacobs Monarch молотый 230 г',
+      [
+        'Корм для кошек Whiskas 85 г',
+        'Корм для собак Pedigree 400 г',
+        'Coca-Cola 1 л',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+        'Coca-Cola 0,5 л',
+      ],
+    ],
+    креветки: ['Креветки королевские 500 г'],
+    сливки: ['Сливки Марианна 20% 200 мл'],
+    крекеры: ['Крекеры TUC 100 г'],
+    булочки: ['Булочки с кунжутом 4 шт', 'Cheetos кукурузные палочки 55 г'],
+    булки: [],
+    пирожные: ['Пирожное Наполеон'],
+    вода: [['Вода Бжни 1,5 л', 'Вода Джермук 0,5 л']],
+    дошик: ['Doshirak лапша курица 90 г'],
+    лапша: [['Лапша удон 300 г', 'Doshirak лапша курица 90 г']],
+    паштет: ['Паштет печёночный Hame 105 г'],
+    творог: ['Творог Ашхар 9% 400 г'],
+    твор: ['Творог Ашхар 9% 400 г'],
+    мука: ['Мука пшеничная высший сорт 2 кг', ['Coca-Cola 1 л', 'Coca-Cola 0,5 л']],
+    туалетка: [['Туалетная бумага Zewa Plus 4 рулона', 'Наполнитель для кошачьего туалета 5 л']],
+    бритва: [],
+    'соевый соус': ['Соевый соус Kikkoman 150 мл', 'Соус чесночный Махеевъ 200 г'],
+    рис: ['Рис длиннозёрный Мистраль 900 г', 'Сок Rich апельсин 1 л'],
+    'таблетки для посудомойки': ['Таблетки для посудомоечной машины Finish 40 шт'],
+    курица: [['Курица целая охлаждённая', 'Курица филе', 'Doshirak лапша курица 90 г']],
+    кур: [
+      [
+        'Курица целая охлаждённая',
+        'Котлеты куриные замороженные',
+        'Курица филе',
+        'Doshirak лапша курица 90 г',
+      ],
+      ["Хлопья кукурузные Kellogg's Corn Flakes 375 г", 'Колбаса сервелат Макур'],
+      [
+        'Корм для кошек Whiskas 85 г',
+        'Корм для собак Pedigree 400 г',
+        'Мука пшеничная высший сорт 2 кг',
+        'Стиральный порошок Ariel 3 кг',
+        'Крекеры TUC 100 г',
+      ],
+    ],
+    'средство для полов': ['Средство для мытья пола Mr. Proper 1 л'],
+    'собачий корм': ['Корм для собак Pedigree 400 г'],
+    корм: [
+      ['Корм для кошек Whiskas 85 г', 'Корм для собак Pedigree 400 г'],
+      ['Креветки королевские 500 г', "Хлопья кукурузные Kellogg's Corn Flakes 375 г"],
+      ['Кофе Jacobs Monarch молотый 230 г', 'Coca-Cola 1 л', 'Coca-Cola 0,5 л'],
+      'Мука пшеничная высший сорт 2 кг',
+    ],
+    наполнитель: ['Наполнитель для кошачьего туалета 5 л'],
+    'стиральный порошок': ['Стиральный порошок Ariel 3 кг'],
+    порошок: ['Стиральный порошок Ariel 3 кг'],
+    тарелки: ['Тарелка суповая'],
+    кружки: ['Кружка керамическая'],
+    полотенца: ['Полотенце кухонное'],
+  }
+
+  /**
+   * The owner's word is not the shelf's: «картошка» for «Картофель», «орешки» for «Арахис».
+   * No spelling rule reaches a synonym, and no threshold does either — pinned as misses.
+   */
+  const SYNONYMS = new Set(['орешки', 'картошка', 'отбеливатель', 'булки', 'бритва'])
+
+  it('pins an answer for every query of the shelf, and no other', () => {
+    expect(Object.keys(ANSWERS).sort()).toEqual(SHELF_QUERIES.map(([query]) => query).sort())
+  })
+
+  it('puts an item the query meant first, or finds nothing for a synonym', () => {
+    // The pinned answers replace nothing in the shared list, so they must still agree with it:
+    // the first row — or the tie it sits in — is one of the items the owner meant.
+    for (const [query, meant] of SHELF_QUERIES) {
+      const [head] = ANSWERS[query] ?? []
+      if (SYNONYMS.has(query)) expect(head, query).toBeUndefined()
+      else
+        expect(
+          [head ?? []].flat().some((name) => meant.includes(name as never)),
+          query,
+        ).toBe(true)
+    }
+  })
+
+  it.each(SHELF_QUERIES)('«%s»', async (query) => {
+    await answers(query, ANSWERS[query] ?? [])
+  })
+
+  /**
+   * Two of the owner's words for what the shelf does not carry still find something: `ovoshi`
+   * is two edits from `vishi` of «высший сорт», `speцi` two from `soevi`. The absolute budget
+   * of MOL-10 — the class of «пельмени» — and with the one button «Предложить товар» shown
+   * only on an empty answer, such an item cannot be added. Pinned as it is.
+   */
+  const FALSE_HITS: Readonly<Record<string, Answer>> = {
+    овощи: ['Мука пшеничная высший сорт 2 кг'],
+    специи: ['Соевый соус Kikkoman 150 мл'],
+  }
+
+  it.each(SHELF_ABSENT.filter((query) => !(query in FALSE_HITS)))(
+    'answers nothing to «%s», which the shelf does not carry',
+    async (query) => {
+      expect(await names(query)).toEqual([])
+    },
+  )
+
+  it.each(Object.entries(FALSE_HITS))(
+    'finds something for «%s» — the absolute budget, pinned as it is',
+    async (query, answer) => {
+      await answers(query, answer)
+    },
+  )
 })
