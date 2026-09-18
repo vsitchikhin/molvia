@@ -66,9 +66,12 @@ examined: written once, its timestamp is `actors.created_at` and the row duplica
 domain table already knows — the very thing the rule above forbids; written on every launch,
 it answers a question no threshold asks, since 0.2 is counted over verdicts and 0.3 over
 `catalogue_viewed`. MOL-12 writes that one: every search that parses records
-`catalogue_viewed` with `subject: product`, at most once per owner in a rolling 24 hours, by
-the database's clock, after the search has answered — and a failure to record is not
-swallowed, because a lost row lowers the gate with nothing to backfill from.
+`catalogue_viewed` with `subject: product`, after the search has answered, at most once per
+owner and payload in each **day of the person's own life** — days counted from their first
+event, as the gate counts its weeks. Not a rolling 24 hours from the last row: that window
+slid over the week line and swallowed a visit early in week four. Overlapping searches are
+serialised by an advisory lock per actor, and a failure to record is not swallowed, because a
+lost row lowers the gate with nothing to backfill from.
 
 **This measures entering, not reading, and that was chosen knowingly.** In 0.1 and 0.2 a
 search is a purchase being entered; the plan hides other people's data until 0.3 precisely so
@@ -180,7 +183,9 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   fires on what the alphabet itself produced, not only on Latin someone typed — `тс` becomes
   `ts` becomes `ц` — which is what makes «счёт» and «щёт» one key, and also what reads the
   `тс` of «Советский» as `ц`. A false merge costs a candidate, a miss costs the answer; the
-  trade is deliberate, and it is a trade.
+  trade is deliberate, and it is a trade. **That is why the key is never an identity:**
+  «Предложить товар» decides a duplicate by `nameIdentity` — case and spacing only — because
+  there a false merge costs the item itself: «Milo» would be answered with «Мыло» (MOL-12).
 - **Armenian is in the table, not passed through.** The first market is Gyumri and Yerevan,
   so an Armenian label is the norm on the shelf. With the table «Գյումրի», «Гюмри» and
   `Gyumri` all become `giumri`, and an Armenian name is reachable from all three keyboards;
@@ -647,9 +652,9 @@ Migrations that lose data, swapping a stack element, CI changes, refactoring out
 eight write inputs and three rules in `packages/model`, with the wire codecs that money and
 quantity need to cross it at all. MOL-5 added the search key; MOL-6 the nine tables of 0.1,
 the GIN index over `search_key` and the constraints that hold the product's key. MOL-8 gave
-the device an identity and the API its first routes; MOL-12 opened the catalogue — search and
-«Предложить товар». No screen yet. Release 0.1 is broken into epics and tasks in Jira. What exists, what is decided
-and what is still open — `docs/onboarding.md`.
+the device an identity and the API its first routes; MOL-12 opened the catalogue — search
+and «Предложить товар». No screen yet. Release 0.1 is broken into epics and tasks in Jira.
+What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 **What the database guarantees and what it leaves to the domain** is a line, not a habit:
 the schema refuses what makes a row unreadable or breaks the product's core — a currency
