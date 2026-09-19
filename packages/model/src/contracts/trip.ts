@@ -7,7 +7,6 @@ import { newPlaceSchema, placeSchema } from '#model/entities/place'
 import type { Place } from '#model/entities/place'
 import { convertMoney, tripTotal } from '#model/entities/trip'
 import type { Trip } from '#model/entities/trip'
-import { DomainError, ERROR } from '#model/support/errors'
 import { currencySchema, moneyCodec } from '#model/values/money'
 import { rateCodec } from '#model/values/rates'
 import { quantityCodec, unitPrice, unitPriceCodec } from '#model/values/units'
@@ -117,7 +116,9 @@ export function tripPlaceOf(place: Place): TripPlace {
  * here comes from a rule the domain already owns — `unitPrice`, `tripTotal`, `convertMoney`.
  *
  * An expense whose item is missing is a defect rather than a state: the foreign key holds it,
- * so reaching the throw means the caller read the rows from two different moments.
+ * so reaching the throw means the caller read the rows from two different moments. A plain
+ * Error on purpose — a DomainError would reach the client as a 404, «not found», and a broken
+ * server would read as a missing row with no line in the log.
  */
 export function tripViewOf(
   trip: Trip,
@@ -129,7 +130,7 @@ export function tripViewOf(
 
   const rows = expenses.map((expense): TripExpenseView => {
     const item = byId.get(expense.itemId)
-    if (!item) throw new DomainError(ERROR.NOT_FOUND, `item ${expense.itemId}`)
+    if (!item) throw new Error(`trip ${trip.id}: item ${expense.itemId} was not read`)
     return {
       id: expense.id,
       createdAt: expense.createdAt,

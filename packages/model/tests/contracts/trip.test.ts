@@ -13,7 +13,7 @@ import { itemSchema } from '#model/entities/item'
 import type { Item } from '#model/entities/item'
 import { placeSchema } from '#model/entities/place'
 import type { Trip } from '#model/entities/trip'
-import { ERROR } from '#model/support/errors'
+import { DomainError } from '#model/support/errors'
 import { parseMoney } from '#model/values/money'
 import { parseRate } from '#model/values/rates'
 import { formatUnitPrice, parseQuantity, unitPriceCodec } from '#model/values/units'
@@ -197,8 +197,10 @@ describe('tripViewOf', () => {
     ).toBeNull()
   })
 
-  it('refuses a row whose item was not read — a defect, not a state', () => {
-    expect(() => tripViewOf(trip, place, handoff(), [ashkhar])).toThrow(ERROR.NOT_FOUND)
+  it('refuses a row whose item was not read — a defect, not a state, so not a DomainError', () => {
+    // A DomainError would reach the client as 404 «not found»; a broken server must be a 500.
+    expect(() => tripViewOf(trip, place, handoff(), [ashkhar])).toThrow(/was not read/)
+    expect(() => tripViewOf(trip, place, handoff(), [ashkhar])).not.toThrow(DomainError)
   })
 })
 
