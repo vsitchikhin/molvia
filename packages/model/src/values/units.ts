@@ -6,7 +6,7 @@ import {
   scaledFromDecimal,
 } from '#model/support/decimal'
 import { DomainError, ERROR, ISSUE } from '#model/support/errors'
-import { MINOR_EXPONENT } from './money'
+import { MINOR_EXPONENT, currencySchema } from './money'
 import type { Currency, Money } from './money'
 
 export const baseUnitSchema = z.enum(['kg', 'l', 'piece'])
@@ -148,3 +148,45 @@ export function formatUnitPrice(price: UnitPrice, locale = 'ru-RU'): string {
   }).format(major)
   return `${amount}/${price.unit}`
 }
+
+/**
+ * A unit price crosses the wire as a decimal in major units, with every digit the ratio holds —
+ * the same way money does, and for the same reason: the screen rounds on output only, and a
+ * price rounded here would compare 577,78 against 577,78 where the rows differ in the third
+ * place (MOL-21).
+ */
+const unitPriceFields = z.object({
+  scaledMinor: z.bigint().nonnegative().max(INT8_MAX),
+  currency: currencySchema,
+  unit: baseUnitSchema,
+})
+
+export const unitPriceWireSchema = z.object({
+  amount: z.string().max(60),
+  currency: currencySchema,
+  unit: baseUnitSchema,
+})
+export type UnitPriceWire = z.infer<typeof unitPriceWireSchema>
+
+const unitPriceDigits = (currency: Currency): number => UNIT_PRICE_DIGITS + MINOR_EXPONENT[currency]
+
+export const unitPriceCodec = z.codec(unitPriceWireSchema, unitPriceFields, {
+  decode: ({ amount, currency, unit }, payload) => {
+    const scaledMinor = scaledFromDecimal(amount, unitPriceDigits(currency))
+    if (scaledMinor === null || scaledMinor < 0n || scaledMinor > INT8_MAX) {
+      payload.issues.push({
+        code: 'custom',
+        input: amount,
+        path: ['amount'],
+        message: ERROR.INVALID_AMOUNT,
+      })
+      return { scaledMinor: 0n, currency, unit }
+    }
+    return { scaledMinor, currency, unit }
+  },
+  encode: (price) => ({
+    amount: decimalFromScaled(price.scaledMinor, unitPriceDigits(price.currency)),
+    currency: price.currency,
+    unit: price.unit,
+  }),
+})

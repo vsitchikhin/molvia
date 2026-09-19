@@ -25,6 +25,9 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   // The request is well formed; another row already holds what it claims — a barcode that
   // belongs to another item. Not 400: nothing about the request itself is wrong.
   [ERROR.CONFLICT]: 409,
+  // Also well formed: another trip of the same person is still open, and which of the two goes
+  // on is the person's choice (MOL-21). The screen reads the code, the status only groups it.
+  [ERROR.TRIP_OPEN]: 409,
   // Not 400: the request is well formed, it simply names no subject the server can find.
   // The PWA reads exactly this to decide that its stored identity is gone (MOL-8, Р-4).
   [ERROR.NO_ACTOR]: 401,

@@ -24,7 +24,7 @@
     "finish": "Finish the trip",
     "finish_confirm": {
       "title": "Finish this trip?",
-      "body": "The items stay recorded. You will not be able to add anything else to this trip",
+      "body": "The items stay recorded. Anything forgotten can still be added later",
       "ok": "Finish",
       "cancel": "Cancel"
     },
@@ -189,6 +189,7 @@
     "not_found": "Not found",
     "conflict": "That barcode already belongs to another item",
     "no_actor": "This device is no longer recognised",
+    "trip_open": "Another trip is still open",
     "internal": "Something went wrong"
   }
 }
