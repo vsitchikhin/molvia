@@ -5,7 +5,13 @@ import { newExpenseSchema } from '#model/entities/expense'
 import type { Item } from '#model/entities/item'
 import { newPlaceSchema, placeSchema } from '#model/entities/place'
 import type { Place } from '#model/entities/place'
-import { convertedMinor, tripTotal } from '#model/entities/trip'
+import {
+  convertedMinor,
+  effectiveRate,
+  isTripRateStale,
+  rateChoiceSchema,
+  tripTotal,
+} from '#model/entities/trip'
 import type { Trip } from '#model/entities/trip'
 import { INT8_MAX } from '#model/support/decimal'
 import { currencySchema, moneyCodec } from '#model/values/money'
@@ -93,13 +99,30 @@ export const tripViewCodec = z.strictObject({
   startedAt: isoDate,
   finishedAt: isoDate.nullable(),
   currency: currencySchema,
+  /** The rate the trip counts by — the snapshot, or the one before its jump if the person chose it. */
   rate: rateCodec.nullable(),
+  /**
+   * When the snapshotted rate jumped (MOL-39, Р-19): both rates and the person's choice, null
+   * until made — the screen warns and offers «по 431.23 / по 4.3123». Null when nothing jumped.
+   */
+  rateJump: z
+    .strictObject({
+      jumped: rateCodec,
+      previous: rateCodec,
+      choice: rateChoiceSchema.nullable(),
+    })
+    .nullable(),
+  /**
+   * The official rate was over a week old when the trip started (Р-18): the screen says the rate
+   * is as of its date and the bank has published nothing since.
+   */
+  rateStale: z.boolean(),
   place: tripPlaceSchema.strict(),
   expenses: z.array(tripExpenseCodec),
   /** One per currency, and empty rather than zero when nothing is priced yet. */
   total: z.array(moneyCodec),
   /**
-   * The total in the trip's currency, converted by the rate the trip snapshotted. An estimate
+   * The total in the trip's currency, converted by the rate the trip counts by. An estimate
    * for display, never a fact — null without a rate: an empty cache, or one currency (MOL-39).
    */
   converted: moneyCodec.nullable(),
@@ -166,16 +189,26 @@ export function tripViewOf(
 
   const total = tripTotal(expenses)
   const inTripCurrency = total.find((money) => money.currency === trip.currency)
+  const rate = effectiveRate(trip)
 
   return {
     id: trip.id,
     startedAt: trip.startedAt,
     finishedAt: trip.finishedAt,
     currency: trip.currency,
-    rate: trip.rate,
+    rate,
+    rateJump:
+      trip.rate && trip.previousRate
+        ? { jumped: trip.rate, previous: trip.previousRate, choice: trip.rateChoice }
+        : null,
+    rateStale: isTripRateStale(trip),
     place: tripPlaceOf(place),
     expenses: rows,
     total: [...total],
-    converted: trip.rate && inTripCurrency ? estimate(inTripCurrency, trip.rate) : null,
+    converted: rate && inTripCurrency ? estimate(inTripCurrency, rate) : null,
   }
 }
+
+/** «Считать по новому курсу / по прежнему» (MOL-39, Р-19). Repeatable: the same choice twice is one. */
+export const rateChoiceBodySchema = z.strictObject({ choice: rateChoiceSchema })
+export type RateChoiceBody = z.infer<typeof rateChoiceBodySchema>

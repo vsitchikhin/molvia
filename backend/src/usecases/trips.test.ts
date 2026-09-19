@@ -62,6 +62,8 @@ const trip: Trip = {
   placeId: place.id,
   currency: 'AMD',
   rate: null,
+  previousRate: null,
+  rateChoice: null,
   startedAt: new Date('2026-09-19T10:00:00.000Z'),
   finishedAt: null,
 }
@@ -97,6 +99,7 @@ function fakeRepositories(
       latestUnfinishedFor: unexpected('trips.latestUnfinishedFor'),
       listFor: unexpected('trips.listFor'),
       finish: unexpected('trips.finish'),
+      chooseRate: unexpected('trips.chooseRate'),
       ...overrides.trips,
     },
     expenses: {
@@ -182,7 +185,7 @@ describe('startTrip', () => {
 
     expect(ensured).toEqual([{ kind: 'store', name: 'Ереван Сити', country: 'AM', city: 'Gyumri' }])
     // An empty cache: nothing to snapshot.
-    expect(started).toEqual([[ACTOR, { id: TRIP, placeId: place.id }, 'AMD', null]])
+    expect(started).toEqual([[ACTOR, { id: TRIP, placeId: place.id }, 'AMD', null, null]])
     expect(created).toBe(true)
     expect(view.place.name).toBe('Ереван Сити')
   })

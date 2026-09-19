@@ -95,3 +95,16 @@ export function rateTo(rate: ExchangeRate | null): RateColumns {
     rateAsOf: rate.asOf,
   }
 }
+
+/** The rate kept beside a jumped snapshot (MOL-39, Р-19): its own number and date, the rest the snapshot's. */
+export function previousRateFrom(
+  columns: RateColumns & {
+    readonly ratePreviousScaled: bigint | null
+    readonly ratePreviousAsOf: Date | null
+  },
+): ExchangeRate | null {
+  const rate = rateFrom(columns)
+  const { ratePreviousScaled, ratePreviousAsOf } = columns
+  if (rate === null || ratePreviousScaled === null || ratePreviousAsOf === null) return null
+  return { ...rate, scaled: ratePreviousScaled, asOf: ratePreviousAsOf }
+}

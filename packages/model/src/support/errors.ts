@@ -72,6 +72,10 @@ export const ISSUE = {
   RATE_SAME_CURRENCY: 'issue.rate_same_currency',
   RATE_NOT_OF_TRIP_CURRENCY: 'issue.rate_not_of_trip_currency',
   RATE_IMPLAUSIBLE_DATE: 'issue.rate_implausible_date',
+  /** A rate kept beside a jumped one that is not the same pair from the same source (MOL-39). */
+  PREVIOUS_RATE_UNMATCHED: 'issue.previous_rate_unmatched',
+  /** A choice between two rates on a trip that holds only one. */
+  RATE_CHOICE_WITHOUT_PREVIOUS: 'issue.rate_choice_without_previous',
   TRIP_FINISHED_BEFORE_START: 'issue.trip_finished_before_start',
   VERDICT_UPDATED_BEFORE_RATED: 'issue.verdict_updated_before_rated',
   VERDICT_PLACE_NOT_FOR_KIND: 'issue.verdict_place_not_for_kind',

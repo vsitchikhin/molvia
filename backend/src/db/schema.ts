@@ -29,6 +29,7 @@ import {
   eventTypeSchema,
   itemKindSchema,
   placeKindSchema,
+  rateChoiceSchema,
   rateProviderSchema,
   rateSourceSchema,
 } from '@molvia/model'
@@ -39,6 +40,7 @@ import type {
   ItemKind,
   PlaceKind,
   AmdRate,
+  RateChoice,
   RateProvider,
   RateSource,
 } from '@molvia/model'
@@ -316,6 +318,11 @@ export const trips = pgTable(
     rateScaled: bigint('rate_scaled', { mode: 'bigint' }),
     rateSource: text('rate_source').$type<RateSource>(),
     rateAsOf: timestamp('rate_as_of', { withTimezone: true }),
+    // When the snapshotted rate jumped (MOL-39, Р-19): the rate before the jump — same pair, same
+    // source, so only its number and date — and which of the two the person chose to count by.
+    ratePreviousScaled: bigint('rate_previous_scaled', { mode: 'bigint' }),
+    ratePreviousAsOf: timestamp('rate_previous_as_of', { withTimezone: true }),
+    rateChoice: text('rate_choice').$type<RateChoice>(),
     // `clock_timestamp()`, not `now()`: `now()` is the moment the *transaction* started, one
     // value shared by every row written inside it. `Conn` exists so a caller can write a trip
     // and its first expense together (MOL-21), and under `now()` those rows would carry the
@@ -359,6 +366,26 @@ export const trips = pgTable(
     // never recomputed, so a zero makes last month free and a negative flips its sign, both
     // as arithmetic rather than as an error.
     check('trips_rate_positive', sql`${table.rateScaled} is null or ${table.rateScaled} > 0`),
+    check(
+      'trips_rate_previous_whole',
+      sql`num_nonnulls(${table.ratePreviousScaled}, ${table.ratePreviousAsOf}) in (0, 2)`,
+    ),
+    check(
+      'trips_rate_previous_needs_rate',
+      sql`${table.ratePreviousScaled} is null or ${table.rateScaled} is not null`,
+    ),
+    check(
+      'trips_rate_previous_positive',
+      sql`${table.ratePreviousScaled} is null or ${table.ratePreviousScaled} > 0`,
+    ),
+    check(
+      'trips_rate_choice_known',
+      sql`${table.rateChoice} is null or ${oneOf(table.rateChoice, rateChoiceSchema.options)}`,
+    ),
+    check(
+      'trips_rate_choice_needs_previous',
+      sql`${table.rateChoice} is null or ${table.ratePreviousScaled} is not null`,
+    ),
     check(
       'trips_finished_after_start',
       sql`${table.finishedAt} is null or ${table.finishedAt} >= ${table.startedAt}`,

@@ -1,5 +1,5 @@
 import { pickOfficialRate, yerevanDate } from '@molvia/model'
-import type { Actor, AmdRate, ExchangeRate, StartTripBody, TripView } from '@molvia/model'
+import type { Actor, AmdRate, OfficialRate, StartTripBody, TripView } from '@molvia/model'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
 import { tripViewFor } from './trip-view'
 
@@ -39,11 +39,13 @@ export async function startTrip(
       country: actor.country,
       city: actor.city,
     })
+    const official = await officialRateFor(repositories, actor, now)
     const { trip, created } = await repositories.trips.start(
       actor.id,
       { id: body.id, placeId: place.id },
       actor.spendCurrency,
-      await officialRateFor(repositories, actor, now),
+      official?.rate ?? null,
+      official?.previous ?? null,
     )
     return { trip: await tripViewFor(repositories, trip), created }
   })
@@ -53,13 +55,14 @@ export async function startTrip(
  * The official rate from the income currency into the spending one, as of `now` in Yerevan, or
  * none: nothing to convert when both are one currency, and nothing known when the cache is empty.
  * Which provider — the central bank, or an open source after a week of its silence — is the
- * domain's rule; a stale rate keeps its date, which the screen shows beside it.
+ * domain's rule; a stale rate keeps its date, which the screen shows beside it. A rate that jumped
+ * comes with the one before it, and the trip keeps both for the person to choose (Р-19).
  */
 async function officialRateFor(
   { rates }: Pick<TripRepositories, 'rates'>,
   actor: Actor,
   now: Date,
-): Promise<ExchangeRate | null> {
+): Promise<OfficialRate | null> {
   const base = actor.incomeCurrency
   const quote = actor.spendCurrency
   if (base === quote) return null
@@ -68,7 +71,5 @@ async function officialRateFor(
   const foreign = [base, quote].filter(
     (currency): currency is AmdRate['currency'] => currency !== 'AMD',
   )
-  return (
-    pickOfficialRate(base, quote, await rates.latestOnOrBefore(foreign, today), today)?.rate ?? null
-  )
+  return pickOfficialRate(base, quote, await rates.latestOnOrBefore(foreign, today), today)
 }

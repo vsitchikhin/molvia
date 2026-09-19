@@ -1,7 +1,7 @@
-import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 import { DomainError, ERROR, tripSchema } from '@molvia/model'
-import type { Currency, ExchangeRate, NewTrip, Trip } from '@molvia/model'
-import { rateFrom, rateTo } from './columns'
+import type { Currency, ExchangeRate, NewTrip, RateChoice, Trip } from '@molvia/model'
+import { previousRateFrom, rateFrom, rateTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit, theRow } from './rows'
@@ -33,6 +33,7 @@ export interface TripRepository {
     input: TripToStart,
     currency: Currency,
     rate: ExchangeRate | null,
+    previousRate?: ExchangeRate | null,
   ): Promise<{ trip: Trip; created: boolean }>
   byId(id: string, actorId: string): Promise<Trip | null>
   /**
@@ -66,6 +67,12 @@ export interface TripRepository {
    * the moment a trip ended is a fact. The trip comes back as it was.
    */
   finish(id: string, actorId: string, at?: Date): Promise<Trip | null>
+  /**
+   * Which of the two rates a trip counts by, when its snapshot jumped (MOL-39, Р-19). The
+   * snapshot is not rewritten — only the choice. `null` for a stranger's or a missing trip and
+   * for one with nothing to choose between; the caller tells those apart.
+   */
+  chooseRate(id: string, actorId: string, choice: RateChoice): Promise<Trip | null>
 }
 
 type TripRow = typeof trips.$inferSelect
@@ -77,6 +84,8 @@ function toTrip(row: TripRow): Trip {
     placeId: row.placeId,
     currency: row.currency,
     rate: rateFrom(row),
+    previousRate: previousRateFrom(row),
+    rateChoice: row.rateChoice,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
   })
@@ -89,7 +98,7 @@ function ownedBy(id: string, actorId: string) {
 
 export function createTripRepository(db: Conn): TripRepository {
   return {
-    async start(actorId, input, currency, rate) {
+    async start(actorId, input, currency, rate, previousRate = null) {
       return translateFailures(async () =>
         db.transaction(async (tx) => {
           // Per owner: two «Начать поход» at once — a double tap after the screen lost its
@@ -115,7 +124,15 @@ export function createTripRepository(db: Conn): TripRepository {
           // primary key has the last word: `23505`, translated to CONFLICT like above.
           const [row] = await tx
             .insert(trips)
-            .values({ id: input.id, actorId, placeId: input.placeId, currency, ...rateTo(rate) })
+            .values({
+              id: input.id,
+              actorId,
+              placeId: input.placeId,
+              currency,
+              ...rateTo(rate),
+              ratePreviousScaled: previousRate?.scaled ?? null,
+              ratePreviousAsOf: previousRate?.asOf ?? null,
+            })
             .returning()
           return { trip: toTrip(theRow(row, 'trips')), created: true }
         }),
@@ -186,6 +203,16 @@ export function createTripRepository(db: Conn): TripRepository {
 
       const [finished] = await db.select().from(trips).where(ownedBy(id, actorId)).limit(1)
       return finished ? toTrip(finished) : null
+    },
+
+    async chooseRate(id, actorId, choice) {
+      if (idOrNull(id) === null || idOrNull(actorId) === null) return null
+      const [row] = await db
+        .update(trips)
+        .set({ rateChoice: choice })
+        .where(and(ownedBy(id, actorId), isNotNull(trips.ratePreviousScaled)))
+        .returning()
+      return row ? toTrip(row) : null
     },
   }
 }

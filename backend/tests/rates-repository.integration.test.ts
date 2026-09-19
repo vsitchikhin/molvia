@@ -198,4 +198,41 @@ describe('снимок курса в походе после миграции 00
       db.execute(sql`update trips set rate_source = 'rate.am' where actor_id = ${actorId}`),
     ).rejects.toThrow()
   })
+
+  it('миграция 0013: прежний курс — только целиком и только рядом со снимком, выбор — только при прежнем', async () => {
+    const actorId = await insertActor(db)
+    const placeId = await insertPlace(db)
+    const id = crypto.randomUUID()
+    await db.insert(trips).values({
+      id,
+      actorId,
+      placeId,
+      currency: 'AMD',
+      rateBase: 'RUB',
+      rateQuote: 'AMD',
+      rateScaled: 431_230_000n,
+      rateSource: 'official',
+      rateAsOf: new Date('2026-09-17T20:00:00Z'),
+      ratePreviousScaled: 4_305_000n,
+      ratePreviousAsOf: new Date('2026-09-16T20:00:00Z'),
+      rateChoice: 'previous',
+    })
+    const update = (set: string) =>
+      db.execute(sql.raw(`update trips set ${set} where id = '${id}'`))
+
+    await expect(update('rate_previous_as_of = null')).rejects.toThrow()
+    await expect(update('rate_previous_scaled = 0')).rejects.toThrow()
+    await expect(update(`rate_choice = 'both'`)).rejects.toThrow()
+    await expect(
+      update('rate_previous_scaled = null, rate_previous_as_of = null'),
+    ).rejects.toThrow()
+    await expect(
+      update(
+        'rate_base = null, rate_quote = null, rate_scaled = null, rate_source = null, rate_as_of = null, rate_choice = null',
+      ),
+    ).rejects.toThrow()
+    await expect(
+      update('rate_choice = null, rate_previous_scaled = null, rate_previous_as_of = null'),
+    ).resolves.toBeDefined()
+  })
 })

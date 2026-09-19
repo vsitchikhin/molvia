@@ -92,6 +92,13 @@
       "when": 1789829414488,
       "tag": "0012_official_rates_jump",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789829807545,
+      "tag": "0013_trip_rate_jump",
+      "breakpoints": true
     }
   ]
 }
