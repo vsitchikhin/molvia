@@ -22,12 +22,13 @@ const searchCatalogue = vi.fn<(query: string) => Promise<CatalogueEntry[]>>()
 const proposeItem =
   vi.fn<(input: ProposedItem) => Promise<{ entry: CatalogueEntry; created: boolean }>>()
 const addExpense = vi.fn<(tripId: string, body: AddExpenseBody) => Promise<unknown>>()
+const currentTrip = vi.fn<() => Promise<unknown>>(() => Promise.resolve(null))
 vi.mock('@/api', () => ({
   api: {
     searchCatalogue: (query: string) => searchCatalogue(query),
     proposeItem: (input: ProposedItem) => proposeItem(input),
     addExpense: (tripId: string, body: AddExpenseBody) => addExpense(tripId, body),
-    currentTrip: () => Promise.resolve(null),
+    currentTrip: () => currentTrip(),
   },
 }))
 
@@ -353,21 +354,22 @@ describe('«What did you pick up?»', () => {
     const TRIP = 'bbbbbbbb-0000-4000-8000-000000000001'
 
     function onTrip(): void {
-      useTripStore(pinia).apply(
-        tripViewCodec.parse({
-          id: TRIP,
-          startedAt: '2026-09-19T08:00:00.000Z',
-          finishedAt: null,
-          currency: 'AMD',
-          rate: null,
-          rateJump: null,
-          rateStale: false,
-          place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
-          expenses: [],
-          total: [],
-          converted: null,
-        }),
-      )
+      const trip = tripViewCodec.parse({
+        id: TRIP,
+        startedAt: '2026-09-19T08:00:00.000Z',
+        finishedAt: null,
+        currency: 'AMD',
+        rate: null,
+        rateJump: null,
+        rateStale: false,
+        place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
+        expenses: [],
+        total: [],
+        converted: null,
+      })
+      useTripStore(pinia).apply(trip)
+      // The sheet asks the server each time it opens; the server knows the same trip.
+      currentTrip.mockResolvedValue(trip)
     }
 
     async function picked(view: VueWrapper): Promise<void> {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { ApiError } from '@molvia/client'
@@ -294,5 +294,106 @@ describe('trip queue', () => {
 
     localStorage.setItem(`molvia.trip-queue.${ME}`, 'not json')
     expect(fresh().pending).toEqual([])
+  })
+
+  describe('two windows of the app — the installed one and a tab from the bot (A2)', () => {
+    const idsOf = (writes: readonly QueuedWrite[]) =>
+      writes.map((write) => (write.kind === 'add' ? write.body.id : write.expenseId))
+
+    it('keep each other’s purchases: storage is the queue, not a copy', async () => {
+      addExpense.mockRejectedValue(offline())
+      fresh()
+      const pwa = useTripQueueStore(createPinia())
+      const tab = useTripQueueStore(createPinia())
+      pwa.enqueue(add(MILK))
+      tab.enqueue(add(BREAD))
+      await settled()
+
+      expect(idsOf(useTripQueueStore(createPinia()).pending)).toEqual([MILK, BREAD])
+    })
+
+    it('do not bring back a purchase one of them sent and then removed', async () => {
+      addExpense.mockRejectedValueOnce(offline())
+      fresh()
+      const pwa = useTripQueueStore(createPinia())
+      pwa.enqueue(add(MILK))
+      await settled()
+      const tab = useTripQueueStore(createPinia())
+      expect(idsOf(tab.pending)).toEqual([MILK])
+
+      addExpense.mockResolvedValue({ trip: answer('520.00'), created: true })
+      removeExpense.mockResolvedValue(answer('0'))
+      await pwa.flush()
+      pwa.enqueue({ kind: 'remove', tripId: TRIP, expenseId: MILK })
+      await settled()
+      await tab.flush()
+
+      expect(addExpense).toHaveBeenCalledTimes(2)
+      expect(removeExpense).toHaveBeenCalledTimes(1)
+      expect(tab.pending).toEqual([])
+    })
+
+    it('reads a queue kept before writes had keys', () => {
+      const good = { kind: 'remove', tripId: TRIP, expenseId: MILK }
+      localStorage.setItem(`molvia.trip-queue.${ME}`, JSON.stringify([good]))
+      expect(fresh().pending).toEqual([good])
+    })
+  })
+
+  it('holds the queue on a 404 the API did not say itself — a portal’s page (A3)', async () => {
+    addExpense.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'HTTP 404', false))
+    const queue = fresh()
+    queue.enqueue(add(MILK))
+    await queue.flush()
+
+    expect(queue.pending).toHaveLength(1)
+    expect(queue.rejected).toEqual([])
+  })
+
+  it('sets aside a 404 the API said itself', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    addExpense.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
+    const queue = fresh()
+    queue.enqueue(add(MILK))
+    await queue.flush()
+
+    expect(queue.pending).toEqual([])
+    expect(queue.rejected[0]?.code).toBe(ERROR.NOT_FOUND)
+  })
+
+  describe('after a server that broke with the connection up (Р-5)', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('tries again a little later, and later still, without waiting for «online»', async () => {
+      vi.useFakeTimers()
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+      addExpense.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'HTTP 502', false))
+      addExpense.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'HTTP 502', false))
+      addExpense.mockResolvedValue({ trip: answer('520.00'), created: true })
+      const queue = fresh()
+      queue.enqueue(add(MILK))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(addExpense).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(addExpense).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(addExpense).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(addExpense).toHaveBeenCalledTimes(3)
+      expect(queue.pending).toEqual([])
+    })
+
+    it('does not poll with no connection — «online» will say when', async () => {
+      vi.useFakeTimers()
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      addExpense.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(add(MILK))
+      await vi.advanceTimersByTimeAsync(600_000)
+      expect(addExpense).toHaveBeenCalledTimes(1)
+    })
   })
 })

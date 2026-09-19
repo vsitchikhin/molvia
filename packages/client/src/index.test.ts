@@ -165,6 +165,24 @@ describe('everything the client throws is an ApiError', () => {
     expect(await codeOf(client.me())).toBe(ERROR.NOT_FOUND)
   })
 
+  it('and says whether the code is the API’s own word or guessed from a bare status', async () => {
+    // A captive portal's 404 page is `not_found` too; a caller for whom a refusal is final must
+    // tell it from the API's (MOL-24, adversarial A3).
+    const failure = async (promise: Promise<unknown>) =>
+      promise.then(
+        () => null,
+        (error: unknown) => (error instanceof ApiError ? error.answered : null),
+      )
+    expect(await failure(clientServing('<html>nginx</html>', { status: 404 }).me())).toBe(false)
+    expect(await failure(clientAnswering(404, { code: ERROR.NOT_FOUND }).me())).toBe(true)
+    expect(await failure(clientAnswering(400, { code: ISSUE.BODY_INVALID }).health())).toBe(true)
+    const dropped = createClient({
+      baseUrl: 'http://api',
+      fetch: () => Promise.reject(new TypeError('Failed to fetch')),
+    })
+    expect(await failure(dropped.me())).toBe(false)
+  })
+
   it('and passes a good answer through', async () => {
     const client = clientAnswering(200, { status: 'ok', version: '1.0.0', database: 'up' })
     await expect(client.health()).resolves.toEqual({

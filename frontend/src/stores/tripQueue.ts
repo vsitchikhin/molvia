@@ -48,6 +48,15 @@ export interface RejectedWrite {
   readonly code: WireCode
 }
 
+/**
+ * A write as it is kept: with a key of its own, so a window takes out the write it sent and not
+ * whatever is first by then — another window may have sent and removed that one already.
+ */
+interface Kept {
+  readonly key: string
+  readonly write: QueuedWrite
+}
+
 const QUEUE_KEY = 'molvia.trip-queue'
 const REJECTED_KEY = 'molvia.trip-rejected'
 
@@ -55,15 +64,29 @@ const REJECTED_KEY = 'molvia.trip-rejected'
  * What stops the queue rather than dropping a write: no connection or a server that broke
  * (both arrive as INTERNAL), an answer off the contract — the captive portal of a shop's wifi
  * answers 200 with its own page — and an identity the server no longer knows, which is waited
- * out rather than refused (MOL-56). Every other refusal would be answered the same way again,
- * and a write retried forever would hold every write behind it (MOL-24, В-10).
+ * out rather than refused (MOL-56). A code the API did not say itself — a portal's 404 page read
+ * as `not_found` — holds it too (adversarial A3). Every other refusal would be answered the same
+ * way again, and a write retried forever would hold every write behind it (MOL-24, В-10).
  */
 const HOLDS: readonly WireCode[] = [ERROR.INTERNAL, ISSUE.RESPONSE_INVALID, ERROR.NO_ACTOR]
+
+/**
+ * How long to wait before trying again after the server broke while the connection is up: a 502
+ * during a deploy brings no `online` event, and the last purchase of a trip would otherwise wait
+ * for the next time the app is opened (review Р-5). Doubling, and never longer than five minutes.
+ */
+const RETRY_FIRST_MS = 15_000
+const RETRY_LAST_MS = 300_000
 
 type Loose = Record<string, unknown>
 
 function isRecord(value: unknown): value is Loose {
   return typeof value === 'object' && value !== null
+}
+
+function newKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(12))
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 /** Wire form: the bodies carry bigints, and the codecs that read them back are the contract's. */
@@ -108,33 +131,37 @@ function decode(raw: unknown): QueuedWrite | null {
   return kind === 'remove' ? { kind, tripId, expenseId } : null
 }
 
-/** A broken entry is dropped alone: the ones around it are somebody's purchases. */
-function recallWrites(key: string): QueuedWrite[] {
+function parsedList(key: string): unknown[] {
   const raw = read(key)
   if (!raw) return []
   try {
     const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.map(decode).filter((entry): entry is QueuedWrite => entry !== null)
+    return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
   }
 }
 
+/**
+ * A broken entry is dropped alone: the ones around it are somebody's purchases. One kept before
+ * writes had keys — the first version of this store — is given one.
+ */
+function recallKept(key: string): Kept[] {
+  return parsedList(key).flatMap((item: unknown) => {
+    if (!isRecord(item)) return []
+    const keyed = typeof item.key === 'string' && isRecord(item.write)
+    const entry = decode(keyed ? item.write : item)
+    if (!entry) return []
+    return [{ key: keyed && typeof item.key === 'string' ? item.key : newKey(), write: entry }]
+  })
+}
+
 function recallRejected(key: string): RejectedWrite[] {
-  const raw = read(key)
-  if (!raw) return []
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.flatMap((item: unknown) => {
-      if (!isRecord(item) || !isWireCode(item.code)) return []
-      const entry = decode(item.write)
-      return entry ? [{ write: entry, code: item.code }] : []
-    })
-  } catch {
-    return []
-  }
+  return parsedList(key).flatMap((item: unknown) => {
+    if (!isRecord(item) || !isWireCode(item.code)) return []
+    const entry = decode(item.write)
+    return entry ? [{ write: entry, code: item.code }] : []
+  })
 }
 
 function send(entry: QueuedWrite): Promise<TripView> {
@@ -148,6 +175,13 @@ function send(entry: QueuedWrite): Promise<TripView> {
   }
 }
 
+/** Runs `work` alone across every window of the app where the browser can say so. */
+function exclusively(name: string, work: () => Promise<void>): Promise<void> {
+  // The DOM types promise `navigator.locks`; older WebViews do not have it (see stores/actor.ts).
+  const locks = (navigator as unknown as Record<string, unknown>).locks as LockManager | undefined
+  return locks ? locks.request(name, work) : work()
+}
+
 /**
  * Every write to a trip goes through here, with a connection or without one — one path, so the
  * sheet never waits on the network and never learns which case it was in (MOL-24, В-2). A write
@@ -156,9 +190,16 @@ function send(entry: QueuedWrite): Promise<TripView> {
  * **A repeat is safe by construction**: the device names every row (MOL-21), so a write whose
  * answer was lost is sent again and meets its own row — `200`, not a second purchase.
  *
- * **Sent when the connection may be back**: at start, on `online` and when the app comes back
- * into view (`App.vue`). There is no background sync on iOS; a queue left in a frozen PWA goes
- * out the next time it is opened.
+ * **Storage is the queue, not a copy of it** (adversarial A2). The installed app and a tab opened
+ * from the bot's link share it: each window reads it before every change and every send, and
+ * takes out only the write it sent. A window that kept its own copy wrote over the other's
+ * purchase, or sent again an add the other had already sent and removed — and a removed row came
+ * back. One window sends at a time (`navigator.locks`).
+ *
+ * **Sent when the connection may be back**: at start, on `online`, when the app comes back into
+ * view (`App.vue`) and, after a server that broke with the connection up, again a little later.
+ * There is no background sync on iOS; a queue left in a frozen PWA goes out the next time it is
+ * opened.
  *
  * The total is never added up here: until a write is answered, the trip on screen is the
  * server's last one, and `pending` is what the trip screen has to say about the rest (В-11).
@@ -167,23 +208,46 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   const actor = useActorStore()
   const trips = useTripStore()
 
+  let kept: Kept[] = []
   const pending = ref<QueuedWrite[]>([])
   const rejected = ref<RejectedWrite[]>([])
+  // Storage refused the last write: until one succeeds, memory is ahead of it and is the truth.
+  let ahead = false
 
-  function load(id: string | null): void {
-    pending.value = id ? recallWrites(`${QUEUE_KEY}.${id}`) : []
-    rejected.value = id ? recallRejected(`${REJECTED_KEY}.${id}`) : []
+  function show(): void {
+    pending.value = kept.map((item) => item.write)
+  }
+
+  /** What storage holds now — another window may have changed it. */
+  function sync(id: string | null): void {
+    if (!id || ahead) return
+    kept = recallKept(`${QUEUE_KEY}.${id}`)
+    rejected.value = recallRejected(`${REJECTED_KEY}.${id}`)
+    show()
   }
 
   function persist(id: string | null): void {
+    show()
     if (!id) return
-    write(`${QUEUE_KEY}.${id}`, JSON.stringify(pending.value.map(encode)))
-    write(
+    const queued = write(
+      `${QUEUE_KEY}.${id}`,
+      JSON.stringify(kept.map((item) => ({ key: item.key, write: encode(item.write) }))),
+    )
+    const refused = write(
       `${REJECTED_KEY}.${id}`,
       JSON.stringify(
         rejected.value.map((item) => ({ write: encode(item.write), code: item.code })),
       ),
     )
+    ahead = !queued || !refused
+  }
+
+  function load(id: string | null): void {
+    ahead = false
+    kept = []
+    rejected.value = []
+    sync(id)
+    show()
   }
 
   load(actor.id)
@@ -195,6 +259,24 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     },
   )
 
+  // Another window changed the queue: what this one shows follows.
+  window.addEventListener('storage', (event) => {
+    const id = actor.id
+    if (id && (event.key === `${QUEUE_KEY}.${id}` || event.key === `${REJECTED_KEY}.${id}`)) {
+      sync(id)
+    }
+  })
+
+  let retry: ReturnType<typeof setTimeout> | undefined
+  let retryDelay = RETRY_FIRST_MS
+
+  function retryLater(): void {
+    if (!navigator.onLine) return
+    clearTimeout(retry)
+    retry = setTimeout(() => void flush(), retryDelay)
+    retryDelay = Math.min(retryDelay * 2, RETRY_LAST_MS)
+  }
+
   let running: Promise<void> | null = null
 
   /**
@@ -205,7 +287,11 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function flush(): Promise<void> {
     if (!running) {
       const owner = actor.id
-      running = drain(owner).finally(() => {
+      clearTimeout(retry)
+      const run = owner
+        ? exclusively(`${QUEUE_KEY}.${owner}`, () => drain(owner))
+        : Promise.resolve()
+      running = run.finally(() => {
         running = null
         if (actor.id !== owner) void flush()
       })
@@ -213,42 +299,53 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     return running
   }
 
-  async function drain(owner: string | null): Promise<void> {
-    if (!owner) return
+  async function drain(owner: string): Promise<void> {
+    for (;;) {
+      if (actor.id !== owner) return
+      sync(owner)
+      const head = kept[0]
+      if (!head) break
 
-    for (let head = pending.value[0]; head; head = pending.value[0]) {
       let refusal: WireCode | null = null
       let answered: TripView | null = null
       try {
-        answered = await send(head)
+        answered = await send(head.write)
       } catch (error) {
-        const code = error instanceof ApiError ? error.code : ERROR.INTERNAL
-        if (HOLDS.includes(code)) return
+        const known = error instanceof ApiError
+        const code = known ? error.code : ERROR.INTERNAL
+        if (!known || !error.answered || HOLDS.includes(code)) {
+          if (code !== ERROR.NO_ACTOR) retryLater()
+          return
+        }
         refusal = code
       }
 
       // The identity changed while the write was out: the queue in memory is now another
-      // person's, and its head is not the write that was answered.
+      // person's, and the write that was answered is not in it.
       if (actor.id !== owner) return
 
       if (answered) trips.apply(answered)
+      sync(owner)
       if (refusal) {
-        console.warn(`[trip queue] ${head.kind} refused: ${refusal}`)
-        rejected.value = [...rejected.value, { write: head, code: refusal }]
+        console.warn(`[trip queue] ${head.write.kind} refused: ${refusal}`)
+        rejected.value = [...rejected.value, { write: head.write, code: refusal }]
       }
-      pending.value = pending.value.slice(1)
+      kept = kept.filter((item) => item.key !== head.key)
       persist(owner)
     }
+    retryDelay = RETRY_FIRST_MS
   }
 
   /** Kept on the device before anything is sent; a second copy of the same add is ignored. */
   function enqueue(entry: QueuedWrite): void {
+    const id = actor.id
+    sync(id)
     const repeated =
       entry.kind === 'add' &&
-      pending.value.some((queued) => queued.kind === 'add' && queued.body.id === entry.body.id)
+      kept.some((item) => item.write.kind === 'add' && item.write.body.id === entry.body.id)
     if (!repeated) {
-      pending.value = [...pending.value, entry]
-      persist(actor.id)
+      kept = [...kept, { key: newKey(), write: entry }]
+      persist(id)
     }
     void flush()
   }

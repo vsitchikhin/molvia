@@ -543,12 +543,20 @@ database access. In a product about data integrity, two write paths will silentl
 
 - **Every write to a trip goes through the queue on the device (MOL-24),** online or not — one
   path, so the sheet never waits on the network. A write is kept first and sent after, one at a
-  time, in order, at start, on `online` and when the app comes back into view; there is no
-  background sync on iOS. A repeat is safe because the device names every row. No connection, a
-  5xx, an answer off the contract (a shop's captive portal) and a 401 hold the queue; any other
-  refusal is set aside in `rejected` and never retried — sent again it would be refused again and
-  hold everything behind it. The last known trip is remembered per identity for the same reason:
-  the app opened at the shelf with no signal still knows where a purchase goes.
+  time, in order, at start, on `online`, when the app comes back into view and, after a 5xx with
+  the connection up, again with a doubling pause; there is no background sync on iOS. A repeat is
+  safe because the device names every row — **while the row exists**: a remove is a hard delete,
+  and an add sent again after it writes the row anew. So **storage is the queue, not a copy of
+  it**: the installed app and a tab from the bot share it, every window reads it before each
+  change and send, takes out only the write it sent (by the write's own key), and one window
+  sends at a time (`navigator.locks`). No connection, a 5xx, an answer off the contract (a shop's
+  captive portal) and a 401 hold the queue, and so does a code the API did not say itself
+  (`ApiError.answered === false` — a portal's 404 page); any other refusal is set aside in
+  `rejected` and never retried — sent again it would be refused again and hold everything behind
+  it. The last known trip is remembered per identity for the same reason: the app opened at the
+  shelf with no signal still knows where a purchase goes — but **the memory is for when the
+  server cannot be asked, not instead of asking**: the sheet asks every time it opens, and a
+  trip answered finished stops being the current one.
 - **Verdict and expense are separate tables with separate write paths.** Do not merge
   them into one input screen: they have different frequencies and different motivations.
 - **A withdrawn verdict is still a row (MOL-27).** `DELETE /verdicts/:itemId` sets

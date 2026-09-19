@@ -129,13 +129,17 @@ export default defineComponent({
     const tripId = computed(() => trips.current?.id ?? null)
     const editing = computed(() => props.expense !== null)
 
-    /** The trip's total and what is still queued for it: a price must fit beside both (A9). */
+    /**
+     * The trip's total and what is still queued for it: a price must fit beside both (A9). The
+     * purchase of this sheet is not counted — once queued it would be counted twice.
+     */
     function occupied(): Money[] {
       const trip = trips.current
       if (!trip) return []
       const held: Money[] = [...trip.total]
       for (const write of queue.pending) {
         if (write.kind !== 'add' || write.tripId !== trip.id || !write.body.amount) continue
+        if (write.body.id === details.expenseId) continue
         const amount = write.body.amount
         const index = held.findIndex((money) => money.currency === amount.currency)
         if (index === -1) held.push(amount)

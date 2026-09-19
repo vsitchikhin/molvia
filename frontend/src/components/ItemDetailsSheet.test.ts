@@ -287,6 +287,21 @@ describe('ItemDetailsSheet', () => {
     expect(queue.pending).toEqual([])
   })
 
+  it('refuses, under the field, a price the trip could not add to what is queued (A9)', async () => {
+    const first = await render()
+    await type(first.view, 'amount', '50 000 000 000 000 000')
+    await button(first.view, 'Добавить в поход').trigger('click')
+    // Its own purchase, once queued, is not counted against it while the sheet goes.
+    expect(first.view.text()).not.toContain('Это не похоже на сумму')
+    expect(first.queue.pending).toHaveLength(1)
+
+    const second = await render()
+    await type(second.view, 'amount', '50 000 000 000 000 000')
+    await button(second.view, 'Добавить в поход').trigger('click')
+    expect(second.view.text()).toContain('Это не похоже на сумму')
+    expect(second.queue.pending).toHaveLength(1)
+  })
+
   describe('the estimate in roubles (В-7)', () => {
     it('shows the package in the income currency by the rate of the trip', async () => {
       const { view } = await render({ trip: trip('4.82') })
