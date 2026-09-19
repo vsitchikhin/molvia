@@ -7,6 +7,7 @@ import { ERROR, ISSUE } from '@molvia/model'
 import type { PendingVerdict, PendingVerdicts, Rating, VerdictCard } from '@molvia/model'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
 import type { VerdictQueue } from '@/composables/useVerdictQueue'
+import { useActorStore } from '@/stores/actor'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 
 const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
@@ -20,6 +21,7 @@ vi.mock('@/api', () => ({
 }))
 
 const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+const OTHER = '1a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d'
 
 function card(n: number, boughtAt = `2026-09-1${String(n)}T10:00:00.000Z`): PendingVerdict {
   return {
@@ -66,6 +68,27 @@ function freshPinia(): void {
 }
 
 const names = (queue: VerdictQueue) => queue.cards.value.map((item) => item.name)
+
+function sent(itemId: string): { verdict: VerdictCard; created: boolean } {
+  const at = new Date()
+  return { verdict: { itemId, score: 4, review: null, ratedAt: at, updatedAt: at }, created: true }
+}
+
+function deferred<T>() {
+  let resolve: (value: T) => void = () => undefined
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
+/** A rating saved offline: on the phone, waiting, its card gone from the screen. */
+async function savedOffline(queue: VerdictQueue, item: PendingVerdict): Promise<void> {
+  online(false)
+  rateItem.mockRejectedValueOnce(offline())
+  queue.save(item, 4, '')
+  await flushPromises()
+}
 
 describe('useVerdictQueue', () => {
   beforeEach(() => {
@@ -242,5 +265,138 @@ describe('useVerdictQueue', () => {
     pendingVerdicts.mockRejectedValue(offline())
 
     expect((await mounted()).phase.value).toBe('offline')
+  })
+
+  describe('adversarial round 1', () => {
+    it('F1: an answer asked for before a rating was confirmed does not bring it back', async () => {
+      pendingVerdicts.mockResolvedValueOnce(answer([milk, bread]))
+      const queue = await mounted()
+      await savedOffline(queue, milk)
+
+      // Back online: App.vue sends, the screen reloads — on the same `online`. The server read
+      // the queue before it wrote the verdict, and the GET is answered after the PUT.
+      online(true)
+      const put = deferred<{ verdict: VerdictCard; created: boolean }>()
+      const get = deferred<PendingVerdicts>()
+      rateItem.mockReturnValueOnce(put.promise)
+      pendingVerdicts.mockReturnValueOnce(get.promise)
+      void useVerdictDraftsStore().flush()
+      void queue.retry()
+      await flushPromises()
+      put.resolve(sent(milk.itemId))
+      await flushPromises()
+      get.resolve(answer([milk, bread]))
+      await flushPromises()
+
+      expect(names(queue)).toEqual(['Позиция 2'])
+      expect(queue.count.value).toBe(1)
+      expect(localStorage.getItem(`molvia.verdict-queue.${ME}`)).not.toContain(milk.itemId)
+
+      // The next answer, asked for after the rating, is taken as it is.
+      pendingVerdicts.mockResolvedValueOnce(answer([bread]))
+      await queue.retry()
+      expect(names(queue)).toEqual(['Позиция 2'])
+    })
+
+    it('F2: a change of identity never writes one person’s queue under another', async () => {
+      pendingVerdicts.mockResolvedValueOnce(answer([milk, bread]))
+      const queue = await mounted()
+      await savedOffline(queue, milk)
+
+      pendingVerdicts.mockRejectedValue(offline())
+      useActorStore().id = OTHER
+      await flushPromises()
+
+      expect(localStorage.getItem(`molvia.verdict-queue.${OTHER}`)).toBeNull()
+      expect(names(queue)).toEqual([])
+      expect(queue.phase.value).toBe('offline')
+      // The first person's queue is theirs still.
+      expect(localStorage.getItem(`molvia.verdict-queue.${ME}`)).toContain(bread.itemId)
+    })
+
+    it('F3: a rating on its way is off the counter even when its item fell off the page', async () => {
+      pendingVerdicts.mockResolvedValueOnce(answer([milk, bread], 3))
+      const queue = await mounted()
+      await savedOffline(queue, milk)
+
+      rateItem.mockReturnValueOnce(new Promise(() => undefined))
+      pendingVerdicts.mockResolvedValueOnce(answer([bread], 3))
+      online(true)
+      await queue.retry()
+
+      expect(queue.count.value).toBe(2)
+    })
+
+    it('F4: without an identity the queue is idle — no skeleton that waits for nothing', async () => {
+      useActorStore().id = null
+      const queue = await mounted()
+
+      expect(pendingVerdicts).not.toHaveBeenCalled()
+      expect(queue.phase.value).toBe('idle')
+    })
+
+    it('F6: nothing remembered and the load failed — offline, not «all rated»', async () => {
+      pendingVerdicts.mockResolvedValue(answer([]))
+      await mounted()
+
+      freshPinia()
+      online(false)
+      pendingVerdicts.mockRejectedValue(offline())
+      expect((await mounted()).phase.value).toBe('offline')
+    })
+  })
+
+  describe('self-review', () => {
+    it('С-1: a card the server refused can be put off like any other', async () => {
+      rateItem.mockRejectedValue(new ApiError(ISSUE.TEXT_NOT_VISIBLE))
+      pendingVerdicts.mockResolvedValue(answer([milk, bread, cheese]))
+      const queue = await mounted()
+      queue.save(milk, 2, 'x')
+      await flushPromises()
+      queue.skip(bread)
+      expect(queue.current.value).toEqual(milk)
+
+      queue.skip(milk)
+
+      expect(queue.current.value).toEqual(cheese)
+      expect(names(queue).at(-1)).toBe('Позиция 3')
+    })
+
+    it('С-1: a card put off and then rated comes back first when refused, not last', async () => {
+      rateItem.mockRejectedValue(new ApiError(ISSUE.TEXT_NOT_VISIBLE))
+      pendingVerdicts.mockResolvedValue(answer([milk, bread]))
+      const queue = await mounted()
+      queue.skip(milk)
+      queue.save(milk, 2, 'x')
+      await flushPromises()
+
+      expect(names(queue)[0]).toBe('Позиция 3')
+    })
+
+    it('С-8: what was put off is forgotten once a full answer no longer lists it', async () => {
+      pendingVerdicts.mockResolvedValue(answer([milk, bread]))
+      const queue = await mounted()
+      queue.skip(milk)
+
+      pendingVerdicts.mockResolvedValue(answer([bread]))
+      await queue.retry()
+      expect(localStorage.getItem(`molvia.verdict-skips.${ME}`)).toBe('[]')
+
+      // Withdrawn later, the milk is back — in its place, not behind.
+      pendingVerdicts.mockResolvedValue(answer([milk, bread]))
+      await queue.retry()
+      expect(names(queue)).toEqual(['Позиция 3', 'Позиция 2'])
+    })
+
+    it('С-8: a page that is not the whole queue forgets nothing', async () => {
+      pendingVerdicts.mockResolvedValue(answer([milk, bread]))
+      const queue = await mounted()
+      queue.skip(milk)
+
+      pendingVerdicts.mockResolvedValue(answer([bread], 60))
+      await queue.retry()
+
+      expect(localStorage.getItem(`molvia.verdict-skips.${ME}`)).toContain(milk.itemId)
+    })
   })
 })

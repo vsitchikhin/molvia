@@ -5,7 +5,7 @@
       {{ card.name }}<br />{{ t('verdict.question_tail') }}
     </h2>
 
-    <div class="scale" role="group" :aria-label="t('verdict.title')">
+    <div class="scale" role="group" :aria-label="t('verdict.scale_group')">
       <button
         v-for="value in SCORES"
         :key="value"
@@ -72,12 +72,23 @@ function shown(code: WireCode | null | undefined): ErrorCode | null {
   return DOMAIN_CODES.includes(code) ? (code as ErrorCode) : ERROR.INTERNAL
 }
 
+/** A line that draws nothing: spaces, format characters, what `INVISIBLE` strips. */
+const BLANK_LINE = /^[\s\p{Cf}\p{Default_Ignorable_Code_Point}]*$/u
+
 /**
- * Runs of empty lines fold to one: the server refuses two in a row, and the words around them
- * are the person's — folding keeps every one of them.
+ * What the server would refuse and a person cannot see, made into what they meant, before it
+ * goes (adversarial F5): a tab pasted from a note is a space, a line separator a line break, a
+ * line of invisible characters an empty one, and runs of empty lines fold to one — the server
+ * refuses two in a row. Every visible word is kept.
  */
 function tidy(text: string): string {
-  return text.replace(/\r\n?/g, '\n').replace(/\n\s*\n(\s*\n)+/g, '\n\n')
+  return text
+    .replace(/\r\n?|[\u2028\u2029]/g, '\n')
+    .replaceAll('\t', ' ')
+    .split('\n')
+    .map((line) => (BLANK_LINE.test(line) ? '' : line))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
 }
 
 /**

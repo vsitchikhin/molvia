@@ -20,4 +20,9 @@ describe('purchaseDay', () => {
     expect(purchaseDay(at(17, 12), 'ru', at(19, 12))).toBe('17 сент.')
     expect(purchaseDay(at(12, 12), 'en', at(19, 12))).toBe('Sep 12')
   })
+
+  it('С-7: a phone clock behind the server still calls a purchase from just now today', () => {
+    expect(purchaseDay(at(19, 23, 59), 'ru', at(19, 12))).toBe('сегодня')
+    expect(purchaseDay(at(20, 0, 5), 'ru', at(19, 23, 58))).toBe('сегодня')
+  })
 })

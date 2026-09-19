@@ -126,6 +126,7 @@
     "scale_low": "Плохо",
     "scale_high": "Отлично",
     "scale_label": "Оценка {n} из 5",
+    "scale_group": "Оценка",
     "review_label": "Пара слов — если есть что сказать",
     "review_placeholder": "Пахнет крахмалом, а не мясом",
     "save": "Сохранить оценку",

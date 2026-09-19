@@ -10,32 +10,16 @@
       </div>
     </ScreenSkeleton>
 
-    <ScreenState
-      v-else-if="phase === 'error'"
-      kind="error"
-      :title="t('verdict.load_error.title')"
-      :body="t('verdict.load_error.body')"
-      @retry="retry"
-    />
-
-    <!-- No button: the queue loads by itself when the connection is back. -->
-    <ScreenState
-      v-else-if="phase === 'offline'"
-      kind="offline"
-      tone="warn"
-      :title="t('verdict.load_offline.title')"
-      :body="t('verdict.load_offline.body')"
-    />
-
-    <template v-else>
-      <!-- What happened to the last rating, above the next card: the card is the answer to
-           «saved», the notice says where the rating is when it has not reached the server. -->
+    <!-- Without an identity there is no queue to ask for; the notice above says why. -->
+    <template v-else-if="phase !== 'idle'">
+      <!-- What happened to the last rating, above whatever comes next: the next card is the
+           answer to «saved», the notice says where the rating is when it has not arrived. -->
       <ScreenState
         v-if="sending === 'offline'"
         class="notice"
         kind="offline"
         tone="good"
-        :inline="phase === 'ready'"
+        :inline="!alone"
         :title="t('verdict.offline.title')"
         :body="t('verdict.offline.body')"
       />
@@ -43,13 +27,30 @@
         v-else-if="sending === 'failed'"
         class="notice"
         kind="error"
-        :inline="phase === 'ready'"
+        :inline="!alone"
         :title="t('verdict.error.title')"
         :body="t('verdict.error.body')"
         @retry="send"
       />
 
-      <template v-if="phase === 'ready' && current">
+      <ScreenState
+        v-if="phase === 'error'"
+        kind="error"
+        :title="t('verdict.load_error.title')"
+        :body="t('verdict.load_error.body')"
+        @retry="retry"
+      />
+
+      <!-- No button: the queue loads by itself when the connection is back. -->
+      <ScreenState
+        v-else-if="phase === 'offline'"
+        kind="offline"
+        tone="warn"
+        :title="t('verdict.load_offline.title')"
+        :body="t('verdict.load_offline.body')"
+      />
+
+      <template v-else-if="phase === 'ready' && current">
         <p v-if="stale && fetchedAt" class="stale">
           {{ t('verdict.stale', { when: day(fetchedAt) }) }}
         </p>
@@ -70,9 +71,10 @@
       </template>
 
       <!-- Empty is a success here, and the only green empty state in the app: nothing left
-           to rate is an achievement. Unless the last rating is still on its way. -->
+           to rate is an achievement. Not while the last rating is still on its way — it may yet
+           come back, and «all rated» said before it arrives would be taken back. -->
       <ScreenState
-        v-else-if="!sending"
+        v-else-if="phase === 'empty' && drafts.waiting.length === 0"
         kind="empty"
         tone="good"
         :icon="IconCheck"
@@ -126,6 +128,8 @@ export default defineComponent({
     // Only while something is actually waiting: a notice about a rating that has since gone
     // through would be a lie.
     const sending = computed(() => (drafts.waiting.length > 0 ? drafts.held : null))
+    // The notice is the whole screen only when nothing else is: the queue is empty.
+    const alone = computed(() => queue.phase.value === 'empty')
 
     function afterMove(): void {
       moved.value = true
@@ -165,6 +169,7 @@ export default defineComponent({
       fetchedAt: queue.fetchedAt,
       retry: () => void queue.retry(),
       sending,
+      alone,
       moved,
       save,
       skip,

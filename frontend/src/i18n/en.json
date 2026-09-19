@@ -126,6 +126,7 @@
     "scale_low": "Poor",
     "scale_high": "Great",
     "scale_label": "Rating {n} out of 5",
+    "scale_group": "Rating",
     "review_label": "A couple of words — if you have any",
     "review_placeholder": "Smells of starch, not meat",
     "save": "Save the rating",

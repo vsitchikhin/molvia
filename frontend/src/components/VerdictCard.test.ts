@@ -97,6 +97,26 @@ describe('VerdictCard', () => {
     view.unmount()
   })
 
+  it('F5: a tab, a line separator and a line of invisible marks become what they look like', async () => {
+    const view = render()
+    const separator = String.fromCodePoint(0x2028)
+    const invisible = String.fromCodePoint(0x200b)
+    await key(view, 4).trigger('click')
+    await view
+      .get('textarea')
+      .setValue(`Вкусно,\tно дорого${separator}второй раз\n${invisible}\n${invisible}\nещё`)
+    await button(view, en.verdict.save).trigger('click')
+
+    expect(view.emitted('save')).toEqual([[4, 'Вкусно, но дорого\nвторой раз\n\nещё']])
+    view.unmount()
+  })
+
+  it('С-9: the scale is named «Rating», not the section', () => {
+    const view = render()
+    expect(view.get('[role="group"]').attributes('aria-label')).toBe(en.verdict.scale_group)
+    view.unmount()
+  })
+
   it('10: the field holds the review to its bound', () => {
     const view = render()
     expect(view.get('textarea').attributes('maxlength')).toBe('500')

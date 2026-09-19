@@ -7,7 +7,9 @@
  * the card are a style, never the text.
  */
 export function purchaseDay(when: Date, locale: string, now = new Date()): string {
-  const days = Math.round((startOfDay(now) - startOfDay(when)) / DAY_MS)
+  // Never in the future: a phone whose clock lags the server's would call today's purchase by
+  // its date (self-review С-7).
+  const days = Math.max(0, Math.round((startOfDay(now) - startOfDay(when)) / DAY_MS))
   if (days === 0 || days === 1) {
     return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(-days, 'day')
   }

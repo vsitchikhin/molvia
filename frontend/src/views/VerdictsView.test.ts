@@ -8,6 +8,7 @@ import type { PendingVerdict, PendingVerdicts, Rating, VerdictCard } from '@molv
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
+import { useActorStore } from '@/stores/actor'
 import VerdictsView from '@/views/VerdictsView.vue'
 
 const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
@@ -51,10 +52,11 @@ function button(view: VueWrapper, text: string): DOMWrapper<HTMLButtonElement> {
 
 const mounted: VueWrapper[] = []
 
-async function render() {
+async function render({ identity = true } = {}) {
   localStorage.setItem('molvia.actor', ME)
   const pinia = createPinia()
   setActivePinia(pinia)
+  if (!identity) useActorStore().id = null
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/verdicts')
   const view = mount(VerdictsView, {
@@ -222,5 +224,40 @@ describe('VerdictsView', () => {
     await vi.waitFor(() => {
       expect(document.activeElement?.tagName).toBe('H1')
     })
+  })
+
+  it('С-3: while the last rating is on its way, no «everything is rated» — nothing yet', async () => {
+    online(true)
+    let answer: (value: { verdict: VerdictCard; created: boolean }) => void = () => undefined
+    rateItem.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    pendingVerdicts.mockResolvedValue({ items: [milk], total: 1 })
+    const { view } = await render()
+
+    await rate(view, 4)
+    expect(view.text()).not.toContain(en.verdict.empty.title)
+
+    answer(answered(milk.itemId))
+    await flushPromises()
+    expect(view.text()).toContain(en.verdict.empty.title)
+  })
+
+  it('F6: offline with an empty memory — the offline state, not a green success', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
+    ;(await render()).view.unmount()
+
+    online(false)
+    pendingVerdicts.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+    const { view } = await render()
+
+    expect(view.text()).toContain(en.verdict.load_offline.title)
+    expect(view.text()).not.toContain(en.verdict.empty.title)
+  })
+
+  it('F4: no identity — neither a skeleton nor a state, only the notice above', async () => {
+    const { view } = await render({ identity: false })
+
+    expect(view.find('.skeleton').exists()).toBe(false)
+    expect(view.text()).not.toContain(en.verdict.empty.title)
+    expect(pendingVerdicts).not.toHaveBeenCalled()
   })
 })
