@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ERROR } from '#model/support/errors'
+import { ERROR, ISSUE } from '#model/support/errors'
 import type { Expense } from '#model/entities/expense'
 import { formatMoney, money, parseMoney } from '#model/values/money'
 import { parseRate } from '#model/values/rates'
@@ -225,6 +225,12 @@ describe('скачок курса в походе (MOL-39, Р-19, Р-21)', () =>
     ]) {
       expect(tripSchema.safeParse(bad).success).toBe(false)
     }
+  })
+
+  it('называет нарушение своим кодом: чужой курс рядом со снимком и выбор того, чего нет', () => {
+    const codeOf = (value: unknown) => tripSchema.safeParse(value).error?.issues[0]?.message
+    expect(codeOf({ ...trip, previousRate: rate('4.82') })).toBe(ISSUE.SIDE_RATE_UNMATCHED)
+    expect(codeOf({ ...jumped, rateChoice: 'manual' })).toBe(ISSUE.RATE_CHOICE_NOT_HELD)
   })
 
   it('свой курс никогда не «устарел»; официальный старше недели на начало похода — устарел', () => {

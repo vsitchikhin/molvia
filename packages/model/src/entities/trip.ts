@@ -61,7 +61,7 @@ export const tripSchema = tripFields
           rate !== null &&
           samePair(manualRate, rate) &&
           manualRate.source === 'personal')),
-    { error: ISSUE.PREVIOUS_RATE_UNMATCHED },
+    { error: ISSUE.SIDE_RATE_UNMATCHED },
   )
   .refine(
     ({ rateChoice, rateJumped, previousRate, manualRate }) =>
@@ -69,7 +69,7 @@ export const tripSchema = tripFields
       (rateJumped &&
         (rateChoice !== 'previous' || previousRate !== null) &&
         (rateChoice !== 'manual' || manualRate !== null)),
-    { error: ISSUE.RATE_CHOICE_WITHOUT_PREVIOUS },
+    { error: ISSUE.RATE_CHOICE_NOT_HELD },
   )
   .refine((trip) => trip.finishedAt === null || trip.finishedAt >= trip.startedAt, {
     error: ISSUE.TRIP_FINISHED_BEFORE_START,

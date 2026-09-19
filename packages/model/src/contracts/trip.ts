@@ -99,7 +99,10 @@ export const tripViewCodec = z.strictObject({
   startedAt: isoDate,
   finishedAt: isoDate.nullable(),
   currency: currencySchema,
-  /** The rate the trip counts by — the snapshot, or the one before its jump if the person chose it. */
+  /**
+   * The rate the trip counts by: the snapshot, or — when it jumped and the person chose — the rate
+   * before the jump, or their own for this trip (`source: 'personal'`). What `converted` uses.
+   */
   rate: rateCodec.nullable(),
   /**
    * When the snapshotted rate jumped (MOL-39, Р-19, Р-21): the jumped rate, the one before it if
