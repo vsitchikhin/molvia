@@ -36,6 +36,7 @@ import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetHistory } from '@/composables/useSheetHistory'
+import type { LeftBy } from '@/composables/useSheetHistory'
 
 /** A double tap lands within this — a platform convention, not a design token. */
 const DOUBLE_TAP = 300
@@ -102,7 +103,7 @@ export default defineComponent({
     let downOnScrim = false
     let settledAt = 0
 
-    const history = useSheetHistory(() => {
+    const history = useSheetHistory((by: LeftBy) => {
       if (!shown.value) return
       shown.value = false
       closing = false
@@ -110,15 +111,21 @@ export default defineComponent({
       reopen = false
       if (dialog.value?.open) dialog.value.close()
       if (!again && props.open) emit('update:open', false)
-      // At once, whatever the way out: deferred, it was lost whenever the screen went away in the
-      // same move — Vue drops what an unmounted component emits (adversarial Б-7, В-2).
-      emit('closed')
-      // Asked for again — by «save and next» before the pop landed, or from `@closed` in this
-      // very tick, where `open` went false and true before the prop could change and the watcher
-      // never heard of it (adversarial А-6, Б-6). A screen gone meanwhile has no dialog to show.
-      void nextTick(() => {
-        if (props.open && !shown.value) show()
-      })
+      if (by === 'away') {
+        // Now: the screen goes away in this same move, and Vue drops what an unmounted component
+        // emits (adversarial Б-7, В-2).
+        emit('closed')
+      } else {
+        // A tick later, once `open` has gone false: a screen that opens the next sheet from
+        // `@closed` then changes the prop false → true, and the watcher hears it (adversarial
+        // А-6). Guessing «still true a tick later, so asked again» reopened the sheet under a
+        // screen that only wrote its false late, after an `await` (adversarial Г-1).
+        void nextTick(() => {
+          emit('closed')
+        })
+      }
+      // Asked for again while it was closing — «save and next» before the pop landed (Б-6).
+      if (again) void nextTick(show)
     })
 
     function show(): void {

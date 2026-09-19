@@ -22,8 +22,13 @@ import { stepBack } from '@/navigation'
  * «back» reaches it.
  */
 
-/** Why the sheet was put away: a pop or a move under it, or the screen going away with it. */
-export type LeftBy = 'history' | 'unmount'
+/**
+ * How the sheet was put away, because the screen hears of it differently:
+ *   stay — a pop that took the sheet's entry and left the screen where it is (×, Esc, «back»);
+ *   away — the screen is being left in the same move (a push, a replace, `close(2)`, a pop past
+ *          it) or taken out of the page: whatever it is told must be told now, before it is gone.
+ */
+export type LeftBy = 'stay' | 'away'
 
 interface Holder {
   left: (by: LeftBy) => void
@@ -42,12 +47,14 @@ function stackOf(router: Router): Holder[] {
   if (!stack) {
     const created: Holder[] = []
     stacks.set(router, created)
-    router.options.history.listen((_to, _from, { delta }) => {
+    router.options.history.listen((to, _from, { delta }) => {
       // Back by `delta` entries; an unknown distance is one. Forward past an open sheet cannot
       // happen: laying its entry cut the forward history away.
       const count = Math.min(delta < 0 ? -delta : delta === 0 ? 1 : 0, created.length)
+      // The router has not moved yet: its current route is the screen the sheets stand on.
+      const by: LeftBy = to === router.currentRoute.value.fullPath ? 'stay' : 'away'
       for (const holder of created.splice(created.length - count, count).reverse()) {
-        holder.left('history')
+        holder.left(by)
       }
     })
     stack = created
@@ -109,14 +116,14 @@ export function useSheetHistory(onLeft: (by: LeftBy) => void): {
       if (failure || to.fullPath === at) return
       forget()
       unmark()
-      onLeft('history')
+      onLeft('away')
     })
   }
 
   /** Steps back off the entry; the pop that follows closes the sheet. */
   function leave(steps = 1): void {
     if (!holder) {
-      onLeft('history')
+      onLeft('stay')
       return
     }
     stepBack(router, steps)
@@ -127,7 +134,7 @@ export function useSheetHistory(onLeft: (by: LeftBy) => void): {
   onBeforeUnmount(() => {
     if (!holder) return
     forget()
-    onLeft('unmount')
+    onLeft('away')
   })
 
   return { lay, leave, laid: () => holder !== undefined }

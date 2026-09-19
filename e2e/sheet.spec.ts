@@ -359,3 +359,27 @@ test('«forward» passes over the dead entry a push left', async ({ page }) => {
   await page.goForward()
   await expectOn(page, '/verdicts', 'Ratings')
 })
+
+// The kit's own `v-model:open`, made one microtask late — as a screen with an `await` before the
+// write would be. The sheet came back up after × (adversarial Г-1).
+test('× closes the sheet of a screen that writes its false late', async ({ page }) => {
+  await openSheet(page)
+  await page.evaluate(() => {
+    interface Instance {
+      vnode: { props: Record<string, unknown> }
+    }
+    const dialog = document.querySelector('dialog') as unknown as { __vueParentComponent: Instance }
+    const props = dialog.__vueParentComponent.vnode.props
+    const write = props['onUpdate:open'] as (open: boolean) => void
+    props['onUpdate:open'] = (open: boolean) => {
+      void Promise.resolve().then(() => {
+        write(open)
+      })
+    }
+  })
+  const length = await historyLength(page)
+  await sheet(page).getByRole('button', { name: 'Close' }).click()
+  await page.waitForTimeout(1000)
+  await expect(sheet(page)).toBeHidden()
+  expect(await historyLength(page)).toBe(length)
+})

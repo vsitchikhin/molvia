@@ -488,4 +488,47 @@ describe('BottomSheet', () => {
     expect(document.querySelector('dialog')).toBeNull()
     expect(closed).toHaveBeenCalledOnce()
   })
+
+  // A screen that writes `open` after an `await` — a store action, a request before closing.
+  // «The prop is still true a tick later» was read as «asked for again», and the sheet the person
+  // had just closed came back up over a second entry laid with no tap (adversarial Г-1).
+  it.each([
+    ['a microtask', (write: () => void) => void Promise.resolve().then(write)],
+    ['a request', (write: () => void) => void setTimeout(write, 80)],
+  ])('stays shut when the screen writes its false %s late', async (_lag, lag) => {
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/')
+    const open = ref(true)
+    const closed = vi.fn()
+    const push = vi.spyOn(router.options.history, 'push')
+    const host = mount(
+      defineComponent(
+        () => () =>
+          h(
+            BottomSheet,
+            {
+              open: open.value,
+              'onUpdate:open': (next: boolean) => {
+                lag(() => (open.value = next))
+              },
+              onClosed: closed,
+            },
+            { title: () => 'Milk' },
+          ),
+      ),
+      { attachTo: document.body, global: { plugins: [router, createAppI18n('en')] } },
+    )
+    await nextTick()
+    wait(1000)
+    await realTime()
+    const dialog = host.get('dialog').element as HTMLDialogElement
+    await host.get('.head button').trigger('click')
+    landed()
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect(open.value).toBe(false)
+    expect(dialog.open).toBe(false)
+    expect(push).toHaveBeenCalledOnce()
+    expect(closed).toHaveBeenCalledOnce()
+    host.unmount()
+  })
 })
