@@ -147,6 +147,34 @@ test('7: rated without a connection — «saved», and it goes by itself once on
   expect(await waiting(who)).toBe(0)
 })
 
+test('7: rated without a connection and the app closed — sent when it is opened again', async ({
+  page,
+  context,
+  request,
+}) => {
+  const who = await person(request, page)
+  await bought(who, [`Творог ${tag}`, `Сметана ${tag}`])
+
+  await page.goto('/verdicts')
+  await expect(page.getByRole('heading', { level: 2 })).toContainText('Сметана')
+
+  await context.setOffline(true)
+  await rate(page, 3)
+  await expect(page.getByText('The rating is saved')).toBeVisible()
+  await page.close()
+  expect(await waiting(who)).toBe(2)
+
+  // Opened again with the connection back: the app sends at start, the screen shows what is
+  // left — and never the card that was rated, whichever answer lands first.
+  await context.setOffline(false)
+  const again = await context.newPage()
+  await again.goto('/verdicts')
+
+  await expect(again.getByRole('heading', { level: 2 })).toContainText('Творог')
+  await expect.poll(() => waiting(who)).toBe(1)
+  await expect(again.getByText('1 purchase is waiting to be rated')).toBeVisible()
+})
+
 test('the queue that could not load is red and loads again on «Try again»', async ({
   page,
   request,
