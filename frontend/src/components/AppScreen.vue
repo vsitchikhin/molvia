@@ -73,7 +73,6 @@ export default defineComponent({
 
     const bar = ref<HTMLElement | null>(null)
     const sentinel = ref<HTMLElement | null>(null)
-    const collapsed = useCollapsed(sentinel, bar)
 
     const parentTitleKey = computed(() => {
       const parent = route.meta.parent
@@ -81,6 +80,12 @@ export default defineComponent({
     })
     const docked = computed(() => Boolean(parentTitleKey.value ?? slots.meta ?? slots.trailing))
     const tabbed = computed(() => Boolean(route.meta.tab))
+
+    // Under a pinned row the title is gone once it passes the row's bottom edge; with the row
+    // out of the page, once it passes the top of the window.
+    const collapsed = useCollapsed(sentinel, () =>
+      docked.value ? (bar.value?.offsetHeight ?? 0) : 0,
+    )
 
     const { goBack } = useNavigation()
 
@@ -234,17 +239,13 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
-/* 24px below the top of the title: past it, the title counts as scrolled away. */
+/* 24px below the top of the header: scrolled past it, the title counts as gone. */
 .sentinel {
   position: absolute;
-  top: calc(var(--safe-top) + var(--space-4) + var(--space-6));
+  top: var(--space-6);
   width: 1px;
   height: 1px;
   pointer-events: none;
-}
-
-.docked .sentinel {
-  top: var(--space-6);
 }
 
 .content {
