@@ -129,6 +129,7 @@
     "scale_group": "Rating",
     "review_label": "A couple of words — if you have any",
     "review_placeholder": "Smells of starch, not meat",
+    "review_unsupported": "The review has a character that cannot be saved",
     "save": "Save the rating",
     "save_disabled": "Pick a rating",
     "skip": "Not now",

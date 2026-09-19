@@ -179,7 +179,7 @@ describe('VerdictCard', () => {
     view.unmount()
   })
 
-  it('a refusal that is a message to a developer reads as «something went wrong»', () => {
+  it('G2: a refusal the server gives about the text reads as a character that cannot be saved', () => {
     const view = render({
       card: milk,
       score: 2,
@@ -188,8 +188,26 @@ describe('VerdictCard', () => {
       error: ISSUE.TEXT_NOT_VISIBLE,
     })
 
-    expect(view.text()).toContain(en.error.internal)
+    expect(view.text()).toContain(en.verdict.review_unsupported)
     expect(view.text()).not.toContain(ISSUE.TEXT_NOT_VISIBLE)
+    expect(view.text()).not.toContain(en.error.internal)
+    view.unmount()
+  })
+
+  it('G2: a private-use character — not sent, and the field says why, until it is edited', async () => {
+    const view = render()
+    await key(view, 4).trigger('click')
+    await view
+      .get('textarea')
+      .setValue(`Как в ${String.fromCodePoint(0xf8ff)} Store, только дешевле`)
+    await button(view, en.verdict.save).trigger('click')
+
+    expect(view.emitted('save')).toBeUndefined()
+    expect(view.get('.error').text()).toBe(en.verdict.review_unsupported)
+    expect(view.get('textarea').attributes('aria-invalid')).toBe('true')
+
+    await view.get('textarea').setValue('Как в Store, только дешевле')
+    expect(view.find('.error').exists()).toBe(false)
     view.unmount()
   })
 

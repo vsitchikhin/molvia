@@ -32,6 +32,7 @@
       :label="t('verdict.review_label')"
       :placeholder="t('verdict.review_placeholder')"
       :error="error"
+      :error-text="unsupported ? t('verdict.review_unsupported') : null"
     />
 
     <AppButton class="save" :class="{ idle: score === null }" block @click="save">
@@ -64,12 +65,12 @@ const REVIEW_MAX = 500
 const DOMAIN_CODES: readonly string[] = Object.values(ERROR)
 
 /**
- * What the field can say about a refusal. Only the domain's codes are words for a person; an
- * `issue.*` is a message to a developer and is shown as «something went wrong» (MOL-18).
+ * A refusal the domain has words for is shown by its code. An `issue.*` is a message to a
+ * developer (MOL-18); for the review it means only that some character in it cannot be kept,
+ * and the card says that in its own words (owner's decision, G2).
  */
-function shown(code: WireCode | null | undefined): ErrorCode | null {
-  if (!code) return null
-  return DOMAIN_CODES.includes(code) ? (code as ErrorCode) : ERROR.INTERNAL
+function domainCode(code: WireCode | null | undefined): ErrorCode | null {
+  return code && DOMAIN_CODES.includes(code) ? (code as ErrorCode) : null
 }
 
 /**
@@ -109,7 +110,9 @@ export default defineComponent({
 
     const score = ref<Score | null>(props.draft?.score ?? null)
     const review = ref(props.draft?.review ?? '')
-    const error = ref<ErrorCode | null>(shown(props.draft?.error))
+    const error = ref<ErrorCode | null>(domainCode(props.draft?.error))
+    /** The review holds a character the server will not keep: the tab and its kin are tidied. */
+    const unsupported = ref(Boolean(props.draft?.error) && error.value === null)
     let saved = false
 
     const day = computed(() => purchaseDay(props.card.boughtAt, locale.value))
@@ -119,6 +122,7 @@ export default defineComponent({
       [score, review],
       ([nextScore, nextReview]) => {
         error.value = null
+        unsupported.value = false
         if (!saved) emit('change', nextScore, nextReview)
       },
       { flush: 'sync' },
@@ -139,7 +143,7 @@ export default defineComponent({
       const tidied = tidyText(review.value)
       review.value = tidied.trim() ? tidied : ''
       if (review.value && !ratingSchema.shape.review.safeParse(review.value).success) {
-        error.value = ERROR.INTERNAL
+        unsupported.value = true
         return
       }
       // One save per card: a double tap would otherwise hand the next card the second tap.
@@ -151,7 +155,20 @@ export default defineComponent({
       if (props.focusOnMount) title.value?.focus({ preventScroll: true })
     })
 
-    return { t, SCORES, REVIEW_MAX, titleId, title, score, review, error, day, choose, save }
+    return {
+      t,
+      SCORES,
+      REVIEW_MAX,
+      titleId,
+      title,
+      score,
+      review,
+      error,
+      unsupported,
+      day,
+      choose,
+      save,
+    }
   },
 })
 </script>

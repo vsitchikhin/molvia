@@ -92,6 +92,14 @@ describe('AppField', () => {
     expect(view.classes()).toContain('invalid')
   })
 
+  it('shows words the screen gave when the registry has no code, over the code', () => {
+    const view = render({ error: ERROR.INVALID_AMOUNT, errorText: 'Свои слова экрана' })
+    const error = view.get('.error')
+    expect(error.text()).toBe('Свои слова экрана')
+    expect(view.get('input').attributes('aria-invalid')).toBe('true')
+    expect(view.get('input').attributes('aria-describedby')).toBe(error.attributes('id'))
+  })
+
   it('must not fire: no error — no aria-invalid and no empty message', () => {
     const view = render()
     const input = view.get('input')
