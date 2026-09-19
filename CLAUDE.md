@@ -331,7 +331,8 @@ Scraping rate.am was rejected.
 **How the official rate reaches a trip (MOL-39).** A trip snapshots it when it starts, from a
 cache in the database — **«Начать поход» never goes to the network**: a trip at the shelf does
 not wait for a central bank. The API refreshes the cache itself, hourly, and at boot unless
-the cache was written less than an hour ago — `make dev` restarts on every save
+the cache was written less than an hour ago — in development, unless it holds anything at all:
+`make dev` restarts on every save
 (`RATES_REFRESH`, on by default, off in end-to-end runs). The cache holds what the banks
 publish — **one currency against the dram per day**, never a pair; the pair is built at the
 snapshot, and an inverse or a cross is rounded there to the snapshot's six digits.
@@ -348,13 +349,18 @@ snapshot, and an inverse or a cross is rounded there to the snapshot's six digit
   fresher, the trip keeps the CBA rate with its date and `rateStale: true`: the screen says the
   bank has published nothing since. A pair is never built from two providers.
 - **A jump is flagged, not refused (owner's decision).** A rate more than a quarter away from the
-  median of that provider's last five is stored with `jump`; a trip that takes it keeps the rate
-  before the jump beside the snapshot, and the person chooses which to count by
-  (`PUT /trips/:tripId/rate-choice`). The snapshot is never rewritten — only the choice moves.
-  The first rate a provider ever sends has nothing to be measured against.
-- **Strict or nothing:** an answer missing a currency, carrying a zero or a negative, or dated by
-  a day that is not one — `0001-01-01`, `1970-01-01`, the 31st of February — is not written at
-  all. A stale rate with its date beats a mixed one.
+  lower median of its recent rates is stored with `jump`. Recent means: the central bank's own last
+  five; an open source's own from the last week if it has three, and otherwise the central bank's
+  — it is asked only when the bank is silent, so its own history is an old episode or nothing,
+  exactly when a trip takes it. **Fewer than three earlier rates, no judgement:** with two the
+  median is their mean, one ×100 day made the next right day a jump and offered itself as
+  «previous». The trip remembers the jump and shows it always; beside the snapshot it keeps the
+  rate before the jump when there is one no older than a week, and the person chooses — the jumped
+  rate, that one, or their own for this trip, `personal` (`PUT /trips/:tripId/rate-choice`). The
+  snapshot is never rewritten — only the choice moves.
+- **Strict or nothing:** an answer missing a currency, carrying a zero or a negative, dated by a
+  day that is not one — `0001-01-01`, `1970-01-01`, the 31st of February — or past tomorrow —
+  `9999-12-31` — is not written at all. A stale rate with its date beats a mixed one.
 - **An empty cache gives a trip no rate, for good** — the snapshot is written once and never
   filled in later (owner's decision, 19.09.2026).
 
