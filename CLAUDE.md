@@ -198,12 +198,15 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   be resolved before the per-character pass, and the aspirated pairs (`պ`/`փ`, `կ`/`ք`,
   `տ`/`թ`) are collapsed deliberately — the same trade as `ш`/`щ`. A letter no table knows
   keeps itself: dropping it would produce an empty key, and `visibleLine` refuses that, so
-  the item would become unbuildable inside the server.
+  the item would become unbuildable inside the server. **What draws nothing is one list,
+  `INVISIBLE` in `text.ts`**, that the name's measure and the key both strip: two copies
+  drifted twice — the Hangul fillers in MOL-12, U+13441 in MOL-27, each time a valid name
+  whose key its own schema refused, a 500. A test walks every code point to hold them equal.
 - **The tables are frozen, and changing one is a migration.** So are the rules that fold and
   decide `c`. The key is stored, so an edit after the first row is written makes every
   accumulated key foreign — silently, with no error and no log line. MOL-11 changed the
   alphabet without one only because no key was stored yet — no production, no real catalogue
-  in any copy. Same standing as `MINOR_EXPONENT`. Retuning the thresholds is a
+  in any copy; MOL-27 widened `INVISIBLE` under the same condition. Same standing as `MINOR_EXPONENT`. Retuning the thresholds is a
   different thing and does not touch the alphabet.
 - **Candidates come from `word_similarity`, never `similarity`.** `similarity` compares
   whole strings, so a long name dilutes the match: «малако» scored 0.158 against
