@@ -1,6 +1,6 @@
 <template>
   <AppScreen :title="t('advice.title')">
-    <p v-if="state === 'loading'" class="muted">{{ t('state.loading') }}</p>
+    <ScreenSkeleton v-if="state === 'loading'" :groups="[40, 78, 62, 78]" />
 
     <template v-else-if="state === 'offline' || state === 'error'">
       <p class="muted">
@@ -26,6 +26,7 @@ import { useI18n } from 'vue-i18n'
 import IconRefresh from '~icons/mdi/refresh'
 import { api } from '@/api'
 import AppScreen from '@/components/AppScreen.vue'
+import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 
 // Every screen has four states, offline included: the target is a phone at a shelf,
 // where the connection drops more often than anything else fails.
@@ -44,7 +45,7 @@ type State = 'loading' | 'offline' | 'error' | 'ready'
  */
 export default defineComponent({
   name: 'HomeView',
-  components: { AppScreen, IconRefresh },
+  components: { AppScreen, IconRefresh, ScreenSkeleton },
   setup() {
     const { t } = useI18n()
     const state = ref<State>('loading')
