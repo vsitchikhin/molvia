@@ -1,0 +1,135 @@
+import { onUnmounted, ref, shallowRef, watch } from 'vue'
+import type { Ref } from 'vue'
+import type { CatalogueEntry } from '@molvia/model'
+import { api } from '@/api'
+import { useReconnect } from '@/composables/useReconnect'
+
+/**
+ * `idle` — nothing typed, the screen shows the recent items and nothing is asked. `loading` —
+ * the first answer is on its way and there is none to show meanwhile. `ready` and `empty` — the
+ * last answer, with rows or without. `error` and `offline` — the last search failed, told apart
+ * by the connection rather than by the code: a dropped connection and a 500 arrive as the same
+ * error from the client.
+ */
+export type SearchPhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'offline'
+
+/** The pause in typing that sends a search (handoff `02`). */
+export const SEARCH_DEBOUNCE_MS = 250
+
+// Asked afresh each time, never narrowed: the answer before the request says nothing about
+// the connection by the time the request has failed.
+function connected(): boolean {
+  return navigator.onLine
+}
+
+export interface CatalogueSearch {
+  readonly phase: Ref<SearchPhase>
+  readonly results: Ref<CatalogueEntry[]>
+  /** An answer is on screen and a newer search is out. */
+  readonly stale: Ref<boolean>
+  /** The query the answer on screen belongs to — «Не нашли „{query}“» names that one. */
+  readonly answered: Ref<string>
+  retry(): void
+}
+
+/**
+ * The catalogue search behind «Что взяли?», as the screen types it.
+ *
+ * One search per pause, and only the latest one counts: a new pause aborts the search still on
+ * its way, and an answer that arrives anyway — the abort lost the race — is dropped by its
+ * number, not by its error code. While a search is out the previous answer stays on screen,
+ * marked `stale`: a list that blinks empty between keystrokes is worse than an old one.
+ *
+ * An empty field sends nothing. The server would answer `[]` and still record a visit in the
+ * log the 0.3 gate reads, so an untouched field would count as someone coming back.
+ */
+export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
+  const phase = ref<SearchPhase>('idle')
+  const results = shallowRef<CatalogueEntry[]>([])
+  const stale = ref(false)
+  const answered = ref('')
+
+  let latest = 0
+  let pending: ReturnType<typeof setTimeout> | undefined
+  let inFlight: AbortController | undefined
+
+  function cancel(): void {
+    clearTimeout(pending)
+    pending = undefined
+    inFlight?.abort()
+    inFlight = undefined
+  }
+
+  async function run(text: string): Promise<void> {
+    cancel()
+    const mine = ++latest
+
+    if (!connected()) {
+      settleFailed()
+      return
+    }
+
+    const controller = new AbortController()
+    inFlight = controller
+    try {
+      const found = await api.searchCatalogue(text, { signal: controller.signal })
+      if (mine !== latest) return
+      results.value = found
+      answered.value = text
+      phase.value = found.length > 0 ? 'ready' : 'empty'
+      stale.value = false
+    } catch {
+      if (mine !== latest) return
+      settleFailed()
+    } finally {
+      if (inFlight === controller) inFlight = undefined
+    }
+  }
+
+  function settleFailed(): void {
+    results.value = []
+    stale.value = false
+    phase.value = connected() ? 'error' : 'offline'
+  }
+
+  function schedule(text: string): void {
+    clearTimeout(pending)
+    if (phase.value === 'ready' || phase.value === 'empty') stale.value = true
+    else phase.value = 'loading'
+    pending = setTimeout(() => {
+      void run(text)
+    }, SEARCH_DEBOUNCE_MS)
+  }
+
+  watch(query, (text) => {
+    if (text.trim() === '') {
+      // Counted too, so an answer to the text just erased cannot land on the empty field.
+      latest += 1
+      cancel()
+      phase.value = 'idle'
+      results.value = []
+      stale.value = false
+      answered.value = ''
+      return
+    }
+    schedule(text)
+  })
+
+  /** «Повторить», and the same when the connection may be back — at once, without the pause. */
+  function retry(): void {
+    if (query.value.trim() === '') return
+    if (phase.value === 'error' || phase.value === 'offline') phase.value = 'loading'
+    void run(query.value)
+  }
+
+  useReconnect(() => {
+    if (phase.value === 'error' || phase.value === 'offline') retry()
+  })
+
+  onUnmounted(() => {
+    latest += 1
+    cancel()
+  })
+
+  return { phase, results, stale, answered, retry }
+}
