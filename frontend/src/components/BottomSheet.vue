@@ -31,12 +31,12 @@
 
 <script lang="ts">
 import { defineComponent, nextTick, onMounted, ref, useId, watch } from 'vue'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetHistory } from '@/composables/useSheetHistory'
-import type { LeftBy } from '@/composables/useSheetHistory'
 
 /** A double tap lands within this — a platform convention, not a design token. */
 const DOUBLE_TAP = 300
@@ -80,10 +80,19 @@ export default defineComponent({
   components: { AppButton, IconClose },
   props: {
     open: { type: Boolean, required: true },
+    /**
+     * `@closed`: the sheet is put away. A prop, not an event, and that is the point. It is called
+     * a tick after `update:open(false)`, once the prop has gone false, so a screen that opens the
+     * next sheet from it changes the prop false → true and the watcher hears it (adversarial
+     * А-6). By then the sheet may be gone — under `v-if="open"`, or with a screen a push took
+     * away — and Vue drops what an unmounted component emits; a handler held as a prop is still
+     * called (adversarial Б-7, В-2, Д-1). Called now, the event broke А-6; deferred, it broke
+     * Д-1 — each fix undid the other until the delivery stopped depending on the component.
+     */
+    onClosed: { type: Function as PropType<() => void>, default: undefined },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
-    closed: () => true,
   },
   setup(props, { emit, expose }) {
     const { t } = useI18n()
@@ -103,7 +112,7 @@ export default defineComponent({
     let downOnScrim = false
     let settledAt = 0
 
-    const history = useSheetHistory((by: LeftBy) => {
+    const history = useSheetHistory(() => {
       if (!shown.value) return
       shown.value = false
       closing = false
@@ -111,20 +120,14 @@ export default defineComponent({
       reopen = false
       if (dialog.value?.open) dialog.value.close()
       if (!again && props.open) emit('update:open', false)
-      if (by === 'away') {
-        // Now: the screen goes away in this same move, and Vue drops what an unmounted component
-        // emits (adversarial Б-7, В-2).
-        emit('closed')
-      } else {
-        // A tick later, once `open` has gone false: a screen that opens the next sheet from
-        // `@closed` then changes the prop false → true, and the watcher hears it (adversarial
-        // А-6). Guessing «still true a tick later, so asked again» reopened the sheet under a
-        // screen that only wrote its false late, after an `await` (adversarial Г-1).
-        void nextTick(() => {
-          emit('closed')
-        })
-      }
-      // Asked for again while it was closing — «save and next» before the pop landed (Б-6).
+      // Read now: the props of a sheet gone by the next tick are still there, but read once.
+      const closed = props.onClosed
+      void nextTick(() => {
+        closed?.()
+      })
+      // Asked for again while it was closing — «save and next» before the pop landed (Б-6). Not
+      // guessed from the prop still being true a tick later: that reopened the sheet under a screen
+      // that only wrote its false late, after an `await` (adversarial Г-1).
       if (again) void nextTick(show)
     })
 

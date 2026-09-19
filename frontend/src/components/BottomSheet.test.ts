@@ -376,7 +376,9 @@ describe('BottomSheet', () => {
   it('says closed when the screen goes away with it open', async () => {
     const { host, closed } = await render({ open: true })
     host.unmount()
-    expect(closed).toHaveBeenCalledOnce()
+    await vi.waitFor(() => {
+      expect(closed).toHaveBeenCalledOnce()
+    })
   })
 
   // A move of the router while the sheet is open — another screen, or this one with a new query
@@ -529,6 +531,46 @@ describe('BottomSheet', () => {
     expect(dialog.open).toBe(false)
     expect(push).toHaveBeenCalledOnce()
     expect(closed).toHaveBeenCalledOnce()
+    host.unmount()
+  })
+
+  // A sheet mounted only while it is open — a fresh form for each item. Its `update:open(false)`
+  // takes it out of the page before a deferred `closed` could be emitted; a handler held as a prop
+  // is still called (adversarial Д-1).
+  it.each([
+    ['×', 'tap'],
+    ['«back»', 'back'],
+  ] as const)('says closed after %s when it lives under v-if="open"', async (_way, way) => {
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/')
+    const open = ref(true)
+    const closed = vi.fn()
+    const host = mount(
+      defineComponent(
+        () => () =>
+          open.value
+            ? h(
+                BottomSheet,
+                {
+                  open: open.value,
+                  'onUpdate:open': (next: boolean) => (open.value = next),
+                  onClosed: closed,
+                },
+                { title: () => 'Milk' },
+              )
+            : null,
+      ),
+      { attachTo: document.body, global: { plugins: [router, createAppI18n('en')] } },
+    )
+    await nextTick()
+    wait(1000)
+    await realTime()
+    if (way === 'tap') await host.get('.head button').trigger('click')
+    else router.back()
+    await vi.waitFor(() => {
+      expect(closed).toHaveBeenCalledOnce()
+    })
+    expect(host.find('dialog').exists()).toBe(false)
     host.unmount()
   })
 })
