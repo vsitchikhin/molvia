@@ -91,11 +91,25 @@ describe('unitPrice', () => {
 describe('formatUnitPrice', () => {
   const digits = (text: string): string => text.replace(/[\s\u00a0\u202f]/g, '')
 
-  it('reads back the shelf price per unit', () => {
-    const price = unitPrice(parseMoney('5403.12', 'AMD'), parseQuantity('1.128', 'kg'))
-    const text = formatUnitPrice(price)
-    expect(digits(text)).toContain('4790,00')
-    expect(text.endsWith('/kg')).toBe(true)
+  it.each([
+    ['570', '1', 'l', '570,00֏'],
+    ['520', '0.9', 'l', '577,78֏'],
+    ['5403.12', '1.128', 'kg', '4790,00֏'],
+    ['250', '1', 'piece', '250,00֏'],
+  ] as const)('prints %s ֏ for %s %s as %s, as the sheet shows it', (amount, qty, unit, shown) => {
+    expect(
+      digits(formatUnitPrice(unitPrice(parseMoney(amount, 'AMD'), parseQuantity(qty, unit)))),
+    ).toBe(shown)
+  })
+
+  it('prints the sign on the shelf, never the ISO code, and leaves the unit to the screen', () => {
+    // MOL-24: «577,78 AMD/l» is what it printed while only tests read it.
+    const perLitre = (currency: 'AMD' | 'RUB' | 'USD'): string =>
+      formatUnitPrice(unitPrice(parseMoney('520', currency), parseQuantity('0.9', 'l')))
+    expect(perLitre('AMD')).not.toContain('AMD')
+    expect(perLitre('AMD')).not.toContain('/')
+    expect(perLitre('RUB')).toContain('₽')
+    expect(perLitre('USD')).toContain('$')
   })
 
   it('rounds only here, and only to the minor unit', () => {

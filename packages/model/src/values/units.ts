@@ -130,20 +130,27 @@ export function compareUnitPrice(a: UnitPrice, b: UnitPrice): number {
   return a.scaledMinor < b.scaledMinor ? -1 : 1
 }
 
-/** At least two digits whatever the currency keeps: the point is telling 570,00 from 577,78. */
+/**
+ * The amount of a unit price, with at least two digits whatever the currency keeps: the point is
+ * telling 570,00 from 577,78.
+ *
+ * Only the amount: the unit is a word of the interface («л», «шт»), not of the domain, so the
+ * screen names it. The first version printed the unit's code and the currency's ISO symbol —
+ * «577,78 AMD/l» where the shelf shows «577,78 ֏/л» (MOL-24).
+ */
 export function formatUnitPrice(price: UnitPrice, locale = 'ru-RU'): string {
   const exponent = Math.max(MINOR_EXPONENT[price.currency], 2)
   const major = decimalFromScaled(
     price.scaledMinor,
     UNIT_PRICE_DIGITS + MINOR_EXPONENT[price.currency],
   )
-  const amount = new Intl.NumberFormat(locale, {
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: price.currency,
+    currencyDisplay: 'narrowSymbol',
     minimumFractionDigits: exponent,
     maximumFractionDigits: exponent,
   }).format(major)
-  return `${amount}/${price.unit}`
 }
 
 /**

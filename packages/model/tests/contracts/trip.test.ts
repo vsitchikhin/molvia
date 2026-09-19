@@ -92,7 +92,9 @@ describe('tripViewOf', () => {
   it('prices every row per unit, and 520 for 0,9 l comes out dearer than 570 for a litre', () => {
     const view = tripViewOf(trip, place, handoff(), items)
     const shown = view.expenses.map((line) =>
-      line.unitPrice ? digits(formatUnitPrice(line.unitPrice)).replace(/[^\d,/a-z]/g, '') : null,
+      line.unitPrice
+        ? `${digits(formatUnitPrice(line.unitPrice)).replace(/[^\d,]/g, '')}/${line.unitPrice.unit}`
+        : null,
     )
 
     // Only the figures and the unit: the symbol is Intl's to choose, and `formatUnitPrice` has
