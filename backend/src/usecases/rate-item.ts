@@ -2,7 +2,7 @@ import { DomainError, ERROR, newVerdictSchemaFor } from '@molvia/model'
 import type { Rating } from '@molvia/model'
 import type { ItemRepository } from '@/db/items-repository'
 import type { RatedVerdict, VerdictRepository } from '@/db/verdicts-repository'
-import { parseBody } from '@/routes/body'
+import { parseBody } from '@/parse'
 
 export interface RateItemDeps {
   readonly items: ItemRepository
@@ -19,8 +19,8 @@ export interface RateItemDeps {
  * and the kind is not in the request and cannot be — the client must not be the one to say
  * it. The body carries no place until 0.3, so a dish that reached the catalogue some other
  * way is refused here as a body that does not fit, rather than by the CHECK as a 500. It is
- * parsed through the same seam as any body: what failed is the request, only its schema
- * became known after a read.
+ * parsed through the same seam as any body (`@/parse`): what failed is the request, only its
+ * schema became known after a read.
  *
  * No event is recorded: the 0.2 gate is a query over `verdicts` (CLAUDE.md).
  */

@@ -8,7 +8,7 @@ import {
 } from '@molvia/model'
 import type { Rating, Verdict, VerdictAmendment } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
-import { parseBody, parseParams } from '@/routes/body'
+import { parseBody, parseParams } from '@/parse'
 
 export interface VerdictApi {
   /** The use cases, already bound to their repositories by the composition point. */

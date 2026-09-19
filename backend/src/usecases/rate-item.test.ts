@@ -3,7 +3,7 @@ import { DomainError, ERROR, ISSUE, itemSchema, verdictSchema } from '@molvia/mo
 import type { Item, NewVerdict } from '@molvia/model'
 import type { ItemRepository } from '@/db/items-repository'
 import type { VerdictRepository } from '@/db/verdicts-repository'
-import { InvalidBody } from '@/routes/body'
+import { InvalidBody } from '@/parse'
 import { rateItem } from './rate-item'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'

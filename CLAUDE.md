@@ -393,6 +393,7 @@ layer: the core is tested directly.
 ```
 backend/        Fastify
   src/routes/     HTTP: parse -> call the use case -> respond. Zero business logic
+  src/parse.ts    the seam a request is parsed through — shared by routes and use cases
   src/usecases/   scenarios: orchestrate domain and repositories
   src/db/         Drizzle schema, migrations, repositories — the only place with SQL
   tests/          integration tests and their fixtures — they need a database
@@ -469,7 +470,9 @@ the same shape applies to any other package under `packages/`.
 
 - `packages/model` imports nothing but `zod`. Not fastify, not drizzle, not vue,
   not `node:*`. If a rule needs I/O, it is not a domain rule.
-- `usecases` know nothing about HTTP: no `request`, no `reply`, no status codes inside.
+- `usecases` know nothing about HTTP: no `request`, no `reply`, no status codes inside, and
+  no import from `routes` — a body whose schema is known only after a read is parsed
+  through `@/parse`, the same seam the routes use (MOL-27).
 - `routes` contain no business logic and never reach the database except via repositories.
 - SQL lives only in `src/db`. Not a single line of SQL in routes or use cases.
 

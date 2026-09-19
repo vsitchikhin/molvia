@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import { ZodError } from 'zod'
 import { DomainError, ERROR, ISSUE, newExpenseSchema } from '@molvia/model'
-import { parseBody } from '@/routes/body'
+import { parseBody } from '@/parse'
 import { buildServer } from '@/server'
 
 const UUID = '11111111-1111-4111-8111-111111111111'
