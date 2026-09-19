@@ -346,3 +346,37 @@ describe('adversarial А: a unit price past int8', () => {
     expect(unitPriceCodec.parse(wire)).toEqual(price)
   })
 })
+
+describe('the device names rows in lower case (adversarial round 2, В)', () => {
+  const upper = 'AA11BB22-CC33-4D44-8E55-FF6677889900'
+
+  it('refuses an upper-case identifier in either body', () => {
+    expect(
+      startTripBodySchema.safeParse({ id: upper, place: { kind: 'store', name: 'SAS' } }).success,
+    ).toBe(false)
+    expect(addExpenseBodySchema.safeParse({ id: upper, itemId: ashkhar.id }).success).toBe(false)
+    expect(
+      addExpenseBodySchema.safeParse({ id: upper.toLowerCase(), itemId: ashkhar.id }).success,
+    ).toBe(true)
+  })
+})
+
+describe('С-11: an estimate that does not fit is none, not a refusal', () => {
+  it('converted is null when the total, converted, is past int8', () => {
+    const tiny: Trip = {
+      ...trip,
+      rate: {
+        base: 'RUB',
+        quote: 'AMD',
+        scaled: parseRate('0.0001'),
+        source: 'official',
+        asOf: new Date('2026-09-19T08:00:00.000Z'),
+      },
+    }
+    // 90 000 000 000 000 000 ֏ — within int8 as money, ten thousand times past it converted.
+    const huge = expense(bread, '90000000000000000', null)
+    const view = tripViewOf(tiny, place, [huge], [bread])
+    expect(view.total).toEqual([{ minor: 9_000_000_000_000_000_000n, currency: 'AMD' }])
+    expect(view.converted).toBeNull()
+  })
+})

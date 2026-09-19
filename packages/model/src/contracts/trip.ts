@@ -5,11 +5,22 @@ import { newExpenseSchema } from '#model/entities/expense'
 import type { Item } from '#model/entities/item'
 import { newPlaceSchema, placeSchema } from '#model/entities/place'
 import type { Place } from '#model/entities/place'
-import { convertMoney, tripTotal } from '#model/entities/trip'
+import { convertedMinor, tripTotal } from '#model/entities/trip'
 import type { Trip } from '#model/entities/trip'
+import { INT8_MAX } from '#model/support/decimal'
 import { currencySchema, moneyCodec } from '#model/values/money'
+import type { Money } from '#model/values/money'
 import { rateCodec } from '#model/values/rates'
+import type { ExchangeRate } from '#model/values/rates'
 import { quantityCodec, unitPrice, unitPriceCodec } from '#model/values/units'
+
+/**
+ * An identifier the device names a row with, in lower case only. Postgres compares uuids without
+ * case and answers in lower case, so an `AB12…` sent in would come back as `ab12…` and the device
+ * would not find its own row in the reply (MOL-21, adversarial round 2, В). Refused rather than
+ * folded: folding would still leave the device holding the spelling it sent.
+ */
+const deviceIdSchema = z.uuid().regex(/^[0-9a-f-]+$/)
 
 /**
  * The body of «Начать поход».
@@ -25,7 +36,7 @@ import { quantityCodec, unitPrice, unitPriceCodec } from '#model/values/units'
  * the reason «Предложить товар» takes products only — a venue would enter the gate as a store.
  */
 export const startTripBodySchema = z.strictObject({
-  id: z.uuid(),
+  id: deviceIdSchema,
   place: z.strictObject({
     kind: z.literal('store'),
     name: newPlaceSchema.shape.name,
@@ -42,7 +53,7 @@ export type StartTripBody = z.infer<typeof startTripBodySchema>
  * as the search bounds it: nothing longer could have been the query that found the item.
  */
 export const addExpenseBodySchema = newExpenseSchema.omit({ tripId: true }).extend({
-  id: z.uuid(),
+  id: deviceIdSchema,
   query: z.string().max(CATALOGUE_QUERY_MAX).optional(),
 })
 export type AddExpenseBody = z.infer<typeof addExpenseBodySchema>
@@ -106,6 +117,17 @@ export const recentPlacesResponseSchema = z.strictObject({
 })
 export type RecentPlacesResponse = z.infer<typeof recentPlacesResponseSchema>
 
+/**
+ * The total converted for display, or nothing. An estimate, never a fact — so one that does not
+ * fit is shown as none rather than refusing the purchase the trip is being written with: the
+ * answer is built inside the writer's transaction, and a throw here would undo the expense
+ * (MOL-21, С-11).
+ */
+function estimate(total: Money, rate: ExchangeRate): Money | null {
+  const minor = convertedMinor(total, rate)
+  return minor > INT8_MAX ? null : { minor, currency: rate.base }
+}
+
 /** The one way a place becomes what the trip screen sees of it. */
 export function tripPlaceOf(place: Place): TripPlace {
   return { id: place.id, kind: place.kind, name: place.name }
@@ -154,6 +176,6 @@ export function tripViewOf(
     place: tripPlaceOf(place),
     expenses: rows,
     total: [...total],
-    converted: trip.rate && inTripCurrency ? convertMoney(inTripCurrency, trip.rate) : null,
+    converted: trip.rate && inTripCurrency ? estimate(inTripCurrency, trip.rate) : null,
   }
 }

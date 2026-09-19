@@ -558,6 +558,17 @@ describe('the trip', () => {
     expect(new URL(calls[0]?.url ?? '').pathname).toBe('/trips/..%2Factors%2Fme%3Fx%3D/finish')
   })
 
+  it('refuses an upper-case identifier before sending it — the reply would name it otherwise', async () => {
+    const { client, calls } = clientReplying(201, tripWire)
+
+    expect(
+      await codeOf(
+        client.startTrip({ id: TRIP.toUpperCase(), place: { kind: 'store', name: 'SAS' } }),
+      ),
+    ).toBe(ISSUE.BODY_INVALID)
+    expect(calls).toHaveLength(0)
+  })
+
   it('lists recent places', async () => {
     const { client } = clientReplying(200, { places: [tripWire.place] })
     expect(await client.recentPlaces()).toEqual([tripWire.place])
