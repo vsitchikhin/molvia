@@ -560,6 +560,17 @@ database access. In a product about data integrity, two write paths will silentl
   of truth.
 - Split components so they are not overloaded, but without five wrappers around one tag.
   One well-scoped component beats five trivial ones.
+- **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
+  frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
+  bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and
+  gets the chevron, labelled with the parent's title, never the word «Back». Tabs and the
+  chevron move through `useNavigation`: «Trip» is home — leaving it pushes, moving between
+  the other sections replaces, returning is a step back — so the system «back» never walks
+  through tab taps, and a nested screen opened cold gets its parent laid underneath. **No
+  gesture is intercepted**: no touch listener, no `overscroll-behavior` on the root — the
+  edge swipe and Android «back» belong to the browser, and the history is the one source of
+  «back». Only the page scrolls, never an inner container: iOS hides its address bar and the
+  router restores positions only for the window.
 
 ## Code rules
 
@@ -690,7 +701,8 @@ eight write inputs and three rules in `packages/model`, with the wire codecs tha
 quantity need to cross it at all. MOL-5 added the search key; MOL-6 the nine tables of 0.1,
 the GIN index over `search_key` and the constraints that hold the product's key. MOL-8 gave
 the device an identity and the API its first routes; MOL-12 opened the catalogue — search
-and «Предложить товар». No screen yet. Release 0.1 is broken into epics and tasks in Jira.
+and «Предложить товар»; MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of
+«back». No real screen yet: three sections are placeholders. Release 0.1 is broken into epics and tasks in Jira.
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 **What the database guarantees and what it leaves to the domain** is a line, not a habit:
