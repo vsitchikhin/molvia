@@ -145,6 +145,51 @@ describe('one verdict per «actor + item + place»', () => {
     })
     await expect(db.select().from(verdicts)).resolves.toHaveLength(1)
   })
+
+  it('refuses a withdrawal older than the rating it withdraws', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+    const ratedAt = new Date('2026-09-01T10:00:00.000Z')
+    const row = { actorId, itemId, itemKind, score: 4, ratedAt, updatedAt: ratedAt }
+
+    await refuses(
+      () =>
+        db
+          .insert(verdicts)
+          .values({ ...row, id: randomUUID(), deletedAt: new Date(ratedAt.getTime() - 1000) }),
+      CHECK,
+    )
+
+    await db.insert(verdicts).values({ ...row, id: randomUUID(), deletedAt: ratedAt })
+    await expect(db.select().from(verdicts)).resolves.toHaveLength(1)
+  })
+
+  it('keeps no text on a withdrawn verdict, on any write path', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+    const id = randomUUID()
+    await db
+      .insert(verdicts)
+      .values({ id, actorId, itemId, itemKind, score: 2, review: 'Пахнет крахмалом' })
+
+    // Withdrawing and forgetting the text is exactly the slip the constraint is there for.
+    await refuses(
+      () =>
+        db
+          .update(verdicts)
+          .set({ deletedAt: sql`clock_timestamp()` })
+          .where(eq(verdicts.id, id)),
+      CHECK,
+    )
+
+    await db
+      .update(verdicts)
+      .set({ deletedAt: sql`clock_timestamp()`, review: null })
+      .where(eq(verdicts.id, id))
+    const [row] = await db.select().from(verdicts)
+    expect(row?.review).toBeNull()
+    expect(row?.score).toBe(2)
+  })
 })
 
 describe('a price is an observation, not a duplicate', () => {

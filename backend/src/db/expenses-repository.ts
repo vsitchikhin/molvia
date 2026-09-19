@@ -1,5 +1,17 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, count, desc, eq, exists, inArray, isNotNull, notExists, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  exists,
+  inArray,
+  isNotNull,
+  isNull,
+  notExists,
+  sql,
+} from 'drizzle-orm'
 import { DomainError, ERROR, UNIT_PRICE_SCALE, expenseSchema } from '@molvia/model'
 import type { BaseUnit, Currency, Expense, ExpensePatch, NewExpense } from '@molvia/model'
 import { moneyFrom, moneyTo, quantityFrom, quantityTo } from './columns'
@@ -200,6 +212,8 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
                   // rather than `=`, because for a product both sides are null.
                   sql`${verdicts.placeId} is not distinct from
                       (case when ${items.kind} = 'dish' then ${trips.placeId} end)`,
+                  // A withdrawn verdict is no opinion, so the purchase waits for one again.
+                  isNull(verdicts.deletedAt),
                 ),
               ),
           ),

@@ -8,7 +8,7 @@ import {
 } from '@molvia/model'
 import type { Item, ProposedItem } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { parseBody, parseQuery } from '@/routes/body'
+import { parseBody, parseQuery } from '@/parse'
 
 export interface CatalogueApi {
   /** The use case, already bound to its repositories by the composition point. */

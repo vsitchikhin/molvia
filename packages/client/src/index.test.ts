@@ -395,3 +395,120 @@ describe('the catalogue', () => {
     expect(calls).toHaveLength(0)
   })
 })
+
+describe('the verdict', () => {
+  const MILK = '0b6f2c4e-8d1a-4f3b-9c7e-5a2d1e0f3b4c'
+  const cardWire = {
+    itemId: MILK,
+    score: 2,
+    review: 'Пахнет крахмалом.\nМясом — нет',
+    ratedAt: '2026-09-18T10:00:00.000Z',
+    updatedAt: '2026-09-19T08:30:00.000Z',
+  }
+
+  function clientReplying(status: number, body: unknown) {
+    const calls: { url: string; method: string; headers: Headers; body: unknown }[] = []
+    const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      calls.push({
+        url: input instanceof URL ? input.href : typeof input === 'string' ? input : input.url,
+        method: init?.method ?? 'GET',
+        headers: new Headers(init?.headers),
+        body: typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined,
+      })
+      return Promise.resolve(
+        body === undefined
+          ? new Response(null, { status })
+          : new Response(JSON.stringify(body), {
+              status,
+              headers: { 'content-type': 'application/json' },
+            }),
+      )
+    }
+    const client = createClient({ baseUrl: 'http://api', fetch, actorId: () => actorWire.id })
+    return { client, calls }
+  }
+
+  it('rates by PUT to the item, and tells a first verdict from one replaced', async () => {
+    const { client, calls } = clientReplying(201, cardWire)
+
+    const { verdict, created } = await client.rateItem(MILK, {
+      score: 2,
+      review: 'Пахнет крахмалом.\nМясом — нет',
+    })
+
+    expect(calls[0]?.method).toBe('PUT')
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/verdicts/${MILK}`)
+    expect(calls[0]?.headers.get(ACTOR_HEADER)).toBe(actorWire.id)
+    expect(calls[0]?.body).toEqual({ score: 2, review: 'Пахнет крахмалом.\nМясом — нет' })
+    expect(verdict.ratedAt).toEqual(new Date(cardWire.ratedAt))
+    expect(created).toBe(true)
+
+    const again = clientReplying(200, cardWire)
+    expect((await again.client.rateItem(MILK, { score: 2 })).created).toBe(false)
+  })
+
+  it('erases the text by PATCH with review null — the null goes on the wire', async () => {
+    const { client, calls } = clientReplying(200, { ...cardWire, review: null })
+
+    const verdict = await client.amendVerdict(MILK, { review: null })
+
+    expect(calls[0]?.method).toBe('PATCH')
+    expect(calls[0]?.body).toEqual({ review: null })
+    expect(verdict.review).toBeNull()
+  })
+
+  it('withdraws by DELETE and takes the empty 204 as done', async () => {
+    const { client, calls } = clientReplying(204, undefined)
+
+    await expect(client.withdrawVerdict(MILK)).resolves.toBeUndefined()
+    expect(calls[0]?.method).toBe('DELETE')
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/verdicts/${MILK}`)
+  })
+
+  it('reports a repeated withdrawal as «not found», for the queue to count as done', async () => {
+    const { client } = clientReplying(404, { code: ERROR.NOT_FOUND })
+
+    expect(await codeOf(client.withdrawVerdict(MILK))).toBe(ERROR.NOT_FOUND)
+  })
+
+  it('refuses a reply that carries the owner — a leak must not pass unread', async () => {
+    const { client } = clientReplying(200, { ...cardWire, actorId: actorWire.id })
+
+    expect(await codeOf(client.rateItem(MILK, { score: 2 }))).toBe(ISSUE.RESPONSE_INVALID)
+    expect(await codeOf(client.amendVerdict(MILK, { score: 3 }))).toBe(ISSUE.RESPONSE_INVALID)
+  })
+
+  it('sends nothing for an item that is not an identifier, or one that would change the address', async () => {
+    const { client, calls } = clientReplying(201, cardWire)
+
+    for (const itemId of ['молоко', '../actors/me', `${MILK}?x=1`, '', MILK.toUpperCase()]) {
+      expect(await codeOf(client.rateItem(itemId, { score: 2 })), itemId).toBe(ISSUE.PATH_INVALID)
+      expect(await codeOf(client.withdrawVerdict(itemId)), itemId).toBe(ISSUE.PATH_INVALID)
+    }
+    expect(calls).toHaveLength(0)
+  })
+
+  it('names an extra field the way the server does — by the key, not by an empty path', async () => {
+    const { client, calls } = clientReplying(201, cardWire)
+
+    const refusal = client.rateItem(MILK, { score: 2, placeId: MILK } as never)
+
+    await expect(refusal).rejects.toMatchObject({ code: ISSUE.BODY_INVALID })
+    await expect(refusal).rejects.toThrow(`${ISSUE.BODY_INVALID}: placeId`)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('sends nothing the schema refuses, and names it with the code the server would', async () => {
+    const { client, calls } = clientReplying(201, cardWire)
+
+    expect(await codeOf(client.rateItem(MILK, { score: 6 }))).toBe(ISSUE.BODY_INVALID)
+    expect(await codeOf(client.amendVerdict(MILK, {}))).toBe(ISSUE.PATCH_EMPTY)
+    expect(await codeOf(client.amendVerdict(MILK, { review: 'а\u0007б' }))).toBe(
+      ISSUE.TEXT_NOT_VISIBLE,
+    )
+    expect(await codeOf(client.rateItem(MILK, { score: 3, review: 'раз\n\n\nдва' }))).toBe(
+      ISSUE.TEXT_NOT_VISIBLE,
+    )
+    expect(calls).toHaveLength(0)
+  })
+})
