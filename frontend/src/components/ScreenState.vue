@@ -4,7 +4,7 @@
       <component :is="glyph" class="glyph" />
     </span>
     <!-- An alert holds the words only: a card read out with its buttons would say «Try again»
-         as if it were the news. Anything polite goes to the screen's live region instead. -->
+         as if it were the news. Anything polite goes to the app's live region instead. -->
     <div class="message" :role="role">
       <h2 class="title">{{ title }}</h2>
       <p v-if="body" class="body">{{ body }}</p>
@@ -139,8 +139,8 @@ export default defineComponent({
     // An error on the screen interrupts: the person was waiting for an answer that did not
     // come. Everything else is polite — and so is anything inline: a notice is drawn again over
     // every screen the person moves to, and an alert would cut off the heading each move has
-    // just focused (MOL-19, A3, Р-9). Polite words go to the screen's live region when there is
-    // one; outside a screen the block carries `status` itself.
+    // just focused (MOL-19, A3, Р-9). Polite words go to the app's live region when there is
+    // one; outside the app the block carries `status` itself.
     const alerts = computed(
       () => !props.inline && (props.kind === 'error' || props.kind === 'attention'),
     )
@@ -149,17 +149,20 @@ export default defineComponent({
       return announce ? undefined : 'status'
     })
 
+    // Words taken back when they are replaced or the block goes: the region must not keep
+    // saying what is no longer on the screen.
+    let withdraw: (() => void) | undefined
     function speak(): void {
+      withdraw?.()
+      withdraw = undefined
       if (alerts.value || !announce) return
-      announce([props.title, props.body].filter(Boolean).join('. '))
+      withdraw = announce([props.title, props.body].filter(Boolean).join('. '))
     }
     onMounted(speak)
     watch(() => [props.title, props.body], speak)
 
-    // Whatever takes this block away — «Try again», the connection coming back, a store that
-    // recovered — the focus inside it goes to the screen heading, as after a move, rather than
-    // falling to <body> (MOL-19, A2, B1).
     onBeforeUnmount(() => {
+      withdraw?.()
       if (root.value?.contains(document.activeElement)) focusScreenTitle()
     })
 

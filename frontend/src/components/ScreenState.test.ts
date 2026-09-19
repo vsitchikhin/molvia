@@ -1,5 +1,5 @@
-import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref, watch, type VNodeArrayChildren } from 'vue'
 import IconPlus from '~icons/mdi/plus'
 import IconAlert from '~icons/mdi/alert-circle-outline'
@@ -201,13 +201,19 @@ describe('ScreenState', () => {
   })
 
   // A screen as the app draws one: its heading, its live region, and what it puts under them.
+  // `said` is every addition to the region, in order — what a screen reader reads; `region` is
+  // what the region holds now — what browse mode would still find there.
   function onScreen(children: () => VNodeArrayChildren) {
     const said: string[] = []
+    const region: string[] = []
     const Screen = defineComponent({
       setup() {
-        const announcement = provideAnnouncer()
-        watch(announcement, (value) => {
-          if (value) said.push(value)
+        const announcements = provideAnnouncer()
+        watch(announcements, (now, before) => {
+          for (const added of now.filter((a) => !before.some((b) => b.id === a.id))) {
+            said.push(added.text)
+          }
+          region.splice(0, region.length, ...now.map((a) => a.text))
         })
         return () => [h('h1', { tabindex: -1 }, 'Screen'), ...children()]
       },
@@ -216,7 +222,7 @@ describe('ScreenState', () => {
       attachTo: document.body,
       global: { plugins: [createAppI18n('en')] },
     })
-    return { view, said }
+    return { view, said, region }
   }
 
   // Whatever takes the block away — «Try again», the connection coming back, a store that
@@ -254,34 +260,76 @@ describe('ScreenState', () => {
     })
   })
 
-  // Inside a screen the polite words go to the screen's live region, which exists before them:
-  // a region born with its words is often not read (MOL-19, П-2).
-  describe('inside a screen', () => {
-    function hosted(props: Props, title = ref('Title')) {
-      return onScreen(() => [h(ScreenState, { title: title.value, ...props } as never)])
+  // Inside the app the polite words go to its live region, which exists before them: a region
+  // born with its words is often not read (MOL-19, П-2, C2). The region's own timing is the
+  // announcer's test; here the words are waited for.
+  describe('inside the app', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    async function settle(): Promise<void> {
+      await nextTick()
+      vi.advanceTimersByTime(200)
+      await nextTick()
     }
 
-    it('hands a polite state to the screen, and carries no role of its own', async () => {
+    function hosted(props: Props, title = ref('Title'), shown = ref(true)) {
+      return onScreen(() => [
+        shown.value ? h(ScreenState, { title: title.value, ...props } as never) : null,
+      ])
+    }
+
+    it('hands a polite state to the region, and carries no role of its own', async () => {
       const { view, said } = hosted({ kind: 'offline', tone: 'warn', body: 'Body' })
-      await flushPromises()
+      await settle()
       expect(said).toEqual(['Title. Body'])
       expect(view.find('.state [role]').exists()).toBe(false)
       view.unmount()
     })
 
-    it('says it again when the words change', async () => {
+    it('says it again when the words change, and takes the old words back', async () => {
       const title = ref('Title')
-      const { view, said } = hosted({ kind: 'offline', tone: 'warn' }, title)
-      await flushPromises()
+      const { view, said, region } = hosted({ kind: 'offline', tone: 'warn' }, title)
+      await settle()
       title.value = 'Other'
-      await flushPromises()
+      await settle()
       expect(said).toEqual(['Title', 'Other'])
+      expect(region).toEqual(['Other'])
+      view.unmount()
+    })
+
+    // «Try again» failing the same way is still an answer (MOL-19, C1).
+    it('says the same words again when the block comes back with them', async () => {
+      const shown = ref(true)
+      const { view, said } = hosted({ kind: 'offline', tone: 'warn' }, ref('Title'), shown)
+      await settle()
+      shown.value = false
+      await settle()
+      shown.value = true
+      await settle()
+      expect(said).toEqual(['Title', 'Title'])
+      view.unmount()
+    })
+
+    // The region is hidden but read in browse mode: it must not keep a state that is gone (C3).
+    it('takes its words back when it goes', async () => {
+      const shown = ref(true)
+      const { view, region } = hosted({ kind: 'offline', tone: 'warn' }, ref('Title'), shown)
+      await settle()
+      expect(region).toEqual(['Title'])
+      shown.value = false
+      await settle()
+      expect(region).toEqual([])
       view.unmount()
     })
 
     it('keeps an alert its own: an alert inserted is read', async () => {
       const { view, said } = hosted({ kind: 'error' })
-      await flushPromises()
+      await settle()
       expect(said).toEqual([])
       expect(view.get('.state [role]').attributes('role')).toBe('alert')
       view.unmount()

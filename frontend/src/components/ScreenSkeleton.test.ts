@@ -1,6 +1,6 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, watch } from 'vue'
+import { defineComponent, h, nextTick, ref, watch } from 'vue'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
@@ -49,23 +49,31 @@ describe('ScreenSkeleton', () => {
     expect(view.get('.bars').attributes('aria-hidden')).toBe('true')
   })
 
-  // Inside a screen «Loading…» goes to the screen's live region, which exists before it: a
-  // region born with its words is often not read (MOL-19, П-2).
-  it("inside a screen, says it in the screen's live region and carries no role", async () => {
-    const said: string[] = []
+  // Inside the app «Loading…» goes to its live region, which exists before it, and leaves it
+  // with the skeleton — left behind it would be read under the answer (MOL-19, П-2, C3).
+  it('inside the app, says it in the live region, carries no role, and takes it back', async () => {
+    vi.useFakeTimers()
+    const shown = ref(true)
+    const region = ref<string[]>([])
     const Screen = defineComponent({
       setup() {
-        const announcement = provideAnnouncer()
-        watch(announcement, (value) => {
-          if (value) said.push(value)
+        const announcements = provideAnnouncer()
+        watch(announcements, (now) => {
+          region.value = now.map((announcement) => announcement.text)
         })
-        return () => h(ScreenSkeleton, { groups: [40] })
+        return () => (shown.value ? h(ScreenSkeleton, { groups: [40] }) : null)
       },
     })
     const view = mount(Screen, { global: { plugins: [createAppI18n('en')] } })
-    await flushPromises()
-    expect(said).toEqual([en.state.loading])
+    vi.advanceTimersByTime(200)
+    await nextTick()
+    expect(region.value).toEqual([en.state.loading])
     expect(view.find('[role]').exists()).toBe(false)
+
+    shown.value = false
+    await nextTick()
+    expect(region.value).toEqual([])
+    vi.useRealTimers()
   })
 
   it('says it in Russian from the same dictionary', () => {

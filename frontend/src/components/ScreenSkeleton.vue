@@ -13,7 +13,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, type PropType } from 'vue'
+import { defineComponent, onBeforeUnmount, onMounted, type PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 
@@ -49,10 +49,14 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18n()
-    // Said in the screen's live region when there is one: a region born with its words is
-    // often not read (MOL-19, П-2).
+    // Said in the app's live region when there is one, and taken back when loading is over —
+    // «Loading…» left in the region would be read under the answer (MOL-19, П-2, C3).
     const announce = useAnnouncer()
-    onMounted(() => announce?.(t('state.loading')))
+    let withdraw: (() => void) | undefined
+    onMounted(() => {
+      withdraw = announce?.(t('state.loading'))
+    })
+    onBeforeUnmount(() => withdraw?.())
     return { t, announce }
   },
 })
