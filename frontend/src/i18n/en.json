@@ -180,7 +180,18 @@
     "restore_failed": "The server did not recognise the old key either. Nothing changed — the current record is untouched."
   },
   "dev": {
-    "connected": "Server is up, version {version}"
+    "connected": "Server is up, version {version}",
+    "kit": {
+      "title": "Kit",
+      "buttons": "Buttons",
+      "fields": "Fields",
+      "badges": "Badges",
+      "cards": "Cards",
+      "open_sheet": "Open the sheet",
+      "sample_milk": "Milk «Ashkhar»",
+      "sample_meta": "UHT, 2.5%",
+      "date": "Date"
+    }
   },
   "error": {
     "invalid_amount": "That does not look like an amount",

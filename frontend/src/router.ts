@@ -9,7 +9,7 @@ import { watchBrowserAnimatedBack } from '@/transitions'
 /** The three sections of the tab bar. «trip» is home: the main scenario of the product. */
 export type Tab = 'trip' | 'advice' | 'verdicts'
 
-export type RouteName = 'trip' | 'advice' | 'verdicts' | 'item-search'
+export type RouteName = 'trip' | 'advice' | 'verdicts' | 'item-search' | 'kit'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -47,6 +47,20 @@ export const routes = [
     component: ItemSearchView,
     meta: { titleKey: 'item.search_title', parent: 'trip' },
   },
+  // Every piece of the kit in every state, and the sheet in a real history — for the eye in both
+  // schemes and for the end-to-end tests, before any screen uses them (MOL-18). Development only:
+  // in a production build the condition is false, the chunk is never emitted, and the path falls
+  // through to the trip.
+  ...(import.meta.env.DEV
+    ? [
+        {
+          path: '/_kit',
+          name: 'kit',
+          component: () => import('@/views/KitView.vue'),
+          meta: { titleKey: 'dev.kit.title', parent: 'trip' },
+        } satisfies RouteRecordRaw & { name: RouteName },
+      ]
+    : []),
   { path: '/:rest(.*)', redirect: '/' },
 ] satisfies (RouteRecordRaw & { name?: RouteName })[]
 
