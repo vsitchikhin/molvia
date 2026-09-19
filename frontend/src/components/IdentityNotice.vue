@@ -1,36 +1,41 @@
 <template>
-  <ScreenState
-    v-if="notice && !dismissed"
-    class="notice"
-    inline
-    :kind="kind"
-    :tone="tone"
-    :title="t(`identity.${notice}.title`)"
-    :body="t(`identity.${notice}.body`)"
-  >
-    <template v-if="restoreFailed" #default>
-      <p class="failed">{{ t('identity.restore_failed') }}</p>
-    </template>
+  <AppCard v-if="notice && !dismissed" class="notice">
+    <ScreenState
+      inline
+      :kind="kind"
+      :tone="tone"
+      :title="t(`identity.${notice}.title`)"
+      :body="t(`identity.${notice}.body`)"
+      @retry="retry"
+    >
+      <template v-if="restoreFailed" #default>
+        <p class="failed">{{ t('identity.restore_failed') }}</p>
+      </template>
 
-    <template v-if="canRetry || canRestore || notice === 'lost'" #action>
-      <button v-if="canRetry" class="action" type="button" @click="retry">
-        <IconRefresh class="icon" aria-hidden="true" />
-        {{ t('state.retry') }}
-      </button>
-      <button v-if="canRestore" class="action" type="button" @click="restore">
-        {{ t('identity.restore') }}
-      </button>
-      <button v-if="notice === 'lost'" class="action" type="button" @click="dismissed = true">
-        {{ t('identity.action') }}
-      </button>
-    </template>
-  </ScreenState>
+      <!-- An error brings its own «Try again»; offline asks for it here, since coming back
+           online is exactly when trying again works. -->
+      <template v-if="notice === 'offline' || notice === 'lost'" #action>
+        <AppButton v-if="notice === 'offline'" block @click="retry">
+          <template #icon><IconRefresh /></template>
+          {{ t('state.retry') }}
+        </AppButton>
+        <AppButton v-if="canRestore" block @click="restore">
+          {{ t('identity.restore') }}
+        </AppButton>
+        <AppButton v-if="notice === 'lost'" variant="ghost" block @click="dismissed = true">
+          {{ t('identity.action') }}
+        </AppButton>
+      </template>
+    </ScreenState>
+  </AppCard>
 </template>
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconRefresh from '~icons/mdi/refresh'
+import AppButton from '@/components/AppButton.vue'
+import AppCard from '@/components/AppCard.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { useActorStore } from '@/stores/actor'
 
@@ -56,22 +61,20 @@ function noticeFor(state: string): Notice | null {
 
 export default defineComponent({
   name: 'IdentityNotice',
-  components: { IconRefresh, ScreenState },
+  components: { AppButton, AppCard, IconRefresh, ScreenState },
   setup() {
     const { t } = useI18n()
     const actor = useActorStore()
     const dismissed = ref(false)
 
     const notice = computed(() => noticeFor(actor.state))
-    // Retrying is only useful where the app might succeed next time. «Uninvited» needs a
-    // different link, not another attempt, and a button there would promise otherwise.
-    const canRetry = computed(() => notice.value === 'error' || notice.value === 'offline')
     // Read from a ref rather than by asking storage: a list that changed while the state
     // stayed `lost` — which is exactly what a failed restore does — left the button showing
     // a stale answer (М-23).
     const canRestore = computed(() => notice.value === 'lost' && actor.lost.length > 0)
     // A lost identity and a missing invite are neither an error of the screen nor offline:
-    // something the person has to know. The screen state gives each its tone and its role.
+    // something the person has to know, with no «Try again» — «uninvited» needs a different
+    // link, not another attempt. The screen state gives each its tone, its role, its retry.
     const kind = computed(() => {
       if (notice.value === 'error' || notice.value === 'offline') return notice.value
       return 'attention' as const
@@ -88,7 +91,6 @@ export default defineComponent({
       t,
       notice,
       dismissed,
-      canRetry,
       canRestore,
       kind,
       tone,
@@ -109,24 +111,5 @@ export default defineComponent({
   margin: 0;
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
-}
-
-/* Until AppButton (MOL-18) is on master: then these become its primary and ghost. */
-.action {
-  @include touch-target;
-
-  gap: var(--space-2);
-  padding: 0 var(--space-4);
-  border: var(--hairline) solid currentcolor;
-  border-radius: var(--radius);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-weight: var(--weight-medium);
-}
-
-.icon {
-  width: 1.25em;
-  height: 1.25em;
 }
 </style>
