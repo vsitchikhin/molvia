@@ -127,6 +127,20 @@ describe('the first launch', () => {
     expect(localStorage.getItem(INVITE_KEY)).toBe('let-me-in')
   })
 
+  // The router keeps its record of the entry underneath in the history state; wiping it made
+  // «back» from a screen opened by an invite link lose its way (MOL-17).
+  it('keeps the history state while scrubbing the code', async () => {
+    createActor.mockResolvedValue(FIRST)
+    const { store } = await freshStore()
+    const routerState = { back: '/', current: '/?c=let-me-in', position: 1 }
+    window.history.replaceState(routerState, '', window.location.href)
+
+    await store.start()
+
+    expect(window.location.search).not.toContain('c=')
+    expect(window.history.state).toEqual(routerState)
+  })
+
   it('remembers the invite code, so the next launch needs no link', async () => {
     createActor.mockResolvedValue(FIRST)
     await (await freshStore()).store.start()

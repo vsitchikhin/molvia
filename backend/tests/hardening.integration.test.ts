@@ -96,7 +96,8 @@ describe('порядок внутри одной транзакции', () => {
     const entered = await db.transaction(async (tx) => {
       const inTx = createVerdictRepository(tx)
       const ids: string[] = []
-      for (const itemId of itemIds) ids.push((await inTx.put(actorId, { itemId, score: 4 })).id)
+      for (const itemId of itemIds)
+        ids.push((await inTx.put(actorId, { itemId, score: 4 })).verdict.id)
       return ids
     })
 
@@ -187,7 +188,7 @@ describe('вердикт хранит отзыв', () => {
     const itemId = await insertItem(db)
 
     await verdicts.put(actorId, { itemId, score: 5, review: 'отличное, брать всегда' })
-    const second = await verdicts.put(actorId, { itemId, score: 4 })
+    const { verdict: second } = await verdicts.put(actorId, { itemId, score: 4 })
 
     expect(second.score).toBe(4)
     expect(second.review).toBe('отличное, брать всегда')
@@ -199,7 +200,11 @@ describe('вердикт хранит отзыв', () => {
     const itemId = await insertItem(db)
 
     await verdicts.put(actorId, { itemId, score: 5, review: 'первое впечатление' })
-    const second = await verdicts.put(actorId, { itemId, score: 5, review: 'передумал' })
+    const { verdict: second } = await verdicts.put(actorId, {
+      itemId,
+      score: 5,
+      review: 'передумал',
+    })
 
     expect(second.review).toBe('передумал')
   })

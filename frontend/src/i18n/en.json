@@ -3,6 +3,7 @@
     "name": "Molvia"
   },
   "nav": {
+    "label": "Sections",
     "trip": "Trip",
     "advice": "What to buy",
     "verdicts": "Ratings",

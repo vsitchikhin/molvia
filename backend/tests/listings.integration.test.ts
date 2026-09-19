@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { and, eq, sql } from 'drizzle-orm'
 import { unitPrice } from '@molvia/model'
 import type { Money, Quantity } from '@molvia/model'
 import { connectDrizzle } from './db'
@@ -8,6 +9,7 @@ import { createExpenseRepository } from '@/db/expenses-repository'
 import { createPlaceRepository } from '@/db/places-repository'
 import { createTripRepository } from '@/db/trips-repository'
 import { createVerdictRepository } from '@/db/verdicts-repository'
+import { verdicts as verdictsTable } from '@/db/schema'
 
 const { db, close } = connectDrizzle()
 const places = createPlaceRepository(db)
@@ -17,6 +19,14 @@ const verdicts = createVerdictRepository(db)
 
 const litre: Quantity = { milli: 900n, unit: 'l' }
 const price: Money = { minor: 57_000n, currency: 'AMD' }
+
+/** Withdraws the way the repository will, without leaning on it: the reads are what is tested. */
+async function withdraw(actorId: string, itemId: string): Promise<void> {
+  await db
+    .update(verdictsTable)
+    .set({ deletedAt: sql`clock_timestamp()`, review: null })
+    .where(and(eq(verdictsTable.actorId, actorId), eq(verdictsTable.itemId, itemId)))
+}
 
 beforeEach(async () => {
   await clearAll(db)
@@ -140,6 +150,22 @@ describe('куплено, но не оценено', () => {
     expect(await expenses.unratedFor(actorId, 10)).toHaveLength(0)
   })
 
+  it('снятая оценка — не мнение: покупка снова ждёт оценки', async () => {
+    const actorId = await insertActor(db)
+    const itemId = await insertItem(db)
+    const { trip } = await trips.start(
+      actorId,
+      { id: randomUUID(), placeId: await insertPlace(db) },
+      'AMD',
+      null,
+    )
+    await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId })
+    await verdicts.put(actorId, { itemId, score: 4 })
+
+    await withdraw(actorId, itemId)
+    expect(await expenses.unratedFor(actorId, 10)).toHaveLength(1)
+  })
+
   it('у блюда покупку закрывает оценка того же места, а не любого', async () => {
     const actorId = await insertActor(db)
     const cafe = await insertPlace(db, { kind: 'venue', name: 'Кафе один' })
@@ -260,5 +286,21 @@ describe('оценки', () => {
 
     expect(await verdicts.listFor(actorId, 10)).toHaveLength(2)
     expect(await verdicts.listFor(actorId, 1)).toHaveLength(1)
+  })
+
+  it('снятая не читается ни списком, ни по позиции, но строка остаётся для ворот', async () => {
+    const actorId = await insertActor(db)
+    const milk = await insertItem(db, { name: 'Молоко', searchKey: 'moloko' })
+    const cheese = await insertItem(db, { name: 'Сыр', searchKey: 'syr' })
+    await verdicts.put(actorId, { itemId: milk, score: 5, review: 'сливочное' })
+    await verdicts.put(actorId, { itemId: cheese, score: 2 })
+
+    await withdraw(actorId, milk)
+
+    expect((await verdicts.listFor(actorId, 10)).map((verdict) => verdict.itemId)).toEqual([cheese])
+    expect(await verdicts.forItem(actorId, milk, null)).toBeNull()
+    const [row] = await db.select().from(verdictsTable).where(eq(verdictsTable.itemId, milk))
+    expect(row?.deletedAt).toBeInstanceOf(Date)
+    expect(row?.score).toBe(5)
   })
 })

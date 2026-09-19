@@ -1,9 +1,12 @@
 import { mount } from '@vue/test-utils'
 import type { HealthResponse } from '@molvia/model'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia } from 'pinia'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
+import { routes } from '@/router'
 import HomeView from '@/views/HomeView.vue'
 
 const health = vi.fn<() => Promise<HealthResponse>>()
@@ -21,8 +24,11 @@ function online(value: boolean): void {
  * `fallbackLocale` a missing key prints its own name instead of the English text. Either way
  * the test confirms behaviour nobody ships.
  */
-function render(locale: 'ru' | 'en' = 'en') {
-  return mount(HomeView, { global: { plugins: [createAppI18n(locale)] } })
+async function render(locale: 'ru' | 'en' = 'en') {
+  // The screen sits in AppScreen, which reads its route and the identity notice's store.
+  const router = createRouter({ history: createMemoryHistory(), routes })
+  await router.push('/advice')
+  return mount(HomeView, { global: { plugins: [router, createPinia(), createAppI18n(locale)] } })
 }
 
 describe('HomeView', () => {
@@ -33,7 +39,7 @@ describe('HomeView', () => {
 
   it('shows the offline state without calling the API at all', async () => {
     online(false)
-    const view = render()
+    const view = await render()
     await vi.waitFor(() => {
       expect(view.text()).toContain(en.advice.offline.title)
     })
@@ -43,7 +49,7 @@ describe('HomeView', () => {
   it('reports a failure instead of an empty screen, and offers a retry', async () => {
     online(true)
     health.mockRejectedValue(new Error('boom'))
-    const view = render()
+    const view = await render()
     await vi.waitFor(() => {
       expect(view.text()).toContain(en.advice.error.title)
     })
@@ -55,7 +61,7 @@ describe('HomeView', () => {
     health
       .mockRejectedValueOnce(new Error('boom'))
       .mockResolvedValue({ status: 'ok', version: '1.2.3', database: 'up' })
-    const view = render()
+    const view = await render()
     await vi.waitFor(() => {
       expect(view.text()).toContain(en.advice.error.title)
     })
@@ -74,7 +80,7 @@ describe('HomeView', () => {
     // же словарём не показывает ничего.
     online(true)
     health.mockResolvedValue({ status: 'ok', version: '1.2.3', database: 'up' })
-    const view = render('ru')
+    const view = await render('ru')
 
     await vi.waitFor(() => {
       expect(view.text()).toContain('1.2.3')

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SEARCH_KEY_TABLES, toSearchKey } from '#model/support/search-key'
-import { visibleLine } from '#model/support/text'
+import { INVISIBLE, visibleLine } from '#model/support/text'
 
 describe('toSearchKey', () => {
   it('folds case, so the same name typed three ways is one key', () => {
@@ -172,6 +172,26 @@ describe('toSearchKey', () => {
       expect(toSearchKey(name)).toBe('!')
       expect(visibleLine(800).safeParse(toSearchKey(name)).success, name).toBe(true)
     }
+  })
+
+  it('agrees with visibleLine for every character that draws nothing, not a chosen four', () => {
+    // MOL-27: U+13441 joined the name's measure and not the key's, and «𓑁!» — a valid name —
+    // got a key its own schema refused: a 500. Every code point the name's measure strips,
+    // in front of a visible «!», must give a key that parses back.
+    const name = visibleLine(200)
+    const key = visibleLine(800)
+    // Built from the list itself, so a character added to it later is walked too (С-23).
+    const strips = new RegExp(`[\\p{Z}\\p{M}${INVISIBLE}]`, 'u')
+    const broken: string[] = []
+    for (let code = 0; code <= 0x10ffff; code += 1) {
+      if (code >= 0xd800 && code <= 0xdfff) continue
+      const char = String.fromCodePoint(code)
+      if (!strips.test(char)) continue
+      const candidate = `${char}!`
+      if (!name.safeParse(candidate).success) continue
+      if (!key.safeParse(toSearchKey(candidate)).success) broken.push(code.toString(16))
+    }
+    expect(broken).toEqual([])
   })
 
   it('tidies the fallback the same way it tidies a real key', () => {

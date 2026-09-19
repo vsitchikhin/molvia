@@ -7,7 +7,7 @@ import { testDatabaseUrl } from './db'
 import { MIGRATIONS } from '@/db/migrate'
 
 /**
- * 0009 on a database that already holds what it makes one: two cards of one café that differ
+ * 0010 on a database that already holds what it makes one: two cards of one café that differ
  * only by a variation selector — legal before it, one place after. Without the merge the new
  * unique index refused them, and since migrations run when the API starts, the API did not
  * (MOL-21, adversarial round 4, А).
@@ -25,7 +25,7 @@ const journal = JSON.parse(readFileSync(`${MIGRATIONS}/meta/_journal.json`, 'utf
 }
 
 const url = new URL(testDatabaseUrl())
-const database = `${url.pathname.slice(1)}_0009`
+const database = `${url.pathname.slice(1)}_0010`
 const maintenance = new URL(url.toString())
 maintenance.pathname = '/postgres'
 const ownUrl = new URL(url.toString())
@@ -59,11 +59,11 @@ afterAll(async () => {
   await admin.end()
 })
 
-describe('0009: places that the new identity makes one', () => {
+describe('0010: places that the new identity makes one', () => {
   it('merges them into the oldest card instead of refusing to start', async () => {
-    const before = journal.entries.filter((entry) => entry.idx < 9)
-    const [nine] = journal.entries.filter((entry) => entry.idx === 9)
-    expect(nine?.tag).toBe('0009_place_identity_selectors')
+    const before = journal.entries.filter((entry) => entry.idx < 10)
+    const [ten] = journal.entries.filter((entry) => entry.idx === 10)
+    expect(ten?.tag).toBe('0010_place_identity_selectors')
     for (const entry of before) await apply(entry)
 
     const actorId = randomUUID()
@@ -81,7 +81,7 @@ describe('0009: places that the new identity makes one', () => {
       insert into items (id, kind, name, search_key, default_unit)
       values (${dishId}, 'dish', 'Хашлама', 'hashlama', 'piece')
     `
-    // What `POST /trips` wrote without complaint before 0009: the old identity tells these apart.
+    // What `POST /trips` wrote without complaint before 0010: the old identity tells these apart.
     await sql`
       insert into places (id, kind, name, country, city, created_at)
       values (${keptPlaceId}, 'venue', ${`Кафе ${CUP}`}, 'AM', 'Гюмри', now() - interval '1 day'),
@@ -101,7 +101,7 @@ describe('0009: places that the new identity makes one', () => {
              (${randomUUID()}, ${actorId}, ${dishId}, 'dish', ${duplicatePlaceId}, 2, now(), now())
     `
 
-    await apply(nine ?? { idx: 9, tag: '0009_place_identity_selectors' })
+    await apply(ten ?? { idx: 10, tag: '0010_place_identity_selectors' })
 
     const places = await sql<
       { id: string; name: string }[]

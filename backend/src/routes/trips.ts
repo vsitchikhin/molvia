@@ -10,7 +10,7 @@ import {
 } from '@molvia/model'
 import type { Actor, AddExpenseBody, ExpensePatch, StartTripBody, TripView } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
-import { parseBody } from '@/routes/body'
+import { parseBody } from '@/parse'
 
 export interface TripsApi {
   /** The use cases, already bound to their repositories by the composition point. */

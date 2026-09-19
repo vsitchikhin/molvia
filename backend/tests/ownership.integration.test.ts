@@ -122,8 +122,8 @@ describe('вердикт', () => {
   it('оценка одного не переписывает оценку другого', async () => {
     const { itemId, owner, stranger } = await scene()
 
-    const mine = await verdicts.put(owner, { itemId, score: 5 })
-    const theirs = await verdicts.put(stranger, { itemId, score: 1 })
+    const { verdict: mine } = await verdicts.put(owner, { itemId, score: 5 })
+    const { verdict: theirs } = await verdicts.put(stranger, { itemId, score: 1 })
 
     expect(theirs.id).not.toBe(mine.id)
     expect((await verdicts.forItem(owner, itemId, null))?.score).toBe(5)

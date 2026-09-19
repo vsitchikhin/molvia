@@ -1,5 +1,5 @@
 {
-  "id": "c3a565ed-95e9-404c-b0e3-56197eda9f0d",
+  "id": "8c7a3c3a-02ee-46c6-b1e2-c4c694aad4ce",
   "prevId": "68cb1fba-a7d6-409e-a06d-c4efab135e28",
   "version": "7",
   "dialect": "postgresql",
@@ -588,13 +588,13 @@
               "nulls": "last"
             },
             {
-              "expression": "btrim(lower(regexp_replace(normalize(\"city\", NFKC), E'[\\uFE00-\\uFE0F\\U000E0100-\\U000E01EF]', '', 'g')), E' \\t\\r\\n\\u00A0\\u200B\\u200C\\u200D\\uFEFF')",
+              "expression": "btrim(lower(normalize(\"city\", NFKC)), E' \\t\\r\\n\\u00A0\\u200B\\u200C\\u200D\\uFEFF')",
               "asc": true,
               "isExpression": true,
               "nulls": "last"
             },
             {
-              "expression": "btrim(lower(regexp_replace(normalize(\"name\", NFKC), E'[\\uFE00-\\uFE0F\\U000E0100-\\U000E01EF]', '', 'g')), E' \\t\\r\\n\\u00A0\\u200B\\u200C\\u200D\\uFEFF')",
+              "expression": "btrim(lower(normalize(\"name\", NFKC)), E' \\t\\r\\n\\u00A0\\u200B\\u200C\\u200D\\uFEFF')",
               "asc": true,
               "isExpression": true,
               "nulls": "last"
@@ -932,6 +932,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "clock_timestamp()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -1001,6 +1007,14 @@
         "verdicts_updated_after_rated": {
           "name": "verdicts_updated_after_rated",
           "value": "\"verdicts\".\"updated_at\" >= \"verdicts\".\"rated_at\""
+        },
+        "verdicts_deleted_after_rated": {
+          "name": "verdicts_deleted_after_rated",
+          "value": "\"verdicts\".\"deleted_at\" >= \"verdicts\".\"rated_at\""
+        },
+        "verdicts_withdrawn_without_review": {
+          "name": "verdicts_withdrawn_without_review",
+          "value": "\"verdicts\".\"deleted_at\" is null or \"verdicts\".\"review\" is null"
         }
       },
       "isRLSEnabled": false

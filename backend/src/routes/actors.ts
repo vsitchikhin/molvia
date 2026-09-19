@@ -3,7 +3,7 @@ import { DomainError, ERROR, ISSUE, actorCodec } from '@molvia/model'
 import type { Actor } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { withInvite } from '@/routes/actor'
-import { InvalidBody } from '@/routes/body'
+import { InvalidBody } from '@/parse'
 
 /**
  * The entity leaves through its codec rather than as the object the repository built: in the

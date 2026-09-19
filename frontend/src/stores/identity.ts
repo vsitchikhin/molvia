@@ -118,7 +118,9 @@ export function takeInviteCodeFromUrl(): void {
   invite = fromLink
   write(INVITE_KEY, fromLink)
   url.searchParams.delete('c')
-  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+  // The state is kept: it is the router's record of the entry underneath, and an empty one
+  // makes the chevron and the tab bar lose track of where «back» leads.
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
 export function inviteCode(): string | null {

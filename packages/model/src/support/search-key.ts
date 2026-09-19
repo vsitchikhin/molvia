@@ -8,6 +8,8 @@
  * GOST 7.79 or ISO 9, is not a requirement here and loses to the measurement every time.
  */
 
+import { INVISIBLE } from './text'
+
 /**
  * Frozen on purpose. The key is stored, so editing the table after the first row is written
  * makes every accumulated key foreign — and it does so silently, with no error and no log
@@ -200,8 +202,9 @@ const WHITESPACE = /\s+/gu
  * `visibleLine` as a name while its key came out as the filler alone, which the very same
  * `visibleLine` then refused. That is an item the server cannot parse back after building
  * it — the failure this whole fallback exists to prevent, arriving through the front door.
+ * So it is no longer a copy: both are built from `INVISIBLE` (MOL-27).
  */
-const IGNORABLE = /[\p{Cf}\p{Default_Ignorable_Code_Point}⠀]/gu
+const IGNORABLE = new RegExp(`[${INVISIBLE}]`, 'gu')
 
 /**
  * Folding runs to a fixed point, and the loop has no ceiling on purpose. A single pass is
