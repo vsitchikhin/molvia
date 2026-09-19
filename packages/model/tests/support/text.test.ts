@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ISSUE } from '#model/support/errors'
-import { visibleLine, visibleText } from '#model/support/text'
+import { tidyText, visibleLine, visibleText } from '#model/support/text'
 
 const review = visibleText(500)
 
@@ -143,5 +143,33 @@ describe('visibleText', () => {
 
   it('leaves a name one line: visibleLine still refuses \\n', () => {
     expect(visibleLine(200).safeParse('Молоко\nАшхар').success).toBe(false)
+  })
+})
+
+describe('tidyText', () => {
+  const cp = (code: number) => String.fromCodePoint(code)
+  const review = visibleText(500)
+
+  it('makes what the eye sees of a pasted review into what the schema takes', () => {
+    const cases: [string, string][] = [
+      ['Вкусно,\tно дорого', 'Вкусно, но дорого'],
+      [`раз${cp(0x2028)}два${cp(0x2029)}три`, 'раз\nдва\nтри'],
+      [`Советовал ${cp(0x2068)}Арам${cp(0x2069)}, не зря`, 'Советовал Арам, не зря'],
+      [`а\n${cp(0x2800)}\n${cp(0x2800)}\nб`, 'а\n\nб'],
+      [`а\n${cp(0x301)}\n\nб`, 'а\n\nб'],
+      [`а\n${cp(0x200b)}\n${cp(0x13441)}\nб`, 'а\n\nб'],
+      ['а\r\n\r\n\r\nб', 'а\n\nб'],
+      [`а${cp(0)}б`, 'аб'],
+    ]
+    for (const [typed, sent] of cases) {
+      expect(tidyText(typed), JSON.stringify(typed)).toBe(sent)
+      expect(review.safeParse(tidyText(typed)).success, JSON.stringify(typed)).toBe(true)
+    }
+  })
+
+  it('must not change a review the schema already takes', () => {
+    for (const text of ['Кислит\nна второй день', 'Абзац\n\nвторой', 'Молокó ☕']) {
+      expect(tidyText(text)).toBe(text)
+    }
   })
 })

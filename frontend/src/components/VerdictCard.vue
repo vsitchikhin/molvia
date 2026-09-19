@@ -47,7 +47,7 @@
 import { computed, defineComponent, onMounted, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ERROR, ratingSchema } from '@molvia/model'
+import { ERROR, ratingSchema, tidyText } from '@molvia/model'
 import type { ErrorCode, PendingVerdict, WireCode } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -70,25 +70,6 @@ const DOMAIN_CODES: readonly string[] = Object.values(ERROR)
 function shown(code: WireCode | null | undefined): ErrorCode | null {
   if (!code) return null
   return DOMAIN_CODES.includes(code) ? (code as ErrorCode) : ERROR.INTERNAL
-}
-
-/** A line that draws nothing: spaces, format characters, what `INVISIBLE` strips. */
-const BLANK_LINE = /^[\s\p{Cf}\p{Default_Ignorable_Code_Point}]*$/u
-
-/**
- * What the server would refuse and a person cannot see, made into what they meant, before it
- * goes (adversarial F5): a tab pasted from a note is a space, a line separator a line break, a
- * line of invisible characters an empty one, and runs of empty lines fold to one — the server
- * refuses two in a row. Every visible word is kept.
- */
-function tidy(text: string): string {
-  return text
-    .replace(/\r\n?|[\u2028\u2029]/g, '\n')
-    .replaceAll('\t', ' ')
-    .split('\n')
-    .map((line) => (BLANK_LINE.test(line) ? '' : line))
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
 }
 
 /**
@@ -154,7 +135,7 @@ export default defineComponent({
         return
       }
       if (review.value.trim()) {
-        review.value = tidy(review.value)
+        review.value = tidyText(review.value)
         if (!ratingSchema.shape.review.safeParse(review.value).success) {
           error.value = ERROR.INTERNAL
           return

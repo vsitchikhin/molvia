@@ -111,6 +111,18 @@ describe('VerdictCard', () => {
     view.unmount()
   })
 
+  it('R3: braille-blank lines and direction marks are tidied by the model, not refused', async () => {
+    const view = render()
+    const blank = String.fromCodePoint(0x2800)
+    const [open, close] = [String.fromCodePoint(0x2068), String.fromCodePoint(0x2069)]
+    await key(view, 4).trigger('click')
+    await view.get('textarea').setValue(`Советовал ${open}Арам${close}\n${blank}\n${blank}\nне зря`)
+    await button(view, en.verdict.save).trigger('click')
+
+    expect(view.emitted('save')).toEqual([[4, 'Советовал Арам\n\nне зря']])
+    view.unmount()
+  })
+
   it('С-9: the scale is named «Rating», not the section', () => {
     const view = render()
     expect(view.get('[role="group"]').attributes('aria-label')).toBe(en.verdict.scale_group)
