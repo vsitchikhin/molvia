@@ -123,6 +123,20 @@ describe('VerdictCard', () => {
     view.unmount()
   })
 
+  it('С-16: a review of invisible marks is as empty as one of spaces — saved without one', async () => {
+    const zero = String.fromCodePoint(0x200b)
+    const braille = String.fromCodePoint(0x2800)
+    for (const invisible of [zero, `${braille}\n${braille}`, ` ${zero} `, '   \n  ']) {
+      const view = render()
+      await key(view, 4).trigger('click')
+      await view.get('textarea').setValue(invisible)
+      await button(view, en.verdict.save).trigger('click')
+
+      expect(view.emitted('save'), JSON.stringify(invisible)).toEqual([[4, '']])
+      view.unmount()
+    }
+  })
+
   it('С-9: the scale is named «Rating», not the section', () => {
     const view = render()
     expect(view.get('[role="group"]').attributes('aria-label')).toBe(en.verdict.scale_group)

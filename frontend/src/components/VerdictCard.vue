@@ -134,12 +134,13 @@ export default defineComponent({
         announce?.(t('verdict.save_disabled'))
         return
       }
-      if (review.value.trim()) {
-        review.value = tidyText(review.value)
-        if (!ratingSchema.shape.review.safeParse(review.value).success) {
-          error.value = ERROR.INTERNAL
-          return
-        }
+      // Tidied first, asked about after: a review of invisible marks is as empty as one of
+      // spaces, and goes without a review the same way (self-review С-16).
+      const tidied = tidyText(review.value)
+      review.value = tidied.trim() ? tidied : ''
+      if (review.value && !ratingSchema.shape.review.safeParse(review.value).success) {
+        error.value = ERROR.INTERNAL
+        return
       }
       // One save per card: a double tap would otherwise hand the next card the second tap.
       saved = true

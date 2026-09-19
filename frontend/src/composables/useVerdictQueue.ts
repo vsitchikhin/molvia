@@ -199,7 +199,9 @@ export function useVerdictQueue(): VerdictQueue {
    * For the counter under the title: what the server counts, less what is on its way. A draft on
    * the page is still counted by the server; one off the page is only when the page is not the
    * whole queue — otherwise it is off the page because the server already has it (adversarial
-   * F3, R2). Never fewer than the cards on screen.
+   * F3, R2). Never fewer than the cards on screen. On a partial page the two cannot be told
+   * apart from one answer, and a rating whose answer was lost is subtracted twice until it is
+   * sent again — a known limit, off by one, over fifty waiting (adversarial G3).
    */
   const count = computed(() => {
     const shown = answer.value
