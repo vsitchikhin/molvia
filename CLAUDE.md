@@ -791,6 +791,11 @@ The shape worth knowing here:
   the code deployed against it is the worse of the two failures. `make migrate`, the test
   setup and the boot path all go through the same code, so a migration cannot behave one
   way locally and another in production.
+- **A migration applied anywhere is never rewritten.** drizzle decides what to run by the
+  journal's `created_at` alone and never compares a file with what was applied: a rewritten
+  migration is skipped silently if its stamp is older, and fails on its first `CREATE` if newer
+  — then the API does not start. Folding a task's migrations into one is safe only while no
+  database has run them; MOL-39 checked every copy's journal before and after doing it.
 - **Postgres publishes no port.** It is reachable only over the compose network.
 - **The PWA calls `/api/...`** and Caddy strips the prefix — the same shape the Vite dev
   proxy has, so nothing about the origin differs between development and production.
