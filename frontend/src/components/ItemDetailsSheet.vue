@@ -163,6 +163,10 @@ export default defineComponent({
     onMounted(() => {
       window.addEventListener('online', listen)
       window.addEventListener('offline', listen)
+      // Opened with no trip in memory — a link opened cold, a trip started on another device:
+      // the server is asked before «start a trip first» is taken for the truth (В-6). A failure
+      // leaves that answer in place; there is nothing else to show.
+      if (!trips.current) trips.load().catch(() => undefined)
     })
     onUnmounted(() => {
       window.removeEventListener('online', listen)
