@@ -8,7 +8,11 @@
     <div v-if="$slots.default" class="extra">
       <slot />
     </div>
-    <div v-if="$slots.action" class="action">
+    <div v-if="kind === 'error' || $slots.action" class="action">
+      <AppButton v-if="kind === 'error'" block @click="$emit('retry')">
+        <template #icon><IconRefresh /></template>
+        {{ t('state.retry') }}
+      </AppButton>
       <slot name="action" />
     </div>
   </section>
@@ -16,8 +20,11 @@
 
 <script lang="ts">
 import { computed, defineComponent, type Component, type PropType } from 'vue'
+import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
+import IconRefresh from '~icons/mdi/refresh'
+import AppButton from '@/components/AppButton.vue'
 
 export type StateKind = 'empty' | 'error' | 'offline' | 'attention'
 
@@ -68,14 +75,20 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  * Offline is never red — the connection drops at the shelf all the time, and an app that
  * panics every time teaches people to ignore it.
  *
+ * An error always offers «Try again», drawn here and reported as `retry`: twelve copies of one
+ * word would drift apart. Every other action is the screen's own and comes through `action`,
+ * after the retry where there is one — the search's «Take from recent».
+ *
  * Texts arrive translated, never as a key prefix: a key assembled from a string is invisible
  * to the linter and to vue-tsc alike (MOL-16, О-12).
  *
  * Laid out to take the free height of the screen with the action at the bottom, under the
- * thumb; `inline` keeps it to its own height, for a notice above the content.
+ * thumb; `inline` keeps it to its own height, for a notice above the content — the surface
+ * around it is the card's, not this block's.
  */
 export default defineComponent({
   name: 'ScreenState',
+  components: { AppButton, IconRefresh },
   props: {
     kind: { type: String as PropType<StateKind>, required: true, validator: fits },
     tone: { type: String as PropType<StateTone | undefined>, default: undefined },
@@ -84,7 +97,10 @@ export default defineComponent({
     body: { type: String, default: undefined },
     inline: { type: Boolean, default: false },
   },
+  emits: ['retry'],
   setup(props) {
+    const { t } = useI18n()
+
     const glyph = computed<Component | undefined>(() => {
       if (props.kind === 'offline') return IconCloudOff
       if (props.kind === 'empty') return props.icon
@@ -107,7 +123,7 @@ export default defineComponent({
       props.kind === 'error' || props.kind === 'attention' ? 'alert' : 'status',
     )
 
-    return { glyph, toneClass, role }
+    return { t, glyph, toneClass, role }
   },
 })
 </script>
@@ -120,10 +136,7 @@ export default defineComponent({
 }
 
 .inline {
-  @include surface;
-
   flex: none;
-  padding: var(--space-4);
 }
 
 .circle {

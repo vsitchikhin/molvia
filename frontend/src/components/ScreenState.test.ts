@@ -4,13 +4,20 @@ import { h } from 'vue'
 import IconPlus from '~icons/mdi/plus'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
+import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
+import { createAppI18n } from '@/i18n'
+import type { AppLocale } from '@/i18n/locale'
 import ScreenState from '@/components/ScreenState.vue'
 
 type Props = Record<string, unknown>
 
-function render(props: Props, slots: Record<string, () => unknown> = {}) {
-  return mount(ScreenState, { props: { title: 'Title', ...props } as never, slots })
+function render(props: Props, slots: Record<string, () => unknown> = {}, locale: AppLocale = 'en') {
+  return mount(ScreenState, {
+    props: { title: 'Title', ...props } as never,
+    slots,
+    global: { plugins: [createAppI18n(locale)] },
+  })
 }
 
 function refused(props: Props): boolean {
@@ -126,6 +133,36 @@ describe('ScreenState', () => {
   // the scaffold does not have.
   it('leaves out the text when there is none', () => {
     expect(render({ kind: 'offline', tone: 'warn' }).find('.body').exists()).toBe(false)
+  })
+
+  describe('«Try again»', () => {
+    it('is offered by every error, and reported rather than acted on', async () => {
+      const view = render({ kind: 'error' })
+      const button = view.get('.action button')
+      expect(button.text()).toBe(en.state.retry)
+
+      await button.trigger('click')
+      expect(view.emitted('retry')).toHaveLength(1)
+    })
+
+    it('says it in Russian from the same dictionary', () => {
+      expect(render({ kind: 'error' }, {}, 'ru').get('.action button').text()).toBe(ru.state.retry)
+    })
+
+    // The search's error has a second way out — «Take from recent» — under the retry.
+    it('comes first when the screen brings an action of its own', () => {
+      const view = render({ kind: 'error' }, { action: () => h('a', 'Take from recent') })
+      const children = [...view.get('.action').element.children].map((child) => child.tagName)
+      expect(children).toEqual(['BUTTON', 'A'])
+    })
+
+    it.each<[string, Props]>([
+      ['empty', { kind: 'empty', tone: 'accent', icon: IconPlus }],
+      ['offline', { kind: 'offline', tone: 'good' }],
+      ['attention', { kind: 'attention' }],
+    ])('is not offered by %s, where trying again is not the way out', (_, props) => {
+      expect(render(props).find('.action').exists()).toBe(false)
+    })
   })
 
   it('puts the action at the end, and draws no empty row without one', () => {
