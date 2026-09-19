@@ -11,7 +11,10 @@ const FORBIDDEN = /[\p{Cc}\p{Cs}\p{Co}\p{Zl}\p{Zp}\u202a-\u202e\u2066-\u2069]/u
 // Not content, but not forbidden either: U+200D joins every composite emoji, and a mark
 // after a letter is ordinary text — «Молокó», Armenian and Vietnamese diacritics. Both are
 // dropped before asking whether anything is left, so a string of marks alone is not a name.
-const BLANK = /[\p{Z}\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]/gu
+// U+2800, U+13441 and U+1D159 are assigned glyphs that draw an empty cell. Unicode has no
+// property for «draws nothing», so this list is knowingly incomplete: a character found
+// later is added here, not worked around.
+const BLANK = /[\p{Z}\p{Cf}\p{Default_Ignorable_Code_Point}\u2800\u{13441}\u{1D159}]/gu
 const MARK = /\p{M}/gu
 
 export function visibleLine(max: number): z.ZodType<string, string> {
@@ -34,15 +37,25 @@ export function visibleLine(max: number): z.ZodType<string, string> {
  * empty on the card as a line of spaces, and a rule that knew only `\s` let twenty of them in.
  */
 function isBlankLine(line: string): boolean {
+  // A forbidden character is not «nothing»: U+202E is `Cf` and would count as blank, and a
+  // line of it at an edge was dropped in silence while the same character inside a line is
+  // refused. The rule must not depend on where the character stands.
+  if (FORBIDDEN.test(line)) return false
   return line.replace(BLANK, '').replace(MARK, '').replace(/\s/gu, '').length === 0
 }
 
-/** Blank lines at either end go the way `trim` sends spaces: they would only pad the card. */
+/**
+ * Blank lines at either end go the way `trim` sends spaces: they would only pad the card.
+ * One slice over indices, not `shift()` in a loop — that moved the whole array per line, and
+ * four hundred thousand empty lines at the head held the event loop for a minute.
+ */
 function withoutBlankEdges(text: string): string {
   const lines = text.split('\n')
-  while (lines.length > 0 && isBlankLine(lines[0] ?? '')) lines.shift()
-  while (lines.length > 0 && isBlankLine(lines.at(-1) ?? '')) lines.pop()
-  return lines.join('\n')
+  let first = 0
+  let last = lines.length
+  while (first < last && isBlankLine(lines[first] ?? '')) first += 1
+  while (last > first && isBlankLine(lines[last - 1] ?? '')) last -= 1
+  return lines.slice(first, last).join('\n')
 }
 
 function hasBlankRun(text: string): boolean {
@@ -64,19 +77,27 @@ function hasBlankRun(text: string): boolean {
  * hole in the card, so a run of them is refused rather than silently squeezed.
  */
 export function visibleText(max: number): z.ZodType<string, string> {
-  return z
-    .string()
-    .overwrite((text) => withoutBlankEdges(text.replace(/\r\n?/g, '\n')))
-    .trim()
-    .min(1)
-    .max(max)
-    .refine(
-      (text) => {
-        const flat = text.replaceAll('\n', '')
-        return !FORBIDDEN.test(flat) && !hasBlankRun(text) && !isBlankLine(flat)
-      },
-      {
-        error: ISSUE.TEXT_NOT_VISIBLE,
-      },
-    )
+  return (
+    z
+      .string()
+      // The length as sent, before anything is folded or dropped: otherwise a body of any size
+      // reaches the normalisation whole and is measured only after it. Twice the bound leaves
+      // room for `\r\n` endings and padding around a review that fits; nothing longer can.
+      // `abort`, because zod runs the checks after a failed one too.
+      .max(2 * max, { abort: true })
+      .overwrite((text) => withoutBlankEdges(text.replace(/\r\n?/g, '\n')))
+      .trim()
+      // Nothing left after the edges went: the text had nothing visible, and says so by name.
+      .min(1, { error: ISSUE.TEXT_NOT_VISIBLE })
+      .max(max)
+      .refine(
+        (text) => {
+          const flat = text.replaceAll('\n', '')
+          return !FORBIDDEN.test(flat) && !hasBlankRun(text) && !isBlankLine(flat)
+        },
+        {
+          error: ISSUE.TEXT_NOT_VISIBLE,
+        },
+      )
+  )
 }

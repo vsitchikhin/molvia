@@ -38,6 +38,8 @@ describe('visibleText', () => {
       '\u200d',
       '\u2060',
       '\u0301',
+      '\u{13441}',
+      '\u{1D159}',
     ]) {
       const hole = `Пахнет крахмалом.\n${`${invisible}\n`.repeat(2)}Мясом — нет`
       expect(refusal(hole), invisible.codePointAt(0)?.toString(16)).toBe(ISSUE.TEXT_NOT_VISIBLE)
@@ -55,6 +57,29 @@ describe('visibleText', () => {
     expect(review.parse('vkusno \u{1F468}\u200d\u{1F373}\nещё')).toBe(
       'vkusno \u{1F468}\u200d\u{1F373}\nещё',
     )
+  })
+
+  it('names a review with nothing visible as such, not as a generic refusal', () => {
+    // Р-11: the code reaches the screen — from the client too, since it checks first.
+    for (const text of ['   ', '\n\n', '\u200b', '\u2800\n\u2800', ' \r\n ']) {
+      expect(refusal(text), JSON.stringify(text)).toBe(ISSUE.TEXT_NOT_VISIBLE)
+    }
+  })
+
+  it('refuses a forbidden character on an edge line as it does inside one', () => {
+    expect(refusal('\u202e\nтекст')).toBe(ISSUE.TEXT_NOT_VISIBLE)
+    expect(refusal('текст\n\u202e')).toBe(ISSUE.TEXT_NOT_VISIBLE)
+    expect(refusal('а\u202eб')).toBe(ISSUE.TEXT_NOT_VISIBLE)
+  })
+
+  it('measures the length as sent, before any normalisation runs', () => {
+    // Four hundred thousand empty lines ahead of one letter used to be folded first — for a
+    // minute, in a loop — and accepted as «a».
+    const started = Date.now()
+    expect(review.safeParse(`${'\n'.repeat(400_000)}a`).success).toBe(false)
+    expect(Date.now() - started).toBeLessThan(100)
+    // Twice the bound as sent still passes when what remains fits.
+    expect(review.parse(`${'\r\n'.repeat(200)}${'а'.repeat(500)}`)).toBe('а'.repeat(500))
   })
 
   it('trims the ends, line breaks included', () => {
