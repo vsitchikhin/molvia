@@ -36,7 +36,6 @@ import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetHistory } from '@/composables/useSheetHistory'
-import type { LeftBy } from '@/composables/useSheetHistory'
 
 /** A double tap lands within this — a platform convention, not a design token. */
 const DOUBLE_TAP = 300
@@ -103,25 +102,23 @@ export default defineComponent({
     let downOnScrim = false
     let settledAt = 0
 
-    const history = useSheetHistory((by: LeftBy) => {
+    const history = useSheetHistory(() => {
       if (!shown.value) return
       shown.value = false
       closing = false
-      const again = reopen && by === 'history'
+      const again = reopen
       reopen = false
       if (dialog.value?.open) dialog.value.close()
       if (!again && props.open) emit('update:open', false)
-      // A tick later: a screen that opens the next sheet from `@closed` would otherwise set `open`
-      // back to true in the same tick it went false, the prop would never change, and the sheet
-      // would stay shut with the screen believing it open (adversarial А-6). Not when the screen
-      // is going away: a component past unmounting emits nothing, and `closed` would be lost
-      // (adversarial Б-7).
-      if (by === 'unmount') emit('closed')
-      else
-        void nextTick(() => {
-          emit('closed')
-          if (again) show()
-        })
+      // At once, whatever the way out: deferred, it was lost whenever the screen went away in the
+      // same move — Vue drops what an unmounted component emits (adversarial Б-7, В-2).
+      emit('closed')
+      // Asked for again — by «save and next» before the pop landed, or from `@closed` in this
+      // very tick, where `open` went false and true before the prop could change and the watcher
+      // never heard of it (adversarial А-6, Б-6). A screen gone meanwhile has no dialog to show.
+      void nextTick(() => {
+        if (props.open && !shown.value) show()
+      })
     })
 
     function show(): void {

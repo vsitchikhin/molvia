@@ -74,14 +74,21 @@ function prefersReducedMotion(): boolean {
  *
  * Exported for the sheet (MOL-18): closing it takes its own entry away, and closing it together
  * with the screen under it — «Add to trip» on the search — takes two in one move.
+ *
+ * The block is a token rather than a flag. The sheet's guard steps over a dead entry from inside
+ * the pop of a step already in flight — the chevron's — and takes the block over with `force`: the
+ * first step's landing must not lift the block that now belongs to the guard's step, or a second
+ * tap on the chevron slipped through between the two pops (adversarial В-3).
  */
-let stepping = false
+let stepping: object | null = null
 
-export function stepBack(router: Router, steps = 1): void {
-  if (stepping) return
-  stepping = true
+/** Moves `steps` entries back — or forward, if negative — once no other step is in flight. */
+export function stepBack(router: Router, steps = 1, force = false): void {
+  if (stepping && !force) return
+  const token = {}
+  stepping = token
   const landed = (): void => {
-    stepping = false
+    if (stepping === token) stepping = null
     window.clearTimeout(timer)
     window.removeEventListener('popstate', landed)
   }

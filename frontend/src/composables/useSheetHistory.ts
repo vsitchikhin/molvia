@@ -22,11 +22,38 @@ import { stepBack } from '@/navigation'
  * «back» reaches it.
  */
 
-/** How many sheets hold an entry right now — the guard below needs to know none does. */
-let holding = 0
-
 /** Why the sheet was put away: a pop or a move under it, or the screen going away with it. */
 export type LeftBy = 'history' | 'unmount'
+
+interface Holder {
+  left: (by: LeftBy) => void
+}
+
+/**
+ * The open sheets of each router, the last opened on top. One listener per router reads the pop
+ * and closes as many sheets from the top as entries it went back — a sheet over a sheet closes
+ * alone. A listener per sheet cannot: each would take any pop for its own, and one that removed
+ * itself inside the router's loop over them made the router skip the next (adversarial В-1).
+ */
+const stacks = new WeakMap<Router, Holder[]>()
+
+function stackOf(router: Router): Holder[] {
+  let stack = stacks.get(router)
+  if (!stack) {
+    const created: Holder[] = []
+    stacks.set(router, created)
+    router.options.history.listen((_to, _from, { delta }) => {
+      // Back by `delta` entries; an unknown distance is one. Forward past an open sheet cannot
+      // happen: laying its entry cut the forward history away.
+      const count = Math.min(delta < 0 ? -delta : delta === 0 ? 1 : 0, created.length)
+      for (const holder of created.splice(created.length - count, count).reverse()) {
+        holder.left('history')
+      }
+    })
+    stack = created
+  }
+  return stack
+}
 
 export function useSheetHistory(onLeft: (by: LeftBy) => void): {
   lay: () => void
@@ -35,13 +62,16 @@ export function useSheetHistory(onLeft: (by: LeftBy) => void): {
 } {
   const router = useRouter()
   const history = router.options.history
-  let release: (() => void) | undefined
+  const stack = stackOf(router)
+  let holder: Holder | undefined
+  let stopMoves: (() => void) | undefined
 
   function forget(): void {
-    if (!release) return
-    release()
-    release = undefined
-    holding -= 1
+    stopMoves?.()
+    stopMoves = undefined
+    const at = holder ? stack.indexOf(holder) : -1
+    if (at !== -1) stack.splice(at, 1)
+    holder = undefined
   }
 
   /**
@@ -54,40 +84,38 @@ export function useSheetHistory(onLeft: (by: LeftBy) => void): {
   }
 
   function lay(): void {
-    if (release) return
+    if (holder) return
     const at = router.currentRoute.value.fullPath
     history.push(at, { sheet: true })
-    holding += 1
+    const own: Holder = {
+      left: (by) => {
+        forget()
+        onLeft(by)
+      },
+    }
+    holder = own
+    stack.push(own)
 
-    // Pops while the sheet is on top can only go down, off its entry: the push cut the forward
-    // history away. Whatever the pop, the sheet is left.
-    const stopListening = history.listen(() => {
-      forget()
-      onLeft('history')
-    })
-    // A pop reaches the listener above first — synchronously, while the router is still resolving
-    // — and `forget` takes this hook away before the move lands. So what arrives here is a move
-    // made while the sheet stood open: a push, a replace, the same screen with a new query.
+    // A pop reaches the router's history listeners first — synchronously, while the router is
+    // still resolving — and the stack closes this sheet and takes this hook away before the move
+    // lands. So what arrives here is a move made while the sheet stood open: a push, a replace,
+    // the same screen with a new query.
     //
     // Except the end of the pop that closed the previous sheet, when this one was opened again
     // before it finished («save and next»): that move lands on the very address the sheet stands
     // on. A push or replace to it is refused by the router as a duplicate, so a move there is
     // never a way out.
-    const stopMoves = router.afterEach((to, _from, failure) => {
+    stopMoves = router.afterEach((to, _from, failure) => {
       if (failure || to.fullPath === at) return
       forget()
       unmark()
       onLeft('history')
     })
-    release = () => {
-      stopListening()
-      stopMoves()
-    }
   }
 
   /** Steps back off the entry; the pop that follows closes the sheet. */
   function leave(steps = 1): void {
-    if (!release) {
+    if (!holder) {
       onLeft('history')
       return
     }
@@ -97,12 +125,12 @@ export function useSheetHistory(onLeft: (by: LeftBy) => void): {
   // Gone with its entry still laid and no move to tell of it — the screen was taken out of the
   // page some other way. The screen is still told the sheet is shut.
   onBeforeUnmount(() => {
-    if (!release) return
+    if (!holder) return
     forget()
     onLeft('unmount')
   })
 
-  return { lay, leave, laid: () => release !== undefined }
+  return { lay, leave, laid: () => holder !== undefined }
 }
 
 /**
@@ -111,19 +139,27 @@ export function useSheetHistory(onLeft: (by: LeftBy) => void): {
  * stayed on the same screen, and worse, the rules of «back» read the screen under itself and a
  * tap on the chevron or on «Trip» replaced instead of stepping back (MOL-18, adversarial А-3).
  *
- * The step is the router's own, not `stepBack`: this runs inside the pop that a chevron or a tab
- * started through `stepBack`, before that step has landed, and `stepBack` refuses a second step
- * while one is in flight — the guard was swallowed exactly when the chevron led onto a dead entry
- * (review Р-1, adversarial Б-1).
+ * It steps on the way the pop went: arrived by «forward», it goes on forward if there is an entry
+ * beyond — stepping back made that screen unreachable (adversarial В-4). The step takes the block
+ * of «a step in flight» over (`force`): it runs inside the pop of a chevron's or a tab's step,
+ * which still holds the block — waiting for it swallowed the guard (review Р-1), ignoring it let a
+ * second tap in between the two pops (adversarial В-3).
  *
  * Installed once, at start — where a reload lands — and then on every pop.
  */
 export function installSheetEntryGuard(router: Router): () => void {
   const history = router.options.history
-  const stepOff = (): void => {
-    if (holding === 0 && history.state.sheet === true) router.go(-1)
+  const stack = stackOf(router)
+  const stepOff = (delta: number): void => {
+    if (stack.length > 0 || history.state.sheet !== true) return
+    // Forward only where there is somewhere to go: a step into nothing never lands, and the
+    // block it holds swallowed the next close for a second.
+    const onward = delta > 0 && typeof history.state.forward === 'string'
+    stepBack(router, onward ? -1 : 1, true)
   }
-  const stop = history.listen(stepOff)
-  stepOff()
+  const stop = history.listen((_to, _from, { delta }) => {
+    stepOff(delta)
+  })
+  stepOff(0)
   return stop
 }

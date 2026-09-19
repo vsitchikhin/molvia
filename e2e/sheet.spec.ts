@@ -289,3 +289,73 @@ test('a segment answers a tap anywhere over the track’s 44px', async ({ page }
   await page.mouse.click(box.x + box.width / 2, track.y + 1)
   await expect(page.getByRole('group', { name: 'Unit' }).first().getByLabel('kg')).toBeChecked()
 })
+
+/** The app's router, reached the way a development build exposes it. */
+interface DevRouter {
+  push: (to: string) => Promise<unknown>
+  addRoute: (route: unknown) => void
+  getRoutes: () => { name?: unknown; components?: { default: unknown } | null }[]
+}
+
+/** Kit → sheet → push to a screen nested under the kit: the sheet's dead entry lies under it. */
+async function childOverDeadEntry(page: Page): Promise<void> {
+  await openSheet(page)
+  await page.evaluate(async () => {
+    const root = document.querySelector('#app') as unknown as {
+      __vue_app__: { config: { globalProperties: { $router: DevRouter } } }
+    }
+    const router = root.__vue_app__.config.globalProperties.$router
+    const view = router.getRoutes().find((route) => route.name === 'item-search')
+      ?.components?.default
+    router.addRoute({
+      path: '/_kit/child',
+      name: 'kit-child',
+      component: view,
+      meta: { titleKey: 'item.search_title', parent: 'kit' },
+    })
+    await router.push('/_kit/child')
+  })
+  await expect(page).toHaveURL('/_kit/child')
+}
+
+// The guard's step over the dead entry runs inside the chevron's pop. Stepping outside the block
+// of «a step in flight», it let a second tap on the chevron through between the two pops, and the
+// person asked for the kit and got the trip (adversarial В-3).
+test('a double tap on the chevron over a dead entry still takes one step', async ({ page }) => {
+  await childOverDeadEntry(page)
+  // The second tap comes in the window the defect had: inside the chevron's pop, after its own
+  // landing has run and before the guard's step lands. Registered after the first tap, the
+  // listener runs after the block's own — every time, not by the luck of a timer.
+  await page.evaluate(() => {
+    const chevron = () => document.querySelector<HTMLButtonElement>('button.back')
+    chevron()?.click()
+    window.addEventListener(
+      'popstate',
+      () => {
+        chevron()?.click()
+      },
+      { once: true },
+    )
+  })
+  await page.waitForTimeout(1500)
+  await expectOn(page, '/_kit', 'Kit')
+  await page.goBack()
+  await expectOn(page, '/', 'Trip')
+})
+
+// Arrived at a dead entry by «forward», the guard goes on forward; stepping back cut the screen
+// beyond off from «forward» for good (adversarial В-4).
+test('«forward» passes over the dead entry a push left', async ({ page }) => {
+  await openSheet(page)
+  await page.evaluate(async () => {
+    const root = document.querySelector('#app') as unknown as {
+      __vue_app__: { config: { globalProperties: { $router: DevRouter } } }
+    }
+    await root.__vue_app__.config.globalProperties.$router.push('/verdicts')
+  })
+  await expect(page).toHaveURL('/verdicts')
+  await page.goBack()
+  await expectOn(page, '/_kit', 'Kit')
+  await page.goForward()
+  await expectOn(page, '/verdicts', 'Ratings')
+})

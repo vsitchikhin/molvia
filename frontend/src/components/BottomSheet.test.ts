@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref } from 'vue'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import type { Router } from 'vue-router'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
@@ -135,7 +135,6 @@ describe('BottomSheet', () => {
     })
   })
 
-  /** A tap on the scrim once the sheet has come up: pressed and let go on the dialog itself. */
   /** A tap on the scrim: pressed and let go on the dialog itself. */
   async function tapScrim(dialog: HTMLDialogElement): Promise<void> {
     dialog.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
@@ -380,5 +379,101 @@ describe('BottomSheet', () => {
       expect(closed).toHaveBeenCalledOnce()
     })
     expect(go).not.toHaveBeenCalled()
+  })
+
+  /** A sheet opened from a sheet — a shop picked over «add to trip». */
+  async function twoSheets() {
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/')
+    const lower = ref(true)
+    const upper = ref(false)
+    const host = mount(
+      defineComponent(() => () => [
+        h(
+          BottomSheet,
+          {
+            open: lower.value,
+            'onUpdate:open': (next: boolean) => (lower.value = next),
+            class: 'lower',
+          },
+          { title: () => 'Add to trip' },
+        ),
+        h(
+          BottomSheet,
+          {
+            open: upper.value,
+            'onUpdate:open': (next: boolean) => (upper.value = next),
+            class: 'upper',
+          },
+          { title: () => 'Pick a shop' },
+        ),
+      ]),
+      { attachTo: document.body, global: { plugins: [router, createAppI18n('en')] } },
+    )
+    await nextTick()
+    upper.value = true
+    await nextTick()
+    wait(1000)
+    const state = () => ({
+      lower: (host.get('dialog.lower').element as HTMLDialogElement).open,
+      upper: (host.get('dialog.upper').element as HTMLDialogElement).open,
+    })
+    return { router, host, state }
+  }
+
+  // Each sheet took any pop for its own, and one removing itself inside the router's loop made it
+  // skip the next: the hidden sheet closed, the visible one stayed (adversarial В-1).
+  it('«back» closes only the sheet on top, and the next «back» the one under it', async () => {
+    const { router, state } = await twoSheets()
+    router.back()
+    await nextTick()
+    expect(state()).toEqual({ lower: true, upper: false })
+    landed()
+    router.back()
+    await nextTick()
+    expect(state()).toEqual({ lower: false, upper: false })
+  })
+
+  it('× on the sheet on top closes only that one', async () => {
+    const { host, state } = await twoSheets()
+    await host.get('dialog.upper .head button').trigger('click')
+    await nextTick()
+    expect(state()).toEqual({ lower: true, upper: false })
+  })
+
+  // A push takes the screen away in the same move that closes the sheet; a deferred `closed` was
+  // dropped by Vue for the unmounted component (adversarial В-2).
+  it('says closed when a push takes its screen away', async () => {
+    const closed = vi.fn()
+    const Screen = defineComponent(() => {
+      const open = ref(true)
+      return () =>
+        h(
+          BottomSheet,
+          {
+            open: open.value,
+            'onUpdate:open': (next: boolean) => (open.value = next),
+            onClosed: closed,
+          },
+          { title: () => 'Milk' },
+        )
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: Screen },
+        { path: '/other', component: { render: () => h('p', 'other') } },
+      ],
+    })
+    await router.push('/')
+    mount(RouterView, {
+      attachTo: document.body,
+      global: { plugins: [router, createAppI18n('en')] },
+    })
+    await nextTick()
+    await router.push('/other')
+    await nextTick()
+    expect(document.querySelector('dialog')).toBeNull()
+    expect(closed).toHaveBeenCalledOnce()
   })
 })
