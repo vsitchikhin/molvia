@@ -104,11 +104,13 @@ describe('IdentityNotice', () => {
     expect(view.text()).toContain(en.identity.restore)
   })
 
-  it('interrupts for a lost identity and stays polite for a dropped connection', () => {
-    // A lost identity interrupts what someone was doing; no connection does not, and a
-    // screen reader should be told the difference.
-    expect(render('lost').view.get('[role]').attributes('role')).toBe('alert')
-    expect(render('offline').view.get('[role]').attributes('role')).toBe('status')
+  // Until MOL-19 a lost identity interrupted. But the notice is drawn again over every screen,
+  // and an interruption on every move cut off the heading the move had just focused — «needs an
+  // invite link» cannot even be dismissed. The owner made every notice polite (MOL-19, Р-9).
+  it('never interrupts: it is drawn again on every screen the person moves to', () => {
+    for (const state of ['lost', 'uninvited', 'error', 'offline'] as const) {
+      expect(render(state).view.find('[role="alert"]').exists()).toBe(false)
+    }
   })
 
   // Drawn by the shared screen state: an error is red like on any screen, offline is yellow
@@ -118,8 +120,8 @@ describe('IdentityNotice', () => {
   it.each([
     ['error', 'bad', 'status'],
     ['offline', 'warn', 'status'],
-    ['lost', 'warn', 'alert'],
-    ['uninvited', 'warn', 'alert'],
+    ['lost', 'warn', 'status'],
+    ['uninvited', 'warn', 'status'],
   ] as const)('draws %s in %s and announces it as %s', (state, tone, role) => {
     const { view } = render(state)
     expect(view.get('.state').classes()).toContain(tone)

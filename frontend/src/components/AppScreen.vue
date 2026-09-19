@@ -28,6 +28,9 @@
       <div ref="sentinel" class="sentinel" aria-hidden="true"></div>
     </div>
 
+    <!-- The screen's live region: states hand their words here rather than carry a role. -->
+    <p class="hidden" role="status">{{ announcement }}</p>
+
     <div class="notice-slot">
       <IdentityNotice />
     </div>
@@ -44,6 +47,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconChevronLeft from '~icons/mdi/chevron-left'
 import IdentityNotice from '@/components/IdentityNotice.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { useCollapsed, useHeight } from '@/composables/useCollapsed'
 import { useNavigation } from '@/navigation'
 
@@ -98,7 +102,9 @@ export default defineComponent({
 
     const { goBack } = useNavigation()
 
-    return { t, bar, sentinel, collapsed, parentTitleKey, docked, tabbed, goBack }
+    const announcement = provideAnnouncer()
+
+    return { t, bar, sentinel, collapsed, parentTitleKey, docked, tabbed, goBack, announcement }
   },
 })
 </script>

@@ -1,11 +1,12 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { h } from 'vue'
+import { defineComponent, h, watch } from 'vue'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import type { AppLocale } from '@/i18n/locale'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 
 function render(groups: unknown, locale: AppLocale = 'en', slot?: () => unknown) {
   return mount(ScreenSkeleton, {
@@ -46,6 +47,25 @@ describe('ScreenSkeleton', () => {
     expect(view.find('[aria-busy]').exists()).toBe(false)
     expect(view.get('[role="status"]').text()).toBe(en.state.loading)
     expect(view.get('.bars').attributes('aria-hidden')).toBe('true')
+  })
+
+  // Inside a screen «Loading…» goes to the screen's live region, which exists before it: a
+  // region born with its words is often not read (MOL-19, П-2).
+  it("inside a screen, says it in the screen's live region and carries no role", async () => {
+    const said: string[] = []
+    const Screen = defineComponent({
+      setup() {
+        const announcement = provideAnnouncer()
+        watch(announcement, (value) => {
+          if (value) said.push(value)
+        })
+        return () => h(ScreenSkeleton, { groups: [40] })
+      },
+    })
+    const view = mount(Screen, { global: { plugins: [createAppI18n('en')] } })
+    await flushPromises()
+    expect(said).toEqual([en.state.loading])
+    expect(view.find('[role]').exists()).toBe(false)
   })
 
   it('says it in Russian from the same dictionary', () => {

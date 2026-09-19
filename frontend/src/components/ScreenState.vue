@@ -1,10 +1,10 @@
 <template>
-  <section class="state" :class="[toneClass, { inline }]">
+  <section ref="root" class="state" :class="[toneClass, { inline }]">
     <span class="circle" aria-hidden="true">
       <component :is="glyph" class="glyph" />
     </span>
-    <!-- The live region holds the words only: a card read out with its buttons would say
-         «Try again» as if it were the news. -->
+    <!-- An alert holds the words only: a card read out with its buttons would say «Try again»
+         as if it were the news. Anything polite goes to the screen's live region instead. -->
     <div class="message" :role="role">
       <h2 class="title">{{ title }}</h2>
       <p v-if="body" class="body">{{ body }}</p>
@@ -13,7 +13,7 @@
       <slot />
     </div>
     <div v-if="kind === 'error' || $slots.action" class="action">
-      <AppButton v-if="kind === 'error'" block @click="retry">
+      <AppButton v-if="kind === 'error'" block @click="$emit('retry')">
         <template #icon><IconRefresh /></template>
         {{ t('state.retry') }}
       </AppButton>
@@ -23,12 +23,22 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, type Component, type PropType } from 'vue'
+import {
+  computed,
+  defineComponent,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+  type Component,
+  type PropType,
+} from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconRefresh from '~icons/mdi/refresh'
 import AppButton from '@/components/AppButton.vue'
+import { useAnnouncer } from '@/composables/useAnnouncer'
 import { focusScreenTitle } from '@/transitions'
 
 export type StateKind = 'empty' | 'error' | 'offline' | 'attention'
@@ -104,8 +114,10 @@ export default defineComponent({
     inline: { type: Boolean, default: false },
   },
   emits: ['retry'],
-  setup(props, { emit }) {
+  setup(props) {
     const { t } = useI18n()
+    const root = ref<HTMLElement | null>(null)
+    const announce = useAnnouncer()
 
     const glyph = computed<Component | undefined>(() => {
       if (props.kind === 'offline') return IconCloudOff
@@ -124,23 +136,34 @@ export default defineComponent({
         : FALLBACK[props.kind]
     })
 
-    // Something went wrong or has to be known now; empty and offline interrupt nothing. An
-    // inline error is a notice drawn again over every screen the person moves to, and one that
-    // interrupted would cut off the heading each move has just focused — it is polite.
+    // An error on the screen interrupts: the person was waiting for an answer that did not
+    // come. Everything else is polite — and so is anything inline: a notice is drawn again over
+    // every screen the person moves to, and an alert would cut off the heading each move has
+    // just focused (MOL-19, A3, Р-9). Polite words go to the screen's live region when there is
+    // one; outside a screen the block carries `status` itself.
+    const alerts = computed(
+      () => !props.inline && (props.kind === 'error' || props.kind === 'attention'),
+    )
     const role = computed(() => {
-      if (props.kind === 'attention') return 'alert'
-      if (props.kind === 'error' && !props.inline) return 'alert'
-      return 'status'
+      if (alerts.value) return 'alert'
+      return announce ? undefined : 'status'
     })
 
-    // The button is about to be replaced by a skeleton: focus goes to the heading first, as it
-    // does after a move, rather than falling to <body>.
-    function retry(): void {
-      focusScreenTitle()
-      emit('retry')
+    function speak(): void {
+      if (alerts.value || !announce) return
+      announce([props.title, props.body].filter(Boolean).join('. '))
     }
+    onMounted(speak)
+    watch(() => [props.title, props.body], speak)
 
-    return { t, glyph, toneClass, role, retry }
+    // Whatever takes this block away — «Try again», the connection coming back, a store that
+    // recovered — the focus inside it goes to the screen heading, as after a move, rather than
+    // falling to <body> (MOL-19, A2, B1).
+    onBeforeUnmount(() => {
+      if (root.value?.contains(document.activeElement)) focusScreenTitle()
+    })
+
+    return { t, root, glyph, toneClass, role }
   },
 })
 </script>

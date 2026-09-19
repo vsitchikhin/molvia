@@ -1,6 +1,6 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { h } from 'vue'
+import { defineComponent, h, nextTick, ref, watch, type VNodeArrayChildren } from 'vue'
 import IconPlus from '~icons/mdi/plus'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
@@ -9,6 +9,7 @@ import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import type { AppLocale } from '@/i18n/locale'
 import ScreenState from '@/components/ScreenState.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 
 type Props = Record<string, unknown>
 
@@ -106,7 +107,9 @@ describe('ScreenState', () => {
     it.each([
       ['error', { kind: 'error' }, 'alert'],
       ['attention', { kind: 'attention' }, 'alert'],
-      ['attention inline', { kind: 'attention', inline: true }, 'alert'],
+      // Inline is always polite: a notice drawn again on every screen would interrupt every move
+      // (MOL-19, Р-9).
+      ['attention inline', { kind: 'attention', inline: true }, 'status'],
       ['empty', { kind: 'empty', tone: 'accent', icon: IconPlus }, 'status'],
       ['offline', { kind: 'offline', tone: 'good' }, 'status'],
       // A notice drawn again over every screen: an alert would cut off the heading each move
@@ -171,16 +174,10 @@ describe('ScreenState', () => {
       expect(view.emitted('retry')).toHaveLength(1)
     })
 
-    // The button is replaced by a skeleton the moment it is pressed; left alone, the focus
-    // falls to <body> and a screen reader starts the page over (MOL-19, A2).
-    it('hands the focus to the screen heading before it goes', async () => {
-      const heading = document.createElement('h1')
-      heading.tabIndex = -1
-      document.body.append(heading)
-      const view = render({ kind: 'error' }, {})
+    it("reports the press and nothing else: what follows is the screen's", async () => {
+      const view = render({ kind: 'error' })
       await view.get('.action button').trigger('click')
-      expect(document.activeElement).toBe(heading)
-      heading.remove()
+      expect(view.emitted('retry')).toHaveLength(1)
     })
 
     it('says it in Russian from the same dictionary', () => {
@@ -200,6 +197,94 @@ describe('ScreenState', () => {
       ['attention', { kind: 'attention' }],
     ])('is not offered by %s, where trying again is not the way out', (_, props) => {
       expect(render(props).find('.action').exists()).toBe(false)
+    })
+  })
+
+  // A screen as the app draws one: its heading, its live region, and what it puts under them.
+  function onScreen(children: () => VNodeArrayChildren) {
+    const said: string[] = []
+    const Screen = defineComponent({
+      setup() {
+        const announcement = provideAnnouncer()
+        watch(announcement, (value) => {
+          if (value) said.push(value)
+        })
+        return () => [h('h1', { tabindex: -1 }, 'Screen'), ...children()]
+      },
+    })
+    const view = mount(Screen, {
+      attachTo: document.body,
+      global: { plugins: [createAppI18n('en')] },
+    })
+    return { view, said }
+  }
+
+  // Whatever takes the block away — «Try again», the connection coming back, a store that
+  // recovered — a focus inside it must not fall to <body> (MOL-19, A2, B1). Taken away the way
+  // a screen takes it: by `v-if`.
+  describe('when it goes', () => {
+    function withState() {
+      const shown = ref(true)
+      const screen = onScreen(() => [
+        h('button', { class: 'elsewhere' }, 'Elsewhere'),
+        shown.value ? h(ScreenState, { kind: 'error', title: 'Title' }) : null,
+      ])
+      return { ...screen, shown }
+    }
+
+    it('hands a focus inside it to the screen heading', async () => {
+      const { view, shown } = withState()
+      ;(view.get('.action button').element as HTMLButtonElement).focus()
+
+      shown.value = false
+      await nextTick()
+      expect(document.activeElement).toBe(view.get('h1').element)
+      view.unmount()
+    })
+
+    it('leaves a focus elsewhere where it is', async () => {
+      const { view, shown } = withState()
+      const elsewhere = view.get('.elsewhere').element as HTMLButtonElement
+      elsewhere.focus()
+
+      shown.value = false
+      await nextTick()
+      expect(document.activeElement).toBe(elsewhere)
+      view.unmount()
+    })
+  })
+
+  // Inside a screen the polite words go to the screen's live region, which exists before them:
+  // a region born with its words is often not read (MOL-19, П-2).
+  describe('inside a screen', () => {
+    function hosted(props: Props, title = ref('Title')) {
+      return onScreen(() => [h(ScreenState, { title: title.value, ...props } as never)])
+    }
+
+    it('hands a polite state to the screen, and carries no role of its own', async () => {
+      const { view, said } = hosted({ kind: 'offline', tone: 'warn', body: 'Body' })
+      await flushPromises()
+      expect(said).toEqual(['Title. Body'])
+      expect(view.find('.state [role]').exists()).toBe(false)
+      view.unmount()
+    })
+
+    it('says it again when the words change', async () => {
+      const title = ref('Title')
+      const { view, said } = hosted({ kind: 'offline', tone: 'warn' }, title)
+      await flushPromises()
+      title.value = 'Other'
+      await flushPromises()
+      expect(said).toEqual(['Title', 'Other'])
+      view.unmount()
+    })
+
+    it('keeps an alert its own: an alert inserted is read', async () => {
+      const { view, said } = hosted({ kind: 'error' })
+      await flushPromises()
+      expect(said).toEqual([])
+      expect(view.get('.state [role]').attributes('role')).toBe('alert')
+      view.unmount()
     })
   })
 

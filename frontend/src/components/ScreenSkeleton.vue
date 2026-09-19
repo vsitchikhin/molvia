@@ -1,6 +1,6 @@
 <template>
   <div class="skeleton">
-    <p class="hidden" role="status">{{ t('state.loading') }}</p>
+    <p v-if="!announce" class="hidden" role="status">{{ t('state.loading') }}</p>
 
     <div class="bars" aria-hidden="true">
       <div v-for="(width, index) in groups" :key="index" class="group">
@@ -13,8 +13,9 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, type PropType } from 'vue'
+import { defineComponent, onMounted, type PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useAnnouncer } from '@/composables/useAnnouncer'
 
 function isWidths(value: unknown): boolean {
   return (
@@ -48,7 +49,11 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18n()
-    return { t }
+    // Said in the screen's live region when there is one: a region born with its words is
+    // often not read (MOL-19, П-2).
+    const announce = useAnnouncer()
+    onMounted(() => announce?.(t('state.loading')))
+    return { t, announce }
   },
 })
 </script>
