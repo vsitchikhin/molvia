@@ -1,5 +1,5 @@
 <template>
-  <div class="skeleton" aria-busy="true">
+  <div class="skeleton">
     <p class="hidden" role="status">{{ t('state.loading') }}</p>
 
     <div class="bars" aria-hidden="true">
@@ -32,6 +32,10 @@ function isWidths(value: unknown): boolean {
  *
  * What is not a pair of bars — the five squares of the rating scale — goes into the slot and
  * breathes with the rest.
+ *
+ * No `aria-busy`: a screen reader holds back what changes inside a busy region until it is
+ * no longer busy, and nothing ever clears it here — the skeleton is simply removed — so the
+ * «Loading…» it wraps would never be read.
  */
 export default defineComponent({
   name: 'ScreenSkeleton',

@@ -39,9 +39,11 @@ describe('ScreenSkeleton', () => {
     expect(view.get('.sub').attributes('style')).toBeUndefined()
   })
 
+  // Not inside aria-busy: a busy region holds its announcements until it is cleared, and a
+  // skeleton is removed rather than cleared.
   it('tells a screen reader it is loading, and hides the bars from it', () => {
     const view = render([40, 78])
-    expect(view.get('.skeleton').attributes('aria-busy')).toBe('true')
+    expect(view.find('[aria-busy]').exists()).toBe(false)
     expect(view.get('[role="status"]').text()).toBe(en.state.loading)
     expect(view.get('.bars').attributes('aria-hidden')).toBe('true')
   })
