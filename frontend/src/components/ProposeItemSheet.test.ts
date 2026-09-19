@@ -47,7 +47,8 @@ async function render(query = '  тан ') {
   })
   mounted.push(wrapper)
   clock += 1000
-  await new Promise((resolve) => setTimeout(resolve, 5))
+  // Past the moment its status line waits before any words, too.
+  await new Promise((resolve) => setTimeout(resolve, 120))
   return wrapper
 }
 
@@ -338,22 +339,23 @@ describe('«Suggest an item»', () => {
       expect(fields(sheet).name.element.value).toBe('Молоко «Ашхар»')
       expect(fields(sheet).note.element.value).toBe('2%')
       expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
-      expect(sheet.text()).not.toContain(en.item.propose.text_invalid)
+      expect(sheet.text()).not.toContain(en.item.propose.name_invalid)
+      expect(sheet.text()).not.toContain(en.item.propose.note_invalid)
     })
 
-    it('says why the button waits when what is left is refused — in the name or in the note', async () => {
+    it('says which field holds what is left to refuse, and that it has to be typed again', async () => {
       const privateUse = String.fromCodePoint(0xe000)
       const sheet = await render('Молоко')
       await chooseUnit(sheet, en.item.unit_l)
 
       await fields(sheet).name.setValue(`Молоко${privateUse}`)
       expect(submitButton(sheet).attributes('disabled')).toBeDefined()
-      expect(sheet.get('[role="status"]').text()).toBe(en.item.propose.text_invalid)
+      expect(sheet.get('[role="status"]').text()).toBe(en.item.propose.name_invalid)
 
       await fields(sheet).name.setValue('Молоко')
       await fields(sheet).note.setValue(`2%${privateUse}`)
       expect(submitButton(sheet).attributes('disabled')).toBeDefined()
-      expect(sheet.get('[role="status"]').text()).toBe(en.item.propose.text_invalid)
+      expect(sheet.get('[role="status"]').text()).toBe(en.item.propose.note_invalid)
     })
 
     it('keeps its status line in place before there is anything to say — only the words change', async () => {
@@ -364,12 +366,29 @@ describe('«Suggest an item»', () => {
       await fields(sheet).name.setValue(`тан${String.fromCodePoint(0xe000)}`)
 
       expect(sheet.get('[role="status"]').element).toBe(line.element)
-      expect(line.text()).toBe(en.item.propose.text_invalid)
+      expect(line.text()).toBe(en.item.propose.name_invalid)
+    })
+
+    it('says its first words a moment after the sheet comes up, not in the same frame', async () => {
+      online(false)
+      const router = createRouter({ history: createMemoryHistory(), routes })
+      await router.push('/trip/add')
+      const sheet = mount(ProposeItemSheet, {
+        attachTo: document.body,
+        props: { open: true, query: 'тан' },
+        global: { plugins: [router, createAppI18n('en')] },
+      })
+      mounted.push(sheet)
+
+      expect(sheet.get('[role="status"]').text()).toBe('')
+      await vi.waitFor(() => {
+        expect(sheet.get('[role="status"]').text()).toBe(en.item.propose.offline)
+      })
     })
 
     it('says nothing of the kind about a name not yet written', async () => {
       const sheet = await render('')
-      expect(sheet.text()).not.toContain(en.item.propose.text_invalid)
+      expect(sheet.text()).not.toContain(en.item.propose.name_invalid)
     })
   })
 

@@ -34,7 +34,13 @@
 <script lang="ts">
 import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ITEM_NAME_MAX, ITEM_NOTE_MAX, drawsNothing, proposedItemSchema } from '@molvia/model'
+import {
+  ITEM_NAME_MAX,
+  ITEM_NOTE_MAX,
+  drawsNothing,
+  pastedLine,
+  proposedItemSchema,
+} from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
@@ -59,6 +65,9 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
  * which the dictionary does not translate, and a blank name — the one refusal a person can make
  * here — never leaves, because the button waits for a name.
  */
+/** As long as the app's live region waits before its words (`useAnnouncer`). */
+const STATUS_DELAY_MS = 100
+
 export default defineComponent({
   name: 'ProposeItemSheet',
   components: { AppButton, AppField, BottomSheet, SegmentedControl },
@@ -94,18 +103,12 @@ export default defineComponent({
      */
     let opening = 0
 
-    // What copying brings along with the text. A break of any kind — a tab between the cells of a
-    // Google Sheets row, a line feed, NEL, U+2028 — is a space; the direction marks and isolates a
-    // chat wraps a pasted name in draw nothing and go. The catalogue refuses all of them inside a
-    // name, and they cannot be seen to be removed by hand (adversarial B4, C1, C2).
-    function pasted(text: string): string {
-      return text
-        .replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, ' ')
-        .replace(/[\u202a-\u202e\u2066-\u2069]/gu, '')
-    }
+    // What copying brings along — a tab between the cells of a spreadsheet row, a line break of
+    // any kind, the direction marks a chat wraps a pasted name in — is made the line it was meant
+    // to be. The list lives in the model beside the one the schema refuses (Р-19).
     watch([name, note], ([nextName, nextNote]) => {
-      if (pasted(nextName) !== nextName) name.value = pasted(nextName)
-      if (pasted(nextNote) !== nextNote) note.value = pasted(nextNote)
+      if (pastedLine(nextName) !== nextName) name.value = pastedLine(nextName)
+      if (pastedLine(nextNote) !== nextNote) note.value = pastedLine(nextNote)
     })
 
     // A fresh form for every opening, starting from what is in the field now.
@@ -116,7 +119,7 @@ export default defineComponent({
         sending.value = false
         if (!open) return
         connected.value = navigator.onLine
-        name.value = pasted(props.query).trim()
+        name.value = pastedLine(props.query).trim()
         unit.value = ''
         note.value = ''
         failed.value = false
@@ -137,19 +140,47 @@ export default defineComponent({
 
     const ready = computed(() => connected.value && !sending.value && input.value.success)
 
-    // What is left for the schema to refuse after `pasted` — a private-use glyph, a lone surrogate
-    // — in the name or the note. The button waits, and the line says why instead of leaving it grey
-    // in silence; typing again is the one way out a person can see.
-    const textRefused = computed(
+    // What is left for the schema to refuse after `pastedLine` — a private-use glyph, a lone
+    // surrogate. The button waits, and the line says which field and why, instead of leaving it
+    // grey in silence; typing it again is the one way out a person can see.
+    const nameRefused = computed(
       () =>
-        (!drawsNothing(name.value) &&
-          !proposedItemSchema.shape.name.safeParse(name.value).success) ||
-        (!drawsNothing(note.value) && !proposedItemSchema.shape.note.safeParse(note.value).success),
+        !drawsNothing(name.value) && !proposedItemSchema.shape.name.safeParse(name.value).success,
     )
+    const noteRefused = computed(
+      () =>
+        !drawsNothing(note.value) && !proposedItemSchema.shape.note.safeParse(note.value).success,
+    )
+    const textRefused = computed(() => nameRefused.value || noteRefused.value)
+
+    // The status line is in the sheet from the start, but a closed <dialog> is outside the
+    // accessibility tree: a sheet opened offline would show the region and its words in one frame,
+    // the case Р-18 left. The words come a moment after the sheet does, as the app's own region
+    // lets them (MOL-19).
+    const settled = ref(false)
+    let settling: ReturnType<typeof setTimeout> | undefined
+    watch(
+      () => props.open,
+      (open) => {
+        clearTimeout(settling)
+        settled.value = false
+        if (open) {
+          settling = setTimeout(() => {
+            settled.value = true
+          }, STATUS_DELAY_MS)
+        }
+      },
+      { immediate: true },
+    )
+    onUnmounted(() => {
+      clearTimeout(settling)
+    })
 
     const status = computed(() => {
+      if (!settled.value) return ''
       if (!connected.value) return t('item.propose.offline')
-      if (textRefused.value) return t('item.propose.text_invalid')
+      if (nameRefused.value) return t('item.propose.name_invalid')
+      if (noteRefused.value) return t('item.propose.note_invalid')
       return ''
     })
 
