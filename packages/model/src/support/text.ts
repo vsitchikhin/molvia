@@ -121,3 +121,85 @@ export function visibleText(max: number): z.ZodType<string, string> {
       )
   )
 }
+
+// One class for the ends of an identity: what `.trim()` removes and what draws nothing, together.
+// Two passes in turn missed an invisible character with a line break after it — the first pass
+// looked for it at the end, the second made it the end (MOL-21, adversarial round 2, А).
+const EDGE = /[\s\p{Z}\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]/u
+const PICTOGRAPH = /\p{Extended_Pictographic}/u
+// U+FE00–FE0F and the supplementary selectors: they choose how the character before is drawn.
+const SELECTOR = /[\ufe00-\ufe0f\u{E0100}-\u{E01EF}]/u
+// Tags spell a subdivision flag after 🏴 and end with U+E007F.
+const TAG = /[\u{E0020}-\u{E007F}]/u
+const CANCEL_TAG = '\u{E007F}'
+const BLACK_FLAG = '\u{1F3F4}'
+const TAG_OFFSET = 0xe0000
+/**
+ * The subdivision flags that are drawn — England, Scotland, Wales, the whole RGI list today. A
+ * tag spelling of the right shape and no flag draws the same black 🏴 and made a second place
+ * (adversarial round 4, Б). A flag Unicode adds later is one more line here.
+ */
+const DRAWN_FLAGS: ReadonlySet<string> = new Set(['gbeng', 'gbsct', 'gbwls'])
+
+/** Whether `chars[first..end]` spells a flag that is drawn, right after a 🏴. */
+function isFlag(chars: readonly string[], first: number, end: number): boolean {
+  if (chars[first - 1] !== BLACK_FLAG || chars[end] !== CANCEL_TAG) return false
+  const spelled = chars
+    .slice(first, end)
+    .map((tag) => String.fromCodePoint((tag.codePointAt(0) ?? 0) - TAG_OFFSET))
+    .join('')
+  return DRAWN_FLAGS.has(spelled)
+}
+
+/**
+ * The line with nothing invisible at its ends, keeping only what draws the last character: VS16
+ * after an emoji makes ☕ an emoji, a tag sequence makes 🏴 Scotland (adversarial round 2, Б).
+ * After a letter a selector draws nothing and goes; a run of tags that is no drawn flag goes whole.
+ *
+ * Linear on purpose: each run of tags is walked once. The first version looked back over the
+ * whole run for every tag it cut, and a megabyte of tags held the event loop for eleven minutes
+ * (adversarial round 3, А) — the length is also bounded before this runs, by the codec below.
+ */
+export function trimInvisibleEdges(text: string): string {
+  const chars = Array.from(text)
+  let start = 0
+  let end = chars.length - 1
+  // At the start nothing precedes, so nothing there can be part of a drawing.
+  while (start <= end && EDGE.test(chars[start] ?? '')) start += 1
+
+  while (end >= start) {
+    const last = chars[end] ?? ''
+    if (!EDGE.test(last)) break
+    if (SELECTOR.test(last)) {
+      if (end > start && PICTOGRAPH.test(chars[end - 1] ?? '')) break
+      end -= 1
+    } else if (TAG.test(last)) {
+      let first = end
+      while (first > start && TAG.test(chars[first - 1] ?? '')) first -= 1
+      if (isFlag(chars, first, end)) break
+      end = first - 1
+    } else {
+      end -= 1
+    }
+  }
+  return chars.slice(start, end + 1).join('')
+}
+
+/**
+ * A line with nothing invisible at its ends, not only no spaces. `.trim()` knows `\s`; a name
+ * pasted from a map or a messenger can end in a word joiner, a soft hyphen or a braille blank,
+ * which draw nothing and still make a second «Ереван Сити» nobody can tell from the first
+ * (MOL-21, adversarial Д). For names that are an identity — a place — where a character no one
+ * can see must not be one.
+ */
+export function visibleIdentityLine(
+  max: number,
+): z.ZodCodec<z.ZodString, z.ZodType<string, string>> {
+  // Bounded before the trim, not only after it: `max` is checked on the trimmed line, and without
+  // this the trim ran over the whole body (adversarial round 3, А). Twice the limit leaves room
+  // for what a paste brings along at the ends.
+  return z.codec(z.string().max(max * 2), visibleLine(max), {
+    decode: trimInvisibleEdges,
+    encode: (text) => text,
+  })
+}

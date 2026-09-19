@@ -30,6 +30,13 @@ export const ERROR = {
    * the first visit answers when the invite code is missing or wrong.
    */
   NO_ACTOR: 'error.no_actor',
+  /**
+   * «Начать поход» while another trip is still open. Added in MOL-21: one open trip per person,
+   * and the choice between the two is the person's, not the server's — continue the open one,
+   * or finish it and start this. So the server refuses rather than deciding either way, and
+   * the screen reads exactly this code to ask.
+   */
+  TRIP_OPEN: 'error.trip_open',
   INTERNAL: 'error.internal',
 } as const
 

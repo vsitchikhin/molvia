@@ -512,3 +512,183 @@ describe('the verdict', () => {
     expect(calls).toHaveLength(0)
   })
 })
+
+describe('the trip', () => {
+  const TRIP = 'd2f1a3b4-5c6d-4e7f-8a9b-0c1d2e3f4a5b'
+  const EXPENSE = 'aa11bb22-cc33-4d44-8e55-ff6677889900'
+
+  const tripWire = {
+    id: TRIP,
+    startedAt: '2026-09-19T10:00:00.000Z',
+    finishedAt: null,
+    currency: 'AMD',
+    rate: null,
+    place: { id: 'b1e0f2a4-5c6d-4e8f-9a0b-1c2d3e4f5a6b', kind: 'store', name: 'Ереван Сити' },
+    expenses: [
+      {
+        id: EXPENSE,
+        createdAt: '2026-09-19T10:05:00.000Z',
+        item: {
+          id: '1c7a3d5f-9e2b-4a4c-8d8f-6b3e2f1a4c5d',
+          kind: 'product',
+          name: 'Молоко «Марианна»',
+          note: null,
+          defaultUnit: 'l',
+          typicalQuantity: null,
+        },
+        quantity: { value: '0.900', unit: 'l' },
+        amount: { amount: '520.00', currency: 'AMD' },
+        unitPrice: { amount: '577.77777778', currency: 'AMD', unit: 'l' },
+      },
+    ],
+    total: [{ amount: '520.00', currency: 'AMD' }],
+    converted: null,
+  }
+
+  function clientReplying(status: number, body: unknown) {
+    const calls: { url: string; method: string; body: unknown }[] = []
+    const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      calls.push({
+        url: input instanceof URL ? input.href : typeof input === 'string' ? input : input.url,
+        method: init?.method ?? 'GET',
+        body: typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined,
+      })
+      return Promise.resolve(
+        status === 204
+          ? new Response(null, { status })
+          : new Response(JSON.stringify(body), {
+              status,
+              headers: { 'content-type': 'application/json' },
+            }),
+      )
+    }
+    const client = createClient({ baseUrl: 'http://api', fetch, actorId: () => actorWire.id })
+    return { client, calls }
+  }
+
+  it('starts a trip by the device’s own identifier and tells a new one from a repeat', async () => {
+    const body = { id: TRIP, place: { kind: 'store' as const, name: 'Ереван Сити' } }
+
+    const fresh = clientReplying(201, tripWire)
+    const repeat = clientReplying(200, tripWire)
+
+    expect((await fresh.client.startTrip(body)).created).toBe(true)
+    expect((await repeat.client.startTrip(body)).created).toBe(false)
+    expect(fresh.calls[0]).toMatchObject({ method: 'POST', body })
+    expect(new URL(fresh.calls[0]?.url ?? '').pathname).toBe('/trips')
+  })
+
+  it('reads another open trip as its own code, for the screen to ask', async () => {
+    const { client } = clientReplying(409, { code: ERROR.TRIP_OPEN })
+
+    expect(
+      await codeOf(client.startTrip({ id: TRIP, place: { kind: 'store', name: 'SAS' } })),
+    ).toBe(ERROR.TRIP_OPEN)
+  })
+
+  it('hands back the trip decoded: money, quantity and unit price out of their strings', async () => {
+    const { client } = clientReplying(200, { trip: tripWire })
+
+    const trip = await client.currentTrip()
+
+    expect(trip?.startedAt).toEqual(new Date('2026-09-19T10:00:00.000Z'))
+    expect(trip?.expenses[0]?.unitPrice).toEqual({
+      scaledMinor: 57_777_777_778n,
+      currency: 'AMD',
+      unit: 'l',
+    })
+    expect(trip?.total).toEqual([{ minor: 52_000n, currency: 'AMD' }])
+  })
+
+  it('«no trip» comes back as null', async () => {
+    const { client } = clientReplying(200, { trip: null })
+    expect(await client.currentTrip()).toBeNull()
+  })
+
+  it('refuses a trip that carries more than the contract', async () => {
+    const { client } = clientReplying(200, { trip: { ...tripWire, actorId: actorWire.id } })
+    expect(await codeOf(client.currentTrip())).toBe(ISSUE.RESPONSE_INVALID)
+  })
+
+  it('adds an expense with money and quantity on the wire as decimal strings', async () => {
+    const { client, calls } = clientReplying(201, tripWire)
+
+    const { created } = await client.addExpense(TRIP, {
+      id: EXPENSE,
+      itemId: '1c7a3d5f-9e2b-4a4c-8d8f-6b3e2f1a4c5d',
+      quantity: { milli: 900n, unit: 'l' },
+      amount: { minor: 52_000n, currency: 'AMD' },
+      query: 'мол',
+    })
+
+    expect(created).toBe(true)
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/trips/${TRIP}/expenses`)
+    expect(calls[0]?.body).toEqual({
+      id: EXPENSE,
+      itemId: '1c7a3d5f-9e2b-4a4c-8d8f-6b3e2f1a4c5d',
+      quantity: { value: '0.900', unit: 'l' },
+      amount: { amount: '520.00', currency: 'AMD' },
+      query: 'мол',
+    })
+  })
+
+  it('refuses a negative price before sending it', async () => {
+    const { client, calls } = clientReplying(201, tripWire)
+
+    expect(
+      await codeOf(
+        client.addExpense(TRIP, {
+          id: EXPENSE,
+          itemId: '1c7a3d5f-9e2b-4a4c-8d8f-6b3e2f1a4c5d',
+          amount: { minor: -1n, currency: 'AMD' },
+        }),
+      ),
+      // The code the server would answer for the same body (MOL-27's `encode`).
+    ).toBe(ERROR.INVALID_AMOUNT)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('clears a field with null, and sends nothing for an empty patch', async () => {
+    const { client, calls } = clientReplying(200, tripWire)
+
+    await client.updateExpense(TRIP, EXPENSE, { amount: null })
+    expect(calls[0]).toMatchObject({ method: 'PATCH', body: { amount: null } })
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/trips/${TRIP}/expenses/${EXPENSE}`)
+
+    expect(await codeOf(client.updateExpense(TRIP, EXPENSE, {}))).toBe(ISSUE.PATCH_EMPTY)
+    expect(calls).toHaveLength(1)
+  })
+
+  it('removes an expense and finishes a trip', async () => {
+    const removing = clientReplying(200, tripWire)
+    await removing.client.removeExpense(TRIP, EXPENSE)
+    expect(removing.calls[0]?.method).toBe('DELETE')
+
+    const finishing = clientReplying(204, undefined)
+    await expect(finishing.client.finishTrip(TRIP)).resolves.toBeUndefined()
+    expect(new URL(finishing.calls[0]?.url ?? '').pathname).toBe(`/trips/${TRIP}/finish`)
+  })
+
+  it('keeps an identifier inside its own path segment', async () => {
+    const { client, calls } = clientReplying(404, { code: ERROR.NOT_FOUND })
+
+    await codeOf(client.finishTrip('../actors/me?x='))
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe('/trips/..%2Factors%2Fme%3Fx%3D/finish')
+  })
+
+  it('refuses an upper-case identifier before sending it — the reply would name it otherwise', async () => {
+    const { client, calls } = clientReplying(201, tripWire)
+
+    expect(
+      await codeOf(
+        client.startTrip({ id: TRIP.toUpperCase(), place: { kind: 'store', name: 'SAS' } }),
+      ),
+    ).toBe(ISSUE.BODY_INVALID)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('lists recent places', async () => {
+    const { client } = clientReplying(200, { places: [tripWire.place] })
+    expect(await client.recentPlaces()).toEqual([tripWire.place])
+  })
+})

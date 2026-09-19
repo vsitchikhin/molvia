@@ -7,17 +7,24 @@ import { healthRoutes } from '@/routes/health'
 import { withActor } from '@/routes/actor'
 import { actorMeRoute, firstVisitRoute } from '@/routes/actors'
 import { catalogueRoutes } from '@/routes/catalogue'
+import { placeRoutes } from '@/routes/places'
+import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
 import { createActor } from '@/usecases/create-actor'
+import { currentTrip } from '@/usecases/current-trip'
 import { getActor } from '@/usecases/get-actor'
 import { proposeItem } from '@/usecases/propose-item'
+import { recentPlaces } from '@/usecases/recent-places'
 import { rateItem } from '@/usecases/rate-item'
 import { amendVerdict } from '@/usecases/amend-verdict'
 import { withdrawVerdict } from '@/usecases/withdraw-verdict'
 import { searchCatalogue } from '@/usecases/search-catalogue'
+import { startTrip } from '@/usecases/start-trip'
+import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
 import { createActorRepository } from '@/db/actors-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
+import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { databaseIsReachable, getDb } from '@/db'
 import type { Db } from '@/db'
@@ -30,6 +37,9 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   // The request is well formed; another row already holds what it claims — a barcode that
   // belongs to another item. Not 400: nothing about the request itself is wrong.
   [ERROR.CONFLICT]: 409,
+  // Also well formed: another trip of the same person is still open, and which of the two goes
+  // on is the person's choice (MOL-21). The screen reads the code, the status only groups it.
+  [ERROR.TRIP_OPEN]: 409,
   // Not 400: the request is well formed, it simply names no subject the server can find.
   // The PWA reads exactly this to decide that its stored identity is gone (MOL-8, Р-4).
   [ERROR.NO_ACTOR]: 401,
@@ -105,6 +115,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
     const events = createEventRepository(db)
+    const tripData = tripRepositories(db)
+    const transact = transactOn(db)
     const verdicts = createVerdictRepository(db)
 
     healthRoutes(instance, { databaseIsReachable })
@@ -123,6 +135,16 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items, events }, actorId, query),
         propose: (actorId, input) => proposeItem(items, actorId, input),
+      })
+      placeRoutes(guarded, { recent: (actorId) => recentPlaces(tripData.places, actorId) })
+      tripRoutes(guarded, {
+        start: (actor, body) => startTrip(transact, actor, body),
+        current: (actorId) => currentTrip(tripData, actorId),
+        add: (actorId, tripId, body) => addExpense(transact, actorId, tripId, body),
+        update: (actorId, tripId, expenseId, patch) =>
+          updateExpense(transact, actorId, tripId, expenseId, patch),
+        remove: (actorId, tripId, expenseId) => removeExpense(transact, actorId, tripId, expenseId),
+        finish: (actorId, tripId) => finishTrip(tripData.trips, actorId, tripId),
       })
       verdictRoutes(guarded, {
         rate: (actorId, itemId, rating) => rateItem({ items, verdicts }, actorId, itemId, rating),

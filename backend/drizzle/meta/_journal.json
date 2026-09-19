@@ -71,6 +71,13 @@
       "when": 1789807093911,
       "tag": "0009_verdict_withdrawal",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789819408858,
+      "tag": "0010_place_identity_selectors",
+      "breakpoints": true
     }
   ]
 }
