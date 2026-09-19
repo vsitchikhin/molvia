@@ -31,7 +31,9 @@
           :body="t('item.error.body')"
           @retry="retry"
         >
-          <template v-if="!fallback" #action>
+          <!-- Offered only when there is something to take: with no recent items the tap would
+               answer with less than was on screen before it (adversarial A4). -->
+          <template v-if="!fallback && hasRecent" #action>
             <AppButton variant="ghost" block @click="fallback = true">
               {{ t('item.error.fallback') }}
             </AppButton>
@@ -122,27 +124,40 @@ export default defineComponent({
         (phase.value === 'error' && fallback.value),
     )
 
+    // Under an error as offline: the server does not answer either way, and «хлеб» typed before
+    // it fell should not show twenty rows instead of one (Р-12).
     const rows = computed<CatalogueEntry[]>(() => {
       if (phase.value === 'ready') return results.value
-      if (phase.value === 'offline') return recent.filter(query.value)
-      if (showsRecent.value) return recent.items
+      if (showsRecent.value) return recent.filter(query.value)
       return []
     })
+
+    const hasRecent = computed(() => recent.items.length > 0)
 
     const heading = computed(() =>
       showsRecent.value ? t('item.group_recent') : t('item.group_found'),
     )
 
-    // Read out once per answer, not on every letter: the answer is what changed.
+    // Read out once per answer, not on every letter: the answer is what changed. An empty answer
+    // too — the block that replaces the list is not a ScreenState and says nothing of itself, and
+    // after «found one» silence would read as nothing having happened (Р-10, A5).
     let withdraw: (() => void) | undefined
     watch([phase, results], ([next, found]) => {
-      if (next !== 'ready') return
+      if (next !== 'ready' && next !== 'empty') return
       withdraw?.()
-      withdraw = announce?.(t('item.results_announced', { n: found.length }, found.length))
+      withdraw = announce?.(
+        next === 'ready'
+          ? t('item.results_announced', { n: found.length }, found.length)
+          : t('item.empty.body', { query: answered.value }),
+      )
     })
 
+    // Rows of an answer leave with the query they answer, not with the field: the list stays on
+    // screen, dimmed, while the next search is out, and a tap on «Кока-кола» found for «кола»
+    // with «хлеб» already typed must not teach the search that «хлеб» means cola (Р-9, A3). The
+    // recent items answer no query — they go with the field as it is.
     function pick(picked: CatalogueEntry): void {
-      entry.pick({ entry: picked, query: query.value })
+      entry.pick({ entry: picked, query: phase.value === 'ready' ? answered.value : query.value })
     }
 
     /** «Предложить товар» — the whole form, the only way the catalogue grows in 0.1. */
@@ -167,6 +182,7 @@ export default defineComponent({
       answered,
       retry,
       fallback,
+      hasRecent,
       rows,
       heading,
       pick,
