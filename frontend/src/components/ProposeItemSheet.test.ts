@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
-import { ERROR, ISSUE } from '@molvia/model'
+import { ERROR, ISSUE, ITEM_NAME_MAX, ITEM_NOTE_MAX } from '@molvia/model'
 import type { CatalogueEntry, ProposedItem } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
@@ -241,5 +241,68 @@ describe('«Suggest an item»', () => {
     expect(fields(sheet).name.element.value).toBe('мацун')
     expect(fields(sheet).note.element.value).toBe('')
     expect(submitButton(sheet).attributes('disabled')).toBeDefined()
+  })
+
+  describe('closed while the suggestion is on its way', () => {
+    function deferred() {
+      let resolve!: (value: { entry: CatalogueEntry; created: boolean }) => void
+      const promise = new Promise<{ entry: CatalogueEntry; created: boolean }>(
+        (done) => (resolve = done),
+      )
+      return { promise, resolve }
+    }
+
+    it('picks nothing: × said no, whatever the server answers after it', async () => {
+      const answer = deferred()
+      proposeItem.mockReturnValue(answer.promise)
+      const sheet = await render()
+      await chooseUnit(sheet, en.item.unit_l)
+      await submitButton(sheet).trigger('click')
+
+      await sheet.setProps({ open: false })
+      answer.resolve({ entry: tan, created: true })
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      expect(sheet.emitted('proposed')).toBeUndefined()
+    })
+
+    it('opens afresh with a live button, and the old answer does not fill the new form', async () => {
+      const answer = deferred()
+      proposeItem.mockReturnValueOnce(answer.promise)
+      const sheet = await render('тан')
+      await chooseUnit(sheet, en.item.unit_l)
+      await submitButton(sheet).trigger('click')
+
+      await sheet.setProps({ open: false })
+      await sheet.setProps({ query: 'мацун', open: true })
+      clock += 1000
+      await chooseUnit(sheet, en.item.unit_kg)
+      expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+
+      answer.resolve({ entry: tan, created: true })
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(sheet.emitted('proposed')).toBeUndefined()
+      expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+    })
+  })
+
+  describe('lengths and blanks', () => {
+    it('stops the name and the note where the catalogue does, instead of going grey past it', async () => {
+      const sheet = await render()
+
+      expect(fields(sheet).name.attributes('maxlength')).toBe(String(ITEM_NAME_MAX))
+      expect(fields(sheet).note.attributes('maxlength')).toBe(String(ITEM_NOTE_MAX))
+    })
+
+    it('leaves out a note that draws nothing, the way it leaves out spaces', async () => {
+      proposeItem.mockResolvedValue({ entry: tan, created: true })
+      const sheet = await render()
+      await chooseUnit(sheet, en.item.unit_l)
+      await fields(sheet).note.setValue(String.fromCodePoint(0x200b))
+
+      expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+      await submitButton(sheet).trigger('click')
+      expect(proposeItem).toHaveBeenCalledWith({ kind: 'product', name: 'тан', defaultUnit: 'l' })
+    })
   })
 })

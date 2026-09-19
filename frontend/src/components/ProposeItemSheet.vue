@@ -10,7 +10,12 @@
       enterkeyhint="next"
     />
     <SegmentedControl v-model="unit" :legend="t('item.unit')" :options="units" />
-    <AppField v-model="note" :label="t('item.propose.note')" enterkeyhint="done" />
+    <AppField
+      v-model="note"
+      :label="t('item.propose.note')"
+      :maxlength="noteMax"
+      enterkeyhint="done"
+    />
 
     <template #footer>
       <p v-if="!connected" class="line" role="status">{{ t('item.propose.offline') }}</p>
@@ -25,7 +30,7 @@
 <script lang="ts">
 import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { CATALOGUE_QUERY_MAX, proposedItemSchema } from '@molvia/model'
+import { ITEM_NAME_MAX, ITEM_NOTE_MAX, drawsNothing, proposedItemSchema } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
@@ -77,10 +82,20 @@ export default defineComponent({
       { value: 'piece', label: t('item.unit_piece') },
     ])
 
+    /**
+     * Which opening of the sheet this is. An answer to a form the person has closed — or closed
+     * and opened afresh — is not theirs any more: × said no, and picking the item anyway would
+     * raise the sheet «how much» for something they turned down (adversarial A1). The item itself
+     * is in the catalogue by then; only the pick is dropped.
+     */
+    let opening = 0
+
     // A fresh form for every opening, starting from what is in the field now.
     watch(
       () => props.open,
       (open) => {
+        opening += 1
+        sending.value = false
         if (!open) return
         connected.value = navigator.onLine
         name.value = props.query.trim()
@@ -96,7 +111,9 @@ export default defineComponent({
         kind: 'product',
         name: name.value,
         defaultUnit: unit.value,
-        ...(note.value.trim() === '' ? {} : { note: note.value }),
+        // Absent when it draws nothing — by the schema's own measure, so a pasted U+200B is left
+        // out like spaces rather than refused with the button going grey (A6b).
+        ...(drawsNothing(note.value) ? {} : { note: note.value }),
       }),
     )
 
@@ -105,16 +122,18 @@ export default defineComponent({
     async function submit(): Promise<void> {
       const parsed = input.value
       if (!ready.value || !parsed.success) return
+      const mine = opening
       sending.value = true
       failed.value = false
       try {
         const { entry } = await api.proposeItem(parsed.data)
-        emit('proposed', entry)
+        if (mine === opening) emit('proposed', entry)
       } catch {
+        if (mine !== opening) return
         connected.value = navigator.onLine
         failed.value = connected.value
       } finally {
-        sending.value = false
+        if (mine === opening) sending.value = false
       }
     }
 
@@ -140,8 +159,8 @@ export default defineComponent({
       failed,
       ready,
       submit,
-      // No name is longer than the longest query (`CATALOGUE_QUERY_MAX`).
-      nameMax: CATALOGUE_QUERY_MAX,
+      nameMax: ITEM_NAME_MAX,
+      noteMax: ITEM_NOTE_MAX,
     }
   },
 })
