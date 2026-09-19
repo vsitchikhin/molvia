@@ -65,8 +65,9 @@ export interface ExpenseRepository {
    * the name, the place and the day of the latest purchase, newest first, and how many items
    * wait in all. The day is the trip's, not the row's: a finished trip takes rows — the sauce
    * found in the bag at home — and an offline queue sends a whole trip later, and neither was
-   * bought when it reached the server. Products only — a dish is rated where it was served, and until 0.3 the verdict
-   * path refuses a place, so a dish here would be a question with no way to answer it.
+   * bought when it reached the server. Products only — a dish is rated where it was served, and
+   * until 0.3 the verdict path refuses a place, so a dish here would be a question with no way
+   * to answer it.
    */
   pendingVerdictsFor(actorId: string, limit: number): Promise<PendingVerdicts>
   /**

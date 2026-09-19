@@ -19,8 +19,8 @@ export interface VerdictQueue {
   readonly current: ComputedRef<PendingVerdict | null>
   /** How many items wait, for the line under the title. */
   readonly count: ComputedRef<number>
-  /** The cards come from memory: the last load failed. */
-  readonly stale: ComputedRef<boolean>
+  /** The cards come from memory: the last load failed, without a connection or with one. */
+  readonly stale: ComputedRef<'offline' | 'error' | null>
   readonly fetchedAt: ComputedRef<Date | null>
   save(card: PendingVerdict, score: Score, review: string): void
   skip(card: PendingVerdict): void
@@ -32,6 +32,8 @@ const SKIPS_KEY = 'molvia.verdict-skips'
 
 interface Remembered {
   readonly answer: PendingVerdicts
+  /** When it was asked for: a rating confirmed later may not be in it yet. */
+  readonly askedAt: Date
   readonly fetchedAt: Date
 }
 
@@ -45,14 +47,22 @@ function recallAnswer(key: string): Remembered | null {
   const raw = read(key)
   if (!raw) return null
   try {
-    const parsed = JSON.parse(raw) as { answer?: unknown; fetchedAt?: unknown }
+    const parsed = JSON.parse(raw) as { answer?: unknown; askedAt?: unknown; fetchedAt?: unknown }
     const answer = pendingVerdictsCodec.safeParse(parsed.answer)
-    const fetchedAt = typeof parsed.fetchedAt === 'string' ? new Date(parsed.fetchedAt) : null
-    if (!answer.success || !fetchedAt || Number.isNaN(fetchedAt.getTime())) return null
-    return { answer: answer.data, fetchedAt }
+    const fetchedAt = dateOf(parsed.fetchedAt)
+    // A memory written before `askedAt` was kept: its answer is at least as old as it arrived.
+    const askedAt = dateOf(parsed.askedAt) ?? fetchedAt
+    if (!answer.success || !askedAt || !fetchedAt) return null
+    return { answer: answer.data, askedAt, fetchedAt }
   } catch {
     return null
   }
+}
+
+function dateOf(value: unknown): Date | null {
+  if (typeof value !== 'string') return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
 function recallSkips(key: string): Skip[] {
@@ -97,31 +107,22 @@ export function useVerdictQueue(): VerdictQueue {
   /** The card on screen stays put while the person is on it, whatever a reload brings. */
   const shownId = ref<string | null>(null)
 
-  /**
-   * When each rating was confirmed, on a clock of this screen's own that also stamps the start
-   * of every load. An answer asked for before a rating was confirmed may have been read before
-   * it was written — sending and reloading start on the same `online` — so such an answer does
-   * not get to put the rated item back (adversarial F1).
-   */
-  let clock = 0
-  const confirmedAt = new Map<string, number>()
-
   function recall(id: string | null): void {
     owner.value = id
     remembered.value = id ? recallAnswer(`${ANSWER_KEY}.${id}`) : null
     skips.value = id ? recallSkips(`${SKIPS_KEY}.${id}`) : []
     failure.value = null
     shownId.value = null
-    confirmedAt.clear()
   }
 
   function rememberAnswer(): void {
     if (!owner.value || !remembered.value) return
-    const { answer, fetchedAt } = remembered.value
+    const { answer, askedAt, fetchedAt } = remembered.value
     write(
       `${ANSWER_KEY}.${owner.value}`,
       JSON.stringify({
         answer: pendingVerdictsCodec.encode(answer),
+        askedAt: askedAt.toISOString(),
         fetchedAt: fetchedAt.toISOString(),
       }),
     )
@@ -138,30 +139,22 @@ export function useVerdictQueue(): VerdictQueue {
   }
 
   /**
-   * A draft that left the waiting list and is not back on a card was answered: the item is
-   * rated, and the remembered answer must stop offering it before the next load says so.
-   * Synchronous: between the draft going and this running, the card would be back on screen.
-   *
-   * Only for the identity this queue holds: a change of identity swaps the drafts first, and the
-   * previous person's drafts «leaving» is not an answer — nor is their queue this person's
-   * (adversarial F2).
+   * The remembered answer, less what was rated after it was asked for: the server may have read
+   * the queue before it wrote the verdict, and whoever sent it — this screen or the app while
+   * the screen was closed — left the moment in `drafts.confirmed` (adversarial F1, R1). Read
+   * every time, never cut out of the memory, so the order of the two answers does not matter.
    */
-  watch(
-    () => drafts.waiting.map((draft) => draft.card.itemId),
-    (now, before) => {
-      if (owner.value !== actor.id) return
-      const done = before.filter((id) => !now.includes(id) && !(id in drafts.drafts))
-      if (done.length === 0) return
-      for (const id of done) confirmedAt.set(id, ++clock)
-      const shown = remembered.value
-      if (!shown) return
-      const answer = without(shown.answer, new Set(done))
-      if (answer.items.length === shown.answer.items.length) return
-      remembered.value = { ...shown, answer }
-      rememberAnswer()
-    },
-    { flush: 'sync' },
-  )
+  const answer = computed<PendingVerdicts | null>(() => {
+    const shown = remembered.value
+    if (!shown) return null
+    const asked = shown.askedAt.getTime()
+    const rated = new Set(
+      Object.entries(drafts.confirmed)
+        .filter(([, at]) => at >= asked)
+        .map(([itemId]) => itemId),
+    )
+    return without(shown.answer, rated)
+  })
 
   const returned = computed(() =>
     Object.values(drafts.drafts)
@@ -176,7 +169,7 @@ export function useVerdictQueue(): VerdictQueue {
   }
 
   const cards = computed<PendingVerdict[]>(() => {
-    const listed = remembered.value?.answer.items ?? []
+    const listed = answer.value?.items ?? []
     const sending = new Set(drafts.waiting.map((draft) => draft.card.itemId))
     const back = new Set(returned.value.map((card) => card.itemId))
     const open = listed.filter((card) => !sending.has(card.itemId) && !back.has(card.itemId))
@@ -203,26 +196,35 @@ export function useVerdictQueue(): VerdictQueue {
   )
 
   /**
-   * For the counter under the title: what the server counts, less what is on its way — whether
-   * or not the item is on the page the server sent (adversarial F3).
+   * For the counter under the title: what the server counts, less what is on its way. A draft on
+   * the page is still counted by the server; one off the page is only when the page is not the
+   * whole queue — otherwise it is off the page because the server already has it (adversarial
+   * F3, R2). Never fewer than the cards on screen.
    */
   const count = computed(() => {
-    const answer = remembered.value?.answer
-    if (!answer) return 0
-    return Math.max(0, answer.total - drafts.waiting.length)
+    const shown = answer.value
+    if (!shown) return 0
+    const listed = new Set(shown.items.map((card) => card.itemId))
+    const partial = shown.total > shown.items.length
+    const onTheirWay = drafts.waiting.filter(
+      (draft) => listed.has(draft.card.itemId) || partial,
+    ).length
+    return Math.max(cards.value.length, shown.total - onTheirWay)
   })
 
   const phase = computed<QueuePhase>(() => {
     // No identity, nothing to ask for: the identity notice above says why (adversarial F4).
     if (!actor.id) return 'idle'
     if (cards.value.length > 0) return 'ready'
-    // Nothing to show and no fresh answer: not a success — the list could not be read.
-    if (failure.value) return failure.value
+    // Nothing to show and no fresh answer: not a success — the list could not be read. Unless
+    // the person emptied it themselves, and a rating is on its way: then that is the news
+    // (adversarial R4).
+    if (failure.value && drafts.waiting.length === 0) return failure.value
     return remembered.value ? 'empty' : 'loading'
   })
 
-  /** Shown from memory because a fresh answer could not be had. */
-  const stale = computed(() => failure.value !== null && remembered.value !== null)
+  /** Shown from memory because a fresh answer could not be had — and why. */
+  const stale = computed(() => (remembered.value === null ? null : failure.value))
   const fetchedAt = computed(() => remembered.value?.fetchedAt ?? null)
 
   /** Forgets what was put off about items the server no longer lists — rated, or withdrawn. */
@@ -241,20 +243,16 @@ export function useVerdictQueue(): VerdictQueue {
     const id = actor.id
     if (!id || loadingFor === id) return
     loadingFor = id
-    const started = ++clock
+    const askedAt = new Date()
     try {
       const fresh = await api.pendingVerdicts()
       if (owner.value !== id) return
-      // Rated after this answer was asked for: the server may have read the queue first.
-      const late = new Set(
-        [...confirmedAt].filter(([, at]) => at > started).map(([itemId]) => itemId),
-      )
-      for (const [itemId, at] of confirmedAt) if (at < started) confirmedAt.delete(itemId)
-      const answer = without(fresh, late)
-      remembered.value = { answer, fetchedAt: new Date() }
+      remembered.value = { answer: fresh, askedAt, fetchedAt: new Date() }
       failure.value = null
       rememberAnswer()
-      pruneSkips(answer)
+      // What was confirmed before this was asked for, the answer already knows.
+      drafts.settle(askedAt)
+      if (answer.value) pruneSkips(answer.value)
     } catch {
       if (owner.value !== id) return
       // Decided after the failure: a connection lost while the answer was on its way is not

@@ -260,4 +260,35 @@ describe('VerdictsView', () => {
     expect(view.text()).not.toContain(en.verdict.empty.title)
     expect(pendingVerdicts).not.toHaveBeenCalled()
   })
+
+  it('R5: the server broke with cards in memory — it says so, and offers «Try again»', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [milk], total: 1 })
+    ;(await render()).view.unmount()
+
+    online(true)
+    pendingVerdicts.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 502'))
+    const { view } = await render()
+    expect(view.get('.stale').text()).toContain('the server did not answer')
+
+    pendingVerdicts.mockResolvedValue({ items: [milk, bread], total: 2 })
+    await button(view, en.state.retry).trigger('click')
+    await flushPromises()
+    expect(view.find('.stale').exists()).toBe(false)
+    expect(view.text()).toContain('2 purchases are waiting to be rated')
+  })
+
+  it('R4: the last remembered card rated offline — only the green «saved»', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [milk], total: 1 })
+    ;(await render()).view.unmount()
+
+    online(false)
+    pendingVerdicts.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+    rateItem.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+    const { view } = await render()
+    await rate(view, 4)
+
+    expect(view.text()).toContain(en.verdict.offline.title)
+    expect(view.text()).not.toContain(en.verdict.load_offline.title)
+    expect(view.text()).not.toContain(en.verdict.empty.title)
+  })
 })

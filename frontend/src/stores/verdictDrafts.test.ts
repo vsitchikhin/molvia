@@ -288,4 +288,20 @@ describe('verdict drafts', () => {
     expect(rateItem).not.toHaveBeenCalled()
     expect(localStorage.getItem(KEY)).toContain(milk.itemId)
   })
+
+  it('R1: remembers when each rating reached the server, across a restart, until settled', async () => {
+    rateItem.mockResolvedValue(answered(milk.itemId, 4))
+    const drafts = fresh()
+    const before = Date.now()
+
+    drafts.save(milk, 4, '')
+    await settled()
+
+    const again = fresh()
+    expect(again.confirmed[milk.itemId]).toBeGreaterThanOrEqual(before)
+
+    again.settle(new Date(Date.now() + 1000))
+    expect(again.confirmed).toEqual({})
+    expect(fresh().confirmed).toEqual({})
+  })
 })

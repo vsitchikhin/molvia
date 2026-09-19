@@ -51,9 +51,20 @@
       />
 
       <template v-else-if="phase === 'ready' && current">
-        <p v-if="stale && fetchedAt" class="stale">
-          {{ t('verdict.stale', { when: day(fetchedAt) }) }}
-        </p>
+        <!-- From memory: without a connection it refreshes by itself; with one, the server broke
+             and nothing will fire again on its own — so the person gets the button. -->
+        <div v-if="stale && fetchedAt" class="stale">
+          <p class="stale-text">
+            {{
+              t(stale === 'offline' ? 'verdict.stale' : 'verdict.stale_error', {
+                when: day(fetchedAt),
+              })
+            }}
+          </p>
+          <AppButton v-if="stale === 'error'" variant="ghost" @click="retry">
+            {{ t('state.retry') }}
+          </AppButton>
+        </div>
 
         <Transition name="card" mode="out-in">
           <VerdictCard
@@ -200,7 +211,16 @@ export default defineComponent({
 }
 
 .stale {
-  margin: 0 0 var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.stale-text {
+  margin: 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
 }

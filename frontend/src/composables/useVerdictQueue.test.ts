@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h, watch } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
@@ -47,9 +47,16 @@ function online(value: boolean): void {
 const offline = () => new ApiError(ERROR.INTERNAL, 'Failed to fetch')
 
 /** Mounted inside a component: the queue loads on mount and listens for the connection. */
+const wrappers: { unmount(): void }[] = []
+
+/** The screen closed: its watchers and listeners go with it. */
+function unmountAll(): void {
+  for (const wrapper of wrappers.splice(0)) wrapper.unmount()
+}
+
 async function mounted(): Promise<VerdictQueue> {
   let queue: VerdictQueue | undefined
-  mount(
+  const wrapper = mount(
     defineComponent({
       setup() {
         queue = useVerdictQueue()
@@ -57,6 +64,7 @@ async function mounted(): Promise<VerdictQueue> {
       },
     }),
   )
+  wrappers.push(wrapper)
   await flushPromises()
   if (!queue) throw new Error('not mounted')
   return queue
@@ -100,6 +108,8 @@ describe('useVerdictQueue', () => {
     freshPinia()
   })
 
+  afterEach(unmountAll)
+
   it('loads the server order, newest first, with the total for the counter', async () => {
     pendingVerdicts.mockResolvedValue(answer([milk, bread, cheese], 7))
     const queue = await mounted()
@@ -107,7 +117,7 @@ describe('useVerdictQueue', () => {
     expect(queue.phase.value).toBe('ready')
     expect(queue.current.value).toEqual(milk)
     expect(queue.count.value).toBe(7)
-    expect(queue.stale.value).toBe(false)
+    expect(queue.stale.value).toBeNull()
   })
 
   it('16: nothing waits — empty, which the screen draws as a success', async () => {
@@ -142,7 +152,7 @@ describe('useVerdictQueue', () => {
 
     expect(queue.phase.value).toBe('ready')
     expect(names(queue)).toEqual(['Позиция 3', 'Позиция 2'])
-    expect(queue.stale.value).toBe(true)
+    expect(queue.stale.value).toBe('offline')
     expect(queue.fetchedAt.value).toBeInstanceOf(Date)
   })
 
@@ -173,7 +183,10 @@ describe('useVerdictQueue', () => {
     expect(names(queue)).toEqual(['Позиция 2'])
     expect(queue.count.value).toBe(1)
     // The memory agrees: a restart without a connection does not offer the milk again.
-    expect(localStorage.getItem(`molvia.verdict-queue.${ME}`)).not.toContain(milk.itemId)
+    freshPinia()
+    online(false)
+    pendingVerdicts.mockRejectedValue(offline())
+    expect(names(await mounted())).toEqual(['Позиция 2'])
   })
 
   it('the last rating, gone through at once, never brings its card back — not for a moment', async () => {
@@ -258,6 +271,20 @@ describe('useVerdictQueue', () => {
     expect(queue.current.value).toEqual(milk)
   })
 
+  it('a memory written without `askedAt` is read with the day it arrived', async () => {
+    localStorage.setItem(
+      `molvia.verdict-queue.${ME}`,
+      JSON.stringify({
+        answer: { items: [{ ...milk, boughtAt: milk.boughtAt.toISOString() }], total: 1 },
+        fetchedAt: '2026-09-01T10:00:00.000Z',
+      }),
+    )
+    online(false)
+    pendingVerdicts.mockRejectedValue(offline())
+
+    expect(names(await mounted())).toEqual(['Позиция 3'])
+  })
+
   it('15: a broken memory is an empty one', async () => {
     localStorage.setItem(`molvia.verdict-queue.${ME}`, '{nope')
     localStorage.setItem(`molvia.verdict-skips.${ME}`, '[{"itemId":1}]')
@@ -290,7 +317,6 @@ describe('useVerdictQueue', () => {
 
       expect(names(queue)).toEqual(['Позиция 2'])
       expect(queue.count.value).toBe(1)
-      expect(localStorage.getItem(`molvia.verdict-queue.${ME}`)).not.toContain(milk.itemId)
 
       // The next answer, asked for after the rating, is taken as it is.
       pendingVerdicts.mockResolvedValueOnce(answer([bread]))
@@ -397,6 +423,71 @@ describe('useVerdictQueue', () => {
       await queue.retry()
 
       expect(localStorage.getItem(`molvia.verdict-skips.${ME}`)).toContain(milk.itemId)
+    })
+  })
+
+  describe('adversarial round 2', () => {
+    it('R1: sent while the screen was closed — not offered again from memory', async () => {
+      pendingVerdicts.mockResolvedValueOnce(answer([milk, bread]))
+      const queue = await mounted()
+      await savedOffline(queue, milk)
+      unmountAll()
+
+      // Elsewhere in the app the connection came back and App.vue sent it; then it went again.
+      rateItem.mockResolvedValueOnce(sent(milk.itemId))
+      online(true)
+      await useVerdictDraftsStore().flush()
+      online(false)
+      pendingVerdicts.mockRejectedValue(offline())
+
+      const again = await mounted()
+      expect(names(again)).toEqual(['Позиция 2'])
+      expect(again.count.value).toBe(1)
+
+      // And after a restart, from the phone's own memory.
+      freshPinia()
+      expect(names(await mounted())).toEqual(['Позиция 2'])
+    })
+
+    it('R2: a rating that reached the server, its answer lost — the counter does not go below the cards', async () => {
+      pendingVerdicts.mockResolvedValueOnce(answer([milk, bread]))
+      const queue = await mounted()
+      await savedOffline(queue, milk)
+
+      // The PUT was written, its answer lost: the draft still waits, the server no longer counts it.
+      online(true)
+      pendingVerdicts.mockResolvedValueOnce(answer([bread], 1))
+      await queue.retry()
+
+      expect(names(queue)).toEqual(['Позиция 2'])
+      expect(queue.count.value).toBe(1)
+    })
+
+    it('R4: the last remembered card rated offline — a rating on its way, not «the list will come»', async () => {
+      pendingVerdicts.mockResolvedValue(answer([milk]))
+      await mounted()
+      unmountAll()
+
+      freshPinia()
+      online(false)
+      pendingVerdicts.mockRejectedValue(offline())
+      const queue = await mounted()
+      await savedOffline(queue, milk)
+
+      expect(queue.phase.value).toBe('empty')
+    })
+
+    it('R5: the server broke and memory has cards — stale says it was the server', async () => {
+      pendingVerdicts.mockResolvedValue(answer([milk]))
+      await mounted()
+
+      freshPinia()
+      online(true)
+      pendingVerdicts.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 502'))
+      const queue = await mounted()
+
+      expect(queue.phase.value).toBe('ready')
+      expect(queue.stale.value).toBe('error')
     })
   })
 })

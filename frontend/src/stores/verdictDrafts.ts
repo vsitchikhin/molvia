@@ -27,6 +27,7 @@ export interface VerdictDraft {
 export type Held = 'offline' | 'failed'
 
 const KEY = 'molvia.verdict-drafts'
+const CONFIRMED_KEY = 'molvia.verdict-confirmed'
 
 /**
  * What stops a run rather than refusing the draft: no connection or a server that broke (both
@@ -73,6 +74,23 @@ function recall(key: string): Record<string, VerdictDraft> {
   }
 }
 
+/** Item → when the server confirmed its rating, as epoch milliseconds. */
+function recallConfirmed(key: string): Record<string, number> {
+  const raw = read(key)
+  if (!raw) return {}
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!isRecord(parsed)) return {}
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, number] => typeof entry[1] === 'number',
+      ),
+    )
+  } catch {
+    return {}
+  }
+}
+
 /** The review goes only when it says something: a `PUT` without one keeps what was written. */
 function ratingOf(draft: VerdictDraft & { score: Score }): Rating {
   return draft.review.trim() ? { score: draft.score, review: draft.review } : { score: draft.score }
@@ -92,6 +110,12 @@ export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
 
   const drafts = ref<Record<string, VerdictDraft>>({})
   const held = ref<Held | null>(null)
+  /**
+   * When each rating reached the server. Kept here, by whoever sends, and on the device: the
+   * queue of «Оценки» may have been closed when a rating went, and a list it remembers from
+   * before must not offer that item again when it opens (adversarial F1, R1).
+   */
+  const confirmed = ref<Record<string, number>>({})
 
   const waiting = computed(() =>
     Object.values(drafts.value).filter((draft) => draft.state === 'saved'),
@@ -99,6 +123,7 @@ export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
 
   function load(id: string | null): void {
     drafts.value = id ? recall(`${KEY}.${id}`) : {}
+    confirmed.value = id ? recallConfirmed(`${CONFIRMED_KEY}.${id}`) : {}
     held.value = null
   }
 
@@ -110,6 +135,21 @@ export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
   function put(draft: VerdictDraft): void {
     drafts.value = { ...drafts.value, [draft.card.itemId]: draft }
     persist(actor.id)
+  }
+
+  function confirm(itemId: string): void {
+    confirmed.value = { ...confirmed.value, [itemId]: Date.now() }
+    if (actor.id) write(`${CONFIRMED_KEY}.${actor.id}`, JSON.stringify(confirmed.value))
+  }
+
+  /** Forgets confirmations an answer asked for at `since` already reflects. */
+  function settle(since: Date): void {
+    const kept = Object.fromEntries(
+      Object.entries(confirmed.value).filter(([, at]) => at >= since.getTime()),
+    )
+    if (Object.keys(kept).length === Object.keys(confirmed.value).length) return
+    confirmed.value = kept
+    if (actor.id) write(`${CONFIRMED_KEY}.${actor.id}`, JSON.stringify(kept))
   }
 
   function forget(itemId: string): void {
@@ -189,13 +229,17 @@ export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
       // Replaced while it was out: the newer word is still waiting and goes on the next pass.
       if (drafts.value[draft.card.itemId] !== draft) continue
 
-      if (refusal === ERROR.NOT_FOUND) forget(draft.card.itemId)
-      else if (refusal) put({ ...draft, state: 'typing', error: refusal })
-      else forget(draft.card.itemId)
+      if (refusal && refusal !== ERROR.NOT_FOUND) {
+        put({ ...draft, state: 'typing', error: refusal })
+      } else {
+        // Rated, or the item is gone: either way nothing is left to ask about it.
+        confirm(draft.card.itemId)
+        forget(draft.card.itemId)
+      }
     }
     held.value = null
     if (waiting.value.length > 0) await drain(owner)
   }
 
-  return { drafts, waiting, held, keep, save, forget, flush }
+  return { drafts, waiting, held, confirmed, keep, save, forget, settle, flush }
 })
