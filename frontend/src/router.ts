@@ -4,6 +4,7 @@ import HomeView from '@/views/HomeView.vue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 import TripView from '@/views/TripView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
+import { watchBrowserAnimatedBack } from '@/transitions'
 
 /** The three sections of the tab bar. «trip» is home: the main scenario of the product. */
 export type Tab = 'trip' | 'advice' | 'verdicts'
@@ -48,6 +49,10 @@ export const routes = [
   },
   { path: '/:rest(.*)', redirect: '/' },
 ] satisfies (RouteRecordRaw & { name?: RouteName })[]
+
+// Before the web history exists, so the browser's own back animation is known in time — see
+// `watchBrowserAnimatedBack`.
+watchBrowserAnimatedBack()
 
 export const router = createRouter({
   history: createWebHistory(),

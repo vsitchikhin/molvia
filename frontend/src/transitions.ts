@@ -30,18 +30,30 @@ function reducedMotion(): boolean {
  * Where the API is missing, or motion is reduced, the move simply happens. The direction rides
  * on `<html data-nav>` for the length of the transition — main.scss picks the animation by it.
  */
-export function installViewTransitions(router: Router): void {
-  const waiting: (() => void)[] = []
-  let current: ViewTransition | undefined
-  let animatedByBrowser = false
+/**
+ * A swipe from the edge on iOS and predictive back on Android already show the page leaving;
+ * sliding it out again on top would play the move twice. The browser says so on the event.
+ * This listens to the history, not to a gesture: nothing is taken from the browser.
+ *
+ * **It must be listening before the router is.** A real `popstate` runs the microtasks after
+ * each listener, so the router's whole guard chain — `beforeResolve` included — finishes before
+ * a listener registered after it is called. Registered later, the flag was read as «no» and the
+ * pop animated anyway, and then set to «yes» for the next move, whose animation it swallowed.
+ * `capture` does not help: on `window` listeners run in the order they were added. So
+ * `router.ts` calls this right before it creates the web history.
+ */
+let animatedByBrowser = false
 
-  // A swipe from the edge on iOS and predictive back on Android already show the page leaving;
-  // sliding it out again on top would play the move twice. The browser says so on the event.
-  // This listens to the history, not to a gesture: nothing is taken from the browser.
+export function watchBrowserAnimatedBack(): void {
   window.addEventListener('popstate', (event) => {
     // Undefined where the browser does not report it — read as «not animated», which is right.
     animatedByBrowser = event.hasUAVisualTransition
   })
+}
+
+export function installViewTransitions(router: Router): void {
+  const waiting: (() => void)[] = []
+  let current: ViewTransition | undefined
 
   router.beforeResolve((to, from) => {
     const byBrowser = animatedByBrowser
@@ -77,6 +89,8 @@ export function installViewTransitions(router: Router): void {
 
   // Runs for a failed or cancelled move too, so a transition never waits forever.
   router.afterEach(async () => {
+    // Whatever move the flag was raised for is over; it must not reach the next one.
+    animatedByBrowser = false
     if (waiting.length === 0) return
     const done = waiting.splice(0)
     await nextTick()
