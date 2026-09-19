@@ -1,0 +1,165 @@
+import { randomUUID } from 'node:crypto'
+import process from 'node:process'
+import { expect, test } from '@playwright/test'
+import type { APIRequestContext, Page } from '@playwright/test'
+
+/**
+ * «Оценки» through a real browser and the real API (MOL-28): the purchases are made over the
+ * API — the trip screen is another task — and everything after them happens on the screen.
+ */
+
+function inviteCode(): string {
+  const code = process.env.SIGNUP_CODE
+  if (!code) {
+    throw new Error("SIGNUP_CODE is not set. Run `make setup` to generate this copy's .env.")
+  }
+  return code
+}
+
+interface Person {
+  readonly id: string
+  call(method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown): Promise<unknown>
+}
+
+/** A new person for each test: the queue is personal, so nothing leaks between tests. */
+async function person(request: APIRequestContext, page: Page): Promise<Person> {
+  const created = await request.post('/api/actors', {
+    headers: { 'x-molvia-invite': inviteCode() },
+  })
+  expect(created.status()).toBe(201)
+  const { id } = (await created.json()) as { id: string }
+  await page.addInitScript((actor) => {
+    localStorage.setItem('molvia.actor', actor)
+  }, id)
+
+  return {
+    id,
+    async call(method, path, body) {
+      const response = await request.fetch(`/api${path}`, {
+        method,
+        headers: { 'x-molvia-actor': id },
+        ...(body === undefined ? {} : { data: body }),
+      })
+      expect(response.ok(), `${method} ${path}: ${String(response.status())}`).toBe(true)
+      return response.status() === 204 ? null : ((await response.json()) as unknown)
+    },
+  }
+}
+
+/** Bought in one trip, in this order — so the last one is the newest and comes first. */
+async function bought(who: Person, names: readonly string[]): Promise<void> {
+  const tripId = randomUUID()
+  await who.call('POST', '/trips', { id: tripId, place: { kind: 'store', name: 'SAS' } })
+  for (const name of names) {
+    const entry = (await who.call('POST', '/catalogue/items', {
+      kind: 'product',
+      name,
+      defaultUnit: 'piece',
+    })) as { id: string }
+    await who.call('POST', `/trips/${tripId}/expenses`, { id: randomUUID(), itemId: entry.id })
+  }
+}
+
+async function waiting(who: Person): Promise<number> {
+  return ((await who.call('GET', '/verdicts/pending')) as { total: number }).total
+}
+
+async function rate(page: Page, score: number): Promise<void> {
+  await page.getByRole('button', { name: `Rating ${String(score)} out of 5` }).click()
+  await page.getByRole('button', { name: 'Save the rating' }).click()
+}
+
+// Unique per run: the catalogue is shared, and a name another run proposed would come back as
+// that item — still unrated for a new person, but the test would read someone else's name.
+const tag = randomUUID().slice(0, 8)
+
+test('rates the purchases one by one, puts one off, and ends at «Everything is rated»', async ({
+  page,
+  request,
+}) => {
+  const who = await person(request, page)
+  const milk = `Молоко ${tag}`
+  const bread = `Хлеб ${tag}`
+  await bought(who, [milk, bread])
+
+  await page.goto('/verdicts')
+
+  await expect(page.getByText('2 purchases are waiting to be rated')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2 })).toContainText(bread)
+  await expect(page.getByText(/today · SAS/i)).toBeVisible()
+
+  await page.getByRole('button', { name: 'Rating 4 out of 5' }).click()
+  await page.getByLabel('A couple of words — if you have any').fill('Мягкий\nна второй день тоже')
+  await page.getByRole('button', { name: 'Save the rating' }).click()
+
+  await expect(page.getByRole('heading', { level: 2 })).toContainText(milk)
+  await expect(page.getByRole('heading', { level: 2 })).toBeFocused()
+  await expect(page.getByText('1 purchase is waiting to be rated')).toBeVisible()
+
+  // Put off, and it is the only one left: it comes round again rather than «all rated».
+  await page.getByRole('button', { name: 'Not now' }).click()
+  await expect(page.getByRole('heading', { level: 2 })).toContainText(milk)
+
+  await rate(page, 2)
+
+  await expect(page.getByRole('heading', { name: 'Everything is rated' })).toBeVisible()
+  await expect.poll(() => waiting(who)).toBe(0)
+
+  // The words went as typed, line break included: an amendment that changes nothing shows them.
+  const itemId = (
+    (await who.call('POST', '/catalogue/items', {
+      kind: 'product',
+      name: bread,
+      defaultUnit: 'piece',
+    })) as { id: string }
+  ).id
+  const verdict = (await who.call('PATCH', `/verdicts/${itemId}`, { score: 4 })) as {
+    review: string
+  }
+  expect(verdict.review).toBe('Мягкий\nна второй день тоже')
+
+  await page.getByRole('button', { name: 'Open «What to buy»' }).click()
+  await expect(page.getByRole('heading', { name: 'What to buy' })).toBeVisible()
+})
+
+test('7: rated without a connection — «saved», and it goes by itself once online', async ({
+  page,
+  context,
+  request,
+}) => {
+  const who = await person(request, page)
+  await bought(who, [`Сыр ${tag}`])
+
+  await page.goto('/verdicts')
+  await expect(page.getByRole('heading', { level: 2 })).toContainText('Сыр')
+
+  await context.setOffline(true)
+  await rate(page, 5)
+
+  await expect(page.getByText('The rating is saved')).toBeVisible()
+  await expect(page.getByText('Everything is rated')).toHaveCount(0)
+  expect(await page.locator('.bad').count()).toBe(0)
+
+  await context.setOffline(false)
+
+  await expect(page.getByText('The rating is saved')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Everything is rated' })).toBeVisible()
+  expect(await waiting(who)).toBe(0)
+})
+
+test('the queue that could not load is red and loads again on «Try again»', async ({
+  page,
+  request,
+}) => {
+  const who = await person(request, page)
+  await bought(who, [`Кефир ${tag}`])
+  await page.route('**/api/verdicts/pending', (route) => route.abort())
+
+  await page.goto('/verdicts')
+  await expect(page.getByText('The list of purchases did not load')).toBeVisible()
+
+  await page.unroute('**/api/verdicts/pending')
+  await page.getByRole('button', { name: 'Try again' }).click()
+
+  await expect(page.getByRole('heading', { level: 2 })).toContainText('Кефир')
+})
