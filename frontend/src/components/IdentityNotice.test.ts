@@ -65,14 +65,17 @@ describe('IdentityNotice', () => {
     expect(render('offline').view.text()).toContain(en.identity.offline.title)
   })
 
-  it('offers a retry in exactly the two states where trying again can work', async () => {
+  // Offline had a «Try again» of its own until MOL-19: under the screen's own offline it made
+  // two buttons of one name doing different things, and the store comes back on `online` by
+  // itself, as the text says. The owner took it away (MOL-19, Р-1).
+  it('offers a retry only for an error, where the next attempt is the way out', async () => {
     const { view, store } = render('error')
     const retry = vi.spyOn(store, 'retry').mockResolvedValue(undefined)
 
     await view.get('button').trigger('click')
 
     expect(retry).toHaveBeenCalled()
-    expect(render('offline').view.find('button').exists()).toBe(true)
+    expect(render('offline').view.find('button').exists()).toBe(false)
     expect(render('uninvited').view.find('button').exists()).toBe(false)
   })
 
@@ -109,20 +112,26 @@ describe('IdentityNotice', () => {
   })
 
   // Drawn by the shared screen state: an error is red like on any screen, offline is yellow
-  // rather than the green of an offline trip — without an identity nothing can be saved.
+  // rather than the green of an offline trip — without an identity nothing can be saved. The
+  // error is announced politely: the notice is drawn again on every screen the person moves
+  // to, and an alert would cut off the heading each move focuses (MOL-19, A3).
   it.each([
-    ['error', 'bad', 'alert'],
+    ['error', 'bad', 'status'],
     ['offline', 'warn', 'status'],
     ['lost', 'warn', 'alert'],
     ['uninvited', 'warn', 'alert'],
   ] as const)('draws %s in %s and announces it as %s', (state, tone, role) => {
-    const notice = render(state).view.get('[role]')
-    expect(notice.classes()).toContain(tone)
-    expect(notice.attributes('role')).toBe(role)
+    const { view } = render(state)
+    expect(view.get('.state').classes()).toContain(tone)
+    expect(view.get('[role]').attributes('role')).toBe(role)
   })
 
   it('is never drawn red for a dropped connection', () => {
-    expect(render('offline').view.get('[role]').classes()).not.toContain('bad')
+    expect(render('offline').view.get('.state').classes()).not.toContain('bad')
+  })
+
+  it('stays a landmark, so it can be reached among the page regions', () => {
+    expect(render('error').view.element.tagName).toBe('ASIDE')
   })
 
   it('takes every word from i18n, not from the markup', () => {

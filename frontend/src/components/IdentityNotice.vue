@@ -1,39 +1,37 @@
 <template>
-  <AppCard v-if="notice && !dismissed" class="notice">
-    <ScreenState
-      inline
-      :kind="kind"
-      :tone="tone"
-      :title="t(`identity.${notice}.title`)"
-      :body="t(`identity.${notice}.body`)"
-      @retry="retry"
-    >
-      <template v-if="restoreFailed" #default>
-        <p class="failed">{{ t('identity.restore_failed') }}</p>
-      </template>
+  <aside v-if="notice && !dismissed" class="notice">
+    <AppCard>
+      <ScreenState
+        inline
+        :kind="kind"
+        :tone="tone"
+        :title="t(`identity.${notice}.title`)"
+        :body="t(`identity.${notice}.body`)"
+        @retry="retry"
+      >
+        <template v-if="restoreFailed" #default>
+          <p class="failed">{{ t('identity.restore_failed') }}</p>
+        </template>
 
-      <!-- An error brings its own «Try again»; offline asks for it here, since coming back
-           online is exactly when trying again works. -->
-      <template v-if="notice === 'offline' || notice === 'lost'" #action>
-        <AppButton v-if="notice === 'offline'" block @click="retry">
-          <template #icon><IconRefresh /></template>
-          {{ t('state.retry') }}
-        </AppButton>
-        <AppButton v-if="canRestore" block @click="restore">
-          {{ t('identity.restore') }}
-        </AppButton>
-        <AppButton v-if="notice === 'lost'" variant="ghost" block @click="dismissed = true">
-          {{ t('identity.action') }}
-        </AppButton>
-      </template>
-    </ScreenState>
-  </AppCard>
+        <!-- An error brings its own «Try again». Offline has none: the store comes back by itself
+           on `online`, as the text promises, and a second «Try again» under the screen's own
+           would do something else under the same name (MOL-19, Р-1). -->
+        <template v-if="notice === 'lost'" #action>
+          <AppButton v-if="canRestore" block @click="restore">
+            {{ t('identity.restore') }}
+          </AppButton>
+          <AppButton variant="ghost" block @click="dismissed = true">
+            {{ t('identity.action') }}
+          </AppButton>
+        </template>
+      </ScreenState>
+    </AppCard>
+  </aside>
 </template>
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import IconRefresh from '~icons/mdi/refresh'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import ScreenState from '@/components/ScreenState.vue'
@@ -61,7 +59,7 @@ function noticeFor(state: string): Notice | null {
 
 export default defineComponent({
   name: 'IdentityNotice',
-  components: { AppButton, AppCard, IconRefresh, ScreenState },
+  components: { AppButton, AppCard, ScreenState },
   setup() {
     const { t } = useI18n()
     const actor = useActorStore()
