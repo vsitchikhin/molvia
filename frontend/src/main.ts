@@ -23,9 +23,11 @@ app.config.errorHandler = (error, _instance, info) => {
   console.error('[molvia]', info, error)
 }
 
-// The invite code is saved and scrubbed from the address bar here, and then from the router
-// too: the router read the address when it was created, and left alone it would keep `/?c=…`
-// as where it is and write that as «back» into the next entry — where the tabs expect `/`.
+// The invite code is saved here, before anything can lose it. It is not gone from the address
+// yet: the router read the address when its module was created, and its first navigation
+// writes that `/?c=…` back into the bar. `forgetInviteInRoute` below is what actually removes
+// it — from the bar and from the router's memory, which would otherwise write `/?c=…` as «back»
+// into the next entry, where the tabs expect `/`. Neither step is a duplicate of the other.
 takeInviteCodeFromUrl()
 
 async function forgetInviteInRoute(): Promise<void> {
@@ -42,7 +44,13 @@ app.use(createPinia()).use(router).use(i18n)
 // Transitions and focus are installed after that, so neither step counts as a move.
 void forgetInviteInRoute()
   .then(() => settleColdStart(router))
-  .then(() => {
+  // Settling the route is a nicety; the app is not. Vue is not running yet, so its error
+  // handler would never see this — logged here, and the app is mounted either way instead of
+  // leaving a blank screen at the shelf.
+  .catch((error: unknown) => {
+    console.error('[molvia]', 'first route', error)
+  })
+  .finally(() => {
     installViewTransitions(router)
     installArrival(router, (key) => i18n.global.t(key))
     app.mount('#app')
