@@ -566,7 +566,9 @@ database access. In a product about data integrity, two write paths will silentl
   gets the chevron, labelled with the parent's title, never the word «Back». Tabs and the
   chevron move through `useNavigation`: «Trip» is home — leaving it pushes, moving between
   the other sections replaces, returning is a step back — so the system «back» never walks
-  through tab taps, and a nested screen opened cold gets its parent laid underneath. **No
+  through tab taps, and a nested screen opened cold gets its parent laid underneath. A
+  section opened cold — a link from the bot — is its own home: «back» leaves the app, the trip
+  is not laid under it, because a push without a gesture is what Chrome may skip. **No
   gesture is intercepted**: no touch listener, no `overscroll-behavior` on the root — the
   edge swipe and Android «back» belong to the browser, and the history is the one source of
   «back». Only the page scrolls, never an inner container: iOS hides its address bar and the

@@ -111,6 +111,20 @@ test.describe('sections', () => {
       expect(box?.width ?? 0).toBeGreaterThanOrEqual(44)
     }
   })
+
+  // Decided in review (О-5): a section opened cold — a link from the bot to «Ratings» — is its
+  // own home. Laying the trip under it would be a push without a gesture, which Chrome may skip.
+  for (const [path, label] of [
+    ['/advice', 'What to buy'],
+    ['/verdicts', 'Ratings'],
+  ] as const) {
+    test(`${path} opened cold is its own home: «back» leaves the app`, async ({ page }) => {
+      await page.goto(path)
+      await expect(tab(page, label)).toHaveAttribute('aria-current', 'page')
+      await page.goBack()
+      await expect(page).toHaveURL('about:blank')
+    })
+  }
 })
 
 test.describe('the nested search', () => {
