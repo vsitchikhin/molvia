@@ -191,18 +191,16 @@ describe('PUT — поставить оценку', () => {
     expect(await rows(itemId)).toHaveLength(0)
   })
 
-  it('Е: сотни тысяч пустых строк в голове отзыва отклоняются сразу, API не встаёт', async () => {
+  it('Е: сотни тысяч невидимых пустых строк в голове отзыва — отказ за миллисекунды', async () => {
+    // The bound is the proof: parsing is synchronous, so a request in parallel would wait
+    // out any blockage and still answer — it would show nothing (С-22).
     const actor = await insertActor(db)
     const itemId = await insertItem(db)
 
     const started = Date.now()
-    const [reply, health] = await Promise.all([
-      rate(actor, itemId, { score: 3, review: `${'\n'.repeat(400_000)}a` }),
-      app.inject({ method: 'GET', url: '/health' }),
-    ])
+    const reply = await rate(actor, itemId, { score: 3, review: `${'\u2800\n'.repeat(200_000)}a` })
 
     expect(reply.status).toBe(400)
-    expect(health.statusCode).toBe(200)
     expect(Date.now() - started).toBeLessThan(2000)
     expect(await rows(itemId)).toHaveLength(0)
   })
