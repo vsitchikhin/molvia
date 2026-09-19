@@ -4,6 +4,7 @@ import App from '@/App.vue'
 import { applyDocumentLang, i18n } from '@/i18n'
 import { settleColdStart } from '@/navigation'
 import { router } from '@/router'
+import { installArrival, installViewTransitions } from '@/transitions'
 import { useActorStore } from '@/stores/actor'
 import '@/styles/main.scss'
 
@@ -25,7 +26,10 @@ app.use(createPinia()).use(router).use(i18n)
 
 // Mounted once the first route is settled: a nested screen opened cold gets its parent laid
 // underneath first, so the first paint is already the screen and not a flash of the parent.
+// Transitions and focus are installed after that, so laying the parent down is not a move.
 void settleColdStart(router).then(() => {
+  installViewTransitions(router)
+  installArrival(router, (key) => i18n.global.t(key))
   app.mount('#app')
 
   // Raised right after the first paint rather than before it: the store carries the four

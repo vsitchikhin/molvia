@@ -49,4 +49,10 @@ export const routes = [
   { path: '/:rest(.*)', redirect: '/' },
 ] satisfies (RouteRecordRaw & { name?: RouteName })[]
 
-export const router = createRouter({ history: createWebHistory(), routes })
+export const router = createRouter({
+  history: createWebHistory(),
+  routes,
+  // Back and forward return to where the person was; any other move starts at the top. The
+  // sections keep no scroll of their own — their state lives in stores, not in components.
+  scrollBehavior: (_to, _from, saved) => saved ?? { top: 0 },
+})

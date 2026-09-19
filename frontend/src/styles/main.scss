@@ -19,3 +19,75 @@ body {
 *::after {
   box-sizing: border-box;
 }
+
+// ── Moves between screens ───────────────────────────────────────────────────
+// View transitions, set up in transitions.ts. A push slides the new screen in from the right
+// over the old one, a pop slides it back out; a change of section cross-fades, which is the
+// browser's own default. The tab bar is a group of its own and does not travel with the page.
+
+::view-transition-group(root) {
+  animation-duration: var(--dur);
+  animation-timing-function: var(--ease);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur);
+  animation-timing-function: var(--ease);
+}
+
+html[data-nav='push'] {
+  &::view-transition-old(root) {
+    animation-name: screen-stay-behind;
+  }
+
+  &::view-transition-new(root) {
+    animation-name: screen-in-from-right;
+  }
+}
+
+html[data-nav='pop'] {
+  &::view-transition-old(root) {
+    z-index: 1;
+    animation-name: screen-out-to-right;
+  }
+
+  &::view-transition-new(root) {
+    animation-name: screen-come-forward;
+  }
+}
+
+@keyframes screen-in-from-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes screen-out-to-right {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+// The screen underneath shifts a little and dims, as it does on iOS — enough to read as depth.
+@keyframes screen-stay-behind {
+  to {
+    transform: translateX(-25%);
+    opacity: 0.6;
+  }
+}
+
+@keyframes screen-come-forward {
+  from {
+    transform: translateX(-25%);
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}
