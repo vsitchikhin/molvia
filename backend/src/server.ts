@@ -16,6 +16,7 @@ import { proposeItem } from '@/usecases/propose-item'
 import { recentPlaces } from '@/usecases/recent-places'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { startTrip } from '@/usecases/start-trip'
+import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
 import { createActorRepository } from '@/db/actors-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
@@ -133,6 +134,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       tripRoutes(guarded, {
         start: (actor, body) => startTrip(transact, actor, body),
         current: (actorId) => currentTrip(tripData, actorId),
+        add: (actorId, tripId, body) => addExpense(transact, actorId, tripId, body),
+        update: (actorId, tripId, expenseId, patch) =>
+          updateExpense(transact, actorId, tripId, expenseId, patch),
+        remove: (actorId, tripId, expenseId) => removeExpense(transact, actorId, tripId, expenseId),
+        finish: (actorId, tripId) => finishTrip(tripData.trips, actorId, tripId),
       })
       guardedDone()
     })

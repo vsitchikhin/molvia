@@ -10,6 +10,7 @@ import type { Transact, TripRepositories } from '@/db/unit-of-work'
 import { currentTrip } from './current-trip'
 import { RECENT_PLACES, recentPlaces } from './recent-places'
 import { startTrip } from './start-trip'
+import { addExpense, finishTrip, removeExpense, updateExpense } from './trip-expenses'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const TRIP = 'd2f1a3b4-5c6d-4e7f-8a9b-0c1d2e3f4a5b'
@@ -268,5 +269,165 @@ describe('recentPlaces', () => {
 
     expect(await recentPlaces(places, ACTOR)).toEqual([place])
     expect(calls).toEqual([[ACTOR, RECENT_PLACES]])
+  })
+})
+
+describe('addExpense', () => {
+  const EXPENSE = 'cc11bb22-cc33-4d44-8e55-ff6677889900'
+
+  function adding(created: boolean, picks: unknown[][]) {
+    return fakeRepositories({
+      ...viewReads,
+      trips: { byId: () => Promise.resolve(trip) },
+      expenses: {
+        ...viewReads.expenses,
+        add: () => Promise.resolve({ expense: milkBought, created }),
+      },
+      searchPicks: {
+        remember: (...args) => {
+          picks.push(args)
+          return Promise.resolve()
+        },
+      },
+    })
+  }
+
+  it('writes the purchase and remembers the query it was found by', async () => {
+    const picks: unknown[][] = []
+    const { created } = await addExpense(transactWith(adding(true, picks)), ACTOR, TRIP, {
+      id: EXPENSE,
+      itemId: milk.id,
+      query: 'мол',
+    })
+
+    expect(created).toBe(true)
+    expect(picks).toEqual([[ACTOR, 'мол', milk.id]])
+  })
+
+  it('must not fire: no query, no pick', async () => {
+    const picks: unknown[][] = []
+    await addExpense(transactWith(adding(true, picks)), ACTOR, TRIP, {
+      id: EXPENSE,
+      itemId: milk.id,
+    })
+    expect(picks).toEqual([])
+  })
+
+  it('must not fire: a repeat from the queue is one purchase and one pick', async () => {
+    const picks: unknown[][] = []
+    const { created } = await addExpense(transactWith(adding(false, picks)), ACTOR, TRIP, {
+      id: EXPENSE,
+      itemId: milk.id,
+      query: 'мол',
+    })
+
+    expect(created).toBe(false)
+    expect(picks).toEqual([])
+  })
+
+  it('hands the repository the trip from the path, never one from the body', async () => {
+    const added: unknown[] = []
+    const repositories = fakeRepositories({
+      ...viewReads,
+      trips: { byId: () => Promise.resolve(trip) },
+      expenses: {
+        ...viewReads.expenses,
+        add: (_actorId, input) => {
+          added.push(input)
+          return Promise.resolve({ expense: milkBought, created: true })
+        },
+      },
+    })
+
+    await addExpense(transactWith(repositories), ACTOR, TRIP, {
+      id: EXPENSE,
+      itemId: milk.id,
+      amount: { minor: 57_000n, currency: 'AMD' },
+    })
+    expect(added).toEqual([
+      { id: EXPENSE, itemId: milk.id, amount: { minor: 57_000n, currency: 'AMD' }, tripId: TRIP },
+    ])
+  })
+
+  it('a stranger’s trip and a missing one answer NOT_FOUND, and nothing is written', async () => {
+    const repositories = fakeRepositories({ trips: { byId: () => Promise.resolve(null) } })
+
+    await expect(
+      addExpense(transactWith(repositories), ACTOR, TRIP, { id: EXPENSE, itemId: milk.id }),
+    ).rejects.toThrow(ERROR.NOT_FOUND)
+  })
+})
+
+describe('updateExpense and removeExpense', () => {
+  const OTHER_TRIP_ROW = 'dd11bb22-cc33-4d44-8e55-ff6677889900'
+
+  it('a row of the person’s other trip, named under this one, is NOT_FOUND and untouched', async () => {
+    // `update` and `remove` are not in the fakes: reaching either would fail the test.
+    const repositories = fakeRepositories({
+      ...viewReads,
+      trips: { byId: () => Promise.resolve(trip) },
+    })
+
+    await expect(
+      updateExpense(transactWith(repositories), ACTOR, TRIP, OTHER_TRIP_ROW, {
+        amount: { minor: 1n, currency: 'AMD' },
+      }),
+    ).rejects.toThrow(ERROR.NOT_FOUND)
+    await expect(
+      removeExpense(transactWith(repositories), ACTOR, TRIP, OTHER_TRIP_ROW),
+    ).rejects.toThrow(ERROR.NOT_FOUND)
+  })
+
+  it('updates the row and answers the trip again, total and all', async () => {
+    const patches: unknown[][] = []
+    const repositories = fakeRepositories({
+      ...viewReads,
+      trips: { byId: () => Promise.resolve(trip) },
+      expenses: {
+        ...viewReads.expenses,
+        update: (...args) => {
+          patches.push(args)
+          return Promise.resolve(milkBought)
+        },
+      },
+    })
+
+    const view = await updateExpense(transactWith(repositories), ACTOR, TRIP, milkBought.id, {
+      amount: null,
+    })
+
+    expect(patches).toEqual([[milkBought.id, ACTOR, { amount: null }]])
+    expect(view.id).toBe(TRIP)
+  })
+
+  it('removes the row and answers the trip again', async () => {
+    const removed: unknown[][] = []
+    const repositories = fakeRepositories({
+      ...viewReads,
+      trips: { byId: () => Promise.resolve(trip) },
+      expenses: {
+        ...viewReads.expenses,
+        remove: (...args) => {
+          removed.push(args)
+          return Promise.resolve(true)
+        },
+      },
+    })
+
+    await removeExpense(transactWith(repositories), ACTOR, TRIP, milkBought.id)
+    expect(removed).toEqual([[milkBought.id, ACTOR]])
+  })
+})
+
+describe('finishTrip', () => {
+  it('a stranger’s trip and a missing one answer NOT_FOUND', async () => {
+    const { trips } = fakeRepositories({ trips: { finish: () => Promise.resolve(null) } })
+    await expect(finishTrip(trips, ACTOR, TRIP)).rejects.toThrow(ERROR.NOT_FOUND)
+  })
+
+  it('finishing again is not an error', async () => {
+    const finished = { ...trip, finishedAt: new Date('2026-09-19T11:00:00.000Z') }
+    const { trips } = fakeRepositories({ trips: { finish: () => Promise.resolve(finished) } })
+    await expect(finishTrip(trips, ACTOR, TRIP)).resolves.toBeUndefined()
   })
 })
