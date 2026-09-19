@@ -286,6 +286,8 @@ test('a segment answers a tap anywhere over the track’s 44px', async ({ page }
   expect(track.height).toBeGreaterThanOrEqual(44)
   const box = await segment.boundingBox()
   if (!box) throw new Error('no segment')
+  // The handoff's 3px inset on every side: the segment is the track less six.
+  expect(Math.round(track.height - box.height)).toBe(6)
   await page.mouse.click(box.x + box.width / 2, track.y + 1)
   await expect(page.getByRole('group', { name: 'Unit' }).first().getByLabel('kg')).toBeChecked()
 })

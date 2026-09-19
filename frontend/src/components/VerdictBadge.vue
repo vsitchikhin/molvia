@@ -1,7 +1,7 @@
 <template>
   <span
     class="badge"
-    :class="[shape.form, { dot: compact }]"
+    :class="[shape.form, { dot: compact, large: compact && large }]"
     :role="compact ? 'img' : undefined"
     :aria-label="compact ? t(shape.name) : undefined"
   >
@@ -58,6 +58,8 @@ export default defineComponent({
   props: {
     level: { type: String as PropType<VerdictLevel>, required: true },
     compact: { type: Boolean, default: false },
+    /** The circle beside a group's title in «What to buy»: 24 rather than the row's 22. */
+    large: { type: Boolean, default: false },
   },
   setup(props) {
     const { t } = useI18n()
@@ -71,7 +73,7 @@ export default defineComponent({
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--badge-gap);
   height: var(--badge-height);
   padding: 0 var(--space-3) 0 var(--space-2);
   border-radius: var(--radius-pill);
@@ -117,5 +119,10 @@ export default defineComponent({
   width: var(--badge-dot);
   height: var(--badge-dot);
   padding: 0;
+}
+
+.large {
+  width: var(--badge-dot-lg);
+  height: var(--badge-dot-lg);
 }
 </style>

@@ -72,9 +72,16 @@
   --touch-target: 2.75rem; /* 44px — the smallest thing a thumb hits reliably */
   --touch-target-lg: 3.25rem; /* 52 — the sheet's main action, the most frequent tap in the product */
 
-  /* The verdict badge: a pill with its word, or a circle with the icon alone. */
+  /* The verdict badge: a pill with its word, or a circle with the icon alone — 22 in a row, 24
+     beside a group's title. The gap between icon and word is the handoff's 5. */
   --badge-height: 1.75rem; /* 28 */
   --badge-dot: 1.375rem; /* 22 */
+  --badge-dot-lg: 1.5rem; /* 24 */
+  --badge-gap: 0.3125rem; /* 5 */
+
+  /* The segmented control's inset — the handoff's 3: the active segment's radius is the track's
+     less this, and the step of the scale (4) made the segments visibly lower. */
+  --segment-inset: 0.1875rem; /* 3 */
 
   /* The sheet takes at most this share of what is visible above the keyboard (BottomSheet). */
   --sheet-height-share: 0.82;

@@ -15,7 +15,7 @@
     ],
     "declaration-property-value-allowed-list": {
       "/^(margin|padding|gap|inset|top|right|bottom|left|scroll-margin|scroll-padding)/": [
-        "/^(0|auto|inherit|initial|unset|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset)\\))*( \\* -1)?\\))(\\s+(0|auto|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset)\\))*( \\* -1)?\\))){0,3}$/"
+        "/^(0|auto|inherit|initial|unset|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|segment-inset|badge-gap)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|segment-inset|badge-gap)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|segment-inset|badge-gap)\\))*( \\* -1)?\\))(\\s+(0|auto|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|segment-inset|badge-gap)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|segment-inset|badge-gap)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|segment-inset|badge-gap)\\))*( \\* -1)?\\))){0,3}$/"
       ]
     },
     "function-disallowed-list": [

@@ -31,7 +31,7 @@
         kind="decimal"
         :error="ERROR.INVALID_AMOUNT"
       >
-        <template #suffix>֏</template>
+        <template #suffix>{{ sign }}</template>
       </AppField>
       <AppField v-model="review" :label="t('verdict.review_label')" kind="multiline" />
       <AppField v-model="date" :label="t('dev.kit.date')" kind="date" readonly />
@@ -43,6 +43,7 @@
       <div class="row">
         <VerdictBadge v-for="level in levels" :key="level" :level="level" />
         <VerdictBadge v-for="level in levels" :key="`${level}-dot`" :level="level" compact />
+        <VerdictBadge v-for="level in levels" :key="`${level}-lg`" :level="level" compact large />
       </div>
     </section>
 
@@ -68,7 +69,7 @@
       <AppField v-model="quantity" :label="t('item.quantity')" kind="decimal" autofocus />
       <SegmentedControl v-model="unit" :legend="t('item.unit')" :options="units" />
       <AppField v-model="price" :label="t('item.price')" kind="decimal">
-        <template #suffix>֏</template>
+        <template #suffix>{{ sign }}</template>
       </AppField>
       <template #footer>
         <AppButton size="large" block @click="sheetOpen = false">{{ t('item.save') }}</AppButton>
@@ -80,7 +81,7 @@
 <script lang="ts">
 import { computed, defineComponent, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ERROR, VERDICT_LEVEL } from '@molvia/model'
+import { ERROR, VERDICT_LEVEL, currencySign, formatMoney, money } from '@molvia/model'
 import IconClose from '~icons/mdi/close'
 import IconPlus from '~icons/mdi/plus'
 import IconRefresh from '~icons/mdi/refresh'
@@ -126,8 +127,9 @@ export default defineComponent({
       ERROR,
       levels: Object.values(VERDICT_LEVEL),
       units,
-      // The handoff's real receipt; figures are data, not copy.
-      figures: { price: '570,00 ֏' },
+      // The handoff's real receipt, through the formatters: the sign belongs to the currency.
+      figures: { price: formatMoney(money(57000n, 'AMD')) },
+      sign: currencySign('AMD'),
       quantity: ref('1'),
       price: ref('57о'),
       review: ref(''),

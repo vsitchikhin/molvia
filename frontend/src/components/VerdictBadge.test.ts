@@ -63,4 +63,21 @@ describe('VerdictBadge', () => {
     const style = source.slice(source.indexOf('<style'))
     expect(style).not.toMatch(/--accent/)
   })
+
+  // 22 in a row, 24 beside a group's title in «What to buy».
+  it('draws the circle a size up beside a group title', () => {
+    const view = mount(VerdictBadge, {
+      props: { level: 'take', compact: true, large: true },
+      global: { plugins: [createAppI18n('en')] },
+    })
+    expect(view.classes()).toEqual(expect.arrayContaining(['dot', 'large']))
+  })
+
+  it('must not fire: «large» means nothing to the pill', () => {
+    const view = mount(VerdictBadge, {
+      props: { level: 'take', large: true },
+      global: { plugins: [createAppI18n('en')] },
+    })
+    expect(view.classes()).not.toContain('large')
+  })
 })

@@ -85,11 +85,9 @@ export default defineComponent({
 
 .track {
   display: flex;
-
-  /* The handoff's 3px is off the scale; the nearest step is one pixel more. */
-  gap: var(--space-1);
+  gap: var(--segment-inset);
   min-height: var(--touch-target);
-  padding: var(--space-1);
+  padding: var(--segment-inset);
   border-radius: var(--radius);
   background: var(--surface-2);
 
@@ -115,11 +113,11 @@ export default defineComponent({
     @include focus-ring;
   }
 
-  /* The segment looks 36px tall, as in the handoff, but answers the thumb over the track's padding
+  /* The segment looks 38px tall, as in the handoff, but answers the thumb over the track's padding
      too — the full 44 of the rule (review Р-3, the owner's choice: the look stays). */
   &::after {
     position: absolute;
-    inset: calc(var(--space-1) * -1) 0;
+    inset: calc(var(--segment-inset) * -1) 0;
     content: '';
   }
 }
