@@ -228,32 +228,40 @@ export function createClient({
     if (options.signal?.aborted) cancel()
     options.signal?.addEventListener('abort', cancel)
 
+    // The deadline and the caller's cancellation hold until the body is read, not only until
+    // the headers: a server that sends its headers and goes quiet — a proxy buffering, the Wi-Fi
+    // at a shelf dropping mid-reply — would otherwise hold the call forever, past both.
     let response: Response
+    let body: unknown
     try {
-      response = await fetch(`${baseUrl}${path}`, {
-        ...(options.method === undefined ? {} : { method: options.method }),
-        ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
-        headers,
-        signal: controller.signal,
-      })
-    } catch (error) {
-      // A dropped connection is `fetch`'s own TypeError. Whether that reads as «offline» or
-      // as «broken» is the caller's call — what matters here is that it arrives as an
-      // ApiError like everything else.
-      throw new ApiError(ERROR.INTERNAL, error instanceof Error ? error.message : 'transport')
+      try {
+        response = await fetch(`${baseUrl}${path}`, {
+          ...(options.method === undefined ? {} : { method: options.method }),
+          ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+          headers,
+          signal: controller.signal,
+        })
+      } catch (error) {
+        // A dropped connection is `fetch`'s own TypeError. Whether that reads as «offline» or
+        // as «broken» is the caller's call — what matters here is that it arrives as an
+        // ApiError like everything else.
+        throw new ApiError(ERROR.INTERNAL, error instanceof Error ? error.message : 'transport')
+      }
+
+      // A proxy page, an empty body, a reply cut off mid-flight: `.json()` throws, and every
+      // line below — including the one that tells a dead identity from a broken server — used
+      // to be skipped entirely.
+      try {
+        body = await response.json()
+      } catch {
+        // Cut off by the deadline or by the caller, the reply never came — it is not a reply
+        // off the contract.
+        if (controller.signal.aborted) throw new ApiError(ERROR.INTERNAL, 'aborted')
+        body = undefined
+      }
     } finally {
       if (timer !== undefined) clearTimeout(timer)
       options.signal?.removeEventListener('abort', cancel)
-    }
-
-    // A proxy page, an empty body, a reply cut off mid-flight: `.json()` throws, and every
-    // line below — including the one that tells a dead identity from a broken server — used
-    // to be skipped entirely.
-    let body: unknown
-    try {
-      body = await response.json()
-    } catch {
-      body = undefined
     }
 
     if (!response.ok) {
