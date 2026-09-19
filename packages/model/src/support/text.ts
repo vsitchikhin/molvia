@@ -35,23 +35,32 @@ const EDGE = /[\s\p{Z}\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]/u
 const PICTOGRAPH = /\p{Extended_Pictographic}/u
 // U+FE00–FE0F and the supplementary selectors: they choose how the character before is drawn.
 const SELECTOR = /[\ufe00-\ufe0f\u{E0100}-\u{E01EF}]/u
-// Tags spell a subdivision flag after 🏴: letters or digits of the subdivision, then U+E007F.
+// Tags spell a subdivision flag after 🏴 and end with U+E007F.
 const TAG = /[\u{E0020}-\u{E007F}]/u
-const FLAG_TAG = /[\u{E0030}-\u{E0039}\u{E0061}-\u{E007A}]/u
 const CANCEL_TAG = '\u{E007F}'
 const BLACK_FLAG = '\u{1F3F4}'
+const TAG_OFFSET = 0xe0000
+/**
+ * The subdivision flags that are drawn — England, Scotland, Wales, the whole RGI list today. A
+ * tag spelling of the right shape and no flag draws the same black 🏴 and made a second place
+ * (adversarial round 4, Б). A flag Unicode adds later is one more line here.
+ */
+const DRAWN_FLAGS: ReadonlySet<string> = new Set(['gbeng', 'gbsct', 'gbwls'])
 
-/** Whether `chars[first..end]` is the tag spelling of a flag, right after a 🏴. */
+/** Whether `chars[first..end]` spells a flag that is drawn, right after a 🏴. */
 function isFlag(chars: readonly string[], first: number, end: number): boolean {
-  if (chars[first - 1] !== BLACK_FLAG || chars[end] !== CANCEL_TAG || end - first < 1) return false
-  for (let at = first; at < end; at += 1) if (!FLAG_TAG.test(chars[at] ?? '')) return false
-  return true
+  if (chars[first - 1] !== BLACK_FLAG || chars[end] !== CANCEL_TAG) return false
+  const spelled = chars
+    .slice(first, end)
+    .map((tag) => String.fromCodePoint((tag.codePointAt(0) ?? 0) - TAG_OFFSET))
+    .join('')
+  return DRAWN_FLAGS.has(spelled)
 }
 
 /**
  * The line with nothing invisible at its ends, keeping only what draws the last character: VS16
  * after an emoji makes ☕ an emoji, a tag sequence makes 🏴 Scotland (adversarial round 2, Б).
- * After a letter a selector draws nothing and goes; a run of tags that spells no flag goes whole.
+ * After a letter a selector draws nothing and goes; a run of tags that is no drawn flag goes whole.
  *
  * Linear on purpose: each run of tags is walked once. The first version looked back over the
  * whole run for every tag it cut, and a megabyte of tags held the event loop for eleven minutes

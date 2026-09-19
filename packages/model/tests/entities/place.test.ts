@@ -119,3 +119,24 @@ describe('newPlaceSchema: the ends, round three (MOL-21, adversarial round 3)', 
     expect(parse(`Паб ${scotland}`).data?.name).toBe(`Паб ${scotland}`)
   })
 })
+
+describe('newPlaceSchema: only drawn flags keep their tags (MOL-21, adversarial round 4, Б)', () => {
+  const name = (text: string) =>
+    newPlaceSchema.parse({ kind: 'store', name: text, country: 'AM', city: 'Gyumri' }).name
+  const BLACK_FLAG = String.fromCodePoint(0x1f3f4)
+  const tags = (letters: string) =>
+    Array.from(letters)
+      .map((letter) => String.fromCodePoint(0xe0000 + (letter.codePointAt(0) ?? 0)))
+      .join('') + String.fromCodePoint(0xe007f)
+
+  it.each(['gbeng', 'gbsct', 'gbwls'])('%s — a flag that is drawn — stays', (letters) => {
+    expect(name(`Паб ${BLACK_FLAG}${tags(letters)}`)).toBe(`Паб ${BLACK_FLAG}${tags(letters)}`)
+  })
+
+  it.each(['zz', '99', 'a', 'gbsctx', ''])(
+    'tags of the right shape spelling «%s» — no flag, the same black 🏴 — go',
+    (letters) => {
+      expect(name(`Паб ${BLACK_FLAG}${tags(letters)}`)).toBe(`Паб ${BLACK_FLAG}`)
+    },
+  )
+})
