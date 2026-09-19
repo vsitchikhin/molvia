@@ -27,3 +27,21 @@ export function visibleLine(max: number): z.ZodType<string, string> {
       },
     )
 }
+
+const EDGE_BLANK = new RegExp(`^${BLANK.source}+|${BLANK.source}+$`, 'gu')
+
+/**
+ * A line with nothing invisible at its ends, not only no spaces. `.trim()` knows `\s`; a name
+ * pasted from a map or a messenger can end in a word joiner, a soft hyphen or a braille blank,
+ * which draw nothing and still make a second «Ереван Сити» nobody can tell from the first
+ * (MOL-21, adversarial Д). For names that are an identity — a place — where a character no one
+ * can see must not be one.
+ */
+export function visibleIdentityLine(
+  max: number,
+): z.ZodCodec<z.ZodString, z.ZodType<string, string>> {
+  return z.codec(z.string(), visibleLine(max), {
+    decode: (text) => text.replace(EDGE_BLANK, ''),
+    encode: (text) => text,
+  })
+}

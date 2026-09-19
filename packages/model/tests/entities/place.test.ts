@@ -41,3 +41,27 @@ describe('newPlaceSchema', () => {
     expect(() => newPlaceSchema.parse({ ...input, currency: 'AMD' })).toThrow()
   })
 })
+
+describe('newPlaceSchema: the name is an identity (MOL-21, adversarial Д)', () => {
+  const place = (name: string) =>
+    newPlaceSchema.parse({ kind: 'store', name, country: 'AM', city: 'Gyumri' }).name
+
+  it.each([
+    ['U+2060 word joiner', '\u2060'],
+    ['U+00AD soft hyphen', '\u00ad'],
+    ['U+2800 braille blank', '\u2800'],
+    ['U+3164 hangul filler', '\u3164'],
+    ['U+200B zero width space', '\u200b'],
+    ['U+00A0 no-break space', '\u00a0'],
+  ])('%s at either end is dropped', (_label, mark) => {
+    expect(place(`${mark}Ереван Сити${mark}`)).toBe('Ереван Сити')
+  })
+
+  it('must not fire: inside the name it stays — that is another name', () => {
+    expect(place('Ереван\u00adСити')).toBe('Ереван\u00adСити')
+  })
+
+  it('a name of invisible characters only is still refused', () => {
+    expect(() => place('\u2060\u2800')).toThrow()
+  })
+})
