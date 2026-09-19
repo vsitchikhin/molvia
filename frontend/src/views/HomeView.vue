@@ -10,20 +10,13 @@
       @retry="load"
     />
 
-    <!-- Title only: the text names a count and an age of data the scaffold does not have. -->
+    <!-- No button: the screen reloads by itself when the connection is back. -->
     <ScreenState
       v-else-if="state === 'offline'"
       kind="offline"
       tone="warn"
-      :title="t('advice.offline.title')"
-    >
-      <template #action>
-        <AppButton block @click="load">
-          <template #icon><IconRefresh /></template>
-          {{ t('state.retry') }}
-        </AppButton>
-      </template>
-    </ScreenState>
+      :title="t('item.offline.title')"
+    />
 
     <ScreenState
       v-else
@@ -42,9 +35,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref } from 'vue'
+import { defineComponent, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import IconRefresh from '~icons/mdi/refresh'
 import IconStar from '~icons/mdi/star-outline'
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
@@ -56,26 +48,36 @@ import ScreenState from '@/components/ScreenState.vue'
 // where the connection drops more often than anything else fails.
 type State = 'loading' | 'offline' | 'error' | 'ready'
 
+// Asked afresh each time, never narrowed: the answer before the request says nothing about
+// the connection by the time the request has failed.
+function connected(): boolean {
+  return navigator.onLine
+}
+
 /**
  * Still the scaffold it has been since the repository was set up, now speaking the 0.1
  * dictionary and drawn by the shared state blocks (MOL-19): MOL-32 replaces it with the real
  * «what to buy» screen.
  *
  * Two seams are deliberate. `dev.connected` is a liveness probe rather than product copy —
- * the name says it is temporary, and MOL-32 deletes it with this file. And offline shows the
- * title of `advice.offline` alone: its text names a count and an age of data this scaffold
- * does not have, and a screen that outlives the sprint is not worth a key of its own.
+ * the name says it is temporary, and MOL-32 deletes it with this file. And offline borrows the
+ * search's plain «No connection»: the advice's own offline text promises yesterday's data,
+ * which this scaffold does not have, and a screen that outlives the sprint is not worth a key
+ * of its own (MOL-19, Р-2).
+ *
+ * Offline or error is decided after the failure, not before the request: a connection that
+ * drops while the answer is on its way is the commonest break at a shelf, and it is not red.
  */
 export default defineComponent({
   name: 'HomeView',
-  components: { AppButton, AppScreen, IconRefresh, ScreenSkeleton, ScreenState },
+  components: { AppButton, AppScreen, ScreenSkeleton, ScreenState },
   setup() {
     const { t } = useI18n()
     const state = ref<State>('loading')
     const version = ref('')
 
     async function load(): Promise<void> {
-      if (!navigator.onLine) {
+      if (!connected()) {
         state.value = 'offline'
         return
       }
@@ -85,12 +87,23 @@ export default defineComponent({
         version.value = (await api.health()).version
         state.value = 'ready'
       } catch {
-        state.value = 'error'
+        state.value = connected() ? 'error' : 'offline'
       }
     }
 
+    // Back online, the screen tries again by itself — the identity does the same, and a screen
+    // left saying «no connection» with the connection back would be lying.
+    function reconnect(): void {
+      if (state.value === 'offline' || state.value === 'error') void load()
+    }
+
     onMounted(() => {
+      window.addEventListener('online', reconnect)
       void load()
+    })
+
+    onUnmounted(() => {
+      window.removeEventListener('online', reconnect)
     })
 
     return { t, state, version, load, IconStar }

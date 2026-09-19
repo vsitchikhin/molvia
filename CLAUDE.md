@@ -565,7 +565,12 @@ database access. In a product about data integrity, two write paths will silentl
   `ScreenSkeleton` for loading, the screen giving the widths of its bars, and `ScreenState`
   for the rest. The tone of the circle carries the meaning and is fixed by the kind — an error
   is always red and always offers «Try again»; offline is green or yellow and **never red**,
-  which `vue-tsc` holds rather than memory: `bad` is not a tone a screen can ask for.
+  which `vue-tsc` holds rather than memory: `bad` is not a tone a screen can ask for. The
+  type holds the prop, not the choice of kind, and that choice is the screen's: **offline or
+  error is decided after the failure** (`navigator.onLine` read then, never narrowed from a
+  check before the request) — a connection that drops while the answer is on its way is the
+  commonest break at a shelf, and drawing it red was the first consumer's bug (MOL-19, A1).
+  Back online, a screen tries again by itself, as the identity does.
 - **Every SFC is one file in one fixed order:** `<template>`, then `<script lang="ts">`
   exporting a `defineComponent`, then `<style scoped lang="scss">`. The linter keeps the
   order, both languages and the `scoped` attribute; none of it is left to memory.
