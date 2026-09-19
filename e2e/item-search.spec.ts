@@ -203,6 +203,8 @@ test.describe('nothing found', () => {
       const sheet = page.getByRole('dialog', { name: 'New item' })
       await expect(sheet).toBeVisible()
       await expect(sheet.getByLabel('As the price tag says')).toHaveValue(word)
+      // The sheet takes no tap while it rises (MOL-18): a unit tapped at once is swallowed.
+      await page.waitForTimeout(400)
 
       const submit = sheet.getByRole('button', { name: 'Add to the catalogue' })
       await expect(submit).toBeDisabled()
@@ -211,6 +213,14 @@ test.describe('nothing found', () => {
 
       await expect(sheet).toBeHidden()
       await expect.poll(() => statuses.at(-1)).toBe(expected)
+
+      // The item suggested is picked: its sheet «how much» comes up once the form's is put
+      // away (MOL-24), and × leaves the search as it was, with nothing written.
+      const details = page.getByRole('dialog', { name: word })
+      await expect(details).toBeVisible()
+      await page.waitForTimeout(400)
+      await details.getByRole('button', { name: 'Close' }).click()
+      await expect(details).toBeHidden()
     }
     // The sheet stepped back off its own entry each time: the search is where it was.
     await expect(page).toHaveURL(/\/trip\/add$/)
