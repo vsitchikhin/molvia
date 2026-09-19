@@ -104,8 +104,25 @@ describe('IdentityNotice', () => {
   it('interrupts for a lost identity and stays polite for a dropped connection', () => {
     // A lost identity interrupts what someone was doing; no connection does not, and a
     // screen reader should be told the difference.
-    expect(render('lost').view.get('aside').attributes('role')).toBe('alert')
-    expect(render('offline').view.get('aside').attributes('role')).toBe('status')
+    expect(render('lost').view.get('[role]').attributes('role')).toBe('alert')
+    expect(render('offline').view.get('[role]').attributes('role')).toBe('status')
+  })
+
+  // Drawn by the shared screen state: an error is red like on any screen, offline is yellow
+  // rather than the green of an offline trip — without an identity nothing can be saved.
+  it.each([
+    ['error', 'bad', 'alert'],
+    ['offline', 'warn', 'status'],
+    ['lost', 'warn', 'alert'],
+    ['uninvited', 'warn', 'alert'],
+  ] as const)('draws %s in %s and announces it as %s', (state, tone, role) => {
+    const notice = render(state).view.get('[role]')
+    expect(notice.classes()).toContain(tone)
+    expect(notice.attributes('role')).toBe(role)
+  })
+
+  it('is never drawn red for a dropped connection', () => {
+    expect(render('offline').view.get('[role]').classes()).not.toContain('bad')
   })
 
   it('takes every word from i18n, not from the markup', () => {

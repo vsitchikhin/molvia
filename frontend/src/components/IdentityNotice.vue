@@ -1,10 +1,18 @@
 <template>
-  <aside v-if="notice && !dismissed" class="notice" :class="tone" :role="role">
-    <h2 class="title">{{ t(`identity.${notice}.title`) }}</h2>
-    <p class="body">{{ t(`identity.${notice}.body`) }}</p>
-    <p v-if="restoreFailed" class="body failed">{{ t('identity.restore_failed') }}</p>
+  <ScreenState
+    v-if="notice && !dismissed"
+    class="notice"
+    inline
+    :kind="kind"
+    :tone="tone"
+    :title="t(`identity.${notice}.title`)"
+    :body="t(`identity.${notice}.body`)"
+  >
+    <template v-if="restoreFailed" #default>
+      <p class="failed">{{ t('identity.restore_failed') }}</p>
+    </template>
 
-    <div class="actions">
+    <template v-if="canRetry || canRestore || notice === 'lost'" #action>
       <button v-if="canRetry" class="action" type="button" @click="retry">
         <IconRefresh class="icon" aria-hidden="true" />
         {{ t('state.retry') }}
@@ -15,14 +23,15 @@
       <button v-if="notice === 'lost'" class="action" type="button" @click="dismissed = true">
         {{ t('identity.action') }}
       </button>
-    </div>
-  </aside>
+    </template>
+  </ScreenState>
 </template>
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconRefresh from '~icons/mdi/refresh'
+import ScreenState from '@/components/ScreenState.vue'
 import { useActorStore } from '@/stores/actor'
 
 /**
@@ -35,8 +44,8 @@ import { useActorStore } from '@/stores/actor'
  * the identity is not up, every request the app makes goes out without an owner. Showing
  * nothing left a person with an app that looked normal and could not save a thing.
  *
- * MOL-19 builds the shared set of four states; these become its cases rather than a second
- * implementation of them.
+ * Drawn by the shared screen state (MOL-19) as a notice of its own height: its four cases are
+ * that block's cases, not a second implementation of them.
  */
 const NOTICES = ['lost', 'uninvited', 'error', 'offline'] as const
 type Notice = (typeof NOTICES)[number]
@@ -47,7 +56,7 @@ function noticeFor(state: string): Notice | null {
 
 export default defineComponent({
   name: 'IdentityNotice',
-  components: { IconRefresh },
+  components: { IconRefresh, ScreenState },
   setup() {
     const { t } = useI18n()
     const actor = useActorStore()
@@ -61,9 +70,14 @@ export default defineComponent({
     // stayed `lost` — which is exactly what a failed restore does — left the button showing
     // a stale answer (М-23).
     const canRestore = computed(() => notice.value === 'lost' && actor.lost.length > 0)
-    const tone = computed(() => (canRetry.value ? 'plain' : 'warn'))
-    // Losing an identity interrupts what someone was doing; a dropped connection does not.
-    const role = computed(() => (canRetry.value ? 'status' : 'alert'))
+    // A lost identity and a missing invite are neither an error of the screen nor offline:
+    // something the person has to know. The screen state gives each its tone and its role.
+    const kind = computed(() => {
+      if (notice.value === 'error' || notice.value === 'offline') return notice.value
+      return 'attention' as const
+    })
+    // Yellow, not the green of an offline trip: without an identity nothing can be saved.
+    const tone = computed(() => (notice.value === 'offline' ? ('warn' as const) : undefined))
 
     // A message dismissed for one situation must not hide the next one.
     watch(notice, () => {
@@ -76,8 +90,8 @@ export default defineComponent({
       dismissed,
       canRetry,
       canRestore,
+      kind,
       tone,
-      role,
       restoreFailed: computed(() => actor.restoreFailed),
       retry: () => void actor.retry(),
       restore: () => void actor.restore(),
@@ -89,51 +103,15 @@ export default defineComponent({
 <style scoped lang="scss">
 .notice {
   margin: var(--space-4) var(--space-4) 0;
-  padding: var(--space-4);
-  border: var(--hairline) solid;
-  border-radius: var(--radius);
-}
-
-/* Something a person has to act on — a lost identity, a link that does not work. */
-.warn {
-  border-color: var(--warn);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-}
-
-/* Something that may pass on its own: no connection, a server that did not answer. */
-.plain {
-  border-color: var(--border);
-  background: var(--surface);
-  color: var(--text);
-}
-
-.title {
-  margin: 0 0 var(--space-2);
-  font-family: var(--font-display);
-  font-size: var(--text-headline);
-  font-weight: var(--weight-bold);
-  line-height: var(--leading-snug);
-}
-
-.body {
-  margin: 0;
-  font-size: var(--text-callout);
-  line-height: var(--leading-body);
 }
 
 .failed {
-  margin-top: var(--space-2);
+  margin: 0;
+  font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
 }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-
+/* Until AppButton (MOL-18) is on master: then these become its primary and ghost. */
 .action {
   @include touch-target;
 

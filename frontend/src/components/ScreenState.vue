@@ -78,7 +78,7 @@ export default defineComponent({
   name: 'ScreenState',
   props: {
     kind: { type: String as PropType<StateKind>, required: true, validator: fits },
-    tone: { type: String as PropType<StateTone>, default: undefined },
+    tone: { type: String as PropType<StateTone | undefined>, default: undefined },
     icon: { type: [Object, Function] as PropType<Component>, default: undefined },
     title: { type: String, required: true },
     body: { type: String, default: undefined },

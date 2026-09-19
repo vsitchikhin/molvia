@@ -265,8 +265,8 @@ describe('AppScreen', () => {
     )
     useActorStore(pinia).state = 'lost'
     await nextTick()
-    const order = [...view.element.querySelectorAll('.head, .notice, .content')].map(
-      (node) => node.className.split(' ')[0],
+    const order = [...view.element.querySelectorAll('.head, .notice, .content')].map((node) =>
+      ['head', 'notice', 'content'].find((name) => node.classList.contains(name)),
     )
     expect(order).toEqual(['head', 'notice', 'content'])
   })
