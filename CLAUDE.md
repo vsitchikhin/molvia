@@ -598,7 +598,8 @@ database access. In a product about data integrity, two write paths will silentl
   off that entry, and only the pop closes it, so exactly one entry is ever taken. Any move of
   the router under an open sheet — push, replace, a new query — closes it too; an entry no
   sheet holds — left by a reload or a move away — is stepped off by `installSheetEntryGuard`.
-  `close(2)` closes it together with the screen under it. Until it has come up the sheet takes
+  `close(2)` closes it together with the screen under it. Sheets may stack: a pop closes as
+  many from the top as entries it went back. Until it has come up the sheet takes
   no tap, so the second tap of a double tap cannot close it or press its main action. Open a
   sheet from a tap only: Chrome skips on «back» an entry laid without a gesture. **The sheet is the one exception to «only the
   page scrolls»**: a panel over the screen has no window of its own, so it scrolls itself and
