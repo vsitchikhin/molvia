@@ -135,3 +135,17 @@ export function formatMoney(value: Money, locale = 'ru-RU'): string {
     maximumFractionDigits: exponent,
   }).format(decimalFromMinor(value))
 }
+
+/**
+ * The sign of a currency as the formatter prints it next to an amount — the tail of a price field
+ * (`֏`), never written into the markup: the sign belongs to the currency, and a receipt in a
+ * foreign one must show its own.
+ */
+export function currencySign(currency: Currency, locale = 'ru-RU'): string {
+  const parts = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    currencyDisplay: 'narrowSymbol',
+  }).formatToParts(0)
+  return parts.find((part) => part.type === 'currency')?.value ?? currency
+}

@@ -2,7 +2,7 @@ import process from 'node:process'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, nextTick } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import type { Router } from 'vue-router'
 import en from '@/i18n/en.json'
@@ -196,6 +196,31 @@ describe('installArrival', () => {
     })
     expect(document.activeElement?.textContent).toBe(en.item.search_title)
     expect(document.title).toBe(`${en.item.search_title} · ${en.app.name}`)
+    view.unmount()
+  })
+  // A sheet lays an entry at the same address and «back» takes it away. The router calls that a
+  // move; nothing on the screen moved, and the button that opened the sheet keeps the focus.
+  it('leaves focus and the title alone when «back» stays on the same address', async () => {
+    const { router, view } = await app()
+    const opener = document.createElement('button')
+    document.body.append(opener)
+    opener.focus()
+    document.title = 'untouched'
+
+    router.options.history.push('/', { sheet: true })
+    const landed = new Promise<void>((resolve) => {
+      const stop = router.afterEach(() => {
+        stop()
+        resolve()
+      })
+    })
+    router.back()
+    await landed
+    await nextTick()
+
+    expect(document.activeElement).toBe(opener)
+    expect(document.title).toBe('untouched')
+    opener.remove()
     view.unmount()
   })
 })
