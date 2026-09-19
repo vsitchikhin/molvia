@@ -2,16 +2,17 @@ import { z } from 'zod'
 import { DomainError, ERROR, ISSUE } from '#model/support/errors'
 import type { ItemKind } from './item'
 import { PATCH_EMPTY, changesSomething } from '#model/support/patch'
-import { visibleLine } from '#model/support/text'
+import { visibleText } from '#model/support/text'
 
-const reviewSchema = visibleLine(500)
+// A textarea on the screen, so a review may run to more than one line (MOL-27).
+const reviewSchema = visibleText(500)
 
 /**
  * Keyed on the item, not on «item + place»: the same milk in every shop, only the price
  * differs. placeId is null for a product and filled for a dish in 0.3, so MOL-6 needs
  * UNIQUE NULLS NOT DISTINCT — without it two nulls count as different and let duplicates in.
  */
-const verdictFields = z.object({
+export const verdictFields = z.object({
   id: z.uuid(),
   actorId: z.uuid(),
   itemId: z.uuid(),

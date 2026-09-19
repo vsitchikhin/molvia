@@ -10,8 +10,8 @@ export default ts.config(
   {
     files: ['src/usecases/**/*.ts'],
     rules: deny(
-      ['fastify', 'fastify/*', 'fastify-*', '@fastify/*'],
-      'Use cases know nothing about HTTP: no request, no reply, no status codes.',
+      ['fastify', 'fastify/*', 'fastify-*', '@fastify/*', '@/routes', '@/routes/*'],
+      'Use cases know nothing about HTTP: no request, no reply, no status codes, no routes.',
     ),
   },
   {

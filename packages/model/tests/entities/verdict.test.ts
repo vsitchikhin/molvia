@@ -183,3 +183,13 @@ describe('a place belongs to a dish and never to a product', () => {
     expect(newVerdictSchemaFor('product').safeParse({ itemId, score: 0 }).success).toBe(false)
   })
 })
+
+describe('the review of a verdict', () => {
+  it('may run to more than one line, in the input and in the patch alike', () => {
+    const review = 'Пахнет крахмалом.\r\nМясом — нет'
+    expect(newVerdictSchema.parse({ itemId: verdict.itemId, score: 2, review }).review).toBe(
+      'Пахнет крахмалом.\nМясом — нет',
+    )
+    expect(verdictPatchSchema.parse({ review }).review).toBe('Пахнет крахмалом.\nМясом — нет')
+  })
+})

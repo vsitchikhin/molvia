@@ -311,10 +311,10 @@ describe('вердикты', () => {
     const dish = await insertItem(db, { kind: 'dish', name: 'Карбонара', searchKey: 'karbonara' })
     const cafe = await insertPlace(db, { kind: 'venue', name: 'Кафе' })
 
-    expect((await verdicts.put(actorId, { itemId: product, score: 5 })).placeId).toBeNull()
-    expect((await verdicts.put(actorId, { itemId: dish, placeId: cafe, score: 4 })).placeId).toBe(
-      cafe,
-    )
+    expect((await verdicts.put(actorId, { itemId: product, score: 5 })).verdict.placeId).toBeNull()
+    expect(
+      (await verdicts.put(actorId, { itemId: dish, placeId: cafe, score: 4 })).verdict.placeId,
+    ).toBe(cafe)
   })
 
   it('товар с местом и блюдо без места база не принимает', async () => {
@@ -353,9 +353,14 @@ describe('вердикты', () => {
     const actorId = await insertActor(db)
     const itemId = await insertItem(db)
 
-    const first = await verdicts.put(actorId, { itemId, score: 5 })
-    const second = await verdicts.put(actorId, { itemId, score: 2 })
+    const { verdict: first, created: firstCreated } = await verdicts.put(actorId, {
+      itemId,
+      score: 5,
+    })
+    const { verdict: second, created } = await verdicts.put(actorId, { itemId, score: 2 })
 
+    expect(firstCreated).toBe(true)
+    expect(created).toBe(false)
     expect(second.id).toBe(first.id)
     expect(second.score).toBe(2)
 

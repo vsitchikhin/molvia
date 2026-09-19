@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { ZodType } from 'zod'
 import {
   ACTOR_HEADER,
@@ -9,9 +10,23 @@ import {
   catalogueSearchResponseSchema,
   errorResponseSchema,
   healthResponseSchema,
+  isWireCode,
   proposedItemSchema,
+  ratingSchema,
+  verdictAmendmentSchema,
+  verdictCardCodec,
+  verdictPathSchema,
 } from '@molvia/model'
-import type { Actor, CatalogueEntry, HealthResponse, ProposedItem, WireCode } from '@molvia/model'
+import type {
+  Actor,
+  CatalogueEntry,
+  HealthResponse,
+  ProposedItem,
+  Rating,
+  VerdictAmendment,
+  VerdictCard,
+  WireCode,
+} from '@molvia/model'
 
 /**
  * What the API answered with. Not a DomainError: the wire carries shape errors too — a
@@ -91,6 +106,19 @@ export interface MolviaClient {
    * kind by the same name — the entry is then that item, and the fields sent were not applied.
    */
   proposeItem(input: ProposedItem): Promise<{ entry: CatalogueEntry; created: boolean }>
+  /**
+   * «Поставить оценку», or give it again — safe to repeat, which is what a draft sent when the
+   * network is back needs. `created` is `true` for a first verdict, or one given after it was
+   * withdrawn; a review left out keeps the one already written.
+   */
+  rateItem(itemId: string, rating: Rating): Promise<{ verdict: VerdictCard; created: boolean }>
+  /** «Изменить оценку»: `review: null` is the one way to erase the text. */
+  amendVerdict(itemId: string, patch: VerdictAmendment): Promise<VerdictCard>
+  /**
+   * «Снять оценку». A repeat answers `ERROR.NOT_FOUND` — nothing is left to withdraw — and a
+   * queue that retries it should count that as done rather than as a failure.
+   */
+  withdrawVerdict(itemId: string): Promise<void>
 }
 
 /**
@@ -201,6 +229,36 @@ export function createClient({
     return (await exchange(path, schema, options)).data
   }
 
+  /**
+   * A verdict is addressed by its item. Checked before anything is sent: an identifier that
+   * is not one can only be refused, and one carrying «/» or «?» would reach another address.
+   */
+  function verdictPath(itemId: string): string {
+    const path = verdictPathSchema.safeParse({ itemId })
+    if (!path.success) throw new ApiError(ISSUE.PATH_INVALID, 'itemId')
+    return `/verdicts/${path.data.itemId}`
+  }
+
+  /**
+   * The input goes out through its schema, and one it refuses arrives as a rejection — with
+   * the code the server would answer for the same input, by the same rule (`server.ts`): the
+   * issue's own code when it is one, `body_invalid` otherwise. Flattening every refusal to
+   * `body_invalid` made one mistake read two ways on screen, depending on who caught it.
+   */
+  function encode<T>(schema: ZodType<T>, input: T): unknown {
+    const encoded = schema.safeEncode(input)
+    if (!encoded.success) {
+      const issue = encoded.error.issues[0]
+      const code = isWireCode(issue?.message) ? issue.message : ISSUE.BODY_INVALID
+      // An unknown key has no path of its own — the object it sits in has — so, as on the
+      // server, the name that was refused is taken from the issue.
+      const details =
+        issue?.code === 'unrecognized_keys' ? issue.keys.join(',') : issue?.path.join('.')
+      throw new ApiError(code, details)
+    }
+    return encoded.data
+  }
+
   return {
     health: () => request('/health', healthResponseSchema),
 
@@ -234,18 +292,31 @@ export function createClient({
 
     // `async` so that an input the schema refuses arrives as a rejection, like everything else.
     proposeItem: async (input) => {
-      const encoded = proposedItemSchema.safeEncode(input)
-      if (!encoded.success) {
-        throw new ApiError(ISSUE.BODY_INVALID, encoded.error.issues[0]?.path.join('.'))
-      }
-
       // An ordinary timeout, unlike the first visit: an abort may leave the item written, and
       // a retry is still safe — the server answers an exact repeat with the item already there.
       const { status, data } = await exchange('/catalogue/items', catalogueEntryCodec, {
         method: 'POST',
-        body: encoded.data,
+        body: encode(proposedItemSchema, input),
       })
       return { entry: data, created: status === 201 }
     },
+
+    rateItem: async (itemId, rating) => {
+      const { status, data } = await exchange(verdictPath(itemId), verdictCardCodec, {
+        method: 'PUT',
+        body: encode(ratingSchema, rating),
+      })
+      return { verdict: data, created: status === 201 }
+    },
+
+    amendVerdict: async (itemId, patch) =>
+      request(verdictPath(itemId), verdictCardCodec, {
+        method: 'PATCH',
+        body: encode(verdictAmendmentSchema, patch),
+      }),
+
+    // 204 carries no body, and a body where none was promised is an answer off the contract.
+    withdrawVerdict: async (itemId) =>
+      request(verdictPath(itemId), z.undefined(), { method: 'DELETE' }),
   }
 }

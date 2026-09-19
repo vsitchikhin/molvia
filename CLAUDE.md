@@ -198,12 +198,15 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   be resolved before the per-character pass, and the aspirated pairs (`պ`/`փ`, `կ`/`ք`,
   `տ`/`թ`) are collapsed deliberately — the same trade as `ш`/`щ`. A letter no table knows
   keeps itself: dropping it would produce an empty key, and `visibleLine` refuses that, so
-  the item would become unbuildable inside the server.
+  the item would become unbuildable inside the server. **What draws nothing is one list,
+  `INVISIBLE` in `text.ts`**, that the name's measure and the key both strip: two copies
+  drifted twice — the Hangul fillers in MOL-12, U+13441 in MOL-27, each time a valid name
+  whose key its own schema refused, a 500. A test walks every code point to hold them equal.
 - **The tables are frozen, and changing one is a migration.** So are the rules that fold and
   decide `c`. The key is stored, so an edit after the first row is written makes every
   accumulated key foreign — silently, with no error and no log line. MOL-11 changed the
   alphabet without one only because no key was stored yet — no production, no real catalogue
-  in any copy. Same standing as `MINOR_EXPONENT`. Retuning the thresholds is a
+  in any copy; MOL-27 widened `INVISIBLE` under the same condition. Same standing as `MINOR_EXPONENT`. Retuning the thresholds is a
   different thing and does not touch the alphabet.
 - **Candidates come from `word_similarity`, never `similarity`.** `similarity` compares
   whole strings, so a long name dilutes the match: «малако» scored 0.158 against
@@ -393,6 +396,7 @@ layer: the core is tested directly.
 ```
 backend/        Fastify
   src/routes/     HTTP: parse -> call the use case -> respond. Zero business logic
+  src/parse.ts    the seam a request is parsed through — shared by routes and use cases
   src/usecases/   scenarios: orchestrate domain and repositories
   src/db/         Drizzle schema, migrations, repositories — the only place with SQL
   tests/          integration tests and their fixtures — they need a database
@@ -469,7 +473,9 @@ the same shape applies to any other package under `packages/`.
 
 - `packages/model` imports nothing but `zod`. Not fastify, not drizzle, not vue,
   not `node:*`. If a rule needs I/O, it is not a domain rule.
-- `usecases` know nothing about HTTP: no `request`, no `reply`, no status codes inside.
+- `usecases` know nothing about HTTP: no `request`, no `reply`, no status codes inside, and
+  no import from `routes` — a body whose schema is known only after a read is parsed
+  through `@/parse`, the same seam the routes use (MOL-27).
 - `routes` contain no business logic and never reach the database except via repositories.
 - SQL lives only in `src/db`. Not a single line of SQL in routes or use cases.
 
@@ -501,6 +507,14 @@ database access. In a product about data integrity, two write paths will silentl
 
 - **Verdict and expense are separate tables with separate write paths.** Do not merge
   them into one input screen: they have different frequencies and different motivations.
+- **A withdrawn verdict is still a row (MOL-27).** `DELETE /verdicts/:itemId` sets
+  `deleted_at` and erases the review; the row stays because the 0.2 gate asks whether someone
+  _gave_ five ratings in two weeks, and «rated five, took one back» is still five — the
+  owner's decision, with the price in view. So **the gate counts every row, and every other
+  reader filters `deleted_at IS NULL`**: the verdict itself, «Что брать», the queue of
+  unrated purchases and every aggregate of 0.3. A reader that forgets the filter puts a
+  withdrawn opinion back on screen, silently. Rating again brings the same row back and keeps
+  `rated_at`, so withdrawing and re-rating cannot move anyone in the gate.
 - **Exactly one field is required — the item.** Everything else may be left empty.
 - **Entering an item is a catalogue lookup** with transliteration and typo tolerance,
   not free text. Free text produces `МОЛОКО МАРИАН 1Л`, which cannot be tied to the canon.
@@ -703,8 +717,9 @@ eight write inputs and three rules in `packages/model`, with the wire codecs tha
 quantity need to cross it at all. MOL-5 added the search key; MOL-6 the nine tables of 0.1,
 the GIN index over `search_key` and the constraints that hold the product's key. MOL-8 gave
 the device an identity and the API its first routes; MOL-12 opened the catalogue — search
-and «Предложить товар»; MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of
-«back». No real screen yet: three sections are placeholders. Release 0.1 is broken into epics and tasks in Jira.
+and «Предложить товар»; MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
+MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of «back». No real screen yet:
+three sections are placeholders. Release 0.1 is broken into epics and tasks in Jira.
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 **What the database guarantees and what it leaves to the domain** is a line, not a habit:

@@ -2,18 +2,23 @@ import Fastify from 'fastify'
 import type { FastifyError, FastifyInstance } from 'fastify'
 import { DomainError, ERROR, ISSUE, errorResponseSchema, isWireCode } from '@molvia/model'
 import type { ErrorCode, ErrorResponse } from '@molvia/model'
-import { InvalidBody } from '@/routes/body'
+import { InvalidBody } from '@/parse'
 import { healthRoutes } from '@/routes/health'
 import { withActor } from '@/routes/actor'
 import { actorMeRoute, firstVisitRoute } from '@/routes/actors'
 import { catalogueRoutes } from '@/routes/catalogue'
+import { verdictRoutes } from '@/routes/verdicts'
 import { createActor } from '@/usecases/create-actor'
 import { getActor } from '@/usecases/get-actor'
 import { proposeItem } from '@/usecases/propose-item'
+import { rateItem } from '@/usecases/rate-item'
+import { amendVerdict } from '@/usecases/amend-verdict'
+import { withdrawVerdict } from '@/usecases/withdraw-verdict'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { createActorRepository } from '@/db/actors-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
+import { createVerdictRepository } from '@/db/verdicts-repository'
 import { databaseIsReachable, getDb } from '@/db'
 import type { Db } from '@/db'
 import { env } from '@/env'
@@ -100,6 +105,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
     const events = createEventRepository(db)
+    const verdicts = createVerdictRepository(db)
 
     healthRoutes(instance, { databaseIsReachable })
     firstVisitRoute(instance, {
@@ -117,6 +123,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items, events }, actorId, query),
         propose: (actorId, input) => proposeItem(items, actorId, input),
+      })
+      verdictRoutes(guarded, {
+        rate: (actorId, itemId, rating) => rateItem({ items, verdicts }, actorId, itemId, rating),
+        amend: (actorId, itemId, patch) => amendVerdict(verdicts, actorId, itemId, patch),
+        withdraw: (actorId, itemId) => withdrawVerdict(verdicts, actorId, itemId),
       })
       guardedDone()
     })

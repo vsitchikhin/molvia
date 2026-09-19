@@ -1,5 +1,12 @@
 import type { ZodError, ZodType } from 'zod'
 
+/*
+ * The seam every request is parsed through — body, query string, path. Not in `routes/`: a
+ * use case parses through it too, when the schema is known only after a read (`rateItem`
+ * learns the item's kind first), and a use case must not reach into the HTTP layer to do it.
+ * Nothing here knows about HTTP; the status is assigned by the handler in `server.ts`.
+ */
+
 /**
  * A request body that did not parse, and only that.
  *
@@ -31,4 +38,9 @@ export function parseBody<T>(schema: ZodType<T>, body: unknown): T {
  */
 export function parseQuery<T>(schema: ZodType<T>, query: unknown): T {
   return parseBody(schema, query)
+}
+
+/** And for the parameters of a path, for the same reason. */
+export function parseParams<T>(schema: ZodType<T>, params: unknown): T {
+  return parseBody(schema, params)
 }

@@ -345,6 +345,17 @@ describe('GET /catalogue/search — the event log', () => {
 })
 
 describe('POST /catalogue/items — «Предложить товар»', () => {
+  it('builds a key its own schema takes for a name around a glyph that draws nothing', async () => {
+    // MOL-27, adversarial pass 3: U+13441 joined the name's list of «draws nothing» and not
+    // the key's, and «𓑁!» — accepted as a name — answered 500 from building its own key.
+    const actor = await insertActor(db)
+
+    for (const name of ['\u{13441}!', '\u{1D159}?', '«\u{13441}»']) {
+      const reply = await propose(actor, { kind: 'product', name, defaultUnit: 'piece' })
+      expect(reply.status, name).toBe(201)
+    }
+  })
+
   const cheese = { kind: 'product', name: 'Сыр чанах Ашхар', defaultUnit: 'kg' }
 
   it('refuses a request that names no owner, and writes nothing', async () => {
