@@ -501,6 +501,14 @@ database access. In a product about data integrity, two write paths will silentl
 
 - **Verdict and expense are separate tables with separate write paths.** Do not merge
   them into one input screen: they have different frequencies and different motivations.
+- **A withdrawn verdict is still a row (MOL-27).** `DELETE /verdicts/:itemId` sets
+  `deleted_at` and erases the review; the row stays because the 0.2 gate asks whether someone
+  _gave_ five ratings in two weeks, and «rated five, took one back» is still five — the
+  owner's decision, with the price in view. So **the gate counts every row, and every other
+  reader filters `deleted_at IS NULL`**: the verdict itself, «Что брать», the queue of
+  unrated purchases and every aggregate of 0.3. A reader that forgets the filter puts a
+  withdrawn opinion back on screen, silently. Rating again brings the same row back and keeps
+  `rated_at`, so withdrawing and re-rating cannot move anyone in the gate.
 - **Exactly one field is required — the item.** Everything else may be left empty.
 - **Entering an item is a catalogue lookup** with transliteration and typo tolerance,
   not free text. Free text produces `МОЛОКО МАРИАН 1Л`, which cannot be tied to the canon.
@@ -690,7 +698,8 @@ eight write inputs and three rules in `packages/model`, with the wire codecs tha
 quantity need to cross it at all. MOL-5 added the search key; MOL-6 the nine tables of 0.1,
 the GIN index over `search_key` and the constraints that hold the product's key. MOL-8 gave
 the device an identity and the API its first routes; MOL-12 opened the catalogue — search
-and «Предложить товар». No screen yet. Release 0.1 is broken into epics and tasks in Jira.
+and «Предложить товар»; MOL-27 the verdict — rate, amend and withdraw, addressed by the item.
+No screen yet. Release 0.1 is broken into epics and tasks in Jira.
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 **What the database guarantees and what it leaves to the domain** is a line, not a habit:
