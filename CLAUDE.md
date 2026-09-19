@@ -570,7 +570,11 @@ database access. In a product about data integrity, two write paths will silentl
   error is decided after the failure** (`navigator.onLine` read then, never narrowed from a
   check before the request) — a connection that drops while the answer is on its way is the
   commonest break at a shelf, and drawing it red was the first consumer's bug (MOL-19, A1).
-  Back online, a screen tries again by itself, as the identity does.
+  Back online, a screen tries again by itself, as the identity does — through `useReconnect`,
+  which also hears the app coming back into view: an iOS PWA frozen in the background misses
+  `online`. Polite states do not carry `role="status"`: they hand their words to the one live
+  region `AppScreen` holds from the first frame, since a region born with its words is often
+  not read. Only an error or «attention» on the screen interrupts; anything inline is polite.
 - **Every SFC is one file in one fixed order:** `<template>`, then `<script lang="ts">`
   exporting a `defineComponent`, then `<style scoped lang="scss">`. The linter keeps the
   order, both languages and the `scoped` attribute; none of it is left to memory.
