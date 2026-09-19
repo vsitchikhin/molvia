@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { ZodType } from 'zod'
 import {
   ACTOR_HEADER,
@@ -5,13 +6,30 @@ import {
   INVITE_HEADER,
   ISSUE,
   actorCodec,
+  addExpenseBodySchema,
   catalogueEntryCodec,
   catalogueSearchResponseSchema,
+  currentTripResponseSchema,
   errorResponseSchema,
+  expensePatchSchema,
   healthResponseSchema,
   proposedItemSchema,
+  recentPlacesResponseSchema,
+  startTripBodySchema,
+  tripViewCodec,
 } from '@molvia/model'
-import type { Actor, CatalogueEntry, HealthResponse, ProposedItem, WireCode } from '@molvia/model'
+import type {
+  Actor,
+  AddExpenseBody,
+  CatalogueEntry,
+  ExpensePatch,
+  HealthResponse,
+  ProposedItem,
+  StartTripBody,
+  TripPlace,
+  TripView,
+  WireCode,
+} from '@molvia/model'
 
 /**
  * What the API answered with. Not a DomainError: the wire carries shape errors too — a
@@ -91,6 +109,23 @@ export interface MolviaClient {
    * kind by the same name — the entry is then that item, and the fields sent were not applied.
    */
   proposeItem(input: ProposedItem): Promise<{ entry: CatalogueEntry; created: boolean }>
+  /** The places this person shopped in lately, to tap at the door instead of typing. */
+  recentPlaces(): Promise<TripPlace[]>
+  /**
+   * «Начать поход». The identifier is the device's own, so sending it again after a lost reply
+   * is safe: `created` is then `false` and the trip is the one already there. Another open trip
+   * rejects with `error.trip_open` — the screen then asks whether to continue it or finish it.
+   */
+  startTrip(body: StartTripBody): Promise<{ trip: TripView; created: boolean }>
+  /** The trip the screen opens on, or null — «Новый поход». */
+  currentTrip(): Promise<TripView | null>
+  /** «Добавить в поход». The same identifier again is one purchase, and `created` is `false`. */
+  addExpense(tripId: string, body: AddExpenseBody): Promise<{ trip: TripView; created: boolean }>
+  /** «Добавить цену», «Сохранить»: `null` clears a field, a missing one leaves it be. */
+  updateExpense(tripId: string, expenseId: string, patch: ExpensePatch): Promise<TripView>
+  removeExpense(tripId: string, expenseId: string): Promise<TripView>
+  /** «Завершить». Finishing twice is not an error. */
+  finishTrip(tripId: string): Promise<void>
 }
 
 /**
@@ -201,6 +236,18 @@ export function createClient({
     return (await exchange(path, schema, options)).data
   }
 
+  /** Encodes a body through its schema, refusing what the schema refuses before anything is sent. */
+  function wire<T>(schema: ZodType<T>, input: T): unknown {
+    const encoded = z.safeEncode(schema, input)
+    if (!encoded.success) {
+      throw new ApiError(ISSUE.BODY_INVALID, encoded.error.issues[0]?.path.join('.'))
+    }
+    return encoded.data
+  }
+
+  /** A path segment an identifier cannot break out of: `/` or `?` in it would name another route. */
+  const segment = encodeURIComponent
+
   return {
     health: () => request('/health', healthResponseSchema),
 
@@ -246,6 +293,45 @@ export function createClient({
         body: encoded.data,
       })
       return { entry: data, created: status === 201 }
+    },
+
+    recentPlaces: async () => (await request('/places/recent', recentPlacesResponseSchema)).places,
+
+    // `async` everywhere below for the reason `proposeItem` has it: a body the schema refuses
+    // must arrive as a rejection. Ordinary timeouts: every one of these is safe to repeat — the
+    // identifiers are the device's own, and a repeat is answered with what is already there.
+    startTrip: async (body) => {
+      const { status, data } = await exchange('/trips', tripViewCodec, {
+        method: 'POST',
+        body: wire(startTripBodySchema, body),
+      })
+      return { trip: data, created: status === 201 }
+    },
+
+    currentTrip: async () => (await request('/trips/current', currentTripResponseSchema)).trip,
+
+    addExpense: async (tripId, body) => {
+      const { status, data } = await exchange(`/trips/${segment(tripId)}/expenses`, tripViewCodec, {
+        method: 'POST',
+        body: wire(addExpenseBodySchema, body),
+      })
+      return { trip: data, created: status === 201 }
+    },
+
+    updateExpense: async (tripId, expenseId, patch) =>
+      request(`/trips/${segment(tripId)}/expenses/${segment(expenseId)}`, tripViewCodec, {
+        method: 'PATCH',
+        body: wire(expensePatchSchema, patch),
+      }),
+
+    removeExpense: async (tripId, expenseId) =>
+      request(`/trips/${segment(tripId)}/expenses/${segment(expenseId)}`, tripViewCodec, {
+        method: 'DELETE',
+      }),
+
+    // 204 has no body, and nothing else is a success here.
+    finishTrip: async (tripId) => {
+      await request(`/trips/${segment(tripId)}/finish`, z.undefined(), { method: 'POST' })
     },
   }
 }
