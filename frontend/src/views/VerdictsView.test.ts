@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
-import { ERROR } from '@molvia/model'
+import { ERROR, ISSUE } from '@molvia/model'
 import type { PendingVerdict, PendingVerdicts, Rating, VerdictCard } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
@@ -235,6 +235,8 @@ describe('VerdictsView', () => {
 
     await rate(view, 4)
     expect(view.text()).not.toContain(en.verdict.empty.title)
+    // С-14: not a blank screen either.
+    expect(view.text()).toContain(en.verdict.sending)
 
     answer(answered(milk.itemId))
     await flushPromises()
@@ -290,5 +292,24 @@ describe('VerdictsView', () => {
     expect(view.text()).toContain(en.verdict.offline.title)
     expect(view.text()).not.toContain(en.verdict.load_offline.title)
     expect(view.text()).not.toContain(en.verdict.empty.title)
+  })
+
+  it('С-4: a rating refused while the next card is on screen — the person is told, the card stays', async () => {
+    online(true)
+    rateItem.mockRejectedValue(new ApiError(ISSUE.TEXT_NOT_VISIBLE))
+    pendingVerdicts.mockResolvedValue({ items: [milk, bread], total: 2 })
+    const { view } = await render()
+
+    await rate(view, 4)
+
+    expect(view.get('.question').text()).toContain('Хлеб')
+    expect(view.get('.notice').text()).toContain('Молоко «Ашхар»')
+    expect(view.get('.notice').text()).toContain('comes back next')
+
+    // Done with the bread, the refused one is next — and the notice has nothing left to say.
+    await button(view, en.verdict.skip).trigger('click')
+    await flushPromises()
+    expect(view.get('.question').text()).toContain('Молоко')
+    expect(view.find('.notice').exists()).toBe(false)
   })
 })

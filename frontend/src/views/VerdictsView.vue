@@ -51,6 +51,16 @@
       />
 
       <template v-else-if="phase === 'ready' && current">
+        <!-- A rating the server refused came back while another card is on screen: the card
+             under the finger stays, so the person is told where the other went (owner's С-4). -->
+        <ScreenState
+          v-if="bounced"
+          class="notice"
+          kind="attention"
+          inline
+          :title="t('verdict.returned', { name: bounced.name })"
+        />
+
         <!-- From memory: without a connection it refreshes by itself; with one, the server broke
              and nothing will fire again on its own — so the person gets the button. -->
         <div v-if="stale && fetchedAt" class="stale">
@@ -80,6 +90,11 @@
 
         <p class="footnote">{{ t('verdict.footnote') }}</p>
       </template>
+
+      <!-- The last rating on its way and nothing said yet: not a blank screen (owner's С-14). -->
+      <p v-else-if="phase === 'empty' && !sending && drafts.waiting.length > 0" class="sending">
+        {{ t('verdict.sending') }}
+      </p>
 
       <!-- Empty is a success here, and the only green empty state in the app: nothing left
            to rate is an achievement. Not while the last rating is still on its way — it may yet
@@ -139,6 +154,10 @@ export default defineComponent({
     // Only while something is actually waiting: a notice about a rating that has since gone
     // through would be a lie.
     const sending = computed(() => (drafts.waiting.length > 0 ? drafts.held : null))
+    // Refused and returned, but not the card on screen — the one the person has to be told about.
+    const bounced = computed(() =>
+      queue.returned.value.find((card) => card.itemId !== queue.current.value?.itemId),
+    )
     // The notice is the whole screen only when nothing else is: the queue is empty.
     const alone = computed(() => queue.phase.value === 'empty')
 
@@ -181,6 +200,7 @@ export default defineComponent({
       retry: () => void queue.retry(),
       sending,
       alone,
+      bounced,
       moved,
       save,
       skip,
@@ -217,6 +237,12 @@ export default defineComponent({
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--space-3);
+}
+
+.sending {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
 }
 
 .stale-text {
