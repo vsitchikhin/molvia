@@ -18,11 +18,12 @@
     />
 
     <template #footer>
-      <p v-if="!connected" class="line" role="status">{{ t('item.propose.offline') }}</p>
-      <p v-else-if="nameRefused" class="line failed" role="status">
-        {{ t('item.propose.name_invalid') }}
+      <!-- There before its words, with only the text changing: a live region born together with
+           what it says is often not read at all (MOL-19; review Р-18). -->
+      <p class="line" :class="{ failed: textRefused }" role="status">{{ status }}</p>
+      <p v-if="connected && failed" class="line failed" role="alert">
+        {{ t('item.propose.failed') }}
       </p>
-      <p v-else-if="failed" class="line failed" role="alert">{{ t('item.propose.failed') }}</p>
       <AppButton size="large" block :disabled="!ready" @click="submit">
         {{ t('item.propose.submit') }}
       </AppButton>
@@ -93,15 +94,18 @@ export default defineComponent({
      */
     let opening = 0
 
-    // A tab or a line break is a cell or a line of wherever the text was copied from — a row of
-    // the owner's Google Sheets. The catalogue refuses them inside a name, and a button gone grey
-    // with no word why was the answer (adversarial B4); a space is what was meant.
-    function oneLine(text: string): string {
-      return text.replace(/[\t\n\v\f\r]+/gu, ' ')
+    // What copying brings along with the text. A break of any kind — a tab between the cells of a
+    // Google Sheets row, a line feed, NEL, U+2028 — is a space; the direction marks and isolates a
+    // chat wraps a pasted name in draw nothing and go. The catalogue refuses all of them inside a
+    // name, and they cannot be seen to be removed by hand (adversarial B4, C1, C2).
+    function pasted(text: string): string {
+      return text
+        .replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, ' ')
+        .replace(/[\u202a-\u202e\u2066-\u2069]/gu, '')
     }
     watch([name, note], ([nextName, nextNote]) => {
-      if (oneLine(nextName) !== nextName) name.value = oneLine(nextName)
-      if (oneLine(nextNote) !== nextNote) note.value = oneLine(nextNote)
+      if (pasted(nextName) !== nextName) name.value = pasted(nextName)
+      if (pasted(nextNote) !== nextNote) note.value = pasted(nextNote)
     })
 
     // A fresh form for every opening, starting from what is in the field now.
@@ -112,7 +116,7 @@ export default defineComponent({
         sending.value = false
         if (!open) return
         connected.value = navigator.onLine
-        name.value = oneLine(props.query).trim()
+        name.value = pasted(props.query).trim()
         unit.value = ''
         note.value = ''
         failed.value = false
@@ -133,12 +137,21 @@ export default defineComponent({
 
     const ready = computed(() => connected.value && !sending.value && input.value.success)
 
-    // A name that draws something and is still refused holds a character no price tag has; the
-    // button waits, and this says why instead of leaving it grey in silence.
-    const nameRefused = computed(
+    // What is left for the schema to refuse after `pasted` — a private-use glyph, a lone surrogate
+    // — in the name or the note. The button waits, and the line says why instead of leaving it grey
+    // in silence; typing again is the one way out a person can see.
+    const textRefused = computed(
       () =>
-        !drawsNothing(name.value) && !proposedItemSchema.shape.name.safeParse(name.value).success,
+        (!drawsNothing(name.value) &&
+          !proposedItemSchema.shape.name.safeParse(name.value).success) ||
+        (!drawsNothing(note.value) && !proposedItemSchema.shape.note.safeParse(note.value).success),
     )
+
+    const status = computed(() => {
+      if (!connected.value) return t('item.propose.offline')
+      if (textRefused.value) return t('item.propose.text_invalid')
+      return ''
+    })
 
     async function submit(): Promise<void> {
       const parsed = input.value
@@ -179,7 +192,8 @@ export default defineComponent({
       connected,
       failed,
       ready,
-      nameRefused,
+      textRefused,
+      status,
       submit,
       nameMax: ITEM_NAME_MAX,
       noteMax: ITEM_NOTE_MAX,
@@ -194,6 +208,10 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   text-align: center;
+}
+
+.line:empty {
+  margin: 0;
 }
 
 .failed {

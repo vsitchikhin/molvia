@@ -311,19 +311,65 @@ describe('«Suggest an item»', () => {
       expect(fields(sheet).name.element.value).toBe('Молоко Ашхар')
     })
 
-    it('says why the button waits when the name holds a character the catalogue refuses', async () => {
+    it('takes any break a paste brings — NEL, a line or paragraph separator — as a space', async () => {
       const sheet = await render('')
       await chooseUnit(sheet, en.item.unit_l)
+      for (const code of [0x85, 0x2028, 0x2029]) {
+        const brk = String.fromCodePoint(code)
+        await fields(sheet).name.setValue('')
+        await fields(sheet).note.setValue('')
+        await fields(sheet).name.setValue(`Молоко${brk}Ашхар`)
+        await fields(sheet).note.setValue(`Ашхар${brk}2%`)
 
-      await fields(sheet).name.setValue(`Молоко${String.fromCodePoint(0x202e)}`)
+        expect(fields(sheet).name.element.value, code.toString(16)).toBe('Молоко Ашхар')
+        expect(fields(sheet).note.element.value, code.toString(16)).toBe('Ашхар 2%')
+        expect(submitButton(sheet).attributes('disabled'), code.toString(16)).toBeUndefined()
+      }
+    })
 
+    it('drops the direction marks and isolates a chat wraps a pasted name in — they draw nothing', async () => {
+      const sheet = await render('')
+      await chooseUnit(sheet, en.item.unit_l)
+      const [open, close] = [String.fromCodePoint(0x2068), String.fromCodePoint(0x2069)]
+
+      await fields(sheet).name.setValue(`${open}Молоко «Ашхар»${close}`)
+      await fields(sheet).note.setValue(`${String.fromCodePoint(0x202b)}2%${close}`)
+
+      expect(fields(sheet).name.element.value).toBe('Молоко «Ашхар»')
+      expect(fields(sheet).note.element.value).toBe('2%')
+      expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+      expect(sheet.text()).not.toContain(en.item.propose.text_invalid)
+    })
+
+    it('says why the button waits when what is left is refused — in the name or in the note', async () => {
+      const privateUse = String.fromCodePoint(0xe000)
+      const sheet = await render('Молоко')
+      await chooseUnit(sheet, en.item.unit_l)
+
+      await fields(sheet).name.setValue(`Молоко${privateUse}`)
       expect(submitButton(sheet).attributes('disabled')).toBeDefined()
-      expect(sheet.text()).toContain(en.item.propose.name_invalid)
+      expect(sheet.get('[role="status"]').text()).toBe(en.item.propose.text_invalid)
+
+      await fields(sheet).name.setValue('Молоко')
+      await fields(sheet).note.setValue(`2%${privateUse}`)
+      expect(submitButton(sheet).attributes('disabled')).toBeDefined()
+      expect(sheet.get('[role="status"]').text()).toBe(en.item.propose.text_invalid)
+    })
+
+    it('keeps its status line in place before there is anything to say — only the words change', async () => {
+      const sheet = await render()
+      const line = sheet.get('[role="status"]')
+      expect(line.text()).toBe('')
+
+      await fields(sheet).name.setValue(`тан${String.fromCodePoint(0xe000)}`)
+
+      expect(sheet.get('[role="status"]').element).toBe(line.element)
+      expect(line.text()).toBe(en.item.propose.text_invalid)
     })
 
     it('says nothing of the kind about a name not yet written', async () => {
       const sheet = await render('')
-      expect(sheet.text()).not.toContain(en.item.propose.name_invalid)
+      expect(sheet.text()).not.toContain(en.item.propose.text_invalid)
     })
   })
 
