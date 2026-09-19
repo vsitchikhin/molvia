@@ -541,6 +541,30 @@ database access. In a product about data integrity, two write paths will silentl
 
 ## Data rules
 
+- **Every write to a trip goes through the queue on the device (MOL-24),** online or not — one
+  path, so the sheet never waits on the network. A write is kept first and sent after, one at a
+  time, in order, at start, on `online`, when the app comes back into view and, after a 5xx with
+  the connection up, again with a doubling pause; there is no background sync on iOS. A repeat is
+  safe because the device names every row — **while the row exists**: a remove is a hard delete,
+  and an add sent again after it writes the row anew. So **storage is the queue, not a copy of
+  it**: the installed app and a tab from the bot share it, every window reads it before each
+  change and send, takes out only the write it sent (by the write's own key), and one window
+  sends at a time (`navigator.locks`). **Without Web Locks** (Safari before 15.4, old WebViews)
+  two windows can send the same head at once, and a removed row can come back — narrowed, not
+  closed, as the identity's own fallback says of itself. What must hold is written to every shelf
+  or kept in memory, and a shelf that refused the write keeps only the part of its past still
+  true — the writes still waiting, never those sent since (removing needs no quota, and the part
+  fits into the room it frees). Left whole, its past is read at the next launch and a removed
+  purchase is sent again and comes back; emptied, it loses the purchases made with no signal.
+  While a shelf refuses, what came after lives in memory only, and a PWA killed before it sends
+  loses that — there is nowhere left to keep it. No connection, a 5xx, an answer off the contract (a shop's
+  captive portal) and a 401 hold the queue, and so does a code the API did not say itself
+  (`ApiError.answered === false` — a portal's 404 page); any other refusal is set aside in
+  `rejected` and never retried — sent again it would be refused again and hold everything behind
+  it. The last known trip is remembered per identity for the same reason: the app opened at the
+  shelf with no signal still knows where a purchase goes — but **the memory is for when the
+  server cannot be asked, not instead of asking**: the sheet asks every time it opens, and a
+  trip answered finished stops being the current one.
 - **Verdict and expense are separate tables with separate write paths.** Do not merge
   them into one input screen: they have different frequencies and different motivations.
 - **A withdrawn verdict is still a row (MOL-27).** `DELETE /verdicts/:itemId` sets
@@ -625,7 +649,12 @@ database access. In a product about data integrity, two write paths will silentl
   the cheapest mistake today and the most expensive one a year from now.
 - **No business logic on the frontend.** The verdict, the unit price and the conversion are
   computed by the server. Client-side validation is for UX only; the backend is the source
-  of truth.
+  of truth. **One exception, and it is not a second implementation (MOL-24):** while a purchase
+  is being typed, the sheet shows its unit price and its estimate in the income currency through
+  `unitPrice()` and `convertMoney()` of `packages/model` — the very functions the server calls.
+  At the shelf with no connection the price per litre is needed now, to decide whether to take
+  the thing. Once written, every number on screen is the server's; the phone never adds up a
+  total, not even for rows still in the queue.
 - Split components so they are not overloaded, but without five wrappers around one tag.
   One well-scoped component beats five trivial ones.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
@@ -797,7 +826,8 @@ trip it was bought on. The trip and its rows are named by the device, so a queue
 purchase.
 MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
 MOL-39 the official rate — a cache refreshed hourly, snapshotted by every new trip, a jump
-left to the person;
+left to the person; MOL-24 the sheet «сколько, в чём, почём» — a live unit price, a price in any
+of the four currencies, and the queue that keeps a purchase on the phone until it is sent;
 MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of «back»; MOL-18 the kit
 screens are built from — button, field, card, verdict badge, sheet. MOL-23 the first real screen,
 «Что взяли?»: the search as the person types, the recent items on the device, «Предложить

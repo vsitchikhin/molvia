@@ -51,11 +51,19 @@ import type {
  */
 export class ApiError extends Error {
   readonly code: WireCode
+  /**
+   * Whether the code is the API's own word — its error body — rather than inferred from a bare
+   * status or from no answer at all. A 404 page from a shop's captive portal becomes `not_found`
+   * here too, and a caller for whom a refusal is final (the trip queue, MOL-24) must not take it
+   * for the server's.
+   */
+  readonly answered: boolean
 
-  constructor(code: WireCode, details?: string) {
+  constructor(code: WireCode, details?: string, answered = true) {
     super(details ? `${code}: ${details}` : code)
     this.name = 'ApiError'
     this.code = code
+    this.answered = answered
   }
 }
 
@@ -245,7 +253,11 @@ export function createClient({
         // A dropped connection is `fetch`'s own TypeError. Whether that reads as «offline» or
         // as «broken» is the caller's call — what matters here is that it arrives as an
         // ApiError like everything else.
-        throw new ApiError(ERROR.INTERNAL, error instanceof Error ? error.message : 'transport')
+        throw new ApiError(
+          ERROR.INTERNAL,
+          error instanceof Error ? error.message : 'transport',
+          false,
+        )
       }
 
       // A proxy page, an empty body, a reply cut off mid-flight: `.json()` throws, and every
@@ -256,7 +268,7 @@ export function createClient({
       } catch {
         // Cut off by the deadline or by the caller, the reply never came — it is not a reply
         // off the contract.
-        if (controller.signal.aborted) throw new ApiError(ERROR.INTERNAL, 'aborted')
+        if (controller.signal.aborted) throw new ApiError(ERROR.INTERNAL, 'aborted', false)
         body = undefined
       }
     } finally {
@@ -276,6 +288,7 @@ export function createClient({
       throw new ApiError(
         CODE_BY_STATUS[response.status] ?? fallback,
         `HTTP ${String(response.status)}`,
+        false,
       )
     }
 

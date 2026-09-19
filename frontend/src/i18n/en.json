@@ -64,13 +64,20 @@
     "unit_ml": "ml",
     "unit_piece": "pc",
     "price": "Price as on the tag",
+    "currency": "Price currency",
     "unit_price_label": "Per unit",
     "unit_price_pending": "Worked out for you — nothing to type",
+    "unit_price_value": "{amount}/{unit}",
+    "unit_price_announced": "Per unit: {value}",
     "save": "Add to the trip",
     "save_edit": "Save",
     "delete": "Remove the item",
     "cancel": "Cancel",
     "offline_note": "Saved on the phone, sent once you are back online",
+    "no_trip": {
+      "body": "Start a trip first: a purchase needs a shop",
+      "action": "To the trip"
+    },
     "empty": {
       "body": "Nothing found for «{query}». We will add it to the catalogue — tell us what the price tag calls it",
       "action": "Suggest an item"
@@ -160,7 +167,7 @@
   "money": {
     "approx": "≈ {amount}",
     "converted_package": "≈ {amount} per pack",
-    "converted_note": "the conversion is approximate, we always compare in drams",
+    "converted_note": "the conversion is approximate, we always compare by the price on the tag",
     "rate_official": "rate {rate} · CBA",
     "rate_mine": "my rate {rate}",
     "rate_frozen": "The rate is saved with the trip. Last month does not change with today's rate",

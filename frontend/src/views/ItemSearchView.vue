@@ -60,18 +60,37 @@
       </template>
     </CatalogueCombobox>
 
-    <ProposeItemSheet v-model:open="proposing" :query="query" @proposed="proposed" />
+    <ProposeItemSheet
+      v-model:open="proposing"
+      :query="query"
+      :on-closed="afterProposing"
+      @proposed="proposed"
+    />
+
+    <!-- Mounted on a pick and put away from `onClosed`: each opening is its own purchase. Two
+         steps back on «Добавить в поход» — the sheet and this screen, back to the trip. -->
+    <ItemDetailsSheet
+      v-if="picked"
+      :key="opened"
+      :entry="picked.entry"
+      :query="picked.query"
+      :close-steps="2"
+      :on-closed="putAway"
+      @added="added"
+    />
   </AppScreen>
 </template>
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import type { CatalogueEntry } from '@molvia/model'
 import IconPlus from '~icons/mdi/plus'
 import AppButton from '@/components/AppButton.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CatalogueCombobox from '@/components/CatalogueCombobox.vue'
+import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ProposeItemSheet from '@/components/ProposeItemSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
@@ -89,8 +108,8 @@ import { useRecentItemsStore } from '@/stores/recentItems'
  * search itself, its pause and its stale answers, is `useCatalogueSearch`; the list and the
  * keyboard are `CatalogueCombobox`.
  *
- * A pick leaves with the query it was made on — see `stores/itemEntry`. The screen stays: the
- * sheet asking how much comes up over it (MOL-24).
+ * A pick leaves with the query it was made on — see `stores/itemEntry` — and the sheet asking how
+ * much and for what price comes up over the screen (MOL-24).
  */
 export default defineComponent({
   name: 'ItemSearchView',
@@ -99,6 +118,7 @@ export default defineComponent({
     AppScreen,
     CatalogueCombobox,
     IconPlus,
+    ItemDetailsSheet,
     ProposeItemSheet,
     ScreenSkeleton,
     ScreenState,
@@ -159,22 +179,46 @@ export default defineComponent({
       )
     })
 
+    const { picked } = storeToRefs(entry)
+    /** Which opening of the sheet this is: the same item picked twice is two purchases. */
+    const opened = ref(0)
+
     // Rows of an answer leave with the query they answer, not with the field: the list stays on
     // screen, dimmed, while the next search is out, and a tap on «Кока-кола» found for «кола»
     // with «хлеб» already typed must not teach the search that «хлеб» means cola (Р-9, A3). The
     // recent items answer no query — they go with the field as it is.
-    function pick(picked: CatalogueEntry): void {
-      entry.pick({ entry: picked, query: phase.value === 'ready' ? answered.value : query.value })
+    function pick(chosen: CatalogueEntry): void {
+      opened.value += 1
+      entry.pick({ entry: chosen, query: phase.value === 'ready' ? answered.value : query.value })
+    }
+
+    // Into the recent items only once it went into the trip, as the server's memory of picks
+    // does (MOL-11): a pick the sheet cancelled is a changed mind.
+    function added(item: CatalogueEntry): void {
+      recent.remember(item)
+    }
+
+    function putAway(): void {
+      entry.clear()
     }
 
     /** «Предложить товар» — the whole form, the only way the catalogue grows in 0.1. */
     const proposing = ref(false)
+    let proposedItem: CatalogueEntry | null = null
 
     // Picked like any other, with the query it was looked for by: the next search for it then
     // puts it first (MOL-11). New or already there — the same, the item is the catalogue's.
-    function proposed(added: CatalogueEntry): void {
+    //
+    // Once its sheet is put away, not at once: its close is a step back through history, and a
+    // sheet laying its entry before that step lands would be the one the step took (MOL-24).
+    function proposed(item: CatalogueEntry): void {
+      proposedItem = item
       proposing.value = false
-      pick(added)
+    }
+
+    function afterProposing(): void {
+      if (proposedItem) pick(proposedItem)
+      proposedItem = null
     }
 
     onMounted(() => {
@@ -196,8 +240,13 @@ export default defineComponent({
       rows,
       heading,
       pick,
+      picked,
+      opened,
+      added,
+      putAway,
       proposing,
       proposed,
+      afterProposing,
     }
   },
 })
