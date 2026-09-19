@@ -29,7 +29,7 @@ export interface CatalogueSearch {
   readonly stale: Ref<boolean>
   /** The query the answer on screen belongs to — «Не нашли „{query}“» names that one. */
   readonly answered: Ref<string>
-  retry(): void
+  readonly retry: () => void
 }
 
 /**
