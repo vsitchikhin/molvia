@@ -30,6 +30,8 @@ function trip(rate: string | null = null): TripView {
       source: 'official',
       asOf: '2026-09-19T00:00:00.000Z',
     },
+    rateJump: null,
+    rateStale: false,
     place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
     expenses: [],
     total: [],

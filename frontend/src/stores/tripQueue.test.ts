@@ -45,6 +45,8 @@ function answer(total: string): TripView {
     finishedAt: null,
     currency: 'AMD',
     rate: null,
+    rateJump: null,
+    rateStale: false,
     place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
     expenses: [],
     total: [{ amount: total, currency: 'AMD' }],
