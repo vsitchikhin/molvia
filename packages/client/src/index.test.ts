@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ACTOR_HEADER, ERROR, INVITE_HEADER, ISSUE } from '@molvia/model'
 import { ApiError, createClient } from '#client/index'
 
@@ -344,6 +344,122 @@ describe('the catalogue', () => {
     const { client } = clientReplying(401, { code: ERROR.NO_ACTOR })
 
     expect(await codeOf(client.searchCatalogue('молоко'))).toBe(ERROR.NO_ACTOR)
+  })
+
+  describe('cancelled by the caller, which the screen does on every keystroke', () => {
+    /** A server that answers only when told to, and gives up the way `fetch` does on an abort. */
+    function clientHanging(options: { timeoutMs?: number } = {}) {
+      const seen: { signal: AbortSignal | undefined }[] = []
+      let answer: (() => void) | undefined
+      const fetch = (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> =>
+        new Promise((resolve, reject) => {
+          seen.push({ signal: init?.signal ?? undefined })
+          const abort = (): void => {
+            reject(new DOMException('The operation was aborted', 'AbortError'))
+          }
+          if (init?.signal?.aborted) abort()
+          init?.signal?.addEventListener('abort', abort)
+          answer = () => {
+            resolve(new Response(JSON.stringify({ items: [entryWire] }), { status: 200 }))
+          }
+        })
+      const client = createClient({ baseUrl: 'http://api', fetch, ...options })
+      return { client, seen, answer: () => answer?.() }
+    }
+
+    it('rejects as an ApiError, not a bare AbortError', async () => {
+      const { client } = clientHanging()
+      const controller = new AbortController()
+
+      const search = client.searchCatalogue('молоко', { signal: controller.signal })
+      controller.abort()
+
+      expect(await codeOf(search)).toBe(ERROR.INTERNAL)
+    })
+
+    it('does not wait for the server when the signal was aborted before the call', async () => {
+      const { client, seen } = clientHanging()
+      const controller = new AbortController()
+      controller.abort()
+
+      expect(await codeOf(client.searchCatalogue('молоко', { signal: controller.signal }))).toBe(
+        ERROR.INTERNAL,
+      )
+      expect(seen[0]?.signal?.aborted).toBe(true)
+    })
+
+    it('changes nothing once the answer is in', async () => {
+      const { client, answer } = clientHanging()
+      const controller = new AbortController()
+
+      const search = client.searchCatalogue('молоко', { signal: controller.signal })
+      answer()
+      const entries = await search
+      controller.abort()
+
+      expect(entries.map((entry) => entry.name)).toEqual([entryWire.name])
+    })
+
+    it('keeps the timeout for a caller that passed a signal of its own', async () => {
+      const { client } = clientHanging({ timeoutMs: 10 })
+      const controller = new AbortController()
+
+      expect(await codeOf(client.searchCatalogue('молоко', { signal: controller.signal }))).toBe(
+        ERROR.INTERNAL,
+      )
+      expect(controller.signal.aborted).toBe(false)
+    })
+
+    /** Headers, the start of the body, and then silence — the body errors once its signal is aborted. */
+    function clientStallingAfterHeaders(options: { timeoutMs?: number } = {}) {
+      const seen: AbortSignal[] = []
+      const fetch = (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        const signal = init?.signal ?? new AbortController().signal
+        seen.push(signal)
+        const body = new ReadableStream<Uint8Array>({
+          start(stream) {
+            stream.enqueue(new TextEncoder().encode('{"items":['))
+            signal.addEventListener('abort', () => {
+              stream.error(new DOMException('aborted', 'AbortError'))
+            })
+          },
+        })
+        return Promise.resolve(new Response(body, { status: 200 }))
+      }
+      const client = createClient({ baseUrl: 'http://api', fetch, ...options })
+      return { client, seen }
+    }
+
+    it('reaches a body still arriving: the caller cancels after the headers', async () => {
+      const { client, seen } = clientStallingAfterHeaders({ timeoutMs: 10_000 })
+      const controller = new AbortController()
+
+      const search = client.searchCatalogue('молоко', { signal: controller.signal })
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      controller.abort()
+
+      expect(await codeOf(search)).toBe(ERROR.INTERNAL)
+      expect(seen[0]?.aborted).toBe(true)
+    })
+
+    it('keeps the deadline for a body that never ends — a quiet server is not an answer', async () => {
+      const { client, seen } = clientStallingAfterHeaders({ timeoutMs: 20 })
+
+      expect(await codeOf(client.searchCatalogue('молоко'))).toBe(ERROR.INTERNAL)
+      expect(seen[0]?.aborted).toBe(true)
+    })
+
+    it('lets go of the caller’s signal when the call is over', async () => {
+      const { client, answer } = clientHanging()
+      const controller = new AbortController()
+      const remove = vi.spyOn(controller.signal, 'removeEventListener')
+
+      const search = client.searchCatalogue('молоко', { signal: controller.signal })
+      answer()
+      await search
+
+      expect(remove.mock.calls.map(([type]) => type)).toEqual(['abort'])
+    })
   })
 
   it('proposes an item as JSON, with the quantity on the wire as a decimal string', async () => {

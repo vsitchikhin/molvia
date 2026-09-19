@@ -1,0 +1,503 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h, nextTick, ref } from 'vue'
+import { mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import type { Pinia } from 'pinia'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import { ApiError } from '@molvia/client'
+import { ERROR } from '@molvia/model'
+import type { CatalogueEntry, ProposedItem } from '@molvia/model'
+import en from '@/i18n/en.json'
+import { createAppI18n } from '@/i18n'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
+import { routes } from '@/router'
+import { useItemEntryStore } from '@/stores/itemEntry'
+import { useRecentItemsStore } from '@/stores/recentItems'
+import ItemSearchView from '@/views/ItemSearchView.vue'
+
+const searchCatalogue = vi.fn<(query: string) => Promise<CatalogueEntry[]>>()
+const proposeItem =
+  vi.fn<(input: ProposedItem) => Promise<{ entry: CatalogueEntry; created: boolean }>>()
+vi.mock('@/api', () => ({
+  api: {
+    searchCatalogue: (query: string) => searchCatalogue(query),
+    proposeItem: (input: ProposedItem) => proposeItem(input),
+  },
+}))
+
+const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+
+function entry(n: number, name: string, note: string | null = null): CatalogueEntry {
+  return {
+    id: `0b6f2c4e-8d1a-4f3b-9c7e-${String(n).padStart(12, '0')}`,
+    kind: 'product',
+    name,
+    note,
+    defaultUnit: 'l',
+    typicalQuantity: null,
+  }
+}
+
+const milk = entry(1, 'Молоко «Ашхар»', 'ультрапастеризованное, 2,5%')
+const marianna = entry(2, 'Молоко «Марианна»')
+const bread = entry(3, 'Хлеб «Гюмри»', 'формовой')
+
+function online(value: boolean): void {
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(value)
+}
+
+const mounted: VueWrapper[] = []
+let pinia: Pinia
+
+/** Items the person added to trips before, as the sheet of MOL-24 will write them. */
+function remembered(...items: CatalogueEntry[]): void {
+  const recent = useRecentItemsStore(pinia)
+  for (const item of [...items].reverse()) recent.remember(item)
+}
+
+/**
+ * The screen under the app's own live region, so what it reads out can be heard. `shown` takes the
+ * screen away while the region stays — what leaving it does.
+ */
+async function render(shown = ref(true)) {
+  const router = createRouter({ history: createMemoryHistory(), routes })
+  await router.push('/trip/add')
+  const wrapper = mount(
+    defineComponent({
+      setup() {
+        const announcements = provideAnnouncer()
+        return () =>
+          h('div', [
+            shown.value ? h(ItemSearchView) : null,
+            h('p', { class: 'live' }, announcements.value.map((a) => a.text).join(' | ')),
+          ])
+      },
+    }),
+    { attachTo: document.body, global: { plugins: [router, pinia, createAppI18n('en')] } },
+  )
+  mounted.push(wrapper)
+  return wrapper
+}
+
+function field(view: VueWrapper) {
+  return view.get<HTMLInputElement>('input[role="combobox"]')
+}
+
+function names(view: VueWrapper): string[] {
+  return view.findAll('[role="option"] .name').map((name) => name.text())
+}
+
+function button(view: VueWrapper, text: string): DOMWrapper<HTMLButtonElement> {
+  const found = view.findAll('button').find((candidate) => candidate.text() === text)
+  if (!found) throw new Error(`no button «${text}»`)
+  return found
+}
+
+beforeEach(() => {
+  localStorage.clear()
+  sessionStorage.clear()
+  localStorage.setItem('molvia.actor', ACTOR)
+  pinia = createPinia()
+  setActivePinia(pinia)
+  searchCatalogue.mockReset()
+  proposeItem.mockReset()
+  online(true)
+})
+
+afterEach(() => {
+  for (const wrapper of mounted.splice(0)) wrapper.unmount()
+  vi.restoreAllMocks()
+})
+
+describe('«What did you pick up?»', () => {
+  it('shows the recent items under an empty field and asks the server nothing', async () => {
+    remembered(bread, milk)
+    const view = await render()
+
+    expect(view.text()).toContain(en.item.group_recent)
+    expect(names(view)).toEqual([bread.name, milk.name])
+    expect(searchCatalogue).not.toHaveBeenCalled()
+  })
+
+  it('shows only the field and its hint on a first visit', async () => {
+    const view = await render()
+
+    expect(view.find('[role="listbox"]').exists()).toBe(false)
+    expect(view.text()).not.toContain(en.item.group_recent)
+    expect(view.text()).toContain(en.item.search_hint)
+  })
+
+  it('draws the skeleton until the first answer, then the rows under «Found»', async () => {
+    let answer!: (entries: CatalogueEntry[]) => void
+    searchCatalogue.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    const view = await render()
+
+    await field(view).setValue('молок')
+    expect(view.find('.loading .bars').exists()).toBe(true)
+
+    await vi.waitFor(() => {
+      expect(searchCatalogue).toHaveBeenCalledWith('молок')
+    })
+    answer([milk, marianna])
+    await vi.waitFor(() => {
+      expect(names(view)).toEqual([milk.name, marianna.name])
+    })
+    expect(view.text()).toContain(en.item.group_found)
+    expect(view.text()).not.toContain(en.item.group_recent)
+    expect(view.find('.loading').exists()).toBe(false)
+  })
+
+  it('reads the count out once the answer is in', async () => {
+    searchCatalogue.mockResolvedValue([milk, marianna])
+    const view = await render()
+
+    await field(view).setValue('молок')
+
+    await vi.waitFor(() => {
+      expect(view.get('.live').text()).toBe('Found 2 items')
+    })
+  })
+
+  it('reads out that nothing was found — after «Found 1 item» silence would mean nothing happened', async () => {
+    searchCatalogue.mockResolvedValueOnce([milk]).mockResolvedValueOnce([])
+    const view = await render()
+    await field(view).setValue('молок')
+    await vi.waitFor(() => {
+      expect(view.get('.live').text()).toBe('Found 1 item')
+    })
+
+    await field(view).setValue('молокоо')
+
+    await vi.waitFor(() => {
+      expect(view.get('.live').text()).toBe(en.item.empty.body.replace('{query}', 'молокоо'))
+    })
+  })
+
+  describe('takes its words back when the answer they describe goes', () => {
+    async function foundOne() {
+      searchCatalogue.mockResolvedValueOnce([milk])
+      const view = await render()
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(view.get('.live').text()).toBe('Found 1 item')
+      })
+      return view
+    }
+
+    it('when the field is cleared', async () => {
+      const view = await foundOne()
+      await field(view).setValue('')
+      expect(view.get('.live').text()).toBe('')
+    })
+
+    it('when the next search fails — «found one» over an error would be a lie', async () => {
+      const view = await foundOne()
+      searchCatalogue.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'HTTP 500'))
+      await field(view).setValue('молоко')
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.item.error.title)
+      })
+      expect(view.get('.live').text()).not.toContain('Found')
+    })
+
+    it('when the screen is left', async () => {
+      searchCatalogue.mockResolvedValue([milk])
+      const shown = ref(true)
+      const view = await render(shown)
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(view.get('.live').text()).toBe('Found 1 item')
+      })
+
+      shown.value = false
+      await nextTick()
+
+      expect(view.get('.live').text()).toBe('')
+    })
+  })
+
+  it('does not read out an answer that lands in the pause — it is for the text before', async () => {
+    let second!: (entries: CatalogueEntry[]) => void
+    searchCatalogue
+      .mockResolvedValueOnce([milk])
+      .mockReturnValueOnce(new Promise((resolve) => (second = resolve)))
+      .mockResolvedValue([marianna])
+    const view = await render()
+    await field(view).setValue('молок')
+    await vi.waitFor(() => {
+      expect(view.get('.live').text()).toBe('Found 1 item')
+    })
+    await field(view).setValue('молоко')
+    await vi.waitFor(() => {
+      expect(searchCatalogue).toHaveBeenCalledTimes(2)
+    })
+
+    await field(view).setValue('молоко м')
+    second([milk, marianna])
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect(view.get('.live').text()).toBe('')
+
+    await vi.waitFor(() => {
+      expect(view.get('.live').text()).toBe('Found 1 item')
+    })
+    expect(names(view)).toEqual([marianna.name])
+  })
+
+  it('names the query nothing was found for', async () => {
+    searchCatalogue.mockResolvedValue([])
+    const view = await render()
+
+    await field(view).setValue('тан')
+
+    await vi.waitFor(() => {
+      expect(view.get('.not-found-text').text()).toBe(en.item.empty.body.replace('{query}', 'тан'))
+    })
+    expect(view.find('[role="listbox"]').exists()).toBe(false)
+  })
+
+  it('goes back to the recent items when the field is cleared', async () => {
+    remembered(bread)
+    searchCatalogue.mockResolvedValue([milk])
+    const view = await render()
+    await field(view).setValue('молок')
+    await vi.waitFor(() => {
+      expect(names(view)).toEqual([milk.name])
+    })
+
+    await field(view).setValue('')
+
+    expect(names(view)).toEqual([bread.name])
+    expect(view.text()).toContain(en.item.group_recent)
+  })
+
+  describe('when the server does not answer', () => {
+    it('says so and tries again on «Try again»', async () => {
+      searchCatalogue.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'HTTP 500'))
+      searchCatalogue.mockResolvedValueOnce([milk])
+      const view = await render()
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.item.error.title)
+      })
+
+      await button(view, en.state.retry).trigger('click')
+
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([milk.name])
+      })
+      expect(searchCatalogue).toHaveBeenCalledTimes(2)
+    })
+
+    it('hands over the recent items when asked, so the trip goes on', async () => {
+      remembered(bread, milk)
+      searchCatalogue.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 500'))
+      const view = await render()
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.item.error.title)
+      })
+      expect(view.find('[role="listbox"]').exists()).toBe(false)
+
+      await button(view, en.item.error.fallback).trigger('click')
+
+      // Narrowed by what was typed, as offline (Р-12): the bread is not what «молок» asked for.
+      expect(names(view)).toEqual([milk.name])
+      expect(view.text()).toContain(en.item.error.title)
+    })
+
+    it('offers no «Pick from recent» when there are none to pick', async () => {
+      searchCatalogue.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 500'))
+      const view = await render()
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.item.error.title)
+      })
+
+      expect(view.text()).not.toContain(en.item.error.fallback)
+      expect(view.text()).toContain(en.state.retry)
+    })
+
+    it('keeps the recent items taken when the app is looked at again and the server is still down', async () => {
+      remembered(milk)
+      searchCatalogue.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 500'))
+      const view = await render()
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.item.error.title)
+      })
+      await button(view, en.item.error.fallback).trigger('click')
+
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+      document.dispatchEvent(new Event('visibilitychange'))
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledTimes(2)
+      })
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      expect(names(view)).toEqual([milk.name])
+      expect(view.text()).not.toContain(en.item.error.fallback)
+    })
+  })
+
+  describe('offline', () => {
+    it('says so in warning, not in red, and searches the recent items as typed', async () => {
+      remembered(bread, milk, marianna)
+      online(false)
+      const view = await render()
+
+      await field(view).setValue('молоко')
+
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.item.offline.title)
+      })
+      expect(view.find('.tone-bad').exists()).toBe(false)
+      expect(names(view)).toEqual([milk.name, marianna.name])
+      expect(searchCatalogue).not.toHaveBeenCalled()
+    })
+
+    it('shows nothing under the notice when no recent item matches', async () => {
+      remembered(bread)
+      online(false)
+      const view = await render()
+
+      await field(view).setValue('молоко')
+
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.item.offline.title)
+      })
+      expect(view.find('[role="listbox"]').exists()).toBe(false)
+    })
+  })
+
+  describe('a pick', () => {
+    it('leaves with the query exactly as typed', async () => {
+      searchCatalogue.mockResolvedValue([milk, marianna])
+      const view = await render()
+      await field(view).setValue(' Мол ')
+      await vi.waitFor(() => {
+        expect(names(view)).toHaveLength(2)
+      })
+
+      await view.findAll('[role="option"]')[1]?.trigger('click')
+
+      expect(useItemEntryStore(pinia).picked).toEqual({ entry: marianna, query: ' Мол ' })
+    })
+
+    it('from a dimmed answer leaves with the query that answer is for, not the one being typed', async () => {
+      let second!: (entries: CatalogueEntry[]) => void
+      searchCatalogue
+        .mockResolvedValueOnce([milk])
+        .mockReturnValueOnce(new Promise((resolve) => (second = resolve)))
+      const view = await render()
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([milk.name])
+      })
+      await field(view).setValue('хлеб')
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledTimes(2)
+      })
+      expect(view.get('[role="listbox"]').classes()).toContain('stale')
+
+      await view.get('[role="option"]').trigger('click')
+
+      expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: 'молок' })
+      second([bread])
+    })
+
+    it('from the recent items offline leaves with the field as typed', async () => {
+      remembered(milk)
+      online(false)
+      const view = await render()
+      await field(view).setValue('мол')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([milk.name])
+      })
+
+      await view.get('[role="option"]').trigger('click')
+
+      expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: 'мол' })
+    })
+
+    it('from the recent items leaves with the empty query it was made on', async () => {
+      remembered(bread)
+      const view = await render()
+
+      await view.get('[role="option"]').trigger('click')
+
+      expect(useItemEntryStore(pinia).picked).toEqual({ entry: bread, query: '' })
+    })
+
+    it('does not write the recent items — that is for adding to a trip, not for a tap', async () => {
+      searchCatalogue.mockResolvedValue([milk])
+      const view = await render()
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(names(view)).toHaveLength(1)
+      })
+
+      await view.get('[role="option"]').trigger('click')
+
+      expect(useRecentItemsStore(pinia).items).toEqual([])
+    })
+  })
+
+  describe('«Suggest an item»', () => {
+    // The sheet takes no tap while it rises (MOL-18): its clock is held by the test and moved
+    // past that moment, and a few real milliseconds pass so Vue does not drop the tap.
+    async function sheetRisen(): Promise<void> {
+      vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+
+    it('is offered when nothing was found, and what it adds is picked with the query', async () => {
+      const tan = entry(9, 'Тан')
+      searchCatalogue.mockResolvedValue([])
+      proposeItem.mockResolvedValue({ entry: tan, created: true })
+      vi.spyOn(performance, 'now').mockReturnValue(0)
+      const view = await render()
+      await field(view).setValue('тан')
+      await vi.waitFor(() => {
+        expect(view.find('.not-found').exists()).toBe(true)
+      })
+
+      await button(view, en.item.empty.action).trigger('click')
+      await sheetRisen()
+      const name = view.get<HTMLInputElement>('dialog input[type="text"]')
+      expect(name.element.value).toBe('тан')
+      const litre = view
+        .findAll('dialog label')
+        .find((label) => label.text() === en.item.unit_l)
+        ?.find('input')
+      await litre?.setValue(true)
+      await button(view, en.item.propose.submit).trigger('click')
+
+      await vi.waitFor(() => {
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: tan, query: 'тан' })
+      })
+    })
+
+    it('is a quiet line under an answer that has rows — the answer may still not be the thing', async () => {
+      searchCatalogue.mockResolvedValue([milk])
+      const view = await render()
+      await field(view).setValue('сметана')
+      await vi.waitFor(() => {
+        expect(names(view)).toHaveLength(1)
+      })
+
+      const line = button(view, en.item.not_listed)
+      expect(view.html().indexOf(en.item.not_listed)).toBeGreaterThan(
+        view.html().indexOf('role="listbox"'),
+      )
+      expect(line.classes().join(' ')).toContain('ghost')
+    })
+
+    it('is not offered under the recent items: they are not an answer to anything', async () => {
+      remembered(bread)
+      const view = await render()
+
+      expect(view.text()).not.toContain(en.item.not_listed)
+      expect(view.text()).not.toContain(en.item.empty.action)
+    })
+  })
+})

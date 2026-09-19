@@ -12,8 +12,12 @@ export type ItemKind = z.infer<typeof itemKindSchema>
 // equivalent and quietly accepts a mistyped nine digits.
 export const barcodeSchema = z.string().regex(/^(\d{8}|\d{12,14})$/)
 
-const nameSchema = visibleLine(200)
-const noteSchema = visibleLine(300)
+/** The longest name and note — for a form that stops at them rather than failing past them. */
+export const ITEM_NAME_MAX = 200
+export const ITEM_NOTE_MAX = 300
+
+const nameSchema = visibleLine(ITEM_NAME_MAX)
+const noteSchema = visibleLine(ITEM_NOTE_MAX)
 
 const barcodesSchema = z
   .array(barcodeSchema)

@@ -582,10 +582,13 @@ database access. In a product about data integrity, two write paths will silentl
 - **Native HTML first, then Reka UI, never a styled kit.** On a phone `<select>`,
   `<input type="date">` and `<input inputmode="decimal">` open the system pickers, which
   beat anything a library renders; `<dialog>` already brings a focus trap and a backdrop.
-  Reka is for the few things native cannot do — the catalogue combobox above all, which is
-  the main screen and is full of subtleties (async results, keyboard navigation,
-  `aria-activedescendant`, a virtual keyboard covering the list). It ships unstyled
-  primitives that tree-shake, so importing `ComboboxRoot` costs only the combobox.
+  Reka is for the few things native cannot do; it ships unstyled primitives that tree-shake.
+  **The catalogue combobox turned out not to be one of them (MOL-23):** Reka's
+  `ComboboxContent` calls `hideOthers` whenever it is shown — an always-open list hid the back
+  chevron, the title and the app's live region from a screen reader — and both its input and its
+  listbox filter highlight the first row by themselves, so «Найти» took a row nobody chose. The
+  combobox is the ARIA 1.2 pattern on a native `<input>`, about a hundred lines
+  (`CatalogueCombobox`): no row is active until an arrow makes one.
   A styled kit (PrimeVue, Vuetify, Naive) is rejected on purpose: its theme and our tokens
   would be two sources of truth about colour, which empties the rule about hardcoded
   values. shadcn-vue is rejected for the same reason in a different shape — it copies
@@ -796,8 +799,12 @@ MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
 MOL-39 the official rate — a cache refreshed hourly, snapshotted by every new trip, a jump
 left to the person;
 MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of «back»; MOL-18 the kit
-screens are built from — button, field, card, verdict badge, sheet. No real screen yet:
-three sections are placeholders. Release 0.1 is broken into epics and tasks in Jira.
+screens are built from — button, field, card, verdict badge, sheet. MOL-23 the first real screen,
+«Что взяли?»: the search as the person types, the recent items on the device, «Предложить
+товар». **A pick leaves with the query it was made on** (`stores/itemEntry`): «Добавить в поход»
+sends it and the server remembers the pick under it — handed the item alone, that memory would
+silently stop filling. The recent items are written when an item goes into a trip, not on a tap,
+per identity. The three sections are still placeholders. Release 0.1 is broken into epics and tasks in Jira.
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 **What the database guarantees and what it leaves to the domain** is a line, not a habit:
