@@ -1,6 +1,12 @@
 import { z } from 'zod'
-import { ratingSchema, verdictCardCodec, verdictCardOf, verdictPathSchema } from '@molvia/model'
-import type { Rating, Verdict } from '@molvia/model'
+import {
+  ratingSchema,
+  verdictAmendmentSchema,
+  verdictCardCodec,
+  verdictCardOf,
+  verdictPathSchema,
+} from '@molvia/model'
+import type { Rating, Verdict, VerdictAmendment } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { parseBody, parseParams } from '@/routes/body'
 
@@ -11,6 +17,7 @@ export interface VerdictApi {
     itemId: string,
     rating: Rating,
   ): Promise<{ verdict: Verdict; created: boolean }>
+  amend(actorId: string, itemId: string, patch: VerdictAmendment): Promise<Verdict>
 }
 
 /** `no-store`: a verdict is personal, and the owner travels in a header. */
@@ -36,5 +43,13 @@ export function verdictRoutes(app: FastifyInstance, api: VerdictApi): void {
     const { verdict, created } = await api.rate(request.actorId, itemId, rating)
 
     return answer(reply.code(created ? 201 : 200), verdict)
+  })
+
+  /** «Изменить оценку»: part of it, and `review: null` is how the text is erased. */
+  app.patch('/verdicts/:itemId', async (request, reply) => {
+    const { itemId } = parseParams(verdictPathSchema, request.params)
+    const patch = parseBody(verdictAmendmentSchema, request.body)
+
+    return answer(reply, await api.amend(request.actorId, itemId, patch))
   })
 }

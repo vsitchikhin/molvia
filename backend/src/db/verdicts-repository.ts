@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { DomainError, ERROR, verdictSchema } from '@molvia/model'
-import type { NewVerdict, Verdict } from '@molvia/model'
+import type { NewVerdict, Verdict, VerdictPatch } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
@@ -19,6 +19,12 @@ export interface Put {
 export interface VerdictRepository {
   /** Rating and re-rating are the same call: the second one replaces the first opinion. */
   put(actorId: string, input: NewVerdict): Promise<Put>
+  /**
+   * Changes part of the person's verdict on a product; `review: null` erases the text, which
+   * `put` cannot do. `null` when there is nothing of theirs to change — none, withdrawn, or
+   * someone else's, answered alike.
+   */
+  amend(actorId: string, itemId: string, patch: VerdictPatch): Promise<Verdict | null>
   forItem(actorId: string, itemId: string, placeId: string | null): Promise<Verdict | null>
   /**
    * Everything this person has rated. «Что брать» groups these into three by `verdictLevel`
@@ -147,6 +153,31 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
       if (!row) throw new DomainError(ERROR.NOT_FOUND)
       const { created, ...verdict } = row
       return { verdict: toVerdict(verdict), created }
+    },
+
+    async amend(actorId, itemId, patch) {
+      if (idOrNull(actorId) === null || idOrNull(itemId) === null) return null
+
+      // `review` is changed only when the patch names it: absent keeps the text, `null`
+      // erases it. The domain refuses an empty patch, so `set` is never empty here.
+      const set: Partial<typeof verdicts.$inferInsert> = {}
+      if (patch.score !== undefined) set.score = patch.score
+      if (patch.review !== undefined) set.review = patch.review
+
+      const [row] = await db
+        .update(verdicts)
+        .set(set)
+        .where(
+          and(
+            eq(verdicts.actorId, actorId),
+            eq(verdicts.itemId, itemId),
+            // Products only until 0.3 — the path names an item, and a product has no place.
+            isNull(verdicts.placeId),
+            isNull(verdicts.deletedAt),
+          ),
+        )
+        .returning()
+      return row ? toVerdict(row) : null
     },
 
     async forItem(actorId, itemId, placeId) {
