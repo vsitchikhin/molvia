@@ -11,13 +11,18 @@ import type { FastifyInstance } from 'fastify'
 import { events, verdicts } from '@/db/schema'
 import { createExpenseRepository } from '@/db/expenses-repository'
 import { createTripRepository } from '@/db/trips-repository'
+import { createVerdictRepository } from '@/db/verdicts-repository'
 import { buildServer } from '@/server'
-import { connectDrizzle } from './db'
+import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const trips = createTripRepository(db)
 const expenses = createExpenseRepository(db)
+// The test pool holds one connection, and the server under test uses it: a withdrawal left
+// open on it would queue the server rather than lock a row. The watcher sees who waits.
+const withdrawing = connectDrizzle()
+const watcher = connect()
 
 const UNKNOWN_ID = '11111111-1111-4111-8111-111111111111'
 
@@ -37,6 +42,8 @@ afterAll(async () => {
   await app.close()
   await clearAll(db)
   await close()
+  await withdrawing.close()
+  await watcher.end()
 })
 
 interface Reply {
@@ -372,6 +379,45 @@ describe('DELETE — снять оценку', () => {
     expect(all).toHaveLength(1)
     expect(all[0]?.deletedAt).toBeNull()
     expect((await stamps(itemId))?.rated).toBe(before?.rated)
+  })
+
+  it('Б: оценка, вставшая за незафиксированным снятием, — 201, а не «заменена»', async () => {
+    const actor = await insertActor(db)
+    const itemId = await insertItem(db)
+    await rate(actor, itemId, { score: 4, review: 'нормально' })
+
+    let put: Promise<Reply> | undefined
+    await withdrawing.db.transaction(async (tx) => {
+      expect(await createVerdictRepository(tx).withdraw(actor, itemId)).toBe(true)
+      put = rate(actor, itemId, { score: 5 })
+      // Until the rating is actually waiting on the row's lock, committing proves nothing.
+      for (let tries = 0; tries < 200; tries += 1) {
+        const [waiting] = await watcher<{ n: number }[]>`
+          select count(*)::int as n from pg_stat_activity
+          where wait_event_type = 'Lock' and datname = current_database()
+        `
+        if ((waiting?.n ?? 0) > 0) break
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+    })
+    const reply = await put!
+
+    expect(reply.status).toBe(201)
+    expect(await rows(itemId)).toMatchObject([{ score: 5, deletedAt: null, review: null }])
+  })
+
+  it('Б: две оценки наперегонки по снятой — одна 201, другая 200', async () => {
+    const actor = await insertActor(db)
+    const itemId = await insertItem(db)
+    await rate(actor, itemId, { score: 4 })
+    await withdraw(actor, itemId)
+
+    const replies = await Promise.all([
+      rate(actor, itemId, { score: 5 }),
+      rate(actor, itemId, { score: 5 }),
+    ])
+
+    expect(replies.map((reply) => reply.status).sort()).toEqual([200, 201])
   })
 
   it('21: снятая оценка не правится и не закрывает покупку', async () => {

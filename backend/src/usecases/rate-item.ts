@@ -1,7 +1,7 @@
 import { DomainError, ERROR, newVerdictSchemaFor } from '@molvia/model'
 import type { Rating } from '@molvia/model'
 import type { ItemRepository } from '@/db/items-repository'
-import type { Put, VerdictRepository } from '@/db/verdicts-repository'
+import type { RatedVerdict, VerdictRepository } from '@/db/verdicts-repository'
 import { parseBody } from '@/routes/body'
 
 export interface RateItemDeps {
@@ -29,7 +29,7 @@ export async function rateItem(
   actorId: string,
   itemId: string,
   rating: Rating,
-): Promise<Put> {
+): Promise<RatedVerdict> {
   const item = await items.byId(itemId)
   if (!item) throw new DomainError(ERROR.NOT_FOUND)
 

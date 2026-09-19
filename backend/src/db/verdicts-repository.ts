@@ -7,7 +7,7 @@ import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
 import { items, verdicts } from './schema'
 
-export interface Put {
+export interface RatedVerdict {
   readonly verdict: Verdict
   /**
    * `true` when the person had no verdict here before — none at all, or one they withdrew:
@@ -18,7 +18,7 @@ export interface Put {
 
 export interface VerdictRepository {
   /** Rating and re-rating are the same call: the second one replaces the first opinion. */
-  put(actorId: string, input: NewVerdict): Promise<Put>
+  put(actorId: string, input: NewVerdict): Promise<RatedVerdict>
   /**
    * Changes part of the person's verdict on a product; `review: null` erases the text, which
    * `put` cannot do. `null` when there is nothing of theirs to change — none, withdrawn, or
@@ -79,7 +79,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
       const placeId = input.placeId ?? null
 
       /*
-       * Raw SQL, and one statement on purpose.
+       * Raw SQL, and one write statement on purpose.
        *
        * `item_kind` is a copy of the item's kind held true by a composite foreign key. The
        * client cannot name it — `newVerdictSchema` is shape only — and fetching it first
@@ -92,15 +92,31 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
        * of adding a second vote. `rated_at` is deliberately left alone and `updated_at` is
        * not mentioned at all: the trigger moves it, which is what leaves the trace.
        */
-      const rows = await translateFailures(async () =>
-        db.execute<VerdictShape & { created: boolean } & Record<string, unknown>>(sql`
-          with prior as (
-            select deleted_at
-            from ${verdicts}
-            where actor_id = ${actorId}::uuid
-              and item_id = ${input.itemId}::uuid
-              and place_id is not distinct from ${placeId}::uuid
-          )
+      const written = await translateFailures(async () =>
+        db.transaction(async (tx) => {
+          /*
+           * The row as it stands *after* any withdrawal still in flight: `FOR UPDATE` waits
+           * for its lock and then reads the latest version. Read from the statement's snapshot
+           * instead — a CTE did that — a rating that queued behind an uncommitted withdrawal
+           * brought the row back and answered «replaced», and two ratings over one withdrawn
+           * row both answered «created» (adversarial pass, Б). Under the lock the second one
+           * sees the row the first brought back.
+           */
+          const [prior] = await tx
+            .select({ deletedAt: verdicts.deletedAt })
+            .from(verdicts)
+            .where(
+              and(
+                eq(verdicts.actorId, actorId),
+                eq(verdicts.itemId, input.itemId),
+                placeId === null ? isNull(verdicts.placeId) : eq(verdicts.placeId, placeId),
+              ),
+            )
+            .for('update')
+
+          const rows = await tx.execute<
+            VerdictShape & { inserted: boolean } & Record<string, unknown>
+          >(sql`
           insert into ${verdicts} (id, actor_id, item_id, item_kind, place_id, score, review)
           select
             ${randomUUID()}::uuid,
@@ -125,8 +141,10 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             review,
             rated_at as "ratedAt",
             updated_at as "updatedAt",
-            (xmax = 0 or (select deleted_at from prior) is not null) as created
-        `),
+            xmax = 0 as inserted
+        `)
+          return { row: rows[0], withdrawn: prior !== undefined && prior.deletedAt !== null }
+        }),
       )
 
       /*
@@ -136,9 +154,9 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
        * text cannot return through `coalesce`: a withdrawn row has none (CHECK).
        *
        * `created` needs the row as it was, and Postgres 17 has no `OLD` in `RETURNING`, so
-       * `prior` reads it in the same statement. `xmax = 0` is the insert: an update through
-       * `ON CONFLICT` leaves the locking transaction there. Two ratings racing over one
-       * withdrawn row may both say «created» — the row is one either way.
+       * it is read under the lock above. `xmax = 0` is the insert: an update through
+       * `ON CONFLICT` leaves the locking transaction there. With no row yet there is nothing
+       * to lock, and two first ratings are settled by the conflict itself — one inserts.
        *
        * `coalesce` above, and not `excluded.review`, because `review` is optional in the
        * input: a person who changes the score and says nothing about the text sends no
@@ -150,14 +168,14 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
        * not nullable, so «no text» and «erase the text» are the same message. Clearing needs
        * a patch method, and 0.1 has no screen that asks for one.
        */
-      const row = rows[0]
+      const { row, withdrawn } = written
       // No rows means the catalogue has no such item — the select found nothing to copy the
       // kind from. A mismatch between kind and place is a different thing: the CHECK refuses
       // it, and that refusal is left untranslated on purpose (the use case must catch it
       // first, so reaching the database with it is a defect in this server).
       if (!row) throw new DomainError(ERROR.NOT_FOUND)
-      const { created, ...verdict } = row
-      return { verdict: toVerdict(verdict), created }
+      const { inserted, ...verdict } = row
+      return { verdict: toVerdict(verdict), created: inserted || withdrawn }
     },
 
     async amend(actorId, itemId, patch) {
