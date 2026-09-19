@@ -76,9 +76,8 @@
   --badge-height: 1.75rem; /* 28 */
   --badge-dot: 1.375rem; /* 22 */
 
-  /* Of the visible height, not of the layout one: with the iOS address bar showing, `vh` is taller
-     than the screen and the sheet's header would sit under the top edge. */
-  --sheet-max-height: 82dvh;
+  /* The sheet takes at most this share of what is visible above the keyboard (BottomSheet). */
+  --sheet-height-share: 0.82;
 
   /* ── Bars ─────────────────────────────────────────────────────────────── */
 

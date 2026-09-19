@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import type { Router } from 'vue-router'
@@ -18,12 +18,28 @@ function landed(): void {
   window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
 }
 
+/**
+ * The sheet ignores a tap that closes while it is still coming up (the second of a double tap).
+ * The clock is the test's: it stands still until a test lets time pass.
+ */
+let clock = 0
+
+function wait(ms: number): void {
+  clock += ms
+}
+
+beforeEach(() => {
+  clock = 0
+  vi.spyOn(performance, 'now').mockImplementation(() => clock)
+})
+
 afterEach(() => {
+  vi.restoreAllMocks()
   landed()
   document.body.innerHTML = ''
 })
 
-async function render(options: { open?: boolean; at?: string } = {}) {
+async function render(options: { open?: boolean; at?: string; rising?: boolean } = {}) {
   const router: Router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/')
   if (options.at) await router.push(options.at)
@@ -53,6 +69,8 @@ async function render(options: { open?: boolean; at?: string } = {}) {
   )
   const dialog = () => host.get('dialog').element as HTMLDialogElement
   const sheet = () => host.findComponent(BottomSheet)
+  // A sheet mounted open has had time to come up, unless a test is about the moment it rises.
+  if (options.rising !== true) wait(1000)
   return { router, host, open, closed, push, go, dialog, sheet }
 }
 
@@ -118,9 +136,8 @@ describe('BottomSheet', () => {
   })
 
   /** A tap on the scrim once the sheet has come up: pressed and let go on the dialog itself. */
-  async function tapScrim(dialog: HTMLDialogElement, after = 1000): Promise<void> {
-    const now = performance.now()
-    vi.spyOn(performance, 'now').mockReturnValue(now + after)
+  /** A tap on the scrim: pressed and let go on the dialog itself. */
+  async function tapScrim(dialog: HTMLDialogElement): Promise<void> {
     dialog.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     dialog.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await nextTick()
@@ -137,7 +154,6 @@ describe('BottomSheet', () => {
   // ancestor — and would throw away what was typed (adversarial Б-4).
   it('must not fire: a press that began inside the sheet and ended on the scrim', async () => {
     const { host, go, dialog } = await render({ open: true })
-    vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 1000)
     host.get('.content').element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     dialog().dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(go).not.toHaveBeenCalled()
@@ -146,10 +162,28 @@ describe('BottomSheet', () => {
 
   // The second tap of a double tap on the opener lands where the scrim now is (adversarial Б-5).
   it('must not fire: a tap on the scrim while the sheet is still coming up', async () => {
-    const { go, dialog } = await render({ open: true })
-    await tapScrim(dialog(), 80)
+    const { go, dialog } = await render({ open: true, rising: true })
+    wait(80)
+    await tapScrim(dialog())
     expect(go).not.toHaveBeenCalled()
     expect(dialog().open).toBe(true)
+  })
+
+  // …or on the ×, or on the main action sliding under the finger (adversarial Б-5).
+  it('must not fire: no tap inside the sheet counts while it is still coming up', async () => {
+    const { host, go, dialog } = await render({ open: true, rising: true })
+    const tapped = vi.fn()
+    host.get('.content').element.addEventListener('click', tapped)
+    wait(80)
+    await host.get('.head button').trigger('click')
+    await host.get('.content').trigger('click')
+    expect(go).not.toHaveBeenCalled()
+    expect(tapped).not.toHaveBeenCalled()
+    expect(dialog().open).toBe(true)
+
+    wait(1000)
+    await host.get('.content').trigger('click')
+    expect(tapped).toHaveBeenCalledOnce()
   })
 
   it('must not fire: a tap inside the sheet does not close it', async () => {
@@ -245,6 +279,7 @@ describe('BottomSheet', () => {
     await router.push('/')
     const open = ref(true)
     let again = true
+    let reopened = 0
     const host = mount(
       defineComponent(
         () => () =>
@@ -254,6 +289,7 @@ describe('BottomSheet', () => {
               open: open.value,
               'onUpdate:open': (next: boolean) => (open.value = next),
               onClosed: () => {
+                reopened += 1
                 if (!again) return
                 again = false
                 open.value = true
@@ -265,13 +301,17 @@ describe('BottomSheet', () => {
       { attachTo: document.body, global: { plugins: [router, createAppI18n('en')] } },
     )
     await nextTick()
+    const go = vi.spyOn(router, 'go')
+    wait(1000)
     await host.get('.head button').trigger('click')
     landed()
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
     const dialog = host.get('dialog').element as HTMLDialogElement
     await vi.waitFor(() => {
-      expect({ prop: open.value, dialogOpen: dialog.open }).toEqual({
+      expect({ prop: open.value, dialogOpen: dialog.open, reopened }).toEqual({
         prop: true,
         dialogOpen: true,
+        reopened: 1,
       })
     })
   })

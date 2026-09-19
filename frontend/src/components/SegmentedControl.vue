@@ -90,12 +90,15 @@ export default defineComponent({
   gap: var(--space-1);
   min-height: var(--touch-target);
   padding: var(--space-1);
-  border: var(--hairline) solid var(--border);
   border-radius: var(--radius);
   background: var(--surface-2);
+
+  /* The edge is drawn inside rather than taking room: every pixel of the 44 goes to the thumb. */
+  box-shadow: inset 0 0 0 var(--hairline) var(--border);
 }
 
 .segment {
+  position: relative;
   display: flex;
   flex: 1;
   align-items: center;
@@ -110,6 +113,14 @@ export default defineComponent({
 
   &:has(.radio:focus-visible) {
     @include focus-ring;
+  }
+
+  /* The segment looks 36px tall, as in the handoff, but answers the thumb over the track's padding
+     too — the full 44 of the rule (review Р-3, the owner's choice: the look stays). */
+  &::after {
+    position: absolute;
+    inset: calc(var(--space-1) * -1) 0;
+    content: '';
   }
 }
 

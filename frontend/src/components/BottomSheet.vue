@@ -6,6 +6,7 @@
     @cancel.prevent="close()"
     @close="closedNatively"
     @pointerdown="pressed"
+    @click.capture="holdWhileRising"
     @click="closeOnScrim"
   >
     <div class="panel">
@@ -98,9 +99,9 @@ export default defineComponent({
     // The screen asked for the sheet again while it was closing — «save and next». Honoured once
     // the pop lands, instead of lost to it (adversarial Б-6).
     let reopen = false
-    // A tap on the scrim counts only if it began there, and only once the sheet has come up.
+    // A tap on the scrim counts only if it began there, and no tap counts until the sheet is up.
     let downOnScrim = false
-    let scrimFrom = 0
+    let settledAt = 0
 
     const history = useSheetHistory((by: LeftBy) => {
       if (!shown.value) return
@@ -128,7 +129,7 @@ export default defineComponent({
       if (!element || shown.value) return
       shown.value = true
       element.showModal()
-      scrimFrom = performance.now() + settleTime(element)
+      settledAt = performance.now() + settleTime(element)
       history.lay()
     }
 
@@ -142,19 +143,24 @@ export default defineComponent({
       downOnScrim = event.target === dialog.value
     }
 
+    // The second tap of a double tap on the opener lands wherever the sheet is while it rises —
+    // the scrim, the ×, the main action sliding under the finger — and closed the sheet before it
+    // was seen, or added an empty item to the trip (adversarial Б-5). Until the sheet is up it
+    // takes no click at all: stopped here, on the way down, before any button hears it.
+    function holdWhileRising(event: MouseEvent): void {
+      if (performance.now() >= settledAt) return
+      event.stopPropagation()
+      event.preventDefault()
+    }
+
     // A tap on the scrim lands on the dialog itself: the panel fills the dialog's box, so any
-    // tap inside the sheet lands on the panel or something in it. Two taps are not a tap:
-    //   - a press that began in a field and was let go over the scrim — a text selection that
-    //     overshot — is clicked on the dialog, their common ancestor, and would throw away what
-    //     was typed (adversarial Б-4);
-    //   - the second tap of a double tap on the opener lands where the scrim now is, while the
-    //     sheet is still coming up, and would close it before it was seen (adversarial Б-5).
+    // tap inside the sheet lands on the panel or something in it. A press that began in a field
+    // and was let go over the scrim — a text selection that overshot — is clicked on the dialog
+    // too, their common ancestor, and threw away what was typed (adversarial Б-4).
     function closeOnScrim(event: MouseEvent): void {
       const fromScrim = downOnScrim
       downOnScrim = false
-      if (event.target !== dialog.value || !fromScrim) return
-      if (performance.now() < scrimFrom) return
-      close()
+      if (event.target === dialog.value && fromScrim) close()
     }
 
     // Chrome lets a page refuse Esc only once per user activation; a second Esc closes the dialog
@@ -187,7 +193,7 @@ export default defineComponent({
     })
 
     expose({ close })
-    return { t, dialog, titleId, close, pressed, closeOnScrim, closedNatively }
+    return { t, dialog, titleId, close, pressed, holdWhileRising, closeOnScrim, closedNatively }
   },
 })
 </script>
@@ -197,7 +203,12 @@ export default defineComponent({
   /* The dialog is the sheet's box and nothing else, pinned to the bottom edge. */
   width: 100%;
   max-width: 100%;
-  max-height: calc(var(--sheet-max-height) - var(--keyboard-inset));
+
+  /* A share of what is visible above the keyboard, not of the window less the keyboard: on iOS
+     `dvh` ignores the keyboard, and 82% of the window minus it left the sheet 208px of the 328
+     that were there to use (review Р-2). `dvh`, not `vh`: with the address bar showing, `vh` is
+     taller than the screen and the header would sit under the top edge. */
+  max-height: calc((100dvh - var(--keyboard-inset)) * var(--sheet-height-share));
 
   /* Lifted over the on-screen keyboard where the browser leaves it covering the page (iOS). */
   margin: auto 0 var(--keyboard-inset);

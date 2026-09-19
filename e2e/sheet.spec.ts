@@ -37,6 +37,8 @@ async function openSheet(page: Page): Promise<{ scrolled: number; length: number
   const length = await historyLength(page)
   await opener(page).click()
   await expect(sheet(page)).toBeVisible()
+  // Until it has come up the sheet takes no tap — the second of a double tap (Б-5).
+  await page.waitForTimeout(400)
   return { scrolled, length }
 }
 
@@ -152,6 +154,7 @@ test.describe('the sheet', () => {
     await opener(page).scrollIntoViewIfNeeded()
     await opener(page).click()
     await expect(sheet(page)).toBeVisible()
+    await page.waitForTimeout(400)
     await sheet(page).getByRole('button', { name: 'Close' }).click()
     await expect(sheet(page)).toBeHidden()
   })
@@ -203,4 +206,86 @@ test.describe('the sheet', () => {
     await page.goBack()
     await expectOn(page, '/', 'Trip')
   })
+
+  /** The opener in the middle of the screen, so a second tap there lands on the scrim. */
+  async function centreOpener(page: Page): Promise<{ x: number; y: number }> {
+    await page.goto('/_kit')
+    await expect(heading(page)).toHaveText('Kit')
+    await opener(page).evaluate((element) => {
+      element.scrollIntoView({ block: 'center', behavior: 'instant' })
+    })
+    const box = await opener(page).boundingBox()
+    if (!box) throw new Error('no opener')
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  }
+
+  // The second tap of a double tap lands where the scrim now is, while the sheet is still coming
+  // up; it closed the sheet before it was seen (adversarial Б-5).
+  test('a double tap on the opener leaves the sheet open', async ({ page }) => {
+    const { x, y } = await centreOpener(page)
+    await page.mouse.dblclick(x, y)
+    await page.waitForTimeout(600)
+    await expect(sheet(page)).toBeVisible()
+  })
+
+  test('two quick taps of a finger on the opener leave the sheet open', async ({ page }) => {
+    const { x, y } = await centreOpener(page)
+    await page.touchscreen.tap(x, y)
+    await page.waitForTimeout(80)
+    await page.touchscreen.tap(x, y)
+    await page.waitForTimeout(600)
+    await expect(sheet(page)).toBeVisible()
+  })
+
+  // A selection that began in a field and overshot onto the scrim is clicked on the dialog, their
+  // common ancestor; it closed the sheet and threw away what was typed (adversarial Б-4).
+  test('a drag from a field out onto the scrim keeps the sheet and what was typed', async ({
+    page,
+  }) => {
+    await openSheet(page)
+    const field = sheet(page).getByLabel('How much')
+    await field.fill('1.5')
+    await page.waitForTimeout(500)
+    const box = await field.boundingBox()
+    if (!box) throw new Error('no field')
+    await page.mouse.move(box.x + box.width - 4, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + 4, box.y - 40, { steps: 5 })
+    await page.mouse.move(12, 12, { steps: 5 })
+    await page.mouse.up()
+    await page.waitForTimeout(600)
+    await expect(sheet(page)).toBeVisible()
+    await expect(field).toHaveValue('1.5')
+  })
+
+  // The share is of what is visible above the keyboard (review Р-2).
+  test('takes its share of what the keyboard leaves visible', async ({ page }) => {
+    await openSheet(page)
+    const { maxHeight, expected } = await page.evaluate(() => {
+      const dialog = document.querySelector('dialog')!
+      dialog.style.setProperty('--keyboard-inset', '300px')
+      return {
+        maxHeight: Number.parseFloat(getComputedStyle(dialog).maxHeight),
+        expected: (window.innerHeight - 300) * 0.82,
+      }
+    })
+    expect(maxHeight).toBeCloseTo(expected, 0)
+  })
+})
+
+// The segment looks as in the handoff and still answers a thumb over the whole 44px (review Р-3).
+test('a segment answers a tap anywhere over the track’s 44px', async ({ page }) => {
+  await page.goto('/_kit')
+  const segment = page
+    .getByRole('group', { name: 'Unit' })
+    .first()
+    .locator('label', { hasText: 'kg' })
+  await segment.scrollIntoViewIfNeeded()
+  const track = await segment.locator('..').boundingBox()
+  if (!track) throw new Error('no track')
+  expect(track.height).toBeGreaterThanOrEqual(44)
+  const box = await segment.boundingBox()
+  if (!box) throw new Error('no segment')
+  await page.mouse.click(box.x + box.width / 2, track.y + 1)
+  await expect(page.getByRole('group', { name: 'Unit' }).first().getByLabel('kg')).toBeChecked()
 })
