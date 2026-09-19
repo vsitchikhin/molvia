@@ -262,9 +262,11 @@ export default defineComponent({
   transform: translateY(-100%);
 }
 
+/* The home indicator is below every screen, not only under the tab bar: a nested screen has
+   no bar to carry it, and its last row would sit under the indicator. */
 .content {
-  padding: var(--space-4) calc(var(--space-4) + var(--safe-right)) var(--space-4)
-    calc(var(--space-4) + var(--safe-left));
+  padding: var(--space-4) calc(var(--space-4) + var(--safe-right))
+    calc(var(--space-4) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
 }
 
 /* The notice keeps its own margins; this only keeps it out from under a notch held sideways. */

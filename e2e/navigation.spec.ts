@@ -279,6 +279,30 @@ test.describe('safe areas', () => {
     await expect(screen(page)).toHaveClass(/collapsed/)
   })
 
+  // A nested screen has no tab bar to carry the indicator: its own content has to.
+  for (const [name, size, bottom, side] of [
+    ['upright', { width: 412, height: 915 }, 34, 0],
+    ['sideways', { width: 915, height: 412 }, 21, 47],
+  ] as const) {
+    test(`the search, ${name}: its last row stays above the home indicator`, async ({ page }) => {
+      await page.setViewportSize(size)
+      await insets(page, { top: side ? 0 : 47, bottom, left: side, right: side })
+      await page.goto('/trip/add')
+      await expect(heading(page)).toHaveText('What did you pick up?')
+      const { lastRow, height } = await page.evaluate(() => {
+        const filler = document.createElement('div')
+        filler.style.height = '3000px'
+        const last = document.createElement('p')
+        last.textContent = 'last'
+        last.style.margin = '0'
+        document.querySelector('.content')?.append(filler, last)
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })
+        return { lastRow: last.getBoundingClientRect().bottom, height: window.innerHeight }
+      })
+      expect(lastRow).toBeLessThanOrEqual(height - bottom)
+    })
+  }
+
   test('held sideways, nothing starts under the notch', async ({ page }) => {
     await page.setViewportSize({ width: 915, height: 412 })
     await insets(page, landscape)
@@ -365,6 +389,29 @@ test.describe('moves', () => {
       }),
     )
     expect(durations).toEqual(['0s', '0s'])
+  })
+
+  // iOS edge swipe and Android predictive back animate the page themselves and say so on the
+  // event. Playwright cannot swipe, so every popstate here claims the browser animated it.
+  test('a back the browser animated is not animated again, and the next move is', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(PopStateEvent.prototype, 'hasUAVisualTransition', { get: () => true })
+    })
+    await countTransitions(page)
+    await page.goto('/')
+    await tab(page, 'Ratings').click()
+    await expectOn(page, '/verdicts', 'Ratings')
+    expect(await transitions(page)).toBe(1)
+
+    await page.goBack()
+    await expectOn(page, '/', 'Trip')
+    expect(await transitions(page)).toBe(1)
+
+    await tab(page, 'What to buy').click()
+    await expectOn(page, '/advice', 'What to buy')
+    expect(await transitions(page)).toBe(2)
   })
 
   test('focus lands on the new heading after a move', async ({ page }) => {
