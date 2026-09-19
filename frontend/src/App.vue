@@ -8,10 +8,12 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import TabBar from '@/components/TabBar.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
+import { useReconnect } from '@/composables/useReconnect'
+import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 
 // No header of its own: no mockup carries the brand, every screen is titled by its section,
 // and the frame around each screen is AppScreen's.
@@ -19,6 +21,13 @@ export default defineComponent({
   name: 'AppRoot',
   components: { TabBar },
   setup() {
+    // Saved verdicts are sent by the app, not by the screen they were saved on: the person may
+    // have left «Оценки» long before the connection came back (MOL-28).
+    const drafts = useVerdictDraftsStore()
+    const send = () => void drafts.flush()
+    onMounted(send)
+    useReconnect(send)
+
     return { route: useRoute(), announcements: provideAnnouncer() }
   },
 })
