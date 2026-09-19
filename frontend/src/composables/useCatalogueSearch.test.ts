@@ -213,6 +213,38 @@ describe('the catalogue search as the screen types it', () => {
     expect(search.phase.value).toBe('loading')
   })
 
+  it('keeps an answer that lands inside the pause dimmed — it answers the question before', async () => {
+    const { query, search } = harness()
+    await type(query, 'мол')
+    await pause()
+    calls[0]?.answer([milk])
+    await settle()
+    await type(query, 'моло')
+    await pause()
+
+    await type(query, 'молок')
+    expect(calls[1]?.signal?.aborted).toBe(true)
+    calls[1]?.answer([cream])
+    await settle()
+
+    expect(search.results.value).toEqual([milk])
+    expect(search.stale.value).toBe(true)
+    await pause()
+    expect(calls.map((call) => call.query)).toEqual(['мол', 'моло', 'молок'])
+    expect(search.stale.value).toBe(true)
+  })
+
+  it('never asks about a field that draws nothing — a pasted U+200B is as empty as spaces', async () => {
+    const { query, search } = harness()
+    for (const text of [String.fromCodePoint(0x200b), String.fromCodePoint(0x2060, 0x20)]) {
+      await type(query, text)
+      await pause()
+    }
+
+    expect(calls).toHaveLength(0)
+    expect(search.phase.value).toBe('idle')
+  })
+
   it('goes back to idle when the field is cleared, cancelling what was out', async () => {
     const { query, search } = harness()
     await type(query, 'мол')
@@ -305,6 +337,24 @@ describe('the catalogue search as the screen types it', () => {
       online(true)
       window.dispatchEvent(new Event('online'))
       expect(calls.map((call) => call.query)).toEqual(['мол'])
+    })
+
+    it('retries quietly when the app is looked at again: what is on screen stays until the answer', async () => {
+      const { query, search } = harness()
+      await type(query, 'мол')
+      await pause()
+      calls[0]?.fail()
+      await settle()
+      expect(search.phase.value).toBe('error')
+
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+      document.dispatchEvent(new Event('visibilitychange'))
+      expect(calls).toHaveLength(2)
+      expect(search.phase.value).toBe('error')
+
+      calls[1]?.fail()
+      await settle()
+      expect(search.phase.value).toBe('error')
     })
 
     it('does not search again on reconnect when nothing failed', async () => {
