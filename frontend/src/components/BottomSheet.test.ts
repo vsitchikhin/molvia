@@ -98,7 +98,9 @@ describe('BottomSheet', () => {
     expect(go).toHaveBeenCalledExactlyOnceWith(-1)
     expect(dialog().open).toBe(false)
     expect(open.value).toBe(false)
-    expect(closed).toHaveBeenCalledOnce()
+    await vi.waitFor(() => {
+      expect(closed).toHaveBeenCalledOnce()
+    })
   })
 
   // Esc, and Android's «back» that Chrome hands to a modal dialog: the browser would close it
@@ -110,7 +112,9 @@ describe('BottomSheet', () => {
     expect(cancel.defaultPrevented).toBe(true)
     expect(go).toHaveBeenCalledExactlyOnceWith(-1)
     expect(dialog().open).toBe(false)
-    expect(closed).toHaveBeenCalledOnce()
+    await vi.waitFor(() => {
+      expect(closed).toHaveBeenCalledOnce()
+    })
   })
 
   it('closes on a tap on the scrim', async () => {
@@ -134,7 +138,9 @@ describe('BottomSheet', () => {
     router.back()
     expect(dialog().open).toBe(false)
     expect(open.value).toBe(false)
-    expect(closed).toHaveBeenCalledOnce()
+    await vi.waitFor(() => {
+      expect(closed).toHaveBeenCalledOnce()
+    })
   })
 
   // «Add to trip» over the search: the sheet and the search go in one step, so the trip's history
@@ -144,7 +150,9 @@ describe('BottomSheet', () => {
     ;(sheet().vm as unknown as { close: (steps: number) => void }).close(2)
     expect(go).toHaveBeenCalledExactlyOnceWith(-2)
     expect(dialog().open).toBe(false)
-    expect(closed).toHaveBeenCalledOnce()
+    await vi.waitFor(() => {
+      expect(closed).toHaveBeenCalledOnce()
+    })
     await vi.waitFor(() => {
       expect(router.currentRoute.value.fullPath).toBe('/')
     })
@@ -156,7 +164,9 @@ describe('BottomSheet', () => {
     await nextTick()
     expect(go).toHaveBeenCalledExactlyOnceWith(-1)
     expect(dialog().open).toBe(false)
-    expect(closed).toHaveBeenCalledOnce()
+    await vi.waitFor(() => {
+      expect(closed).toHaveBeenCalledOnce()
+    })
   })
 
   // Chrome honours a refused Esc only once per user activation; the second one closes the
@@ -167,7 +177,9 @@ describe('BottomSheet', () => {
     dialog().dispatchEvent(new Event('close'))
     expect(go).toHaveBeenCalledExactlyOnceWith(-1)
     expect(open.value).toBe(false)
-    expect(closed).toHaveBeenCalledOnce()
+    await vi.waitFor(() => {
+      expect(closed).toHaveBeenCalledOnce()
+    })
   })
 
   // A second tap on × before the first step lands must not step past the screen, out of the app.
@@ -194,6 +206,68 @@ describe('BottomSheet', () => {
   it('must not fire: going away with the screen takes no step of its own', async () => {
     const { host, go } = await render({ open: true })
     host.unmount()
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  // A screen that opens the next sheet as soon as the last one is put away («add another»):
+  // `update:open` false and the new true must not land in one tick, or the prop never changes
+  // and the sheet stays shut with the screen believing it open (adversarial А-6).
+  it('opens again when the screen reopens it from @closed', async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/')
+    const open = ref(true)
+    let again = true
+    const host = mount(
+      defineComponent(
+        () => () =>
+          h(
+            BottomSheet,
+            {
+              open: open.value,
+              'onUpdate:open': (next: boolean) => (open.value = next),
+              onClosed: () => {
+                if (!again) return
+                again = false
+                open.value = true
+              },
+            },
+            { title: () => 'Milk' },
+          ),
+      ),
+      { attachTo: document.body, global: { plugins: [router, createAppI18n('en')] } },
+    )
+    await nextTick()
+    await host.get('.head button').trigger('click')
+    landed()
+    const dialog = host.get('dialog').element as HTMLDialogElement
+    await vi.waitFor(() => {
+      expect({ prop: open.value, dialogOpen: dialog.open }).toEqual({
+        prop: true,
+        dialogOpen: true,
+      })
+    })
+  })
+
+  // The `close` event of the last sheet comes a task later; a sheet reopened in between is not
+  // the one the browser shut (adversarial А-5).
+  it('must not fire: a late close event does not shut the sheet opened again', async () => {
+    const { open, go, dialog, host } = await render({ open: true })
+    await host.get('.head button').trigger('click')
+    landed()
+    open.value = true
+    await nextTick()
+    go.mockClear()
+    dialog().dispatchEvent(new Event('close'))
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().open).toBe(true)
+  })
+
+  // Left by a push, not a pop: the entry stays in the history, but the screen is told the sheet
+  // is shut, so a store holding `open` does not reopen it on the way back (adversarial А-4).
+  it('tells the screen it is shut when the screen goes away with it open', async () => {
+    const { host, open, go } = await render({ open: true })
+    host.unmount()
+    expect(open.value).toBe(false)
     expect(go).not.toHaveBeenCalled()
   })
 })

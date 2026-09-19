@@ -28,7 +28,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref, useId, watch } from 'vue'
+import { defineComponent, nextTick, onMounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
@@ -76,7 +76,12 @@ export default defineComponent({
       shown.value = false
       if (dialog.value?.open) dialog.value.close()
       if (props.open) emit('update:open', false)
-      emit('closed')
+      // A tick later: a screen that opens the next sheet from `@closed` would otherwise set `open`
+      // back to true in the same tick it went false, the prop would never change, and the sheet
+      // would stay shut with the screen believing it open (MOL-18, adversarial А-6).
+      void nextTick(() => {
+        emit('closed')
+      })
     })
 
     function show(): void {
@@ -100,7 +105,11 @@ export default defineComponent({
 
     // Chrome lets a page refuse Esc only once per user activation; a second Esc closes the dialog
     // regardless. The entry must still go, or «back» would land on a sheet that is gone.
+    //
+    // Not when it is open again: the `close` event of the last sheet arrives a task later, and a
+    // sheet reopened in between would be taken for the one the browser shut (adversarial А-5).
     function closedNatively(): void {
+      if (dialog.value?.open) return
       if (history.laid()) close()
     }
 

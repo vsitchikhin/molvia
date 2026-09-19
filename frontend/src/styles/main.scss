@@ -20,9 +20,10 @@ body {
   box-sizing: border-box;
 }
 
-// A modal <dialog> makes the page inert but not still: on iOS it slides under a finger on the
+// A modal <dialog> makes the page inert but not still — `:modal`, not `[open]`, so a dialog shown
+// in place does not freeze the page: on iOS it slides under a finger on the
 // scrim. The sheet scrolls on its own; the page under it waits.
-html:has(dialog[open]) {
+html:has(dialog:modal) {
   overflow: hidden;
 }
 

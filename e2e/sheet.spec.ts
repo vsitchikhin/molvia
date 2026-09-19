@@ -14,6 +14,11 @@ const opener = (page: Page) => page.getByRole('button', { name: 'Open the sheet'
 const sheet = (page: Page) => page.getByRole('dialog', { name: 'Milk «Ashkhar»' })
 const heading = (page: Page) => page.getByRole('heading', { level: 1 })
 
+async function expectOn(page: Page, path: string, title: string): Promise<void> {
+  await expect(page).toHaveURL(path)
+  await expect(heading(page)).toHaveText(title)
+}
+
 async function historyLength(page: Page): Promise<number> {
   return page.evaluate(() => window.history.length)
 }
@@ -121,8 +126,8 @@ test.describe('the sheet', () => {
     }
   })
 
-  // An entry is not an address: a reload on it opens no sheet, breaks nothing, and the «back»
-  // from it stays on the same screen once.
+  // An entry is not an address: a reload on it opens no sheet and breaks nothing, and the start
+  // steps off the entry no sheet holds — the first «back» leaves the screen, as without a sheet.
   test('a reload on its entry opens no sheet and breaks nothing', async ({ page }) => {
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
@@ -132,8 +137,70 @@ test.describe('the sheet', () => {
     await expect(sheet(page)).toBeHidden()
 
     await page.goBack()
-    await expect(page).toHaveURL('/_kit')
-    await expect(heading(page)).toHaveText('Kit')
+    await expectOn(page, '/', 'Trip')
     expect(errors).toEqual([])
+  })
+
+  // An entry left from a reload carries the same flag; the close of a sheet opened again stepped
+  // back onto it and took it for its own — the sheet stayed open (adversarial А-1, А-2).
+  test('after a reload on its entry, a sheet opened again closes on the first ×', async ({
+    page,
+  }) => {
+    await openSheet(page)
+    await page.reload()
+    await expect(heading(page)).toHaveText('Kit')
+    await opener(page).scrollIntoViewIfNeeded()
+    await opener(page).click()
+    await expect(sheet(page)).toBeVisible()
+    await sheet(page).getByRole('button', { name: 'Close' }).click()
+    await expect(sheet(page)).toBeHidden()
+  })
+
+  test('after «forward» onto its old entry, a sheet opened again closes on the first Esc', async ({
+    page,
+  }) => {
+    await openSheet(page)
+    await page.keyboard.press('Escape')
+    await expect(sheet(page)).toBeHidden()
+    await page.goForward()
+    await expect(page).toHaveURL('/_kit')
+    await opener(page).click()
+    await expect(sheet(page)).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(sheet(page)).toBeHidden()
+  })
+
+  // The dead entry is the screen's address twice; the rules of «back» read the screen under
+  // itself, and the chevron replaced instead of stepping back (adversarial А-3).
+  test('after a reload on its entry, the chevron and «back» keep the rules of MOL-17', async ({
+    page,
+  }) => {
+    await openSheet(page)
+    await page.reload()
+    await expect(heading(page)).toHaveText('Kit')
+    await page.getByRole('button', { name: 'Back Trip' }).click()
+    await expectOn(page, '/', 'Trip')
+    await page.goBack()
+    await expect(page).not.toHaveURL(/_kit/)
+  })
+
+  // Left by a push with the sheet open: the entry stays behind, and «back» steps over it — one
+  // «back» to the screen, one more off it, as without a sheet (adversarial А-4).
+  test('a push away from an open sheet leaves no extra «back» behind', async ({ page }) => {
+    await openSheet(page)
+    await page.evaluate(async () => {
+      const root = document.querySelector('#app') as unknown as {
+        __vue_app__: {
+          config: { globalProperties: { $router: { push: (to: string) => Promise<unknown> } } }
+        }
+      }
+      await root.__vue_app__.config.globalProperties.$router.push('/verdicts')
+    })
+    await expect(page).toHaveURL('/verdicts')
+    await page.goBack()
+    await expectOn(page, '/_kit', 'Kit')
+    await expect(sheet(page)).toBeHidden()
+    await page.goBack()
+    await expectOn(page, '/', 'Trip')
   })
 })
