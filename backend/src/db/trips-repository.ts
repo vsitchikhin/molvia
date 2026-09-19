@@ -1,11 +1,17 @@
-import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { DomainError, ERROR, tripSchema } from '@molvia/model'
 import type { Currency, ExchangeRate, NewTrip, RateChoice, Trip } from '@molvia/model'
-import { previousRateFrom, rateFrom, rateTo } from './columns'
+import { rateFrom, rateTo, sideRateFrom } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit, theRow } from './rows'
 import { trips } from './schema'
+
+/** That the snapshot jumped, and the rate before it if there was one (MOL-39, Р-19, Р-21). */
+export interface SnapshotJump {
+  readonly jumped: boolean
+  readonly previous: ExchangeRate | null
+}
 
 /** A trip to start, named by the device that starts it (MOL-21, В-2). */
 export type TripToStart = NewTrip & { readonly id: string }
@@ -33,7 +39,7 @@ export interface TripRepository {
     input: TripToStart,
     currency: Currency,
     rate: ExchangeRate | null,
-    previousRate?: ExchangeRate | null,
+    jump?: SnapshotJump,
   ): Promise<{ trip: Trip; created: boolean }>
   byId(id: string, actorId: string): Promise<Trip | null>
   /**
@@ -68,23 +74,31 @@ export interface TripRepository {
    */
   finish(id: string, actorId: string, at?: Date): Promise<Trip | null>
   /**
-   * Which of the two rates a trip counts by, when its snapshot jumped (MOL-39, Р-19). The
-   * snapshot is not rewritten — only the choice. `null` for a stranger's or a missing trip and
-   * for one with nothing to choose between; the caller tells those apart.
+   * Which rate a trip counts by, when its snapshot jumped (MOL-39, Р-19, Р-21), and the
+   * person's own when that is the choice. The snapshot is not rewritten. Whether the choice is
+   * possible is the use case's to check under `lock`; the CHECKs refuse what slips past it.
    */
-  chooseRate(id: string, actorId: string, choice: RateChoice): Promise<Trip | null>
+  chooseRate(
+    id: string,
+    actorId: string,
+    choice: RateChoice,
+    manual: ExchangeRate | null,
+  ): Promise<Trip | null>
 }
 
 type TripRow = typeof trips.$inferSelect
 
 function toTrip(row: TripRow): Trip {
+  const snapshot = rateFrom(row)
   return tripSchema.parse({
     id: row.id,
     actorId: row.actorId,
     placeId: row.placeId,
     currency: row.currency,
-    rate: rateFrom(row),
-    previousRate: previousRateFrom(row),
+    rate: snapshot,
+    rateJumped: row.rateJumped,
+    previousRate: sideRateFrom(snapshot, row.ratePreviousScaled, row.ratePreviousAsOf),
+    manualRate: sideRateFrom(snapshot, row.rateManualScaled, row.rateManualAsOf, 'personal'),
     rateChoice: row.rateChoice,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
@@ -98,7 +112,7 @@ function ownedBy(id: string, actorId: string) {
 
 export function createTripRepository(db: Conn): TripRepository {
   return {
-    async start(actorId, input, currency, rate, previousRate = null) {
+    async start(actorId, input, currency, rate, jump = { jumped: false, previous: null }) {
       return translateFailures(async () =>
         db.transaction(async (tx) => {
           // Per owner: two «Начать поход» at once — a double tap after the screen lost its
@@ -130,8 +144,9 @@ export function createTripRepository(db: Conn): TripRepository {
               placeId: input.placeId,
               currency,
               ...rateTo(rate),
-              ratePreviousScaled: previousRate?.scaled ?? null,
-              ratePreviousAsOf: previousRate?.asOf ?? null,
+              rateJumped: jump.jumped,
+              ratePreviousScaled: jump.previous?.scaled ?? null,
+              ratePreviousAsOf: jump.previous?.asOf ?? null,
             })
             .returning()
           return { trip: toTrip(theRow(row, 'trips')), created: true }
@@ -205,12 +220,15 @@ export function createTripRepository(db: Conn): TripRepository {
       return finished ? toTrip(finished) : null
     },
 
-    async chooseRate(id, actorId, choice) {
+    async chooseRate(id, actorId, choice, manual) {
       if (idOrNull(id) === null || idOrNull(actorId) === null) return null
       const [row] = await db
         .update(trips)
-        .set({ rateChoice: choice })
-        .where(and(ownedBy(id, actorId), isNotNull(trips.ratePreviousScaled)))
+        .set({
+          rateChoice: choice,
+          ...(manual ? { rateManualScaled: manual.scaled, rateManualAsOf: manual.asOf } : {}),
+        })
+        .where(ownedBy(id, actorId))
         .returning()
       return row ? toTrip(row) : null
     },

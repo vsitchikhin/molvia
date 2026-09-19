@@ -750,11 +750,82 @@ describe('скачок курса и выбор человека (MOL-39, Р-19)
     ).toBe(400)
   })
 
-  it('скачок без более раннего курса — считать не по чему другому, выбора нет', async () => {
+  it('скачок без более раннего курса — скачок виден, прежнего нет, свой курс можно ввести (Р-21)', async () => {
     await rates.upsert([rub('431.23', daysAgo(1), true)])
     const actor = await insertActor(db)
+    const started = trip(await start(actor))
 
-    expect(trip(await start(actor)).rateJump).toBeNull()
+    expect(started.rateJump).toMatchObject({
+      jumped: { scaled: 431_230_000n },
+      previous: null,
+      manual: null,
+      choice: null,
+    })
+    expect((await choose(actor, started.id, 'previous')).status).toBe(409)
+  })
+
+  it('свой курс: поход считается по нему, источник personal, снимок не тронут', async () => {
+    const { actor, view } = await jumpedTrip()
+
+    const chosen = await call('PUT', `/trips/${view.id}/rate-choice`, actor, {
+      choice: 'manual',
+      rate: '4,31',
+    })
+
+    expect(chosen.status).toBe(200)
+    expect(chosen.body).toMatchObject({
+      rate: { rate: '4.310000', source: 'personal', base: 'RUB', quote: 'AMD' },
+      rateJump: { choice: 'manual', manual: { rate: '4.310000', source: 'personal' } },
+      // 10 000 ֏ / 4.31
+      converted: { amount: '2320.19', currency: 'RUB' },
+      rateStale: false,
+    })
+    const [row] = await db.select().from(trips).where(eq(trips.id, view.id))
+    expect(row).toMatchObject({ rateScaled: 431_230_000n, rateManualScaled: 4_310_000n })
+  })
+
+  it('свой курс остаётся, если вернуться «по новому», и заменяется новым вводом', async () => {
+    const { actor, view } = await jumpedTrip()
+    const manual = (rate: string) =>
+      call('PUT', `/trips/${view.id}/rate-choice`, actor, { choice: 'manual', rate })
+
+    await manual('4.31')
+    const back = trip(await choose(actor, view.id, 'jumped'))
+    const again = trip(await manual('4.32'))
+
+    expect(back.rate?.scaled).toBe(431_230_000n)
+    expect(back.rateJump?.manual?.scaled).toBe(4_310_000n)
+    expect(again.rate?.scaled).toBe(4_320_000n)
+  })
+
+  it('свой курс, который не курс, — 400 invalid_rate, и ничего не записано', async () => {
+    const { actor, view } = await jumpedTrip()
+
+    for (const rate of ['abc', '0', '-4.31', '0.00001']) {
+      const reply = await call('PUT', `/trips/${view.id}/rate-choice`, actor, {
+        choice: 'manual',
+        rate,
+      })
+      expect(reply.status).toBe(400)
+      expect(code(reply)).toBe(ERROR.INVALID_RATE)
+    }
+    expect(
+      (await call('PUT', `/trips/${view.id}/rate-choice`, actor, { choice: 'manual' })).status,
+    ).toBe(400)
+    const [row] = await db.select().from(trips).where(eq(trips.id, view.id))
+    expect(row).toMatchObject({ rateManualScaled: null, rateChoice: null })
+  })
+
+  it('свой курс в походе без скачка — 409: предлагается только при скачке', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(1))])
+    const actor = await insertActor(db)
+    const view = trip(await start(actor))
+
+    const reply = await call('PUT', `/trips/${view.id}/rate-choice`, actor, {
+      choice: 'manual',
+      rate: '4.31',
+    })
+    expect(reply.status).toBe(409)
   })
 })
 

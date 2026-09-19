@@ -318,10 +318,14 @@ export const trips = pgTable(
     rateScaled: bigint('rate_scaled', { mode: 'bigint' }),
     rateSource: text('rate_source').$type<RateSource>(),
     rateAsOf: timestamp('rate_as_of', { withTimezone: true }),
-    // When the snapshotted rate jumped (MOL-39, Р-19): the rate before the jump — same pair, same
-    // source, so only its number and date — and which of the two the person chose to count by.
+    // When the snapshotted rate jumped (MOL-39, Р-19, Р-21): the flag, the rate before the jump
+    // and the person's own — each the snapshot's pair, so only a number and a date — and which
+    // one the person chose to count by. The snapshot itself is never rewritten.
+    rateJumped: boolean('rate_jumped').notNull().default(false),
     ratePreviousScaled: bigint('rate_previous_scaled', { mode: 'bigint' }),
     ratePreviousAsOf: timestamp('rate_previous_as_of', { withTimezone: true }),
+    rateManualScaled: bigint('rate_manual_scaled', { mode: 'bigint' }),
+    rateManualAsOf: timestamp('rate_manual_as_of', { withTimezone: true }),
     rateChoice: text('rate_choice').$type<RateChoice>(),
     // `clock_timestamp()`, not `now()`: `now()` is the moment the *transaction* started, one
     // value shared by every row written inside it. `Conn` exists so a caller can write a trip
@@ -367,24 +371,33 @@ export const trips = pgTable(
     // as arithmetic rather than as an error.
     check('trips_rate_positive', sql`${table.rateScaled} is null or ${table.rateScaled} > 0`),
     check(
+      'trips_rate_jumped_needs_rate',
+      sql`not ${table.rateJumped} or ${table.rateScaled} is not null`,
+    ),
+    check(
       'trips_rate_previous_whole',
       sql`num_nonnulls(${table.ratePreviousScaled}, ${table.ratePreviousAsOf}) in (0, 2)`,
     ),
     check(
-      'trips_rate_previous_needs_rate',
-      sql`${table.ratePreviousScaled} is null or ${table.rateScaled} is not null`,
+      'trips_rate_previous_needs_jump',
+      sql`${table.ratePreviousScaled} is null or (${table.rateJumped} and ${table.ratePreviousScaled} > 0)`,
     ),
     check(
-      'trips_rate_previous_positive',
-      sql`${table.ratePreviousScaled} is null or ${table.ratePreviousScaled} > 0`,
+      'trips_rate_manual_whole',
+      sql`num_nonnulls(${table.rateManualScaled}, ${table.rateManualAsOf}) in (0, 2)`,
+    ),
+    check(
+      'trips_rate_manual_needs_jump',
+      sql`${table.rateManualScaled} is null or (${table.rateJumped} and ${table.rateManualScaled} > 0)`,
     ),
     check(
       'trips_rate_choice_known',
       sql`${table.rateChoice} is null or ${oneOf(table.rateChoice, rateChoiceSchema.options)}`,
     ),
+    // A choice needs a jump, and names a rate the trip holds.
     check(
-      'trips_rate_choice_needs_previous',
-      sql`${table.rateChoice} is null or ${table.ratePreviousScaled} is not null`,
+      'trips_rate_choice_held',
+      sql`${table.rateChoice} is null or (${table.rateJumped} and (${table.rateChoice} <> 'previous' or ${table.ratePreviousScaled} is not null) and (${table.rateChoice} <> 'manual' or ${table.rateManualScaled} is not null))`,
     ),
     check(
       'trips_finished_after_start',

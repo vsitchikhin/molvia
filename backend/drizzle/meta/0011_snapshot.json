@@ -1,5 +1,5 @@
 {
-  "id": "9dd8d179-74e9-444f-bab4-44b3310b0d90",
+  "id": "ee7fafcf-6ad9-4240-94e6-574fd76dee4c",
   "prevId": "76fe241a-3e6d-465a-a0f0-7bec173c3e21",
   "version": "7",
   "dialect": "postgresql",
@@ -557,6 +557,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "jump": {
+          "name": "jump",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "fetched_at": {
           "name": "fetched_at",
           "type": "timestamp with time zone",
@@ -820,6 +827,43 @@
           "primaryKey": false,
           "notNull": false
         },
+        "rate_jumped": {
+          "name": "rate_jumped",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "rate_previous_scaled": {
+          "name": "rate_previous_scaled",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_previous_as_of": {
+          "name": "rate_previous_as_of",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_manual_scaled": {
+          "name": "rate_manual_scaled",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_manual_as_of": {
+          "name": "rate_manual_as_of",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_choice": {
+          "name": "rate_choice",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "started_at": {
           "name": "started_at",
           "type": "timestamp with time zone",
@@ -927,6 +971,34 @@
         "trips_rate_positive": {
           "name": "trips_rate_positive",
           "value": "\"trips\".\"rate_scaled\" is null or \"trips\".\"rate_scaled\" > 0"
+        },
+        "trips_rate_jumped_needs_rate": {
+          "name": "trips_rate_jumped_needs_rate",
+          "value": "not \"trips\".\"rate_jumped\" or \"trips\".\"rate_scaled\" is not null"
+        },
+        "trips_rate_previous_whole": {
+          "name": "trips_rate_previous_whole",
+          "value": "num_nonnulls(\"trips\".\"rate_previous_scaled\", \"trips\".\"rate_previous_as_of\") in (0, 2)"
+        },
+        "trips_rate_previous_needs_jump": {
+          "name": "trips_rate_previous_needs_jump",
+          "value": "\"trips\".\"rate_previous_scaled\" is null or (\"trips\".\"rate_jumped\" and \"trips\".\"rate_previous_scaled\" > 0)"
+        },
+        "trips_rate_manual_whole": {
+          "name": "trips_rate_manual_whole",
+          "value": "num_nonnulls(\"trips\".\"rate_manual_scaled\", \"trips\".\"rate_manual_as_of\") in (0, 2)"
+        },
+        "trips_rate_manual_needs_jump": {
+          "name": "trips_rate_manual_needs_jump",
+          "value": "\"trips\".\"rate_manual_scaled\" is null or (\"trips\".\"rate_jumped\" and \"trips\".\"rate_manual_scaled\" > 0)"
+        },
+        "trips_rate_choice_known": {
+          "name": "trips_rate_choice_known",
+          "value": "\"trips\".\"rate_choice\" is null or \"trips\".\"rate_choice\" in ('jumped', 'previous', 'manual')"
+        },
+        "trips_rate_choice_held": {
+          "name": "trips_rate_choice_held",
+          "value": "\"trips\".\"rate_choice\" is null or (\"trips\".\"rate_jumped\" and (\"trips\".\"rate_choice\" <> 'previous' or \"trips\".\"rate_previous_scaled\" is not null) and (\"trips\".\"rate_choice\" <> 'manual' or \"trips\".\"rate_manual_scaled\" is not null))"
         },
         "trips_finished_after_start": {
           "name": "trips_finished_after_start",

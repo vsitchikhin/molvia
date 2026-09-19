@@ -62,7 +62,9 @@ const trip: Trip = {
   placeId: place.id,
   currency: 'AMD',
   rate: null,
+  rateJumped: false,
   previousRate: null,
+  manualRate: null,
   rateChoice: null,
   startedAt: new Date('2026-09-19T10:00:00.000Z'),
   finishedAt: null,
@@ -185,7 +187,9 @@ describe('startTrip', () => {
 
     expect(ensured).toEqual([{ kind: 'store', name: 'Ереван Сити', country: 'AM', city: 'Gyumri' }])
     // An empty cache: nothing to snapshot.
-    expect(started).toEqual([[ACTOR, { id: TRIP, placeId: place.id }, 'AMD', null, null]])
+    expect(started).toEqual([
+      [ACTOR, { id: TRIP, placeId: place.id }, 'AMD', null, { jumped: false, previous: null }],
+    ])
     expect(created).toBe(true)
     expect(view.place.name).toBe('Ереван Сити')
   })

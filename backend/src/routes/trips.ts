@@ -13,7 +13,7 @@ import type {
   Actor,
   AddExpenseBody,
   ExpensePatch,
-  RateChoice,
+  RateChoiceBody,
   StartTripBody,
   TripView,
 } from '@molvia/model'
@@ -32,7 +32,7 @@ export interface TripsApi {
   update(actorId: string, tripId: string, expenseId: string, patch: ExpensePatch): Promise<TripView>
   remove(actorId: string, tripId: string, expenseId: string): Promise<TripView>
   finish(actorId: string, tripId: string): Promise<void>
-  chooseRate(actorId: string, tripId: string, choice: RateChoice): Promise<TripView>
+  chooseRate(actorId: string, tripId: string, body: RateChoiceBody): Promise<TripView>
 }
 
 /**
@@ -118,12 +118,13 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
   })
 
   /**
-   * «Считать по новому курсу / по прежнему», when the rate the trip took jumped (MOL-39, Р-19).
-   * PUT: the same choice again is the same state. 409 `error.conflict` for a trip with nothing
-   * to choose between.
+   * «Считать по новому курсу / по прежнему / по своему», when the rate the trip took jumped
+   * (MOL-39, Р-19, Р-21). PUT: the same choice again is the same state. 409 `error.conflict` for
+   * a trip that never jumped or a «previous» it does not hold; 400 `error.invalid_rate` for an
+   * own rate that is not one.
    */
   app.put<{ Params: TripParams }>('/trips/:tripId/rate-choice', async (request, reply) => {
-    const { choice } = parseBody(rateChoiceBodySchema, request.body)
-    return answer(reply, await api.chooseRate(request.actorId, request.params.tripId, choice))
+    const body = parseBody(rateChoiceBodySchema, request.body)
+    return answer(reply, await api.chooseRate(request.actorId, request.params.tripId, body))
   })
 }

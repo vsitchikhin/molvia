@@ -1,28 +1,34 @@
-import { DomainError, ERROR } from '@molvia/model'
-import type { RateChoice, TripView } from '@molvia/model'
+import { DomainError, ERROR, manualRateFor } from '@molvia/model'
+import type { RateChoiceBody, TripView } from '@molvia/model'
 import type { Transact } from '@/db/unit-of-work'
 import { tripViewFor } from './trip-view'
 
 /**
- * «Считать по новому курсу / по прежнему» (MOL-39, Р-19). The snapshot stays as it was taken;
- * the choice only says which of its two rates the trip counts by, so choosing again — either way —
- * is always possible and the same choice twice is one. Any trip of the person's, finished too:
- * the jump is noticed on the screen, often after the shop.
+ * «Считать по новому курсу / по прежнему / по своему» (MOL-39, Р-19, Р-21). The snapshot stays as
+ * it was taken; the choice only says which rate the trip counts by, so choosing again — any way —
+ * is always possible, and the same choice twice is one. An own rate is the snapshot's pair with
+ * the person's number, dated when entered. Any trip of the person's, finished too: the jump is
+ * noticed on the screen, often after the shop.
  *
- * A trip that is not the person's answers as a missing one does; a trip with nothing to choose
- * between is a conflict with the trip's state, not a bad request.
+ * A trip that is not the person's answers as a missing one does. A trip that never jumped, or a
+ * choice of «previous» where there is none, conflicts with the trip's state — not a bad request.
  */
 export async function chooseTripRate(
   transact: Transact,
   actorId: string,
   tripId: string,
-  choice: RateChoice,
+  body: RateChoiceBody,
+  now: Date = new Date(),
 ): Promise<TripView> {
   return transact(async (repositories) => {
-    const chosen = await repositories.trips.chooseRate(tripId, actorId, choice)
-    if (chosen) return tripViewFor(repositories, chosen)
+    const trip = await repositories.trips.lock(tripId, actorId)
+    if (!trip) throw new DomainError(ERROR.NOT_FOUND)
+    if (!trip.rate || !trip.rateJumped) throw new DomainError(ERROR.CONFLICT)
+    if (body.choice === 'previous' && !trip.previousRate) throw new DomainError(ERROR.CONFLICT)
 
-    const trip = await repositories.trips.byId(tripId, actorId)
-    throw new DomainError(trip ? ERROR.CONFLICT : ERROR.NOT_FOUND)
+    const manual = body.choice === 'manual' ? manualRateFor(trip.rate, body.rate, now) : null
+    const chosen = await repositories.trips.chooseRate(tripId, actorId, body.choice, manual)
+    if (!chosen) throw new DomainError(ERROR.NOT_FOUND)
+    return tripViewFor(repositories, chosen)
   })
 }

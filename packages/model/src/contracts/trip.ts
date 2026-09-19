@@ -102,13 +102,15 @@ export const tripViewCodec = z.strictObject({
   /** The rate the trip counts by — the snapshot, or the one before its jump if the person chose it. */
   rate: rateCodec.nullable(),
   /**
-   * When the snapshotted rate jumped (MOL-39, Р-19): both rates and the person's choice, null
-   * until made — the screen warns and offers «по 431.23 / по 4.3123». Null when nothing jumped.
+   * When the snapshotted rate jumped (MOL-39, Р-19, Р-21): the jumped rate, the one before it if
+   * there is one, the person's own if they entered it, and their choice — null until made. The
+   * screen warns and offers «по новому / по прежнему / свой». Null when nothing jumped.
    */
   rateJump: z
     .strictObject({
       jumped: rateCodec,
-      previous: rateCodec,
+      previous: rateCodec.nullable(),
+      manual: rateCodec.nullable(),
       choice: rateChoiceSchema.nullable(),
     })
     .nullable(),
@@ -198,8 +200,13 @@ export function tripViewOf(
     currency: trip.currency,
     rate,
     rateJump:
-      trip.rate && trip.previousRate
-        ? { jumped: trip.rate, previous: trip.previousRate, choice: trip.rateChoice }
+      trip.rate && trip.rateJumped
+        ? {
+            jumped: trip.rate,
+            previous: trip.previousRate,
+            manual: trip.manualRate,
+            choice: trip.rateChoice,
+          }
         : null,
     rateStale: isTripRateStale(trip),
     place: tripPlaceOf(place),
@@ -209,6 +216,13 @@ export function tripViewOf(
   }
 }
 
-/** «Считать по новому курсу / по прежнему» (MOL-39, Р-19). Repeatable: the same choice twice is one. */
-export const rateChoiceBodySchema = z.strictObject({ choice: rateChoiceSchema })
+/**
+ * «Считать по новому курсу / по прежнему / по своему» (MOL-39, Р-19, Р-21). Repeatable: the same
+ * choice twice is one. The own rate travels as the decimal a person types — `parseRate` reads it.
+ */
+export const rateChoiceBodySchema = z.discriminatedUnion('choice', [
+  z.strictObject({ choice: z.literal('jumped') }),
+  z.strictObject({ choice: z.literal('previous') }),
+  z.strictObject({ choice: z.literal('manual'), rate: z.string().max(40) }),
+])
 export type RateChoiceBody = z.infer<typeof rateChoiceBodySchema>

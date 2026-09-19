@@ -674,13 +674,15 @@ describe('the trip', () => {
   it('chooses which rate a trip counts by after a jump, and refuses a choice that is not one', async () => {
     const { client, calls } = clientReplying(200, tripWire)
 
-    await client.chooseTripRate(TRIP, 'previous')
+    await client.chooseTripRate(TRIP, { choice: 'previous' })
+    await client.chooseTripRate(TRIP, { choice: 'manual', rate: '4.31' })
     expect(calls[0]).toMatchObject({ method: 'PUT', body: { choice: 'previous' } })
+    expect(calls[1]?.body).toEqual({ choice: 'manual', rate: '4.31' })
     expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/trips/${TRIP}/rate-choice`)
 
-    // @ts-expect-error — a choice the server does not know is refused before it is sent
-    expect(await codeOf(client.chooseTripRate(TRIP, 'both'))).toBe(ISSUE.BODY_INVALID)
-    expect(calls).toHaveLength(1)
+    // @ts-expect-error — an own rate without the rate is refused before it is sent
+    expect(await codeOf(client.chooseTripRate(TRIP, { choice: 'manual' }))).toBe(ISSUE.BODY_INVALID)
+    expect(calls).toHaveLength(2)
   })
 
   it('keeps an identifier inside its own path segment', async () => {

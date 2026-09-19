@@ -146,7 +146,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           updateExpense(transact, actorId, tripId, expenseId, patch),
         remove: (actorId, tripId, expenseId) => removeExpense(transact, actorId, tripId, expenseId),
         finish: (actorId, tripId) => finishTrip(tripData.trips, actorId, tripId),
-        chooseRate: (actorId, tripId, choice) => chooseTripRate(transact, actorId, tripId, choice),
+        chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
       })
       verdictRoutes(guarded, {
         rate: (actorId, itemId, rating) => rateItem({ items, verdicts }, actorId, itemId, rating),

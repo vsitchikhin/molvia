@@ -4,16 +4,24 @@ import { DomainError, ERROR, ISSUE } from '#model/support/errors'
 import type { Expense } from './expense'
 import { MINOR_EXPONENT, currencySchema } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
-import { RATE_DIGITS, exchangeRateSchema, isRateFresh, yerevanDate } from '#model/values/rates'
+import {
+  RATE_DIGITS,
+  exchangeRateSchema,
+  isRateFresh,
+  parseRate,
+  yerevanDate,
+} from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
 
 /**
- * Which of two rates a trip counts by when the one it snapshotted jumped (MOL-39, Р-19): the
- * jumped one, or the one before it. Absent until the person chooses; until then the trip counts
- * by the rate it took.
+ * Which rate a trip counts by when the one it snapshotted jumped (MOL-39, Р-19, Р-21): the jumped
+ * one, the one before it, or the person's own. Absent until chosen; until then the trip counts by
+ * the rate it took.
  */
-export const rateChoiceSchema = z.enum(['jumped', 'previous'])
+export const rateChoiceSchema = z.enum(['jumped', 'previous', 'manual'])
 export type RateChoice = z.infer<typeof rateChoiceSchema>
+
+const samePair = (a: ExchangeRate, b: ExchangeRate) => a.base === b.base && a.quote === b.quote
 
 const tripFields = z.object({
   id: z.uuid(),
@@ -21,12 +29,16 @@ const tripFields = z.object({
   placeId: z.uuid(),
   currency: currencySchema,
   rate: exchangeRateSchema.nullable(),
+  /** The snapshotted rate jumped when it arrived: the screen warns, whatever else there is. */
+  rateJumped: z.boolean().default(false),
   /**
-   * The last rate before the snapshotted one jumped — the same pair from the same source — kept
-   * beside it so the person can choose. Null when nothing jumped. The snapshot itself is never
-   * rewritten: the choice only says which of the two to count by.
+   * Kept beside a jumped snapshot so the person can choose; the snapshot itself is never
+   * rewritten, the choice only says which rate to count by. The rate before the jump — same pair,
+   * same source, at most a week older — when there was one.
    */
   previousRate: exchangeRateSchema.nullable().default(null),
+  /** The person's own rate for this trip, entered instead of the jumped one — `personal`. */
+  manualRate: exchangeRateSchema.nullable().default(null),
   rateChoice: rateChoiceSchema.nullable().default(null),
   startedAt: z.date(),
   finishedAt: z.date().nullable(),
@@ -37,17 +49,28 @@ export const tripSchema = tripFields
     error: ISSUE.RATE_NOT_OF_TRIP_CURRENCY,
   })
   .refine(
-    ({ rate, previousRate }) =>
-      previousRate === null ||
-      (rate !== null &&
-        previousRate.base === rate.base &&
-        previousRate.quote === rate.quote &&
-        previousRate.source === rate.source),
+    ({ rate, rateJumped, previousRate, manualRate }) =>
+      (!rateJumped || rate !== null) &&
+      (previousRate === null ||
+        (rateJumped &&
+          rate !== null &&
+          samePair(previousRate, rate) &&
+          previousRate.source === rate.source)) &&
+      (manualRate === null ||
+        (rateJumped &&
+          rate !== null &&
+          samePair(manualRate, rate) &&
+          manualRate.source === 'personal')),
     { error: ISSUE.PREVIOUS_RATE_UNMATCHED },
   )
-  .refine((trip) => trip.rateChoice === null || trip.previousRate !== null, {
-    error: ISSUE.RATE_CHOICE_WITHOUT_PREVIOUS,
-  })
+  .refine(
+    ({ rateChoice, rateJumped, previousRate, manualRate }) =>
+      rateChoice === null ||
+      (rateJumped &&
+        (rateChoice !== 'previous' || previousRate !== null) &&
+        (rateChoice !== 'manual' || manualRate !== null)),
+    { error: ISSUE.RATE_CHOICE_WITHOUT_PREVIOUS },
+  )
   .refine((trip) => trip.finishedAt === null || trip.finishedAt >= trip.startedAt, {
     error: ISSUE.TRIP_FINISHED_BEFORE_START,
   })
@@ -58,9 +81,25 @@ export const newTripSchema = z.strictObject({
 })
 export type NewTrip = z.infer<typeof newTripSchema>
 
-/** The rate a trip counts by: the one it took, unless the person chose the one before a jump. */
+/** The rate a trip counts by: the one it took, unless the person chose another after a jump. */
 export function effectiveRate(trip: Trip): ExchangeRate | null {
-  return trip.rateChoice === 'previous' && trip.previousRate ? trip.previousRate : trip.rate
+  if (trip.rateChoice === 'previous' && trip.previousRate) return trip.previousRate
+  if (trip.rateChoice === 'manual' && trip.manualRate) return trip.manualRate
+  return trip.rate
+}
+
+/**
+ * The person's own rate for a trip whose snapshot jumped (Р-21): the snapshot's pair, their
+ * number — refused as a rate typed under «мой курс» would be — and the moment they entered it.
+ */
+export function manualRateFor(snapshot: ExchangeRate, rate: string, at: Date): ExchangeRate {
+  return {
+    base: snapshot.base,
+    quote: snapshot.quote,
+    scaled: parseRate(rate),
+    source: 'personal',
+    asOf: at,
+  }
 }
 
 /**
