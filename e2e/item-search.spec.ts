@@ -203,8 +203,6 @@ test.describe('nothing found', () => {
       const sheet = page.getByRole('dialog', { name: 'New item' })
       await expect(sheet).toBeVisible()
       await expect(sheet.getByLabel('As the price tag says')).toHaveValue(word)
-      // The sheet takes no tap while it rises (MOL-18): a unit tapped at once is swallowed.
-      await page.waitForTimeout(400)
 
       const submit = sheet.getByRole('button', { name: 'Add to the catalogue' })
       await expect(submit).toBeDisabled()
