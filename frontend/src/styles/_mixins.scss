@@ -25,3 +25,22 @@
     @content;
   }
 }
+
+/// A bar that stays put while the page scrolls under it: the top row, the tab bar, the total.
+/// Translucency is the --chrome token; the blur only keeps the text under it from fighting
+/// the text on it.
+@mixin pinned-bar {
+  background: var(--chrome);
+  backdrop-filter: blur(12px);
+}
+
+/// Read by a screen reader, never drawn. For words the screen already says with a picture —
+/// the «Back» in front of the chevron's label.
+@mixin visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

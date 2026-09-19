@@ -71,6 +71,22 @@
 
   --touch-target: 2.75rem; /* 44px — the smallest thing a thumb hits reliably */
 
+  /* ── Bars ─────────────────────────────────────────────────────────────── */
+
+  /* The pinned row under the status bar is one touch target tall, collapsed or not: a bar
+     that shrank as the title collapsed would pull the content up and flip itself back. */
+  --bar-height: var(--touch-target);
+  --tabbar-height: 4.625rem; /* 74 — the tab bar itself; the home indicator comes on top */
+
+  /* Where the notch and the home indicator are. `viewport-fit=cover` lets the page run
+     under them on every side — the notch is on the left or the right once the phone is
+     turned — and a phone without them reports zero. The unit on the fallback matters:
+     a bare 0 is not a length inside calc(). */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
   /* ── Motion ───────────────────────────────────────────────────────────── */
   --dur-fast: 120ms; /* state change on a control */
   --dur: 220ms; /* sheet, push, tab */

@@ -1,7 +1,5 @@
 <template>
-  <section>
-    <h2 class="heading">{{ t('advice.title') }}</h2>
-
+  <AppScreen :title="t('advice.title')">
     <p v-if="state === 'loading'" class="muted">{{ t('state.loading') }}</p>
 
     <template v-else-if="state === 'offline' || state === 'error'">
@@ -19,7 +17,7 @@
       <p>{{ t('advice.empty.body') }}</p>
       <button class="button" type="button">{{ t('advice.empty.action') }}</button>
     </template>
-  </section>
+  </AppScreen>
 </template>
 
 <script lang="ts">
@@ -27,6 +25,7 @@ import { defineComponent, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconRefresh from '~icons/mdi/refresh'
 import { api } from '@/api'
+import AppScreen from '@/components/AppScreen.vue'
 
 // Every screen has four states, offline included: the target is a phone at a shelf,
 // where the connection drops more often than anything else fails.
@@ -45,7 +44,7 @@ type State = 'loading' | 'offline' | 'error' | 'ready'
  */
 export default defineComponent({
   name: 'HomeView',
-  components: { IconRefresh },
+  components: { AppScreen, IconRefresh },
   setup() {
     const { t } = useI18n()
     const state = ref<State>('loading')
@@ -76,13 +75,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.heading {
-  margin: 0 0 var(--space-4);
-  font-family: var(--font-display);
-  font-size: var(--text-display);
-  line-height: var(--leading-tight);
-}
-
 .muted {
   color: var(--text-muted);
 }

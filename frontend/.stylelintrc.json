@@ -14,10 +14,16 @@
       }
     ],
     "declaration-property-value-allowed-list": {
-      "/^(margin|padding|gap|inset|top|right|bottom|left)/": [
-        "/^(0|auto|inherit|initial|unset|var\\(--space-[a-z0-9]+\\))( (0|auto|var\\(--space-[a-z0-9]+\\))){0,3}$/"
+      "/^(margin|padding|gap|inset|top|right|bottom|left|scroll-margin|scroll-padding)/": [
+        "/^(0|auto|inherit|initial|unset|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height)\\))*( \\* -1)?\\))(\\s+(0|auto|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height)\\))*( \\* -1)?\\))){0,3}$/"
       ]
     },
+    "function-disallowed-list": [
+      ["env"],
+      {
+        "message": "Safe areas live in styles/_tokens.scss. Use var(--safe-\u2026)."
+      }
+    ],
     "no-descending-specificity": null,
     "custom-property-empty-line-before": null
   },
@@ -27,7 +33,8 @@
       "rules": {
         "color-no-hex": null,
         "color-named": null,
-        "declaration-property-value-allowed-list": null
+        "declaration-property-value-allowed-list": null,
+        "function-disallowed-list": null
       }
     }
   ],
