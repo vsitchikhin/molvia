@@ -89,6 +89,8 @@
       "note": "What sets it apart on the shelf — optional",
       "submit": "Add to the catalogue",
       "offline": "Suggesting needs a connection",
+      "name_invalid": "The name holds a character the catalogue will not take — type the name again",
+      "note_invalid": "The note holds a character the catalogue will not take — type the note again",
       "failed": "Could not add it. Please try again"
     },
     "error": {

@@ -10,11 +10,20 @@
       enterkeyhint="next"
     />
     <SegmentedControl v-model="unit" :legend="t('item.unit')" :options="units" />
-    <AppField v-model="note" :label="t('item.propose.note')" enterkeyhint="done" />
+    <AppField
+      v-model="note"
+      :label="t('item.propose.note')"
+      :maxlength="noteMax"
+      enterkeyhint="done"
+    />
 
     <template #footer>
-      <p v-if="!connected" class="line" role="status">{{ t('item.propose.offline') }}</p>
-      <p v-else-if="failed" class="line failed" role="alert">{{ t('item.propose.failed') }}</p>
+      <!-- There before its words, with only the text changing: a live region born together with
+           what it says is often not read at all (MOL-19; review Р-18). -->
+      <p class="line" :class="{ failed: textRefused }" role="status">{{ status }}</p>
+      <p v-if="connected && failed" class="line failed" role="alert">
+        {{ t('item.propose.failed') }}
+      </p>
       <AppButton size="large" block :disabled="!ready" @click="submit">
         {{ t('item.propose.submit') }}
       </AppButton>
@@ -25,7 +34,13 @@
 <script lang="ts">
 import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { CATALOGUE_QUERY_MAX, proposedItemSchema } from '@molvia/model'
+import {
+  ITEM_NAME_MAX,
+  ITEM_NOTE_MAX,
+  drawsNothing,
+  pastedLine,
+  proposedItemSchema,
+} from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
@@ -50,6 +65,9 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
  * which the dictionary does not translate, and a blank name — the one refusal a person can make
  * here — never leaves, because the button waits for a name.
  */
+/** As long as the app's live region waits before its words (`useAnnouncer`). */
+const STATUS_DELAY_MS = 100
+
 export default defineComponent({
   name: 'ProposeItemSheet',
   components: { AppButton, AppField, BottomSheet, SegmentedControl },
@@ -77,13 +95,31 @@ export default defineComponent({
       { value: 'piece', label: t('item.unit_piece') },
     ])
 
+    /**
+     * Which opening of the sheet this is. An answer to a form the person has closed — or closed
+     * and opened afresh — is not theirs any more: × said no, and picking the item anyway would
+     * raise the sheet «how much» for something they turned down (adversarial A1). The item itself
+     * is in the catalogue by then; only the pick is dropped.
+     */
+    let opening = 0
+
+    // What copying brings along — a tab between the cells of a spreadsheet row, a line break of
+    // any kind, the direction marks a chat wraps a pasted name in — is made the line it was meant
+    // to be. The list lives in the model beside the one the schema refuses (Р-19).
+    watch([name, note], ([nextName, nextNote]) => {
+      if (pastedLine(nextName) !== nextName) name.value = pastedLine(nextName)
+      if (pastedLine(nextNote) !== nextNote) note.value = pastedLine(nextNote)
+    })
+
     // A fresh form for every opening, starting from what is in the field now.
     watch(
       () => props.open,
       (open) => {
+        opening += 1
+        sending.value = false
         if (!open) return
         connected.value = navigator.onLine
-        name.value = props.query.trim()
+        name.value = pastedLine(props.query).trim()
         unit.value = ''
         note.value = ''
         failed.value = false
@@ -96,25 +132,73 @@ export default defineComponent({
         kind: 'product',
         name: name.value,
         defaultUnit: unit.value,
-        ...(note.value.trim() === '' ? {} : { note: note.value }),
+        // Absent when it draws nothing — by the schema's own measure, so a pasted U+200B is left
+        // out like spaces rather than refused with the button going grey (A6b).
+        ...(drawsNothing(note.value) ? {} : { note: note.value }),
       }),
     )
 
     const ready = computed(() => connected.value && !sending.value && input.value.success)
 
+    // What is left for the schema to refuse after `pastedLine` — a private-use glyph, a lone
+    // surrogate. The button waits, and the line says which field and why, instead of leaving it
+    // grey in silence; typing it again is the one way out a person can see.
+    const nameRefused = computed(
+      () =>
+        !drawsNothing(name.value) && !proposedItemSchema.shape.name.safeParse(name.value).success,
+    )
+    const noteRefused = computed(
+      () =>
+        !drawsNothing(note.value) && !proposedItemSchema.shape.note.safeParse(note.value).success,
+    )
+    const textRefused = computed(() => nameRefused.value || noteRefused.value)
+
+    // The status line is in the sheet from the start, but a closed <dialog> is outside the
+    // accessibility tree: a sheet opened offline would show the region and its words in one frame,
+    // the case Р-18 left. The words come a moment after the sheet does, as the app's own region
+    // lets them (MOL-19).
+    const settled = ref(false)
+    let settling: ReturnType<typeof setTimeout> | undefined
+    watch(
+      () => props.open,
+      (open) => {
+        clearTimeout(settling)
+        settled.value = false
+        if (open) {
+          settling = setTimeout(() => {
+            settled.value = true
+          }, STATUS_DELAY_MS)
+        }
+      },
+      { immediate: true },
+    )
+    onUnmounted(() => {
+      clearTimeout(settling)
+    })
+
+    const status = computed(() => {
+      if (!settled.value) return ''
+      if (!connected.value) return t('item.propose.offline')
+      if (nameRefused.value) return t('item.propose.name_invalid')
+      if (noteRefused.value) return t('item.propose.note_invalid')
+      return ''
+    })
+
     async function submit(): Promise<void> {
       const parsed = input.value
       if (!ready.value || !parsed.success) return
+      const mine = opening
       sending.value = true
       failed.value = false
       try {
         const { entry } = await api.proposeItem(parsed.data)
-        emit('proposed', entry)
+        if (mine === opening) emit('proposed', entry)
       } catch {
+        if (mine !== opening) return
         connected.value = navigator.onLine
         failed.value = connected.value
       } finally {
-        sending.value = false
+        if (mine === opening) sending.value = false
       }
     }
 
@@ -139,9 +223,11 @@ export default defineComponent({
       connected,
       failed,
       ready,
+      textRefused,
+      status,
       submit,
-      // No name is longer than the longest query (`CATALOGUE_QUERY_MAX`).
-      nameMax: CATALOGUE_QUERY_MAX,
+      nameMax: ITEM_NAME_MAX,
+      noteMax: ITEM_NOTE_MAX,
     }
   },
 })
@@ -153,6 +239,10 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   text-align: center;
+}
+
+.line:empty {
+  margin: 0;
 }
 
 .failed {

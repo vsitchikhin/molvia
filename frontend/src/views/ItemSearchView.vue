@@ -31,7 +31,9 @@
           :body="t('item.error.body')"
           @retry="retry"
         >
-          <template v-if="!fallback" #action>
+          <!-- Offered only when there is something to take: with no recent items the tap would
+               answer with less than was on screen before it (adversarial A4). -->
+          <template v-if="!fallback && hasRecent" #action>
             <AppButton variant="ghost" block @click="fallback = true">
               {{ t('item.error.fallback') }}
             </AppButton>
@@ -80,7 +82,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import type { CatalogueEntry } from '@molvia/model'
@@ -142,32 +144,52 @@ export default defineComponent({
         (phase.value === 'error' && fallback.value),
     )
 
+    // Under an error as offline: the server does not answer either way, and «хлеб» typed before
+    // it fell should not show twenty rows instead of one (Р-12).
     const rows = computed<CatalogueEntry[]>(() => {
       if (phase.value === 'ready') return results.value
-      if (phase.value === 'offline') return recent.filter(query.value)
-      if (showsRecent.value) return recent.items
+      if (showsRecent.value) return recent.filter(query.value)
       return []
     })
+
+    // What the fallback would show, not whether there are recent items at all: under an error
+    // they are narrowed by the query, and a button leading to none of them is a dead end (B2).
+    const hasRecent = computed(() => recent.filter(query.value).length > 0)
 
     const heading = computed(() =>
       showsRecent.value ? t('item.group_recent') : t('item.group_found'),
     )
 
-    // Read out once per answer, not on every letter: the answer is what changed.
+    // Read out once per answer, not on every letter: the answer is what changed. An empty answer
+    // too — the block that replaces the list is not a ScreenState and says nothing of itself, and
+    // after «found one» silence would read as nothing having happened (Р-10, A5).
+    // The words go with the answer they describe — a new answer, any other state, the screen
+    // left: the region is read in browse mode, and «found one» over an error is a lie (B3).
+    // A dimmed answer is not read out: it is for the text before, and the answer to what is typed
+    // follows — two counts in a row are noise for someone listening.
     let withdraw: (() => void) | undefined
-    watch([phase, results], ([next, found]) => {
-      if (next !== 'ready') return
+    watch([phase, results, stale], ([next, found, dimmed]) => {
       withdraw?.()
-      withdraw = announce?.(t('item.results_announced', { n: found.length }, found.length))
+      withdraw = undefined
+      if ((next !== 'ready' && next !== 'empty') || dimmed) return
+      withdraw = announce?.(
+        next === 'ready'
+          ? t('item.results_announced', { n: found.length }, found.length)
+          : t('item.empty.body', { query: answered.value }),
+      )
     })
 
     const { picked } = storeToRefs(entry)
     /** Which opening of the sheet this is: the same item picked twice is two purchases. */
     const opened = ref(0)
 
+    // Rows of an answer leave with the query they answer, not with the field: the list stays on
+    // screen, dimmed, while the next search is out, and a tap on «Кока-кола» found for «кола»
+    // with «хлеб» already typed must not teach the search that «хлеб» means cola (Р-9, A3). The
+    // recent items answer no query — they go with the field as it is.
     function pick(chosen: CatalogueEntry): void {
       opened.value += 1
-      entry.pick({ entry: chosen, query: query.value })
+      entry.pick({ entry: chosen, query: phase.value === 'ready' ? answered.value : query.value })
     }
 
     // Into the recent items only once it went into the trip, as the server's memory of picks
@@ -202,6 +224,9 @@ export default defineComponent({
     onMounted(() => {
       recent.sync()
     })
+    onUnmounted(() => {
+      withdraw?.()
+    })
 
     return {
       t,
@@ -211,6 +236,7 @@ export default defineComponent({
       answered,
       retry,
       fallback,
+      hasRecent,
       rows,
       heading,
       pick,

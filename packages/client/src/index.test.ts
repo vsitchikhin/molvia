@@ -428,6 +428,45 @@ describe('the catalogue', () => {
       expect(controller.signal.aborted).toBe(false)
     })
 
+    /** Headers, the start of the body, and then silence — the body errors once its signal is aborted. */
+    function clientStallingAfterHeaders(options: { timeoutMs?: number } = {}) {
+      const seen: AbortSignal[] = []
+      const fetch = (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        const signal = init?.signal ?? new AbortController().signal
+        seen.push(signal)
+        const body = new ReadableStream<Uint8Array>({
+          start(stream) {
+            stream.enqueue(new TextEncoder().encode('{"items":['))
+            signal.addEventListener('abort', () => {
+              stream.error(new DOMException('aborted', 'AbortError'))
+            })
+          },
+        })
+        return Promise.resolve(new Response(body, { status: 200 }))
+      }
+      const client = createClient({ baseUrl: 'http://api', fetch, ...options })
+      return { client, seen }
+    }
+
+    it('reaches a body still arriving: the caller cancels after the headers', async () => {
+      const { client, seen } = clientStallingAfterHeaders({ timeoutMs: 10_000 })
+      const controller = new AbortController()
+
+      const search = client.searchCatalogue('молоко', { signal: controller.signal })
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      controller.abort()
+
+      expect(await codeOf(search)).toBe(ERROR.INTERNAL)
+      expect(seen[0]?.aborted).toBe(true)
+    })
+
+    it('keeps the deadline for a body that never ends — a quiet server is not an answer', async () => {
+      const { client, seen } = clientStallingAfterHeaders({ timeoutMs: 20 })
+
+      expect(await codeOf(client.searchCatalogue('молоко'))).toBe(ERROR.INTERNAL)
+      expect(seen[0]?.aborted).toBe(true)
+    })
+
     it('lets go of the caller’s signal when the call is over', async () => {
       const { client, answer } = clientHanging()
       const controller = new AbortController()

@@ -228,12 +228,23 @@ describe('the catalogue combobox', () => {
       expect(document.activeElement).toBe(field(wrapper).element)
     })
 
-    it('lets go of the active row on Escape', async () => {
+    it('lets go of the active row on Escape, and keeps the query the field would clear', async () => {
       const wrapper = combobox()
       await press(wrapper, 'ArrowDown')
-      await press(wrapper, 'Escape')
+      const escape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })
+      field(wrapper).element.dispatchEvent(escape)
+      await wrapper.vm.$nextTick()
 
       expect(field(wrapper).attributes('aria-activedescendant')).toBeUndefined()
+      expect(escape.defaultPrevented).toBe(true)
+    })
+
+    it('leaves Escape to the field when no row is active — clearing it is the platform’s way', () => {
+      const wrapper = combobox()
+      const escape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })
+      field(wrapper).element.dispatchEvent(escape)
+
+      expect(escape.defaultPrevented).toBe(false)
     })
 
     it('does nothing with arrows over an empty list', async () => {

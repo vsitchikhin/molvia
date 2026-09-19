@@ -1,5 +1,6 @@
 import { onUnmounted, ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
+import { drawsNothing } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
@@ -77,9 +78,12 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
       results.value = found
       answered.value = text
       phase.value = found.length > 0 ? 'ready' : 'empty'
-      stale.value = false
+      // Still dimmed while a newer search waits for its pause.
+      stale.value = pending !== undefined
     } catch {
-      if (mine !== latest) return
+      // A failure of a search a newer one is waiting to replace says nothing about that one: the
+      // screen keeps what it shows until the newer answers (Р-17).
+      if (mine !== latest || pending !== undefined) return
       settleFailed()
     } finally {
       if (inFlight === controller) inFlight = undefined
@@ -93,16 +97,23 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
   }
 
   function schedule(text: string): void {
+    // The search still out is not cancelled at the keystroke, only at the next pause (`run`):
+    // on a slow network at a shelf every letter would otherwise cut the search the pause before it
+    // sent, and nothing would show until the typing stopped — though «мол» already finds the milk
+    // (Р-13). Its answer, when it lands in the pause, is shown but stays dimmed: it answers the
+    // text before (A2), and a pick from it leaves with that text (`answered`).
     clearTimeout(pending)
     if (phase.value === 'ready' || phase.value === 'empty') stale.value = true
     else phase.value = 'loading'
     pending = setTimeout(() => {
+      pending = undefined
       void run(text)
     }, SEARCH_DEBOUNCE_MS)
   }
 
   watch(query, (text) => {
-    if (text.trim() === '') {
+    // By what draws, not by `trim`: a pasted U+200B looks empty and would still count as a visit.
+    if (drawsNothing(text)) {
       // Counted too, so an answer to the text just erased cannot land on the empty field.
       latest += 1
       cancel()
@@ -123,15 +134,19 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
     schedule(text)
   })
 
-  /** «Повторить», and the same when the connection may be back — at once, without the pause. */
+  /** «Повторить» — at once, without the pause, and the skeleton says it is trying. */
   function retry(): void {
-    if (query.value.trim() === '') return
+    if (drawsNothing(query.value)) return
     if (phase.value === 'error' || phase.value === 'offline') phase.value = 'loading'
     void run(query.value)
   }
 
+  // The connection may be back, or the app is looked at again — which happens every time the
+  // phone is unlocked at a shelf. Quietly: what is on screen stays until an answer replaces it,
+  // so the recent items taken under an error are not pulled from under the finger (A8).
   useReconnect(() => {
-    if (phase.value === 'error' || phase.value === 'offline') retry()
+    if (drawsNothing(query.value)) return
+    if (phase.value === 'error' || phase.value === 'offline') void run(query.value)
   })
 
   onUnmounted(() => {

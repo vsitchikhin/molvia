@@ -6,7 +6,26 @@ import { ISSUE } from './errors'
 // with a newer ICU and rejected by the API. Cs is here because a lone surrogate does not
 // encode to UTF-8 and Postgres answers 22021, the same as it does to NUL; Co because a
 // private-use character is drawn differently by every font, or not at all.
-const FORBIDDEN = /[\p{Cc}\p{Cs}\p{Co}\p{Zl}\p{Zp}\u202a-\u202e\u2066-\u2069]/u
+// Split in two for what a paste brings along — `pastedLine` below — and joined back into the one
+// list the schema refuses: a second copy of either half in a screen drifted before (MOL-23, Р-19).
+// A break of any kind: controls — the tab between the cells of a spreadsheet row, a line feed,
+// NEL — and the line and paragraph separators.
+const BREAK = String.raw`\p{Cc}\p{Zl}\p{Zp}`
+// The embeddings, overrides and isolates a chat wraps pasted text in: they draw nothing.
+const DIRECTION = String.raw`\u202a-\u202e\u2066-\u2069`
+const FORBIDDEN = new RegExp(String.raw`[${BREAK}\p{Cs}\p{Co}${DIRECTION}]`, 'u')
+const BREAKS = new RegExp(`[${BREAK}]+`, 'gu')
+const DIRECTIONS = new RegExp(`[${DIRECTION}]`, 'gu')
+
+/**
+ * Text pasted into a one-line field, made the line it was meant to be: a break of any kind becomes
+ * a space and the direction marks go. Everything `FORBIDDEN` refuses that a person cannot see to
+ * remove by hand is taken care of here; what is left — a private-use glyph, a lone surrogate — is
+ * for the form to explain.
+ */
+export function pastedLine(text: string): string {
+  return text.replace(BREAKS, ' ').replace(DIRECTIONS, '')
+}
 
 /**
  * What draws nothing, as the body of a character class — the one definition both sides of an
@@ -28,6 +47,15 @@ export const INVISIBLE = String.raw`\p{Cf}\p{Default_Ignorable_Code_Point}\u2800
 const BLANK = new RegExp(`[\\p{Z}${INVISIBLE}]`, 'gu')
 const MARK = /\p{M}/gu
 
+/**
+ * Whether a text draws nothing — by the measure `visibleLine` applies to a name: separators, what
+ * `INVISIBLE` lists and lone marks do not count. For a screen asking «is this field empty» before
+ * it sends anything, so a pasted U+200B is as empty there as it is here (MOL-23).
+ */
+export function drawsNothing(text: string): boolean {
+  return text.trim().replace(BLANK, '').replace(MARK, '').length === 0
+}
+
 export function visibleLine(max: number): z.ZodType<string, string> {
   return (
     z
@@ -37,12 +65,9 @@ export function visibleLine(max: number): z.ZodType<string, string> {
       // the same way — a generic «too small» told the screen nothing (MOL-27, С-17).
       .min(1, { error: ISSUE.TEXT_NOT_VISIBLE })
       .max(max)
-      .refine(
-        (text) => !FORBIDDEN.test(text) && text.replace(BLANK, '').replace(MARK, '').length > 0,
-        {
-          error: ISSUE.TEXT_NOT_VISIBLE,
-        },
-      )
+      .refine((text) => !FORBIDDEN.test(text) && !drawsNothing(text), {
+        error: ISSUE.TEXT_NOT_VISIBLE,
+      })
   )
 }
 
