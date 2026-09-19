@@ -216,7 +216,9 @@ export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
         if (HOLDS.includes(code)) {
           // Decided after the failure, never before: a connection that drops while the answer
           // is on its way is the commonest break, and it is not the server's fault.
-          if (code !== ERROR.NO_ACTOR) held.value = navigator.onLine ? 'failed' : 'offline'
+          // An identity the server forgot is not the connection: the draft waits, and the screen
+          // says it did not go rather than «sending» for the rest of the session (adversarial H2).
+          held.value = navigator.onLine || code === ERROR.NO_ACTOR ? 'failed' : 'offline'
           return
         }
         refusal = code

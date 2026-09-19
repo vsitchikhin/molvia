@@ -490,4 +490,19 @@ describe('useVerdictQueue', () => {
       expect(queue.stale.value).toBe('error')
     })
   })
+
+  it('H3: a refused card the person put off since is not «coming back next»', async () => {
+    rateItem.mockRejectedValue(new ApiError(ERROR.INVALID_SCORE))
+    pendingVerdicts.mockResolvedValue(answer([milk, bread]))
+    const queue = await mounted()
+    queue.save(milk, 2, '')
+    await flushPromises()
+    expect(queue.returned.value).toEqual([milk])
+
+    queue.skip(bread)
+    queue.skip(milk)
+
+    expect(queue.current.value).toEqual(bread)
+    expect(queue.returned.value).toEqual([])
+  })
 })

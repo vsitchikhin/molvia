@@ -194,6 +194,20 @@ describe('VerdictCard', () => {
     view.unmount()
   })
 
+  it('С-19: a refusal with no review to blame says the generic words, not «a character»', () => {
+    const view = render({
+      card: milk,
+      score: 2,
+      review: '',
+      state: 'typing',
+      error: ISSUE.BODY_INVALID,
+    })
+
+    expect(view.text()).toContain(en.error.internal)
+    expect(view.text()).not.toContain(en.verdict.review_unsupported)
+    view.unmount()
+  })
+
   it('G2: a private-use character — not sent, and the field says why, until it is edited', async () => {
     const view = render()
     await key(view, 4).trigger('click')

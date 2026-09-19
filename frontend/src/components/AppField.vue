@@ -61,8 +61,10 @@ export type FieldKind = 'text' | 'decimal' | 'multiline' | 'date'
  * The error is a code from the domain registry and doubles as its i18n key, so no message is
  * written where it is shown. `errorText` is for a refusal the registry has no code for — the
  * screen's own words, already translated: the review's «a character that cannot be saved»
- * (MOL-28, G2). It wins over `error` when both are given. Every other attribute — `autofocus`, `enterkeyhint`, `maxlength` —
- * goes to the control itself; `class` and `style` stay on the field, where the layout is.
+ * (MOL-28, G2). It wins over `error` when both are given.
+ *
+ * Every other attribute — `autofocus`, `enterkeyhint`, `maxlength` — goes to the control
+ * itself; `class` and `style` stay on the field, where the layout is.
  */
 export default defineComponent({
   name: 'AppField',

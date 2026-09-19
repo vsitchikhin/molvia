@@ -160,8 +160,13 @@ describe('everything the client throws is an ApiError', () => {
     expect(await codeOf(client.me())).toBe(ERROR.INTERNAL)
   })
 
-  it('and telling «not found» apart from the rest without reading a message', async () => {
+  it('and a bare 404 is not «not found»: a proxy says it without knowing what an item is', async () => {
     const client = clientServing('<html>nginx</html>', { status: 404 })
+    expect(await codeOf(client.me())).toBe(ISSUE.RESPONSE_INVALID)
+  })
+
+  it('and «not found» when the API says so, in its own shape', async () => {
+    const client = clientAnswering(404, { code: ERROR.NOT_FOUND })
     expect(await codeOf(client.me())).toBe(ERROR.NOT_FOUND)
   })
 

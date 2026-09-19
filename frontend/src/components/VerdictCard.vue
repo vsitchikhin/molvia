@@ -112,7 +112,11 @@ export default defineComponent({
     const review = ref(props.draft?.review ?? '')
     const error = ref<ErrorCode | null>(domainCode(props.draft?.error))
     /** The review holds a character the server will not keep: the tab and its kin are tidied. */
-    const unsupported = ref(Boolean(props.draft?.error) && error.value === null)
+    // Only with a review to blame: a refusal of an empty one is not about a character in it
+    // (self-review С-19), and says the generic words instead.
+    const refusedCode = Boolean(props.draft?.error) && error.value === null
+    const unsupported = ref(refusedCode && Boolean(props.draft?.review.trim()))
+    if (refusedCode && !unsupported.value) error.value = ERROR.INTERNAL
     let saved = false
 
     const day = computed(() => purchaseDay(props.card.boughtAt, locale.value))

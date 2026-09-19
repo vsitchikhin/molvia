@@ -62,19 +62,6 @@ export class ApiError extends Error {
 }
 
 /**
- * Codes that may be inferred from a status alone, when the body carries nothing usable.
- *
- * **401 is deliberately absent.** A 401 is the one status the PWA acts on destructively —
- * it means «this identity is gone», and the store replaces it. Anything in front of the API
- * can answer 401 without knowing what an actor is: basic auth on Caddy, an API gateway, a
- * captive portal on shop wifi. Only a body that parses as this project's own error shape
- * may say NO_ACTOR; a bare 401 is reported as an answer that did not match the contract.
- */
-const CODE_BY_STATUS: Readonly<Record<number, WireCode>> = Object.freeze({
-  404: ERROR.NOT_FOUND,
-})
-
-/**
  * A header value has to survive `Headers.set`, which throws a TypeError on anything outside
  * Latin-1 or containing a line break. Both values here come from outside the code — the
  * identifier from storage anyone can write to, the invite code from a link someone typed —
@@ -245,16 +232,17 @@ export function createClient({
     if (!response.ok) {
       const failure = errorResponseSchema.safeParse(body)
       if (failure.success) throw new ApiError(failure.data.code, failure.data.details)
-      // The body says nothing this project would recognise, so only the status is left —
-      // and it is never allowed to mean NO_ACTOR (see CODE_BY_STATUS). A 5xx is the server
-      // being down rather than answering off-contract: Caddy's 502 during a deploy is «the
-      // server broke», and calling it a malformed reply would send the caller looking in
-      // the wrong place.
-      const fallback = response.status >= 500 ? ERROR.INTERNAL : ISSUE.RESPONSE_INVALID
-      throw new ApiError(
-        CODE_BY_STATUS[response.status] ?? fallback,
-        `HTTP ${String(response.status)}`,
-      )
+      // The body says nothing this project would recognise, so only the status is left — and
+      // no status alone may name a domain code. Anything in front of the API answers 401 and
+      // 404 without knowing what an actor or an item is: basic auth on Caddy, a route missing
+      // after a deploy, a captive portal on shop wifi. A bare 401 read as NO_ACTOR replaced
+      // the identity; a bare 404 read as NOT_FOUND made a saved rating count as done and
+      // dropped it (MOL-28, adversarial H1). Only a body in this project's shape says either.
+      // A 5xx is the server being down rather than answering off-contract: Caddy's 502 during
+      // a deploy is «the server broke», and calling it a malformed reply would send the caller
+      // looking in the wrong place.
+      const code = response.status >= 500 ? ERROR.INTERNAL : ISSUE.RESPONSE_INVALID
+      throw new ApiError(code, `HTTP ${String(response.status)}`)
     }
 
     // A reply that does not match the schema is still the API's answer, so it leaves here

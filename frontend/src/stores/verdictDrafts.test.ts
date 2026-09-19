@@ -159,7 +159,7 @@ describe('verdict drafts', () => {
     expect(drafts.drafts).toEqual({})
   })
 
-  it('an identity the server no longer knows holds the draft without calling it a failure', async () => {
+  it('H2: an identity the server no longer knows holds the draft, and says it did not go', async () => {
     online(true)
     rateItem.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
     const drafts = fresh()
@@ -168,7 +168,19 @@ describe('verdict drafts', () => {
     await settled()
 
     expect(drafts.waiting).toHaveLength(1)
-    expect(drafts.held).toBeNull()
+    expect(drafts.held).toBe('failed')
+  })
+
+  it('H1: an answer off the contract — a proxy’s bare 404 — holds the draft, never confirms it', async () => {
+    online(true)
+    rateItem.mockRejectedValue(new ApiError(ISSUE.RESPONSE_INVALID, 'HTTP 404'))
+    const drafts = fresh()
+
+    drafts.save(milk, 4, '')
+    await settled()
+
+    expect(drafts.waiting).toHaveLength(1)
+    expect(drafts.confirmed).toEqual({})
   })
 
   it('6: two runs at once are one run — a draft is never sent twice in parallel', async () => {

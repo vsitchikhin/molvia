@@ -15,7 +15,7 @@ export type QueuePhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'off
 export interface VerdictQueue {
   readonly phase: ComputedRef<QueuePhase>
   readonly cards: ComputedRef<PendingVerdict[]>
-  /** Cards the server refused a rating for: back in the queue, first. */
+  /** Cards the server refused a rating for and that come next — not the ones put off since. */
   readonly returned: ComputedRef<PendingVerdict[]>
   /** The card on screen, or none when there is nothing to rate. */
   readonly current: ComputedRef<PendingVerdict | null>
@@ -186,6 +186,9 @@ export function useVerdictQueue(): VerdictQueue {
     return [...all.filter((card) => !later.has(card.itemId)), ...skippedLast]
   })
 
+  // What the screen may promise «comes back next»: put off by the person, it does not (H3).
+  const comingBack = computed(() => returned.value.filter((card) => !isSkipped(card)))
+
   const current = computed<PendingVerdict | null>(
     () => cards.value.find((card) => card.itemId === shownId.value) ?? cards.value[0] ?? null,
   )
@@ -299,5 +302,16 @@ export function useVerdictQueue(): VerdictQueue {
   onMounted(() => void load())
   useReconnect(() => void load())
 
-  return { phase, cards, returned, current, count, stale, fetchedAt, save, skip, retry: load }
+  return {
+    phase,
+    cards,
+    returned: comingBack,
+    current,
+    count,
+    stale,
+    fetchedAt,
+    save,
+    skip,
+    retry: load,
+  }
 }
