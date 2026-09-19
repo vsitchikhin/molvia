@@ -256,7 +256,9 @@ describe('ItemDetailsSheet', () => {
       await type(view, 'quantity', '0,9')
       await type(view, 'amount', '520')
       expect(view.text()).toContain('≈')
-      expect(view.text()).toMatch(/107,88\s₽/)
+      // 520 / 4,82 = 107,88 ₽, and an estimate is whole roubles («Валюты»).
+      expect(view.text()).toMatch(/≈\s108\s₽/)
+      expect(view.text()).not.toContain('107,88')
       expect(view.text()).toContain('пересчёт приблизительный')
     })
 

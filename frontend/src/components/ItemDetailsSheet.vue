@@ -71,7 +71,7 @@ import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconMenuDown from '~icons/mdi/menu-down'
-import { currencySchema, currencySign, formatMoney, formatUnitPrice } from '@molvia/model'
+import { currencySchema, currencySign, formatEstimate, formatUnitPrice } from '@molvia/model'
 import type { BaseUnit, CatalogueEntry, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
@@ -151,7 +151,7 @@ export default defineComponent({
     })
     const converted = computed(() => {
       const money = details.converted.value
-      return money ? formatMoney(money, locale.value) : null
+      return money ? formatEstimate(money, locale.value) : null
     })
 
     // Read now and on every change, not narrowed from a check made before: whether the note shows
