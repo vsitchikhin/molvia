@@ -28,6 +28,15 @@ export const INVISIBLE = String.raw`\p{Cf}\p{Default_Ignorable_Code_Point}\u2800
 const BLANK = new RegExp(`[\\p{Z}${INVISIBLE}]`, 'gu')
 const MARK = /\p{M}/gu
 
+/**
+ * Whether a text draws nothing — by the measure `visibleLine` applies to a name: separators, what
+ * `INVISIBLE` lists and lone marks do not count. For a screen asking «is this field empty» before
+ * it sends anything, so a pasted U+200B is as empty there as it is here (MOL-23).
+ */
+export function drawsNothing(text: string): boolean {
+  return text.trim().replace(BLANK, '').replace(MARK, '').length === 0
+}
+
 export function visibleLine(max: number): z.ZodType<string, string> {
   return (
     z
@@ -37,12 +46,9 @@ export function visibleLine(max: number): z.ZodType<string, string> {
       // the same way — a generic «too small» told the screen nothing (MOL-27, С-17).
       .min(1, { error: ISSUE.TEXT_NOT_VISIBLE })
       .max(max)
-      .refine(
-        (text) => !FORBIDDEN.test(text) && text.replace(BLANK, '').replace(MARK, '').length > 0,
-        {
-          error: ISSUE.TEXT_NOT_VISIBLE,
-        },
-      )
+      .refine((text) => !FORBIDDEN.test(text) && !drawsNothing(text), {
+        error: ISSUE.TEXT_NOT_VISIBLE,
+      })
   )
 }
 

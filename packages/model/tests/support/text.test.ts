@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ISSUE } from '#model/support/errors'
-import { visibleLine, visibleText } from '#model/support/text'
+import { drawsNothing, visibleLine, visibleText } from '#model/support/text'
 
 const review = visibleText(500)
 
@@ -143,5 +143,29 @@ describe('visibleText', () => {
 
   it('leaves a name one line: visibleLine still refuses \\n', () => {
     expect(visibleLine(200).safeParse('Молоко\nАшхар').success).toBe(false)
+  })
+})
+
+describe('drawsNothing', () => {
+  const line = visibleLine(100)
+
+  it('agrees with visibleLine on every text either of them has an opinion about', () => {
+    const texts = [
+      '',
+      '   ',
+      '\t',
+      String.fromCodePoint(0x200b),
+      String.fromCodePoint(0x2060, 0x3000),
+      String.fromCodePoint(0x2800),
+      String.fromCodePoint(0x0301),
+      'а',
+      ' молоко ',
+      'Молокó',
+      String.fromCodePoint(0x1f95b),
+      '?',
+    ]
+    for (const text of texts) {
+      expect(drawsNothing(text), JSON.stringify(text)).toBe(!line.safeParse(text).success)
+    }
   })
 })
