@@ -572,9 +572,11 @@ database access. In a product about data integrity, two write paths will silentl
   commonest break at a shelf, and drawing it red was the first consumer's bug (MOL-19, A1).
   Back online, a screen tries again by itself, as the identity does — through `useReconnect`,
   which also hears the app coming back into view: an iOS PWA frozen in the background misses
-  `online`. Polite states do not carry `role="status"`: they hand their words to the one live
-  region `AppScreen` holds from the first frame, since a region born with its words is often
-  not read. Only an error or «attention» on the screen interrupts; anything inline is polite.
+  `online`. Polite states do not carry `role="status"`: they hand their words to the app's one
+  live region in `App.vue`, above the router, since a region born with its words is often not
+  read. Each announcement is a node added a task later, taken back when its block goes and
+  gone by itself after seconds — a hidden region is still read in browse mode. Only an error
+  or «attention» on the screen interrupts; anything inline is polite.
 - **Every SFC is one file in one fixed order:** `<template>`, then `<script lang="ts">`
   exporting a `defineComponent`, then `<style scoped lang="scss">`. The linter keeps the
   order, both languages and the `scoped` attribute; none of it is left to memory.
