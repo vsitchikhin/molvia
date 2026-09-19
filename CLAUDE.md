@@ -800,11 +800,11 @@ screens are built from — button, field, card, verdict badge, sheet. MOL-28 the
 screen, «Оценки»: `GET /verdicts/pending` gives **one card per item**, not per purchase — a
 product has one verdict per person — with the place and day of the latest purchase: when its row
 was entered, but never after its trip was finished (the sauce found at home was bought that
-week). «Сохранить»
-keeps the rating on the phone and moves on; the app sends it (`stores/verdictDrafts`, a map
-«item → latest rating», not an ordered queue: `PUT` is safe to repeat). «Не сейчас» puts a card
-behind the others until the item is bought again; the last answer is remembered for offline.
-«Поход» and «Что брать» are still placeholders. Release 0.1 is broken into epics and tasks in Jira.
+week). «Сохранить» keeps the rating on the phone and moves on; the app sends it
+(`stores/verdictDrafts`, a map «item → latest rating», not an ordered queue: `PUT` is safe to
+repeat). «Не сейчас» puts a card behind the others until the item is bought again; the last
+answer is remembered for offline. «Поход» and «Что брать» are still placeholders. Release 0.1 is
+broken into epics and tasks in Jira.
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 **What the database guarantees and what it leaves to the domain** is a line, not a habit:

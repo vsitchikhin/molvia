@@ -66,9 +66,10 @@ export interface ExpenseRepository {
    * wait in all. The day is when the row was entered, but never after its trip was finished
    * (owner's decision, R6): the sauce found in the bag at home and written into last week's
    * trip was bought that week, and a trip left open for days takes today's cheese today. The
-   * one case it misses is an open trip sent late by an offline queue. Products only — a dish is rated where it was served, and
-   * until 0.3 the verdict path refuses a place, so a dish here would be a question with no way
-   * to answer it.
+   * one case it misses is an open trip sent late by an offline queue.
+   *
+   * Products only — a dish is rated where it was served, and until 0.3 the verdict path
+   * refuses a place, so a dish here would be a question with no way to answer it.
    */
   pendingVerdictsFor(actorId: string, limit: number): Promise<PendingVerdicts>
   /**
