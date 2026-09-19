@@ -6,23 +6,34 @@ import {
   INVITE_HEADER,
   ISSUE,
   actorCodec,
+  addExpenseBodySchema,
   catalogueEntryCodec,
   catalogueSearchResponseSchema,
+  currentTripResponseSchema,
   errorResponseSchema,
+  expensePatchSchema,
   healthResponseSchema,
   isWireCode,
   proposedItemSchema,
   ratingSchema,
+  recentPlacesResponseSchema,
+  startTripBodySchema,
+  tripViewCodec,
   verdictAmendmentSchema,
   verdictCardCodec,
   verdictPathSchema,
 } from '@molvia/model'
 import type {
   Actor,
+  AddExpenseBody,
   CatalogueEntry,
+  ExpensePatch,
   HealthResponse,
   ProposedItem,
   Rating,
+  StartTripBody,
+  TripPlace,
+  TripView,
   VerdictAmendment,
   VerdictCard,
   WireCode,
@@ -106,6 +117,23 @@ export interface MolviaClient {
    * kind by the same name — the entry is then that item, and the fields sent were not applied.
    */
   proposeItem(input: ProposedItem): Promise<{ entry: CatalogueEntry; created: boolean }>
+  /** The places this person shopped in lately, to tap at the door instead of typing. */
+  recentPlaces(): Promise<TripPlace[]>
+  /**
+   * «Начать поход». The identifier is the device's own, so sending it again after a lost reply
+   * is safe: `created` is then `false` and the trip is the one already there. Another open trip
+   * rejects with `error.trip_open` — the screen then asks whether to continue it or finish it.
+   */
+  startTrip(body: StartTripBody): Promise<{ trip: TripView; created: boolean }>
+  /** The trip the screen opens on, or null — «Новый поход». */
+  currentTrip(): Promise<TripView | null>
+  /** «Добавить в поход». The same identifier again is one purchase, and `created` is `false`. */
+  addExpense(tripId: string, body: AddExpenseBody): Promise<{ trip: TripView; created: boolean }>
+  /** «Добавить цену», «Сохранить»: `null` clears a field, a missing one leaves it be. */
+  updateExpense(tripId: string, expenseId: string, patch: ExpensePatch): Promise<TripView>
+  removeExpense(tripId: string, expenseId: string): Promise<TripView>
+  /** «Завершить». Finishing twice is not an error. */
+  finishTrip(tripId: string): Promise<void>
   /**
    * «Поставить оценку», or give it again — safe to repeat, which is what a draft sent when the
    * network is back needs. `created` is `true` for a first verdict, or one given after it was
@@ -259,6 +287,13 @@ export function createClient({
     return encoded.data
   }
 
+  /**
+   * An identifier kept to its own path segment: `/`, `?` and `#` in it are escaped. Not a full
+   * guarantee — `.` is not escaped, so an identifier of `..` is folded away by URL resolution —
+   * but identifiers here are the device's own uuids, and a malformed one reaches no route.
+   */
+  const segment = encodeURIComponent
+
   return {
     health: () => request('/health', healthResponseSchema),
 
@@ -301,6 +336,44 @@ export function createClient({
       return { entry: data, created: status === 201 }
     },
 
+    recentPlaces: async () => (await request('/places/recent', recentPlacesResponseSchema)).places,
+
+    // `async` everywhere below for the reason `proposeItem` has it: a body the schema refuses
+    // must arrive as a rejection. Ordinary timeouts: every one of these is safe to repeat — the
+    // identifiers are the device's own, and a repeat is answered with what is already there.
+    startTrip: async (body) => {
+      const { status, data } = await exchange('/trips', tripViewCodec, {
+        method: 'POST',
+        body: encode(startTripBodySchema, body),
+      })
+      return { trip: data, created: status === 201 }
+    },
+
+    currentTrip: async () => (await request('/trips/current', currentTripResponseSchema)).trip,
+
+    addExpense: async (tripId, body) => {
+      const { status, data } = await exchange(`/trips/${segment(tripId)}/expenses`, tripViewCodec, {
+        method: 'POST',
+        body: encode(addExpenseBodySchema, body),
+      })
+      return { trip: data, created: status === 201 }
+    },
+
+    updateExpense: async (tripId, expenseId, patch) =>
+      request(`/trips/${segment(tripId)}/expenses/${segment(expenseId)}`, tripViewCodec, {
+        method: 'PATCH',
+        body: encode(expensePatchSchema, patch),
+      }),
+
+    removeExpense: async (tripId, expenseId) =>
+      request(`/trips/${segment(tripId)}/expenses/${segment(expenseId)}`, tripViewCodec, {
+        method: 'DELETE',
+      }),
+
+    // 204 has no body, and nothing else is a success here.
+    finishTrip: async (tripId) => {
+      await request(`/trips/${segment(tripId)}/finish`, z.undefined(), { method: 'POST' })
+    },
     rateItem: async (itemId, rating) => {
       const { status, data } = await exchange(verdictPath(itemId), verdictCardCodec, {
         method: 'PUT',

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 /**
  * The verdict, through the server rather than around it (MOL-27): the hook, the path and body
  * seams, the use cases, the central error handler and the wire contract all take part. The
@@ -452,8 +453,13 @@ describe('DELETE — снять оценку', () => {
   it('21: снятая оценка не правится и не закрывает покупку', async () => {
     const actor = await insertActor(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actor, { placeId: await insertPlace(db) }, 'AMD', null)
-    await expenses.add(actor, { tripId: trip.id, itemId })
+    const { trip } = await trips.start(
+      actor,
+      { id: randomUUID(), placeId: await insertPlace(db) },
+      'AMD',
+      null,
+    )
+    await expenses.add(actor, { id: randomUUID(), tripId: trip.id, itemId })
     await rate(actor, itemId, { score: 4 })
     expect(await expenses.unratedFor(actor, 10)).toHaveLength(0)
 

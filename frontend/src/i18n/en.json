@@ -25,7 +25,7 @@
     "finish": "Finish the trip",
     "finish_confirm": {
       "title": "Finish this trip?",
-      "body": "The items stay recorded. You will not be able to add anything else to this trip",
+      "body": "The items stay recorded. Anything forgotten can still be added later",
       "ok": "Finish",
       "cancel": "Cancel"
     },
@@ -201,8 +201,9 @@
     "currency_mismatch": "Amounts in different currencies cannot be added",
     "unit_mismatch": "Prices in different units cannot be compared",
     "not_found": "Not found",
-    "conflict": "That barcode already belongs to another item",
+    "conflict": "That is already taken",
     "no_actor": "This device is no longer recognised",
+    "trip_open": "Another trip is still open",
     "internal": "Something went wrong"
   }
 }

@@ -48,18 +48,26 @@ export function tripTotal(expenses: readonly Expense[]): readonly Money[] {
     .sort((a, b) => (a.currency === b.currency ? 0 : a.currency < b.currency ? -1 : 1))
 }
 
-/** Display only. The rate lives in the trip as a snapshot; last month must not move. */
-export function convertMoney(amount: Money, rate: ExchangeRate): Money {
+/** The converted amount in the base's minor units, unbounded — the caller decides what does not fit. */
+export function convertedMinor(amount: Money, rate: ExchangeRate): bigint {
   if (amount.currency !== rate.quote) {
     throw new DomainError(ERROR.CURRENCY_MISMATCH, `${amount.currency} vs ${rate.quote}`)
   }
 
-  const minor = convertScaled(
+  return convertScaled(
     amount.minor,
     rate.scaled,
     RATE_DIGITS,
     MINOR_EXPONENT[amount.currency],
     MINOR_EXPONENT[rate.base],
   )
+}
+
+/** Display only. The rate lives in the trip as a snapshot; last month must not move. */
+export function convertMoney(amount: Money, rate: ExchangeRate): Money {
+  const minor = convertedMinor(amount, rate)
+  // A small rate grows the amount: without this bound the result is legal arithmetic and an
+  // illegal Money, and the trip answer built from it fails on the wire (MOL-21, adversarial А).
+  if (minor > INT8_MAX) throw new DomainError(ERROR.INVALID_AMOUNT, String(minor))
   return { minor, currency: rate.base }
 }

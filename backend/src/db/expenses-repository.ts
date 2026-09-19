@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import {
   and,
   asc,
@@ -17,12 +16,25 @@ import type { BaseUnit, Currency, Expense, ExpensePatch, NewExpense } from '@mol
 import { moneyFrom, moneyTo, quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
-import { idOrNull, rowLimit, theRow } from './rows'
+import { idOrNull, rowLimit } from './rows'
 import { expenses, items, trips, verdicts } from './schema'
 
+/** An expense to add, named by the device that adds it (MOL-21, В-2). */
+export type ExpenseToAdd = NewExpense & { readonly id: string }
+
 export interface ExpenseRepository {
-  /** The only required field is the item; everything else may be filled in later. */
-  add(actorId: string, input: NewExpense): Promise<Expense>
+  /**
+   * The only required field is the item; everything else may be filled in later.
+   *
+   * The identifier comes from the device, so a queue that sends twice after a lost reply writes
+   * one purchase, not two: the same identifier in the same trip for the same item is a repeat
+   * and returns the row already there with `created: false` — the first write wins, the fields
+   * sent again are not applied. Anything else holding that identifier is `CONFLICT`.
+   *
+   * A finished trip takes expenses like an open one (MOL-21, В-8): the soy sauce found in the
+   * bag at home belongs to the trip it was bought on.
+   */
+  add(actorId: string, input: ExpenseToAdd): Promise<{ expense: Expense; created: boolean }>
   /**
    * Every expense of one trip, and deliberately without a limit — the one exception to the
    * rule that a listing takes one. A trip is a single visit to a single shop, the screen
@@ -30,8 +42,15 @@ export interface ExpenseRepository {
    * computed from the same rows.
    */
   forTrip(tripId: string, actorId: string): Promise<Expense[]>
-  update(id: string, actorId: string, patch: ExpensePatch): Promise<Expense | null>
-  remove(id: string, actorId: string): Promise<boolean>
+  /**
+   * The expense is named with its trip, and both are conditions of the statement: a row of the
+   * person's other trip, named under this one, is not found rather than changed — and the
+   * identifiers are compared by Postgres as uuids, so an upper-case one a device sent is the same
+   * row (MOL-21, adversarial В). `null` when no row matched.
+   */
+  update(id: string, tripId: string, actorId: string, patch: ExpensePatch): Promise<Expense | null>
+  /** `false` when no row matched — gone already, someone else's, or of another trip. */
+  remove(id: string, tripId: string, actorId: string): Promise<boolean>
   /** Bought but not yet rated — by this person, since a stranger's verdict is not an opinion. */
   unratedFor(actorId: string, limit: number): Promise<Expense[]>
   /**
@@ -115,7 +134,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           const [row] = await tx
             .insert(expenses)
             .values({
-              id: randomUUID(),
+              id: input.id,
               tripId: input.tripId,
               itemId: input.itemId,
               qtyMilli: quantity.milli,
@@ -123,8 +142,26 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
               amountMinor: amount.minor,
               amountCurrency: amount.currency,
             })
+            .onConflictDoNothing({ target: expenses.id })
             .returning()
-          return toExpense(theRow(row, 'expenses'))
+          if (row) return { expense: toExpense(row), created: true }
+
+          // Nothing was written, so the identifier is taken. Read back under the owner's trip
+          // rather than by the identifier alone: `DO NOTHING` says only that *some* row holds
+          // it, and returning that row as ours would hand out a stranger's purchase.
+          const [existing] = await tx
+            .select()
+            .from(expenses)
+            .where(
+              and(
+                eq(expenses.id, input.id),
+                eq(expenses.tripId, input.tripId),
+                eq(expenses.itemId, input.itemId),
+              ),
+            )
+            .limit(1)
+          if (!existing) throw new DomainError(ERROR.CONFLICT)
+          return { expense: toExpense(existing), created: false }
         }),
       )
     },
@@ -147,8 +184,10 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
       return rows.map(toExpense)
     },
 
-    async update(id, actorId, patch) {
-      if (idOrNull(id) === null || idOrNull(actorId) === null) return null
+    async update(id, tripId, actorId, patch) {
+      if (idOrNull(id) === null || idOrNull(tripId) === null || idOrNull(actorId) === null) {
+        return null
+      }
 
       // `undefined` means «not mentioned» and `null` means «cleared», and the two must not
       // collapse: the sheet leaves a price empty as often as it fills one in.
@@ -175,17 +214,19 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
       const [row] = await db
         .update(expenses)
         .set(set)
-        .where(and(eq(expenses.id, id), ownedByActor(actorId)))
+        .where(and(eq(expenses.id, id), eq(expenses.tripId, tripId), ownedByActor(actorId)))
         .returning()
       return row ? toExpense(row) : null
     },
 
-    async remove(id, actorId) {
-      if (idOrNull(id) === null || idOrNull(actorId) === null) return false
+    async remove(id, tripId, actorId) {
+      if (idOrNull(id) === null || idOrNull(tripId) === null || idOrNull(actorId) === null) {
+        return false
+      }
 
       const removed = await db
         .delete(expenses)
-        .where(and(eq(expenses.id, id), ownedByActor(actorId)))
+        .where(and(eq(expenses.id, id), eq(expenses.tripId, tripId), ownedByActor(actorId)))
         .returning({ id: expenses.id })
       return removed.length > 0
     },

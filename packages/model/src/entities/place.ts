@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { citySchema, countrySchema } from '#model/values/geo'
-import { visibleLine } from '#model/support/text'
+import { visibleIdentityLine, visibleLine } from '#model/support/text'
 
 // 'venue' for the same reason as an item's 'dish': the 0.3 gate is measured separately.
 export const placeKindSchema = z.enum(['store', 'venue'])
@@ -20,7 +20,9 @@ export type Place = z.infer<typeof placeSchema>
 
 export const newPlaceSchema = z.strictObject({
   kind: placeKindSchema,
-  name: nameSchema,
+  // Invisible characters at the ends are dropped before the place is named: its name is its
+  // identity, and a character nobody can see must not make a second shop.
+  name: visibleIdentityLine(200),
   country: countrySchema,
   city: citySchema,
 })

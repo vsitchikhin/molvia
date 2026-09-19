@@ -735,7 +735,13 @@ eight write inputs and three rules in `packages/model`, with the wire codecs tha
 quantity need to cross it at all. MOL-5 added the search key; MOL-6 the nine tables of 0.1,
 the GIN index over `search_key` and the constraints that hold the product's key. MOL-8 gave
 the device an identity and the API its first routes; MOL-12 opened the catalogue — search
-and «Предложить товар»; MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
+and «Предложить товар»; MOL-21 the trip — start it, add, fix and remove its rows, finish it.
+**One trip is open at a time, and the choice is the person's:** «Начать поход» while another
+is open answers `409 error.trip_open`, and the screen asks whether to continue that one or finish
+it first. A finished trip still takes rows — the soy sauce found in the bag at home belongs to the
+trip it was bought on. The trip and its rows are named by the device, so a queue sent twice is one
+purchase.
+MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
 MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of «back»; MOL-18 the kit
 screens are built from — button, field, card, verdict badge, sheet. No real screen yet:
 three sections are placeholders. Release 0.1 is broken into epics and tasks in Jira.
