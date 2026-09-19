@@ -112,6 +112,14 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
       answered.value = ''
       return
     }
+    // Offline there is nothing to wait for: the pause would only blink the skeleton over the
+    // recent items, which are what the screen searches meanwhile.
+    if (!connected()) {
+      latest += 1
+      cancel()
+      settleFailed()
+      return
+    }
     schedule(text)
   })
 

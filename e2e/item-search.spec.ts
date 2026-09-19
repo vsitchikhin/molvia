@@ -208,7 +208,13 @@ test.describe('nothing found', () => {
 
       const submit = sheet.getByRole('button', { name: 'Add to the catalogue' })
       await expect(submit).toBeDisabled()
-      await sheet.getByText('l', { exact: true }).click()
+      // The sheet takes no tap while it is still coming up (MOL-18), so the tap is repeated
+      // until the unit is taken — as a person would tap again.
+      const litre = sheet.getByRole('radio', { name: 'l', exact: true })
+      await expect(async () => {
+        await sheet.getByText('l', { exact: true }).click()
+        await expect(litre).toBeChecked({ timeout: 200 })
+      }).toPass({ timeout: 5000 })
       await submit.click()
 
       await expect(sheet).toBeHidden()
