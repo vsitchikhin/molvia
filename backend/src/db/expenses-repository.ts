@@ -295,6 +295,8 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           name: sql<string>`${items.name}`.as('item_name'),
           placeName: sql<string>`${places.name}`.as('place_name'),
           boughtAt: trips.startedAt,
+          // Inside one trip every purchase has its day, so the order of entry breaks the tie.
+          enteredAt: sql<Date>`${expenses.createdAt}`.as('entered_at'),
         })
         .from(expenses)
         .innerJoin(trips, and(eq(trips.id, expenses.tripId), eq(trips.actorId, actorId)))
@@ -321,7 +323,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           total: sql<number>`count(*) over ()`.mapWith(Number),
         })
         .from(latest)
-        .orderBy(desc(latest.boughtAt), desc(latest.itemId))
+        .orderBy(desc(latest.boughtAt), desc(latest.enteredAt), desc(latest.itemId))
         .limit(rowLimit(limit))
 
       return {

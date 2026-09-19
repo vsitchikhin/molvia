@@ -187,6 +187,23 @@ describe('GET /verdicts/pending', () => {
     })
   })
 
+  it('в одном походе у покупок один день — первой стоит набранная последней', async () => {
+    const actor = await insertActor(db)
+    const tripId = await insertTrip(db, { actorId: actor, placeId: await insertPlace(db) })
+    const names = ['Творог', 'Сметана', 'Кефир']
+    for (const [n, name] of names.entries()) {
+      const itemId = await insertItem(db, { name, searchKey: name })
+      const createdAt = new Date(Date.UTC(2026, 8, 19, 10, n))
+      await db.insert(expenses).values({ id: randomUUID(), tripId, itemId, createdAt })
+    }
+
+    expect((await queue(actor)).items.map((card) => card.name)).toEqual([
+      'Кефир',
+      'Сметана',
+      'Творог',
+    ])
+  })
+
   it('блюдо в очередь не идёт: до 0.3 путь вердикта не принимает место', async () => {
     const actor = await insertActor(db)
     const dish = await insertItem(db, {
