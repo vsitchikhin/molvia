@@ -70,6 +70,15 @@
   --hairline: 1px;
 
   --touch-target: 2.75rem; /* 44px — the smallest thing a thumb hits reliably */
+  --touch-target-lg: 3.25rem; /* 52 — the sheet's main action, the most frequent tap in the product */
+
+  /* The verdict badge: a pill with its word, or a circle with the icon alone. */
+  --badge-height: 1.75rem; /* 28 */
+  --badge-dot: 1.375rem; /* 22 */
+
+  /* Of the visible height, not of the layout one: with the iOS address bar showing, `vh` is taller
+     than the screen and the sheet's header would sit under the top edge. */
+  --sheet-max-height: 82dvh;
 
   /* ── Bars ─────────────────────────────────────────────────────────────── */
 
