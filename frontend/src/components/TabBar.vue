@@ -1,8 +1,21 @@
 <template>
   <nav class="tabbar" :aria-label="t('nav.label')">
-    <RouterLink v-for="tab in tabs" :key="tab.name" class="tab" :to="{ name: tab.name }">
-      <component :is="tab.icon" class="icon" aria-hidden="true" />
-      <span class="label">{{ t(`nav.${tab.name}`) }}</span>
+    <RouterLink
+      v-for="tab in tabs"
+      :key="tab.name"
+      v-slot="{ href, isExactActive }"
+      :to="{ name: tab.name }"
+      custom
+    >
+      <a
+        class="tab"
+        :href="href"
+        :aria-current="isExactActive ? 'page' : undefined"
+        @click="open($event, tab.name)"
+      >
+        <component :is="tab.icon" class="icon" aria-hidden="true" />
+        <span class="label">{{ t(`nav.${tab.name}`) }}</span>
+      </a>
     </RouterLink>
   </nav>
 </template>
@@ -13,6 +26,7 @@ import { useI18n } from 'vue-i18n'
 import IconCart from '~icons/mdi/cart-outline'
 import IconLightbulb from '~icons/mdi/lightbulb-on-outline'
 import IconStar from '~icons/mdi/star-outline'
+import { useNavigation } from '@/navigation'
 import type { Tab } from '@/router'
 
 const tabs: { name: Tab; icon: object }[] = [
@@ -22,15 +36,28 @@ const tabs: { name: Tab; icon: object }[] = [
 ]
 
 /**
- * The three sections of 0.1. Which one is active is the router's to say: `RouterLink` sets
- * `aria-current="page"` on the exact match, and the style hangs on that attribute rather than
- * on a class of its own, so what a screen reader hears and what the eye sees cannot disagree.
+ * The three sections of 0.1. Which one is active is the router's to say — its exact match sets
+ * `aria-current="page"`, and the style hangs on that attribute rather than on a class of its
+ * own, so what a screen reader hears and what the eye sees cannot disagree.
+ *
+ * The link keeps its `href`, so a long press or a modified click still does what a link does;
+ * a plain tap goes through `goTab`, which decides how the move is written into the history.
  */
 export default defineComponent({
   name: 'TabBar',
   setup() {
     const { t } = useI18n()
-    return { t, tabs }
+    const { goTab } = useNavigation()
+
+    function open(event: MouseEvent, tab: Tab): void {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return
+      }
+      event.preventDefault()
+      void goTab(tab)
+    }
+
+    return { t, tabs, open }
   },
 })
 </script>

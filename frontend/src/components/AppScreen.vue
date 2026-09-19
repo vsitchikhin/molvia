@@ -2,7 +2,7 @@
   <div class="screen" :class="{ collapsed, docked, tabbed }">
     <header ref="bar" class="bar">
       <div class="leading">
-        <button v-if="parentTitleKey" class="back" type="button" @click="back">
+        <button v-if="parentTitleKey" class="back" type="button" @click="goBack">
           <IconChevronLeft class="chevron" aria-hidden="true" />
           <span class="hidden">{{ t('nav.back_label') }}</span> {{ t(parentTitleKey) }}
         </button>
@@ -43,6 +43,7 @@ import { useRoute, useRouter } from 'vue-router'
 import IconChevronLeft from '~icons/mdi/chevron-left'
 import IdentityNotice from '@/components/IdentityNotice.vue'
 import { useCollapsed } from '@/composables/useCollapsed'
+import { useNavigation } from '@/navigation'
 
 /**
  * The frame every screen of 0.1 sits in: a pinned row, the large title, the room under the tab
@@ -81,12 +82,9 @@ export default defineComponent({
     const docked = computed(() => Boolean(parentTitleKey.value ?? slots.meta ?? slots.trailing))
     const tabbed = computed(() => Boolean(route.meta.tab))
 
-    function back(): void {
-      const parent = route.meta.parent
-      if (parent) void router.replace({ name: parent })
-    }
+    const { goBack } = useNavigation()
 
-    return { t, bar, sentinel, collapsed, parentTitleKey, docked, tabbed, back }
+    return { t, bar, sentinel, collapsed, parentTitleKey, docked, tabbed, goBack }
   },
 })
 </script>

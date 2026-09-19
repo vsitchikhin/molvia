@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from '@/App.vue'
 import { applyDocumentLang, i18n } from '@/i18n'
+import { settleColdStart } from '@/navigation'
 import { router } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import '@/styles/main.scss'
@@ -20,10 +21,16 @@ app.config.errorHandler = (error, _instance, info) => {
   console.error('[molvia]', info, error)
 }
 
-app.use(createPinia()).use(router).use(i18n).mount('#app')
+app.use(createPinia()).use(router).use(i18n)
 
-// Raised right after the first paint rather than before it: the store carries the four
-// states a screen shows, so a person gets «loading» instead of a blank page while the
-// identity is being fetched. Every request after this one carries the identifier, and the
-// screen that explains a lost identity is drawn from the same state.
-void useActorStore().start()
+// Mounted once the first route is settled: a nested screen opened cold gets its parent laid
+// underneath first, so the first paint is already the screen and not a flash of the parent.
+void settleColdStart(router).then(() => {
+  app.mount('#app')
+
+  // Raised right after the first paint rather than before it: the store carries the four
+  // states a screen shows, so a person gets «loading» instead of a blank page while the
+  // identity is being fetched. Every request after this one carries the identifier, and the
+  // screen that explains a lost identity is drawn from the same state.
+  void useActorStore().start()
+})
