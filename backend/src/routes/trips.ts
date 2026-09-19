@@ -5,10 +5,18 @@ import {
   addExpenseBodySchema,
   currentTripResponseSchema,
   expensePatchSchema,
+  rateChoiceBodySchema,
   startTripBodySchema,
   tripViewCodec,
 } from '@molvia/model'
-import type { Actor, AddExpenseBody, ExpensePatch, StartTripBody, TripView } from '@molvia/model'
+import type {
+  Actor,
+  AddExpenseBody,
+  ExpensePatch,
+  RateChoiceBody,
+  StartTripBody,
+  TripView,
+} from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { parseBody } from '@/parse'
 
@@ -24,6 +32,7 @@ export interface TripsApi {
   update(actorId: string, tripId: string, expenseId: string, patch: ExpensePatch): Promise<TripView>
   remove(actorId: string, tripId: string, expenseId: string): Promise<TripView>
   finish(actorId: string, tripId: string): Promise<void>
+  chooseRate(actorId: string, tripId: string, body: RateChoiceBody): Promise<TripView>
 }
 
 /**
@@ -106,5 +115,16 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
   app.post<{ Params: TripParams }>('/trips/:tripId/finish', async (request, reply) => {
     await api.finish(request.actorId, request.params.tripId)
     return reply.code(204).header('cache-control', 'no-store').send()
+  })
+
+  /**
+   * «Считать по новому курсу / по прежнему / по своему», when the rate the trip took jumped
+   * (MOL-39, Р-19, Р-21). PUT: the same choice again is the same state. 409 `error.conflict` for
+   * a trip that never jumped or a «previous» it does not hold; 400 `error.invalid_rate` for an
+   * own rate that is not one.
+   */
+  app.put<{ Params: TripParams }>('/trips/:tripId/rate-choice', async (request, reply) => {
+    const body = parseBody(rateChoiceBodySchema, request.body)
+    return answer(reply, await api.chooseRate(request.actorId, request.params.tripId, body))
   })
 }

@@ -328,6 +328,42 @@ native scanner only reads QR. Native is a 1.0 question.
 **Exchange rates:** official ones from the open CBA API; real exchange rates from users.
 Scraping rate.am was rejected.
 
+**How the official rate reaches a trip (MOL-39).** A trip snapshots it when it starts, from a
+cache in the database — **«Начать поход» never goes to the network**: a trip at the shelf does
+not wait for a central bank. The API refreshes the cache itself, hourly, and at boot unless
+the cache was written less than an hour ago — in development, unless it holds anything at all:
+`make dev` restarts on every save
+(`RATES_REFRESH`, on by default, off in end-to-end runs). The cache holds what the banks
+publish — **one currency against the dram per day**, never a pair; the pair is built at the
+snapshot, and an inverse or a cross is rounded there to the snapshot's six digits.
+
+- **The CBA speaks SOAP only** — the GET form answers «Runtime Error» — and dates its rate by
+  the day in Yerevan, with nothing on weekends: a Sunday trip takes Friday's rate, with Friday's
+  date. The date always travels with the rate; «≈» without one is worse than an old number.
+- **Two open sources stand in for it: the Bank of Russia, then open.er-api.com.** «The CBA is
+  silent» has two faces and both count: five failures in a row, **or** an answer whose rate is
+  over **seven days** old — a service stuck on its last date looks healthy. Every refresh still
+  asks the CBA first; an open source as stale as the CBA sends the refresh on to the next one. A
+  trip takes a fallback only when it is fresher than a CBA rate over a week old — a shorter bound
+  would mark every weekend — and such a snapshot says `source: 'fallback'`. When nothing is
+  fresher, the trip keeps the CBA rate with its date and `rateStale: true`: the screen says the
+  bank has published nothing since. A pair is never built from two providers.
+- **A jump is flagged, not refused (owner's decision).** A rate more than a quarter away from the
+  lower median of its recent rates is stored with `jump`. Recent means: the central bank's own last
+  five; an open source's own from the last week if it has three, and otherwise the central bank's
+  — it is asked only when the bank is silent, so its own history is an old episode or nothing,
+  exactly when a trip takes it. **Fewer than three earlier rates, no judgement:** with two the
+  median is their mean, one ×100 day made the next right day a jump and offered itself as
+  «previous». The trip remembers the jump and shows it always; beside the snapshot it keeps the
+  rate before the jump when there is one no older than a week, and the person chooses — the jumped
+  rate, that one, or their own for this trip, `personal` (`PUT /trips/:tripId/rate-choice`). The
+  snapshot is never rewritten — only the choice moves.
+- **Strict or nothing:** an answer missing a currency, carrying a zero or a negative, dated by a
+  day that is not one — `0001-01-01`, `1970-01-01`, the 31st of February — or past tomorrow —
+  `9999-12-31` — is not written at all. A stale rate with its date beats a mixed one.
+- **An empty cache gives a trip no rate, for good** — the snapshot is written once and never
+  filled in later (owner's decision, 19.09.2026).
+
 ## Tracker and documentation
 
 They live outside the repository, on the same Atlassian site, reachable through the
@@ -760,6 +796,8 @@ it first. A finished trip still takes rows — the soy sauce found in the bag at
 trip it was bought on. The trip and its rows are named by the device, so a queue sent twice is one
 purchase.
 MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
+MOL-39 the official rate — a cache refreshed hourly, snapshotted by every new trip, a jump
+left to the person;
 MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of «back»; MOL-18 the kit
 screens are built from — button, field, card, verdict badge, sheet. MOL-23 the first real screen,
 «Что взяли?»: the search as the person types, the recent items on the device, «Предложить
@@ -794,6 +832,11 @@ The shape worth knowing here:
   the code deployed against it is the worse of the two failures. `make migrate`, the test
   setup and the boot path all go through the same code, so a migration cannot behave one
   way locally and another in production.
+- **A migration applied anywhere is never rewritten.** drizzle decides what to run by the
+  journal's `created_at` alone and never compares a file with what was applied: a rewritten
+  migration is skipped silently if its stamp is older, and fails on its first `CREATE` if newer
+  — then the API does not start. Folding a task's migrations into one is safe only while no
+  database has run them; MOL-39 checked every copy's journal before and after doing it.
 - **Postgres publishes no port.** It is reachable only over the compose network.
 - **The PWA calls `/api/...`** and Caddy strips the prefix — the same shape the Vite dev
   proxy has, so nothing about the origin differs between development and production.

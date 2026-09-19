@@ -11,12 +11,16 @@ import {
   ERROR,
   catalogueSearchResponseSchema,
   currentTripResponseSchema,
+  parseRate,
   recentPlacesResponseSchema,
   toSearchKey,
   tripViewCodec,
+  yerevanDate,
+  yerevanMidnight,
 } from '@molvia/model'
-import type { TripView } from '@molvia/model'
+import type { CachedRate, RateProvider, TripView } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
+import { createRateRepository } from '@/db/rates-repository'
 import { places, searchPicks, trips } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
@@ -49,7 +53,7 @@ interface Reply {
 }
 
 async function call(
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   url: string,
   actor: string | null,
   body?: unknown,
@@ -546,5 +550,326 @@ describe('запомненный выбор (MOL-11) пишется добавл
 
     await add(actor, tripId, { itemId: randomUUID(), query: 'молоко' })
     expect(await db.select().from(searchPicks)).toEqual([])
+  })
+})
+
+describe('курс в походе (MOL-39)', () => {
+  // Dated by the real clock: the route snapshots as of now, in Yerevan.
+  const today = yerevanDate(new Date())
+  const daysAgo = (days: number): string =>
+    yerevanDate(new Date(Date.now() - days * 24 * 60 * 60 * 1000))
+  const rub = (value: string, date = today, provider: RateProvider = 'cba'): CachedRate => ({
+    provider,
+    currency: 'RUB',
+    date,
+    scaled: parseRate(value),
+    jump: false,
+  })
+  const rates = createRateRepository(db)
+
+  it('«Начать поход» снимает курс ЦБ РА, и пересчёт считает сервер', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(1))])
+    const actor = await insertActor(db)
+
+    const started = await start(actor)
+    const view = trip(started)
+    const itemId = await insertItem(db)
+    const added = await add(actor, view.id, {
+      itemId,
+      amount: { amount: '10000', currency: 'AMD' },
+    })
+
+    expect(started.body).toMatchObject({
+      rate: { base: 'RUB', quote: 'AMD', rate: '4.312300', source: 'official' },
+    })
+    expect(view.rate?.asOf).toEqual(yerevanMidnight(daysAgo(1)))
+    // 10 000 ֏ / 4.3123 = 2 318.948… ₽
+    expect(added.body).toMatchObject({ converted: { amount: '2318.95', currency: 'RUB' } })
+  })
+
+  it('новый курс в кеше не трогает начатый поход — ни в текущем, ни в повторе POST', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(1))])
+    const actor = await insertActor(db)
+    const id = randomUUID()
+    const before = trip(await start(actor, 'Ереван Сити', id))
+
+    await rates.upsert([rub('4.5000', today), rub('4.4000', daysAgo(1))])
+
+    expect(await current(actor)).toEqual(before)
+    expect(trip(await start(actor, 'Ереван Сити', id)).rate).toEqual(before.rate)
+    const [row] = await db.select().from(trips).where(eq(trips.id, id))
+    expect(row?.rateScaled).toBe(4_312_300n)
+  })
+
+  it('следующий поход берёт уже новый курс', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(1))])
+    const actor = await insertActor(db)
+    const first = trip(await start(actor))
+    await call('POST', `/trips/${first.id}/finish`, actor)
+    await rates.upsert([rub('4.5000', today)])
+
+    expect(trip(await start(actor)).rate).toMatchObject({ scaled: 4_500_000n })
+  })
+
+  it('курс из будущего не берётся — даже если поставщик его уже выставил', async () => {
+    const tomorrow = yerevanDate(new Date(Date.now() + 24 * 60 * 60 * 1000))
+    await rates.upsert([rub('4.3123', daysAgo(1)), rub('9.9999', tomorrow, 'cba')])
+    const actor = await insertActor(db)
+
+    expect(trip(await start(actor)).rate).toMatchObject({ scaled: 4_312_300n })
+  })
+
+  it('ЦБ РА молчит больше недели — запасной курс с пометкой fallback', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(8)), rub('4.3165', daysAgo(1), 'cbr')])
+    const actor = await insertActor(db)
+
+    expect((await start(actor)).body).toMatchObject({
+      rate: { rate: '4.316500', source: 'fallback' },
+    })
+  })
+
+  it('пустой кеш — поход без курса, а не отказ', async () => {
+    const actor = await insertActor(db)
+    const started = await start(actor)
+
+    expect(started.status).toBe(201)
+    expect(trip(started).rate).toBeNull()
+  })
+
+  it('доход и траты в одной валюте — курса нет даже при полном кеше', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(1))])
+    const actor = await insertActor(db, { incomeCurrency: 'AMD' })
+
+    expect(trip(await start(actor)).rate).toBeNull()
+  })
+})
+
+describe('скачок курса и выбор человека (MOL-39, Р-19)', () => {
+  const daysAgo = (days: number): string =>
+    yerevanDate(new Date(Date.now() - days * 24 * 60 * 60 * 1000))
+  const rub = (value: string, date: string, jump = false): CachedRate => ({
+    provider: 'cba',
+    currency: 'RUB',
+    date,
+    scaled: parseRate(value),
+    jump,
+  })
+  const rates = createRateRepository(db)
+  const choose = (actor: string, tripId: string, choice: unknown) =>
+    call('PUT', `/trips/${tripId}/rate-choice`, actor, { choice })
+
+  async function jumpedTrip(): Promise<{ actor: string; view: TripView }> {
+    await rates.upsert([rub('4.3050', daysAgo(2)), rub('431.23', daysAgo(1), true)])
+    const actor = await insertActor(db)
+    const view = trip(await start(actor))
+    const itemId = await insertItem(db)
+    const added = await add(actor, view.id, {
+      itemId,
+      amount: { amount: '10000', currency: 'AMD' },
+    })
+    return { actor, view: trip(added) }
+  }
+
+  it('поход считает по новому курсу, а рядом отдаёт прежний и пустой выбор', async () => {
+    const { view } = await jumpedTrip()
+
+    expect(view.rate?.scaled).toBe(431_230_000n)
+    expect(view.rateJump).toMatchObject({
+      jumped: { scaled: 431_230_000n },
+      previous: { scaled: 4_305_000n, source: 'official' },
+      choice: null,
+    })
+    // 10 000 ֏ / 431.23
+    expect(view.converted).toEqual({ minor: 2_319n, currency: 'RUB' })
+  })
+
+  it('выбор «по прежнему» пересчитывает поход, снимок остаётся как был', async () => {
+    const { actor, view } = await jumpedTrip()
+
+    const chosen = await choose(actor, view.id, 'previous')
+
+    expect(chosen.status).toBe(200)
+    expect(chosen.body).toMatchObject({
+      rate: { rate: '4.305000' },
+      rateJump: { choice: 'previous' },
+      // 10 000 ֏ / 4.305
+      converted: { amount: '2322.88', currency: 'RUB' },
+    })
+    const [row] = await db.select().from(trips).where(eq(trips.id, view.id))
+    expect(row).toMatchObject({ rateScaled: 431_230_000n, rateChoice: 'previous' })
+    expect(await current(actor)).toEqual(trip(chosen))
+  })
+
+  it('выбор можно повторить и передумать — обратно «по новому»', async () => {
+    const { actor, view } = await jumpedTrip()
+    await choose(actor, view.id, 'previous')
+    const again = await choose(actor, view.id, 'previous')
+    const back = await choose(actor, view.id, 'jumped')
+
+    expect(again.status).toBe(200)
+    expect(trip(back).rate?.scaled).toBe(431_230_000n)
+    expect(trip(back).rateJump?.choice).toBe('jumped')
+  })
+
+  it('выбрать можно и в завершённом походе — скачок часто замечают уже дома', async () => {
+    const { actor, view } = await jumpedTrip()
+    await call('POST', `/trips/${view.id}/finish`, actor)
+
+    expect((await choose(actor, view.id, 'previous')).status).toBe(200)
+  })
+
+  it('поход без скачка — 409 conflict: выбирать не из чего', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(1))])
+    const actor = await insertActor(db)
+    const view = trip(await start(actor))
+
+    const reply = await choose(actor, view.id, 'previous')
+
+    expect(reply.status).toBe(409)
+    expect(code(reply)).toBe(ERROR.CONFLICT)
+    expect(view.rateJump).toBeNull()
+  })
+
+  it('чужой поход отвечает как несуществующий — 404, и выбор не записан', async () => {
+    const { view } = await jumpedTrip()
+    const stranger = await insertActor(db)
+
+    expect((await choose(stranger, view.id, 'previous')).status).toBe(404)
+    expect((await choose(stranger, randomUUID(), 'previous')).status).toBe(404)
+    const [row] = await db.select().from(trips).where(eq(trips.id, view.id))
+    expect(row?.rateChoice).toBeNull()
+  })
+
+  it('неизвестный выбор и лишнее поле — 400', async () => {
+    const { actor, view } = await jumpedTrip()
+
+    expect((await choose(actor, view.id, 'both')).status).toBe(400)
+    expect(
+      (await call('PUT', `/trips/${view.id}/rate-choice`, actor, { choice: 'jumped', rate: '4.3' }))
+        .status,
+    ).toBe(400)
+  })
+
+  it('скачок без более раннего курса — скачок виден, прежнего нет, свой курс можно ввести (Р-21)', async () => {
+    await rates.upsert([rub('431.23', daysAgo(1), true)])
+    const actor = await insertActor(db)
+    const started = trip(await start(actor))
+
+    expect(started.rateJump).toMatchObject({
+      jumped: { scaled: 431_230_000n },
+      previous: null,
+      manual: null,
+      choice: null,
+    })
+    expect((await choose(actor, started.id, 'previous')).status).toBe(409)
+  })
+
+  it('свой курс: поход считается по нему, источник personal, снимок не тронут', async () => {
+    const { actor, view } = await jumpedTrip()
+
+    const chosen = await call('PUT', `/trips/${view.id}/rate-choice`, actor, {
+      choice: 'manual',
+      rate: '4,31',
+    })
+
+    expect(chosen.status).toBe(200)
+    expect(chosen.body).toMatchObject({
+      rate: { rate: '4.310000', source: 'personal', base: 'RUB', quote: 'AMD' },
+      rateJump: { choice: 'manual', manual: { rate: '4.310000', source: 'personal' } },
+      // 10 000 ֏ / 4.31
+      converted: { amount: '2320.19', currency: 'RUB' },
+      rateStale: false,
+    })
+    const [row] = await db.select().from(trips).where(eq(trips.id, view.id))
+    expect(row).toMatchObject({ rateScaled: 431_230_000n, rateManualScaled: 4_310_000n })
+  })
+
+  it('свой курс остаётся, если вернуться «по новому», и заменяется новым вводом', async () => {
+    const { actor, view } = await jumpedTrip()
+    const manual = (rate: string) =>
+      call('PUT', `/trips/${view.id}/rate-choice`, actor, { choice: 'manual', rate })
+
+    await manual('4.31')
+    const back = trip(await choose(actor, view.id, 'jumped'))
+    const again = trip(await manual('4.32'))
+
+    expect(back.rate?.scaled).toBe(431_230_000n)
+    expect(back.rateJump?.manual?.scaled).toBe(4_310_000n)
+    expect(again.rate?.scaled).toBe(4_320_000n)
+  })
+
+  it('свой курс, который не курс, — 400 invalid_rate, и ничего не записано', async () => {
+    const { actor, view } = await jumpedTrip()
+
+    for (const rate of ['abc', '0', '-4.31', '0.00001']) {
+      const reply = await call('PUT', `/trips/${view.id}/rate-choice`, actor, {
+        choice: 'manual',
+        rate,
+      })
+      expect(reply.status).toBe(400)
+      expect(code(reply)).toBe(ERROR.INVALID_RATE)
+    }
+    expect(
+      (await call('PUT', `/trips/${view.id}/rate-choice`, actor, { choice: 'manual' })).status,
+    ).toBe(400)
+    const [row] = await db.select().from(trips).where(eq(trips.id, view.id))
+    expect(row).toMatchObject({ rateManualScaled: null, rateChoice: null })
+  })
+
+  it('свой курс в походе без скачка — 409: предлагается только при скачке', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(1))])
+    const actor = await insertActor(db)
+    const view = trip(await start(actor))
+
+    const reply = await call('PUT', `/trips/${view.id}/rate-choice`, actor, {
+      choice: 'manual',
+      rate: '4.31',
+    })
+    expect(reply.status).toBe(409)
+  })
+})
+
+describe('курс устарел (MOL-39, Р-18)', () => {
+  const daysAgo = (days: number): string =>
+    yerevanDate(new Date(Date.now() - days * 24 * 60 * 60 * 1000))
+  const rates = createRateRepository(db)
+  const at = (provider: RateProvider, value: string, date: string): CachedRate => ({
+    provider,
+    currency: 'RUB',
+    date,
+    scaled: parseRate(value),
+    jump: false,
+  })
+
+  it('ЦБ РА молчит больше недели, запасных нет — его курс с датой и признаком «устарел»', async () => {
+    await rates.upsert([at('cba', '4.3123', daysAgo(10))])
+    const actor = await insertActor(db)
+
+    expect(trip(await start(actor))).toMatchObject({
+      rate: { source: 'official' },
+      rateStale: true,
+    })
+  })
+
+  it('запасной такой же старый — всё равно ЦБ РА с признаком', async () => {
+    await rates.upsert([at('cba', '4.3123', daysAgo(10)), at('cbr', '4.3165', daysAgo(10))])
+    const actor = await insertActor(db)
+
+    expect(trip(await start(actor))).toMatchObject({
+      rate: { source: 'official' },
+      rateStale: true,
+    })
+  })
+
+  it('пятничный курс в воскресенье — не устарел: неделя ещё не прошла', async () => {
+    await rates.upsert([at('cba', '4.3123', daysAgo(2))])
+    const actor = await insertActor(db)
+
+    expect(trip(await start(actor)).rateStale).toBe(false)
+  })
+
+  it('без курса признака нет', async () => {
+    const actor = await insertActor(db)
+    expect(trip(await start(actor)).rateStale).toBe(false)
   })
 })

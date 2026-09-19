@@ -30,6 +30,8 @@ export default defineConfig({
     {
       command: 'npm run start -w @molvia/backend',
       url: `http://127.0.0.1:${apiPort}/health`,
+      // No central bank in a test run: its answer would decide the outcome (MOL-39).
+      env: { RATES_REFRESH: 'off' },
       reuseExistingServer: !ci,
       stdout: 'pipe',
     },

@@ -6,6 +6,7 @@ import {
   expenses,
   itemBarcodes,
   items,
+  officialRates,
   places,
   searchPicks,
   trips,
@@ -76,6 +77,7 @@ export async function insertTrip(
 /** Deleted child-first: every table here points at the one below it. */
 export async function clearAll(db: Db): Promise<void> {
   await db.delete(events)
+  await db.delete(officialRates)
   await db.delete(searchPicks)
   await db.delete(verdicts)
   await db.delete(expenses)

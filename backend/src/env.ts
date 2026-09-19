@@ -29,6 +29,12 @@ const envSchema = z.object({
    */
   SIGNUP_CODE: z.string().min(16),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  /**
+   * The hourly refresh of official rates (MOL-39), which goes out to the central banks. On by
+   * default, so production cannot forget it; end-to-end runs switch it off, because a test that
+   * depends on a foreign server answering is a test that fails for someone else's reasons.
+   */
+  RATES_REFRESH: z.enum(['on', 'off']).default('on'),
 })
 
 export const env = envSchema.parse(process.env)
