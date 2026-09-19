@@ -59,6 +59,8 @@
         <VerdictBadge level="take" />
         <p class="name">{{ t('dev.kit.sample_milk') }}</p>
       </AppCard>
+      <VerdictCard :card="verdictCard" />
+      <VerdictCard :card="verdictCard" :draft="verdictDraft" />
     </section>
 
     <AppButton block @click="sheetOpen = true">{{ t('dev.kit.open_sheet') }}</AppButton>
@@ -92,6 +94,7 @@ import AppScreen from '@/components/AppScreen.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import VerdictBadge from '@/components/VerdictBadge.vue'
+import VerdictCard from '@/components/VerdictCard.vue'
 
 /**
  * Every piece of the kit in its states, on one page, and a sheet in a real history — reached in
@@ -114,6 +117,7 @@ export default defineComponent({
     IconRefresh,
     SegmentedControl,
     VerdictBadge,
+    VerdictCard,
   },
   setup() {
     const { t } = useI18n()
@@ -136,6 +140,20 @@ export default defineComponent({
       date: ref('2026-09-19'),
       unit: ref('l'),
       sheetOpen: ref(false),
+      // The verdict card blank, and as a refused draft comes back: a score, words, the error.
+      verdictCard: computed(() => ({
+        itemId: '00000000-0000-4000-8000-000000000001',
+        name: t('dev.kit.sample_milk'),
+        placeName: 'SAS',
+        boughtAt: new Date(Date.now() - 86_400_000),
+      })),
+      verdictDraft: computed(() => ({
+        card: { itemId: '', name: '', placeName: '', boughtAt: new Date() },
+        score: 2 as const,
+        review: t('verdict.review_placeholder'),
+        state: 'typing' as const,
+        error: ERROR.INTERNAL,
+      })),
     }
   },
 })

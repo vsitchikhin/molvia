@@ -144,6 +144,15 @@
     "offline": {
       "title": "The rating is saved",
       "body": "It will go on its own once you are back online. You can close the app"
+    },
+    "stale": "The list as of {when} — we will refresh it once you are back online",
+    "load_error": {
+      "title": "The list of purchases did not load",
+      "body": "The server did not answer. Saved ratings are safe on the phone"
+    },
+    "load_offline": {
+      "title": "The list of purchases will appear once you are online",
+      "body": "Saved ratings are safe on the phone and will go on their own"
     }
   },
   "money": {

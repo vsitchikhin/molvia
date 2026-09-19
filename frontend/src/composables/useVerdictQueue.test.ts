@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, watch } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
@@ -151,6 +151,29 @@ describe('useVerdictQueue', () => {
     expect(queue.count.value).toBe(1)
     // The memory agrees: a restart without a connection does not offer the milk again.
     expect(localStorage.getItem(`molvia.verdict-queue.${ME}`)).not.toContain(milk.itemId)
+  })
+
+  it('the last rating, gone through at once, never brings its card back — not for a moment', async () => {
+    rateItem.mockResolvedValue({
+      verdict: {
+        itemId: milk.itemId,
+        score: 4,
+        review: null,
+        ratedAt: new Date(),
+        updatedAt: new Date(),
+      },
+      created: true,
+    })
+    pendingVerdicts.mockResolvedValue(answer([milk], 1))
+    const queue = await mounted()
+    const seen: (string | undefined)[] = []
+    watch(queue.current, (card) => seen.push(card?.name), { flush: 'sync' })
+
+    queue.save(milk, 4, '')
+    await flushPromises()
+
+    expect(seen).toEqual([undefined])
+    expect(queue.phase.value).toBe('empty')
   })
 
   it('a draft the server refused comes back first, and counts again', async () => {

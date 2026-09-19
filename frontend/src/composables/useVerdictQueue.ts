@@ -122,6 +122,7 @@ export function useVerdictQueue(): VerdictQueue {
   /**
    * A draft that left the waiting list and is not back on a card was answered: the item is
    * rated, and the remembered answer must stop offering it before the next load says so.
+   * Synchronous: between the draft going and this running, the card would be back on screen.
    */
   watch(
     () => drafts.waiting.map((draft) => draft.card.itemId),
@@ -136,6 +137,7 @@ export function useVerdictQueue(): VerdictQueue {
       remembered.value = { ...shown, answer: { items, total } }
       rememberAnswer()
     },
+    { flush: 'sync' },
   )
 
   const returned = computed(() =>
