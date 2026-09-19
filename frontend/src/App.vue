@@ -8,10 +8,12 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import TabBar from '@/components/TabBar.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
+import { useReconnect } from '@/composables/useReconnect'
+import { useTripQueueStore } from '@/stores/tripQueue'
 
 // No header of its own: no mockup carries the brand, every screen is titled by its section,
 // and the frame around each screen is AppScreen's.
@@ -19,6 +21,13 @@ export default defineComponent({
   name: 'AppRoot',
   components: { TabBar },
   setup() {
+    // The app, not a screen, sends what the trip queue holds: a purchase written at the shelf
+    // goes out when the connection is back, whichever screen is open then (MOL-24).
+    const queue = useTripQueueStore()
+    const send = () => void queue.flush()
+    onMounted(send)
+    useReconnect(send)
+
     return { route: useRoute(), announcements: provideAnnouncer() }
   },
 })
