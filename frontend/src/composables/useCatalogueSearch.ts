@@ -78,7 +78,8 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
       results.value = found
       answered.value = text
       phase.value = found.length > 0 ? 'ready' : 'empty'
-      stale.value = false
+      // Still dimmed while a newer search waits for its pause.
+      stale.value = pending !== undefined
     } catch {
       if (mine !== latest) return
       settleFailed()
@@ -94,14 +95,16 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
   }
 
   function schedule(text: string): void {
-    // The search still out answers a question already changed: it is dropped now, at the
-    // keystroke, and not when the pause ends — an answer landing inside the pause was taken for
-    // the latest and shown undimmed while the next search ran (adversarial A2).
-    latest += 1
-    cancel()
+    // The search still out is not cancelled at the keystroke, only at the next pause (`run`):
+    // on a slow network at a shelf every letter would otherwise cut the search the pause before it
+    // sent, and nothing would show until the typing stopped — though «мол» already finds the milk
+    // (Р-13). Its answer, when it lands in the pause, is shown but stays dimmed: it answers the
+    // text before (A2), and a pick from it leaves with that text (`answered`).
+    clearTimeout(pending)
     if (phase.value === 'ready' || phase.value === 'empty') stale.value = true
     else phase.value = 'loading'
     pending = setTimeout(() => {
+      pending = undefined
       void run(text)
     }, SEARCH_DEBOUNCE_MS)
   }

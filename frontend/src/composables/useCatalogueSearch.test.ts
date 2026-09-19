@@ -213,7 +213,7 @@ describe('the catalogue search as the screen types it', () => {
     expect(search.phase.value).toBe('loading')
   })
 
-  it('keeps an answer that lands inside the pause dimmed — it answers the question before', async () => {
+  it('shows an answer that lands inside the pause, dimmed — it answers the text before', async () => {
     const { query, search } = harness()
     await type(query, 'мол')
     await pause()
@@ -223,14 +223,36 @@ describe('the catalogue search as the screen types it', () => {
     await pause()
 
     await type(query, 'молок')
-    expect(calls[1]?.signal?.aborted).toBe(true)
+    // Not cut at the keystroke: on a slow network that would leave nothing on screen until the
+    // typing stopped (Р-13).
+    expect(calls[1]?.signal?.aborted).toBe(false)
     calls[1]?.answer([cream])
     await settle()
 
-    expect(search.results.value).toEqual([milk])
+    expect(search.results.value).toEqual([cream])
+    expect(search.answered.value).toBe('моло')
     expect(search.stale.value).toBe(true)
+
     await pause()
     expect(calls.map((call) => call.query)).toEqual(['мол', 'моло', 'молок'])
+    expect(search.stale.value).toBe(true)
+    calls[2]?.answer([milk])
+    await settle()
+    expect(search.stale.value).toBe(false)
+    expect(search.answered.value).toBe('молок')
+  })
+
+  it('answers while the person keeps typing, however slow the network — every pause shows something', async () => {
+    const { query, search } = harness()
+    await type(query, 'м')
+    await pause()
+    // The next letter comes before the answer: the search it sent lives on.
+    await type(query, 'мо')
+    calls[0]?.answer([milk])
+    await settle()
+
+    expect(search.phase.value).toBe('ready')
+    expect(search.results.value).toEqual([milk])
     expect(search.stale.value).toBe(true)
   })
 
