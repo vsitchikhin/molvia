@@ -37,12 +37,14 @@
         </template>
       </AppField>
 
-      <div class="per-unit" aria-live="polite">
+      <div class="per-unit">
         <span class="per-unit-label">{{ t('item.unit_price_label') }}</span>
         <span class="per-unit-value">{{ perUnit ?? '—' }}</span>
       </div>
       <p v-if="!perUnit" class="caption">{{ t('item.unit_price_pending') }}</p>
-      <p v-else-if="converted" class="caption">
+      <!-- The price of the package needs no quantity: a weight not yet known still has its
+           price in roubles (adversarial A6). -->
+      <p v-if="converted" class="caption">
         <span>{{ t('money.converted_package', { amount: converted }) }}</span>
         <span class="note">{{ t('money.converted_note') }}</span>
       </p>
@@ -67,16 +69,17 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconMenuDown from '~icons/mdi/menu-down'
 import { currencySchema, currencySign, formatEstimate, formatUnitPrice } from '@molvia/model'
-import type { BaseUnit, CatalogueEntry, TripExpenseView } from '@molvia/model'
+import type { BaseUnit, CatalogueEntry, Money, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useItemDetails } from '@/composables/useItemDetails'
 import type { DetailsField } from '@/composables/useItemDetails'
 import { useActorStore } from '@/stores/actor'
@@ -126,9 +129,28 @@ export default defineComponent({
     const tripId = computed(() => trips.current?.id ?? null)
     const editing = computed(() => props.expense !== null)
 
+    /** The trip's total and what is still queued for it: a price must fit beside both (A9). */
+    function occupied(): Money[] {
+      const trip = trips.current
+      if (!trip) return []
+      const held: Money[] = [...trip.total]
+      for (const write of queue.pending) {
+        if (write.kind !== 'add' || write.tripId !== trip.id || !write.body.amount) continue
+        const amount = write.body.amount
+        const index = held.findIndex((money) => money.currency === amount.currency)
+        if (index === -1) held.push(amount)
+        else {
+          const sum = (held[index]?.minor ?? 0n) + amount.minor
+          held[index] = { minor: sum, currency: amount.currency }
+        }
+      }
+      return held
+    }
+
     const details = useItemDetails({
       entry: props.entry,
       trip: () => trips.current,
+      occupied,
       // With neither a trip nor a known person the sheet cannot write at all («start a trip
       // first»), and the currency it would have started in is never seen.
       currency: trips.current?.currency ?? actor.actor?.spendCurrency ?? currencySchema.enum.AMD,
@@ -154,6 +176,23 @@ export default defineComponent({
       return money ? formatEstimate(money, locale.value) : null
     })
 
+    // Read out through the app's one live region, not a region of its own born with the sheet —
+    // those are often not read (CLAUDE.md, MOL-19). Once typing pauses, not on every keystroke.
+    const announce = useAnnouncer()
+    let withdraw: (() => void) | undefined
+    let pause: ReturnType<typeof setTimeout> | undefined
+    watch(perUnit, (value) => {
+      clearTimeout(pause)
+      pause = setTimeout(() => {
+        withdraw?.()
+        withdraw = value ? announce?.(t('item.unit_price_announced', { value })) : undefined
+      }, 700)
+    })
+    onUnmounted(() => {
+      clearTimeout(pause)
+      withdraw?.()
+    })
+
     // Read now and on every change, not narrowed from a check made before: whether the note shows
     // is a statement about this moment.
     const online = ref(navigator.onLine)
@@ -163,10 +202,10 @@ export default defineComponent({
     onMounted(() => {
       window.addEventListener('online', listen)
       window.addEventListener('offline', listen)
-      // Opened with no trip in memory — a link opened cold, a trip started on another device:
-      // the server is asked before «start a trip first» is taken for the truth (В-6). A failure
-      // leaves that answer in place; there is nothing else to show.
-      if (!trips.current) trips.load().catch(() => undefined)
+      // The server is asked every time the sheet opens: the trip in memory is for when it cannot
+      // be asked, not instead of asking — finished or started anew on another device, it would
+      // otherwise take purchases for ever (review Р-2). A failure keeps the memory (В-6).
+      trips.load().catch(() => undefined)
     })
     onUnmounted(() => {
       window.removeEventListener('online', listen)

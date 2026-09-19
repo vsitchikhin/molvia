@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nextTick } from 'vue'
+import { nextTick, ref } from 'vue'
 import { ERROR, formatUnitPrice, parseMoney, parseQuantity, tripViewCodec } from '@molvia/model'
 import type { CatalogueEntry, TripExpenseView, TripView } from '@molvia/model'
 import { useItemDetails } from '@/composables/useItemDetails'
@@ -277,6 +277,72 @@ describe('useItemDetails', () => {
       const sheet = details({ trip: trip('0.01') })
       sheet.amount.value = '92233720368547758'
       expect(sheet.converted.value).toBeNull()
+    })
+  })
+
+  describe('after the adversarial round', () => {
+    it('follows the trip that arrives after it opened, until a currency is picked (A5)', async () => {
+      const arriving = ref<TripView | null>(null)
+      const sheet = details({ trip: () => arriving.value, currency: 'USD' })
+      expect(sheet.currency.value).toBe('USD')
+
+      arriving.value = trip()
+      await nextTick()
+      expect(sheet.currency.value).toBe('AMD')
+
+      sheet.currency.value = 'EUR'
+      await nextTick()
+      arriving.value = { ...trip(), currency: 'RUB' }
+      await nextTick()
+      expect(sheet.currency.value).toBe('EUR')
+    })
+
+    it('takes a field holding only characters that draw nothing for an empty one (A7)', () => {
+      const sheet = details()
+      sheet.amount.value = String.fromCodePoint(0x200b)
+      expect(sheet.validate()).toBeNull()
+      expect(sheet.body(null).amount).toBeUndefined()
+
+      sheet.amount.value = `52${String.fromCodePoint(0x200b)}0`
+      expect(sheet.body(null).amount).toEqual(parseMoney('520', 'AMD'))
+    })
+
+    it('refuses a price the trip cannot add to what it holds (A9)', () => {
+      const held = [{ minor: 5_000_000_000_000_000_000n, currency: 'AMD' as const }]
+      const sheet = details({ occupied: held })
+      sheet.amount.value = '50 000 000 000 000 000'
+      expect(sheet.validate()).toBe('amount')
+      expect(sheet.errors.value.amount).toBe(ERROR.INVALID_AMOUNT)
+
+      sheet.currency.value = 'RUB'
+      expect(sheet.validate()).toBeNull()
+    })
+
+    it('counts an amended row once, not twice, against what the trip holds', () => {
+      const amount = { minor: 5_000_000_000_000_000_000n, currency: 'AMD' as const }
+      const row: TripExpenseView = {
+        id: 'cccccccc-0000-4000-8000-000000000001',
+        createdAt: new Date('2026-09-19T08:10:00.000Z'),
+        item: entry(),
+        quantity: null,
+        amount,
+        unitPrice: null,
+      }
+      const sheet = details({ expense: row, occupied: [amount] })
+      expect(sheet.validate()).toBeNull()
+    })
+
+    it('names a purchase where randomUUID is missing — plain http on the LAN (Р-6)', () => {
+      const original = Object.getOwnPropertyDescriptor(crypto, 'randomUUID')
+      Object.defineProperty(crypto, 'randomUUID', { configurable: true, value: undefined })
+      try {
+        const id = details().expenseId
+        expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+        expect(details().expenseId).not.toBe(id)
+      } finally {
+        if (original) Object.defineProperty(crypto, 'randomUUID', original)
+        else Reflect.deleteProperty(crypto, 'randomUUID')
+      }
     })
   })
 })

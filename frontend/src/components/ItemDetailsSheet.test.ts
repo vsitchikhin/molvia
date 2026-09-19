@@ -90,11 +90,20 @@ interface Options {
   readonly expense?: TripExpenseView | null
   readonly closeSteps?: 1 | 2
   readonly trip?: TripView | null
+  /** What `GET /trips/current` answers; the trip in memory unless said otherwise. */
+  readonly server?: TripView | null | 'down'
   readonly locale?: 'ru' | 'en'
 }
 
 async function render(options: Options = {}) {
   if (options.trip !== null) useTripStore().apply(options.trip ?? trip())
+  // The sheet asks the server every time it opens; unless a test says otherwise, the server
+  // agrees with the memory.
+  if (options.server === 'down') currentTrip.mockRejectedValue(new Error('Failed to fetch'))
+  else {
+    const memory = options.trip === undefined ? trip() : options.trip
+    currentTrip.mockResolvedValue(options.server === undefined ? memory : options.server)
+  }
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/')
   await router.push('/trip/add')
@@ -247,17 +256,26 @@ describe('ItemDetailsSheet', () => {
   })
 
   it('asks the server for the trip when it has none in memory', async () => {
-    currentTrip.mockResolvedValue(trip())
-    const { view } = await render({ trip: null })
+    const { view } = await render({ trip: null, server: trip() })
     await vi.waitFor(() => {
       expect(view.findAll('button').some((b) => b.text() === 'Добавить в поход')).toBe(true)
     })
     expect(currentTrip).toHaveBeenCalledTimes(1)
   })
 
-  it('does not ask when it already knows the trip', async () => {
-    await render()
-    expect(currentTrip).not.toHaveBeenCalled()
+  it('asks the server even when it remembers a trip, and the answer wins', async () => {
+    // Finished on another device: the memory would otherwise take purchases for ever (Р-2).
+    const { view } = await render({ server: null })
+    expect(currentTrip).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => {
+      expect(view.text()).toContain('Сначала начните поход')
+    })
+  })
+
+  it('keeps the trip it remembers when the server cannot be asked', async () => {
+    const { view } = await render({ server: 'down' })
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(view.text()).toContain('Добавить в поход')
   })
 
   it('asks for a trip first when there is none, and leads back to it (В-6)', async () => {
@@ -279,6 +297,20 @@ describe('ItemDetailsSheet', () => {
       expect(view.text()).toMatch(/≈\s108\s₽/)
       expect(view.text()).not.toContain('107,88')
       expect(view.text()).toContain('пересчёт приблизительный')
+    })
+
+    it('shows it with no quantity yet — the price of the package is enough (A6)', async () => {
+      const { view } = await render({ trip: trip('4.82') })
+      await type(view, 'amount', '520')
+      expect(perUnit(view)).toBe('—')
+      expect(view.text()).toMatch(/≈\s108\s₽/)
+    })
+
+    it('does not say the comparison is in drams — the price may be in any currency (A8)', async () => {
+      const { view } = await render({ trip: trip('4.82') })
+      await type(view, 'amount', '520')
+      expect(view.text()).not.toContain('в драмах')
+      expect(view.text()).toContain('по цене на ценнике')
     })
 
     it('shows none for a price in another currency, and prices it per unit in that one', async () => {

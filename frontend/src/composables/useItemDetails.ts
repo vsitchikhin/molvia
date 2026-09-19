@@ -1,12 +1,15 @@
-import { computed, ref, toValue, watch } from 'vue'
+import { computed, nextTick, ref, toValue, watch } from 'vue'
 import type { ComputedRef, MaybeRefOrGetter, Ref } from 'vue'
 import {
   ERROR,
+  INVISIBLE,
+  addMoney,
   convertMoney,
   decimalFromMilli,
   decimalFromMinor,
   parseMoney,
   parseQuantity,
+  subtractMoney,
   unitPrice as unitPriceOf,
 } from '@molvia/model'
 import type {
@@ -36,13 +39,35 @@ type Parsed<T> =
 const BLANK = { kind: 'blank' } as const
 const INVALID = { kind: 'invalid' } as const
 
+const INVISIBLE_CHARACTERS = new RegExp(`[${INVISIBLE}]`, 'gu')
+
+/**
+ * What the field shows is what is parsed: a character that draws nothing — a zero-width space
+ * pasted with the price — is not input. Left in, it turned a field that looks empty into «not an
+ * amount» and blocked the purchase (adversarial A7).
+ */
 function parsed<T>(text: string, parse: (text: string) => T): Parsed<T> {
-  if (text.trim() === '') return BLANK
+  const visible = text.replace(INVISIBLE_CHARACTERS, '')
+  if (visible.trim() === '') return BLANK
   try {
-    return { kind: 'value', value: parse(text) }
+    return { kind: 'value', value: parse(visible) }
   } catch {
     return INVALID
   }
+}
+
+/**
+ * A purchase is named by the device (MOL-21). `randomUUID` exists only in a secure context, and a
+ * phone on the LAN over plain http — `PWA_EXPOSE=1 make dev` without `make certs` — is not one
+ * (review Р-6); `getRandomValues` is there everywhere.
+ */
+function newId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
 function valueOf<T>(field: Parsed<T>): T | null {
@@ -66,8 +91,17 @@ function sameMoney(a: Money | null, b: Money | null): boolean {
 export interface ItemDetailsInput {
   readonly entry: CatalogueEntry
   readonly trip: MaybeRefOrGetter<TripView | null>
-  /** The currency a price starts in: the trip's, or the person's own when there is no trip yet. */
+  /**
+   * The currency a price starts in: the trip's, or the person's own when there is no trip yet.
+   * Until the person picks one, the price follows the trip's currency as it arrives (Р-3).
+   */
   readonly currency: Currency
+  /**
+   * What the trip already holds, per currency — its total and the purchases still queued. A price
+   * the trip cannot add to it is refused here, where the person still sees the field: the server
+   * would refuse it once the sheet is gone (adversarial A9).
+   */
+  readonly occupied?: MaybeRefOrGetter<readonly Money[]>
   /** The row being amended, or none when a purchase is being added. */
   readonly expense?: TripExpenseView | null
   /** The decimal separator of the interface: a Russian keyboard writes «0,9». */
@@ -124,7 +158,26 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
   const amount = ref(original.amount ? shown(decimalFromMinor(original.amount), separator) : '')
   const currency = ref<Currency>(original.amount?.currency ?? input.currency)
 
-  const expenseId = expense?.id ?? crypto.randomUUID()
+  // The price follows the trip's currency until the person picks one: the trip may arrive after
+  // the sheet opened (В-6), in a currency other than the person's own (review Р-3).
+  let chosen = expense !== null
+  let following = false
+  watch(currency, () => {
+    if (!following) chosen = true
+  })
+  watch(
+    () => toValue(input.trip)?.currency,
+    (tripCurrency) => {
+      if (chosen || !tripCurrency || tripCurrency === currency.value) return
+      following = true
+      currency.value = tripCurrency
+      void nextTick(() => {
+        following = false
+      })
+    },
+  )
+
+  const expenseId = expense?.id ?? newId()
 
   const parsedQuantity = computed(() =>
     parsed(quantity.value, (text) => parseQuantity(text, unit.value)),
@@ -157,6 +210,26 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
     }
   })
 
+  /** Whether the trip can still add this price to what it holds — the server's own sum. */
+  const fits = computed(() => {
+    const a = valueOf(parsedAmount.value)
+    if (!a) return true
+    const held = toValue(input.occupied ?? [])
+    const same = held.find((money) => money.currency === a.currency)
+    if (!same) return true
+    try {
+      // An amended row is already in the total: it is replaced, not added again.
+      const base =
+        original.amount?.currency === a.currency ? subtractMoney(same, original.amount) : same
+      addMoney(base, a)
+      return true
+    } catch {
+      return false
+    }
+  })
+
+  const amountWrong = computed(() => parsedAmount.value.kind === 'invalid' || !fits.value)
+
   // An error is shown once the person has left the field or pressed the button, not on every
   // keystroke: «1,» is a number on its way.
   const touched = ref<Record<DetailsField, boolean>>({ quantity: false, amount: false })
@@ -172,8 +245,7 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
       touched.value.quantity && parsedQuantity.value.kind === 'invalid'
         ? ERROR.INVALID_QUANTITY
         : null,
-    amount:
-      touched.value.amount && parsedAmount.value.kind === 'invalid' ? ERROR.INVALID_AMOUNT : null,
+    amount: touched.value.amount && amountWrong.value ? ERROR.INVALID_AMOUNT : null,
   }))
 
   function leave(field: DetailsField): void {
@@ -187,7 +259,7 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
   function validate(): DetailsField | null {
     touched.value = { quantity: true, amount: true }
     if (parsedQuantity.value.kind === 'invalid') return 'quantity'
-    if (parsedAmount.value.kind === 'invalid') return 'amount'
+    if (amountWrong.value) return 'amount'
     return null
   }
 

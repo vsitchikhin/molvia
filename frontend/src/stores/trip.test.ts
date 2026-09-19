@@ -112,6 +112,53 @@ describe('trip store', () => {
     expect(store.current?.id).toBe(LATER)
   })
 
+  it('lets go of the current trip once it is answered finished', () => {
+    // Finished on another device, or by «Завершить» through the queue: purchases must not keep
+    // going into it (review Р-1).
+    const store = fresh()
+    store.apply(trip(OPEN))
+    store.apply(trip(OPEN, { finishedAt: '2026-09-19T10:00:00.000Z' }))
+    expect(store.current).toBeNull()
+    expect(fresh().current).toBeNull()
+  })
+
+  it('gives an answer that was out while the identity changed to nobody', async () => {
+    let answer: (trip: TripView | null) => void = () => undefined
+    currentTrip.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve
+        }),
+    )
+    const store = fresh()
+    const loading = store.load()
+    const actor = useActorStore()
+    actor.id = OTHER
+    await nextTick()
+    answer(trip(OPEN))
+    await loading
+
+    expect(store.current).toBeNull()
+    expect(localStorage.getItem(`molvia.trip.${OTHER}`)).toBeNull()
+  })
+
+  it('does not put back an older trip over an answer to a write that came back first', async () => {
+    let answer: (trip: TripView | null) => void = () => undefined
+    currentTrip.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve
+        }),
+    )
+    const store = fresh()
+    const loading = store.load()
+    store.apply(trip(OPEN, { amount: '520.00' }))
+    answer(trip(OPEN))
+    await loading
+
+    expect(store.current?.total).toEqual([{ minor: 52000n, currency: 'AMD' }])
+  })
+
   it('does not adopt a finished trip when it had none', () => {
     const store = fresh()
     store.apply(trip(OPEN, { finishedAt: '2026-09-19T10:00:00.000Z' }))

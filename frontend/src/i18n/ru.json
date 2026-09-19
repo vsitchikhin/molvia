@@ -68,6 +68,7 @@
     "unit_price_label": "За единицу",
     "unit_price_pending": "Считается само, вводить не надо",
     "unit_price_value": "{amount}/{unit}",
+    "unit_price_announced": "За единицу: {value}",
     "save": "Добавить в поход",
     "save_edit": "Сохранить",
     "delete": "Удалить позицию",
@@ -164,7 +165,7 @@
   "money": {
     "approx": "≈ {amount}",
     "converted_package": "≈ {amount} за упаковку",
-    "converted_note": "пересчёт приблизительный, сравниваем всегда в драмах",
+    "converted_note": "пересчёт приблизительный, сравниваем всегда по цене на ценнике",
     "rate_official": "курс {rate} · ЦБ РА",
     "rate_mine": "мой курс {rate}",
     "rate_frozen": "Курс сохраняется вместе с походом. Прошлый месяц не меняется от сегодняшнего курса",

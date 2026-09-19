@@ -68,6 +68,7 @@
     "unit_price_label": "Per unit",
     "unit_price_pending": "Worked out for you — nothing to type",
     "unit_price_value": "{amount}/{unit}",
+    "unit_price_announced": "Per unit: {value}",
     "save": "Add to the trip",
     "save_edit": "Save",
     "delete": "Remove the item",
@@ -164,7 +165,7 @@
   "money": {
     "approx": "≈ {amount}",
     "converted_package": "≈ {amount} per pack",
-    "converted_note": "the conversion is approximate, we always compare in drams",
+    "converted_note": "the conversion is approximate, we always compare by the price on the tag",
     "rate_official": "rate {rate} · CBA",
     "rate_mine": "my rate {rate}",
     "rate_frozen": "The rate is saved with the trip. Last month does not change with today's rate",
