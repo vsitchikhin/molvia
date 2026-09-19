@@ -19,6 +19,9 @@
 
     <template #footer>
       <p v-if="!connected" class="line" role="status">{{ t('item.propose.offline') }}</p>
+      <p v-else-if="nameRefused" class="line failed" role="status">
+        {{ t('item.propose.name_invalid') }}
+      </p>
       <p v-else-if="failed" class="line failed" role="alert">{{ t('item.propose.failed') }}</p>
       <AppButton size="large" block :disabled="!ready" @click="submit">
         {{ t('item.propose.submit') }}
@@ -90,6 +93,17 @@ export default defineComponent({
      */
     let opening = 0
 
+    // A tab or a line break is a cell or a line of wherever the text was copied from — a row of
+    // the owner's Google Sheets. The catalogue refuses them inside a name, and a button gone grey
+    // with no word why was the answer (adversarial B4); a space is what was meant.
+    function oneLine(text: string): string {
+      return text.replace(/[\t\n\v\f\r]+/gu, ' ')
+    }
+    watch([name, note], ([nextName, nextNote]) => {
+      if (oneLine(nextName) !== nextName) name.value = oneLine(nextName)
+      if (oneLine(nextNote) !== nextNote) note.value = oneLine(nextNote)
+    })
+
     // A fresh form for every opening, starting from what is in the field now.
     watch(
       () => props.open,
@@ -98,7 +112,7 @@ export default defineComponent({
         sending.value = false
         if (!open) return
         connected.value = navigator.onLine
-        name.value = props.query.trim()
+        name.value = oneLine(props.query).trim()
         unit.value = ''
         note.value = ''
         failed.value = false
@@ -118,6 +132,13 @@ export default defineComponent({
     )
 
     const ready = computed(() => connected.value && !sending.value && input.value.success)
+
+    // A name that draws something and is still refused holds a character no price tag has; the
+    // button waits, and this says why instead of leaving it grey in silence.
+    const nameRefused = computed(
+      () =>
+        !drawsNothing(name.value) && !proposedItemSchema.shape.name.safeParse(name.value).success,
+    )
 
     async function submit(): Promise<void> {
       const parsed = input.value
@@ -158,6 +179,7 @@ export default defineComponent({
       connected,
       failed,
       ready,
+      nameRefused,
       submit,
       nameMax: ITEM_NAME_MAX,
       noteMax: ITEM_NOTE_MAX,

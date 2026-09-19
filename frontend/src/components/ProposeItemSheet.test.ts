@@ -286,6 +286,47 @@ describe('«Suggest an item»', () => {
     })
   })
 
+  describe('text pasted from elsewhere', () => {
+    it('takes a row of a spreadsheet: the tab between cells becomes a space', async () => {
+      proposeItem.mockResolvedValue({ entry: tan, created: true })
+      const sheet = await render('')
+      await chooseUnit(sheet, en.item.unit_l)
+
+      await fields(sheet).name.setValue('Молоко\tАшхар')
+      await fields(sheet).note.setValue('пастеризованное\t3,2%')
+
+      expect(fields(sheet).name.element.value).toBe('Молоко Ашхар')
+      expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+      await submitButton(sheet).trigger('click')
+      expect(proposeItem).toHaveBeenCalledWith({
+        kind: 'product',
+        name: 'Молоко Ашхар',
+        defaultUnit: 'l',
+        note: 'пастеризованное 3,2%',
+      })
+    })
+
+    it('starts from a query with a tab in it as one line', async () => {
+      const sheet = await render('Молоко\tАшхар')
+      expect(fields(sheet).name.element.value).toBe('Молоко Ашхар')
+    })
+
+    it('says why the button waits when the name holds a character the catalogue refuses', async () => {
+      const sheet = await render('')
+      await chooseUnit(sheet, en.item.unit_l)
+
+      await fields(sheet).name.setValue(`Молоко${String.fromCodePoint(0x202e)}`)
+
+      expect(submitButton(sheet).attributes('disabled')).toBeDefined()
+      expect(sheet.text()).toContain(en.item.propose.name_invalid)
+    })
+
+    it('says nothing of the kind about a name not yet written', async () => {
+      const sheet = await render('')
+      expect(sheet.text()).not.toContain(en.item.propose.name_invalid)
+    })
+  })
+
   describe('lengths and blanks', () => {
     it('stops the name and the note where the catalogue does, instead of going grey past it', async () => {
       const sheet = await render()
