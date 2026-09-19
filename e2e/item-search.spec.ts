@@ -231,7 +231,8 @@ test.describe('nothing found', () => {
     const word = nonsense()
 
     await field(page).fill(word)
-    await expect(page.getByText(`Nothing found for «${word}»`)).toBeVisible()
+    // The block on the screen, not the live region, which says the same words (Р-10).
+    await expect(page.locator('.not-found-text')).toContainText(`Nothing found for «${word}»`)
 
     const statuses: number[] = []
     page.on('response', (response) => {
