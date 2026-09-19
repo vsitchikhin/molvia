@@ -17,6 +17,7 @@ import {
   proposedItemSchema,
   rateChoiceBodySchema,
   ratingSchema,
+  pendingVerdictsCodec,
   recentPlacesResponseSchema,
   startTripBodySchema,
   tripViewCodec,
@@ -30,6 +31,7 @@ import type {
   CatalogueEntry,
   ExpensePatch,
   HealthResponse,
+  PendingVerdicts,
   ProposedItem,
   RateChoiceBody,
   Rating,
@@ -170,6 +172,8 @@ export interface MolviaClient {
    * queue that retries it should count that as done rather than as a failure.
    */
   withdrawVerdict(itemId: string): Promise<void>
+  /** «Оценки»: bought and not rated, one card per item, and how many wait in all. */
+  pendingVerdicts(): Promise<PendingVerdicts>
 }
 
 /**
@@ -445,5 +449,7 @@ export function createClient({
     // 204 carries no body, and a body where none was promised is an answer off the contract.
     withdrawVerdict: async (itemId) =>
       request(verdictPath(itemId), z.undefined(), { method: 'DELETE' }),
+
+    pendingVerdicts: async () => request('/verdicts/pending', pendingVerdictsCodec),
   }
 }

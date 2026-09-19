@@ -12,12 +12,19 @@ import {
   sql,
 } from 'drizzle-orm'
 import { DomainError, ERROR, UNIT_PRICE_SCALE, expenseSchema } from '@molvia/model'
-import type { BaseUnit, Currency, Expense, ExpensePatch, NewExpense } from '@molvia/model'
+import type {
+  BaseUnit,
+  Currency,
+  Expense,
+  ExpensePatch,
+  NewExpense,
+  PendingVerdicts,
+} from '@molvia/model'
 import { moneyFrom, moneyTo, quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
-import { expenses, items, trips, verdicts } from './schema'
+import { expenses, items, places, trips, verdicts } from './schema'
 
 /** An expense to add, named by the device that adds it (MOL-21, В-2). */
 export type ExpenseToAdd = NewExpense & { readonly id: string }
@@ -53,6 +60,18 @@ export interface ExpenseRepository {
   remove(id: string, tripId: string, actorId: string): Promise<boolean>
   /** Bought but not yet rated — by this person, since a stranger's verdict is not an opinion. */
   unratedFor(actorId: string, limit: number): Promise<Expense[]>
+  /**
+   * The same purchases as the screen «Оценки» asks about them (MOL-28): one row per item, with
+   * the name, the place and the day of the latest purchase, newest first, and how many items
+   * wait in all. The day is when the row was entered, but never after its trip was finished
+   * (owner's decision, R6): the sauce found in the bag at home and written into last week's
+   * trip was bought that week, and a trip left open for days takes today's cheese today. The
+   * one case it misses is an open trip sent late by an offline queue.
+   *
+   * Products only — a dish is rated where it was served, and until 0.3 the verdict path
+   * refuses a place, so a dish here would be a question with no way to answer it.
+   */
+  pendingVerdictsFor(actorId: string, limit: number): Promise<PendingVerdicts>
   /**
    * Where it was cheaper: one row per place, currency and unit.
    *
@@ -113,6 +132,30 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
         .select({ one: sql`1` })
         .from(trips)
         .where(and(eq(trips.id, expenses.tripId), eq(trips.actorId, actorId))),
+    )
+
+  /**
+   * The purchase has no living verdict of this person. Shared by both readers of the queue, so
+   * «unrated» cannot mean two things. Expects `trips` and `items` joined to the expense.
+   */
+  const noLiveVerdict = (actorId: string) =>
+    notExists(
+      db
+        .select({ one: sql`1` })
+        .from(verdicts)
+        .where(
+          and(
+            eq(verdicts.actorId, actorId),
+            eq(verdicts.itemId, expenses.itemId),
+            // A product is rated as itself and a dish only where it was served, so the place
+            // that closes a purchase depends on the kind. `is not distinct from` rather than
+            // `=`, because for a product both sides are null.
+            sql`${verdicts.placeId} is not distinct from
+                (case when ${items.kind} = 'dish' then ${trips.placeId} end)`,
+            // A withdrawn verdict is no opinion, so the purchase waits for one again.
+            isNull(verdicts.deletedAt),
+          ),
+        ),
     )
 
   return {
@@ -239,29 +282,61 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
         .from(expenses)
         .innerJoin(trips, and(eq(trips.id, expenses.tripId), eq(trips.actorId, actorId)))
         .innerJoin(items, eq(items.id, expenses.itemId))
-        .where(
-          notExists(
-            db
-              .select({ one: sql`1` })
-              .from(verdicts)
-              .where(
-                and(
-                  eq(verdicts.actorId, actorId),
-                  eq(verdicts.itemId, expenses.itemId),
-                  // A product is rated as itself and a dish only where it was served, so the
-                  // place that closes a purchase depends on the kind. `is not distinct from`
-                  // rather than `=`, because for a product both sides are null.
-                  sql`${verdicts.placeId} is not distinct from
-                      (case when ${items.kind} = 'dish' then ${trips.placeId} end)`,
-                  // A withdrawn verdict is no opinion, so the purchase waits for one again.
-                  isNull(verdicts.deletedAt),
-                ),
-              ),
-          ),
-        )
+        .where(noLiveVerdict(actorId))
         .orderBy(desc(expenses.createdAt), desc(expenses.id))
         .limit(rowLimit(limit))
       return rows.map((row) => toExpense(row.expense))
+    },
+
+    async pendingVerdictsFor(actorId, limit) {
+      if (idOrNull(actorId) === null) return { items: [], total: 0 }
+
+      // `least` passes over a null: an open trip has no end, and the entry stands.
+      const boughtAt = sql<Date>`least(${expenses.createdAt}, ${trips.finishedAt})`.mapWith(
+        expenses.createdAt,
+      )
+      const latest = db
+        .selectDistinctOn([expenses.itemId], {
+          itemId: expenses.itemId,
+          // Aliased: both names are `name`, and a subquery keeps only the bare column name.
+          name: sql<string>`${items.name}`.as('item_name'),
+          placeName: sql<string>`${places.name}`.as('place_name'),
+          boughtAt: boughtAt.as('bought_at'),
+          // Inside one trip every purchase has its day, so the order of entry breaks the tie.
+          enteredAt: sql<Date>`${expenses.createdAt}`.as('entered_at'),
+        })
+        .from(expenses)
+        .innerJoin(trips, and(eq(trips.id, expenses.tripId), eq(trips.actorId, actorId)))
+        .innerJoin(items, and(eq(items.id, expenses.itemId), eq(items.kind, 'product')))
+        .innerJoin(places, eq(places.id, trips.placeId))
+        .where(noLiveVerdict(actorId))
+        .orderBy(expenses.itemId, desc(boughtAt), desc(expenses.createdAt), desc(expenses.id))
+        .as('latest')
+
+      // The total is counted by a window over the same rows, before the limit applies: a
+      // second statement could see a purchase the first did not, and the counter would
+      // disagree with the page it came with.
+      const rows = await db
+        .select({
+          itemId: latest.itemId,
+          name: latest.name,
+          placeName: latest.placeName,
+          boughtAt: latest.boughtAt,
+          total: sql<number>`count(*) over ()`.mapWith(Number),
+        })
+        .from(latest)
+        .orderBy(desc(latest.boughtAt), desc(latest.enteredAt), desc(latest.itemId))
+        .limit(rowLimit(limit))
+
+      return {
+        items: rows.map(({ itemId, name, placeName, boughtAt }) => ({
+          itemId,
+          name,
+          placeName,
+          boughtAt,
+        })),
+        total: rows[0]?.total ?? 0,
+      }
     },
 
     async cheapestFor(actorId, itemIds, limit = PLACES_PER_ITEM) {

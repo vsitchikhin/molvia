@@ -14,6 +14,7 @@ import TabBar from '@/components/TabBar.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 
 // No header of its own: no mockup carries the brand, every screen is titled by its section,
 // and the frame around each screen is AppScreen's.
@@ -21,10 +22,14 @@ export default defineComponent({
   name: 'AppRoot',
   components: { TabBar },
   setup() {
-    // The app, not a screen, sends what the trip queue holds: a purchase written at the shelf
-    // goes out when the connection is back, whichever screen is open then (MOL-24).
+    // The app, not a screen, sends what waits on the phone, whichever screen is open when the
+    // connection is back: purchases written at the shelf (MOL-24) and saved ratings (MOL-28).
     const queue = useTripQueueStore()
-    const send = () => void queue.flush()
+    const drafts = useVerdictDraftsStore()
+    const send = () => {
+      void queue.flush()
+      void drafts.flush()
+    }
     onMounted(send)
     useReconnect(send)
 

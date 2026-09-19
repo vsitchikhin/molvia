@@ -107,6 +107,30 @@ function hasBlankRun(text: string): boolean {
   return false
 }
 
+/** Control characters other than the line break, which a person typing a review never means. */
+const CONTROL = /[^\P{Cc}\n]/gu
+
+/**
+ * What a review looks like, made into what `visibleText` accepts, before it is sent — on the
+ * phone, by the measure the server applies (MOL-28, adversarial F5, R3). A tab pasted from a
+ * note is a space, a line or paragraph separator a line break, direction marks and stray control
+ * characters go, a line on which nothing draws is empty, and runs of empty lines fold to one.
+ * Every character that draws is kept, so nothing the person wrote is lost.
+ *
+ * Here and not on the screen: what counts as blank is `isBlankLine`'s to say, and a second
+ * list of it on the phone would drift the way `INVISIBLE` did twice.
+ */
+export function tidyText(text: string): string {
+  const lines = text
+    .replace(/\r\n?|[\u2028\u2029]/gu, '\n')
+    .replaceAll('\t', ' ')
+    .replace(DIRECTIONS, '')
+    .replace(CONTROL, '')
+    .split('\n')
+    .map((line) => (isBlankLine(line) ? '' : line))
+  return lines.filter((line, index) => line !== '' || lines[index - 1] !== '').join('\n')
+}
+
 /**
  * `visibleLine` that may break into lines — for a review, typed into a three-row textarea.
  *

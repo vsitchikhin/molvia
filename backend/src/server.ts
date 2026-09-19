@@ -18,6 +18,7 @@ import { recentPlaces } from '@/usecases/recent-places'
 import { rateItem } from '@/usecases/rate-item'
 import { amendVerdict } from '@/usecases/amend-verdict'
 import { withdrawVerdict } from '@/usecases/withdraw-verdict'
+import { pendingVerdicts } from '@/usecases/pending-verdicts'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { chooseTripRate } from '@/usecases/choose-trip-rate'
 import { startTrip } from '@/usecases/start-trip'
@@ -152,6 +153,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         rate: (actorId, itemId, rating) => rateItem({ items, verdicts }, actorId, itemId, rating),
         amend: (actorId, itemId, patch) => amendVerdict(verdicts, actorId, itemId, patch),
         withdraw: (actorId, itemId) => withdrawVerdict(verdicts, actorId, itemId),
+        pending: (actorId) => pendingVerdicts(tripData.expenses, actorId),
       })
       guardedDone()
     })

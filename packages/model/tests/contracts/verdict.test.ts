@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {
+  PENDING_VERDICTS_LIMIT,
+  pendingVerdictsCodec,
   ratingSchema,
   verdictAmendmentSchema,
   verdictCardCodec,
@@ -126,5 +128,48 @@ describe('verdictPathSchema', () => {
     expect(
       verdictPathSchema.safeParse({ itemId: ITEM.toUpperCase() }).error?.issues[0]?.message,
     ).toBe(ISSUE.PATH_INVALID)
+  })
+})
+
+describe('pendingVerdictsCodec', () => {
+  const card = {
+    itemId: ITEM,
+    name: 'Молоко «Ашхар» 3,2%',
+    placeName: 'Ереван Сити',
+    boughtAt: new Date('2026-09-18T17:40:00.000Z'),
+  }
+
+  it('crosses the wire and comes back the same', () => {
+    const wire = z.encode(pendingVerdictsCodec, { items: [card], total: 3 })
+
+    expect(wire).toEqual({
+      items: [{ ...card, boughtAt: '2026-09-18T17:40:00.000Z' }],
+      total: 3,
+    })
+    expect(z.decode(pendingVerdictsCodec, wire)).toEqual({ items: [card], total: 3 })
+  })
+
+  it('refuses a card that grew a field — a price must not ride along', () => {
+    const wire = {
+      items: [{ ...card, boughtAt: '2026-09-18T17:40:00.000Z', amount: '520' }],
+      total: 1,
+    }
+
+    expect(pendingVerdictsCodec.safeParse(wire).success).toBe(false)
+  })
+
+  it('carries at most one page, and a total that is a count', () => {
+    const page = Array.from({ length: PENDING_VERDICTS_LIMIT + 1 }, () => card)
+
+    expect(() => z.encode(pendingVerdictsCodec, { items: page, total: page.length })).toThrow()
+    expect(() => z.encode(pendingVerdictsCodec, { items: [], total: -1 })).toThrow()
+    expect(() => z.encode(pendingVerdictsCodec, { items: [], total: 1.5 })).toThrow()
+  })
+
+  it('refuses a total smaller than the page it came with', () => {
+    const wire = { items: [{ ...card, boughtAt: '2026-09-18T17:40:00.000Z' }], total: 0 }
+
+    expect(pendingVerdictsCodec.safeParse(wire).success).toBe(false)
+    expect(pendingVerdictsCodec.safeParse({ ...wire, total: 1 }).success).toBe(true)
   })
 })

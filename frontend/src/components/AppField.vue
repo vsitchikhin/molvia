@@ -1,5 +1,5 @@
 <template>
-  <div class="field" :class="[attrs.class, { invalid: error, readonly }]" :style="attrs.style">
+  <div class="field" :class="[attrs.class, { invalid: failed, readonly }]" :style="attrs.style">
     <label class="label" :for="id">{{ label }}</label>
 
     <div class="well">
@@ -10,7 +10,7 @@
         v-bind="control()"
         :value="modelValue"
         :readonly="readonly"
-        :aria-invalid="error ? 'true' : undefined"
+        :aria-invalid="failed ? 'true' : undefined"
         :aria-describedby="describedBy()"
         @input="update"
       ></textarea>
@@ -23,7 +23,7 @@
         :inputmode="kind === 'decimal' ? 'decimal' : undefined"
         :value="modelValue"
         :readonly="readonly"
-        :aria-invalid="error ? 'true' : undefined"
+        :aria-invalid="failed ? 'true' : undefined"
         :aria-describedby="describedBy()"
         @input="update"
       />
@@ -32,12 +32,12 @@
       </span>
     </div>
 
-    <p v-if="error" :id="`${id}-error`" class="error">{{ t(error) }}</p>
+    <p v-if="failed" :id="`${id}-error`" class="error">{{ errorText ?? t(error ?? '') }}</p>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, useAttrs, useId, useSlots } from 'vue'
+import { computed, defineComponent, useAttrs, useId, useSlots } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { ErrorCode } from '@molvia/model'
@@ -59,8 +59,12 @@ export type FieldKind = 'text' | 'decimal' | 'multiline' | 'date'
  * read.
  *
  * The error is a code from the domain registry and doubles as its i18n key, so no message is
- * written where it is shown. Every other attribute — `autofocus`, `enterkeyhint`, `maxlength` —
- * goes to the control itself; `class` and `style` stay on the field, where the layout is.
+ * written where it is shown. `errorText` is for a refusal the registry has no code for — the
+ * screen's own words, already translated: the review's «a character that cannot be saved»
+ * (MOL-28, G2). It wins over `error` when both are given.
+ *
+ * Every other attribute — `autofocus`, `enterkeyhint`, `maxlength` — goes to the control
+ * itself; `class` and `style` stay on the field, where the layout is.
  */
 export default defineComponent({
   name: 'AppField',
@@ -70,6 +74,7 @@ export default defineComponent({
     label: { type: String, required: true },
     kind: { type: String as PropType<FieldKind>, default: 'text' },
     error: { type: String as PropType<ErrorCode | null>, default: null },
+    errorText: { type: String as PropType<string | null>, default: null },
     readonly: { type: Boolean, default: false },
   },
   emits: {
@@ -80,6 +85,7 @@ export default defineComponent({
     const attrs = useAttrs()
     const slots = useSlots()
     const id = useId()
+    const failed = computed(() => props.errorText !== null || props.error !== null)
 
     // Functions, not computeds: neither attrs nor slots are reactive, and a computed would keep
     // what it saw first — an `enterkeyhint` added later, a tail that came with the unit.
@@ -92,7 +98,7 @@ export default defineComponent({
     function describedBy(): string | undefined {
       const parts = [
         slots.suffix ? `${id}-suffix` : undefined,
-        props.error ? `${id}-error` : undefined,
+        failed.value ? `${id}-error` : undefined,
       ].filter(Boolean)
       return parts.length > 0 ? parts.join(' ') : undefined
     }
@@ -101,7 +107,7 @@ export default defineComponent({
       emit('update:modelValue', (event.target as HTMLInputElement | HTMLTextAreaElement).value)
     }
 
-    return { t, attrs, id, control, describedBy, update }
+    return { t, attrs, id, failed, control, describedBy, update }
   },
 })
 </script>
