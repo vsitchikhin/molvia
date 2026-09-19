@@ -258,6 +258,17 @@ describe('the catalogue search as the screen types it', () => {
       expect(search.phase.value).toBe('offline')
     })
 
+    it('stays offline letter by letter — no skeleton over the recent items', async () => {
+      online(false)
+      const { query, search } = harness()
+      for (const text of ['м', 'мо', 'мол']) {
+        await type(query, text)
+        expect(search.phase.value, text).toBe('offline')
+      }
+      await pause()
+      expect(calls).toHaveLength(0)
+    })
+
     it('does not ask at all while offline', async () => {
       online(false)
       const { query, search } = harness()
