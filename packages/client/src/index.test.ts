@@ -488,11 +488,17 @@ describe('the verdict', () => {
     expect(calls).toHaveLength(0)
   })
 
-  it('sends nothing the schema refuses: a score off the scale, an empty patch', async () => {
+  it('sends nothing the schema refuses, and names it with the code the server would', async () => {
     const { client, calls } = clientReplying(201, cardWire)
 
     expect(await codeOf(client.rateItem(MILK, { score: 6 }))).toBe(ISSUE.BODY_INVALID)
-    expect(await codeOf(client.amendVerdict(MILK, {}))).toBe(ISSUE.BODY_INVALID)
+    expect(await codeOf(client.amendVerdict(MILK, {}))).toBe(ISSUE.PATCH_EMPTY)
+    expect(await codeOf(client.amendVerdict(MILK, { review: 'а\u0007б' }))).toBe(
+      ISSUE.TEXT_NOT_VISIBLE,
+    )
+    expect(await codeOf(client.rateItem(MILK, { score: 3, review: 'раз\n\n\nдва' }))).toBe(
+      ISSUE.TEXT_NOT_VISIBLE,
+    )
     expect(calls).toHaveLength(0)
   })
 })

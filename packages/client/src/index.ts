@@ -10,6 +10,7 @@ import {
   catalogueSearchResponseSchema,
   errorResponseSchema,
   healthResponseSchema,
+  isWireCode,
   proposedItemSchema,
   ratingSchema,
   verdictAmendmentSchema,
@@ -238,11 +239,18 @@ export function createClient({
     return `/verdicts/${path.data.itemId}`
   }
 
-  /** The input goes out through its schema, and one it refuses arrives as a rejection. */
+  /**
+   * The input goes out through its schema, and one it refuses arrives as a rejection — with
+   * the code the server would answer for the same input, by the same rule (`server.ts`): the
+   * issue's own code when it is one, `body_invalid` otherwise. Flattening every refusal to
+   * `body_invalid` made one mistake read two ways on screen, depending on who caught it.
+   */
   function encode<T>(schema: ZodType<T>, input: T): unknown {
     const encoded = schema.safeEncode(input)
     if (!encoded.success) {
-      throw new ApiError(ISSUE.BODY_INVALID, encoded.error.issues[0]?.path.join('.'))
+      const issue = encoded.error.issues[0]
+      const code = isWireCode(issue?.message) ? issue.message : ISSUE.BODY_INVALID
+      throw new ApiError(code, issue?.path.join('.'))
     }
     return encoded.data
   }
@@ -280,16 +288,11 @@ export function createClient({
 
     // `async` so that an input the schema refuses arrives as a rejection, like everything else.
     proposeItem: async (input) => {
-      const encoded = proposedItemSchema.safeEncode(input)
-      if (!encoded.success) {
-        throw new ApiError(ISSUE.BODY_INVALID, encoded.error.issues[0]?.path.join('.'))
-      }
-
       // An ordinary timeout, unlike the first visit: an abort may leave the item written, and
       // a retry is still safe — the server answers an exact repeat with the item already there.
       const { status, data } = await exchange('/catalogue/items', catalogueEntryCodec, {
         method: 'POST',
-        body: encoded.data,
+        body: encode(proposedItemSchema, input),
       })
       return { entry: data, created: status === 201 }
     },
