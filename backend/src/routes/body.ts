@@ -32,3 +32,8 @@ export function parseBody<T>(schema: ZodType<T>, body: unknown): T {
 export function parseQuery<T>(schema: ZodType<T>, query: unknown): T {
   return parseBody(schema, query)
 }
+
+/** And for the parameters of a path, for the same reason. */
+export function parseParams<T>(schema: ZodType<T>, params: unknown): T {
+  return parseBody(schema, params)
+}

@@ -7,9 +7,18 @@ import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
 import { items, verdicts } from './schema'
 
+export interface Put {
+  readonly verdict: Verdict
+  /**
+   * `true` when the person had no verdict here before — none at all, or one they withdrew:
+   * rating again after taking it back is a new opinion to them, whatever the row says.
+   */
+  readonly created: boolean
+}
+
 export interface VerdictRepository {
   /** Rating and re-rating are the same call: the second one replaces the first opinion. */
-  put(actorId: string, input: NewVerdict): Promise<Verdict>
+  put(actorId: string, input: NewVerdict): Promise<Put>
   forItem(actorId: string, itemId: string, placeId: string | null): Promise<Verdict | null>
   /**
    * Everything this person has rated. «Что брать» groups these into three by `verdictLevel`
@@ -73,7 +82,14 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
        * not mentioned at all: the trigger moves it, which is what leaves the trace.
        */
       const rows = await translateFailures(async () =>
-        db.execute<VerdictShape & Record<string, unknown>>(sql`
+        db.execute<VerdictShape & { created: boolean } & Record<string, unknown>>(sql`
+          with prior as (
+            select deleted_at
+            from ${verdicts}
+            where actor_id = ${actorId}::uuid
+              and item_id = ${input.itemId}::uuid
+              and place_id is not distinct from ${placeId}::uuid
+          )
           insert into ${verdicts} (id, actor_id, item_id, item_kind, place_id, score, review)
           select
             ${randomUUID()}::uuid,
@@ -87,7 +103,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
           where ${items.id} = ${input.itemId}::uuid
           on conflict (actor_id, item_id, place_id) do update
             set score = excluded.score,
-                review = coalesce(excluded.review, ${verdicts}.review)
+                review = coalesce(excluded.review, ${verdicts}.review),
+                deleted_at = null
           returning
             id,
             actor_id as "actorId",
@@ -96,11 +113,22 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             score,
             review,
             rated_at as "ratedAt",
-            updated_at as "updatedAt"
+            updated_at as "updatedAt",
+            (xmax = 0 or (select deleted_at from prior) is not null) as created
         `),
       )
 
       /*
+       * Rating again after a withdrawal lands on the same row — the uniqueness holds withdrawn
+       * rows too — and brings it back: `deleted_at` is cleared, `rated_at` stays, because
+       * taking a verdict back and giving it again must not move anyone in the 0.2 gate. The old
+       * text cannot return through `coalesce`: a withdrawn row has none (CHECK).
+       *
+       * `created` needs the row as it was, and Postgres 17 has no `OLD` in `RETURNING`, so
+       * `prior` reads it in the same statement. `xmax = 0` is the insert: an update through
+       * `ON CONFLICT` leaves the locking transaction there. Two ratings racing over one
+       * withdrawn row may both say «created» — the row is one either way.
+       *
        * `coalesce` above, and not `excluded.review`, because `review` is optional in the
        * input: a person who changes the score and says nothing about the text sends no
        * review at all, and `excluded.review` is then NULL. Overwriting with it erased what
@@ -117,7 +145,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
       // it, and that refusal is left untranslated on purpose (the use case must catch it
       // first, so reaching the database with it is a defect in this server).
       if (!row) throw new DomainError(ERROR.NOT_FOUND)
-      return toVerdict(row)
+      const { created, ...verdict } = row
+      return { verdict: toVerdict(verdict), created }
     },
 
     async forItem(actorId, itemId, placeId) {
