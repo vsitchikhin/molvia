@@ -28,6 +28,15 @@ function wait(ms: number): void {
   clock += ms
 }
 
+/**
+ * Real time, a few milliseconds of it. Vue drops an event that reaches a handler created in the
+ * same millisecond the event began — its guard against handlers attached mid-dispatch — and a
+ * test that mounts and taps at once hit it now and then. No finger taps that fast.
+ */
+async function realTime(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 5))
+}
+
 beforeEach(() => {
   clock = 0
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -71,6 +80,7 @@ async function render(options: { open?: boolean; at?: string; rising?: boolean }
   const sheet = () => host.findComponent(BottomSheet)
   // A sheet mounted open has had time to come up, unless a test is about the moment it rises.
   if (options.rising !== true) wait(1000)
+  await realTime()
   return { router, host, open, closed, push, go, dialog, sheet }
 }
 
@@ -302,6 +312,7 @@ describe('BottomSheet', () => {
     await nextTick()
     const go = vi.spyOn(router, 'go')
     wait(1000)
+    await realTime()
     await host.get('.head button').trigger('click')
     landed()
     expect(go).toHaveBeenCalledExactlyOnceWith(-1)
@@ -414,6 +425,7 @@ describe('BottomSheet', () => {
     upper.value = true
     await nextTick()
     wait(1000)
+    await realTime()
     const state = () => ({
       lower: (host.get('dialog.lower').element as HTMLDialogElement).open,
       upper: (host.get('dialog.upper').element as HTMLDialogElement).open,
