@@ -55,6 +55,10 @@ const trip: Trip = {
   placeId: place.id,
   currency: 'AMD',
   rate: null,
+  rateJumped: false,
+  previousRate: null,
+  manualRate: null,
+  rateChoice: null,
   startedAt: new Date('2026-09-19T10:00:00.000Z'),
   finishedAt: null,
 }

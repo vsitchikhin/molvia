@@ -5,6 +5,8 @@ import { createItemRepository } from './items-repository'
 import type { ItemRepository } from './items-repository'
 import { createPlaceRepository } from './places-repository'
 import type { PlaceRepository } from './places-repository'
+import { createRateRepository } from './rates-repository'
+import type { RateRepository } from './rates-repository'
 import { createSearchPickRepository } from './search-picks-repository'
 import type { SearchPickRepository } from './search-picks-repository'
 import { createTripRepository } from './trips-repository'
@@ -17,6 +19,8 @@ export interface TripRepositories {
   readonly places: PlaceRepository
   readonly items: ItemRepository
   readonly searchPicks: SearchPickRepository
+  /** Read by «Начать поход» to snapshot the official rate (MOL-39); written by the refresh. */
+  readonly rates: RateRepository
 }
 
 export function tripRepositories(conn: Conn): TripRepositories {
@@ -26,6 +30,7 @@ export function tripRepositories(conn: Conn): TripRepositories {
     places: createPlaceRepository(conn),
     items: createItemRepository(conn),
     searchPicks: createSearchPickRepository(conn),
+    rates: createRateRepository(conn),
   }
 }
 

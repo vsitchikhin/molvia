@@ -19,6 +19,7 @@ import { rateItem } from '@/usecases/rate-item'
 import { amendVerdict } from '@/usecases/amend-verdict'
 import { withdrawVerdict } from '@/usecases/withdraw-verdict'
 import { searchCatalogue } from '@/usecases/search-catalogue'
+import { chooseTripRate } from '@/usecases/choose-trip-rate'
 import { startTrip } from '@/usecases/start-trip'
 import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
 import { createActorRepository } from '@/db/actors-repository'
@@ -145,6 +146,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           updateExpense(transact, actorId, tripId, expenseId, patch),
         remove: (actorId, tripId, expenseId) => removeExpense(transact, actorId, tripId, expenseId),
         finish: (actorId, tripId) => finishTrip(tripData.trips, actorId, tripId),
+        chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
       })
       verdictRoutes(guarded, {
         rate: (actorId, itemId, rating) => rateItem({ items, verdicts }, actorId, itemId, rating),
