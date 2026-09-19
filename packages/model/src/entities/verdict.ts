@@ -12,7 +12,7 @@ const reviewSchema = visibleText(500)
  * differs. placeId is null for a product and filled for a dish in 0.3, so MOL-6 needs
  * UNIQUE NULLS NOT DISTINCT — without it two nulls count as different and let duplicates in.
  */
-const verdictFields = z.object({
+export const verdictFields = z.object({
   id: z.uuid(),
   actorId: z.uuid(),
   itemId: z.uuid(),

@@ -54,6 +54,8 @@ export const ISSUE = {
   BODY_INVALID: 'issue.body_invalid',
   /** A query string that did not parse. Not BODY_INVALID: a `GET` has no body to blame. */
   QUERY_INVALID: 'issue.query_invalid',
+  /** An identifier in the path that did not parse — the address is wrong, not the body. */
+  PATH_INVALID: 'issue.path_invalid',
   RESPONSE_INVALID: 'issue.response_invalid',
   HEALTH_CONTRADICTS_ITSELF: 'issue.health_contradicts_itself',
   PATCH_EMPTY: 'issue.patch_empty',
