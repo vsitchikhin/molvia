@@ -239,13 +239,16 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
-/* 24px below the top of the header: scrolled past it, the title counts as gone. */
+/* Its bottom edge 24px below the top of the header: scrolled past it, the title counts as
+   gone. Lifted by its own height because an observer still reports a box that only touches
+   the line as intersecting — at the top edge the collapse would come a pixel late. */
 .sentinel {
   position: absolute;
   top: var(--space-6);
   width: 1px;
   height: 1px;
   pointer-events: none;
+  transform: translateY(-100%);
 }
 
 .content {
