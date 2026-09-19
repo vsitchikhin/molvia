@@ -179,10 +179,31 @@ describe('PUT — поставить оценку', () => {
     const actor = await insertActor(db)
     const itemId = await insertItem(db)
 
-    for (const review of ['раз\n\n\nдва', '   ', 'а\u202eб']) {
+    // The code, not only the status: it reaches the screen (Р-11).
+    for (const review of ['раз\n\n\nдва', '   ', '\u2800\n\u2800', 'а\u202eб', '\u202e\nтекст']) {
       const reply = await rate(actor, itemId, { score: 3, review })
       expect(reply.status, JSON.stringify(review)).toBe(400)
+      expect(reply.body, JSON.stringify(review)).toEqual({
+        code: ISSUE.TEXT_NOT_VISIBLE,
+        details: 'review',
+      })
     }
+    expect(await rows(itemId)).toHaveLength(0)
+  })
+
+  it('Е: сотни тысяч пустых строк в голове отзыва отклоняются сразу, API не встаёт', async () => {
+    const actor = await insertActor(db)
+    const itemId = await insertItem(db)
+
+    const started = Date.now()
+    const [reply, health] = await Promise.all([
+      rate(actor, itemId, { score: 3, review: `${'\n'.repeat(400_000)}a` }),
+      app.inject({ method: 'GET', url: '/health' }),
+    ])
+
+    expect(reply.status).toBe(400)
+    expect(health.statusCode).toBe(200)
+    expect(Date.now() - started).toBeLessThan(2000)
     expect(await rows(itemId)).toHaveLength(0)
   })
 
@@ -397,15 +418,18 @@ describe('DELETE — снять оценку', () => {
     await withdrawing.db.transaction(async (tx) => {
       expect(await createVerdictRepository(tx).withdraw(actor, itemId)).toBe(true)
       put = rate(actor, itemId, { score: 5 })
-      // Until the rating is actually waiting on the row's lock, committing proves nothing.
-      for (let tries = 0; tries < 200; tries += 1) {
+      // Until the rating is actually waiting on the row's lock, committing proves nothing —
+      // and a test that committed anyway would pass on the old code too (С-19).
+      let waited = false
+      for (let tries = 0; tries < 500 && !waited; tries += 1) {
         const [waiting] = await watcher<{ n: number }[]>`
           select count(*)::int as n from pg_stat_activity
           where wait_event_type = 'Lock' and datname = current_database()
         `
-        if ((waiting?.n ?? 0) > 0) break
-        await new Promise((resolve) => setTimeout(resolve, 10))
+        waited = (waiting?.n ?? 0) > 0
+        if (!waited) await new Promise((resolve) => setTimeout(resolve, 10))
       }
+      expect(waited).toBe(true)
     })
     const reply = await put!
 
