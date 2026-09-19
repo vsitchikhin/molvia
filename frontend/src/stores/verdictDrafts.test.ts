@@ -173,7 +173,7 @@ describe('verdict drafts', () => {
 
   it('H1: an answer off the contract — a proxy’s bare 404 — holds the draft, never confirms it', async () => {
     online(true)
-    rateItem.mockRejectedValue(new ApiError(ISSUE.RESPONSE_INVALID, 'HTTP 404'))
+    rateItem.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'HTTP 404', false))
     const drafts = fresh()
 
     drafts.save(milk, 4, '')

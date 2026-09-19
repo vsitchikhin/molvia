@@ -137,6 +137,20 @@ export function formatMoney(value: Money, locale = 'ru-RU'): string {
 }
 
 /**
+ * An estimate — money converted by a rate — rounded to whole units. Kopecks in a figure that is
+ * only approximate are exactly the false precision the rule of «≈» exists against (handoff,
+ * «Валюты»): «≈ 108 ₽», never «≈ 107,88 ₽». Rounding here, on output, as everywhere.
+ */
+export function formatEstimate(value: Money, locale = 'ru-RU'): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: value.currency,
+    currencyDisplay: 'narrowSymbol',
+    maximumFractionDigits: 0,
+  }).format(decimalFromMinor(value))
+}
+
+/**
  * The sign of a currency as the formatter prints it next to an amount — the tail of a price field
  * (`֏`), never written into the markup: the sign belongs to the currency, and a receipt in a
  * foreign one must show its own.

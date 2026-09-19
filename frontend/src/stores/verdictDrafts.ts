@@ -32,7 +32,8 @@ const CONFIRMED_KEY = 'molvia.verdict-confirmed'
 /**
  * What stops a run rather than refusing the draft: no connection or a server that broke (both
  * arrive as INTERNAL), an answer off the contract — the captive portal of a shop's wifi — and
- * an identity the server no longer knows. The same three hold the trip queue (MOL-24).
+ * an identity the server no longer knows. The same three hold the trip queue (MOL-24), and so
+ * does any code the API did not say itself.
  */
 const HOLDS: readonly WireCode[] = [ERROR.INTERNAL, ISSUE.RESPONSE_INVALID, ERROR.NO_ACTOR]
 
@@ -213,7 +214,10 @@ export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
         await api.rateItem(draft.card.itemId, ratingOf({ ...draft, score: draft.score }))
       } catch (error) {
         const code = error instanceof ApiError ? error.code : ERROR.INTERNAL
-        if (HOLDS.includes(code)) {
+        // A code the API did not say itself — a proxy's 404 page read as `not_found` — is no
+        // refusal: taken for one, it confirmed and dropped a saved rating (adversarial H1).
+        const theirs = error instanceof ApiError && error.answered
+        if (HOLDS.includes(code) || !theirs) {
           // Decided after the failure, never before: a connection that drops while the answer
           // is on its way is the commonest break, and it is not the server's fault.
           // An identity the server forgot is not the connection: the draft waits, and the screen

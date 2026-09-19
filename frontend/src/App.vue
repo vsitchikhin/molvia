@@ -13,6 +13,7 @@ import { useRoute } from 'vue-router'
 import TabBar from '@/components/TabBar.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
+import { useTripQueueStore } from '@/stores/tripQueue'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 
 // No header of its own: no mockup carries the brand, every screen is titled by its section,
@@ -21,10 +22,14 @@ export default defineComponent({
   name: 'AppRoot',
   components: { TabBar },
   setup() {
-    // Saved verdicts are sent by the app, not by the screen they were saved on: the person may
-    // have left «Оценки» long before the connection came back (MOL-28).
+    // The app, not a screen, sends what waits on the phone, whichever screen is open when the
+    // connection is back: purchases written at the shelf (MOL-24) and saved ratings (MOL-28).
+    const queue = useTripQueueStore()
     const drafts = useVerdictDraftsStore()
-    const send = () => void drafts.flush()
+    const send = () => {
+      void queue.flush()
+      void drafts.flush()
+    }
     onMounted(send)
     useReconnect(send)
 

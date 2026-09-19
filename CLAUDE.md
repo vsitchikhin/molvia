@@ -541,6 +541,30 @@ database access. In a product about data integrity, two write paths will silentl
 
 ## Data rules
 
+- **Every write to a trip goes through the queue on the device (MOL-24),** online or not — one
+  path, so the sheet never waits on the network. A write is kept first and sent after, one at a
+  time, in order, at start, on `online`, when the app comes back into view and, after a 5xx with
+  the connection up, again with a doubling pause; there is no background sync on iOS. A repeat is
+  safe because the device names every row — **while the row exists**: a remove is a hard delete,
+  and an add sent again after it writes the row anew. So **storage is the queue, not a copy of
+  it**: the installed app and a tab from the bot share it, every window reads it before each
+  change and send, takes out only the write it sent (by the write's own key), and one window
+  sends at a time (`navigator.locks`). **Without Web Locks** (Safari before 15.4, old WebViews)
+  two windows can send the same head at once, and a removed row can come back — narrowed, not
+  closed, as the identity's own fallback says of itself. What must hold is written to every shelf
+  or kept in memory, and a shelf that refused the write keeps only the part of its past still
+  true — the writes still waiting, never those sent since (removing needs no quota, and the part
+  fits into the room it frees). Left whole, its past is read at the next launch and a removed
+  purchase is sent again and comes back; emptied, it loses the purchases made with no signal.
+  While a shelf refuses, what came after lives in memory only, and a PWA killed before it sends
+  loses that — there is nowhere left to keep it. No connection, a 5xx, an answer off the contract (a shop's
+  captive portal) and a 401 hold the queue, and so does a code the API did not say itself
+  (`ApiError.answered === false` — a portal's 404 page); any other refusal is set aside in
+  `rejected` and never retried — sent again it would be refused again and hold everything behind
+  it. The last known trip is remembered per identity for the same reason: the app opened at the
+  shelf with no signal still knows where a purchase goes — but **the memory is for when the
+  server cannot be asked, not instead of asking**: the sheet asks every time it opens, and a
+  trip answered finished stops being the current one.
 - **Verdict and expense are separate tables with separate write paths.** Do not merge
   them into one input screen: they have different frequencies and different motivations.
 - **A withdrawn verdict is still a row (MOL-27).** `DELETE /verdicts/:itemId` sets
@@ -582,10 +606,13 @@ database access. In a product about data integrity, two write paths will silentl
 - **Native HTML first, then Reka UI, never a styled kit.** On a phone `<select>`,
   `<input type="date">` and `<input inputmode="decimal">` open the system pickers, which
   beat anything a library renders; `<dialog>` already brings a focus trap and a backdrop.
-  Reka is for the few things native cannot do — the catalogue combobox above all, which is
-  the main screen and is full of subtleties (async results, keyboard navigation,
-  `aria-activedescendant`, a virtual keyboard covering the list). It ships unstyled
-  primitives that tree-shake, so importing `ComboboxRoot` costs only the combobox.
+  Reka is for the few things native cannot do; it ships unstyled primitives that tree-shake.
+  **The catalogue combobox turned out not to be one of them (MOL-23):** Reka's
+  `ComboboxContent` calls `hideOthers` whenever it is shown — an always-open list hid the back
+  chevron, the title and the app's live region from a screen reader — and both its input and its
+  listbox filter highlight the first row by themselves, so «Найти» took a row nobody chose. The
+  combobox is the ARIA 1.2 pattern on a native `<input>`, about a hundred lines
+  (`CatalogueCombobox`): no row is active until an arrow makes one.
   A styled kit (PrimeVue, Vuetify, Naive) is rejected on purpose: its theme and our tokens
   would be two sources of truth about colour, which empties the rule about hardcoded
   values. shadcn-vue is rejected for the same reason in a different shape — it copies
@@ -622,7 +649,12 @@ database access. In a product about data integrity, two write paths will silentl
   the cheapest mistake today and the most expensive one a year from now.
 - **No business logic on the frontend.** The verdict, the unit price and the conversion are
   computed by the server. Client-side validation is for UX only; the backend is the source
-  of truth.
+  of truth. **One exception, and it is not a second implementation (MOL-24):** while a purchase
+  is being typed, the sheet shows its unit price and its estimate in the income currency through
+  `unitPrice()` and `convertMoney()` of `packages/model` — the very functions the server calls.
+  At the shelf with no connection the price per litre is needed now, to decide whether to take
+  the thing. Once written, every number on screen is the server's; the phone never adds up a
+  total, not even for rows still in the queue.
 - Split components so they are not overloaded, but without five wrappers around one tag.
   One well-scoped component beats five trivial ones.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
@@ -794,13 +826,18 @@ trip it was bought on. The trip and its rows are named by the device, so a queue
 purchase.
 MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
 MOL-39 the official rate — a cache refreshed hourly, snapshotted by every new trip, a jump
-left to the person;
+left to the person; MOL-24 the sheet «сколько, в чём, почём» — a live unit price, a price in any
+of the four currencies, and the queue that keeps a purchase on the phone until it is sent;
 MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of «back»; MOL-18 the kit
-screens are built from — button, field, card, verdict badge, sheet. MOL-28 the first real
-screen, «Оценки»: `GET /verdicts/pending` gives **one card per item**, not per purchase — a
-product has one verdict per person — with the place and day of the latest purchase: when its row
-was entered, but never after its trip was finished (the sauce found at home was bought that
-week). «Сохранить» keeps the rating on the phone and moves on; the app sends it
+screens are built from — button, field, card, verdict badge, sheet. MOL-23 the first real screen,
+«Что взяли?»: the search as the person types, the recent items on the device, «Предложить
+товар». **A pick leaves with the query it was made on** (`stores/itemEntry`): «Добавить в поход»
+sends it and the server remembers the pick under it — handed the item alone, that memory would
+silently stop filling. The recent items are written when an item goes into a trip, not on a tap,
+per identity. MOL-28 «Оценки»: `GET /verdicts/pending` gives **one card per item**, not per
+purchase — a product has one verdict per person — with the place and day of the latest purchase:
+when its row was entered, but never after its trip was finished (the sauce found at home was
+bought that week). «Сохранить» keeps the rating on the phone and moves on; the app sends it
 (`stores/verdictDrafts`, a map «item → latest rating», not an ordered queue: `PUT` is safe to
 repeat). «Не сейчас» puts a card behind the others until the item is bought again; the last
 answer is remembered for offline. «Поход» and «Что брать» are still placeholders. Release 0.1 is

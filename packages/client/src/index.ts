@@ -53,13 +53,34 @@ import type {
  */
 export class ApiError extends Error {
   readonly code: WireCode
+  /**
+   * Whether the code is the API's own word — its error body — rather than inferred from a bare
+   * status or from no answer at all. A 404 page from a shop's captive portal becomes `not_found`
+   * here too, and a caller for whom a refusal is final (the trip queue, MOL-24) must not take it
+   * for the server's.
+   */
+  readonly answered: boolean
 
-  constructor(code: WireCode, details?: string) {
+  constructor(code: WireCode, details?: string, answered = true) {
     super(details ? `${code}: ${details}` : code)
     this.name = 'ApiError'
     this.code = code
+    this.answered = answered
   }
 }
+
+/**
+ * Codes that may be inferred from a status alone, when the body carries nothing usable.
+ *
+ * **401 is deliberately absent.** A 401 is the one status the PWA acts on destructively —
+ * it means «this identity is gone», and the store replaces it. Anything in front of the API
+ * can answer 401 without knowing what an actor is: basic auth on Caddy, an API gateway, a
+ * captive portal on shop wifi. Only a body that parses as this project's own error shape
+ * may say NO_ACTOR; a bare 401 is reported as an answer that did not match the contract.
+ */
+const CODE_BY_STATUS: Readonly<Record<number, WireCode>> = Object.freeze({
+  404: ERROR.NOT_FOUND,
+})
 
 /**
  * A header value has to survive `Headers.set`, which throws a TypeError on anything outside
@@ -101,8 +122,15 @@ export interface MolviaClient {
    * which is what makes «check before restoring» possible instead of «replace and hope».
    */
   me(identifier?: string): Promise<Actor>
-  /** The catalogue lookup behind «что взяли?», ranked by the server — the query goes as typed. */
-  searchCatalogue(query: string): Promise<CatalogueEntry[]>
+  /**
+   * The catalogue lookup behind «что взяли?», ranked by the server — the query goes as typed.
+   * The screen searches while the person types, so a search the next keystroke made stale is
+   * cancelled through `signal`; the cancellation arrives as an ApiError like everything else.
+   */
+  searchCatalogue(
+    query: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<CatalogueEntry[]>
   /**
    * «Предложить товар». `created` is `false` when the catalogue already held an item of this
    * kind by the same name — the entry is then that item, and the fields sent were not applied.
@@ -175,6 +203,8 @@ export function createClient({
     readonly timeout?: number | null
     /** Sent as JSON. Already on the wire's side: the caller encodes through the schema. */
     readonly body?: unknown
+    /** The caller's own cancellation, on top of the timeout. */
+    readonly signal?: AbortSignal
   }
 
   async function exchange<T>(
@@ -201,48 +231,69 @@ export function createClient({
         : setTimeout(() => {
             controller.abort()
           }, limit)
-
-    let response: Response
-    try {
-      response = await fetch(`${baseUrl}${path}`, {
-        ...(options.method === undefined ? {} : { method: options.method }),
-        ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
-        headers,
-        signal: controller.signal,
-      })
-    } catch (error) {
-      // A dropped connection is `fetch`'s own TypeError. Whether that reads as «offline» or
-      // as «broken» is the caller's call — what matters here is that it arrives as an
-      // ApiError like everything else.
-      throw new ApiError(ERROR.INTERNAL, error instanceof Error ? error.message : 'transport')
-    } finally {
-      if (timer !== undefined) clearTimeout(timer)
+    // The caller's signal drives the same controller rather than replacing it, so the timeout
+    // still holds for a caller that passed one. `AbortSignal.any` would say this in one line,
+    // and Safari only learned it in 17.4.
+    const cancel = (): void => {
+      controller.abort()
     }
+    if (options.signal?.aborted) cancel()
+    options.signal?.addEventListener('abort', cancel)
 
-    // A proxy page, an empty body, a reply cut off mid-flight: `.json()` throws, and every
-    // line below — including the one that tells a dead identity from a broken server — used
-    // to be skipped entirely.
+    // The deadline and the caller's cancellation hold until the body is read, not only until
+    // the headers: a server that sends its headers and goes quiet — a proxy buffering, the Wi-Fi
+    // at a shelf dropping mid-reply — would otherwise hold the call forever, past both.
+    let response: Response
     let body: unknown
     try {
-      body = await response.json()
-    } catch {
-      body = undefined
+      try {
+        response = await fetch(`${baseUrl}${path}`, {
+          ...(options.method === undefined ? {} : { method: options.method }),
+          ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+          headers,
+          signal: controller.signal,
+        })
+      } catch (error) {
+        // A dropped connection is `fetch`'s own TypeError. Whether that reads as «offline» or
+        // as «broken» is the caller's call — what matters here is that it arrives as an
+        // ApiError like everything else.
+        throw new ApiError(
+          ERROR.INTERNAL,
+          error instanceof Error ? error.message : 'transport',
+          false,
+        )
+      }
+
+      // A proxy page, an empty body, a reply cut off mid-flight: `.json()` throws, and every
+      // line below — including the one that tells a dead identity from a broken server — used
+      // to be skipped entirely.
+      try {
+        body = await response.json()
+      } catch {
+        // Cut off by the deadline or by the caller, the reply never came — it is not a reply
+        // off the contract.
+        if (controller.signal.aborted) throw new ApiError(ERROR.INTERNAL, 'aborted', false)
+        body = undefined
+      }
+    } finally {
+      if (timer !== undefined) clearTimeout(timer)
+      options.signal?.removeEventListener('abort', cancel)
     }
 
     if (!response.ok) {
       const failure = errorResponseSchema.safeParse(body)
       if (failure.success) throw new ApiError(failure.data.code, failure.data.details)
-      // The body says nothing this project would recognise, so only the status is left — and
-      // no status alone may name a domain code. Anything in front of the API answers 401 and
-      // 404 without knowing what an actor or an item is: basic auth on Caddy, a route missing
-      // after a deploy, a captive portal on shop wifi. A bare 401 read as NO_ACTOR replaced
-      // the identity; a bare 404 read as NOT_FOUND made a saved rating count as done and
-      // dropped it (MOL-28, adversarial H1). Only a body in this project's shape says either.
-      // A 5xx is the server being down rather than answering off-contract: Caddy's 502 during
-      // a deploy is «the server broke», and calling it a malformed reply would send the caller
-      // looking in the wrong place.
-      const code = response.status >= 500 ? ERROR.INTERNAL : ISSUE.RESPONSE_INVALID
-      throw new ApiError(code, `HTTP ${String(response.status)}`)
+      // The body says nothing this project would recognise, so only the status is left —
+      // and it is never allowed to mean NO_ACTOR (see CODE_BY_STATUS). A 5xx is the server
+      // being down rather than answering off-contract: Caddy's 502 during a deploy is «the
+      // server broke», and calling it a malformed reply would send the caller looking in
+      // the wrong place.
+      const fallback = response.status >= 500 ? ERROR.INTERNAL : ISSUE.RESPONSE_INVALID
+      throw new ApiError(
+        CODE_BY_STATUS[response.status] ?? fallback,
+        `HTTP ${String(response.status)}`,
+        false,
+      )
     }
 
     // A reply that does not match the schema is still the API's answer, so it leaves here
@@ -314,13 +365,14 @@ export function createClient({
     me: (identifier) =>
       request('/actors/me', actorCodec, identifier === undefined ? {} : { as: identifier }),
 
-    searchCatalogue: async (query) => {
+    searchCatalogue: async (query, options = {}) => {
       // URLSearchParams, not a template: «&», «#», «+» and «%» in a query would otherwise
       // cut it short or change its meaning on the way.
       const search = new URLSearchParams({ q: query })
       const { items } = await request(
         `/catalogue/search?${search.toString()}`,
         catalogueSearchResponseSchema,
+        options.signal === undefined ? {} : { signal: options.signal },
       )
       return items
     },

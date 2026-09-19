@@ -9,6 +9,7 @@ import {
   currencySign,
   currencySchema,
   decimalFromMinor,
+  formatEstimate,
   formatMoney,
   minorPerMajor,
   money,
@@ -240,5 +241,21 @@ describe('currencySign', () => {
   // The same sign the formatter puts next to an amount, so a field's tail and a printed price agree.
   it('is the sign formatMoney prints', () => {
     expect(formatMoney(money(57000n, 'AMD'))).toContain(currencySign('AMD'))
+  })
+})
+
+describe('formatEstimate', () => {
+  const digits = (text: string): string => text.replace(/[\s\u00a0\u202f]/g, '')
+
+  it('rounds an estimate to whole units, half away from zero, and keeps the sign', () => {
+    expect(digits(formatEstimate(money(10788n, 'RUB')))).toBe('108₽')
+    expect(digits(formatEstimate(money(10749n, 'RUB')))).toBe('107₽')
+    expect(digits(formatEstimate(money(10750n, 'RUB')))).toBe('108₽')
+    expect(digits(formatEstimate(money(134712n, 'RUB')))).toBe('1347₽')
+  })
+
+  it('keeps every digit of a figure past 2^53', () => {
+    const text = formatEstimate(money(9_007_199_254_740_993n, 'USD'), 'en-US')
+    expect(text.replace(/[\s,]/g, '')).toContain('90071992547410')
   })
 })
