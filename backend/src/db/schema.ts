@@ -447,6 +447,15 @@ export const verdicts = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .default(sql`clock_timestamp()`),
+    /**
+     * A withdrawn verdict stays a row (MOL-27, the owner's decision): the 0.2 gate asks
+     * whether someone reached five ratings in their first two weeks, and «rated five, took
+     * one back» has to stay five. So **the gate counts every row, and every other reader
+     * counts only `deleted_at IS NULL`** — «Что брать», the verdict itself, and the
+     * aggregates of 0.3. A reader that forgets the filter puts a withdrawn opinion back on
+     * screen, silently. Rating again clears it on the same row, keeping `rated_at`.
+     */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (table) => [
     /**
@@ -474,6 +483,14 @@ export const verdicts = pgTable(
     index('verdicts_item_idx').on(table.itemId),
     check('verdicts_score_range', sql`${table.score} between 1 and 5`),
     check('verdicts_updated_after_rated', sql`${table.updatedAt} >= ${table.ratedAt}`),
+    check('verdicts_deleted_after_rated', sql`${table.deletedAt} >= ${table.ratedAt}`),
+    // The row outlives the withdrawal for the gate, which needs only that it existed and
+    // when. The text does not: someone who deleted their review expects it gone, and keeping
+    // it would be a promise nobody made. Held here so no write path can forget it.
+    check(
+      'verdicts_withdrawn_without_review',
+      sql`${table.deletedAt} is null or ${table.review} is null`,
+    ),
   ],
 )
 

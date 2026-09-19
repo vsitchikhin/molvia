@@ -137,6 +137,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             // A product is rated as itself and carries no place, so the empty place is a
             // value here, not a missing filter.
             placeId === null ? isNull(verdicts.placeId) : eq(verdicts.placeId, placeId),
+            isNull(verdicts.deletedAt),
           ),
         )
         .limit(1)
@@ -148,7 +149,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
       const rows = await db
         .select()
         .from(verdicts)
-        .where(eq(verdicts.actorId, actorId))
+        // A withdrawn verdict is kept for the gate only (schema, `deleted_at`).
+        .where(and(eq(verdicts.actorId, actorId), isNull(verdicts.deletedAt)))
         .orderBy(desc(verdicts.updatedAt), desc(verdicts.id))
         .limit(rowLimit(limit))
       return rows.map(toVerdict)
