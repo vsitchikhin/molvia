@@ -129,16 +129,22 @@ export function isRateDay(date: string): boolean {
   return yerevanMidnight(date) >= RATE_EPOCH
 }
 
-function daysBetween(earlier: string, later: string): number {
-  return Math.round((Date.parse(later) - Date.parse(earlier)) / DAY_MS)
-}
-
 /**
  * How long the Central Bank of Armenia may stay silent before a trip takes an open source
  * instead (MOL-39, В-7). A week covers weekends and holidays, when it publishes nothing and
  * nothing is wrong: a shorter bound would mark every Sunday trip «not the central bank».
  */
 export const OFFICIAL_RATE_FRESH_DAYS = 7
+
+/**
+ * Whether a rate dated `date` still counts as current on `today`: at most a week old. The one
+ * measure of «silent» for both halves of MOL-39 — when the refresh asks the open sources, and
+ * when a trip takes one — so the two can never disagree about the same day.
+ */
+export function isRateFresh(date: string, today: string): boolean {
+  const days = Math.round((Date.parse(today) - Date.parse(date)) / DAY_MS)
+  return days <= OFFICIAL_RATE_FRESH_DAYS
+}
 
 // Tie-breaking order: the central bank first, then the other central bank, then the aggregator.
 const PROVIDER_ORDER: readonly RateProvider[] = ['cba', 'cbr', 'erapi']
@@ -206,7 +212,7 @@ export function pickOfficialRate(
   })
 
   const central = candidates.find((candidate) => candidate.provider === 'cba')
-  if (central && daysBetween(central.date, today) <= OFFICIAL_RATE_FRESH_DAYS) return central.rate
+  if (central && isRateFresh(central.date, today)) return central.rate
 
   const freshest = candidates.reduce<(typeof candidates)[number] | null>(
     (best, candidate) => (best === null || candidate.date > best.date ? candidate : best),

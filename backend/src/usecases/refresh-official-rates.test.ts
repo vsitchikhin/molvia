@@ -3,44 +3,69 @@ import type { AmdRate, RateProvider } from '@molvia/model'
 import type { Published, RateFeed } from '@/rates/feed'
 import { FALLBACK_AFTER_FAILURES, officialRatesRefresh } from './refresh-official-rates'
 
-function answer(provider: RateProvider): Published {
+// Saturday 19.09.2026, noon in Yerevan; the central bank's latest is Friday's.
+const NOW = new Date('2026-09-19T08:00:00.000Z')
+const FRIDAY = '2026-09-18'
+
+function answer(provider: RateProvider, date = FRIDAY): Published {
   const rates: AmdRate[] = [
-    { provider, currency: 'RUB', date: '2026-09-18', scaled: 4_312_300n },
-    { provider, currency: 'USD', date: '2026-09-18', scaled: 363_440_000n },
-    { provider, currency: 'EUR', date: '2026-09-18', scaled: 417_050_000n },
+    { provider, currency: 'RUB', date, scaled: 4_312_300n },
+    { provider, currency: 'USD', date, scaled: 363_440_000n },
+    { provider, currency: 'EUR', date, scaled: 417_050_000n },
   ]
-  return { provider, date: '2026-09-18', rates }
+  return { provider, date, rates }
 }
 
 /** A feed that answers or fails as the test switches it, and counts how often it was asked. */
-function feed(provider: RateProvider, up = true) {
-  const state = { up, asked: 0 }
+function feed(provider: RateProvider, up = true, date = FRIDAY) {
+  const state = { up, date, asked: 0 }
   const self: RateFeed = {
     provider,
     fetchLatest() {
       state.asked += 1
-      return state.up ? Promise.resolve(answer(provider)) : Promise.reject(new Error('down'))
+      return state.up
+        ? Promise.resolve(answer(provider, state.date))
+        : Promise.reject(new Error('down', { cause: new Error('ENOTFOUND api.cba.am') }))
     },
   }
   return { feed: self, state }
 }
 
-function harness(options: { cba?: boolean; cbr?: boolean; erapi?: boolean } = {}) {
-  const cba = feed('cba', options.cba ?? true)
-  const cbr = feed('cbr', options.cbr ?? true)
-  const erapi = feed('erapi', options.erapi ?? true)
+interface Options {
+  cba?: boolean
+  cbr?: boolean
+  erapi?: boolean
+  cbaDate?: string
+  cbrDate?: string
+  /** What the cache already holds of the central bank, before this run. */
+  cached?: AmdRate[]
+  writeFails?: boolean
+}
+
+function harness(options: Options = {}) {
+  const cba = feed('cba', options.cba ?? true, options.cbaDate)
+  const cbr = feed('cbr', options.cbr ?? true, options.cbrDate)
+  const erapi = feed('erapi', options.erapi ?? true, '2026-09-19')
   const written: RateProvider[][] = []
-  const warnings: object[] = []
+  const warnings: { details: Record<string, unknown>; message: string }[] = []
+  const cache: AmdRate[] = [...(options.cached ?? [])]
   const run = officialRatesRefresh({
     primary: cba.feed,
     fallbacks: [cbr.feed, erapi.feed],
     rates: {
       upsert: (rates) => {
+        if (options.writeFails) return Promise.reject(new Error('connection terminated'))
         written.push([...new Set(rates.map((rate) => rate.provider))])
+        cache.push(...rates)
         return Promise.resolve()
       },
+      latestOnOrBefore: () => Promise.resolve(cache),
     },
-    log: { warn: (details) => warnings.push(details) },
+    log: {
+      warn: (details, message) =>
+        warnings.push({ details: details as Record<string, unknown>, message }),
+    },
+    now: () => NOW,
   })
   return { run, cba: cba.state, cbr: cbr.state, erapi: erapi.state, written, warnings }
 }
@@ -50,7 +75,7 @@ async function times(run: () => Promise<void>, count: number): Promise<void> {
 }
 
 describe('обновление официальных курсов', () => {
-  it('ЦБ РА ответил — пишется его ответ, запасные не спрашиваются', async () => {
+  it('ЦБ РА ответил пятничным курсом в субботу — пишется он, запасные не спрашиваются', async () => {
     const h = harness()
     await h.run()
     expect(h.written).toEqual([['cba']])
@@ -105,18 +130,66 @@ describe('обновление официальных курсов', () => {
     const h = harness({ cba: false, cbr: false, erapi: false })
     await expect(times(h.run, FALLBACK_AFTER_FAILURES + 1)).resolves.toBeUndefined()
     expect(h.written).toEqual([])
-    expect(h.warnings.at(-1)).toMatchObject({ provider: 'erapi' })
+    expect(h.warnings.at(-1)?.details).toMatchObject({ provider: 'erapi' })
+  })
+})
+
+describe('Р-18: ЦБ РА отвечает, но курс стоит', () => {
+  it('ответ ЦБ РА старше недели — запасные спрошены сразу, без пяти сбоев', async () => {
+    const h = harness({ cbaDate: '2026-09-01' })
+    await h.run()
+    expect(h.cbr.asked).toBe(1)
+    expect(h.written).toEqual([['cba'], ['cbr']])
   })
 
-  it('база не приняла ответ — это сбой того поставщика, а не падение', async () => {
-    const warnings: object[] = []
-    const run = officialRatesRefresh({
-      primary: feed('cba').feed,
-      fallbacks: [],
-      rates: { upsert: () => Promise.reject(new Error('check violated')) },
-      log: { warn: (details) => warnings.push(details) },
+  it('ровно неделя — ещё свежий, запасные не спрашиваются', async () => {
+    const h = harness({ cbaDate: '2026-09-12' })
+    await h.run()
+    expect(h.cbr.asked).toBe(0)
+  })
+
+  it('ЦБ РФ отдал такой же старый курс — спрошен и open.er-api', async () => {
+    const h = harness({ cbaDate: '2026-09-01', cbrDate: '2026-09-01' })
+    await h.run()
+    expect(h.erapi.asked).toBe(1)
+    expect(h.written).toEqual([['cba'], ['cbr'], ['erapi']])
+  })
+
+  it('ЦБ РА падает, а в кеше его курс старше недели — запасные с первого же сбоя', async () => {
+    const stale: AmdRate = { provider: 'cba', currency: 'RUB', date: '2026-09-01', scaled: 1n }
+    const h = harness({ cba: false, cached: [stale] })
+    await h.run()
+    expect(h.cbr.asked).toBe(1)
+  })
+
+  it('ЦБ РА падает, а кеш пуст — ждём пяти сбоев: молчание без даты ещё не старость', async () => {
+    const h = harness({ cba: false })
+    await h.run()
+    expect(h.cbr.asked).toBe(0)
+  })
+})
+
+describe('лог сбоя', () => {
+  it('несёт саму ошибку с причиной и дату последнего курса ЦБ РА (Д, С-2)', async () => {
+    const cached: AmdRate = { provider: 'cba', currency: 'RUB', date: '2026-09-16', scaled: 1n }
+    const h = harness({ cba: false, cached: [cached] })
+    await h.run()
+
+    const [warning] = h.warnings
+    expect(warning?.message).toBe('official rate fetch failed')
+    expect(warning?.details).toMatchObject({ provider: 'cba', lastKnown: '2026-09-16' })
+    const err = warning?.details.err as Error
+    expect((err.cause as Error).message).toBe('ENOTFOUND api.cba.am')
+  })
+
+  it('база не приняла ответ — это сбой записи, а не ЦБ РА: запасные не спрошены (Г)', async () => {
+    const h = harness({ writeFails: true })
+    await times(h.run, FALLBACK_AFTER_FAILURES + 1)
+
+    expect(h.cbr.asked).toBe(0)
+    expect(h.warnings[0]).toMatchObject({
+      message: 'official rate cache write failed',
+      details: { provider: 'cba' },
     })
-    await expect(run()).resolves.toBeUndefined()
-    expect(warnings).toMatchObject([{ provider: 'cba' }])
   })
 })
