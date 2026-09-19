@@ -68,6 +68,14 @@ export function writeEverywhere(key: string, value: string): boolean {
       shelf.setItem(key, value)
     } catch {
       everywhere = false
+      // A shelf that refused keeps its past, and a restart would read it back: the queue sent a
+      // purchase again after it was removed, and the row came back (review Р-13). Removing needs
+      // no quota; with the shelf empty, `read` goes on to the one that holds the present.
+      try {
+        shelf.removeItem(key)
+      } catch {
+        // Nothing more to do: this shelf refuses everything.
+      }
     }
   }
   return everywhere

@@ -552,7 +552,9 @@ database access. In a product about data integrity, two write paths will silentl
   sends at a time (`navigator.locks`). **Without Web Locks** (Safari before 15.4, old WebViews)
   two windows can send the same head at once, and a removed row can come back — narrowed, not
   closed, as the identity's own fallback says of itself. What must hold is written to every shelf
-  or kept in memory: a shelf that refused a write still answers reads with its past. No connection, a 5xx, an answer off the contract (a shop's
+  or kept in memory, and a shelf that refused the write is emptied of that key (removing needs no
+  quota): left alone it answers the next launch with its past, and a removed purchase is sent
+  again and comes back. No connection, a 5xx, an answer off the contract (a shop's
   captive portal) and a 401 hold the queue, and so does a code the API did not say itself
   (`ApiError.answered === false` — a portal's 404 page); any other refusal is set aside in
   `rejected` and never retried — sent again it would be refused again and hold everything behind

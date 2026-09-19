@@ -121,7 +121,7 @@ function decode(raw: unknown): QueuedWrite | null {
   if (typeof tripId !== 'string' || !isIdentifier(tripId)) return null
 
   if (kind === 'add') {
-    const body = addExpenseBodySchema.safeParse(raw.body)
+    const body = addExpenseBodySchema.safeParse(bodyOf(raw.body))
     return body.success ? { kind, tripId, body: body.data, entry: cardOf(raw.entry) } : null
   }
   if (typeof expenseId !== 'string' || !isIdentifier(expenseId)) return null
@@ -130,6 +130,20 @@ function decode(raw: unknown): QueuedWrite | null {
     return patch.success ? { kind, tripId, expenseId, patch: patch.data } : null
   }
   return kind === 'remove' ? { kind, tripId, expenseId } : null
+}
+
+const BODY_FIELDS = ['id', 'itemId', 'quantity', 'amount', 'query'] as const
+
+/**
+ * The body as far as this version knows it: a body kept by a newer build — one rolled back after
+ * — may carry a field this one has never heard of, and the strict schema would drop the whole
+ * purchase for it. Only the known fields are read, as `cardOf` does for the card (round 3).
+ */
+function bodyOf(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw
+  return Object.fromEntries(
+    BODY_FIELDS.filter((field) => raw[field] !== undefined).map((field) => [field, raw[field]]),
+  )
 }
 
 const CARD_FIELDS = ['id', 'kind', 'name', 'note', 'defaultUnit', 'typicalQuantity'] as const

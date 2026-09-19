@@ -420,6 +420,75 @@ describe('trip queue', () => {
     })
   })
 
+  it('does not send again after a restart what it sent while a shelf refused (Р-13)', async () => {
+    // localStorage fills up; the purchase goes and is removed; the PWA is killed in the
+    // background — its sessionStorage goes with it — and opened again.
+    addExpense.mockRejectedValue(offline())
+    const queue = fresh()
+    queue.enqueue(add(MILK))
+    await settled()
+    const working = localStorage.setItem.bind(localStorage)
+    Object.defineProperty(localStorage, 'setItem', {
+      configurable: true,
+      writable: true,
+      value: () => {
+        throw new Error('QuotaExceededError')
+      },
+    })
+    try {
+      addExpense.mockReset()
+      addExpense.mockResolvedValue({ trip: answer('520.00'), created: true })
+      removeExpense.mockResolvedValue(answer('0'))
+      await queue.flush()
+      queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: MILK })
+      await settled()
+      expect(queue.pending).toEqual([])
+
+      sessionStorage.clear()
+      addExpense.mockClear()
+      removeExpense.mockClear()
+      // A restart: the identity is already stored, and this localStorage takes no writes.
+      setActivePinia(createPinia())
+      const restarted = useTripQueueStore()
+      await restarted.flush()
+
+      expect(restarted.pending).toEqual([])
+      expect(addExpense).not.toHaveBeenCalled()
+      expect(removeExpense).not.toHaveBeenCalled()
+    } finally {
+      Object.defineProperty(localStorage, 'setItem', {
+        configurable: true,
+        writable: true,
+        value: working,
+      })
+    }
+  })
+
+  it('reads a purchase kept by a newer build that grew a field of its body', () => {
+    // A build rolled back after it queued a purchase: the body is the purchase, and a field this
+    // build has never heard of must not drop it.
+    localStorage.setItem(
+      `molvia.trip-queue.${ME}`,
+      JSON.stringify([
+        {
+          key: 'k1',
+          write: {
+            kind: 'add',
+            tripId: TRIP,
+            body: { id: MILK, itemId: milk.id, amount: { amount: '520', currency: 'AMD' }, tip: 1 },
+            entry: catalogueEntryCodec.encode(milk),
+          },
+        },
+      ]),
+    )
+    const [write] = fresh().pending
+    expect(write?.kind === 'add' && write.body).toEqual({
+      id: MILK,
+      itemId: milk.id,
+      amount: parseMoney('520', 'AMD'),
+    })
+  })
+
   it('keeps memory for the truth when one shelf refuses and the other takes the write (Б3)', async () => {
     // localStorage reads back what it held and refuses every write; sessionStorage works.
     addExpense.mockRejectedValue(offline())
