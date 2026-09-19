@@ -4,18 +4,18 @@
     "color-no-hex": [
       true,
       {
-        "message": "Colours live in styles/_tokens.scss. Use var(--\u2026)."
+        "message": "Colours live in styles/_tokens.scss. Use var(--…)."
       }
     ],
     "color-named": [
       "never",
       {
-        "message": "Colours live in styles/_tokens.scss. Use var(--\u2026)."
+        "message": "Colours live in styles/_tokens.scss. Use var(--…)."
       }
     ],
     "declaration-property-value-allowed-list": {
       "/^(margin|padding|gap|inset|top|right|bottom|left)/": [
-        "/^(0|auto|inherit|initial|unset|var\\(--space-[a-z0-9]+\\))( (0|auto|var\\(--space-[a-z0-9]+\\))){0,3}$/"
+        "/^(0|auto|inherit|initial|unset|var\\(--(space-[a-z0-9]+|safe-(top|bottom)|bar-height|tabbar-height)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom)|bar-height|tabbar-height)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom)|bar-height|tabbar-height)\\))*( \\* -1)?\\))( (0|auto|var\\(--(space-[a-z0-9]+|safe-(top|bottom)|bar-height|tabbar-height)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom)|bar-height|tabbar-height)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom)|bar-height|tabbar-height)\\))*( \\* -1)?\\))){0,3}$/"
       ]
     },
     "no-descending-specificity": null,
