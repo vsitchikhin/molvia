@@ -330,7 +330,8 @@ Scraping rate.am was rejected.
 
 **How the official rate reaches a trip (MOL-39).** A trip snapshots it when it starts, from a
 cache in the database — **«Начать поход» never goes to the network**: a trip at the shelf does
-not wait for a central bank. The API refreshes the cache itself, at boot and then hourly
+not wait for a central bank. The API refreshes the cache itself, hourly, and at boot unless
+the cache was written less than an hour ago — `make dev` restarts on every save
 (`RATES_REFRESH`, on by default, off in end-to-end runs). The cache holds what the banks
 publish — **one currency against the dram per day**, never a pair; the pair is built at the
 snapshot, and an inverse or a cross is rounded there to the snapshot's six digits.
@@ -338,13 +339,22 @@ snapshot, and an inverse or a cross is rounded there to the snapshot's six digit
 - **The CBA speaks SOAP only** — the GET form answers «Runtime Error» — and dates its rate by
   the day in Yerevan, with nothing on weekends: a Sunday trip takes Friday's rate, with Friday's
   date. The date always travels with the rate; «≈» without one is worse than an old number.
-- **Two open sources stand in for it: the Bank of Russia, then open.er-api.com.** They are asked
-  only after five failures of the CBA in a row, and every refresh still asks the CBA first. A trip
-  takes a fallback only when the CBA has published nothing for **seven days** — a shorter bound
-  would mark every weekend — and such a snapshot says `source: 'fallback'`, so the screen can
-  say the rate is not the CBA's. A pair is never built from two providers.
-- **Strict or nothing:** an answer missing a currency, or carrying one outside the plausible
-  band, is not written at all. A stale rate with its date beats a mixed one.
+- **Two open sources stand in for it: the Bank of Russia, then open.er-api.com.** «The CBA is
+  silent» has two faces and both count: five failures in a row, **or** an answer whose rate is
+  over **seven days** old — a service stuck on its last date looks healthy. Every refresh still
+  asks the CBA first; an open source as stale as the CBA sends the refresh on to the next one. A
+  trip takes a fallback only when it is fresher than a CBA rate over a week old — a shorter bound
+  would mark every weekend — and such a snapshot says `source: 'fallback'`. When nothing is
+  fresher, the trip keeps the CBA rate with its date and `rateStale: true`: the screen says the
+  bank has published nothing since. A pair is never built from two providers.
+- **A jump is flagged, not refused (owner's decision).** A rate more than a quarter away from the
+  median of that provider's last five is stored with `jump`; a trip that takes it keeps the rate
+  before the jump beside the snapshot, and the person chooses which to count by
+  (`PUT /trips/:tripId/rate-choice`). The snapshot is never rewritten — only the choice moves.
+  The first rate a provider ever sends has nothing to be measured against.
+- **Strict or nothing:** an answer missing a currency, carrying a zero or a negative, or dated by
+  a day that is not one — `0001-01-01`, `1970-01-01`, the 31st of February — is not written at
+  all. A stale rate with its date beats a mixed one.
 - **An empty cache gives a trip no rate, for good** — the snapshot is written once and never
   filled in later (owner's decision, 19.09.2026).
 
@@ -744,7 +754,8 @@ it first. A finished trip still takes rows — the soy sauce found in the bag at
 trip it was bought on. The trip and its rows are named by the device, so a queue sent twice is one
 purchase.
 MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
-MOL-39 the official rate — a cache refreshed hourly, snapshotted by every new trip;
+MOL-39 the official rate — a cache refreshed hourly, snapshotted by every new trip, a jump
+left to the person;
 MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of «back». No real screen yet:
 three sections are placeholders. Release 0.1 is broken into epics and tasks in Jira.
 What exists, what is decided and what is still open — `docs/onboarding.md`.
