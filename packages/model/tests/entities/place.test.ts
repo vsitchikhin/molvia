@@ -65,3 +65,29 @@ describe('newPlaceSchema: the name is an identity (MOL-21, adversarial Д)', () 
     expect(() => place('\u2060\u2800')).toThrow()
   })
 })
+
+describe('newPlaceSchema: the ends, round two (MOL-21, adversarial round 2)', () => {
+  const place = (name: string) =>
+    newPlaceSchema.parse({ kind: 'store', name, country: 'AM', city: 'Gyumri' }).name
+
+  it.each([
+    ['U+2060 and a line break at the end', 'Ереван Сити⁠\n'],
+    ['U+2800 and \\r\\n at the end', 'Ереван Сити⠀\r\n'],
+    ['a tab and U+00AD at the start', '\t­Ереван Сити'],
+    ['U+3164 and a tab at the end', 'Ереван Ситиㅤ\t'],
+  ])('%s — both go, in either order', (_label, name) => {
+    expect(place(name)).toBe('Ереван Сити')
+  })
+
+  it('keeps what draws the last character: VS16 after an emoji, a flag’s tags', () => {
+    expect(place('Кафе ☕️')).toBe('Кафе ☕️')
+    expect(place('Сердце ❤️\n')).toBe('Сердце ❤️')
+    const scotland = '🏴\u{e0067}\u{e0062}\u{e0073}\u{e0063}\u{e0074}\u{e007f}'
+    expect(place(`Паб ${scotland}`)).toBe(`Паб ${scotland}`)
+  })
+
+  it('a selector after a letter draws nothing and goes, and so does a dangling joiner', () => {
+    expect(place('Ереван Сити️')).toBe('Ереван Сити')
+    expect(place('Бар 👨‍')).toBe('Бар 👨')
+  })
+})
