@@ -209,8 +209,8 @@ export default defineComponent({
   cursor: pointer;
 
   &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+    @include focus-ring;
+
     border-radius: var(--radius-sm);
   }
 }
