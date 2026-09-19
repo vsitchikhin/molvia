@@ -1,57 +1,84 @@
 <template>
   <AppScreen :title="t('advice.title')">
-    <p v-if="state === 'loading'" class="muted">{{ t('state.loading') }}</p>
+    <ScreenSkeleton v-if="state === 'loading'" :groups="[40, 78, 62, 78]" />
 
-    <template v-else-if="state === 'offline' || state === 'error'">
-      <p class="muted">
-        {{ state === 'offline' ? t('advice.offline.title') : t('advice.error.title') }}
-      </p>
-      <button class="button" type="button" @click="load">
-        <IconRefresh class="icon" aria-hidden="true" />
-        {{ t('state.retry') }}
-      </button>
-    </template>
+    <ScreenState
+      v-else-if="state === 'error'"
+      kind="error"
+      :title="t('advice.error.title')"
+      :body="t('advice.error.body')"
+      @retry="load"
+    />
 
-    <template v-else>
-      <p class="muted">{{ t('dev.connected', { version }) }}</p>
-      <p>{{ t('advice.empty.body') }}</p>
-      <button class="button" type="button">{{ t('advice.empty.action') }}</button>
-    </template>
+    <!-- No button: the screen reloads by itself when the connection is back. -->
+    <ScreenState
+      v-else-if="state === 'offline'"
+      kind="offline"
+      tone="warn"
+      :title="t('item.offline.title')"
+    />
+
+    <ScreenState
+      v-else
+      kind="empty"
+      tone="accent"
+      :icon="IconStar"
+      :title="t('advice.empty.title')"
+      :body="t('advice.empty.body')"
+    >
+      <p class="dev">{{ t('dev.connected', { version }) }}</p>
+      <template #action>
+        <AppButton block>{{ t('advice.empty.action') }}</AppButton>
+      </template>
+    </ScreenState>
   </AppScreen>
 </template>
 
 <script lang="ts">
 import { defineComponent, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import IconRefresh from '~icons/mdi/refresh'
+import IconStar from '~icons/mdi/star-outline'
 import { api } from '@/api'
+import AppButton from '@/components/AppButton.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import ScreenState from '@/components/ScreenState.vue'
+import { useReconnect } from '@/composables/useReconnect'
 
 // Every screen has four states, offline included: the target is a phone at a shelf,
 // where the connection drops more often than anything else fails.
 type State = 'loading' | 'offline' | 'error' | 'ready'
 
+// Asked afresh each time, never narrowed: the answer before the request says nothing about
+// the connection by the time the request has failed.
+function connected(): boolean {
+  return navigator.onLine
+}
+
 /**
  * Still the scaffold it has been since the repository was set up, now speaking the 0.1
- * dictionary: MOL-32 replaces it with the real «what to buy» screen, and MOL-19 gives every
- * screen the shared four-state block this one only gestures at.
+ * dictionary and drawn by the shared state blocks (MOL-19): MOL-32 replaces it with the real
+ * «what to buy» screen.
  *
  * Two seams are deliberate. `dev.connected` is a liveness probe rather than product copy —
- * the name says it is temporary, and MOL-32 deletes it with this file. And the offline text
- * here is `advice.offline.*`, which speaks of stale data this scaffold does not actually
- * have; the dictionary is the thing being built, and a screen that outlives the sprint is
- * not worth a key of its own.
+ * the name says it is temporary, and MOL-32 deletes it with this file. And offline borrows the
+ * search's plain «No connection»: the advice's own offline text promises yesterday's data,
+ * which this scaffold does not have, and a screen that outlives the sprint is not worth a key
+ * of its own (MOL-19, Р-2).
+ *
+ * Offline or error is decided after the failure, not before the request: a connection that
+ * drops while the answer is on its way is the commonest break at a shelf, and it is not red.
  */
 export default defineComponent({
   name: 'HomeView',
-  components: { AppScreen, IconRefresh },
+  components: { AppButton, AppScreen, ScreenSkeleton, ScreenState },
   setup() {
     const { t } = useI18n()
     const state = ref<State>('loading')
     const version = ref('')
 
     async function load(): Promise<void> {
-      if (!navigator.onLine) {
+      if (!connected()) {
         state.value = 'offline'
         return
       }
@@ -61,42 +88,29 @@ export default defineComponent({
         version.value = (await api.health()).version
         state.value = 'ready'
       } catch {
-        state.value = 'error'
+        state.value = connected() ? 'error' : 'offline'
       }
     }
+
+    // Back online, the screen tries again by itself — the identity does the same, and a screen
+    // left saying «no connection» with the connection back would be lying.
+    useReconnect(() => {
+      if (state.value === 'offline' || state.value === 'error') void load()
+    })
 
     onMounted(() => {
       void load()
     })
 
-    return { t, state, version, load }
+    return { t, state, version, load, IconStar }
   },
 })
 </script>
 
 <style scoped lang="scss">
-.muted {
+.dev {
+  margin: 0;
   color: var(--text-muted);
-}
-
-.button {
-  @include touch-target;
-
-  gap: var(--space-2);
-  padding: 0 var(--space-4);
-  border: none;
-  border-radius: var(--radius);
-
-  /* --accent is marked non-text use only; a filled control carrying a label takes
-     --accent-solid, which is 6.5:1 against --on-accent. */
-  background: var(--accent-solid);
-  color: var(--on-accent);
-  font: inherit;
-  font-weight: var(--weight-medium);
-}
-
-.icon {
-  width: 1.25em;
-  height: 1.25em;
+  font-size: var(--text-footnote);
 }
 </style>

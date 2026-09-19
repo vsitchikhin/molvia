@@ -172,7 +172,7 @@
       "body": "Until that works, the app cannot save anything — there is nowhere to put it."
     },
     "offline": {
-      "title": "No connection",
+      "title": "This device isn't identified yet",
       "body": "We will identify this device as soon as you are back online. Until then nothing new can be saved."
     },
     "action": "Got it",

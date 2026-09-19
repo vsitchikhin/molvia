@@ -49,6 +49,6 @@ test('asks for the invite link when the app is opened without one', async ({ pag
   // domain sees: an explanation rather than a blank screen or a raw 401.
   await page.goto('/')
 
-  await expect(page.getByText('An invite link is needed')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'An invite link is needed' })).toBeVisible()
   expect(await storedIdentity(page)).toBeNull()
 })

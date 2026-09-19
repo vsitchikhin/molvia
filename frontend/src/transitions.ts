@@ -99,6 +99,15 @@ export function installViewTransitions(router: Router): void {
 }
 
 /**
+ * Focus on the screen's own heading, where a screen reader starts reading it. For whatever just
+ * took the focused control away: a move to another screen, or a «Try again» that swaps its
+ * state for a skeleton — left alone, the focus falls to <body> and the page is read from the top.
+ */
+export function focusScreenTitle(): void {
+  document.querySelector<HTMLElement>('h1')?.focus({ preventScroll: true })
+}
+
+/**
  * What a person who cannot see the screen needs after a move: the tab's title names the screen
  * (and the Android task switcher shows it), and focus lands on the new heading instead of
  * staying on a button that has just disappeared. Not on the first render — nothing moved yet.
@@ -117,6 +126,6 @@ export function installArrival(router: Router, t: (key: string) => string): void
     document.title = name(to)
     if (from.matched.length === 0) return
     await nextTick()
-    document.querySelector<HTMLElement>('h1')?.focus({ preventScroll: true })
+    focusScreenTitle()
   })
 }

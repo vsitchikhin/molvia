@@ -109,7 +109,6 @@ describe('словарь: повторяющиеся тексты', () => {
       Оценки: ['nav.verdicts', 'verdict.title'],
       // Цена Р-2: одно состояние, написанное для трёх экранов.
       'Сервер не ответил': ['advice.error.title', 'item.error.title', 'trip.error.title'],
-      'Нет сети': ['identity.offline.title', 'item.offline.title'],
       // Кнопка в двух местах похода: в списке и в офлайне.
       'Добавить позицию': ['trip.add_item', 'trip.offline.action'],
     })
@@ -125,7 +124,6 @@ describe('словарь: повторяющиеся тексты', () => {
       'What to buy': ['advice.title', 'nav.advice'],
       Ratings: ['nav.verdicts', 'verdict.title'],
       'The server did not answer': ['advice.error.title', 'item.error.title', 'trip.error.title'],
-      'No connection': ['identity.offline.title', 'item.offline.title'],
       'Add an item': ['trip.add_item', 'trip.offline.action'],
       // Английский не различает отмену диалога и отмену ввода; русский различает.
       Cancel: ['item.cancel', 'trip.finish_confirm.cancel'],
