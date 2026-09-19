@@ -71,10 +71,14 @@ function prefersReducedMotion(): boolean {
  * A second tap in between still sees the parent underneath and steps past it, out of the app —
  * so until the step lands, further moves are ignored. The timer only guards against a step that
  * never lands.
+ *
+ * Exported for the sheet (MOL-18): closing it takes its own entry away, and closing it together
+ * with the screen under it — «Add to trip» on the search — takes two in one move.
  */
 let stepping = false
 
-function stepBack(router: Router): void {
+export function stepBack(router: Router, steps = 1): void {
+  if (stepping) return
   stepping = true
   const landed = (): void => {
     stepping = false
@@ -83,7 +87,7 @@ function stepBack(router: Router): void {
   }
   const timer = window.setTimeout(landed, 1000)
   window.addEventListener('popstate', landed)
-  router.back()
+  router.go(-steps)
 }
 
 export function useNavigation(): {

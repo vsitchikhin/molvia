@@ -20,6 +20,12 @@ body {
   box-sizing: border-box;
 }
 
+// A modal <dialog> makes the page inert but not still: on iOS it slides under a finger on the
+// scrim. The sheet scrolls on its own; the page under it waits.
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
 // ── Moves between screens ───────────────────────────────────────────────────
 // View transitions, set up in transitions.ts. A push slides the new screen in from the right
 // over the old one, a pop slides it back out; a change of section cross-fades, which is the
