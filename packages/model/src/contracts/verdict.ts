@@ -112,8 +112,10 @@ export const PENDING_VERDICTS_LIMIT = 50
  * `GET /verdicts/pending`. `total` is how many items wait, the list only the first of them —
  * the counter under the title must not stop at the length of a page.
  */
-export const pendingVerdictsCodec = z.strictObject({
-  items: z.array(pendingVerdictCodec).max(PENDING_VERDICTS_LIMIT),
-  total: z.int().nonnegative(),
-})
+export const pendingVerdictsCodec = z
+  .strictObject({
+    items: z.array(pendingVerdictCodec).max(PENDING_VERDICTS_LIMIT),
+    total: z.int().nonnegative(),
+  })
+  .refine((answer) => answer.total >= answer.items.length, { error: ISSUE.RESPONSE_INVALID })
 export type PendingVerdicts = z.output<typeof pendingVerdictsCodec>

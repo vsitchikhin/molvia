@@ -1,8 +1,8 @@
-import { randomUUID } from 'node:crypto'
 /**
  * «Оценки» through the server (MOL-28): what was bought and not rated, one card per item. The
  * numbers in the test names are the corners of `requirements/MOL-28.md` §5.
  */
+import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { PENDING_VERDICTS_LIMIT, pendingVerdictsCodec } from '@molvia/model'
 import type { PendingVerdicts } from '@molvia/model'
@@ -47,8 +47,9 @@ async function queue(actor: string): Promise<PendingVerdicts> {
   return pendingVerdictsCodec.parse(JSON.parse(reply.body))
 }
 
+/** Bought on a trip of that day: the day of a purchase is its trip's, not its row's. */
 async function bought(actorId: string, itemId: string, placeId: string, at: string) {
-  const tripId = await insertTrip(db, { actorId, placeId })
+  const tripId = await insertTrip(db, { actorId, placeId, startedAt: new Date(at) })
   await db.insert(expenses).values({ id: randomUUID(), tripId, itemId, createdAt: new Date(at) })
 }
 
@@ -138,14 +139,12 @@ describe('GET /verdicts/pending', () => {
   it('4: ровно 50 — список 50; 51 — список 50 и total 51', async () => {
     const actor = await insertActor(db)
     const place = await insertPlace(db)
-    const tripId = await insertTrip(db, { actorId: actor, placeId: place })
     const buy = async (n: number) => {
       const itemId = await insertItem(db, {
         name: `Позиция ${String(n)}`,
         searchKey: `pozicia ${String(n)}`,
       })
-      const at = new Date(Date.UTC(2026, 8, 1, 0, n))
-      await db.insert(expenses).values({ id: randomUUID(), tripId, itemId, createdAt: at })
+      await bought(actor, itemId, place, new Date(Date.UTC(2026, 8, 1, 0, n)).toISOString())
     }
     for (let n = 1; n <= PENDING_VERDICTS_LIMIT; n++) await buy(n)
 
@@ -161,6 +160,31 @@ describe('GET /verdicts/pending', () => {
     // The newest first, so the one that did not fit is the oldest.
     expect(over.items[0]?.name).toBe(`Позиция ${String(PENDING_VERDICTS_LIMIT + 1)}`)
     expect(over.items.map((card) => card.name)).not.toContain('Позиция 1')
+  })
+
+  it('B1: день покупки — день похода, а не ввода: соус из пакета не становится «сегодня»', async () => {
+    const actor = await insertActor(db)
+    const sas = await insertPlace(db)
+    const city = await insertPlace(db, { name: 'Ереван Сити' })
+    const sauce = await insertItem(db, { name: 'Соевый соус', searchKey: 'soevii sous' })
+    const bread = await insertItem(db, { name: 'Хлеб', searchKey: 'hleb', defaultUnit: 'piece' })
+    await bought(actor, bread, city, '2026-09-18T10:00:00.000Z')
+    // Last week's trip, the sauce written into it only now — found in the bag at home.
+    const lastWeek = await insertTrip(db, {
+      actorId: actor,
+      placeId: sas,
+      startedAt: new Date('2026-09-12T10:00:00.000Z'),
+      finishedAt: new Date('2026-09-12T11:00:00.000Z'),
+    })
+    await db.insert(expenses).values({ id: randomUUID(), tripId: lastWeek, itemId: sauce })
+
+    const { items } = await queue(actor)
+
+    expect(items.map((card) => card.name)).toEqual(['Хлеб', 'Соевый соус'])
+    expect(items[1]).toMatchObject({
+      placeName: 'SAS',
+      boughtAt: new Date('2026-09-12T10:00:00.000Z'),
+    })
   })
 
   it('блюдо в очередь не идёт: до 0.3 путь вердикта не принимает место', async () => {

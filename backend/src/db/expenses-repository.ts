@@ -63,7 +63,9 @@ export interface ExpenseRepository {
   /**
    * The same purchases as the screen «Оценки» asks about them (MOL-28): one row per item, with
    * the name, the place and the day of the latest purchase, newest first, and how many items
-   * wait in all. Products only — a dish is rated where it was served, and until 0.3 the verdict
+   * wait in all. The day is the trip's, not the row's: a finished trip takes rows — the sauce
+   * found in the bag at home — and an offline queue sends a whole trip later, and neither was
+   * bought when it reached the server. Products only — a dish is rated where it was served, and until 0.3 the verdict
    * path refuses a place, so a dish here would be a question with no way to answer it.
    */
   pendingVerdictsFor(actorId: string, limit: number): Promise<PendingVerdicts>
@@ -292,14 +294,19 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           // Aliased: both names are `name`, and a subquery keeps only the bare column name.
           name: sql<string>`${items.name}`.as('item_name'),
           placeName: sql<string>`${places.name}`.as('place_name'),
-          boughtAt: expenses.createdAt,
+          boughtAt: trips.startedAt,
         })
         .from(expenses)
         .innerJoin(trips, and(eq(trips.id, expenses.tripId), eq(trips.actorId, actorId)))
         .innerJoin(items, and(eq(items.id, expenses.itemId), eq(items.kind, 'product')))
         .innerJoin(places, eq(places.id, trips.placeId))
         .where(noLiveVerdict(actorId))
-        .orderBy(expenses.itemId, desc(expenses.createdAt), desc(expenses.id))
+        .orderBy(
+          expenses.itemId,
+          desc(trips.startedAt),
+          desc(expenses.createdAt),
+          desc(expenses.id),
+        )
         .as('latest')
 
       // The total is counted by a window over the same rows, before the limit applies: a

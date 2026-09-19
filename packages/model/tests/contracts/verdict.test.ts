@@ -165,4 +165,11 @@ describe('pendingVerdictsCodec', () => {
     expect(() => z.encode(pendingVerdictsCodec, { items: [], total: -1 })).toThrow()
     expect(() => z.encode(pendingVerdictsCodec, { items: [], total: 1.5 })).toThrow()
   })
+
+  it('refuses a total smaller than the page it came with', () => {
+    const wire = { items: [{ ...card, boughtAt: '2026-09-18T17:40:00.000Z' }], total: 0 }
+
+    expect(pendingVerdictsCodec.safeParse(wire).success).toBe(false)
+    expect(pendingVerdictsCodec.safeParse({ ...wire, total: 1 }).success).toBe(true)
+  })
 })
