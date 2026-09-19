@@ -1,15 +1,19 @@
 <template>
-  <section class="state" :class="[toneClass, { inline }]" :role="role">
+  <section class="state" :class="[toneClass, { inline }]">
     <span class="circle" aria-hidden="true">
       <component :is="glyph" class="glyph" />
     </span>
-    <h2 class="title">{{ title }}</h2>
-    <p v-if="body" class="body">{{ body }}</p>
+    <!-- The live region holds the words only: a card read out with its buttons would say
+         «Try again» as if it were the news. -->
+    <div class="message" :role="role">
+      <h2 class="title">{{ title }}</h2>
+      <p v-if="body" class="body">{{ body }}</p>
+    </div>
     <div v-if="$slots.default" class="extra">
       <slot />
     </div>
     <div v-if="kind === 'error' || $slots.action" class="action">
-      <AppButton v-if="kind === 'error'" block @click="$emit('retry')">
+      <AppButton v-if="kind === 'error'" block @click="retry">
         <template #icon><IconRefresh /></template>
         {{ t('state.retry') }}
       </AppButton>
@@ -25,6 +29,7 @@ import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconRefresh from '~icons/mdi/refresh'
 import AppButton from '@/components/AppButton.vue'
+import { focusScreenTitle } from '@/transitions'
 
 export type StateKind = 'empty' | 'error' | 'offline' | 'attention'
 
@@ -46,8 +51,9 @@ const TONES: Record<StateKind, readonly StateTone[]> = {
 // to yellow, «the data may be old», which is true of every offline screen; green is a promise.
 const FALLBACK = { empty: 'accent', offline: 'warn' } as const
 
+// Own keys only: `in` walks the prototype, and «toString» would pass for a kind.
 function isKind(value: unknown): value is StateKind {
-  return typeof value === 'string' && value in TONES
+  return typeof value === 'string' && Object.hasOwn(TONES, value)
 }
 
 /**
@@ -98,7 +104,7 @@ export default defineComponent({
     inline: { type: Boolean, default: false },
   },
   emits: ['retry'],
-  setup(props) {
+  setup(props, { emit }) {
     const { t } = useI18n()
 
     const glyph = computed<Component | undefined>(() => {
@@ -111,19 +117,30 @@ export default defineComponent({
     // only warns, and a warning in the console must not turn offline red on the screen.
     const toneClass = computed(() => {
       if (props.kind === 'error') return 'bad'
-      if (props.kind === 'attention') return 'warn'
+      if (!isKind(props.kind) || props.kind === 'attention') return 'warn'
       const allowed = TONES[props.kind]
       return props.tone !== undefined && allowed.includes(props.tone)
         ? props.tone
         : FALLBACK[props.kind]
     })
 
-    // Something went wrong or has to be known now; empty and offline interrupt nothing.
-    const role = computed(() =>
-      props.kind === 'error' || props.kind === 'attention' ? 'alert' : 'status',
-    )
+    // Something went wrong or has to be known now; empty and offline interrupt nothing. An
+    // inline error is a notice drawn again over every screen the person moves to, and one that
+    // interrupted would cut off the heading each move has just focused — it is polite.
+    const role = computed(() => {
+      if (props.kind === 'attention') return 'alert'
+      if (props.kind === 'error' && !props.inline) return 'alert'
+      return 'status'
+    })
 
-    return { t, glyph, toneClass, role }
+    // The button is about to be replaced by a skeleton: focus goes to the heading first, as it
+    // does after a move, rather than falling to <body>.
+    function retry(): void {
+      focusScreenTitle()
+      emit('retry')
+    }
+
+    return { t, glyph, toneClass, role, retry }
   },
 })
 </script>
@@ -142,17 +159,15 @@ export default defineComponent({
 .circle {
   display: grid;
   place-items: center;
-
-  /* 38 with a 22 icon — the handoff's state circle */
-  width: 2.375rem;
-  height: 2.375rem;
+  width: var(--state-circle);
+  height: var(--state-circle);
   margin-bottom: var(--space-3);
   border-radius: 50%;
 }
 
 .glyph {
-  width: 1.375rem;
-  height: 1.375rem;
+  width: var(--state-glyph);
+  height: var(--state-glyph);
 }
 
 .accent .circle {
@@ -180,6 +195,7 @@ export default defineComponent({
   font-size: var(--text-headline);
   font-weight: var(--weight-medium);
   line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
 }
 
 .body {
@@ -187,6 +203,7 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   line-height: var(--leading-body);
+  overflow-wrap: anywhere;
 }
 
 .extra {

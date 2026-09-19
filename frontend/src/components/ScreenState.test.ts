@@ -86,6 +86,8 @@ describe('ScreenState', () => {
       ['attention with a tone', { kind: 'attention', tone: 'good' }],
       ['offline with an icon of its own', { kind: 'offline', tone: 'good', icon: IconPlus }],
       ['a kind that does not exist', { kind: 'loading' }],
+      // `in` walks the prototype: «toString» passed for a kind with a fixed tone (MOL-19, A5).
+      ['a name off the prototype', { kind: 'toString' }],
     ])('%s', (_, props) => {
       expect(refused(props)).toBe(true)
     })
@@ -104,10 +106,27 @@ describe('ScreenState', () => {
     it.each([
       ['error', { kind: 'error' }, 'alert'],
       ['attention', { kind: 'attention' }, 'alert'],
+      ['attention inline', { kind: 'attention', inline: true }, 'alert'],
       ['empty', { kind: 'empty', tone: 'accent', icon: IconPlus }, 'status'],
       ['offline', { kind: 'offline', tone: 'good' }, 'status'],
+      // A notice drawn again over every screen: an alert would cut off the heading each move
+      // has just focused (MOL-19, A3).
+      ['inline error', { kind: 'error', inline: true }, 'status'],
     ])('%s is announced as %s', (_, props, role) => {
-      expect(render(props).attributes('role')).toBe(role)
+      expect(render(props).get('[role]').attributes('role')).toBe(role)
+    })
+
+    // Read out with its buttons, the card would announce «Try again» as if it were the news.
+    it('keeps the buttons out of what it announces', () => {
+      const view = render(
+        { kind: 'error', body: 'Body' },
+        { action: () => h('a', 'Take from recent') },
+      )
+      const region = view.get('[role]')
+      expect(region.find('button').exists()).toBe(false)
+      expect(region.find('a').exists()).toBe(false)
+      expect(region.text()).toContain('Title')
+      expect(region.text()).toContain('Body')
     })
 
     // The circle is decoration: the title and the text say what happened.
@@ -135,6 +154,13 @@ describe('ScreenState', () => {
     expect(render({ kind: 'offline', tone: 'warn' }).find('.body').exists()).toBe(false)
   })
 
+  // The handoff's fifth kind, arriving as a string: warned about, and drawn rather than thrown.
+  it('draws a kind it does not know in a tone, instead of failing the screen', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const view = render({ kind: 'loading', tone: 'good' })
+    expect(view.classes()).toContain('warn')
+  })
+
   describe('«Try again»', () => {
     it('is offered by every error, and reported rather than acted on', async () => {
       const view = render({ kind: 'error' })
@@ -143,6 +169,18 @@ describe('ScreenState', () => {
 
       await button.trigger('click')
       expect(view.emitted('retry')).toHaveLength(1)
+    })
+
+    // The button is replaced by a skeleton the moment it is pressed; left alone, the focus
+    // falls to <body> and a screen reader starts the page over (MOL-19, A2).
+    it('hands the focus to the screen heading before it goes', async () => {
+      const heading = document.createElement('h1')
+      heading.tabIndex = -1
+      document.body.append(heading)
+      const view = render({ kind: 'error' }, {})
+      await view.get('.action button').trigger('click')
+      expect(document.activeElement).toBe(heading)
+      heading.remove()
     })
 
     it('says it in Russian from the same dictionary', () => {
