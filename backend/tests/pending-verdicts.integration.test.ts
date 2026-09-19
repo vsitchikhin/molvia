@@ -162,7 +162,7 @@ describe('GET /verdicts/pending', () => {
     expect(over.items.map((card) => card.name)).not.toContain('Позиция 1')
   })
 
-  it('B1: день покупки — день похода, а не ввода: соус из пакета не становится «сегодня»', async () => {
+  it('B1: дописанное в закрытый поход куплено не позже его закрытия, а не «сегодня»', async () => {
     const actor = await insertActor(db)
     const sas = await insertPlace(db)
     const city = await insertPlace(db, { name: 'Ереван Сити' })
@@ -183,8 +183,24 @@ describe('GET /verdicts/pending', () => {
     expect(items.map((card) => card.name)).toEqual(['Хлеб', 'Соевый соус'])
     expect(items[1]).toMatchObject({
       placeName: 'SAS',
-      boughtAt: new Date('2026-09-12T10:00:00.000Z'),
+      boughtAt: new Date('2026-09-12T11:00:00.000Z'),
     })
+  })
+
+  it('R6: в незакрытом походе сегодняшняя покупка — сегодняшняя, а не день открытия', async () => {
+    const actor = await insertActor(db)
+    const cheese = await insertItem(db, { name: 'Сыр', searchKey: 'sir' })
+    const threeDaysAgo = new Date(Date.now() - 3 * 86_400_000)
+    const open = await insertTrip(db, {
+      actorId: actor,
+      placeId: await insertPlace(db),
+      startedAt: threeDaysAgo,
+    })
+    const before = Date.now()
+    await db.insert(expenses).values({ id: randomUUID(), tripId: open, itemId: cheese })
+
+    const [card] = (await queue(actor)).items
+    expect(card?.boughtAt.getTime()).toBeGreaterThanOrEqual(before - 1000)
   })
 
   it('в одном походе у покупок один день — первой стоит набранная последней', async () => {
