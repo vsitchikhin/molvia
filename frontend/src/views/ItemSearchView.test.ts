@@ -6,22 +6,28 @@ import type { Pinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
-import type { CatalogueEntry, ProposedItem } from '@molvia/model'
+import { tripViewCodec } from '@molvia/model'
+import type { AddExpenseBody, CatalogueEntry, ProposedItem } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { routes } from '@/router'
 import { useItemEntryStore } from '@/stores/itemEntry'
 import { useRecentItemsStore } from '@/stores/recentItems'
+import { useTripStore } from '@/stores/trip'
+import { useTripQueueStore } from '@/stores/tripQueue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 
 const searchCatalogue = vi.fn<(query: string) => Promise<CatalogueEntry[]>>()
 const proposeItem =
   vi.fn<(input: ProposedItem) => Promise<{ entry: CatalogueEntry; created: boolean }>>()
+const addExpense = vi.fn<(tripId: string, body: AddExpenseBody) => Promise<unknown>>()
 vi.mock('@/api', () => ({
   api: {
     searchCatalogue: (query: string) => searchCatalogue(query),
     proposeItem: (input: ProposedItem) => proposeItem(input),
+    addExpense: (tripId: string, body: AddExpenseBody) => addExpense(tripId, body),
+    currentTrip: () => Promise.resolve(null),
   },
 }))
 
@@ -340,6 +346,86 @@ describe('«What did you pick up?»', () => {
 
       expect(view.text()).not.toContain(en.item.not_listed)
       expect(view.text()).not.toContain(en.item.empty.action)
+    })
+  })
+
+  describe('the sheet «how much, for what price» (MOL-24)', () => {
+    const TRIP = 'bbbbbbbb-0000-4000-8000-000000000001'
+
+    function onTrip(): void {
+      useTripStore(pinia).apply(
+        tripViewCodec.parse({
+          id: TRIP,
+          startedAt: '2026-09-19T08:00:00.000Z',
+          finishedAt: null,
+          currency: 'AMD',
+          rate: null,
+          rateJump: null,
+          rateStale: false,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
+          expenses: [],
+          total: [],
+          converted: null,
+        }),
+      )
+    }
+
+    async function picked(view: VueWrapper): Promise<void> {
+      await view.get('[role="option"]').trigger('click')
+      // Past the moment the sheet rises: until then it takes no tap.
+      vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+
+    beforeEach(() => {
+      addExpense.mockReset()
+      addExpense.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+      vi.spyOn(performance, 'now').mockReturnValue(0)
+      onTrip()
+    })
+
+    it('comes up over the screen on a pick', async () => {
+      remembered(milk)
+      const view = await render()
+      await picked(view)
+
+      const sheet = view.get('dialog[open]')
+      expect(sheet.text()).toContain(milk.name)
+      expect(sheet.text()).toContain(en.item.save)
+    })
+
+    it('adds with the query of the search, and only then remembers the item', async () => {
+      searchCatalogue.mockResolvedValue([milk])
+      const view = await render()
+      await field(view).setValue('мол')
+      await vi.waitFor(() => {
+        expect(names(view)).toHaveLength(1)
+      })
+      await picked(view)
+
+      const add = view.findAll('dialog[open] button').find((b) => b.text() === en.item.save)
+      await add?.trigger('click')
+
+      const [write] = useTripQueueStore(pinia).pending
+      expect(write).toMatchObject({ kind: 'add', tripId: TRIP, entry: milk })
+      if (write?.kind === 'add') expect(write.body.query).toBe('мол')
+      expect(useRecentItemsStore(pinia).items).toEqual([milk])
+    })
+
+    it('writes nothing, not even the recent items, when closed with ×', async () => {
+      remembered(bread)
+      searchCatalogue.mockResolvedValue([milk])
+      const view = await render()
+      await field(view).setValue('мол')
+      await vi.waitFor(() => {
+        expect(names(view)).toHaveLength(1)
+      })
+      await picked(view)
+
+      await view.get(`dialog[open] button[aria-label="${en.sheet.close}"]`).trigger('click')
+
+      expect(useTripQueueStore(pinia).pending).toEqual([])
+      expect(useRecentItemsStore(pinia).items).toEqual([bread])
     })
   })
 })
