@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import type { RouteRecordRaw } from 'vue-router'
+import type { RouteRecordRaw, RouterScrollBehavior } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 import TripView from '@/views/TripView.vue'
@@ -54,10 +54,16 @@ export const routes = [
 // `watchBrowserAnimatedBack`.
 watchBrowserAnimatedBack()
 
-export const router = createRouter({
-  history: createWebHistory(),
-  routes,
-  // Back and forward return to where the person was; any other move starts at the top. The
-  // sections keep no scroll of their own — their state lives in stores, not in components.
-  scrollBehavior: (_to, _from, saved) => saved ?? { top: 0 },
-})
+/**
+ * Back and forward return to where the person was; any other move starts at the top. The
+ * sections keep no scroll of their own — their state lives in stores, not in components.
+ *
+ * A move to the very address the screen is on leaves the page where it is. The router runs one
+ * on every `popstate`, and a sheet closed by «back» is exactly that: the entry it laid is gone,
+ * the address never changed, and no position was ever saved for an entry the router did not
+ * write — so the list jumped to the top under a sheet that was only dismissed (MOL-18).
+ */
+export const scrollBehavior: RouterScrollBehavior = (to, from, saved) =>
+  to.fullPath === from.fullPath ? false : (saved ?? { top: 0 })
+
+export const router = createRouter({ history: createWebHistory(), routes, scrollBehavior })

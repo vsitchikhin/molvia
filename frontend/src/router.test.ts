@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import type { RouteLocationNormalized } from 'vue-router'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
-import { routes } from '@/router'
+import { routes, scrollBehavior } from '@/router'
 
 function lookup(dictionary: unknown, key: string): unknown {
   return key.split('.').reduce<unknown>((node, part) => {
@@ -67,4 +68,28 @@ describe('routes', () => {
       expect(typeof lookup(en, key)).toBe('string')
     },
   )
+})
+
+describe('scrollBehavior', () => {
+  const at = (fullPath: string) => ({ fullPath }) as RouteLocationNormalized
+
+  it('starts a new screen at the top', () => {
+    expect(scrollBehavior(at('/trip/add'), at('/'), null)).toEqual({ top: 0 })
+  })
+
+  it('returns to the saved position on back and forward', () => {
+    expect(scrollBehavior(at('/'), at('/trip/add'), { left: 0, top: 600 })).toEqual({
+      left: 0,
+      top: 600,
+    })
+  })
+
+  // A sheet closed by «back» pops an entry at the same address; the list under it stays put.
+  it('does not touch the scroll when the address stays the same', () => {
+    expect(scrollBehavior(at('/'), at('/'), null)).toBe(false)
+  })
+
+  it('must not fire: a query that changed is a different place', () => {
+    expect(scrollBehavior(at('/?x=1'), at('/'), null)).toEqual({ top: 0 })
+  })
 })

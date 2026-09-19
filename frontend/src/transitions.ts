@@ -102,13 +102,18 @@ export function installViewTransitions(router: Router): void {
  * What a person who cannot see the screen needs after a move: the tab's title names the screen
  * (and the Android task switcher shows it), and focus lands on the new heading instead of
  * staying on a button that has just disappeared. Not on the first render — nothing moved yet.
+ *
+ * Nor when the address stayed the same. The router calls every `popstate` a move, and a sheet
+ * closed by «back» is one: the screen did not change, the button that opened the sheet is still
+ * there, and `<dialog>` has just handed focus back to it — taking it to the heading would drop a
+ * screen-reader user at the top of the page (MOL-18).
  */
 export function installArrival(router: Router, t: (key: string) => string): void {
   const name = (to: RouteLocationNormalized): string => `${t(to.meta.titleKey)} · ${t('app.name')}`
 
   document.title = name(router.currentRoute.value)
   router.afterEach(async (to, from, failure) => {
-    if (failure) return
+    if (failure || to.fullPath === from.fullPath) return
     document.title = name(to)
     if (from.matched.length === 0) return
     await nextTick()
