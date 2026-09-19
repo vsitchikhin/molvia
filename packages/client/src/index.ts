@@ -110,8 +110,15 @@ export interface MolviaClient {
    * which is what makes «check before restoring» possible instead of «replace and hope».
    */
   me(identifier?: string): Promise<Actor>
-  /** The catalogue lookup behind «что взяли?», ranked by the server — the query goes as typed. */
-  searchCatalogue(query: string): Promise<CatalogueEntry[]>
+  /**
+   * The catalogue lookup behind «что взяли?», ranked by the server — the query goes as typed.
+   * The screen searches while the person types, so a search the next keystroke made stale is
+   * cancelled through `signal`; the cancellation arrives as an ApiError like everything else.
+   */
+  searchCatalogue(
+    query: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<CatalogueEntry[]>
   /**
    * «Предложить товар». `created` is `false` when the catalogue already held an item of this
    * kind by the same name — the entry is then that item, and the fields sent were not applied.
@@ -176,6 +183,8 @@ export function createClient({
     readonly timeout?: number | null
     /** Sent as JSON. Already on the wire's side: the caller encodes through the schema. */
     readonly body?: unknown
+    /** The caller's own cancellation, on top of the timeout. */
+    readonly signal?: AbortSignal
   }
 
   async function exchange<T>(
@@ -202,6 +211,14 @@ export function createClient({
         : setTimeout(() => {
             controller.abort()
           }, limit)
+    // The caller's signal drives the same controller rather than replacing it, so the timeout
+    // still holds for a caller that passed one. `AbortSignal.any` would say this in one line,
+    // and Safari only learned it in 17.4.
+    const cancel = (): void => {
+      controller.abort()
+    }
+    if (options.signal?.aborted) cancel()
+    options.signal?.addEventListener('abort', cancel)
 
     let response: Response
     try {
@@ -218,6 +235,7 @@ export function createClient({
       throw new ApiError(ERROR.INTERNAL, error instanceof Error ? error.message : 'transport')
     } finally {
       if (timer !== undefined) clearTimeout(timer)
+      options.signal?.removeEventListener('abort', cancel)
     }
 
     // A proxy page, an empty body, a reply cut off mid-flight: `.json()` throws, and every
@@ -314,13 +332,14 @@ export function createClient({
     me: (identifier) =>
       request('/actors/me', actorCodec, identifier === undefined ? {} : { as: identifier }),
 
-    searchCatalogue: async (query) => {
+    searchCatalogue: async (query, options = {}) => {
       // URLSearchParams, not a template: «&», «#», «+» and «%» in a query would otherwise
       // cut it short or change its meaning on the way.
       const search = new URLSearchParams({ q: query })
       const { items } = await request(
         `/catalogue/search?${search.toString()}`,
         catalogueSearchResponseSchema,
+        options.signal === undefined ? {} : { signal: options.signal },
       )
       return items
     },
