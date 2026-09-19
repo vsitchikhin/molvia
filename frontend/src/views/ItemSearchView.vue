@@ -65,7 +65,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { CatalogueEntry } from '@molvia/model'
 import IconPlus from '~icons/mdi/plus'
@@ -132,7 +132,9 @@ export default defineComponent({
       return []
     })
 
-    const hasRecent = computed(() => recent.items.length > 0)
+    // What the fallback would show, not whether there are recent items at all: under an error
+    // they are narrowed by the query, and a button leading to none of them is a dead end (B2).
+    const hasRecent = computed(() => recent.filter(query.value).length > 0)
 
     const heading = computed(() =>
       showsRecent.value ? t('item.group_recent') : t('item.group_found'),
@@ -141,10 +143,13 @@ export default defineComponent({
     // Read out once per answer, not on every letter: the answer is what changed. An empty answer
     // too — the block that replaces the list is not a ScreenState and says nothing of itself, and
     // after «found one» silence would read as nothing having happened (Р-10, A5).
+    // The words go with the answer they describe — a new answer, any other state, the screen
+    // left: the region is read in browse mode, and «found one» over an error is a lie (B3).
     let withdraw: (() => void) | undefined
     watch([phase, results], ([next, found]) => {
-      if (next !== 'ready' && next !== 'empty') return
       withdraw?.()
+      withdraw = undefined
+      if (next !== 'ready' && next !== 'empty') return
       withdraw = announce?.(
         next === 'ready'
           ? t('item.results_announced', { n: found.length }, found.length)
@@ -172,6 +177,9 @@ export default defineComponent({
 
     onMounted(() => {
       recent.sync()
+    })
+    onUnmounted(() => {
+      withdraw?.()
     })
 
     return {

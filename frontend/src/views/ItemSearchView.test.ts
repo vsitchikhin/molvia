@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, nextTick, ref } from 'vue'
 import { mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import type { Pinia } from 'pinia'
@@ -55,8 +55,11 @@ function remembered(...items: CatalogueEntry[]): void {
   for (const item of [...items].reverse()) recent.remember(item)
 }
 
-/** The screen under the app's own live region, so what it reads out can be heard. */
-async function render() {
+/**
+ * The screen under the app's own live region, so what it reads out can be heard. `shown` takes the
+ * screen away while the region stays — what leaving it does.
+ */
+async function render(shown = ref(true)) {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/trip/add')
   const wrapper = mount(
@@ -65,7 +68,7 @@ async function render() {
         const announcements = provideAnnouncer()
         return () =>
           h('div', [
-            h(ItemSearchView),
+            shown.value ? h(ItemSearchView) : null,
             h('p', { class: 'live' }, announcements.value.map((a) => a.text).join(' | ')),
           ])
       },
@@ -167,6 +170,49 @@ describe('«What did you pick up?»', () => {
 
     await vi.waitFor(() => {
       expect(view.get('.live').text()).toBe(en.item.empty.body.replace('{query}', 'молокоо'))
+    })
+  })
+
+  describe('takes its words back when the answer they describe goes', () => {
+    async function foundOne() {
+      searchCatalogue.mockResolvedValueOnce([milk])
+      const view = await render()
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(view.get('.live').text()).toBe('Found 1 item')
+      })
+      return view
+    }
+
+    it('when the field is cleared', async () => {
+      const view = await foundOne()
+      await field(view).setValue('')
+      expect(view.get('.live').text()).toBe('')
+    })
+
+    it('when the next search fails — «found one» over an error would be a lie', async () => {
+      const view = await foundOne()
+      searchCatalogue.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'HTTP 500'))
+      await field(view).setValue('молоко')
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.item.error.title)
+      })
+      expect(view.get('.live').text()).not.toContain('Found')
+    })
+
+    it('when the screen is left', async () => {
+      searchCatalogue.mockResolvedValue([milk])
+      const shown = ref(true)
+      const view = await render(shown)
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(view.get('.live').text()).toBe('Found 1 item')
+      })
+
+      shown.value = false
+      await nextTick()
+
+      expect(view.get('.live').text()).toBe('')
     })
   })
 
