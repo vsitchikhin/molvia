@@ -130,7 +130,7 @@ describe('«What did you pick up?»', () => {
     const view = await render()
 
     await field(view).setValue('молок')
-    expect(view.find('.skeleton .bars').exists()).toBe(true)
+    expect(view.find('.loading .bars').exists()).toBe(true)
 
     await vi.waitFor(() => {
       expect(searchCatalogue).toHaveBeenCalledWith('молок')
@@ -141,7 +141,7 @@ describe('«What did you pick up?»', () => {
     })
     expect(view.text()).toContain(en.item.group_found)
     expect(view.text()).not.toContain(en.item.group_recent)
-    expect(view.find('.skeleton').exists()).toBe(false)
+    expect(view.find('.loading').exists()).toBe(false)
   })
 
   it('reads the count out once the answer is in', async () => {

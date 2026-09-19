@@ -239,6 +239,11 @@ export default defineComponent({
     color: var(--text-muted);
     opacity: 1;
   }
+
+  /* Chrome draws its clear button in the system blue, past the tokens. */
+  &::-webkit-search-cancel-button {
+    appearance: none;
+  }
 }
 
 .hint {

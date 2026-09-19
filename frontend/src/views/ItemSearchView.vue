@@ -11,7 +11,7 @@
       @pick="pick"
     >
       <template #before>
-        <div v-if="phase === 'loading'" class="skeleton">
+        <div v-if="phase === 'loading'" class="loading">
           <ScreenSkeleton :groups="[62, 62, 62]" />
         </div>
 
@@ -178,8 +178,10 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.skeleton {
+/* Not `.skeleton`: a scoped class reaches the root of a child too, and that is ScreenSkeleton's. */
+.loading {
   margin-top: var(--space-6);
+  padding: var(--space-4);
   overflow: hidden;
   border: var(--hairline) solid var(--border);
   border-radius: var(--radius-lg);
