@@ -15,6 +15,7 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 
 // Every write fails as a dropped connection would, so what the sheet queued stays to be read.
 const offline = vi.hoisted(() => () => Promise.reject(new Error('Failed to fetch')))
+const currentTrip = vi.hoisted(() => vi.fn<() => Promise<unknown>>())
 vi.mock('@/api', async () => {
   const { ApiError } = await import('@molvia/client')
   const { ERROR } = await import('@molvia/model')
@@ -22,7 +23,9 @@ vi.mock('@/api', async () => {
     offline().catch((error: unknown) => {
       throw new ApiError(ERROR.INTERNAL, String(error))
     })
-  return { api: { addExpense: fail, updateExpense: fail, removeExpense: fail } }
+  return {
+    api: { addExpense: fail, updateExpense: fail, removeExpense: fail, currentTrip },
+  }
 })
 
 const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
@@ -71,6 +74,8 @@ beforeEach(() => {
   setActivePinia(pinia)
   clock = 0
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
+  currentTrip.mockReset()
+  currentTrip.mockResolvedValue(null)
 })
 
 afterEach(() => {
@@ -239,6 +244,20 @@ describe('ItemDetailsSheet', () => {
     window.dispatchEvent(new Event('online'))
     await nextTick()
     expect(view.find('.offline').exists()).toBe(false)
+  })
+
+  it('asks the server for the trip when it has none in memory', async () => {
+    currentTrip.mockResolvedValue(trip())
+    const { view } = await render({ trip: null })
+    await vi.waitFor(() => {
+      expect(view.findAll('button').some((b) => b.text() === 'Добавить в поход')).toBe(true)
+    })
+    expect(currentTrip).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not ask when it already knows the trip', async () => {
+    await render()
+    expect(currentTrip).not.toHaveBeenCalled()
   })
 
   it('asks for a trip first when there is none, and leads back to it (В-6)', async () => {
