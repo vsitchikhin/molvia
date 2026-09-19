@@ -623,6 +623,24 @@ database access. In a product about data integrity, two write paths will silentl
   edge swipe and Android «back» belong to the browser, and the history is the one source of
   «back». Only the page scrolls, never an inner container: iOS hides its address bar and the
   router restores positions only for the window.
+- **A screen is built from the kit, not drawn anew** (MOL-18): `AppButton`, `AppField`,
+  `SegmentedControl`, `VerdictBadge`, `AppCard`, `BottomSheet` in `components/`, every state of
+  them on the development-only page `/_kit`. `AppCard` carries exactly the differences between
+  the three cards of 0.1 — `as`, `tone="take"`, `list` — and nothing for later: a component over
+  a surface is one prop away from a wrapper around a `<div>`. **The sheet is a native
+  `<dialog>` with an entry in the history**, laid through the router's own `history.push` at
+  the same address — never a bare `pushState`, which leaves no scroll position saved and drops
+  the list to the top on «back». Every close — ×, the scrim, Esc, Android «back» — steps back
+  off that entry, and only the pop closes it, so exactly one entry is ever taken. Any move of
+  the router under an open sheet — push, replace, a new query — closes it too; an entry no
+  sheet holds — left by a reload or a move away — is stepped off by `installSheetEntryGuard`.
+  `close(2)` closes it together with the screen under it, the sheets above and below included,
+  and never steps out of the app. Sheets may stack: a pop closes as many from the top as
+  entries it went back. Until it has come up the sheet takes
+  no tap, so the second tap of a double tap cannot close it or press its main action. Open a
+  sheet from a tap only: Chrome skips on «back» an entry laid without a gesture. **The sheet is the one exception to «only the
+  page scrolls»**: a panel over the screen has no window of its own, so it scrolls itself and
+  the page under it is held still.
 
 ## Code rules
 
@@ -762,7 +780,8 @@ purchase.
 MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
 MOL-39 the official rate — a cache refreshed hourly, snapshotted by every new trip, a jump
 left to the person;
-MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of «back». No real screen yet:
+MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of «back»; MOL-18 the kit
+screens are built from — button, field, card, verdict badge, sheet. No real screen yet:
 three sections are placeholders. Release 0.1 is broken into epics and tasks in Jira.
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 

@@ -5,6 +5,7 @@ import { applyDocumentLang, i18n } from '@/i18n'
 import { settleColdStart } from '@/navigation'
 import { router } from '@/router'
 import { installArrival, installViewTransitions } from '@/transitions'
+import { installSheetEntryGuard } from '@/composables/useSheetHistory'
 import { useActorStore } from '@/stores/actor'
 import { takeInviteCodeFromUrl } from '@/stores/identity'
 import '@/styles/main.scss'
@@ -53,6 +54,7 @@ void forgetInviteInRoute()
   .finally(() => {
     installViewTransitions(router)
     installArrival(router, (key) => i18n.global.t(key))
+    installSheetEntryGuard(router)
     app.mount('#app')
 
     // Raised right after the first paint rather than before it: the store carries the four

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
@@ -67,4 +67,28 @@ describe('routes', () => {
       expect(typeof lookup(en, key)).toBe('string')
     },
   )
+})
+
+// The kit is a page for development; a production build must not carry it.
+describe('the kit page', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  it('is there in development, nested under the trip', async () => {
+    const route = await resolveAt('/_kit')
+    expect(route.name).toBe('kit')
+    expect(route.meta.parent).toBe('trip')
+  })
+
+  it('must not fire: a production build has no such page', async () => {
+    vi.stubEnv('DEV', false)
+    vi.resetModules()
+    const production = await import('@/router')
+    const router = createRouter({ history: createMemoryHistory(), routes: production.routes })
+    await router.push('/_kit')
+    expect(router.currentRoute.value.fullPath).toBe('/')
+    expect(production.routes.some((route) => route.path === '/_kit')).toBe(false)
+  })
 })
