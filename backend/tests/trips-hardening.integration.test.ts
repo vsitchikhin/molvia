@@ -196,22 +196,45 @@ describe('Б. итог похода держится и между двумя о
   })
 })
 
-describe('В. id устройства в верхнем регистре', () => {
-  it('трата с id в верхнем регистре правится и удаляется тем же id', async () => {
+describe('В. id устройства — только в нижнем регистре', () => {
+  it('трату с id в верхнем регистре не завести: 400 и ни строки (заход 2, В)', async () => {
     const actor = await insertActor(db)
     const milk = await insertItem(db, { name: 'Молоко', searchKey: 'moloko' })
     const tripId = await startTrip(actor)
-    // Так id выдаёт, например, `UUID().uuidString` на iOS; `z.uuid()` его принимает.
+    // Так id выдаёт, например, `UUID().uuidString` на iOS: в ответе он вернулся бы в нижнем
+    // регистре, и телефон не нашёл бы свою строку.
     const upper = randomUUID().toUpperCase()
 
-    expect(
-      (await call(app, 'POST', `/trips/${tripId}/expenses`, actor, { id: upper, itemId: milk }))
-        .status,
-    ).toBe(201)
-
-    const patched = await call(app, 'PATCH', `/trips/${tripId}/expenses/${upper}`, actor, {
-      amount: { amount: '570', currency: 'AMD' },
+    const added = await call(app, 'POST', `/trips/${tripId}/expenses`, actor, {
+      id: upper,
+      itemId: milk,
     })
+    const started = await call(app, 'POST', '/trips', actor, {
+      id: randomUUID().toUpperCase(),
+      place: { kind: 'store', name: 'Рынок' },
+    })
+
+    expect([added.status, started.status]).toEqual([400, 400])
+    expect(await rowsOf(tripId)).toEqual([])
+  })
+
+  it('путь в верхнем регистре к существующей трате работает: uuid сравнивает Postgres', async () => {
+    const actor = await insertActor(db)
+    const milk = await insertItem(db, { name: 'Молоко', searchKey: 'moloko' })
+    const tripId = await startTrip(actor)
+    const id = randomUUID()
+    await call(app, 'POST', `/trips/${tripId}/expenses`, actor, { id, itemId: milk })
+    const upper = id.toUpperCase()
+
+    const patched = await call(
+      app,
+      'PATCH',
+      `/trips/${tripId.toUpperCase()}/expenses/${upper}`,
+      actor,
+      {
+        amount: { amount: '570', currency: 'AMD' },
+      },
+    )
     expect(patched.status).toBe(200)
     expect(view(patched).total).toEqual([{ minor: 57_000n, currency: 'AMD' }])
 
@@ -331,5 +354,33 @@ describe('Д. невидимый знак по краю имени — то же
     const actor = await insertActor(db)
     const first = await startAndFinish(actor, 'Ереван Сити')
     expect(await startAndFinish(actor, 'Ереван­Сити')).not.toBe(first)
+  })
+})
+
+describe('Д, заход 2: невидимый знак и перевод строки по краю вместе', () => {
+  async function placeOf(actor: string, name: string) {
+    const id = randomUUID()
+    const reply = await call(app, 'POST', '/trips', actor, { id, place: { kind: 'store', name } })
+    expect(reply.status).toBe(201)
+    expect((await call(app, 'POST', `/trips/${id}/finish`, actor)).status).toBe(204)
+    return view(reply).place
+  }
+
+  it.each([
+    ['U+2060 и перевод строки в конце', 'Ереван Сити\u2060\n'],
+    ['U+2800 и \\r\\n в конце', 'Ереван Сити\u2800\r\n'],
+    ['таб и U+00AD в начале', '\t\u00adЕреван Сити'],
+    ['U+3164 и таб в конце', 'Ереван Сити\u3164\t'],
+  ])('%s — то же место', async (_label, name) => {
+    const actor = await insertActor(db)
+    const first = await placeOf(actor, 'Ереван Сити')
+
+    expect((await placeOf(actor, name)).id).toBe(first.id)
+    expect(await db.select().from(places)).toHaveLength(1)
+  })
+
+  it('«Кафе ☕️» записано как ввёл человек — эмодзи не теряет вид (заход 2, Б)', async () => {
+    const actor = await insertActor(db)
+    expect((await placeOf(actor, 'Кафе ☕\ufe0f')).name).toBe('Кафе ☕\ufe0f')
   })
 })
