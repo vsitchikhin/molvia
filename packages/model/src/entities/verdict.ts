@@ -2,9 +2,10 @@ import { z } from 'zod'
 import { DomainError, ERROR, ISSUE } from '#model/support/errors'
 import type { ItemKind } from './item'
 import { PATCH_EMPTY, changesSomething } from '#model/support/patch'
-import { visibleLine } from '#model/support/text'
+import { visibleText } from '#model/support/text'
 
-const reviewSchema = visibleLine(500)
+// A textarea on the screen, so a review may run to more than one line (MOL-27).
+const reviewSchema = visibleText(500)
 
 /**
  * Keyed on the item, not on «item + place»: the same milk in every shop, only the price

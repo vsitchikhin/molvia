@@ -27,3 +27,37 @@ export function visibleLine(max: number): z.ZodType<string, string> {
       },
     )
 }
+
+// A blank line may hold spaces a phone keyboard left behind, and still reads as nothing.
+const BLANK_LINES = /\n(?:[^\S\n]*\n){2,}/u
+
+/**
+ * `visibleLine` that may break into lines — for a review, typed into a three-row textarea.
+ *
+ * `\n` is the only control character let through, and every line ending becomes it first:
+ * the same review typed on Windows and on a phone is then one string, and a lone `\r` —
+ * which draws nothing and moves the caret back over the text — cannot slip in as an ending.
+ * One empty line between paragraphs is writing; two are a gap the screen would show as a
+ * hole in the card, so a run of them is refused rather than silently squeezed.
+ */
+export function visibleText(max: number): z.ZodType<string, string> {
+  return z
+    .string()
+    .overwrite((text) => text.replace(/\r\n?/g, '\n'))
+    .trim()
+    .min(1)
+    .max(max)
+    .refine(
+      (text) => {
+        const flat = text.replaceAll('\n', '')
+        return (
+          !FORBIDDEN.test(flat) &&
+          !BLANK_LINES.test(text) &&
+          flat.replace(BLANK, '').replace(MARK, '').length > 0
+        )
+      },
+      {
+        error: ISSUE.TEXT_NOT_VISIBLE,
+      },
+    )
+}
