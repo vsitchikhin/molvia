@@ -28,6 +28,35 @@ describe('visibleText', () => {
     expect(refusal('раз\r\n \r\n\r\nдва')).toBe(ISSUE.TEXT_NOT_VISIBLE)
   })
 
+  it('counts a line of what draws nothing as empty — not only spaces', () => {
+    // Adversarial pass: a rule that knew only `\\s` let twenty such lines through as a hole.
+    for (const invisible of [
+      '\u200b',
+      '\u2800',
+      '\u3164',
+      '\u00ad',
+      '\u200d',
+      '\u2060',
+      '\u0301',
+    ]) {
+      const hole = `Пахнет крахмалом.\n${`${invisible}\n`.repeat(2)}Мясом — нет`
+      expect(refusal(hole), invisible.codePointAt(0)?.toString(16)).toBe(ISSUE.TEXT_NOT_VISIBLE)
+      // One such line between paragraphs is an empty line, and one is allowed.
+      expect(review.safeParse(`раз\n${invisible}\nдва`).success).toBe(true)
+    }
+  })
+
+  it('drops blank lines at either end, invisible ones included, as trim drops spaces', () => {
+    const padded = `${'\u2800\n'.repeat(5)}Мясом — нет${'\n\u200b'.repeat(5)}`
+    expect(review.parse(padded)).toBe('Мясом — нет')
+  })
+
+  it('keeps an invisible character inside a line that has text', () => {
+    expect(review.parse('vkusno \u{1F468}\u200d\u{1F373}\nещё')).toBe(
+      'vkusno \u{1F468}\u200d\u{1F373}\nещё',
+    )
+  })
+
   it('trims the ends, line breaks included', () => {
     expect(review.parse('\n\n  вкусно  \n')).toBe('вкусно')
   })

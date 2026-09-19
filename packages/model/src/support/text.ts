@@ -28,8 +28,31 @@ export function visibleLine(max: number): z.ZodType<string, string> {
     )
 }
 
-// A blank line may hold spaces a phone keyboard left behind, and still reads as nothing.
-const BLANK_LINES = /\n(?:[^\S\n]*\n){2,}/u
+/**
+ * A line is blank when nothing on it draws — by the same measure `visibleLine` applies to a
+ * whole name, not by `\s`: a line of U+2800, a zero-width space or a lone combining mark is as
+ * empty on the card as a line of spaces, and a rule that knew only `\s` let twenty of them in.
+ */
+function isBlankLine(line: string): boolean {
+  return line.replace(BLANK, '').replace(MARK, '').replace(/\s/gu, '').length === 0
+}
+
+/** Blank lines at either end go the way `trim` sends spaces: they would only pad the card. */
+function withoutBlankEdges(text: string): string {
+  const lines = text.split('\n')
+  while (lines.length > 0 && isBlankLine(lines[0] ?? '')) lines.shift()
+  while (lines.length > 0 && isBlankLine(lines.at(-1) ?? '')) lines.pop()
+  return lines.join('\n')
+}
+
+function hasBlankRun(text: string): boolean {
+  let run = 0
+  for (const line of text.split('\n')) {
+    run = isBlankLine(line) ? run + 1 : 0
+    if (run > 1) return true
+  }
+  return false
+}
 
 /**
  * `visibleLine` that may break into lines — for a review, typed into a three-row textarea.
@@ -43,18 +66,14 @@ const BLANK_LINES = /\n(?:[^\S\n]*\n){2,}/u
 export function visibleText(max: number): z.ZodType<string, string> {
   return z
     .string()
-    .overwrite((text) => text.replace(/\r\n?/g, '\n'))
+    .overwrite((text) => withoutBlankEdges(text.replace(/\r\n?/g, '\n')))
     .trim()
     .min(1)
     .max(max)
     .refine(
       (text) => {
         const flat = text.replaceAll('\n', '')
-        return (
-          !FORBIDDEN.test(flat) &&
-          !BLANK_LINES.test(text) &&
-          flat.replace(BLANK, '').replace(MARK, '').length > 0
-        )
+        return !FORBIDDEN.test(flat) && !hasBlankRun(text) && !isBlankLine(flat)
       },
       {
         error: ISSUE.TEXT_NOT_VISIBLE,
