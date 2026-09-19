@@ -44,10 +44,26 @@ export function officialRatesRefresh({
 }: RefreshDeps): () => Promise<void> {
   let failures = 0
 
-  /** The provider's answer, or null — its failure logged, with how old the cache already is. */
-  async function fetchFrom(feed: RateFeed, lastKnown: string | null): Promise<Published | null> {
+  /**
+   * The provider's answer, or null — its failure logged, with how old the cache already is. An
+   * answer dated past tomorrow is a failure too (Р-25): `9999-12-31` is a .NET service's «no
+   * date», it would look fresh for ever, and no trip could take it.
+   */
+  async function fetchFrom(
+    feed: RateFeed,
+    today: string,
+    lastKnown: string | null,
+  ): Promise<Published | null> {
     try {
-      return await feed.fetchLatest()
+      const answer = await feed.fetchLatest()
+      if (answer.date > today && !isRateFresh(answer.date, today)) {
+        log.warn(
+          { provider: feed.provider, date: answer.date, lastKnown },
+          'official rate dated in the future',
+        )
+        return null
+      }
+      return answer
     } catch (error) {
       log.warn({ provider: feed.provider, err: error, lastKnown }, 'official rate fetch failed')
       return null
@@ -121,7 +137,7 @@ export function officialRatesRefresh({
     const today = yerevanDate(now())
     const lastKnown = await lastCentralDate(today)
 
-    const central = await fetchFrom(primary, lastKnown)
+    const central = await fetchFrom(primary, today, lastKnown)
     if (central) {
       failures = 0
       await store(central)
@@ -134,7 +150,7 @@ export function officialRatesRefresh({
     if (failures <= FALLBACK_AFTER_FAILURES && !stale) return
 
     for (const fallback of fallbacks) {
-      const answer = await fetchFrom(fallback, lastKnown)
+      const answer = await fetchFrom(fallback, today, lastKnown)
       if (!answer) continue
       await store(answer)
       if (isRateFresh(answer.date, today)) return

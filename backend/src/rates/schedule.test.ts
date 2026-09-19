@@ -58,6 +58,11 @@ describe('обновление при старте', () => {
     expect(refreshAtBoot(ago(REFRESH_EVERY_MS), now)).toBe(true)
   })
 
+  it('в разработке — только пустой кеш: без сети каждое сохранение шло во все три источника (И)', () => {
+    expect(refreshAtBoot(null, now, { development: true })).toBe(true)
+    expect(refreshAtBoot(ago(10 * REFRESH_EVERY_MS), now, { development: true })).toBe(false)
+  })
+
   it('кеш записан меньше часа назад — перезапуск `make dev` в ЦБ РА не идёт', () => {
     expect(refreshAtBoot(ago(REFRESH_EVERY_MS - 1), now)).toBe(false)
     expect(refreshAtBoot(ago(0), now)).toBe(false)

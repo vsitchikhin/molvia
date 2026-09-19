@@ -32,7 +32,11 @@ if (env.RATES_REFRESH === 'on') {
       rates,
       log: app.log,
     }),
-    { immediately: refreshAtBoot(await rates.lastFetchedAt().catch(() => null), new Date()) },
+    {
+      immediately: refreshAtBoot(await rates.lastFetchedAt().catch(() => null), new Date(), {
+        development: env.NODE_ENV === 'development',
+      }),
+    },
   )
   app.addHook('onClose', (_instance, done) => {
     stop()

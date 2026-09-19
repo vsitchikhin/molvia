@@ -383,3 +383,22 @@ describe('Р-22: запасной меряется по ЦБ РА, пока св
     )
   })
 })
+
+describe('Р-25: ответ из будущего', () => {
+  it('ЦБ РА с датой 9999-12-31 — сбой: не пишется, считается, и на шестом раз зовёт запасной', async () => {
+    const h = harness({ cbaDate: '9999-12-31' })
+    for (let index = 0; index <= FALLBACK_AFTER_FAILURES; index += 1) await h.run()
+
+    expect(h.written).toEqual([['cbr']])
+    expect(h.warnings[0]).toMatchObject({
+      message: 'official rate dated in the future',
+      details: { provider: 'cba', date: '9999-12-31' },
+    })
+  })
+
+  it('ЦБ РФ с завтрашней датой — законно, пишется', async () => {
+    const h = harness({ cba: false, cbrDate: '2026-09-20' })
+    for (let index = 0; index <= FALLBACK_AFTER_FAILURES; index += 1) await h.run()
+    expect(h.written).toEqual([['cbr']])
+  })
+})

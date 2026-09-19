@@ -4,15 +4,19 @@ export const REFRESH_EVERY_MS = 60 * 60 * 1000
 /**
  * Whether the boot should refresh at once: not when the cache was written less than a period
  * ago. `make dev` restarts the API on every saved file, and each restart asking the central bank
- * made dozens of calls an hour from every working copy (MOL-39, С-1). Production boots rarely,
+ * made dozens of calls an hour from every working copy (MOL-39, С-1). In development, not at all
+ * once the cache holds anything (Р-26): with the sources unreachable nothing is written, «less
+ * than a period ago» never comes true, and every save went to all three. Production boots rarely,
  * and a deploy an hour after the last refresh still refreshes at once.
  */
 export function refreshAtBoot(
   lastFetchedAt: Date | null,
   now: Date,
-  everyMs = REFRESH_EVERY_MS,
+  { development = false, everyMs = REFRESH_EVERY_MS } = {},
 ): boolean {
-  return lastFetchedAt === null || now.getTime() - lastFetchedAt.getTime() >= everyMs
+  if (lastFetchedAt === null) return true
+  if (development) return false
+  return now.getTime() - lastFetchedAt.getTime() >= everyMs
 }
 
 /**
