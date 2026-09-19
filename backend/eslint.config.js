@@ -21,5 +21,23 @@ export default ts.config(
       'Routes hold no business logic and never reach the database except through a use case.',
     ),
   },
+  {
+    files: ['src/rates/**/*.ts'],
+    rules: deny(
+      [
+        'fastify',
+        'fastify/*',
+        '@/routes',
+        '@/routes/*',
+        '@/usecases',
+        '@/usecases/*',
+        '@/db',
+        '@/db/*',
+        'drizzle-orm*',
+        'postgres',
+      ],
+      'A rate feed reads a provider and nothing else: the cache and the schedule decide what to keep.',
+    ),
+  },
   prettier,
 )
