@@ -8,27 +8,42 @@ import { ISSUE } from './errors'
 // private-use character is drawn differently by every font, or not at all.
 const FORBIDDEN = /[\p{Cc}\p{Cs}\p{Co}\p{Zl}\p{Zp}\u202a-\u202e\u2066-\u2069]/u
 
+/**
+ * What draws nothing, as the body of a character class — the one definition both sides of an
+ * item use: `visibleLine` strips it before asking whether a name has content, and
+ * `toSearchKey` strips it from the key. Two copies drifted once (MOL-12, the Hangul fillers)
+ * and again in MOL-27, when U+13441 joined the name's list only and «𓑁!» became a name whose
+ * key its own schema refused — a 500 from «Предложить товар».
+ *
+ * U+2800, U+13441 and U+1D159 are assigned glyphs that draw an empty cell. Unicode has no
+ * property for «draws nothing», so the list is knowingly incomplete: a character found later
+ * is added here, once, and reaches both sides. It shapes the stored key, so an addition after
+ * the first key is stored needs a migration (CLAUDE.md, «The tables are frozen»).
+ */
+export const INVISIBLE = String.raw`\p{Cf}\p{Default_Ignorable_Code_Point}\u2800\u{13441}\u{1D159}`
+
 // Not content, but not forbidden either: U+200D joins every composite emoji, and a mark
 // after a letter is ordinary text — «Молокó», Armenian and Vietnamese diacritics. Both are
 // dropped before asking whether anything is left, so a string of marks alone is not a name.
-// U+2800, U+13441 and U+1D159 are assigned glyphs that draw an empty cell. Unicode has no
-// property for «draws nothing», so this list is knowingly incomplete: a character found
-// later is added here, not worked around.
-const BLANK = /[\p{Z}\p{Cf}\p{Default_Ignorable_Code_Point}\u2800\u{13441}\u{1D159}]/gu
+const BLANK = new RegExp(`[\\p{Z}${INVISIBLE}]`, 'gu')
 const MARK = /\p{M}/gu
 
 export function visibleLine(max: number): z.ZodType<string, string> {
-  return z
-    .string()
-    .trim()
-    .min(1)
-    .max(max)
-    .refine(
-      (text) => !FORBIDDEN.test(text) && text.replace(BLANK, '').replace(MARK, '').length > 0,
-      {
-        error: ISSUE.TEXT_NOT_VISIBLE,
-      },
-    )
+  return (
+    z
+      .string()
+      .trim()
+      // Blank after the trim is the same verdict as blank after the refine, and names itself
+      // the same way — a generic «too small» told the screen nothing (MOL-27, С-17).
+      .min(1, { error: ISSUE.TEXT_NOT_VISIBLE })
+      .max(max)
+      .refine(
+        (text) => !FORBIDDEN.test(text) && text.replace(BLANK, '').replace(MARK, '').length > 0,
+        {
+          error: ISSUE.TEXT_NOT_VISIBLE,
+        },
+      )
+  )
 }
 
 /**
@@ -80,10 +95,15 @@ export function visibleText(max: number): z.ZodType<string, string> {
   return (
     z
       .string()
-      // The length as sent, before anything is folded or dropped: otherwise a body of any size
-      // reaches the normalisation whole and is measured only after it. Twice the bound leaves
-      // room for `\r\n` endings and padding around a review that fits; nothing longer can.
-      // `abort`, because zod runs the checks after a failed one too.
+      // Whitespace at the ends first — linear, and it cannot change what the text says — so
+      // that padding never decides the answer: a review of spaces is «nothing visible» at any
+      // length, and 500 letters followed by 501 spaces is 500 letters.
+      .trim()
+      // Then the length, before anything is split or folded: otherwise a body of any size
+      // reaches the normalisation whole, and four hundred thousand empty lines held the event
+      // loop for a minute. Twice the bound leaves room for `\r\n` endings and invisible edge
+      // lines around a review that fits; past it the text is too long whatever it holds.
+      // `abort`, because zod runs the later checks too.
       .max(2 * max, { abort: true })
       .overwrite((text) => withoutBlankEdges(text.replace(/\r\n?/g, '\n')))
       .trim()

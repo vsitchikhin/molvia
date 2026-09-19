@@ -72,14 +72,32 @@ describe('visibleText', () => {
     expect(refusal('а\u202eб')).toBe(ISSUE.TEXT_NOT_VISIBLE)
   })
 
-  it('measures the length as sent, before any normalisation runs', () => {
-    // Four hundred thousand empty lines ahead of one letter used to be folded first — for a
-    // minute, in a loop — and accepted as «a».
-    const started = Date.now()
-    expect(review.safeParse(`${'\n'.repeat(400_000)}a`).success).toBe(false)
+  it('lets padding decide nothing: spaces at the ends are trimmed before the length', () => {
+    // Adversarial pass 3, К: 1000 spaces were «nothing visible», 1001 a generic refusal, and
+    // 500 letters with 501 trailing spaces were refused though 500 letters fit.
+    for (const text of [' '.repeat(1001), '\n'.repeat(1001), '\r\n'.repeat(700)]) {
+      expect(refusal(text), `${String(text.length)} blanks`).toBe(ISSUE.TEXT_NOT_VISIBLE)
+    }
+    expect(review.parse(`${'а'.repeat(500)}${' '.repeat(501)}`)).toBe('а'.repeat(500))
+  })
+
+  it('calls a text too long once what stands between its ends passes twice the bound', () => {
+    // Invisible glyphs are not whitespace, so they count — the length is the contract here.
+    expect(refusal('\u2800'.repeat(1001))).not.toBe(ISSUE.TEXT_NOT_VISIBLE)
+    expect(refusal('\u2800'.repeat(1000))).toBe(ISSUE.TEXT_NOT_VISIBLE)
+  })
+
+  it('stays linear on a body of any size — the head of empty lines held the loop a minute', () => {
+    // Blank lines of an invisible glyph survive `trim`, so they meet the length first.
+    let started = Date.now()
+    expect(review.safeParse(`${'\u2800\n'.repeat(200_000)}a`).success).toBe(false)
     expect(Date.now() - started).toBeLessThan(100)
-    // Twice the bound as sent still passes when what remains fits.
-    expect(review.parse(`${'\r\n'.repeat(200)}${'а'.repeat(500)}`)).toBe('а'.repeat(500))
+    // Plain line breaks are whitespace: `trim` drops them, linearly, and what is left is «a».
+    started = Date.now()
+    expect(review.parse(`${'\n'.repeat(400_000)}a`)).toBe('a')
+    expect(Date.now() - started).toBeLessThan(100)
+    // Twice the bound still passes when what remains fits.
+    expect(review.parse(`${'\u200b\r\n'.repeat(160)}${'а'.repeat(500)}`)).toBe('а'.repeat(500))
   })
 
   it('trims the ends, line breaks included', () => {
@@ -103,6 +121,24 @@ describe('visibleText', () => {
     expect(review.safeParse('а'.repeat(501)).success).toBe(false)
     // 249 + \r\n + 249 is 500 characters once folded, and 501 as typed.
     expect(review.safeParse(`${'а'.repeat(249)}\r\n${'б'.repeat(249)}`).success).toBe(true)
+  })
+
+  it('names a blank name the way it names a blank review', () => {
+    for (const text of ['', '   ', '\u200b', '\u2800']) {
+      expect(visibleLine(200).safeParse(text).error?.issues[0]?.message, JSON.stringify(text)).toBe(
+        ISSUE.TEXT_NOT_VISIBLE,
+      )
+    }
+  })
+
+  it('holds a name to the same list of what draws nothing — the two glyphs added in MOL-27', () => {
+    // A rule change for names too, and deliberate: one list for both (`INVISIBLE`).
+    for (const glyph of ['\u{13441}', '\u{1D159}']) {
+      expect(visibleLine(200).safeParse(glyph.repeat(3)).error?.issues[0]?.message).toBe(
+        ISSUE.TEXT_NOT_VISIBLE,
+      )
+      expect(visibleLine(200).safeParse(`${glyph}!`).success).toBe(true)
+    }
   })
 
   it('leaves a name one line: visibleLine still refuses \\n', () => {
