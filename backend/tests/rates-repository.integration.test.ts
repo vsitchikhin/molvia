@@ -90,6 +90,14 @@ describe('кеш официальных курсов', () => {
     expect(await rates.latestOnOrBefore([], '2026-09-18')).toEqual([])
   })
 
+  it('помнит, когда кеш писали последний раз, и молчит, пока не писали никогда', async () => {
+    expect(await rates.lastFetchedAt()).toBeNull()
+    const before = Date.now()
+    await rates.upsert([amd('RUB', '4.3123', '2026-09-18')])
+    const at = await rates.lastFetchedAt()
+    expect(at?.getTime()).toBeGreaterThanOrEqual(before - 1000)
+  })
+
   it('пустая запись — ни строки и не ошибка', async () => {
     await rates.upsert([])
     expect(await db.select().from(officialRates)).toEqual([])

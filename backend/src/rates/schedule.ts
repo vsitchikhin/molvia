@@ -2,12 +2,29 @@
 export const REFRESH_EVERY_MS = 60 * 60 * 1000
 
 /**
- * Runs the refresh now and then every `everyMs`, in the API's own process — there is one
- * instance (CLAUDE.md, «Deployment»), so no second timer fights it for the same row. A run that
- * is still going when the next is due is not doubled. Unreferenced, so the timer never keeps a
- * process alive that is otherwise done; the returned function stops it.
+ * Whether the boot should refresh at once: not when the cache was written less than a period
+ * ago. `make dev` restarts the API on every saved file, and each restart asking the central bank
+ * made dozens of calls an hour from every working copy (MOL-39, С-1). Production boots rarely,
+ * and a deploy an hour after the last refresh still refreshes at once.
  */
-export function startSchedule(run: () => Promise<void>, everyMs = REFRESH_EVERY_MS): () => void {
+export function refreshAtBoot(
+  lastFetchedAt: Date | null,
+  now: Date,
+  everyMs = REFRESH_EVERY_MS,
+): boolean {
+  return lastFetchedAt === null || now.getTime() - lastFetchedAt.getTime() >= everyMs
+}
+
+/**
+ * Runs the refresh — at once if `immediately`, and then every `everyMs` — in the API's own
+ * process: there is one instance (CLAUDE.md, «Deployment»), so no second timer fights it for the
+ * same row. A run that is still going when the next is due is not doubled. Unreferenced, so the
+ * timer never keeps a process alive that is otherwise done; the returned function stops it.
+ */
+export function startSchedule(
+  run: () => Promise<void>,
+  { everyMs = REFRESH_EVERY_MS, immediately = true } = {},
+): () => void {
   let running = false
   const tick = (): void => {
     if (running) return
@@ -16,7 +33,7 @@ export function startSchedule(run: () => Promise<void>, everyMs = REFRESH_EVERY_
       running = false
     })
   }
-  tick()
+  if (immediately) tick()
   const timer = setInterval(tick, everyMs)
   timer.unref()
   return () => {

@@ -1,4 +1,4 @@
-import { and, inArray, lte, sql } from 'drizzle-orm'
+import { and, inArray, lte, max, sql } from 'drizzle-orm'
 import type { AmdRate } from '@molvia/model'
 import type { Conn } from './index'
 import { officialRates } from './schema'
@@ -19,6 +19,9 @@ export interface RateRepository {
     currencies: readonly AmdRate['currency'][],
     date: string,
   ): Promise<readonly AmdRate[]>
+
+  /** When any provider's answer was last written — whether the boot refresh can be skipped. */
+  lastFetchedAt(): Promise<Date | null>
 }
 
 export function createRateRepository(db: Conn): RateRepository {
@@ -60,6 +63,11 @@ export function createRateRepository(db: Conn): RateRepository {
         date: row.rateDate,
         scaled: row.scaled,
       }))
+    },
+
+    async lastFetchedAt() {
+      const [row] = await db.select({ at: max(officialRates.fetchedAt) }).from(officialRates)
+      return row?.at ?? null
     },
   }
 }

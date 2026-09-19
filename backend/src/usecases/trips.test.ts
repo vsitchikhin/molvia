@@ -130,6 +130,7 @@ function fakeRepositories(
     rates: {
       upsert: unexpected('rates.upsert'),
       latestOnOrBefore: unexpected('rates.latestOnOrBefore'),
+      lastFetchedAt: unexpected('rates.lastFetchedAt'),
       ...overrides.rates,
     },
   }
