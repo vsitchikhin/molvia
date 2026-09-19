@@ -31,37 +31,54 @@ export function visibleLine(max: number): z.ZodType<string, string> {
 // One class for the ends of an identity: what `.trim()` removes and what draws nothing, together.
 // Two passes in turn missed an invisible character with a line break after it — the first pass
 // looked for it at the end, the second made it the end (MOL-21, adversarial round 2, А).
-const EDGE = /[\s\p{Z}\p{Cf}\p{Default_Ignorable_Code_Point}⠀]/u
+const EDGE = /[\s\p{Z}\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]/u
 const PICTOGRAPH = /\p{Extended_Pictographic}/u
 // U+FE00–FE0F and the supplementary selectors: they choose how the character before is drawn.
-const SELECTOR = /[︀-️\u{E0100}-\u{E01EF}]/u
-// Tags spell a subdivision flag after 🏴 and end with U+E007F.
+const SELECTOR = /[\ufe00-\ufe0f\u{E0100}-\u{E01EF}]/u
+// Tags spell a subdivision flag after 🏴: letters or digits of the subdivision, then U+E007F.
 const TAG = /[\u{E0020}-\u{E007F}]/u
+const FLAG_TAG = /[\u{E0030}-\u{E0039}\u{E0061}-\u{E007A}]/u
+const CANCEL_TAG = '\u{E007F}'
 const BLACK_FLAG = '\u{1F3F4}'
 
-/**
- * Whether the last characters, invisible themselves, are part of how the one before them is
- * drawn: VS16 makes ☕ an emoji, a tag sequence makes 🏴 Scotland. Cutting those changes what the
- * person typed (adversarial round 2, Б). After a letter a selector draws nothing and goes.
- */
-function drawsTheEnd(chars: readonly string[], end: number): boolean {
-  let at = end
-  const last = chars[at]
-  if (last === undefined) return false
-  if (SELECTOR.test(last)) return at > 0 && PICTOGRAPH.test(chars[at - 1] ?? '')
-  if (!TAG.test(last)) return false
-  while (at > 0 && TAG.test(chars[at] ?? '')) at -= 1
-  return chars[at] === BLACK_FLAG
+/** Whether `chars[first..end]` is the tag spelling of a flag, right after a 🏴. */
+function isFlag(chars: readonly string[], first: number, end: number): boolean {
+  if (chars[first - 1] !== BLACK_FLAG || chars[end] !== CANCEL_TAG || end - first < 1) return false
+  for (let at = first; at < end; at += 1) if (!FLAG_TAG.test(chars[at] ?? '')) return false
+  return true
 }
 
-/** The line with nothing invisible at its ends, keeping only what draws the last character. */
+/**
+ * The line with nothing invisible at its ends, keeping only what draws the last character: VS16
+ * after an emoji makes ☕ an emoji, a tag sequence makes 🏴 Scotland (adversarial round 2, Б).
+ * After a letter a selector draws nothing and goes; a run of tags that spells no flag goes whole.
+ *
+ * Linear on purpose: each run of tags is walked once. The first version looked back over the
+ * whole run for every tag it cut, and a megabyte of tags held the event loop for eleven minutes
+ * (adversarial round 3, А) — the length is also bounded before this runs, by the codec below.
+ */
 export function trimInvisibleEdges(text: string): string {
   const chars = Array.from(text)
   let start = 0
   let end = chars.length - 1
   // At the start nothing precedes, so nothing there can be part of a drawing.
   while (start <= end && EDGE.test(chars[start] ?? '')) start += 1
-  while (end >= start && EDGE.test(chars[end] ?? '') && !drawsTheEnd(chars, end)) end -= 1
+
+  while (end >= start) {
+    const last = chars[end] ?? ''
+    if (!EDGE.test(last)) break
+    if (SELECTOR.test(last)) {
+      if (end > start && PICTOGRAPH.test(chars[end - 1] ?? '')) break
+      end -= 1
+    } else if (TAG.test(last)) {
+      let first = end
+      while (first > start && TAG.test(chars[first - 1] ?? '')) first -= 1
+      if (isFlag(chars, first, end)) break
+      end = first - 1
+    } else {
+      end -= 1
+    }
+  }
   return chars.slice(start, end + 1).join('')
 }
 
@@ -75,7 +92,10 @@ export function trimInvisibleEdges(text: string): string {
 export function visibleIdentityLine(
   max: number,
 ): z.ZodCodec<z.ZodString, z.ZodType<string, string>> {
-  return z.codec(z.string(), visibleLine(max), {
+  // Bounded before the trim, not only after it: `max` is checked on the trimmed line, and without
+  // this the trim ran over the whole body (adversarial round 3, А). Twice the limit leaves room
+  // for what a paste brings along at the ends.
+  return z.codec(z.string().max(max * 2), visibleLine(max), {
     decode: trimInvisibleEdges,
     encode: (text) => text,
   })
