@@ -4,6 +4,7 @@ import type { Actor, Expense, Item, Place, Trip } from '@molvia/model'
 import type { ExpenseRepository } from '@/db/expenses-repository'
 import type { ItemRepository } from '@/db/items-repository'
 import type { PlaceRepository } from '@/db/places-repository'
+import type { RateRepository } from '@/db/rates-repository'
 import type { SearchPickRepository } from '@/db/search-picks-repository'
 import type { TripRepository } from '@/db/trips-repository'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
@@ -77,6 +78,7 @@ function fakeRepositories(
     places?: Partial<PlaceRepository>
     items?: Partial<ItemRepository>
     searchPicks?: Partial<SearchPickRepository>
+    rates?: Partial<RateRepository>
   } = {},
 ): TripRepositories {
   return {
@@ -116,6 +118,11 @@ function fakeRepositories(
     searchPicks: {
       remember: unexpected('searchPicks.remember'),
       ...overrides.searchPicks,
+    },
+    rates: {
+      upsert: unexpected('rates.upsert'),
+      latestOnOrBefore: unexpected('rates.latestOnOrBefore'),
+      ...overrides.rates,
     },
   }
 }

@@ -2,6 +2,7 @@ import {
   bigint,
   char,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -27,6 +28,7 @@ import {
   eventTypeSchema,
   itemKindSchema,
   placeKindSchema,
+  rateProviderSchema,
   rateSourceSchema,
 } from '@molvia/model'
 import type {
@@ -35,6 +37,8 @@ import type {
   EventPayload,
   ItemKind,
   PlaceKind,
+  AmdRate,
+  RateProvider,
   RateSource,
 } from '@molvia/model'
 
@@ -544,5 +548,35 @@ export const searchPicks = pgTable(
       'search_picks_query_key_indexable',
       sql`octet_length(${table.queryKey}) <= ${sql.raw(String(QUERY_KEY_MAX_OCTETS))}`,
     ),
+  ],
+)
+
+/**
+ * The official rates as their providers published them: one currency against the dram per
+ * day (MOL-39). Not pairs — no provider publishes those, and a stored pair would be a number
+ * already divided and already rounded. The pair is built when a trip snapshots it.
+ *
+ * A cache and nothing more: a trip copies the rate into its own columns, so rewriting a row
+ * here — a provider correcting itself — moves no trip that already started.
+ */
+export const officialRates = pgTable(
+  'official_rates',
+  {
+    provider: text('provider').$type<RateProvider>().notNull(),
+    currency: char('currency', { length: 3 }).$type<AmdRate['currency']>().notNull(),
+    rateDate: date('rate_date').notNull(),
+    // Drams per one unit, at RATE_SCALE — whatever «per 100» the provider printed is divided out.
+    scaled: bigint('scaled', { mode: 'bigint' }).notNull(),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Also the index «the latest row not after this day» walks, provider and currency first.
+    primaryKey({ columns: [table.provider, table.currency, table.rateDate] }),
+    check('official_rates_provider_known', oneOf(table.provider, rateProviderSchema.options)),
+    check(
+      'official_rates_currency_foreign',
+      sql`${oneOf(table.currency, currencySchema.options)} and ${table.currency} <> 'AMD'`,
+    ),
+    check('official_rates_positive', sql`${table.scaled} > 0`),
   ],
 )
