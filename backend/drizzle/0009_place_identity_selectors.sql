@@ -1,0 +1,2 @@
+DROP INDEX "places_identity_key";--> statement-breakpoint
+CREATE UNIQUE INDEX "places_identity_key" ON "places" USING btree ("kind","country",btrim(lower(regexp_replace(normalize("city", NFKC), E'[\uFE00-\uFE0F\U000E0100-\U000E01EF]', '', 'g')), E' \t\r\n\u00A0\u200B\u200C\u200D\uFEFF'),btrim(lower(regexp_replace(normalize("name", NFKC), E'[\uFE00-\uFE0F\U000E0100-\U000E01EF]', '', 'g')), E' \t\r\n\u00A0\u200B\u200C\u200D\uFEFF'));

@@ -330,12 +330,12 @@ describe('Д. невидимый знак по краю имени — то же
   }
 
   it.each([
-    ['U+200B zero width space', '​'],
-    ['U+00A0 no-break space', ' '],
-    ['U+2060 word joiner', '⁠'],
-    ['U+00AD soft hyphen', '­'],
-    ['U+2800 braille blank', '⠀'],
-    ['U+3164 hangul filler', 'ㅤ'],
+    ['U+200B zero width space', '\u200b'],
+    ['U+00A0 no-break space', '\u00a0'],
+    ['U+2060 word joiner', '\u2060'],
+    ['U+00AD soft hyphen', '\u00ad'],
+    ['U+2800 braille blank', '\u2800'],
+    ['U+3164 hangul filler', '\u3164'],
   ])('%s в начале и в конце — то же место', async (_label, mark) => {
     const actor = await insertActor(db)
     const first = await startAndFinish(actor, 'Ереван Сити')
@@ -353,7 +353,7 @@ describe('Д. невидимый знак по краю имени — то же
   it('не должно сработать: знак внутри имени остаётся — это уже другое имя', async () => {
     const actor = await insertActor(db)
     const first = await startAndFinish(actor, 'Ереван Сити')
-    expect(await startAndFinish(actor, 'Ереван­Сити')).not.toBe(first)
+    expect(await startAndFinish(actor, 'Ереван\u00adСити')).not.toBe(first)
   })
 })
 
@@ -379,8 +379,52 @@ describe('Д, заход 2: невидимый знак и перевод стр
     expect(await db.select().from(places)).toHaveLength(1)
   })
 
-  it('«Кафе ☕️» записано как ввёл человек — эмодзи не теряет вид (заход 2, Б)', async () => {
+  it('«Кафе ☕\ufe0f» записано как ввёл человек — эмодзи не теряет вид (заход 2, Б)', async () => {
     const actor = await insertActor(db)
     expect((await placeOf(actor, 'Кафе ☕\ufe0f')).name).toBe('Кафе ☕\ufe0f')
+  })
+})
+
+describe('заход 3: вид и тождество места — разные вопросы', () => {
+  async function placeOf(actor: string, name: string) {
+    const id = randomUUID()
+    const reply = await call(app, 'POST', '/trips', actor, { id, place: { kind: 'store', name } })
+    expect(reply.status).toBe(201)
+    expect((await call(app, 'POST', `/trips/${id}/finish`, actor)).status).toBe(204)
+    return view(reply).place
+  }
+
+  it.each([
+    ['☕', '☕\ufe0f'],
+    ['❤', '❤\ufe0f'],
+    ['❤\ufe0f', '❤'],
+  ])('Б: «Кафе %s» и «Кафе %s» — одно место, имя — как ввели первым', async (a, b) => {
+    const actor = await insertActor(db)
+    const first = await placeOf(actor, `Кафе ${a}`)
+    const second = await placeOf(actor, `Кафе ${b}`)
+
+    expect(second.id).toBe(first.id)
+    expect(second.name).toBe(`Кафе ${a}`)
+    expect(await db.select().from(places)).toHaveLength(1)
+  })
+
+  it('А: хвост из тегов на сотни килобайт — быстрый 400, API не стоит', async () => {
+    const actor = await insertActor(db)
+    const started = performance.now()
+
+    const reply = await call(app, 'POST', '/trips', actor, {
+      id: randomUUID(),
+      place: { kind: 'store', name: `Рынок${'\u{e0020}'.repeat(64_000)}` },
+    })
+
+    expect(reply.status).toBe(400)
+    expect(performance.now() - started).toBeLessThan(1_000)
+    expect(await db.select().from(places)).toEqual([])
+  })
+
+  it('В: «Паб 🏴» с хвостом тегов без флага — то же место, что «Паб 🏴»', async () => {
+    const actor = await insertActor(db)
+    const first = await placeOf(actor, 'Паб 🏴')
+    expect((await placeOf(actor, `Паб 🏴${'\u{e0020}'.repeat(3)}`)).id).toBe(first.id)
   })
 })

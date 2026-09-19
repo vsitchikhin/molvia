@@ -64,6 +64,14 @@ function literal(value: string) {
 const BLANKS = String.raw` \t\r\n\u00A0\u200B\u200C\u200D\uFEFF`
 
 /**
+ * Variation selectors, which choose how the character before them is drawn and never which
+ * character it is: «Кафе ☕» and «Кафе ☕» with VS16 are one café, typed on two keyboards. The
+ * name keeps them, so the emoji is drawn as it was typed; the identity drops them (MOL-21,
+ * adversarial round 3, Б). Anywhere in the name, not only at the ends.
+ */
+const SELECTORS = String.raw`[\uFE00-\uFE0F\U000E0100-\U000E01EF]`
+
+/**
  * The identity of a place as the unique index below computes it. Exported because the
  * repository has to repeat it word for word: `ON CONFLICT` infers an index over expressions
  * only from the very same expressions, and naming the columns instead answers `42P10` on the
@@ -71,7 +79,7 @@ const BLANKS = String.raw` \t\r\n\u00A0\u200B\u200C\u200D\uFEFF`
  * index and the conflict target cannot drift apart.
  */
 export function placeIdentity(value: AnyPgColumn | SQL): SQL {
-  return sql`btrim(lower(normalize(${value}, NFKC)), E'${sql.raw(BLANKS)}')`
+  return sql`btrim(lower(regexp_replace(normalize(${value}, NFKC), E'${sql.raw(SELECTORS)}', '', 'g')), E'${sql.raw(BLANKS)}')`
 }
 
 /** A quantity unit is nullable in several tables; the list is the same everywhere. */
