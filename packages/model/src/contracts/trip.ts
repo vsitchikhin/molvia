@@ -100,7 +100,7 @@ export const tripViewCodec = z.strictObject({
   total: z.array(moneyCodec),
   /**
    * The total in the trip's currency, converted by the rate the trip snapshotted. An estimate
-   * for display, never a fact — null without a rate, which is every trip until MOL-39/40.
+   * for display, never a fact — null without a rate: an empty cache, or one currency (MOL-39).
    */
   converted: moneyCodec.nullable(),
 })

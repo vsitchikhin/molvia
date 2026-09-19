@@ -297,7 +297,7 @@ export const places = pgTable(
  * Currency and rate are snapshots, spread over columns instead of pointing at a rate
  * table: a reference would let today's rate rewrite last month's trip, which is exactly
  * what «the rate is stored with the transaction» forbids. The plausibility band of a rate
- * is not checked here — the real check is disagreement with the official rate (MOL-39).
+ * is not checked here — the real check is disagreement with the official rate (MOL-40).
  */
 export const trips = pgTable(
   'trips',
@@ -353,7 +353,7 @@ export const trips = pgTable(
       'trips_rate_source_known',
       sql`${table.rateSource} is null or ${oneOf(table.rateSource, rateSourceSchema.options)}`,
     ),
-    // Not a plausibility band — that one is MOL-39's, and its numbers stay in the domain.
+    // Not a plausibility band — that one is the domain's (RATE_MIN, RATE_MAX), and so it stays.
     // Zero and negative are outside any band there could be: a snapshot is written once and
     // never recomputed, so a zero makes last month free and a negative flips its sign, both
     // as arithmetic rather than as an error.

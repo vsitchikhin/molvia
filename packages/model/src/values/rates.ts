@@ -7,8 +7,8 @@ import type { Currency } from './money'
 export const RATE_DIGITS = 6
 export const RATE_SCALE = 10n ** BigInt(RATE_DIGITS)
 
-// A sanity band, not a validation: the real check on a rate is disagreement with the
-// official one for the same day, and that needs the cache from MOL-39.
+// A sanity band, not a validation: the real check on a personal rate is disagreement with the
+// official one for the same day — MOL-40's, against the cache of MOL-39.
 export const RATE_MIN = RATE_SCALE / 10_000n
 export const RATE_MAX = RATE_SCALE * 1_000_000n
 

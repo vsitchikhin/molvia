@@ -1,5 +1,6 @@
-import type { Actor, StartTripBody, TripView } from '@molvia/model'
-import type { Transact } from '@/db/unit-of-work'
+import { pickOfficialRate, yerevanDate } from '@molvia/model'
+import type { Actor, AmdRate, ExchangeRate, StartTripBody, TripView } from '@molvia/model'
+import type { Transact, TripRepositories } from '@/db/unit-of-work'
 import { tripViewFor } from './trip-view'
 
 export interface Started {
@@ -15,14 +16,16 @@ export interface Started {
  * `places.ensure` meets «ЕРЕВАН СИТИ» and «ереван сити» at the one shop. «Yerevan City» is a
  * second shop, accepted for 0.1 — merging places is 0.2's, as merging items is (MOL-21, В-11).
  *
- * The currency is a snapshot of the person's setting; the rate is null until MOL-39/40 give it
- * a source. One transaction, so a trip refused because another is open leaves no new place
- * behind either.
+ * The currency is a snapshot of the person's setting, and so is the rate: the official one, read
+ * from the cache and never from the network — a trip at the shelf does not wait for a central
+ * bank (MOL-39, Р-3). One transaction, so a trip refused because another is open leaves no new
+ * place behind either.
  */
 export async function startTrip(
   transact: Transact,
   actor: Actor,
   body: StartTripBody,
+  now: Date = new Date(),
 ): Promise<Started> {
   return transact(async (repositories) => {
     // A repeat is answered before the place is looked at: the same identifier sent again with
@@ -40,8 +43,30 @@ export async function startTrip(
       actor.id,
       { id: body.id, placeId: place.id },
       actor.spendCurrency,
-      null,
+      await officialRateFor(repositories, actor, now),
     )
     return { trip: await tripViewFor(repositories, trip), created }
   })
+}
+
+/**
+ * The official rate from the income currency into the spending one, as of `now` in Yerevan, or
+ * none: nothing to convert when both are one currency, and nothing known when the cache is empty.
+ * Which provider — the central bank, or an open source after a week of its silence — is the
+ * domain's rule; a stale rate keeps its date, which the screen shows beside it.
+ */
+async function officialRateFor(
+  { rates }: Pick<TripRepositories, 'rates'>,
+  actor: Actor,
+  now: Date,
+): Promise<ExchangeRate | null> {
+  const base = actor.incomeCurrency
+  const quote = actor.spendCurrency
+  if (base === quote) return null
+
+  const today = yerevanDate(now)
+  const foreign = [base, quote].filter(
+    (currency): currency is AmdRate['currency'] => currency !== 'AMD',
+  )
+  return pickOfficialRate(base, quote, await rates.latestOnOrBefore(foreign, today), today)
 }

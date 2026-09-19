@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { DomainError, ERROR, actorSchema, itemSchema, placeSchema } from '@molvia/model'
-import type { Actor, Expense, Item, Place, Trip } from '@molvia/model'
+import {
+  DomainError,
+  ERROR,
+  actorSchema,
+  itemSchema,
+  parseRate,
+  placeSchema,
+  yerevanMidnight,
+} from '@molvia/model'
+import type { Actor, AmdRate, Expense, Item, Place, RateProvider, Trip } from '@molvia/model'
 import type { ExpenseRepository } from '@/db/expenses-repository'
 import type { ItemRepository } from '@/db/items-repository'
 import type { PlaceRepository } from '@/db/places-repository'
@@ -139,11 +147,15 @@ const viewReads = {
   items: { byIds: () => Promise.resolve([milk]) },
 }
 
+/** No rate has ever been fetched: the trip starts without one (MOL-39, В-2). */
+const emptyCache = { rates: { latestOnOrBefore: () => Promise.resolve([]) } }
+
 describe('startTrip', () => {
   it('names the place from the body, and the country, city and currency from the person', async () => {
     const ensured: unknown[] = []
     const started: unknown[] = []
     const repositories = fakeRepositories({
+      ...emptyCache,
       ...viewReads,
       places: {
         ...viewReads.places,
@@ -167,7 +179,7 @@ describe('startTrip', () => {
     })
 
     expect(ensured).toEqual([{ kind: 'store', name: 'Ереван Сити', country: 'AM', city: 'Gyumri' }])
-    // The rate is null until MOL-39/40 give it a source.
+    // An empty cache: nothing to snapshot.
     expect(started).toEqual([[ACTOR, { id: TRIP, placeId: place.id }, 'AMD', null]])
     expect(created).toBe(true)
     expect(view.place.name).toBe('Ереван Сити')
@@ -175,6 +187,7 @@ describe('startTrip', () => {
 
   it('passes a repeat on as not created — the route answers 200', async () => {
     const repositories = fakeRepositories({
+      ...emptyCache,
       ...viewReads,
       places: { ...viewReads.places, ensure: () => Promise.resolve(place) },
       trips: {
@@ -192,6 +205,7 @@ describe('startTrip', () => {
 
   it('lets TRIP_OPEN through untouched — the choice is the person’s', async () => {
     const repositories = fakeRepositories({
+      ...emptyCache,
       places: { ensure: () => Promise.resolve(place) },
       trips: {
         byId: () => Promise.resolve(null),
@@ -210,6 +224,7 @@ describe('startTrip', () => {
   it('runs inside one transaction', async () => {
     let transactions = 0
     const repositories = fakeRepositories({
+      ...emptyCache,
       ...viewReads,
       places: { ...viewReads.places, ensure: () => Promise.resolve(place) },
       trips: {
@@ -224,6 +239,121 @@ describe('startTrip', () => {
 
     await startTrip(counting, actor, { id: TRIP, place: { kind: 'store', name: 'Ереван Сити' } })
     expect(transactions).toBe(1)
+  })
+})
+
+describe('startTrip: the official rate (MOL-39)', () => {
+  const friday = '2026-09-18'
+  // Sunday 20.09 at noon in Yerevan.
+  const sunday = new Date('2026-09-20T08:00:00.000Z')
+
+  function startedWith(
+    cache: readonly AmdRate[],
+    person: Actor = actor,
+    now: Date = sunday,
+  ): Promise<{ rate: unknown; asked: unknown[] }> {
+    const asked: unknown[] = []
+    let rate: unknown = 'not started'
+    const repositories = fakeRepositories({
+      ...viewReads,
+      places: { ...viewReads.places, ensure: () => Promise.resolve(place) },
+      trips: {
+        byId: () => Promise.resolve(null),
+        // As the repository does: the trip carries the person's currency beside the rate.
+        start: (_actorId, _input, currency, snapshot) => {
+          rate = snapshot
+          return Promise.resolve({ trip: { ...trip, currency, rate: snapshot }, created: true })
+        },
+      },
+      rates: {
+        latestOnOrBefore: (currencies, date) => {
+          asked.push([currencies, date])
+          return Promise.resolve(cache.filter((row) => currencies.includes(row.currency)))
+        },
+      },
+    })
+    return startTrip(
+      transactWith(repositories),
+      person,
+      { id: TRIP, place: { kind: 'store', name: 'Ереван Сити' } },
+      now,
+    ).then(() => ({ rate, asked }))
+  }
+
+  const rub = (value: string, date = friday, provider: RateProvider = 'cba'): AmdRate => ({
+    provider,
+    currency: 'RUB',
+    date,
+    scaled: parseRate(value),
+  })
+
+  it('snapshots the central bank rate of Friday on a Sunday, with its date', async () => {
+    const { rate, asked } = await startedWith([rub('4.3123')])
+
+    expect(asked).toEqual([[['RUB'], '2026-09-20']])
+    expect(rate).toEqual({
+      base: 'RUB',
+      quote: 'AMD',
+      scaled: 4_312_300n,
+      source: 'official',
+      asOf: yerevanMidnight(friday),
+    })
+  })
+
+  it('answers the trip converted by the rate it snapshotted', async () => {
+    const repositories = fakeRepositories({
+      ...viewReads,
+      places: { ...viewReads.places, ensure: () => Promise.resolve(place) },
+      trips: {
+        byId: () => Promise.resolve(null),
+        start: (_actorId, _input, _currency, snapshot) =>
+          Promise.resolve({ trip: { ...trip, rate: snapshot }, created: true }),
+      },
+      rates: { latestOnOrBefore: () => Promise.resolve([rub('4.3123')]) },
+    })
+
+    const { trip: view } = await startTrip(
+      transactWith(repositories),
+      actor,
+      { id: TRIP, place: { kind: 'store', name: 'Ереван Сити' } },
+      sunday,
+    )
+
+    // 570 ֏ / 4.3123 = 132.18 ₽
+    expect(view.converted).toEqual({ minor: 13_218n, currency: 'RUB' })
+  })
+
+  it('asks the cache for the day in Yerevan, which turns at 20:00 UTC', async () => {
+    const { asked } = await startedWith([], actor, new Date('2026-09-19T20:30:00.000Z'))
+    expect(asked).toEqual([[['RUB'], '2026-09-20']])
+  })
+
+  it('marks an open source taken after a week of the central bank’s silence', async () => {
+    const { rate } = await startedWith([
+      rub('4.3123', '2026-09-11'),
+      rub('4.3165', '2026-09-19', 'cbr'),
+    ])
+    expect(rate).toMatchObject({ scaled: 4_316_500n, source: 'fallback' })
+  })
+
+  it('starts without a rate on an empty cache', async () => {
+    expect((await startedWith([])).rate).toBeNull()
+  })
+
+  it('does not read the cache at all when a person spends what they earn', async () => {
+    const { rate, asked } = await startedWith([rub('4.3123')], { ...actor, incomeCurrency: 'AMD' })
+    expect(rate).toBeNull()
+    expect(asked).toEqual([])
+  })
+
+  it('asks for both currencies of a cross, and snapshots it', async () => {
+    const usd: AmdRate = { provider: 'cba', currency: 'USD', date: friday, scaled: 363_440_000n }
+    const { rate, asked } = await startedWith([rub('4.3123'), usd], {
+      ...actor,
+      spendCurrency: 'USD',
+    })
+    expect(asked).toEqual([[['RUB', 'USD'], '2026-09-20']])
+    expect(rate).toMatchObject({ base: 'RUB', quote: 'USD', scaled: 11_865n })
   })
 })
 
