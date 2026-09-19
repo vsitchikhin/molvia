@@ -170,6 +170,46 @@ test.describe('from the keyboard', () => {
     await expect(second).toHaveAttribute('aria-selected', 'true')
   })
 
+  test('the active row is never left under the pinned bar, going down or wrapping to the top', async ({
+    page,
+  }) => {
+    const actor = await arrive(page)
+    const sorts = ['альфа', 'бета', 'гамма', 'дельта', 'эпсилон', 'дзета', 'эта', 'тета', 'йота']
+    const more = ['каппа', 'лямбда', 'мю', 'ню', 'кси', 'омикрон', 'пи', 'ро', 'сигма', 'тау', 'фи']
+    for (const sort of [...sorts, ...more]) {
+      await propose(page, actor, { name: `Квирта ${sort}`, defaultUnit: 'piece' })
+    }
+    await page.goto('/trip/add')
+    await field(page).fill('квирта')
+    await expect(options(page)).toHaveCount(20)
+
+    const bar = page.locator('header.bar')
+    async function activeIsClear(): Promise<void> {
+      const id = await field(page).getAttribute('aria-activedescendant')
+      const row = page.locator(`[id="${id ?? ''}"]`)
+      const [rowBox, barBox] = await Promise.all([row.boundingBox(), bar.boundingBox()])
+      const viewport = page.viewportSize()
+      expect(rowBox && barBox && viewport).toBeTruthy()
+      if (!rowBox || !barBox || !viewport) return
+      expect(rowBox.y).toBeGreaterThanOrEqual(barBox.y + barBox.height - 1)
+      expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(viewport.height + 1)
+    }
+
+    for (let step = 0; step < 20; step += 1) await field(page).press('ArrowDown')
+    await expect(options(page).last()).toHaveAttribute('aria-selected', 'true')
+    await activeIsClear()
+
+    for (let step = 0; step < 12; step += 1) await field(page).press('ArrowUp')
+    await activeIsClear()
+
+    // From the last row down wraps to the first, far above: the page scrolls up to it.
+    for (let step = 0; step < 12; step += 1) await field(page).press('ArrowDown')
+    await expect(options(page).last()).toHaveAttribute('aria-selected', 'true')
+    await field(page).press('ArrowDown')
+    await expect(options(page).first()).toHaveAttribute('aria-selected', 'true')
+    await activeIsClear()
+  })
+
   test('Enter with no active row hides the keyboard and picks nothing', async ({ page }) => {
     await withKvirta(page)
     await field(page).fill('квирта')

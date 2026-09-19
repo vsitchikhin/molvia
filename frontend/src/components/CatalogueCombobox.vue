@@ -157,6 +157,11 @@ export default defineComponent({
           active.value = active.value <= 0 ? last : active.value - 1
           return
         case 'Escape':
+          // With a row active, Esc lets go of the row only: a search field clears itself on Esc
+          // in Chrome and Safari, and the query would go with it. With none, the field is cleared
+          // the platform's way.
+          if (active.value < 0) return
+          event.preventDefault()
           active.value = -1
           return
         case 'Enter': {
@@ -285,6 +290,10 @@ export default defineComponent({
   min-height: var(--touch-target);
   padding: var(--space-3) var(--space-4);
   cursor: pointer;
+
+  /* The page scrolls the active row into view, and the pinned bar of a nested screen covers the
+     top of it: moving up, the row would stop right under the bar (Р-8). */
+  scroll-margin-top: calc(var(--bar-height) + var(--safe-top) + var(--space-2));
 
   & + & {
     border-top: var(--hairline) solid var(--border);
