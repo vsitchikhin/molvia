@@ -7,13 +7,19 @@ import { healthRoutes } from '@/routes/health'
 import { withActor } from '@/routes/actor'
 import { actorMeRoute, firstVisitRoute } from '@/routes/actors'
 import { catalogueRoutes } from '@/routes/catalogue'
+import { placeRoutes } from '@/routes/places'
+import { tripRoutes } from '@/routes/trips'
 import { createActor } from '@/usecases/create-actor'
+import { currentTrip } from '@/usecases/current-trip'
 import { getActor } from '@/usecases/get-actor'
 import { proposeItem } from '@/usecases/propose-item'
+import { recentPlaces } from '@/usecases/recent-places'
 import { searchCatalogue } from '@/usecases/search-catalogue'
+import { startTrip } from '@/usecases/start-trip'
 import { createActorRepository } from '@/db/actors-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
+import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { databaseIsReachable, getDb } from '@/db'
 import type { Db } from '@/db'
 import { env } from '@/env'
@@ -103,6 +109,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
     const events = createEventRepository(db)
+    const tripData = tripRepositories(db)
+    const transact = transactOn(db)
 
     healthRoutes(instance, { databaseIsReachable })
     firstVisitRoute(instance, {
@@ -120,6 +128,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items, events }, actorId, query),
         propose: (actorId, input) => proposeItem(items, actorId, input),
+      })
+      placeRoutes(guarded, { recent: (actorId) => recentPlaces(tripData.places, actorId) })
+      tripRoutes(guarded, {
+        start: (actor, body) => startTrip(transact, actor, body),
+        current: (actorId) => currentTrip(tripData, actorId),
       })
       guardedDone()
     })
