@@ -250,7 +250,11 @@ export function createClient({
     if (!encoded.success) {
       const issue = encoded.error.issues[0]
       const code = isWireCode(issue?.message) ? issue.message : ISSUE.BODY_INVALID
-      throw new ApiError(code, issue?.path.join('.'))
+      // An unknown key has no path of its own — the object it sits in has — so, as on the
+      // server, the name that was refused is taken from the issue.
+      const details =
+        issue?.code === 'unrecognized_keys' ? issue.keys.join(',') : issue?.path.join('.')
+      throw new ApiError(code, details)
     }
     return encoded.data
   }

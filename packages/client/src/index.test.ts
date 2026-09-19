@@ -488,6 +488,16 @@ describe('the verdict', () => {
     expect(calls).toHaveLength(0)
   })
 
+  it('names an extra field the way the server does — by the key, not by an empty path', async () => {
+    const { client, calls } = clientReplying(201, cardWire)
+
+    const refusal = client.rateItem(MILK, { score: 2, placeId: MILK } as never)
+
+    await expect(refusal).rejects.toMatchObject({ code: ISSUE.BODY_INVALID })
+    await expect(refusal).rejects.toThrow(`${ISSUE.BODY_INVALID}: placeId`)
+    expect(calls).toHaveLength(0)
+  })
+
   it('sends nothing the schema refuses, and names it with the code the server would', async () => {
     const { client, calls } = clientReplying(201, cardWire)
 
