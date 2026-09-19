@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
@@ -28,7 +29,7 @@ function stubViewTransitions() {
   const start = vi.fn((update: () => Promise<void>) => {
     calls.push(document.documentElement.dataset.nav ?? '')
     const finished = Promise.resolve().then(update)
-    return { finished } as unknown as ViewTransition
+    return { finished, ready: Promise.resolve() } as unknown as ViewTransition
   })
   Object.defineProperty(document, 'startViewTransition', { value: start, configurable: true })
   return { start, calls }
@@ -97,6 +98,63 @@ describe('installViewTransitions', () => {
     await vi.waitFor(() => {
       expect(document.documentElement.dataset.nav).toBeUndefined()
     })
+  })
+
+  // The next transition cuts the running one short: the skipped one rejects `ready` and
+  // finishes at once. Neither may leak — no unhandled rejection, and the direction stays with
+  // the transition still on screen.
+  it('lets a transition cut short go quietly, keeping the direction of the one that follows', async () => {
+    const endings: (() => void)[] = []
+    const start = vi.fn((update: () => Promise<void>) => {
+      const ended = new Promise<void>((resolve) => endings.push(resolve))
+      const finished = Promise.resolve()
+        .then(update)
+        .then(() => ended)
+      const ready = Promise.reject(new DOMException('Transition was skipped', 'AbortError'))
+      return { finished, ready } as unknown as ViewTransition
+    })
+    Object.defineProperty(document, 'startViewTransition', { value: start, configurable: true })
+    const unhandled = vi.fn()
+    process.on('unhandledRejection', unhandled)
+
+    const router = routerAt()
+    installViewTransitions(router)
+    await router.push('/')
+    await router.push('/trip/add')
+    await router.push('/')
+    expect(document.documentElement.dataset.nav).toBe('pop')
+
+    // The first, skipped, finishes now — the second is still running.
+    endings[0]?.()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(document.documentElement.dataset.nav).toBe('pop')
+
+    endings[1]?.()
+    await vi.waitFor(() => {
+      expect(document.documentElement.dataset.nav).toBeUndefined()
+    })
+    process.off('unhandledRejection', unhandled)
+    expect(unhandled).not.toHaveBeenCalled()
+  })
+
+  // iOS edge swipe and Android predictive back animate the page themselves.
+  it('does not play a pop the browser has already shown', async () => {
+    const { start } = stubViewTransitions()
+    const router = routerAt()
+    installViewTransitions(router)
+    await router.push('/')
+    await router.push('/trip/add')
+    start.mockClear()
+
+    const event = new PopStateEvent('popstate', { state: null })
+    Object.defineProperty(event, 'hasUAVisualTransition', { value: true })
+    window.dispatchEvent(event)
+    await router.push('/')
+    expect(start).not.toHaveBeenCalled()
+
+    // Only that one move: the next is animated again.
+    await router.push('/trip/add')
+    expect(start).toHaveBeenCalledOnce()
   })
 
   it('does not animate at all when motion is reduced', async () => {

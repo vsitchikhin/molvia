@@ -31,11 +31,24 @@ function reducedMotion(): boolean {
  * on `<html data-nav>` for the length of the transition — main.scss picks the animation by it.
  */
 export function installViewTransitions(router: Router): void {
-  let settled: (() => void) | undefined
+  const waiting: (() => void)[] = []
+  let current: ViewTransition | undefined
+  let animatedByBrowser = false
+
+  // A swipe from the edge on iOS and predictive back on Android already show the page leaving;
+  // sliding it out again on top would play the move twice. The browser says so on the event.
+  // This listens to the history, not to a gesture: nothing is taken from the browser.
+  window.addEventListener('popstate', (event) => {
+    // Undefined where the browser does not report it — read as «not animated», which is right.
+    animatedByBrowser = event.hasUAVisualTransition
+  })
 
   router.beforeResolve((to, from) => {
+    const byBrowser = animatedByBrowser
+    animatedByBrowser = false
     const move = direction(from, to)
-    if (!move || typeof document.startViewTransition !== 'function' || reducedMotion()) return
+    if (!move || byBrowser) return
+    if (typeof document.startViewTransition !== 'function' || reducedMotion()) return
 
     const root = document.documentElement
     return new Promise<void>((proceed) => {
@@ -43,12 +56,20 @@ export function installViewTransitions(router: Router): void {
       const transition = document.startViewTransition(
         () =>
           new Promise<void>((done) => {
-            settled = done
+            waiting.push(done)
             // The old screen is captured; the router may now swap it for the new one.
             proceed()
           }),
       )
+      current = transition
+      // A transition cut short by the next one rejects `ready`; that is the platform's way of
+      // saying «skipped», not an error of ours.
+      transition.ready.catch(() => undefined)
       void transition.finished.finally(() => {
+        // A skipped transition finishes at once — it must not take the direction away from the
+        // one that replaced it and is still running.
+        if (current !== transition) return
+        current = undefined
         delete root.dataset.nav
       })
     })
@@ -56,11 +77,10 @@ export function installViewTransitions(router: Router): void {
 
   // Runs for a failed or cancelled move too, so a transition never waits forever.
   router.afterEach(async () => {
-    const done = settled
-    settled = undefined
-    if (!done) return
+    if (waiting.length === 0) return
+    const done = waiting.splice(0)
     await nextTick()
-    done()
+    for (const release of done) release()
   })
 }
 
