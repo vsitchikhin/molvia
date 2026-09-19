@@ -1,3 +1,7 @@
+/// <reference lib="dom" />
+// DOM for the code inside page.evaluate and addInitScript, which runs in the browser; the
+// rest of the root project (playwright.config.ts, vitest.config.ts) runs in Node and keeps
+// the lib it has.
 import process from 'node:process'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
