@@ -6,6 +6,7 @@ import {
   MINOR_EXPONENT,
   addMoney,
   compareMoney,
+  currencySign,
   currencySchema,
   decimalFromMinor,
   formatMoney,
@@ -223,5 +224,21 @@ describe('the ceiling of an amount', () => {
   it('bounds the negative side too — a difference is still a Money', () => {
     expect(moneySchema.safeParse({ minor: -INT8_MAX, currency: 'AMD' }).success).toBe(true)
     expect(moneySchema.safeParse({ minor: -INT8_MAX - 1n, currency: 'AMD' }).success).toBe(false)
+  })
+})
+
+describe('currencySign', () => {
+  it.each([
+    ['AMD', '֏'],
+    ['RUB', '₽'],
+    ['USD', '$'],
+    ['EUR', '€'],
+  ] as const)('%s is %s', (currency, sign) => {
+    expect(currencySign(currency)).toBe(sign)
+  })
+
+  // The same sign the formatter puts next to an amount, so a field's tail and a printed price agree.
+  it('is the sign formatMoney prints', () => {
+    expect(formatMoney(money(57000n, 'AMD'))).toContain(currencySign('AMD'))
   })
 })

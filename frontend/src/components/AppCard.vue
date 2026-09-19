@@ -66,5 +66,11 @@ export default defineComponent({
   > :deep(* + *) {
     border-top: var(--hairline) solid var(--border);
   }
+
+  /* The list clips its rows to its radius, and a ring drawn outside a row would be cut on three
+     sides — a row that is tapped has to show its focus inside (review Р-4). */
+  :deep(:focus-visible) {
+    outline-offset: -2px;
+  }
 }
 </style>

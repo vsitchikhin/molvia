@@ -51,4 +51,10 @@ describe('AppCard', () => {
   it('never uses the accent', () => {
     expect(source.slice(source.indexOf('<style'))).not.toMatch(/--accent/)
   })
+
+  // The list clips its rows; a ring drawn outside a tapped row would be cut on three sides.
+  it('draws focus inside a row of a list', () => {
+    const style = source.slice(source.indexOf('<style'))
+    expect(style).toMatch(/:deep\(:focus-visible\)\s*\{\s*outline-offset:\s*-2px/)
+  })
 })

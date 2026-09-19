@@ -129,12 +129,12 @@ describe('the tab bar walks the history as В-2 decided', () => {
       const { router, tap } = await app(entry)
       await tap(1)
       expect(router.currentRoute.value.name).toBe('advice')
-      const back = vi.spyOn(router, 'back')
+      const back = vi.spyOn(router, 'go')
       await tap(0)
       await vi.waitFor(() => {
         expect(router.currentRoute.value.name).toBe('trip')
       })
-      expect(back).toHaveBeenCalledOnce()
+      expect(back).toHaveBeenCalledExactlyOnceWith(-1)
       expect(router.options.history.state.back).toBeNull()
     },
   )
@@ -146,14 +146,14 @@ describe('the tab bar walks the history as В-2 decided', () => {
     const view = mount(TabBar, {
       global: { plugins: [router, createPinia(), createAppI18n('en')] },
     })
-    const back = vi.spyOn(router, 'back')
+    const back = vi.spyOn(router, 'go')
     const trip = view.findAll('.tab')[0]
     void trip?.trigger('click', { button: 0 })
     void trip?.trigger('click', { button: 0 })
     await vi.waitFor(() => {
       expect(router.currentRoute.value.name).toBe('trip')
     })
-    expect(back).toHaveBeenCalledOnce()
+    expect(back).toHaveBeenCalledExactlyOnceWith(-1)
   })
 
   it('two taps on the chevron in one go take one step back', async () => {
@@ -163,14 +163,14 @@ describe('the tab bar walks the history as В-2 decided', () => {
       defineComponent(() => () => h(RouterView)),
       { global: { plugins: [router, createPinia(), createAppI18n('en')] } },
     )
-    const back = vi.spyOn(router, 'back')
+    const back = vi.spyOn(router, 'go')
     const chevron = view.get('.back')
     void chevron.trigger('click')
     void chevron.trigger('click')
     await vi.waitFor(() => {
       expect(router.currentRoute.value.name).toBe('trip')
     })
-    expect(back).toHaveBeenCalledOnce()
+    expect(back).toHaveBeenCalledExactlyOnceWith(-1)
   })
 
   // The example the owner answered: Trip → What to buy → Ratings, then «back».

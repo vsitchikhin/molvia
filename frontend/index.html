@@ -2,7 +2,12 @@
 <html lang="ru">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- `interactive-widget`: Chrome on Android shrinks the page when the keyboard opens, so the
+         sheet stays above it (MOL-18). iOS ignores it; useKeyboardInset lifts the sheet there. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
     <!-- The status bar of the installed app is painted with this. It is --surface of each
          scheme, so the bar runs into the header without a seam; theme-color.test.ts holds
          both values to _tokens.scss. -->
