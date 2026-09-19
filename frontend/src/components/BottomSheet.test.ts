@@ -117,11 +117,39 @@ describe('BottomSheet', () => {
     })
   })
 
+  /** A tap on the scrim once the sheet has come up: pressed and let go on the dialog itself. */
+  async function tapScrim(dialog: HTMLDialogElement, after = 1000): Promise<void> {
+    const now = performance.now()
+    vi.spyOn(performance, 'now').mockReturnValue(now + after)
+    dialog.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    dialog.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await nextTick()
+  }
+
   it('closes on a tap on the scrim', async () => {
-    const { host, go, dialog } = await render({ open: true })
-    await host.get('dialog').trigger('click')
+    const { go, dialog } = await render({ open: true })
+    await tapScrim(dialog())
     expect(go).toHaveBeenCalledExactlyOnceWith(-1)
     expect(dialog().open).toBe(false)
+  })
+
+  // A text selection that began in a field and overshot is clicked on the dialog — the common
+  // ancestor — and would throw away what was typed (adversarial Б-4).
+  it('must not fire: a press that began inside the sheet and ended on the scrim', async () => {
+    const { host, go, dialog } = await render({ open: true })
+    vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 1000)
+    host.get('.content').element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    dialog().dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().open).toBe(true)
+  })
+
+  // The second tap of a double tap on the opener lands where the scrim now is (adversarial Б-5).
+  it('must not fire: a tap on the scrim while the sheet is still coming up', async () => {
+    const { go, dialog } = await render({ open: true })
+    await tapScrim(dialog(), 80)
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().open).toBe(true)
   })
 
   it('must not fire: a tap inside the sheet does not close it', async () => {
@@ -268,6 +296,49 @@ describe('BottomSheet', () => {
     const { host, open, go } = await render({ open: true })
     host.unmount()
     expect(open.value).toBe(false)
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  // «Save and next»: the screen shuts the sheet and asks for it again before the step back has
+  // landed. In a browser the pop comes a task later (adversarial Б-6).
+  it('opens again when asked while it was closing', async () => {
+    const { router, open, dialog, closed } = await render({ open: true })
+    const land = router.options.history.go.bind(router.options.history)
+    vi.spyOn(router.options.history, 'go').mockImplementation((delta) => {
+      setTimeout(() => {
+        land(delta)
+      }, 0)
+    })
+    open.value = false
+    await nextTick()
+    open.value = true
+    await nextTick()
+    await vi.waitFor(() => {
+      expect(closed).toHaveBeenCalledOnce()
+    })
+    await vi.waitFor(() => {
+      expect(dialog().open).toBe(true)
+    })
+    expect(open.value).toBe(true)
+  })
+
+  // Past unmounting a component emits nothing, so a deferred `closed` was lost (adversarial Б-7).
+  it('says closed when the screen goes away with it open', async () => {
+    const { host, closed } = await render({ open: true })
+    host.unmount()
+    expect(closed).toHaveBeenCalledOnce()
+  })
+
+  // A move of the router while the sheet is open — another screen, or this one with a new query
+  // — closes it; the sheet belonged to the place that was left (adversarial Б-3).
+  it('closes when the router moves under it, even to the same screen', async () => {
+    const { router, open, dialog, closed, go } = await render({ open: true })
+    await router.push('/?q=milk')
+    expect(dialog().open).toBe(false)
+    expect(open.value).toBe(false)
+    await vi.waitFor(() => {
+      expect(closed).toHaveBeenCalledOnce()
+    })
     expect(go).not.toHaveBeenCalled()
   })
 })

@@ -5,6 +5,7 @@
     :aria-labelledby="titleId"
     @cancel.prevent="close()"
     @close="closedNatively"
+    @pointerdown="pressed"
     @click="closeOnScrim"
   >
     <div class="panel">
@@ -34,6 +35,28 @@ import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetHistory } from '@/composables/useSheetHistory'
+import type { LeftBy } from '@/composables/useSheetHistory'
+
+/** A double tap lands within this — a platform convention, not a design token. */
+const DOUBLE_TAP = 300
+
+/**
+ * How long the sheet takes to come up — its own transition, so reduced motion (none) and the
+ * token (`--dur`) are both honoured — and never less than a double tap.
+ */
+function settleTime(element: HTMLElement): number {
+  const longest = Math.max(
+    0,
+    ...getComputedStyle(element)
+      .transitionDuration.split(',')
+      .map((part) => {
+        const value = Number.parseFloat(part)
+        if (Number.isNaN(value)) return 0
+        return part.trim().endsWith('ms') ? value : value * 1000
+      }),
+  )
+  return Math.max(longest, DOUBLE_TAP)
+}
 
 /**
  * The sheet of 0.1: it rises from the bottom over the screen, which stays visible behind the
@@ -70,18 +93,34 @@ export default defineComponent({
     // may close the dialog on its own (a second Esc), and the sheet is still to be put away —
     // its entry taken, the screen told — exactly once.
     const shown = ref(false)
+    // A step back is on its way and the pop has not come yet.
+    let closing = false
+    // The screen asked for the sheet again while it was closing — «save and next». Honoured once
+    // the pop lands, instead of lost to it (adversarial Б-6).
+    let reopen = false
+    // A tap on the scrim counts only if it began there, and only once the sheet has come up.
+    let downOnScrim = false
+    let scrimFrom = 0
 
-    const history = useSheetHistory(() => {
+    const history = useSheetHistory((by: LeftBy) => {
       if (!shown.value) return
       shown.value = false
+      closing = false
+      const again = reopen && by === 'history'
+      reopen = false
       if (dialog.value?.open) dialog.value.close()
-      if (props.open) emit('update:open', false)
+      if (!again && props.open) emit('update:open', false)
       // A tick later: a screen that opens the next sheet from `@closed` would otherwise set `open`
       // back to true in the same tick it went false, the prop would never change, and the sheet
-      // would stay shut with the screen believing it open (MOL-18, adversarial А-6).
-      void nextTick(() => {
-        emit('closed')
-      })
+      // would stay shut with the screen believing it open (adversarial А-6). Not when the screen
+      // is going away: a component past unmounting emits nothing, and `closed` would be lost
+      // (adversarial Б-7).
+      if (by === 'unmount') emit('closed')
+      else
+        void nextTick(() => {
+          emit('closed')
+          if (again) show()
+        })
     })
 
     function show(): void {
@@ -89,18 +128,33 @@ export default defineComponent({
       if (!element || shown.value) return
       shown.value = true
       element.showModal()
+      scrimFrom = performance.now() + settleTime(element)
       history.lay()
     }
 
     /** Closes the sheet — and `steps - 1` screens under it — by stepping back through history. */
     function close(steps = 1): void {
+      closing = history.laid()
       history.leave(steps)
     }
 
+    function pressed(event: PointerEvent): void {
+      downOnScrim = event.target === dialog.value
+    }
+
     // A tap on the scrim lands on the dialog itself: the panel fills the dialog's box, so any
-    // tap inside the sheet lands on the panel or something in it.
+    // tap inside the sheet lands on the panel or something in it. Two taps are not a tap:
+    //   - a press that began in a field and was let go over the scrim — a text selection that
+    //     overshot — is clicked on the dialog, their common ancestor, and would throw away what
+    //     was typed (adversarial Б-4);
+    //   - the second tap of a double tap on the opener lands where the scrim now is, while the
+    //     sheet is still coming up, and would close it before it was seen (adversarial Б-5).
     function closeOnScrim(event: MouseEvent): void {
-      if (event.target === dialog.value) close()
+      const fromScrim = downOnScrim
+      downOnScrim = false
+      if (event.target !== dialog.value || !fromScrim) return
+      if (performance.now() < scrimFrom) return
+      close()
     }
 
     // Chrome lets a page refuse Esc only once per user activation; a second Esc closes the dialog
@@ -118,8 +172,14 @@ export default defineComponent({
     watch(
       () => props.open,
       (open) => {
-        if (open) show()
-        else if (shown.value) close()
+        if (!open) {
+          reopen = false
+          if (shown.value && !closing) close()
+        } else if (shown.value && closing) {
+          reopen = true
+        } else {
+          show()
+        }
       },
     )
     onMounted(() => {
@@ -127,7 +187,7 @@ export default defineComponent({
     })
 
     expose({ close })
-    return { t, dialog, titleId, close, closeOnScrim, closedNatively }
+    return { t, dialog, titleId, close, pressed, closeOnScrim, closedNatively }
   },
 })
 </script>
