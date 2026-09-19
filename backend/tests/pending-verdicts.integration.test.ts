@@ -1,0 +1,192 @@
+import { randomUUID } from 'node:crypto'
+/**
+ * «Оценки» through the server (MOL-28): what was bought and not rated, one card per item. The
+ * numbers in the test names are the corners of `requirements/MOL-28.md` §5.
+ */
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { PENDING_VERDICTS_LIMIT, pendingVerdictsCodec } from '@molvia/model'
+import type { PendingVerdicts } from '@molvia/model'
+import type { FastifyInstance } from 'fastify'
+import { events, expenses } from '@/db/schema'
+import { buildServer } from '@/server'
+import { connectDrizzle } from './db'
+import { clearAll, insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
+
+const { db, close } = connectDrizzle()
+
+let app: FastifyInstance
+
+beforeAll(async () => {
+  app = buildServer({ db })
+  await app.ready()
+})
+
+beforeEach(async () => {
+  await clearAll(db)
+})
+
+afterAll(async () => {
+  await app.close()
+  await clearAll(db)
+  await close()
+})
+
+async function pending(actor: string | null) {
+  const response = await app.inject({
+    method: 'GET',
+    url: '/verdicts/pending',
+    headers: actor === null ? {} : { 'x-molvia-actor': actor },
+  })
+  return { status: response.statusCode, headers: response.headers, body: response.body }
+}
+
+/** Read through the contract the client parses — a server that drifted from it fails here. */
+async function queue(actor: string): Promise<PendingVerdicts> {
+  const reply = await pending(actor)
+  expect(reply.status).toBe(200)
+  return pendingVerdictsCodec.parse(JSON.parse(reply.body))
+}
+
+async function bought(actorId: string, itemId: string, placeId: string, at: string) {
+  const tripId = await insertTrip(db, { actorId, placeId })
+  await db.insert(expenses).values({ id: randomUUID(), tripId, itemId, createdAt: new Date(at) })
+}
+
+function rate(actor: string, itemId: string, score = 4) {
+  return app.inject({
+    method: 'PUT',
+    url: `/verdicts/${itemId}`,
+    headers: { 'x-molvia-actor': actor },
+    payload: { score },
+  })
+}
+
+describe('GET /verdicts/pending', () => {
+  it('1: три покупки одной позиции в двух местах — одна карточка, место и день последней', async () => {
+    const actor = await insertActor(db)
+    const milk = await insertItem(db)
+    const sas = await insertPlace(db)
+    const city = await insertPlace(db, { name: 'Ереван Сити' })
+    await bought(actor, milk, sas, '2026-09-15T10:00:00.000Z')
+    await bought(actor, milk, city, '2026-09-18T17:40:00.000Z')
+    await bought(actor, milk, sas, '2026-09-16T09:00:00.000Z')
+
+    expect(await queue(actor)).toEqual({
+      items: [
+        {
+          itemId: milk,
+          name: 'Молоко «Ашхар»',
+          placeName: 'Ереван Сити',
+          boughtAt: new Date('2026-09-18T17:40:00.000Z'),
+        },
+      ],
+      total: 1,
+    })
+  })
+
+  it('новые покупки сверху, по последней покупке позиции', async () => {
+    const actor = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    const bread = await insertItem(db, { name: 'Хлеб', searchKey: 'hleb', defaultUnit: 'piece' })
+    await bought(actor, milk, place, '2026-09-16T10:00:00.000Z')
+    await bought(actor, bread, place, '2026-09-17T10:00:00.000Z')
+    await bought(actor, milk, place, '2026-09-18T10:00:00.000Z')
+
+    expect((await queue(actor)).items.map((card) => card.name)).toEqual(['Молоко «Ашхар»', 'Хлеб'])
+  })
+
+  it('2: оценённая позиция уходит, снятая оценка возвращает её', async () => {
+    const actor = await insertActor(db)
+    const milk = await insertItem(db)
+    await bought(actor, milk, await insertPlace(db), '2026-09-18T10:00:00.000Z')
+
+    await rate(actor, milk)
+    expect(await queue(actor)).toEqual({ items: [], total: 0 })
+
+    await app.inject({
+      method: 'DELETE',
+      url: `/verdicts/${milk}`,
+      headers: { 'x-molvia-actor': actor },
+    })
+    expect((await queue(actor)).total).toBe(1)
+  })
+
+  it('оценка, поставленная до покупки, тоже закрывает её — вердикт один на позицию', async () => {
+    const actor = await insertActor(db)
+    const milk = await insertItem(db)
+    await rate(actor, milk)
+    await bought(actor, milk, await insertPlace(db), '2026-09-18T10:00:00.000Z')
+
+    expect((await queue(actor)).total).toBe(0)
+  })
+
+  it('3: чужая покупка не видна, чужой вердикт мою не закрывает', async () => {
+    const me = await insertActor(db)
+    const stranger = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    const bread = await insertItem(db, { name: 'Хлеб', searchKey: 'hleb', defaultUnit: 'piece' })
+    await bought(me, milk, place, '2026-09-18T10:00:00.000Z')
+    await bought(stranger, bread, place, '2026-09-18T11:00:00.000Z')
+    await rate(stranger, milk)
+
+    expect((await queue(me)).items.map((card) => card.itemId)).toEqual([milk])
+    expect((await queue(stranger)).items.map((card) => card.itemId)).toEqual([bread])
+  })
+
+  it('4: ровно 50 — список 50; 51 — список 50 и total 51', async () => {
+    const actor = await insertActor(db)
+    const place = await insertPlace(db)
+    const tripId = await insertTrip(db, { actorId: actor, placeId: place })
+    const buy = async (n: number) => {
+      const itemId = await insertItem(db, {
+        name: `Позиция ${String(n)}`,
+        searchKey: `pozicia ${String(n)}`,
+      })
+      const at = new Date(Date.UTC(2026, 8, 1, 0, n))
+      await db.insert(expenses).values({ id: randomUUID(), tripId, itemId, createdAt: at })
+    }
+    for (let n = 1; n <= PENDING_VERDICTS_LIMIT; n++) await buy(n)
+
+    const full = await queue(actor)
+    expect(full.items).toHaveLength(PENDING_VERDICTS_LIMIT)
+    expect(full.total).toBe(PENDING_VERDICTS_LIMIT)
+
+    await buy(PENDING_VERDICTS_LIMIT + 1)
+
+    const over = await queue(actor)
+    expect(over.items).toHaveLength(PENDING_VERDICTS_LIMIT)
+    expect(over.total).toBe(PENDING_VERDICTS_LIMIT + 1)
+    // The newest first, so the one that did not fit is the oldest.
+    expect(over.items[0]?.name).toBe(`Позиция ${String(PENDING_VERDICTS_LIMIT + 1)}`)
+    expect(over.items.map((card) => card.name)).not.toContain('Позиция 1')
+  })
+
+  it('блюдо в очередь не идёт: до 0.3 путь вердикта не принимает место', async () => {
+    const actor = await insertActor(db)
+    const dish = await insertItem(db, {
+      kind: 'dish',
+      name: 'Карбонара',
+      searchKey: 'karbonara',
+      defaultUnit: 'piece',
+    })
+    await bought(actor, dish, await insertPlace(db, { kind: 'venue' }), '2026-09-18T10:00:00.000Z')
+
+    expect(await queue(actor)).toEqual({ items: [], total: 0 })
+  })
+
+  it('без покупок — пусто, не ошибка; ответ не кешируется и журнал не пишется', async () => {
+    const actor = await insertActor(db)
+    const reply = await pending(actor)
+
+    expect(reply.status).toBe(200)
+    expect(reply.headers['cache-control']).toBe('no-store')
+    expect(JSON.parse(reply.body)).toEqual({ items: [], total: 0 })
+    expect(await db.select().from(events)).toEqual([])
+  })
+
+  it('без заголовка владельца — 401', async () => {
+    expect((await pending(null)).status).toBe(401)
+  })
+})

@@ -110,6 +110,7 @@ function fakeRepositories(
       update: unexpected('expenses.update'),
       remove: unexpected('expenses.remove'),
       unratedFor: unexpected('expenses.unratedFor'),
+      pendingVerdictsFor: unexpected('expenses.pendingVerdictsFor'),
       cheapestFor: unexpected('expenses.cheapestFor'),
       ...overrides.expenses,
     },

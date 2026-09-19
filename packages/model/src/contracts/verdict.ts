@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { ISSUE } from '#model/support/errors'
+import { itemSchema } from '#model/entities/item'
+import { placeSchema } from '#model/entities/place'
 import { newVerdictSchema, verdictFields, verdictPatchSchema } from '#model/entities/verdict'
 import type { Verdict } from '#model/entities/verdict'
 
@@ -78,3 +80,40 @@ export function verdictCardOf(verdict: Verdict): VerdictCard {
     updatedAt: verdict.updatedAt,
   }
 }
+
+/**
+ * An item bought and not rated yet — one card of «Оценки» (MOL-28). One per item, not per
+ * purchase: a product has one verdict per person, so three purchases of the milk are one
+ * question, asked with the place and the day of the latest, the one best remembered. No price,
+ * no expense id: the screen has neither, and the two streams stay apart.
+ */
+export const pendingVerdictSchema = z.strictObject({
+  itemId: z.uuid(),
+  name: itemSchema.shape.name,
+  placeName: placeSchema.shape.name,
+  boughtAt: z.date(),
+})
+export type PendingVerdict = z.infer<typeof pendingVerdictSchema>
+
+/** One card on the wire — and in the phone's own storage, where a draft keeps it (MOL-28). */
+export const pendingVerdictCodec = z.codec(
+  z.strictObject({ ...pendingVerdictSchema.shape, boughtAt: z.iso.datetime() }),
+  pendingVerdictSchema,
+  {
+    decode: (wire) => ({ ...wire, boughtAt: new Date(wire.boughtAt) }),
+    encode: (card) => ({ ...card, boughtAt: card.boughtAt.toISOString() }),
+  },
+)
+
+/** How many items one answer carries. The screen shows one card at a time. */
+export const PENDING_VERDICTS_LIMIT = 50
+
+/**
+ * `GET /verdicts/pending`. `total` is how many items wait, the list only the first of them —
+ * the counter under the title must not stop at the length of a page.
+ */
+export const pendingVerdictsCodec = z.strictObject({
+  items: z.array(pendingVerdictCodec).max(PENDING_VERDICTS_LIMIT),
+  total: z.int().nonnegative(),
+})
+export type PendingVerdicts = z.output<typeof pendingVerdictsCodec>

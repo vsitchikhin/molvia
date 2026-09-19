@@ -1,12 +1,13 @@
 import { z } from 'zod'
 import {
+  pendingVerdictsCodec,
   ratingSchema,
   verdictAmendmentSchema,
   verdictCardCodec,
   verdictCardOf,
   verdictPathSchema,
 } from '@molvia/model'
-import type { Rating, Verdict, VerdictAmendment } from '@molvia/model'
+import type { PendingVerdicts, Rating, Verdict, VerdictAmendment } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { parseBody, parseParams } from '@/parse'
 
@@ -19,6 +20,7 @@ export interface VerdictApi {
   ): Promise<{ verdict: Verdict; created: boolean }>
   amend(actorId: string, itemId: string, patch: VerdictAmendment): Promise<Verdict>
   withdraw(actorId: string, itemId: string): Promise<void>
+  pending(actorId: string): Promise<PendingVerdicts>
 }
 
 /** `no-store`: a verdict is personal, and the owner travels in a header. */
@@ -33,6 +35,12 @@ function answer(reply: FastifyReply, verdict: Verdict) {
  * scope: the owner comes from the hook, never from the request.
  */
 export function verdictRoutes(app: FastifyInstance, api: VerdictApi): void {
+  /** «Оценки»: bought and not rated, one card per item (MOL-28). Personal, never cached. */
+  app.get('/verdicts/pending', { exposeHeadRoute: false }, async (request, reply) => {
+    const pending = await api.pending(request.actorId)
+    return reply.header('cache-control', 'no-store').send(z.encode(pendingVerdictsCodec, pending))
+  })
+
   /**
    * «Поставить оценку», and the same again. 201 for a first verdict — or one given after it
    * was withdrawn — and 200 for one replaced: repeating a draft that already arrived is an

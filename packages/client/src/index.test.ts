@@ -457,6 +457,29 @@ describe('the verdict', () => {
     expect(verdict.review).toBeNull()
   })
 
+  it('reads what waits for a verdict, with the day as a Date', async () => {
+    const card = {
+      itemId: MILK,
+      name: 'Молоко Ашхар',
+      placeName: 'SAS',
+      boughtAt: cardWire.ratedAt,
+    }
+    const { client, calls } = clientReplying(200, { items: [card], total: 4 })
+
+    const pending = await client.pendingVerdicts()
+
+    expect(calls[0]?.method).toBe('GET')
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe('/verdicts/pending')
+    expect(pending).toEqual({ items: [{ ...card, boughtAt: new Date(card.boughtAt) }], total: 4 })
+  })
+
+  it('refuses a pending card that grew a price', async () => {
+    const card = { itemId: MILK, name: 'Молоко', placeName: 'SAS', boughtAt: cardWire.ratedAt }
+    const { client } = clientReplying(200, { items: [{ ...card, amount: '520' }], total: 1 })
+
+    await expect(client.pendingVerdicts()).rejects.toThrow()
+  })
+
   it('withdraws by DELETE and takes the empty 204 as done', async () => {
     const { client, calls } = clientReplying(204, undefined)
 
