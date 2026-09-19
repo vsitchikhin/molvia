@@ -116,6 +116,19 @@ export function yerevanMidnight(date: string): Date {
   return new Date(Date.parse(`${date}T00:00:00.000Z`) - YEREVAN_OFFSET_MS)
 }
 
+/**
+ * A day a rate may be dated by: a real calendar day whose Yerevan midnight the snapshot accepts.
+ * `Date.parse('2026-02-31')` is the 3rd of March, not NaN, and `0001-01-01` is what a .NET service
+ * answers for a date it does not have. One rule for the cache and the snapshot, so the cache never
+ * holds what no trip could take.
+ */
+export function isRateDay(date: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
+  const parsed = new Date(`${date}T00:00:00.000Z`)
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return false
+  return yerevanMidnight(date) >= RATE_EPOCH
+}
+
 function daysBetween(earlier: string, later: string): number {
   return Math.round((Date.parse(later) - Date.parse(earlier)) / DAY_MS)
 }
@@ -136,8 +149,8 @@ const PROVIDER_ORDER: readonly RateProvider[] = ['cba', 'cbr', 'erapi']
  * cross are a division rounded half-up to the snapshot's six digits — the one rounding outside
  * output, because the snapshot's scale is fixed (MOL-4) and the snapshot is this value's output.
  *
- * `null` when a currency is missing, when the pair is not a pair, or when the result falls
- * outside the band `exchangeRateSchema` holds. The date is the older of the two halves: a cross
+ * `null` when a currency is missing, when the pair is not a pair, or when the result is anything
+ * `exchangeRateSchema` refuses — outside the band, or dated before 2000. The date is the older of the two halves: a cross
  * is no fresher than its stalest part.
  */
 export function rateFromAmd(
@@ -155,13 +168,15 @@ export function rateFromAmd(
 
   const amdPer = (index: number): bigint => halves[index]?.scaled ?? RATE_SCALE
   const scaled = divideRounded(amdPer(0) * RATE_SCALE, amdPer(1))
-  if (scaled < RATE_MIN || scaled > RATE_MAX) return null
 
   const dates = halves.flatMap((half) => (half ? [half.date] : [])).sort()
   const [oldest] = dates
   if (oldest === undefined) return null
 
-  return { base, quote, scaled, source, asOf: yerevanMidnight(oldest) }
+  // Whatever the snapshot would refuse — a rate outside the band, a date before 2000 — is not
+  // built: a trip that cannot be written is a 500 at the shelf, not a trip without a rate.
+  const rate = { base, quote, scaled, source, asOf: yerevanMidnight(oldest) }
+  return exchangeRateSchema.safeParse(rate).success ? rate : null
 }
 
 /**

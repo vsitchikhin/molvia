@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
-import { parseCba } from './cba'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cbaFeed, parseCba } from './cba'
 import { parseCbr } from './cbr'
 import { parseErapi } from './erapi'
+import { FEED_TIMEOUT_MS, FOREIGN, request } from './feed'
 
 // Answers recorded from the providers on 19.09.2026 (a Saturday), byte for byte.
 function fixture(name: string): string {
@@ -123,5 +124,94 @@ describe('ExchangeRate-API', () => {
       const variant = { ...body, rates: { ...body.rates, RUB: bad } }
       expect(() => parseErapi(JSON.stringify(variant))).toThrow('erapi: implausible RUB')
     }
+  })
+})
+
+describe('дата ответа', () => {
+  it('отвергает день, которого нет в календаре, — V8 читает 31 февраля как 3 марта', () => {
+    const february = cba.replace('<CurrentDate>2026-09-18T', '<CurrentDate>2026-02-31T')
+    expect(() => parseCba(february)).toThrow('cba: unreadable date "2026-02-31"')
+  })
+
+  it('отвергает дату до 2000 года: 0001-01-01 — «нет даты» у .NET, 1970 — нулевое время', () => {
+    const dotnet = cba.replace('<CurrentDate>2026-09-18T', '<CurrentDate>0001-01-01T')
+    expect(() => parseCba(dotnet)).toThrow('cba: unreadable date')
+    const epoch = erapi.replace(/"time_last_update_unix":\d+/, '"time_last_update_unix":0')
+    expect(() => parseErapi(epoch)).toThrow('erapi: unreadable date "1970-01-01"')
+  })
+
+  it('отвергает 1 января 2000: его полночь в Ереване — ещё 1999 год по UTC, снимок её не возьмёт', () => {
+    const xml = cba.replace('<CurrentDate>2026-09-18T', '<CurrentDate>2000-01-01T')
+    expect(() => parseCba(xml)).toThrow('cba: unreadable date "2000-01-01"')
+  })
+
+  it('принимает 2 января 2000 и 29 февраля високосного', () => {
+    for (const day of ['2000-01-02', '2024-02-29']) {
+      const xml = cba.replace('<CurrentDate>2026-09-18T', `<CurrentDate>${day}T`)
+      expect(parseCba(xml).date).toBe(day)
+    }
+  })
+})
+
+describe('список валют', () => {
+  it('берётся из схемы: всё, кроме драма', () => {
+    expect(FOREIGN).toEqual(['RUB', 'USD', 'EUR'])
+  })
+})
+
+describe('транспорт', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('ответ не 200 — сбой поставщика с кодом, разбор не начинается', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response('busy', { status: 503 }))),
+    )
+    await expect(cbaFeed().fetchLatest()).rejects.toThrow('cba: HTTP 503')
+  })
+
+  it('поставщик, который молчит дольше таймаута, обрывается, а не держит обновление', async () => {
+    // AbortSignal.timeout runs on a timer fake timers do not reach: its delay is checked here,
+    // and the abort it would fire is fired by hand.
+    const controller = new AbortController()
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new DOMException('timed out', 'TimeoutError'))
+            })
+          }),
+      ),
+    )
+
+    const pending = request('cba', 'https://example.invalid')
+    controller.abort()
+
+    await expect(pending).rejects.toThrow('timed out')
+    expect(timeout).toHaveBeenCalledWith(FEED_TIMEOUT_MS)
+    timeout.mockRestore()
+  })
+
+  it('шлёт SOAP-конверт операции ExchangeRatesLatest', async () => {
+    const fetch = vi.fn(() => Promise.resolve(new Response(cba, { status: 200 })))
+    vi.stubGlobal('fetch', fetch)
+
+    await cbaFeed().fetchLatest()
+
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.cba.am/exchangerates.asmx',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          SOAPAction: '"http://www.cba.am/ExchangeRatesLatest"',
+        }) as unknown,
+        body: expect.stringContaining('<ExchangeRatesLatest') as unknown,
+      }),
+    )
   })
 })

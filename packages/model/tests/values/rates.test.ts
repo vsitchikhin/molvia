@@ -8,6 +8,7 @@ import {
   RATE_SCALE,
   decimalFromRate,
   exchangeRateSchema,
+  isRateDay,
   parseRate,
   pickOfficialRate,
   rateCodec,
@@ -198,6 +199,24 @@ describe('rateFromAmd', () => {
     // 0.0001 / 1 000 000 is below any plausible rate: refused rather than snapshotted.
     const far = [amd('RUB', '0.0001'), amd('USD', '1000000')]
     expect(rateFromAmd('RUB', 'USD', far, 'official')).toBeNull()
+  })
+
+  it('builds nothing the snapshot would refuse for its date', () => {
+    // 1970 is what an aggregator's zero update time becomes; a trip refuses anything before 2000.
+    expect(rateFromAmd('RUB', 'AMD', [amd('RUB', '4.3148', '1970-01-01')], 'fallback')).toBeNull()
+    expect(
+      rateFromAmd('RUB', 'AMD', [amd('RUB', '4.3148', '2000-01-02')], 'fallback'),
+    ).not.toBeNull()
+  })
+
+  it('isRateDay: a calendar day whose Yerevan midnight a snapshot accepts', () => {
+    expect(isRateDay('2026-09-18')).toBe(true)
+    expect(isRateDay('2024-02-29')).toBe(true)
+    expect(isRateDay('2026-02-31')).toBe(false)
+    // Its midnight in Yerevan is still 1999 in UTC.
+    expect(isRateDay('2000-01-01')).toBe(false)
+    expect(isRateDay('2000-01-02')).toBe(true)
+    expect(isRateDay('18.09.2026')).toBe(false)
   })
 
   it('always builds what the snapshot schema accepts', () => {

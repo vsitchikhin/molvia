@@ -1,4 +1,4 @@
-import { RATE_MAX, RATE_MIN } from '@molvia/model'
+import { RATE_MAX, RATE_MIN, currencySchema, isRateDay } from '@molvia/model'
 import type { AmdRate, RateProvider } from '@molvia/model'
 
 /** What one provider published in one answer: every currency the product holds, for one day. */
@@ -14,8 +14,14 @@ export interface RateFeed {
   fetchLatest(): Promise<Published>
 }
 
-/** Every currency but the dram — the rates are against it, so it has no row of its own. */
-export const FOREIGN: readonly AmdRate['currency'][] = ['RUB', 'USD', 'EUR']
+/**
+ * Every currency but the dram — the rates are against it, so it has no row of its own. Taken
+ * from the schema, as the table's CHECK is: a currency added there is asked for here too, rather
+ * than accepted by the cache and silently never fetched.
+ */
+export const FOREIGN: readonly AmdRate['currency'][] = currencySchema.options.filter(
+  (currency): currency is AmdRate['currency'] => currency !== 'AMD',
+)
 
 /**
  * A provider slower than this is down, as far as an hourly refresh cares. Generous because
@@ -41,9 +47,7 @@ export function published(
   date: string,
   scaled: ReadonlyMap<string, bigint | null>,
 ): Published {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) {
-    throw new FeedError(provider, `unreadable date ${JSON.stringify(date)}`)
-  }
+  if (!isRateDay(date)) throw new FeedError(provider, `unreadable date ${JSON.stringify(date)}`)
   const rates = FOREIGN.map((currency): AmdRate => {
     const value = scaled.get(currency)
     if (value === undefined) throw new FeedError(provider, `no ${currency}`)
