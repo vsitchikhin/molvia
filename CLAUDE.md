@@ -541,6 +541,14 @@ database access. In a product about data integrity, two write paths will silentl
 
 ## Data rules
 
+- **Every write to a trip goes through the queue on the device (MOL-24),** online or not — one
+  path, so the sheet never waits on the network. A write is kept first and sent after, one at a
+  time, in order, at start, on `online` and when the app comes back into view; there is no
+  background sync on iOS. A repeat is safe because the device names every row. No connection, a
+  5xx, an answer off the contract (a shop's captive portal) and a 401 hold the queue; any other
+  refusal is set aside in `rejected` and never retried — sent again it would be refused again and
+  hold everything behind it. The last known trip is remembered per identity for the same reason:
+  the app opened at the shelf with no signal still knows where a purchase goes.
 - **Verdict and expense are separate tables with separate write paths.** Do not merge
   them into one input screen: they have different frequencies and different motivations.
 - **A withdrawn verdict is still a row (MOL-27).** `DELETE /verdicts/:itemId` sets
@@ -622,7 +630,12 @@ database access. In a product about data integrity, two write paths will silentl
   the cheapest mistake today and the most expensive one a year from now.
 - **No business logic on the frontend.** The verdict, the unit price and the conversion are
   computed by the server. Client-side validation is for UX only; the backend is the source
-  of truth.
+  of truth. **One exception, and it is not a second implementation (MOL-24):** while a purchase
+  is being typed, the sheet shows its unit price and its estimate in the income currency through
+  `unitPrice()` and `convertMoney()` of `packages/model` — the very functions the server calls.
+  At the shelf with no connection the price per litre is needed now, to decide whether to take
+  the thing. Once written, every number on screen is the server's; the phone never adds up a
+  total, not even for rows still in the queue.
 - Split components so they are not overloaded, but without five wrappers around one tag.
   One well-scoped component beats five trivial ones.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
@@ -794,7 +807,8 @@ trip it was bought on. The trip and its rows are named by the device, so a queue
 purchase.
 MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
 MOL-39 the official rate — a cache refreshed hourly, snapshotted by every new trip, a jump
-left to the person;
+left to the person; MOL-24 the sheet «сколько, в чём, почём» — a live unit price, a price in any
+of the four currencies, and the queue that keeps a purchase on the phone until it is sent;
 MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of «back»; MOL-18 the kit
 screens are built from — button, field, card, verdict badge, sheet. No real screen yet:
 three sections are placeholders. Release 0.1 is broken into epics and tasks in Jira.
