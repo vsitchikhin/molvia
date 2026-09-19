@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ISSUE } from '#model/support/errors'
-import { drawsNothing, visibleLine, visibleText } from '#model/support/text'
+import { drawsNothing, pastedLine, visibleLine, visibleText } from '#model/support/text'
 
 const review = visibleText(500)
 
@@ -166,6 +166,37 @@ describe('drawsNothing', () => {
     ]
     for (const text of texts) {
       expect(drawsNothing(text), JSON.stringify(text)).toBe(!line.safeParse(text).success)
+    }
+  })
+})
+
+describe('pastedLine', () => {
+  const name = visibleLine(100)
+  // Left for the form to explain: a private-use glyph and a lone surrogate cannot be made a space
+  // or dropped without changing what the person meant.
+  const LEFT = /^[\p{Co}\p{Cs}]$/u
+
+  it('makes every character the schema refuses inside a line acceptable, but the two it cannot', () => {
+    const missed: string[] = []
+    for (let code = 0; code <= 0x10ffff; code += 1) {
+      const char = String.fromCodePoint(code)
+      const text = `а${char}б`
+      if (name.safeParse(text).success || LEFT.test(char)) continue
+      if (!name.safeParse(pastedLine(text)).success) missed.push(code.toString(16))
+    }
+    expect(missed).toEqual([])
+  })
+
+  it('turns a break into one space and drops the direction marks', () => {
+    const tab = String.fromCodePoint(9)
+    const isolate = [String.fromCodePoint(0x2068), String.fromCodePoint(0x2069)]
+    expect(pastedLine(`Молоко${tab}${tab}Ашхар`)).toBe('Молоко Ашхар')
+    expect(pastedLine(`${isolate[0] ?? ''}Молоко${isolate[1] ?? ''}`)).toBe('Молоко')
+  })
+
+  it('leaves ordinary text as it is', () => {
+    for (const text of ['Молоко «Ашхар» 3,2%', 'Հաց', 'Coca-Cola 0.5 л', 'Молокó']) {
+      expect(pastedLine(text)).toBe(text)
     }
   })
 })
