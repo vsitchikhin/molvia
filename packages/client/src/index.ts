@@ -245,7 +245,11 @@ export function createClient({
     return encoded.data
   }
 
-  /** A path segment an identifier cannot break out of: `/` or `?` in it would name another route. */
+  /**
+   * An identifier kept to its own path segment: `/`, `?` and `#` in it are escaped. Not a full
+   * guarantee — `.` is not escaped, so an identifier of `..` is folded away by URL resolution —
+   * but identifiers here are the device's own uuids, and a malformed one reaches no route.
+   */
   const segment = encodeURIComponent
 
   return {
