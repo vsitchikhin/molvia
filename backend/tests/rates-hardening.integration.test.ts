@@ -365,3 +365,105 @@ describe('Контроль: правило выбора держит то, чт�
     expect(pickOfficialRate('RUB', 'USD', rows, '2026-09-19')).toBeNull()
   })
 })
+
+// ---------------------------------------------------------------------------------------------
+// Второй заход атак (`.scratch/tasks/selftests/MOL-39-adversarial-round-2.md`), с решениями §10.
+
+const GOOD = 4_312_300n
+const BAD = 431_230_000n
+
+async function centralAnswers(published: Published): Promise<void> {
+  await officialRatesRefresh({
+    primary: { provider: 'cba', fetchLatest: () => Promise.resolve(published) },
+    fallbacks: [],
+    rates,
+    log: quiet,
+  })()
+}
+
+async function jumpOf(provider: RateProvider, date: string): Promise<boolean | undefined> {
+  const rows = await rates.latestOnOrBefore(['RUB'], date)
+  return rows.find((row) => row.provider === provider && row.date === date)?.jump
+}
+
+describe('Е (Р-22). Первый ответ запасного сверяется с ЦБ РА', () => {
+  it('ЦБ РА застыл 10 дней назад, ЦБ РФ впервые отвечает рублём ×100 — метка и предупреждение в походе', async () => {
+    for (const days of [13, 12, 11, 10]) await centralAnswers(answer('cba', daysAgo(days)))
+    const run = officialRatesRefresh({
+      primary: { provider: 'cba', fetchLatest: () => Promise.resolve(answer('cba', daysAgo(10))) },
+      fallbacks: [
+        { provider: 'cbr', fetchLatest: () => Promise.resolve(answer('cbr', daysAgo(0), BAD)) },
+      ],
+      rates,
+      log: quiet,
+    })
+
+    await run()
+
+    expect(await jumpOf('cbr', daysAgo(0))).toBe(true)
+    const trip = view(await start(await insertActor(db)))
+    expect(trip.rate).toMatchObject({ scaled: BAD, source: 'fallback' })
+    // Своих прежних у ЦБ РФ нет — выбор из «по новому» и «свой».
+    expect(trip.rateJump).toMatchObject({ jumped: { scaled: BAD }, previous: null, choice: null })
+  })
+})
+
+describe('Ж (Р-23). Одна ошибка не делает скачком правильные дни и не становится «прежним»', () => {
+  it('хороший → плохой → хороший: пока истории меньше трёх, не судим — и нет «по 4.3123 или по 4.3123»', async () => {
+    await centralAnswers(answer('cba', daysAgo(2)))
+    await centralAnswers(answer('cba', daysAgo(1), BAD))
+    await centralAnswers(answer('cba', daysAgo(0)))
+
+    expect(await jumpOf('cba', daysAgo(0))).toBe(false)
+    expect(view(await start(await insertActor(db))).rateJump).toBeNull()
+  })
+
+  it('плохой первый ответ → хороший: правильный не помечен, ошибочный «прежним» не предложен', async () => {
+    await centralAnswers(answer('cba', daysAgo(1), BAD))
+    await centralAnswers(answer('cba', daysAgo(0)))
+
+    expect(await jumpOf('cba', daysAgo(0))).toBe(false)
+    const trip = view(await start(await insertActor(db)))
+    expect(trip.rate?.scaled).toBe(GOOD)
+    expect(trip.rateJump).toBeNull()
+  })
+
+  it('три спокойных дня → ошибка → правильный: ошибка помечена, правильный — нет', async () => {
+    for (const days of [5, 4, 3]) await centralAnswers(answer('cba', daysAgo(days)))
+    await centralAnswers(answer('cba', daysAgo(2), BAD))
+    await centralAnswers(answer('cba', daysAgo(1)))
+
+    expect(await jumpOf('cba', daysAgo(2))).toBe(true)
+    expect(await jumpOf('cba', daysAgo(1))).toBe(false)
+  })
+
+  it('контроль: настоящая девальвация — скачок три дня, на четвёртый метка снята', async () => {
+    for (const days of [8, 7, 6, 5, 4]) await centralAnswers(answer('cba', daysAgo(days)))
+    for (const days of [3, 2, 1, 0]) await centralAnswers(answer('cba', daysAgo(days), 6_000_000n))
+
+    expect(await jumpOf('cba', daysAgo(3))).toBe(true)
+    expect(await jumpOf('cba', daysAgo(1))).toBe(true)
+    expect(await jumpOf('cba', daysAgo(0))).toBe(false)
+  })
+})
+
+describe('З (Р-25). Ответ из будущего — сбой источника', () => {
+  it('ЦБ РА отдаёт 9999-12-31: в кеш не пишется, а старый курс в кеше сразу зовёт ЦБ РФ', async () => {
+    await rates.upsert(
+      answer('cba', daysAgo(20)).rates.map((rate): CachedRate => ({ ...rate, jump: false })),
+    )
+    const cbr = counting('cbr', () => Promise.resolve(answer('cbr', daysAgo(0))))
+    const run = officialRatesRefresh({
+      primary: { provider: 'cba', fetchLatest: () => Promise.resolve(answer('cba', '9999-12-31')) },
+      fallbacks: [cbr.feed],
+      rates,
+      log: quiet,
+    })
+
+    await run()
+    // The cache holds a 20-day-old central bank rate: stale, so the fallback is asked at once.
+    expect(cbr.state.asked).toBe(1)
+    const stored = await db.select().from(officialRates)
+    expect(stored.some((row) => row.rateDate === '9999-12-31')).toBe(false)
+  })
+})
