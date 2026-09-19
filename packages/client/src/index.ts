@@ -15,6 +15,7 @@ import {
   healthResponseSchema,
   isWireCode,
   proposedItemSchema,
+  rateChoiceBodySchema,
   ratingSchema,
   recentPlacesResponseSchema,
   startTripBodySchema,
@@ -30,6 +31,7 @@ import type {
   ExpensePatch,
   HealthResponse,
   ProposedItem,
+  RateChoiceBody,
   Rating,
   StartTripBody,
   TripPlace,
@@ -134,6 +136,12 @@ export interface MolviaClient {
   removeExpense(tripId: string, expenseId: string): Promise<TripView>
   /** «Завершить». Finishing twice is not an error. */
   finishTrip(tripId: string): Promise<void>
+  /**
+   * «Считать по новому курсу / по прежнему / по своему» when the rate the trip took jumped
+   * (`rateJump`). Safe to repeat; a trip with nothing to choose between rejects with
+   * `error.conflict`, an own rate that is not a rate with `error.invalid_rate`.
+   */
+  chooseTripRate(tripId: string, body: RateChoiceBody): Promise<TripView>
   /**
    * «Поставить оценку», or give it again — safe to repeat, which is what a draft sent when the
    * network is back needs. `created` is `true` for a first verdict, or one given after it was
@@ -368,6 +376,12 @@ export function createClient({
     removeExpense: async (tripId, expenseId) =>
       request(`/trips/${segment(tripId)}/expenses/${segment(expenseId)}`, tripViewCodec, {
         method: 'DELETE',
+      }),
+
+    chooseTripRate: async (tripId, body) =>
+      request(`/trips/${segment(tripId)}/rate-choice`, tripViewCodec, {
+        method: 'PUT',
+        body: encode(rateChoiceBodySchema, body),
       }),
 
     // 204 has no body, and nothing else is a success here.

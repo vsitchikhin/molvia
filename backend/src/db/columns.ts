@@ -95,3 +95,17 @@ export function rateTo(rate: ExchangeRate | null): RateColumns {
     rateAsOf: rate.asOf,
   }
 }
+
+/**
+ * A rate kept beside a jumped snapshot (MOL-39, Р-19, Р-21): its own number and date, the pair
+ * the snapshot's, and the source the snapshot's unless named — the person's own is `personal`.
+ */
+export function sideRateFrom(
+  snapshot: ExchangeRate | null,
+  scaled: bigint | null,
+  asOf: Date | null,
+  source?: ExchangeRate['source'],
+): ExchangeRate | null {
+  if (snapshot === null || scaled === null || asOf === null) return null
+  return { ...snapshot, scaled, asOf, source: source ?? snapshot.source }
+}

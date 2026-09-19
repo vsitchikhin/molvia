@@ -4,8 +4,24 @@ import { DomainError, ERROR, ISSUE } from '#model/support/errors'
 import type { Expense } from './expense'
 import { MINOR_EXPONENT, currencySchema } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
-import { RATE_DIGITS, exchangeRateSchema } from '#model/values/rates'
+import {
+  RATE_DIGITS,
+  exchangeRateSchema,
+  isRateFresh,
+  parseRate,
+  yerevanDate,
+} from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
+
+/**
+ * Which rate a trip counts by when the one it snapshotted jumped (MOL-39, Р-19, Р-21): the jumped
+ * one, the one before it, or the person's own. Absent until chosen; until then the trip counts by
+ * the rate it took.
+ */
+export const rateChoiceSchema = z.enum(['jumped', 'previous', 'manual'])
+export type RateChoice = z.infer<typeof rateChoiceSchema>
+
+const samePair = (a: ExchangeRate, b: ExchangeRate) => a.base === b.base && a.quote === b.quote
 
 const tripFields = z.object({
   id: z.uuid(),
@@ -13,6 +29,17 @@ const tripFields = z.object({
   placeId: z.uuid(),
   currency: currencySchema,
   rate: exchangeRateSchema.nullable(),
+  /** The snapshotted rate jumped when it arrived: the screen warns, whatever else there is. */
+  rateJumped: z.boolean().default(false),
+  /**
+   * Kept beside a jumped snapshot so the person can choose; the snapshot itself is never
+   * rewritten, the choice only says which rate to count by. The rate before the jump — same pair,
+   * same source, at most a week older — when there was one.
+   */
+  previousRate: exchangeRateSchema.nullable().default(null),
+  /** The person's own rate for this trip, entered instead of the jumped one — `personal`. */
+  manualRate: exchangeRateSchema.nullable().default(null),
+  rateChoice: rateChoiceSchema.nullable().default(null),
   startedAt: z.date(),
   finishedAt: z.date().nullable(),
 })
@@ -21,6 +48,29 @@ export const tripSchema = tripFields
   .refine((trip) => trip.rate === null || trip.rate.quote === trip.currency, {
     error: ISSUE.RATE_NOT_OF_TRIP_CURRENCY,
   })
+  .refine(
+    ({ rate, rateJumped, previousRate, manualRate }) =>
+      (!rateJumped || rate !== null) &&
+      (previousRate === null ||
+        (rateJumped &&
+          rate !== null &&
+          samePair(previousRate, rate) &&
+          previousRate.source === rate.source)) &&
+      (manualRate === null ||
+        (rateJumped &&
+          rate !== null &&
+          samePair(manualRate, rate) &&
+          manualRate.source === 'personal')),
+    { error: ISSUE.SIDE_RATE_UNMATCHED },
+  )
+  .refine(
+    ({ rateChoice, rateJumped, previousRate, manualRate }) =>
+      rateChoice === null ||
+      (rateJumped &&
+        (rateChoice !== 'previous' || previousRate !== null) &&
+        (rateChoice !== 'manual' || manualRate !== null)),
+    { error: ISSUE.RATE_CHOICE_NOT_HELD },
+  )
   .refine((trip) => trip.finishedAt === null || trip.finishedAt >= trip.startedAt, {
     error: ISSUE.TRIP_FINISHED_BEFORE_START,
   })
@@ -30,6 +80,38 @@ export const newTripSchema = z.strictObject({
   placeId: z.uuid(),
 })
 export type NewTrip = z.infer<typeof newTripSchema>
+
+/** The rate a trip counts by: the one it took, unless the person chose another after a jump. */
+export function effectiveRate(trip: Trip): ExchangeRate | null {
+  if (trip.rateChoice === 'previous' && trip.previousRate) return trip.previousRate
+  if (trip.rateChoice === 'manual' && trip.manualRate) return trip.manualRate
+  return trip.rate
+}
+
+/**
+ * The person's own rate for a trip whose snapshot jumped (Р-21): the snapshot's pair, their
+ * number — refused as a rate typed under «мой курс» would be — and the moment they entered it.
+ */
+export function manualRateFor(snapshot: ExchangeRate, rate: string, at: Date): ExchangeRate {
+  return {
+    base: snapshot.base,
+    quote: snapshot.quote,
+    scaled: parseRate(rate),
+    source: 'personal',
+    asOf: at,
+  }
+}
+
+/**
+ * Whether the official rate a trip counts by was over a week old when the trip started — the
+ * screen's «курс на 1 сентября, с тех пор ЦБ РА не менялся» (MOL-39, Р-18). A personal rate is
+ * the person's own and never stale here.
+ */
+export function isTripRateStale(trip: Trip): boolean {
+  const rate = effectiveRate(trip)
+  if (rate === null || rate.source === 'personal') return false
+  return !isRateFresh(yerevanDate(rate.asOf), yerevanDate(trip.startedAt))
+}
 
 /**
  * One total per currency: an expense carries its own, and paying for one thing by card in

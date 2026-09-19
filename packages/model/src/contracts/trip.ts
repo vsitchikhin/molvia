@@ -5,7 +5,13 @@ import { newExpenseSchema } from '#model/entities/expense'
 import type { Item } from '#model/entities/item'
 import { newPlaceSchema, placeSchema } from '#model/entities/place'
 import type { Place } from '#model/entities/place'
-import { convertedMinor, tripTotal } from '#model/entities/trip'
+import {
+  convertedMinor,
+  effectiveRate,
+  isTripRateStale,
+  rateChoiceSchema,
+  tripTotal,
+} from '#model/entities/trip'
 import type { Trip } from '#model/entities/trip'
 import { INT8_MAX } from '#model/support/decimal'
 import { currencySchema, moneyCodec } from '#model/values/money'
@@ -93,14 +99,36 @@ export const tripViewCodec = z.strictObject({
   startedAt: isoDate,
   finishedAt: isoDate.nullable(),
   currency: currencySchema,
+  /**
+   * The rate the trip counts by: the snapshot, or — when it jumped and the person chose — the rate
+   * before the jump, or their own for this trip (`source: 'personal'`). What `converted` uses.
+   */
   rate: rateCodec.nullable(),
+  /**
+   * When the snapshotted rate jumped (MOL-39, Р-19, Р-21): the jumped rate, the one before it if
+   * there is one, the person's own if they entered it, and their choice — null until made. The
+   * screen warns and offers «по новому / по прежнему / свой». Null when nothing jumped.
+   */
+  rateJump: z
+    .strictObject({
+      jumped: rateCodec,
+      previous: rateCodec.nullable(),
+      manual: rateCodec.nullable(),
+      choice: rateChoiceSchema.nullable(),
+    })
+    .nullable(),
+  /**
+   * The official rate was over a week old when the trip started (Р-18): the screen says the rate
+   * is as of its date and the bank has published nothing since.
+   */
+  rateStale: z.boolean(),
   place: tripPlaceSchema.strict(),
   expenses: z.array(tripExpenseCodec),
   /** One per currency, and empty rather than zero when nothing is priced yet. */
   total: z.array(moneyCodec),
   /**
-   * The total in the trip's currency, converted by the rate the trip snapshotted. An estimate
-   * for display, never a fact — null without a rate, which is every trip until MOL-39/40.
+   * The total in the trip's currency, converted by the rate the trip counts by. An estimate
+   * for display, never a fact — null without a rate: an empty cache, or one currency (MOL-39).
    */
   converted: moneyCodec.nullable(),
 })
@@ -166,16 +194,38 @@ export function tripViewOf(
 
   const total = tripTotal(expenses)
   const inTripCurrency = total.find((money) => money.currency === trip.currency)
+  const rate = effectiveRate(trip)
 
   return {
     id: trip.id,
     startedAt: trip.startedAt,
     finishedAt: trip.finishedAt,
     currency: trip.currency,
-    rate: trip.rate,
+    rate,
+    rateJump:
+      trip.rate && trip.rateJumped
+        ? {
+            jumped: trip.rate,
+            previous: trip.previousRate,
+            manual: trip.manualRate,
+            choice: trip.rateChoice,
+          }
+        : null,
+    rateStale: isTripRateStale(trip),
     place: tripPlaceOf(place),
     expenses: rows,
     total: [...total],
-    converted: trip.rate && inTripCurrency ? estimate(inTripCurrency, trip.rate) : null,
+    converted: rate && inTripCurrency ? estimate(inTripCurrency, rate) : null,
   }
 }
+
+/**
+ * «Считать по новому курсу / по прежнему / по своему» (MOL-39, Р-19, Р-21). Repeatable: the same
+ * choice twice is one. The own rate travels as the decimal a person types — `parseRate` reads it.
+ */
+export const rateChoiceBodySchema = z.discriminatedUnion('choice', [
+  z.strictObject({ choice: z.literal('jumped') }),
+  z.strictObject({ choice: z.literal('previous') }),
+  z.strictObject({ choice: z.literal('manual'), rate: z.string().max(40) }),
+])
+export type RateChoiceBody = z.infer<typeof rateChoiceBodySchema>

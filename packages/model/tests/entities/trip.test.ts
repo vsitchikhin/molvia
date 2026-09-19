@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { ERROR } from '#model/support/errors'
+import { ERROR, ISSUE } from '#model/support/errors'
 import type { Expense } from '#model/entities/expense'
 import { formatMoney, money, parseMoney } from '#model/values/money'
 import { parseRate } from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
-import { convertMoney, newTripSchema, tripSchema, tripTotal } from '#model/entities/trip'
+import {
+  convertMoney,
+  effectiveRate,
+  isTripRateStale,
+  manualRateFor,
+  newTripSchema,
+  tripSchema,
+  tripTotal,
+} from '#model/entities/trip'
 import { formatUnitPrice, parseQuantity, unitPrice } from '#model/values/units'
 
 const digits = (text: string): string => text.replace(/[\s\u00a0\u202f]/g, '')
@@ -164,5 +172,75 @@ describe('convertMoney: a result past int8', () => {
       minor: 1_000_000n,
       currency: 'RUB',
     })
+  })
+})
+
+describe('скачок курса в походе (MOL-39, Р-19, Р-21)', () => {
+  const jumped = { ...trip, rate: rate('482'), rateJumped: true }
+  const at = new Date('2026-09-09T08:00:00Z')
+
+  it('считает по снимку, пока человек не выбрал', () => {
+    expect(effectiveRate(tripSchema.parse(jumped))?.scaled).toBe(parseRate('482'))
+  })
+
+  it('считает по прежнему или по своему, когда выбран он', () => {
+    const previous = tripSchema.parse({
+      ...jumped,
+      previousRate: rate('4.82'),
+      rateChoice: 'previous',
+    })
+    expect(effectiveRate(previous)?.scaled).toBe(parseRate('4.82'))
+
+    const own = manualRateFor(jumped.rate, '4,81', at)
+    expect(own).toEqual({
+      base: 'RUB',
+      quote: 'AMD',
+      scaled: parseRate('4.81'),
+      source: 'personal',
+      asOf: at,
+    })
+    expect(
+      effectiveRate(tripSchema.parse({ ...jumped, manualRate: own, rateChoice: 'manual' })),
+    ).toEqual(own)
+  })
+
+  it('свой курс, который не курс, — invalid_rate, как у «моего курса»', () => {
+    expect(() => manualRateFor(jumped.rate, 'abc', at)).toThrow(
+      expect.objectContaining({ code: ERROR.INVALID_RATE }),
+    )
+  })
+
+  it('не принимает прежний или свой без скачка, чужую пару и выбор того, чего нет', () => {
+    const own = manualRateFor(jumped.rate, '4.81', at)
+    for (const bad of [
+      { ...trip, previousRate: rate('4.82') },
+      { ...trip, manualRate: own },
+      { ...jumped, previousRate: { ...rate('4.82'), base: 'USD' } },
+      { ...jumped, previousRate: rate('4.82', 'personal') },
+      { ...jumped, manualRate: rate('4.81', 'official') },
+      { ...jumped, rateChoice: 'previous' },
+      { ...jumped, rateChoice: 'manual' },
+      { ...trip, rateChoice: 'jumped' },
+      { ...trip, rate: null, rateJumped: true },
+    ]) {
+      expect(tripSchema.safeParse(bad).success).toBe(false)
+    }
+  })
+
+  it('называет нарушение своим кодом: чужой курс рядом со снимком и выбор того, чего нет', () => {
+    const codeOf = (value: unknown) => tripSchema.safeParse(value).error?.issues[0]?.message
+    expect(codeOf({ ...trip, previousRate: rate('4.82') })).toBe(ISSUE.SIDE_RATE_UNMATCHED)
+    expect(codeOf({ ...jumped, rateChoice: 'manual' })).toBe(ISSUE.RATE_CHOICE_NOT_HELD)
+  })
+
+  it('свой курс никогда не «устарел»; официальный старше недели на начало похода — устарел', () => {
+    const own = manualRateFor(jumped.rate, '4.81', new Date('2026-08-01T00:00:00Z'))
+    expect(
+      isTripRateStale(tripSchema.parse({ ...jumped, manualRate: own, rateChoice: 'manual' })),
+    ).toBe(false)
+    const old = { ...rate('4.82'), asOf: new Date('2026-08-30T20:00:00Z') }
+    expect(isTripRateStale(tripSchema.parse({ ...trip, rate: old }))).toBe(true)
+    const week = { ...rate('4.82'), asOf: new Date('2026-08-31T20:00:00Z') }
+    expect(isTripRateStale(tripSchema.parse({ ...trip, rate: week }))).toBe(false)
   })
 })

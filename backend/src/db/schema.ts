@@ -1,7 +1,9 @@
 import {
   bigint,
+  boolean,
   char,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -27,6 +29,8 @@ import {
   eventTypeSchema,
   itemKindSchema,
   placeKindSchema,
+  rateChoiceSchema,
+  rateProviderSchema,
   rateSourceSchema,
 } from '@molvia/model'
 import type {
@@ -35,6 +39,9 @@ import type {
   EventPayload,
   ItemKind,
   PlaceKind,
+  AmdRate,
+  RateChoice,
+  RateProvider,
   RateSource,
 } from '@molvia/model'
 
@@ -293,7 +300,7 @@ export const places = pgTable(
  * Currency and rate are snapshots, spread over columns instead of pointing at a rate
  * table: a reference would let today's rate rewrite last month's trip, which is exactly
  * what «the rate is stored with the transaction» forbids. The plausibility band of a rate
- * is not checked here — the real check is disagreement with the official rate (MOL-39).
+ * is not checked here — the real check is disagreement with the official rate (MOL-40).
  */
 export const trips = pgTable(
   'trips',
@@ -311,6 +318,15 @@ export const trips = pgTable(
     rateScaled: bigint('rate_scaled', { mode: 'bigint' }),
     rateSource: text('rate_source').$type<RateSource>(),
     rateAsOf: timestamp('rate_as_of', { withTimezone: true }),
+    // When the snapshotted rate jumped (MOL-39, Р-19, Р-21): the flag, the rate before the jump
+    // and the person's own — each the snapshot's pair, so only a number and a date — and which
+    // one the person chose to count by. The snapshot itself is never rewritten.
+    rateJumped: boolean('rate_jumped').notNull().default(false),
+    ratePreviousScaled: bigint('rate_previous_scaled', { mode: 'bigint' }),
+    ratePreviousAsOf: timestamp('rate_previous_as_of', { withTimezone: true }),
+    rateManualScaled: bigint('rate_manual_scaled', { mode: 'bigint' }),
+    rateManualAsOf: timestamp('rate_manual_as_of', { withTimezone: true }),
+    rateChoice: text('rate_choice').$type<RateChoice>(),
     // `clock_timestamp()`, not `now()`: `now()` is the moment the *transaction* started, one
     // value shared by every row written inside it. `Conn` exists so a caller can write a trip
     // and its first expense together (MOL-21), and under `now()` those rows would carry the
@@ -349,11 +365,40 @@ export const trips = pgTable(
       'trips_rate_source_known',
       sql`${table.rateSource} is null or ${oneOf(table.rateSource, rateSourceSchema.options)}`,
     ),
-    // Not a plausibility band — that one is MOL-39's, and its numbers stay in the domain.
+    // Not a plausibility band — that one is the domain's (RATE_MIN, RATE_MAX), and so it stays.
     // Zero and negative are outside any band there could be: a snapshot is written once and
     // never recomputed, so a zero makes last month free and a negative flips its sign, both
     // as arithmetic rather than as an error.
     check('trips_rate_positive', sql`${table.rateScaled} is null or ${table.rateScaled} > 0`),
+    check(
+      'trips_rate_jumped_needs_rate',
+      sql`not ${table.rateJumped} or ${table.rateScaled} is not null`,
+    ),
+    check(
+      'trips_rate_previous_whole',
+      sql`num_nonnulls(${table.ratePreviousScaled}, ${table.ratePreviousAsOf}) in (0, 2)`,
+    ),
+    check(
+      'trips_rate_previous_needs_jump',
+      sql`${table.ratePreviousScaled} is null or (${table.rateJumped} and ${table.ratePreviousScaled} > 0)`,
+    ),
+    check(
+      'trips_rate_manual_whole',
+      sql`num_nonnulls(${table.rateManualScaled}, ${table.rateManualAsOf}) in (0, 2)`,
+    ),
+    check(
+      'trips_rate_manual_needs_jump',
+      sql`${table.rateManualScaled} is null or (${table.rateJumped} and ${table.rateManualScaled} > 0)`,
+    ),
+    check(
+      'trips_rate_choice_known',
+      sql`${table.rateChoice} is null or ${oneOf(table.rateChoice, rateChoiceSchema.options)}`,
+    ),
+    // A choice needs a jump, and names a rate the trip holds.
+    check(
+      'trips_rate_choice_held',
+      sql`${table.rateChoice} is null or (${table.rateJumped} and (${table.rateChoice} <> 'previous' or ${table.ratePreviousScaled} is not null) and (${table.rateChoice} <> 'manual' or ${table.rateManualScaled} is not null))`,
+    ),
     check(
       'trips_finished_after_start',
       sql`${table.finishedAt} is null or ${table.finishedAt} >= ${table.startedAt}`,
@@ -544,5 +589,38 @@ export const searchPicks = pgTable(
       'search_picks_query_key_indexable',
       sql`octet_length(${table.queryKey}) <= ${sql.raw(String(QUERY_KEY_MAX_OCTETS))}`,
     ),
+  ],
+)
+
+/**
+ * The official rates as their providers published them: one currency against the dram per
+ * day (MOL-39). Not pairs — no provider publishes those, and a stored pair would be a number
+ * already divided and already rounded. The pair is built when a trip snapshots it.
+ *
+ * A cache and nothing more: a trip copies the rate into its own columns, so rewriting a row
+ * here — a provider correcting itself — moves no trip that already started.
+ */
+export const officialRates = pgTable(
+  'official_rates',
+  {
+    provider: text('provider').$type<RateProvider>().notNull(),
+    currency: char('currency', { length: 3 }).$type<AmdRate['currency']>().notNull(),
+    rateDate: date('rate_date').notNull(),
+    // Drams per one unit, at RATE_SCALE — whatever «per 100» the provider printed is divided out.
+    scaled: bigint('scaled', { mode: 'bigint' }).notNull(),
+    // Over a quarter away from the provider's recent rates when it arrived (MOL-39, Р-19): kept,
+    // since it may be true, and a trip that takes it lets the person choose.
+    jump: boolean('jump').notNull().default(false),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Also the index «the latest row not after this day» walks, provider and currency first.
+    primaryKey({ columns: [table.provider, table.currency, table.rateDate] }),
+    check('official_rates_provider_known', oneOf(table.provider, rateProviderSchema.options)),
+    check(
+      'official_rates_currency_foreign',
+      sql`${oneOf(table.currency, currencySchema.options)} and ${table.currency} <> 'AMD'`,
+    ),
+    check('official_rates_positive', sql`${table.scaled} > 0`),
   ],
 )

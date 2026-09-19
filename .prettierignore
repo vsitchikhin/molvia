@@ -6,3 +6,5 @@ package-lock.json
 .lavish
 .githooks
 coverage
+# Recorded provider responses: byte for byte what came over the wire (MOL-39)
+backend/tests/fixtures/rates
