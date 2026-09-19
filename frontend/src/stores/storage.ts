@@ -54,6 +54,25 @@ export function write(key: string, value: string): boolean {
   return written
 }
 
+/**
+ * Writes to every shelf, and says whether **every** one took it. `write` is content with any
+ * shelf — right for a value that only has to outlive the tab. It is wrong for one that is read
+ * back to decide what to do: `read` prefers the first shelf, and a `localStorage` that refused
+ * the write still answers with what it held before, while `sessionStorage` moved on. The trip
+ * queue read its own past that way and sent one purchase in a loop (MOL-24, adversarial Б3).
+ */
+export function writeEverywhere(key: string, value: string): boolean {
+  let everywhere = true
+  for (const shelf of shelves()) {
+    try {
+      shelf.setItem(key, value)
+    } catch {
+      everywhere = false
+    }
+  }
+  return everywhere
+}
+
 export function forget(key: string): void {
   for (const shelf of shelves()) {
     try {

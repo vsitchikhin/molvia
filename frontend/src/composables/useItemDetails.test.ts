@@ -297,6 +297,18 @@ describe('useItemDetails', () => {
       expect(sheet.currency.value).toBe('EUR')
     })
 
+    it('does not change the currency under a price already typed (Р-12, Б4)', async () => {
+      const arriving = ref<TripView | null>(trip())
+      const sheet = details({ trip: () => arriving.value, currency: 'AMD' })
+      sheet.amount.value = '520'
+      await nextTick()
+
+      arriving.value = { ...trip(), currency: 'USD' }
+      await nextTick()
+      expect(sheet.currency.value).toBe('AMD')
+      expect(sheet.body(null).amount).toEqual(parseMoney('520', 'AMD'))
+    })
+
     it('takes a field holding only characters that draw nothing for an empty one (A7)', () => {
       const sheet = details()
       sheet.amount.value = String.fromCodePoint(0x200b)

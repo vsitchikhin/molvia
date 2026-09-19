@@ -2,7 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { ApiError } from '@molvia/client'
-import { ERROR, ISSUE, parseMoney, parseQuantity, tripViewCodec } from '@molvia/model'
+import {
+  ERROR,
+  ISSUE,
+  catalogueEntryCodec,
+  parseMoney,
+  parseQuantity,
+  tripViewCodec,
+} from '@molvia/model'
 import type { AddExpenseBody, CatalogueEntry, ExpensePatch, TripView } from '@molvia/model'
 import { useActorStore } from '@/stores/actor'
 import { useTripStore } from '@/stores/trip'
@@ -271,7 +278,7 @@ describe('trip queue', () => {
 
     localStorage.setItem(
       `molvia.trip-queue.${OTHER}`,
-      JSON.stringify([{ kind: 'remove', tripId: TRIP, expenseId: BREAD }]),
+      JSON.stringify([{ key: 'k1', write: { kind: 'remove', tripId: TRIP, expenseId: BREAD } }]),
     )
     removeExpense.mockRejectedValue(offline())
     useActorStore().id = OTHER
@@ -288,7 +295,15 @@ describe('trip queue', () => {
     const good = { kind: 'remove', tripId: TRIP, expenseId: MILK }
     localStorage.setItem(
       `molvia.trip-queue.${ME}`,
-      JSON.stringify([good, { kind: 'add', tripId: TRIP, body: { id: 'x' } }, 'junk', good]),
+      JSON.stringify([
+        { key: 'k1', write: good },
+        { key: 'k2', write: { kind: 'add', tripId: TRIP, body: { id: 'x' } } },
+        'junk',
+        // Kept without a key: no version that shipped wrote this, and one without its key would
+        // be sent again after every read (review Р-10).
+        good,
+        { key: 'k3', write: good },
+      ]),
     )
     expect(fresh().pending).toEqual([good, good])
 
@@ -333,11 +348,109 @@ describe('trip queue', () => {
       expect(tab.pending).toEqual([])
     })
 
-    it('reads a queue kept before writes had keys', () => {
-      const good = { kind: 'remove', tripId: TRIP, expenseId: MILK }
-      localStorage.setItem(`molvia.trip-queue.${ME}`, JSON.stringify([good]))
-      expect(fresh().pending).toEqual([good])
+    it('send a write once each, with a lock that excludes as a browser’s does (Б2)', async () => {
+      // happy-dom's `navigator.locks` excludes nothing: a minimal exclusive one, as browsers have.
+      let tail = Promise.resolve()
+      const locks = {
+        request: (_name: string, work: () => Promise<void>) => {
+          const run = tail.then(work)
+          tail = run.catch(() => undefined)
+          return run
+        },
+      }
+      const real = Object.getOwnPropertyDescriptor(navigator, 'locks')
+      Object.defineProperty(navigator, 'locks', { value: locks, configurable: true })
+      try {
+        addExpense.mockRejectedValueOnce(offline())
+        fresh()
+        const pwa = useTripQueueStore(createPinia())
+        pwa.enqueue(add(MILK))
+        await settled()
+        const tab = useTripQueueStore(createPinia())
+
+        let release: (answered: { trip: TripView; created: boolean }) => void = () => undefined
+        addExpense.mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              release = resolve
+            }),
+        )
+        addExpense.mockResolvedValue({ trip: answer('520.00'), created: false })
+        const slow = tab.flush()
+        await vi.waitFor(() => {
+          expect(addExpense).toHaveBeenCalledTimes(2)
+        })
+        const quick = pwa.flush()
+        release({ trip: answer('520.00'), created: true })
+        await Promise.all([slow, quick])
+
+        // Offline once, then the tab's send; the PWA waited for it and found nothing left.
+        expect(addExpense).toHaveBeenCalledTimes(2)
+      } finally {
+        if (real) Object.defineProperty(navigator, 'locks', real)
+        else Reflect.deleteProperty(navigator, 'locks')
+      }
     })
+  })
+
+  describe('a card for the screen the app cannot read (Б1)', () => {
+    function kept(entry: unknown) {
+      const body = { id: MILK, itemId: milk.id, amount: { amount: '520', currency: 'AMD' } }
+      localStorage.setItem(
+        `molvia.trip-queue.${ME}`,
+        JSON.stringify([{ key: 'k1', write: { kind: 'add', tripId: TRIP, body, entry } }]),
+      )
+    }
+
+    it('reads a card that grew a field — barcodes in 0.2', () => {
+      kept({ ...catalogueEntryCodec.encode(milk), barcodes: ['4850001234567'] })
+      const [write] = fresh().pending
+      expect(write?.kind === 'add' && write.entry).toEqual(milk)
+    })
+
+    it('keeps and sends the purchase when the card cannot be read at all', async () => {
+      kept({ name: 42 })
+      addExpense.mockResolvedValue({ trip: answer('520.00'), created: true })
+      const queue = fresh()
+      expect(queue.pending).toHaveLength(1)
+      expect(queue.pending[0]?.kind === 'add' && queue.pending[0].entry).toBeNull()
+
+      await queue.flush()
+      expect(addExpense).toHaveBeenCalledWith(TRIP, expect.objectContaining({ id: MILK }))
+    })
+  })
+
+  it('keeps memory for the truth when one shelf refuses and the other takes the write (Б3)', async () => {
+    // localStorage reads back what it held and refuses every write; sessionStorage works.
+    addExpense.mockRejectedValue(offline())
+    const queue = fresh()
+    queue.enqueue(add(MILK))
+    await settled()
+    const working = localStorage.setItem.bind(localStorage)
+    Object.defineProperty(localStorage, 'setItem', {
+      configurable: true,
+      writable: true,
+      value: () => {
+        throw new Error('QuotaExceededError')
+      },
+    })
+    try {
+      queue.enqueue(add(BREAD))
+      await settled()
+      expect(queue.pending).toHaveLength(2)
+
+      addExpense.mockReset()
+      addExpense.mockResolvedValue({ trip: answer('520.00'), created: true })
+      await queue.flush()
+      expect(addExpense.mock.calls.map(([, body]) => body.id)).toEqual([MILK, BREAD])
+      expect(queue.pending).toEqual([])
+    } finally {
+      Object.defineProperty(localStorage, 'setItem', {
+        configurable: true,
+        writable: true,
+        value: working,
+      })
+    }
   })
 
   it('holds the queue on a 404 the API did not say itself — a portal’s page (A3)', async () => {

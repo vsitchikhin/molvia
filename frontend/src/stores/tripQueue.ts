@@ -19,7 +19,7 @@ import type {
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
 import { isIdentifier } from '@/stores/identity'
-import { read, write } from '@/stores/storage'
+import { read, writeEverywhere } from '@/stores/storage'
 import { useTripStore } from '@/stores/trip'
 
 /**
@@ -32,8 +32,12 @@ export type QueuedWrite =
       readonly kind: 'add'
       readonly tripId: string
       readonly body: AddExpenseBody
-      /** Not sent: the trip screen needs a name for a row the server has not answered yet. */
-      readonly entry: CatalogueEntry
+      /**
+       * Not sent: the trip screen needs a name for a row the server has not answered yet. `null`
+       * when the card was kept by another version of the app and cannot be read: the purchase is
+       * the body, and it goes all the same (adversarial Б1).
+       */
+      readonly entry: CatalogueEntry | null
     }
   | {
       readonly kind: 'update'
@@ -97,7 +101,7 @@ function encode(entry: QueuedWrite): Loose {
         kind: 'add',
         tripId: entry.tripId,
         body: addExpenseBodySchema.encode(entry.body),
-        entry: catalogueEntryCodec.encode(entry.entry),
+        entry: entry.entry ? catalogueEntryCodec.encode(entry.entry) : null,
       }
     case 'update':
       return {
@@ -118,10 +122,7 @@ function decode(raw: unknown): QueuedWrite | null {
 
   if (kind === 'add') {
     const body = addExpenseBodySchema.safeParse(raw.body)
-    const entry = catalogueEntryCodec.safeParse(raw.entry)
-    return body.success && entry.success
-      ? { kind, tripId, body: body.data, entry: entry.data }
-      : null
+    return body.success ? { kind, tripId, body: body.data, entry: cardOf(raw.entry) } : null
   }
   if (typeof expenseId !== 'string' || !isIdentifier(expenseId)) return null
   if (kind === 'update') {
@@ -129,6 +130,20 @@ function decode(raw: unknown): QueuedWrite | null {
     return patch.success ? { kind, tripId, expenseId, patch: patch.data } : null
   }
   return kind === 'remove' ? { kind, tripId, expenseId } : null
+}
+
+const CARD_FIELDS = ['id', 'kind', 'name', 'note', 'defaultUnit', 'typicalQuantity'] as const
+
+/**
+ * The card as far as this version can read it: only the fields it knows are looked at, so one
+ * that grew a field — barcodes in 0.2 — still reads. The codec is strict on purpose for the
+ * server's answers; a card kept on the device is not an answer.
+ */
+function cardOf(raw: unknown): CatalogueEntry | null {
+  if (!isRecord(raw)) return null
+  const known = Object.fromEntries(CARD_FIELDS.map((field) => [field, raw[field]]))
+  const card = catalogueEntryCodec.safeParse(known)
+  return card.success ? card.data : null
 }
 
 function parsedList(key: string): unknown[] {
@@ -142,17 +157,12 @@ function parsedList(key: string): unknown[] {
   }
 }
 
-/**
- * A broken entry is dropped alone: the ones around it are somebody's purchases. One kept before
- * writes had keys — the first version of this store — is given one.
- */
+/** A broken entry is dropped alone: the ones around it are somebody's purchases. */
 function recallKept(key: string): Kept[] {
   return parsedList(key).flatMap((item: unknown) => {
-    if (!isRecord(item)) return []
-    const keyed = typeof item.key === 'string' && isRecord(item.write)
-    const entry = decode(keyed ? item.write : item)
-    if (!entry) return []
-    return [{ key: keyed && typeof item.key === 'string' ? item.key : newKey(), write: entry }]
+    if (!isRecord(item) || typeof item.key !== 'string') return []
+    const entry = decode(item.write)
+    return entry ? [{ key: item.key, write: entry }] : []
   })
 }
 
@@ -211,7 +221,8 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   let kept: Kept[] = []
   const pending = ref<QueuedWrite[]>([])
   const rejected = ref<RejectedWrite[]>([])
-  // Storage refused the last write: until one succeeds, memory is ahead of it and is the truth.
+  // A shelf refused the last write: until every shelf takes one, memory is ahead of storage and
+  // is the truth — one refusing shelf still answers `read` with what it held before (Б3).
   let ahead = false
 
   function show(): void {
@@ -229,11 +240,11 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function persist(id: string | null): void {
     show()
     if (!id) return
-    const queued = write(
+    const queued = writeEverywhere(
       `${QUEUE_KEY}.${id}`,
       JSON.stringify(kept.map((item) => ({ key: item.key, write: encode(item.write) }))),
     )
-    const refused = write(
+    const refused = writeEverywhere(
       `${REJECTED_KEY}.${id}`,
       JSON.stringify(
         rejected.value.map((item) => ({ write: encode(item.write), code: item.code })),

@@ -159,11 +159,16 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
   const currency = ref<Currency>(original.amount?.currency ?? input.currency)
 
   // The price follows the trip's currency until the person picks one: the trip may arrive after
-  // the sheet opened (В-6), in a currency other than the person's own (review Р-3).
+  // the sheet opened (В-6), in a currency other than the person's own (review Р-3). A price
+  // already typed is a choice too — the sign must not change under «520», which would then go
+  // as 520 dollars rather than 520 drams (Р-12, adversarial Б4).
   let chosen = expense !== null
   let following = false
   watch(currency, () => {
     if (!following) chosen = true
+  })
+  watch(amount, (typed) => {
+    if (typed.replace(INVISIBLE_CHARACTERS, '').trim() !== '') chosen = true
   })
   watch(
     () => toValue(input.trip)?.currency,
@@ -210,7 +215,12 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
     }
   })
 
-  /** Whether the trip can still add this price to what it holds — the server's own sum. */
+  /**
+   * Whether the trip can still add this price to what it holds — the server's own sum. A price
+   * that does not fit is told «not an amount» on purpose: past 9·10¹⁶ ֏ of total no real price
+   * lies, and a code of its own for it would be a word for a case nobody meets. For the same
+   * reason queued amendments and removals are not counted, only queued additions (review Р-11).
+   */
   const fits = computed(() => {
     const a = valueOf(parsedAmount.value)
     if (!a) return true
