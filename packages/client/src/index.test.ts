@@ -481,7 +481,7 @@ describe('the verdict', () => {
   it('sends nothing for an item that is not an identifier, or one that would change the address', async () => {
     const { client, calls } = clientReplying(201, cardWire)
 
-    for (const itemId of ['молоко', '../actors/me', `${MILK}?x=1`, '']) {
+    for (const itemId of ['молоко', '../actors/me', `${MILK}?x=1`, '', MILK.toUpperCase()]) {
       expect(await codeOf(client.rateItem(itemId, { score: 2 })), itemId).toBe(ISSUE.PATH_INVALID)
       expect(await codeOf(client.withdrawVerdict(itemId)), itemId).toBe(ISSUE.PATH_INVALID)
     }

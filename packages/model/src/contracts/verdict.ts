@@ -11,7 +11,11 @@ import type { Verdict } from '#model/entities/verdict'
  * made offline right after rating with nowhere to go.
  */
 export const verdictPathSchema = z.strictObject({
-  itemId: z.uuid({ error: ISSUE.PATH_INVALID }),
+  // Lower case only, the spelling every identifier leaves this server in. `z.uuid()` and
+  // Postgres take either case, so an upper-case address was rated and answered with a card
+  // whose `itemId` was not the one sent — and a draft kept under the id it was sent with
+  // would no longer match its own reply (adversarial pass, Д). One resource, one address.
+  itemId: z.uuid({ error: ISSUE.PATH_INVALID }).regex(/^[\da-f-]+$/, { error: ISSUE.PATH_INVALID }),
 })
 export type VerdictPath = z.infer<typeof verdictPathSchema>
 

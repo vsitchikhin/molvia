@@ -229,6 +229,13 @@ describe('PUT — поставить оценку', () => {
       status: 400,
       body: { code: ISSUE.PATH_INVALID, details: 'itemId' },
     })
+    // Д: one resource, one address — the card would otherwise answer with another `itemId`.
+    const itemId = await insertItem(db)
+    expect(await rate(actor, itemId.toUpperCase(), { score: 4 })).toMatchObject({
+      status: 400,
+      body: { code: ISSUE.PATH_INVALID, details: 'itemId' },
+    })
+    expect(await rows(itemId)).toHaveLength(0)
   })
 
   it('12: блюдо, попавшее в справочник мимо API, — 400, а не 500', async () => {
