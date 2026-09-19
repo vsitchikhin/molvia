@@ -74,6 +74,21 @@ test.describe('sections', () => {
   // The invite link is how everyone arrives. Its code is scrubbed from the address on start;
   // done behind the router's back, the router remembered `/?c=…` as where it came from, and the
   // way home stopped being a step back — «back» from the trip then landed on the trip again.
+  // The trip is the trip whatever its address carries — a tracking tag on a shared link, a hash.
+  for (const entry of ['/?utm_source=telegram', '/#top']) {
+    test(`arriving at ${entry}, the way home is still a step back`, async ({ page }) => {
+      await page.goto(entry)
+      await expect(heading(page)).toHaveText('Trip')
+      await tab(page, 'What to buy').click()
+      await expectOn(page, '/advice', 'What to buy')
+      await tab(page, 'Trip').click()
+      await expect(heading(page)).toHaveText('Trip')
+
+      await page.goBack()
+      await expect(page).toHaveURL('about:blank')
+    })
+  }
+
   test('arriving by an invite link, the way home is still a step back', async ({ page }) => {
     const code = process.env.SIGNUP_CODE
     test.skip(!code, 'SIGNUP_CODE is not set')
@@ -189,6 +204,93 @@ test.describe('the large title', () => {
   })
 })
 
+/**
+ * The notch and the home indicator, set through the engine rather than faked in a token:
+ * `Emulation.setSafeAreaInsetsOverride` gives `env(safe-area-inset-*)` real values in the same
+ * Chromium that runs Chrome on Android. No phone is needed for the geometry.
+ */
+test.describe('safe areas', () => {
+  interface Insets {
+    top: number
+    bottom: number
+    left: number
+    right: number
+  }
+  const portrait: Insets = { top: 47, bottom: 34, left: 0, right: 0 }
+  const landscape: Insets = { top: 0, bottom: 21, left: 47, right: 47 }
+
+  async function insets(page: Page, value: Insets): Promise<void> {
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send(
+      'Emulation.setSafeAreaInsetsOverride' as never,
+      {
+        insets: {
+          top: value.top,
+          topMax: value.top,
+          bottom: value.bottom,
+          bottomMax: value.bottom,
+          left: value.left,
+          leftMax: value.left,
+          right: value.right,
+          rightMax: value.right,
+        },
+      } as never,
+    )
+  }
+
+  const bar = (page: Page) => page.locator('header.bar')
+  const screen = (page: Page) => page.locator('.screen')
+
+  test('the pinned row grows by the notch, and the tab bar by the indicator', async ({ page }) => {
+    await insets(page, portrait)
+    await page.goto('/')
+    await expect(page.locator('nav.tabbar')).toHaveJSProperty('offsetHeight', 74 + 34)
+    await page.goto('/trip/add')
+    await expect(bar(page)).toHaveJSProperty('offsetHeight', 44 + 47)
+  })
+
+  // Turned, the notch leaves the top and the row shrinks: the line under it follows, so the
+  // screen is not collapsed at rest.
+  test('turning the phone keeps the title open at rest', async ({ page }) => {
+    await insets(page, portrait)
+    await page.goto('/trip/add')
+    await expect(bar(page)).toHaveJSProperty('offsetHeight', 91)
+
+    await page.setViewportSize({ width: 915, height: 412 })
+    await insets(page, landscape)
+    await expect(bar(page)).toHaveJSProperty('offsetHeight', 44)
+    await page.waitForTimeout(150)
+    await expect(screen(page)).not.toHaveClass(/collapsed/)
+  })
+
+  test('turned the other way, it still collapses past 24px', async ({ page }) => {
+    await page.setViewportSize({ width: 915, height: 412 })
+    await insets(page, landscape)
+    await page.goto('/trip/add')
+    await page.setViewportSize({ width: 412, height: 915 })
+    await insets(page, portrait)
+    await expect(bar(page)).toHaveJSProperty('offsetHeight', 91)
+    await page.evaluate(() => {
+      const filler = document.createElement('div')
+      filler.style.height = '3000px'
+      document.querySelector('.content')?.append(filler)
+      window.scrollTo({ top: 25, behavior: 'instant' })
+    })
+    await expect(screen(page)).toHaveClass(/collapsed/)
+  })
+
+  test('held sideways, nothing starts under the notch', async ({ page }) => {
+    await page.setViewportSize({ width: 915, height: 412 })
+    await insets(page, landscape)
+    await page.goto('/trip/add')
+    const back = await chevron(page).boundingBox()
+    const title = await heading(page).boundingBox()
+    expect(back?.x ?? 0).toBeGreaterThanOrEqual(landscape.left)
+    expect(title?.x ?? 0).toBeGreaterThanOrEqual(landscape.left)
+    expect((title?.x ?? 0) + (title?.width ?? 0)).toBeLessThanOrEqual(915 - landscape.right)
+  })
+})
+
 test.describe('what the shell leaves alone', () => {
   // Swipe from the edge and the Android «back» belong to the browser. The shell registers no
   // touch handler anywhere to fight them with.
@@ -251,6 +353,18 @@ test.describe('moves', () => {
     await tab(page, 'What to buy').click()
     await expectOn(page, '/advice', 'What to buy')
     expect(await transitions(page)).toBe(0)
+  })
+
+  test('the title collapses without motion when motion is reduced', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/trip/add')
+    const durations = await page.evaluate(() =>
+      ['.bar', '.small'].map((selector) => {
+        const node = document.querySelector(selector)
+        return node ? getComputedStyle(node).transitionDuration : 'missing'
+      }),
+    )
+    expect(durations).toEqual(['0s', '0s'])
   })
 
   test('focus lands on the new heading after a move', async ({ page }) => {
