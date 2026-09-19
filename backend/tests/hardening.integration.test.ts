@@ -46,7 +46,7 @@ describe('порядок внутри одной транзакции', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
 
     // `Conn` заведён ровно ради этого: MOL-21 пишет поход и первую трату вместе. Под `now()`
     // все строки такой транзакции получали одну метку, и порядок решал randomUUID().
@@ -54,8 +54,13 @@ describe('порядок внутри одной транзакции', () => {
       const inTx = createExpenseRepository(tx)
       const ids: string[] = []
       for (let index = 0; index < 10; index += 1) {
-        const added = await inTx.add(actorId, { tripId: trip.id, itemId, amount: price })
-        ids.push(added.id)
+        const { expense } = await inTx.add(actorId, {
+          id: randomUUID(),
+          tripId: trip.id,
+          itemId,
+          amount: price,
+        })
+        ids.push(expense.id)
       }
       return ids
     })
@@ -63,16 +68,21 @@ describe('порядок внутри одной транзакции', () => {
     expect((await expenses.forTrip(trip.id, actorId)).map((row) => row.id)).toEqual(entered)
   })
 
-  it('из двух походов одной транзакции текущим становится начатый последним', async () => {
+  it('из двух походов одной транзакции новее тот, что начат последним', async () => {
+    // Открытым поход бывает один (MOL-21), так что первый здесь завершается — но часы у
+    // обоих старт один и тот же: под `now()` оба получили бы одну метку, и порядок решал бы id.
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
 
-    const second = await db.transaction(async (tx) => {
+    const [first, second] = await db.transaction(async (tx) => {
       const inTx = createTripRepository(tx)
-      await inTx.start(actorId, { placeId }, 'AMD', null)
-      return inTx.start(actorId, { placeId }, 'AMD', null)
+      const { trip: opened } = await inTx.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)
+      await inTx.finish(opened.id, actorId)
+      const { trip: next } = await inTx.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)
+      return [opened, next]
     })
 
+    expect((await trips.listFor(actorId, 10)).map((trip) => trip.id)).toEqual([second.id, first.id])
     expect((await trips.latestUnfinishedFor(actorId))?.id).toBe(second.id)
   })
 
@@ -101,7 +111,9 @@ describe('предел выборки', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     for (let index = 0; index < 3; index += 1) {
-      await trips.start(actorId, { placeId }, 'AMD', null)
+      // Открытым поход бывает один (MOL-21), поэтому каждый завершается сразу.
+      const { trip } = await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)
+      await trips.finish(trip.id, actorId)
     }
 
     // drizzle на отрицательном пределе не печатал клаузу вовсе — то есть возвращал всё.
@@ -115,7 +127,9 @@ describe('предел выборки', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     for (let index = 0; index < 5; index += 1) {
-      await trips.start(actorId, { placeId }, 'AMD', null)
+      // Открытым поход бывает один (MOL-21), поэтому каждый завершается сразу.
+      const { trip } = await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)
+      await trips.finish(trip.id, actorId)
     }
 
     expect(await trips.listFor(actorId, 2.5)).toHaveLength(2)
@@ -126,8 +140,15 @@ describe('предел выборки', () => {
     const itemId = await insertItem(db)
     for (let index = 0; index < 4; index += 1) {
       const placeId = await insertPlace(db, { name: `Лавка ${String(index)}` })
-      const trip = await trips.start(actorId, { placeId }, 'AMD', null)
-      await expenses.add(actorId, { tripId: trip.id, itemId, quantity: litre, amount: price })
+      const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
+      await trips.finish(trip.id, actorId)
+      await expenses.add(actorId, {
+        id: randomUUID(),
+        tripId: trip.id,
+        itemId,
+        quantity: litre,
+        amount: price,
+      })
     }
 
     expect(await expenses.cheapestFor(actorId, [itemId], 2)).toHaveLength(2)
@@ -215,8 +236,10 @@ describe('пустой патч называет себя', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
-    const added = await expenses.add(actorId, { tripId: trip.id, itemId, amount: price })
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
+    const added = (
+      await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId, amount: price })
+    ).expense
 
     await expect(expenses.update(added.id, actorId, {})).rejects.toThrow(/patch with no fields/)
     await expect(actors.update(actorId, {})).rejects.toThrow(/patch with no fields/)

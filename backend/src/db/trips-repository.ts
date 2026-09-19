@@ -1,6 +1,5 @@
-import { randomUUID } from 'node:crypto'
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
-import { tripSchema } from '@molvia/model'
+import { DomainError, ERROR, tripSchema } from '@molvia/model'
 import type { Currency, ExchangeRate, NewTrip, Trip } from '@molvia/model'
 import { rateFrom, rateTo } from './columns'
 import { translateFailures } from './failure'
@@ -8,24 +7,38 @@ import type { Conn } from './index'
 import { idOrNull, rowLimit, theRow } from './rows'
 import { trips } from './schema'
 
+/** A trip to start, named by the device that starts it (MOL-21, В-2). */
+export type TripToStart = NewTrip & { readonly id: string }
+
 export interface TripRepository {
   /**
    * The currency is a snapshot of the person's setting and the rate a snapshot of the
    * moment: neither is looked up again later, or last month's total would move with
    * today's rate. Whether that rate is plausible — and that its `asOf` is not from the
    * future — belongs to the use case, which is the only place with a clock.
+   *
+   * **One open trip per person** (MOL-21, В-4): another unfinished trip refuses with
+   * `TRIP_OPEN`, because which of the two goes on is the person's choice, not the server's.
+   * The same identifier again is a repeat — a double tap, a queue sent twice — and returns the
+   * trip already there with `created: false`, finished or not. The same identifier under
+   * someone else is `CONFLICT`.
+   *
+   * Held here under a lock per owner rather than by a partial unique index (В-10): the rule is
+   * about the screen, not about whether a row is readable. So rows written around this method —
+   * a fixture, a restore — can still hold two open trips, and `latestUnfinishedFor` still has
+   * to answer for them.
    */
   start(
     actorId: string,
-    input: NewTrip,
+    input: TripToStart,
     currency: Currency,
     rate: ExchangeRate | null,
-  ): Promise<Trip>
+  ): Promise<{ trip: Trip; created: boolean }>
   byId(id: string, actorId: string): Promise<Trip | null>
   /**
-   * The most recent trip that has not been finished — a row, not a verdict on which trip is
-   * «current». Several trips in one day is an open product question (the market in the
-   * morning, the supermarket in the evening) and MOL-22 is the one that answers it.
+   * The most recent trip that has not been finished. Several trips a day, yes; several open at
+   * once, no — `start` refuses the second (MOL-21, В-4). Rows written around it can still hold
+   * two, and then the newer one is current.
    */
   latestUnfinishedFor(actorId: string): Promise<Trip | null>
   listFor(actorId: string, limit: number): Promise<Trip[]>
@@ -40,6 +53,9 @@ export interface TripRepository {
    * `at` stays for the case that genuinely has its own moment: a trip closed after the
    * fact. A moment earlier than the start is still refused, and that is still the caller's
    * defect rather than this repository's.
+   *
+   * Finishing twice moves nothing (MOL-21): a repeat from a queue is not a later finish, and
+   * the moment a trip ended is a fact. The trip comes back as it was.
    */
   finish(id: string, actorId: string, at?: Date): Promise<Trip | null>
 }
@@ -66,13 +82,36 @@ function ownedBy(id: string, actorId: string) {
 export function createTripRepository(db: Conn): TripRepository {
   return {
     async start(actorId, input, currency, rate) {
-      return translateFailures(async () => {
-        const [row] = await db
-          .insert(trips)
-          .values({ id: randomUUID(), actorId, placeId: input.placeId, currency, ...rateTo(rate) })
-          .returning()
-        return toTrip(theRow(row, 'trips'))
-      })
+      return translateFailures(async () =>
+        db.transaction(async (tx) => {
+          // Per owner: two «Начать поход» at once — a double tap after the screen lost its
+          // state — would otherwise both see no open trip and both write one.
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext('trips'), hashtext(${actorId}))`,
+          )
+
+          const [same] = await tx.select().from(trips).where(eq(trips.id, input.id)).limit(1)
+          if (same) {
+            if (same.actorId !== actorId) throw new DomainError(ERROR.CONFLICT)
+            return { trip: toTrip(same), created: false }
+          }
+
+          const [open] = await tx
+            .select({ id: trips.id })
+            .from(trips)
+            .where(and(eq(trips.actorId, actorId), isNull(trips.finishedAt)))
+            .limit(1)
+          if (open) throw new DomainError(ERROR.TRIP_OPEN)
+
+          // A stranger's insert of the same identifier is not under this lock, so the
+          // primary key has the last word: `23505`, translated to CONFLICT like above.
+          const [row] = await tx
+            .insert(trips)
+            .values({ id: input.id, actorId, placeId: input.placeId, currency, ...rateTo(rate) })
+            .returning()
+          return { trip: toTrip(theRow(row, 'trips')), created: true }
+        }),
+      )
     },
 
     async byId(id, actorId) {
@@ -126,9 +165,12 @@ export function createTripRepository(db: Conn): TripRepository {
       const [row] = await db
         .update(trips)
         .set({ finishedAt: at ?? sql`clock_timestamp()` })
-        .where(ownedBy(id, actorId))
+        .where(and(ownedBy(id, actorId), isNull(trips.finishedAt)))
         .returning()
-      return row ? toTrip(row) : null
+      if (row) return toTrip(row)
+
+      const [finished] = await db.select().from(trips).where(ownedBy(id, actorId)).limit(1)
+      return finished ? toTrip(finished) : null
     },
   }
 }

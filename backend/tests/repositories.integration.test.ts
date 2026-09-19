@@ -180,7 +180,7 @@ describe('походы и траты', () => {
   it('поход без курса читается как null, а не как половина снимка', async () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
 
     expect(trip.rate).toBeNull()
     expect((await trips.byId(trip.id, actorId))?.rate).toBeNull()
@@ -197,7 +197,7 @@ describe('походы и траты', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
 
-    const trip = await trips.start(actorId, { placeId }, 'AMD', rate)
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', rate)).trip
     expect(trip.rate).toEqual(rate)
     expect((await trips.byId(trip.id, actorId))?.rate).toEqual(rate)
   })
@@ -205,7 +205,7 @@ describe('походы и траты', () => {
   it('свой поход завершается, и время завершения ставит база', async () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
 
     const finished = await trips.finish(trip.id, actorId)
 
@@ -220,7 +220,7 @@ describe('походы и траты', () => {
   it('момент можно передать явно — так закрывают поход задним числом', async () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
 
     const at = new Date(trip.startedAt.getTime() + 60_000)
     const finished = await trips.finish(trip.id, actorId, at)
@@ -233,9 +233,10 @@ describe('походы и траты', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
 
-    const added = await expenses.add(actorId, { tripId: trip.id, itemId })
+    const added = (await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId }))
+      .expense
     expect(added.quantity).toBeNull()
     expect(added.amount).toBeNull()
   })
@@ -244,13 +245,16 @@ describe('походы и траты', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
 
-    const added = await expenses.add(actorId, {
-      tripId: trip.id,
-      itemId,
-      amount: { minor: INT8_MAX, currency: 'AMD' },
-    })
+    const added = (
+      await expenses.add(actorId, {
+        id: randomUUID(),
+        tripId: trip.id,
+        itemId,
+        amount: { minor: INT8_MAX, currency: 'AMD' },
+      })
+    ).expense
     expect(added.amount?.minor).toBe(INT8_MAX)
 
     expect(() => moneySchema.parse({ minor: INT8_MAX + 1n, currency: 'AMD' })).toThrow()
@@ -271,8 +275,10 @@ describe('походы и траты', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
-    const added = await expenses.add(actorId, { tripId: trip.id, itemId, amount: price })
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
+    const added = (
+      await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId, amount: price })
+    ).expense
 
     // Разобранный патч пустым не бывает — expensePatchSchema его отвергает, — поэтому
     // пустой здесь означает, что вызывающий обошёл домен. Это дефект сервера (Р-11), но
@@ -287,13 +293,16 @@ describe('походы и траты', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
-    const added = await expenses.add(actorId, {
-      tripId: trip.id,
-      itemId,
-      quantity: litre,
-      amount: price,
-    })
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
+    const added = (
+      await expenses.add(actorId, {
+        id: randomUUID(),
+        tripId: trip.id,
+        itemId,
+        quantity: litre,
+        amount: price,
+      })
+    ).expense
 
     const updated = await expenses.update(added.id, actorId, { amount: null })
     expect(updated?.amount).toBeNull()

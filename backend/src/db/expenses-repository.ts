@@ -1,16 +1,28 @@
-import { randomUUID } from 'node:crypto'
 import { and, asc, count, desc, eq, exists, inArray, isNotNull, notExists, sql } from 'drizzle-orm'
 import { DomainError, ERROR, UNIT_PRICE_SCALE, expenseSchema } from '@molvia/model'
 import type { BaseUnit, Currency, Expense, ExpensePatch, NewExpense } from '@molvia/model'
 import { moneyFrom, moneyTo, quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
-import { idOrNull, rowLimit, theRow } from './rows'
+import { idOrNull, rowLimit } from './rows'
 import { expenses, items, trips, verdicts } from './schema'
 
+/** An expense to add, named by the device that adds it (MOL-21, В-2). */
+export type ExpenseToAdd = NewExpense & { readonly id: string }
+
 export interface ExpenseRepository {
-  /** The only required field is the item; everything else may be filled in later. */
-  add(actorId: string, input: NewExpense): Promise<Expense>
+  /**
+   * The only required field is the item; everything else may be filled in later.
+   *
+   * The identifier comes from the device, so a queue that sends twice after a lost reply writes
+   * one purchase, not two: the same identifier in the same trip for the same item is a repeat
+   * and returns the row already there with `created: false` — the first write wins, the fields
+   * sent again are not applied. Anything else holding that identifier is `CONFLICT`.
+   *
+   * A finished trip takes expenses like an open one (MOL-21, В-8): the soy sauce found in the
+   * bag at home belongs to the trip it was bought on.
+   */
+  add(actorId: string, input: ExpenseToAdd): Promise<{ expense: Expense; created: boolean }>
   /**
    * Every expense of one trip, and deliberately without a limit — the one exception to the
    * rule that a listing takes one. A trip is a single visit to a single shop, the screen
@@ -103,7 +115,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           const [row] = await tx
             .insert(expenses)
             .values({
-              id: randomUUID(),
+              id: input.id,
               tripId: input.tripId,
               itemId: input.itemId,
               qtyMilli: quantity.milli,
@@ -111,8 +123,26 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
               amountMinor: amount.minor,
               amountCurrency: amount.currency,
             })
+            .onConflictDoNothing({ target: expenses.id })
             .returning()
-          return toExpense(theRow(row, 'expenses'))
+          if (row) return { expense: toExpense(row), created: true }
+
+          // Nothing was written, so the identifier is taken. Read back under the owner's trip
+          // rather than by the identifier alone: `DO NOTHING` says only that *some* row holds
+          // it, and returning that row as ours would hand out a stranger's purchase.
+          const [existing] = await tx
+            .select()
+            .from(expenses)
+            .where(
+              and(
+                eq(expenses.id, input.id),
+                eq(expenses.tripId, input.tripId),
+                eq(expenses.itemId, input.itemId),
+              ),
+            )
+            .limit(1)
+          if (!existing) throw new DomainError(ERROR.CONFLICT)
+          return { expense: toExpense(existing), created: false }
         }),
       )
     },

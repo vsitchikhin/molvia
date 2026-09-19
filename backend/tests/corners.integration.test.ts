@@ -32,10 +32,17 @@ describe('вторая цена за ту же пару', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
 
-    await expenses.add(actorId, { tripId: trip.id, itemId, quantity: litre, amount: drams })
     await expenses.add(actorId, {
+      id: randomUUID(),
+      tripId: trip.id,
+      itemId,
+      quantity: litre,
+      amount: drams,
+    })
+    await expenses.add(actorId, {
+      id: randomUUID(),
       tripId: trip.id,
       itemId,
       quantity: litre,
@@ -52,10 +59,11 @@ describe('третья валюта внутри похода', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
 
-    await expenses.add(actorId, { tripId: trip.id, itemId, amount: drams })
+    await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId, amount: drams })
     await expenses.add(actorId, {
+      id: randomUUID(),
       tripId: trip.id,
       itemId,
       amount: { minor: 50_000n, currency: 'RUB' },
@@ -98,18 +106,18 @@ describe('ссылка в никуда', () => {
   it('поход в несуществующем месте — NOT_FOUND, а не пятисотка', async () => {
     const actorId = await insertActor(db)
 
-    await expect(trips.start(actorId, { placeId: randomUUID() }, 'AMD', null)).rejects.toThrow(
-      DomainError,
-    )
+    await expect(
+      trips.start(actorId, { id: randomUUID(), placeId: randomUUID() }, 'AMD', null),
+    ).rejects.toThrow(DomainError)
   })
 
   it('трата в несуществующий поход — то же самое', async () => {
     const actorId = await insertActor(db)
     const itemId = await insertItem(db)
 
-    await expect(expenses.add(actorId, { tripId: randomUUID(), itemId })).rejects.toThrow(
-      DomainError,
-    )
+    await expect(
+      expenses.add(actorId, { id: randomUUID(), tripId: randomUUID(), itemId }),
+    ).rejects.toThrow(DomainError)
   })
 })
 

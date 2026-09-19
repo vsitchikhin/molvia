@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { unitPrice } from '@molvia/model'
 import type { Money, Quantity } from '@molvia/model'
@@ -41,19 +42,28 @@ describe('пустые выборки', () => {
 
 describe('порядок и предел', () => {
   it('незавершённым считается самый свежий, а завершённые не в счёт', async () => {
+    // Два открытых похода сразу `start` не допускает (MOL-21), но строки, записанные мимо него,
+    // — фикстура, восстановление — могут их держать, и текущим тогда должен быть новый.
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
 
-    const older = await trips.start(actorId, { placeId }, 'AMD', null)
-    const newer = await trips.start(actorId, { placeId }, 'AMD', null)
-    expect((await trips.latestUnfinishedFor(actorId))?.id).toBe(newer.id)
+    const older = await insertTrip(db, {
+      actorId,
+      placeId,
+      startedAt: new Date('2026-09-10T10:00:00Z'),
+    })
+    const newer = await insertTrip(db, {
+      actorId,
+      placeId,
+      startedAt: new Date('2026-09-10T18:00:00Z'),
+    })
+    expect((await trips.latestUnfinishedFor(actorId))?.id).toBe(newer)
 
-    // Без момента: этому тесту важен факт завершения, а не его время, и `new Date()` здесь
-    // нёс ту же ловушку — поход, завершённый в миллисекунду своего старта, база отвергает.
-    await trips.finish(newer.id, actorId)
-    expect((await trips.latestUnfinishedFor(actorId))?.id).toBe(older.id)
+    // Без момента: этому тесту важен факт завершения, а не его время.
+    await trips.finish(newer, actorId)
+    expect((await trips.latestUnfinishedFor(actorId))?.id).toBe(older)
 
-    await trips.finish(older.id, actorId)
+    await trips.finish(older, actorId)
     expect(await trips.latestUnfinishedFor(actorId)).toBeNull()
   })
 
@@ -61,7 +71,9 @@ describe('порядок и предел', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     for (let index = 0; index < 3; index += 1) {
-      await trips.start(actorId, { placeId }, 'AMD', null)
+      // Открытым поход бывает один (MOL-21), поэтому каждый завершается сразу.
+      const { trip } = await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)
+      await trips.finish(trip.id, actorId)
     }
 
     expect(await trips.listFor(actorId, 0)).toHaveLength(0)
@@ -118,8 +130,8 @@ describe('куплено, но не оценено', () => {
     const stranger = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
-    await expenses.add(actorId, { tripId: trip.id, itemId })
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
+    await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId })
 
     await verdicts.put(stranger, { itemId, score: 5 })
     expect(await expenses.unratedFor(actorId, 10)).toHaveLength(1)
@@ -133,8 +145,8 @@ describe('куплено, но не оценено', () => {
     const cafe = await insertPlace(db, { kind: 'venue', name: 'Кафе один' })
     const other = await insertPlace(db, { kind: 'venue', name: 'Кафе два' })
     const itemId = await insertItem(db, { kind: 'dish', name: 'Карбонара', searchKey: 'karbonara' })
-    const trip = await trips.start(actorId, { placeId: cafe }, 'AMD', null)
-    await expenses.add(actorId, { tripId: trip.id, itemId })
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId: cafe }, 'AMD', null)).trip
+    await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId })
 
     await verdicts.put(actorId, { itemId, placeId: other, score: 5 })
     expect(await expenses.unratedFor(actorId, 10)).toHaveLength(1)
@@ -149,8 +161,14 @@ describe('где дешевле', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
-    await expenses.add(actorId, { tripId: trip.id, itemId, quantity: litre, amount: price })
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
+    await expenses.add(actorId, {
+      id: randomUUID(),
+      tripId: trip.id,
+      itemId,
+      quantity: litre,
+      amount: price,
+    })
 
     const [row] = await expenses.cheapestFor(actorId, [itemId])
     expect(row?.scaledMinor).toBe(unitPrice(price, litre).scaledMinor)
@@ -160,12 +178,25 @@ describe('где дешевле', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
 
     const cheaper: Money = { minor: 49_000n, currency: 'AMD' }
-    await expenses.add(actorId, { tripId: trip.id, itemId, quantity: litre, amount: price })
-    await expenses.add(actorId, { tripId: trip.id, itemId, quantity: litre, amount: cheaper })
     await expenses.add(actorId, {
+      id: randomUUID(),
+      tripId: trip.id,
+      itemId,
+      quantity: litre,
+      amount: price,
+    })
+    await expenses.add(actorId, {
+      id: randomUUID(),
+      tripId: trip.id,
+      itemId,
+      quantity: litre,
+      amount: cheaper,
+    })
+    await expenses.add(actorId, {
+      id: randomUUID(),
       tripId: trip.id,
       itemId,
       quantity: litre,
@@ -184,10 +215,11 @@ describe('где дешевле', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
 
     for (const currency of ['USD', 'AMD', 'EUR', 'RUB'] as const) {
       await expenses.add(actorId, {
+        id: randomUUID(),
         tripId: trip.id,
         itemId,
         quantity: litre,
@@ -207,11 +239,11 @@ describe('где дешевле', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    const trip = await trips.start(actorId, { placeId }, 'AMD', null)
+    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
 
-    await expenses.add(actorId, { tripId: trip.id, itemId })
-    await expenses.add(actorId, { tripId: trip.id, itemId, amount: price })
-    await expenses.add(actorId, { tripId: trip.id, itemId, quantity: litre })
+    await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId })
+    await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId, amount: price })
+    await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId, quantity: litre })
 
     expect(await expenses.cheapestFor(actorId, [itemId])).toEqual([])
   })

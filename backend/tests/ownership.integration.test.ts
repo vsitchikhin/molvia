@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { DomainError } from '@molvia/model'
 import type { Money, Quantity } from '@molvia/model'
@@ -39,7 +40,7 @@ async function scene() {
   const stranger = await insertActor(db)
   const placeId = await insertPlace(db)
   const itemId = await insertItem(db)
-  const trip = await trips.start(owner, { placeId }, 'AMD', null)
+  const trip = (await trips.start(owner, { id: randomUUID(), placeId }, 'AMD', null)).trip
   return { owner, stranger, placeId, itemId, trip }
 }
 
@@ -69,19 +70,22 @@ describe('трата', () => {
     const { trip, itemId, stranger, owner } = await scene()
 
     await expect(
-      expenses.add(stranger, { tripId: trip.id, itemId, amount: price }),
+      expenses.add(stranger, { id: randomUUID(), tripId: trip.id, itemId, amount: price }),
     ).rejects.toThrow(DomainError)
     expect(await expenses.forTrip(trip.id, owner)).toEqual([])
   })
 
   it('чужая не видна, не правится и не удаляется', async () => {
     const { trip, itemId, owner, stranger } = await scene()
-    const added = await expenses.add(owner, {
-      tripId: trip.id,
-      itemId,
-      quantity: litre,
-      amount: price,
-    })
+    const added = (
+      await expenses.add(owner, {
+        id: randomUUID(),
+        tripId: trip.id,
+        itemId,
+        quantity: litre,
+        amount: price,
+      })
+    ).expense
 
     expect(await expenses.forTrip(trip.id, stranger)).toEqual([])
     expect(await expenses.update(added.id, stranger, { amount: null })).toBeNull()
@@ -93,7 +97,13 @@ describe('трата', () => {
 
   it('чужая не попадает ни в «не оценено», ни в цены', async () => {
     const { trip, itemId, owner, stranger } = await scene()
-    await expenses.add(owner, { tripId: trip.id, itemId, quantity: litre, amount: price })
+    await expenses.add(owner, {
+      id: randomUUID(),
+      tripId: trip.id,
+      itemId,
+      quantity: litre,
+      amount: price,
+    })
 
     expect(await expenses.unratedFor(stranger, 10)).toEqual([])
     expect(await expenses.cheapestFor(stranger, [itemId])).toEqual([])
