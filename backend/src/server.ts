@@ -13,6 +13,7 @@ import { getActor } from '@/usecases/get-actor'
 import { proposeItem } from '@/usecases/propose-item'
 import { rateItem } from '@/usecases/rate-item'
 import { amendVerdict } from '@/usecases/amend-verdict'
+import { withdrawVerdict } from '@/usecases/withdraw-verdict'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { createActorRepository } from '@/db/actors-repository'
 import { createEventRepository } from '@/db/events-repository'
@@ -126,6 +127,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       verdictRoutes(guarded, {
         rate: (actorId, itemId, rating) => rateItem({ items, verdicts }, actorId, itemId, rating),
         amend: (actorId, itemId, patch) => amendVerdict(verdicts, actorId, itemId, patch),
+        withdraw: (actorId, itemId) => withdrawVerdict(verdicts, actorId, itemId),
       })
       guardedDone()
     })

@@ -25,6 +25,11 @@ export interface VerdictRepository {
    * someone else's, answered alike.
    */
   amend(actorId: string, itemId: string, patch: VerdictPatch): Promise<Verdict | null>
+  /**
+   * Takes the person's verdict on a product back. The row stays, for the 0.2 gate only
+   * (schema, `deleted_at`); the text goes. `false` when there was nothing of theirs to take.
+   */
+  withdraw(actorId: string, itemId: string): Promise<boolean>
   forItem(actorId: string, itemId: string, placeId: string | null): Promise<Verdict | null>
   /**
    * Everything this person has rated. «Что брать» groups these into three by `verdictLevel`
@@ -178,6 +183,27 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         )
         .returning()
       return row ? toVerdict(row) : null
+    },
+
+    async withdraw(actorId, itemId) {
+      if (idOrNull(actorId) === null || idOrNull(itemId) === null) return false
+
+      const withdrawn = await db
+        .update(verdicts)
+        // The text is erased with the withdrawal: whoever deletes a review expects it gone,
+        // and the gate needs only that the row existed and when. A CHECK holds the pair.
+        .set({ deletedAt: sql`clock_timestamp()`, review: null })
+        .where(
+          and(
+            eq(verdicts.actorId, actorId),
+            eq(verdicts.itemId, itemId),
+            isNull(verdicts.placeId),
+            // A second withdrawal finds nothing: the first one's time is the one that stands.
+            isNull(verdicts.deletedAt),
+          ),
+        )
+        .returning({ id: verdicts.id })
+      return withdrawn.length > 0
     },
 
     async forItem(actorId, itemId, placeId) {

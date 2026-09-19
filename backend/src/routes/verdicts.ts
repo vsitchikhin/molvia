@@ -18,6 +18,7 @@ export interface VerdictApi {
     rating: Rating,
   ): Promise<{ verdict: Verdict; created: boolean }>
   amend(actorId: string, itemId: string, patch: VerdictAmendment): Promise<Verdict>
+  withdraw(actorId: string, itemId: string): Promise<void>
 }
 
 /** `no-store`: a verdict is personal, and the owner travels in a header. */
@@ -51,5 +52,13 @@ export function verdictRoutes(app: FastifyInstance, api: VerdictApi): void {
     const patch = parseBody(verdictAmendmentSchema, request.body)
 
     return answer(reply, await api.amend(request.actorId, itemId, patch))
+  })
+
+  /** «Снять оценку»: 204, nothing to send back — the verdict is no longer there to show. */
+  app.delete('/verdicts/:itemId', async (request, reply) => {
+    const { itemId } = parseParams(verdictPathSchema, request.params)
+    await api.withdraw(request.actorId, itemId)
+
+    return reply.code(204).header('cache-control', 'no-store').send()
   })
 }
