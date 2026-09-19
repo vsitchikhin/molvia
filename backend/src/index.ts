@@ -1,6 +1,13 @@
 import process from 'node:process'
 import { env } from './env'
+import { getDb } from '@/db'
 import { migrateToLatest } from '@/db/migrate'
+import { createRateRepository } from '@/db/rates-repository'
+import { cbaFeed } from '@/rates/cba'
+import { cbrFeed } from '@/rates/cbr'
+import { erapiFeed } from '@/rates/erapi'
+import { startSchedule } from '@/rates/schedule'
+import { officialRatesRefresh } from '@/usecases/refresh-official-rates'
 import { buildServer } from './server'
 
 const app = buildServer()
@@ -12,6 +19,23 @@ try {
 } catch (error) {
   app.log.error(error, 'migrations failed')
   process.exit(1)
+}
+
+// After the migrations, so the first refresh finds its table. The trip never waits for it: it
+// reads the cache, and a cache still empty gives a trip without a rate (MOL-39, В-2).
+if (env.RATES_REFRESH === 'on') {
+  const stop = startSchedule(
+    officialRatesRefresh({
+      primary: cbaFeed(),
+      fallbacks: [cbrFeed(), erapiFeed()],
+      rates: createRateRepository(getDb()),
+      log: app.log,
+    }),
+  )
+  app.addHook('onClose', (_instance, done) => {
+    stop()
+    done()
+  })
 }
 
 // In a container the API must answer on the container network; in development it has no
