@@ -75,6 +75,15 @@
       "body": "Nothing found for «{query}». We will add it to the catalogue — tell us what the price tag calls it",
       "action": "Suggest an item"
     },
+    "not_listed": "Not here? Suggest an item",
+    "propose": {
+      "title": "New item",
+      "name": "As the price tag says",
+      "note": "What sets it apart on the shelf — optional",
+      "submit": "Add to the catalogue",
+      "offline": "Suggesting needs a connection",
+      "failed": "Could not add it. Please try again"
+    },
     "error": {
       "title": "The server did not answer",
       "body": "Catalogue search lives on the server, there is no local copy",

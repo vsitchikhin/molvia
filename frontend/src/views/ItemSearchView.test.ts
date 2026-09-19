@@ -6,7 +6,7 @@ import type { Pinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
-import type { CatalogueEntry } from '@molvia/model'
+import type { CatalogueEntry, ProposedItem } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
@@ -16,8 +16,13 @@ import { useRecentItemsStore } from '@/stores/recentItems'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 
 const searchCatalogue = vi.fn<(query: string) => Promise<CatalogueEntry[]>>()
+const proposeItem =
+  vi.fn<(input: ProposedItem) => Promise<{ entry: CatalogueEntry; created: boolean }>>()
 vi.mock('@/api', () => ({
-  api: { searchCatalogue: (query: string) => searchCatalogue(query) },
+  api: {
+    searchCatalogue: (query: string) => searchCatalogue(query),
+    proposeItem: (input: ProposedItem) => proposeItem(input),
+  },
 }))
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
@@ -92,6 +97,7 @@ beforeEach(() => {
   pinia = createPinia()
   setActivePinia(pinia)
   searchCatalogue.mockReset()
+  proposeItem.mockReset()
   online(true)
 })
 
@@ -156,7 +162,7 @@ describe('«What did you pick up?»', () => {
     await field(view).setValue('тан')
 
     await vi.waitFor(() => {
-      expect(view.get('.not-found').text()).toBe(en.item.empty.body.replace('{query}', 'тан'))
+      expect(view.get('.not-found-text').text()).toBe(en.item.empty.body.replace('{query}', 'тан'))
     })
     expect(view.find('[role="listbox"]').exists()).toBe(false)
   })
@@ -275,6 +281,65 @@ describe('«What did you pick up?»', () => {
       await view.get('[role="option"]').trigger('click')
 
       expect(useRecentItemsStore(pinia).items).toEqual([])
+    })
+  })
+
+  describe('«Suggest an item»', () => {
+    // The sheet takes no tap while it rises (MOL-18): its clock is held by the test and moved
+    // past that moment, and a few real milliseconds pass so Vue does not drop the tap.
+    async function sheetRisen(): Promise<void> {
+      vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+
+    it('is offered when nothing was found, and what it adds is picked with the query', async () => {
+      const tan = entry(9, 'Тан')
+      searchCatalogue.mockResolvedValue([])
+      proposeItem.mockResolvedValue({ entry: tan, created: true })
+      vi.spyOn(performance, 'now').mockReturnValue(0)
+      const view = await render()
+      await field(view).setValue('тан')
+      await vi.waitFor(() => {
+        expect(view.find('.not-found').exists()).toBe(true)
+      })
+
+      await button(view, en.item.empty.action).trigger('click')
+      await sheetRisen()
+      const name = view.get<HTMLInputElement>('dialog input[type="text"]')
+      expect(name.element.value).toBe('тан')
+      const litre = view
+        .findAll('dialog label')
+        .find((label) => label.text() === en.item.unit_l)
+        ?.find('input')
+      await litre?.setValue(true)
+      await button(view, en.item.propose.submit).trigger('click')
+
+      await vi.waitFor(() => {
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: tan, query: 'тан' })
+      })
+    })
+
+    it('is a quiet line under an answer that has rows — the answer may still not be the thing', async () => {
+      searchCatalogue.mockResolvedValue([milk])
+      const view = await render()
+      await field(view).setValue('сметана')
+      await vi.waitFor(() => {
+        expect(names(view)).toHaveLength(1)
+      })
+
+      const line = button(view, en.item.not_listed)
+      expect(view.html().indexOf(en.item.not_listed)).toBeGreaterThan(
+        view.html().indexOf('role="listbox"'),
+      )
+      expect(line.classes().join(' ')).toContain('ghost')
+    })
+
+    it('is not offered under the recent items: they are not an answer to anything', async () => {
+      remembered(bread)
+      const view = await render()
+
+      expect(view.text()).not.toContain(en.item.not_listed)
+      expect(view.text()).not.toContain(en.item.empty.action)
     })
   })
 })

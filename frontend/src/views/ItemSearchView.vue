@@ -17,6 +17,10 @@
 
         <div v-else-if="phase === 'empty'" class="not-found" :class="{ stale }">
           <p class="not-found-text">{{ t('item.empty.body', { query: answered }) }}</p>
+          <AppButton @click="proposing = true">
+            <template #icon><IconPlus /></template>
+            {{ t('item.empty.action') }}
+          </AppButton>
         </div>
 
         <ScreenState
@@ -43,7 +47,18 @@
           :body="t('item.offline.body')"
         />
       </template>
+
+      <!-- The answer is not empty, and still not the thing: «сметана» finds the crisps «со
+           сметаной», and without this the sour cream could never be added (В-3). Quiet, so it
+           does not invite a duplicate of what is listed right above it. -->
+      <template v-if="phase === 'ready'" #after>
+        <AppButton variant="ghost" block @click="proposing = true">
+          {{ t('item.not_listed') }}
+        </AppButton>
+      </template>
     </CatalogueCombobox>
+
+    <ProposeItemSheet v-model:open="proposing" :query="query" @proposed="proposed" />
   </AppScreen>
 </template>
 
@@ -51,9 +66,11 @@
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { CatalogueEntry } from '@molvia/model'
+import IconPlus from '~icons/mdi/plus'
 import AppButton from '@/components/AppButton.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CatalogueCombobox from '@/components/CatalogueCombobox.vue'
+import ProposeItemSheet from '@/components/ProposeItemSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -75,7 +92,15 @@ import { useRecentItemsStore } from '@/stores/recentItems'
  */
 export default defineComponent({
   name: 'ItemSearchView',
-  components: { AppButton, AppScreen, CatalogueCombobox, ScreenSkeleton, ScreenState },
+  components: {
+    AppButton,
+    AppScreen,
+    CatalogueCombobox,
+    IconPlus,
+    ProposeItemSheet,
+    ScreenSkeleton,
+    ScreenState,
+  },
   setup() {
     const { t } = useI18n()
     const query = ref('')
@@ -120,11 +145,34 @@ export default defineComponent({
       entry.pick({ entry: picked, query: query.value })
     }
 
+    /** «Предложить товар» — the whole form, the only way the catalogue grows in 0.1. */
+    const proposing = ref(false)
+
+    // Picked like any other, with the query it was looked for by: the next search for it then
+    // puts it first (MOL-11). New or already there — the same, the item is the catalogue's.
+    function proposed(added: CatalogueEntry): void {
+      proposing.value = false
+      pick(added)
+    }
+
     onMounted(() => {
       recent.sync()
     })
 
-    return { t, query, phase, stale, answered, retry, fallback, rows, heading, pick }
+    return {
+      t,
+      query,
+      phase,
+      stale,
+      answered,
+      retry,
+      fallback,
+      rows,
+      heading,
+      pick,
+      proposing,
+      proposed,
+    }
   },
 })
 </script>
