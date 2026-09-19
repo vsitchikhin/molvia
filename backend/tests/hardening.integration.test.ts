@@ -174,8 +174,8 @@ describe('негодный идентификатор', () => {
   it('на правке и удалении — тем же, чем чужое', async () => {
     const actorId = await insertActor(db)
 
-    expect(await expenses.update('не-uuid', actorId, { amount: null })).toBeNull()
-    expect(await expenses.remove('не-uuid', actorId)).toBe(false)
+    expect(await expenses.update('не-uuid', randomUUID(), actorId, { amount: null })).toBeNull()
+    expect(await expenses.remove('не-uuid', randomUUID(), actorId)).toBe(false)
     expect(await trips.finish('не-uuid', actorId, new Date())).toBeNull()
     expect(await actors.update('не-uuid', { city: 'Ереван' })).toBeNull()
   })
@@ -241,7 +241,9 @@ describe('пустой патч называет себя', () => {
       await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId, amount: price })
     ).expense
 
-    await expect(expenses.update(added.id, actorId, {})).rejects.toThrow(/patch with no fields/)
+    await expect(expenses.update(added.id, added.tripId, actorId, {})).rejects.toThrow(
+      /patch with no fields/,
+    )
     await expect(actors.update(actorId, {})).rejects.toThrow(/patch with no fields/)
   })
 })

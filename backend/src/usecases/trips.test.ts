@@ -83,6 +83,7 @@ function fakeRepositories(
     trips: {
       start: unexpected('trips.start'),
       byId: unexpected('trips.byId'),
+      lock: unexpected('trips.lock'),
       latestUnfinishedFor: unexpected('trips.latestUnfinishedFor'),
       listFor: unexpected('trips.listFor'),
       finish: unexpected('trips.finish'),
@@ -145,6 +146,7 @@ describe('startTrip', () => {
         },
       },
       trips: {
+        byId: () => Promise.resolve(null),
         start: (...args) => {
           started.push(args)
           return Promise.resolve({ trip, created: true })
@@ -168,7 +170,10 @@ describe('startTrip', () => {
     const repositories = fakeRepositories({
       ...viewReads,
       places: { ...viewReads.places, ensure: () => Promise.resolve(place) },
-      trips: { start: () => Promise.resolve({ trip, created: false }) },
+      trips: {
+        byId: () => Promise.resolve(null),
+        start: () => Promise.resolve({ trip, created: false }),
+      },
     })
 
     const { created } = await startTrip(transactWith(repositories), actor, {
@@ -181,7 +186,10 @@ describe('startTrip', () => {
   it('lets TRIP_OPEN through untouched — the choice is the person’s', async () => {
     const repositories = fakeRepositories({
       places: { ensure: () => Promise.resolve(place) },
-      trips: { start: () => Promise.reject(new DomainError(ERROR.TRIP_OPEN)) },
+      trips: {
+        byId: () => Promise.resolve(null),
+        start: () => Promise.reject(new DomainError(ERROR.TRIP_OPEN)),
+      },
     })
 
     await expect(
@@ -197,7 +205,10 @@ describe('startTrip', () => {
     const repositories = fakeRepositories({
       ...viewReads,
       places: { ...viewReads.places, ensure: () => Promise.resolve(place) },
-      trips: { start: () => Promise.resolve({ trip, created: true }) },
+      trips: {
+        byId: () => Promise.resolve(null),
+        start: () => Promise.resolve({ trip, created: true }),
+      },
     })
     const counting: Transact = (work) => {
       transactions += 1
@@ -206,6 +217,24 @@ describe('startTrip', () => {
 
     await startTrip(counting, actor, { id: TRIP, place: { kind: 'store', name: 'Ереван Сити' } })
     expect(transactions).toBe(1)
+  })
+})
+
+describe('startTrip: a repeat', () => {
+  it('С-4: the same identifier again is answered before any place is named', async () => {
+    // `ensure` and `start` are not in the fakes: reaching either would fail the test.
+    const repositories = fakeRepositories({
+      ...viewReads,
+      trips: { byId: () => Promise.resolve(trip) },
+    })
+
+    const { trip: view, created } = await startTrip(transactWith(repositories), actor, {
+      id: TRIP,
+      place: { kind: 'store', name: 'Другое имя' },
+    })
+
+    expect(created).toBe(false)
+    expect(view.place.name).toBe('Ереван Сити')
   })
 })
 
@@ -278,7 +307,7 @@ describe('addExpense', () => {
   function adding(created: boolean, picks: unknown[][]) {
     return fakeRepositories({
       ...viewReads,
-      trips: { byId: () => Promise.resolve(trip) },
+      trips: { lock: () => Promise.resolve(trip) },
       expenses: {
         ...viewReads.expenses,
         add: () => Promise.resolve({ expense: milkBought, created }),
@@ -329,7 +358,7 @@ describe('addExpense', () => {
     const added: unknown[] = []
     const repositories = fakeRepositories({
       ...viewReads,
-      trips: { byId: () => Promise.resolve(trip) },
+      trips: { lock: () => Promise.resolve(trip) },
       expenses: {
         ...viewReads.expenses,
         add: (_actorId, input) => {
@@ -350,7 +379,7 @@ describe('addExpense', () => {
   })
 
   it('a stranger’s trip and a missing one answer NOT_FOUND, and nothing is written', async () => {
-    const repositories = fakeRepositories({ trips: { byId: () => Promise.resolve(null) } })
+    const repositories = fakeRepositories({ trips: { lock: () => Promise.resolve(null) } })
 
     await expect(
       addExpense(transactWith(repositories), ACTOR, TRIP, { id: EXPENSE, itemId: milk.id }),
@@ -359,63 +388,66 @@ describe('addExpense', () => {
 })
 
 describe('updateExpense and removeExpense', () => {
-  const OTHER_TRIP_ROW = 'dd11bb22-cc33-4d44-8e55-ff6677889900'
+  const ELSEWHERE = 'dd11bb22-cc33-4d44-8e55-ff6677889900'
 
-  it('a row of the person’s other trip, named under this one, is NOT_FOUND and untouched', async () => {
-    // `update` and `remove` are not in the fakes: reaching either would fail the test.
+  it('locks the trip before touching its rows, and names the row with its trip', async () => {
+    const order: string[] = []
     const repositories = fakeRepositories({
       ...viewReads,
-      trips: { byId: () => Promise.resolve(trip) },
-    })
-
-    await expect(
-      updateExpense(transactWith(repositories), ACTOR, TRIP, OTHER_TRIP_ROW, {
-        amount: { minor: 1n, currency: 'AMD' },
-      }),
-    ).rejects.toThrow(ERROR.NOT_FOUND)
-    await expect(
-      removeExpense(transactWith(repositories), ACTOR, TRIP, OTHER_TRIP_ROW),
-    ).rejects.toThrow(ERROR.NOT_FOUND)
-  })
-
-  it('updates the row and answers the trip again, total and all', async () => {
-    const patches: unknown[][] = []
-    const repositories = fakeRepositories({
-      ...viewReads,
-      trips: { byId: () => Promise.resolve(trip) },
+      trips: {
+        lock: () => {
+          order.push('lock')
+          return Promise.resolve(trip)
+        },
+      },
       expenses: {
         ...viewReads.expenses,
         update: (...args) => {
-          patches.push(args)
+          order.push(`update ${JSON.stringify(args.slice(0, 3))}`)
           return Promise.resolve(milkBought)
         },
       },
     })
 
-    const view = await updateExpense(transactWith(repositories), ACTOR, TRIP, milkBought.id, {
-      amount: null,
+    await updateExpense(transactWith(repositories), ACTOR, TRIP, milkBought.id, { amount: null })
+    expect(order).toEqual(['lock', `update ${JSON.stringify([milkBought.id, TRIP, ACTOR])}`])
+  })
+
+  it('a price saved into a row that is not there is NOT_FOUND, not «saved»', async () => {
+    const repositories = fakeRepositories({
+      ...viewReads,
+      trips: { lock: () => Promise.resolve(trip) },
+      expenses: { ...viewReads.expenses, update: () => Promise.resolve(null) },
     })
 
-    expect(patches).toEqual([[milkBought.id, ACTOR, { amount: null }]])
+    await expect(
+      updateExpense(transactWith(repositories), ACTOR, TRIP, ELSEWHERE, {
+        amount: { minor: 1n, currency: 'AMD' },
+      }),
+    ).rejects.toThrow(ERROR.NOT_FOUND)
+  })
+
+  it('С-8: removing a row already gone answers the trip as it is — safe to repeat', async () => {
+    const repositories = fakeRepositories({
+      ...viewReads,
+      trips: { lock: () => Promise.resolve(trip) },
+      expenses: { ...viewReads.expenses, remove: () => Promise.resolve(false) },
+    })
+
+    const view = await removeExpense(transactWith(repositories), ACTOR, TRIP, ELSEWHERE)
     expect(view.id).toBe(TRIP)
   })
 
-  it('removes the row and answers the trip again', async () => {
-    const removed: unknown[][] = []
-    const repositories = fakeRepositories({
-      ...viewReads,
-      trips: { byId: () => Promise.resolve(trip) },
-      expenses: {
-        ...viewReads.expenses,
-        remove: (...args) => {
-          removed.push(args)
-          return Promise.resolve(true)
-        },
-      },
-    })
+  it('a stranger’s or a missing trip is NOT_FOUND, for the change and the delete alike', async () => {
+    // `update` and `remove` are not in the fakes: reaching either would fail the test.
+    const repositories = fakeRepositories({ trips: { lock: () => Promise.resolve(null) } })
 
-    await removeExpense(transactWith(repositories), ACTOR, TRIP, milkBought.id)
-    expect(removed).toEqual([[milkBought.id, ACTOR]])
+    await expect(
+      updateExpense(transactWith(repositories), ACTOR, TRIP, milkBought.id, { amount: null }),
+    ).rejects.toThrow(ERROR.NOT_FOUND)
+    await expect(
+      removeExpense(transactWith(repositories), ACTOR, TRIP, milkBought.id),
+    ).rejects.toThrow(ERROR.NOT_FOUND)
   })
 })
 

@@ -30,8 +30,15 @@ export interface ExpenseRepository {
    * computed from the same rows.
    */
   forTrip(tripId: string, actorId: string): Promise<Expense[]>
-  update(id: string, actorId: string, patch: ExpensePatch): Promise<Expense | null>
-  remove(id: string, actorId: string): Promise<boolean>
+  /**
+   * The expense is named with its trip, and both are conditions of the statement: a row of the
+   * person's other trip, named under this one, is not found rather than changed — and the
+   * identifiers are compared by Postgres as uuids, so an upper-case one a device sent is the same
+   * row (MOL-21, adversarial В). `null` when no row matched.
+   */
+  update(id: string, tripId: string, actorId: string, patch: ExpensePatch): Promise<Expense | null>
+  /** `false` when no row matched — gone already, someone else's, or of another trip. */
+  remove(id: string, tripId: string, actorId: string): Promise<boolean>
   /** Bought but not yet rated — by this person, since a stranger's verdict is not an opinion. */
   unratedFor(actorId: string, limit: number): Promise<Expense[]>
   /**
@@ -165,8 +172,10 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
       return rows.map(toExpense)
     },
 
-    async update(id, actorId, patch) {
-      if (idOrNull(id) === null || idOrNull(actorId) === null) return null
+    async update(id, tripId, actorId, patch) {
+      if (idOrNull(id) === null || idOrNull(tripId) === null || idOrNull(actorId) === null) {
+        return null
+      }
 
       // `undefined` means «not mentioned» and `null` means «cleared», and the two must not
       // collapse: the sheet leaves a price empty as often as it fills one in.
@@ -193,17 +202,19 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
       const [row] = await db
         .update(expenses)
         .set(set)
-        .where(and(eq(expenses.id, id), ownedByActor(actorId)))
+        .where(and(eq(expenses.id, id), eq(expenses.tripId, tripId), ownedByActor(actorId)))
         .returning()
       return row ? toExpense(row) : null
     },
 
-    async remove(id, actorId) {
-      if (idOrNull(id) === null || idOrNull(actorId) === null) return false
+    async remove(id, tripId, actorId) {
+      if (idOrNull(id) === null || idOrNull(tripId) === null || idOrNull(actorId) === null) {
+        return false
+      }
 
       const removed = await db
         .delete(expenses)
-        .where(and(eq(expenses.id, id), ownedByActor(actorId)))
+        .where(and(eq(expenses.id, id), eq(expenses.tripId, tripId), ownedByActor(actorId)))
         .returning({ id: expenses.id })
       return removed.length > 0
     },

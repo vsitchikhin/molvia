@@ -283,7 +283,9 @@ describe('походы и траты', () => {
     // Разобранный патч пустым не бывает — expensePatchSchema его отвергает, — поэтому
     // пустой здесь означает, что вызывающий обошёл домен. Это дефект сервера (Р-11), но
     // он обязан называть себя, а не отвечать «No values to set» из недр drizzle.
-    await expect(expenses.update(added.id, actorId, {})).rejects.toThrow(/patch with no fields/)
+    await expect(expenses.update(added.id, added.tripId, actorId, {})).rejects.toThrow(
+      /patch with no fields/,
+    )
 
     // И трата при этом не тронута.
     expect((await expenses.forTrip(trip.id, actorId))[0]?.amount).toEqual(price)
@@ -304,11 +306,11 @@ describe('походы и траты', () => {
       })
     ).expense
 
-    const updated = await expenses.update(added.id, actorId, { amount: null })
+    const updated = await expenses.update(added.id, added.tripId, actorId, { amount: null })
     expect(updated?.amount).toBeNull()
     expect(updated?.quantity).toEqual(litre)
 
-    expect(await expenses.remove(added.id, actorId)).toBe(true)
+    expect(await expenses.remove(added.id, added.tripId, actorId)).toBe(true)
     expect(await expenses.forTrip(trip.id, actorId)).toEqual([])
   })
 })

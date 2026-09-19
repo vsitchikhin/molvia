@@ -357,7 +357,7 @@ describe('чужое отвечает как несуществующее (IDOR)
     expect((await current(owner))?.finishedAt).toBeNull()
   })
 
-  it('чужой expenseId в своём походе — 404, чужая трата не тронута', async () => {
+  it('чужой expenseId в своём походе: правка 404, удаление 200 — чужая трата не тронута', async () => {
     const owner = await insertActor(db)
     const stranger = await insertActor(db)
     const milk = await item('Молоко «Ашхар»')
@@ -371,7 +371,10 @@ describe('чужое отвечает как несуществующее (IDOR)
     })
     const removed = await call('DELETE', `/trips/${myTrip}/expenses/${String(theirs)}`, owner)
 
-    expect([patched.status, removed.status]).toEqual([404, 404])
+    // Правка — 404: цену некуда записать. Удаление — 200 и свой поход как есть (С-8): в своём
+    // походе такой строки нет, то есть она «уже удалена»; чужую строку это не трогает.
+    expect([patched.status, removed.status]).toEqual([404, 200])
+    expect(trip(removed).id).toBe(myTrip)
     expect((await current(stranger))?.total).toEqual([{ minor: 57_000n, currency: 'AMD' }])
   })
 

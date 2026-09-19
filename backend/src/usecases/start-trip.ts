@@ -25,6 +25,11 @@ export async function startTrip(
   body: StartTripBody,
 ): Promise<Started> {
   return transact(async (repositories) => {
+    // A repeat is answered before the place is looked at: the same identifier sent again with
+    // another name would otherwise leave a shop behind that no trip is in (MOL-21, С-4).
+    const already = await repositories.trips.byId(body.id, actor.id)
+    if (already) return { trip: await tripViewFor(repositories, already), created: false }
+
     const place = await repositories.places.ensure({
       kind: body.place.kind,
       name: body.place.name,

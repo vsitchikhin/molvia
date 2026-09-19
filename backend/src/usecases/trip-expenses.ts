@@ -1,7 +1,7 @@
 import { DomainError, ERROR } from '@molvia/model'
 import type { AddExpenseBody, ExpensePatch, Trip, TripView } from '@molvia/model'
 import type { TripRepository } from '@/db/trips-repository'
-import type { Transact, TripRepositories } from '@/db/unit-of-work'
+import type { Transact } from '@/db/unit-of-work'
 import { tripViewFor } from './trip-view'
 
 export interface Added {
@@ -10,27 +10,14 @@ export interface Added {
   readonly created: boolean
 }
 
-/** The owner's trip, or the same answer a stranger's and a missing one give. */
-async function ownTrip(trips: TripRepository, tripId: string, actorId: string): Promise<Trip> {
-  const trip = await trips.byId(tripId, actorId)
-  if (!trip) throw new DomainError(ERROR.NOT_FOUND)
-  return trip
-}
-
 /**
- * The expense has to be of this trip, not merely of this owner: the repository checks the
- * owner, and a row of the person's other trip named under this one would be changed while the
- * answer showed a trip it is not in.
+ * The owner's trip, locked for the rest of the transaction — or the answer a stranger's and a
+ * missing one give. Every write to a trip's rows goes through it, so they run one at a time per
+ * trip: the total each one checks includes the others (MOL-21, adversarial Б).
  */
-async function ownExpense(
-  repositories: TripRepositories,
-  tripId: string,
-  expenseId: string,
-  actorId: string,
-): Promise<Trip> {
-  const trip = await ownTrip(repositories.trips, tripId, actorId)
-  const rows = await repositories.expenses.forTrip(trip.id, actorId)
-  if (!rows.some((row) => row.id === expenseId)) throw new DomainError(ERROR.NOT_FOUND)
+async function lockedTrip(trips: TripRepository, tripId: string, actorId: string): Promise<Trip> {
+  const trip = await trips.lock(tripId, actorId)
+  if (!trip) throw new DomainError(ERROR.NOT_FOUND)
   return trip
 }
 
@@ -49,7 +36,7 @@ export async function addExpense(
   body: AddExpenseBody,
 ): Promise<Added> {
   return transact(async (repositories) => {
-    const trip = await ownTrip(repositories.trips, tripId, actorId)
+    const trip = await lockedTrip(repositories.trips, tripId, actorId)
     const { query, ...fields } = body
     const { created } = await repositories.expenses.add(actorId, { ...fields, tripId: trip.id })
     if (created && query !== undefined) {
@@ -59,7 +46,11 @@ export async function addExpense(
   })
 }
 
-/** «Добавить цену», «Сохранить» — the fields left for later, filled in or cleared. */
+/**
+ * «Добавить цену», «Сохранить» — the fields left for later, filled in or cleared. A row that is
+ * not in this trip — gone, of another trip, someone else's — is NOT_FOUND: a price saved into
+ * nothing must not answer «saved».
+ */
 export async function updateExpense(
   transact: Transact,
   actorId: string,
@@ -68,13 +59,21 @@ export async function updateExpense(
   patch: ExpensePatch,
 ): Promise<TripView> {
   return transact(async (repositories) => {
-    const trip = await ownExpense(repositories, tripId, expenseId, actorId)
-    await repositories.expenses.update(expenseId, actorId, patch)
+    const trip = await lockedTrip(repositories.trips, tripId, actorId)
+    const updated = await repositories.expenses.update(expenseId, trip.id, actorId, patch)
+    if (!updated) throw new DomainError(ERROR.NOT_FOUND)
     return tripViewFor(repositories, trip)
   })
 }
 
-/** «Удалить позицию» — the only delete there is; there is no swipe on a row. */
+/**
+ * «Удалить позицию» — the only delete there is; there is no swipe on a row.
+ *
+ * Safe to repeat (MOL-21, С-8): a row not in the person's own trip is gone already, and the
+ * answer is the trip as it is — the queue that sends it again after a lost reply meets the state
+ * it asked for, not an error. A stranger's or a missing trip is still NOT_FOUND, and a stranger's
+ * row is untouched: the owner and the trip are conditions of the delete.
+ */
 export async function removeExpense(
   transact: Transact,
   actorId: string,
@@ -82,8 +81,8 @@ export async function removeExpense(
   expenseId: string,
 ): Promise<TripView> {
   return transact(async (repositories) => {
-    const trip = await ownExpense(repositories, tripId, expenseId, actorId)
-    await repositories.expenses.remove(expenseId, actorId)
+    const trip = await lockedTrip(repositories.trips, tripId, actorId)
+    await repositories.expenses.remove(expenseId, trip.id, actorId)
     return tripViewFor(repositories, trip)
   })
 }

@@ -88,8 +88,8 @@ describe('трата', () => {
     ).expense
 
     expect(await expenses.forTrip(trip.id, stranger)).toEqual([])
-    expect(await expenses.update(added.id, stranger, { amount: null })).toBeNull()
-    expect(await expenses.remove(added.id, stranger)).toBe(false)
+    expect(await expenses.update(added.id, added.tripId, stranger, { amount: null })).toBeNull()
+    expect(await expenses.remove(added.id, added.tripId, stranger)).toBe(false)
 
     const untouched = await expenses.forTrip(trip.id, owner)
     expect(untouched[0]?.amount).toEqual(price)

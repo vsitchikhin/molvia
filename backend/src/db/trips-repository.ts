@@ -36,6 +36,14 @@ export interface TripRepository {
   ): Promise<{ trip: Trip; created: boolean }>
   byId(id: string, actorId: string): Promise<Trip | null>
   /**
+   * The trip, locked until the caller's transaction ends — `null` for a stranger's or a missing
+   * one. Every write to a trip's rows takes it first, so two of them run one after the other:
+   * each checks the total with the other's row in view (MOL-21, adversarial Б), and a change
+   * racing a delete meets the delete rather than a list read before it (adversarial Г).
+   * Outside a transaction the lock lasts one statement and holds nothing.
+   */
+  lock(id: string, actorId: string): Promise<Trip | null>
+  /**
    * The most recent trip that has not been finished. Several trips a day, yes; several open at
    * once, no — `start` refuses the second (MOL-21, В-4). Rows written around it can still hold
    * two, and then the newer one is current.
@@ -121,6 +129,13 @@ export function createTripRepository(db: Conn): TripRepository {
       if (idOrNull(id) === null || idOrNull(actorId) === null) return null
 
       const [row] = await db.select().from(trips).where(ownedBy(id, actorId)).limit(1)
+      return row ? toTrip(row) : null
+    },
+
+    async lock(id, actorId) {
+      if (idOrNull(id) === null || idOrNull(actorId) === null) return null
+
+      const [row] = await db.select().from(trips).where(ownedBy(id, actorId)).limit(1).for('update')
       return row ? toTrip(row) : null
     },
 
