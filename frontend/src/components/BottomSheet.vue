@@ -134,6 +134,13 @@ export default defineComponent({
     function show(): void {
       const element = dialog.value
       if (!element || shown.value) return
+      // Chrome skips on «back» an entry laid without a gesture, and «back» would then leave the
+      // screen along with the sheet (adversarial П-6). A sheet opens from a tap.
+      // Not every browser has it (Safari before 16.4), whatever the DOM types say.
+      const activation = (navigator as { userActivation?: UserActivation }).userActivation
+      if (import.meta.env.DEV && activation && !activation.isActive) {
+        console.warn('[BottomSheet] opened without a tap: «back» may skip its entry')
+      }
       shown.value = true
       element.showModal()
       settledAt = performance.now() + settleTime(element)

@@ -395,9 +395,10 @@ describe('BottomSheet', () => {
   })
 
   /** A sheet opened from a sheet — a shop picked over «add to trip». */
-  async function twoSheets() {
+  async function twoSheets(at = '/') {
     const router = createRouter({ history: createMemoryHistory(), routes })
     await router.push('/')
+    if (at !== '/') await router.push(at)
     const lower = ref(true)
     const upper = ref(false)
     const host = mount(
@@ -572,5 +573,19 @@ describe('BottomSheet', () => {
     })
     expect(host.find('dialog').exists()).toBe(false)
     host.unmount()
+  })
+
+  // `close(2)` counts the sheet and the screen under it; sheets are entries too, so from a sheet
+  // over a sheet it steps over both and leaves the screen (adversarial round 4).
+  it('close(2) from a sheet over a sheet leaves the screen', async () => {
+    const { router, host, state } = await twoSheets('/trip/add')
+    const go = vi.spyOn(router, 'go')
+    const upper = host.findAllComponents(BottomSheet)[1]
+    ;(upper?.vm as unknown as { close: (steps: number) => void }).close(2)
+    expect(go).toHaveBeenCalledExactlyOnceWith(-3)
+    expect(state()).toEqual({ lower: false, upper: false })
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.fullPath).toBe('/')
+    })
   })
 })

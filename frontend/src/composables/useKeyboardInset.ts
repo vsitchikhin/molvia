@@ -20,7 +20,10 @@ export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<bo
     const element = target.value
     const viewport = window.visualViewport
     if (!element || !viewport) return
-    const covered = window.innerHeight - viewport.height - viewport.offsetTop
+    // Pinched in, the visual viewport shrinks as it does under a keyboard; that is not a keyboard,
+    // and the sheet stays where it is (adversarial П-8).
+    const covered =
+      viewport.scale > 1 ? 0 : window.innerHeight - viewport.height - viewport.offsetTop
     element.style.setProperty('--keyboard-inset', `${String(Math.max(0, Math.round(covered)))}px`)
   }
 

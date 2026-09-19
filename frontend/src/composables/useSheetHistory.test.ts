@@ -116,4 +116,32 @@ describe('the sheet and the router', () => {
     await landsOn(router, '/verdicts')
     view.unmount()
   })
+
+  // A section opened cold — a link from the bot — has nothing of ours beneath it; `close(2)` there
+  // only puts the sheet away instead of leaving the app (adversarial П-7).
+  it('close(2) never steps out of the app', async () => {
+    const router = await fresh('/verdicts')
+    expect(router.options.history.state.back).toBeNull()
+    const open = ref(true)
+    const view = mount(
+      defineComponent(() => () => [
+        h(RouterView),
+        h(
+          BottomSheet,
+          { open: open.value, 'onUpdate:open': (next: boolean) => (open.value = next) },
+          { title: () => 'Milk' },
+        ),
+      ]),
+      {
+        attachTo: document.body,
+        global: { plugins: [router, createPinia(), createAppI18n('en')] },
+      },
+    )
+    await nextTick()
+    const go = vi.spyOn(router, 'go')
+    ;(view.findComponent(BottomSheet).vm as unknown as { close: (steps: number) => void }).close(2)
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+    await landsOn(router, '/verdicts')
+    view.unmount()
+  })
 })

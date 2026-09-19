@@ -62,6 +62,9 @@ export function useSheetHistory(onLeft: () => void): {
   const stack = stackOf(router)
   let holder: Holder | undefined
   let stopMoves: (() => void) | undefined
+  // Whether the screen under the sheet has an entry of the app beneath it: `null` for a section
+  // opened cold — a link from the bot — which is its own home.
+  let screenBelow: unknown
 
   function forget(): void {
     stopMoves?.()
@@ -83,6 +86,7 @@ export function useSheetHistory(onLeft: () => void): {
   function lay(): void {
     if (holder) return
     const at = router.currentRoute.value.fullPath
+    screenBelow = history.state.back
     history.push(at, { sheet: true })
     const own: Holder = {
       left: () => {
@@ -110,13 +114,24 @@ export function useSheetHistory(onLeft: () => void): {
     })
   }
 
-  /** Steps back off the entry; the pop that follows closes the sheet. */
+  /**
+   * Steps back off the entry; the pop that follows closes the sheet. `steps` counts this sheet
+   * and the screens under it: `close(2)` puts the sheet away and leaves the screen. Sheets are
+   * entries too, so the ones over this sheet — and, when the screen is left, the ones under it —
+   * are stepped over as well: `close(2)` from a sheet over a sheet leaves the screen, not just the
+   * two sheets (adversarial round 4).
+   *
+   * Never out of the app: a section opened cold has nothing of ours beneath it, and `close(2)`
+   * there only puts the sheet away (adversarial П-7).
+   */
   function leave(steps = 1): void {
     if (!holder) {
       onLeft()
       return
     }
-    stepBack(router, steps)
+    const over = stack.length - stack.indexOf(holder)
+    const screens = screenBelow === null ? 0 : steps - 1
+    stepBack(router, screens > 0 ? stack.length + screens : over)
   }
 
   // Gone with its entry still laid and no move to tell of it — the screen was taken out of the

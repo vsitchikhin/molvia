@@ -4,11 +4,12 @@ import { defineComponent, h, nextTick, ref } from 'vue'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
 
 /** A visual viewport the test moves by hand, the way a keyboard opening would. */
-function fakeViewport(height: number, offsetTop = 0) {
+function fakeViewport(height: number, offsetTop = 0, scale = 1) {
   const listeners = new Map<string, Set<() => void>>()
   const viewport = {
     height,
     offsetTop,
+    scale,
     addEventListener: vi.fn((type: string, listener: () => void) => {
       listeners.set(type, (listeners.get(type) ?? new Set()).add(listener))
     }),
@@ -101,5 +102,19 @@ describe('useKeyboardInset', () => {
     on.value = true
     await nextTick()
     expect(inset()).toBe('')
+  })
+
+  // Pinched in, the visual viewport shrinks as it does under a keyboard (adversarial П-8).
+  it('must not fire: a pinch-zoom is not a keyboard', async () => {
+    const viewport = fakeViewport(400, 100, 2)
+    const { on, inset } = host()
+    on.value = true
+    await nextTick()
+    expect(inset()).toBe('0px')
+    viewport.scale = 1
+    viewport.height = 500
+    viewport.offsetTop = 0
+    viewport.fire('resize')
+    expect(inset()).toBe('300px')
   })
 })
