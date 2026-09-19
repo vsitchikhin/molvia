@@ -1,0 +1,1 @@
+ALTER TABLE "official_rates" ADD COLUMN "jump" boolean DEFAULT false NOT NULL;

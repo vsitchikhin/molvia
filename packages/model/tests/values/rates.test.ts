@@ -9,6 +9,7 @@ import {
   decimalFromRate,
   exchangeRateSchema,
   isRateDay,
+  isRateJump,
   parseRate,
   pickOfficialRate,
   rateCodec,
@@ -16,7 +17,7 @@ import {
   yerevanDate,
   yerevanMidnight,
 } from '#model/values/rates'
-import type { AmdRate, RateProvider } from '#model/values/rates'
+import type { AmdRate, CachedRate, RateProvider } from '#model/values/rates'
 
 const asOf = new Date('2026-09-08T10:00:00Z')
 
@@ -133,7 +134,8 @@ const amd = (
   value: string,
   date = '2026-09-18',
   provider: RateProvider = 'cba',
-): AmdRate => ({ provider, currency, date, scaled: parseRate(value) })
+  jump = false,
+): CachedRate => ({ provider, currency, date, scaled: parseRate(value), jump })
 
 const cba18 = [amd('RUB', '4.3123'), amd('USD', '363.44'), amd('EUR', '417.05')]
 
@@ -241,6 +243,8 @@ describe('rateFromAmd', () => {
 })
 
 describe('pickOfficialRate', () => {
+  const pick = (...args: Parameters<typeof pickOfficialRate>) =>
+    pickOfficialRate(...args)?.rate ?? null
   const sunday = '2026-09-20'
 
   it('takes the Friday rate of the central bank on a Sunday, not a fresher open source', () => {
@@ -249,7 +253,7 @@ describe('pickOfficialRate', () => {
       amd('RUB', '4.3165', sunday, 'cbr'),
       amd('RUB', '4.3148', sunday, 'erapi'),
     ]
-    expect(pickOfficialRate('RUB', 'AMD', rows, sunday)).toMatchObject({
+    expect(pick('RUB', 'AMD', rows, sunday)).toMatchObject({
       scaled: 4_312_300n,
       source: 'official',
       asOf: yerevanMidnight('2026-09-18'),
@@ -259,8 +263,8 @@ describe('pickOfficialRate', () => {
   it('keeps the central bank up to exactly a week of silence, and not a day more', () => {
     const rows = [amd('RUB', '4.3123', '2026-09-18'), amd('RUB', '4.3165', '2026-09-26', 'cbr')]
     expect(OFFICIAL_RATE_FRESH_DAYS).toBe(7)
-    expect(pickOfficialRate('RUB', 'AMD', rows, '2026-09-25')?.source).toBe('official')
-    expect(pickOfficialRate('RUB', 'AMD', rows, '2026-09-26')).toMatchObject({
+    expect(pick('RUB', 'AMD', rows, '2026-09-25')?.source).toBe('official')
+    expect(pick('RUB', 'AMD', rows, '2026-09-26')).toMatchObject({
       scaled: 4_316_500n,
       source: 'fallback',
     })
@@ -268,7 +272,7 @@ describe('pickOfficialRate', () => {
 
   it('keeps a stale central bank rate, with its date, when no open source is fresher', () => {
     const rows = [amd('RUB', '4.3123', '2026-09-01'), amd('RUB', '4.30', '2026-08-30', 'cbr')]
-    expect(pickOfficialRate('RUB', 'AMD', rows, sunday)).toMatchObject({
+    expect(pick('RUB', 'AMD', rows, sunday)).toMatchObject({
       source: 'official',
       asOf: yerevanMidnight('2026-09-01'),
     })
@@ -277,35 +281,128 @@ describe('pickOfficialRate', () => {
   it('takes the freshest open source, the other central bank on a tie', () => {
     const cbr = amd('RUB', '4.3165', '2026-09-19', 'cbr')
     const erapi = amd('RUB', '4.3148', '2026-09-19', 'erapi')
-    expect(pickOfficialRate('RUB', 'AMD', [erapi, cbr], sunday)?.scaled).toBe(4_316_500n)
+    expect(pick('RUB', 'AMD', [erapi, cbr], sunday)?.scaled).toBe(4_316_500n)
     const newer = amd('RUB', '4.3148', sunday, 'erapi')
-    expect(pickOfficialRate('RUB', 'AMD', [cbr, newer], sunday)?.scaled).toBe(4_314_800n)
+    expect(pick('RUB', 'AMD', [cbr, newer], sunday)?.scaled).toBe(4_314_800n)
   })
 
   it('takes an open source when the central bank has never answered', () => {
     const rows = [amd('RUB', '4.3148', '2026-09-19', 'erapi')]
-    expect(pickOfficialRate('RUB', 'AMD', rows, sunday)?.source).toBe('fallback')
+    expect(pick('RUB', 'AMD', rows, sunday)?.source).toBe('fallback')
   })
 
   it('never builds a pair from two providers', () => {
     // The central bank has the rouble, only the aggregator has the dollar: no rate at all.
     const rows = [amd('RUB', '4.3123'), amd('USD', '363.50', '2026-09-19', 'erapi')]
-    expect(pickOfficialRate('RUB', 'USD', rows, sunday)).toBeNull()
+    expect(pick('RUB', 'USD', rows, sunday)).toBeNull()
   })
 
   it('ignores a rate dated after today, as a bank that sets tomorrow early publishes it', () => {
     const rows = [amd('RUB', '4.3123', '2026-09-18'), amd('RUB', '4.40', '2026-09-21')]
-    expect(pickOfficialRate('RUB', 'AMD', rows, sunday)?.scaled).toBe(4_312_300n)
-    expect(pickOfficialRate('RUB', 'AMD', [amd('RUB', '4.40', '2026-09-21')], sunday)).toBeNull()
+    expect(pick('RUB', 'AMD', rows, sunday)?.scaled).toBe(4_312_300n)
+    expect(pick('RUB', 'AMD', [amd('RUB', '4.40', '2026-09-21')], sunday)).toBeNull()
   })
 
   it('takes the latest row of a provider when the cache holds several days', () => {
     const rows = [amd('RUB', '4.2971', '2026-09-11'), amd('RUB', '4.3123', '2026-09-18')]
-    expect(pickOfficialRate('RUB', 'AMD', rows, sunday)?.scaled).toBe(4_312_300n)
+    expect(pick('RUB', 'AMD', rows, sunday)?.scaled).toBe(4_312_300n)
   })
 
   it('has nothing for an empty cache or for spending what one earns', () => {
-    expect(pickOfficialRate('RUB', 'AMD', [], sunday)).toBeNull()
-    expect(pickOfficialRate('AMD', 'AMD', cba18, sunday)).toBeNull()
+    expect(pick('RUB', 'AMD', [], sunday)).toBeNull()
+    expect(pick('AMD', 'AMD', cba18, sunday)).toBeNull()
+  })
+})
+
+describe('isRateJump', () => {
+  const r = (value: string) => parseRate(value)
+  const recent = ['4.3123', '4.3050', '4.2971', '4.3100', '4.2900'].map(r)
+
+  it('ловит сдвиг запятой в обе стороны', () => {
+    expect(isRateJump(r('431.23'), recent)).toBe(true)
+    expect(isRateJump(r('0.043123'), recent)).toBe(true)
+  })
+
+  it('четверть от медианы — ещё не скачок, чуть больше — уже скачок', () => {
+    // median 4.3050; a quarter of it is 1.07625
+    expect(isRateJump(r('5.38125'), recent)).toBe(false)
+    expect(isRateJump(r('5.381251'), recent)).toBe(true)
+    expect(isRateJump(r('3.22875'), recent)).toBe(false)
+    expect(isRateJump(r('3.228749'), recent)).toBe(true)
+  })
+
+  it('первый курс не с чем сравнить — не скачок', () => {
+    expect(isRateJump(r('431.23'), [])).toBe(false)
+  })
+
+  it('медиана, а не последний: один неверный день в истории не делает скачком верный', () => {
+    expect(isRateJump(r('4.3123'), [r('431.23'), ...recent.slice(0, 4)])).toBe(false)
+  })
+
+  it('движение, продержавшееся три дня из пяти, перестаёт быть скачком', () => {
+    const moved = ['6.0', '6.0', '6.0', '4.31', '4.30'].map(r)
+    expect(isRateJump(r('6.0'), moved)).toBe(false)
+  })
+
+  it('смотрит только на пять последних', () => {
+    const long = [...recent, ...Array.from({ length: 10 }, () => r('100'))]
+    expect(isRateJump(r('4.31'), long)).toBe(false)
+  })
+
+  it('медиана чётного числа — среднее двух средних', () => {
+    // median of 4 and 6 is 5; 6.25 is exactly a quarter above
+    expect(isRateJump(r('6.25'), [r('4'), r('6')])).toBe(false)
+    expect(isRateJump(r('6.250001'), [r('4'), r('6')])).toBe(true)
+  })
+})
+
+describe('pickOfficialRate: скачок', () => {
+  const sunday = '2026-09-20'
+
+  it('курс скачком — поход считает по нему, а прежний отдаётся на выбор', () => {
+    const rows = [
+      amd('RUB', '431.23', '2026-09-18', 'cba', true),
+      amd('RUB', '4.3050', '2026-09-17'),
+    ]
+    expect(pickOfficialRate('RUB', 'AMD', rows, sunday)).toEqual({
+      rate: expect.objectContaining({
+        scaled: 431_230_000n,
+        asOf: yerevanMidnight('2026-09-18'),
+      }) as unknown,
+      previous: expect.objectContaining({
+        scaled: 4_305_000n,
+        source: 'official',
+        asOf: yerevanMidnight('2026-09-17'),
+      }) as unknown,
+    })
+  })
+
+  it('без скачка прежнего нет', () => {
+    expect(pickOfficialRate('RUB', 'AMD', [amd('RUB', '4.3123')], sunday)?.previous).toBeNull()
+  })
+
+  it('скачок без более раннего курса — выбирать не из чего, прежнего нет', () => {
+    const rows = [amd('RUB', '431.23', '2026-09-18', 'cba', true)]
+    expect(pickOfficialRate('RUB', 'AMD', rows, sunday)).toMatchObject({
+      rate: { scaled: 431_230_000n },
+      previous: null,
+    })
+  })
+
+  it('в кроссе прыгнула одна половина — прежний собирается из прежней и неизменной', () => {
+    const rows = [
+      amd('RUB', '4.3123', '2026-09-18'),
+      amd('USD', '36344', '2026-09-18', 'cba', true),
+      amd('USD', '363.44', '2026-09-17'),
+    ]
+    const picked = pickOfficialRate('RUB', 'USD', rows, sunday)
+    expect(picked?.rate.scaled).toBe(119n)
+    // 4.3123 / 363.44 = 0.011865, dated by its older half
+    expect(picked?.previous).toMatchObject({ scaled: 11_865n, asOf: yerevanMidnight('2026-09-17') })
+  })
+
+  it('скачок у валюты не из пары прежний не заводит', () => {
+    const rows = [amd('RUB', '4.3123'), amd('USD', '36344', '2026-09-18', 'cba', true)]
+    expect(pickOfficialRate('RUB', 'AMD', rows, sunday)?.previous).toBeNull()
   })
 })

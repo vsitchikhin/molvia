@@ -1,4 +1,5 @@
-import { isRateFresh, yerevanDate } from '@molvia/model'
+import { isRateFresh, isRateJump, yerevanDate } from '@molvia/model'
+import type { CachedRate } from '@molvia/model'
 import type { RateRepository } from '@/db/rates-repository'
 import { FOREIGN } from '@/rates/feed'
 import type { Published, RateFeed } from '@/rates/feed'
@@ -19,7 +20,7 @@ export interface RefreshDeps {
   readonly primary: RateFeed
   /** Open sources in order of trust: the Bank of Russia, then the aggregator. */
   readonly fallbacks: readonly RateFeed[]
-  readonly rates: Pick<RateRepository, 'upsert' | 'latestOnOrBefore'>
+  readonly rates: Pick<RateRepository, 'upsert' | 'latestOnOrBefore' | 'history'>
   readonly log: RefreshLog
   readonly now?: () => Date
 }
@@ -53,11 +54,30 @@ export function officialRatesRefresh({
     }
   }
 
-  // A write that fails is the database's failure, not the provider's: it is logged as such and
-  // does not count against the central bank (adversarial Г).
+  // Each rate is measured against the provider's recent ones and marked when it jumped (Р-19):
+  // kept, since it may be true, and logged, since it may be a comma in the wrong place. A write
+  // that fails is the database's failure, not the provider's: logged as such, and not counted
+  // against the central bank (adversarial Г).
   async function store(answer: Published): Promise<void> {
     try {
-      await rates.upsert(answer.rates)
+      const currencies = answer.rates.map((rate) => rate.currency)
+      const history = await rates.history(answer.provider, currencies, answer.date)
+      const marked = answer.rates.map((rate): CachedRate => ({
+        ...rate,
+        jump: isRateJump(rate.scaled, history.get(rate.currency) ?? []),
+      }))
+      for (const rate of marked.filter((row) => row.jump)) {
+        log.warn(
+          {
+            provider: rate.provider,
+            currency: rate.currency,
+            date: rate.date,
+            scaled: String(rate.scaled),
+          },
+          'official rate jumped',
+        )
+      }
+      await rates.upsert(marked)
     } catch (error) {
       log.warn({ provider: answer.provider, err: error }, 'official rate cache write failed')
     }

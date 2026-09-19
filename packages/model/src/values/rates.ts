@@ -102,6 +102,40 @@ export interface AmdRate {
   readonly scaled: bigint
 }
 
+/**
+ * A rate as the cache holds it: what the provider published, and whether it jumped away from that
+ * provider's recent rates when it arrived (MOL-39, Р-19). A jump is kept, not refused — it may be
+ * true — and the trip that takes it lets the person choose.
+ */
+export interface CachedRate extends AmdRate {
+  readonly jump: boolean
+}
+
+/** How many of a provider's latest rates of a currency a new one is measured against. */
+export const RATE_JUMP_HISTORY = 5
+
+/** How far from their median a new rate may move before it counts as a jump: a quarter. */
+const RATE_JUMP_PERCENT = 25n
+
+/**
+ * Whether `scaled` jumped: more than a quarter away from the median of `history` — the provider's
+ * latest rates of the same currency, newest first, at most `RATE_JUMP_HISTORY` of them. The median
+ * rather than the last value: one wrong day in the history does not make the next right day look
+ * like a jump, and a move that holds for three days of five stops being one. Nothing to measure
+ * against — the first rate ever — is no jump.
+ */
+export function isRateJump(scaled: bigint, history: readonly bigint[]): boolean {
+  const recent = [...history.slice(0, RATE_JUMP_HISTORY)].sort((a, b) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  )
+  if (recent.length === 0) return false
+  const middle = Math.floor(recent.length / 2)
+  const upper = recent[middle] ?? 0n
+  const median = recent.length % 2 === 1 ? upper : ((recent[middle - 1] ?? upper) + upper) / 2n
+  const distance = scaled > median ? scaled - median : median - scaled
+  return distance * 100n > median * RATE_JUMP_PERCENT
+}
+
 // Armenia has kept +04:00 all year since 2012, so the offset is a constant, not a lookup.
 const YEREVAN_OFFSET_MS = 4 * 60 * 60 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -185,38 +219,66 @@ export function rateFromAmd(
   return exchangeRateSchema.safeParse(rate).success ? rate : null
 }
 
+/** The rate a trip snapshots, and — when that rate jumped — the last one before the jump. */
+export interface OfficialRate {
+  readonly rate: ExchangeRate
+  /**
+   * The same pair from the provider's latest rows that did not jump, offered to the person as
+   * «count by the previous rate» (MOL-39, Р-19). Null when nothing jumped, or when there is no
+   * earlier rate to offer — then there is no choice to make either.
+   */
+  readonly previous: ExchangeRate | null
+}
+
+function latestOf<Row extends AmdRate>(rows: readonly Row[]): Row[] {
+  return [...new Set(rows.map((row) => row.currency))].flatMap((currency) => {
+    const own = rows.filter((row) => row.currency === currency)
+    const [first] = own
+    return first === undefined
+      ? []
+      : [own.reduce((best, row) => (row.date > best.date ? row : best), first)]
+  })
+}
+
 /**
- * The official rate a trip started on `today` snapshots (MOL-39, В-7).
+ * The official rate a trip started on `today` snapshots (MOL-39, В-7, Р-18).
  *
  * The Central Bank of Armenia while its latest rate is at most a week old — a Friday rate on
  * Sunday is the right answer, not a stale one. Past that, whichever provider has the freshest
  * rate for both halves of the pair, the central bank winning a tie: an open source is taken only
  * for being newer, and a trip built on it is marked `fallback`. Rows dated after `today` are
  * ignored — a bank that sets tomorrow's rate today has not made it today's.
+ *
+ * `rows` may hold, beside each provider's latest rate of a currency, its latest rate that did not
+ * jump: when a half of the chosen pair jumped, those build `previous`.
  */
 export function pickOfficialRate(
   base: Currency,
   quote: Currency,
-  rows: readonly AmdRate[],
+  rows: readonly CachedRate[],
   today: string,
-): ExchangeRate | null {
+): OfficialRate | null {
+  const needed = new Set<Currency>([base, quote])
   const candidates = PROVIDER_ORDER.flatMap((provider) => {
     const own = rows.filter((row) => row.provider === provider && row.date <= today)
-    const latest = [...new Set(own.map((row) => row.currency))].map((currency) =>
-      own
-        .filter((row) => row.currency === currency)
-        .reduce((best, row) => (row.date > best.date ? row : best)),
-    )
-    const rate = rateFromAmd(base, quote, latest, provider === 'cba' ? 'official' : 'fallback')
-    return rate ? [{ provider, rate, date: yerevanDate(rate.asOf) }] : []
+    const source = provider === 'cba' ? 'official' : 'fallback'
+    const latest = latestOf(own)
+    const rate = rateFromAmd(base, quote, latest, source)
+    if (!rate) return []
+
+    const jumped = latest.some((row) => row.jump && needed.has(row.currency))
+    const previous = jumped
+      ? rateFromAmd(base, quote, latestOf(own.filter((row) => !row.jump)), source)
+      : null
+    return [{ provider, pick: { rate, previous }, date: yerevanDate(rate.asOf) }]
   })
 
   const central = candidates.find((candidate) => candidate.provider === 'cba')
-  if (central && isRateFresh(central.date, today)) return central.rate
+  if (central && isRateFresh(central.date, today)) return central.pick
 
   const freshest = candidates.reduce<(typeof candidates)[number] | null>(
     (best, candidate) => (best === null || candidate.date > best.date ? candidate : best),
     null,
   )
-  return freshest?.rate ?? null
+  return freshest?.pick ?? null
 }

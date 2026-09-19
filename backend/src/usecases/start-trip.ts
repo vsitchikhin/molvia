@@ -68,5 +68,7 @@ async function officialRateFor(
   const foreign = [base, quote].filter(
     (currency): currency is AmdRate['currency'] => currency !== 'AMD',
   )
-  return pickOfficialRate(base, quote, await rates.latestOnOrBefore(foreign, today), today)
+  return (
+    pickOfficialRate(base, quote, await rates.latestOnOrBefore(foreign, today), today)?.rate ?? null
+  )
 }

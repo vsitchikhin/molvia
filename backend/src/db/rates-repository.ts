@@ -1,5 +1,6 @@
-import { and, inArray, lte, max, sql } from 'drizzle-orm'
-import type { AmdRate } from '@molvia/model'
+import { and, eq, inArray, lt, lte, max, sql } from 'drizzle-orm'
+import { RATE_JUMP_HISTORY } from '@molvia/model'
+import type { AmdRate, CachedRate, RateProvider } from '@molvia/model'
 import type { Conn } from './index'
 import { officialRates } from './schema'
 
@@ -9,22 +10,58 @@ export interface RateRepository {
    * entirely or not at all. A day already there is overwritten — the cache mirrors its
    * provider, and a trip that took the old number keeps it in its own columns (MOL-39, Р-8).
    */
-  upsert(rates: readonly AmdRate[]): Promise<void>
+  upsert(rates: readonly CachedRate[]): Promise<void>
 
   /**
-   * The latest row of every provider for each of `currencies`, dated no later than `date`.
-   * Which provider a trip takes is the domain's rule (`pickOfficialRate`), not a query's.
+   * For each provider and each of `currencies`, dated no later than `date`: the latest row, and
+   * the latest row that did not jump when they differ — the one a trip offers as «previous»
+   * (Р-19). Which provider a trip takes is the domain's rule (`pickOfficialRate`), not a query's.
    */
   latestOnOrBefore(
     currencies: readonly AmdRate['currency'][],
     date: string,
-  ): Promise<readonly AmdRate[]>
+  ): Promise<readonly CachedRate[]>
+
+  /**
+   * A provider's latest rates of each currency dated before `date`, newest first, at most
+   * `RATE_JUMP_HISTORY` of them — what a new rate is measured against for a jump.
+   */
+  history(
+    provider: RateProvider,
+    currencies: readonly AmdRate['currency'][],
+    date: string,
+  ): Promise<ReadonlyMap<AmdRate['currency'], readonly bigint[]>>
 
   /** When any provider's answer was last written — whether the boot refresh can be skipped. */
   lastFetchedAt(): Promise<Date | null>
 }
 
 export function createRateRepository(db: Conn): RateRepository {
+  async function latest(
+    currencies: readonly AmdRate['currency'][],
+    date: string,
+    steadyOnly: boolean,
+  ): Promise<CachedRate[]> {
+    const rows = await db
+      .selectDistinctOn([officialRates.provider, officialRates.currency])
+      .from(officialRates)
+      .where(
+        and(
+          inArray(officialRates.currency, [...currencies]),
+          lte(officialRates.rateDate, date),
+          steadyOnly ? eq(officialRates.jump, false) : undefined,
+        ),
+      )
+      .orderBy(officialRates.provider, officialRates.currency, sql`${officialRates.rateDate} desc`)
+    return rows.map((row) => ({
+      provider: row.provider,
+      currency: row.currency,
+      date: row.rateDate,
+      scaled: row.scaled,
+      jump: row.jump,
+    }))
+  }
+
   return {
     async upsert(rates) {
       if (rates.length === 0) return
@@ -36,33 +73,51 @@ export function createRateRepository(db: Conn): RateRepository {
             currency: rate.currency,
             rateDate: rate.date,
             scaled: rate.scaled,
+            jump: rate.jump,
           })),
         )
         .onConflictDoUpdate({
           target: [officialRates.provider, officialRates.currency, officialRates.rateDate],
-          set: { scaled: sql`excluded.scaled`, fetchedAt: sql`now()` },
+          set: { scaled: sql`excluded.scaled`, jump: sql`excluded.jump`, fetchedAt: sql`now()` },
         })
     },
 
     async latestOnOrBefore(currencies, date) {
       if (currencies.length === 0) return []
-      const rows = await db
-        .selectDistinctOn([officialRates.provider, officialRates.currency])
+      const newest = await latest(currencies, date, false)
+      if (!newest.some((row) => row.jump)) return newest
+      return [...newest, ...(await latest(currencies, date, true))]
+    },
+
+    async history(provider, currencies, date) {
+      const byCurrency = new Map<AmdRate['currency'], bigint[]>()
+      if (currencies.length === 0) return byCurrency
+      const ranked = db
+        .select({
+          currency: officialRates.currency,
+          scaled: officialRates.scaled,
+          rank: sql<number>`row_number() over (partition by ${officialRates.currency} order by ${officialRates.rateDate} desc)`.as(
+            'rank',
+          ),
+        })
         .from(officialRates)
         .where(
-          and(inArray(officialRates.currency, [...currencies]), lte(officialRates.rateDate, date)),
+          and(
+            eq(officialRates.provider, provider),
+            inArray(officialRates.currency, [...currencies]),
+            lt(officialRates.rateDate, date),
+          ),
         )
-        .orderBy(
-          officialRates.provider,
-          officialRates.currency,
-          sql`${officialRates.rateDate} desc`,
-        )
-      return rows.map((row) => ({
-        provider: row.provider,
-        currency: row.currency,
-        date: row.rateDate,
-        scaled: row.scaled,
-      }))
+        .as('ranked')
+      const rows = await db
+        .select()
+        .from(ranked)
+        .where(lte(ranked.rank, RATE_JUMP_HISTORY))
+        .orderBy(ranked.currency, ranked.rank)
+      for (const row of rows) {
+        byCurrency.set(row.currency, [...(byCurrency.get(row.currency) ?? []), row.scaled])
+      }
+      return byCurrency
     },
 
     async lastFetchedAt() {

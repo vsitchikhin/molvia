@@ -18,7 +18,7 @@ import {
   yerevanDate,
   yerevanMidnight,
 } from '@molvia/model'
-import type { AmdRate, RateProvider, TripView } from '@molvia/model'
+import type { CachedRate, RateProvider, TripView } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
 import { places, searchPicks, trips } from '@/db/schema'
@@ -558,11 +558,12 @@ describe('курс в походе (MOL-39)', () => {
   const today = yerevanDate(new Date())
   const daysAgo = (days: number): string =>
     yerevanDate(new Date(Date.now() - days * 24 * 60 * 60 * 1000))
-  const rub = (value: string, date = today, provider: RateProvider = 'cba'): AmdRate => ({
+  const rub = (value: string, date = today, provider: RateProvider = 'cba'): CachedRate => ({
     provider,
     currency: 'RUB',
     date,
     scaled: parseRate(value),
+    jump: false,
   })
   const rates = createRateRepository(db)
 

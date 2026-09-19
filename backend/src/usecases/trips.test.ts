@@ -8,7 +8,7 @@ import {
   placeSchema,
   yerevanMidnight,
 } from '@molvia/model'
-import type { Actor, AmdRate, Expense, Item, Place, RateProvider, Trip } from '@molvia/model'
+import type { Actor, CachedRate, Expense, Item, Place, RateProvider, Trip } from '@molvia/model'
 import type { ExpenseRepository } from '@/db/expenses-repository'
 import type { ItemRepository } from '@/db/items-repository'
 import type { PlaceRepository } from '@/db/places-repository'
@@ -130,6 +130,7 @@ function fakeRepositories(
     rates: {
       upsert: unexpected('rates.upsert'),
       latestOnOrBefore: unexpected('rates.latestOnOrBefore'),
+      history: unexpected('rates.history'),
       lastFetchedAt: unexpected('rates.lastFetchedAt'),
       ...overrides.rates,
     },
@@ -249,7 +250,7 @@ describe('startTrip: the official rate (MOL-39)', () => {
   const sunday = new Date('2026-09-20T08:00:00.000Z')
 
   function startedWith(
-    cache: readonly AmdRate[],
+    cache: readonly CachedRate[],
     person: Actor = actor,
     now: Date = sunday,
   ): Promise<{ rate: unknown; asked: unknown[] }> {
@@ -281,11 +282,12 @@ describe('startTrip: the official rate (MOL-39)', () => {
     ).then(() => ({ rate, asked }))
   }
 
-  const rub = (value: string, date = friday, provider: RateProvider = 'cba'): AmdRate => ({
+  const rub = (value: string, date = friday, provider: RateProvider = 'cba'): CachedRate => ({
     provider,
     currency: 'RUB',
     date,
     scaled: parseRate(value),
+    jump: false,
   })
 
   it('snapshots the central bank rate of Friday on a Sunday, with its date', async () => {
@@ -348,7 +350,13 @@ describe('startTrip: the official rate (MOL-39)', () => {
   })
 
   it('asks for both currencies of a cross, and snapshots it', async () => {
-    const usd: AmdRate = { provider: 'cba', currency: 'USD', date: friday, scaled: 363_440_000n }
+    const usd: CachedRate = {
+      provider: 'cba',
+      currency: 'USD',
+      date: friday,
+      scaled: 363_440_000n,
+      jump: false,
+    }
     const { rate, asked } = await startedWith([rub('4.3123'), usd], {
       ...actor,
       spendCurrency: 'USD',

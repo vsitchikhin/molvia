@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { parseRate } from '@molvia/model'
-import type { AmdRate, RateProvider } from '@molvia/model'
+import type { AmdRate, CachedRate, RateProvider } from '@molvia/model'
 import { sql } from 'drizzle-orm'
 import { createRateRepository } from '@/db/rates-repository'
 import { officialRates, trips } from '@/db/schema'
@@ -15,7 +15,8 @@ const amd = (
   value: string,
   date: string,
   provider: RateProvider = 'cba',
-): AmdRate => ({ provider, currency, date, scaled: parseRate(value) })
+  jump = false,
+): CachedRate => ({ provider, currency, date, scaled: parseRate(value), jump })
 
 beforeEach(async () => {
   await clearAll(db)
@@ -109,6 +110,49 @@ describe('кеш официальных курсов', () => {
     await expect(rates.upsert([amd('RUB', '4.3123', '2026-09-18'), zero])).rejects.toThrow()
 
     expect(await db.select().from(officialRates)).toEqual([])
+  })
+})
+
+describe('Р-19: скачок в кеше', () => {
+  it('метка пишется и читается, и повтор дня её перезаписывает', async () => {
+    await rates.upsert([amd('RUB', '431.23', '2026-09-18', 'cba', true)])
+    expect(await rates.latestOnOrBefore(['RUB'], '2026-09-18')).toEqual([
+      amd('RUB', '431.23', '2026-09-18', 'cba', true),
+      // nothing steady before it: nothing more to offer
+    ])
+
+    await rates.upsert([amd('RUB', '4.3123', '2026-09-18')])
+    expect(await rates.latestOnOrBefore(['RUB'], '2026-09-18')).toEqual([
+      amd('RUB', '4.3123', '2026-09-18'),
+    ])
+  })
+
+  it('последняя строка со скачком — рядом отдаётся последняя без него', async () => {
+    await rates.upsert([
+      amd('RUB', '4.2971', '2026-09-16'),
+      amd('RUB', '4.3050', '2026-09-17'),
+      amd('RUB', '431.23', '2026-09-18', 'cba', true),
+    ])
+
+    expect(await rates.latestOnOrBefore(['RUB'], '2026-09-19')).toEqual([
+      amd('RUB', '431.23', '2026-09-18', 'cba', true),
+      amd('RUB', '4.3050', '2026-09-17'),
+    ])
+  })
+
+  it('история — пять последних до даты, новые первыми, у каждой валюты своя и только у своего поставщика', async () => {
+    const days = ['10', '11', '12', '13', '14', '15', '16'].map((day) => `2026-09-${day}`)
+    await rates.upsert(days.map((date, index) => amd('RUB', `4.30${String(index)}`, date)))
+    await rates.upsert([
+      amd('USD', '363.44', '2026-09-15'),
+      amd('RUB', '9.99', '2026-09-15', 'cbr'),
+    ])
+
+    const history = await rates.history('cba', ['RUB', 'USD', 'EUR'], '2026-09-16')
+
+    expect(history.get('RUB')).toEqual([4_305_000n, 4_304_000n, 4_303_000n, 4_302_000n, 4_301_000n])
+    expect(history.get('USD')).toEqual([363_440_000n])
+    expect(history.get('EUR')).toBeUndefined()
   })
 })
 

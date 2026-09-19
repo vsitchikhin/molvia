@@ -1,5 +1,6 @@
 import {
   bigint,
+  boolean,
   char,
   check,
   date,
@@ -567,6 +568,9 @@ export const officialRates = pgTable(
     rateDate: date('rate_date').notNull(),
     // Drams per one unit, at RATE_SCALE — whatever «per 100» the provider printed is divided out.
     scaled: bigint('scaled', { mode: 'bigint' }).notNull(),
+    // Over a quarter away from the provider's recent rates when it arrived (MOL-39, Р-19): kept,
+    // since it may be true, and a trip that takes it lets the person choose.
+    jump: boolean('jump').notNull().default(false),
     fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
