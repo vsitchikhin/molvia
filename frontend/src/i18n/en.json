@@ -64,13 +64,19 @@
     "unit_ml": "ml",
     "unit_piece": "pc",
     "price": "Price as on the tag",
+    "currency": "Price currency",
     "unit_price_label": "Per unit",
     "unit_price_pending": "Worked out for you — nothing to type",
+    "unit_price_value": "{amount}/{unit}",
     "save": "Add to the trip",
     "save_edit": "Save",
     "delete": "Remove the item",
     "cancel": "Cancel",
     "offline_note": "Saved on the phone, sent once you are back online",
+    "no_trip": {
+      "body": "Start a trip first: a purchase needs a shop",
+      "action": "To the trip"
+    },
     "empty": {
       "body": "Nothing found for «{query}». We will add it to the catalogue — tell us what the price tag calls it",
       "action": "Suggest an item"
