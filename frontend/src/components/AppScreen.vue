@@ -28,7 +28,9 @@
       <div ref="sentinel" class="sentinel" aria-hidden="true"></div>
     </div>
 
-    <IdentityNotice />
+    <div class="notice-slot">
+      <IdentityNotice />
+    </div>
 
     <div class="content">
       <slot />
@@ -37,12 +39,12 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from 'vue'
+import { computed, defineComponent, onBeforeUpdate, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconChevronLeft from '~icons/mdi/chevron-left'
 import IdentityNotice from '@/components/IdentityNotice.vue'
-import { useCollapsed } from '@/composables/useCollapsed'
+import { useCollapsed, useHeight } from '@/composables/useCollapsed'
 import { useNavigation } from '@/navigation'
 
 /**
@@ -78,14 +80,21 @@ export default defineComponent({
       const parent = route.meta.parent
       return parent ? router.resolve({ name: parent }).meta.titleKey : undefined
     })
-    const docked = computed(() => Boolean(parentTitleKey.value ?? slots.meta ?? slots.trailing))
+    // Slots are not reactive, so a computed would keep whatever it saw on mount — and the trip's
+    // place and «Finish» arrive with the trip, from the API, after it. Read again before every
+    // render instead: a row filled late is pinned and alive, not drawn inside an invisible one.
+    const hasRow = (): boolean => Boolean(parentTitleKey.value ?? slots.meta ?? slots.trailing)
+    const docked = ref(hasRow())
+    onBeforeUpdate(() => {
+      docked.value = hasRow()
+    })
     const tabbed = computed(() => Boolean(route.meta.tab))
 
     // Under a pinned row the title is gone once it passes the row's bottom edge; with the row
     // out of the page, once it passes the top of the window.
-    const collapsed = useCollapsed(sentinel, () =>
-      docked.value ? (bar.value?.offsetHeight ?? 0) : 0,
-    )
+    const barHeight = useHeight(bar)
+    const line = computed(() => (docked.value ? barHeight.value : 0))
+    const collapsed = useCollapsed(sentinel, line)
 
     const { goBack } = useNavigation()
 
@@ -108,7 +117,8 @@ export default defineComponent({
   align-items: center;
   gap: var(--space-2);
   height: calc(var(--bar-height) + var(--safe-top));
-  padding: var(--safe-top) var(--space-4) 0;
+  padding: var(--safe-top) calc(var(--space-4) + var(--safe-right)) 0
+    calc(var(--space-4) + var(--safe-left));
   border-bottom: var(--hairline) solid transparent;
 
   /* With nothing in it the row waits out of sight and takes no room. */
@@ -210,7 +220,8 @@ export default defineComponent({
 
 .head {
   position: relative;
-  padding: calc(var(--safe-top) + var(--space-4)) var(--space-4) var(--space-3);
+  padding: calc(var(--safe-top) + var(--space-4)) calc(var(--space-4) + var(--safe-right))
+    var(--space-3) calc(var(--space-4) + var(--safe-left));
   border-bottom: var(--hairline) solid var(--border);
   background: var(--chrome);
 }
@@ -252,7 +263,13 @@ export default defineComponent({
 }
 
 .content {
-  padding: var(--space-4);
+  padding: var(--space-4) calc(var(--space-4) + var(--safe-right)) var(--space-4)
+    calc(var(--space-4) + var(--safe-left));
+}
+
+/* The notice keeps its own margins; this only keeps it out from under a notch held sideways. */
+.notice-slot {
+  padding: 0 var(--safe-right) 0 var(--safe-left);
 }
 
 .tabbed .content {

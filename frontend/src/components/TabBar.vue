@@ -77,7 +77,7 @@ export default defineComponent({
   /* 74 + the home indicator, not the handoff's fixed 74 + 22: 22 is one iPhone's indicator,
      and a phone with buttons would get an empty strip. */
   height: calc(var(--tabbar-height) + var(--safe-bottom));
-  padding-bottom: var(--safe-bottom);
+  padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
   border-top: var(--hairline) solid var(--border);
 
   /* Stays put while the screen above it slides: see the view transitions in main.scss. */

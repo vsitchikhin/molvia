@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { defineComponent, h, nextTick } from 'vue'
+import { defineComponent, h, nextTick, ref } from 'vue'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
@@ -68,6 +68,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 describe('AppScreen', () => {
@@ -140,6 +141,67 @@ describe('AppScreen', () => {
   })
 
   describe('the pinned row', () => {
+    // The trip's place and «Finish» come with the trip, from the API, after the screen is up.
+    it('pins a row that is filled after mount, and it stays alive', async () => {
+      const router = createRouter({ history: createMemoryHistory(), routes })
+      await router.push('/')
+      const loaded = ref(false)
+      const Trip = defineComponent(
+        () => () =>
+          h(
+            AppScreen,
+            { title: 'Trip' },
+            loaded.value
+              ? {
+                  meta: () => 'Yerevan City · today',
+                  trailing: () => h('button', { class: 'finish' }, 'Finish'),
+                }
+              : {},
+          ),
+      )
+      const view = mount(Trip, {
+        global: { plugins: [router, createPinia(), createAppI18n('en')] },
+      })
+      expect(view.get('.screen').classes()).not.toContain('docked')
+
+      loaded.value = true
+      await nextTick()
+      expect(view.get('.meta').text()).toBe('Yerevan City · today')
+      expect(view.get('.screen').classes()).toContain('docked')
+    })
+
+    // A turned phone moves the notch, and the row's height with it: the line follows.
+    it('sets the observer up again when the row changes height', async () => {
+      let height = 91
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(() => height)
+      let resized: (() => void) | undefined
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(callback: () => void) {
+            resized = callback
+          }
+          observe(): void {
+            // driven by the test
+          }
+          disconnect(): void {
+            // nothing to let go
+          }
+        },
+      )
+
+      await render('/trip/add')
+      await nextTick()
+      expect(DrivenObserver.last?.options?.rootMargin).toBe('-91px 0px 0px 0px')
+      const first = DrivenObserver.last
+
+      height = 44
+      resized?.()
+      await nextTick()
+      expect(first?.disconnected).toBe(true)
+      expect(DrivenObserver.last?.options?.rootMargin).toBe('-44px 0px 0px 0px')
+    })
+
     // «What to buy» and «Ratings» have nothing to put there: the row takes no room at rest.
     it('is not docked on a section with nothing in the row', async () => {
       const { view } = await render('/advice')
