@@ -288,8 +288,16 @@ export const useActorStore = defineStore('actor', () => {
   // A connection that came back is the commonest recovery there is, and until now it took a
   // reload. `error` is listened for too: `navigator.onLine` is true on a captive portal and
   // on wifi with no route out, so the commonest way to lose the network lands there (Н-3).
-  window.addEventListener('online', () => {
+  //
+  // Coming back into view is listened for as well: an iOS PWA frozen in the background misses
+  // `online` while the network returns, and since MOL-19 the offline notice has no button — it
+  // would have waited for a restart (Р-8).
+  function recover(): void {
     if (state.value === 'offline' || state.value === 'error') void start()
+  }
+  window.addEventListener('online', recover)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') recover()
   })
 
   return { actor, id, state, lost, restoreFailed, start, retry: start, restore }

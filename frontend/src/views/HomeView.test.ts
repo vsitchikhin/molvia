@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
 import type { HealthResponse } from '@molvia/model'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
@@ -14,6 +14,13 @@ vi.mock('@/api', () => ({ api: { health: () => health() } }))
 
 function online(value: boolean): void {
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(value)
+}
+
+// By its words, not by position: the identity notice above the screen has buttons too.
+function button(view: VueWrapper, text: string): DOMWrapper<HTMLButtonElement> {
+  const found = view.findAll('button').find((candidate) => candidate.text() === text)
+  if (!found) throw new Error(`no button «${text}»`)
+  return found
 }
 
 /**
@@ -41,8 +48,69 @@ describe('HomeView', () => {
     online(false)
     const view = await render()
     await vi.waitFor(() => {
-      expect(view.text()).toContain(en.advice.offline.title)
+      expect(view.text()).toContain(en.item.offline.title)
     })
+    expect(health).not.toHaveBeenCalled()
+    // «Showing yesterday's data» would promise what the scaffold does not have (MOL-19, Р-2).
+    expect(view.text()).not.toContain(en.advice.offline.title)
+  })
+
+  // The commonest break at a shelf: the answer was on its way when the connection went. On
+  // master and in the first cut of MOL-19 this was drawn as a red error (A1).
+  it('calls a request lost with the connection offline, not an error', async () => {
+    online(true)
+    health.mockImplementation(() => {
+      online(false)
+      return Promise.reject(new TypeError('Failed to fetch'))
+    })
+    const view = await render()
+    await vi.waitFor(() => {
+      expect(view.text()).toContain(en.item.offline.title)
+    })
+    expect(view.text()).not.toContain(en.advice.error.title)
+    expect(view.find('.bad').exists()).toBe(false)
+  })
+
+  it('tries again by itself when the connection comes back', async () => {
+    online(false)
+    health.mockResolvedValue({ status: 'ok', version: '1.2.3', database: 'up' })
+    const view = await render()
+    await vi.waitFor(() => {
+      expect(view.text()).toContain(en.item.offline.title)
+    })
+
+    online(true)
+    window.dispatchEvent(new Event('online'))
+    await vi.waitFor(() => {
+      expect(view.text()).toContain('1.2.3')
+    })
+  })
+
+  // The connection came back while the app was in the background and `online` was missed —
+  // iOS freezes a PWA there. Coming back into view is enough (MOL-19, B2).
+  it('tries again when the app comes back into view', async () => {
+    online(false)
+    health.mockResolvedValue({ status: 'ok', version: '1.2.3', database: 'up' })
+    const view = await render()
+    await vi.waitFor(() => {
+      expect(view.text()).toContain(en.item.offline.title)
+    })
+
+    online(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.waitFor(() => {
+      expect(view.text()).toContain('1.2.3')
+    })
+  })
+
+  it('stops listening once it is gone', async () => {
+    online(false)
+    const view = await render()
+    view.unmount()
+    online(true)
+    window.dispatchEvent(new Event('online'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await Promise.resolve()
     expect(health).not.toHaveBeenCalled()
   })
 
@@ -53,7 +121,7 @@ describe('HomeView', () => {
     await vi.waitFor(() => {
       expect(view.text()).toContain(en.advice.error.title)
     })
-    expect(view.find('button').text()).toBe(en.state.retry)
+    expect(() => button(view, en.state.retry)).not.toThrow()
   })
 
   it('recovers when the retry succeeds', async () => {
@@ -66,7 +134,7 @@ describe('HomeView', () => {
       expect(view.text()).toContain(en.advice.error.title)
     })
 
-    await view.find('button').trigger('click')
+    await button(view, en.state.retry).trigger('click')
     await vi.waitFor(() => {
       expect(view.text()).toContain('1.2.3')
     })
@@ -87,6 +155,6 @@ describe('HomeView', () => {
     })
     expect(view.text()).toContain(ru.advice.title)
     expect(view.text()).toContain(ru.advice.empty.body)
-    expect(view.find('button').text()).toBe(ru.advice.empty.action)
+    expect(() => button(view, ru.advice.empty.action)).not.toThrow()
   })
 })

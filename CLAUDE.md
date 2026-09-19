@@ -561,7 +561,22 @@ database access. In a product about data integrity, two write paths will silentl
   and the mark is a placeholder until there is real branding.
 - Touch target >= 44px. The primary action is reachable with a thumb.
 - **Every screen has four states:** loading, empty, error, offline. The empty state is not
-  "no data" but an offer to act.
+  "no data" but an offer to act. They are drawn by two blocks and nothing else (MOL-19):
+  `ScreenSkeleton` for loading, the screen giving the widths of its bars, and `ScreenState`
+  for the rest. The tone of the circle carries the meaning and is fixed by the kind — an error
+  is always red and always offers «Try again»; offline is green or yellow and **never red**,
+  which `vue-tsc` holds rather than memory: `bad` is not a tone a screen can ask for. The
+  type holds the prop, not the choice of kind, and that choice is the screen's: **offline or
+  error is decided after the failure** (`navigator.onLine` read then, never narrowed from a
+  check before the request) — a connection that drops while the answer is on its way is the
+  commonest break at a shelf, and drawing it red was the first consumer's bug (MOL-19, A1).
+  Back online, a screen tries again by itself, as the identity does — through `useReconnect`,
+  which also hears the app coming back into view: an iOS PWA frozen in the background misses
+  `online`. Polite states do not carry `role="status"`: they hand their words to the app's one
+  live region in `App.vue`, above the router, since a region born with its words is often not
+  read. Each announcement is a node added a task later, taken back when its block goes and
+  gone by itself after seconds — a hidden region is still read in browse mode. Only an error
+  or «attention» on the screen interrupts; anything inline is polite.
 - **Every SFC is one file in one fixed order:** `<template>`, then `<script lang="ts">`
   exporting a `defineComponent`, then `<style scoped lang="scss">`. The linter keeps the
   order, both languages and the `scoped` attribute; none of it is left to memory.

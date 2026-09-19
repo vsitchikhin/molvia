@@ -1,0 +1,108 @@
+import { mount } from '@vue/test-utils'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h, nextTick, ref, watch } from 'vue'
+import en from '@/i18n/en.json'
+import ru from '@/i18n/ru.json'
+import { createAppI18n } from '@/i18n'
+import type { AppLocale } from '@/i18n/locale'
+import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
+
+function render(groups: unknown, locale: AppLocale = 'en', slot?: () => unknown) {
+  return mount(ScreenSkeleton, {
+    props: { groups: groups as number[] },
+    slots: slot ? { default: slot } : {},
+    global: { plugins: [createAppI18n(locale)] },
+  })
+}
+
+describe('ScreenSkeleton', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('draws one pair of bars per group, the line as wide as the screen asked', () => {
+    const view = render([72, 54, 84, 46])
+    expect(view.findAll('.group')).toHaveLength(4)
+    expect(view.findAll('.line').map((line) => line.attributes('style'))).toEqual([
+      'width: 72%;',
+      'width: 54%;',
+      'width: 84%;',
+      'width: 46%;',
+    ])
+    expect(view.findAll('.sub')).toHaveLength(4)
+  })
+
+  // The width of the second bar is the block's, not the screen's: every screen of the
+  // handoff draws it at 38 %, and a prop for it would only be a way to drift.
+  it('gives the second bar no width of its own to set', () => {
+    const view = render([40])
+    expect(view.get('.sub').attributes('style')).toBeUndefined()
+  })
+
+  // Not inside aria-busy: a busy region holds its announcements until it is cleared, and a
+  // skeleton is removed rather than cleared.
+  it('tells a screen reader it is loading, and hides the bars from it', () => {
+    const view = render([40, 78])
+    expect(view.find('[aria-busy]').exists()).toBe(false)
+    expect(view.get('[role="status"]').text()).toBe(en.state.loading)
+    expect(view.get('.bars').attributes('aria-hidden')).toBe('true')
+  })
+
+  // Inside the app «Loading…» goes to its live region, which exists before it, and leaves it
+  // with the skeleton — left behind it would be read under the answer (MOL-19, П-2, C3).
+  it('inside the app, says it in the live region, carries no role, and takes it back', async () => {
+    vi.useFakeTimers()
+    const shown = ref(true)
+    const region = ref<string[]>([])
+    const Screen = defineComponent({
+      setup() {
+        const announcements = provideAnnouncer()
+        watch(announcements, (now) => {
+          region.value = now.map((announcement) => announcement.text)
+        })
+        return () => (shown.value ? h(ScreenSkeleton, { groups: [40] }) : null)
+      },
+    })
+    const view = mount(Screen, { global: { plugins: [createAppI18n('en')] } })
+    vi.advanceTimersByTime(200)
+    await nextTick()
+    expect(region.value).toEqual([en.state.loading])
+    expect(view.find('[role]').exists()).toBe(false)
+
+    shown.value = false
+    await nextTick()
+    expect(region.value).toEqual([])
+    vi.useRealTimers()
+  })
+
+  it('says it in Russian from the same dictionary', () => {
+    const view = render([40], 'ru')
+    expect(view.get('[role="status"]').text()).toBe(ru.state.loading)
+  })
+
+  // The rating card ends in five squares, which are not a pair of bars: they come through the
+  // slot, after the bars and hidden with them.
+  it('puts what the screen adds after the bars, hidden with them', () => {
+    const view = render([58, 90], 'en', () => h('div', { class: 'scale' }))
+    const bars = view.get('.bars')
+    expect(bars.element.lastElementChild?.className).toBe('scale')
+  })
+
+  it.each([
+    ['nothing to draw', []],
+    ['a width of zero', [0]],
+    ['a width past the whole', [101]],
+    ['not a number', ['72']],
+  ])('refuses %s', (_, groups) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    render(groups)
+    expect(warn.mock.calls.some(([message]) => String(message).includes('Invalid prop'))).toBe(true)
+  })
+
+  it('accepts the edges of the scale', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    render([0.5, 100])
+    expect(warn).not.toHaveBeenCalled()
+  })
+})
