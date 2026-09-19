@@ -121,28 +121,30 @@ function decode(raw: unknown): QueuedWrite | null {
   if (typeof tripId !== 'string' || !isIdentifier(tripId)) return null
 
   if (kind === 'add') {
-    const body = addExpenseBodySchema.safeParse(bodyOf(raw.body))
+    const body = addExpenseBodySchema.safeParse(knownFields(raw.body, BODY_FIELDS))
     return body.success ? { kind, tripId, body: body.data, entry: cardOf(raw.entry) } : null
   }
   if (typeof expenseId !== 'string' || !isIdentifier(expenseId)) return null
   if (kind === 'update') {
-    const patch = expensePatchSchema.safeParse(raw.patch)
+    const patch = expensePatchSchema.safeParse(knownFields(raw.patch, PATCH_FIELDS))
     return patch.success ? { kind, tripId, expenseId, patch: patch.data } : null
   }
   return kind === 'remove' ? { kind, tripId, expenseId } : null
 }
 
 const BODY_FIELDS = ['id', 'itemId', 'quantity', 'amount', 'query'] as const
+const PATCH_FIELDS = ['quantity', 'amount'] as const
 
 /**
- * The body as far as this version knows it: a body kept by a newer build — one rolled back after
- * — may carry a field this one has never heard of, and the strict schema would drop the whole
- * purchase for it. Only the known fields are read, as `cardOf` does for the card (round 3).
+ * A kept body or patch as far as this version knows it: one kept by a newer build — rolled back
+ * after — may carry a field this one has never heard of, and the strict schema would drop the
+ * whole write for it. Only the known fields are read, as `cardOf` does for the card (round 3,
+ * review Р-14).
  */
-function bodyOf(raw: unknown): unknown {
+function knownFields(raw: unknown, fields: readonly string[]): unknown {
   if (!isRecord(raw)) return raw
   return Object.fromEntries(
-    BODY_FIELDS.filter((field) => raw[field] !== undefined).map((field) => [field, raw[field]]),
+    fields.filter((field) => raw[field] !== undefined).map((field) => [field, raw[field]]),
   )
 }
 
@@ -169,6 +171,22 @@ function parsedList(key: string): unknown[] {
   } catch {
     return []
   }
+}
+
+/** The part of a kept queue still waiting: its past, less what has been sent since. */
+function stillWaiting(past: string, waiting: ReadonlySet<string>): string | null {
+  let entries: unknown
+  try {
+    entries = JSON.parse(past)
+  } catch {
+    return null
+  }
+  if (!Array.isArray(entries)) return null
+  const left = entries.filter(
+    (item: unknown) => isRecord(item) && typeof item.key === 'string' && waiting.has(item.key),
+  )
+  if (left.length === entries.length) return past
+  return left.length > 0 ? JSON.stringify(left) : null
 }
 
 /** A broken entry is dropped alone: the ones around it are somebody's purchases. */
@@ -257,12 +275,18 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     const queued = writeEverywhere(
       `${QUEUE_KEY}.${id}`,
       JSON.stringify(kept.map((item) => ({ key: item.key, write: encode(item.write) }))),
+      // A shelf that refused keeps the writes of its past still waiting: those already sent
+      // would go again at the next launch — an add after its remove brings the row back (Р-13) —
+      // and those still waiting are purchases made at the shelf with no signal (Г1).
+      (past) => stillWaiting(past, new Set(kept.map((item) => item.key))),
     )
+    // Refusals only grow, so a refusing shelf's past is a true, shorter list: it stays.
     const refused = writeEverywhere(
       `${REJECTED_KEY}.${id}`,
       JSON.stringify(
         rejected.value.map((item) => ({ write: encode(item.write), code: item.code })),
       ),
+      (past) => past,
     )
     ahead = !queued || !refused
   }

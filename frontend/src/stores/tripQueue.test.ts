@@ -464,6 +464,93 @@ describe('trip queue', () => {
     }
   })
 
+  describe('a localStorage that fills up while purchases wait (Г1)', () => {
+    function full(): () => void {
+      const working = localStorage.setItem.bind(localStorage)
+      Object.defineProperty(localStorage, 'setItem', {
+        configurable: true,
+        writable: true,
+        value: () => {
+          throw new Error('QuotaExceededError')
+        },
+      })
+      return () => {
+        Object.defineProperty(localStorage, 'setItem', {
+          configurable: true,
+          writable: true,
+          value: working,
+        })
+      }
+    }
+
+    function restarted() {
+      // The PWA killed in the background: its sessionStorage goes with it.
+      sessionStorage.clear()
+      setActivePinia(createPinia())
+      return useTripQueueStore()
+    }
+
+    it('keeps the purchase waiting from before across a restart', async () => {
+      addExpense.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(add(MILK))
+      await settled()
+      const release = full()
+      try {
+        queue.enqueue(add(BREAD))
+        await settled()
+        const [kept] = restarted().pending
+        // The bread came when nothing could be written; the milk was written before and stays.
+        expect(kept?.kind === 'add' && kept.body.id).toBe(MILK)
+      } finally {
+        release()
+      }
+    })
+
+    it('keeps the refusals from before across a restart (Г1b)', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      addExpense.mockRejectedValueOnce(new ApiError(ERROR.INVALID_AMOUNT))
+      addExpense.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(add(MILK))
+      await settled()
+      expect(queue.rejected).toHaveLength(1)
+      const release = full()
+      try {
+        queue.enqueue(add(BREAD))
+        await settled()
+        expect(restarted().rejected).toHaveLength(1)
+      } finally {
+        release()
+      }
+    })
+  })
+
+  it('reads an amendment kept by a newer build that grew a field of its patch (Р-14)', () => {
+    localStorage.setItem(
+      `molvia.trip-queue.${ME}`,
+      JSON.stringify([
+        {
+          key: 'k1',
+          write: {
+            kind: 'update',
+            tripId: TRIP,
+            expenseId: MILK,
+            patch: { amount: { amount: '570', currency: 'AMD' }, note: 'акция' },
+          },
+        },
+      ]),
+    )
+    expect(fresh().pending).toEqual([
+      {
+        kind: 'update',
+        tripId: TRIP,
+        expenseId: MILK,
+        patch: { amount: parseMoney('570', 'AMD') },
+      },
+    ])
+  })
+
   it('reads a purchase kept by a newer build that grew a field of its body', () => {
     // A build rolled back after it queued a purchase: the body is the purchase, and a field this
     // build has never heard of must not drop it.

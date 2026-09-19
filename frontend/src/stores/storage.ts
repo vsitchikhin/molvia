@@ -60,25 +60,46 @@ export function write(key: string, value: string): boolean {
  * back to decide what to do: `read` prefers the first shelf, and a `localStorage` that refused
  * the write still answers with what it held before, while `sessionStorage` moved on. The trip
  * queue read its own past that way and sent one purchase in a loop (MOL-24, adversarial Б3).
+ *
+ * What a refusing shelf keeps is `salvage`'s to say, from what it held: the part of its past that
+ * is still true. All of it — nothing is touched, as nothing can be written anyway; a part — the
+ * key is removed, which needs no quota, and the part written back into the room that freed; none
+ * — the key is removed. Without `salvage` the past is removed. Left alone, a past that is no
+ * longer true is read back at the next launch (review Р-13); removed whole, a past that still is
+ * goes with it (adversarial Г1).
  */
-export function writeEverywhere(key: string, value: string): boolean {
+export function writeEverywhere(
+  key: string,
+  value: string,
+  salvage?: (past: string) => string | null,
+): boolean {
   let everywhere = true
   for (const shelf of shelves()) {
     try {
       shelf.setItem(key, value)
     } catch {
       everywhere = false
-      // A shelf that refused keeps its past, and a restart would read it back: the queue sent a
-      // purchase again after it was removed, and the row came back (review Р-13). Removing needs
-      // no quota; with the shelf empty, `read` goes on to the one that holds the present.
-      try {
-        shelf.removeItem(key)
-      } catch {
-        // Nothing more to do: this shelf refuses everything.
-      }
+      keepWhatIsTrue(shelf, key, salvage)
     }
   }
   return everywhere
+}
+
+function keepWhatIsTrue(
+  shelf: Storage,
+  key: string,
+  salvage: ((past: string) => string | null) | undefined,
+): void {
+  try {
+    const past = shelf.getItem(key)
+    if (past === null) return
+    const kept = salvage ? salvage(past) : null
+    if (kept === past) return
+    shelf.removeItem(key)
+    if (kept !== null) shelf.setItem(key, kept)
+  } catch {
+    // Nothing more to do: this shelf refuses everything.
+  }
 }
 
 export function forget(key: string): void {
