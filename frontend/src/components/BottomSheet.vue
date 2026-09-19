@@ -32,6 +32,7 @@ import { defineComponent, onMounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
+import { useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetHistory } from '@/composables/useSheetHistory'
 
 /**
@@ -68,11 +69,11 @@ export default defineComponent({
     // Whether the sheet is open as far as the screen is concerned. Not `dialog.open`: the browser
     // may close the dialog on its own (a second Esc), and the sheet is still to be put away —
     // its entry taken, the screen told — exactly once.
-    let shown = false
+    const shown = ref(false)
 
     const history = useSheetHistory(() => {
-      if (!shown) return
-      shown = false
+      if (!shown.value) return
+      shown.value = false
       if (dialog.value?.open) dialog.value.close()
       if (props.open) emit('update:open', false)
       emit('closed')
@@ -80,8 +81,8 @@ export default defineComponent({
 
     function show(): void {
       const element = dialog.value
-      if (!element || shown) return
-      shown = true
+      if (!element || shown.value) return
+      shown.value = true
       element.showModal()
       history.lay()
     }
@@ -103,11 +104,13 @@ export default defineComponent({
       if (history.laid()) close()
     }
 
+    useKeyboardInset(dialog, shown)
+
     watch(
       () => props.open,
       (open) => {
         if (open) show()
-        else if (shown) close()
+        else if (shown.value) close()
       },
     )
     onMounted(() => {
@@ -125,8 +128,10 @@ export default defineComponent({
   /* The dialog is the sheet's box and nothing else, pinned to the bottom edge. */
   width: 100%;
   max-width: 100%;
-  max-height: var(--sheet-max-height);
-  margin: auto 0 0;
+  max-height: calc(var(--sheet-max-height) - var(--keyboard-inset));
+
+  /* Lifted over the on-screen keyboard where the browser leaves it covering the page (iOS). */
+  margin: auto 0 var(--keyboard-inset);
   padding: 0;
   overflow: auto;
   overscroll-behavior: contain;

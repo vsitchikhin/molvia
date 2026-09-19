@@ -96,6 +96,10 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
 
+  /* How far an on-screen keyboard covers the bottom of the window. Zero until a sheet with a
+     field is open over it — `useKeyboardInset` sets it on that sheet. */
+  --keyboard-inset: 0px;
+
   /* ── Motion ───────────────────────────────────────────────────────────── */
   --dur-fast: 120ms; /* state change on a control */
   --dur: 220ms; /* sheet, push, tab */
