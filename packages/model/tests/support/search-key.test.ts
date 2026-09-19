@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SEARCH_KEY_TABLES, toSearchKey } from '#model/support/search-key'
-import { visibleLine } from '#model/support/text'
+import { INVISIBLE, visibleLine } from '#model/support/text'
 
 describe('toSearchKey', () => {
   it('folds case, so the same name typed three ways is one key', () => {
@@ -180,7 +180,8 @@ describe('toSearchKey', () => {
     // in front of a visible «!», must give a key that parses back.
     const name = visibleLine(200)
     const key = visibleLine(800)
-    const strips = /[\p{Z}\p{Cf}\p{Default_Ignorable_Code_Point}\p{M}\u2800\u{13441}\u{1D159}]/u
+    // Built from the list itself, so a character added to it later is walked too (С-23).
+    const strips = new RegExp(`[\\p{Z}\\p{M}${INVISIBLE}]`, 'u')
     const broken: string[] = []
     for (let code = 0; code <= 0x10ffff; code += 1) {
       if (code >= 0xd800 && code <= 0xdfff) continue
