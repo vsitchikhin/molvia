@@ -288,7 +288,8 @@ describe('startTripBodySchema', () => {
 
   it('refuses a name with nothing visible in it', () => {
     expect(
-      startTripBodySchema.safeParse({ ...body, place: { kind: 'store', name: ' ​ ' } }).success,
+      startTripBodySchema.safeParse({ ...body, place: { kind: 'store', name: ' \u200b ' } })
+        .success,
     ).toBe(false)
   })
 })
