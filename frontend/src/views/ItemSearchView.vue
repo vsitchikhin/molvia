@@ -145,11 +145,13 @@ export default defineComponent({
     // after «found one» silence would read as nothing having happened (Р-10, A5).
     // The words go with the answer they describe — a new answer, any other state, the screen
     // left: the region is read in browse mode, and «found one» over an error is a lie (B3).
+    // A dimmed answer is not read out: it is for the text before, and the answer to what is typed
+    // follows — two counts in a row are noise for someone listening.
     let withdraw: (() => void) | undefined
-    watch([phase, results], ([next, found]) => {
+    watch([phase, results, stale], ([next, found, dimmed]) => {
       withdraw?.()
       withdraw = undefined
-      if (next !== 'ready' && next !== 'empty') return
+      if ((next !== 'ready' && next !== 'empty') || dimmed) return
       withdraw = announce?.(
         next === 'ready'
           ? t('item.results_announced', { n: found.length }, found.length)

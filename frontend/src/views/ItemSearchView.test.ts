@@ -216,6 +216,33 @@ describe('«What did you pick up?»', () => {
     })
   })
 
+  it('does not read out an answer that lands in the pause — it is for the text before', async () => {
+    let second!: (entries: CatalogueEntry[]) => void
+    searchCatalogue
+      .mockResolvedValueOnce([milk])
+      .mockReturnValueOnce(new Promise((resolve) => (second = resolve)))
+      .mockResolvedValue([marianna])
+    const view = await render()
+    await field(view).setValue('молок')
+    await vi.waitFor(() => {
+      expect(view.get('.live').text()).toBe('Found 1 item')
+    })
+    await field(view).setValue('молоко')
+    await vi.waitFor(() => {
+      expect(searchCatalogue).toHaveBeenCalledTimes(2)
+    })
+
+    await field(view).setValue('молоко м')
+    second([milk, marianna])
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect(view.get('.live').text()).toBe('')
+
+    await vi.waitFor(() => {
+      expect(view.get('.live').text()).toBe('Found 1 item')
+    })
+    expect(names(view)).toEqual([marianna.name])
+  })
+
   it('names the query nothing was found for', async () => {
     searchCatalogue.mockResolvedValue([])
     const view = await render()

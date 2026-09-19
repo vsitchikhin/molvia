@@ -256,6 +256,21 @@ describe('the catalogue search as the screen types it', () => {
     expect(search.stale.value).toBe(true)
   })
 
+  it('does not paint an error for a search the next pause will replace', async () => {
+    const { query, search } = harness()
+    await type(query, 'мол')
+    await pause()
+    await type(query, 'моло')
+    calls[0]?.fail(new ApiError(ERROR.INTERNAL, 'HTTP 500'))
+    await settle()
+
+    expect(search.phase.value).toBe('loading')
+    await pause()
+    calls[1]?.answer([milk])
+    await settle()
+    expect(search.phase.value).toBe('ready')
+  })
+
   it('never asks about a field that draws nothing — a pasted U+200B is as empty as spaces', async () => {
     const { query, search } = harness()
     for (const text of [String.fromCodePoint(0x200b), String.fromCodePoint(0x2060, 0x20)]) {

@@ -81,7 +81,9 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
       // Still dimmed while a newer search waits for its pause.
       stale.value = pending !== undefined
     } catch {
-      if (mine !== latest) return
+      // A failure of a search a newer one is waiting to replace says nothing about that one: the
+      // screen keeps what it shows until the newer answers (Р-17).
+      if (mine !== latest || pending !== undefined) return
       settleFailed()
     } finally {
       if (inFlight === controller) inFlight = undefined
