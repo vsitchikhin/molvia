@@ -1,6 +1,6 @@
-import { isRateFresh, isRateJump, yerevanDate } from '@molvia/model'
+import { RATE_JUMP_MIN_HISTORY, isRateFresh, isRateJump, yerevanDate } from '@molvia/model'
 import type { CachedRate } from '@molvia/model'
-import type { RateRepository } from '@/db/rates-repository'
+import type { PastRate, RateRepository } from '@/db/rates-repository'
 import { FOREIGN } from '@/rates/feed'
 import type { Published, RateFeed } from '@/rates/feed'
 
@@ -54,17 +54,41 @@ export function officialRatesRefresh({
     }
   }
 
-  // Each rate is measured against the provider's recent ones and marked when it jumped (Р-19):
-  // kept, since it may be true, and logged, since it may be a comma in the wrong place. A write
-  // that fails is the database's failure, not the provider's: logged as such, and not counted
-  // against the central bank (adversarial Г).
+  /**
+   * What a new rate is measured against for a jump (Р-19, Р-22). The central bank, by its own
+   * latest rates. An open source is asked only while the central bank is silent, so its own
+   * history is an earlier episode, often months old — or nothing, exactly when a trip is about to
+   * take it: without three of its own from the last week, it is measured against the central
+   * bank's latest, in the same unit.
+   */
+  async function referenceFor(answer: Published): Promise<ReadonlyMap<string, readonly bigint[]>> {
+    const currencies = answer.rates.map((rate) => rate.currency)
+    const own = await rates.history(answer.provider, currencies, answer.date)
+    const central =
+      answer.provider === 'cba' ? own : await rates.history('cba', currencies, answer.date)
+    const values = (past: readonly PastRate[] | undefined) => (past ?? []).map((row) => row.scaled)
+
+    return new Map(
+      currencies.map((currency) => {
+        if (answer.provider === 'cba') return [currency, values(own.get(currency))]
+        const recent = (own.get(currency) ?? []).filter((row) => isRateFresh(row.date, answer.date))
+        return [
+          currency,
+          recent.length >= RATE_JUMP_MIN_HISTORY ? values(recent) : values(central.get(currency)),
+        ]
+      }),
+    )
+  }
+
+  // Each rate is marked when it jumped (Р-19): kept, since it may be true, and logged, since it
+  // may be a comma in the wrong place. A write that fails is the database's failure, not the
+  // provider's: logged as such, and not counted against the central bank (adversarial Г).
   async function store(answer: Published): Promise<void> {
     try {
-      const currencies = answer.rates.map((rate) => rate.currency)
-      const history = await rates.history(answer.provider, currencies, answer.date)
+      const reference = await referenceFor(answer)
       const marked = answer.rates.map((rate): CachedRate => ({
         ...rate,
-        jump: isRateJump(rate.scaled, history.get(rate.currency) ?? []),
+        jump: isRateJump(rate.scaled, reference.get(rate.currency) ?? []),
       }))
       for (const rate of marked.filter((row) => row.jump)) {
         log.warn(

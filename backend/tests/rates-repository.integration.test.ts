@@ -150,8 +150,16 @@ describe('Р-19: скачок в кеше', () => {
 
     const history = await rates.history('cba', ['RUB', 'USD', 'EUR'], '2026-09-16')
 
-    expect(history.get('RUB')).toEqual([4_305_000n, 4_304_000n, 4_303_000n, 4_302_000n, 4_301_000n])
-    expect(history.get('USD')).toEqual([363_440_000n])
+    expect(history.get('RUB')?.map((row) => row.scaled)).toEqual([
+      4_305_000n,
+      4_304_000n,
+      4_303_000n,
+      4_302_000n,
+      4_301_000n,
+    ])
+    expect(history.get('RUB')?.[0]?.date).toBe('2026-09-15')
+    expect(history.get('USD')).toEqual([{ date: '2026-09-15', scaled: 363_440_000n }])
+
     expect(history.get('EUR')).toBeUndefined()
   })
 })

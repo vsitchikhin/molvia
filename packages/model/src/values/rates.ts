@@ -114,24 +114,29 @@ export interface CachedRate extends AmdRate {
 /** How many of a provider's latest rates of a currency a new one is measured against. */
 export const RATE_JUMP_HISTORY = 5
 
+/**
+ * Fewer earlier rates than this and no judgement is made (MOL-39, Р-23). With two, the median is
+ * their mean, and one wrong day ×100 made the next right day a jump — and offered the wrong one
+ * as «previous».
+ */
+export const RATE_JUMP_MIN_HISTORY = 3
+
 /** How far from their median a new rate may move before it counts as a jump: a quarter. */
 const RATE_JUMP_PERCENT = 25n
 
 /**
- * Whether `scaled` jumped: more than a quarter away from the median of `history` — the provider's
- * latest rates of the same currency, newest first, at most `RATE_JUMP_HISTORY` of them. The median
- * rather than the last value: one wrong day in the history does not make the next right day look
- * like a jump, and a move that holds for three days of five stops being one. Nothing to measure
- * against — the first rate ever — is no jump.
+ * Whether `scaled` jumped: more than a quarter away from the median of `history` — the latest
+ * rates it is measured against, newest first, at most `RATE_JUMP_HISTORY` of them and at least
+ * `RATE_JUMP_MIN_HISTORY`. The lower median rather than the last value or a mean: one wrong day
+ * in the history does not make the next right day look like a jump, and a move that holds for
+ * three days of five stops being one.
  */
 export function isRateJump(scaled: bigint, history: readonly bigint[]): boolean {
   const recent = [...history.slice(0, RATE_JUMP_HISTORY)].sort((a, b) =>
     a < b ? -1 : a > b ? 1 : 0,
   )
-  if (recent.length === 0) return false
-  const middle = Math.floor(recent.length / 2)
-  const upper = recent[middle] ?? 0n
-  const median = recent.length % 2 === 1 ? upper : ((recent[middle - 1] ?? upper) + upper) / 2n
+  if (recent.length < RATE_JUMP_MIN_HISTORY) return false
+  const median = recent[Math.floor((recent.length - 1) / 2)] ?? scaled
   const distance = scaled > median ? scaled - median : median - scaled
   return distance * 100n > median * RATE_JUMP_PERCENT
 }
@@ -177,7 +182,9 @@ export const OFFICIAL_RATE_FRESH_DAYS = 7
  */
 export function isRateFresh(date: string, today: string): boolean {
   const days = Math.round((Date.parse(today) - Date.parse(date)) / DAY_MS)
-  return days <= OFFICIAL_RATE_FRESH_DAYS
+  // Tomorrow is as far ahead as a bank dates a rate — the Bank of Russia sets it the day before.
+  // Further ahead is not fresh but wrong: `9999-12-31` is a .NET service's «no date» (Р-25).
+  return days >= -1 && days <= OFFICIAL_RATE_FRESH_DAYS
 }
 
 // Tie-breaking order: the central bank first, then the other central bank, then the aggregator.
@@ -222,10 +229,12 @@ export function rateFromAmd(
 /** The rate a trip snapshots, and — when that rate jumped — the last one before the jump. */
 export interface OfficialRate {
   readonly rate: ExchangeRate
+  /** A half of the pair jumped when it arrived (MOL-39, Р-19, Р-21): the screen warns. */
+  readonly jumped: boolean
   /**
-   * The same pair from the provider's latest rows that did not jump, offered to the person as
-   * «count by the previous rate» (MOL-39, Р-19). Null when nothing jumped, or when there is no
-   * earlier rate to offer — then there is no choice to make either.
+   * The same pair from the provider's latest rows that did not jump, at most a week older than
+   * the jump, offered as «count by the previous rate». Null when nothing jumped or there is no
+   * such rate — the person can still count by the new one or enter their own.
    */
   readonly previous: ExchangeRate | null
 }
@@ -267,10 +276,14 @@ export function pickOfficialRate(
     if (!rate) return []
 
     const jumped = latest.some((row) => row.jump && needed.has(row.currency))
-    const previous = jumped
+    // A previous rate over a week older than the jump is not an alternative but a stale number
+    // (Р-24): not offered, and the person still has «count by the new one» and their own.
+    const steady = jumped
       ? rateFromAmd(base, quote, latestOf(own.filter((row) => !row.jump)), source)
       : null
-    return [{ provider, pick: { rate, previous }, date: yerevanDate(rate.asOf) }]
+    const date = yerevanDate(rate.asOf)
+    const previous = steady && isRateFresh(yerevanDate(steady.asOf), date) ? steady : null
+    return [{ provider, pick: { rate, jumped, previous }, date }]
   })
 
   const central = candidates.find((candidate) => candidate.provider === 'cba')

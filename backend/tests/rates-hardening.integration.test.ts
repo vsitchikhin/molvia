@@ -198,7 +198,8 @@ describe('Б. Курс, сдвинутый в 100 раз, — скачок и в
     const steady = parseErapi(erapiJson)
     const earlier = (days: number) =>
       steady.rates.map((rate): CachedRate => ({ ...rate, date: daysAgo(days), jump: false }))
-    await rates.upsert([...earlier(3), ...earlier(2)])
+    // Three days of its own in the last week: judged by its own history (Р-22, Р-23).
+    await rates.upsert([...earlier(4), ...earlier(3), ...earlier(2)])
     const shifted = parseErapi(erapiJson.replace(/"RUB":[0-9.]+/, '"RUB":0.0023'))
     const run = officialRatesRefresh({
       primary: {

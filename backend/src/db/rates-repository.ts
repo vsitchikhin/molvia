@@ -4,6 +4,12 @@ import type { AmdRate, CachedRate, RateProvider } from '@molvia/model'
 import type { Conn } from './index'
 import { officialRates } from './schema'
 
+/** One earlier rate a new one is measured against: its day matters for whose history counts. */
+export interface PastRate {
+  readonly date: string
+  readonly scaled: bigint
+}
+
 export interface RateRepository {
   /**
    * What a provider published, written whole: one statement, so a response is in the cache
@@ -30,7 +36,7 @@ export interface RateRepository {
     provider: RateProvider,
     currencies: readonly AmdRate['currency'][],
     date: string,
-  ): Promise<ReadonlyMap<AmdRate['currency'], readonly bigint[]>>
+  ): Promise<ReadonlyMap<AmdRate['currency'], readonly PastRate[]>>
 
   /** When any provider's answer was last written — whether the boot refresh can be skipped. */
   lastFetchedAt(): Promise<Date | null>
@@ -90,11 +96,12 @@ export function createRateRepository(db: Conn): RateRepository {
     },
 
     async history(provider, currencies, date) {
-      const byCurrency = new Map<AmdRate['currency'], bigint[]>()
+      const byCurrency = new Map<AmdRate['currency'], PastRate[]>()
       if (currencies.length === 0) return byCurrency
       const ranked = db
         .select({
           currency: officialRates.currency,
+          date: officialRates.rateDate,
           scaled: officialRates.scaled,
           rank: sql<number>`row_number() over (partition by ${officialRates.currency} order by ${officialRates.rateDate} desc)`.as(
             'rank',
@@ -115,7 +122,8 @@ export function createRateRepository(db: Conn): RateRepository {
         .where(lte(ranked.rank, RATE_JUMP_HISTORY))
         .orderBy(ranked.currency, ranked.rank)
       for (const row of rows) {
-        byCurrency.set(row.currency, [...(byCurrency.get(row.currency) ?? []), row.scaled])
+        const past = { date: row.date, scaled: row.scaled }
+        byCurrency.set(row.currency, [...(byCurrency.get(row.currency) ?? []), past])
       }
       return byCurrency
     },

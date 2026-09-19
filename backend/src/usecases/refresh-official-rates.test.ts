@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AmdRate, CachedRate, RateProvider } from '@molvia/model'
+import type { PastRate } from '@/db/rates-repository'
 import type { Published, RateFeed } from '@/rates/feed'
 import { FALLBACK_AFTER_FAILURES, officialRatesRefresh } from './refresh-official-rates'
 
@@ -61,7 +62,7 @@ function harness(options: Options = {}) {
       },
       latestOnOrBefore: () => Promise.resolve(cache),
       history: (provider, currencies, date) => {
-        const byCurrency = new Map<AmdRate['currency'], bigint[]>()
+        const byCurrency = new Map<AmdRate['currency'], PastRate[]>()
         for (const currency of currencies) {
           const own = cache
             .filter(
@@ -70,7 +71,7 @@ function harness(options: Options = {}) {
             .sort((a, b) => (a.date < b.date ? 1 : -1))
           byCurrency.set(
             currency,
-            own.map((row) => row.scaled),
+            own.map((row) => ({ date: row.date, scaled: row.scaled })),
           )
         }
         return Promise.resolve(byCurrency)
@@ -254,7 +255,10 @@ describe('Р-19: метка скачка', () => {
           return Promise.resolve()
         },
         latestOnOrBefore: () => Promise.resolve(cached),
-        history: () => Promise.resolve(new Map([['RUB', cached.map((row) => row.scaled)]])),
+        history: () =>
+          Promise.resolve(
+            new Map([['RUB', cached.map((row) => ({ date: row.date, scaled: row.scaled }))]]),
+          ),
       },
       log: {
         warn: (details, message) =>
@@ -279,5 +283,103 @@ describe('Р-19: метка скачка', () => {
     const h = harness()
     await h.run()
     expect(h.warnings).toEqual([])
+  })
+})
+
+describe('Р-22: запасной меряется по ЦБ РА, пока своей свежей истории нет', () => {
+  const past = (provider: RateProvider, date: string, scaled: bigint): CachedRate => ({
+    provider,
+    currency: 'RUB',
+    date,
+    scaled,
+    jump: false,
+  })
+  const cbaWeek = ['2026-09-05', '2026-09-06', '2026-09-07', '2026-09-08'].map((date) =>
+    past('cba', date, 4_312_300n),
+  )
+
+  function fallbackRun(cached: CachedRate[], rub: bigint) {
+    const cache = [...cached]
+    const upserted: CachedRate[] = []
+    const run = officialRatesRefresh({
+      // The central bank answers with a stale date, so the open source is asked (Р-18).
+      primary: { provider: 'cba', fetchLatest: () => Promise.resolve(answer('cba', '2026-09-08')) },
+      fallbacks: [
+        {
+          provider: 'cbr',
+          fetchLatest: () => {
+            const published = answer('cbr', '2026-09-19')
+            const rates = published.rates.map((rate) =>
+              rate.currency === 'RUB' ? { ...rate, scaled: rub } : rate,
+            )
+            return Promise.resolve({ ...published, rates })
+          },
+        },
+      ],
+      rates: {
+        upsert: (rates) => {
+          upserted.push(...rates)
+          return Promise.resolve()
+        },
+        latestOnOrBefore: () => Promise.resolve(cache),
+        history: (provider, currencies, date) =>
+          Promise.resolve(
+            new Map(
+              currencies.map((currency) => [
+                currency,
+                cache
+                  .filter(
+                    (row) =>
+                      row.provider === provider && row.currency === currency && row.date < date,
+                  )
+                  .sort((a, b) => (a.date < b.date ? 1 : -1))
+                  .map((row) => ({ date: row.date, scaled: row.scaled })),
+              ]),
+            ),
+          ),
+      },
+      log: { warn: () => undefined },
+      now: () => NOW,
+    })
+    return { run, upserted }
+  }
+
+  it('Е: первый ответ ЦБ РФ рублём ×100 — сверен с ЦБ РА и помечен', async () => {
+    const { run, upserted } = fallbackRun(cbaWeek, 431_230_000n)
+    await run()
+    expect(upserted.find((row) => row.provider === 'cbr' && row.currency === 'RUB')?.jump).toBe(
+      true,
+    )
+  })
+
+  it('честный первый ответ ЦБ РФ рядом с курсом ЦБ РА — без метки', async () => {
+    const { run, upserted } = fallbackRun(cbaWeek, 4_316_500n)
+    await run()
+    expect(upserted.find((row) => row.provider === 'cbr' && row.currency === 'RUB')?.jump).toBe(
+      false,
+    )
+  })
+
+  it('своя свежая история из трёх есть — меряется по ней, а не по ЦБ РА', async () => {
+    // ЦБ РА помнит 4.31, а ЦБ РФ всю неделю отдаёт 6.0: для него 6.0 — не скачок.
+    const own = ['2026-09-16', '2026-09-17', '2026-09-18'].map((date) =>
+      past('cbr', date, 6_000_000n),
+    )
+    const { run, upserted } = fallbackRun([...cbaWeek, ...own], 6_000_000n)
+    await run()
+    expect(upserted.find((row) => row.provider === 'cbr' && row.currency === 'RUB')?.jump).toBe(
+      false,
+    )
+  })
+
+  it('своя история старше недели не в счёт — снова ЦБ РА', async () => {
+    const old = ['2026-03-01', '2026-03-02', '2026-03-03'].map((date) =>
+      past('cbr', date, 4_312_300n),
+    )
+    const { run, upserted } = fallbackRun([...cbaWeek, ...old], 431_230_000n)
+    await run()
+    expect(upserted.find((row) => row.provider === 'cbr' && row.currency === 'RUB')?.jump).toBe(
+      true,
+    )
   })
 })

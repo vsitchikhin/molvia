@@ -9,6 +9,7 @@ import {
   decimalFromRate,
   exchangeRateSchema,
   isRateDay,
+  isRateFresh,
   isRateJump,
   parseRate,
   pickOfficialRate,
@@ -335,6 +336,12 @@ describe('isRateJump', () => {
     expect(isRateJump(r('431.23'), [])).toBe(false)
   })
 
+  it('isRateFresh: завтра — ещё свежий (ЦБ РФ ставит курс заранее), дальше — нет (З)', () => {
+    expect(isRateFresh('2026-09-20', '2026-09-19')).toBe(true)
+    expect(isRateFresh('2026-09-21', '2026-09-19')).toBe(false)
+    expect(isRateFresh('9999-12-31', '2026-09-19')).toBe(false)
+  })
+
   it('медиана, а не последний: один неверный день в истории не делает скачком верный', () => {
     expect(isRateJump(r('4.3123'), [r('431.23'), ...recent.slice(0, 4)])).toBe(false)
   })
@@ -349,10 +356,18 @@ describe('isRateJump', () => {
     expect(isRateJump(r('4.31'), long)).toBe(false)
   })
 
-  it('медиана чётного числа — среднее двух средних', () => {
-    // median of 4 and 6 is 5; 6.25 is exactly a quarter above
-    expect(isRateJump(r('6.25'), [r('4'), r('6')])).toBe(false)
-    expect(isRateJump(r('6.250001'), [r('4'), r('6')])).toBe(true)
+  it('чётное число — нижняя медиана: среднее двух сдвинулось бы от одной ошибки', () => {
+    // lower median of 4, 4.2, 6, 431.23 is 4.2
+    const four = ['4', '4.2', '6', '431.23'].map(r)
+    expect(isRateJump(r('5.25'), four)).toBe(false)
+    expect(isRateJump(r('5.250001'), four)).toBe(true)
+  })
+
+  it('Ж: меньше трёх прошлых курсов — не судим, иначе одна ошибка делает скачком верный день', () => {
+    expect(isRateJump(r('4.3123'), [r('431.23'), r('4.31')])).toBe(false)
+    expect(isRateJump(r('4.3123'), [r('431.23')])).toBe(false)
+    expect(isRateJump(r('4.3123'), [r('431.23'), r('4.31'), r('4.311')])).toBe(false)
+    expect(isRateJump(r('431.23'), [r('4.31'), r('4.30'), r('4.311')])).toBe(true)
   })
 })
 
@@ -365,6 +380,7 @@ describe('pickOfficialRate: скачок', () => {
       amd('RUB', '4.3050', '2026-09-17'),
     ]
     expect(pickOfficialRate('RUB', 'AMD', rows, sunday)).toEqual({
+      jumped: true,
       rate: expect.objectContaining({
         scaled: 431_230_000n,
         asOf: yerevanMidnight('2026-09-18'),
@@ -377,16 +393,37 @@ describe('pickOfficialRate: скачок', () => {
     })
   })
 
-  it('без скачка прежнего нет', () => {
-    expect(pickOfficialRate('RUB', 'AMD', [amd('RUB', '4.3123')], sunday)?.previous).toBeNull()
+  it('без скачка нет ни метки, ни прежнего', () => {
+    expect(pickOfficialRate('RUB', 'AMD', [amd('RUB', '4.3123')], sunday)).toMatchObject({
+      jumped: false,
+      previous: null,
+    })
   })
 
-  it('скачок без более раннего курса — выбирать не из чего, прежнего нет', () => {
+  it('скачок без более раннего курса — скачок виден, прежнего нет', () => {
     const rows = [amd('RUB', '431.23', '2026-09-18', 'cba', true)]
     expect(pickOfficialRate('RUB', 'AMD', rows, sunday)).toMatchObject({
       rate: { scaled: 431_230_000n },
+      jumped: true,
       previous: null,
     })
+  })
+
+  it('прежний старше недели от скачка не предлагается (С-13)', () => {
+    const rows = [
+      amd('RUB', '431.23', '2026-09-18', 'cba', true),
+      amd('RUB', '4.3050', '2026-09-09'),
+      amd('RUB', '4.3050', '2026-09-10'),
+    ]
+    expect(pickOfficialRate('RUB', 'AMD', rows, sunday)).toMatchObject({
+      jumped: true,
+      previous: null,
+    })
+    const week = [
+      amd('RUB', '431.23', '2026-09-18', 'cba', true),
+      amd('RUB', '4.3050', '2026-09-11'),
+    ]
+    expect(pickOfficialRate('RUB', 'AMD', week, sunday)?.previous).not.toBeNull()
   })
 
   it('в кроссе прыгнула одна половина — прежний собирается из прежней и неизменной', () => {
@@ -401,8 +438,11 @@ describe('pickOfficialRate: скачок', () => {
     expect(picked?.previous).toMatchObject({ scaled: 11_865n, asOf: yerevanMidnight('2026-09-17') })
   })
 
-  it('скачок у валюты не из пары прежний не заводит', () => {
+  it('скачок у валюты не из пары пару не метит', () => {
     const rows = [amd('RUB', '4.3123'), amd('USD', '36344', '2026-09-18', 'cba', true)]
-    expect(pickOfficialRate('RUB', 'AMD', rows, sunday)?.previous).toBeNull()
+    expect(pickOfficialRate('RUB', 'AMD', rows, sunday)).toMatchObject({
+      jumped: false,
+      previous: null,
+    })
   })
 })
