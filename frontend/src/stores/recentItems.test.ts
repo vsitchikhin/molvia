@@ -157,6 +157,19 @@ describe('recent items', () => {
     expect(shown.items.map((item) => item.id)).toEqual([bread.id])
   })
 
+  it('keeps what it wrote when a full localStorage refuses it and sessionStorage takes it', () => {
+    const store = relaunched()
+    store.remember(bread)
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError')
+    })
+
+    store.remember(milk)
+    store.sync()
+
+    expect(store.items.map((item) => item.id)).toEqual([milk.id, bread.id])
+  })
+
   it('remembers for the session when storage refuses every write', () => {
     const store = relaunched()
     vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
@@ -205,6 +218,21 @@ describe('recent items', () => {
       const store = withThree()
       expect(store.filter('')).toHaveLength(3)
       expect(store.filter('   ')).toHaveLength(3)
+    })
+
+    it('not at all under a query that draws nothing — the search calls it empty, and so does this', () => {
+      const store = withThree()
+      expect(store.filter(String.fromCodePoint(0x200b))).toHaveLength(3)
+      expect(store.filter(String.fromCodePoint(0x2060, 0x20))).toHaveLength(3)
+    })
+
+    it('past what draws nothing inside the query', () => {
+      const zwsp = String.fromCodePoint(0x200b)
+      expect(
+        withThree()
+          .filter(`хлеб${zwsp}`)
+          .map((item) => item.id),
+      ).toEqual([bread.id])
     })
 
     it('trimmed at the edges, like the question «is it empty»', () => {

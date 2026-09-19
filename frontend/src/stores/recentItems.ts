@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { catalogueEntryCodec } from '@molvia/model'
+import { INVISIBLE, catalogueEntryCodec, drawsNothing } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import { currentIdentity } from '@/stores/identity'
 import { read, write } from '@/stores/storage'
@@ -36,6 +36,13 @@ function load(actorId: string): CatalogueEntry[] | null {
     const entry = catalogueEntryCodec.safeDecode(row)
     return entry.success ? [entry.data] : []
   })
+}
+
+const UNSEEN = new RegExp(`[${INVISIBLE}]`, 'gu')
+
+/** Case and what draws nothing set aside — for narrowing, never for storing. */
+function comparable(text: string): string {
+  return text.replace(UNSEEN, '').toLocaleLowerCase()
 }
 
 /**
@@ -85,10 +92,12 @@ export const useRecentItemsStore = defineStore('recentItems', () => {
       RECENT_LIMIT,
     )
     if (owner !== null) {
-      ahead = !write(
-        keyOf(owner),
-        JSON.stringify(items.value.map((kept) => catalogueEntryCodec.encode(kept))),
-      )
+      const written = JSON.stringify(items.value.map((kept) => catalogueEntryCodec.encode(kept)))
+      write(keyOf(owner), written)
+      // Ahead unless storage reads back what was written. «Some shelf took it» is not enough: a
+      // full localStorage keeps its older list and is read first, and the next `sync` would bring
+      // that list back over the one just written to sessionStorage (adversarial B5).
+      ahead = read(keyOf(owner)) !== written
     }
   }
 
@@ -97,12 +106,14 @@ export const useRecentItemsStore = defineStore('recentItems', () => {
    * typos, which is what the offline text says («только среди недавних»).
    */
   function filter(query: string): CatalogueEntry[] {
-    const needle = query.trim().toLocaleLowerCase()
-    if (needle === '') return items.value
+    // Empty by the measure the search uses, and what draws nothing is not looked for on either
+    // side: a pasted U+200B left the phase at «nothing typed» and the list empty (Р-14, B1).
+    if (drawsNothing(query)) return items.value
+    const needle = comparable(query).trim()
     return items.value.filter(
       (entry) =>
-        entry.name.toLocaleLowerCase().includes(needle) ||
-        (entry.note?.toLocaleLowerCase().includes(needle) ?? false),
+        comparable(entry.name).includes(needle) ||
+        (entry.note !== null && comparable(entry.note).includes(needle)),
     )
   }
 
