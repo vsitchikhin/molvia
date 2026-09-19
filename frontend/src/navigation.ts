@@ -15,9 +15,9 @@ import type { RouteName, Tab } from '@/router'
  */
 export type TabMove = 'push' | 'replace' | 'back' | 'top'
 
-export function tabMove(from: Tab | undefined, to: Tab, back: string | null): TabMove {
+export function tabMove(from: Tab | undefined, to: Tab, below: RouteName | undefined): TabMove {
   if (from === to) return 'top'
-  if (to === 'trip') return back === '/' ? 'back' : 'replace'
+  if (to === 'trip') return below === 'trip' ? 'back' : 'replace'
   return from === 'trip' ? 'push' : 'replace'
 }
 
@@ -28,14 +28,21 @@ export function tabMove(from: Tab | undefined, to: Tab, back: string | null): Ta
  */
 export type BackMove = 'back' | { replace: RouteName }
 
-export function backMove(parent: RouteName, parentPath: string, back: string | null): BackMove {
-  return back === parentPath ? 'back' : { replace: parent }
+export function backMove(parent: RouteName, below: RouteName | undefined): BackMove {
+  return below === parent ? 'back' : { replace: parent }
 }
 
-/** The entry underneath the current one, as vue-router records it in the history state. */
-function entryBelow(router: Router): string | null {
+/**
+ * Which screen the entry underneath the current one is — by route, never by address. The
+ * history records the address whole, and `/?utm_source=telegram` or `/#top` is the trip as
+ * much as `/` is; a string compared with `'/'` took them for somewhere else, and «back» from
+ * the trip then led to the trip again.
+ */
+function entryBelow(router: Router): RouteName | undefined {
   const back: unknown = router.options.history.state.back
-  return typeof back === 'string' ? back : null
+  if (typeof back !== 'string') return undefined
+  const name = router.resolve(back).name
+  return typeof name === 'string' ? (name as RouteName) : undefined
 }
 
 /**
@@ -48,7 +55,7 @@ export async function settleColdStart(router: Router): Promise<void> {
   await router.isReady()
   const route = router.currentRoute.value
   const parent = route.meta.parent
-  if (!parent || entryBelow(router) !== null) return
+  if (!parent || router.options.history.state.back) return
 
   const target = route.fullPath
   await router.replace({ name: parent })
@@ -59,6 +66,26 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
+/**
+ * A step back is taken the moment it is asked for, but the history only moves on `popstate`.
+ * A second tap in between still sees the parent underneath and steps past it, out of the app —
+ * so until the step lands, further moves are ignored. The timer only guards against a step that
+ * never lands.
+ */
+let stepping = false
+
+function stepBack(router: Router): void {
+  stepping = true
+  const landed = (): void => {
+    stepping = false
+    window.clearTimeout(timer)
+    window.removeEventListener('popstate', landed)
+  }
+  const timer = window.setTimeout(landed, 1000)
+  window.addEventListener('popstate', landed)
+  router.back()
+}
+
 export function useNavigation(): {
   goTab: (to: Tab) => Promise<void>
   goBack: () => Promise<void>
@@ -67,11 +94,12 @@ export function useNavigation(): {
   const route: RouteLocationNormalizedLoaded = useRoute()
 
   async function goTab(to: Tab): Promise<void> {
+    if (stepping) return
     const move = tabMove(route.meta.tab, to, entryBelow(router))
     if (move === 'top') {
       window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
     } else if (move === 'back') {
-      router.back()
+      stepBack(router)
     } else {
       await router[move]({ name: to })
     }
@@ -79,9 +107,9 @@ export function useNavigation(): {
 
   async function goBack(): Promise<void> {
     const parent = route.meta.parent
-    if (!parent) return
-    const move = backMove(parent, router.resolve({ name: parent }).fullPath, entryBelow(router))
-    if (move === 'back') router.back()
+    if (!parent || stepping) return
+    const move = backMove(parent, entryBelow(router))
+    if (move === 'back') stepBack(router)
     else await router.replace({ name: move.replace })
   }
 

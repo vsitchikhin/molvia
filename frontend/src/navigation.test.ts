@@ -7,7 +7,7 @@ import type { Router } from 'vue-router'
 import { createAppI18n } from '@/i18n'
 import { backMove, settleColdStart, tabMove } from '@/navigation'
 import type { TabMove } from '@/navigation'
-import type { Tab } from '@/router'
+import type { RouteName, Tab } from '@/router'
 import { routes } from '@/router'
 import TabBar from '@/components/TabBar.vue'
 
@@ -15,37 +15,37 @@ import TabBar from '@/components/TabBar.vue'
 vi.mock('@/api', () => ({ api: { health: () => new Promise(() => undefined) } }))
 
 describe('tabMove — «Trip» is home', () => {
-  it.each<[Tab, Tab, string | null, TabMove]>([
+  it.each<[Tab, Tab, RouteName | undefined, TabMove]>([
     // Leaving home pushes, so «back» returns to it.
-    ['trip', 'advice', null, 'push'],
-    ['trip', 'verdicts', '/somewhere', 'push'],
+    ['trip', 'advice', undefined, 'push'],
+    ['trip', 'verdicts', 'advice', 'push'],
     // Between the other sections nothing piles up.
-    ['advice', 'verdicts', '/', 'replace'],
-    ['verdicts', 'advice', '/', 'replace'],
-    ['advice', 'verdicts', null, 'replace'],
+    ['advice', 'verdicts', 'trip', 'replace'],
+    ['verdicts', 'advice', 'trip', 'replace'],
+    ['advice', 'verdicts', undefined, 'replace'],
     // Home again is a step back — when home is the entry underneath.
-    ['advice', 'trip', '/', 'back'],
-    ['verdicts', 'trip', '/', 'back'],
+    ['advice', 'trip', 'trip', 'back'],
+    ['verdicts', 'trip', 'trip', 'back'],
     // Opened cold on a section: home is not underneath, and a step back would leave the app.
-    ['verdicts', 'trip', null, 'replace'],
-    ['advice', 'trip', '/verdicts', 'replace'],
+    ['verdicts', 'trip', undefined, 'replace'],
+    ['advice', 'trip', 'verdicts', 'replace'],
     // The section already open scrolls to its top.
-    ['trip', 'trip', null, 'top'],
-    ['advice', 'advice', '/', 'top'],
-  ])('%s → %s with %s underneath: %s', (from, to, back, move) => {
-    expect(tabMove(from, to, back)).toBe(move)
+    ['trip', 'trip', undefined, 'top'],
+    ['advice', 'advice', 'trip', 'top'],
+  ])('%s → %s with %s underneath: %s', (from, to, below, move) => {
+    expect(tabMove(from, to, below)).toBe(move)
   })
 })
 
 describe('backMove — the chevron agrees with the system button', () => {
   it('steps back when the parent is underneath', () => {
-    expect(backMove('trip', '/', '/')).toBe('back')
+    expect(backMove('trip', 'trip')).toBe('back')
   })
 
-  it.each([null, '/advice', '/verdicts'])(
+  it.each<RouteName | undefined>([undefined, 'advice', 'verdicts'])(
     'replaces onto the parent when %s is underneath, never leaving the app',
-    (back) => {
-      expect(backMove('trip', '/', back)).toEqual({ replace: 'trip' })
+    (below) => {
+      expect(backMove('trip', below)).toEqual({ replace: 'trip' })
     },
   )
 })
@@ -120,6 +120,57 @@ describe('the tab bar walks the history as В-2 decided', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  // The trip is the trip whatever its address carries: a query from a shared link, a hash.
+  it.each(['/?utm_source=telegram', '/#top'])(
+    'arrived at %s: What to buy → Trip is still the step back',
+    async (entry) => {
+      const { router, tap } = await app(entry)
+      await tap(1)
+      expect(router.currentRoute.value.name).toBe('advice')
+      const back = vi.spyOn(router, 'back')
+      await tap(0)
+      await vi.waitFor(() => {
+        expect(router.currentRoute.value.name).toBe('trip')
+      })
+      expect(back).toHaveBeenCalledOnce()
+      expect(router.options.history.state.back).toBeNull()
+    },
+  )
+
+  // Two taps before the history moves: the second must not step past the trip, out of the app.
+  it('two taps on Trip in one go take one step back', async () => {
+    const { router } = await app('/')
+    await router.push('/advice')
+    const view = mount(TabBar, {
+      global: { plugins: [router, createPinia(), createAppI18n('en')] },
+    })
+    const back = vi.spyOn(router, 'back')
+    const trip = view.findAll('.tab')[0]
+    void trip?.trigger('click', { button: 0 })
+    void trip?.trigger('click', { button: 0 })
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.name).toBe('trip')
+    })
+    expect(back).toHaveBeenCalledOnce()
+  })
+
+  it('two taps on the chevron in one go take one step back', async () => {
+    const router = await fresh('/')
+    await router.push('/trip/add')
+    const view = mount(
+      defineComponent(() => () => h(RouterView)),
+      { global: { plugins: [router, createPinia(), createAppI18n('en')] } },
+    )
+    const back = vi.spyOn(router, 'back')
+    const chevron = view.get('.back')
+    void chevron.trigger('click')
+    void chevron.trigger('click')
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.name).toBe('trip')
+    })
+    expect(back).toHaveBeenCalledOnce()
   })
 
   // The example the owner answered: Trip → What to buy → Ratings, then «back».
