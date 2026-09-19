@@ -224,6 +224,36 @@ describe('the first launch', () => {
     })
   })
 
+  // An iOS PWA frozen in the background misses `online` while the network returns. Since
+  // MOL-19 the offline notice has no button, so coming back into view is the other way back
+  // (Р-8, B2).
+  it('recovers when the app comes back into view, even with no «online» to hear', async () => {
+    online(false)
+    const { store } = await freshStore()
+    await store.start()
+    expect(store.state).toBe('offline')
+
+    online(true)
+    createActor.mockResolvedValue(FIRST)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.waitFor(() => {
+      expect(store.state).toBe('ready')
+    })
+  })
+
+  it('does not start over on coming into view when it is fine', async () => {
+    localStorage.setItem(KEY, FIRST.id)
+    const { store } = await freshStore()
+    me.mockResolvedValue(FIRST)
+    await store.start()
+    expect(store.state).toBe('ready')
+    me.mockClear()
+
+    document.dispatchEvent(new Event('visibilitychange'))
+    await Promise.resolve()
+    expect(me).not.toHaveBeenCalled()
+  })
+
   it('starts on a device whose storage is blocked outright, instead of rejecting', async () => {
     // Disabled cookies, an embedded WebView, a corporate policy: reaching for the property
     // throws, not just writing to it. One unguarded read left `start()` rejecting into

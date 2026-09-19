@@ -86,12 +86,30 @@ describe('HomeView', () => {
     })
   })
 
+  // The connection came back while the app was in the background and `online` was missed —
+  // iOS freezes a PWA there. Coming back into view is enough (MOL-19, B2).
+  it('tries again when the app comes back into view', async () => {
+    online(false)
+    health.mockResolvedValue({ status: 'ok', version: '1.2.3', database: 'up' })
+    const view = await render()
+    await vi.waitFor(() => {
+      expect(view.text()).toContain(en.item.offline.title)
+    })
+
+    online(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.waitFor(() => {
+      expect(view.text()).toContain('1.2.3')
+    })
+  })
+
   it('stops listening once it is gone', async () => {
     online(false)
     const view = await render()
     view.unmount()
     online(true)
     window.dispatchEvent(new Event('online'))
+    document.dispatchEvent(new Event('visibilitychange'))
     await Promise.resolve()
     expect(health).not.toHaveBeenCalled()
   })

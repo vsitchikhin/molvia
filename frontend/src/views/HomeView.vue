@@ -35,7 +35,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, onUnmounted, ref } from 'vue'
+import { defineComponent, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconStar from '~icons/mdi/star-outline'
 import { api } from '@/api'
@@ -43,6 +43,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import { useReconnect } from '@/composables/useReconnect'
 
 // Every screen has four states, offline included: the target is a phone at a shelf,
 // where the connection drops more often than anything else fails.
@@ -93,17 +94,12 @@ export default defineComponent({
 
     // Back online, the screen tries again by itself — the identity does the same, and a screen
     // left saying «no connection» with the connection back would be lying.
-    function reconnect(): void {
+    useReconnect(() => {
       if (state.value === 'offline' || state.value === 'error') void load()
-    }
-
-    onMounted(() => {
-      window.addEventListener('online', reconnect)
-      void load()
     })
 
-    onUnmounted(() => {
-      window.removeEventListener('online', reconnect)
+    onMounted(() => {
+      void load()
     })
 
     return { t, state, version, load, IconStar }
