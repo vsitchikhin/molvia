@@ -6,6 +6,7 @@ import { settleColdStart } from '@/navigation'
 import { router } from '@/router'
 import { installArrival, installViewTransitions } from '@/transitions'
 import { useActorStore } from '@/stores/actor'
+import { takeInviteCodeFromUrl } from '@/stores/identity'
 import '@/styles/main.scss'
 
 const app = createApp(App)
@@ -21,6 +22,10 @@ applyDocumentLang()
 app.config.errorHandler = (error, _instance, info) => {
   console.error('[molvia]', info, error)
 }
+
+// Before the router reads the address: otherwise it keeps `?c=` as the current location and
+// writes it as «back» into the next entry, where the path `/` is expected.
+takeInviteCodeFromUrl()
 
 app.use(createPinia()).use(router).use(i18n)
 
