@@ -23,23 +23,33 @@ app.config.errorHandler = (error, _instance, info) => {
   console.error('[molvia]', info, error)
 }
 
-// Before the router reads the address: otherwise it keeps `?c=` as the current location and
-// writes it as «back» into the next entry, where the path `/` is expected.
+// The invite code is saved and scrubbed from the address bar here, and then from the router
+// too: the router read the address when it was created, and left alone it would keep `/?c=…`
+// as where it is and write that as «back» into the next entry — where the tabs expect `/`.
 takeInviteCodeFromUrl()
+
+async function forgetInviteInRoute(): Promise<void> {
+  await router.isReady()
+  const { c, ...query } = router.currentRoute.value.query
+  if (c === undefined) return
+  await router.replace({ query, hash: router.currentRoute.value.hash })
+}
 
 app.use(createPinia()).use(router).use(i18n)
 
 // Mounted once the first route is settled: a nested screen opened cold gets its parent laid
 // underneath first, so the first paint is already the screen and not a flash of the parent.
-// Transitions and focus are installed after that, so laying the parent down is not a move.
-void settleColdStart(router).then(() => {
-  installViewTransitions(router)
-  installArrival(router, (key) => i18n.global.t(key))
-  app.mount('#app')
+// Transitions and focus are installed after that, so neither step counts as a move.
+void forgetInviteInRoute()
+  .then(() => settleColdStart(router))
+  .then(() => {
+    installViewTransitions(router)
+    installArrival(router, (key) => i18n.global.t(key))
+    app.mount('#app')
 
-  // Raised right after the first paint rather than before it: the store carries the four
-  // states a screen shows, so a person gets «loading» instead of a blank page while the
-  // identity is being fetched. Every request after this one carries the identifier, and the
-  // screen that explains a lost identity is drawn from the same state.
-  void useActorStore().start()
-})
+    // Raised right after the first paint rather than before it: the store carries the four
+    // states a screen shows, so a person gets «loading» instead of a blank page while the
+    // identity is being fetched. Every request after this one carries the identifier, and the
+    // screen that explains a lost identity is drawn from the same state.
+    void useActorStore().start()
+  })
