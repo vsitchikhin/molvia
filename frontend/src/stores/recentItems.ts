@@ -1,0 +1,95 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { catalogueEntryCodec } from '@molvia/model'
+import type { CatalogueEntry } from '@molvia/model'
+import { currentIdentity } from '@/stores/identity'
+import { read, write } from '@/stores/storage'
+
+/** As many as the search answers with: the device keeps the same twenty (`SEARCH_LIMIT`). */
+export const RECENT_LIMIT = 20
+
+/**
+ * Per identity: after «Вернуть прежние данные» the recent items are that identity's, not the
+ * one set aside — the same person, but not the same purchases.
+ */
+function keyOf(actorId: string): string {
+  return `molvia.recent.${actorId}`
+}
+
+/**
+ * Entry by entry, so one row an older version wrote differently costs that row and not the
+ * list. Anything that is not a list at all is no list.
+ */
+function load(actorId: string): CatalogueEntry[] {
+  const raw = read(keyOf(actorId))
+  if (!raw) return []
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return []
+  }
+  if (!Array.isArray(parsed)) return []
+
+  return parsed.flatMap((row) => {
+    const entry = catalogueEntryCodec.safeDecode(row)
+    return entry.success ? [entry.data] : []
+  })
+}
+
+/**
+ * The items this person added to trips lately, kept on the device: «Часто берёте» under an
+ * empty query, and the only thing to search while the network is gone.
+ *
+ * Written when an item goes into a trip, never on a tap — a tap the sheet cancels is a changed
+ * mind, the rule the server's own memory of picks keeps (MOL-11). The writer is the sheet
+ * (MOL-24). Newest first, by recency rather than by frequency: the handoff asks for «the last
+ * twenty picked».
+ *
+ * Catalogue cards only — six public fields, nothing about the person — so nothing here is more
+ * private than the catalogue itself.
+ */
+export const useRecentItemsStore = defineStore('recentItems', () => {
+  const items = ref<CatalogueEntry[]>([])
+  /** Whose list `items` holds. Kept in memory, so a device that cannot write still remembers for the session. */
+  let owner: string | null = null
+
+  /** Called where the list is shown: the identity may have changed since the last time. */
+  function sync(): void {
+    const actorId = currentIdentity()
+    if (actorId === owner) return
+    owner = actorId
+    items.value = actorId === null ? [] : load(actorId)
+  }
+
+  function remember(entry: CatalogueEntry): void {
+    sync()
+    items.value = [entry, ...items.value.filter((kept) => kept.id !== entry.id)].slice(
+      0,
+      RECENT_LIMIT,
+    )
+    if (owner !== null) {
+      write(
+        keyOf(owner),
+        JSON.stringify(items.value.map((kept) => catalogueEntryCodec.encode(kept))),
+      )
+    }
+  }
+
+  /**
+   * Narrowing twenty rows while offline, not a catalogue search: no transliteration and no
+   * typos, which is what the offline text says («только среди недавних»).
+   */
+  function filter(query: string): CatalogueEntry[] {
+    const needle = query.trim().toLocaleLowerCase()
+    if (needle === '') return items.value
+    return items.value.filter(
+      (entry) =>
+        entry.name.toLocaleLowerCase().includes(needle) ||
+        (entry.note?.toLocaleLowerCase().includes(needle) ?? false),
+    )
+  }
+
+  return { items, sync, remember, filter }
+})
