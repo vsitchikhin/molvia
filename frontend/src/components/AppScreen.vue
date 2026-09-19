@@ -104,6 +104,14 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* A column as tall as the viewport, so that what fills the content — an empty or an offline
+   state — can take the free height and put its action at the bottom, under the thumb. */
+.screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
 .bar {
   @include pinned-bar;
 
@@ -265,6 +273,9 @@ export default defineComponent({
 /* The home indicator is below every screen, not only under the tab bar: a nested screen has
    no bar to carry it, and its last row would sit under the indicator. */
 .content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   padding: var(--space-4) calc(var(--space-4) + var(--safe-right))
     calc(var(--space-4) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
 }
