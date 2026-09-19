@@ -135,6 +135,28 @@ describe('recent items', () => {
     expect(relaunched().items.map((item) => item.id)).toEqual([matsun.id, bread.id])
   })
 
+  it('keeps what another window of the app added — the installed app and a tab share storage', () => {
+    const pwa = relaunched()
+    setActivePinia(createPinia())
+    const tab = useRecentItemsStore()
+    tab.sync()
+
+    pwa.remember(milk)
+    tab.remember(bread)
+
+    expect(relaunched().items.map((item) => item.id)).toEqual([bread.id, milk.id])
+  })
+
+  it('shows what another window added the next time the list is shown', () => {
+    const shown = relaunched()
+    const other = relaunched()
+    other.remember(bread)
+
+    shown.sync()
+
+    expect(shown.items.map((item) => item.id)).toEqual([bread.id])
+  })
+
   it('remembers for the session when storage refuses every write', () => {
     const store = relaunched()
     vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
