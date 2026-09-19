@@ -152,3 +152,17 @@ describe('convertMoney', () => {
     expect(convertMoney(money(12345n, 'AMD'), rate('1')).minor).toBe(12345n)
   })
 })
+
+describe('convertMoney: a result past int8', () => {
+  it('refuses rather than build a Money nothing can carry (MOL-21, adversarial А)', () => {
+    // A rate at the bottom of its band multiplies: the largest amount becomes ten thousand times it.
+    const tiny: ExchangeRate = { ...rate('0.0001'), quote: 'AMD' }
+    expect(() => convertMoney({ minor: 9_000_000_000_000_000n, currency: 'AMD' }, tiny)).toThrow(
+      ERROR.INVALID_AMOUNT,
+    )
+    expect(convertMoney({ minor: 100n, currency: 'AMD' }, tiny)).toEqual({
+      minor: 1_000_000n,
+      currency: 'RUB',
+    })
+  })
+})

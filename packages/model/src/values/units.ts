@@ -115,11 +115,8 @@ export function unitPrice(amount: Money, quantity: Quantity): UnitPrice {
   if (amount.minor < 0n) {
     throw new DomainError(ERROR.INVALID_AMOUNT, String(amount.minor))
   }
-  return {
-    scaledMinor: divideRounded(amount.minor * 1000n * UNIT_PRICE_SCALE, quantity.milli),
-    currency: amount.currency,
-    unit: quantity.unit,
-  }
+  const scaledMinor = divideRounded(amount.minor * 1000n * UNIT_PRICE_SCALE, quantity.milli)
+  return { scaledMinor, currency: amount.currency, unit: quantity.unit }
 }
 
 export function compareUnitPrice(a: UnitPrice, b: UnitPrice): number {
@@ -154,9 +151,15 @@ export function formatUnitPrice(price: UnitPrice, locale = 'ru-RU'): string {
  * the same way money does, and for the same reason: the screen rounds on output only, and a
  * price rounded here would compare 577,78 against 577,78 where the rows differ in the third
  * place (MOL-21).
+ *
+ * **No int8 ceiling**, unlike money. A unit price is a ratio that is never stored, and it keeps
+ * its own scale: 92 233 720,37 ֏ for one gram is a legal amount over a legal quantity whose price
+ * per kilo is past int8. The first version capped it here, and since the answer is encoded after
+ * the expense is written, such a row was stored and every later read of its trip answered 500
+ * (MOL-21, adversarial А). The string bound is what keeps the wire finite.
  */
 const unitPriceFields = z.object({
-  scaledMinor: z.bigint().nonnegative().max(INT8_MAX),
+  scaledMinor: z.bigint().nonnegative(),
   currency: currencySchema,
   unit: baseUnitSchema,
 })
@@ -173,7 +176,7 @@ const unitPriceDigits = (currency: Currency): number => UNIT_PRICE_DIGITS + MINO
 export const unitPriceCodec = z.codec(unitPriceWireSchema, unitPriceFields, {
   decode: ({ amount, currency, unit }, payload) => {
     const scaledMinor = scaledFromDecimal(amount, unitPriceDigits(currency))
-    if (scaledMinor === null || scaledMinor < 0n || scaledMinor > INT8_MAX) {
+    if (scaledMinor === null || scaledMinor < 0n) {
       payload.issues.push({
         code: 'custom',
         input: amount,

@@ -1,4 +1,5 @@
-import { tripViewOf } from '@molvia/model'
+import { z } from 'zod'
+import { tripViewCodec, tripViewOf } from '@molvia/model'
 import type { Trip, TripView } from '@molvia/model'
 import type { TripRepositories } from '@/db/unit-of-work'
 
@@ -21,5 +22,12 @@ export async function tripViewFor(
 
   const rows = await expenses.forTrip(trip.id, trip.actorId)
   const catalogue = await items.byIds([...new Set(rows.map((row) => row.itemId))])
-  return tripViewOf(trip, place, rows, catalogue)
+  const view = tripViewOf(trip, place, rows, catalogue)
+
+  // Encoded here as well as in the route, because here is still inside the writer's
+  // transaction: an answer the wire cannot carry must undo the write it describes, not follow it
+  // as a 500 — the first version stored such a row, and every read of its trip failed after
+  // (MOL-21, adversarial А).
+  z.encode(tripViewCodec, view)
+  return view
 }

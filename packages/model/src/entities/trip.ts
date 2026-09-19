@@ -61,5 +61,8 @@ export function convertMoney(amount: Money, rate: ExchangeRate): Money {
     MINOR_EXPONENT[amount.currency],
     MINOR_EXPONENT[rate.base],
   )
+  // A small rate grows the amount: without this bound the result is legal arithmetic and an
+  // illegal Money, and the trip answer built from it fails on the wire (MOL-21, adversarial А).
+  if (minor > INT8_MAX) throw new DomainError(ERROR.INVALID_AMOUNT, String(minor))
   return { minor, currency: rate.base }
 }

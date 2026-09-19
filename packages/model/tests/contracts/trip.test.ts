@@ -333,3 +333,16 @@ describe('addExpenseBodySchema', () => {
     ).toBe(false)
   })
 })
+
+describe('adversarial А: a unit price past int8', () => {
+  it('crosses the wire and back whole — it is a ratio, never stored', () => {
+    // 92 233 720,37 ֏ for one gram: each field legal, the price per kilo past int8.
+    const price = {
+      scaledMinor: 9_223_372_037_000_000_000n,
+      currency: 'AMD' as const,
+      unit: 'kg' as const,
+    }
+    const wire = JSON.parse(JSON.stringify(z.encode(unitPriceCodec, price))) as unknown
+    expect(unitPriceCodec.parse(wire)).toEqual(price)
+  })
+})
