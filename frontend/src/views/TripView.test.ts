@@ -13,10 +13,12 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 import TripView from '@/views/TripView.vue'
 
 const currentTrip = vi.fn<() => Promise<TripViewModel | null>>()
+const recentPlaces = vi.fn<() => Promise<{ id: string; kind: 'store'; name: string }[]>>()
 const addExpense = vi.fn()
 vi.mock('@/api', () => ({
   api: {
     currentTrip: () => currentTrip(),
+    recentPlaces: () => recentPlaces(),
     addExpense: (...args: unknown[]) => addExpense(...args),
     updateExpense: () => new Promise(() => undefined),
     removeExpense: () => new Promise(() => undefined),
@@ -102,6 +104,15 @@ const handoff = (): Row[] => [
 /** Прочитанное с экрана: деньги печатаются с неразрывным пробелом, тесты — обычным. */
 const plain = (value: string | null | undefined): string => (value ?? '').replaceAll('\u00a0', ' ')
 
+/** Кнопка внутри шторки: она живёт в `<dialog>` вне дерева компонента. */
+function inside(sheet: Element | null, text: string): HTMLButtonElement {
+  const found = [...(sheet?.querySelectorAll('button') ?? [])].find((node) =>
+    node.textContent.includes(text),
+  )
+  if (!found) throw new Error(`нет кнопки «${text}» в шторке`)
+  return found
+}
+
 function button(view: VueWrapper, text: string): DOMWrapper<HTMLButtonElement> {
   const found = view.findAll('button').find((candidate) => candidate.text() === text)
   if (!found) throw new Error(`нет кнопки «${text}»`)
@@ -137,6 +148,8 @@ describe('TripView', () => {
     sessionStorage.clear()
     currentTrip.mockReset()
     currentTrip.mockResolvedValue(null)
+    recentPlaces.mockReset()
+    recentPlaces.mockResolvedValue([])
     addExpense.mockReset()
     addExpense.mockReturnValue(new Promise(() => undefined))
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
@@ -356,6 +369,73 @@ describe('TripView', () => {
       await button(view, ru.state.retry).trigger('click')
       await flushPromises()
       expect(view.text()).not.toContain(ru.trip.error.title)
+    })
+  })
+
+  describe('начать и завершить (В-1, В-2)', () => {
+    it('«Начать поход» пишет поход в очередь и рисует его сразу — сеть не ждём', async () => {
+      recentPlaces.mockRejectedValue(new Error('Failed to fetch'))
+      const { view, queue } = await render()
+      await button(view, ru.trip.none.action).trigger('click')
+      await flushPromises()
+      clock += 1000
+
+      const sheet = document.body.querySelector('dialog')
+      const field = sheet?.querySelector('input')
+      if (!field) throw new Error('нет поля места')
+      field.value = 'Рынок'
+      field.dispatchEvent(new Event('input'))
+      await flushPromises()
+      inside(sheet, ru.trip.none.action).click()
+      await flushPromises()
+
+      const start = queue.pending.find((write) => write.kind === 'start')
+      expect(start?.place.name).toBe('Рынок')
+      expect(start?.tripId).toMatch(/^[0-9a-f-]+$/)
+      // Поход виден с местом и днём, хотя сервер о нём ещё не знает.
+      expect(view.text()).toContain('Рынок · сегодня')
+    })
+
+    it('недавнее место начинает поход одним тапом', async () => {
+      recentPlaces.mockResolvedValue([
+        { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: 'Ереван Сити' },
+      ])
+      const { view, queue } = await render()
+      await button(view, ru.trip.none.action).trigger('click')
+      await flushPromises()
+      clock += 1000
+
+      await button(view, 'Ереван Сити').trigger('click')
+      await flushPromises()
+
+      expect(queue.pending.find((write) => write.kind === 'start')?.place.name).toBe('Ереван Сити')
+    })
+
+    it('«Завершить» сначала спрашивает, и отмена ничего не пишет', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      const { view, queue } = await render()
+      await button(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      clock += 1000
+
+      expect(document.body.textContent).toContain(ru.trip.finish_confirm.title)
+      inside(document.body.querySelector('dialog'), ru.trip.finish_confirm.cancel).click()
+      await flushPromises()
+      expect(queue.pending).toEqual([])
+    })
+
+    it('подтверждённое завершение уходит в очередь, и экран зовёт начать новый', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      const { view, queue } = await render()
+      await button(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      clock += 1000
+      inside(document.body.querySelector('dialog'), ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+
+      expect(queue.pending.some((write) => write.kind === 'finish')).toBe(true)
+      expect(view.text()).toContain(ru.trip.none.title)
+      expect(view.findAll('.row')).toHaveLength(0)
     })
   })
 

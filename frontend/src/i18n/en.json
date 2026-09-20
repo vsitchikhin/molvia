@@ -88,6 +88,10 @@
       "own": "enter",
       "save": "Count by it",
       "failed": "The choice could not be saved. Try again"
+    },
+    "start": {
+      "title": "Where are you?",
+      "other": "Another place"
     }
   },
   "item": {

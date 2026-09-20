@@ -2,6 +2,10 @@
   <AppScreen :title="t('trip.title')">
     <template v-if="meta" #meta>{{ meta }}</template>
 
+    <template v-if="phase === 'going'" #trailing>
+      <button class="finish" type="button" @click="finishing = true">{{ t('trip.finish') }}</button>
+    </template>
+
     <ScreenSkeleton v-if="phase === 'loading'" :groups="[72, 54, 84, 46]" />
 
     <template v-else-if="phase === 'none'">
@@ -97,6 +101,23 @@
       <TripTotal :trip="trip" :pending="waiting" :local="local !== null" />
     </template>
 
+    <StartTripSheet v-if="starting" v-model:open="starting" />
+
+    <!-- Asked before, not undone after: a trip cannot be reopened in 0.1, and «Завершить» is one
+         tap away from «Добавить позицию». -->
+    <BottomSheet v-if="finishing" v-model:open="finishing">
+      <template #title>{{ t('trip.finish_confirm.title') }}</template>
+      <p class="confirm">{{ t('trip.finish_confirm.body') }}</p>
+      <template #footer>
+        <AppButton size="large" block @click="finish">
+          {{ t('trip.finish_confirm.ok') }}
+        </AppButton>
+        <AppButton variant="ghost" block @click="finishing = false">
+          {{ t('trip.finish_confirm.cancel') }}
+        </AppButton>
+      </template>
+    </BottomSheet>
+
     <!-- Mounted on a tap and put away from `onClosed`, as the search does it: one opening, one
          purchase. One step back — the trip is the screen under it. -->
     <ItemDetailsSheet
@@ -122,8 +143,10 @@ import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import BottomSheet from '@/components/BottomSheet.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import StartTripSheet from '@/components/StartTripSheet.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import TripRateNotes from '@/components/TripRateNotes.vue'
 import TripRow from '@/components/TripRow.vue'
@@ -166,10 +189,12 @@ export default defineComponent({
     AppButton,
     AppCard,
     AppScreen,
+    BottomSheet,
     IconPlus,
     ItemDetailsSheet,
     ScreenSkeleton,
     ScreenState,
+    StartTripSheet,
     TripRateNotes,
     TripRow,
     TripTotal,
@@ -185,6 +210,7 @@ export default defineComponent({
     const asked = ref(trips.current !== null)
     const trouble = ref<'offline' | 'error' | null>(null)
     const starting = ref(false)
+    const finishing = ref(false)
 
     async function load(): Promise<void> {
       try {
@@ -341,6 +367,16 @@ export default defineComponent({
       if (refusal) queue.dismiss(refusal)
     }
 
+    /**
+     * The trip is over on the phone the moment it is asked for: the write goes into the queue
+     * behind every purchase of this trip, so «завершить» reaches the server last (MOL-22, В-1).
+     */
+    function finish(): void {
+      const id = tripId.value
+      if (id) queue.enqueue({ kind: 'finish', tripId: id })
+      finishing.value = false
+    }
+
     function putAway(): void {
       opened.value = null
     }
@@ -372,6 +408,8 @@ export default defineComponent({
       rejected,
       opened,
       starting,
+      finishing,
+      finish,
       load: () => void load(),
       refusalKey,
       refusalTitle,
@@ -388,6 +426,33 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.finish {
+  @include touch-target;
+
+  /* Its optical edge lines up with the field below, not its box (handoff). */
+  margin-right: calc(var(--space-2) * -1);
+  padding: 0 var(--space-2);
+  border: none;
+  background: none;
+  color: var(--accent-ink);
+  font: inherit;
+  font-size: var(--text-callout);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+
+  &:focus-visible {
+    @include focus-ring;
+
+    border-radius: var(--radius-sm);
+  }
+}
+
+.confirm {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+}
+
 .notice {
   margin-bottom: var(--space-3);
 }
