@@ -65,6 +65,8 @@
         </template>
       </ScreenState>
 
+      <TripRateNotes v-if="trip" :trip="trip" />
+
       <ScreenState
         v-if="rows.length === 0"
         kind="empty"
@@ -123,6 +125,7 @@ import AppScreen from '@/components/AppScreen.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import TripRateNotes from '@/components/TripRateNotes.vue'
 import TripRow from '@/components/TripRow.vue'
 import TripTotal from '@/components/TripTotal.vue'
 import type { RowMark, TripRowView } from '@/components/tripRow'
@@ -167,6 +170,7 @@ export default defineComponent({
     ItemDetailsSheet,
     ScreenSkeleton,
     ScreenState,
+    TripRateNotes,
     TripRow,
     TripTotal,
   },
