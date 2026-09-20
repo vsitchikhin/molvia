@@ -92,6 +92,13 @@
       "when": 1789917290002,
       "tag": "0012_telegram_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789919182213,
+      "tag": "0013_sessions",
+      "breakpoints": true
     }
   ]
 }
