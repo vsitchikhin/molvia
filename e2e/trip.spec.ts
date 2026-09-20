@@ -1,0 +1,146 @@
+/// <reference lib="dom" />
+// DOM for the code inside page.evaluate, which runs in the browser.
+import process from 'node:process'
+import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+/**
+ * The trip from end to end, against the real API: started at the door of a shop, filled one
+ * purchase at a time, corrected, and finished. What no component test can show is that the screen
+ * and the server agree about every one of those — the trip the phone named, the row the server
+ * priced per litre, the total it added up, and the trip that stops being current once it is over.
+ *
+ * Each test arrives as a new device with its own identity, so what it counts is its own.
+ */
+
+const KEY = 'molvia.actor'
+
+function inviteCode(): string {
+  const code = process.env.SIGNUP_CODE
+  if (!code) {
+    throw new Error("SIGNUP_CODE is not set. Run `make setup` to generate this copy's .env.")
+  }
+  return code
+}
+
+/** A word no catalogue holds, so the search finds this test's item and nothing else. */
+function nonsense(): string {
+  const consonants = 'бвгджзклмнпрстфхцчш'
+  const vowels = 'аоуиэы'
+  let word = ''
+  for (let i = 0; i < 5; i += 1) {
+    word += consonants.charAt(Math.floor(Math.random() * consonants.length))
+    word += vowels.charAt(Math.floor(Math.random() * vowels.length))
+  }
+  return word
+}
+
+interface Setting {
+  readonly page: Page
+  readonly word: string
+  /** What the server holds of this device's current trip. */
+  readonly current: () => Promise<{ expenses: unknown[]; place: { name: string } } | null>
+}
+
+/** A device with an identity and one item of its own in the catalogue — but no trip yet. */
+async function device(page: Page): Promise<Setting> {
+  await page.goto(`/?c=${inviteCode()}`)
+  const stored = () => page.evaluate((key) => localStorage.getItem(key) ?? '', KEY)
+  await expect.poll(stored).toMatch(/^[0-9a-f-]{36}$/)
+  const headers = { 'x-molvia-actor': await stored() }
+
+  const word = nonsense()
+  const proposed = await page.request.post('/api/catalogue/items', {
+    headers,
+    data: { kind: 'product', name: `Молоко «${word}»`, defaultUnit: 'l' },
+  })
+  expect([200, 201]).toContain(proposed.status())
+
+  const current = async () => {
+    const response = await page.request.get('/api/trips/current', { headers })
+    const body = (await response.json()) as {
+      trip: { expenses: unknown[]; place: { name: string } } | null
+    }
+    return body.trip
+  }
+  return { page, word, current }
+}
+
+const sheet = (page: Page) => page.locator('dialog[open]')
+const row = (page: Page) => page.locator('.row')
+
+async function startTrip(page: Page, place: string): Promise<void> {
+  await page.getByRole('button', { name: 'Start a trip' }).click()
+  await expect(sheet(page)).toContainText('Where are you?')
+  // The sheet takes no tap while it rises.
+  await page.waitForTimeout(400)
+  await sheet(page).getByLabel('Another place').fill(place)
+  await sheet(page).getByRole('button', { name: 'Start a trip' }).click()
+  await expect(sheet(page)).toBeHidden()
+}
+
+async function addItem(page: Page, word: string, price: string): Promise<void> {
+  // An empty trip asks for the first item; one with rows has «Add an item» at the end of the card.
+  await page.getByRole('button', { name: /Add an item|Find an item/ }).click()
+  await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(word)
+  await page.getByRole('option').first().click()
+  await expect(sheet(page)).toContainText(word)
+  await page.waitForTimeout(400)
+  await sheet(page).getByLabel('How much').fill('1')
+  await sheet(page).getByLabel('Price as on the tag').fill(price)
+  await sheet(page).getByRole('button', { name: 'Add to the trip' }).click()
+  await expect(page).toHaveURL(/\/$/)
+}
+
+test.describe('the trip', () => {
+  test('is started, filled, corrected and finished', async ({ page }) => {
+    const setting = await device(page)
+
+    await startTrip(page, 'Ереван Сити')
+    // The place is on screen before the server has answered, and the server gets it all the same.
+    await expect(page.locator('.meta')).toContainText('Ереван Сити')
+    await expect.poll(async () => (await setting.current())?.place.name).toBe('Ереван Сити')
+
+    await addItem(page, setting.word, '570')
+    await expect(row(page)).toHaveCount(1)
+    // The price per litre is the server's: the phone divides nothing once the row is written.
+    await expect(row(page).first()).toContainText('570.00')
+    await expect(row(page).first()).toContainText('per l')
+    await expect(page.locator('.sum')).toContainText('570.00')
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+
+    await row(page).first().click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByLabel('Price as on the tag').fill('580')
+    await sheet(page).getByRole('button', { name: 'Save' }).click()
+    await expect(sheet(page)).toBeHidden()
+    await expect(row(page).first()).toContainText('580.00')
+    await expect(page.locator('.sum')).toContainText('580.00')
+
+    await row(page).first().click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Remove the item' }).click()
+    await expect(row(page)).toHaveCount(0)
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(0)
+
+    await page.getByRole('button', { name: 'Finish the trip' }).click()
+    await expect(sheet(page)).toContainText('Finish this trip?')
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+
+    // Over on the phone at once, and over on the server as soon as the queue has been out.
+    await expect(page.getByText('A new trip')).toBeVisible()
+    await expect.poll(setting.current).toBeNull()
+  })
+
+  test('is started with no connection, and the purchases catch up with it', async ({ page }) => {
+    const setting = await device(page)
+    await startTrip(page, 'Рынок')
+    await expect.poll(async () => (await setting.current())?.place.name).toBe('Рынок')
+
+    // The trip is there, so the next purchase has somewhere to go even before the answer.
+    await addItem(page, setting.word, '250')
+    await expect(row(page)).toHaveCount(1)
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+  })
+})
