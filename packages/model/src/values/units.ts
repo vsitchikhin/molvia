@@ -154,6 +154,19 @@ export function formatUnitPrice(price: UnitPrice, locale = 'ru-RU'): string {
 }
 
 /**
+ * How much of a thing, as the screen prints it: «1», «0,9», «1,128». Trailing zeros go — the
+ * quantity is exact to a thousandth, and «1,000 л» reads as a precision nobody measured (MOL-22).
+ *
+ * Only the number, as with a unit price: the unit is a word of the interface, not of the domain.
+ */
+export function formatQuantity(quantity: Quantity, locale = 'ru-RU'): string {
+  // Thousandths, the scale a quantity is stored in (`decimalFromMilli`).
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(
+    decimalFromMilli(quantity),
+  )
+}
+
+/**
  * A unit price crosses the wire as a decimal in major units, with every digit the ratio holds —
  * the same way money does, and for the same reason: the screen rounds on output only, and a
  * price rounded here would compare 577,78 against 577,78 where the rows differ in the third

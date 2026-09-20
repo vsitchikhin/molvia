@@ -82,7 +82,7 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useItemDetails } from '@/composables/useItemDetails'
-import type { DetailsField } from '@/composables/useItemDetails'
+import type { DetailsField, RetryPurchase } from '@/composables/useItemDetails'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -110,6 +110,8 @@ export default defineComponent({
     query: { type: String as PropType<string | null>, default: null },
     /** The row being amended; none when a purchase is being added. */
     expense: { type: Object as PropType<TripExpenseView | null>, default: null },
+    /** A purchase the server refused, opened to be corrected and sent again (MOL-22, В-3). */
+    retry: { type: Object as PropType<RetryPurchase | null>, default: null },
     closeSteps: { type: Number as PropType<1 | 2>, default: 1 },
     onClosed: { type: Function as PropType<() => void>, default: undefined },
   },
@@ -160,6 +162,7 @@ export default defineComponent({
       // the person's own currency — the one the server will give the trip anyway.
       currency: currency.value,
       expense: props.expense,
+      retry: props.retry,
       separator: locale.value === 'ru' ? ',' : '.',
     })
 

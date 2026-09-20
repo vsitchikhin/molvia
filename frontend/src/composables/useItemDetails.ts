@@ -88,6 +88,13 @@ function sameMoney(a: Money | null, b: Money | null): boolean {
   return a?.minor === b?.minor && a?.currency === b?.currency
 }
 
+/** A refused purchase as the sheet takes it back: its own identifier and what was typed. */
+export interface RetryPurchase {
+  readonly id: string
+  readonly quantity: Quantity | null
+  readonly amount: Money | null
+}
+
 export interface ItemDetailsInput {
   readonly entry: CatalogueEntry
   readonly trip: MaybeRefOrGetter<TripView | null>
@@ -104,6 +111,12 @@ export interface ItemDetailsInput {
   readonly occupied?: MaybeRefOrGetter<readonly Money[]>
   /** The row being amended, or none when a purchase is being added. */
   readonly expense?: TripExpenseView | null
+  /**
+   * A purchase the server refused, opened again to be corrected (MOL-22, В-3). Still an addition,
+   * not an amendment — there is no row to amend — and it keeps the purchase's own identifier: the
+   * server never took it, so the same id cannot meet a second copy of itself.
+   */
+  readonly retry?: RetryPurchase | null
   /** The decimal separator of the interface: a Russian keyboard writes «0,9». */
   readonly separator?: string
 }
@@ -140,10 +153,11 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
   const separator = input.separator ?? ','
   const expense = input.expense ?? null
   const original = { quantity: expense?.quantity ?? null, amount: expense?.amount ?? null }
+  /** What the sheet opens filled with: the row being amended, or the purchase being corrected. */
+  const filled = expense ?? input.retry ?? null
 
   function initialQuantity(): string {
-    if (expense)
-      return original.quantity ? shown(decimalFromMilli(original.quantity), separator) : ''
+    if (filled) return filled.quantity ? shown(decimalFromMilli(filled.quantity), separator) : ''
     const typical = input.entry.typicalQuantity
     if (typical) return shown(decimalFromMilli(typical), separator)
     // A piece is one unless said otherwise; a weight left at «1 kg» would turn the price of a
@@ -153,16 +167,16 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
 
   const quantity = ref(initialQuantity())
   const unit = ref<BaseUnit>(
-    original.quantity?.unit ?? input.entry.typicalQuantity?.unit ?? input.entry.defaultUnit,
+    filled?.quantity?.unit ?? input.entry.typicalQuantity?.unit ?? input.entry.defaultUnit,
   )
-  const amount = ref(original.amount ? shown(decimalFromMinor(original.amount), separator) : '')
-  const currency = ref<Currency>(original.amount?.currency ?? input.currency)
+  const amount = ref(filled?.amount ? shown(decimalFromMinor(filled.amount), separator) : '')
+  const currency = ref<Currency>(filled?.amount?.currency ?? input.currency)
 
   // The price follows the trip's currency until the person picks one: the trip may arrive after
   // the sheet opened (В-6), in a currency other than the person's own (review Р-3). A price
   // already typed is a choice too — the sign must not change under «520», which would then go
   // as 520 dollars rather than 520 drams (Р-12, adversarial Б4).
-  let chosen = expense !== null
+  let chosen = filled !== null
   let following = false
   watch(currency, () => {
     if (!following) chosen = true
@@ -182,7 +196,7 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
     },
   )
 
-  const expenseId = expense?.id ?? newId()
+  const expenseId = expense?.id ?? input.retry?.id ?? newId()
 
   const parsedQuantity = computed(() =>
     parsed(quantity.value, (text) => parseQuantity(text, unit.value)),

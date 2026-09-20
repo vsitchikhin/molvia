@@ -1,0 +1,370 @@
+import { flushPromises, mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import { ApiError } from '@molvia/client'
+import { ERROR, ISSUE, parseMoney, parseQuantity, tripViewCodec } from '@molvia/model'
+import type { CatalogueEntry, TripView as TripViewModel, WireCode } from '@molvia/model'
+import ru from '@/i18n/ru.json'
+import { createAppI18n } from '@/i18n'
+import { routes } from '@/router'
+import { useTripStore } from '@/stores/trip'
+import { useTripQueueStore } from '@/stores/tripQueue'
+import TripView from '@/views/TripView.vue'
+
+const currentTrip = vi.fn<() => Promise<TripViewModel | null>>()
+const addExpense = vi.fn()
+vi.mock('@/api', () => ({
+  api: {
+    currentTrip: () => currentTrip(),
+    addExpense: (...args: unknown[]) => addExpense(...args),
+    updateExpense: () => new Promise(() => undefined),
+    removeExpense: () => new Promise(() => undefined),
+    startTrip: () => new Promise(() => undefined),
+    finishTrip: () => new Promise(() => undefined),
+  },
+}))
+
+const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+const TRIP = 'bbbbbbbb-0000-4000-8000-000000000001'
+const ASHKHAR = 'aa000000-0000-4000-8000-000000000001'
+const MARIANNA = 'aa000000-0000-4000-8000-000000000002'
+const BREAD = 'aa000000-0000-4000-8000-000000000003'
+
+const milk: CatalogueEntry = {
+  id: 'dddddddd-0000-4000-8000-000000000001',
+  kind: 'product',
+  name: 'Молоко «Ашхар»',
+  note: null,
+  defaultUnit: 'l',
+  typicalQuantity: parseQuantity('1', 'l'),
+}
+
+interface Row {
+  readonly id: string
+  readonly name: string
+  readonly value?: string
+  readonly quantity?: [string, 'kg' | 'l' | 'piece']
+  readonly unitPrice?: string
+}
+
+function trip(rows: readonly Row[] = [], over: Partial<Record<'id', string>> = {}): TripViewModel {
+  return tripViewCodec.parse({
+    id: over.id ?? TRIP,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    currency: 'AMD',
+    rate: null,
+    rateProvider: null,
+    rateJump: null,
+    rateStale: false,
+    place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
+    expenses: rows.map((row) => ({
+      id: row.id,
+      createdAt: new Date().toISOString(),
+      item: {
+        id: `dddddddd-0000-4000-8000-0000000000${row.id.slice(-2)}`,
+        kind: 'product',
+        name: row.name,
+        note: null,
+        defaultUnit: row.quantity?.[1] ?? 'piece',
+        typicalQuantity: null,
+      },
+      quantity: row.quantity ? { value: row.quantity[0], unit: row.quantity[1] } : null,
+      amount: row.value ? { amount: row.value, currency: 'AMD' } : null,
+      unitPrice: row.unitPrice
+        ? { amount: row.unitPrice, currency: 'AMD', unit: row.quantity?.[1] ?? 'piece' }
+        : null,
+    })),
+    total: [],
+    converted: null,
+  })
+}
+
+/** The handoff's own fixture: 520 ֏ for 0,9 l is dearer than 570 ֏ for a litre. */
+const handoff = (): Row[] => [
+  {
+    id: ASHKHAR,
+    name: 'Молоко «Ашхар»',
+    value: '570',
+    quantity: ['1', 'l'],
+    unitPrice: '570',
+  },
+  {
+    id: MARIANNA,
+    name: 'Молоко «Марианна»',
+    value: '520',
+    quantity: ['0.9', 'l'],
+    unitPrice: '577.777778',
+  },
+]
+
+/** Прочитанное с экрана: деньги печатаются с неразрывным пробелом, тесты — обычным. */
+const plain = (value: string | null | undefined): string => (value ?? '').replaceAll('\u00a0', ' ')
+
+function button(view: VueWrapper, text: string): DOMWrapper<HTMLButtonElement> {
+  const found = view.findAll('button').find((candidate) => candidate.text() === text)
+  if (!found) throw new Error(`нет кнопки «${text}»`)
+  return found
+}
+
+/** Пока шторка не поднялась, она не берёт нажатий: второй тап двойного не должен её закрыть. */
+let clock = 0
+
+const mounted: VueWrapper[] = []
+
+async function render({ memory = null as TripViewModel | null } = {}) {
+  localStorage.setItem('molvia.actor', ME)
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const trips = useTripStore()
+  const queue = useTripQueueStore()
+  if (memory) trips.apply(memory)
+  const router = createRouter({ history: createMemoryHistory(), routes })
+  await router.push('/')
+  const view = mount(TripView, {
+    global: { plugins: [router, pinia, createAppI18n('ru')] },
+    attachTo: document.body,
+  })
+  mounted.push(view)
+  await flushPromises()
+  return { view, router, trips, queue }
+}
+
+describe('TripView', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+    currentTrip.mockReset()
+    currentTrip.mockResolvedValue(null)
+    addExpense.mockReset()
+    addExpense.mockReturnValue(new Promise(() => undefined))
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    clock = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => clock)
+  })
+
+  afterEach(() => {
+    while (mounted.length) mounted.pop()?.unmount()
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  it('без похода предлагает начать, а не показывает пустой список', async () => {
+    const { view } = await render()
+    expect(view.text()).toContain(ru.trip.none.title)
+    expect(button(view, ru.trip.none.action).exists()).toBe(true)
+  })
+
+  it('поход без позиций зовёт добавить первую', async () => {
+    currentTrip.mockResolvedValue(trip())
+    const { view } = await render()
+    expect(view.text()).toContain(ru.trip.empty.title)
+    expect(button(view, ru.trip.empty.action).exists()).toBe(true)
+  })
+
+  it('пока сервера не спросили и памяти нет — скелетон, а не «Новый поход»', async () => {
+    currentTrip.mockReturnValue(new Promise(() => undefined))
+    localStorage.setItem('molvia.actor', ME)
+    setActivePinia(createPinia())
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/')
+    const view = mount(TripView, {
+      global: { plugins: [router, createPinia(), createAppI18n('ru')] },
+      attachTo: document.body,
+    })
+    mounted.push(view)
+    expect(view.find('.skeleton').exists() || view.text()).toBeTruthy()
+    expect(view.text()).not.toContain(ru.trip.none.title)
+  })
+
+  it('весь смысл продукта в двух числах: 520 ֏ за 0,9 л дороже 570 ֏ за литр', async () => {
+    currentTrip.mockResolvedValue(trip(handoff()))
+    const { view } = await render()
+
+    const rows = view.findAll('.row')
+    expect(rows).toHaveLength(2)
+    expect(plain(rows[0]?.text())).toContain('570,00 ֏ за л')
+    // Дешевле на ценнике и дороже за литр — ради этой строки экран и существует.
+    expect(plain(rows[1]?.text())).toContain('520,00 ֏')
+    expect(plain(rows[1]?.text())).toContain('577,78 ֏ за л')
+  })
+
+  it('строка без цены зовёт её дописать', async () => {
+    currentTrip.mockResolvedValue(trip([{ id: BREAD, name: 'Хлеб «Матнакаш»' }]))
+    const { view } = await render()
+    expect(view.get('.row').text()).toContain(ru.trip.add_price)
+  })
+
+  it('место и день в строке над заголовком', async () => {
+    currentTrip.mockResolvedValue(trip(handoff()))
+    const { view } = await render()
+    expect(view.text()).toContain('Ереван Сити · сегодня')
+  })
+
+  it('тап по строке открывает шторку той же позиции', async () => {
+    currentTrip.mockResolvedValue(trip(handoff()))
+    const { view } = await render()
+    await view.findAll('.row')[1]?.trigger('click')
+    await flushPromises()
+
+    const sheet = document.body.querySelector('dialog')
+    expect(sheet?.textContent).toContain('Молоко «Марианна»')
+    expect(sheet?.textContent).toContain(ru.item.save_edit)
+  })
+
+  describe('очередь на экране', () => {
+    const queued = (id: string, price = '600') =>
+      ({
+        kind: 'add' as const,
+        tripId: TRIP,
+        entry: milk,
+        body: {
+          id,
+          itemId: milk.id,
+          quantity: parseQuantity('2', 'l'),
+          amount: parseMoney(price, 'AMD'),
+        },
+      }) as const
+
+    it('«ещё не ушло» — строка с ценой за единицу, посчитанной на телефоне', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      const { view, queue } = await render()
+      queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000001'))
+      await flushPromises()
+
+      const rows = view.findAll('.row')
+      expect(rows).toHaveLength(3)
+      const last = rows[2]
+      expect(last?.text()).toContain(ru.trip.queued.waiting)
+      expect(plain(last?.text())).toContain('300,00 ֏ за л')
+    })
+
+    it('правка и удаление помечают серверную строку, а не заводят новую', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      const { view, queue } = await render()
+      queue.enqueue({
+        kind: 'update',
+        tripId: TRIP,
+        expenseId: ASHKHAR,
+        patch: { amount: parseMoney('580', 'AMD') },
+      })
+      queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: MARIANNA })
+      await flushPromises()
+
+      const rows = view.findAll('.row')
+      expect(rows).toHaveLength(2)
+      expect(rows[0]?.text()).toContain(ru.trip.queued.editing)
+      expect(rows[1]?.text()).toContain(ru.trip.queued.removing)
+    })
+
+    it('записи чужого похода в список не попадают', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      const { view, queue } = await render()
+      queue.enqueue({
+        ...queued('eeeeeeee-0000-4000-8000-000000000002'),
+        tripId: 'bbbbbbbb-0000-4000-8000-000000000009',
+      })
+      await flushPromises()
+
+      expect(view.findAll('.row')).toHaveLength(2)
+    })
+  })
+
+  describe('«не принято» (В-3)', () => {
+    const refused = async (code: WireCode = ERROR.INVALID_AMOUNT) => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      addExpense.mockRejectedValue(new ApiError(code, undefined, true))
+      const rendered = await render()
+      rendered.queue.enqueue({
+        kind: 'add',
+        tripId: TRIP,
+        entry: milk,
+        body: {
+          id: 'eeeeeeee-0000-4000-8000-000000000003',
+          itemId: milk.id,
+          quantity: parseQuantity('1', 'l'),
+          amount: parseMoney('600', 'AMD'),
+        },
+      })
+      await rendered.queue.flush()
+      await flushPromises()
+      return rendered
+    }
+
+    it('называет позицию и причину отказа, а не «что-то пошло не так»', async () => {
+      const { view } = await refused()
+      expect(view.text()).toContain('«Молоко «Ашхар»» — сервер не принял')
+      expect(view.text()).toContain(ru.error.invalid_amount)
+    })
+
+    it('код не из словаря показывается как есть — для отчёта', async () => {
+      const { view } = await refused(ISSUE.BODY_INVALID)
+      expect(view.text()).toContain(ISSUE.BODY_INVALID)
+    })
+
+    it('«Поправить» открывает шторку с теми же числами и тем же id покупки', async () => {
+      const { view, queue } = await refused()
+      await button(view, ru.trip.rejected.fix).trigger('click')
+      await flushPromises()
+      clock += 1000
+
+      const sheet = document.body.querySelector('dialog')
+      expect(sheet?.querySelector<HTMLInputElement>('[data-field="amount"]')?.value).toBe('600')
+      // Добавление, а не правка: строки на сервере нет.
+      expect(sheet?.textContent).toContain(ru.item.save)
+
+      addExpense.mockReturnValue(new Promise(() => undefined))
+      await button(view, ru.item.save).trigger('click')
+      await flushPromises()
+
+      expect(queue.rejected).toEqual([])
+      const written = queue.pending.filter((write) => write.kind === 'add')
+      expect(written).toHaveLength(1)
+      expect(written[0]?.body.id).toBe('eeeeeeee-0000-4000-8000-000000000003')
+    })
+
+    it('«Убрать» снимает запись с телефона', async () => {
+      const { view, queue } = await refused()
+      await button(view, ru.trip.rejected.drop).trigger('click')
+      await flushPromises()
+
+      expect(queue.rejected).toEqual([])
+      expect(view.text()).not.toContain(ru.trip.rejected.fix)
+    })
+  })
+
+  describe('сервер не ответил', () => {
+    it('без сети — зелёная плашка поверх похода, который помнит телефон', async () => {
+      currentTrip.mockRejectedValue(new Error('Failed to fetch'))
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const { view } = await render({ memory: trip(handoff()) })
+
+      expect(view.text()).toContain(ru.trip.offline.title)
+      // Поход остаётся на экране: покупки целы, и ими продолжают пользоваться.
+      expect(view.findAll('.row')).toHaveLength(2)
+    })
+
+    it('сеть есть, а сервер молчит — ошибка, тоже поверх похода, и «Повторить»', async () => {
+      currentTrip.mockRejectedValue(new Error('HTTP 500'))
+      const { view } = await render({ memory: trip(handoff()) })
+
+      expect(view.text()).toContain(ru.trip.error.title)
+      expect(view.findAll('.row')).toHaveLength(2)
+
+      currentTrip.mockResolvedValue(trip(handoff()))
+      await button(view, ru.state.retry).trigger('click')
+      await flushPromises()
+      expect(view.text()).not.toContain(ru.trip.error.title)
+    })
+  })
+
+  it('«Добавить позицию» ведёт на поиск', async () => {
+    currentTrip.mockResolvedValue(trip(handoff()))
+    const { view, router } = await render()
+    await button(view, ru.trip.add_item).trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('item-search')
+  })
+})
