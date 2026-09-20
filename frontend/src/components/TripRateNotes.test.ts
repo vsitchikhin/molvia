@@ -83,7 +83,7 @@ async function render(over: Over = {}) {
   return view
 }
 
-/** Кнопка внутри шторки: она живёт в `<dialog>` вне дерева компонента. */
+/** Кнопка в поднятой шторке: закрытые `<dialog>` висят в дереве и не в счёт. */
 function inside(sheet: Element | null, text: string): HTMLButtonElement {
   const found = [...(sheet?.querySelectorAll('button') ?? [])].find((node) =>
     node.textContent.includes(text),
@@ -148,7 +148,7 @@ describe('TripRateNotes', () => {
       expect(view.text()).toContain('прежнего курса рядом нет')
 
       await button(view, ru.trip.rate.choose).trigger('click')
-      const sheet = document.body.querySelector('dialog')
+      const sheet = document.body.querySelector('dialog[open]')
       expect(sheet?.textContent).toContain(ru.trip.rate.new)
       expect(sheet?.textContent).not.toContain(ru.trip.rate.old)
       expect(sheet?.textContent).toContain(ru.trip.rate.mine)
@@ -161,7 +161,7 @@ describe('TripRateNotes', () => {
       await flushPromises()
       clock += 1000
 
-      const sheet = () => document.body.querySelector('dialog')
+      const sheet = () => document.body.querySelector('dialog[open]')
       inside(sheet(), ru.trip.rate.old).click()
       await flushPromises()
       inside(sheet(), ru.trip.rate.save).click()
@@ -178,19 +178,19 @@ describe('TripRateNotes', () => {
       await flushPromises()
       clock += 1000
 
-      inside(document.body.querySelector('dialog'), ru.trip.rate.mine).click()
+      inside(document.body.querySelector('dialog[open]'), ru.trip.rate.mine).click()
       await flushPromises()
 
-      const field = document.body.querySelector('dialog')?.querySelector('input')
+      const field = document.body.querySelector('dialog[open]')?.querySelector('input')
       if (!field) throw new Error('нет поля своего курса')
       field.value = 'абв'
       field.dispatchEvent(new Event('input'))
       await flushPromises()
 
-      inside(document.body.querySelector('dialog'), ru.trip.rate.save).click()
+      inside(document.body.querySelector('dialog[open]'), ru.trip.rate.save).click()
       await flushPromises()
 
-      expect(document.body.querySelector('dialog')).not.toBeNull()
+      expect(document.body.querySelector('dialog[open]')).not.toBeNull()
       expect(document.body.textContent).toContain(ru.error.invalid_rate)
     })
   })

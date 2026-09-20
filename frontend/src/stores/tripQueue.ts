@@ -490,21 +490,27 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   }
 
   /**
-   * Kept on the device before anything is sent. A second copy of the same purchase, of the same
-   * start or of the same finish is ignored — a double tap is one intent; a second edit of one row
-   * is not (`sameWrite`).
+   * Kept on the device before anything is sent.
+   *
+   * A purchase, a start or a finish already waiting **takes the new one's place** rather than
+   * being queued twice (`sameWrite`): a double tap is one intent, and a purchase corrected before
+   * it has gone anywhere is the same purchase — queued again it would become a second row on the
+   * server, with the correction lost (MOL-22, review 1). An edit of a row the server already has
+   * is another matter: two of those are two changes of mind, and both go.
    */
   function enqueue(entry: QueuedWrite): void {
     const id = actor.id
     sync(id)
-    const repeated =
-      entry.kind !== 'update' &&
-      entry.kind !== 'remove' &&
-      kept.some((item) => sameWrite(item.write, entry))
-    if (!repeated) {
+    const replaceable = entry.kind !== 'update' && entry.kind !== 'remove'
+    const at = replaceable ? kept.findIndex((item) => sameWrite(item.write, entry)) : -1
+    if (at === -1) {
       kept = [...kept, { key: newKey(), write: entry }]
-      persist(id)
+    } else {
+      // In its own place in the queue, under its own key: the order of what is waiting is the
+      // order it was made in, and the key is what a window takes its own write out by.
+      kept = kept.map((item, index) => (index === at ? { ...item, write: entry } : item))
     }
+    persist(id)
     void flush()
   }
 

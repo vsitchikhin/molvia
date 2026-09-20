@@ -51,7 +51,7 @@ export function parseRate(input: string): bigint {
   return scaled
 }
 
-export function decimalFromRate(scaled: bigint): string {
+export function decimalFromRate(scaled: bigint): `${number}` {
   return decimalFromScaled(scaled, RATE_DIGITS)
 }
 
@@ -94,11 +94,14 @@ export const rateCodec = z.codec(exchangeRateWireSchema, exchangeRateSchema, {
  * 0,0001 printed to two digits is «0,00» — a zero rate on screen (MOL-22).
  */
 export function formatRate(rate: ExchangeRate, locale = 'ru-RU'): string {
-  const value = Number(decimalFromRate(rate.scaled))
+  // The decimal itself, as every other formatter of the domain does it: a rate is six digits, and
+  // a float on the way to the screen is a float in the one value that multiplies every amount.
+  const decimal = decimalFromRate(rate.scaled)
+  const small = rate.scaled < RATE_SCALE
   const number = new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
-    maximumFractionDigits: value < 1 ? RATE_DIGITS : 2,
-  }).format(value)
+    maximumFractionDigits: small ? RATE_DIGITS : 2,
+  }).format(decimal)
   return `${number} ${currencySign(rate.quote, locale)}/${currencySign(rate.base, locale)}`
 }
 

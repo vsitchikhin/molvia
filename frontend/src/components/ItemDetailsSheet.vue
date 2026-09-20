@@ -51,7 +51,7 @@
     </div>
 
     <template #footer>
-      <template v-if="tripId">
+      <template v-if="writeInto">
         <AppButton size="large" block @click="submit">
           {{ editing ? t('item.save_edit') : t('item.save') }}
         </AppButton>
@@ -112,6 +112,12 @@ export default defineComponent({
     expense: { type: Object as PropType<TripExpenseView | null>, default: null },
     /** A purchase the server refused, opened to be corrected and sent again (MOL-22, В-3). */
     retry: { type: Object as PropType<RetryPurchase | null>, default: null },
+    /**
+     * The trip this write belongs to, when it is not simply the one going on: a row opened from
+     * «Поход» belongs to the trip it is in, which may have been finished elsewhere while the sheet
+     * was up (MOL-24, С-3; MOL-22, review 8).
+     */
+    tripId: { type: String as PropType<string | null>, default: null },
     closeSteps: { type: Number as PropType<1 | 2>, default: 1 },
     onClosed: { type: Function as PropType<() => void>, default: undefined },
   },
@@ -129,7 +135,10 @@ export default defineComponent({
     const form = ref<HTMLElement | null>(null)
     // Both places that know whether a trip is going on: without the queue the sheet would say
     // «start a trip first» at a shelf where one was started with no signal (MOL-22, Р-2).
-    const { trip, tripId, currency } = useCurrentTrip()
+    const current = useCurrentTrip()
+    const { trip, currency } = current
+    // The trip the caller named, or the one going on — the search and a first purchase name none.
+    const writeInto = computed(() => props.tripId ?? current.tripId.value)
     const editing = computed(() => props.expense !== null)
 
     /**
@@ -137,7 +146,7 @@ export default defineComponent({
      * purchase of this sheet is not counted — once queued it would be counted twice.
      */
     function occupied(): Money[] {
-      const id = tripId.value
+      const id = writeInto.value
       if (!id) return []
       const held: Money[] = [...(trip.value?.total ?? [])]
       for (const write of queue.pending) {
@@ -235,7 +244,7 @@ export default defineComponent({
     }
 
     function submit(): void {
-      if (done || !tripId.value) return
+      if (done || !writeInto.value) return
       const wrong = details.validate()
       if (wrong) {
         focus(wrong)
@@ -248,7 +257,7 @@ export default defineComponent({
         if (patch) {
           queue.enqueue({
             kind: 'update',
-            tripId: tripId.value,
+            tripId: writeInto.value,
             expenseId: props.expense.id,
             patch,
           })
@@ -260,7 +269,7 @@ export default defineComponent({
 
       queue.enqueue({
         kind: 'add',
-        tripId: tripId.value,
+        tripId: writeInto.value,
         body: details.body(props.query),
         entry: props.entry,
       })
@@ -269,9 +278,9 @@ export default defineComponent({
     }
 
     function remove(): void {
-      if (done || !tripId.value || !props.expense) return
+      if (done || !writeInto.value || !props.expense) return
       done = true
-      queue.enqueue({ kind: 'remove', tripId: tripId.value, expenseId: props.expense.id })
+      queue.enqueue({ kind: 'remove', tripId: writeInto.value, expenseId: props.expense.id })
       emit('removed')
       close(props.closeSteps)
     }
@@ -296,7 +305,7 @@ export default defineComponent({
       perUnit,
       converted,
       online,
-      tripId,
+      writeInto,
       editing,
       submit,
       remove,

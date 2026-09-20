@@ -33,6 +33,30 @@
       />
     </template>
 
+    <!-- A purchase the server refused: what it was, why, and a way to correct it. Shown whatever
+         else is on the screen, and for every trip, not only the one going on — a purchase that was
+         never recorded does not stop mattering when its trip is finished (MOL-22, В-3, review 2). -->
+    <ScreenState
+      v-for="item in rejected"
+      :key="refusalKey(item)"
+      class="notice"
+      kind="attention"
+      inline
+      :title="refusalTitle(item)"
+      :body="refusalReason(item)"
+    >
+      <template #action>
+        <div class="refusal-actions">
+          <AppButton v-if="correctable(item)" variant="ghost" @click="correct(item)">
+            {{ t('trip.rejected.fix') }}
+          </AppButton>
+          <AppButton variant="ghost" @click="queue.dismiss(item)">
+            {{ t('trip.rejected.drop') }}
+          </AppButton>
+        </div>
+      </template>
+    </ScreenState>
+
     <template v-if="phase === 'none'">
       <ScreenState
         kind="empty"
@@ -50,29 +74,6 @@
     </template>
 
     <template v-else-if="phase === 'going'">
-      <!-- A purchase the server refused: what it was, why, and a way to correct it. «Убрать»
-           alone would lose a thing the person actually bought (MOL-22, В-3). -->
-      <ScreenState
-        v-for="item in rejected"
-        :key="refusalKey(item)"
-        class="notice"
-        kind="attention"
-        inline
-        :title="refusalTitle(item)"
-        :body="refusalReason(item)"
-      >
-        <template #action>
-          <div class="refusal-actions">
-            <AppButton v-if="correctable(item)" variant="ghost" @click="correct(item)">
-              {{ t('trip.rejected.fix') }}
-            </AppButton>
-            <AppButton variant="ghost" @click="queue.dismiss(item)">
-              {{ t('trip.rejected.drop') }}
-            </AppButton>
-          </div>
-        </template>
-      </ScreenState>
-
       <TripRateNotes v-if="trip" :trip="trip" />
 
       <ScreenState
@@ -105,11 +106,13 @@
       <TripTotal :trip="trip" :pending="waiting" :local="local !== null" />
     </template>
 
-    <StartTripSheet v-if="starting" v-model:open="starting" />
+    <!-- Mounted always and led by `open`, as «Предложить товар» is: under a `v-if` the sheet
+         would be gone before it could step back off its own history entry (MOL-18; review 5). -->
+    <StartTripSheet v-model:open="starting" />
 
     <!-- Asked before, not undone after: a trip cannot be reopened in 0.1, and «Завершить» is one
          tap away from «Добавить позицию». -->
-    <BottomSheet v-if="finishing" v-model:open="finishing">
+    <BottomSheet v-model:open="finishing">
       <template #title>{{ t('trip.finish_confirm.title') }}</template>
       <p class="confirm">{{ t('trip.finish_confirm.body') }}</p>
       <template #footer>
@@ -129,6 +132,7 @@
       :key="opened.key"
       :entry="opened.entry"
       :expense="opened.expense"
+      :trip-id="opened.tripId"
       :retry="opened.retry"
       :close-steps="1"
       :on-closed="putAway"
@@ -138,7 +142,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, ref } from 'vue'
+import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPlus from '~icons/mdi/plus'
@@ -160,6 +164,7 @@ import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import type { RetryPurchase } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
 import { purchaseDay } from '@/days'
+import { useActorStore } from '@/stores/actor'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import type { QueuedWrite, RejectedWrite } from '@/stores/tripQueue'
@@ -169,6 +174,8 @@ interface Opened {
   readonly key: string
   readonly entry: CatalogueEntry
   readonly expense: TripExpenseView | null
+  /** The trip the row belongs to, which is not always the one going on now. */
+  readonly tripId: string | null
   readonly retry: RetryPurchase | null
   readonly refusal: RejectedWrite | null
 }
@@ -206,6 +213,7 @@ export default defineComponent({
   setup() {
     const { t, locale } = useI18n()
     const router = useRouter()
+    const actor = useActorStore()
     const trips = useTripStore()
     const queue = useTripQueueStore()
     const { trip, local, tripId } = useCurrentTrip()
@@ -217,6 +225,11 @@ export default defineComponent({
     const finishing = ref(false)
 
     async function load(): Promise<void> {
+      // No identity yet — the first launch is still making one, and there is nothing to ask for
+      // (MOL-28 does the same). A red «the server did not answer» before the app has an identity
+      // would be about the app's own start, not about the network; the identity notice above says
+      // what is happening.
+      if (!actor.id) return
       try {
         await trips.load()
         trouble.value = null
@@ -230,7 +243,7 @@ export default defineComponent({
     }
 
     const phase = computed(() => {
-      if (!asked.value && tripId.value === null) return 'loading'
+      if ((!asked.value || !actor.id) && tripId.value === null) return 'loading'
       return tripId.value === null ? 'none' : 'going'
     })
 
@@ -291,18 +304,28 @@ export default defineComponent({
       return [...server, ...queued]
     })
 
-    /** Writes of this trip the server has not taken: the total is behind the list by exactly these. */
+    /**
+     * Purchases of this trip the server has not taken yet — exactly what the total is missing
+     * (review 6). An edit or a removal also leaves it behind, but by no whole item, and «+1
+     * позиция ещё не ушла» about a row being deleted would be the wrong direction.
+     */
     const waiting = computed(
-      () => queue.pending.filter((write) => write.tripId === tripId.value).length,
+      () =>
+        queue.pending.filter((write) => write.kind === 'add' && write.tripId === tripId.value)
+          .length,
     )
 
-    // Only this trip's: a refusal from a trip that is over says nothing about this one.
-    const rejected = computed(() =>
-      queue.rejected.filter((item) => item.write.tripId === tripId.value),
-    )
+    const rejected = computed(() => queue.rejected)
 
+    // By the row it is about, not by its name: two refused purchases of one item under one code
+    // would otherwise share a key, and Vue would reuse one's node for the other (review 7).
     const refusalKey = (item: RejectedWrite): string =>
-      `${item.write.kind}-${item.code}-${nameOf(item) ?? ''}`
+      `${item.write.kind}-${item.code}-${subjectOf(item.write)}`
+
+    function subjectOf(write: QueuedWrite): string {
+      if (write.kind === 'add') return write.body.id
+      return 'expenseId' in write ? write.expenseId : write.tripId
+    }
 
     function nameOf(item: RejectedWrite): string | null {
       if (item.write.kind === 'add') return item.write.entry?.name ?? null
@@ -334,6 +357,15 @@ export default defineComponent({
     const opened = ref<Opened | null>(null)
     let openings = 0
 
+    /**
+     * A row the server has answered opens as an amendment of that row, **of its own trip**: the
+     * current one may have changed under the sheet — finished on another device — and the edit
+     * would then be addressed to a trip the row is not in (review 8).
+     *
+     * A purchase still in the queue has no row to amend. It opens as itself — the same purchase
+     * identifier, the numbers as typed — and goes back into the queue in place of what is there
+     * (review 1): opened as a new purchase it became a second row on the server.
+     */
     function amend(row: TripRowView): void {
       if (!row.entry) return
       openings += 1
@@ -341,7 +373,8 @@ export default defineComponent({
         key: `amend-${row.key}-${String(openings)}`,
         entry: row.entry,
         expense: row.expense,
-        retry: null,
+        tripId: row.expense ? (trip.value?.id ?? null) : tripId.value,
+        retry: row.expense ? null : { id: row.key, quantity: row.quantity, amount: row.amount },
         refusal: null,
       }
     }
@@ -354,6 +387,7 @@ export default defineComponent({
         key: `fix-${write.body.id}-${String(openings)}`,
         entry: write.entry,
         expense: null,
+        tripId: write.tripId,
         // The purchase keeps its own identifier: the server never took it, so it cannot meet
         // a second copy of itself.
         retry: {
@@ -393,6 +427,14 @@ export default defineComponent({
     useReconnect(() => {
       if (trouble.value) void load()
     })
+
+    // The identity arrives a moment after the first launch, and the trip is asked for then.
+    watch(
+      () => actor.id,
+      (id) => {
+        if (id) void load()
+      },
+    )
 
     onMounted(() => {
       void load()

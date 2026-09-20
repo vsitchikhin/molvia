@@ -82,19 +82,26 @@ export default defineComponent({
 
     const converted = computed(() => props.trip?.converted ?? null)
 
+    /**
+     * What the big number shows: the total in the trip's own currency, or — when nothing was paid
+     * in it — the first of the others, so a trip paid for entirely in roubles is not a dash.
+     */
+    const shown = computed(() => own.value ?? props.trip?.total[0] ?? null)
+
     const big = computed(() => {
       const value = converted.value
       if (flipped.value && value) return estimated(value)
-      const sum = own.value ?? props.trip?.total[0] ?? null
-      return sum ? money(sum) : '—'
+      return shown.value ? money(shown.value) : '—'
     })
 
-    /** Beside the big number: the other currencies of the trip, and the flipped-away sum. */
+    /**
+     * Beside the big number: every other sum of the trip, and the one the flip moved down. Never
+     * what is already big — a trip paid for in one foreign currency printed it twice (review 3).
+     */
     const rest = computed(() => {
-      const lines = others.value.map((value) => money(value))
-      const sum = own.value
-      if (flipped.value && converted.value && sum) lines.unshift(money(sum))
-      return lines
+      const big = flipped.value && converted.value ? null : shown.value
+      const lines = props.trip?.total ?? []
+      return lines.filter((value) => value.currency !== big?.currency).map((value) => money(value))
     })
 
     const estimate = computed(() => {

@@ -31,7 +31,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { drawsNothing, newPlaceSchema, pastedLine } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
@@ -75,18 +75,18 @@ export default defineComponent({
       if (pastedLine(typed) !== typed) name.value = pastedLine(typed)
     })
 
+    // A fresh form every time it opens, and the list asked for then — the sheet is mounted with
+    // the screen, and refreshing on mount would be a request on every visit to the trip.
     watch(
       () => props.open,
       (open) => {
-        if (open) name.value = ''
+        if (!open) return
+        name.value = ''
+        // What the phone remembers is shown at once; the server only refreshes it, and a failure
+        // leaves what is remembered.
+        void places.refresh().catch(() => undefined)
       },
     )
-
-    onMounted(() => {
-      // The list on the phone is shown at once; the server only refreshes it, and a failure
-      // leaves what is remembered.
-      void places.refresh().catch(() => undefined)
-    })
 
     const ready = computed(
       () => !drawsNothing(name.value) && newPlaceSchema.shape.name.safeParse(name.value).success,
@@ -105,8 +105,8 @@ export default defineComponent({
       emit('update:open', false)
     }
 
-    // Стор целиком, не его список: развёрнутый в setup массив перестал бы обновляться, и
-    // недавние места, приехавшие с сервера, на экран бы не попали.
+    // The store itself, not its list: an array unwrapped here would stop following the store,
+    // and the places the server answers with would never reach the screen.
     return { t, name, ready, NAME_MAX, places, start }
   },
 })

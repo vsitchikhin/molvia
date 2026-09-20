@@ -8,9 +8,10 @@ import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import type { QueuedWrite } from '@/stores/tripQueue'
 
+const startTrip = vi.fn<() => Promise<{ trip: TripView; created: boolean }>>()
 vi.mock('@/api', () => ({
   api: {
-    startTrip: () => new Promise(() => undefined),
+    startTrip: () => startTrip(),
     finishTrip: () => new Promise(() => undefined),
     addExpense: () => new Promise(() => undefined),
     currentTrip: () => new Promise(() => undefined),
@@ -57,6 +58,8 @@ describe('useCurrentTrip', () => {
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()
+    startTrip.mockReset()
+    startTrip.mockReturnValue(new Promise(() => undefined))
   })
 
   it('без похода и без очереди похода нет', () => {
@@ -89,7 +92,7 @@ describe('useCurrentTrip', () => {
     expect(current.trip.value).toBeNull()
   })
 
-  it('валюта до ответа сервера — своя, а после — походная', () => {
+  it('валюта до ответа сервера — своя, а после — походная', async () => {
     const { trips, queue, current } = fresh()
     const actor = useActorStore()
     actor.actor = {
@@ -101,13 +104,21 @@ describe('useCurrentTrip', () => {
       createdAt: new Date('2026-09-19T08:00:00.000Z'),
       updatedAt: new Date('2026-09-19T08:00:00.000Z'),
     }
+    // Ответ сервера держим в руке: до него поход живёт в очереди, после — в сторе.
+    let answer: (trip: { trip: TripView; created: boolean }) => void = () => undefined
+    startTrip.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
     queue.enqueue(start(OWN))
     expect(current.currency.value).toBe('AMD')
 
     trips.apply(serverTrip('USD'))
     expect(current.currency.value).toBe('AMD')
 
-    queue.$patch({ pending: [] })
+    answer({ trip: serverTrip('USD'), created: true })
+    await queue.flush()
     expect(current.currency.value).toBe('USD')
   })
 

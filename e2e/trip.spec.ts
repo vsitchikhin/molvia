@@ -133,14 +133,36 @@ test.describe('the trip', () => {
     await expect.poll(setting.current).toBeNull()
   })
 
-  test('is started with no connection, and the purchases catch up with it', async ({ page }) => {
+  test('is started with no connection, and catches up when it comes back', async ({
+    page,
+    context,
+  }) => {
     const setting = await device(page)
+    // The catalogue is asked for while the connection is still there: the search has no offline
+    // answer beyond the recent items, and this test is about the trip, not about the search.
     await startTrip(page, 'Рынок')
+    await addItem(page, setting.word, '250')
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+
+    await context.setOffline(true)
+    await page.getByRole('button', { name: 'Finish the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    // The trip is over on the phone at once, though nothing has reached the server.
+    await expect(page.getByText('A new trip')).toBeVisible()
+    expect(await setting.current()).not.toBeNull()
+
+    await startTrip(page, 'Ереван Сити')
+    await expect(page.locator('.meta')).toContainText('Ереван Сити')
+    // Nothing has gone out: the second trip exists only on the phone.
     await expect.poll(async () => (await setting.current())?.place.name).toBe('Рынок')
 
-    // The trip is there, so the next purchase has somewhere to go even before the answer.
-    await addItem(page, setting.word, '250')
-    await expect(row(page)).toHaveCount(1)
-    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+    await context.setOffline(false)
+    // The queue goes out in order: «finish» of the first trip, then the second trip itself.
+    await expect
+      .poll(async () => (await setting.current())?.place.name, {
+        timeout: 15_000,
+      })
+      .toBe('Ереван Сити')
   })
 })

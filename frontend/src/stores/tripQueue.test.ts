@@ -725,7 +725,28 @@ describe('trip queue', () => {
       expect(again.pending[0]).toEqual(started())
     })
 
-    it('двойное нажатие «Начать поход» — один поход', async () => {
+    it('поправленная покупка занимает место прежней, а не встаёт второй', async () => {
+      addExpense.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(add(MILK, '520'))
+      queue.enqueue(add(BREAD))
+      await queue.flush()
+
+      queue.enqueue(add(MILK, '750'))
+
+      const adds = queue.pending.filter((write) => write.kind === 'add')
+      expect(adds).toHaveLength(2)
+      // На своём месте в очереди и с новой ценой: порядок покупок — тот, в котором их делали.
+      expect(adds[0]?.body.id).toBe(MILK)
+      expect(adds[0]?.body.amount?.minor).toBe(75_000n)
+      expect(fresh().pending.find((write) => write.kind === 'add')?.body.amount?.minor).toBe(
+        75_000n,
+      )
+    })
+
+    it('двойное нажатие «Начать поход» — один поход, даже когда id у тапов разные', async () => {
+      // Шторка на каждый тап придумывает свой id, поэтому дедупликацию делает не он: второй
+      // старт того же похода отсекать нечем, и защита здесь — в том, что шторка уходит сразу.
       startTrip.mockRejectedValue(offline())
       const queue = fresh()
       queue.enqueue(started())

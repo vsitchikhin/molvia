@@ -20,7 +20,7 @@
 
     <p v-if="stale" class="note quiet">{{ stale }}</p>
 
-    <TripRateSheet v-if="choosing" v-model:open="choosing" :trip="trip" />
+    <TripRateSheet v-model:open="choosing" :trip="trip" />
   </div>
 </template>
 

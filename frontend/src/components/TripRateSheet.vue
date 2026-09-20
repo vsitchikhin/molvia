@@ -39,11 +39,11 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
-import { ERROR, currencySign, formatRate } from '@molvia/model'
+import { ERROR, currencySign, decimalFromRate, formatRate } from '@molvia/model'
 import type { ErrorCode, RateChoice, TripView } from '@molvia/model'
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
@@ -83,7 +83,24 @@ export default defineComponent({
     const failed = ref(false)
     const error = ref<ErrorCode | null>(null)
 
-    const sign = computed(() => currencySign(props.trip.rate?.base ?? 'RUB', locale.value))
+    // Mounted with the screen now, so the form is made afresh every time it comes up — otherwise
+    // it would still hold the choice of the last opening, and the error under the field with it.
+    watch(
+      () => props.open,
+      (open) => {
+        if (!open) return
+        choice.value = jump.value?.choice ?? 'jumped'
+        own.value = jump.value?.manual ? decimalFromRate(jump.value.manual.scaled) : ''
+        sending.value = false
+        failed.value = false
+        error.value = null
+      },
+    )
+
+    // The pair is the snapshot's; without a snapshot there is no jump and no sheet to show.
+    const sign = computed(() =>
+      props.trip.rate ? currencySign(props.trip.rate.base, locale.value) : '',
+    )
 
     const options = computed(() => {
       const held = jump.value

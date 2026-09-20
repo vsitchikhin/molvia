@@ -104,7 +104,7 @@ const handoff = (): Row[] => [
 /** Прочитанное с экрана: деньги печатаются с неразрывным пробелом, тесты — обычным. */
 const plain = (value: string | null | undefined): string => (value ?? '').replaceAll('\u00a0', ' ')
 
-/** Кнопка внутри шторки: она живёт в `<dialog>` вне дерева компонента. */
+/** Кнопка в поднятой шторке: закрытые `<dialog>` висят в дереве и не в счёт. */
 function inside(sheet: Element | null, text: string): HTMLButtonElement {
   const found = [...(sheet?.querySelectorAll('button') ?? [])].find((node) =>
     node.textContent.includes(text),
@@ -179,15 +179,17 @@ describe('TripView', () => {
   it('пока сервера не спросили и памяти нет — скелетон, а не «Новый поход»', async () => {
     currentTrip.mockReturnValue(new Promise(() => undefined))
     localStorage.setItem('molvia.actor', ME)
-    setActivePinia(createPinia())
+    const pinia = createPinia()
+    setActivePinia(pinia)
     const router = createRouter({ history: createMemoryHistory(), routes })
     await router.push('/')
     const view = mount(TripView, {
-      global: { plugins: [router, createPinia(), createAppI18n('ru')] },
+      global: { plugins: [router, pinia, createAppI18n('ru')] },
       attachTo: document.body,
     })
     mounted.push(view)
-    expect(view.find('.skeleton').exists() || view.text()).toBeTruthy()
+
+    expect(view.findAll('.bar')).not.toHaveLength(0)
     expect(view.text()).not.toContain(ru.trip.none.title)
   })
 
@@ -221,7 +223,7 @@ describe('TripView', () => {
     await view.findAll('.row')[1]?.trigger('click')
     await flushPromises()
 
-    const sheet = document.body.querySelector('dialog')
+    const sheet = document.body.querySelector('dialog[open]')
     expect(sheet?.textContent).toContain('Молоко «Марианна»')
     expect(sheet?.textContent).toContain(ru.item.save_edit)
   })
@@ -239,6 +241,34 @@ describe('TripView', () => {
           amount: parseMoney(price, 'AMD'),
         },
       }) as const
+
+    it('правка ещё не ушедшей покупки заменяет её, а не добавляет вторую', async () => {
+      currentTrip.mockResolvedValue(trip())
+      const { view, queue } = await render()
+      const purchase = 'eeeeeeee-0000-4000-8000-000000000005'
+      queue.enqueue(queued(purchase, '600'))
+      await flushPromises()
+
+      await view.get('.row').trigger('click')
+      await flushPromises()
+      clock += 1000
+
+      // Шторка открыта той же покупкой: те же числа и та же кнопка, что при добавлении.
+      const sheet = document.body.querySelector('dialog[open]')
+      expect(sheet?.querySelector<HTMLInputElement>('[data-field="amount"]')?.value).toBe('600')
+      const field = sheet?.querySelector<HTMLInputElement>('[data-field="amount"]')
+      if (!field) throw new Error('нет поля цены')
+      field.value = '750'
+      field.dispatchEvent(new Event('input'))
+      await flushPromises()
+      inside(sheet, ru.item.save).click()
+      await flushPromises()
+
+      const added = queue.pending.filter((write) => write.kind === 'add')
+      expect(added).toHaveLength(1)
+      expect(added[0]?.body.id).toBe(purchase)
+      expect(added[0]?.body.amount?.minor).toBe(75_000n)
+    })
 
     it('«ещё не ушло» — строка с ценой за единицу, посчитанной на телефоне', async () => {
       currentTrip.mockResolvedValue(trip(handoff()))
@@ -281,7 +311,7 @@ describe('TripView', () => {
       expect(row?.element.tagName).toBe('DIV')
       await row?.trigger('click')
       await flushPromises()
-      expect(document.body.querySelector('dialog')).toBeNull()
+      expect(document.body.querySelector('dialog[open]')).toBeNull()
     })
 
     it('записи чужого похода в список не попадают', async () => {
@@ -335,7 +365,7 @@ describe('TripView', () => {
       await flushPromises()
       clock += 1000
 
-      const sheet = document.body.querySelector('dialog')
+      const sheet = document.body.querySelector('dialog[open]')
       expect(sheet?.querySelector<HTMLInputElement>('[data-field="amount"]')?.value).toBe('600')
       // Добавление, а не правка: строки на сервере нет.
       expect(sheet?.textContent).toContain(ru.item.save)
@@ -348,6 +378,20 @@ describe('TripView', () => {
       const written = queue.pending.filter((write) => write.kind === 'add')
       expect(written).toHaveLength(1)
       expect(written[0]?.body.id).toBe('eeeeeeee-0000-4000-8000-000000000003')
+    })
+
+    it('отвергнутая покупка не исчезает вместе с завершённым походом', async () => {
+      const { view, queue } = await refused()
+      await button(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      clock += 1000
+      inside(document.body.querySelector('dialog[open]'), ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+
+      // Поход закончился, а покупка так и не записана — спрятать её значит потерять.
+      expect(view.text()).toContain(ru.trip.none.title)
+      expect(view.text()).toContain(ru.trip.rejected.drop)
+      expect(queue.rejected).toHaveLength(1)
     })
 
     it('«Убрать» снимает запись с телефона', async () => {
@@ -403,7 +447,7 @@ describe('TripView', () => {
       await flushPromises()
       clock += 1000
 
-      const sheet = document.body.querySelector('dialog')
+      const sheet = document.body.querySelector('dialog[open]')
       const field = sheet?.querySelector('input')
       if (!field) throw new Error('нет поля места')
       field.value = 'Рынок'
@@ -442,7 +486,7 @@ describe('TripView', () => {
       clock += 1000
 
       expect(document.body.textContent).toContain(ru.trip.finish_confirm.title)
-      inside(document.body.querySelector('dialog'), ru.trip.finish_confirm.cancel).click()
+      inside(document.body.querySelector('dialog[open]'), ru.trip.finish_confirm.cancel).click()
       await flushPromises()
       expect(queue.pending).toEqual([])
     })
@@ -453,7 +497,7 @@ describe('TripView', () => {
       await button(view, ru.trip.finish).trigger('click')
       await flushPromises()
       clock += 1000
-      inside(document.body.querySelector('dialog'), ru.trip.finish_confirm.ok).click()
+      inside(document.body.querySelector('dialog[open]'), ru.trip.finish_confirm.ok).click()
       await flushPromises()
 
       expect(queue.pending.some((write) => write.kind === 'finish')).toBe(true)
