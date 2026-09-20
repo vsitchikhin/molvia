@@ -60,26 +60,27 @@ verdicts, not an event — anything a domain table already knows must never be d
 into the log. Nothing updates or deletes from it, the gate queries are its only readers,
 and each is pinned by an integration test, boundary days included.
 
-**The first writer is the catalogue search, once a day per owner (MOL-12).** MOL-8 was going
-to record `session_started` on the first visit, and the promise was withdrawn when it was
-examined: written once, its timestamp is `actors.created_at` and the row duplicates what a
-domain table already knows — the very thing the rule above forbids; written on every launch,
-it answers a question no threshold asks, since 0.2 is counted over verdicts and 0.3 over
-`catalogue_viewed`. MOL-12 writes that one: every search that parses records
-`catalogue_viewed` with `subject: product`, after the search has answered, at most once per
-owner and payload in each **day of the person's own life** — days counted from their first
-event, as the gate counts its weeks, and both in hours rather than calendar days, so a
-`timezone` set on the database later cannot pull them apart. Not a rolling 24 hours from the
-last row: that window slid over the week line and swallowed a visit early in week four.
-Overlapping searches are serialised by an advisory lock per actor, and a failure to record is
-not swallowed, because a lost row lowers the gate with nothing to backfill from.
+**The one writer is «Что брать», once a day per owner (MOL-31).** MOL-8 was going to record
+`session_started` on the first visit, and the promise was withdrawn when it was examined:
+written once, its timestamp is `actors.created_at` and the row duplicates what a domain table
+already knows — the very thing the rule above forbids; written on every launch, it answers a
+question no threshold asks, since 0.2 is counted over verdicts. The screen records
+`advice_viewed` with `subject: product` **only in the shared mode**, after the answer is
+built, at most once per owner and payload in each **day of the person's own life** — days
+counted from their first event, as the gate counts its weeks, and both in hours rather than
+calendar days, so a `timezone` set on the database later cannot pull them apart. Not a rolling
+24 hours from the last row: that window slid over the week line and swallowed a visit early in
+week four. Overlapping requests are serialised by an advisory lock per actor, and a failure to
+record is not swallowed, because a lost row lowers the gate with nothing to backfill from.
 
-**This measures entering, not reading, and that was chosen knowingly.** In 0.1 and 0.2 a
-search is a purchase being entered; the plan hides other people's data until 0.3 precisely so
-that «came to write» and «came to read» stay apart. The owner took the event from the search
-anyway, with that price in view. So **when the screens of 0.3 show other people's data, who
-writes `catalogue_viewed` has to be decided again** — left as it is, the 0.3 gate counts
-someone who only logs purchases as someone who came back for other people's ratings.
+**That question was asked and answered once already.** From MOL-12 the writer was the
+catalogue search, recording `catalogue_viewed` — and it measured entering, not reading, which
+the owner accepted knowingly while no screen showed anyone else's data. The condition was
+written down with the decision: when a screen does, who writes the visit is decided again.
+MOL-31 is that screen, so the gate moved to `advice_viewed`, and **the search stopped writing
+anything at all** — with the gate gone, `catalogue_viewed` had no reader, and whether a person
+enters purchases is what `expenses` and `verdicts` answer. The rows already written stay where
+they are: the log is append-only, and they were true when they were made.
 
 One consequence of MOL-6 is open and worth knowing before it is met: the log points at
 `actors` with a real foreign key, so an actor that has events cannot be deleted. When
@@ -91,6 +92,13 @@ written exception to append-only. It is a product decision, not a schema detail.
 
 Access is a monthly resource: ~10 ratings = a month, or $1. Contribution does not expire
 and is spent before money; there are no auto-charges. Tips via Telegram Stars from 0.3.
+
+**The access itself exists from 0.1 (MOL-31, owner's decision 20.09.2026):**
+`actors.shared_until` is a moment in time — «other people's figures are visible until then» —
+so ten ratings buying a month, a dollar buying one, and a grant made by hand all land in the
+same column and the paid layer needs no second migration. Nothing sets it but a person with
+`psql`; empty and a past date are the same answer. What it opens is described under «Что
+брать» below, and what it never opens is anyone's expenses.
 It is accepted that there is no revenue for the first two years.
 
 ---
@@ -321,6 +329,50 @@ shows what it moves.
 They are not the answer to typos or transliteration, both of which are already solved
 deterministically above. The cost is real: `vector` is not in `postgres:17-alpine`, so it
 means owning the image, plus a model resident in memory on a cheap VPS.
+
+### What «Что брать» shows, and what it refuses to (MOL-31)
+
+One route, `GET /advice`, and the whole screen: the rated items in three groups, each given
+exactly what it is entitled to. **«Не брать нигде» has no field for a price, a place or a
+threshold** — the answer is a discriminated union on `level`, so cheapness cannot reach a bad
+item through an oversight in a later use case. That is the product's core rule held by the
+type checker rather than by a reader, the way `bad` is not a tone a screen can ask for.
+
+- **Two figures decide everything, and the domain owns both.** The repository returns a sum of
+  scores and how many people stand behind it; `verdictLevel` picks the group and
+  `averageScore` prints «4.3». The rating crosses the wire as a **decimal string**, never a
+  number: one person's whole five and an average over many share one field, and «never float»
+  has to hold for both.
+- **Free is your own data; access opens other people's.** `actors.shared_until` decides, read
+  once per request, and `scope: 'own' | 'shared'` travels with the answer because the screen
+  cannot work it out and «4,3 из 5» read as one's own score would be a lie. There is no
+  parameter with which to ask for anyone else's.
+- **An average needs three people (`AGGREGATE_MIN_CONTRIBUTIONS`).** With two, whoever knows
+  their own score gets the other's by subtraction. Below three the row falls back to the
+  person's own figures, and a row that has no own figures either — a stranger's lone verdict —
+  **does not appear at all**: its mere presence with a verdict would be that opinion, read
+  without them. A contribution is a person, never a row.
+- **Prices are stricter than ratings, and in practice almost always one's own.** The same
+  threshold counts _buyers of one item in one place_, so a place with fewer than three is shown
+  only when the asker shopped there, with their own price. Expenses are private, and one
+  stranger's price in one shop is their basket. Ratings travel with the person; **prices are
+  filtered by the asker's own country and city**, because «cheaper» across cities means
+  «elsewhere».
+- **The threshold of «только если дёшево» is the lower median, from three purchases**
+  (`PRICE_MEDIAN_MIN_OBSERVATIONS`, MOL-33's answer) — `percentile_disc(0.5)`, a price someone
+  actually paid, the same rule `isRateJump` follows. Fewer than three and the field is `null`,
+  which the contract requires the server to say rather than omit.
+- **One «currency + unit» per item, the one with the most observations**, ties broken by the
+  latest purchase (MOL-31, Р-4). Two prices in different currencies have no common ground
+  without a rate, and a rate belongs to one trip and one day, so they are never shown side by
+  side.
+- **Order is by rating down, then by name, in all three groups.** The handoff asked for
+  ascending unit price; that sorts _different products_ by a number — milk at 570 ֏/л above
+  beef at 4 790 ֏/кг — and «compare by unit price» is about one item across places.
+- **The server names no superlative.** It returns the places sorted by price and nothing else;
+  whether that reads «Дешевле всего» or «Брали здесь» is the screen's to decide by their number
+  (MOL-34's answer). And a review is always the asker's own: words are not an aggregate, there
+  is nothing in them to average and nothing to hide behind.
 
 **Telegram Mini App was dropped:** `getUserMedia` is broken on both platforms and the
 native scanner only reads QR. Native is a 1.0 question.
@@ -840,8 +892,12 @@ when its row was entered, but never after its trip was finished (the sauce found
 bought that week). «Сохранить» keeps the rating on the phone and moves on; the app sends it
 (`stores/verdictDrafts`, a map «item → latest rating», not an ordered queue: `PUT` is safe to
 repeat). «Не сейчас» puts a card behind the others until the item is bought again; the last
-answer is remembered for offline. «Поход» and «Что брать» are still placeholders. Release 0.1 is
-broken into epics and tasks in Jira.
+answer is remembered for offline. MOL-31 the API of «Что брать» — the three groups, where it is
+cheaper, the threshold of «только если дёшево» — **and with it the paid layer, pulled into 0.1
+by the owner on 20.09.2026**: free is one's own data, `actors.shared_until` opens other
+people's, and the 0.3 gate moved from the search's event to this screen's. «Поход» and the
+screen of «Что брать» itself are still placeholders. Release 0.1 is broken into epics and tasks
+in Jira.
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 **What the database guarantees and what it leaves to the domain** is a line, not a habit:
