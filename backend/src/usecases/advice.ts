@@ -11,7 +11,13 @@ import {
   hasSharedAccess,
   verdictLevel,
 } from '@molvia/model'
-import type { AdvicePlace, AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
+import type {
+  AdvicePlace,
+  AdviceResponse,
+  AdviceRow,
+  AdviceScope,
+  VerdictLevel,
+} from '@molvia/model'
 import type { ActorRepository } from '@/db/actors-repository'
 import type { EventRepository } from '@/db/events-repository'
 import type { ExpenseRepository, PlacePrice, PriceMedian } from '@/db/expenses-repository'
@@ -60,21 +66,23 @@ export async function advice(
   })
 
   const levelled = rated.map((row) => ({ row, level: verdictLevel(row.sum, row.count) }))
-  const priced = levelled
-    .filter((entry) => entry.level !== 'never')
-    .map((entry) => entry.row.itemId)
+  const asked = (...levels: readonly VerdictLevel[]) =>
+    levelled.filter((entry) => levels.includes(entry.level)).map((entry) => entry.row.itemId)
 
   const query = {
     actorId,
-    itemIds: priced,
     scope,
     minBuyers: AGGREGATE_MIN_CONTRIBUTIONS,
     country: actor.country,
     city: actor.city,
   }
+  // Two questions, so two lists of items. «Не брать нигде» is in neither: its price is not
+  // filtered out of an answer, it is never asked for. And a threshold is only ever printed on
+  // «только если дёшево», so asking for the medians of everything else was half the work of
+  // every screen spent on a number nobody would read.
   const [places, medians] = await Promise.all([
-    expenses.cheapestFor(query),
-    expenses.medianPriceFor(query),
+    expenses.cheapestFor({ ...query, itemIds: asked('take', 'if_cheap') }),
+    expenses.medianPriceFor({ ...query, itemIds: asked('if_cheap') }),
   ])
 
   const byItem = groupPrices(places)
@@ -149,28 +157,24 @@ function dominant(groups: Map<GroupKey, PlacePrice[]>): [GroupKey, PlacePrice[]]
 }
 
 function placesOf(places: readonly PlacePrice[]): AdvicePlace[] {
-  return [...places]
-    .sort(
-      (a, b) =>
-        (a.scaledMinor < b.scaledMinor ? -1 : a.scaledMinor > b.scaledMinor ? 1 : 0) ||
-        a.placeName.localeCompare(b.placeName, 'ru') ||
-        a.placeId.localeCompare(b.placeId),
-    )
-    .map((place) => ({
-      placeId: place.placeId,
-      name: place.placeName,
-      unitPrice: {
-        scaledMinor: place.scaledMinor,
-        currency: place.currency,
-        unit: place.unit,
-      },
-      observations: place.observations,
-    }))
+  // Already cheapest first: the statement ordered them, and it ordered the rows of the answer
+  // by the same collation. Sorting again here used another alphabet, so one answer came back
+  // in two orders — «молоко» under «Яблоко» among the rows, over it among the places (F7).
+  return places.map((place) => ({
+    placeId: place.placeId,
+    name: place.placeName,
+    unitPrice: {
+      scaledMinor: place.scaledMinor,
+      currency: place.currency,
+      unit: place.unit,
+    },
+    observations: place.observations,
+  }))
 }
 
 function rowOf(
   row: AdviceVerdictRow,
-  level: ReturnType<typeof verdictLevel>,
+  level: VerdictLevel,
   groups: Map<GroupKey, PlacePrice[]> | undefined,
   medians: Map<string, PriceMedian>,
 ): AdviceRow {

@@ -67,14 +67,27 @@ async function rate(actorId: string, itemId: string, score: number, review?: str
     .onConflictDoNothing()
 }
 
+interface Bought {
+  readonly quantity?: Quantity
+  /** The day of the visit — what «the last purchase» means (Р-4). */
+  readonly startedAt?: Date
+  /** When the row reached the server. The offline queue makes these two differ. */
+  readonly createdAt?: Date
+}
+
 async function bought(
   actorId: string,
   itemId: string,
   placeId: string,
   amount: Money,
-  quantity: Quantity = kilo,
+  options: Bought = {},
 ) {
-  const tripId = await insertTrip(db, { actorId, placeId })
+  const quantity = options.quantity ?? kilo
+  const tripId = await insertTrip(db, {
+    actorId,
+    placeId,
+    ...(options.startedAt ? { startedAt: options.startedAt } : {}),
+  })
   await db.insert(expenses).values({
     id: randomUUID(),
     tripId,
@@ -83,8 +96,11 @@ async function bought(
     qtyUnit: quantity.unit,
     amountMinor: amount.minor,
     amountCurrency: amount.currency,
+    ...(options.createdAt ? { createdAt: options.createdAt } : {}),
   })
 }
+
+const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 
 /** Access is granted, never asked for: there is no route that sets this column. */
 async function grantAccess(actorId: string) {
@@ -371,5 +387,92 @@ describe('журнал событий', () => {
     await ask(randomUUID())
 
     expect(await db.select().from(events)).toHaveLength(0)
+  })
+})
+
+/** Дефекты первого адверсариального раунда: каждый закреплён, чтобы не вернулся. */
+describe('ревью 1', () => {
+  it('F1 — порог не выносит цену из места, которое тот же ответ скрыл', async () => {
+    const me = await insertActor(db)
+    await grantAccess(me)
+    const itemId = await insertItem(db, { name: 'Сыр «Чанах»' })
+    const sas = await insertPlace(db, { name: 'SAS' })
+    const carrefour = await insertPlace(db, { name: 'Carrefour' })
+    const yerevanCity = await insertPlace(db, { name: 'Ереван Сити' })
+
+    // Трое покупателей, но в трёх разных магазинах: ни один магазин порога не проходит.
+    await bought(me, itemId, sas, amd(500_000))
+    await bought(await insertActor(db), itemId, carrefour, amd(300_000))
+    await bought(await insertActor(db), itemId, yerevanCity, amd(400_000))
+    for (const who of [me, await insertActor(db), await insertActor(db)]) {
+      await rate(who, itemId, 3)
+    }
+
+    const [row] = (await screen(me)).rows
+    expect(row?.level === 'if_cheap' && row.places.map((place) => place.name)).toEqual(['SAS'])
+    // Медиана считается по тем же строкам, что и места: моя одна покупка — не три наблюдения.
+    expect(row?.level === 'if_cheap' && row.threshold).toBeNull()
+  })
+
+  it('F4 — ничью решает день похода, а не час, когда очередь дошла до сервера', async () => {
+    const me = await insertActor(db)
+    const placeId = await insertPlace(db)
+    const itemId = await insertItem(db)
+    await rate(me, itemId, 5)
+
+    // Поход десятидневной давности долежал в телефоне и ушёл сегодня.
+    await bought(me, itemId, placeId, amd(500_000), {
+      quantity: kilo,
+      startedAt: daysAgo(10),
+      createdAt: new Date(),
+    })
+    await bought(me, itemId, placeId, amd(570_000), {
+      quantity: { milli: 1000n, unit: 'l' },
+      startedAt: daysAgo(1),
+      createdAt: daysAgo(1),
+    })
+
+    const [row] = (await screen(me)).rows
+    expect(row?.level === 'take' && row.places[0]?.unitPrice.unit).toBe('l')
+  })
+
+  it('F5 — доступ не отбирает мои собственные цены из другого города', async () => {
+    const me = await insertActor(db, { city: 'Гюмри' })
+    const yerevan = await insertPlace(db, { name: 'SAS', city: 'Ереван' })
+    const itemId = await insertItem(db)
+    await rate(me, itemId, 3)
+    for (const minor of [290_000, 300_000, 340_000]) {
+      await bought(me, itemId, yerevan, amd(minor))
+    }
+
+    const free = (await screen(me)).rows[0]
+    await grantAccess(me)
+    const paid = (await screen(me)).rows[0]
+
+    expect(free?.level === 'if_cheap' && free.threshold?.scaledMinor).toBe(perKilo(300_000))
+    expect(paid?.level === 'if_cheap' && paid.places).toHaveLength(1)
+    expect(paid?.level === 'if_cheap' && paid.threshold?.scaledMinor).toBe(perKilo(300_000))
+  })
+
+  it('F7 — строки и места в одном ответе идут по одному алфавиту', async () => {
+    const me = await insertActor(db)
+    const milk = await insertItem(db, { name: 'молоко' })
+    const apple = await insertItem(db, { name: 'Яблоко' })
+    await rate(me, milk, 5)
+    await rate(me, apple, 5)
+    // Два места с одной ценой: порядок между ними решает только название.
+    const yezh = await insertPlace(db, { name: 'Ёжик' })
+    const yezhevika = await insertPlace(db, { name: 'Ежевика' })
+    await bought(me, milk, yezh, amd(500_000))
+    await bought(me, milk, yezhevika, amd(500_000))
+
+    const { rows } = await screen(me)
+    const milkRow = rows.find((row) => row.name === 'молоко')
+
+    expect(rows.map((row) => row.name)).toEqual(['молоко', 'Яблоко'])
+    expect(milkRow?.level === 'take' && milkRow.places.map((place) => place.name)).toEqual([
+      'Ежевика',
+      'Ёжик',
+    ])
   })
 })

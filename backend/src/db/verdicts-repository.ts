@@ -366,7 +366,14 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         from shown
         -- By rating down, then by name (Р-6). ::numeric rather than a float: the order of a
         -- product decision must not depend on how two doubles compare.
-        order by score_sum::numeric / contributors desc, name asc, item_id asc
+        --
+        -- The name is compared in the root ICU collation, not the database's own. The database
+        -- is created with en_US.utf8, where «Ёжик» lands before «Ежевика» and a name typed in
+        -- lower case falls below every capitalised one — and the places inside a row were
+        -- ordered by yet another alphabet, so one answer came back in two orders (adversarial
+        -- round 1, F7). The root locale rather than ru-RU: this catalogue holds Russian,
+        -- Armenian and Latin names, and no single language should decide for all three.
+        order by score_sum::numeric / contributors desc, name collate "und-x-icu" asc, item_id asc
         limit ${rowLimit(limit)}
       `)
 

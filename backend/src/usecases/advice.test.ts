@@ -145,10 +145,13 @@ describe('три группы', () => {
 })
 
 describe('места и порог', () => {
-  it('сортирует места по возрастанию цены за единицу', async () => {
+  it('не переставляет места: порядок задан выборкой, и он же у строк ответа', async () => {
+    // Сортировать их здесь ещё раз значило бы сравнивать названия другим алфавитом, чем тот,
+    // которым база упорядочила строки, — один ответ в двух порядках (ревью 1, F7). Сам порядок
+    // закреплён интеграционным тестом, на настоящей коллации.
     const prices = [
-      price({ placeId: SAS, placeName: 'SAS', scaledMinor: perKilo(510_000) }),
       price({ placeId: MARKET, scaledMinor: perKilo(479_000) }),
+      price({ placeId: SAS, placeName: 'SAS', scaledMinor: perKilo(510_000) }),
     ]
 
     const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows

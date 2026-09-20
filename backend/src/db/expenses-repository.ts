@@ -158,24 +158,13 @@ function asDate(value: Date | string): Date {
 }
 
 /**
- * The pieces every price aggregate is built from, so the two can never disagree about which
- * purchases they are allowed to look at — a median over everyone beside a minimum over one
- * person would be two answers about the same shelf.
- *
- * `unitPrice` is computed in SQL rather than in the domain (MOL-21, В-7): with other people's
- * data it has to be SQL anyway, and in memory it would be written twice. The scale comes from
- * `UNIT_PRICE_SCALE`, and `round` matches `divideRounded` — both take half away from zero.
- * `::numeric` is not optional: integer division truncates, shaving almost half a unit off
- * every price, quietly and always in the same direction.
- *
- * `chosen(aggregate)` is that aggregate over everyone when enough people bought the item, and
- * over this person's own purchases otherwise (Р-17). The number arrives with the query, so no
- * threshold lives in this file; in the own mode nobody else's rows are there to begin with.
+ * The two pieces of the statement both price aggregates share. What they mean, and why the
+ * choosing happens on the row rather than on the aggregate, is written once — over
+ * `pricedRows` below, where it is built.
  */
 interface PricedRows {
-  readonly unitPrice: SQL
-  readonly chosen: (aggregate: SQL) => SQL
-  readonly from: SQL
+  /** `from (…) priced where …` — the visible, showable purchases, ready to be aggregated. */
+  readonly rows: SQL
   readonly limit: SQL
 }
 
@@ -252,27 +241,37 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
     )
 
   /**
-   * The one statement both price aggregates are built on (MOL-31): same rows, same privacy,
-   * different column list. Written once because the two must never disagree about which
-   * purchases they are allowed to look at — a median over everyone beside a minimum over one
-   * person would be two answers about the same shelf.
+   * The rows both price aggregates are built on (MOL-31): same purchases, same privacy, and
+   * the choosing is done once, here, on the row rather than on the aggregate.
    *
-   * The caller writes only the columns, and gets three pieces to write them with:
+   * It has to be the row. The first version decided per aggregate — «everyone's, or this
+   * person's own» — and the two aggregates group differently: a place at a time for the
+   * minimum, a whole «currency + unit» for the median. Three strangers in three shops then
+   * made the median «enough» although no shop of theirs passed the threshold, and
+   * `percentile_disc` handed back an exact price someone paid in a shop the same answer had
+   * just refused to show (adversarial round 1, F1). One `showable` per row, read by both, is
+   * what makes «same privacy» true rather than merely claimed.
+   *
+   * What a row carries:
    *
    * - `unitPrice`, computed in SQL rather than in the domain (MOL-21, В-7): with other
    *   people's data it has to be SQL anyway, and in memory it would be written twice. The
    *   scale comes from `UNIT_PRICE_SCALE`, and `round` matches `divideRounded` — both take
    *   half away from zero. `::numeric` is not optional: integer division truncates, shaving
    *   almost half a unit off every price, quietly and always in the same direction.
-   * - `chosen(aggregate)` — the aggregate over everyone when enough people bought it, and
-   *   over this person's own purchases otherwise (Р-17). The number comes from the caller,
-   *   so this file holds no threshold; in the own mode nobody else's rows are here at all,
-   *   so the fallback branch is simply the whole of it.
-   * - the rows themselves are already filtered: own — this person's purchases wherever they
-   *   were; shared — everyone's, but only in this person's own city (Р-10).
+   * - `bought_at` — `trips.started_at`, the day of the visit. Not `created_at`: the offline
+   *   queue (MOL-24) sends a whole trip when the connection returns, so a ten-day-old purchase
+   *   can carry today's, and «the last purchase» of Р-4 would be decided by when the phone
+   *   found signal (F4).
+   * - `mine`, and `place_buyers` — how many people bought this item in this place, counted
+   *   over the visible rows. A buyer is a person: three purchases by one of them are one.
+   * - `showable` — `mine or place_buyers >= minBuyers` (Р-17). The number arrives with the
+   *   query, so this file holds no threshold of its own.
    *
-   * `::text` on the way out of the caller's columns, because a numeric wider than a double
-   * must not pass through one.
+   * Which rows are visible at all: in the own mode only this person's, wherever they shopped;
+   * in the shared mode theirs **and** everyone else's in their own city. «Theirs» is there on
+   * purpose — the city rule is about other people's prices (Р-10), and without it buying
+   * access took away the Erevan prices a Gyumri resident could see for free (F5).
    */
   function pricedRows(query: PriceQuery): PricedRows | null {
     // A malformed identifier can match nothing, so it is dropped rather than sent to meet
@@ -280,33 +279,62 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
     const known = query.itemIds.map(idOrNull).filter((id): id is string => id !== null)
     if (idOrNull(query.actorId) === null || known.length === 0) return null
 
-    const unitPrice = sql`round(
-      ${expenses.amountMinor}::numeric * 1000 * ${sql.raw(UNIT_PRICE_SCALE.toString())}
-      / ${expenses.qtyMilli}
-    )`
     const mine = sql`${trips.actorId} = ${query.actorId}::uuid`
-    // A buyer is a person: three purchases by one of them are one contribution.
-    const enough = sql`count(distinct ${trips.actorId}) >= ${query.minBuyers}`
-
     const visible =
       query.scope === 'own'
         ? mine
-        : sql`${places.country} = ${query.country} and ${places.city} = ${query.city}`
+        : sql`${mine} or (${places.country} = ${query.country} and ${places.city} = ${query.city})`
 
     return {
-      unitPrice,
-      chosen: (aggregate) =>
-        sql`case when ${enough} then ${aggregate} else ${aggregate} filter (where ${mine}) end`,
-      from: sql`
-        from ${expenses}
-        join ${trips} on ${trips.id} = ${expenses.tripId}
-        join ${places} on ${places.id} = ${trips.placeId}
-        where ${inArray(expenses.itemId, known)}
-          -- An observation without a price or without a quantity says nothing about a unit
-          -- price, so it is skipped by an explicit condition rather than silently.
-          and ${expenses.amountMinor} is not null
-          and ${expenses.qtyMilli} is not null
-          and (${visible})`,
+      rows: sql`
+        from (
+          with visible as (
+            select
+              ${expenses.itemId} as item_id,
+              ${trips.placeId} as place_id,
+              ${places.name} as place_name,
+              ${expenses.amountCurrency} as currency,
+              ${expenses.qtyUnit} as unit,
+              round(
+                ${expenses.amountMinor}::numeric * 1000 * ${sql.raw(UNIT_PRICE_SCALE.toString())}
+                / ${expenses.qtyMilli}
+              ) as unit_price,
+              -- The day of the visit, not the moment the row reached the server. The offline
+              -- queue (MOL-24) sends a whole trip when the connection returns, so a ten-day-old
+              -- purchase can carry today's created_at and win a tie it lost by ten days
+              -- (adversarial round 1, F4). A row added to a trip later — the sauce found in the
+              -- bag at home — belongs to the visit it was bought on, which is the same answer.
+              ${trips.startedAt} as bought_at,
+              ${trips.actorId} as actor_id,
+              ${mine} as mine
+            from ${expenses}
+            join ${trips} on ${trips.id} = ${expenses.tripId}
+            join ${places} on ${places.id} = ${trips.placeId}
+            where ${inArray(expenses.itemId, known)}
+              -- An observation without a price or without a quantity says nothing about a
+              -- unit price, so it is skipped by an explicit condition rather than silently.
+              and ${expenses.amountMinor} is not null
+              and ${expenses.qtyMilli} is not null
+              and (${visible})
+          ),
+          -- A grouped count rather than a window: Postgres has no DISTINCT inside one.
+          -- Currency and unit stay part of the key here as everywhere else, and they are
+          -- never null in these rows — the pairing CHECKs tie them to the amount and the
+          -- quantity the filter above has already demanded.
+          buyers as (
+            select item_id, place_id, currency, unit, count(distinct actor_id) as place_buyers
+            from visible
+            group by item_id, place_id, currency, unit
+          )
+          select visible.*, buyers.place_buyers
+          from visible
+          join buyers
+            on buyers.item_id = visible.item_id
+           and buyers.place_id = visible.place_id
+           and buyers.currency = visible.currency
+           and buyers.unit = visible.unit
+        ) priced
+        where mine or place_buyers >= ${query.minBuyers}`,
       // The default follows the question: so many places per item asked about. A flat cap
       // would be right for one item and wrong for two hundred, and it would run out on the
       // items the ordering leaves last rather than trimming everyone evenly.
@@ -496,35 +524,34 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
     },
 
     async cheapestFor(query) {
-      const rows = pricedRows(query)
-      if (!rows) return []
-      const { unitPrice, chosen, from, limit } = rows
+      const priced = pricedRows(query)
+      if (!priced) return []
 
       const found = await db.execute<PlacePriceShape>(sql`
         select
-          ${expenses.itemId} as "itemId",
-          ${trips.placeId} as "placeId",
-          ${places.name} as "placeName",
-          ${expenses.amountCurrency} as currency,
-          ${expenses.qtyUnit} as unit,
-          ${chosen(sql`min(${unitPrice})`)}::text as "scaledMinor",
-          ${chosen(sql`count(*)`)}::text as observations,
-          ${chosen(sql`max(${expenses.createdAt})`)} as "latestAt"
-        ${from}
-        group by ${expenses.itemId}, ${trips.placeId}, ${places.name},
-                 ${expenses.amountCurrency}, ${expenses.qtyUnit}
+          item_id as "itemId",
+          place_id as "placeId",
+          place_name as "placeName",
+          currency,
+          unit,
+          min(unit_price)::text as "scaledMinor",
+          count(*)::text as observations,
+          max(bought_at) as "latestAt"
+        ${priced.rows}
+        group by item_id, place_id, place_name, currency, unit
+        -- Ordered here rather than after, and by the price itself: the screen shows the
+        -- places of one item cheapest first, and a second sort in JavaScript would compare
+        -- names by another alphabet than the one that ordered the rows of the answer (F7).
         -- Currency and unit are part of the key, so they belong in the order as well:
         -- without them two rows of one place are tied, and a tie is an order the planner is
         -- free to change between two loads of the same screen.
-        order by ${expenses.itemId}, ${trips.placeId},
-                 ${expenses.amountCurrency}, ${expenses.qtyUnit}
-        ${limit}
+        order by item_id, min(unit_price), place_name collate "und-x-icu", currency, unit, place_id
+        ${priced.limit}
       `)
 
       return found.flatMap((row) => {
         // The pairing CHECKs make these non-null wherever the amount and the quantity are,
-        // but the column types do not say so. A price this person was not entitled to see is
-        // dropped here: the statement answers NULL for it (Р-17).
+        // but the column types do not say so.
         if (row.currency === null || row.unit === null || row.scaledMinor === null) return []
         return [
           {
@@ -542,22 +569,20 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
     },
 
     async medianPriceFor(query) {
-      const rows = pricedRows(query)
-      if (!rows) return []
-      const { unitPrice, chosen, from, limit } = rows
+      const priced = pricedRows(query)
+      if (!priced) return []
 
       const found = await db.execute<PriceMedianShape>(sql`
         select
-          ${expenses.itemId} as "itemId",
-          ${expenses.amountCurrency} as currency,
-          ${expenses.qtyUnit} as unit,
-          ${chosen(sql`percentile_disc(0.5) within group (order by ${unitPrice})`)}
-            ::text as "scaledMinor",
-          ${chosen(sql`count(*)`)}::text as observations
-        ${from}
-        group by ${expenses.itemId}, ${expenses.amountCurrency}, ${expenses.qtyUnit}
-        order by ${expenses.itemId}, ${expenses.amountCurrency}, ${expenses.qtyUnit}
-        ${limit}
+          item_id as "itemId",
+          currency,
+          unit,
+          percentile_disc(0.5) within group (order by unit_price)::text as "scaledMinor",
+          count(*)::text as observations
+        ${priced.rows}
+        group by item_id, currency, unit
+        order by item_id, currency, unit
+        ${priced.limit}
       `)
 
       return found.flatMap((row) => {
