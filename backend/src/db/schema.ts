@@ -139,7 +139,9 @@ export const events = pgTable(
       // asserted to be there before its value is compared. And the domain's `strictObject`
       // has to hold here too: `payload - 'subject'` must leave nothing, or an extra key
       // lands in an append-only log with nothing to clean it out with.
-      sql`(${table.type} <> ${literal(EVENT.CATALOGUE_VIEWED)}
+      // `advice_viewed` carries the same axis as `catalogue_viewed` and is checked by the
+      // same shape: the gate splits products from venues whichever screen was opened.
+      sql`(${table.type} not in (${list([EVENT.CATALOGUE_VIEWED, EVENT.ADVICE_VIEWED])})
              or (jsonb_exists(${table.payload}, 'subject')
                  and ${table.payload} ->> 'subject' in (${list(catalogueSubjectSchema.options)})
                  and ${table.payload} - 'subject' = '{}'::jsonb))

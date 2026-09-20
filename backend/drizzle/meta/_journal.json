@@ -92,6 +92,13 @@
       "when": 1789917864310,
       "tag": "0012_advice_shared_access",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789919748358,
+      "tag": "0013_advice_viewed_event",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm'
+import { EVENT } from '@molvia/model'
 import type { CatalogueSubject, EventInput } from '@molvia/model'
 import type { Conn } from './index'
 import { events } from './schema'
@@ -33,7 +34,16 @@ export interface EventRepository {
    * keystroke, and two overlapping requests would otherwise both see no row and both write.
    */
   recordOncePerDay(event: RecordedEvent): Promise<boolean>
-  /** Gate 0.3: of those first seen in a window, how many came back in their fourth week. */
+  /**
+   * Gate 0.3: of those first seen in a window, how many came back in their fourth week —
+   * and came back *to read other people's data*, which is what the threshold actually asks.
+   *
+   * It counts `advice_viewed` (MOL-31, Р-15), not `catalogue_viewed`. The search wrote that
+   * one while nothing on any screen came from anyone else, so it meant «came back to enter a
+   * purchase»; once «Что брать» shows other people's figures, the visit that answers this
+   * gate is the one to that screen. The rows the search already wrote stay where they are —
+   * the log is append-only — and nothing reads them.
+   */
   weekFourReturn(subject: CatalogueSubject, from: Date, to: Date): Promise<CohortReturn>
 }
 
@@ -100,7 +110,7 @@ export function createEventRepository(db: Conn): EventRepository {
           select distinct c.actor_id
           from cohort c
           join ${events} e on e.actor_id = c.actor_id
-          where e.type = 'catalogue_viewed'
+          where e.type = ${EVENT.ADVICE_VIEWED}
             and e.payload ->> 'subject' = ${subject}
             and e.occurred_at >= c.started + interval '504 hours'
             and e.occurred_at < c.started + interval '672 hours'

@@ -24,7 +24,6 @@ import { chooseTripRate } from '@/usecases/choose-trip-rate'
 import { startTrip } from '@/usecases/start-trip'
 import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
 import { createActorRepository } from '@/db/actors-repository'
-import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
@@ -116,7 +115,6 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const db = options.db ?? getDb()
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
-    const events = createEventRepository(db)
     const tripData = tripRepositories(db)
     const transact = transactOn(db)
     const verdicts = createVerdictRepository(db)
@@ -135,7 +133,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       withActor(guarded, (id) => getActor(actors, id))
       actorMeRoute(guarded)
       catalogueRoutes(guarded, {
-        search: (actorId, query) => searchCatalogue({ items, events }, actorId, query),
+        search: (actorId, query) => searchCatalogue({ items }, actorId, query),
         propose: (actorId, input) => proposeItem(items, actorId, input),
       })
       placeRoutes(guarded, { recent: (actorId) => recentPlaces(tripData.places, actorId) })

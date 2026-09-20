@@ -1,0 +1,1174 @@
+{
+  "id": "45958718-650b-4681-a458-bdc48edf2ddc",
+  "prevId": "fda8cb3d-5718-4f67-87e6-832aa01375ca",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.actors": {
+      "name": "actors",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "country": {
+          "name": "country",
+          "type": "char(2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "city": {
+          "name": "city",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "spend_currency": {
+          "name": "spend_currency",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "income_currency": {
+          "name": "income_currency",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "shared_until": {
+          "name": "shared_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "actors_country_iso": {
+          "name": "actors_country_iso",
+          "value": "\"actors\".\"country\" ~ '^[A-Z]{2}$'"
+        },
+        "actors_spend_currency_known": {
+          "name": "actors_spend_currency_known",
+          "value": "\"actors\".\"spend_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+        },
+        "actors_income_currency_known": {
+          "name": "actors_income_currency_known",
+          "value": "\"actors\".\"income_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.events": {
+      "name": "events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "events_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        }
+      },
+      "indexes": {
+        "events_actor_occurred_idx": {
+          "name": "events_actor_occurred_idx",
+          "columns": [
+            {
+              "expression": "actor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "events_type_occurred_idx": {
+          "name": "events_type_occurred_idx",
+          "columns": [
+            {
+              "expression": "type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "events_actor_id_actors_id_fk": {
+          "name": "events_actor_id_actors_id_fk",
+          "tableFrom": "events",
+          "tableTo": "actors",
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "events_type_known": {
+          "name": "events_type_known",
+          "value": "\"events\".\"type\" in ('session_started', 'catalogue_viewed', 'advice_viewed')"
+        },
+        "events_payload_is_object": {
+          "name": "events_payload_is_object",
+          "value": "jsonb_typeof(\"events\".\"payload\") = 'object'"
+        },
+        "events_payload_matches_type": {
+          "name": "events_payload_matches_type",
+          "value": "(\"events\".\"type\" not in ('catalogue_viewed', 'advice_viewed')\n             or (jsonb_exists(\"events\".\"payload\", 'subject')\n                 and \"events\".\"payload\" ->> 'subject' in ('product', 'venue')\n                 and \"events\".\"payload\" - 'subject' = '{}'::jsonb))\n          and (\"events\".\"type\" <> 'session_started'\n             or \"events\".\"payload\" = '{}'::jsonb)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.expenses": {
+      "name": "expenses",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "trip_id": {
+          "name": "trip_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "qty_milli": {
+          "name": "qty_milli",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "qty_unit": {
+          "name": "qty_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amount_minor": {
+          "name": "amount_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amount_currency": {
+          "name": "amount_currency",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        }
+      },
+      "indexes": {
+        "expenses_trip_idx": {
+          "name": "expenses_trip_idx",
+          "columns": [
+            {
+              "expression": "trip_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "expenses_item_idx": {
+          "name": "expenses_item_idx",
+          "columns": [
+            {
+              "expression": "item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "expenses_trip_id_trips_id_fk": {
+          "name": "expenses_trip_id_trips_id_fk",
+          "tableFrom": "expenses",
+          "tableTo": "trips",
+          "columnsFrom": ["trip_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "expenses_item_id_items_id_fk": {
+          "name": "expenses_item_id_items_id_fk",
+          "tableFrom": "expenses",
+          "tableTo": "items",
+          "columnsFrom": ["item_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "expenses_quantity_paired": {
+          "name": "expenses_quantity_paired",
+          "value": "(\"expenses\".\"qty_milli\" is null) = (\"expenses\".\"qty_unit\" is null)"
+        },
+        "expenses_quantity_positive": {
+          "name": "expenses_quantity_positive",
+          "value": "\"expenses\".\"qty_milli\" is null or \"expenses\".\"qty_milli\" > 0"
+        },
+        "expenses_quantity_unit_known": {
+          "name": "expenses_quantity_unit_known",
+          "value": "\"expenses\".\"qty_unit\" is null or \"expenses\".\"qty_unit\" in ('kg', 'l', 'piece')"
+        },
+        "expenses_quantity_whole_pieces": {
+          "name": "expenses_quantity_whole_pieces",
+          "value": "\"expenses\".\"qty_unit\" is distinct from 'piece' or \"expenses\".\"qty_milli\" % 1000 = 0"
+        },
+        "expenses_amount_paired": {
+          "name": "expenses_amount_paired",
+          "value": "(\"expenses\".\"amount_minor\" is null) = (\"expenses\".\"amount_currency\" is null)"
+        },
+        "expenses_amount_not_negative": {
+          "name": "expenses_amount_not_negative",
+          "value": "\"expenses\".\"amount_minor\" is null or \"expenses\".\"amount_minor\" >= 0"
+        },
+        "expenses_amount_currency_known": {
+          "name": "expenses_amount_currency_known",
+          "value": "\"expenses\".\"amount_currency\" is null or \"expenses\".\"amount_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.item_barcodes": {
+      "name": "item_barcodes",
+      "schema": "",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "varchar(14)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "item_barcodes_item_idx": {
+          "name": "item_barcodes_item_idx",
+          "columns": [
+            {
+              "expression": "item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "item_barcodes_item_id_items_id_fk": {
+          "name": "item_barcodes_item_id_items_id_fk",
+          "tableFrom": "item_barcodes",
+          "tableTo": "items",
+          "columnsFrom": ["item_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "item_barcodes_gtin_shape": {
+          "name": "item_barcodes_gtin_shape",
+          "value": "\"item_barcodes\".\"code\" ~ '^([0-9]{8}|[0-9]{12,14})$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.items": {
+      "name": "items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "search_key": {
+          "name": "search_key",
+          "type": "varchar(800)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_unit": {
+          "name": "default_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "typical_qty_milli": {
+          "name": "typical_qty_milli",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "typical_qty_unit": {
+          "name": "typical_qty_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "items_search_key_trgm_idx": {
+          "name": "items_search_key_trgm_idx",
+          "columns": [
+            {
+              "expression": "search_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "items_created_by_actors_id_fk": {
+          "name": "items_created_by_actors_id_fk",
+          "tableFrom": "items",
+          "tableTo": "actors",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "items_id_kind_key": {
+          "name": "items_id_kind_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "kind"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "items_kind_known": {
+          "name": "items_kind_known",
+          "value": "\"items\".\"kind\" in ('product', 'dish')"
+        },
+        "items_search_key_present": {
+          "name": "items_search_key_present",
+          "value": "btrim(\"items\".\"search_key\", E' \\t\\r\\n\\u00A0\\u200B\\u200C\\u200D\\uFEFF') <> ''"
+        },
+        "items_default_unit_known": {
+          "name": "items_default_unit_known",
+          "value": "\"items\".\"default_unit\" in ('kg', 'l', 'piece')"
+        },
+        "items_typical_quantity_paired": {
+          "name": "items_typical_quantity_paired",
+          "value": "(\"items\".\"typical_qty_milli\" is null) = (\"items\".\"typical_qty_unit\" is null)"
+        },
+        "items_typical_quantity_positive": {
+          "name": "items_typical_quantity_positive",
+          "value": "\"items\".\"typical_qty_milli\" is null or \"items\".\"typical_qty_milli\" > 0"
+        },
+        "items_typical_quantity_unit_known": {
+          "name": "items_typical_quantity_unit_known",
+          "value": "\"items\".\"typical_qty_unit\" is null or \"items\".\"typical_qty_unit\" in ('kg', 'l', 'piece')"
+        },
+        "items_typical_quantity_whole_pieces": {
+          "name": "items_typical_quantity_whole_pieces",
+          "value": "\"items\".\"typical_qty_unit\" is distinct from 'piece' or \"items\".\"typical_qty_milli\" % 1000 = 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.official_rates": {
+      "name": "official_rates",
+      "schema": "",
+      "columns": {
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rate_date": {
+          "name": "rate_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scaled": {
+          "name": "scaled",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "jump": {
+          "name": "jump",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "fetched_at": {
+          "name": "fetched_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "official_rates_provider_currency_rate_date_pk": {
+          "name": "official_rates_provider_currency_rate_date_pk",
+          "columns": ["provider", "currency", "rate_date"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "official_rates_provider_known": {
+          "name": "official_rates_provider_known",
+          "value": "\"official_rates\".\"provider\" in ('cba', 'cbr', 'erapi')"
+        },
+        "official_rates_currency_foreign": {
+          "name": "official_rates_currency_foreign",
+          "value": "\"official_rates\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR') and \"official_rates\".\"currency\" <> 'AMD'"
+        },
+        "official_rates_positive": {
+          "name": "official_rates_positive",
+          "value": "\"official_rates\".\"scaled\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.places": {
+      "name": "places",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "country": {
+          "name": "country",
+          "type": "char(2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "city": {
+          "name": "city",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "places_identity_key": {
+          "name": "places_identity_key",
+          "columns": [
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "country",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "btrim(lower(regexp_replace(normalize(\"city\", NFKC), E'[\\uFE00-\\uFE0F\\U000E0100-\\U000E01EF]', '', 'g')), E' \\t\\r\\n\\u00A0\\u200B\\u200C\\u200D\\uFEFF')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "btrim(lower(regexp_replace(normalize(\"name\", NFKC), E'[\\uFE00-\\uFE0F\\U000E0100-\\U000E01EF]', '', 'g')), E' \\t\\r\\n\\u00A0\\u200B\\u200C\\u200D\\uFEFF')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "places_kind_known": {
+          "name": "places_kind_known",
+          "value": "\"places\".\"kind\" in ('store', 'venue')"
+        },
+        "places_country_iso": {
+          "name": "places_country_iso",
+          "value": "\"places\".\"country\" ~ '^[A-Z]{2}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.search_picks": {
+      "name": "search_picks",
+      "schema": "",
+      "columns": {
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "query_key": {
+          "name": "query_key",
+          "type": "varchar(600)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "picks": {
+          "name": "picks",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_picked_at": {
+          "name": "last_picked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "search_picks_actor_id_actors_id_fk": {
+          "name": "search_picks_actor_id_actors_id_fk",
+          "tableFrom": "search_picks",
+          "tableTo": "actors",
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "search_picks_item_id_items_id_fk": {
+          "name": "search_picks_item_id_items_id_fk",
+          "tableFrom": "search_picks",
+          "tableTo": "items",
+          "columnsFrom": ["item_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "search_picks_actor_id_query_key_item_id_pk": {
+          "name": "search_picks_actor_id_query_key_item_id_pk",
+          "columns": ["actor_id", "query_key", "item_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "search_picks_counted": {
+          "name": "search_picks_counted",
+          "value": "\"search_picks\".\"picks\" > 0"
+        },
+        "search_picks_query_key_indexable": {
+          "name": "search_picks_query_key_indexable",
+          "value": "octet_length(\"search_picks\".\"query_key\") <= 600"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.trips": {
+      "name": "trips",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "place_id": {
+          "name": "place_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rate_base": {
+          "name": "rate_base",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_quote": {
+          "name": "rate_quote",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_scaled": {
+          "name": "rate_scaled",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_source": {
+          "name": "rate_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_as_of": {
+          "name": "rate_as_of",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_jumped": {
+          "name": "rate_jumped",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "rate_previous_scaled": {
+          "name": "rate_previous_scaled",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_previous_as_of": {
+          "name": "rate_previous_as_of",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_manual_scaled": {
+          "name": "rate_manual_scaled",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_manual_as_of": {
+          "name": "rate_manual_as_of",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_choice": {
+          "name": "rate_choice",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "trips_actor_started_idx": {
+          "name": "trips_actor_started_idx",
+          "columns": [
+            {
+              "expression": "actor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "started_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trips_place_idx": {
+          "name": "trips_place_idx",
+          "columns": [
+            {
+              "expression": "place_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "trips_actor_id_actors_id_fk": {
+          "name": "trips_actor_id_actors_id_fk",
+          "tableFrom": "trips",
+          "tableTo": "actors",
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "trips_place_id_places_id_fk": {
+          "name": "trips_place_id_places_id_fk",
+          "tableFrom": "trips",
+          "tableTo": "places",
+          "columnsFrom": ["place_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "trips_currency_known": {
+          "name": "trips_currency_known",
+          "value": "\"trips\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+        },
+        "trips_rate_all_or_none": {
+          "name": "trips_rate_all_or_none",
+          "value": "num_nonnulls(\"trips\".\"rate_base\", \"trips\".\"rate_quote\", \"trips\".\"rate_scaled\", \"trips\".\"rate_source\", \"trips\".\"rate_as_of\") in (0, 5)"
+        },
+        "trips_rate_quote_is_trip_currency": {
+          "name": "trips_rate_quote_is_trip_currency",
+          "value": "\"trips\".\"rate_quote\" is null or \"trips\".\"rate_quote\" = \"trips\".\"currency\""
+        },
+        "trips_rate_two_currencies": {
+          "name": "trips_rate_two_currencies",
+          "value": "\"trips\".\"rate_base\" is null or \"trips\".\"rate_base\" <> \"trips\".\"rate_quote\""
+        },
+        "trips_rate_base_known": {
+          "name": "trips_rate_base_known",
+          "value": "\"trips\".\"rate_base\" is null or \"trips\".\"rate_base\" in ('AMD', 'RUB', 'USD', 'EUR')"
+        },
+        "trips_rate_quote_known": {
+          "name": "trips_rate_quote_known",
+          "value": "\"trips\".\"rate_quote\" is null or \"trips\".\"rate_quote\" in ('AMD', 'RUB', 'USD', 'EUR')"
+        },
+        "trips_rate_source_known": {
+          "name": "trips_rate_source_known",
+          "value": "\"trips\".\"rate_source\" is null or \"trips\".\"rate_source\" in ('personal', 'official', 'fallback')"
+        },
+        "trips_rate_positive": {
+          "name": "trips_rate_positive",
+          "value": "\"trips\".\"rate_scaled\" is null or \"trips\".\"rate_scaled\" > 0"
+        },
+        "trips_rate_jumped_needs_rate": {
+          "name": "trips_rate_jumped_needs_rate",
+          "value": "not \"trips\".\"rate_jumped\" or \"trips\".\"rate_scaled\" is not null"
+        },
+        "trips_rate_previous_whole": {
+          "name": "trips_rate_previous_whole",
+          "value": "num_nonnulls(\"trips\".\"rate_previous_scaled\", \"trips\".\"rate_previous_as_of\") in (0, 2)"
+        },
+        "trips_rate_previous_needs_jump": {
+          "name": "trips_rate_previous_needs_jump",
+          "value": "\"trips\".\"rate_previous_scaled\" is null or (\"trips\".\"rate_jumped\" and \"trips\".\"rate_previous_scaled\" > 0)"
+        },
+        "trips_rate_manual_whole": {
+          "name": "trips_rate_manual_whole",
+          "value": "num_nonnulls(\"trips\".\"rate_manual_scaled\", \"trips\".\"rate_manual_as_of\") in (0, 2)"
+        },
+        "trips_rate_manual_needs_jump": {
+          "name": "trips_rate_manual_needs_jump",
+          "value": "\"trips\".\"rate_manual_scaled\" is null or (\"trips\".\"rate_jumped\" and \"trips\".\"rate_manual_scaled\" > 0)"
+        },
+        "trips_rate_choice_known": {
+          "name": "trips_rate_choice_known",
+          "value": "\"trips\".\"rate_choice\" is null or \"trips\".\"rate_choice\" in ('jumped', 'previous', 'manual')"
+        },
+        "trips_rate_choice_held": {
+          "name": "trips_rate_choice_held",
+          "value": "\"trips\".\"rate_choice\" is null or (\"trips\".\"rate_jumped\" and (\"trips\".\"rate_choice\" <> 'previous' or \"trips\".\"rate_previous_scaled\" is not null) and (\"trips\".\"rate_choice\" <> 'manual' or \"trips\".\"rate_manual_scaled\" is not null))"
+        },
+        "trips_finished_after_start": {
+          "name": "trips_finished_after_start",
+          "value": "\"trips\".\"finished_at\" is null or \"trips\".\"finished_at\" >= \"trips\".\"started_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.verdicts": {
+      "name": "verdicts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "item_kind": {
+          "name": "item_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "place_id": {
+          "name": "place_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "score": {
+          "name": "score",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "review": {
+          "name": "review",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rated_at": {
+          "name": "rated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "verdicts_item_idx": {
+          "name": "verdicts_item_idx",
+          "columns": [
+            {
+              "expression": "item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "verdicts_actor_id_actors_id_fk": {
+          "name": "verdicts_actor_id_actors_id_fk",
+          "tableFrom": "verdicts",
+          "tableTo": "actors",
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "verdicts_place_id_places_id_fk": {
+          "name": "verdicts_place_id_places_id_fk",
+          "tableFrom": "verdicts",
+          "tableTo": "places",
+          "columnsFrom": ["place_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "verdicts_item_id_kind_fk": {
+          "name": "verdicts_item_id_kind_fk",
+          "tableFrom": "verdicts",
+          "tableTo": "items",
+          "columnsFrom": ["item_id", "item_kind"],
+          "columnsTo": ["id", "kind"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "verdicts_actor_item_place_key": {
+          "name": "verdicts_actor_item_place_key",
+          "nullsNotDistinct": true,
+          "columns": ["actor_id", "item_id", "place_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "verdicts_place_matches_kind": {
+          "name": "verdicts_place_matches_kind",
+          "value": "(\"verdicts\".\"item_kind\" = 'product') = (\"verdicts\".\"place_id\" is null)"
+        },
+        "verdicts_score_range": {
+          "name": "verdicts_score_range",
+          "value": "\"verdicts\".\"score\" between 1 and 5"
+        },
+        "verdicts_updated_after_rated": {
+          "name": "verdicts_updated_after_rated",
+          "value": "\"verdicts\".\"updated_at\" >= \"verdicts\".\"rated_at\""
+        },
+        "verdicts_deleted_after_rated": {
+          "name": "verdicts_deleted_after_rated",
+          "value": "\"verdicts\".\"deleted_at\" >= \"verdicts\".\"rated_at\""
+        },
+        "verdicts_withdrawn_without_review": {
+          "name": "verdicts_withdrawn_without_review",
+          "value": "\"verdicts\".\"deleted_at\" is null or \"verdicts\".\"review\" is null"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
