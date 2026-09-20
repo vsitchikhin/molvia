@@ -82,6 +82,13 @@ export const ISSUE = {
   TRIP_FINISHED_BEFORE_START: 'issue.trip_finished_before_start',
   VERDICT_UPDATED_BEFORE_RATED: 'issue.verdict_updated_before_rated',
   VERDICT_PLACE_NOT_FOR_KIND: 'issue.verdict_place_not_for_kind',
+  /**
+   * A session or a login request opened with its end already behind it. The database says the
+   * same through `*_lifetime_forward`, but as `23514` — which nothing translates, so a caller
+   * that simply passed a bad date got a 500 (MOL-52, adversarial А5).
+   */
+  SESSION_ALREADY_EXPIRED: 'issue.session_already_expired',
+  LOGIN_REQUEST_ALREADY_EXPIRED: 'issue.login_request_already_expired',
 } as const
 
 export type IssueCode = (typeof ISSUE)[keyof typeof ISSUE]

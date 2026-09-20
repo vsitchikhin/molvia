@@ -38,8 +38,13 @@ await build({
   define: { 'process.env.NODE_ENV': '"production"' },
   // And this is what actually removes the folded branch — measured, not assumed. With the
   // define alone esbuild emitted `if (false) { devActorRoute(...) }` verbatim: it drops dead
-  // branches while minifying syntax, not while bundling. Identifiers are left alone, so the
-  // reason `minify` stays off below — a readable stack trace — is untouched.
+  // branches while minifying syntax, not while bundling.
+  //
+  // What it costs is honest to name. Identifiers keep their names, so a stack trace still says
+  // which function threw; line numbers do move, and what puts them back is the sourcemap above
+  // — which is why `sourcemap: true` is now load-bearing rather than a convenience. Applied to
+  // both apps, though only the API has a seam: one bundler, one shape, and a second code path
+  // for the bot would be a second thing to keep true.
   //
   // `bundle-seam.integration.test.ts` checks the built file rather than taking any of this on
   // trust: every step here fails silently, and what ships if one does is an open route.

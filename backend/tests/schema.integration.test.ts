@@ -1003,20 +1003,27 @@ describe('the session, which is a key rather than data', () => {
     )
   })
 
-  it('does not outlive its owner by a millisecond', async () => {
+  it('does not outlive its owner by a millisecond, and takes no login request with it', async () => {
     // Cascade, unlike a trip or a verdict (MOL-6, Р-6): those are data and a person's history,
     // this is the key to them. It is also the line MOL-58's deletion script would otherwise
     // have to remember.
+    //
+    // The second half is the one that was left to be inferred: a login request survives the
+    // owner because it never pointed at one — on a first login there is no owner yet (Р-10).
+    // Inferring it from «there is no foreign key» is how a key gets added later by someone who
+    // did not know, so it is asserted rather than reasoned about.
     const actorId = await insertActor(db)
     const otherId = await insertActor(db)
     await insertSession(db, { actorId })
     await insertSession(db, { actorId: otherId })
+    await insertLoginRequest(db, { telegramUserId: 777_000_123 })
 
     await db.delete(actors).where(eq(actors.id, actorId))
 
     const left = await db.select().from(sessions)
     expect(left).toHaveLength(1)
     expect(left[0]?.actorId).toBe(otherId)
+    await expect(db.select().from(loginRequests)).resolves.toHaveLength(1)
   })
 })
 

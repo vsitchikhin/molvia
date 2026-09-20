@@ -676,6 +676,8 @@ export const sessions = pgTable(
     /** Short, derived: «iPhone · Safari», never the browser string it came from. */
     deviceName: varchar('device_name', { length: DEVICE_NAME_MAX }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    // Nothing moves it yet, so until MOL-53 it is a second `created_at` and a device list would
+    // be lying if it showed it. MOL-53 writes it, and not on every request — at most once a day.
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   },
@@ -718,7 +720,13 @@ export const loginRequests = pgTable(
   },
   (table) => [
     unique('login_requests_code_key').on(table.code),
-    check('login_requests_code_format', sql`${table.code} ~ '^[A-Za-z0-9_-]{1,64}$'`),
+    // The length comes from `LOGIN_CODE_MAX` here too, and not as a second 64 typed out: it is
+    // Telegram's number, it already decides the column's width and `loginCodeSchema`, and the
+    // one place it was written by hand is the one place it could have drifted.
+    check(
+      'login_requests_code_format',
+      sql`${table.code} ~ '^[A-Za-z0-9_-]{1,${sql.raw(String(LOGIN_CODE_MAX))}}$'`,
+    ),
     check('login_requests_secret_hash_hex', hexDigest(table.secretHash)),
     check('login_requests_lifetime_forward', sql`${table.expiresAt} > ${table.createdAt}`),
     // The same two bounds `actors` holds: a confirmed request becomes an owner, and a number

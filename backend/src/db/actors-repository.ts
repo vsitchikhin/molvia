@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { actorSchema } from '@molvia/model'
+import { actorSchema, telegramUserIdSchema } from '@molvia/model'
 import type { Actor, ActorPatch, NewActor, TelegramUserId } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -15,6 +15,18 @@ export interface ActorRepository {
    */
   create(id: string, telegramUserId: TelegramUserId, input: NewActor): Promise<Actor>
   byId(id: string): Promise<Actor | null>
+
+  /**
+   * The owner behind a Telegram account, or nothing — «the person came back», which is the
+   * only scenario the column exists for (MOL-52).
+   *
+   * It is here rather than in MOL-54 with its caller, against this task's own rule of shipping
+   * no method without one, and the adversarial pass is why: without it a second login is a
+   * dead end. `create` answers CONFLICT, the refusal carries no identifier, and `byId` wants a
+   * uuid that a person arriving from Telegram does not have. A promise the schema makes aloud
+   * and nothing can read is not delivered (А2).
+   */
+  byTelegramUserId(telegramUserId: TelegramUserId): Promise<Actor | null>
   update(id: string, patch: ActorPatch): Promise<Actor | null>
 }
 
@@ -47,6 +59,20 @@ export function createActorRepository(db: Conn): ActorRepository {
           .returning()
         return toActor(theRow(row, 'actors'))
       })
+    },
+
+    async byTelegramUserId(telegramUserId) {
+      // Judged before it reaches Postgres: a number outside the column's two bounds is not a
+      // row that is missing, it is a value that could never have been written, and `bigint`
+      // would answer with an error rather than with nothing found.
+      if (!telegramUserIdSchema.safeParse(telegramUserId).success) return null
+
+      const [row] = await db
+        .select()
+        .from(actors)
+        .where(eq(actors.telegramUserId, telegramUserId))
+        .limit(1)
+      return row ? toActor(row) : null
     },
 
     async byId(id) {

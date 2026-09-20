@@ -17,17 +17,24 @@ export const ACTOR_HEADER = 'x-molvia-actor'
  * The owner as anyone outside the server sees them: the settings, without the identity behind
  * them (MOL-52).
  *
- * An allowlist by subtraction rather than a second list of fields, for the reason the wire
- * below is derived too — but the subtraction itself is deliberate. The epic promised that only
- * Telegram's numeric id is *stored*, not that it is shown, and «who am I» is a question about
- * settings. Left in, it would have reached `GET /actors/me` in silence: the wire is an
- * `.extend` of the entity, so no line of this file would have had to change for it.
+ * **An allowlist — `pick`, not `omit`** — and the difference is the whole safeguard, as it is
+ * for `catalogueEntrySchema`. Written by subtraction it protected against exactly one field,
+ * the one already known about: the *next* field added to `Actor` would have joined this view,
+ * and then the wire, without a line of this file changing (adversarial Б2). Written by
+ * addition, a new field stays on the server until somebody names it here.
  *
- * Not strict, and that is what does the work: `actorViewSchema.parse(actor)` is how a route
- * narrows an `Actor` to what it may send, in one visible step rather than by hoping something
- * downstream drops the field.
+ * The rule it enforces is the epic's: only Telegram's numeric id is *stored*, not shown, and
+ * «who am I» is a question about settings.
  */
-export const actorViewSchema = actorSchema.omit({ telegramUserId: true })
+export const actorViewSchema = actorSchema.pick({
+  id: true,
+  country: true,
+  city: true,
+  spendCurrency: true,
+  incomeCurrency: true,
+  createdAt: true,
+  updatedAt: true,
+})
 export type ActorView = z.infer<typeof actorViewSchema>
 
 /**

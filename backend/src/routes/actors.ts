@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { DomainError, ERROR, actorCodec, actorViewSchema } from '@molvia/model'
+import { DomainError, ERROR, actorCodec } from '@molvia/model'
 import type { Actor } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 
@@ -8,18 +8,19 @@ import type { FastifyInstance, FastifyReply } from 'fastify'
  * domain the timestamps are `Date`, and JSON would turn them into strings silently — the
  * client would then parse a shape nothing promised it.
  *
- * Narrowed through `actorViewSchema` first, in one visible step (MOL-52): an `Actor` carries
- * `telegramUserId`, the view does not, and the wire schema is strict — so a narrowing that was
- * forgotten here fails loudly instead of leaking the identity to the screen.
+ * What keeps the Telegram id off the wire is not this function but `actorViewSchema` itself,
+ * which the codec decodes to: `z.encode` parses its input through that schema first, so a field
+ * the view does not name is gone before `encode` runs. An earlier version called
+ * `actorViewSchema.parse(actor)` here and claimed in this very comment that forgetting it would
+ * «fail loudly» — measured, it did nothing at all, because the codec had already done it
+ * (adversarial Б2). The safeguard that does work is that the view is an allowlist.
  *
  * `no-store` travels with it. Until MOL-53 the identifier is still the proof of identity —
  * whoever reads it is the owner — so a shared cache or a disk cache holding this reply is the
  * whole account sitting in a file nobody meant to write.
  */
 export function answerWithActor(reply: FastifyReply, actor: Actor): FastifyReply {
-  return reply
-    .header('cache-control', 'no-store')
-    .send(z.encode(actorCodec, actorViewSchema.parse(actor)))
+  return reply.header('cache-control', 'no-store').send(z.encode(actorCodec, actor))
 }
 
 /**

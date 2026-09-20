@@ -36,4 +36,16 @@ describe('the production bundle', () => {
     // contains no `/dev/actors` either.
     expect(bundle).toContain('/actors/me')
   })
+
+  it('does not carry the address in the sourcemap either, which ships in the same image', () => {
+    // Checked because the claim was made about «the artifact», and the map is part of it:
+    // `COPY --from=build /repo/backend/dist ./dist` takes the whole directory. What the map
+    // **does** carry is the module's name and its source, since esbuild records every input it
+    // read — so «the route is absent» is a statement about the code that runs, not about every
+    // byte in the image (adversarial А11). That is the honest scope, and it is enough: a name
+    // in a map registers no route. The address itself is nowhere, and this pins that.
+    const map = readFileSync(`${root}backend/dist/index.js.map`, 'utf8')
+
+    expect(map).not.toContain('/dev/actors')
+  })
 })

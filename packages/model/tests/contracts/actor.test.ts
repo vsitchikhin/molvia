@@ -44,6 +44,29 @@ describe('actorCodec', () => {
     expect(actorCodec.safeParse({ ...wire, telegramUserId: 777_000_123 }).success).toBe(false)
   })
 
+  it('names what it sends, so tomorrow\u2019s field stays on the server by default', () => {
+    // The safeguard is that the view is an allowlist. Written by subtraction it protected
+    // against exactly one field — the one already known about — and the *next* field added to
+    // `Actor` would have joined the view, and then the wire, without a line of the contract
+    // changing (adversarial Б2). Checked against the shipped schema rather than a copy of its
+    // shape: a copy would go on passing after the real one was rewritten.
+    const sent = Object.keys(actorViewSchema.shape)
+
+    expect(sent).not.toContain('telegramUserId')
+    expect(sent.sort()).toEqual([
+      'city',
+      'country',
+      'createdAt',
+      'id',
+      'incomeCurrency',
+      'spendCurrency',
+      'updatedAt',
+    ])
+    // And the entity really is the wider of the two — otherwise the list above would be
+    // agreeing with nothing.
+    expect(Object.keys(actorSchema.shape)).toContain('telegramUserId')
+  })
+
   it('keeps the two timestamps apart to the millisecond', () => {
     // The gap between them is what tells «settings were edited» from «never touched», and
     // the trigger that moves updated_at works in microseconds. A codec that rounded either

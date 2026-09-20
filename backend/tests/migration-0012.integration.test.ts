@@ -91,6 +91,11 @@ describe('0012: the owners a Telegram identity cannot be found for', () => {
       insert into places (id, kind, name, country, city)
       values (${placeId}, 'store', 'SAS', 'AM', 'Гюмри')
     `
+    await sql`insert into item_barcodes (code, item_id) values ('4820000000017', ${itemId})`
+    await sql`
+      insert into official_rates (provider, currency, rate_date, scaled)
+      values ('cba', 'RUB', '2026-09-19', 4700000)
+    `
     await sql`
       insert into trips (id, actor_id, place_id, currency)
       values (${tripId}, ${actorId}, ${placeId}, 'AMD')
@@ -123,14 +128,18 @@ describe('0012: the owners a Telegram identity cannot be found for', () => {
       expect([table, await countOf(table)]).toEqual([table, 0])
     }
 
-    // Alive: the shared catalogue and the places, the item merely orphaned. That is
-    // `ON DELETE SET NULL` doing it, not a line of the migration — which is the point of
-    // checking: nothing in the file says «keep the items».
-    expect(await countOf('places')).toBe(1)
+    // Alive, and by three different mechanisms — which is why each is checked rather than
+    // «the rest survives». The item is orphaned by its own `ON DELETE SET NULL`, and nothing
+    // in the migration says «keep the items». Its barcode hangs off the item, not off the
+    // person. Places and the rate cache never referenced an owner at all, so there was never
+    // anything to cascade.
     const items = await sql<{ id: string; created_by: string | null }[]>`
       select id, created_by from items
     `
     expect(items).toEqual([{ id: itemId, created_by: null }])
+    expect(await countOf('item_barcodes')).toBe(1)
+    expect(await countOf('places')).toBe(1)
+    expect(await countOf('official_rates')).toBe(1)
 
     // And the column it cleared the way for is there with its constraints, not merely added:
     // a migration that dropped the UNIQUE would leave every later login able to fork an

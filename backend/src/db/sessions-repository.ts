@@ -1,7 +1,7 @@
 import { and, eq, gt, sql } from 'drizzle-orm'
-import { sessionSchema } from '@molvia/model'
+import { deviceNameSchema, newSessionSchema, sessionSchema } from '@molvia/model'
 import type { Session } from '@molvia/model'
-import { sha256Hex } from './digest'
+import { secretOrNull, sha256Hex } from './digest'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { theRow } from './rows'
@@ -14,6 +14,12 @@ export interface SessionRepository {
    * The interface speaks in raw tokens on purpose (MOL-52, Р-6): «the token is in the database
    * only as a hash» then holds in one place, and no later caller can put the token in the
    * column by mistake, because there is no method that would take it.
+   *
+   * The input is judged **before** the row exists (`newSessionSchema`). It used to be judged
+   * after, on the way back through `sessionSchema`, and that was a defect of its own: an
+   * unusable device name left a session written, unreadable and holding its token's unique
+   * index, while the caller got a ZodError — a 500 *with* a row rather than instead of one
+   * (adversarial А1).
    */
   create(
     id: string,
@@ -32,28 +38,71 @@ export interface SessionRepository {
    * same 401 without having to remember to.
    */
   byToken(token: string): Promise<Session | null>
+
+  /**
+   * **Two methods this table needs and does not have here: removing a session and listing an
+   * owner's.** Both are decisions of MOL-52 — «revoking is deleting the row», «the device list
+   * is what is left of the table», and `sessions_actor_idx` is in the schema for the second —
+   * but their callers are MOL-57, and a method with no caller is a method no test exercises
+   * for real. Said out loud rather than left to be noticed: the repository is delivered for
+   * the login of MOL-53 and MOL-54, not for the settings screen (adversarial А2).
+   */
 }
 
 function toSession(row: typeof sessions.$inferSelect): Session {
   return sessionSchema.parse(row)
 }
 
+/**
+ * A device name the schema cannot use becomes «no name» rather than a refusal.
+ *
+ * It is the one input here that is pure decoration: MOL-53 derives it from `User-Agent`, that
+ * is from a string anybody can send, and a login must not fail because a header held nothing
+ * but braille blanks. Everything else in `newSessionSchema` is refused outright, because
+ * everything else is either this server's own doing or a fact about the account.
+ *
+ * `catch` rather than a hand-written check so the rule stays one rule: the same `visibleLine`
+ * that decides what a *stored* name may be decides what an incoming one has to survive.
+ */
+const usableDeviceName = deviceNameSchema.nullable().catch(null)
+
 export function createSessionRepository(db: Conn): SessionRepository {
   return {
     async create(id, actorId, token, deviceName, expiresAt) {
+      // A plain Error, as `actors-repository` does for an empty patch: a token this server
+      // could not have minted means a caller went around the only path that mints one, and
+      // there is no answer to give a client — only a 500 with a log line. Left as a defect,
+      // but named, and refused before a row exists (adversarial А6).
+      if (secretOrNull(token) === null) {
+        throw new Error('a token this server could not have minted reached the session repository')
+      }
+
+      const input = newSessionSchema.parse({
+        id,
+        actorId,
+        deviceName: usableDeviceName.parse(deviceName),
+        expiresAt,
+      })
+
       // An actor that is not there is an ordinary answer rather than a defect — an account
       // deleted between reading the login request and issuing the session — so the foreign
       // key comes back as NOT_FOUND instead of a 500.
       return translateFailures(async () => {
         const [row] = await db
           .insert(sessions)
-          .values({ id, actorId, tokenHash: sha256Hex(token), deviceName, expiresAt })
+          .values({ ...input, tokenHash: sha256Hex(token) })
           .returning()
         return toSession(theRow(row, 'sessions'))
       })
     },
 
     async byToken(token) {
+      // A token that could never have been minted here matches nothing, and says so as `null`
+      // rather than by hashing something else: `sha256Hex` folds a lone surrogate into U+FFFD,
+      // so two such strings share a digest (adversarial А6). Refusing the shape at the door
+      // keeps the hash an identity of the token rather than almost one.
+      if (secretOrNull(token) === null) return null
+
       // `now()` and not a Date from this process: the row's own clock decides whether it is
       // still alive, the same clock that wrote `created_at`. A server whose time drifted
       // would otherwise hand out minutes of life that the database does not agree exist.

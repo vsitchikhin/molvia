@@ -103,6 +103,29 @@ describe('истёкший, использованный и несуществу
     expect(await repository.consume('', secret())).toBeNull()
   })
 
+  it('и мусорный код — тоже: NUL в коде давал 22021, то есть шестой путь', async () => {
+    // У `code` не было стража, который есть у `id`, хотя код приходит снаружи — это полезная
+    // нагрузка `/start` у бота, и MOL-55 будет читать по нему на каждое «ссылка уже
+    // использована» (адверсариальный проход, А3).
+    for (const junk of ['\u0000', 'код с пробелом', 'a+b', 'a'.repeat(65), '']) {
+      expect(await repository.byCode(junk)).toBeNull()
+      expect(await repository.confirm(junk, TELEGRAM_ID)).toBeNull()
+      expect(await repository.decline(junk)).toBeNull()
+    }
+  })
+
+  it('секрет не той формы ничего не открывает и не пишется', async () => {
+    // Иначе два разных одиночных суррогата делят хеш и открывают один запрос (А6).
+    const request = await asked()
+    await repository.confirm(request.code, TELEGRAM_ID)
+
+    expect(await repository.byIdAndSecret(request.id, '\uD800')).toBeNull()
+    expect(await repository.consume(request.id, 'короткий')).toBeNull()
+    await expect(
+      repository.create(randomUUID(), code(), '\uD800', null, anHourFromNow()),
+    ).rejects.toThrow()
+  })
+
   it('бот не видит ни истёкшего, ни уже подтверждённого кода', async () => {
     const stale = await asked()
     await expire(stale.id)
@@ -112,6 +135,53 @@ describe('истёкший, использованный и несуществу
     expect(await repository.byCode(stale.code)).toBeNull()
     expect(await repository.byCode(confirmed.code)).toBeNull()
     expect(await repository.byCode('никогда-не-существовавший')).toBeNull()
+  })
+})
+
+describe('вход судится до записи, а не после', () => {
+  it('код, который база отвергнет, не пишется и приходит доменным отказом', async () => {
+    // Раньше это был непереведённый `22001`/`23514` — пятисотка за то, что рядом лежит схема,
+    // которой значение проверяется (А5). Теперь отказ один и тот же, и строки не остаётся.
+    for (const bad of ['a'.repeat(65), 'код!', 'a+b', '']) {
+      await expect(
+        repository.create(randomUUID(), bad, secret(), null, anHourFromNow()),
+      ).rejects.toThrow()
+    }
+
+    await expect(db.select().from(loginRequests)).resolves.toHaveLength(0)
+  })
+
+  it('срок в прошлом — отказ домена, и строки тоже не остаётся', async () => {
+    await expect(
+      repository.create(randomUUID(), code(), secret(), null, new Date(Date.now() - 1000)),
+    ).rejects.toThrow()
+
+    await expect(db.select().from(loginRequests)).resolves.toHaveLength(0)
+  })
+
+  it('имя устройства, которое нечем показать, становится «без имени»', async () => {
+    const request = await asked('\u2800\u2800')
+
+    expect((await repository.byCode(request.code))?.deviceName).toBeNull()
+  })
+
+  it('имя подрезается до записи, а не на чтении', async () => {
+    const request = await asked('  iPhone · Safari  ')
+
+    const [row] = await db.select().from(loginRequests)
+    expect(row?.deviceName).toBe('iPhone · Safari')
+    expect((await repository.byCode(request.code))?.deviceName).toBe('iPhone · Safari')
+  })
+
+  it('Telegram-id вне границ — отказ домена, а не 23514 насквозь', async () => {
+    const request = await asked()
+
+    for (const bad of [0, -1, 1.5, 9_007_199_254_740_992]) {
+      await expect(repository.confirm(request.code, bad)).rejects.toThrow()
+    }
+
+    // И запрос при этом цел: отказ не тронул строку.
+    expect((await repository.byCode(request.code))?.telegramUserId).toBeNull()
   })
 })
 

@@ -90,6 +90,71 @@ describe('сессия — ключ, и в базе от него только �
     expect((await repository.byToken(laptop))?.deviceName).toBe('MacBook · Chrome')
   })
 
+  it('имя устройства, которое нечем показать, становится «без имени», а не отказом', async () => {
+    // Имя — украшение: MOL-53 выводит его из `User-Agent`, то есть из строки, которую шлёт кто
+    // угодно, и вход не должен падать из-за косметики заголовка. Раньше падал, и хуже: строка
+    // оставалась в базе, а вызывающий получал ZodError — пятисотку **вместе** с записью,
+    // причём сессию уже было не забрать и не отозвать (адверсариальный проход, А1).
+    const actorId = await insertActor(db)
+    const first = token()
+    const second = token()
+
+    // U+2800 рисует пустоту и не является `\s` — тот самый класс, который CLAUDE.md заводил
+    // дважды: Hangul-филлеры в MOL-12, U+13441 в MOL-27.
+    await repository.create(randomUUID(), actorId, first, '\u2800\u2800', anHourFromNow())
+    await repository.create(randomUUID(), actorId, second, '   ', anHourFromNow())
+
+    expect((await repository.byToken(first))?.deviceName).toBeNull()
+    expect((await repository.byToken(second))?.deviceName).toBeNull()
+    await expect(db.select().from(sessions)).resolves.toHaveLength(2)
+  })
+
+  it('в колонке лежит ровно то, что вернул метод: имя подрезается до записи', async () => {
+    // Раньше `visibleLine` подрезал на чтении, а писалось сырое значение — и колонка
+    // расходилась с сущностью, что стало бы видно на первом же сравнении в списке устройств
+    // (А4). Заодно имя на границе длины с пробелом по краям больше не даёт 22001.
+    const actorId = await insertActor(db)
+    const padded = token()
+    const atTheLimit = token()
+    await repository.create(randomUUID(), actorId, padded, '  iPhone · Safari  ', anHourFromNow())
+    await repository.create(
+      randomUUID(),
+      actorId,
+      atTheLimit,
+      ` ${'a'.repeat(80)} `,
+      anHourFromNow(),
+    )
+
+    const rows = await db.select().from(sessions)
+    expect(rows.map((row) => row.deviceName).sort()).toEqual(['a'.repeat(80), 'iPhone · Safari'])
+  })
+
+  it('срок в прошлом — отказ домена, а не 23514 насквозь', async () => {
+    // `sessions_lifetime_forward` говорит то же самое, но кодом, который никто не переводит:
+    // пятисотка там, где вызывающий просто передал не ту дату (А5).
+    const actorId = await insertActor(db)
+
+    await expect(
+      repository.create(randomUUID(), actorId, token(), null, new Date(Date.now() - 1000)),
+    ).rejects.toThrow()
+    await expect(db.select().from(sessions)).resolves.toHaveLength(0)
+  })
+
+  it('токен, которого этот сервер не мог выдать, не пишется и ничего не находит', async () => {
+    // `sha256Hex` сворачивает одиночный суррогат в U+FFFD, поэтому два разных таких токена
+    // делят хеш — и открыли бы одну сессию (А6). Форма проверяется на входе, и тождество
+    // «хеш = токен» держится на том алфавите, из которого токены и берутся.
+    const actorId = await insertActor(db)
+
+    await expect(
+      repository.create(randomUUID(), actorId, '\uD800', null, anHourFromNow()),
+    ).rejects.toThrow()
+    expect(await repository.byToken('\uD800')).toBeNull()
+    expect(await repository.byToken('\uDFFF')).toBeNull()
+    expect(await repository.byToken('короткий')).toBeNull()
+    await expect(db.select().from(sessions)).resolves.toHaveLength(0)
+  })
+
   it('сессия несуществующего владельца — NOT_FOUND, а не пятисотка', async () => {
     const orphan = repository.create(randomUUID(), randomUUID(), token(), null, anHourFromNow())
 
