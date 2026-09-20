@@ -22,20 +22,25 @@ export function sha256Hex(value: string): string {
 }
 
 /**
- * Every secret this server mints is `randomBytes(32)` in base64url or hex, so this is the
- * shape both of them have — and the shape anything reaching a digest column has to survive.
+ * What a secret has to look like to reach a digest column.
  *
  * It exists because `sha256Hex` is **not** injective over arbitrary JavaScript strings: a lone
- * surrogate becomes U+FFFD on the way to UTF-8, so `'\uD800'` and `'\uDFFF'` share a digest,
- * and two different tokens would open one session (MOL-52, adversarial А6). Rather than change
- * how the hash is taken — hex is what a person compares against in `psql` — the values that
- * reach it are held to the alphabet they are actually drawn from. Over that alphabet the
- * digest is an identity, which is what the repositories promise.
+ * surrogate becomes U+FFFD on the way to UTF-8, so two different tokens would share a digest
+ * and open one session (MOL-52, adversarial А6). Rather than change how the hash is taken —
+ * hex is what a person compares against in `psql` — what reaches it has to be a string that
+ * survives the trip to UTF-8 unchanged.
  *
- * The floor of 32 characters is not a security rule (the length of what is minted is MOL-53's
- * business): it is what makes «this could not have come from us» decidable here.
+ * **Printable ASCII, and deliberately not «base64url or hex».** That narrower rule was the
+ * first version, and it was a trap: 32 bytes as plain `base64` end in `=`, which it refused —
+ * so a single `.toString('base64')` in MOL-53, where the minting actually happens, would have
+ * made **every** login a 500, and no test here would have shown it, because the tests all mint
+ * correctly (adversarial Р4). The property this guard is for is the round trip, so the round
+ * trip is what it checks; the encoding is the minter's business.
+ *
+ * The floor of 32 characters is not a security rule (how long a token is belongs to MOL-53):
+ * it is what makes «this could not have come from us» decidable here at all.
  */
-const SECRET = /^[A-Za-z0-9_-]{32,512}$/
+const SECRET = /^[\x21-\x7E]{32,512}$/
 
 /** The secret as it reached us, or `null` when this server could not have minted it. */
 export function secretOrNull(value: string): string | null {

@@ -1,5 +1,5 @@
 import { and, eq, gt, sql } from 'drizzle-orm'
-import { deviceNameSchema, newSessionSchema, sessionSchema } from '@molvia/model'
+import { deviceNameOrNull, newSessionSchema, sessionSchema } from '@molvia/model'
 import type { Session } from '@molvia/model'
 import { secretOrNull, sha256Hex } from './digest'
 import { translateFailures } from './failure'
@@ -53,19 +53,6 @@ function toSession(row: typeof sessions.$inferSelect): Session {
   return sessionSchema.parse(row)
 }
 
-/**
- * A device name the schema cannot use becomes «no name» rather than a refusal.
- *
- * It is the one input here that is pure decoration: MOL-53 derives it from `User-Agent`, that
- * is from a string anybody can send, and a login must not fail because a header held nothing
- * but braille blanks. Everything else in `newSessionSchema` is refused outright, because
- * everything else is either this server's own doing or a fact about the account.
- *
- * `catch` rather than a hand-written check so the rule stays one rule: the same `visibleLine`
- * that decides what a *stored* name may be decides what an incoming one has to survive.
- */
-const usableDeviceName = deviceNameSchema.nullable().catch(null)
-
 export function createSessionRepository(db: Conn): SessionRepository {
   return {
     async create(id, actorId, token, deviceName, expiresAt) {
@@ -80,7 +67,11 @@ export function createSessionRepository(db: Conn): SessionRepository {
       const input = newSessionSchema.parse({
         id,
         actorId,
-        deviceName: usableDeviceName.parse(deviceName),
+        // The one input here that is pure decoration, so it is brought to a usable shape
+        // rather than refused: too long is cut, drawing nothing is `null`. Everything else in
+        // `newSessionSchema` is refused outright, because everything else is either this
+        // server's own doing or a fact about the account.
+        deviceName: deviceNameOrNull(deviceName),
         expiresAt,
       })
 

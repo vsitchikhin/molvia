@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { ZodError } from 'zod'
 import { DomainError, ERROR } from '@molvia/model'
 import { createSessionRepository } from '@/db/sessions-repository'
 import { sessions } from '@/db/schema'
@@ -129,15 +130,48 @@ describe('сессия — ключ, и в базе от него только �
     expect(rows.map((row) => row.deviceName).sort()).toEqual(['a'.repeat(80), 'iPhone · Safari'])
   })
 
-  it('срок в прошлом — отказ домена, а не 23514 насквозь', async () => {
-    // `sessions_lifetime_forward` говорит то же самое, но кодом, который никто не переводит:
-    // пятисотка там, где вызывающий просто передал не ту дату (А5).
+  it('срок в прошлом — отказ нашей схемы, а не 23514 насквозь, и строки не остаётся', async () => {
+    // `sessions_lifetime_forward` говорит то же самое, но кодом, который никто не переводит (А5).
+    // Класс проверяется нарочно: `rejects.toThrow()` без него прошёл бы и для старой ошибки
+    // Postgres — то есть ровно для того, что этот тест и должен был различать (Р1). ZodError,
+    // а не DomainError: срок считает сам сервер из константы, так что назвать этим кодом
+    // некого, и в реестре его поэтому нет.
     const actorId = await insertActor(db)
 
     await expect(
       repository.create(randomUUID(), actorId, token(), null, new Date(Date.now() - 1000)),
-    ).rejects.toThrow()
+    ).rejects.toThrow(ZodError)
     await expect(db.select().from(sessions)).resolves.toHaveLength(0)
+  })
+
+  it('имя устройства длиннее предела режется, а не пропадает', async () => {
+    // Слишком длинное и «не рисует ничего» — разные вещи, и раньше оба давали `null` (Р5).
+    const actorId = await insertActor(db)
+    const secret = token()
+
+    await repository.create(
+      randomUUID(),
+      actorId,
+      secret,
+      `iPhone · Safari ${'о'.repeat(200)}`,
+      anHourFromNow(),
+    )
+
+    const name = (await repository.byToken(secret))?.deviceName
+    expect(name).toHaveLength(80)
+    expect(name?.startsWith('iPhone · Safari')).toBe(true)
+  })
+
+  it('секрет обычным base64 принимается — чеканит MOL-53, и не обязательно url-safe', async () => {
+    // Узкий алфавит отвергал `=` в хвосте, то есть один `.toString('base64')` в MOL-53
+    // сделал бы пятисоткой каждый вход, и ни один здешний тест этого бы не показал (Р4).
+    const actorId = await insertActor(db)
+    const padded = randomBytes(32).toString('base64')
+    expect(padded.endsWith('=')).toBe(true)
+
+    await repository.create(randomUUID(), actorId, padded, null, anHourFromNow())
+
+    expect((await repository.byToken(padded))?.actorId).toBe(actorId)
   })
 
   it('токен, которого этот сервер не мог выдать, не пишется и ничего не находит', async () => {

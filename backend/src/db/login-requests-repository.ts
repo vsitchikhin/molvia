@@ -1,6 +1,6 @@
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import {
-  deviceNameSchema,
+  deviceNameOrNull,
   loginCodeSchema,
   loginRequestSchema,
   newLoginRequestSchema,
@@ -31,7 +31,15 @@ export interface LoginRequestRepository {
   /** What the bot has in hand after `/start <code>`: a request still waiting for an answer. */
   byCode(code: string): Promise<LoginRequest | null>
 
-  /** «Sign in» in the bot. Naming the account is the only thing the bot adds. */
+  /**
+   * «Sign in» in the bot. Naming the account is the only thing the bot adds.
+   *
+   * Both arguments arrive from outside — the code is the payload of `/start`, the account is
+   * `ctx.from.id` — so both are judged the same way and independently of each other: anything
+   * no row could carry answers `null`, the same nothing an unknown code answers. It used to
+   * depend on the order they were checked in, so one bad account id could be silence or a 500
+   * depending on which code travelled beside it (adversarial Р2).
+   */
   confirm(code: string, telegramUserId: TelegramUserId): Promise<LoginRequest | null>
 
   /** «This was not me». Puts the request out without confirming it — the fourth state (Р-9). */
@@ -61,9 +69,6 @@ export interface LoginRequestRepository {
 function toLoginRequest(row: typeof loginRequests.$inferSelect): LoginRequest {
   return loginRequestSchema.parse(row)
 }
-
-/** Decoration, so an unusable one becomes «no name» — the same rule sessions apply. */
-const usableDeviceName = deviceNameSchema.nullable().catch(null)
 
 /**
  * A code as it reached us, or `null` when no row could ever carry it.
@@ -101,7 +106,8 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
       const input = newLoginRequestSchema.parse({
         id,
         code,
-        deviceName: usableDeviceName.parse(deviceName),
+        // Decoration: cut if too long, `null` if it draws nothing — the rule sessions apply.
+        deviceName: deviceNameOrNull(deviceName),
         expiresAt,
       })
 
@@ -126,11 +132,12 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
     },
 
     async confirm(code, telegramUserId) {
-      if (codeOrNull(code) === null) return null
-      // The account the bot names comes from Telegram, so its bounds are checked where the
-      // value arrives rather than by the CHECK at the end of the journey: `23514` is a 500
-      // for what is plainly a caller's mistake (А5).
-      telegramUserIdSchema.parse(telegramUserId)
+      // Neither guard is allowed to shadow the other: both inputs come from the bot, and the
+      // answer to a bad one must not depend on what was passed beside it (Р2). A number the
+      // column could never hold is not this server's defect and not worth a 500 — it is a
+      // confirmation that cannot happen, which is what `null` already means here.
+      const named = telegramUserIdSchema.safeParse(telegramUserId).success
+      if (codeOrNull(code) === null || !named) return null
 
       // Only while unconfirmed: pressing the button twice must not move the account the
       // request names. The second press finds nothing and says so, which is what MOL-55 shows

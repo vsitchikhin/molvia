@@ -48,6 +48,28 @@ describe('владелец', () => {
     expect(await actors.byId(id)).toEqual(created)
   })
 
+  it('находится по Telegram-аккаунту — тот самый круг, ради которого колонка и заведена', async () => {
+    // «Человек вернулся»: он приносит номер аккаунта, а не uuid строки. Без этого круга второй
+    // вход упирался в CONFLICT, из которого не выйти (MOL-52, адверсариальный проход А2), —
+    // а сам метод, закрывший А2, не был проверен ничем (Р3).
+    const telegram = telegramId()
+    const created = await actors.create(randomUUID(), telegram, settings)
+
+    expect(await actors.byTelegramUserId(telegram)).toEqual(created)
+  })
+
+  it('на аккаунт, которого нет, и на номер, которого не бывает, отвечает одинаково', async () => {
+    // Свой страж, а не `bigint` в Postgres: число вне границ колонки — это не «строки не
+    // нашлось», это значение, которого там никогда не было, и оно не должно давать ошибку.
+    await actors.create(randomUUID(), telegramId(), settings)
+
+    expect(await actors.byTelegramUserId(424_242_424)).toBeNull()
+    expect(await actors.byTelegramUserId(0)).toBeNull()
+    expect(await actors.byTelegramUserId(-1)).toBeNull()
+    expect(await actors.byTelegramUserId(1.5)).toBeNull()
+    expect(await actors.byTelegramUserId(9_007_199_254_740_992)).toBeNull()
+  })
+
   it('несуществующий владелец — это null, а не ошибка', async () => {
     expect(await actors.byId(randomUUID())).toBeNull()
   })

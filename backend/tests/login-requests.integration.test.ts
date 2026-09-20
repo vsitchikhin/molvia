@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { ZodError } from 'zod'
 import { DomainError, ERROR } from '@molvia/model'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { loginRequests } from '@/db/schema'
@@ -139,22 +140,25 @@ describe('истёкший, использованный и несуществу
 })
 
 describe('вход судится до записи, а не после', () => {
-  it('код, который база отвергнет, не пишется и приходит доменным отказом', async () => {
-    // Раньше это был непереведённый `22001`/`23514` — пятисотка за то, что рядом лежит схема,
-    // которой значение проверяется (А5). Теперь отказ один и тот же, и строки не остаётся.
+  it('код, который база отвергнет, не пишется — и отказ именно наш, а не Postgres', async () => {
+    // Раньше это был непереведённый `22001`/`23514` (А5). Проверяется класс, а не просто
+    // «что-нибудь бросило»: `rejects.toThrow()` без класса прошёл бы и для старой ошибки
+    // Postgres, то есть на той оси, о которой заголовок, не различал бы ничего (Р1).
+    // ZodError, а не DomainError, — сознательно: код чеканит сам сервер, так что негодный
+    // код это его дефект, и отвечать им некому. Отсюда и отсутствие кода в реестре.
     for (const bad of ['a'.repeat(65), 'код!', 'a+b', '']) {
       await expect(
         repository.create(randomUUID(), bad, secret(), null, anHourFromNow()),
-      ).rejects.toThrow()
+      ).rejects.toThrow(ZodError)
     }
 
     await expect(db.select().from(loginRequests)).resolves.toHaveLength(0)
   })
 
-  it('срок в прошлом — отказ домена, и строки тоже не остаётся', async () => {
+  it('срок в прошлом — тот же отказ, и строки тоже не остаётся', async () => {
     await expect(
       repository.create(randomUUID(), code(), secret(), null, new Date(Date.now() - 1000)),
-    ).rejects.toThrow()
+    ).rejects.toThrow(ZodError)
 
     await expect(db.select().from(loginRequests)).resolves.toHaveLength(0)
   })
@@ -173,15 +177,43 @@ describe('вход судится до записи, а не после', () => 
     expect((await repository.byCode(request.code))?.deviceName).toBe('iPhone · Safari')
   })
 
-  it('Telegram-id вне границ — отказ домена, а не 23514 насквозь', async () => {
+  it('Telegram-id вне границ — то же ничего, что и неизвестный код, и не зависит от соседа', async () => {
+    // Номер приходит от Telegram (`ctx.from.id`), то есть снаружи, — значит это не дефект
+    // сервера, а подтверждение, которого не может быть, и `null` здесь уже это и значит.
+    // Раньше было хуже: один и тот же негодный номер давал то `null`, то пятисотку —
+    // решал код, переданный рядом, потому что его страж стоял раньше (Р2).
     const request = await asked()
 
     for (const bad of [0, -1, 1.5, 9_007_199_254_740_992]) {
-      await expect(repository.confirm(request.code, bad)).rejects.toThrow()
+      expect(await repository.confirm(request.code, bad)).toBeNull()
+      expect(await repository.confirm('код!', bad)).toBeNull()
     }
 
     // И запрос при этом цел: отказ не тронул строку.
     expect((await repository.byCode(request.code))?.telegramUserId).toBeNull()
+  })
+
+  it('имя устройства длиннее предела режется, а не пропадает', async () => {
+    // Разница между «слишком длинное» и «не рисует ничего» (Р5): у первого есть что показать
+    // человеку в списке устройств, у второго нет. Раньше оба одинаково становились `null`.
+    const long = `iPhone · Safari ${'о'.repeat(200)}`
+    const request = await asked(long)
+
+    const name = (await repository.byCode(request.code))?.deviceName
+    expect(name).toHaveLength(80)
+    expect(name?.startsWith('iPhone · Safari')).toBe(true)
+  })
+
+  it('секрет обычным base64 принимается: чеканить будет MOL-53, и не обязательно url-safe', async () => {
+    // Узкий алфавит был ловушкой: 32 байта в обычном base64 кончаются на `=`, и один
+    // `.toString('base64')` в MOL-53 сделал бы пятисоткой **каждый** вход (Р4).
+    const padded = randomBytes(32).toString('base64')
+    expect(padded.endsWith('=')).toBe(true)
+
+    const id = randomUUID()
+    await repository.create(id, code(), padded, null, anHourFromNow())
+
+    expect(await repository.byIdAndSecret(id, padded)).not.toBeNull()
   })
 })
 
