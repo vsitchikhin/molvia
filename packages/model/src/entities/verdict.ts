@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { decimalFromScaled, divideRounded } from '#model/support/decimal'
 import { DomainError, ERROR, ISSUE } from '#model/support/errors'
 import type { ItemKind } from './item'
 import { PATCH_EMPTY, changesSomething } from '#model/support/patch'
@@ -100,4 +101,33 @@ export function verdictLevel(sum: number, count: number): VerdictLevel {
   if (sum >= 4 * count) return VERDICT_LEVEL.TAKE
   if (2 * sum < 5 * count) return VERDICT_LEVEL.NEVER
   return VERDICT_LEVEL.IF_CHEAP
+}
+
+/**
+ * How many people must have rated an item before their average may be shown (MOL-31, Р-13).
+ *
+ * Three, not two, and the reason is arithmetic rather than taste: with two, whoever knows
+ * their own score gets the other one by subtraction — «4,5 из 5 · 2 оценки» beside a five of
+ * one's own is a four someone never shared. The same number, for the same kind of reason, as
+ * `RATE_JUMP_MIN_HISTORY`: below it there is no judgement to make.
+ *
+ * A contribution is a person, not a row: three purchases by one person are one contribution.
+ */
+export const AGGREGATE_MIN_CONTRIBUTIONS = 3
+
+/**
+ * The average of `sum` scores over `count` of them, as a decimal with one tenth — «5.0»,
+ * «4.3». A string rather than a number on purpose (MOL-31, Р-12): the same field carries one
+ * person's own whole score and an average over many, and «never float» holds for both. Rounded
+ * half away from zero, the way every other ratio in this package is.
+ */
+export function averageScore(sum: number, count: number): `${number}` {
+  const details = `${String(sum)}/${String(count)}`
+  if (!Number.isSafeInteger(sum) || !Number.isSafeInteger(count) || count <= 0) {
+    throw new DomainError(ERROR.INVALID_SCORE, details)
+  }
+  if (sum < count || sum > 5 * count) {
+    throw new DomainError(ERROR.INVALID_SCORE, details)
+  }
+  return decimalFromScaled(divideRounded(BigInt(sum) * 10n, BigInt(count)), 1)
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { ERROR, ISSUE } from '#model/support/errors'
 import {
+  AGGREGATE_MIN_CONTRIBUTIONS,
+  averageScore,
   newVerdictSchema,
   newVerdictSchemaFor,
   placeMatchesKind,
@@ -191,5 +193,55 @@ describe('the review of a verdict', () => {
       'Пахнет крахмалом.\nМясом — нет',
     )
     expect(verdictPatchSchema.parse({ review }).review).toBe('Пахнет крахмалом.\nМясом — нет')
+  })
+})
+
+describe('averageScore', () => {
+  it('writes one person\u2019s own score with a tenth, so the field never changes shape', () => {
+    expect(averageScore(5, 1)).toBe('5.0')
+    expect(averageScore(1, 1)).toBe('1.0')
+  })
+
+  it('averages several and rounds half away from zero', () => {
+    expect(averageScore(13, 3)).toBe('4.3') // 4.333…
+    expect(averageScore(9, 2)).toBe('4.5')
+    expect(averageScore(14, 3)).toBe('4.7') // 4.666…
+    expect(averageScore(5, 2)).toBe('2.5')
+    // 4.25 and 4.35 sit exactly between two tenths: half goes away from zero, both times.
+    expect(averageScore(17, 4)).toBe('4.3')
+    expect(averageScore(87, 20)).toBe('4.4')
+  })
+
+  it('never produces a number outside the scale it claims', () => {
+    expect(averageScore(50, 10)).toBe('5.0')
+    expect(averageScore(10, 10)).toBe('1.0')
+  })
+
+  it('refuses an aggregate no set of ratings could produce, exactly as verdictLevel does', () => {
+    for (const [sum, count] of [
+      [0, 0],
+      [3, 0],
+      [0, 1],
+      [6, 1],
+      [3, 10],
+      [51, 10],
+    ] as const) {
+      expect(() => averageScore(sum, count)).toThrow(
+        expect.objectContaining({ code: ERROR.INVALID_SCORE }),
+      )
+    }
+  })
+
+  it('agrees with verdictLevel on where the groups start', () => {
+    expect(averageScore(8, 2)).toBe('4.0')
+    expect(verdictLevel(8, 2)).toBe('take')
+    expect(averageScore(5, 2)).toBe('2.5')
+    expect(verdictLevel(5, 2)).toBe('if_cheap')
+  })
+})
+
+describe('AGGREGATE_MIN_CONTRIBUTIONS', () => {
+  it('is three: with two, subtracting one\u2019s own score gives away the other', () => {
+    expect(AGGREGATE_MIN_CONTRIBUTIONS).toBe(3)
   })
 })
