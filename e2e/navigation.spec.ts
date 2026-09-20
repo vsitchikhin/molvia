@@ -2,7 +2,6 @@
 // DOM for the code inside page.evaluate and addInitScript, which runs in the browser; the
 // rest of the root project (playwright.config.ts, vitest.config.ts) runs in Node and keeps
 // the lib it has.
-import process from 'node:process'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
@@ -71,10 +70,10 @@ test.describe('sections', () => {
     await expect(page).toHaveURL('about:blank')
   })
 
-  // The invite link is how everyone arrives. Its code is scrubbed from the address on start;
-  // done behind the router's back, the router remembered `/?c=…` as where it came from, and the
-  // way home stopped being a step back — «back» from the trip then landed on the trip again.
-  // The trip is the trip whatever its address carries — a tracking tag on a shared link, a hash.
+  // The trip is the trip whatever its address carries — a tracking tag on a shared link, a
+  // hash. The invite link that used to arrive here is gone with the door (MOL-52), but what it
+  // caught is not: a query rewritten behind the router's back left `/?c=…` remembered as where
+  // it came from, and the way home stopped being a step back.
   for (const entry of ['/?utm_source=telegram', '/#top']) {
     test(`arriving at ${entry}, the way home is still a step back`, async ({ page }) => {
       await page.goto(entry)
@@ -88,20 +87,6 @@ test.describe('sections', () => {
       await expect(page).toHaveURL('about:blank')
     })
   }
-
-  test('arriving by an invite link, the way home is still a step back', async ({ page }) => {
-    const code = process.env.SIGNUP_CODE
-    test.skip(!code, 'SIGNUP_CODE is not set')
-    await page.goto(`/?c=${code ?? ''}`)
-    await expect(page).toHaveURL('/')
-    await tab(page, 'What to buy').click()
-    await expectOn(page, '/advice', 'What to buy')
-    await tab(page, 'Trip').click()
-    await expectOn(page, '/', 'Trip')
-
-    await page.goBack()
-    await expect(page).toHaveURL('about:blank')
-  })
 
   test('each tab is a thumb-sized target', async ({ page }) => {
     await page.goto('/')

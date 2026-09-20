@@ -15,21 +15,30 @@ function fakeActors(overrides: Partial<ActorRepository> = {}): ActorRepository {
   }
 }
 
-function actorFrom(id: string, input: NewActor): Actor {
-  return actorSchema.parse({ id, ...input, createdAt: new Date(), updatedAt: new Date() })
+/** Any positive number inside 2^53 will do; the use case does not choose it (MOL-52). */
+const TELEGRAM_ID = 777_000_123
+
+function actorFrom(id: string, telegramUserId: number, input: NewActor): Actor {
+  return actorSchema.parse({
+    id,
+    telegramUserId,
+    ...input,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  })
 }
 
 describe('createActor', () => {
   it('writes the four settings a first visit starts with', async () => {
     let written: NewActor | undefined
     const actors = fakeActors({
-      create: (id, input) => {
+      create: (id, telegramUserId, input) => {
         written = input
-        return Promise.resolve(actorFrom(id, input))
+        return Promise.resolve(actorFrom(id, telegramUserId, input))
       },
     })
 
-    const actor = await createActor(actors)
+    const actor = await createActor(actors, TELEGRAM_ID)
 
     expect(written).toEqual({
       country: 'AM',
@@ -45,14 +54,14 @@ describe('createActor', () => {
     // that chose its own could choose someone else's.
     const seen: string[] = []
     const actors = fakeActors({
-      create: (id, input) => {
+      create: (id, telegramUserId, input) => {
         seen.push(id)
-        return Promise.resolve(actorFrom(id, input))
+        return Promise.resolve(actorFrom(id, telegramUserId, input))
       },
     })
 
-    await createActor(actors)
-    await createActor(actors)
+    await createActor(actors, TELEGRAM_ID)
+    await createActor(actors, TELEGRAM_ID)
 
     expect(seen[0]).not.toBe(seen[1])
     expect(seen[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
@@ -62,10 +71,10 @@ describe('createActor', () => {
     // created_at and updated_at belong to the database, and the entity only exists once a
     // row does — so the use case returns the row rather than assembling an answer.
     const actors = fakeActors({
-      create: (id, input) => Promise.resolve(actorFrom(id, input)),
+      create: (id, telegramUserId, input) => Promise.resolve(actorFrom(id, telegramUserId, input)),
     })
 
-    const actor = await createActor(actors)
+    const actor = await createActor(actors, TELEGRAM_ID)
 
     expect(actor.createdAt).toBeInstanceOf(Date)
     expect(() => actorSchema.parse(actor)).not.toThrow()

@@ -14,20 +14,6 @@ try {
 const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3300),
   DATABASE_URL: z.string().min(1),
-  /**
-   * The door of the first visit (MOL-8). Required rather than optional-with-a-default on
-   * purpose: a default would mean every deployment that forgot to set it shares one publicly
-   * guessable code, and an empty string would open the door to everyone. Failing at boot is
-   * the honest failure — a server nobody can sign into is easier to diagnose than one
-   * anybody can.
-   *
-   * The length is a requirement rather than a habit. There is no counter, no delay and no
-   * lockout behind this door — a hundred wrong codes cost an attacker nothing — so the only
-   * thing standing between the internet and a guess is how long the code is. Sixteen is what
-   * `bin/init-env.sh` generates (8 random bytes as hex); this line is what makes that a rule
-   * rather than a default somebody can quietly undercut.
-   */
-  SIGNUP_CODE: z.string().min(16),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   /**
    * The hourly refresh of official rates (MOL-39), which goes out to the central banks. On by

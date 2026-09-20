@@ -1,52 +1,25 @@
-import { ZodError, z } from 'zod'
-import { DomainError, ERROR, ISSUE, actorCodec } from '@molvia/model'
+import { z } from 'zod'
+import { DomainError, ERROR, actorCodec, actorViewSchema } from '@molvia/model'
 import type { Actor } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
-import { withInvite } from '@/routes/actor'
-import { InvalidBody } from '@/parse'
 
 /**
  * The entity leaves through its codec rather than as the object the repository built: in the
  * domain the timestamps are `Date`, and JSON would turn them into strings silently — the
  * client would then parse a shape nothing promised it.
  *
- * `no-store` travels with it. In 0.1 the identifier *is* the proof of identity — whoever
- * reads it is the owner — so a shared cache or a disk cache holding this reply is the whole
- * account sitting in a file nobody meant to write.
+ * Narrowed through `actorViewSchema` first, in one visible step (MOL-52): an `Actor` carries
+ * `telegramUserId`, the view does not, and the wire schema is strict — so a narrowing that was
+ * forgotten here fails loudly instead of leaking the identity to the screen.
+ *
+ * `no-store` travels with it. Until MOL-53 the identifier is still the proof of identity —
+ * whoever reads it is the owner — so a shared cache or a disk cache holding this reply is the
+ * whole account sitting in a file nobody meant to write.
  */
-function answer(reply: FastifyReply, actor: Actor) {
-  return reply.header('cache-control', 'no-store').send(z.encode(actorCodec, actor))
-}
-
-/**
- * The first visit. Registered in its own scope because that scope carries the door, and
- * because an identity cannot be required of a request whose whole purpose is to get one.
- */
-export function firstVisitRoute(
-  app: FastifyInstance,
-  api: { create(): Promise<Actor>; signupCode: string },
-): void {
-  void app.register((scope, _options, done) => {
-    withInvite(scope, api.signupCode)
-
-    scope.post('/actors', async (request, reply) => {
-      // Documented as having no body, so a body is refused rather than dropped in silence:
-      // accepting `{"country":"RU"}` and answering «AM» tells the caller their input was
-      // understood when it was discarded. Refused through the body seam, which is what
-      // turns it into a 400 naming the field — the route assigns no status itself.
-      if (request.body !== undefined && request.body !== null) {
-        throw new InvalidBody(
-          new ZodError([
-            { code: 'custom', path: ['body'], message: ISSUE.BODY_INVALID, input: request.body },
-          ]),
-        )
-      }
-
-      return answer(reply.code(201), await api.create())
-    })
-
-    done()
-  })
+export function answerWithActor(reply: FastifyReply, actor: Actor): FastifyReply {
+  return reply
+    .header('cache-control', 'no-store')
+    .send(z.encode(actorCodec, actorViewSchema.parse(actor)))
 }
 
 /**
@@ -62,6 +35,6 @@ export function actorMeRoute(app: FastifyInstance): void {
     const actor = request.actor
     if (!actor) throw new DomainError(ERROR.NO_ACTOR)
 
-    return answer(reply, actor)
+    return answerWithActor(reply, actor)
   })
 }

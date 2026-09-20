@@ -10,7 +10,6 @@
 import { read, readList, write, writeList } from '@/stores/storage'
 
 const KEY = 'molvia.actor'
-const INVITE_KEY = 'molvia.invite'
 /** Identifiers the server stopped recognising. A list: a second loss must not erase the first. */
 const LOST_KEY = 'molvia.actor.lost'
 /** How many are worth keeping — enough for a week of mistakes, not a log. */
@@ -18,14 +17,6 @@ const LOST_LIMIT = 5
 
 /** What this device is right now. `null` until the first visit succeeds. */
 let current: string | null = null
-
-/**
- * The invite code, in memory, for the same reason the identifier is: when storage refuses
- * every write, a code that arrived in the link has nowhere to be kept — and reading it back
- * a moment later returns nothing. The device would then be told it needs an invite while
- * holding one, and could never create an identity at all.
- */
-let invite: string | null = null
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -101,38 +92,6 @@ export function commitRestore(id: string): void {
   )
   current = id
   write(KEY, id)
-}
-
-/**
- * The invite code travels in the link once and then lives on the device. The query is
- * scrubbed on every start rather than only while creating an identity: a device that
- * already has one, opened from the same link again, used to keep `?c=` in the address bar —
- * and from there it goes into history, into screenshots, into the `start_url` of an
- * installed PWA and into every `Referer` the page sends (О-17, М-20).
- */
-export function takeInviteCodeFromUrl(): void {
-  const url = new URL(window.location.href)
-  const fromLink = url.searchParams.get('c')
-  if (!fromLink) return
-
-  invite = fromLink
-  write(INVITE_KEY, fromLink)
-  url.searchParams.delete('c')
-  // The state is kept: it is the router's record of the entry underneath, and an empty one
-  // makes the chevron and the tab bar lose track of where «back» leads.
-  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
-}
-
-export function inviteCode(): string | null {
-  takeInviteCodeFromUrl()
-  invite ??= read(INVITE_KEY)
-  return invite
-}
-
-/** A code the door refused is worse than no code: it turns every retry into the same 401. */
-export function forgetInviteCode(): void {
-  invite = null
-  write(INVITE_KEY, '')
 }
 
 export const IDENTITY_KEY = KEY

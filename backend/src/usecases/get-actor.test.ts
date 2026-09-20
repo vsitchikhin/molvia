@@ -16,6 +16,7 @@ function fakeActors(overrides: Partial<ActorRepository> = {}): ActorRepository {
 
 const actor = actorSchema.parse({
   id: ID,
+  telegramUserId: 777_000_123,
   country: 'AM',
   city: 'Гюмри',
   spendCurrency: 'AMD',

@@ -7,7 +7,6 @@ import { router } from '@/router'
 import { installArrival, installViewTransitions } from '@/transitions'
 import { installSheetEntryGuard } from '@/composables/useSheetHistory'
 import { useActorStore } from '@/stores/actor'
-import { takeInviteCodeFromUrl } from '@/stores/identity'
 import '@/styles/main.scss'
 
 const app = createApp(App)
@@ -24,27 +23,12 @@ app.config.errorHandler = (error, _instance, info) => {
   console.error('[molvia]', info, error)
 }
 
-// The invite code is saved here, before anything can lose it. It is not gone from the address
-// yet: the router read the address when its module was created, and its first navigation
-// writes that `/?c=…` back into the bar. `forgetInviteInRoute` below is what actually removes
-// it — from the bar and from the router's memory, which would otherwise write `/?c=…` as «back»
-// into the next entry, where the tabs expect `/`. Neither step is a duplicate of the other.
-takeInviteCodeFromUrl()
-
-async function forgetInviteInRoute(): Promise<void> {
-  await router.isReady()
-  const { c, ...query } = router.currentRoute.value.query
-  if (c === undefined) return
-  await router.replace({ query, hash: router.currentRoute.value.hash })
-}
-
 app.use(createPinia()).use(router).use(i18n)
 
 // Mounted once the first route is settled: a nested screen opened cold gets its parent laid
 // underneath first, so the first paint is already the screen and not a flash of the parent.
 // Transitions and focus are installed after that, so neither step counts as a move.
-void forgetInviteInRoute()
-  .then(() => settleColdStart(router))
+void settleColdStart(router)
   // Settling the route is a nicety; the app is not. Vue is not running yet, so its error
   // handler would never see this — logged here, and the app is mounted either way instead of
   // leaving a blank screen at the shelf.

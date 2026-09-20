@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, insertTrip, telegramId } from './fixtures'
 import {
   actors,
   events,
@@ -790,11 +790,26 @@ describe('the actor', () => {
     await refuses(
       () =>
         db.execute(sql`
-        insert into ${actors} (id, country, city, spend_currency, income_currency)
-        values (${randomUUID()}, 'AM', 'Гюмри', 'GBP', 'RUB')
+        insert into ${actors} (id, telegram_user_id, country, city, spend_currency, income_currency)
+        values (${randomUUID()}, ${telegramId()}, 'AM', 'Гюмри', 'GBP', 'RUB')
       `),
       CHECK,
     )
+  })
+
+  it('refuses a second owner on one Telegram account, and an id outside what JSON carries', async () => {
+    // The whole point of the column (MOL-52): «one Telegram account, one owner» is a claim
+    // about *other rows*, which only the database can make. The bounds are the edge cases —
+    // 2^53 − 1 is the largest id Telegram promised, 2^53 the first number a reply could not
+    // carry back unchanged.
+    const shared = telegramId()
+    await insertActor(db, { telegramUserId: shared })
+
+    await refuses(() => insertActor(db, { telegramUserId: shared }), UNIQUE)
+    await refuses(() => insertActor(db, { telegramUserId: 0 }), CHECK)
+    await refuses(() => insertActor(db, { telegramUserId: -1 }), CHECK)
+    await refuses(() => insertActor(db, { telegramUserId: 9_007_199_254_740_992 }), CHECK)
+    await expect(insertActor(db, { telegramUserId: 9_007_199_254_740_991 })).resolves.toBeTruthy()
   })
 
   it('refuses a country that is not two capitals', async () => {

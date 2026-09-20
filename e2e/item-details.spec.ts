@@ -1,7 +1,6 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
 import { randomUUID } from 'node:crypto'
-import process from 'node:process'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
@@ -16,14 +15,6 @@ import type { Page } from '@playwright/test'
  */
 
 const KEY = 'molvia.actor'
-
-function inviteCode(): string {
-  const code = process.env.SIGNUP_CODE
-  if (!code) {
-    throw new Error("SIGNUP_CODE is not set. Run `make setup` to generate this copy's .env.")
-  }
-  return code
-}
 
 function nonsense(): string {
   const consonants = 'бвгджзклмнпрстфхцчш'
@@ -52,7 +43,7 @@ interface Setting {
 
 /** A device with an identity, a trip open in a shop, and one item of its own in the catalogue. */
 async function onTrip(page: Page): Promise<Setting> {
-  await page.goto(`/?c=${inviteCode()}`)
+  await page.goto('/')
   const stored = () => page.evaluate((key) => localStorage.getItem(key) ?? '', KEY)
   await expect.poll(stored).toMatch(/^[0-9a-f-]{36}$/)
   const actor = await stored()

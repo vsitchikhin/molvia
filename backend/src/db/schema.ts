@@ -160,6 +160,13 @@ export const actors = pgTable(
   'actors',
   {
     id: uuid('id').primaryKey(),
+    /**
+     * The external identity a person comes back by (MOL-52). `bigint` because Telegram long
+     * outgrew 32 bits, `mode: 'number'` because it promised never to outgrow 52 — the two
+     * CHECKs below are that promise, held by the database rather than by whoever writes the
+     * next insert.
+     */
+    telegramUserId: bigint('telegram_user_id', { mode: 'number' }).notNull(),
     country: char('country', { length: 2 }).notNull(),
     city: varchar('city', { length: 120 }).notNull(),
     /** Currency travels beside every amount: without it the minor exponent is unknown. */
@@ -171,6 +178,13 @@ export const actors = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    // «One Telegram account, one owner» — the whole point of the column, and a statement
+    // about *other rows*, which only the database can make.
+    unique('actors_telegram_user_id_key').on(table.telegramUserId),
+    check('actors_telegram_user_id_positive', sql`${table.telegramUserId} > 0`),
+    // A row JSON could not carry back without distorting it must not exist at all: the first
+    // to notice otherwise would be somebody's browser, not this server. 2^53.
+    check('actors_telegram_user_id_safe', sql`${table.telegramUserId} < 9007199254740992`),
     check('actors_country_iso', sql`${table.country} ~ '^[A-Z]{2}$'`),
     check('actors_spend_currency_known', oneOf(table.spendCurrency, currencySchema.options)),
     check('actors_income_currency_known', oneOf(table.incomeCurrency, currencySchema.options)),

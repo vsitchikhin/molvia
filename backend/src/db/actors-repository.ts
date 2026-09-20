@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { actorSchema } from '@molvia/model'
-import type { Actor, ActorPatch, NewActor } from '@molvia/model'
+import type { Actor, ActorPatch, NewActor, TelegramUserId } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
@@ -13,7 +13,7 @@ export interface ActorRepository {
    * its own could name someone else's. `actors.id` has no default for the same reason —
    * a database default would be a second place that decides.
    */
-  create(id: string, input: NewActor): Promise<Actor>
+  create(id: string, telegramUserId: TelegramUserId, input: NewActor): Promise<Actor>
   byId(id: string): Promise<Actor | null>
   update(id: string, patch: ActorPatch): Promise<Actor | null>
 }
@@ -33,16 +33,17 @@ function toActor(row: typeof actors.$inferSelect): Actor {
 // server.ts points it at the real one.
 export function createActorRepository(db: Conn): ActorRepository {
   return {
-    async create(id, input) {
-      // The identifier is a fresh `randomUUID()` from the use case, so a collision here is
-      // vanishingly unlikely — `actors` has no unique constraint but its primary key. The
-      // wrapper stays because the alternative is a 500 with no name on it: unwrapped,
-      // `23505` went up untouched, and a repeat would look like a broken server rather than
-      // a refused write.
+    async create(id, telegramUserId, input) {
+      // Two ways to collide now, and only the second is an ordinary day. The identifier is a
+      // fresh `randomUUID()`, so a primary-key collision is vanishingly unlikely;
+      // `telegram_user_id` is unique too, and a second actor for the same Telegram account is
+      // exactly what that constraint exists to refuse (MOL-52). Both arrive as `23505`, which
+      // the wrapper turns into CONFLICT — unwrapped it went up untouched and a refused write
+      // looked like a broken server.
       return translateFailures(async () => {
         const [row] = await db
           .insert(actors)
-          .values({ id, ...input })
+          .values({ id, telegramUserId, ...input })
           .returning()
         return toActor(theRow(row, 'actors'))
       })

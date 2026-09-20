@@ -14,28 +14,40 @@ import { actorSchema } from '#model/entities/actor'
 export const ACTOR_HEADER = 'x-molvia-actor'
 
 /**
- * The door of the first visit. A header rather than a body field: creating an identity has no
- * body on purpose — the only thing a client could send is the four settings, and no screen
- * sets them in 0.1 — so adding one to carry a code would break the decision it protects.
+ * The owner as anyone outside the server sees them: the settings, without the identity behind
+ * them (MOL-52).
  *
- * It is not a second identity. It says «you were invited»; the actor header says «you are
- * this person», and only the second is checked on every later request.
+ * An allowlist by subtraction rather than a second list of fields, for the reason the wire
+ * below is derived too — but the subtraction itself is deliberate. The epic promised that only
+ * Telegram's numeric id is *stored*, not that it is shown, and «who am I» is a question about
+ * settings. Left in, it would have reached `GET /actors/me` in silence: the wire is an
+ * `.extend` of the entity, so no line of this file would have had to change for it.
+ *
+ * Not strict, and that is what does the work: `actorViewSchema.parse(actor)` is how a route
+ * narrows an `Actor` to what it may send, in one visible step rather than by hoping something
+ * downstream drops the field.
  */
-export const INVITE_HEADER = 'x-molvia-invite'
+export const actorViewSchema = actorSchema.omit({ telegramUserId: true })
+export type ActorView = z.infer<typeof actorViewSchema>
 
 /**
- * The first entity to cross the wire whole, so the shape chosen here is the shape the trip,
+ * The first entity to cross the wire, so the shape chosen here is the shape the trip,
  * the verdict and the exchange will take after it (MOL-21, MOL-27, MOL-42).
  *
  * In the domain the timestamps are `Date`; in JSON they are strings. An entity handed back
  * unchanged would fail `actorSchema.parse` in `packages/client` on its very first field —
  * which is why money and quantity already cross this border through codecs.
  *
- * Derived from the entity rather than retyped beside it: a field added to `Actor` and
- * forgotten here would leave the wire quietly behind, and the first sign of it would be an
- * `encode` dropping data nobody noticed was missing.
+ * Derived from the view rather than retyped beside it: a field added to `Actor` and forgotten
+ * here would leave the wire quietly behind, and the first sign of it would be an `encode`
+ * dropping data nobody noticed was missing.
+ *
+ * Strict, on the client's side as much as the server's, and for the same reason
+ * `catalogueEntryCodec` is: a reply that grew a field fails to parse rather than carrying it
+ * past a client that simply never reads it — which is how a leak would otherwise go unnoticed.
  */
-export const actorWireSchema = actorSchema.extend({
+export const actorWireSchema = z.strictObject({
+  ...actorViewSchema.shape,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 })
@@ -47,7 +59,7 @@ export type ActorWire = z.infer<typeof actorWireSchema>
  * and still fails to become one. `z.iso.datetime()` refuses everything `new Date` would turn
  * into an Invalid Date, so by the time decode runs there is nothing left to report.
  */
-export const actorCodec = z.codec(actorWireSchema, actorSchema, {
+export const actorCodec = z.codec(actorWireSchema, actorViewSchema, {
   decode: (wire) => ({
     ...wire,
     createdAt: new Date(wire.createdAt),

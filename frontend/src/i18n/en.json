@@ -195,10 +195,6 @@
       "title": "The server did not recognise this device",
       "body": "Your earlier trips and ratings are still there, but the server no longer counts them as this device's — so a new record has been started. The old key is kept: if this was a mistake on the server, the data can be brought back."
     },
-    "uninvited": {
-      "title": "An invite link is needed",
-      "body": "Open the app through the link you were sent: it carries a code, and without it nothing can be saved."
-    },
     "error": {
       "title": "This device could not be identified",
       "body": "Until that works, the app cannot save anything — there is nowhere to put it."

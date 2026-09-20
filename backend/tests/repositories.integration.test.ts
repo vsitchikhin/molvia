@@ -5,7 +5,7 @@ import { DomainError, moneySchema, newItemSchema, toSearchKey } from '@molvia/mo
 import type { ExchangeRate, Money, Quantity } from '@molvia/model'
 import { INT8_MAX } from '@molvia/model'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, telegramId } from './fixtures'
 import { createActorRepository } from '@/db/actors-repository'
 import { createExpenseRepository } from '@/db/expenses-repository'
 import { createItemRepository } from '@/db/items-repository'
@@ -42,7 +42,7 @@ afterAll(async () => {
 describe('владелец', () => {
   it('пишется с идентификатором, который принесло устройство, и читается обратно', async () => {
     const id = randomUUID()
-    const created = await actors.create(id, settings)
+    const created = await actors.create(id, telegramId(), settings)
 
     expect(created.id).toBe(id)
     expect(await actors.byId(id)).toEqual(created)
