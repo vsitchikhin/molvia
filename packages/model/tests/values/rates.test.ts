@@ -381,6 +381,7 @@ describe('pickOfficialRate: скачок', () => {
     ]
     expect(pickOfficialRate('RUB', 'AMD', rows, sunday)).toEqual({
       jumped: true,
+      provider: 'cba',
       rate: expect.objectContaining({
         scaled: 431_230_000n,
         asOf: yerevanMidnight('2026-09-18'),

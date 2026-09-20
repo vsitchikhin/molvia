@@ -20,6 +20,7 @@ function trip(id: string, over: { finishedAt?: string | null; amount?: string } 
     finishedAt: over.finishedAt ?? null,
     currency: 'AMD',
     rate: null,
+    rateProvider: null,
     rateJump: null,
     rateStale: false,
     place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },

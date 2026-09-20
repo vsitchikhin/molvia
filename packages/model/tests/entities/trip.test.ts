@@ -31,6 +31,7 @@ const trip = {
   placeId: 'b1e0f2a4-5c6d-4e8f-9a0b-1c2d3e4f5a6b',
   currency: 'AMD',
   rate: rate('4.82'),
+  rateProvider: 'cba',
   startedAt: new Date('2026-09-08T10:00:00Z'),
   finishedAt: null,
 }
@@ -50,7 +51,22 @@ describe('tripSchema', () => {
   })
 
   it('accepts a trip with no rate — nothing to convert into', () => {
-    expect(() => tripSchema.parse({ ...trip, rate: null })).not.toThrow()
+    expect(() => tripSchema.parse({ ...trip, rate: null, rateProvider: null })).not.toThrow()
+  })
+
+  // MOL-22, Р-3: the screen names the bank it counts by, so a published rate always says who
+  // published it — and a rate nobody published never does.
+  it('требует издателя у снимка и запрещает его там, где издателя нет', () => {
+    const codeOf = (value: unknown) => tripSchema.safeParse(value).error?.issues[0]?.message
+    expect(codeOf({ ...trip, rateProvider: null })).toBe(ISSUE.RATE_PROVIDER_UNMATCHED)
+    expect(codeOf({ ...trip, rate: null })).toBe(ISSUE.RATE_PROVIDER_UNMATCHED)
+    expect(codeOf({ ...trip, rate: rate('4.82', 'personal'), rateProvider: 'cba' })).toBe(
+      ISSUE.RATE_PROVIDER_UNMATCHED,
+    )
+    expect(
+      tripSchema.safeParse({ ...trip, rate: rate('4.82', 'personal'), rateProvider: null }).success,
+    ).toBe(true)
+    expect(tripSchema.safeParse({ ...trip, rateProvider: 'erapi' }).success).toBe(true)
   })
 
   it('refuses a rate quoted in some other currency than the trip', () => {
@@ -221,7 +237,7 @@ describe('скачок курса в походе (MOL-39, Р-19, Р-21)', () =>
       { ...jumped, rateChoice: 'previous' },
       { ...jumped, rateChoice: 'manual' },
       { ...trip, rateChoice: 'jumped' },
-      { ...trip, rate: null, rateJumped: true },
+      { ...trip, rate: null, rateProvider: null, rateJumped: true },
     ]) {
       expect(tripSchema.safeParse(bad).success).toBe(false)
     }

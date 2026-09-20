@@ -16,7 +16,7 @@ import type { Trip } from '#model/entities/trip'
 import { INT8_MAX } from '#model/support/decimal'
 import { currencySchema, moneyCodec } from '#model/values/money'
 import type { Money } from '#model/values/money'
-import { rateCodec } from '#model/values/rates'
+import { rateCodec, rateProviderSchema } from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
 import { quantityCodec, unitPrice, unitPriceCodec } from '#model/values/units'
 
@@ -104,6 +104,12 @@ export const tripViewCodec = z.strictObject({
    * before the jump, or their own for this trip (`source: 'personal'`). What `converted` uses.
    */
   rate: rateCodec.nullable(),
+  /**
+   * Who published the rate the trip snapshotted (MOL-22). Null without a snapshot and for one the
+   * person entered themselves. `source: 'fallback'` alone cannot be shown: the screen has to name
+   * the bank or the aggregator it counts by, and the aggregator's terms require the name.
+   */
+  rateProvider: rateProviderSchema.nullable(),
   /**
    * When the snapshotted rate jumped (MOL-39, Р-19, Р-21): the jumped rate, the one before it if
    * there is one, the person's own if they entered it, and their choice — null until made. The
@@ -202,6 +208,7 @@ export function tripViewOf(
     finishedAt: trip.finishedAt,
     currency: trip.currency,
     rate,
+    rateProvider: trip.rateProvider,
     rateJump:
       trip.rate && trip.rateJumped
         ? {

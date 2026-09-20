@@ -44,8 +44,7 @@ export async function startTrip(
       actor.id,
       { id: body.id, placeId: place.id },
       actor.spendCurrency,
-      official?.rate ?? null,
-      { jumped: official?.jumped ?? false, previous: official?.previous ?? null },
+      official,
     )
     return { trip: await tripViewFor(repositories, trip), created }
   })

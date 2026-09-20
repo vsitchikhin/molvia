@@ -318,6 +318,9 @@ export const trips = pgTable(
     rateScaled: bigint('rate_scaled', { mode: 'bigint' }),
     rateSource: text('rate_source').$type<RateSource>(),
     rateAsOf: timestamp('rate_as_of', { withTimezone: true }),
+    // Who published the snapshot (MOL-22): the source says it is not the central bank of
+    // Armenia, and the screen has to name the one it is instead.
+    rateProvider: text('rate_provider').$type<RateProvider>(),
     // When the snapshotted rate jumped (MOL-39, Р-19, Р-21): the flag, the rate before the jump
     // and the person's own — each the snapshot's pair, so only a number and a date — and which
     // one the person chose to count by. The snapshot itself is never rewritten.
@@ -361,6 +364,15 @@ export const trips = pgTable(
     ),
     check('trips_rate_base_known', currencyKnownOrNull(table.rateBase)),
     check('trips_rate_quote_known', currencyKnownOrNull(table.rateQuote)),
+    check(
+      'trips_rate_provider_known',
+      sql`${table.rateProvider} is null or ${oneOf(table.rateProvider, rateProviderSchema.options)}`,
+    ),
+    // A publisher for every published rate, and none for a rate nobody published.
+    check(
+      'trips_rate_provider_matches_source',
+      sql`(${table.rateSource} is null or ${table.rateSource} = 'personal') = (${table.rateProvider} is null)`,
+    ),
     check(
       'trips_rate_source_known',
       sql`${table.rateSource} is null or ${oneOf(table.rateSource, rateSourceSchema.options)}`,

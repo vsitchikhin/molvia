@@ -1,14 +1,20 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { DomainError, ERROR, tripSchema } from '@molvia/model'
-import type { Currency, ExchangeRate, NewTrip, RateChoice, Trip } from '@molvia/model'
+import type { Currency, ExchangeRate, NewTrip, RateChoice, RateProvider, Trip } from '@molvia/model'
 import { rateFrom, rateTo, sideRateFrom } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit, theRow } from './rows'
 import { trips } from './schema'
 
-/** That the snapshot jumped, and the rate before it if there was one (MOL-39, Р-19, Р-21). */
-export interface SnapshotJump {
+/**
+ * The rate a trip is started with, as the trip keeps it: who published it, whether it jumped when
+ * it arrived, and the rate before the jump (MOL-39, Р-19, Р-21; MOL-22, Р-3). An `OfficialRate`
+ * is one; `provider` is null only for a rate the person entered themselves, which is MOL-40's.
+ */
+export interface TripSnapshot {
+  readonly rate: ExchangeRate
+  readonly provider: RateProvider | null
   readonly jumped: boolean
   readonly previous: ExchangeRate | null
 }
@@ -38,8 +44,7 @@ export interface TripRepository {
     actorId: string,
     input: TripToStart,
     currency: Currency,
-    rate: ExchangeRate | null,
-    jump?: SnapshotJump,
+    snapshot: TripSnapshot | null,
   ): Promise<{ trip: Trip; created: boolean }>
   byId(id: string, actorId: string): Promise<Trip | null>
   /**
@@ -96,6 +101,7 @@ function toTrip(row: TripRow): Trip {
     placeId: row.placeId,
     currency: row.currency,
     rate: snapshot,
+    rateProvider: row.rateProvider,
     rateJumped: row.rateJumped,
     previousRate: sideRateFrom(snapshot, row.ratePreviousScaled, row.ratePreviousAsOf),
     manualRate: sideRateFrom(snapshot, row.rateManualScaled, row.rateManualAsOf, 'personal'),
@@ -112,7 +118,7 @@ function ownedBy(id: string, actorId: string) {
 
 export function createTripRepository(db: Conn): TripRepository {
   return {
-    async start(actorId, input, currency, rate, jump = { jumped: false, previous: null }) {
+    async start(actorId, input, currency, snapshot) {
       return translateFailures(async () =>
         db.transaction(async (tx) => {
           // Per owner: two «Начать поход» at once — a double tap after the screen lost its
@@ -143,10 +149,11 @@ export function createTripRepository(db: Conn): TripRepository {
               actorId,
               placeId: input.placeId,
               currency,
-              ...rateTo(rate),
-              rateJumped: jump.jumped,
-              ratePreviousScaled: jump.previous?.scaled ?? null,
-              ratePreviousAsOf: jump.previous?.asOf ?? null,
+              ...rateTo(snapshot?.rate ?? null),
+              rateProvider: snapshot?.provider ?? null,
+              rateJumped: snapshot?.jumped ?? false,
+              ratePreviousScaled: snapshot?.previous?.scaled ?? null,
+              ratePreviousAsOf: snapshot?.previous?.asOf ?? null,
             })
             .returning()
           return { trip: toTrip(theRow(row, 'trips')), created: true }

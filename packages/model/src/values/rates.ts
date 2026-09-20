@@ -229,6 +229,8 @@ export function rateFromAmd(
 /** The rate a trip snapshots, and — when that rate jumped — the last one before the jump. */
 export interface OfficialRate {
   readonly rate: ExchangeRate
+  /** Who published it: the trip keeps it, and the screen names the source it counts by (MOL-22). */
+  readonly provider: RateProvider
   /** A half of the pair jumped when it arrived (MOL-39, Р-19, Р-21): the screen warns. */
   readonly jumped: boolean
   /**
@@ -283,7 +285,7 @@ export function pickOfficialRate(
       : null
     const date = yerevanDate(rate.asOf)
     const previous = steady && isRateFresh(yerevanDate(steady.asOf), date) ? steady : null
-    return [{ provider, pick: { rate, jumped, previous }, date }]
+    return [{ provider, pick: { rate, provider, jumped, previous }, date }]
   })
 
   const central = candidates.find((candidate) => candidate.provider === 'cba')

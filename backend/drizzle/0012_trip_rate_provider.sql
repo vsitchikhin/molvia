@@ -1,0 +1,3 @@
+ALTER TABLE "trips" ADD COLUMN "rate_provider" text;--> statement-breakpoint
+ALTER TABLE "trips" ADD CONSTRAINT "trips_rate_provider_known" CHECK ("trips"."rate_provider" is null or "trips"."rate_provider" in ('cba', 'cbr', 'erapi'));--> statement-breakpoint
+ALTER TABLE "trips" ADD CONSTRAINT "trips_rate_provider_matches_source" CHECK (("trips"."rate_source" is null or "trips"."rate_source" = 'personal') = ("trips"."rate_provider" is null));

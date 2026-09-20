@@ -847,8 +847,26 @@ describe('курс устарел (MOL-39, Р-18)', () => {
 
     expect(trip(await start(actor))).toMatchObject({
       rate: { source: 'official' },
+      rateProvider: 'cba',
       rateStale: true,
     })
+  })
+
+  // MOL-22, Р-3: «источник — запасной» ничего не говорит человеку, а условия агрегатора требуют
+  // назвать его. Поэтому издатель едет в ответе и переживает перезагрузку.
+  it('запасной курс называет издателя, и тот держится в снимке', async () => {
+    await rates.upsert([at('cba', '4.3123', daysAgo(10)), at('cbr', '4.3165', daysAgo(1))])
+    const actor = await insertActor(db)
+
+    const started = trip(await start(actor))
+    expect(started).toMatchObject({ rate: { source: 'fallback' }, rateProvider: 'cbr' })
+    expect((await current(actor))?.rateProvider).toBe('cbr')
+  })
+
+  it('без курса издателя нет', async () => {
+    const actor = await insertActor(db)
+
+    expect(trip(await start(actor))).toMatchObject({ rate: null, rateProvider: null })
   })
 
   it('запасной такой же старый — всё равно ЦБ РА с признаком', async () => {

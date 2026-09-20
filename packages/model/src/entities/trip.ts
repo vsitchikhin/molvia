@@ -9,6 +9,7 @@ import {
   exchangeRateSchema,
   isRateFresh,
   parseRate,
+  rateProviderSchema,
   yerevanDate,
 } from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
@@ -29,6 +30,13 @@ const tripFields = z.object({
   placeId: z.uuid(),
   currency: currencySchema,
   rate: exchangeRateSchema.nullable(),
+  /**
+   * Who published the snapshotted rate (MOL-22, Р-3). The source says «not the central bank of
+   * Armenia»; the screen has to say which one it was instead, because the terms of the open
+   * aggregator require naming it. Not a field of `ExchangeRate`: a personal rate has no provider,
+   * and the field would be optional everywhere a rate is ever mentioned.
+   */
+  rateProvider: rateProviderSchema.nullable().default(null),
   /** The snapshotted rate jumped when it arrived: the screen warns, whatever else there is. */
   rateJumped: z.boolean().default(false),
   /**
@@ -45,6 +53,13 @@ const tripFields = z.object({
 })
 
 export const tripSchema = tripFields
+  // A provider belongs to a published rate and to nothing else: none without a snapshot, none for
+  // a snapshot the person entered themselves, and one for every rate a bank or an aggregator gave.
+  .refine(
+    ({ rate, rateProvider }) =>
+      rate === null || rate.source === 'personal' ? rateProvider === null : rateProvider !== null,
+    { error: ISSUE.RATE_PROVIDER_UNMATCHED },
+  )
   .refine((trip) => trip.rate === null || trip.rate.quote === trip.currency, {
     error: ISSUE.RATE_NOT_OF_TRIP_CURRENCY,
   })

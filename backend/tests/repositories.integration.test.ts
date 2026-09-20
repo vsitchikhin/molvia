@@ -197,7 +197,14 @@ describe('походы и траты', () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
 
-    const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', rate)).trip
+    const trip = (
+      await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', {
+        rate,
+        provider: null,
+        jumped: false,
+        previous: null,
+      })
+    ).trip
     expect(trip.rate).toEqual(rate)
     expect((await trips.byId(trip.id, actorId))?.rate).toEqual(rate)
   })
