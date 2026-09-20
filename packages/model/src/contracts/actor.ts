@@ -34,8 +34,13 @@ export const INVITE_HEADER = 'x-molvia-invite'
  * Derived from the entity rather than retyped beside it: a field added to `Actor` and
  * forgotten here would leave the wire quietly behind, and the first sign of it would be an
  * `encode` dropping data nobody noticed was missing.
+ *
+ * So `sharedUntil` crosses too (MOL-31, Р-9), even though no screen of 0.1 reads it: it is the
+ * person's own access, not anyone else's, and the thing a screen actually acts on — whose
+ * figures it is showing — travels with the answer that carries them, as `scope`.
  */
 export const actorWireSchema = actorSchema.extend({
+  sharedUntil: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 })
@@ -50,11 +55,13 @@ export type ActorWire = z.infer<typeof actorWireSchema>
 export const actorCodec = z.codec(actorWireSchema, actorSchema, {
   decode: (wire) => ({
     ...wire,
+    sharedUntil: wire.sharedUntil === null ? null : new Date(wire.sharedUntil),
     createdAt: new Date(wire.createdAt),
     updatedAt: new Date(wire.updatedAt),
   }),
   encode: (actor) => ({
     ...actor,
+    sharedUntil: actor.sharedUntil === null ? null : actor.sharedUntil.toISOString(),
     createdAt: actor.createdAt.toISOString(),
     updatedAt: actor.updatedAt.toISOString(),
   }),

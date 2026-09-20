@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { actorPatchSchema, actorSchema, newActorSchema } from '#model/entities/actor'
+import {
+  actorPatchSchema,
+  actorSchema,
+  hasSharedAccess,
+  newActorSchema,
+} from '#model/entities/actor'
 
 const actor = {
   id: '3f2b1c6e-9a4d-4c1b-8f7e-2d5a6b8c9e01',
@@ -7,6 +12,7 @@ const actor = {
   city: 'Гюмри',
   spendCurrency: 'AMD',
   incomeCurrency: 'RUB',
+  sharedUntil: null,
   createdAt: new Date('2026-09-08T10:00:00Z'),
   updatedAt: new Date('2026-09-08T10:00:00Z'),
 }
@@ -54,6 +60,11 @@ describe('newActorSchema', () => {
     expect(() => newActorSchema.parse({ ...settings, updatedAt: new Date() })).toThrow()
   })
 
+  it('has no place for access to other people\u2019s data — it is granted, never asked for', () => {
+    expect(() => newActorSchema.parse({ ...settings, sharedUntil: new Date() })).toThrow()
+    expect(() => actorPatchSchema.parse({ sharedUntil: new Date() })).toThrow()
+  })
+
   it('refuses a half-filled screen: all four travel together or none do', () => {
     for (const missing of ['country', 'city', 'spendCurrency', 'incomeCurrency'] as const) {
       const partial = Object.fromEntries(
@@ -97,5 +108,23 @@ describe('actorPatchSchema', () => {
     ]) {
       expect(() => actorPatchSchema.parse({ city: 'Ереван', ...smuggled })).toThrow()
     }
+  })
+})
+
+describe('hasSharedAccess', () => {
+  const now = new Date('2026-09-20T12:00:00Z')
+
+  it('says no when access was never granted', () => {
+    expect(hasSharedAccess({ sharedUntil: null }, now)).toBe(false)
+  })
+
+  it('says no the second it runs out — the boundary is exactly now', () => {
+    expect(hasSharedAccess({ sharedUntil: new Date('2026-09-20T11:59:59Z') }, now)).toBe(false)
+    expect(hasSharedAccess({ sharedUntil: now }, now)).toBe(false)
+  })
+
+  it('says yes while it lasts', () => {
+    expect(hasSharedAccess({ sharedUntil: new Date('2026-09-20T12:00:01Z') }, now)).toBe(true)
+    expect(hasSharedAccess({ sharedUntil: new Date('2026-10-20T00:00:00Z') }, now)).toBe(true)
   })
 })

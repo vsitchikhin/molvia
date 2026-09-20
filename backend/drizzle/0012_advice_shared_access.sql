@@ -1,0 +1,1 @@
+ALTER TABLE "actors" ADD COLUMN "shared_until" timestamp with time zone;

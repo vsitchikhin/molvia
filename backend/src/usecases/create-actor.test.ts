@@ -16,7 +16,13 @@ function fakeActors(overrides: Partial<ActorRepository> = {}): ActorRepository {
 }
 
 function actorFrom(id: string, input: NewActor): Actor {
-  return actorSchema.parse({ id, ...input, createdAt: new Date(), updatedAt: new Date() })
+  return actorSchema.parse({
+    id,
+    ...input,
+    sharedUntil: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  })
 }
 
 describe('createActor', () => {

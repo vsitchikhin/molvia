@@ -10,6 +10,7 @@ const actor = {
   city: 'Гюмри',
   spendCurrency: 'AMD',
   incomeCurrency: 'RUB',
+  sharedUntil: null,
   createdAt: new Date('2026-09-16T10:00:00.123Z'),
   updatedAt: new Date('2026-09-16T10:00:00.456Z'),
 }
@@ -25,6 +26,7 @@ describe('actorCodec', () => {
       city: 'Гюмри',
       spendCurrency: 'AMD',
       incomeCurrency: 'RUB',
+      sharedUntil: null,
       createdAt: '2026-09-16T10:00:00.123Z',
       updatedAt: '2026-09-16T10:00:00.456Z',
     })
@@ -56,5 +58,16 @@ describe('actorCodec', () => {
     // GEL is in the Google Sheet the project grew out of and deliberately not in the schema:
     // a fifth currency is a migration plus four CHECK constraints, not a wire concern.
     expect(actorCodec.safeParse({ ...wire, spendCurrency: 'GEL' }).success).toBe(false)
+  })
+
+  it('carries a granted access over the wire, and an empty one as null', () => {
+    const granted = actorSchema.parse({ ...actor, sharedUntil: new Date('2026-10-20T00:00:00Z') })
+    const wire = z.encode(actorCodec, granted)
+
+    expect(wire.sharedUntil).toBe('2026-10-20T00:00:00.000Z')
+    expect(actorCodec.parse(JSON.parse(JSON.stringify(wire)))).toEqual(granted)
+    // `undefined` is not `null`: a wire that simply left the field out would read as «no
+    // access» while meaning «the server forgot to say», and the two must not collapse.
+    expect(actorCodec.safeParse({ ...wire, sharedUntil: undefined }).success).toBe(false)
   })
 })
