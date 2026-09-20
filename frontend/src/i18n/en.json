@@ -40,8 +40,7 @@
     },
     "offline": {
       "title": "No connection — no matter",
-      "body": "The items are saved on the phone and will be sent on their own. The trip goes on",
-      "action": "Add an item"
+      "body": "The items are saved on the phone and will be sent on their own. The trip goes on"
     },
     "none": {
       "title": "A new trip",
@@ -92,6 +91,10 @@
     "start": {
       "title": "Where are you?",
       "other": "Another place"
+    },
+    "unsent": {
+      "title": "{n} purchase has not been sent | {n} purchases have not been sent",
+      "body": "They are on the phone. We send them as soon as there is a connection"
     }
   },
   "item": {

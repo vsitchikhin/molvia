@@ -76,9 +76,9 @@ export default defineComponent({
 
     const jump = computed(() => props.trip.rateJump)
     const choice = ref<RateChoice>(jump.value?.choice ?? 'jumped')
-    const own = ref(
-      jump.value?.manual ? (formatRate(jump.value.manual, locale.value).split(' ')[0] ?? '') : '',
-    )
+    // The decimal the person typed, printed the way the interface writes numbers — never the
+    // sheet's own formatted output parsed back (adversarial В3).
+    const own = ref(shownRate(jump.value?.manual ?? null))
     const sending = ref(false)
     const failed = ref(false)
     const error = ref<ErrorCode | null>(null)
@@ -90,7 +90,7 @@ export default defineComponent({
       (open) => {
         if (!open) return
         choice.value = jump.value?.choice ?? 'jumped'
-        own.value = jump.value?.manual ? decimalFromRate(jump.value.manual.scaled) : ''
+        own.value = shownRate(jump.value?.manual ?? null)
         sending.value = false
         failed.value = false
         error.value = null
@@ -117,6 +117,16 @@ export default defineComponent({
 
     function rateOf(rate: NonNullable<TripView['rate']>): string {
       return formatRate(rate, locale.value)
+    }
+
+    /**
+     * A rate in the field as a person writes one: no trailing zeros of the snapshot's six digits,
+     * and the separator of the interface — «4312,3», not «4312.300000» (adversarial В3).
+     */
+    function shownRate(rate: TripView['rate']): string {
+      if (!rate) return ''
+      const decimal = decimalFromRate(rate.scaled).replace(/0+$/, '').replace(/\.$/, '')
+      return locale.value === 'ru' ? decimal.replace('.', ',') : decimal
     }
 
     async function submit(): Promise<void> {

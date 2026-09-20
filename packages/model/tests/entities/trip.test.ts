@@ -66,7 +66,16 @@ describe('tripSchema', () => {
     expect(
       tripSchema.safeParse({ ...trip, rate: rate('4.82', 'personal'), rateProvider: null }).success,
     ).toBe(true)
-    expect(tripSchema.safeParse({ ...trip, rateProvider: 'erapi' }).success).toBe(true)
+    // Издатель и источник — один факт, записанный дважды: «запасной от ЦБ РА» и «официальный от
+    // агрегатора» не состояния, а противоречие (В2-11).
+    expect(codeOf({ ...trip, rateProvider: 'erapi' })).toBe(ISSUE.RATE_PROVIDER_UNMATCHED)
+    expect(codeOf({ ...trip, rate: rate('4.82', 'fallback'), rateProvider: 'cba' })).toBe(
+      ISSUE.RATE_PROVIDER_UNMATCHED,
+    )
+    expect(
+      tripSchema.safeParse({ ...trip, rate: rate('4.82', 'fallback'), rateProvider: 'erapi' })
+        .success,
+    ).toBe(true)
   })
 
   it('refuses a rate quoted in some other currency than the trip', () => {

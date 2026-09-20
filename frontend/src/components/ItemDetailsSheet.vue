@@ -55,7 +55,7 @@
         <AppButton size="large" block @click="submit">
           {{ editing ? t('item.save_edit') : t('item.save') }}
         </AppButton>
-        <AppButton v-if="editing" variant="danger-ghost" block @click="remove">
+        <AppButton v-if="removable" variant="danger-ghost" block @click="remove">
           {{ t('item.delete') }}
         </AppButton>
         <p v-if="!online" class="caption offline">{{ t('item.offline_note') }}</p>
@@ -140,6 +140,12 @@ export default defineComponent({
     // The trip the caller named, or the one going on — the search and a first purchase name none.
     const writeInto = computed(() => props.tripId ?? current.tripId.value)
     const editing = computed(() => props.expense !== null)
+    /**
+     * «Удалить позицию» is for anything already written down, whether the server has heard of it
+     * or not: the wrong thing picked up at a shelf with no signal is undone by dropping the write,
+     * not by sending it first and deleting the row it becomes (adversarial В2).
+     */
+    const removable = computed(() => props.expense !== null || props.retry !== null)
 
     /**
      * The trip's total and what is still queued for it: a price must fit beside both (A9). The
@@ -270,7 +276,7 @@ export default defineComponent({
       queue.enqueue({
         kind: 'add',
         tripId: writeInto.value,
-        body: details.body(props.query),
+        body: details.body(props.retry?.query ?? props.query),
         entry: props.entry,
       })
       emit('added', props.entry)
@@ -278,7 +284,15 @@ export default defineComponent({
     }
 
     function remove(): void {
-      if (done || !writeInto.value || !props.expense) return
+      if (done || !writeInto.value) return
+      // Still only on the phone: taken out of the queue, and nothing is sent at all.
+      if (!props.expense) {
+        done = true
+        if (props.retry) queue.dropPurchase(writeInto.value, props.retry.id)
+        emit('removed')
+        close(props.closeSteps)
+        return
+      }
       done = true
       queue.enqueue({ kind: 'remove', tripId: writeInto.value, expenseId: props.expense.id })
       emit('removed')
@@ -307,6 +321,7 @@ export default defineComponent({
       online,
       writeInto,
       editing,
+      removable,
       submit,
       remove,
       leave,

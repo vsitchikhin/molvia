@@ -12,17 +12,33 @@ function keyOf(actorId: string): string {
   return `${KEY}.${actorId}`
 }
 
-/** The trip this identity last saw. Anything that does not parse is no trip rather than a crash. */
+/**
+ * The trip this identity last saw. Anything that does not parse is no trip rather than a crash.
+ *
+ * **Read more kindly than a server's answer** (adversarial Б3): the codec is strict on purpose,
+ * and a trip remembered by the build before this one lacks a field this one requires — the whole
+ * basket would vanish on the first launch after an update, exactly at a shelf, which is what the
+ * memory was made for. A field this build added is filled in with what the absence means; the
+ * queue reads its own cards the same way («a card kept on the device is not an answer»).
+ */
 function recall(actorId: string | null): TripView | null {
   if (!actorId) return null
   const raw = read(keyOf(actorId))
   if (!raw) return null
   try {
-    const parsed = currentTripResponseSchema.safeParse(JSON.parse(raw))
+    const held: unknown = JSON.parse(raw)
+    const trip = isRecord(held) && isRecord(held.trip) ? { rateProvider: null, ...held.trip } : held
+    const parsed = currentTripResponseSchema.safeParse(
+      isRecord(held) && isRecord(held.trip) ? { trip } : held,
+    )
     return parsed.success ? parsed.data.trip : null
   } catch {
     return null
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }
 
 function remember(actorId: string | null, trip: TripView | null): void {
@@ -51,6 +67,14 @@ export const useTripStore = defineStore('trip', () => {
       current.value = recall(id)
     },
   )
+
+  // Another window of the same person wrote the trip: the installed app and a tab from the bot
+  // share the queue through storage and must share this too, or one of them keeps showing a trip
+  // the other has already filled, finished or started (adversarial Б4).
+  window.addEventListener('storage', (event) => {
+    const id = actor.id
+    if (id && event.key === keyOf(id)) current.value = recall(id)
+  })
 
   /**
    * Answers written since a `load()` went out: a read that left before a write was answered

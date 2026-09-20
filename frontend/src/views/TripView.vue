@@ -57,6 +57,18 @@
       </template>
     </ScreenState>
 
+    <!-- Finished with no signal: the trip is over on the phone, and what it still holds must not
+         go quiet with it — on iOS nothing is sent in the background, and an app that was closed
+         here would never say a word (adversarial В1). -->
+    <ScreenState
+      v-if="phase !== 'going' && unsent > 0"
+      class="notice"
+      kind="attention"
+      inline
+      :title="t('trip.unsent.title', { n: unsent }, unsent)"
+      :body="t('trip.unsent.body')"
+    />
+
     <template v-if="phase === 'none'">
       <ScreenState
         kind="empty"
@@ -102,7 +114,9 @@
     </template>
 
     <!-- The one permanent place money is converted, and it stays put while the list scrolls. -->
-    <template v-if="phase === 'going'" #docked>
+    <!-- On the skeleton too, with a dash for the sum: the strip is part of the frame, and a screen
+         that grows it after the answer jumps under the thumb (требования §5, В2-7). -->
+    <template v-if="phase !== 'none'" #docked>
       <TripTotal :trip="trip" :pending="waiting" :local="local !== null" />
     </template>
 
@@ -282,8 +296,11 @@ export default defineComponent({
         entry: expense.item,
         expense,
       }))
+      const written = new Set(server.map((row) => row.key))
       const queued = held.value.added.flatMap((write): TripRowView[] =>
-        write.kind === 'add'
+        // The server answered it while the queue still holds the write — the connection dropped
+        // between the write and its answer. One purchase, one line (В2-2).
+        write.kind === 'add' && !written.has(write.body.id)
           ? [
               {
                 key: write.body.id,
@@ -309,29 +326,28 @@ export default defineComponent({
      * (review 6). An edit or a removal also leaves it behind, but by no whole item, and «+1
      * позиция ещё не ушла» about a row being deleted would be the wrong direction.
      */
-    const waiting = computed(
-      () =>
-        queue.pending.filter((write) => write.kind === 'add' && write.tripId === tripId.value)
-          .length,
-    )
+    const waiting = computed(() => rows.value.filter((row) => row.mark === 'waiting').length)
 
     const rejected = computed(() => queue.rejected)
 
-    // By the row it is about, not by its name: two refused purchases of one item under one code
-    // would otherwise share a key, and Vue would reuse one's node for the other (review 7).
-    const refusalKey = (item: RejectedWrite): string =>
-      `${item.write.kind}-${item.code}-${subjectOf(item.write)}`
+    /** Writes of any trip the server has not taken: after «Завершить» they are all there is left. */
+    const unsent = computed(() => queue.pending.filter((write) => write.kind === 'add').length)
 
-    function subjectOf(write: QueuedWrite): string {
-      if (write.kind === 'add') return write.body.id
-      return 'expenseId' in write ? write.expenseId : write.tripId
-    }
+    // Its own name on the phone: two refusals about one row differ in nothing a screen can see,
+    // and Vue would reuse one's node for the other (review 7, В2-8).
+    const refusalKey = (item: RejectedWrite): string => item.key
 
+    /**
+     * What to call the refused write. A purchase carries its own card; an amendment or a removal
+     * is named by the row it is about — and only while that row is on screen. A refusal from a
+     * trip that is over stays nameless (В2-9): the row is not there to ask, and inventing a name
+     * is worse than «одна запись».
+     */
     function nameOf(item: RejectedWrite): string | null {
-      if (item.write.kind === 'add') return item.write.entry?.name ?? null
-      const expense = trip.value?.expenses.find(
-        (row) => 'expenseId' in item.write && row.id === item.write.expenseId,
-      )
+      const write = item.write
+      if (write.kind === 'add') return write.entry?.name ?? null
+      if (!('expenseId' in write)) return null
+      const expense = trip.value?.expenses.find((row) => row.id === write.expenseId)
       return expense?.item.name ?? null
     }
 
@@ -374,8 +390,22 @@ export default defineComponent({
         entry: row.entry,
         expense: row.expense,
         tripId: row.expense ? (trip.value?.id ?? null) : tripId.value,
-        retry: row.expense ? null : { id: row.key, quantity: row.quantity, amount: row.amount },
+        retry: row.expense ? null : queuedPurchase(row.key),
         refusal: null,
+      }
+    }
+
+    /** A purchase still in the queue, as the sheet takes it back: numbers and the query with it. */
+    function queuedPurchase(id: string): RetryPurchase | null {
+      const write = queue.pending.find(
+        (item) => item.kind === 'add' && item.body.id === id && item.tripId === tripId.value,
+      )
+      if (write?.kind !== 'add') return null
+      return {
+        id,
+        quantity: write.body.quantity ?? null,
+        amount: write.body.amount ?? null,
+        query: write.body.query ?? null,
       }
     }
 
@@ -394,6 +424,7 @@ export default defineComponent({
           id: write.body.id,
           quantity: write.body.quantity ?? null,
           amount: write.body.amount ?? null,
+          query: write.body.query ?? null,
         },
         refusal: item,
       }
@@ -452,6 +483,7 @@ export default defineComponent({
       meta,
       rows,
       rejected,
+      unsent,
       opened,
       starting,
       finishing,

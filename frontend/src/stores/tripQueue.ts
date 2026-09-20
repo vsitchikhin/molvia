@@ -62,8 +62,17 @@ export type QueuedWrite =
   | { readonly kind: 'remove'; readonly tripId: string; readonly expenseId: string }
 
 export interface RejectedWrite {
+  /** Its own name on the phone: two refusals about one row are two notices, not one (В2-8). */
+  readonly key: string
   readonly write: QueuedWrite
   readonly code: WireCode
+}
+
+/** A trip is open somewhere else, so the purchases of this one are waiting (adversarial Б1). */
+export interface TripElsewhere {
+  /** Where the open trip is, and where the person thinks they are. */
+  readonly place: string
+  readonly mine: string
 }
 
 /**
@@ -234,19 +243,35 @@ function recallRejected(key: string): RejectedWrite[] {
   return parsedList(key).flatMap((item: unknown) => {
     if (!isRecord(item) || !isWireCode(item.code)) return []
     const entry = decode(item.write)
-    return entry ? [{ write: entry, code: item.code }] : []
+    if (!entry) return []
+    return [
+      { key: typeof item.key === 'string' ? item.key : newKey(), write: entry, code: item.code },
+    ]
   })
 }
 
-/** The trip as the server answers it, or nothing: «завершить» answers `204`. */
-function send(entry: QueuedWrite): Promise<TripView | null> {
+/**
+ * The trip as the server answers it, or nothing: «завершить» answers `204`.
+ *
+ * **A purchase the server already has goes as an amendment**, not as a second `add` (adversarial
+ * А1, owner's decision). `POST /expenses` with an identifier the server knows answers `200` with
+ * the row it has and changes nothing — that is the promise that makes a resent queue safe. But a
+ * purchase can be corrected on the phone after its first `add` has gone, and sent again it would
+ * be answered «yes» while the new price quietly went nowhere.
+ */
+function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
   switch (entry.kind) {
     case 'start':
       return api.startTrip({ id: entry.tripId, place: entry.place }).then(({ trip }) => trip)
     case 'finish':
       return api.finishTrip(entry.tripId).then(() => null)
     case 'add':
-      return api.addExpense(entry.tripId, entry.body).then(({ trip }) => trip)
+      return written
+        ? api.updateExpense(entry.tripId, entry.body.id, {
+            quantity: entry.body.quantity ?? null,
+            amount: entry.body.amount ?? null,
+          })
+        : api.addExpense(entry.tripId, entry.body).then(({ trip }) => trip)
     case 'update':
       return api.updateExpense(entry.tripId, entry.expenseId, entry.patch)
     case 'remove':
@@ -311,6 +336,8 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   let kept: Kept[] = []
   const pending = ref<QueuedWrite[]>([])
   const rejected = ref<RejectedWrite[]>([])
+  /** Set when a trip started here met one open in another shop; cleared as soon as it is not so. */
+  const elsewhere = ref<TripElsewhere | null>(null)
   // A shelf refused the last write: until every shelf takes one, memory is ahead of storage and
   // is the truth — one refusing shelf still answers `read` with what it held before (Б3).
   let ahead = false
@@ -344,7 +371,11 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     const refused = writeEverywhere(
       `${REJECTED_KEY}.${id}`,
       JSON.stringify(
-        rejected.value.map((item) => ({ write: encode(item.write), code: item.code })),
+        rejected.value.map((item) => ({
+          key: item.key,
+          write: encode(item.write),
+          code: item.code,
+        })),
       ),
       (past) => past,
     )
@@ -418,7 +449,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       let refusal: WireCode | null = null
       let answered: TripView | null = null
       try {
-        answered = await send(head.write)
+        answered = await send(head.write, alreadyWritten(head.write))
       } catch (error) {
         const known = error instanceof ApiError
         const code = known ? error.code : ERROR.INTERNAL
@@ -426,8 +457,9 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
           if (code !== ERROR.NO_ACTOR) retryLater()
           return
         }
-        if (code === ERROR.TRIP_OPEN && head.write.kind === 'start') {
-          if (!(await rerouted(owner, head))) return
+        const start = head.write
+        if (code === ERROR.TRIP_OPEN && start.kind === 'start') {
+          if (!(await rerouted(owner, { key: head.key, write: start }))) return
           continue
         }
         refusal = code
@@ -439,15 +471,27 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
 
       if (answered) trips.apply(answered)
       // «Завершить» answers `204`, so there is nothing to apply: the trip the person closed stops
-      // being the one they are on here, without waiting for a connection to say so again.
-      if (head.write.kind === 'finish') trips.closed(head.write.tripId)
+      // being the one they are on here, without waiting for a connection to say so again. Only on
+      // success — a refused finish did not close anything (adversarial, second pass).
+      if (!refusal && head.write.kind === 'finish') trips.closed(head.write.tripId)
       sync(owner)
-      if (refusal) {
+      // Corrected while it was out: the correction is in the queue under its own key, and what
+      // came back is about a body nobody holds any more. Neither refusal nor answer is news about
+      // it, and the old numbers must not be what «Поправить» offers (В2-1).
+      const superseded = kept.some(
+        (item) => item.key !== head.key && sameWrite(item.write, head.write),
+      )
+      if (refusal && !superseded) {
         console.warn(`[trip queue] ${head.write.kind} refused: ${refusal}`)
-        rejected.value = [...rejected.value, { write: head.write, code: refusal }]
+        rejected.value = [...rejected.value, { key: newKey(), write: head.write, code: refusal }]
       }
       kept = kept.filter((item) => item.key !== head.key)
       persist(owner)
+
+      // A trip the server would not take leaves its purchases naming a trip that does not exist:
+      // sent on, each would earn its own `404` and its own notice about a purchase that is not
+      // the problem (adversarial Б2). They stay on the phone until the person decides.
+      if (refusal && head.write.kind === 'start') return
     }
     retryDelay = RETRY_FIRST_MS
   }
@@ -455,11 +499,22 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   /**
    * A trip started with no signal met one the server already has open (MOL-22, Р-1). The person
    * was writing purchases at a shelf, not asking for a second trip, so the purchases behind this
-   * start move into the open trip instead of failing one by one with `404`. `false` means the
-   * queue stopped: the open trip could not be read, and dropping the start now would leave every
-   * purchase pointing at a trip that does not exist.
+   * start move into the open trip instead of failing one by one with `404`.
+   *
+   * **Only into a trip in the same shop** (adversarial Б1, owner's decision). «Item + place» is
+   * the key the whole product rests on: a price seen in «Ереван Сити» written against a trip
+   * somebody left open in «SAS» is not a cheaper shop, it is a wrong fact that nothing later can
+   * tell apart. A trip open somewhere else is a question for the person — until they answer it
+   * the queue holds, and the screen says so.
+   *
+   * `false` means the queue stopped: the open trip could not be read, is in another shop, or
+   * there is none — and dropping the start now would leave every purchase pointing at a trip that
+   * does not exist.
    */
-  async function rerouted(owner: string, head: Kept): Promise<boolean> {
+  async function rerouted(
+    owner: string,
+    head: Kept & { write: Extract<QueuedWrite, { kind: 'start' }> },
+  ): Promise<boolean> {
     let open: TripView | null
     try {
       open = await api.currentTrip()
@@ -475,6 +530,13 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       retryLater()
       return false
     }
+
+    if (head.write.place.name !== open.place.name) {
+      elsewhere.value = { place: open.place.name, mine: head.write.place.name }
+      retryLater()
+      return false
+    }
+    elsewhere.value = null
 
     trips.apply(open)
     const from = head.write.tripId
@@ -506,9 +568,11 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     if (at === -1) {
       kept = [...kept, { key: newKey(), write: entry }]
     } else {
-      // In its own place in the queue, under its own key: the order of what is waiting is the
-      // order it was made in, and the key is what a window takes its own write out by.
-      kept = kept.map((item, index) => (index === at ? { ...item, write: entry } : item))
+      // In its own place in the queue and under a **new** key: the order of what is waiting is
+      // the order it was made in, but the key must not be the one a send is already carrying —
+      // the answer to that older body takes its key out, and the correction would go with it
+      // (adversarial В2-1).
+      kept = kept.map((item, index) => (index === at ? { key: newKey(), write: entry } : item))
     }
     persist(id)
     void flush()
@@ -522,11 +586,41 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function dismiss(item: RejectedWrite): void {
     const id = actor.id
     sync(id)
-    rejected.value = rejected.value.filter(
-      (entry) => !(entry.code === item.code && sameWrite(entry.write, item.write)),
-    )
+    rejected.value = rejected.value.filter((entry) => entry.key !== item.key)
     persist(id)
   }
 
-  return { pending, rejected, enqueue, dismiss, flush }
+  /**
+   * Takes a purchase out of the queue before it has gone anywhere (adversarial В2): the wrong
+   * thing picked up at a shelf with no signal is undone by dropping the write, not by sending it
+   * and deleting the row it becomes. Only what is still waiting — once the server has it, the
+   * row is deleted through `remove`.
+   */
+  function dropPurchase(tripId: string, purchaseId: string): boolean {
+    const id = actor.id
+    sync(id)
+    const at = kept.findIndex(
+      (item) =>
+        item.write.kind === 'add' &&
+        item.write.tripId === tripId &&
+        item.write.body.id === purchaseId,
+    )
+    if (at === -1) return false
+    kept = kept.filter((_, index) => index !== at)
+    persist(id)
+    return true
+  }
+
+  /**
+   * Whether this purchase is already a row of its trip: a repeat of `add` would then be answered
+   * «yes» and change nothing, so the correction goes as an amendment instead (А1).
+   */
+  function alreadyWritten(write: QueuedWrite): boolean {
+    if (write.kind !== 'add') return false
+    const trip = trips.current
+    if (trip?.id !== write.tripId) return false
+    return trip.expenses.some((row) => row.id === write.body.id)
+  }
+
+  return { pending, rejected, elsewhere, enqueue, dismiss, dropPurchase, flush }
 })

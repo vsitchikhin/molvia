@@ -93,6 +93,8 @@ export interface RetryPurchase {
   readonly id: string
   readonly quantity: Quantity | null
   readonly amount: Money | null
+  /** What was typed when the item was picked: it travels with the purchase (MOL-11, В2-4). */
+  readonly query?: string | null
 }
 
 export interface ItemDetailsInput {
@@ -176,7 +178,9 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
   // the sheet opened (В-6), in a currency other than the person's own (review Р-3). A price
   // already typed is a choice too — the sign must not change under «520», which would then go
   // as 520 dollars rather than 520 drams (Р-12, adversarial Б4).
-  let chosen = filled !== null
+  // A price already written is a choice of currency; a purchase reopened without one is not, and
+  // its currency still follows the trip (В2-4).
+  let chosen = filled?.amount != null
   let following = false
   watch(currency, () => {
     if (!following) chosen = true

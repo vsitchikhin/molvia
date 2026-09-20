@@ -2,7 +2,9 @@
   <div class="total">
     <div class="sums">
       <p class="caption">{{ t('trip.total') }}</p>
-      <p class="sum">{{ big }}</p>
+      <!-- Flipped, the big number is the conversion — and it keeps every sign of being one:
+           «≈», the muted colour, and the exact sum beside it (handoff «Валюты», В2-5). -->
+      <p class="sum" :class="{ guess: flipped }">{{ big }}</p>
       <p v-if="rest.length > 0" class="rest">{{ rest.join(' · ') }}</p>
     </div>
 
@@ -10,9 +12,13 @@
       :is="flippable ? 'button' : 'div'"
       class="aside"
       :type="flippable ? 'button' : undefined"
-      :aria-label="flippable ? t('trip.flip') : undefined"
+      :aria-pressed="flippable ? flipped : undefined"
       @click="flippable && flip()"
     >
+      <!-- Hidden text in front of what the button shows, never an `aria-label`: a label would
+           replace the number, the rate and the caveat with the name of the action, and the caveat
+           is what matters most to whoever is listening (AppScreen does the same, В2-6). -->
+      <span v-if="flippable" class="hidden">{{ t('trip.flip') }}</span>
       <p v-if="estimate" class="estimate">{{ estimate }}</p>
       <p v-if="rateLine" class="rate">{{ rateLine }}</p>
       <p v-if="caveat" class="caveat">{{ caveat }}</p>
@@ -139,7 +145,7 @@ export default defineComponent({
     // Nothing to swap without a conversion: a lone total is not two numbers.
     const flippable = computed(() => converted.value !== null)
 
-    return { t, big, rest, estimate, rateLine, caveat, flippable, flip }
+    return { t, big, rest, estimate, rateLine, caveat, flippable, flipped, flip }
   },
 })
 </script>
@@ -205,6 +211,16 @@ button.aside {
   &:focus-visible {
     @include focus-ring;
   }
+}
+
+/* An estimate never looks like a fact, whichever way the flip stands: the big number, when it is
+   the conversion, is muted too. */
+.guess {
+  color: var(--text-muted);
+}
+
+.hidden {
+  @include visually-hidden;
 }
 
 /* «≈», a smaller size and a muted colour, whichever way the flip stands. */

@@ -368,10 +368,15 @@ export const trips = pgTable(
       'trips_rate_provider_known',
       sql`${table.rateProvider} is null or ${oneOf(table.rateProvider, rateProviderSchema.options)}`,
     ),
-    // A publisher for every published rate, and none for a rate nobody published.
+    // A publisher for every published rate, and none for a rate nobody published — and the two
+    // say the same thing: the source *is* the publisher («official» is the central bank of
+    // Armenia and nothing else), so «fallback by cba» or «official by erapi» is not a state but a
+    // contradiction (MOL-22, В2-11). On a personal rate and on no rate at all the second
+    // expression is null and the check passes.
     check(
       'trips_rate_provider_matches_source',
-      sql`(${table.rateSource} is null or ${table.rateSource} = 'personal') = (${table.rateProvider} is null)`,
+      sql`(${table.rateSource} is null or ${table.rateSource} = 'personal') = (${table.rateProvider} is null)
+        and ((${table.rateSource} = 'official') = (${table.rateProvider} = 'cba')) is not false`,
     ),
     check(
       'trips_rate_source_known',
