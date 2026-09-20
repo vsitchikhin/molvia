@@ -113,6 +113,7 @@ function fakeRepositories(
       unratedFor: unexpected('expenses.unratedFor'),
       pendingVerdictsFor: unexpected('expenses.pendingVerdictsFor'),
       cheapestFor: unexpected('expenses.cheapestFor'),
+      medianPriceFor: unexpected('expenses.medianPriceFor'),
       ...overrides.expenses,
     },
     places: {

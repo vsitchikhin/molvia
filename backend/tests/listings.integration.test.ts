@@ -4,7 +4,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { unitPrice } from '@molvia/model'
 import type { Money, Quantity } from '@molvia/model'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, insertTrip, ownPrices } from './fixtures'
 import { createExpenseRepository } from '@/db/expenses-repository'
 import { createPlaceRepository } from '@/db/places-repository'
 import { createTripRepository } from '@/db/trips-repository'
@@ -44,7 +44,7 @@ describe('пустые выборки', () => {
     expect(await trips.listFor(actorId, 10)).toEqual([])
     expect(await trips.latestUnfinishedFor(actorId)).toBeNull()
     expect(await expenses.unratedFor(actorId, 10)).toEqual([])
-    expect(await expenses.cheapestFor(actorId, [])).toEqual([])
+    expect(await expenses.cheapestFor(ownPrices(actorId, []))).toEqual([])
     expect(await verdicts.listFor(actorId, 10)).toEqual([])
     expect(await places.recentFor(actorId, 10)).toEqual([])
   })
@@ -196,7 +196,7 @@ describe('где дешевле', () => {
       amount: price,
     })
 
-    const [row] = await expenses.cheapestFor(actorId, [itemId])
+    const [row] = await expenses.cheapestFor(ownPrices(actorId, [itemId]))
     expect(row?.scaledMinor).toBe(unitPrice(price, litre).scaledMinor)
   })
 
@@ -229,7 +229,7 @@ describe('где дешевле', () => {
       amount: { minor: 50_000n, currency: 'RUB' },
     })
 
-    const rows = await expenses.cheapestFor(actorId, [itemId])
+    const rows = await expenses.cheapestFor(ownPrices(actorId, [itemId]))
     const drams = rows.find((row) => row.currency === 'AMD')
 
     expect(rows).toHaveLength(2)
@@ -256,7 +256,7 @@ describe('где дешевле', () => {
     // Сортировки по позиции и месту мало: строки одного места остаются связанными, а
     // связанные строки планировщик вправе отдать в любом порядке.
     for (let load = 0; load < 4; load += 1) {
-      const rows = await expenses.cheapestFor(actorId, [itemId])
+      const rows = await expenses.cheapestFor(ownPrices(actorId, [itemId]))
       expect(rows.map((row) => row.currency)).toEqual(['AMD', 'EUR', 'RUB', 'USD'])
     }
   })
@@ -271,7 +271,7 @@ describe('где дешевле', () => {
     await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId, amount: price })
     await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId, quantity: litre })
 
-    expect(await expenses.cheapestFor(actorId, [itemId])).toEqual([])
+    expect(await expenses.cheapestFor(ownPrices(actorId, [itemId]))).toEqual([])
   })
 })
 

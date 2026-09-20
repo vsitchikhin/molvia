@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { AGGREGATE_MIN_CONTRIBUTIONS } from '@molvia/model'
 import type { Db } from '@/db/index'
+import type { PriceQuery } from '@/db/expenses-repository'
 import {
   actors,
   events,
@@ -86,4 +88,21 @@ export async function clearAll(db: Db): Promise<void> {
   await db.delete(items)
   await db.delete(places)
   await db.delete(actors)
+}
+
+/**
+ * The price query as it looks before anyone has access to other people's data: this person's
+ * own purchases, wherever they were made. The city is there only because the shared mode reads
+ * it — in the own mode nothing looks at it.
+ */
+export function ownPrices(actorId: string, itemIds: readonly string[], limit?: number): PriceQuery {
+  return {
+    actorId,
+    itemIds,
+    scope: 'own',
+    minBuyers: AGGREGATE_MIN_CONTRIBUTIONS,
+    country: 'AM',
+    city: 'Гюмри',
+    ...(limit === undefined ? {} : { limit }),
+  }
 }

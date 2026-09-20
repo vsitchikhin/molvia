@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import { DomainError, tripTotal } from '@molvia/model'
 import type { Money, Quantity } from '@molvia/model'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, ownPrices } from './fixtures'
 import { items } from '@/db/schema'
 import { createExpenseRepository } from '@/db/expenses-repository'
 import { createItemRepository } from '@/db/items-repository'
@@ -50,7 +50,7 @@ describe('вторая цена за ту же пару', () => {
     })
 
     expect(await expenses.forTrip(trip.id, actorId)).toHaveLength(2)
-    expect((await expenses.cheapestFor(actorId, [itemId]))[0]?.observations).toBe(2)
+    expect((await expenses.cheapestFor(ownPrices(actorId, [itemId])))[0]?.observations).toBe(2)
   })
 })
 
