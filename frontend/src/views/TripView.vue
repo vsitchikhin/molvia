@@ -90,6 +90,11 @@
       </template>
     </template>
 
+    <!-- The one permanent place money is converted, and it stays put while the list scrolls. -->
+    <template v-if="phase === 'going'" #docked>
+      <TripTotal :trip="trip" :pending="waiting" :local="local !== null" />
+    </template>
+
     <!-- Mounted on a tap and put away from `onClosed`, as the search does it: one opening, one
          purchase. One step back — the trip is the screen under it. -->
     <ItemDetailsSheet
@@ -119,6 +124,7 @@ import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import TripRow from '@/components/TripRow.vue'
+import TripTotal from '@/components/TripTotal.vue'
 import type { RowMark, TripRowView } from '@/components/tripRow'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import type { RetryPurchase } from '@/composables/useItemDetails'
@@ -162,6 +168,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     TripRow,
+    TripTotal,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -249,6 +256,11 @@ export default defineComponent({
       )
       return [...server, ...queued]
     })
+
+    /** Writes of this trip the server has not taken: the total is behind the list by exactly these. */
+    const waiting = computed(
+      () => queue.pending.filter((write) => write.tripId === tripId.value).length,
+    )
 
     // Only this trip's: a refusal from a trip that is over says nothing about this one.
     const rejected = computed(() =>
@@ -346,6 +358,9 @@ export default defineComponent({
       t,
       IconPlus,
       queue,
+      trip,
+      local,
+      waiting,
       phase,
       trouble,
       meta,

@@ -164,6 +164,7 @@ describe('словарь: плюральные формы', () => {
     // разделитель, поставленный по недосмотру.
     expect(pluralised(RU).map(([key]) => key)).toEqual([
       'trip.items_count',
+      'trip.caveat.pending',
       'item.results_announced',
       'advice.ratings_count',
       'verdict.pending_count',

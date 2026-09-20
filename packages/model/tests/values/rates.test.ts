@@ -8,6 +8,7 @@ import {
   RATE_SCALE,
   decimalFromRate,
   exchangeRateSchema,
+  formatRate,
   isRateDay,
   isRateFresh,
   isRateJump,
@@ -18,7 +19,8 @@ import {
   yerevanDate,
   yerevanMidnight,
 } from '#model/values/rates'
-import type { AmdRate, CachedRate, RateProvider } from '#model/values/rates'
+import type { AmdRate, CachedRate, ExchangeRate, RateProvider } from '#model/values/rates'
+import type { Currency } from '#model/values/money'
 
 const asOf = new Date('2026-09-08T10:00:00Z')
 
@@ -445,5 +447,29 @@ describe('pickOfficialRate: скачок', () => {
       jumped: false,
       previous: null,
     })
+  })
+})
+
+describe('formatRate', () => {
+  const at = new Date('2026-09-18T20:00:00Z')
+  const of = (value: string, base: Currency = 'RUB', quote: Currency = 'AMD'): ExchangeRate => ({
+    base,
+    quote,
+    scaled: parseRate(value),
+    source: 'official',
+    asOf: at,
+  })
+
+  it('печатает оба знака: число без них не говорит, в какую сторону курс', () => {
+    expect(formatRate(of('4.82')).replaceAll('\u00a0', ' ')).toBe('4,82 ֏/₽')
+    expect(formatRate(of('363.44', 'USD')).replaceAll('\u00a0', ' ')).toBe('363,44 ֏/$')
+  })
+
+  it('мелкий курс не округляется в ноль', () => {
+    expect(formatRate(of('0.0001')).replaceAll('\u00a0', ' ')).toBe('0,0001 ֏/₽')
+  })
+
+  it('лишние знаки снимка на экран не выносит', () => {
+    expect(formatRate(of('4.821234')).replaceAll('\u00a0', ' ')).toBe('4,82 ֏/₽')
   })
 })

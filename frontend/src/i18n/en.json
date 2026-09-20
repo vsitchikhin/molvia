@@ -61,6 +61,13 @@
       "unknown": "The server did not accept the record ({code})",
       "fix": "Correct it",
       "drop": "Dismiss"
+    },
+    "rate_line": "rate {rate} · {date}",
+    "flip": "Show in the other currency",
+    "caveat": {
+      "pending": "+ {n} item not sent yet | + {n} items not sent yet",
+      "partial": "converted from {currency} only",
+      "local": "the trip has not been sent — the total comes after it has"
     }
   },
   "item": {

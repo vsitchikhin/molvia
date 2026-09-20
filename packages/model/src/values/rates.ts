@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { decimalFromScaled, divideRounded, scaledFromDecimal } from '#model/support/decimal'
 import { DomainError, ERROR, ISSUE } from '#model/support/errors'
-import { currencySchema } from './money'
+import { currencySchema, currencySign } from './money'
 import type { Currency } from './money'
 
 export const RATE_DIGITS = 6
@@ -85,6 +85,22 @@ export const rateCodec = z.codec(exchangeRateWireSchema, exchangeRateSchema, {
     asOf: value.asOf.toISOString(),
   }),
 })
+
+/**
+ * The rate as the screen prints it: «4,82 ֏/₽» — how much of the quote currency one unit of the
+ * base buys, with both signs, because a bare number says nothing about which way it goes.
+ *
+ * Two digits, and up to four when the number is small: the snapshot keeps six, and a rate of
+ * 0,0001 printed to two digits is «0,00» — a zero rate on screen (MOL-22).
+ */
+export function formatRate(rate: ExchangeRate, locale = 'ru-RU'): string {
+  const value = Number(decimalFromRate(rate.scaled))
+  const number = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: value < 1 ? RATE_DIGITS : 2,
+  }).format(value)
+  return `${number} ${currencySign(rate.quote, locale)}/${currencySign(rate.base, locale)}`
+}
 
 /**
  * Where an official rate was read. The cache keeps the provider so that one pair is never built
