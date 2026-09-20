@@ -80,9 +80,9 @@ import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useItemDetails } from '@/composables/useItemDetails'
 import type { DetailsField } from '@/composables/useItemDetails'
-import { useActorStore } from '@/stores/actor'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -122,11 +122,12 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const trips = useTripStore()
     const queue = useTripQueueStore()
-    const actor = useActorStore()
 
     const open = ref(true)
     const form = ref<HTMLElement | null>(null)
-    const tripId = computed(() => trips.current?.id ?? null)
+    // Both places that know whether a trip is going on: without the queue the sheet would say
+    // «start a trip first» at a shelf where one was started with no signal (MOL-22, Р-2).
+    const { trip, tripId, currency } = useCurrentTrip()
     const editing = computed(() => props.expense !== null)
 
     /**
@@ -134,11 +135,11 @@ export default defineComponent({
      * purchase of this sheet is not counted — once queued it would be counted twice.
      */
     function occupied(): Money[] {
-      const trip = trips.current
-      if (!trip) return []
-      const held: Money[] = [...trip.total]
+      const id = tripId.value
+      if (!id) return []
+      const held: Money[] = [...(trip.value?.total ?? [])]
       for (const write of queue.pending) {
-        if (write.kind !== 'add' || write.tripId !== trip.id || !write.body.amount) continue
+        if (write.kind !== 'add' || write.tripId !== id || !write.body.amount) continue
         if (write.body.id === details.expenseId) continue
         const amount = write.body.amount
         const index = held.findIndex((money) => money.currency === amount.currency)
@@ -153,11 +154,11 @@ export default defineComponent({
 
     const details = useItemDetails({
       entry: props.entry,
-      trip: () => trips.current,
+      trip: () => trip.value,
       occupied,
-      // With neither a trip nor a known person the sheet cannot write at all («start a trip
-      // first»), and the currency it would have started in is never seen.
-      currency: trips.current?.currency ?? actor.actor?.spendCurrency ?? currencySchema.enum.AMD,
+      // A trip the server has not answered yet has no rate and no total, so the price starts in
+      // the person's own currency — the one the server will give the trip anyway.
+      currency: currency.value,
       expense: props.expense,
       separator: locale.value === 'ru' ? ',' : '.',
     })
