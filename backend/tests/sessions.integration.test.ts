@@ -180,9 +180,11 @@ describe('сессия — ключ, и в базе от него только �
     // «хеш = токен» держится на том алфавите, из которого токены и берутся.
     const actorId = await insertActor(db)
 
+    // Именованный отказ: токен чеканит сам сервер, и негодный значит, что кто-то обошёл
+    // единственный путь, который их выдаёт.
     await expect(
       repository.create(randomUUID(), actorId, '\uD800', null, anHourFromNow()),
-    ).rejects.toThrow()
+    ).rejects.toThrow('could not have minted')
     expect(await repository.byToken('\uD800')).toBeNull()
     expect(await repository.byToken('\uDFFF')).toBeNull()
     expect(await repository.byToken('короткий')).toBeNull()

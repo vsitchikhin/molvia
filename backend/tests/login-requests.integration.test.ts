@@ -122,9 +122,12 @@ describe('истёкший, использованный и несуществу
 
     expect(await repository.byIdAndSecret(request.id, '\uD800')).toBeNull()
     expect(await repository.consume(request.id, 'короткий')).toBeNull()
+    // Именованный отказ, а не «что-нибудь бросило»: секрет чеканит сам сервер, так что
+    // негодный означает, что кто-то обошёл путь, который их выдаёт, — отвечать этим некому.
     await expect(
       repository.create(randomUUID(), code(), '\uD800', null, anHourFromNow()),
-    ).rejects.toThrow()
+    ).rejects.toThrow('could not have minted')
+    await expect(db.select().from(loginRequests)).resolves.toHaveLength(1)
   })
 
   it('бот не видит ни истёкшего, ни уже подтверждённого кода', async () => {
