@@ -34,6 +34,20 @@
 
     <div class="content">
       <slot />
+      <!-- The room the strip below takes, kept inside the scroll: the last row of a list has to
+           be reachable, and the strip is over the page, not in it. -->
+      <div
+        v-if="$slots.docked"
+        class="dock-room"
+        :style="{ height: room }"
+        aria-hidden="true"
+      ></div>
+    </div>
+
+    <!-- Pinned above the tab bar, and the room for it is the frame's to keep: a screen that
+         drew its own would part ways with the padding on the first change of its height. -->
+    <div v-if="$slots.docked" ref="dock" class="dock">
+      <slot name="docked" />
     </div>
   </div>
 </template>
@@ -74,6 +88,7 @@ export default defineComponent({
     const router = useRouter()
 
     const bar = ref<HTMLElement | null>(null)
+    const dock = ref<HTMLElement | null>(null)
     const sentinel = ref<HTMLElement | null>(null)
 
     const parentTitleKey = computed(() => {
@@ -96,9 +111,16 @@ export default defineComponent({
     const line = computed(() => (docked.value ? barHeight.value : 0))
     const collapsed = useCollapsed(sentinel, line)
 
+    // Measured rather than guessed: the strip holds a total that grows a line when the queue is
+    // not empty or the rate jumped, and the last row of a list must never end up under it.
+    const dockHeight = useHeight(dock)
+    const room = computed(() =>
+      dockHeight.value > 0 ? `calc(${String(dockHeight.value)}px + var(--space-4))` : undefined,
+    )
+
     const { goBack } = useNavigation()
 
-    return { t, bar, sentinel, collapsed, parentTitleKey, docked, tabbed, goBack }
+    return { t, bar, dock, sentinel, collapsed, parentTitleKey, docked, tabbed, room, goBack }
   },
 })
 </script>
@@ -278,6 +300,30 @@ export default defineComponent({
   flex-direction: column;
   padding: var(--space-4) calc(var(--space-4) + var(--safe-right))
     calc(var(--space-4) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
+}
+
+.dock-room {
+  flex: none;
+}
+
+/* Over the page, above the tab bar where there is one, and below the safe area where there is
+   not: the same chrome as the pinned row at the top. */
+.dock {
+  @include pinned-bar;
+
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  border-top: var(--hairline) solid var(--border);
+  padding: 0 calc(var(--space-4) + var(--safe-right)) var(--safe-bottom)
+    calc(var(--space-4) + var(--safe-left));
+}
+
+.tabbed .dock {
+  bottom: calc(var(--tabbar-height) + var(--safe-bottom));
+  padding-bottom: 0;
 }
 
 /* The notice keeps its own margins; this only keeps it out from under a notch held sideways. */

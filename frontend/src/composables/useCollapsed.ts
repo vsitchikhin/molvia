@@ -51,21 +51,31 @@ export function useCollapsed(sentinel: Ref<HTMLElement | null>, line: Ref<number
  * The height of an element, kept current: the pinned row grows with the notch above it, and
  * the notch moves when the phone is turned. Zero until mounted, and where the platform cannot
  * observe a size, the height it had on mount.
+ *
+ * The element itself may arrive later — the trip's total strip appears with the trip (MOL-22) —
+ * so the ref is watched rather than read once: measured on mount only, a late element would
+ * stay at zero for ever and the last row of a list would sit under it.
  */
 export function useHeight(element: Ref<HTMLElement | null>): Ref<number> {
   const height = ref(0)
   let observer: ResizeObserver | undefined
 
-  onMounted(() => {
-    const target = element.value
-    if (!target) return
-    height.value = target.offsetHeight
-    if (typeof ResizeObserver === 'undefined') return
+  function measure(target: HTMLElement | null): void {
+    observer?.disconnect()
+    observer = undefined
+    height.value = target?.offsetHeight ?? 0
+    if (!target || typeof ResizeObserver === 'undefined') return
     observer = new ResizeObserver(() => {
       height.value = target.offsetHeight
     })
     observer.observe(target)
+  }
+
+  onMounted(() => {
+    measure(element.value)
   })
+  // After the patch, so the element the ref now names is in the page and has a size.
+  watch(element, measure, { flush: 'post' })
 
   onBeforeUnmount(() => {
     observer?.disconnect()
