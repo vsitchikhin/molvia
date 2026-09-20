@@ -307,7 +307,10 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           and ${expenses.amountMinor} is not null
           and ${expenses.qtyMilli} is not null
           and (${visible})`,
-      limit: sql`limit ${rowLimit(query.limit ?? PLACES_PER_ITEM)}`,
+      // The default follows the question: so many places per item asked about. A flat cap
+      // would be right for one item and wrong for two hundred, and it would run out on the
+      // items the ordering leaves last rather than trimming everyone evenly.
+      limit: sql`limit ${rowLimit(query.limit ?? known.length * PLACES_PER_ITEM)}`,
     }
   }
 

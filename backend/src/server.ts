@@ -6,10 +6,12 @@ import { InvalidBody } from '@/parse'
 import { healthRoutes } from '@/routes/health'
 import { withActor } from '@/routes/actor'
 import { actorMeRoute, firstVisitRoute } from '@/routes/actors'
+import { adviceRoutes } from '@/routes/advice'
 import { catalogueRoutes } from '@/routes/catalogue'
 import { placeRoutes } from '@/routes/places'
 import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
+import { advice } from '@/usecases/advice'
 import { createActor } from '@/usecases/create-actor'
 import { currentTrip } from '@/usecases/current-trip'
 import { getActor } from '@/usecases/get-actor'
@@ -24,6 +26,7 @@ import { chooseTripRate } from '@/usecases/choose-trip-rate'
 import { startTrip } from '@/usecases/start-trip'
 import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
 import { createActorRepository } from '@/db/actors-repository'
+import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
@@ -115,6 +118,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const db = options.db ?? getDb()
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
+    const events = createEventRepository(db)
     const tripData = tripRepositories(db)
     const transact = transactOn(db)
     const verdicts = createVerdictRepository(db)
@@ -146,6 +150,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         remove: (actorId, tripId, expenseId) => removeExpense(transact, actorId, tripId, expenseId),
         finish: (actorId, tripId) => finishTrip(tripData.trips, actorId, tripId),
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
+      })
+      adviceRoutes(guarded, {
+        advice: (actorId) =>
+          advice({ actors, verdicts, expenses: tripData.expenses, events }, actorId),
       })
       verdictRoutes(guarded, {
         rate: (actorId, itemId, rating) => rateItem({ items, verdicts }, actorId, itemId, rating),
