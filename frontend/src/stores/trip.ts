@@ -89,7 +89,11 @@ export const useTripStore = defineStore('trip', () => {
    * what it already knows.
    */
   function closed(tripId: string): void {
-    if (current.value?.id === tripId) set(null)
+    if (current.value?.id !== tripId) return
+    // Counted like an answer: a `load()` that left before the trip was finished must not put it
+    // back when it returns — the person has closed it, and the server will agree in a moment.
+    applied += 1
+    set(null)
   }
 
   /**

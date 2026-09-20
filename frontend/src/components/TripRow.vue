@@ -1,10 +1,10 @@
 <template>
   <component
-    :is="row.entry ? 'button' : 'div'"
+    :is="open ? 'button' : 'div'"
     class="row"
     :class="{ waiting: row.mark !== null, gone: row.mark === 'removing' }"
-    :type="row.entry ? 'button' : undefined"
-    @click="row.entry && $emit('open', row)"
+    :type="open ? 'button' : undefined"
+    @click="open && $emit('open', row)"
   >
     <span class="what">
       <span class="name">
@@ -52,6 +52,13 @@ export default defineComponent({
   setup(props) {
     const { t, locale } = useI18n()
 
+    /**
+     * A row opens the sheet when there is a card to open it on — and not while it is being
+     * removed: an amendment queued behind the removal would reach a row the server no longer has,
+     * and come back as «не принято» about a purchase the person threw away themselves.
+     */
+    const open = computed(() => props.row.entry !== null && props.row.mark !== 'removing')
+
     const quantity = computed(() => {
       const value = props.row.quantity
       return value
@@ -76,7 +83,7 @@ export default defineComponent({
         : null
     })
 
-    return { t, quantity, amount, perUnit }
+    return { t, open, quantity, amount, perUnit }
   },
 })
 </script>

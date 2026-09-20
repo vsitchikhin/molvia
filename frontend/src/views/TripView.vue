@@ -8,25 +8,11 @@
 
     <ScreenSkeleton v-if="phase === 'loading'" :groups="[72, 54, 84, 46]" />
 
-    <template v-else-if="phase === 'none'">
-      <ScreenState
-        kind="empty"
-        tone="accent"
-        :icon="IconPlus"
-        :title="t('trip.none.title')"
-        :body="t('trip.none.body')"
-      >
-        <template #action>
-          <AppButton size="large" block @click="starting = true">
-            {{ t('trip.none.action') }}
-          </AppButton>
-        </template>
-      </ScreenState>
-    </template>
-
     <template v-else>
-      <!-- Over the trip, never instead of it: at a shelf the list the phone remembers is worth
-           more than a red square, and the purchases are all still there (MOL-19). -->
+      <!-- Over whatever the screen shows, never instead of it: at a shelf the list the phone
+           remembers is worth more than a red square, and the purchases are all still there
+           (MOL-19). Above «Новый поход» too — otherwise a trip the server holds but could not be
+           asked for reads as «no trip at all». -->
       <ScreenState
         v-if="trouble === 'offline'"
         class="notice"
@@ -45,7 +31,25 @@
         :body="t('trip.error.body')"
         @retry="load"
       />
+    </template>
 
+    <template v-if="phase === 'none'">
+      <ScreenState
+        kind="empty"
+        tone="accent"
+        :icon="IconPlus"
+        :title="t('trip.none.title')"
+        :body="t('trip.none.body')"
+      >
+        <template #action>
+          <AppButton size="large" block @click="starting = true">
+            {{ t('trip.none.action') }}
+          </AppButton>
+        </template>
+      </ScreenState>
+    </template>
+
+    <template v-else-if="phase === 'going'">
       <!-- A purchase the server refused: what it was, why, and a way to correct it. «Убрать»
            alone would lose a thing the person actually bought (MOL-22, В-3). -->
       <ScreenState

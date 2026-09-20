@@ -271,6 +271,19 @@ describe('TripView', () => {
       expect(rows[1]?.text()).toContain(ru.trip.queued.removing)
     })
 
+    it('строку, которая удаляется, не открыть: правка ушла бы следом за удалением', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      const { view, queue } = await render()
+      queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: ASHKHAR })
+      await flushPromises()
+
+      const row = view.findAll('.row')[0]
+      expect(row?.element.tagName).toBe('DIV')
+      await row?.trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('dialog')).toBeNull()
+    })
+
     it('записи чужого похода в список не попадают', async () => {
       currentTrip.mockResolvedValue(trip(handoff()))
       const { view, queue } = await render()
@@ -356,6 +369,16 @@ describe('TripView', () => {
       expect(view.text()).toContain(ru.trip.offline.title)
       // Поход остаётся на экране: покупки целы, и ими продолжают пользоваться.
       expect(view.findAll('.row')).toHaveLength(2)
+    })
+
+    it('похода нет и спросить не удалось — «Новый поход» не молчит об этом', async () => {
+      currentTrip.mockRejectedValue(new Error('Failed to fetch'))
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const { view } = await render()
+
+      expect(view.text()).toContain(ru.trip.none.title)
+      // Иначе поход, который сервер держит, но о котором не спросили, читается как «похода нет».
+      expect(view.text()).toContain(ru.trip.offline.title)
     })
 
     it('сеть есть, а сервер молчит — ошибка, тоже поверх похода, и «Повторить»', async () => {

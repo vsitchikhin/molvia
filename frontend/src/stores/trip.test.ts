@@ -195,6 +195,24 @@ describe('trip store', () => {
     expect(fresh().current).toBeNull()
   })
 
+  it('завершённый поход не возвращается ответом, который был в пути', async () => {
+    const store = fresh()
+    store.apply(trip(OPEN))
+    let answer: (trip: TripView | null) => void = () => undefined
+    currentTrip.mockReturnValue(
+      new Promise<TripView | null>((resolve) => {
+        answer = resolve
+      }),
+    )
+
+    const loading = store.load()
+    store.closed(OPEN)
+    answer(trip(OPEN))
+    await loading
+
+    expect(store.current).toBeNull()
+  })
+
   it('reads a broken memory as no trip rather than failing to start', () => {
     localStorage.setItem(`molvia.trip.${ME}`, '{"trip":{"id":"not a trip"}}')
     expect(fresh().current).toBeNull()
