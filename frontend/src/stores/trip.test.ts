@@ -181,6 +181,20 @@ describe('trip store', () => {
     expect(store.current?.id).toBe(OPEN)
   })
 
+  // MOL-22, Н-11: «завершить» отвечает 204 — применять нечего, а поход на экране обязан
+  // закончиться сразу, без второго запроса у полки.
+  it('завершённый поход перестаёт быть текущим, чужой — не трогается', () => {
+    const store = fresh()
+    store.apply(trip(OPEN))
+
+    store.closed(LATER)
+    expect(store.current?.id).toBe(OPEN)
+
+    store.closed(OPEN)
+    expect(store.current).toBeNull()
+    expect(fresh().current).toBeNull()
+  })
+
   it('reads a broken memory as no trip rather than failing to start', () => {
     localStorage.setItem(`molvia.trip.${ME}`, '{"trip":{"id":"not a trip"}}')
     expect(fresh().current).toBeNull()

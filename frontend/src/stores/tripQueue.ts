@@ -8,11 +8,13 @@ import {
   catalogueEntryCodec,
   expensePatchSchema,
   isWireCode,
+  startTripBodySchema,
 } from '@molvia/model'
 import type {
   AddExpenseBody,
   CatalogueEntry,
   ExpensePatch,
+  StartTripBody,
   TripView,
   WireCode,
 } from '@molvia/model'
@@ -23,11 +25,23 @@ import { read, writeEverywhere } from '@/stores/storage'
 import { useTripStore } from '@/stores/trip'
 
 /**
- * One write to a trip, kept until the server has it. `start` and `finish` join when the trip
- * screen writes through here (MOL-22, MOL-25): a trip started with no signal is named by the
- * device precisely so the rows queued inside it can refer to it.
+ * One write to a trip, kept until the server has it — starting and finishing it included
+ * (MOL-22, В-2): a trip started with no signal is named by the device precisely so the rows
+ * queued inside it can refer to it, and the queue is in order, so «завершить» goes last by
+ * being queued last.
  */
 export type QueuedWrite =
+  | {
+      readonly kind: 'start'
+      readonly tripId: string
+      readonly place: StartTripBody['place']
+      /**
+       * Not sent — the server times the trip by its own clock. The screen needs a moment for
+       * «Ереван Сити · сегодня» while the trip is still only on the phone.
+       */
+      readonly startedAt: Date
+    }
+  | { readonly kind: 'finish'; readonly tripId: string }
   | {
       readonly kind: 'add'
       readonly tripId: string
@@ -96,6 +110,15 @@ function newKey(): string {
 /** Wire form: the bodies carry bigints, and the codecs that read them back are the contract's. */
 function encode(entry: QueuedWrite): Loose {
   switch (entry.kind) {
+    case 'start':
+      return {
+        kind: 'start',
+        tripId: entry.tripId,
+        place: { ...entry.place },
+        startedAt: entry.startedAt.toISOString(),
+      }
+    case 'finish':
+      return { ...entry }
     case 'add':
       return {
         kind: 'add',
@@ -120,6 +143,15 @@ function decode(raw: unknown): QueuedWrite | null {
   const { kind, tripId, expenseId } = raw
   if (typeof tripId !== 'string' || !isIdentifier(tripId)) return null
 
+  if (kind === 'start') {
+    // Through the body's own schema, so a name the server would refuse never waits in the queue
+    // for a connection that will only bring a `400`.
+    const body = startTripBodySchema.safeParse({ id: tripId, place: raw.place })
+    const startedAt = typeof raw.startedAt === 'string' ? new Date(raw.startedAt) : null
+    if (!body.success || startedAt === null || Number.isNaN(startedAt.getTime())) return null
+    return { kind, tripId, place: body.data.place, startedAt }
+  }
+  if (kind === 'finish') return { kind, tripId }
   if (kind === 'add') {
     const body = addExpenseBodySchema.safeParse(knownFields(raw.body, BODY_FIELDS))
     return body.success ? { kind, tripId, body: body.data, entry: cardOf(raw.entry) } : null
@@ -206,8 +238,13 @@ function recallRejected(key: string): RejectedWrite[] {
   })
 }
 
-function send(entry: QueuedWrite): Promise<TripView> {
+/** The trip as the server answers it, or nothing: «завершить» answers `204`. */
+function send(entry: QueuedWrite): Promise<TripView | null> {
   switch (entry.kind) {
+    case 'start':
+      return api.startTrip({ id: entry.tripId, place: entry.place }).then(({ trip }) => trip)
+    case 'finish':
+      return api.finishTrip(entry.tripId).then(() => null)
     case 'add':
       return api.addExpense(entry.tripId, entry.body).then(({ trip }) => trip)
     case 'update':
@@ -215,6 +252,27 @@ function send(entry: QueuedWrite): Promise<TripView> {
     case 'remove':
       return api.removeExpense(entry.tripId, entry.expenseId)
   }
+}
+
+/**
+ * What names a write among the writes of its kind: the row it is about. Two adds of one purchase
+ * are one; two edits of one row are not — the later one is a later change of mind.
+ */
+function subject(write: QueuedWrite): string {
+  switch (write.kind) {
+    case 'add':
+      return write.body.id
+    case 'update':
+    case 'remove':
+      return write.expenseId
+    case 'start':
+    case 'finish':
+      return write.tripId
+  }
+}
+
+function sameWrite(a: QueuedWrite, b: QueuedWrite): boolean {
+  return a.kind === b.kind && a.tripId === b.tripId && subject(a) === subject(b)
 }
 
 /** Runs `work` alone across every window of the app where the browser can say so. */
@@ -280,7 +338,9 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       // and those still waiting are purchases made at the shelf with no signal (Г1).
       (past) => stillWaiting(past, new Set(kept.map((item) => item.key))),
     )
-    // Refusals only grow, so a refusing shelf's past is a true, shorter list: it stays.
+    // A refusing shelf keeps its past list: everything in it was refused by the server and is
+    // still true. The one thing it loses is a «Убрать» (В-3) — the entry comes back on that shelf
+    // alone, and memory, which is ahead of it, is what the screen shows until the tab is closed.
     const refused = writeEverywhere(
       `${REJECTED_KEY}.${id}`,
       JSON.stringify(
@@ -366,6 +426,10 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
           if (code !== ERROR.NO_ACTOR) retryLater()
           return
         }
+        if (code === ERROR.TRIP_OPEN && head.write.kind === 'start') {
+          if (!(await rerouted(owner, head))) return
+          continue
+        }
         refusal = code
       }
 
@@ -374,6 +438,9 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       if (actor.id !== owner) return
 
       if (answered) trips.apply(answered)
+      // «Завершить» answers `204`, so there is nothing to apply: the trip the person closed stops
+      // being the one they are on here, without waiting for a connection to say so again.
+      if (head.write.kind === 'finish') trips.closed(head.write.tripId)
       sync(owner)
       if (refusal) {
         console.warn(`[trip queue] ${head.write.kind} refused: ${refusal}`)
@@ -385,13 +452,55 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     retryDelay = RETRY_FIRST_MS
   }
 
-  /** Kept on the device before anything is sent; a second copy of the same add is ignored. */
+  /**
+   * A trip started with no signal met one the server already has open (MOL-22, Р-1). The person
+   * was writing purchases at a shelf, not asking for a second trip, so the purchases behind this
+   * start move into the open trip instead of failing one by one with `404`. `false` means the
+   * queue stopped: the open trip could not be read, and dropping the start now would leave every
+   * purchase pointing at a trip that does not exist.
+   */
+  async function rerouted(owner: string, head: Kept): Promise<boolean> {
+    let open: TripView | null
+    try {
+      open = await api.currentTrip()
+    } catch {
+      retryLater()
+      return false
+    }
+    if (actor.id !== owner) return false
+    sync(owner)
+    // Nothing open any more — it was finished while this start waited, and the start itself is
+    // good again. Left in place, it goes out on the next run.
+    if (!open) {
+      retryLater()
+      return false
+    }
+
+    trips.apply(open)
+    const from = head.write.tripId
+    kept = kept.flatMap((item) =>
+      item.write.tripId !== from
+        ? [item]
+        : item.key === head.key
+          ? []
+          : [{ key: item.key, write: { ...item.write, tripId: open.id } }],
+    )
+    persist(owner)
+    return true
+  }
+
+  /**
+   * Kept on the device before anything is sent. A second copy of the same purchase, of the same
+   * start or of the same finish is ignored — a double tap is one intent; a second edit of one row
+   * is not (`sameWrite`).
+   */
   function enqueue(entry: QueuedWrite): void {
     const id = actor.id
     sync(id)
     const repeated =
-      entry.kind === 'add' &&
-      kept.some((item) => item.write.kind === 'add' && item.write.body.id === entry.body.id)
+      entry.kind !== 'update' &&
+      entry.kind !== 'remove' &&
+      kept.some((item) => sameWrite(item.write, entry))
     if (!repeated) {
       kept = [...kept, { key: newKey(), write: entry }]
       persist(id)
@@ -399,5 +508,19 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     void flush()
   }
 
-  return { pending, rejected, enqueue, flush }
+  /**
+   * Forgets a write the server refused (MOL-22, В-3). Matched by what it is about rather than by
+   * reference: the list is re-read from storage whenever another window changes it, so the object
+   * the screen holds is not the object in memory by then.
+   */
+  function dismiss(item: RejectedWrite): void {
+    const id = actor.id
+    sync(id)
+    rejected.value = rejected.value.filter(
+      (entry) => !(entry.code === item.code && sameWrite(entry.write, item.write)),
+    )
+    persist(id)
+  }
+
+  return { pending, rejected, enqueue, dismiss, flush }
 })

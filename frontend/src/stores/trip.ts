@@ -83,6 +83,16 @@ export const useTripStore = defineStore('trip', () => {
   }
 
   /**
+   * The trip is over, and the server said so with `204` — there is no trip to apply (MOL-22, Н-11).
+   * Nothing is asked here on purpose: at the shelf the person has just finished a trip and may be
+   * starting the next one, and a screen waiting on the network to say «done» would be lying about
+   * what it already knows.
+   */
+  function closed(tripId: string): void {
+    if (current.value?.id === tripId) set(null)
+  }
+
+  /**
    * Asks the server; the memory is for when it cannot be asked, not instead of asking (Р-2). A
    * failure keeps what is remembered and is the caller's to show.
    *
@@ -97,5 +107,5 @@ export const useTripStore = defineStore('trip', () => {
     set(trip)
   }
 
-  return { current, apply, load }
+  return { current, apply, closed, load }
 })
