@@ -26,6 +26,7 @@ function actorWith(id: string): Actor {
     city: 'Гюмри',
     spendCurrency: 'AMD',
     incomeCurrency: 'RUB',
+    sharedUntil: null,
     createdAt: new Date('2026-09-16T10:00:00.000Z'),
     updatedAt: new Date('2026-09-16T10:00:00.000Z'),
   }
