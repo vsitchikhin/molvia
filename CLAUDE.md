@@ -67,11 +67,24 @@ already knows — the very thing the rule above forbids; written on every launch
 question no threshold asks, since 0.2 is counted over verdicts. The screen records
 `advice_viewed` with `subject: product` **only in the shared mode**, after the answer is
 built, at most once per owner and payload in each **day of the person's own life** — days
-counted from their first event, as the gate counts its weeks, and both in hours rather than
-calendar days, so a `timezone` set on the database later cannot pull them apart. Not a rolling
-24 hours from the last row: that window slid over the week line and swallowed a visit early in
-week four. Overlapping requests are serialised by an advisory lock per actor, and a failure to
-record is not swallowed, because a lost row lowers the gate with nothing to backfill from.
+counted from `actors.created_at`, as the gate counts its weeks from it, and both in hours
+rather than calendar days, so a `timezone` set on the database later cannot pull them apart.
+Not a rolling 24 hours from the last row: that window slid over the week line and swallowed a
+visit early in week four. Overlapping requests are serialised by an advisory lock per actor,
+and a failure to record is not swallowed, because a lost row lowers the gate with nothing to
+backfill from.
+
+**Both halves of the gate count from `actors.created_at`, not from a first event** (MOL-31,
+Р-20). While the search wrote on every visit the two were the same day; with one writer left,
+and that one behind a paid door, «first event» had become «first paid view». A person without
+access never entered the denominator at all, and one with access had their fourth week counted
+from the day they paid — a threshold selected on the very thing it tests, and one that could no
+longer say «no». Reading a domain table is not what the log's rule forbids; duplicating it into
+the log is, which is why `session_started` stays withdrawn. **And the visit is counted by
+intent, not by catch** (Р-21): the condition is access, not content, so someone who opens an
+empty screen — or one made entirely of their own figures, which the threshold of three
+contributors makes ordinary — counts as having come back for other people's data. They came for
+it; there was none.
 
 **That question was asked and answered once already.** From MOL-12 the writer was the
 catalogue search, recording `catalogue_viewed` — and it measured entering, not reading, which
@@ -342,7 +355,10 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   scores and how many people stand behind it; `verdictLevel` picks the group and
   `averageScore` prints «4.3». The rating crosses the wire as a **decimal string**, never a
   number: one person's whole five and an average over many share one field, and «never float»
-  has to hold for both.
+  has to hold for both. **The group is decided by the printed tenth, not by the exact
+  fraction** (Р-22): 79 over 20 is 3.95, prints «4.0», and grouping it below «брать» put two
+  rows carrying the same number in different groups with nothing to explain it. The person
+  reasons with the number they see, so that number decides.
 - **Free is your own data; access opens other people's.** `actors.shared_until` decides, read
   once per request, and `scope: 'own' | 'shared'` travels with the answer because the screen
   cannot work it out and «4,3 из 5» read as one's own score would be a lie. There is no
@@ -369,6 +385,12 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
 - **Order is by rating down, then by name, in all three groups.** The handoff asked for
   ascending unit price; that sorts _different products_ by a number — milk at 570 ֏/л above
   beef at 4 790 ֏/кг — and «compare by unit price» is about one item across places.
+- **The limit never cuts what must be seen** (Р-23). The list is ordered by rating, so the
+  worst lie at its end, and `ADVICE_LIMIT` used to eat exactly them — two hundred strangers'
+  fives deleted the one «не брать нигде» the screen exists for. What survives the cut is this
+  person's own rows and every warning; what stands at the top of the screen is still the
+  rating. Two orders in one statement, on purpose, and `total` beside the rows so a truncated
+  list can say that it is one.
 - **The server names no superlative.** It returns the places sorted by price and nothing else;
   whether that reads «Дешевле всего» or «Брали здесь» is the screen's to decide by their number
   (MOL-34's answer). And a review is always the asker's own: words are not an aggregate, there
@@ -635,7 +657,12 @@ database access. In a product about data integrity, two write paths will silentl
   not an optimization.
 - **Privacy:** expenses are always private. Prices and ratings are public only in
   aggregate, and an aggregate is not shown until it holds several independent
-  contributions — otherwise someone's basket can be derived from the "average price".
+  contributions — three of them, and a contribution is a person, not a row
+  (`AGGREGATE_MIN_CONTRIBUTIONS`). Otherwise someone's basket can be derived from the
+  "average price". **The threshold closes the still picture, not the moving one:** a row that
+  read «4.3 · 3 оценки» yesterday and «4.5 · 4 оценки» today hands the fourth person's score
+  to whoever looked twice, and the same holds for prices. Closing that needs noise or delayed
+  publication, neither of which 0.1 has — a known limit, not an oversight.
 - Country and city are part of the key from the start, not "we'll add it later".
 
 ## Frontend and styling rules
