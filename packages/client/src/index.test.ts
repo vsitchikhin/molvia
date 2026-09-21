@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ACTOR_HEADER, ERROR, INVITE_HEADER, ISSUE } from '@molvia/model'
+import { ACTOR_HEADER, ERROR, ISSUE } from '@molvia/model'
 import { ApiError, createClient } from '#client/index'
 
 function clientAnswering(status: number, body: unknown) {
@@ -46,7 +46,6 @@ const actorWire = {
   city: 'Гюмри',
   spendCurrency: 'AMD',
   incomeCurrency: 'RUB',
-  sharedUntil: null,
   createdAt: '2026-09-16T10:00:00.123Z',
   updatedAt: '2026-09-16T10:00:00.456Z',
 }
@@ -147,7 +146,7 @@ describe('everything the client throws is an ApiError', () => {
         }),
     })
 
-    const actor = await client.createActor('let-me-in')
+    const actor = await client.createActor()
 
     expect(aborted).toBe(false)
     expect(actor.id).toBe(actorWire.id)
@@ -269,33 +268,26 @@ describe('the identity the client speaks for', () => {
 })
 
 describe('the first visit', () => {
-  it('posts with the invite code and no body at all', async () => {
+  it('posts to the development seam, with no body at all', async () => {
     const { client, calls } = clientRecording()
 
-    await client.createActor('let-me-in')
+    await client.createActor()
 
     expect(calls[0]?.method).toBe('POST')
-    expect(calls[0]?.url).toBe('http://api/actors')
-    expect(calls[0]?.headers.get(INVITE_HEADER)).toBe('let-me-in')
+    // Not `/actors`: the invite door and the handle behind it went together (MOL-52), and
+    // what is left exists only outside production. Against a production server this is a 404,
+    // and that is the point — the real door is the Telegram login of MOL-54.
+    expect(calls[0]?.url).toBe('http://api/dev/actors')
   })
 
   it('hands back the domain entity, with dates rather than the strings on the wire', async () => {
     const { client } = clientRecording()
 
-    const actor = await client.createActor('let-me-in')
+    const actor = await client.createActor()
 
     expect(actor.createdAt).toBeInstanceOf(Date)
     expect(actor.createdAt.toISOString()).toBe(actorWire.createdAt)
     expect(actor.spendCurrency).toBe('AMD')
-  })
-
-  it('refuses a code that cannot be sent, instead of throwing a TypeError', async () => {
-    // molvia.com/?c=код — a code that came out of a keyboard rather than out of
-    // `openssl rand -hex`. The door would refuse it anyway; what matters is that the person
-    // is told it is the link, not the server.
-    const { client } = clientRecording()
-
-    expect(await codeOf(client.createActor('приглашение'))).toBe(ERROR.NO_ACTOR)
   })
 
   it('refuses an answer whose shape is not the contract', async () => {

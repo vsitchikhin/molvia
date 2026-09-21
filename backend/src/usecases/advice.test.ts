@@ -20,6 +20,7 @@ const perKilo = (minor: number) => unitPrice(amd(minor), kilo).scaledMinor
 function actor(sharedUntil: Date | null = null): Actor {
   return actorSchema.parse({
     id: ACTOR,
+    telegramUserId: 777_000_123,
     country: 'AM',
     city: 'Гюмри',
     spendCurrency: 'AMD',
@@ -69,6 +70,7 @@ function deps(world: World = {}) {
   const actors: ActorRepository = {
     create: () => Promise.reject(new Error('create was not expected')),
     byId: () => Promise.resolve(world.actor === undefined ? actor() : world.actor),
+    byTelegramUserId: () => Promise.reject(new Error('byTelegramUserId was not expected')),
     update: () => Promise.reject(new Error('update was not expected')),
   }
 

@@ -657,6 +657,18 @@ database access. In a product about data integrity, two write paths will silentl
   shelf with no signal still knows where a purchase goes — but **the memory is for when the
   server cannot be asked, not instead of asking**: the sheet asks every time it opens, and a
   trip answered finished stops being the current one.
+- **Identity is proved by a session; `actors.id` proves only ownership (MOL-52).** The two
+  were one thing until now, and everything awkward about 0.1 followed from it: `created_by`
+  hidden from a catalogue card, a header that must not be logged, `no-store` on every reply
+  carrying an identifier. What a person comes back by is `actors.telegram_user_id` — unique,
+  so one Telegram account is one owner — and what a request proves itself with is a session
+  token. **The token exists in the database only as a `sha256` in hex**, and the repository
+  is what holds that: it takes raw tokens and hashes them itself, so no caller has a method
+  that could store one. **Revoking a session is deleting its row**, not marking it — which is
+  the opposite of a withdrawn verdict above, and for a reason worth keeping straight: a
+  verdict is data with a reader (the gate counts it), a session is a key, and a discarded key
+  has no readers. Deletion also makes «revoked», «expired» and «never existed» one answer for
+  free, where a flag would need every later query to remember it.
 - **Verdict and expense are separate tables with separate write paths.** Do not merge
   them into one input screen: they have different frequencies and different motivations.
 - **A withdrawn verdict is still a row (MOL-27).** `DELETE /verdicts/:itemId` sets
@@ -949,6 +961,17 @@ by the owner on 20.09.2026**: free is one's own data, `actors.shared_until` open
 people's, and the 0.3 gate moved from the search's event to this screen's. «Поход» and the
 screen of «Что брать» itself are still placeholders. Release 0.1 is broken into epics and tasks
 in Jira.
+MOL-52 put the schema under accounts: the Telegram identity on the owner, `sessions` and
+`login_requests`, and the repositories over them — the routes are MOL-53 and MOL-54. Its
+migration **emptied the owners and everything hanging off them**, because a Telegram identity
+cannot be invented for a row already written; the catalogue and the places survived, with
+`created_by` nulled (owner's decision, 20.09.2026). **The invite door of MOL-8 is gone with
+its handle**: `POST /actors`, `withInvite`, `INVITE_HEADER`, `SIGNUP_CODE` and the `?c=` link.
+Until MOL-54 an identity comes from `POST /dev/actors`, a seam that **is not in the production
+bundle at all** — the bundler folds its guard to a constant and the module is tree-shaken away,
+which a test asserts against the built file rather than against the intention. The price is
+named: in production there is no way to create an identity until MOL-54 exists.
+
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 **What the database guarantees and what it leaves to the domain** is a line, not a habit:

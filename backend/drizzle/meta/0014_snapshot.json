@@ -1,6 +1,6 @@
 {
-  "id": "d0cfbd8e-284b-4b92-bdf0-32d92a6a19ae",
-  "prevId": "ee7fafcf-6ad9-4240-94e6-574fd76dee4c",
+  "id": "49a79fe9-1a03-421d-b904-129619e0487c",
+  "prevId": "9fb12d69-8bcb-4504-a37d-54ace816d582",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -43,6 +43,12 @@
           "type": "char(3)",
           "primaryKey": false,
           "notNull": true
+        },
+        "shared_until": {
+          "name": "shared_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -203,7 +209,7 @@
       "checkConstraints": {
         "events_type_known": {
           "name": "events_type_known",
-          "value": "\"events\".\"type\" in ('session_started', 'catalogue_viewed')"
+          "value": "\"events\".\"type\" in ('session_started', 'catalogue_viewed', 'advice_viewed')"
         },
         "events_payload_is_object": {
           "name": "events_payload_is_object",
@@ -211,7 +217,7 @@
         },
         "events_payload_matches_type": {
           "name": "events_payload_matches_type",
-          "value": "(\"events\".\"type\" <> 'catalogue_viewed'\n             or (jsonb_exists(\"events\".\"payload\", 'subject')\n                 and \"events\".\"payload\" ->> 'subject' in ('product', 'venue')\n                 and \"events\".\"payload\" - 'subject' = '{}'::jsonb))\n          and (\"events\".\"type\" <> 'session_started'\n             or \"events\".\"payload\" = '{}'::jsonb)"
+          "value": "(\"events\".\"type\" not in ('catalogue_viewed', 'advice_viewed')\n             or (jsonb_exists(\"events\".\"payload\", 'subject')\n                 and \"events\".\"payload\" ->> 'subject' in ('product', 'venue')\n                 and \"events\".\"payload\" - 'subject' = '{}'::jsonb))\n          and (\"events\".\"type\" <> 'session_started'\n             or \"events\".\"payload\" = '{}'::jsonb)"
         }
       },
       "isRLSEnabled": false
@@ -549,6 +555,95 @@
       },
       "isRLSEnabled": false
     },
+    "public.login_requests": {
+      "name": "login_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "secret_hash": {
+          "name": "secret_hash",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_name": {
+          "name": "device_name",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "telegram_user_id": {
+          "name": "telegram_user_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "login_requests_code_key": {
+          "name": "login_requests_code_key",
+          "nullsNotDistinct": false,
+          "columns": ["code"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "login_requests_code_format": {
+          "name": "login_requests_code_format",
+          "value": "\"login_requests\".\"code\" ~ '^[A-Za-z0-9_-]{1,64}$'"
+        },
+        "login_requests_secret_hash_hex": {
+          "name": "login_requests_secret_hash_hex",
+          "value": "\"login_requests\".\"secret_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "login_requests_lifetime_forward": {
+          "name": "login_requests_lifetime_forward",
+          "value": "\"login_requests\".\"expires_at\" > \"login_requests\".\"created_at\""
+        },
+        "login_requests_telegram_user_id_positive": {
+          "name": "login_requests_telegram_user_id_positive",
+          "value": "\"login_requests\".\"telegram_user_id\" is null or \"login_requests\".\"telegram_user_id\" > 0"
+        },
+        "login_requests_telegram_user_id_safe": {
+          "name": "login_requests_telegram_user_id_safe",
+          "value": "\"login_requests\".\"telegram_user_id\" is null or \"login_requests\".\"telegram_user_id\" < 9007199254740992"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.official_rates": {
       "name": "official_rates",
       "schema": "",
@@ -785,6 +880,104 @@
         "search_picks_query_key_indexable": {
           "name": "search_picks_query_key_indexable",
           "value": "octet_length(\"search_picks\".\"query_key\") <= 600"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.sessions": {
+      "name": "sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_name": {
+          "name": "device_name",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "sessions_actor_idx": {
+          "name": "sessions_actor_idx",
+          "columns": [
+            {
+              "expression": "actor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sessions_actor_id_actors_id_fk": {
+          "name": "sessions_actor_id_actors_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "actors",
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "sessions_token_hash_key": {
+          "name": "sessions_token_hash_key",
+          "nullsNotDistinct": false,
+          "columns": ["token_hash"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "sessions_token_hash_hex": {
+          "name": "sessions_token_hash_hex",
+          "value": "\"sessions\".\"token_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "sessions_lifetime_forward": {
+          "name": "sessions_lifetime_forward",
+          "value": "\"sessions\".\"expires_at\" > \"sessions\".\"created_at\""
         }
       },
       "isRLSEnabled": false

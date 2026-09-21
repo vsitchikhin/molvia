@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto'
+import { ZodError } from 'zod'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { DomainError, moneySchema, newItemSchema, toSearchKey } from '@molvia/model'
 import type { ExchangeRate, Money, Quantity } from '@molvia/model'
 import { INT8_MAX } from '@molvia/model'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, telegramId } from './fixtures'
+import { actors as actorsTable } from '@/db/schema'
 import { createActorRepository } from '@/db/actors-repository'
 import { createExpenseRepository } from '@/db/expenses-repository'
 import { createItemRepository } from '@/db/items-repository'
@@ -42,10 +44,45 @@ afterAll(async () => {
 describe('владелец', () => {
   it('пишется с идентификатором, который принесло устройство, и читается обратно', async () => {
     const id = randomUUID()
-    const created = await actors.create(id, settings)
+    const created = await actors.create(id, telegramId(), settings)
 
     expect(created.id).toBe(id)
     expect(await actors.byId(id)).toEqual(created)
+  })
+
+  it('находится по Telegram-аккаунту — тот самый круг, ради которого колонка и заведена', async () => {
+    // «Человек вернулся»: он приносит номер аккаунта, а не uuid строки. Без этого круга второй
+    // вход упирался в CONFLICT, из которого не выйти (MOL-52, адверсариальный проход А2), —
+    // а сам метод, закрывший А2, не был проверен ничем (Р3).
+    const telegram = telegramId()
+    const created = await actors.create(randomUUID(), telegram, settings)
+
+    expect(await actors.byTelegramUserId(telegram)).toEqual(created)
+  })
+
+  it('номер, которого не бывает, не доезжает до базы и на записи', async () => {
+    // Из трёх мест, судящих одно число, страж был у двух: `byTelegramUserId` и `confirm`
+    // отвечали `null`, а `create` пропускал до колонки и получал `23514` — непереведённую
+    // пятисотку (адверсариальный проход, С1). Отказ здесь не `null`, и это не непоследовательность:
+    // `confirm` читает строку, и «такого подтверждения нет» у него в словаре есть, а `create`
+    // строку пишет, и сказать ему нечего — значит дефект вызывающего, названный и без строки.
+    for (const bad of [0, -1, 1.5, 9_007_199_254_740_992]) {
+      await expect(actors.create(randomUUID(), bad, settings)).rejects.toThrow(ZodError)
+    }
+
+    await expect(db.select().from(actorsTable)).resolves.toHaveLength(0)
+  })
+
+  it('на аккаунт, которого нет, и на номер, которого не бывает, отвечает одинаково', async () => {
+    // Свой страж, а не `bigint` в Postgres: число вне границ колонки — это не «строки не
+    // нашлось», это значение, которого там никогда не было, и оно не должно давать ошибку.
+    await actors.create(randomUUID(), telegramId(), settings)
+
+    expect(await actors.byTelegramUserId(424_242_424)).toBeNull()
+    expect(await actors.byTelegramUserId(0)).toBeNull()
+    expect(await actors.byTelegramUserId(-1)).toBeNull()
+    expect(await actors.byTelegramUserId(1.5)).toBeNull()
+    expect(await actors.byTelegramUserId(9_007_199_254_740_992)).toBeNull()
   })
 
   it('несуществующий владелец — это null, а не ошибка', async () => {

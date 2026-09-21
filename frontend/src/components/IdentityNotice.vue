@@ -50,7 +50,7 @@ import { useActorStore } from '@/stores/actor'
  * Drawn by the shared screen state (MOL-19) as a notice of its own height: its four cases are
  * that block's cases, not a second implementation of them.
  */
-const NOTICES = ['lost', 'uninvited', 'error', 'offline'] as const
+const NOTICES = ['lost', 'error', 'offline'] as const
 type Notice = (typeof NOTICES)[number]
 
 function noticeFor(state: string): Notice | null {
@@ -70,9 +70,9 @@ export default defineComponent({
     // stayed `lost` — which is exactly what a failed restore does — left the button showing
     // a stale answer (М-23).
     const canRestore = computed(() => notice.value === 'lost' && actor.lost.length > 0)
-    // A lost identity and a missing invite are neither an error of the screen nor offline:
-    // something the person has to know, with no «Try again» — «uninvited» needs a different
-    // link, not another attempt. The screen state gives each its tone, its role, its retry.
+    // A lost identity is neither an error of the screen nor offline: something the person has
+    // to know, with no «Try again» — a retry restores nothing by itself. The screen state
+    // gives each case its tone, its role, its retry.
     const kind = computed(() => {
       if (notice.value === 'error' || notice.value === 'offline') return notice.value
       return 'attention' as const

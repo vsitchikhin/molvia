@@ -1,32 +1,30 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { ERROR } from '@molvia/model'
-import type { Actor } from '@molvia/model'
+import type { ActorView } from '@molvia/model'
 // Nothing is imported from the store or the identity module at the top on purpose: every
 // test loads them through `freshStore`, and a module captured here would be a second copy
 // with its own in-memory identifier — the assertions would then read a value the code under
 // test never wrote.
 
-const createActor = vi.fn<(code: string) => Promise<Actor>>()
-const me = vi.fn<(identifier?: string) => Promise<Actor>>()
+const createActor = vi.fn<() => Promise<ActorView>>()
+const me = vi.fn<(identifier?: string) => Promise<ActorView>>()
 vi.mock('@/api', () => ({
   api: {
-    createActor: (code: string) => createActor(code),
+    createActor: () => createActor(),
     me: (identifier?: string) => me(identifier),
   },
 }))
 
 const KEY = 'molvia.actor'
-const INVITE_KEY = 'molvia.invite'
 
-function actorWith(id: string): Actor {
+function actorWith(id: string): ActorView {
   return {
     id,
     country: 'AM',
     city: 'Гюмри',
     spendCurrency: 'AMD',
     incomeCurrency: 'RUB',
-    sharedUntil: null,
     createdAt: new Date('2026-09-16T10:00:00.000Z'),
     updatedAt: new Date('2026-09-16T10:00:00.000Z'),
   }
@@ -35,10 +33,6 @@ function actorWith(id: string): Actor {
 const FIRST = actorWith('9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f')
 const SECOND = actorWith('2c4e6a80-1111-4222-8333-444455556666')
 const THIRD = actorWith('7a5b3c10-2222-4333-8444-555566667777')
-
-function openedWith(search: string): void {
-  window.history.replaceState({}, '', `/${search}`)
-}
 
 function online(value: boolean): void {
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(value)
@@ -95,7 +89,6 @@ beforeEach(() => {
   createActor.mockReset()
   me.mockReset()
   online(true)
-  openedWith('?c=let-me-in')
 })
 
 afterEach(() => {
@@ -110,85 +103,9 @@ describe('the first launch', () => {
 
     await store.start()
 
-    expect(createActor).toHaveBeenCalledWith('let-me-in')
+    expect(createActor).toHaveBeenCalledWith()
     expect(localStorage.getItem(KEY)).toBe(FIRST.id)
     expect(store.state).toBe('ready')
-  })
-
-  it('scrubs the invite code out of the address bar once it is saved', async () => {
-    // The query lands in history, in screenshots, in the `start_url` of an installed PWA
-    // and in every `Referer` the page sends — the same reason the identifier never goes
-    // into a query in the first place.
-    createActor.mockResolvedValue(FIRST)
-    const { store } = await freshStore()
-
-    await store.start()
-
-    expect(window.location.search).not.toContain('c=')
-    expect(localStorage.getItem(INVITE_KEY)).toBe('let-me-in')
-  })
-
-  // The router keeps its record of the entry underneath in the history state; wiping it made
-  // «back» from a screen opened by an invite link lose its way (MOL-17).
-  it('keeps the history state while scrubbing the code', async () => {
-    createActor.mockResolvedValue(FIRST)
-    const { store } = await freshStore()
-    const routerState = { back: '/', current: '/?c=let-me-in', position: 1 }
-    window.history.replaceState(routerState, '', window.location.href)
-
-    await store.start()
-
-    expect(window.location.search).not.toContain('c=')
-    expect(window.history.state).toEqual(routerState)
-  })
-
-  it('remembers the invite code, so the next launch needs no link', async () => {
-    createActor.mockResolvedValue(FIRST)
-    await (await freshStore()).store.start()
-
-    localStorage.removeItem(KEY)
-    openedWith('')
-    createActor.mockResolvedValue(SECOND)
-
-    await (await freshStore()).store.start()
-
-    expect(createActor).toHaveBeenLastCalledWith('let-me-in')
-  })
-
-  it('does not even try without a code: the refusal would explain nothing', async () => {
-    openedWith('')
-    const { store } = await freshStore()
-
-    await store.start()
-
-    expect(createActor).not.toHaveBeenCalled()
-    expect(store.state).toBe('uninvited')
-  })
-
-  it('says «uninvited», not «broken», when the door refuses the code', async () => {
-    // A rotated or mistyped code used to land in the state meant for an outage, and the
-    // person read «the server did not answer» about a link that was simply wrong.
-    const { store } = await freshStore()
-    createActor.mockRejectedValue(await refusal())
-
-    await store.start()
-
-    expect(store.state).toBe('uninvited')
-  })
-
-  it('forgets a refused code instead of handing it over on every retry', async () => {
-    const { store } = await freshStore()
-    createActor.mockRejectedValue(await refusal())
-
-    await store.start()
-    openedWith('')
-    await store.retry()
-
-    // Read through the module rather than the key: an emptied value and a removed one are
-    // the same thing to everything that asks, and only one of them survives a shelf that
-    // refuses writes.
-    expect(localStorage.getItem(INVITE_KEY)).toBeFalsy()
-    expect(createActor).toHaveBeenCalledTimes(1)
   })
 
   it('says «offline» instead of hanging, and recovers when the network returns', async () => {
@@ -427,9 +344,9 @@ describe('two tabs opened at once', () => {
   it('refuses to start twice in the same tab while the first attempt is running', async () => {
     // `retry` is the store's public name for `start`, and a retry button is wired to it.
     // Without a guard the second call queued behind a claim this tab set itself.
-    let release: (actor: Actor) => void = () => undefined
+    let release: (actor: ActorView) => void = () => undefined
     createActor.mockReturnValue(
-      new Promise<Actor>((resolve) => {
+      new Promise<ActorView>((resolve) => {
         release = resolve
       }),
     )
@@ -522,9 +439,9 @@ describe('a set-aside identity', () => {
 
     await store.start()
 
-    let release: (actor: Actor) => void = () => undefined
+    let release: (actor: ActorView) => void = () => undefined
     me.mockReturnValue(
-      new Promise<Actor>((resolve) => {
+      new Promise<ActorView>((resolve) => {
         release = resolve
       }),
     )

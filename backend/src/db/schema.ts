@@ -22,7 +22,9 @@ import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import {
+  DEVICE_NAME_MAX,
   EVENT,
+  LOGIN_CODE_MAX,
   baseUnitSchema,
   catalogueSubjectSchema,
   currencySchema,
@@ -87,6 +89,14 @@ const SELECTORS = String.raw`[\uFE00-\uFE0F\U000E0100-\U000E01EF]`
  */
 export function placeIdentity(value: AnyPgColumn | SQL): SQL {
   return sql`btrim(lower(regexp_replace(normalize(${value}, NFKC), E'${sql.raw(SELECTORS)}', '', 'g')), E'${sql.raw(BLANKS)}')`
+}
+
+/**
+ * A `sha256` written down as hex, which is the only shape either digest column ever holds.
+ * Same rule twice, so the two cannot drift into meaning different things.
+ */
+function hexDigest(column: AnyPgColumn) {
+  return sql`${column} ~ '^[0-9a-f]{64}$'`
 }
 
 /** A quantity unit is nullable in several tables; the list is the same everywhere. */
@@ -162,6 +172,13 @@ export const actors = pgTable(
   'actors',
   {
     id: uuid('id').primaryKey(),
+    /**
+     * The external identity a person comes back by (MOL-52). `bigint` because Telegram long
+     * outgrew 32 bits, `mode: 'number'` because it promised never to outgrow 52 — the two
+     * CHECKs below are that promise, held by the database rather than by whoever writes the
+     * next insert.
+     */
+    telegramUserId: bigint('telegram_user_id', { mode: 'number' }).notNull(),
     country: char('country', { length: 2 }).notNull(),
     city: varchar('city', { length: 120 }).notNull(),
     /** Currency travels beside every amount: without it the minor exponent is unknown. */
@@ -182,6 +199,13 @@ export const actors = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    // «One Telegram account, one owner» — the whole point of the column, and a statement
+    // about *other rows*, which only the database can make.
+    unique('actors_telegram_user_id_key').on(table.telegramUserId),
+    check('actors_telegram_user_id_positive', sql`${table.telegramUserId} > 0`),
+    // A row JSON could not carry back without distorting it must not exist at all: the first
+    // to notice otherwise would be somebody's browser, not this server. 2^53.
+    check('actors_telegram_user_id_safe', sql`${table.telegramUserId} < 9007199254740992`),
     check('actors_country_iso', sql`${table.country} ~ '^[A-Z]{2}$'`),
     check('actors_spend_currency_known', oneOf(table.spendCurrency, currencySchema.options)),
     check('actors_income_currency_known', oneOf(table.incomeCurrency, currencySchema.options)),
@@ -633,5 +657,98 @@ export const officialRates = pgTable(
       sql`${oneOf(table.currency, currencySchema.options)} and ${table.currency} <> 'AMD'`,
     ),
     check('official_rates_positive', sql`${table.scaled} > 0`),
+  ],
+)
+
+/**
+ * A live way into an account, and nothing else (MOL-52).
+ *
+ * The token is not here — only `sha256` of it in hex, which is what makes «the token is in the
+ * database only as a hash» a property of the table rather than of whoever writes the next
+ * insert. sha256 without a salt is the right tool and not a shortcut: the token is 32 bytes of
+ * `randomBytes`, so there is no dictionary to make expensive, and the hash has to be
+ * deterministic or the unique index below could not find it.
+ *
+ * Revoking is deleting the row (Р-4). A `revoked_at` would be a column every later query had to
+ * remember, and the first one that forgot would quietly let a thrown-out device back in — while
+ * a deleted row is indistinguishable from an expired and from a nonexistent one for free, which
+ * is exactly what MOL-53 has to answer.
+ */
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid('id').primaryKey(),
+    // Cascade, unlike the trips and verdicts of MOL-6: those are data, this is the key to
+    // them, and a key must not outlive its owner by a millisecond.
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    tokenHash: char('token_hash', { length: 64 }).notNull(),
+    /** Short, derived: «iPhone · Safari», never the browser string it came from. */
+    deviceName: varchar('device_name', { length: DEVICE_NAME_MAX }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    // Nothing moves it yet, so until MOL-53 it is a second `created_at` and a device list would
+    // be lying if it showed it. MOL-53 writes it, and not on every request — at most once a day.
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    // The one path every request to the API takes, so it is an index before it is a rule.
+    unique('sessions_token_hash_key').on(table.tokenHash),
+    index('sessions_actor_idx').on(table.actorId),
+    check('sessions_token_hash_hex', hexDigest(table.tokenHash)),
+    check('sessions_lifetime_forward', sql`${table.expiresAt} > ${table.createdAt}`),
+  ],
+)
+
+/**
+ * A login being waited for: the row that turns a link into a bot into a session for the very
+ * browser that asked (MOL-52, MOL-54).
+ *
+ * Two addresses, on purpose (Р-7). `code` travels into Telegram — into a chat, a link preview,
+ * someone's forward — so its alphabet is Telegram's. `id` travels in an HTTP path, that is into
+ * the access log, so it is a uuid like every other identifier here.
+ *
+ * `telegram_user_id` carries no foreign key, and that is not an oversight: on a first login the
+ * owner does not exist yet. Referential integrity would be telling a lie about the world.
+ */
+export const loginRequests = pgTable(
+  'login_requests',
+  {
+    id: uuid('id').primaryKey(),
+    code: varchar('code', { length: LOGIN_CODE_MAX }).notNull(),
+    /** Of the requesting browser's own secret, which rides in its cookie and nowhere else. */
+    secretHash: char('secret_hash', { length: 64 }).notNull(),
+    /** What the bot shows the person: «sign in on <this>?». Written here because the bot asks
+     * before a session exists, and it cannot see the browser (Р-8). */
+    deviceName: varchar('device_name', { length: DEVICE_NAME_MAX }),
+    telegramUserId: bigint('telegram_user_id', { mode: 'number' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    /** Set when the session is handed over — and also when «this was not me» puts the request
+     * out without confirming it. One answer for both, because there is one reader. */
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+  },
+  (table) => [
+    unique('login_requests_code_key').on(table.code),
+    // The length comes from `LOGIN_CODE_MAX` here too, and not as a second 64 typed out: it is
+    // Telegram's number, it already decides the column's width and `loginCodeSchema`, and the
+    // one place it was written by hand is the one place it could have drifted.
+    check(
+      'login_requests_code_format',
+      sql`${table.code} ~ '^[A-Za-z0-9_-]{1,${sql.raw(String(LOGIN_CODE_MAX))}}$'`,
+    ),
+    check('login_requests_secret_hash_hex', hexDigest(table.secretHash)),
+    check('login_requests_lifetime_forward', sql`${table.expiresAt} > ${table.createdAt}`),
+    // The same two bounds `actors` holds: a confirmed request becomes an owner, and a number
+    // that could not survive JSON must not reach that point either.
+    check(
+      'login_requests_telegram_user_id_positive',
+      sql`${table.telegramUserId} is null or ${table.telegramUserId} > 0`,
+    ),
+    check(
+      'login_requests_telegram_user_id_safe',
+      sql`${table.telegramUserId} is null or ${table.telegramUserId} < 9007199254740992`,
+    ),
   ],
 )

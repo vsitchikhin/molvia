@@ -89,15 +89,22 @@
     {
       "idx": 12,
       "version": "7",
-      "when": 1789917864310,
-      "tag": "0012_advice_shared_access",
+      "when": 1789917290002,
+      "tag": "0012_telegram_identity",
       "breakpoints": true
     },
     {
       "idx": 13,
       "version": "7",
-      "when": 1789919748358,
-      "tag": "0013_advice_viewed_event",
+      "when": 1789919182213,
+      "tag": "0013_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790009814501,
+      "tag": "0014_advice_access_and_event",
       "breakpoints": true
     }
   ]

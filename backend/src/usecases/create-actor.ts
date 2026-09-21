@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { newActorSchema } from '@molvia/model'
-import type { Actor, NewActor } from '@molvia/model'
+import type { Actor, NewActor, TelegramUserId } from '@molvia/model'
 import type { ActorRepository } from '@/db/actors-repository'
 
 /**
@@ -22,10 +22,16 @@ const FIRST_VISIT: NewActor = Object.freeze(
 )
 
 /**
- * The identifier is issued here, not brought by the device: it is the only proof of identity
- * this release has, so a client that named its own could name someone else's and read their
- * trips whole.
+ * The identifier is issued here, not brought by the device: a client that named its own could
+ * name someone else's and read their trips whole.
+ *
+ * The Telegram id comes from the caller rather than from here, because who the person is is
+ * not this use case's to know: MOL-54 takes it from a login request the person confirmed in
+ * the bot, and until then the development seam mints one (MOL-52, Р-3).
  */
-export async function createActor(actors: ActorRepository): Promise<Actor> {
-  return actors.create(randomUUID(), FIRST_VISIT)
+export async function createActor(
+  actors: ActorRepository,
+  telegramUserId: TelegramUserId,
+): Promise<Actor> {
+  return actors.create(randomUUID(), telegramUserId, FIRST_VISIT)
 }

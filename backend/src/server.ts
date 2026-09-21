@@ -5,8 +5,9 @@ import type { ErrorCode, ErrorResponse } from '@molvia/model'
 import { InvalidBody } from '@/parse'
 import { healthRoutes } from '@/routes/health'
 import { withActor } from '@/routes/actor'
-import { actorMeRoute, firstVisitRoute } from '@/routes/actors'
+import { actorMeRoute } from '@/routes/actors'
 import { adviceRoutes } from '@/routes/advice'
+import { devActorRoute } from '@/routes/dev-actors'
 import { catalogueRoutes } from '@/routes/catalogue'
 import { placeRoutes } from '@/routes/places'
 import { tripRoutes } from '@/routes/trips'
@@ -32,7 +33,6 @@ import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { databaseIsReachable, getDb } from '@/db'
 import type { Db } from '@/db'
-import { env } from '@/env'
 
 // The one place where a domain error becomes an HTTP status. Routes never map errors
 // themselves, so a code cannot mean 400 in one place and 404 in another.
@@ -124,10 +124,20 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const verdicts = createVerdictRepository(db)
 
     healthRoutes(instance, { databaseIsReachable })
-    firstVisitRoute(instance, {
-      create: () => createActor(actors),
-      signupCode: env.SIGNUP_CODE,
-    })
+
+    // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).
+    // `bin/bundle.mjs` replaces this exact expression with the literal `'production'`, so in
+    // the production bundle the condition folds to `false`, the branch goes, and with its
+    // last reference gone `dev-actors` is tree-shaken out entirely — the address does not
+    // exist there rather than being switched off. Two things keep that true, and both are
+    // easy to undo without noticing: esbuild only substitutes an *unbound* `process`, so this
+    // file must never `import process from 'node:process'`, and the parsed `env` object is no
+    // substitute because its value is only known while running. What actually holds the
+    // promise is neither comment but `bundle-seam.integration.test.ts`, which greps the built
+    // file.
+    if (process.env.NODE_ENV !== 'production') {
+      devActorRoute(instance, { create: (telegramUserId) => createActor(actors, telegramUserId) })
+    }
 
     // Everything that needs an owner is registered inside this scope, and the scope is here
     // rather than inside a route module: «new routes land in the guarded place by default»
