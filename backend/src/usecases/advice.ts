@@ -5,6 +5,7 @@ import {
   DomainError,
   ERROR,
   EVENT,
+  NEVER_BELOW_TENTHS,
   PRICE_MEDIAN_MIN_OBSERVATIONS,
   adviceResponseSchema,
   averageScore,
@@ -62,10 +63,11 @@ export async function advice(
     actorId,
     scope,
     minContributions: AGGREGATE_MIN_CONTRIBUTIONS,
+    neverBelowTenths: NEVER_BELOW_TENTHS,
     limit: ADVICE_LIMIT,
   })
 
-  const levelled = rated.map((row) => ({ row, level: verdictLevel(row.sum, row.count) }))
+  const levelled = rated.rows.map((row) => ({ row, level: verdictLevel(row.sum, row.count) }))
   const asked = (...levels: readonly VerdictLevel[]) =>
     levelled.filter((entry) => levels.includes(entry.level)).map((entry) => entry.row.itemId)
 
@@ -94,7 +96,7 @@ export async function advice(
 
   // Encoded here rather than only in the route, the way `tripViewFor` is: an answer the wire
   // cannot carry has to fail where it was built, beside the data that made it.
-  const answer = { scope, rows }
+  const answer = { scope, rows, total: rated.total }
   z.encode(adviceResponseSchema, answer)
 
   /*
@@ -102,6 +104,13 @@ export async function advice(
    * nothing on this screen came from anyone else, so it is not a return for other people's
    * data. Recorded after the answer is built, so a failed read is not a visit, and never
    * swallowed — a row lost here lowers the gate with nothing to backfill from.
+   *
+   * **The visit is counted by intent, not by catch** (Р-21, the owner's decision after
+   * adversarial round 1, F3). The condition is access, not content: a person with access who
+   * opens an empty screen, or one made entirely of their own figures — which the threshold of
+   * three contributors will make ordinary for a long while — is counted as having come back
+   * for other people's data. They did come for it; there was none. Written down here because
+   * the name of the event and the wording of Р-15 both read the other way.
    *
    * `product` always: 0.1 has no venues, and the screen shows what the catalogue holds.
    */

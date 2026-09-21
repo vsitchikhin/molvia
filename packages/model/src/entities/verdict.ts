@@ -84,22 +84,41 @@ export const VERDICT_LEVEL = {
 export type VerdictLevel = (typeof VERDICT_LEVEL)[keyof typeof VERDICT_LEVEL]
 
 /**
- * Thresholds 4.0 and 2.5, both inclusive, compared as integers so an average in 0.3 never
- * puts a float in a product decision. A sum outside [count, 5*count] is a broken aggregate.
+ * The scale in tenths, which is the number the screen prints and therefore the number the
+ * groups are decided by (MOL-31, Р-22). «Брать» from 4.0, «не брать нигде» below 2.5, both
+ * boundaries inclusive on the side they name.
+ *
+ * Deciding on the exact fraction instead put «4,0 из 5» in «только если дёшево»: 79 over 20
+ * is 3.95, which prints as «4.0» and grouped one floor below, and two rows with the same
+ * number stood in different groups with nothing to explain it (adversarial round 1, F6).
+ * The person reasons with the printed number, so the printed number decides.
  */
-export function verdictLevel(sum: number, count: number): VerdictLevel {
+export const TAKE_FROM_TENTHS = 40
+export const NEVER_BELOW_TENTHS = 25
+
+/** The average in tenths, rounded half away from zero — exactly what `averageScore` prints. */
+function tenthsOf(sum: number, count: number): number {
   const details = `${String(sum)}/${String(count)}`
-  if (!Number.isSafeInteger(sum) || !Number.isSafeInteger(count)) {
+  if (!Number.isSafeInteger(sum) || !Number.isSafeInteger(count) || count <= 0) {
     throw new DomainError(ERROR.INVALID_SCORE, details)
   }
-  if (count <= 0) {
-    throw new DomainError(ERROR.INVALID_SCORE, details)
-  }
+  // A sum outside [count, 5*count] is a broken aggregate — a join that multiplied rows, a
+  // NULL counted as zero — and it used to come back as a confident verdict instead of an error.
   if (sum < count || sum > 5 * count) {
     throw new DomainError(ERROR.INVALID_SCORE, details)
   }
-  if (sum >= 4 * count) return VERDICT_LEVEL.TAKE
-  if (2 * sum < 5 * count) return VERDICT_LEVEL.NEVER
+  return Number(divideRounded(BigInt(sum) * 10n, BigInt(count)))
+}
+
+/**
+ * Which of the three groups an item falls into, from the sum of its scores and how many
+ * people gave them. Integers throughout, so a product decision never rests on how two
+ * doubles compare.
+ */
+export function verdictLevel(sum: number, count: number): VerdictLevel {
+  const tenths = tenthsOf(sum, count)
+  if (tenths >= TAKE_FROM_TENTHS) return VERDICT_LEVEL.TAKE
+  if (tenths < NEVER_BELOW_TENTHS) return VERDICT_LEVEL.NEVER
   return VERDICT_LEVEL.IF_CHEAP
 }
 
@@ -122,12 +141,5 @@ export const AGGREGATE_MIN_CONTRIBUTIONS = 3
  * half away from zero, the way every other ratio in this package is.
  */
 export function averageScore(sum: number, count: number): `${number}` {
-  const details = `${String(sum)}/${String(count)}`
-  if (!Number.isSafeInteger(sum) || !Number.isSafeInteger(count) || count <= 0) {
-    throw new DomainError(ERROR.INVALID_SCORE, details)
-  }
-  if (sum < count || sum > 5 * count) {
-    throw new DomainError(ERROR.INVALID_SCORE, details)
-  }
-  return decimalFromScaled(divideRounded(BigInt(sum) * 10n, BigInt(count)), 1)
+  return decimalFromScaled(BigInt(tenthsOf(sum, count)), 1)
 }

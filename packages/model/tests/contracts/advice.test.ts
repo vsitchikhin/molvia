@@ -97,26 +97,37 @@ describe('adviceRowSchema', () => {
 
 describe('adviceResponseSchema', () => {
   it('says whose figures it carries', () => {
-    const answer = adviceResponseSchema.parse({ scope: 'shared', rows: [take, never] })
+    const wire = { scope: 'shared', rows: [take, never], total: 2 }
+    const answer = adviceResponseSchema.parse(wire)
 
     expect(answer.scope).toBe('shared')
-    expect(z.encode(adviceResponseSchema, answer)).toEqual({ scope: 'shared', rows: [take, never] })
+    expect(z.encode(adviceResponseSchema, answer)).toEqual(wire)
   })
 
   it('answers an empty catalogue with an empty list, not with a missing field', () => {
-    expect(adviceResponseSchema.parse({ scope: 'own', rows: [] }).rows).toEqual([])
-    expect(adviceResponseSchema.safeParse({ scope: 'own' }).success).toBe(false)
+    expect(adviceResponseSchema.parse({ scope: 'own', rows: [], total: 0 }).rows).toEqual([])
+    expect(adviceResponseSchema.safeParse({ scope: 'own', total: 0 }).success).toBe(false)
+    expect(adviceResponseSchema.safeParse({ scope: 'own', rows: [] }).success).toBe(false)
   })
 
   it('refuses a mode a client invented', () => {
-    expect(adviceResponseSchema.safeParse({ scope: 'everyone', rows: [] }).success).toBe(false)
+    expect(adviceResponseSchema.safeParse({ scope: 'everyone', rows: [], total: 0 }).success).toBe(
+      false,
+    )
   })
 
   it('stops at the limit rather than carrying a list nobody bounded', () => {
     const rows = Array.from({ length: ADVICE_LIMIT + 1 }, () => take)
 
-    expect(adviceResponseSchema.safeParse({ scope: 'own', rows: rows.slice(1) }).success).toBe(true)
-    expect(adviceResponseSchema.safeParse({ scope: 'own', rows }).success).toBe(false)
+    const total = rows.length
+    expect(
+      adviceResponseSchema.safeParse({ scope: 'own', rows: rows.slice(1), total }).success,
+    ).toBe(true)
+    expect(adviceResponseSchema.safeParse({ scope: 'own', rows, total }).success).toBe(false)
+    // Счётчик не может быть меньше страницы, которую он сопровождает.
+    expect(adviceResponseSchema.safeParse({ scope: 'own', rows: [take], total: 0 }).success).toBe(
+      false,
+    )
   })
 })
 

@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { and, eq, sql } from 'drizzle-orm'
-import { AGGREGATE_MIN_CONTRIBUTIONS } from '@molvia/model'
+import { AGGREGATE_MIN_CONTRIBUTIONS, NEVER_BELOW_TENTHS } from '@molvia/model'
 import type { AdviceScope } from '@molvia/model'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace } from './fixtures'
@@ -10,13 +10,28 @@ import { verdicts as verdictsTable } from '@/db/schema'
 const { db, close } = connectDrizzle()
 const verdicts = createVerdictRepository(db)
 
-function rowsFor(actorId: string, scope: AdviceScope = 'own', limit = 50) {
-  return verdicts.adviceRowsFor({
+async function rowsFor(actorId: string, scope: AdviceScope = 'own', limit = 50) {
+  const { rows } = await verdicts.adviceRowsFor({
     actorId,
     scope,
     minContributions: AGGREGATE_MIN_CONTRIBUTIONS,
+    neverBelowTenths: NEVER_BELOW_TENTHS,
     limit,
   })
+  return rows
+}
+
+/** The counter travels with the page, so the two can be read apart. */
+function totalFor(actorId: string, scope: AdviceScope = 'own', limit = 50) {
+  return verdicts
+    .adviceRowsFor({
+      actorId,
+      scope,
+      minContributions: AGGREGATE_MIN_CONTRIBUTIONS,
+      neverBelowTenths: NEVER_BELOW_TENTHS,
+      limit,
+    })
+    .then((answer) => answer.total)
 }
 
 /** Rates without going through the repository: the read is what these tests are about. */
@@ -208,5 +223,32 @@ describe('порядок и предел', () => {
 
   it('отвечают пустым списком на личность, которой не бывает', async () => {
     expect(await rowsFor('не-uuid')).toEqual([])
+  })
+
+  it('считают всё, что есть, а не только страницу', async () => {
+    const actorId = await insertActor(db)
+    for (const name of ['Один', 'Два', 'Три'])
+      await rate(actorId, await insertItem(db, { name }), 4)
+
+    expect(await totalFor(actorId, 'own', 2)).toBe(3)
+    expect(await rowsFor(actorId, 'own', 2)).toHaveLength(2)
+  })
+
+  it('берегут от предела своё и «не брать нигде» (Р-23)', async () => {
+    const me = await insertActor(db)
+    const mine = await insertItem(db, { name: 'Моя тройка' })
+    await rate(me, mine, 3)
+    const bad = await insertItem(db, { name: 'Чужая единица' })
+    for (let n = 0; n < 3; n += 1) await rate(await insertActor(db), bad, 1)
+    // Две чужие пятёрки: по оценке они выше обеих, и предел в две строки съел бы и мою
+    // тройку, и предупреждение.
+    for (const name of ['Чужая пятёрка', 'Ещё пятёрка']) {
+      const other = await insertItem(db, { name })
+      for (let n = 0; n < 3; n += 1) await rate(await insertActor(db), other, 5)
+    }
+
+    const names = (await rowsFor(me, 'shared', 2)).map((row) => row.name)
+    expect(names).toEqual(['Моя тройка', 'Чужая единица'])
+    expect(await totalFor(me, 'shared', 2)).toBe(4)
   })
 })

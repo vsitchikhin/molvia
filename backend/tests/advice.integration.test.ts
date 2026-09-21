@@ -127,7 +127,7 @@ describe('дверь', () => {
   it('пустой экран — пустой список, а не ошибка', async () => {
     const actorId = await insertActor(db)
 
-    expect(await screen(actorId)).toEqual({ scope: 'own', rows: [] })
+    expect(await screen(actorId)).toEqual({ scope: 'own', rows: [], total: 0 })
   })
 })
 
@@ -141,13 +141,14 @@ describe('три группы', () => {
     await rate(actorId, cheese, 3)
     await rate(actorId, sausage, 2, 'Пахнет крахмалом')
 
-    const { rows } = await screen(actorId)
+    const { rows, total } = await screen(actorId)
 
     expect(rows.map((row) => [row.name, row.level, row.rating])).toEqual([
       ['Говядина', 'take', '5.0'],
       ['Сыр «Чанах»', 'if_cheap', '3.0'],
       ['Колбаса «Молочная»', 'never', '2.0'],
     ])
+    expect(total).toBe(3)
   })
 
   it('у «не брать нигде» в ответе нет ни места, ни цены, ни порога — даже ключа', async () => {
@@ -474,5 +475,35 @@ describe('ревью 1', () => {
       'Ежевика',
       'Ёжик',
     ])
+  })
+
+  it('F6 — напечатанное число и группа не спорят на границе', async () => {
+    const me = await insertActor(db)
+    const four = await insertItem(db, { name: 'Ровно четыре' })
+    const almost = await insertItem(db, { name: 'Почти четыре' })
+    // Двадцать человек: 80 — это ровно 4,0, а 79 — 3,95, и печатается тоже «4.0».
+    for (let n = 0; n < 20; n += 1) {
+      const who = await insertActor(db)
+      await rate(who, four, 4)
+      await rate(who, almost, n === 0 ? 3 : 4)
+    }
+    await grantAccess(me)
+
+    const rows = (await screen(me)).rows.filter((row) => row.ratingsCount === 20)
+    // Обе печатают «4.0» и обе в «брать» — это и есть починка. Между собой их по-прежнему
+    // разводит точная дробь: 4,00 выше 3,95.
+    expect(rows.map((row) => [row.name, row.rating, row.level])).toEqual([
+      ['Ровно четыре', '4.0', 'take'],
+      ['Почти четыре', '4.0', 'take'],
+    ])
+  })
+
+  it('F8 — счётчик говорит, что список неполон', async () => {
+    const me = await insertActor(db)
+    for (const name of ['Один', 'Два']) await rate(me, await insertItem(db, { name }), 5)
+
+    const answer = await screen(me)
+    expect(answer.total).toBe(2)
+    expect(answer.rows).toHaveLength(2)
   })
 })

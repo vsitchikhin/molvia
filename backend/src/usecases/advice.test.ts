@@ -54,6 +54,7 @@ function median(patch: Partial<PriceMedian> & { scaledMinor: bigint }): PriceMed
 interface World {
   readonly actor?: Actor | null
   readonly rows?: AdviceVerdictRow[]
+  readonly total?: number
   readonly prices?: PlacePrice[]
   readonly medians?: PriceMedian[]
   readonly recorded?: RecordedEvent[]
@@ -77,7 +78,8 @@ function deps(world: World = {}) {
     withdraw: () => Promise.reject(new Error('withdraw was not expected')),
     forItem: () => Promise.reject(new Error('forItem was not expected')),
     listFor: () => Promise.reject(new Error('listFor was not expected')),
-    adviceRowsFor: () => Promise.resolve(world.rows ?? []),
+    adviceRowsFor: () =>
+      Promise.resolve({ rows: world.rows ?? [], total: world.total ?? (world.rows ?? []).length }),
   }
 
   const expenses: ExpenseRepository = {

@@ -888,13 +888,14 @@ describe('the trip', () => {
     }
 
     it('reads the three groups and says whose figures they are', async () => {
-      const { client, calls } = clientReplying(200, { scope: 'shared', rows: [beef] })
+      const { client, calls } = clientReplying(200, { scope: 'shared', rows: [beef], total: 1 })
 
       const answer = await client.advice()
 
       expect(calls[0]?.method).toBe('GET')
       expect(new URL(calls[0]?.url ?? '').pathname).toBe('/advice')
       expect(answer.scope).toBe('shared')
+      expect(answer.total).toBe(1)
       expect(
         answer.rows[0]?.level === 'take' && answer.rows[0].places[0]?.unitPrice.scaledMinor,
       ).toBe(479_000_000_000n)

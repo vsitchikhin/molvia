@@ -98,13 +98,25 @@ describe('verdictLevel', () => {
     expect(verdictLevel(1, 1)).toBe('never')
   })
 
-  it('holds the same thresholds on an average, which is what 0.3 brings', () => {
+  it('holds the same thresholds on an average, which is what the shared mode brings', () => {
     // Exactly 4.0 and exactly 2.5 are the two values a float would fumble.
     expect(verdictLevel(8, 2)).toBe('take') // 4.0
     expect(verdictLevel(39, 10)).toBe('if_cheap') // 3.9
     expect(verdictLevel(5, 2)).toBe('if_cheap') // 2.5
-    expect(verdictLevel(249, 100)).toBe('never') // 2.49
     expect(verdictLevel(9, 2)).toBe('take') // 4.5
+  })
+
+  it('decides by the number the screen prints, not by the fraction behind it (Р-22)', () => {
+    // 3.95 prints as «4.0», and a row saying «4,0 из 5» in «только если дёшево» is a
+    // contradiction nothing on the screen can explain (adversarial round 1, F6).
+    expect(averageScore(79, 20)).toBe('4.0')
+    expect(verdictLevel(79, 20)).toBe('take')
+    // The same at the other boundary: 2.45 prints as «2.5» and belongs with the 2.5s.
+    expect(averageScore(49, 20)).toBe('2.5')
+    expect(verdictLevel(49, 20)).toBe('if_cheap')
+    // 2.449 still prints «2.4» and stays below.
+    expect(averageScore(2449, 1000)).toBe('2.4')
+    expect(verdictLevel(2449, 1000)).toBe('never')
   })
 
   it('refuses an aggregate that no set of ratings could produce', () => {

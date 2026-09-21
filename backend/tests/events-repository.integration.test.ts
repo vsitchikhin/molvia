@@ -29,10 +29,14 @@ afterAll(async () => {
   await close()
 })
 
+/**
+ * A person who appeared on that day. Nothing is written to the log: the cohort is read from
+ * `actors.created_at` (MOL-31, Р-20), and the fixture used to seed `session_started` — an
+ * event no code writes since MOL-8 withdrew it. A fixture describing a path the product does
+ * not take is what kept the gate's own defect hidden (adversarial round 1, F2).
+ */
 async function actorSeenAt(started: Date): Promise<string> {
-  const actorId = await insertActor(db)
-  await repository.record({ actorId, type: EVENT.SESSION_STARTED, occurredAt: started })
-  return actorId
+  return insertActor(db, { createdAt: started })
 }
 
 describe('week-four return', () => {
@@ -135,6 +139,19 @@ describe('week-four return', () => {
     })
   })
 
+  it('counts a person who never wrote a single event — the denominator is «who came»', async () => {
+    // Without access nothing on the screen is anyone else's, so nothing is recorded; the
+    // person still arrived, still enters purchases, and the gate must be able to see that
+    // they did not come back. Building the cohort from the log put them outside it forever
+    // and left the threshold measuring only those who had paid (adversarial round 1, F2).
+    await actorSeenAt(daysAgo(35))
+
+    await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
+      cohortSize: 1,
+      returned: 0,
+    })
+  })
+
   it('ignores actors first seen outside the cohort window', async () => {
     const actorId = await actorSeenAt(daysAgo(5))
     await repository.record({
@@ -171,8 +188,8 @@ describe("recording at most once a day of the person's own life", () => {
   })
 
   it('writes nothing more in the same day of their life', async () => {
-    const actorId = await insertActor(db)
-    // First seen ten days and three hours ago: today of their life began three hours ago.
+    // Appeared ten days and three hours ago: today of their life began three hours ago.
+    const actorId = await insertActor(db, { createdAt: ago(10 * DAY + 3 * HOUR) })
     await repository.record({ ...view(actorId), occurredAt: ago(10 * DAY + 3 * HOUR) })
     await repository.record({ ...view(actorId), occurredAt: ago(2 * HOUR) })
 
@@ -183,8 +200,8 @@ describe("recording at most once a day of the person's own life", () => {
   it('writes a visit in week four even when the last row is under a day old', async () => {
     // The rolling window lost exactly this: an evening in week three swallowed the next
     // morning in week four, and the gate saw a person who came back as one who did not.
-    const actorId = await insertActor(db)
     const started = ago(21 * DAY + HOUR) // week four of their life began an hour ago
+    const actorId = await insertActor(db, { createdAt: started })
     await repository.record({ ...view(actorId), occurredAt: started })
     await repository.record({ ...view(actorId), occurredAt: ago(2 * HOUR) }) // still week three
 

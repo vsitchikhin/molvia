@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ISSUE } from '#model/support/errors'
 import { itemSchema } from '#model/entities/item'
 import { placeSchema } from '#model/entities/place'
 import { verdictFields } from '#model/entities/verdict'
@@ -100,8 +101,16 @@ export const ADVICE_LIMIT = 200
  * `GET /advice`. An object rather than a bare list, so a field beside the rows does not break
  * a client, and `scope` is that field: it is the one thing the screen cannot work out itself.
  */
-export const adviceResponseSchema = z.strictObject({
-  scope: adviceScopeSchema,
-  rows: z.array(adviceRowSchema).max(ADVICE_LIMIT),
-})
+export const adviceResponseSchema = z
+  .strictObject({
+    scope: adviceScopeSchema,
+    rows: z.array(adviceRowSchema).max(ADVICE_LIMIT),
+    /**
+     * How many rated items there are in all, so a truncated list can say so (MOL-31, Р-23).
+     * Without it the screen could not tell a short list from a cut one, and the cut is not
+     * hypothetical: in the shared mode the list is everything anyone has rated.
+     */
+    total: z.int().nonnegative(),
+  })
+  .refine((answer) => answer.total >= answer.rows.length, { error: ISSUE.RESPONSE_INVALID })
 export type AdviceResponse = z.output<typeof adviceResponseSchema>
