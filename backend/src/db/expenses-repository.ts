@@ -131,8 +131,13 @@ export interface PlacePrice {
   /** The same scale `unitPrice()` produces, so the domain can compare these directly. */
   readonly scaledMinor: bigint
   readonly observations: number
-  /** The newest purchase behind this row — the tie-break between two «currency + unit» groups. */
-  readonly latestAt: Date
+  /**
+   * The day of the most recent **visit** in which this was bought — `trips.started_at`, not
+   * the moment a row reached the server (F4). It breaks the tie between two «currency + unit»
+   * groups, and it is named after the trip on purpose: called «the latest purchase» it invited
+   * the next reader to «fix» it back to `created_at`, which is what the offline queue stamps.
+   */
+  readonly latestVisitAt: Date
 }
 
 /**
@@ -177,7 +182,7 @@ interface PlacePriceShape extends Record<string, unknown> {
   unit: BaseUnit | null
   scaledMinor: string | null
   observations: string
-  latestAt: Date | string
+  latestVisitAt: Date | string
 }
 
 interface PriceMedianShape extends Record<string, unknown> {
@@ -541,7 +546,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           unit,
           min(unit_price)::text as "scaledMinor",
           count(*)::text as observations,
-          max(bought_at) as "latestAt"
+          max(bought_at) as "latestVisitAt"
         ${priced.rows}
         group by item_id, place_id, place_name, currency, unit
         -- Ordered here rather than after, and by the price itself: the screen shows the
@@ -572,7 +577,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
             unit: row.unit,
             scaledMinor: BigInt(row.scaledMinor),
             observations: Number(row.observations),
-            latestAt: asDate(row.latestAt),
+            latestVisitAt: asDate(row.latestVisitAt),
           },
         ]
       })

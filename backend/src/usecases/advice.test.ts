@@ -42,7 +42,7 @@ function price(patch: Partial<PlacePrice> & { scaledMinor: bigint }): PlacePrice
     currency: 'AMD',
     unit: 'kg',
     observations: 1,
-    latestAt: new Date('2026-09-18T10:00:00.000Z'),
+    latestVisitAt: new Date('2026-09-18T10:00:00.000Z'),
     ...patch,
   }
 }
@@ -202,7 +202,7 @@ describe('места и порог', () => {
         currency: 'RUB',
         scaledMinor: 1n,
         observations: 1,
-        latestAt: new Date('2026-09-19T10:00:00.000Z'),
+        latestVisitAt: new Date('2026-09-19T10:00:00.000Z'),
       }),
     ]
 
@@ -214,11 +214,11 @@ describe('места и порог', () => {
 
   it('при равном числе наблюдений решает последняя покупка', async () => {
     const prices = [
-      price({ scaledMinor: perKilo(479_000), latestAt: new Date('2026-09-01T10:00:00.000Z') }),
+      price({ scaledMinor: perKilo(479_000), latestVisitAt: new Date('2026-09-01T10:00:00.000Z') }),
       price({
         currency: 'RUB',
         scaledMinor: 1n,
-        latestAt: new Date('2026-09-19T10:00:00.000Z'),
+        latestVisitAt: new Date('2026-09-19T10:00:00.000Z'),
       }),
     ]
 

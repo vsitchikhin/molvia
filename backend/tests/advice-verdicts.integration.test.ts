@@ -5,6 +5,7 @@ import {
   AGGREGATE_MIN_CONTRIBUTIONS,
   NEVER_BELOW_TENTHS,
 } from '@molvia/model'
+import { verdictLevel } from '@molvia/model'
 import type { AdviceScope } from '@molvia/model'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace } from './fixtures'
@@ -297,5 +298,34 @@ describe('порядок и предел', () => {
     const names = (await rowsFor(me, 'shared', 2)).map((row) => row.name)
     expect(names).toEqual(['Моя тройка', 'Чужая единица'])
     expect(await totalFor(me, 'shared', 2)).toBe(4)
+  })
+
+  it('округляет границу так же, как домен — иначе предел берёг бы не те строки (С-12)', async () => {
+    // Уровень строки считает домен (`divideRounded`), а что предел не имеет права срезать —
+    // SQL (`round(score_sum * 10.0 / contributors)`). Разойдись они хоть на одной паре, и
+    // строка, которую домен зовёт «не брать нигде», перестала бы быть защищённой — то есть
+    // дефект F8 вернулся бы через заднюю дверь, и увидеть это можно было бы только на полном
+    // списке. Пары взяты у самой границы: 2,45 печатается «2.5» и уходит выше, 2,4 остаётся.
+    const me = await insertActor(db)
+    const cases = [
+      { name: 'Ровно 2,4', scores: [2, 2, 2, 3, 3] }, // 12/5 → «2.4» → не брать
+      { name: 'Ровно 2,45', scores: [...Array<number>(11).fill(2), ...Array<number>(9).fill(3)] }, // 49/20 → «2.5»
+      { name: 'Ровно 2,5', scores: [...Array<number>(10).fill(2), ...Array<number>(10).fill(3)] }, // 50/20
+      { name: 'Ровно 5,0', scores: [5, 5, 5] },
+    ]
+
+    const expectedNever: string[] = []
+    for (const { name, scores } of cases) {
+      const itemId = await insertItem(db, { name })
+      for (const score of scores) await rate(await insertActor(db), itemId, score)
+      const sum = scores.reduce((total, score) => total + score, 0)
+      if (verdictLevel(sum, scores.length) === 'never') expectedNever.push(name)
+    }
+
+    // Предел ровно в число защищённых строк: выживут только те, что SQL считает «не брать».
+    const protectedRows = await rowsFor(me, 'shared', expectedNever.length)
+
+    expect(expectedNever).toEqual(['Ровно 2,4'])
+    expect(protectedRows.map((row) => row.name)).toEqual(expectedNever)
   })
 })

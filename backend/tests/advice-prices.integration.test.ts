@@ -117,8 +117,8 @@ describe('последняя покупка', () => {
     await bought(actorId, itemId, placeId, amd(300_000))
 
     const [row] = await expenses.cheapestFor(ownPrices(actorId, [itemId]))
-    expect(row?.latestAt).toBeInstanceOf(Date)
-    expect(Date.now() - (row?.latestAt.getTime() ?? 0)).toBeLessThan(60_000)
+    expect(row?.latestVisitAt).toBeInstanceOf(Date)
+    expect(Date.now() - (row?.latestVisitAt.getTime() ?? 0)).toBeLessThan(60_000)
   })
 })
 

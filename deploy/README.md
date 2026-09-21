@@ -56,3 +56,13 @@ same command ending in `down -v`.
 There is no workflow that SSHs into the machine and deploys. Until a machine exists there
 are no secrets to configure, and a deploy job that cannot run is worse than none: it looks
 like a safety net and is not one. The two commands above are the whole deploy.
+
+## The Postgres image has to carry ICU
+
+«Что брать» orders names with `collate "und-x-icu"` (MOL-31): the database is created with
+`en_US.utf8`, where «Ёжик» sorts before «Ежевика» and a name typed in lower case falls below
+every capitalised one, and one answer must not come back in two alphabets. `postgres:17-alpine`
+carries the ICU collations, and the compose file pins that image — but an image built without
+ICU would make those queries **fail**, not degrade: `ORDER BY` on a collation the server does
+not know is an error. So the image is part of the contract, and swapping it is a migration-sized
+decision rather than a version bump.

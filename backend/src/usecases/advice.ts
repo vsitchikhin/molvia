@@ -141,27 +141,28 @@ function groupPrices(places: readonly PlacePrice[]): Map<string, Map<GroupKey, P
 
 /**
  * Which «currency + unit» an item's prices are shown in (Р-4). The one with the most
- * observations, and the latest purchase breaks a tie: a single trip abroad must not replace
- * a year of buying the same thing at home. Two prices from different groups cannot be
+ * observations, and the most recent visit breaks a tie — the day of the trip, never the hour
+ * an offline queue delivered it: a single trip abroad must not replace a year of buying the
+ * same thing at home. Two prices from different groups cannot be
  * compared without a rate, and a rate belongs to one trip and one day.
  */
 function dominant(groups: Map<GroupKey, PlacePrice[]>): [GroupKey, PlacePrice[]] | undefined {
   let best: [GroupKey, PlacePrice[]] | undefined
-  let bestWeight = { observations: 0, latestAt: 0 }
+  let bestWeight = { observations: 0, latestVisitAt: 0 }
   for (const [key, places] of groups) {
     const observations = places.reduce((sum, place) => sum + place.observations, 0)
-    const latestAt = Math.max(...places.map((place) => place.latestAt.getTime()))
+    const latestVisitAt = Math.max(...places.map((place) => place.latestVisitAt.getTime()))
     const better =
       observations > bestWeight.observations ||
-      (observations === bestWeight.observations && latestAt > bestWeight.latestAt) ||
+      (observations === bestWeight.observations && latestVisitAt > bestWeight.latestVisitAt) ||
       // Both equal: the key itself decides, so two loads of one screen cannot disagree.
       (observations === bestWeight.observations &&
-        latestAt === bestWeight.latestAt &&
+        latestVisitAt === bestWeight.latestVisitAt &&
         best !== undefined &&
         key < best[0])
     if (better) {
       best = [key, places]
-      bestWeight = { observations, latestAt }
+      bestWeight = { observations, latestVisitAt }
     }
   }
   return best
