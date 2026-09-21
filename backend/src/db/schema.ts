@@ -149,7 +149,9 @@ export const events = pgTable(
       // asserted to be there before its value is compared. And the domain's `strictObject`
       // has to hold here too: `payload - 'subject'` must leave nothing, or an extra key
       // lands in an append-only log with nothing to clean it out with.
-      sql`(${table.type} <> ${literal(EVENT.CATALOGUE_VIEWED)}
+      // `advice_viewed` carries the same axis as `catalogue_viewed` and is checked by the
+      // same shape: the gate splits products from venues whichever screen was opened.
+      sql`(${table.type} not in (${list([EVENT.CATALOGUE_VIEWED, EVENT.ADVICE_VIEWED])})
              or (jsonb_exists(${table.payload}, 'subject')
                  and ${table.payload} ->> 'subject' in (${list(catalogueSubjectSchema.options)})
                  and ${table.payload} - 'subject' = '{}'::jsonb))
@@ -182,6 +184,15 @@ export const actors = pgTable(
     /** Currency travels beside every amount: without it the minor exponent is unknown. */
     spendCurrency: char('spend_currency', { length: 3 }).$type<Currency>().notNull(),
     incomeCurrency: char('income_currency', { length: 3 }).$type<Currency>().notNull(),
+    /**
+     * Until when other people's data is visible to this person (MOL-31, Р-9). «How much
+     * access someone has» is «until what date»: ten ratings buying a month, a dollar buying
+     * one, and a grant made by hand all land in the same column, so the paid layer of 0.2
+     * needs no second migration. Empty and a past date mean the same thing — nothing of
+     * anyone else's — and the boundary is exactly «now», which is the domain's to decide
+     * (`hasSharedAccess`), not a default here.
+     */
+    sharedUntil: timestamp('shared_until', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.

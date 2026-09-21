@@ -31,6 +31,7 @@ const actor: Actor = actorSchema.parse({
   city: 'Gyumri',
   spendCurrency: 'AMD',
   incomeCurrency: 'RUB',
+  sharedUntil: null,
   createdAt: new Date('2026-09-01T10:00:00.000Z'),
   updatedAt: new Date('2026-09-01T10:00:00.000Z'),
 })
@@ -113,6 +114,7 @@ function fakeRepositories(
       unratedFor: unexpected('expenses.unratedFor'),
       pendingVerdictsFor: unexpected('expenses.pendingVerdictsFor'),
       cheapestFor: unexpected('expenses.cheapestFor'),
+      medianPriceFor: unexpected('expenses.medianPriceFor'),
       ...overrides.expenses,
     },
     places: {

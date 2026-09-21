@@ -24,6 +24,7 @@ function actorFrom(id: string, telegramUserId: number, input: NewActor): Actor {
     id,
     telegramUserId,
     ...input,
+    sharedUntil: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   })

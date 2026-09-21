@@ -52,6 +52,11 @@ export type ActorView = z.infer<typeof actorViewSchema>
  * Strict, on the client's side as much as the server's, and for the same reason
  * `catalogueEntryCodec` is: a reply that grew a field fails to parse rather than carrying it
  * past a client that simply never reads it — which is how a leak would otherwise go unnoticed.
+ *
+ * `sharedUntil` (MOL-31, Р-9) is therefore **not** here: the allowlist above never named it,
+ * and no screen of 0.1 says «access until». The thing a screen acts on — whose figures it is
+ * being shown — travels with the answer that carries them, as `scope`. It joins the wire with
+ * the screen that grants or sells access, by being named in the view, not by being derived.
  */
 export const actorWireSchema = z.strictObject({
   ...actorViewSchema.shape,

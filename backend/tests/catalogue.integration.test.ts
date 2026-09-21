@@ -9,7 +9,6 @@ import { eq } from 'drizzle-orm'
 import {
   CATALOGUE_QUERY_MAX,
   ERROR,
-  EVENT,
   ISSUE,
   catalogueEntryCodec,
   catalogueSearchResponseSchema,
@@ -303,42 +302,14 @@ describe('GET /catalogue/search — the answer', () => {
 })
 
 describe('GET /catalogue/search — the event log', () => {
-  it('records one catalogue view on the product half for the first search', async () => {
+  it('writes nothing at all: the visit that answers the 0.3 gate is «Что брать»', async () => {
+    // The search recorded `catalogue_viewed` from MOL-12 until MOL-31 (Р-18). It meant «came
+    // back to enter a purchase», which was the honest reading while no screen showed anyone
+    // else's data; now that one does, `advice_viewed` is the row the gate counts, and an
+    // event nobody reads has no place in an append-only log.
     const actor = await insertActor(db)
 
-    await search(actor, q('молоко'))
-
-    const rows = await viewsOf(actor)
-    expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({ type: EVENT.CATALOGUE_VIEWED, payload: { subject: 'product' } })
-  })
-
-  it('keeps it to one a day however many searches follow', async () => {
-    const actor = await insertActor(db)
-
-    for (const text of ['м', 'мо', 'мол', 'моло', 'молок', 'молоко', 'сыр', '', 'хлеб', 'чай']) {
-      await search(actor, q(text))
-    }
-
-    expect(await viewsOf(actor)).toHaveLength(1)
-  })
-
-  it('counts each owner apart', async () => {
-    const one = await insertActor(db)
-    const other = await insertActor(db)
-
-    await search(one, q('молоко'))
-    await search(other, q('молоко'))
-
-    expect(await viewsOf(one)).toHaveLength(1)
-    expect(await viewsOf(other)).toHaveLength(1)
-  })
-
-  it('must not record a refused search', async () => {
-    const actor = await insertActor(db)
-
-    await search(actor, '?q=a&q=b')
-    await search(actor, q('м'.repeat(CATALOGUE_QUERY_MAX + 1)))
+    for (const text of ['м', 'мо', 'мол', 'молоко']) await search(actor, q(text))
 
     expect(await viewsOf(actor)).toHaveLength(0)
   })

@@ -6,11 +6,13 @@ import { InvalidBody } from '@/parse'
 import { healthRoutes } from '@/routes/health'
 import { withActor } from '@/routes/actor'
 import { actorMeRoute } from '@/routes/actors'
+import { adviceRoutes } from '@/routes/advice'
 import { devActorRoute } from '@/routes/dev-actors'
 import { catalogueRoutes } from '@/routes/catalogue'
 import { placeRoutes } from '@/routes/places'
 import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
+import { advice } from '@/usecases/advice'
 import { createActor } from '@/usecases/create-actor'
 import { currentTrip } from '@/usecases/current-trip'
 import { getActor } from '@/usecases/get-actor'
@@ -145,7 +147,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       withActor(guarded, (id) => getActor(actors, id))
       actorMeRoute(guarded)
       catalogueRoutes(guarded, {
-        search: (actorId, query) => searchCatalogue({ items, events }, actorId, query),
+        search: (actorId, query) => searchCatalogue({ items }, actorId, query),
         propose: (actorId, input) => proposeItem(items, actorId, input),
       })
       placeRoutes(guarded, { recent: (actorId) => recentPlaces(tripData.places, actorId) })
@@ -158,6 +160,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         remove: (actorId, tripId, expenseId) => removeExpense(transact, actorId, tripId, expenseId),
         finish: (actorId, tripId) => finishTrip(tripData.trips, actorId, tripId),
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
+      })
+      adviceRoutes(guarded, {
+        advice: (actorId) =>
+          advice({ actors, verdicts, expenses: tripData.expenses, events }, actorId),
       })
       verdictRoutes(guarded, {
         rate: (actorId, itemId, rating) => rateItem({ items, verdicts }, actorId, itemId, rating),

@@ -12,6 +12,15 @@ import { catalogueSubjectSchema } from '#model/values/gate'
 export const EVENT = {
   SESSION_STARTED: 'session_started',
   CATALOGUE_VIEWED: 'catalogue_viewed',
+  /**
+   * Someone opened «Что брать» and was shown other people's figures (MOL-31, Р-15). This is
+   * the event the 0.3 gate counts, and it exists because `catalogue_viewed` could no longer
+   * answer what that gate asks. The catalogue search wrote that one while nothing on any
+   * screen came from anyone else, so «came back» meant «came back to enter a purchase»; from
+   * the moment a screen shows other people's ratings, the two have to be different rows, and
+   * an append-only log cannot be told apart afterwards.
+   */
+  ADVICE_VIEWED: 'advice_viewed',
 } as const
 
 export type EventType = (typeof EVENT)[keyof typeof EVENT]
@@ -28,6 +37,12 @@ export const eventSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal(EVENT.SESSION_STARTED) }),
   z.strictObject({
     type: z.literal(EVENT.CATALOGUE_VIEWED),
+    payload: z.strictObject({ subject: catalogueSubjectSchema }),
+  }),
+  // The same axis, because the gate splits on it either way: products and venues are counted
+  // apart, and «Что брать» shows one or the other.
+  z.strictObject({
+    type: z.literal(EVENT.ADVICE_VIEWED),
     payload: z.strictObject({ subject: catalogueSubjectSchema }),
   }),
 ])

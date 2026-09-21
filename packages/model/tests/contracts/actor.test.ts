@@ -11,6 +11,7 @@ const actor = {
   city: 'Гюмри',
   spendCurrency: 'AMD',
   incomeCurrency: 'RUB',
+  sharedUntil: null,
   createdAt: new Date('2026-09-16T10:00:00.123Z'),
   updatedAt: new Date('2026-09-16T10:00:00.456Z'),
 }
@@ -95,5 +96,16 @@ describe('actorCodec', () => {
     // GEL is in the Google Sheet the project grew out of and deliberately not in the schema:
     // a fifth currency is a migration plus four CHECK constraints, not a wire concern.
     expect(actorCodec.safeParse({ ...wire, spendCurrency: 'GEL' }).success).toBe(false)
+  })
+
+  it('keeps the granted access on the server — the allowlist never named it', () => {
+    // `sharedUntil` is the person's own, but no screen of 0.1 reads it, and the view is an
+    // allowlist: what a screen acts on — whose figures it is shown — travels with the answer
+    // that carries them, as `scope` (MOL-31, Р-9).
+    const granted = actorSchema.parse({ ...actor, sharedUntil: new Date('2026-10-20T00:00:00Z') })
+    const wire = z.encode(actorCodec, granted)
+
+    expect(wire).not.toHaveProperty('sharedUntil')
+    expect(actorWireSchema.safeParse({ ...wire, sharedUntil: null }).success).toBe(false)
   })
 })

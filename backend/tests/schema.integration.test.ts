@@ -886,6 +886,33 @@ describe('the gate log refuses what the gates cannot count', () => {
     await expect(db.select().from(events)).resolves.toHaveLength(1)
   })
 
+  it('holds an advice view to the same shape: the gate splits it on the same axis', async () => {
+    const actorId = await insertActor(db)
+
+    await refuses(
+      () =>
+        db.execute(sql`
+      insert into ${events} (actor_id, type) values (${actorId}, 'advice_viewed')
+    `),
+      CHECK,
+    )
+
+    await refuses(
+      () =>
+        db.execute(sql`
+      insert into ${events} (actor_id, type, payload)
+      values (${actorId}, 'advice_viewed', '{"subject":"product","scope":"shared"}'::jsonb)
+    `),
+      CHECK,
+    )
+
+    await db.execute(sql`
+      insert into ${events} (actor_id, type, payload)
+      values (${actorId}, 'advice_viewed', '{"subject":"product"}'::jsonb)
+    `)
+    await expect(db.select().from(events)).resolves.toHaveLength(1)
+  })
+
   it('refuses a payload that is not an object, and a session that carries one', async () => {
     const actorId = await insertActor(db)
 

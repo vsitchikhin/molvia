@@ -5,6 +5,7 @@ import {
   ERROR,
   ISSUE,
   actorCodec,
+  adviceResponseSchema,
   addExpenseBodySchema,
   catalogueEntryCodec,
   catalogueSearchResponseSchema,
@@ -26,6 +27,7 @@ import {
 } from '@molvia/model'
 import type {
   ActorView,
+  AdviceResponse,
   AddExpenseBody,
   CatalogueEntry,
   ExpensePatch,
@@ -177,6 +179,12 @@ export interface MolviaClient {
   withdrawVerdict(itemId: string): Promise<void>
   /** «Оценки»: bought and not rated, one card per item, and how many wait in all. */
   pendingVerdicts(): Promise<PendingVerdicts>
+  /**
+   * «Что брать»: the rated rows in three groups, with prices where a price is allowed.
+   * Takes nothing — whose figures come back follows from the person's access (MOL-31, Р-11)
+   * and is said in `scope`, so there is no parameter with which to ask for anyone else's.
+   */
+  advice(): Promise<AdviceResponse>
 }
 
 /**
@@ -450,5 +458,7 @@ export function createClient({
       request(verdictPath(itemId), z.undefined(), { method: 'DELETE' }),
 
     pendingVerdicts: async () => request('/verdicts/pending', pendingVerdictsCodec),
+
+    advice: async () => request('/advice', adviceResponseSchema),
   }
 }

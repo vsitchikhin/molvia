@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { DomainError } from '@molvia/model'
 import type { Money, Quantity } from '@molvia/model'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, ownPrices } from './fixtures'
 import { createExpenseRepository } from '@/db/expenses-repository'
 import { createPlaceRepository } from '@/db/places-repository'
 import { createTripRepository } from '@/db/trips-repository'
@@ -106,7 +106,7 @@ describe('трата', () => {
     })
 
     expect(await expenses.unratedFor(stranger, 10)).toEqual([])
-    expect(await expenses.cheapestFor(stranger, [itemId])).toEqual([])
+    expect(await expenses.cheapestFor(ownPrices(stranger, [itemId]))).toEqual([])
   })
 })
 

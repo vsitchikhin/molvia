@@ -857,4 +857,50 @@ describe('the trip', () => {
     const { client } = clientReplying(200, { places: [tripWire.place] })
     expect(await client.recentPlaces()).toEqual([tripWire.place])
   })
+
+  describe('«Что брать»', () => {
+    const BEEF = '0b6f2c4e-8d1a-4f3b-9c7e-5a2d1e0f3b4c'
+    const MARKET = 'd2f1a3b4-5c6d-4e7f-8a9b-0c1d2e3f4a5b'
+
+    const beef = {
+      level: 'take',
+      itemId: BEEF,
+      name: 'Говядина, вырезка',
+      rating: '4.3',
+      ratingsCount: 3,
+      review: null,
+      places: [
+        {
+          placeId: MARKET,
+          name: 'Рынок в Гюмри',
+          unitPrice: { amount: '4790.00000000', currency: 'AMD', unit: 'kg' },
+          observations: 2,
+        },
+      ],
+    }
+
+    it('reads the three groups and says whose figures they are', async () => {
+      const { client, calls } = clientReplying(200, { scope: 'shared', rows: [beef], total: 1 })
+
+      const answer = await client.advice()
+
+      expect(calls[0]?.method).toBe('GET')
+      expect(new URL(calls[0]?.url ?? '').pathname).toBe('/advice')
+      expect(answer.scope).toBe('shared')
+      expect(answer.total).toBe(1)
+      expect(
+        answer.rows[0]?.level === 'take' && answer.rows[0].places[0]?.unitPrice.scaledMinor,
+      ).toBe(479_000_000_000n)
+    })
+
+    it('refuses a «не брать нигде» that arrived with a price', async () => {
+      const never = { ...beef, level: 'never', places: undefined }
+      const { client } = clientReplying(200, {
+        scope: 'own',
+        rows: [{ ...never, places: beef.places }],
+      })
+
+      await expect(client.advice()).rejects.toThrow()
+    })
+  })
 })

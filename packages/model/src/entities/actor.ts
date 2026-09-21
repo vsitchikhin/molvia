@@ -24,10 +24,26 @@ export const actorSchema = z.object({
   city: citySchema,
   spendCurrency: currencySchema,
   incomeCurrency: currencySchema,
+  /**
+   * Until when other people's data is visible to this person (MOL-31, Р-9). Absent from
+   * `newActorSchema` and `actorPatchSchema` on purpose: access is granted, never requested,
+   * and a field a client could send would be the release's one paywall with no wall.
+   */
+  sharedUntil: z.date().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
 })
 export type Actor = z.infer<typeof actorSchema>
+
+/**
+ * Whether this person sees other people's ratings right now (MOL-31, Р-9). Empty and a past
+ * date are the same answer, and the boundary is exactly «now»: a grant that ran out this
+ * second is over. `now` is passed rather than read, so a use case and its test agree on when
+ * they are.
+ */
+export function hasSharedAccess(actor: Pick<Actor, 'sharedUntil'>, now: Date): boolean {
+  return actor.sharedUntil !== null && actor.sharedUntil > now
+}
 
 /**
  * The four settings a person arrives with. No `id` here on purpose: the server issues it

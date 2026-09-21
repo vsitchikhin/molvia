@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { DomainError, ERROR, verdictSchema } from '@molvia/model'
-import type { NewVerdict, Verdict, VerdictPatch } from '@molvia/model'
+import type { AdviceScope, NewVerdict, Verdict, VerdictPatch } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
@@ -36,6 +36,69 @@ export interface VerdictRepository {
    * — the thresholds stay in the domain, so the query carries no product decision.
    */
   listFor(actorId: string, limit: number): Promise<Verdict[]>
+  /**
+   * The rated rows of «Что брать» (MOL-31), already reduced to the pair every product rule
+   * takes: a sum of scores and how many people are behind it. `verdictLevel` and
+   * `averageScore` read exactly that pair, so the query decides nothing — it is handed
+   * `minContributions` rather than knowing it.
+   *
+   * In the own mode only this person's verdicts take part, so the pair is their own score
+   * over one. In the shared mode everyone's do — but a row whose people are fewer than
+   * `minContributions` falls back to this person's own figures (Р-16): showing an average
+   * over two hands the other person's score to whoever knows their own, and showing a
+   * stranger's lone verdict hands over all of it.
+   *
+   * Products only: a dish is rated where it was served, and 0.1 has no dishes.
+   */
+  adviceRowsFor(query: AdviceQuery): Promise<AdviceRows>
+}
+
+/**
+ * The page of rows the screen gets, and how many there are in all. The total is counted over
+ * the same rows in the same statement, before the limit applies: a second query could see a
+ * verdict the first did not, and the counter would disagree with the page it came with.
+ */
+export interface AdviceRows {
+  readonly rows: AdviceVerdictRow[]
+  readonly total: number
+}
+
+/** What «Что брать» asks the verdicts for. */
+export interface AdviceQuery {
+  readonly actorId: string
+  readonly scope: AdviceScope
+  /** The domain's number (`AGGREGATE_MIN_CONTRIBUTIONS`), never this file's. */
+  readonly minContributions: number
+  /**
+   * The domain's `NEVER_BELOW_TENTHS`: below this average, in tenths, a row is «не брать
+   * нигде». The statement uses it for one thing only — to decide what the limit may not cut
+   * (Р-23) — and holds no threshold of its own.
+   */
+  readonly neverBelowTenths: number
+  /**
+   * The domain's `ADVICE_WARNINGS_RESERVED`: how many of the rows are held for other people's
+   * warnings (Р-25). Also only ever read by the cut.
+   */
+  readonly warningsReserved: number
+  readonly limit: number
+}
+
+/**
+ * One item of «Что брать», before prices join it. Not a domain entity: an aggregate of
+ * verdicts has no identity and is never written back.
+ */
+export interface AdviceVerdictRow {
+  readonly itemId: string
+  readonly name: string
+  /** The sum of the scores the row is entitled to show, and how many of them there are. */
+  readonly sum: number
+  readonly count: number
+  /**
+   * This person's own review, and only ever theirs. A review is words, not an aggregate:
+   * there is nothing in it to average and nothing to hide behind, so someone else's text
+   * stays theirs until a release decides otherwise (MOL-31, Р-19).
+   */
+  readonly review: string | null
 }
 
 /**
@@ -258,6 +321,151 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         .orderBy(desc(verdicts.updatedAt), desc(verdicts.id))
         .limit(rowLimit(limit))
       return rows.map(toVerdict)
+    },
+
+    async adviceRowsFor({
+      actorId,
+      scope,
+      minContributions,
+      neverBelowTenths,
+      warningsReserved,
+      limit,
+    }) {
+      if (idOrNull(actorId) === null) return { rows: [], total: 0 }
+
+      /*
+       * Raw SQL, and one statement: the choice between «everyone's figures» and «my own»
+       * (Р-16) has to be made before the rows are ordered and cut, or the limit would drop
+       * items by a rating they are not going to be shown with.
+       *
+       * The choice lives here rather than in the use case for the same reason the unit price
+       * does in `expenses-repository`: made once, over the columns it is made of. What the
+       * domain owns is the *numbers* — they arrive as parameters — and what it then does with
+       * the pair: `verdictLevel` and `averageScore` read `sum` and `count` and nothing else.
+       *
+       * `count(distinct actor_id)`, not `count(*)`: a contribution is a person. One verdict
+       * per person per product is already the uniqueness of the table, but the shape of this
+       * aggregate must not depend on that — 0.3 adds dishes, where a place is part of the key.
+       */
+      const mine = sql`${verdicts.actorId} = ${actorId}::uuid`
+      const rows = await db.execute<{
+        itemId: string
+        name: string
+        sum: string
+        count: string
+        review: string | null
+        total: string
+      }>(sql`
+        with rated as (
+          select
+            ${verdicts.itemId} as item_id,
+            sum(${verdicts.score}) as score_sum,
+            count(distinct ${verdicts.actorId}) as contributors,
+            max(${verdicts.score}) filter (where ${mine}) as own_score,
+            max(${verdicts.review}) filter (where ${mine}) as own_review
+          from ${verdicts}
+          -- A withdrawn verdict is kept for the 0.2 gate alone: it is nobody's opinion, so
+          -- it is neither a score nor a contribution here.
+          where ${verdicts.deletedAt} is null
+            ${scope === 'own' ? sql`and ${mine}` : sql``}
+          group by ${verdicts.itemId}
+        ),
+        shown as (
+          select
+            r.item_id,
+            ${items.name} as name,
+            case when r.contributors >= ${minContributions} then r.score_sum else r.own_score end
+              as score_sum,
+            case when r.contributors >= ${minContributions} then r.contributors else 1 end
+              as contributors,
+            r.own_review,
+            r.own_score is not null as is_mine
+          from rated r
+          -- Not aliased: the column references above are written by drizzle and carry the
+          -- table's own name, so an alias here would leave them pointing at nothing.
+          join ${items} on ${items.id} = r.item_id and ${items.kind} = 'product'
+          where r.contributors >= ${minContributions} or r.own_score is not null
+        ),
+        scored as (
+          select
+            shown.*,
+            -- The same rounding the domain prints and groups by: half away from zero.
+            round(score_sum * 10.0 / contributors) as tenths,
+            count(*) over () as total
+          from shown
+        ),
+        ranked as (
+          select
+            scored.*,
+            -- Where this row stands among other people's warnings, best first. Only the
+            -- first warningsReserved of them are held back from the cut (Р-25); the rest
+            -- take their chances on rating like everything else.
+            row_number() over (
+              partition by (tenths < ${neverBelowTenths} and not is_mine)
+              order by score_sum::numeric / contributors desc, item_id
+            ) as warning_rank
+          from scored
+        )
+        select "itemId", name, sum, count, review, total
+        from (
+          select
+            item_id as "itemId",
+            name,
+            score_sum::text as sum,
+            contributors::text as count,
+            own_review as review,
+            total::text as total,
+            -- ::numeric rather than a float: the order of a product decision must not depend
+            -- on how two doubles compare.
+            score_sum::numeric / contributors as rating,
+            -- The name is compared in the root ICU collation, not the database's own. The
+            -- database is created with en_US.utf8, where «Ёжик» lands before «Ежевика» and a
+            -- name typed in lower case falls below every capitalised one — and the places
+            -- inside a row were ordered by yet another alphabet, so one answer came back in
+            -- two orders (adversarial round 1, F7). The root locale rather than ru-RU: this
+            -- catalogue holds Russian, Armenian and Latin names, and no single language
+            -- should decide for all three.
+            name collate "und-x-icu" as sort_name
+          from ranked
+          /*
+           * What the limit may not cut (Р-23). The list is ordered by rating, so the worst lie
+           * at its end, and the limit used to eat exactly them — two hundred strangers' fives
+           * deleted the one warning the screen exists for (adversarial round 1, F8).
+           *
+           * Three tiers, in this order (Р-25):
+           *   1. other people's «не брать нигде», up to warningsReserved of them,
+           *   2. this person's own rows,
+           *   3. everything else, by rating.
+           * The reserve goes first because tier 2 alone can fill the page, and then a
+           * stranger's warning — the one thing the person could not have learnt themselves —
+           * was the first row dropped (adversarial round 2, G2). It is a reserve and not a
+           * reordering: warnings have no bound in the shared mode, and putting all of them
+           * above tier 2 returned a page of two hundred warnings and no recommendation at all.
+           */
+          order by
+            (tenths < ${neverBelowTenths} and not is_mine and warning_rank <= ${warningsReserved}) desc,
+            is_mine desc,
+            (tenths < ${neverBelowTenths}) desc,
+            rating desc, sort_name asc, item_id asc
+          limit ${rowLimit(limit)}
+        ) page
+        -- And the page is shown by rating down, then by name (Р-6). Two orders on purpose:
+        -- what must survive the cut is not what must stand at the top of the screen.
+        order by rating desc, sort_name asc, "itemId" asc
+      `)
+
+      return {
+        rows: rows.map((row) => ({
+          itemId: row.itemId,
+          name: row.name,
+          // `sum` and `count` arrive as text: `sum()` over a smallint is a bigint, and the
+          // driver hands those over as strings rather than risking a double.
+          sum: Number(row.sum),
+          count: Number(row.count),
+          review: row.review,
+        })),
+        total: Number(rows[0]?.total ?? 0),
+      }
     },
   }
 }
