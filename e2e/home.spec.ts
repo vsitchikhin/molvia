@@ -1,4 +1,3 @@
-import process from 'node:process'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
@@ -126,7 +125,7 @@ test('offline, nothing offers a second «Try again», and the screen comes back 
     w.__online = false
     Object.defineProperty(Navigator.prototype, 'onLine', { get: () => w.__online })
   })
-  await page.goto(`/advice?c=${process.env.SIGNUP_CODE ?? ''}`)
+  await page.goto('/advice')
 
   // One «No connection», the screen's: the identity notice names its own trouble (B3).
   await expect(page.getByRole('heading', { name: 'No connection' })).toHaveCount(1)
@@ -156,7 +155,7 @@ test('the app speaks through a live region that was there first', async ({ page 
     await held
     await route.abort()
   })
-  await page.goto(`/advice?c=${process.env.SIGNUP_CODE ?? ''}`)
+  await page.goto('/advice')
   await expect.poll(said).toContainEqual(expect.stringContaining('Loading…'))
 
   release()
@@ -170,7 +169,7 @@ test('the app speaks through a live region that was there first', async ({ page 
 // the answer (MOL-19, C3).
 test('the live region does not keep what is no longer on the screen', async ({ page }) => {
   await page.route('**/api/health', (route) => route.abort())
-  await page.goto(`/advice?c=${process.env.SIGNUP_CODE ?? ''}`)
+  await page.goto('/advice')
   await expect(page.getByText('The server did not answer')).toBeVisible()
   await expect.poll(() => liveRegion(page)).not.toContain('Loading…')
 })
@@ -179,8 +178,8 @@ test('the live region does not keep what is no longer on the screen', async ({ p
 // failing the same way must be heard again, not swallowed as «no change» (MOL-19, C1).
 test('the same answer after «Try again» is said again', async ({ page }) => {
   const said = await recordLiveRegion(page)
-  await page.route('**/api/actors**', (route) => route.fulfill({ status: 500, body: '{}' }))
-  await page.goto(`/?c=${process.env.SIGNUP_CODE ?? ''}`)
+  await page.route('**/api/dev/actors**', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await page.goto('/')
   await expect(
     page.getByRole('heading', { name: 'This device could not be identified' }),
   ).toBeVisible()

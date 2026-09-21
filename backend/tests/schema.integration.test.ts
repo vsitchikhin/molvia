@@ -2,15 +2,27 @@ import { randomUUID } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
+import {
+  anHourFromNow,
+  clearAll,
+  insertActor,
+  insertItem,
+  insertLoginRequest,
+  insertPlace,
+  insertSession,
+  insertTrip,
+  telegramId,
+} from './fixtures'
 import {
   actors,
   events,
   expenses,
   itemBarcodes,
   items,
+  loginRequests,
   places,
   searchPicks,
+  sessions,
   trips,
   verdicts,
 } from '@/db/schema'
@@ -790,11 +802,26 @@ describe('the actor', () => {
     await refuses(
       () =>
         db.execute(sql`
-        insert into ${actors} (id, country, city, spend_currency, income_currency)
-        values (${randomUUID()}, 'AM', 'Гюмри', 'GBP', 'RUB')
+        insert into ${actors} (id, telegram_user_id, country, city, spend_currency, income_currency)
+        values (${randomUUID()}, ${telegramId()}, 'AM', 'Гюмри', 'GBP', 'RUB')
       `),
       CHECK,
     )
+  })
+
+  it('refuses a second owner on one Telegram account, and an id outside what JSON carries', async () => {
+    // The whole point of the column (MOL-52): «one Telegram account, one owner» is a claim
+    // about *other rows*, which only the database can make. The bounds are the edge cases —
+    // 2^53 − 1 is the largest id Telegram promised, 2^53 the first number a reply could not
+    // carry back unchanged.
+    const shared = telegramId()
+    await insertActor(db, { telegramUserId: shared })
+
+    await refuses(() => insertActor(db, { telegramUserId: shared }), UNIQUE)
+    await refuses(() => insertActor(db, { telegramUserId: 0 }), CHECK)
+    await refuses(() => insertActor(db, { telegramUserId: -1 }), CHECK)
+    await refuses(() => insertActor(db, { telegramUserId: 9_007_199_254_740_992 }), CHECK)
+    await expect(insertActor(db, { telegramUserId: 9_007_199_254_740_991 })).resolves.toBeTruthy()
   })
 
   it('refuses a country that is not two capitals', async () => {
@@ -946,6 +973,113 @@ describe('the remembered pick', () => {
 
     await db.insert(searchPicks).values({ actorId, queryKey: 'k'.repeat(600), itemId })
     await expect(db.select().from(searchPicks)).resolves.toHaveLength(1)
+  })
+})
+
+describe('the session, which is a key rather than data', () => {
+  it('refuses a token hash that is not one: wrong length, upper case, not hex', async () => {
+    const actorId = await insertActor(db)
+
+    for (const tokenHash of ['0'.repeat(63), 'A'.repeat(64), 'z'.repeat(64), '']) {
+      await refuses(() => insertSession(db, { actorId, tokenHash }), CHECK)
+    }
+  })
+
+  it('refuses two sessions on one token, so a stolen one cannot be planted beside its own', async () => {
+    const actorId = await insertActor(db)
+    const otherId = await insertActor(db)
+    const tokenHash = 'a'.repeat(64)
+    await insertSession(db, { actorId, tokenHash })
+
+    await refuses(() => insertSession(db, { actorId: otherId, tokenHash }), UNIQUE)
+  })
+
+  it('refuses a session that expires before it began', async () => {
+    const actorId = await insertActor(db)
+
+    await refuses(
+      () => insertSession(db, { actorId, expiresAt: new Date(Date.now() - 1000) }),
+      CHECK,
+    )
+  })
+
+  it('does not outlive its owner by a millisecond, and takes no login request with it', async () => {
+    // Cascade, unlike a trip or a verdict (MOL-6, Р-6): those are data and a person's history,
+    // this is the key to them. It is also the line MOL-58's deletion script would otherwise
+    // have to remember.
+    //
+    // The second half is the one that was left to be inferred: a login request survives the
+    // owner because it never pointed at one — on a first login there is no owner yet (Р-10).
+    // Inferring it from «there is no foreign key» is how a key gets added later by someone who
+    // did not know, so it is asserted rather than reasoned about.
+    const actorId = await insertActor(db)
+    const otherId = await insertActor(db)
+    await insertSession(db, { actorId })
+    await insertSession(db, { actorId: otherId })
+    await insertLoginRequest(db, { telegramUserId: 777_000_123 })
+
+    await db.delete(actors).where(eq(actors.id, actorId))
+
+    const left = await db.select().from(sessions)
+    expect(left).toHaveLength(1)
+    expect(left[0]?.actorId).toBe(otherId)
+    await expect(db.select().from(loginRequests)).resolves.toHaveLength(1)
+  })
+})
+
+describe('the login request, which lives minutes', () => {
+  it('refuses a code outside the alphabet Telegram accepts', async () => {
+    // `start` takes `[A-Za-z0-9_-]` and at most 64 of them. A code the link cannot carry is a
+    // login that cannot happen, and it should fail where it is written, not in a chat.
+    for (const code of ['', 'код', 'a+b', 'a/b', 'a=b', 'a b', 'a\nb']) {
+      await refuses(() => insertLoginRequest(db, { code }), CHECK)
+    }
+
+    // One character past the limit is refused by the type rather than by the CHECK — the two
+    // answer with different codes, and pretending otherwise would pin the wrong rule.
+    await refuses(() => insertLoginRequest(db, { code: 'a'.repeat(65) }), TOO_LONG)
+
+    // The boundary itself: 64 is Telegram's own limit, and the shortest code is one character.
+    await expect(insertLoginRequest(db, { code: 'a'.repeat(64) })).resolves.toBeTruthy()
+    await expect(insertLoginRequest(db, { code: 'a' })).resolves.toBeTruthy()
+  })
+
+  it('refuses two requests on one code', async () => {
+    await insertLoginRequest(db, { code: 'the-same-code' })
+
+    await refuses(() => insertLoginRequest(db, { code: 'the-same-code' }), UNIQUE)
+  })
+
+  it('refuses a secret hash that is not a sha256 in hex', async () => {
+    await refuses(() => insertLoginRequest(db, { secretHash: 'not-a-digest' }), CHECK)
+  })
+
+  it('holds the same two bounds on a Telegram id as the owner does, and still takes none', async () => {
+    // A confirmed request becomes an owner, so a number that could not survive the journey
+    // must not reach that point either. Null until the person presses the button, and there
+    // is deliberately no foreign key: on a first login the owner does not exist yet.
+    await expect(insertLoginRequest(db, { telegramUserId: null })).resolves.toBeTruthy()
+    await expect(insertLoginRequest(db, { telegramUserId: 777_000_123 })).resolves.toBeTruthy()
+
+    await refuses(() => insertLoginRequest(db, { telegramUserId: 0 }), CHECK)
+    await refuses(() => insertLoginRequest(db, { telegramUserId: -1 }), CHECK)
+    await refuses(() => insertLoginRequest(db, { telegramUserId: 9_007_199_254_740_992 }), CHECK)
+  })
+
+  it('takes a Telegram id no owner has, which is what a first login is', async () => {
+    const [request] = await db
+      .insert(loginRequests)
+      .values({
+        id: randomUUID(),
+        code: 'first-login',
+        secretHash: 'b'.repeat(64),
+        telegramUserId: 424_242_424,
+        expiresAt: anHourFromNow(),
+      })
+      .returning()
+
+    expect(request?.telegramUserId).toBe(424_242_424)
+    await expect(db.select().from(actors)).resolves.toHaveLength(0)
   })
 })
 

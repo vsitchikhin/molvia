@@ -10,7 +10,6 @@ import type { ActorWire } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { actors, events } from '@/db/schema'
 import { buildServer } from '@/server'
-import { env } from '@/env'
 import { connectDrizzle } from './db'
 
 const { db, close } = connectDrizzle()
@@ -43,14 +42,10 @@ function actorIn(body: unknown): ActorWire {
   return actorWireSchema.parse(body)
 }
 
-/** The first visit, with the code unless a test deliberately withholds or breaks it. */
-async function firstVisit(code: string | null = env.SIGNUP_CODE): Promise<Reply> {
+/** The first visit through the development seam that replaced the invite door (MOL-52). */
+async function firstVisit(): Promise<Reply> {
   return served(async (app) => {
-    const response = await app.inject({
-      method: 'POST',
-      url: '/actors',
-      headers: code === null ? {} : { 'x-molvia-invite': code },
-    })
+    const response = await app.inject({ method: 'POST', url: '/dev/actors' })
     return { status: response.statusCode, body: JSON.parse(response.body) as unknown }
   })
 }
@@ -99,21 +94,16 @@ describe('the first visit', () => {
     expect(new Date(actor.createdAt).getTime()).not.toBeNaN()
   })
 
-  it('refuses without the invite code, and writes nothing', async () => {
-    const { status, body } = await firstVisit(null)
+  it('never sends the Telegram id, though the row it just wrote holds one', async () => {
+    // The wire schema is strict, so a reply that grew the field would fail `actorIn` rather
+    // than travel unnoticed — which is the whole reason it is strict (MOL-52, Р-11).
+    const { body } = await firstVisit()
 
-    expect(status).toBe(401)
-    expect(body).toEqual({ code: ERROR.NO_ACTOR })
-    expect(await db.select().from(actors)).toHaveLength(0)
-  })
+    expect(body).not.toHaveProperty('telegramUserId')
+    expect(actorIn(body)).not.toHaveProperty('telegramUserId')
 
-  it('answers a wrong code exactly as it answers a missing one', async () => {
-    // A different reply would confirm to a stranger that a code is what they lack.
-    const wrong = await firstVisit('not-the-code')
-    const missing = await firstVisit(null)
-
-    expect(wrong).toEqual(missing)
-    expect(await db.select().from(actors)).toHaveLength(0)
+    const [row] = await db.select().from(actors)
+    expect(row?.telegramUserId).toBeGreaterThan(0)
   })
 
   it('gives two visits two identities: the server does not guess the device', async () => {

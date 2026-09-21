@@ -4,13 +4,13 @@
  * or an ordinary mistyped request actually gets now.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import process from 'node:process'
 import Fastify from 'fastify'
-import { ERROR, ISSUE } from '@molvia/model'
+import { ISSUE } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { actors, events } from '@/db/schema'
 import { buildServer } from '@/server'
 import { withActor } from '@/routes/actor'
-import { env } from '@/env'
 import { connectDrizzle } from './db'
 
 const { db, close } = connectDrizzle()
@@ -34,63 +34,111 @@ afterAll(async () => {
   await close()
 })
 
-function firstVisit(code: string | null, payload?: string) {
+/**
+ * The first visit through the development seam (MOL-52). The invite code it used to carry is
+ * gone with the door; what the seam kept is everything the door had nothing to do with — the
+ * refusal of a body, the shape of a malformed one, and `no-store` on the reply.
+ */
+function firstVisit(payload?: string) {
   return app.inject({
     method: 'POST',
-    url: '/actors',
-    headers: {
-      ...(code === null ? {} : { 'x-molvia-invite': code }),
-      ...(payload === undefined ? {} : { 'content-type': 'application/json' }),
-    },
+    url: '/dev/actors',
+    headers: payload === undefined ? {} : { 'content-type': 'application/json' },
     ...(payload === undefined ? {} : { payload }),
   })
 }
 
-describe('the door speaks before the body does', () => {
-  it('refuses a stranger whatever they sent, instead of letting the size decide', async () => {
-    // The seam used to answer first: a megabyte was buffered and parsed for a caller who
-    // was never allowed to speak, and a body past the limit came back 413 — so what a
-    // stranger learned depended on what they sent rather than on the door.
-    const megabyte = await firstVisit(null, JSON.stringify({ junk: 'x'.repeat(900_000) }))
-    const larger = await firstVisit(null, JSON.stringify({ junk: 'x'.repeat(2_000_000) }))
-
-    expect(megabyte.statusCode).toBe(401)
-    expect(larger.statusCode).toBe(401)
-    expect(JSON.parse(larger.body)).toEqual({ code: ERROR.NO_ACTOR })
-  })
-
+describe('the seam that replaced the door', () => {
   it('refuses a body on the handle documented as having none', async () => {
     // Accepting `{"country":"RU"}` and answering «AM» told the caller their input was
     // understood when it had been discarded.
-    const response = await firstVisit(env.SIGNUP_CODE, JSON.stringify({ country: 'RU' }))
+    const response = await firstVisit(JSON.stringify({ country: 'RU' }))
 
     expect(response.statusCode).toBe(400)
     expect(JSON.parse(response.body)).toMatchObject({ code: ISSUE.BODY_INVALID })
     expect(await db.select().from(actors)).toHaveLength(0)
   })
-})
 
-describe('a malformed body is the caller’s mistake, and reads as one', () => {
-  it('answers 400 with the code that means «your request», not «our fault»', async () => {
-    // It used to be a 400 carrying `error.internal`: the status said one thing, the body
-    // said another, and the PWA showed «Something went wrong». It also went through
-    // `log.error`, filing a client's typo as a server failure.
-    const response = await firstVisit(env.SIGNUP_CODE, '{')
+  it('refuses a stranger whatever they sent, instead of letting the size decide', async () => {
+    // This used to be `withInvite`'s property, and it was lost when the door went: the check
+    // moved onto `request.body`, so a megabyte came back 400 after being buffered and parsed,
+    // while two megabytes came back 413 — what a caller learned depended on how much they sent
+    // (adversarial А9). Decided by the headers on `onRequest` again, both are the same answer.
+    const megabyte = await firstVisit(JSON.stringify({ junk: 'x'.repeat(900_000) }))
+    const larger = await firstVisit(JSON.stringify({ junk: 'x'.repeat(2_000_000) }))
 
-    expect(response.statusCode).toBe(400)
-    expect(JSON.parse(response.body)).toEqual({ code: ISSUE.BODY_INVALID })
+    expect(megabyte.statusCode).toBe(400)
+    expect(larger.statusCode).toBe(400)
+    expect(JSON.parse(larger.body)).toMatchObject({ code: ISSUE.BODY_INVALID })
+    expect(await db.select().from(actors)).toHaveLength(0)
   })
 
-  it('answers an empty body announced as JSON the same way', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: '/actors',
-      headers: { 'content-type': 'application/json', 'x-molvia-invite': env.SIGNUP_CODE },
-      payload: '',
-    })
+  it('refuses a body of literal null, which is a body like any other', async () => {
+    // Read off `request.body` it was indistinguishable from no body at all, so it wrote a row
+    // in silence — the one case the old check let through (А9).
+    const response = await firstVisit('null')
 
     expect(response.statusCode).toBe(400)
-    expect(JSON.parse(response.body)).toEqual({ code: ISSUE.BODY_INVALID })
+    expect(await db.select().from(actors)).toHaveLength(0)
+  })
+
+  it('does not answer the address the door used to stand at', async () => {
+    // `POST /actors` and its invite code went together (MOL-52): taking the code off and
+    // leaving the handle open to the internet would have been worse than either.
+    const gone = await firstVisit()
+    expect(gone.statusCode).toBe(201)
+
+    const old = await app.inject({ method: 'POST', url: '/actors' })
+    expect(old.statusCode).toBe(404)
+  })
+
+  it('is not registered at all when NODE_ENV says production', async () => {
+    // The other half of «the seam cannot be switched on in production» (требования, проверка
+    // 13). The build check in `bundle-seam` covers the artifact; this covers a server started
+    // from source with that variable set — the way CI and a misconfigured host would run it.
+    const was = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    try {
+      const production = buildServer({ db })
+      await production.ready()
+      try {
+        const response = await production.inject({ method: 'POST', url: '/dev/actors' })
+
+        expect(response.statusCode).toBe(404)
+        expect(await db.select().from(actors)).toHaveLength(0)
+      } finally {
+        await production.close()
+      }
+    } finally {
+      process.env.NODE_ENV = was
+    }
+  })
+})
+
+describe('a body is a body, whatever is inside it', () => {
+  // These used to check that a **malformed** body came back 400 with the registry's code
+  // rather than a 400 carrying `error.internal`. On this handle that can no longer be asked:
+  // the body is refused by its headers before anything parses it (А9), so `'{'`, `''` and a
+  // well-formed object are one and the same answer — which is the property worth having here.
+  // The malformed-JSON path itself is exercised where it belongs, in
+  // `error-handler.integration.test.ts`, on a route that actually takes a body.
+  it('answers the same to broken JSON, to empty JSON and to a valid object', async () => {
+    const answers = await Promise.all(
+      ['{', '', '{}'].map(async (payload) => {
+        const response = await app.inject({
+          method: 'POST',
+          url: '/dev/actors',
+          headers: { 'content-type': 'application/json' },
+          payload,
+        })
+        return { status: response.statusCode, body: response.body }
+      }),
+    )
+
+    expect(answers.map((answer) => answer.status)).toEqual([400, 400, 400])
+    expect(new Set(answers.map((answer) => answer.body)).size).toBe(1)
+    expect(JSON.parse(answers[0]?.body ?? '')).toMatchObject({ code: ISSUE.BODY_INVALID })
+    expect(await db.select().from(actors)).toHaveLength(0)
   })
 })
 
@@ -98,7 +146,7 @@ describe('the replies that carry the identity', () => {
   it('tell every cache not to keep them', async () => {
     // In 0.1 the identifier is the whole proof of identity — whoever reads it is the owner.
     // A shared or disk cache holding this reply is the account sitting in a file.
-    const created = await firstVisit(env.SIGNUP_CODE)
+    const created = await firstVisit()
     const id = (JSON.parse(created.body) as { id: string }).id
 
     const mine = await app.inject({
@@ -146,28 +194,5 @@ describe('the guarded scope', () => {
     const response = await app.inject({ method: 'GET', url: '/health' })
 
     expect(response.statusCode).toBe(200)
-  })
-})
-
-describe('the door itself', () => {
-  it('answers a wrong code exactly as it answers a missing one', async () => {
-    const wrong = await firstVisit('not-the-code')
-    const missing = await firstVisit(null)
-
-    expect(wrong.statusCode).toBe(missing.statusCode)
-    expect(wrong.body).toBe(missing.body)
-    expect(await db.select().from(actors)).toHaveLength(0)
-  })
-
-  it('refuses a code that is right except for its last character', async () => {
-    // The length rule lives in the env schema, so asserting it here could not fail — the
-    // process would not have started. What is worth pinning is that a near miss is a miss:
-    // the comparison is over digests, so it neither stops early nor leaks how much matched.
-    const almost = `${env.SIGNUP_CODE.slice(0, -1)}${env.SIGNUP_CODE.endsWith('a') ? 'b' : 'a'}`
-
-    const response = await firstVisit(almost)
-
-    expect(response.statusCode).toBe(401)
-    expect(await db.select().from(actors)).toHaveLength(0)
   })
 })

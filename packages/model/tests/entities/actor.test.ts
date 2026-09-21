@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { actorPatchSchema, actorSchema, newActorSchema } from '#model/entities/actor'
+import {
+  actorPatchSchema,
+  actorSchema,
+  newActorSchema,
+  telegramUserIdSchema,
+} from '#model/entities/actor'
 
 const actor = {
   id: '3f2b1c6e-9a4d-4c1b-8f7e-2d5a6b8c9e01',
+  telegramUserId: 777_000_123,
   country: 'AM',
   city: 'Гюмри',
   spendCurrency: 'AMD',
@@ -30,6 +36,32 @@ describe('actorSchema', () => {
 
   it('rejects an empty city rather than storing a blank one', () => {
     expect(() => actorSchema.parse({ ...actor, city: '   ' })).toThrow()
+  })
+})
+
+describe('telegramUserIdSchema', () => {
+  it('takes the id Telegram issues today, and the largest one it promised never to exceed', () => {
+    // 2^53 − 1. The promise is what makes `number` safe here and `bigint` unnecessary — and
+    // it is the same bound `actors_telegram_user_id_safe` holds in the database.
+    expect(telegramUserIdSchema.parse(777_000_123)).toBe(777_000_123)
+    expect(telegramUserIdSchema.parse(9_007_199_254_740_991)).toBe(9_007_199_254_740_991)
+  })
+
+  it('refuses 2^53 itself, where a number stops being able to tell itself from its neighbour', () => {
+    expect(() => telegramUserIdSchema.parse(9_007_199_254_740_992)).toThrow()
+  })
+
+  it('refuses what is not an account: zero, a negative, a fraction, a string', () => {
+    for (const value of [0, -1, -777_000_123, 1.5, '777000123', null]) {
+      expect(() => telegramUserIdSchema.parse(value)).toThrow()
+    }
+  })
+
+  it('is required on the entity: an owner nobody can come back to is not one', () => {
+    const without: Record<string, unknown> = { ...actor }
+    delete without.telegramUserId
+
+    expect(() => actorSchema.parse(without)).toThrow()
   })
 })
 
@@ -92,6 +124,7 @@ describe('actorPatchSchema', () => {
   it('refuses fields the server owns, so a client cannot smuggle them in', () => {
     for (const smuggled of [
       { id: actor.id },
+      { telegramUserId: 42 },
       { createdAt: new Date() },
       { updatedAt: new Date() },
     ]) {

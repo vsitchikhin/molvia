@@ -1,5 +1,4 @@
-import { createHash, timingSafeEqual } from 'node:crypto'
-import { ACTOR_HEADER, DomainError, ERROR, INVITE_HEADER } from '@molvia/model'
+import { ACTOR_HEADER, DomainError, ERROR } from '@molvia/model'
 import type { Actor } from '@molvia/model'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
@@ -44,28 +43,5 @@ export function withActor(app: FastifyInstance, lookup: ActorLookup): void {
     const actor = await lookup(sent)
     request.actor = actor
     request.actorId = actor.id
-  })
-}
-
-/**
- * The door of the first visit, over the scope that creates identities. Also `onRequest`:
- * refusing a stranger should cost nothing but a header comparison.
- *
- * «No code» and «wrong code» answer identically — a difference would confirm to a stranger
- * that a code is what they are missing.
- */
-export function withInvite(app: FastifyInstance, expected: string): void {
-  const fingerprint = (value: string) => createHash('sha256').update(value).digest()
-  const wanted = fingerprint(expected)
-
-  app.addHook('onRequest', (request: FastifyRequest) => {
-    const sent = request.headers[INVITE_HEADER]
-    // Compared through fixed-length digests, so the time this takes says nothing about how
-    // much of the code was right. The effect is small over a network and the cost is two
-    // lines — and there is no counter behind this door to make guessing expensive otherwise.
-    const matches = typeof sent === 'string' && timingSafeEqual(fingerprint(sent), wanted)
-
-    if (!matches) throw new DomainError(ERROR.NO_ACTOR)
-    return Promise.resolve()
   })
 }
