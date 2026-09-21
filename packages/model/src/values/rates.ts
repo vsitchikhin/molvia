@@ -90,8 +90,8 @@ export const rateCodec = z.codec(exchangeRateWireSchema, exchangeRateSchema, {
  * The rate as the screen prints it: «4,82 ֏/₽» — how much of the quote currency one unit of the
  * base buys, with both signs, because a bare number says nothing about which way it goes.
  *
- * Two digits, and all six of the snapshot when the rate is under one: printed to two digits a
- * rate of 0,0001 is «0,00» — a zero rate on screen (MOL-22).
+ * Two digits, and up to the snapshot's six when the rate is under one — trailing zeros go, so 0,5
+ * prints «0,50». Printed to two digits a rate of 0,0001 is «0,00», a zero rate on screen (MOL-22).
  */
 export function formatRate(rate: ExchangeRate, locale = 'ru-RU'): string {
   // The decimal itself, as every other formatter of the domain does it: a rate is six digits, and

@@ -4,7 +4,7 @@ import { currentTripResponseSchema } from '@molvia/model'
 import type { TripView } from '@molvia/model'
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
-import { read, write } from '@/stores/storage'
+import { read, writeEverywhere } from '@/stores/storage'
 
 const KEY = 'molvia.trip'
 
@@ -27,25 +27,60 @@ function recall(actorId: string | null): TripView | null {
   if (!raw) return null
   try {
     const held: unknown = JSON.parse(raw)
-    const trip = isRecord(held) && isRecord(held.trip) ? { rateProvider: null, ...held.trip } : held
-    const parsed = currentTripResponseSchema.safeParse(
-      isRecord(held) && isRecord(held.trip) ? { trip } : held,
-    )
+    const parsed = currentTripResponseSchema.safeParse({ trip: known(held) })
     return parsed.success ? parsed.data.trip : null
   } catch {
     return null
   }
 }
 
+/** The fields of a trip this build knows; a field it added is filled with what its absence means. */
+const TRIP_FIELDS = [
+  'id',
+  'startedAt',
+  'finishedAt',
+  'currency',
+  'rate',
+  'rateProvider',
+  'rateJump',
+  'rateStale',
+  'place',
+  'expenses',
+  'total',
+  'converted',
+] as const
+
+/**
+ * A remembered trip as far as this build can read it, in both directions (Т-9): a field it has
+ * since gained is filled in — the build before MOL-22 kept no `rateProvider` — and a field it has
+ * never heard of, kept by a newer build the person rolled back from, is left out instead of
+ * failing the whole parse. The queue reads its own cards the same way (`cardOf`).
+ */
+function known(held: unknown): unknown {
+  if (!isRecord(held)) return null
+  const trip = held.trip
+  if (!isRecord(trip)) return trip ?? null
+  const fields = Object.fromEntries(
+    TRIP_FIELDS.filter((field) => trip[field] !== undefined).map((field) => [field, trip[field]]),
+  )
+  return { rateProvider: null, ...fields }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
+/**
+ * Written to every shelf that will take it, and taken off the ones that will not (Т-8): `read`
+ * answers from the first shelf that has anything, so a stale copy left on a full `localStorage`
+ * would be handed back as the trip on the next re-read — and those happen now on every change a
+ * neighbouring window makes.
+ */
 function remember(actorId: string | null, trip: TripView | null): void {
   if (!actorId) return
   // Wire form: a trip carries bigints, which JSON cannot hold, and the codec that reads it back
   // is the one the client reads the server's answer with.
-  write(keyOf(actorId), JSON.stringify(currentTripResponseSchema.encode({ trip })))
+  writeEverywhere(keyOf(actorId), JSON.stringify(currentTripResponseSchema.encode({ trip })))
 }
 
 /**

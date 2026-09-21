@@ -94,12 +94,12 @@
     },
     "unsent": {
       "title": "{n} purchase has not been sent | {n} purchases have not been sent",
-      "body": "They are on the phone. We send them as soon as there is a connection"
+      "body": "They are on the phone. They go out when there is a connection and the app is open"
     },
     "elsewhere": {
       "title": "A trip in «{place}» is already open",
       "body": "The purchases of this one («{mine}») are still on the phone: prices from one shop cannot be written to another — they are what comparisons are made of",
-      "join": "Add them to «{place}»",
+      "join": "Add them to that trip",
       "finish": "Finish that trip"
     }
   },

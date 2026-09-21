@@ -283,18 +283,22 @@ export default defineComponent({
       close(props.closeSteps)
     }
 
+    /**
+     * «Удалить позицию», wherever the purchase has got to by now. A row the server answered is
+     * deleted through the queue; one still waiting is taken out of it and never sent. In between
+     * there are two moments the sheet cannot see from its props (Т-3, Т-4): the purchase was
+     * refused while the sheet was open — then dropping it takes the refusal off the screen too —
+     * or it left and became a row — and then it has to be deleted like any other, or the sheet
+     * would close on a purchase that is still in the trip.
+     */
     function remove(): void {
-      if (done || !writeInto.value) return
-      // Still only on the phone: taken out of the queue, and nothing is sent at all.
-      if (!props.expense) {
-        done = true
-        if (props.retry) queue.dropPurchase(writeInto.value, props.retry.id)
-        emit('removed')
-        close(props.closeSteps)
-        return
-      }
+      const purchase = props.expense?.id ?? props.retry?.id
+      if (done || !writeInto.value || !purchase) return
       done = true
-      queue.enqueue({ kind: 'remove', tripId: writeInto.value, expenseId: props.expense.id })
+      const undone = !props.expense && queue.dropPurchase(writeInto.value, purchase)
+      if (!undone) {
+        queue.enqueue({ kind: 'remove', tripId: writeInto.value, expenseId: purchase })
+      }
       emit('removed')
       close(props.closeSteps)
     }

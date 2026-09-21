@@ -45,9 +45,11 @@ const FLIPPED = 'molvia.total-flipped'
  * convert: `total` and `converted` come with the trip, and until a queued purchase has been
  * answered the total is honestly behind the list — hence the caveat beside it (MOL-24, В-11).
  *
- * **The conversion always looks like an estimate** — «≈», a smaller size, a muted colour — in
- * either position of the flip. Two equal numbers read as two facts; there is one fact here and
- * one guess, and the guess may be wrong by the whole rate.
+ * **The conversion always looks like an estimate**: «≈» and the muted colour stay on it in either
+ * position of the flip, and beside the big number it is smaller as well. Two equal numbers read as
+ * two facts; there is one fact here and one guess, and the guess may be wrong by the whole rate.
+ * Flipped, the person asked for their own money to be the big number (handoff «Валюты»), so the
+ * size is theirs to change and the other two marks are not.
  *
  * **Only the trip's own currency is converted.** A purchase paid for in another is its own line
  * under the total: adding two currencies is refused by the domain and meaningless on a screen.
@@ -213,8 +215,8 @@ button.aside {
   }
 }
 
-/* An estimate never looks like a fact, whichever way the flip stands: the big number, when it is
-   the conversion, is muted too. */
+/* An estimate never looks like a fact: the big number, when it is the conversion, is muted and
+   keeps its «≈» — only its size is the person's choice. */
 .guess {
   color: var(--text-muted);
 }

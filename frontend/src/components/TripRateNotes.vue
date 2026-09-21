@@ -1,5 +1,5 @@
 <template>
-  <div class="notes">
+  <div class="notes" :class="{ empty: !jump && !fallback && !stale }">
     <!-- A jump is flagged, never refused (MOL-39, owner's decision): the rate may have truly
          moved, and only the person knows which number their money changed at. -->
     <div v-if="jump" class="note warn">
@@ -98,8 +98,9 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-/* No notes and no sheet up — nothing to take room: the screen has enough of its own. */
-.notes:not(:has(.note)) {
+/* No notes — nothing to take room: the screen has enough of its own. A class rather than
+   `:has()`, which older WebViews do not know. */
+.empty {
   display: contents;
 }
 

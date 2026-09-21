@@ -16,10 +16,11 @@ export interface TripSnapshot {
   readonly rate: ExchangeRate
   /**
    * Who published it — `null` only for a rate the person entered themselves, which is MOL-40's.
-   * The type cannot hold the pair together (`OfficialRate` carries the wide `RateSource`), so the
-   * agreement between this and `rate.source` — `official` is `cba` and nothing else — is held
-   * where it can be: `tripSchema`'s refine and the `trips_rate_provider_matches_source` check,
-   * both of which every write goes through (В2-14).
+   * A discriminated union would say this in the type, and it is not used on purpose: `OfficialRate`
+   * carries the wide `RateSource`, so every producer of a snapshot would have to narrow it, and the
+   * rule would be stated in three places instead of two. The agreement between this and
+   * `rate.source` — `official` is `cba` and nothing else — is held where every write goes through
+   * anyway: `tripSchema`'s refine and the `trips_rate_provider_matches_source` check (В2-14).
    */
   readonly provider: RateProvider | null
   readonly jumped: boolean

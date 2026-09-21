@@ -302,6 +302,18 @@ function sameWrite(a: QueuedWrite, b: QueuedWrite): boolean {
   return a.kind === b.kind && a.tripId === b.tripId && subject(a) === subject(b)
 }
 
+/**
+ * Whether two shop names are the same shop, as nearly as the phone can tell: the server decides
+ * this with `placeIdentity` in SQL — NFKC, emoji selectors dropped, lower case, trimmed — and the
+ * phone repeats what it can of it (Т-6). A name that differs only by something this misses asks
+ * the person a needless question; a name that differs in earnest never passes silently, and that
+ * is the side to err on (Б1).
+ */
+function samePlace(a: string, b: string): boolean {
+  const plain = (name: string) => name.normalize('NFKC').toLowerCase().replace(/\s+/gu, ' ').trim()
+  return plain(a) === plain(b)
+}
+
 /** Runs `work` alone across every window of the app where the browser can say so. */
 function exclusively(name: string, work: () => Promise<void>): Promise<void> {
   // The DOM types promise `navigator.locks`; older WebViews do not have it (see stores/actor.ts).
@@ -340,11 +352,19 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   const rejected = ref<RejectedWrite[]>([])
   /** Set when a trip started here met one open in another shop; cleared as soon as it is not so. */
   const elsewhere = ref<TripElsewhere | null>(null)
-  /** The person said «write them into that trip anyway»: the next reroute goes through. */
-  let yielded = false
+  /**
+   * The trip the person agreed to write into, by its identifier — never a bare «yes» (Т-1): a
+   * reroute that did not happen (the connection went, that trip was closed) would otherwise leave
+   * the agreement standing, and the next trip started anywhere would move into a third shop.
+   */
+  let yielded: string | null = null
   // A shelf refused the last write: until every shelf takes one, memory is ahead of storage and
   // is the truth — one refusing shelf still answers `read` with what it held before (Б3).
   let ahead = false
+  /** Purchases undone while their `add` was already out: the row it becomes is deleted at once. */
+  const dropped = new Set<string>()
+  /** The write a send is carrying right now, so «undo» can tell «gone» from «already a row». */
+  let inFlight: QueuedWrite | null = null
 
   function show(): void {
     pending.value = kept.map((item) => item.write)
@@ -455,6 +475,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
 
       let refusal: WireCode | null = null
       let answered: TripView | null = null
+      inFlight = head.write
       try {
         answered = await send(head.write, alreadyWritten(head.write))
       } catch (error) {
@@ -472,6 +493,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         refusal = code
       }
 
+      inFlight = null
       // The identity changed while the write was out: the queue in memory is now another
       // person's, and the write that was answered is not in it.
       if (actor.id !== owner) return
@@ -493,6 +515,19 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         rejected.value = [...rejected.value, { key: newKey(), write: head.write, code: refusal }]
       }
       kept = kept.filter((item) => item.key !== head.key)
+      // The person undid this purchase while it was in the air (Т-5): the server has the row now,
+      // so it goes as a removal rather than coming back on screen. After the re-read above, or
+      // storage would hand back the queue without it.
+      const write = head.write
+      if (answered && write.kind === 'add' && dropped.delete(write.body.id)) {
+        kept = [
+          ...kept,
+          {
+            key: newKey(),
+            write: { kind: 'remove', tripId: write.tripId, expenseId: write.body.id },
+          },
+        ]
+      }
       persist(owner)
 
       // A trip the server would not take leaves its purchases naming a trip that does not exist:
@@ -532,18 +567,21 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     if (actor.id !== owner) return false
     sync(owner)
     // Nothing open any more — it was finished while this start waited, and the start itself is
-    // good again. Left in place, it goes out on the next run.
+    // good again: sent at once rather than after a wait nothing depends on (Т-7). A question that
+    // was on screen about that trip is answered by its disappearance (Т-2).
     if (!open) {
-      retryLater()
-      return false
+      elsewhere.value = null
+      return true
     }
 
-    if (head.write.place.name !== open.place.name && !yielded) {
+    if (!samePlace(head.write.place.name, open.place.name) && yielded !== open.id) {
       elsewhere.value = { tripId: open.id, place: open.place.name, mine: head.write.place.name }
-      retryLater()
+      // No timer while a question is on screen (Т-7): nothing changes until the person answers,
+      // and asking the server every fifteen seconds only spends their battery.
+      clearTimeout(retry)
       return false
     }
-    yielded = false
+    yielded = null
     elsewhere.value = null
 
     trips.apply(open)
@@ -604,7 +642,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
    * price into another shop (Б1).
    */
   function joinElsewhere(): void {
-    yielded = true
+    yielded = elsewhere.value?.tripId ?? null
     elsewhere.value = null
     void flush()
   }
@@ -634,14 +672,25 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function dropPurchase(tripId: string, purchaseId: string): boolean {
     const id = actor.id
     sync(id)
-    const at = kept.findIndex(
-      (item) =>
-        item.write.kind === 'add' &&
-        item.write.tripId === tripId &&
-        item.write.body.id === purchaseId,
-    )
-    if (at === -1) return false
-    kept = kept.filter((_, index) => index !== at)
+    const mine = (write: QueuedWrite): boolean =>
+      write.kind === 'add' && write.tripId === tripId && write.body.id === purchaseId
+    const at = kept.findIndex((item) => mine(item.write))
+    const refused = rejected.value.find((item) => mine(item.write))
+    // A write waits in the queue until its answer comes back, so «in the queue» and «in the air»
+    // are not exclusive: undone at that moment it has to leave the queue *and* be deleted once
+    // the server says it has it (Т-5).
+    const flying = inFlight !== null && mine(inFlight)
+
+    if (at === -1 && !refused && !flying) {
+      // Not on the phone any more: it is a row of the trip, and the caller deletes it as one.
+      return false
+    }
+
+    if (at !== -1) kept = kept.filter((_, index) => index !== at)
+    // Refused and then undone: the notice about it goes with the purchase (Т-3).
+    if (refused) rejected.value = rejected.value.filter((item) => item.key !== refused.key)
+    if (flying) dropped.add(purchaseId)
+
     persist(id)
     return true
   }

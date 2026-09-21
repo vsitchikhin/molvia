@@ -71,7 +71,7 @@
       <template #action>
         <div class="refusal-actions">
           <AppButton variant="ghost" @click="queue.joinElsewhere()">
-            {{ t('trip.elsewhere.join', { place: queue.elsewhere.place }) }}
+            {{ t('trip.elsewhere.join') }}
           </AppButton>
           <AppButton variant="ghost" @click="queue.finishElsewhere()">
             {{ t('trip.elsewhere.finish') }}
@@ -84,7 +84,7 @@
          go quiet with it — on iOS nothing is sent in the background, and an app that was closed
          here would never say a word (adversarial В1). -->
     <ScreenState
-      v-if="phase !== 'going' && unsent > 0"
+      v-if="phase !== 'loading' && unsent > 0"
       class="notice"
       kind="attention"
       inline
@@ -309,20 +309,27 @@ export default defineComponent({
     })
 
     const rows = computed<TripRowView[]>(() => {
+      // A purchase the server already has, queued again, is a correction on its way: it says so
+      // on the row it is about, and never as a second line (Т-12).
+      const correcting = new Set(
+        held.value.added.flatMap((write) => (write.kind === 'add' ? [write.body.id] : [])),
+      )
       const server = (trip.value?.expenses ?? []).map((expense): TripRowView => ({
         key: expense.id,
         name: expense.item.name,
         quantity: expense.quantity,
         amount: expense.amount,
         unitPrice: expense.unitPrice,
-        mark: held.value.marks.get(expense.id) ?? null,
+        mark: held.value.marks.get(expense.id) ?? (correcting.has(expense.id) ? 'editing' : null),
         entry: expense.item,
         expense,
       }))
       const written = new Set(server.map((row) => row.key))
       const queued = held.value.added.flatMap((write): TripRowView[] =>
         // The server answered it while the queue still holds the write — the connection dropped
-        // between the write and its answer. One purchase, one line (В2-2).
+        // between the write and its answer, or the purchase is being corrected and goes as an
+        // amendment. One purchase, one line, and the line says the correction is on its way
+        // (В2-2, Т-12).
         write.kind === 'add' && !written.has(write.body.id)
           ? [
               {
@@ -353,8 +360,16 @@ export default defineComponent({
 
     const rejected = computed(() => queue.rejected)
 
-    /** Writes of any trip the server has not taken: after «Завершить» they are all there is left. */
-    const unsent = computed(() => queue.pending.filter((write) => write.kind === 'add').length)
+    /**
+     * Purchases waiting for a trip that is not the one on screen — after «Завершить», and after
+     * the next trip has been started (Т-11). Those of the trip on screen are lines of it, with
+     * their own mark and their own caveat under the total; these have nowhere else to be said.
+     */
+    const unsent = computed(
+      () =>
+        queue.pending.filter((write) => write.kind === 'add' && write.tripId !== tripId.value)
+          .length,
+    )
 
     // Its own name on the phone: two refusals about one row differ in nothing a screen can see,
     // and Vue would reuse one's node for the other (review 7, В2-8).
@@ -407,13 +422,17 @@ export default defineComponent({
      */
     function amend(row: TripRowView): void {
       if (!row.entry) return
+      // A waiting line whose write has just gone: opened as a purchase it would be a new one,
+      // with a new identifier, and «Сохранить» would write the same thing twice (Т-10).
+      const purchase = row.expense ? null : queuedPurchase(row.key)
+      if (!row.expense && !purchase) return
       openings += 1
       opened.value = {
         key: `amend-${row.key}-${String(openings)}`,
         entry: row.entry,
         expense: row.expense,
         tripId: row.expense ? (trip.value?.id ?? null) : tripId.value,
-        retry: row.expense ? null : queuedPurchase(row.key),
+        retry: purchase,
         refusal: null,
       }
     }
@@ -560,6 +579,7 @@ export default defineComponent({
 
 .refusal-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   justify-content: center;
 }

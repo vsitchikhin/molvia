@@ -347,6 +347,37 @@ describe('TripView', () => {
       expect(view.text()).toContain(ru.trip.empty.title)
     })
 
+    it('правка, ушедшая правкой, помечает строку — иначе она невидима (Т-12)', async () => {
+      currentTrip.mockResolvedValue(
+        trip([{ id: ASHKHAR, name: 'Молоко «Ашхар»', value: '570', quantity: ['1', 'l'] }]),
+      )
+      const { view, queue } = await render()
+      queue.enqueue({
+        ...queued(ASHKHAR, '750'),
+        body: { ...queued(ASHKHAR, '750').body, id: ASHKHAR },
+      })
+      await flushPromises()
+
+      const rows = view.findAll('.card .row')
+      expect(rows).toHaveLength(1)
+      expect(rows[0]?.text()).toContain(ru.trip.queued.editing)
+    })
+
+    it('строка, чья запись уже ушла, не открывает пустую покупку (Т-10)', async () => {
+      currentTrip.mockResolvedValue(trip())
+      const { view, queue } = await render()
+      queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000011'))
+      await flushPromises()
+      const row = view.get('.card .row')
+
+      // Запись ушла ровно между отрисовкой и тапом.
+      queue.dropPurchase(TRIP, 'eeeeeeee-0000-4000-8000-000000000011')
+      await row.trigger('click')
+      await flushPromises()
+
+      expect(document.body.querySelector('dialog[open]')).toBeNull()
+    })
+
     it('записи чужого похода в список не попадают', async () => {
       currentTrip.mockResolvedValue(trip(handoff()))
       const { view, queue } = await render()
@@ -379,14 +410,39 @@ describe('TripView', () => {
       expect(view.text()).toContain('1 покупка ещё не отправлена')
     })
 
+    it('и не замолкает, стоит начать следующий поход (Т-11)', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      addExpense.mockReturnValue(new Promise(() => undefined))
+      const { view, queue } = await render()
+      queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000012'))
+      await flushPromises()
+
+      await button(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      clock += 1000
+      inside(document.body.querySelector('dialog[open]'), ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+
+      queue.enqueue({
+        kind: 'start',
+        tripId: 'bbbbbbbb-0000-4000-8000-000000000021',
+        place: { kind: 'store', name: 'Рынок' },
+        startedAt: new Date(),
+      })
+      await flushPromises()
+
+      expect(view.text()).toContain('Рынок')
+      expect(view.text()).toContain('1 покупка ещё не отправлена')
+    })
+
     it('поход открыт в другом магазине — экран называет оба и предлагает выбор', async () => {
       currentTrip.mockResolvedValue(null)
       const { view, queue } = await render()
       queue.elsewhere = { tripId: TRIP, place: 'SAS', mine: 'Ереван Сити' }
       await flushPromises()
 
-      expect(view.text()).toContain('Уже открыт поход в «SAS»')
-      expect(button(view, 'Дописать в «SAS»').exists()).toBe(true)
+      expect(view.text()).toContain('Уже открыт поход в „SAS“')
+      expect(button(view, ru.trip.elsewhere.join).exists()).toBe(true)
       await button(view, ru.trip.elsewhere.finish).trigger('click')
       expect(queue.elsewhere).toBeNull()
     })
