@@ -73,6 +73,46 @@ describe('deviceNameOrNull', () => {
     expect(cut?.startsWith('iPhone · Safari')).toBe(true)
   })
 
+  it('repairs a name instead of losing it over a tab or a direction mark', () => {
+    // A HTAB is legal inside a header value, and `visibleLine` refuses a break — so one tab
+    // used to turn a perfectly good name into «unknown device» (adversarial С3). `pastedLine`
+    // is the one-line form of the cleaning `tidyText` does for a review, and it is what the
+    // documentation always claimed happened here.
+    expect(deviceNameOrNull('iPhone\tSafari')).toBe('iPhone Safari')
+    expect(deviceNameOrNull(`iPhone${String.fromCodePoint(0x202e)}Safari`)).toBe('iPhoneSafari')
+  })
+
+  it('trims the invisible edge before the cut, not only after it', () => {
+    // A hundred braille blanks in front of the name filled the whole budget, so the cut kept
+    // the padding and threw away the only part that draws (С3).
+    expect(deviceNameOrNull(`${'\u2800'.repeat(100)}iPhone`)).toBe('iPhone')
+  })
+
+  it('leaves a cut edge to `trimInvisibleEdges`, which knows more than a surrogate rule', () => {
+    // The first version knew one shape of «half a character» — a lone high surrogate — while
+    // this same package already decides what may stand at an edge: a selector draws the emoji
+    // before it, a run of tags is a flag only when it spells one, a dangling joiner draws
+    // nothing (MOL-21, adversarial round 4). A second, poorer rule beside the first is the
+    // drift `INVISIBLE` went through twice (С4).
+    const family = `${'a'.repeat(76)}\u{1F468}\u200D\u{1F469}\u200D\u{1F467}`
+    const scotland = `${'a'.repeat(70)}\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}`
+
+    // The joiner goes with the halves it can no longer join; what is left is a whole character.
+    expect(deviceNameOrNull(family)).toBe(`${'a'.repeat(76)}\u{1F468}`)
+    // The tags go whole — without their cancel tag they spell no flag — and 🏴 stays. Asserted
+    // as the exact string: «contains 🏴 and no cancel tag» is equally true of the broken result,
+    // where four of the five tags rode into the column invisibly.
+    expect(deviceNameOrNull(scotland)).toBe(`${'a'.repeat(70)}\u{1F3F4}`)
+    expect(deviceNameOrNull(scotland)).toHaveLength(72)
+  })
+
+  it('drops a combining mark whose letter is the last thing that fits — a known edge', () => {
+    // Named rather than fixed (С4): the cut walks code points, so «…é» at the boundary becomes
+    // «…e». A plainer name, not a broken one, and the proper fix would carry `Intl.Segmenter`
+    // into every browser that loads the domain.
+    expect(deviceNameOrNull(`${'a'.repeat(79)}e\u0301`)).toBe(`${'a'.repeat(79)}e`)
+  })
+
   it('never cuts a character in half', () => {
     // The branch nothing else reaches: the 80th UTF-16 unit is the high half of an emoji, and
     // the low half is on the other side of the cut. Half a character is not a shorter name.
@@ -98,6 +138,14 @@ describe('deviceNameOrNull', () => {
   it('takes exactly the limit untouched, and one more is cut rather than dropped', () => {
     expect(deviceNameOrNull('a'.repeat(DEVICE_NAME_MAX))).toHaveLength(DEVICE_NAME_MAX)
     expect(deviceNameOrNull('a'.repeat(DEVICE_NAME_MAX + 1))).toHaveLength(DEVICE_NAME_MAX)
+  })
+
+  it('turns a name carrying what nobody can be shown into null, and says so', () => {
+    // The third outcome, which the first version had without documenting it: a lone surrogate
+    // and a private-use glyph are exactly what `pastedLine` leaves «for the form to explain»,
+    // and here there is no form — the name is derived from a header (С3).
+    expect(deviceNameOrNull(`iPhone${String.fromCodePoint(0xd800)}Safari`)).toBeNull()
+    expect(deviceNameOrNull(`iPhone${String.fromCodePoint(0xe000)}Safari`)).toBeNull()
   })
 
   it('turns a name that draws nothing into null, however long it is', () => {

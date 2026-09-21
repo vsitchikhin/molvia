@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { telegramUserIdSchema } from '#model/entities/actor'
-import { visibleLine } from '#model/support/text'
+import { pastedLine, trimInvisibleEdges, visibleLine } from '#model/support/text'
 
 /**
  * The longest device name — for a caller that shortens one rather than failing past it.
@@ -20,38 +20,69 @@ export const DEVICE_NAME_MAX = 80
  */
 export const deviceNameSchema = visibleLine(DEVICE_NAME_MAX)
 
-/** A cut that would leave the high half of a character behind, with no low half to follow. */
-const HALF_A_CHARACTER = /[\uD800-\uDBFF]$/u
+/**
+ * As many whole characters as fit into `max` UTF-16 units.
+ *
+ * `for…of` walks code points, so a pair is taken or left but never split — that is the whole
+ * reason the cut is not a `slice`. Units, because that is what `visibleLine` counts; the column
+ * counts code points and is therefore never the stricter of the two.
+ */
+function cutToUnits(line: string, max: number): string {
+  let taken = ''
+  let units = 0
+  for (const character of line) {
+    if (units + character.length > max) break
+    taken += character
+    units += character.length
+  }
+  return taken
+}
 
 /**
- * A device name made into what the column and `deviceNameSchema` both accept — `tidyText`'s
- * job, for a name instead of a review.
+ * A device name made into what the column and `deviceNameSchema` both accept — `pastedLine`'s
+ * job, for a name derived from a header instead of one pasted into a field.
  *
- * Two outcomes, and the difference between them is the point (adversarial Р5). A name that is
- * merely **too long** is cut and kept: «iPhone · Safari …» shortened still tells a person which
- * device they are looking at, and losing it would leave «unknown device» beside a login they
- * made ten seconds ago. A name that **draws nothing** — braille blanks, a zero-width space, an
- * empty `User-Agent` — becomes `null`, because there is nothing there to shorten.
+ * **Three outcomes, and all three are the point** (MOL-52, adversarial Р5, С3, С4):
  *
- * Here rather than in whoever derives the name, for the reason `tidyText` is here: what counts
- * as blank belongs to `visibleLine`, and a second copy of it in MOL-53 would drift the way
- * `INVISIBLE` did twice.
+ * 1. Too long → **cut and kept**. «iPhone · Safari …» shortened still tells a person which
+ *    device they are looking at, and losing it would leave «unknown device» beside a login they
+ *    made ten seconds ago.
+ * 2. Draws nothing — braille blanks, a zero-width space, an empty `User-Agent` → **`null`**,
+ *    because there is nothing there to shorten.
+ * 3. Carries a character no one can be shown — a lone surrogate, a private-use glyph → **`null`
+ *    as well**, and this is the outcome the first version had without saying so. It is the line
+ *    `pastedLine` itself draws: breaks and direction marks it repairs, those two it deliberately
+ *    leaves «for the form to explain». Here there is no form and no person typing — the name is
+ *    derived — so there is nobody to explain it to, and a name is dropped rather than shown as
+ *    mojibake beside a real device.
+ *
+ * What a cut may leave behind is `trimInvisibleEdges`'s to decide, not this function's: it
+ * already knows that a selector after an emoji draws it, that a run of tags is a flag only when
+ * it spells one, and that a joiner left dangling draws nothing (MOL-21, adversarial round 4).
+ * A second, poorer rule here — the first version knew only a lone high surrogate — is exactly
+ * the drift `INVISIBLE` went through twice (MOL-12, MOL-27).
+ *
+ * **One edge is known and left as it is:** a combining mark whose base letter is the last thing
+ * that fits is dropped with everything after it, so «…Молокó» ends «…Молоко». The cut walks code
+ * points, not grapheme clusters, and taking the base letter out too would trade a plainer name
+ * for a shorter one — no better for a decoration, and the only way to do it properly is
+ * `Intl.Segmenter`, which this package would then carry into every browser that loads the domain
+ * for the sake of one device name's last character (adversarial С4).
  */
 export function deviceNameOrNull(value: string | null): string | null {
   if (value === null) return null
 
-  const trimmed = value.trim()
-  // Cut by UTF-16 units, which is what `visibleLine` counts; the column counts code points and
-  // is therefore never the stricter of the two. Half a character is not a shorter name, it is
-  // a broken one, so a cut that would leave one takes a unit less.
-  const cut =
-    trimmed.length <= DEVICE_NAME_MAX
-      ? trimmed
-      : trimmed.slice(0, DEVICE_NAME_MAX).replace(HALF_A_CHARACTER, '')
+  // A tab between «iPhone» and «Safari» is a legal header value, and it used to take the whole
+  // name down with it: `visibleLine` refuses a break, and `?? null` turned that into «unknown
+  // device» (С3). Repaired here rather than refused, because a name is decoration.
+  //
+  // Trimmed **before** the cut as well as after, and the first one is not tidiness: a hundred
+  // braille blanks in front of «iPhone» used to fill the whole budget, so the cut kept the
+  // padding and threw away the only part that draws.
+  const line = trimInvisibleEdges(pastedLine(value))
+  const cut = line.length <= DEVICE_NAME_MAX ? line : cutToUnits(line, DEVICE_NAME_MAX)
 
-  // Trimmed again: a cut lands wherever it lands, and a name left ending in a space is not what
-  // the schema calls a line.
-  return deviceNameSchema.safeParse(cut.trim()).data ?? null
+  return deviceNameSchema.safeParse(trimInvisibleEdges(cut)).data ?? null
 }
 
 /**
