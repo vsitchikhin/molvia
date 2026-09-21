@@ -7,7 +7,12 @@ import { router } from '@/router'
 import { installArrival, installViewTransitions } from '@/transitions'
 import { installSheetEntryGuard } from '@/composables/useSheetHistory'
 import { useActorStore } from '@/stores/actor'
+import { forgetTheInviteDoor } from '@/stores/identity'
 import '@/styles/main.scss'
+
+// Before the router reads the address: the door of MOL-8 is gone, and this clears what it left
+// on devices that used it — a dead code in storage and a `?c=` that nothing scrubs any more.
+forgetTheInviteDoor()
 
 const app = createApp(App)
 

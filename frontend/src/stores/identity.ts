@@ -7,7 +7,7 @@
  * Storage is a cache of these values, not the values themselves: `stores/storage.ts` holds
  * the guarded access, and nothing outside this module needs it.
  */
-import { read, readList, write, writeList } from '@/stores/storage'
+import { forget, read, readList, write, writeList } from '@/stores/storage'
 
 const KEY = 'molvia.actor'
 /** Identifiers the server stopped recognising. A list: a second loss must not erase the first. */
@@ -92,6 +92,33 @@ export function commitRestore(id: string): void {
   )
   current = id
   write(KEY, id)
+}
+
+/**
+ * What the invite door left behind on devices that used it (MOL-52, adversarial Б1).
+ *
+ * The door is gone — `POST /actors`, the code, the header — but two traces of it outlive the
+ * deletion on every phone that ever opened an invite link: the code itself in storage, and the
+ * `?c=` in the address. Neither opens anything any more; what they do is sit there. The query
+ * is the worse of the two, and not because of the code in it: an address goes into history,
+ * into a screenshot, into the `start_url` of an installed PWA and into every `Referer` the page
+ * sends — which is exactly why it used to be scrubbed on every start, and that scrubbing went
+ * out with the door it belonged to.
+ *
+ * Called once at startup, before anything reads the address. Named here rather than inlined in
+ * `main.ts` so that it can be deleted in one piece: after MOL-56 has rewritten the way in,
+ * nobody will have such a device left and this goes with them.
+ */
+export function forgetTheInviteDoor(): void {
+  forget('molvia.invite')
+
+  const url = new URL(window.location.href)
+  if (!url.searchParams.has('c')) return
+
+  url.searchParams.delete('c')
+  // The state is kept: it is the router's record of the entry underneath, and an empty one
+  // makes the chevron and the tab bar lose track of where «back» leads (MOL-17).
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
 export const IDENTITY_KEY = KEY
