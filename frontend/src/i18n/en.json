@@ -40,13 +40,69 @@
     },
     "offline": {
       "title": "No connection — no matter",
-      "body": "The items are saved on the phone and will be sent on their own. The trip goes on",
-      "action": "Add an item"
+      "body": "The items are saved on the phone and will be sent on their own. The trip goes on"
     },
     "none": {
       "title": "A new trip",
       "body": "Start one when you get to the shop. Items go in one at a time, and the price can wait",
       "action": "Start a trip"
+    },
+    "quantity": "{amount} {unit}",
+    "queued": {
+      "waiting": "not sent yet",
+      "editing": "edit not sent",
+      "removing": "being removed",
+      "unnamed": "Item"
+    },
+    "rejected": {
+      "title": "One record was not accepted",
+      "named": "«{name}» was not accepted",
+      "unknown": "The server did not accept the record ({code})",
+      "fix": "Correct it",
+      "drop": "Dismiss",
+      "orphaned": "it holds {n} purchase, and it is waiting | it holds {n} purchases, and they are waiting",
+      "drop_trip": "Drop the trip and its purchases"
+    },
+    "rate_line": "rate {rate} · {date}",
+    "flip": "Show in the other currency",
+    "caveat": {
+      "pending": "+ {n} item not sent yet | + {n} items not sent yet",
+      "partial": "converted from {currency} only",
+      "local": "the trip has not been sent — the total comes after it has"
+    },
+    "rate": {
+      "source_cba": "the Central Bank of Armenia",
+      "source_cbr": "the Bank of Russia",
+      "source_erapi": "open.er-api.com",
+      "fallback": "Not a rate of the Central Bank of Armenia — it has been silent for over a week. Source:",
+      "stale_official": "The rate is of {date} — the Central Bank of Armenia has published nothing since",
+      "stale_fallback": "The rate is of {date} — nothing newer has been published anywhere",
+      "jump_title": "The rate jumped by more than a quarter",
+      "jump_previous": "{rate} instead of {previous} of {date}",
+      "jump_alone": "{rate}, and there is no earlier rate beside it",
+      "choose": "Choose a rate",
+      "sheet_title": "Which rate should count?",
+      "sheet_meta": "Only the conversion changes — the prices stay as they were",
+      "new": "The new one",
+      "old": "The earlier one",
+      "mine": "My own",
+      "own": "enter",
+      "save": "Count by it",
+      "failed": "The choice could not be saved. Try again"
+    },
+    "start": {
+      "title": "Where are you?",
+      "other": "Another place"
+    },
+    "unsent": {
+      "title": "{n} purchase has not been sent | {n} purchases have not been sent",
+      "body": "They are on the phone. They go out when there is a connection and the app is open"
+    },
+    "elsewhere": {
+      "title": "A trip in «{place}» is already open",
+      "body": "The purchases of this one («{mine}») are still on the phone: prices from one shop cannot be written to another — they are what comparisons are made of",
+      "join": "Add them to that trip",
+      "finish": "Finish that trip"
     }
   },
   "item": {

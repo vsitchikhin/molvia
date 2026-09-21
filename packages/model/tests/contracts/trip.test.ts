@@ -55,6 +55,7 @@ const trip: Trip = {
   placeId: place.id,
   currency: 'AMD',
   rate: null,
+  rateProvider: null,
   rateJumped: false,
   previousRate: null,
   manualRate: null,
@@ -176,6 +177,7 @@ describe('tripViewOf', () => {
         source: 'official',
         asOf: new Date('2026-09-19T08:00:00.000Z'),
       },
+      rateProvider: 'cba',
     }
     const view = tripViewOf(
       withRate,
@@ -197,6 +199,7 @@ describe('tripViewOf', () => {
         source: 'official',
         asOf: new Date('2026-09-19T08:00:00.000Z'),
       },
+      rateProvider: 'cba',
     }
     expect(
       tripViewOf(withRate, place, [expense(bread, '2', null, 'USD')], items).converted,
@@ -379,6 +382,7 @@ describe('С-11: an estimate that does not fit is none, not a refusal', () => {
         source: 'official',
         asOf: new Date('2026-09-19T08:00:00.000Z'),
       },
+      rateProvider: 'cba',
     }
     // 90 000 000 000 000 000 ֏ — within int8 as money, ten thousand times past it converted.
     const huge = expense(bread, '90000000000000000', null)

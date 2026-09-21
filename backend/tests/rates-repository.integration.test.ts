@@ -201,10 +201,48 @@ describe('снимок курса в походе после миграции 00
       rateAsOf: new Date('2026-09-18T20:00:00Z'),
     }
 
-    await db.insert(trips).values({ ...snapshot, id: crypto.randomUUID(), rateSource: 'fallback' })
+    await db
+      .insert(trips)
+      .values({ ...snapshot, id: crypto.randomUUID(), rateSource: 'fallback', rateProvider: 'cbr' })
     await expect(
       db.execute(sql`update trips set rate_source = 'rate.am' where actor_id = ${actorId}`),
     ).rejects.toThrow()
+  })
+
+  // MOL-22, Р-3: плашка называет банк, которым поход считает, поэтому у опубликованного курса
+  // издатель есть всегда, а у курса, которого никто не публиковал, его нет.
+  it('издатель курса: обязателен у снимка, запрещён без него и у своего курса', async () => {
+    const actorId = await insertActor(db)
+    const placeId = await insertPlace(db)
+    const snapshot = {
+      actorId,
+      placeId,
+      currency: 'AMD' as const,
+      rateBase: 'RUB' as const,
+      rateQuote: 'AMD' as const,
+      rateScaled: 4_820_000n,
+      rateAsOf: new Date('2026-09-18T20:00:00Z'),
+    }
+    const write = (values: Record<string, unknown>) =>
+      db.insert(trips).values({ ...snapshot, id: crypto.randomUUID(), ...values })
+
+    await expect(write({ rateSource: 'official', rateProvider: null })).rejects.toMatchObject({
+      cause: { constraint_name: 'trips_rate_provider_matches_source' },
+    })
+    await expect(write({ rateSource: 'personal', rateProvider: 'cba' })).rejects.toMatchObject({
+      cause: { constraint_name: 'trips_rate_provider_matches_source' },
+    })
+    await expect(write({ rateSource: 'official', rateProvider: 'rate.am' })).rejects.toThrow()
+    await expect(
+      db.insert(trips).values({
+        id: crypto.randomUUID(),
+        actorId,
+        placeId,
+        currency: 'AMD',
+        rateProvider: 'cba',
+      }),
+    ).rejects.toThrow()
+    await expect(write({ rateSource: 'fallback', rateProvider: 'erapi' })).resolves.toBeDefined()
   })
 
   it('колонки скачка: прежний и свой — целиком и только при скачке, выбор — только из того, что есть', async () => {
@@ -220,6 +258,7 @@ describe('снимок курса в походе после миграции 00
       rateQuote: 'AMD',
       rateScaled: 431_230_000n,
       rateSource: 'official',
+      rateProvider: 'cba',
       rateAsOf: new Date('2026-09-17T20:00:00Z'),
       rateJumped: true,
       ratePreviousScaled: 4_305_000n,
@@ -247,7 +286,7 @@ describe('снимок курса в походе после миграции 00
     // A jump without a snapshot: the whole snapshot gone, so only `trips_rate_jumped_needs_rate` can refuse.
     await expect(
       update(
-        'rate_jumped = true, rate_base = null, rate_quote = null, rate_scaled = null, rate_source = null, rate_as_of = null',
+        'rate_jumped = true, rate_base = null, rate_quote = null, rate_scaled = null, rate_source = null, rate_as_of = null, rate_provider = null',
       ),
     ).rejects.toMatchObject({ cause: { constraint_name: 'trips_rate_jumped_needs_rate' } })
   })

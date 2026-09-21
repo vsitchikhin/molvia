@@ -8,6 +8,7 @@ import {
   RATE_SCALE,
   decimalFromRate,
   exchangeRateSchema,
+  formatRate,
   isRateDay,
   isRateFresh,
   isRateJump,
@@ -18,7 +19,8 @@ import {
   yerevanDate,
   yerevanMidnight,
 } from '#model/values/rates'
-import type { AmdRate, CachedRate, RateProvider } from '#model/values/rates'
+import type { AmdRate, CachedRate, ExchangeRate, RateProvider } from '#model/values/rates'
+import type { Currency } from '#model/values/money'
 
 const asOf = new Date('2026-09-08T10:00:00Z')
 
@@ -381,6 +383,8 @@ describe('pickOfficialRate: скачок', () => {
     ]
     expect(pickOfficialRate('RUB', 'AMD', rows, sunday)).toEqual({
       jumped: true,
+      // Прежний — того же издателя и того же источника: пара из двух источников не пара.
+      provider: 'cba',
       rate: expect.objectContaining({
         scaled: 431_230_000n,
         asOf: yerevanMidnight('2026-09-18'),
@@ -390,6 +394,19 @@ describe('pickOfficialRate: скачок', () => {
         source: 'official',
         asOf: yerevanMidnight('2026-09-17'),
       }) as unknown,
+    })
+  })
+
+  it('у запасного издателя и прежний курс — его же, а не банка', () => {
+    const rows = [
+      amd('RUB', '431.23', '2026-09-18', 'cbr', true),
+      amd('RUB', '4.3050', '2026-09-17', 'cbr'),
+      amd('RUB', '4.3123', '2026-09-01'),
+    ]
+    expect(pickOfficialRate('RUB', 'AMD', rows, sunday)).toMatchObject({
+      provider: 'cbr',
+      rate: { source: 'fallback' },
+      previous: { source: 'fallback', scaled: 4_305_000n },
     })
   })
 
@@ -444,5 +461,29 @@ describe('pickOfficialRate: скачок', () => {
       jumped: false,
       previous: null,
     })
+  })
+})
+
+describe('formatRate', () => {
+  const at = new Date('2026-09-18T20:00:00Z')
+  const of = (value: string, base: Currency = 'RUB', quote: Currency = 'AMD'): ExchangeRate => ({
+    base,
+    quote,
+    scaled: parseRate(value),
+    source: 'official',
+    asOf: at,
+  })
+
+  it('печатает оба знака: число без них не говорит, в какую сторону курс', () => {
+    expect(formatRate(of('4.82')).replaceAll('\u00a0', ' ')).toBe('4,82 ֏/₽')
+    expect(formatRate(of('363.44', 'USD')).replaceAll('\u00a0', ' ')).toBe('363,44 ֏/$')
+  })
+
+  it('мелкий курс не округляется в ноль', () => {
+    expect(formatRate(of('0.0001')).replaceAll('\u00a0', ' ')).toBe('0,0001 ֏/₽')
+  })
+
+  it('лишние знаки снимка на экран не выносит', () => {
+    expect(formatRate(of('4.821234')).replaceAll('\u00a0', ' ')).toBe('4,82 ֏/₽')
   })
 })

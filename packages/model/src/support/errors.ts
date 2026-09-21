@@ -79,6 +79,11 @@ export const ISSUE = {
   SIDE_RATE_UNMATCHED: 'issue.side_rate_unmatched',
   /** A choice of rate on a trip with nothing to choose, or naming a rate the trip does not hold. */
   RATE_CHOICE_NOT_HELD: 'issue.rate_choice_not_held',
+  /**
+   * A snapshot whose publisher is unknown, or a publisher named for a rate nobody published —
+   * none, or the person's own (MOL-22).
+   */
+  RATE_PROVIDER_UNMATCHED: 'issue.rate_provider_unmatched',
   TRIP_FINISHED_BEFORE_START: 'issue.trip_finished_before_start',
   VERDICT_UPDATED_BEFORE_RATED: 'issue.verdict_updated_before_rated',
   VERDICT_PLACE_NOT_FOR_KIND: 'issue.verdict_place_not_for_kind',

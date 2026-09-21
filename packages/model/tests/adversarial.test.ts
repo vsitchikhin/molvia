@@ -246,7 +246,12 @@ describe('round two: the same classes, found again on the new code', () => {
       source: 'official' as const,
       asOf: new Date('2026-09-08T00:00:00Z'),
     }
-    const night = { ...trip, rate, startedAt: new Date('2026-09-07T22:00:00Z') }
+    const night = {
+      ...trip,
+      rate,
+      rateProvider: 'cba' as const,
+      startedAt: new Date('2026-09-07T22:00:00Z'),
+    }
     expect(tripSchema.safeParse(night).success).toBe(true)
   })
 

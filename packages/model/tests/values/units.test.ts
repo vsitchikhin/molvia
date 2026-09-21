@@ -6,6 +6,7 @@ import {
   UNIT_PRICE_SCALE,
   compareUnitPrice,
   decimalFromMilli,
+  formatQuantity,
   formatUnitPrice,
   parseQuantity,
   quantityCodec,
@@ -156,5 +157,24 @@ describe('decimalFromMilli', () => {
     expect(decimalFromMilli(parseQuantity('1.128', 'kg'))).toBe('1.128')
     expect(decimalFromMilli(parseQuantity('0.9', 'l'))).toBe('0.900')
     expect(decimalFromMilli(parseQuantity('2', 'piece'))).toBe('2.000')
+  })
+})
+
+describe('formatQuantity', () => {
+  const plain = (value: string) => value.replaceAll('\u00a0', ' ')
+  const of = (value: string, unit: 'kg' | 'l' | 'piece' = 'l') => parseQuantity(value, unit)
+
+  it('печатает столько, сколько набрали, без хвоста нулей', () => {
+    expect(plain(formatQuantity(of('1')))).toBe('1')
+    expect(plain(formatQuantity(of('0.9')))).toBe('0,9')
+    expect(plain(formatQuantity(of('1.128', 'kg')))).toBe('1,128')
+  })
+
+  it('тысячная — предел домена, и форматтер её не теряет', () => {
+    expect(plain(formatQuantity(of('0.001', 'kg')))).toBe('0,001')
+  })
+
+  it('в английской раскладке — точка и разряды', () => {
+    expect(plain(formatQuantity(of('1500', 'piece'), 'en-US'))).toBe('1,500')
   })
 })

@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { ApiError } from '@molvia/client'
-import { ERROR, tripViewCodec } from '@molvia/model'
+import { ERROR, currentTripResponseSchema, tripViewCodec } from '@molvia/model'
 import type { TripView } from '@molvia/model'
 import { useActorStore } from '@/stores/actor'
-import { useTripStore } from '@/stores/trip'
+import { TRIP_FIELDS, useTripStore } from '@/stores/trip'
 
 const currentTrip = vi.fn<() => Promise<TripView | null>>()
 vi.mock('@/api', () => ({ api: { currentTrip: () => currentTrip() } }))
@@ -20,6 +20,7 @@ function trip(id: string, over: { finishedAt?: string | null; amount?: string } 
     finishedAt: over.finishedAt ?? null,
     currency: 'AMD',
     rate: null,
+    rateProvider: null,
     rateJump: null,
     rateStale: false,
     place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
@@ -178,6 +179,125 @@ describe('trip store', () => {
     actor.id = ME
     await nextTick()
     expect(store.current?.id).toBe(OPEN)
+  })
+
+  // MOL-22, Н-11: «завершить» отвечает 204 — применять нечего, а поход на экране обязан
+  // закончиться сразу, без второго запроса у полки.
+  it('завершённый поход перестаёт быть текущим, чужой — не трогается', () => {
+    const store = fresh()
+    store.apply(trip(OPEN))
+
+    store.closed(LATER)
+    expect(store.current?.id).toBe(OPEN)
+
+    store.closed(OPEN)
+    expect(store.current).toBeNull()
+    expect(fresh().current).toBeNull()
+  })
+
+  it('завершённый поход не возвращается ответом, который был в пути', async () => {
+    const store = fresh()
+    store.apply(trip(OPEN))
+    let answer: (trip: TripView | null) => void = () => undefined
+    currentTrip.mockReturnValue(
+      new Promise<TripView | null>((resolve) => {
+        answer = resolve
+      }),
+    )
+
+    const loading = store.load()
+    store.closed(OPEN)
+    answer(trip(OPEN))
+    await loading
+
+    expect(store.current).toBeNull()
+  })
+
+  // Адверсариальная Б3: строгий кодек правилен для ответов сервера, но своя память — не ответ.
+  it('поход, запомненный прошлой сборкой, не пропадает после обновления', () => {
+    const remembered = currentTripResponseSchema.encode({ trip: trip(OPEN) })
+    const old = JSON.parse(JSON.stringify(remembered)) as { trip: Record<string, unknown> }
+    delete old.trip.rateProvider
+    localStorage.setItem(`molvia.trip.${ME}`, JSON.stringify(old))
+
+    const store = fresh()
+    expect(store.current?.id).toBe(OPEN)
+    expect(store.current?.rateProvider).toBeNull()
+  })
+
+  // Адверсариальная Б4: очередь общая между окнами, и поход обязан быть таким же.
+  it('второе окно узнаёт о походе, который записало первое', () => {
+    const store = fresh()
+    expect(store.current).toBeNull()
+
+    localStorage.setItem(
+      `molvia.trip.${ME}`,
+      JSON.stringify(currentTripResponseSchema.encode({ trip: trip(OPEN) })),
+    )
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip.${ME}` }))
+
+    expect(store.current?.id).toBe(OPEN)
+  })
+
+  // Ч-6: список знакомых полей — вторая точка правды рядом с контрактом. Разойдутся — поход
+  // будет молча пропадать при перезапуске.
+  it('список полей памяти совпадает с контрактом похода', () => {
+    expect([...TRIP_FIELDS].sort()).toEqual(Object.keys(tripViewCodec.def.shape).sort())
+  })
+
+  // Раунд 2, Д1: «Источник:» без источника — хуже, чем отсутствие плашки.
+  it('запасной курс без издателя не читается как курс, а поход остаётся', () => {
+    const remembered = currentTripResponseSchema.encode({ trip: trip(OPEN) })
+    const old = JSON.parse(JSON.stringify(remembered)) as { trip: Record<string, unknown> }
+    delete old.trip.rateProvider
+    old.trip.rate = {
+      base: 'RUB',
+      quote: 'AMD',
+      rate: '4.820000',
+      source: 'fallback',
+      asOf: '2026-09-18T12:00:00.000Z',
+    }
+    localStorage.setItem(`molvia.trip.${ME}`, JSON.stringify(old))
+
+    const store = fresh()
+    expect(store.current?.id).toBe(OPEN)
+    expect(store.current?.rate).toBeNull()
+    expect(store.current?.rateProvider).toBeNull()
+  })
+
+  it('официальный курс прошлой сборки читается как курс ЦБ РА', () => {
+    const remembered = currentTripResponseSchema.encode({ trip: trip(OPEN) })
+    const old = JSON.parse(JSON.stringify(remembered)) as { trip: Record<string, unknown> }
+    delete old.trip.rateProvider
+    old.trip.rate = {
+      base: 'RUB',
+      quote: 'AMD',
+      rate: '4.820000',
+      source: 'official',
+      asOf: '2026-09-18T12:00:00.000Z',
+    }
+    localStorage.setItem(`molvia.trip.${ME}`, JSON.stringify(old))
+
+    expect(fresh().current?.rateProvider).toBe('cba')
+  })
+
+  // П-2: у своего курса издателя нет по определению — это не «описать нечем».
+  it('свой курс прошлой сборки остаётся курсом', () => {
+    const remembered = currentTripResponseSchema.encode({ trip: trip(OPEN) })
+    const old = JSON.parse(JSON.stringify(remembered)) as { trip: Record<string, unknown> }
+    delete old.trip.rateProvider
+    old.trip.rate = {
+      base: 'RUB',
+      quote: 'AMD',
+      rate: '4.600000',
+      source: 'personal',
+      asOf: '2026-09-18T12:00:00.000Z',
+    }
+    localStorage.setItem(`molvia.trip.${ME}`, JSON.stringify(old))
+
+    const store = fresh()
+    expect(store.current?.rate?.source).toBe('personal')
+    expect(store.current?.rateProvider).toBeNull()
   })
 
   it('reads a broken memory as no trip rather than failing to start', () => {

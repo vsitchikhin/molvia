@@ -14,7 +14,7 @@ import type { ItemRepository } from '@/db/items-repository'
 import type { PlaceRepository } from '@/db/places-repository'
 import type { RateRepository } from '@/db/rates-repository'
 import type { SearchPickRepository } from '@/db/search-picks-repository'
-import type { TripRepository } from '@/db/trips-repository'
+import type { TripRepository, TripSnapshot } from '@/db/trips-repository'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
 import { currentTrip } from './current-trip'
 import { RECENT_PLACES, recentPlaces } from './recent-places'
@@ -58,12 +58,18 @@ const milk: Item = itemSchema.parse({
   createdAt: new Date('2026-09-18T10:00:00.000Z'),
 })
 
+/** What a trip holds of the snapshot it was started with — as the repository writes it. */
+function held(snapshot: TripSnapshot | null): Pick<Trip, 'rate' | 'rateProvider'> {
+  return { rate: snapshot?.rate ?? null, rateProvider: snapshot?.provider ?? null }
+}
+
 const trip: Trip = {
   id: TRIP,
   actorId: ACTOR,
   placeId: place.id,
   currency: 'AMD',
   rate: null,
+  rateProvider: null,
   rateJumped: false,
   previousRate: null,
   manualRate: null,
@@ -191,9 +197,7 @@ describe('startTrip', () => {
 
     expect(ensured).toEqual([{ kind: 'store', name: 'Ереван Сити', country: 'AM', city: 'Gyumri' }])
     // An empty cache: nothing to snapshot.
-    expect(started).toEqual([
-      [ACTOR, { id: TRIP, placeId: place.id }, 'AMD', null, { jumped: false, previous: null }],
-    ])
+    expect(started).toEqual([[ACTOR, { id: TRIP, placeId: place.id }, 'AMD', null]])
     expect(created).toBe(true)
     expect(view.place.name).toBe('Ереван Сити')
   })
@@ -275,7 +279,7 @@ describe('startTrip: the official rate (MOL-39)', () => {
         // As the repository does: the trip carries the person's currency beside the rate.
         start: (_actorId, _input, currency, snapshot) => {
           rate = snapshot
-          return Promise.resolve({ trip: { ...trip, currency, rate: snapshot }, created: true })
+          return Promise.resolve({ trip: { ...trip, currency, ...held(snapshot) }, created: true })
         },
       },
       rates: {
@@ -306,11 +310,16 @@ describe('startTrip: the official rate (MOL-39)', () => {
 
     expect(asked).toEqual([[['RUB'], '2026-09-20']])
     expect(rate).toEqual({
-      base: 'RUB',
-      quote: 'AMD',
-      scaled: 4_312_300n,
-      source: 'official',
-      asOf: yerevanMidnight(friday),
+      rate: {
+        base: 'RUB',
+        quote: 'AMD',
+        scaled: 4_312_300n,
+        source: 'official',
+        asOf: yerevanMidnight(friday),
+      },
+      provider: 'cba',
+      jumped: false,
+      previous: null,
     })
   })
 
@@ -321,7 +330,7 @@ describe('startTrip: the official rate (MOL-39)', () => {
       trips: {
         byId: () => Promise.resolve(null),
         start: (_actorId, _input, _currency, snapshot) =>
-          Promise.resolve({ trip: { ...trip, rate: snapshot }, created: true }),
+          Promise.resolve({ trip: { ...trip, ...held(snapshot) }, created: true }),
       },
       rates: { latestOnOrBefore: () => Promise.resolve([rub('4.3123')]) },
     })
@@ -347,7 +356,10 @@ describe('startTrip: the official rate (MOL-39)', () => {
       rub('4.3123', '2026-09-11'),
       rub('4.3165', '2026-09-19', 'cbr'),
     ])
-    expect(rate).toMatchObject({ scaled: 4_316_500n, source: 'fallback' })
+    expect(rate).toMatchObject({
+      rate: { scaled: 4_316_500n, source: 'fallback' },
+      provider: 'cbr',
+    })
   })
 
   it('starts without a rate on an empty cache', async () => {
@@ -373,7 +385,7 @@ describe('startTrip: the official rate (MOL-39)', () => {
       spendCurrency: 'USD',
     })
     expect(asked).toEqual([[['RUB', 'USD'], '2026-09-20']])
-    expect(rate).toMatchObject({ base: 'RUB', quote: 'USD', scaled: 11_865n })
+    expect(rate).toMatchObject({ rate: { base: 'RUB', quote: 'USD', scaled: 11_865n } })
   })
 })
 

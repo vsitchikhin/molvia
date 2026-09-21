@@ -51,11 +51,11 @@
     </div>
 
     <template #footer>
-      <template v-if="tripId">
+      <template v-if="writeInto">
         <AppButton size="large" block @click="submit">
           {{ editing ? t('item.save_edit') : t('item.save') }}
         </AppButton>
-        <AppButton v-if="editing" variant="danger-ghost" block @click="remove">
+        <AppButton v-if="removable" variant="danger-ghost" block @click="remove">
           {{ t('item.delete') }}
         </AppButton>
         <p v-if="!online" class="caption offline">{{ t('item.offline_note') }}</p>
@@ -80,9 +80,9 @@ import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useItemDetails } from '@/composables/useItemDetails'
-import type { DetailsField } from '@/composables/useItemDetails'
-import { useActorStore } from '@/stores/actor'
+import type { DetailsField, RetryPurchase } from '@/composables/useItemDetails'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -110,6 +110,14 @@ export default defineComponent({
     query: { type: String as PropType<string | null>, default: null },
     /** The row being amended; none when a purchase is being added. */
     expense: { type: Object as PropType<TripExpenseView | null>, default: null },
+    /** A purchase the server refused, opened to be corrected and sent again (MOL-22, В-3). */
+    retry: { type: Object as PropType<RetryPurchase | null>, default: null },
+    /**
+     * The trip this write belongs to, when it is not simply the one going on: a row opened from
+     * «Поход» belongs to the trip it is in, which may have been finished elsewhere while the sheet
+     * was up (MOL-24, С-3; MOL-22, review 8).
+     */
+    tripId: { type: String as PropType<string | null>, default: null },
     closeSteps: { type: Number as PropType<1 | 2>, default: 1 },
     onClosed: { type: Function as PropType<() => void>, default: undefined },
   },
@@ -122,23 +130,33 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const trips = useTripStore()
     const queue = useTripQueueStore()
-    const actor = useActorStore()
 
     const open = ref(true)
     const form = ref<HTMLElement | null>(null)
-    const tripId = computed(() => trips.current?.id ?? null)
+    // Both places that know whether a trip is going on: without the queue the sheet would say
+    // «start a trip first» at a shelf where one was started with no signal (MOL-22, Р-2).
+    const current = useCurrentTrip()
+    const { trip, currency } = current
+    // The trip the caller named, or the one going on — the search and a first purchase name none.
+    const writeInto = computed(() => props.tripId ?? current.tripId.value)
     const editing = computed(() => props.expense !== null)
+    /**
+     * «Удалить позицию» is for anything already written down, whether the server has heard of it
+     * or not: the wrong thing picked up at a shelf with no signal is undone by dropping the write,
+     * not by sending it first and deleting the row it becomes (adversarial В2).
+     */
+    const removable = computed(() => props.expense !== null || props.retry !== null)
 
     /**
      * The trip's total and what is still queued for it: a price must fit beside both (A9). The
      * purchase of this sheet is not counted — once queued it would be counted twice.
      */
     function occupied(): Money[] {
-      const trip = trips.current
-      if (!trip) return []
-      const held: Money[] = [...trip.total]
+      const id = writeInto.value
+      if (!id) return []
+      const held: Money[] = [...(trip.value?.total ?? [])]
       for (const write of queue.pending) {
-        if (write.kind !== 'add' || write.tripId !== trip.id || !write.body.amount) continue
+        if (write.kind !== 'add' || write.tripId !== id || !write.body.amount) continue
         if (write.body.id === details.expenseId) continue
         const amount = write.body.amount
         const index = held.findIndex((money) => money.currency === amount.currency)
@@ -153,12 +171,13 @@ export default defineComponent({
 
     const details = useItemDetails({
       entry: props.entry,
-      trip: () => trips.current,
+      trip: () => trip.value,
       occupied,
-      // With neither a trip nor a known person the sheet cannot write at all («start a trip
-      // first»), and the currency it would have started in is never seen.
-      currency: trips.current?.currency ?? actor.actor?.spendCurrency ?? currencySchema.enum.AMD,
+      // A trip the server has not answered yet has no rate and no total, so the price starts in
+      // the person's own currency — the one the server will give the trip anyway.
+      currency: currency.value,
       expense: props.expense,
+      retry: props.retry,
       separator: locale.value === 'ru' ? ',' : '.',
     })
 
@@ -231,7 +250,7 @@ export default defineComponent({
     }
 
     function submit(): void {
-      if (done || !tripId.value) return
+      if (done || !writeInto.value) return
       const wrong = details.validate()
       if (wrong) {
         focus(wrong)
@@ -244,7 +263,7 @@ export default defineComponent({
         if (patch) {
           queue.enqueue({
             kind: 'update',
-            tripId: tripId.value,
+            tripId: writeInto.value,
             expenseId: props.expense.id,
             patch,
           })
@@ -256,18 +275,30 @@ export default defineComponent({
 
       queue.enqueue({
         kind: 'add',
-        tripId: tripId.value,
-        body: details.body(props.query),
+        tripId: writeInto.value,
+        body: details.body(props.retry?.query ?? props.query),
         entry: props.entry,
       })
       emit('added', props.entry)
       close(props.closeSteps)
     }
 
+    /**
+     * «Удалить позицию», wherever the purchase has got to by now. A row the server answered is
+     * deleted through the queue; one still waiting is taken out of it and never sent. In between
+     * there are two moments the sheet cannot see from its props (Т-3, Т-4): the purchase was
+     * refused while the sheet was open — then dropping it takes the refusal off the screen too —
+     * or it left and became a row — and then it has to be deleted like any other, or the sheet
+     * would close on a purchase that is still in the trip.
+     */
     function remove(): void {
-      if (done || !tripId.value || !props.expense) return
+      const purchase = props.expense?.id ?? props.retry?.id
+      if (done || !writeInto.value || !purchase) return
       done = true
-      queue.enqueue({ kind: 'remove', tripId: tripId.value, expenseId: props.expense.id })
+      const undone = !props.expense && queue.dropPurchase(writeInto.value, purchase)
+      if (!undone) {
+        queue.enqueue({ kind: 'remove', tripId: writeInto.value, expenseId: purchase })
+      }
       emit('removed')
       close(props.closeSteps)
     }
@@ -292,8 +323,9 @@ export default defineComponent({
       perUnit,
       converted,
       online,
-      tripId,
+      writeInto,
       editing,
+      removable,
       submit,
       remove,
       leave,

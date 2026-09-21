@@ -3,7 +3,7 @@ import { ERROR, ISSUE } from '#model/support/errors'
 import type { Expense } from '#model/entities/expense'
 import { formatMoney, money, parseMoney } from '#model/values/money'
 import { parseRate } from '#model/values/rates'
-import type { ExchangeRate } from '#model/values/rates'
+import type { ExchangeRate, RateSource } from '#model/values/rates'
 import {
   convertMoney,
   effectiveRate,
@@ -17,7 +17,7 @@ import { formatUnitPrice, parseQuantity, unitPrice } from '#model/values/units'
 
 const digits = (text: string): string => text.replace(/[\s\u00a0\u202f]/g, '')
 
-const rate = (value: string, source: 'personal' | 'official' = 'official'): ExchangeRate => ({
+const rate = (value: string, source: RateSource = 'official'): ExchangeRate => ({
   base: 'RUB',
   quote: 'AMD',
   scaled: parseRate(value),
@@ -31,6 +31,7 @@ const trip = {
   placeId: 'b1e0f2a4-5c6d-4e8f-9a0b-1c2d3e4f5a6b',
   currency: 'AMD',
   rate: rate('4.82'),
+  rateProvider: 'cba',
   startedAt: new Date('2026-09-08T10:00:00Z'),
   finishedAt: null,
 }
@@ -50,7 +51,31 @@ describe('tripSchema', () => {
   })
 
   it('accepts a trip with no rate — nothing to convert into', () => {
-    expect(() => tripSchema.parse({ ...trip, rate: null })).not.toThrow()
+    expect(() => tripSchema.parse({ ...trip, rate: null, rateProvider: null })).not.toThrow()
+  })
+
+  // MOL-22, Р-3: the screen names the bank it counts by, so a published rate always says who
+  // published it — and a rate nobody published never does.
+  it('требует издателя у снимка и запрещает его там, где издателя нет', () => {
+    const codeOf = (value: unknown) => tripSchema.safeParse(value).error?.issues[0]?.message
+    expect(codeOf({ ...trip, rateProvider: null })).toBe(ISSUE.RATE_PROVIDER_UNMATCHED)
+    expect(codeOf({ ...trip, rate: null })).toBe(ISSUE.RATE_PROVIDER_UNMATCHED)
+    expect(codeOf({ ...trip, rate: rate('4.82', 'personal'), rateProvider: 'cba' })).toBe(
+      ISSUE.RATE_PROVIDER_UNMATCHED,
+    )
+    expect(
+      tripSchema.safeParse({ ...trip, rate: rate('4.82', 'personal'), rateProvider: null }).success,
+    ).toBe(true)
+    // Издатель и источник — один факт, записанный дважды: «запасной от ЦБ РА» и «официальный от
+    // агрегатора» не состояния, а противоречие (В2-11).
+    expect(codeOf({ ...trip, rateProvider: 'erapi' })).toBe(ISSUE.RATE_PROVIDER_UNMATCHED)
+    expect(codeOf({ ...trip, rate: rate('4.82', 'fallback'), rateProvider: 'cba' })).toBe(
+      ISSUE.RATE_PROVIDER_UNMATCHED,
+    )
+    expect(
+      tripSchema.safeParse({ ...trip, rate: rate('4.82', 'fallback'), rateProvider: 'erapi' })
+        .success,
+    ).toBe(true)
   })
 
   it('refuses a rate quoted in some other currency than the trip', () => {
@@ -221,7 +246,7 @@ describe('скачок курса в походе (MOL-39, Р-19, Р-21)', () =>
       { ...jumped, rateChoice: 'previous' },
       { ...jumped, rateChoice: 'manual' },
       { ...trip, rateChoice: 'jumped' },
-      { ...trip, rate: null, rateJumped: true },
+      { ...trip, rate: null, rateProvider: null, rateJumped: true },
     ]) {
       expect(tripSchema.safeParse(bad).success).toBe(false)
     }

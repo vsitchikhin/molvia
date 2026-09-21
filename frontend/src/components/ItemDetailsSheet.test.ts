@@ -53,6 +53,7 @@ function trip(rate: string | null = null): TripView {
       source: 'official',
       asOf: '2026-09-19T00:00:00.000Z',
     },
+    rateProvider: rate && 'cba',
     rateJump: null,
     rateStale: false,
     place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
@@ -285,6 +286,28 @@ describe('ItemDetailsSheet', () => {
     await button(view, 'К походу').trigger('click')
     expect(go).toHaveBeenCalledWith(-2)
     expect(queue.pending).toEqual([])
+  })
+
+  // MOL-22, Р-2: у полки без сети поход есть — он лежит в очереди стартом. Шторка, которая
+  // смотрит только в ответ сервера, отправила бы человека «сначала начать поход» посреди похода.
+  it('пишет в поход, начатый без сети, — по его телефонному id', async () => {
+    const own = 'bbbbbbbb-0000-4000-8000-000000000042'
+    const queue = useTripQueueStore()
+    queue.enqueue({
+      kind: 'start',
+      tripId: own,
+      place: { kind: 'store', name: 'Рынок' },
+      startedAt: new Date('2026-09-19T12:00:00.000Z'),
+    })
+    const { view } = await render({ trip: null, server: null })
+
+    expect(view.text()).not.toContain('Сначала начните поход')
+    await type(view, 'amount', '520')
+    await button(view, 'Добавить в поход').trigger('click')
+
+    const written = queue.pending.filter((write) => write.kind === 'add')
+    expect(written).toHaveLength(1)
+    expect(written[0]?.tripId).toBe(own)
   })
 
   it('refuses, under the field, a price the trip could not add to what is queued (A9)', async () => {

@@ -10,7 +10,13 @@ import {
   parseQuantity,
   tripViewCodec,
 } from '@molvia/model'
-import type { AddExpenseBody, CatalogueEntry, ExpensePatch, TripView } from '@molvia/model'
+import type {
+  AddExpenseBody,
+  CatalogueEntry,
+  ExpensePatch,
+  StartTripBody,
+  TripView,
+} from '@molvia/model'
 import { useActorStore } from '@/stores/actor'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -21,12 +27,18 @@ const addExpense =
 const updateExpense =
   vi.fn<(tripId: string, expenseId: string, patch: ExpensePatch) => Promise<TripView>>()
 const removeExpense = vi.fn<(tripId: string, expenseId: string) => Promise<TripView>>()
+const startTrip = vi.fn<(body: StartTripBody) => Promise<{ trip: TripView; created: boolean }>>()
+const finishTrip = vi.fn<(tripId: string) => Promise<void>>()
+const currentTrip = vi.fn<() => Promise<TripView | null>>()
 vi.mock('@/api', () => ({
   api: {
     addExpense: (tripId: string, body: AddExpenseBody) => addExpense(tripId, body),
     updateExpense: (tripId: string, expenseId: string, patch: ExpensePatch) =>
       updateExpense(tripId, expenseId, patch),
     removeExpense: (tripId: string, expenseId: string) => removeExpense(tripId, expenseId),
+    startTrip: (body: StartTripBody) => startTrip(body),
+    finishTrip: (tripId: string) => finishTrip(tripId),
+    currentTrip: () => currentTrip(),
   },
 }))
 
@@ -45,16 +57,22 @@ const milk: CatalogueEntry = {
   typicalQuantity: parseQuantity('1', 'l'),
 }
 
-function answer(total: string): TripView {
+function answer(
+  total: string,
+  id = TRIP,
+  finishedAt: string | null = null,
+  place = 'Ереван Сити',
+): TripView {
   return tripViewCodec.parse({
-    id: TRIP,
+    id,
     startedAt: '2026-09-19T08:00:00.000Z',
-    finishedAt: null,
+    finishedAt,
     currency: 'AMD',
     rate: null,
+    rateProvider: null,
     rateJump: null,
     rateStale: false,
-    place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
+    place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: place },
     expenses: [],
     total: [{ amount: total, currency: 'AMD' }],
     converted: null,
@@ -76,7 +94,32 @@ function add(id: string, price = '520'): QueuedWrite {
   }
 }
 
+/** Поход, в котором эта покупка уже строка — с теми числами, какие назвали. */
+function answered1(purchase: string, quantity: string, price: string): TripView {
+  const trip = answer(price)
+  return tripViewCodec.parse({
+    ...tripViewCodec.encode(trip),
+    expenses: [
+      {
+        id: purchase,
+        createdAt: '2026-09-19T08:05:00.000Z',
+        item: catalogueEntryCodec.encode(milk),
+        quantity: { value: quantity, unit: 'l' },
+        amount: { amount: price, currency: 'AMD' },
+        unitPrice: null,
+      },
+    ],
+  })
+}
+
 const offline = () => new ApiError(ERROR.INTERNAL, 'Failed to fetch')
+
+const started = (tripId = TRIP, place = 'Ереван Сити'): QueuedWrite => ({
+  kind: 'start',
+  tripId,
+  place: { kind: 'store', name: place },
+  startedAt: new Date('2026-09-19T08:00:00.000Z'),
+})
 
 function fresh(identity = ME) {
   localStorage.setItem('molvia.actor', identity)
@@ -94,6 +137,9 @@ describe('trip queue', () => {
     addExpense.mockReset()
     updateExpense.mockReset()
     removeExpense.mockReset()
+    startTrip.mockReset()
+    finishTrip.mockReset()
+    currentTrip.mockReset()
     vi.restoreAllMocks()
   })
 
@@ -313,7 +359,13 @@ describe('trip queue', () => {
 
   describe('two windows of the app — the installed one and a tab from the bot (A2)', () => {
     const idsOf = (writes: readonly QueuedWrite[]) =>
-      writes.map((write) => (write.kind === 'add' ? write.body.id : write.expenseId))
+      writes.map((write) =>
+        write.kind === 'add'
+          ? write.body.id
+          : write.kind === 'update' || write.kind === 'remove'
+            ? write.expenseId
+            : write.tripId,
+      )
 
     it('keep each other’s purchases: storage is the queue, not a copy', async () => {
       addExpense.mockRejectedValue(offline())
@@ -663,6 +715,573 @@ describe('trip queue', () => {
       queue.enqueue(add(MILK))
       await vi.advanceTimersByTimeAsync(600_000)
       expect(addExpense).toHaveBeenCalledTimes(1)
+    })
+  })
+  describe('начать и завершить поход — тоже записи очереди (MOL-22, В-2)', () => {
+    it('поход уходит первым, покупки за ним, «завершить» последним', async () => {
+      startTrip.mockResolvedValue({ trip: answer('0.00'), created: true })
+      addExpense.mockResolvedValue({ trip: answer('520.00'), created: true })
+      finishTrip.mockResolvedValue()
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      queue.enqueue({ kind: 'finish', tripId: TRIP })
+      await queue.flush()
+
+      expect(startTrip).toHaveBeenCalledWith({
+        id: TRIP,
+        place: { kind: 'store', name: 'Ереван Сити' },
+      })
+      expect(addExpense).toHaveBeenCalledTimes(1)
+      expect(finishTrip).toHaveBeenCalledWith(TRIP)
+      expect(queue.pending).toEqual([])
+    })
+
+    it('старт без сети ждёт в очереди и переживает перезапуск вместе с местом и моментом', async () => {
+      startTrip.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(started())
+      await queue.flush()
+      expect(queue.pending).toHaveLength(1)
+
+      const again = fresh()
+      expect(again.pending[0]).toEqual(started())
+    })
+
+    it('поправленная покупка занимает место прежней, а не встаёт второй', async () => {
+      addExpense.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(add(MILK, '520'))
+      queue.enqueue(add(BREAD))
+      await queue.flush()
+
+      queue.enqueue(add(MILK, '750'))
+
+      const adds = queue.pending.filter((write) => write.kind === 'add')
+      expect(adds).toHaveLength(2)
+      // На своём месте в очереди и с новой ценой: порядок покупок — тот, в котором их делали.
+      expect(adds[0]?.body.id).toBe(MILK)
+      expect(adds[0]?.body.amount?.minor).toBe(75_000n)
+      expect(fresh().pending.find((write) => write.kind === 'add')?.body.amount?.minor).toBe(
+        75_000n,
+      )
+    })
+
+    it('двойное нажатие с одним id — одна запись', async () => {
+      startTrip.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(started())
+      await queue.flush()
+
+      expect(queue.pending).toHaveLength(1)
+    })
+
+    it('двойное нажатие с разными id — всё равно один поход (Ч-3)', async () => {
+      // Шторка придумывает свой id на каждый тап, так что дедупликация тут не при чём: второй
+      // старт получает `409` и переезжает в первый — того же магазина.
+      const SECOND = 'bbbbbbbb-0000-4000-8000-000000000015'
+      startTrip.mockResolvedValueOnce({ trip: answer('0.00'), created: true })
+      startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_OPEN, undefined, true))
+      currentTrip.mockResolvedValue(answer('0.00'))
+      addExpense.mockResolvedValue({ trip: answer('520.00'), created: true })
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(started(SECOND))
+      queue.enqueue({ ...add(MILK), tripId: SECOND })
+      await queue.flush()
+
+      expect(startTrip).toHaveBeenCalledTimes(2)
+      // Покупка второго тапа уехала в поход первого, а не осталась без похода.
+      expect(addExpense).toHaveBeenCalledWith(TRIP, expect.objectContaining({ id: MILK }))
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toEqual([])
+    })
+
+    it('«завершить» отвечает 204, и поход перестаёт быть текущим без второго запроса', async () => {
+      startTrip.mockResolvedValue({ trip: answer('0.00'), created: true })
+      finishTrip.mockResolvedValue()
+      const queue = fresh()
+      const trips = useTripStore()
+      queue.enqueue(started())
+      await queue.flush()
+      expect(trips.current?.id).toBe(TRIP)
+
+      queue.enqueue({ kind: 'finish', tripId: TRIP })
+      await queue.flush()
+
+      expect(trips.current).toBeNull()
+      expect(currentTrip).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('старт встретил уже открытый поход (MOL-22, Р-1)', () => {
+    const OPEN = 'bbbbbbbb-0000-4000-8000-000000000009'
+    const tripOpen = () => new ApiError(ERROR.TRIP_OPEN, undefined, true)
+
+    it('покупки переезжают в открытый поход, а не теряются по одной', async () => {
+      startTrip.mockRejectedValue(tripOpen())
+      currentTrip.mockResolvedValue(answer('0.00', OPEN))
+      addExpense.mockResolvedValue({ trip: answer('520.00', OPEN), created: true })
+      const queue = fresh()
+      const trips = useTripStore()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      queue.enqueue(add(BREAD))
+      await queue.flush()
+
+      expect(trips.current?.id).toBe(OPEN)
+      expect(addExpense).toHaveBeenNthCalledWith(1, OPEN, expect.objectContaining({ id: MILK }))
+      expect(addExpense).toHaveBeenNthCalledWith(2, OPEN, expect.objectContaining({ id: BREAD }))
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toEqual([])
+    })
+
+    it('чужие записи не трогает: переезжают только записи того же похода', async () => {
+      const ELSE = 'bbbbbbbb-0000-4000-8000-000000000007'
+      startTrip.mockRejectedValue(tripOpen())
+      currentTrip.mockResolvedValue(answer('0.00', OPEN))
+      addExpense.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue({ ...add(MILK), tripId: ELSE })
+      await queue.flush()
+
+      expect(queue.pending).toEqual([{ ...add(MILK), tripId: ELSE }])
+    })
+
+    it('открытый поход не прочитался — очередь стоит, покупки целы', async () => {
+      startTrip.mockRejectedValue(tripOpen())
+      currentTrip.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      await queue.flush()
+
+      expect(queue.pending).toHaveLength(2)
+      expect(queue.rejected).toEqual([])
+      expect(addExpense).not.toHaveBeenCalled()
+    })
+
+    it('открытого похода уже нет — старт уходит тут же, а не через паузу', async () => {
+      startTrip.mockRejectedValueOnce(tripOpen())
+      startTrip.mockResolvedValue({ trip: answer('0.00'), created: true })
+      currentTrip.mockResolvedValue(null)
+      const queue = fresh()
+      queue.enqueue(started())
+      await queue.flush()
+
+      // Тот поход завершили, пока этот ждал: ждать пятнадцать секунд не за чем (Т-7).
+      expect(startTrip).toHaveBeenCalledTimes(2)
+      expect(queue.pending).toEqual([])
+      expect(queue.elsewhere).toBeNull()
+    })
+  })
+
+  describe('правка покупки, которая уже ушла (адверсариальная А1)', () => {
+    it('исправленная цена уходит правкой: повтор add сервер принял бы и ничего не изменил', async () => {
+      addExpense.mockResolvedValue({ trip: answer('520.00'), created: true })
+      updateExpense.mockResolvedValue(answer('750.00'))
+      const queue = fresh()
+      const trips = useTripStore()
+      queue.enqueue(add(MILK, '520'))
+      await queue.flush()
+      // Сервер ответил походом, в котором эта покупка уже строка.
+      trips.apply(
+        tripViewCodec.parse({
+          ...tripViewCodec.encode(answer('520.00')),
+          expenses: [
+            {
+              id: MILK,
+              createdAt: '2026-09-19T08:05:00.000Z',
+              item: catalogueEntryCodec.encode(milk),
+              quantity: { value: '0.9', unit: 'l' },
+              amount: { amount: '520', currency: 'AMD' },
+              unitPrice: null,
+            },
+          ],
+        }),
+      )
+
+      queue.enqueue(add(MILK, '750'))
+      await queue.flush()
+
+      expect(updateExpense).toHaveBeenCalledWith(TRIP, MILK, expect.objectContaining({}))
+      expect(addExpense).toHaveBeenCalledTimes(1)
+      expect(trips.current?.total[0]?.minor).toBe(75_000n)
+    })
+
+    it('ответ, где строка та же, что отправили, ничего за собой не тянет', async () => {
+      // И не роняет прогон: количество и цена — bigint, а через JSON он бы бросил (нашлось e2e).
+      addExpense.mockResolvedValue({ trip: answered1(MILK, '0.9', '520'), created: true })
+      const queue = fresh()
+      queue.enqueue(add(MILK, '520'))
+      await queue.flush()
+
+      expect(updateExpense).not.toHaveBeenCalled()
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toEqual([])
+    })
+
+    it('ответ со старыми числами — правка уходит следом (Г1: ответ потерялся)', async () => {
+      // Сервер принял первую версию, ответ не дошёл; повтор с новой ценой он встречает своей
+      // строкой и отвечает 200 со старыми числами.
+      addExpense.mockResolvedValue({ trip: answered1(MILK, '0.9', '520'), created: false })
+      updateExpense.mockResolvedValue(answered1(MILK, '0.9', '750'))
+      const queue = fresh()
+      queue.enqueue(add(MILK, '750'))
+      await queue.flush()
+
+      expect(updateExpense).toHaveBeenCalledWith(TRIP, MILK, {
+        quantity: parseQuantity('0.9', 'l'),
+        amount: parseMoney('750', 'AMD'),
+      })
+      expect(queue.pending).toEqual([])
+    })
+
+    it('правка, положенная пока запись в пути, не уходит с ответом на прежнюю', async () => {
+      let answered: (trip: { trip: TripView; created: boolean }) => void = () => undefined
+      addExpense.mockReturnValueOnce(
+        new Promise((resolve) => {
+          answered = resolve
+        }),
+      )
+      addExpense.mockResolvedValue({ trip: answer('750.00'), created: true })
+      const queue = fresh()
+      queue.enqueue(add(MILK, '520'))
+      await settled()
+
+      // Человек правит цену, пока первая версия висит в сети.
+      queue.enqueue(add(MILK, '750'))
+      answered({ trip: answer('520.00'), created: true })
+      await queue.flush()
+
+      // Правка не выброшена ответом на прежнее тело — она ушла второй.
+      expect(addExpense).toHaveBeenCalledTimes(2)
+      expect(addExpense.mock.calls[1]?.[1].amount?.minor).toBe(75_000n)
+      expect(queue.pending).toEqual([])
+    })
+
+    it('отказ на прежнее тело не становится плашкой, когда правка уже в очереди', async () => {
+      let refuse: (error: unknown) => void = () => undefined
+      addExpense.mockReturnValueOnce(
+        new Promise((_resolve, reject) => {
+          refuse = reject
+        }),
+      )
+      addExpense.mockResolvedValue({ trip: answer('750.00'), created: true })
+      const queue = fresh()
+      queue.enqueue(add(MILK, '520'))
+      await settled()
+
+      queue.enqueue(add(MILK, '750'))
+      refuse(new ApiError(ERROR.INVALID_AMOUNT, undefined, true))
+      await queue.flush()
+
+      expect(queue.rejected).toEqual([])
+      expect(queue.pending).toEqual([])
+    })
+  })
+
+  describe('открытый поход в другом магазине (адверсариальная Б1)', () => {
+    const OPEN = 'bbbbbbbb-0000-4000-8000-000000000009'
+    const tripOpen = () => new ApiError(ERROR.TRIP_OPEN, undefined, true)
+
+    it('покупки не уезжают в чужой магазин: очередь ждёт и называет оба места', async () => {
+      startTrip.mockRejectedValue(tripOpen())
+      currentTrip.mockResolvedValue(answer('0.00', OPEN, null, 'SAS'))
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      await queue.flush()
+
+      expect(addExpense).not.toHaveBeenCalled()
+      expect(queue.pending).toHaveLength(2)
+      expect(queue.elsewhere).toEqual({ tripId: OPEN, place: 'SAS', mine: 'Ереван Сити' })
+    })
+
+    it('«Дописать в тот поход» — и покупки переезжают по слову человека', async () => {
+      startTrip.mockRejectedValue(tripOpen())
+      currentTrip.mockResolvedValue(answer('0.00', OPEN, null, 'SAS'))
+      addExpense.mockResolvedValue({ trip: answer('520.00', OPEN, null, 'SAS'), created: true })
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      await queue.flush()
+
+      queue.joinElsewhere()
+      await queue.flush()
+
+      expect(addExpense).toHaveBeenCalledWith(OPEN, expect.objectContaining({ id: MILK }))
+      expect(queue.elsewhere).toBeNull()
+      expect(queue.pending).toEqual([])
+    })
+
+    it('«Завершить тот поход» встаёт в начало очереди — свой поход уйдёт следом', async () => {
+      startTrip.mockRejectedValue(tripOpen())
+      currentTrip.mockResolvedValue(answer('0.00', OPEN, null, 'SAS'))
+      finishTrip.mockResolvedValue()
+      const queue = fresh()
+      queue.enqueue(started())
+      await queue.flush()
+
+      // Тот поход закрыт — значит следующий заход старта уже проходит.
+      startTrip.mockResolvedValue({ trip: answer('0.00'), created: true })
+      queue.finishElsewhere()
+      await settled()
+
+      expect(finishTrip).toHaveBeenCalledWith(OPEN)
+      expect(startTrip).toHaveBeenCalled()
+      expect(queue.elsewhere).toBeNull()
+      expect(queue.pending).toEqual([])
+    })
+
+    it('согласие принадлежит тому походу, а не живёт до конца сессии (Т-1)', async () => {
+      const THIRD = 'bbbbbbbb-0000-4000-8000-000000000003'
+      startTrip.mockRejectedValue(tripOpen())
+      currentTrip.mockResolvedValue(answer('0.00', OPEN, null, 'SAS'))
+      const queue = fresh()
+      queue.enqueue(started())
+      await queue.flush()
+
+      // Человек согласился дописать в «SAS», но переезд не состоялся — связь пропала.
+      currentTrip.mockRejectedValueOnce(offline())
+      queue.joinElsewhere()
+      await queue.flush()
+
+      // Следующий поход встречает уже третий магазин: молча переезжать туда нельзя.
+      currentTrip.mockResolvedValue(answer('0.00', THIRD, null, 'Рынок'))
+      await queue.flush()
+
+      expect(queue.elsewhere).toMatchObject({ tripId: THIRD, place: 'Рынок' })
+      expect(addExpense).not.toHaveBeenCalled()
+    })
+
+    it('плашка гаснет, когда тот поход закрыли (Т-2)', async () => {
+      startTrip.mockRejectedValueOnce(tripOpen())
+      startTrip.mockResolvedValue({ trip: answer('0.00'), created: true })
+      currentTrip.mockResolvedValueOnce(answer('0.00', OPEN, null, 'SAS'))
+      const queue = fresh()
+      queue.enqueue(started())
+      await queue.flush()
+      expect(queue.elsewhere).not.toBeNull()
+
+      // Тот поход завершили с другого устройства — вопроса больше нет.
+      currentTrip.mockResolvedValue(null)
+      queue.joinElsewhere()
+      await queue.flush()
+
+      expect(queue.elsewhere).toBeNull()
+      expect(queue.pending).toEqual([])
+    })
+
+    it('«Ереван Сити» и «ереван сити » — один магазин, вопроса нет (Т-6)', async () => {
+      startTrip.mockRejectedValue(tripOpen())
+      currentTrip.mockResolvedValue(answer('0.00', OPEN, null, ' ереван  сити '))
+      addExpense.mockResolvedValue({ trip: answer('520.00', OPEN), created: true })
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      await queue.flush()
+
+      expect(queue.elsewhere).toBeNull()
+      expect(addExpense).toHaveBeenCalledWith(OPEN, expect.objectContaining({ id: MILK }))
+    })
+
+    it('тот же магазин — переезд молча, как и было', async () => {
+      startTrip.mockRejectedValue(tripOpen())
+      currentTrip.mockResolvedValue(answer('0.00', OPEN))
+      addExpense.mockResolvedValue({ trip: answer('520.00', OPEN), created: true })
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      await queue.flush()
+
+      expect(addExpense).toHaveBeenCalledWith(OPEN, expect.objectContaining({ id: MILK }))
+      expect(queue.elsewhere).toBeNull()
+    })
+  })
+
+  describe('отвергнутый старт (адверсариальная Б2)', () => {
+    it('покупки мёртвого похода остаются на телефоне, а не получают каждая свой отказ', async () => {
+      startTrip.mockRejectedValue(new ApiError(ERROR.CONFLICT, undefined, true))
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      await queue.flush()
+
+      expect(addExpense).not.toHaveBeenCalled()
+      expect(queue.rejected).toHaveLength(1)
+      expect(queue.pending.filter((write) => write.kind === 'add')).toHaveLength(1)
+    })
+  })
+
+  describe('очередь за сиротой (раунд 4, Ж1)', () => {
+    it('«Убрать» у отвергнутого старта уносит и покупки этого похода', async () => {
+      startTrip.mockRejectedValue(new ApiError(ERROR.CONFLICT, undefined, true))
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      await queue.flush()
+      expect(queue.heldBack(TRIP)).toBe(1)
+
+      const refusal = queue.rejected[0]
+      if (!refusal) throw new Error('нет отказа на старт')
+      queue.dismiss(refusal)
+
+      // Ни покупки, ни отказа: висеть в очереди вечно им больше негде.
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toEqual([])
+      expect(fresh().pending).toEqual([])
+    })
+
+    it('покупки мёртвого похода стоят, а следующий поход уходит', async () => {
+      const NEXT = 'bbbbbbbb-0000-4000-8000-000000000031'
+      startTrip.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, undefined, true))
+      startTrip.mockResolvedValue({ trip: answer('0.00', NEXT), created: true })
+      addExpense.mockResolvedValue({ trip: answer('520.00', NEXT), created: true })
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      await queue.flush()
+
+      // Следующий поход и его покупка встали за сиротой — и не должны ждать её вечно.
+      queue.enqueue({ ...started(NEXT, 'Рынок') })
+      queue.enqueue({ ...add(BREAD), tripId: NEXT })
+      await queue.flush()
+
+      expect(startTrip).toHaveBeenCalledTimes(2)
+      expect(addExpense).toHaveBeenCalledWith(NEXT, expect.objectContaining({ id: BREAD }))
+      // Покупка мёртвого похода по-прежнему на телефоне и не получила своего отказа.
+      expect(queue.pending.filter((write) => write.kind === 'add')).toHaveLength(1)
+      expect(queue.rejected).toHaveLength(1)
+    })
+  })
+
+  describe('покупка, отменённая в полёте, и догоняющая правка (П-3)', () => {
+    it('правка не уходит за покупкой, которую уже отменили', async () => {
+      let answered: (trip: { trip: TripView; created: boolean }) => void = () => undefined
+      addExpense.mockReturnValueOnce(
+        new Promise((resolve) => {
+          answered = resolve
+        }),
+      )
+      removeExpense.mockResolvedValue(answer('0.00'))
+      const queue = fresh()
+      queue.enqueue(add(MILK, '750'))
+      await settled()
+
+      queue.dropPurchase(TRIP, MILK)
+      // Сервер отвечает строкой со старой ценой — обычно за этим уходит догоняющая правка.
+      answered({ trip: answered1(MILK, '0.9', '520'), created: false })
+      await queue.flush()
+
+      expect(updateExpense).not.toHaveBeenCalled()
+      expect(removeExpense).toHaveBeenCalledWith(TRIP, MILK)
+      expect(queue.rejected).toEqual([])
+    })
+  })
+
+  describe('ждущую покупку можно убрать (адверсариальная В2)', () => {
+    it('покупка уходит из очереди, а вслед за ней — удаление: его может ждать другое окно', async () => {
+      addExpense.mockRejectedValue(offline())
+      removeExpense.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(add(MILK))
+      await queue.flush()
+
+      expect(queue.dropPurchase(TRIP, MILK)).toBe(true)
+      await queue.flush()
+
+      // Самой покупки в очереди нет, есть только её отмена — и она переживёт перезапуск.
+      expect(queue.pending.filter((write) => write.kind === 'add')).toEqual([])
+      expect(queue.pending.filter((write) => write.kind === 'remove')).toHaveLength(1)
+      expect(fresh().pending.filter((write) => write.kind === 'remove')).toHaveLength(1)
+    })
+
+    it('удаление строки, которой сервер не знает, — не отказ, а тот же итог', async () => {
+      addExpense.mockRejectedValue(offline())
+      removeExpense.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, undefined, true))
+      const queue = fresh()
+      queue.enqueue(add(MILK))
+      await queue.flush()
+      queue.dropPurchase(TRIP, MILK)
+      await queue.flush()
+
+      expect(queue.rejected).toEqual([])
+      expect(queue.pending).toEqual([])
+    })
+
+    it('покупку, которой в очереди нет, не трогает', () => {
+      const queue = fresh()
+      expect(queue.dropPurchase(TRIP, MILK)).toBe(false)
+    })
+
+    it('отвергнутую покупку тоже снимает — вместе с плашкой (Т-3)', async () => {
+      addExpense.mockRejectedValue(new ApiError(ERROR.INVALID_AMOUNT, undefined, true))
+      const queue = fresh()
+      queue.enqueue(add(MILK))
+      await queue.flush()
+      expect(queue.rejected).toHaveLength(1)
+
+      expect(queue.dropPurchase(TRIP, MILK)).toBe(true)
+      expect(queue.rejected).toEqual([])
+      expect(fresh().rejected).toEqual([])
+    })
+
+    it('снятая в полёте покупка не воскресает: за ней уходит удаление (Т-5)', async () => {
+      let answered: (trip: { trip: TripView; created: boolean }) => void = () => undefined
+      addExpense.mockReturnValueOnce(
+        new Promise((resolve) => {
+          answered = resolve
+        }),
+      )
+      removeExpense.mockResolvedValue(answer('0.00'))
+      const queue = fresh()
+      queue.enqueue(add(MILK))
+      await settled()
+
+      // Человек передумал, пока запись была в сети.
+      expect(queue.dropPurchase(TRIP, MILK)).toBe(true)
+      answered({ trip: answer('520.00'), created: true })
+      await queue.flush()
+
+      expect(removeExpense).toHaveBeenCalledWith(TRIP, MILK)
+      expect(queue.pending).toEqual([])
+    })
+  })
+
+  describe('«не принято» снимается с телефона (MOL-22, В-3)', () => {
+    it('«Убрать» снимает запись и переживает перезапуск', async () => {
+      addExpense.mockRejectedValue(new ApiError(ERROR.INVALID_AMOUNT, undefined, true))
+      const queue = fresh()
+      queue.enqueue(add(MILK))
+      queue.enqueue(add(BREAD))
+      await queue.flush()
+      expect(queue.rejected).toHaveLength(2)
+
+      const first = queue.rejected[0]
+      if (first) queue.dismiss(first)
+
+      expect(queue.rejected).toHaveLength(1)
+      expect(fresh().rejected).toHaveLength(1)
+    })
+
+    it('снимает ту запись, а не ту, что первая в перечитанном списке', async () => {
+      addExpense.mockRejectedValue(new ApiError(ERROR.INVALID_AMOUNT, undefined, true))
+      const queue = fresh()
+      queue.enqueue(add(MILK))
+      queue.enqueue(add(BREAD))
+      await queue.flush()
+
+      // Как это приходит с экрана: копия объекта, взятая до того, как список перечитали.
+      const held = queue.rejected[1]
+      if (!held) throw new Error('второй отвергнутой записи нет')
+      queue.dismiss({ ...held })
+
+      expect(
+        queue.rejected.map((item) => (item.write.kind === 'add' ? item.write.body.id : '')),
+      ).toEqual([MILK])
     })
   })
 })

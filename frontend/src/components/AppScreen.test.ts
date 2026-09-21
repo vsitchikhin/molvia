@@ -216,6 +216,53 @@ describe('AppScreen', () => {
     })
   })
 
+  // MOL-22, Н-1: полосу итога рисует фрейм, потому что место под ней — его забота. Высота
+  // меряется в живом браузере (e2e), здесь — что полоса есть, пуста по умолчанию и что место
+  // под неё контент просит переменной.
+  describe('the docked strip', () => {
+    it('is not there at all when a screen has nothing to pin', async () => {
+      const { view } = await render('/')
+      expect(view.find('.dock').exists()).toBe(false)
+      expect(view.find('.dock-room').exists()).toBe(false)
+    })
+
+    it('holds what the screen puts there, over the page and outside the scroll', async () => {
+      const { view } = await render('/', { slots: { docked: () => h('p', 'ИТОГО 6 493,12 ֏') } })
+      const dock = view.get('.dock')
+      expect(dock.text()).toBe('ИТОГО 6 493,12 ֏')
+      // Над контентом, а не внутри него: иначе полоса уезжала бы с прокруткой. Место под неё
+      // при этом внутри — последняя строка списка должна доставаться пальцем.
+      expect(view.get('.content').element.contains(dock.element)).toBe(false)
+      expect(view.get('.content').find('.dock-room').exists()).toBe(true)
+    })
+
+    it('appears with the trip it belongs to, not only on mount', async () => {
+      const shown = ref(false)
+      const view = mount(
+        defineComponent({
+          components: { AppScreen },
+          setup: () => ({ shown }),
+          template:
+            '<AppScreen title="Trip"><template v-if="shown" #docked>ИТОГО</template></AppScreen>',
+        }),
+        {
+          global: {
+            plugins: [
+              createRouter({ history: createMemoryHistory(), routes }),
+              createPinia(),
+              createAppI18n('en'),
+            ],
+          },
+        },
+      )
+      expect(view.find('.dock').exists()).toBe(false)
+
+      shown.value = true
+      await nextTick()
+      expect(view.get('.dock').text()).toBe('ИТОГО')
+    })
+  })
+
   describe('the back chevron', () => {
     it('is absent on a section', async () => {
       for (const path of ['/', '/advice', '/verdicts']) {

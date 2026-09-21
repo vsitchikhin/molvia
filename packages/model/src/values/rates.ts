@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { decimalFromScaled, divideRounded, scaledFromDecimal } from '#model/support/decimal'
 import { DomainError, ERROR, ISSUE } from '#model/support/errors'
-import { currencySchema } from './money'
+import { currencySchema, currencySign } from './money'
 import type { Currency } from './money'
 
 export const RATE_DIGITS = 6
@@ -51,7 +51,7 @@ export function parseRate(input: string): bigint {
   return scaled
 }
 
-export function decimalFromRate(scaled: bigint): string {
+export function decimalFromRate(scaled: bigint): `${number}` {
   return decimalFromScaled(scaled, RATE_DIGITS)
 }
 
@@ -85,6 +85,25 @@ export const rateCodec = z.codec(exchangeRateWireSchema, exchangeRateSchema, {
     asOf: value.asOf.toISOString(),
   }),
 })
+
+/**
+ * The rate as the screen prints it: «4,82 ֏/₽» — how much of the quote currency one unit of the
+ * base buys, with both signs, because a bare number says nothing about which way it goes.
+ *
+ * Two digits, and up to the snapshot's six when the rate is under one — trailing zeros go, so 0,5
+ * prints «0,50». Printed to two digits a rate of 0,0001 is «0,00», a zero rate on screen (MOL-22).
+ */
+export function formatRate(rate: ExchangeRate, locale = 'ru-RU'): string {
+  // The decimal itself, as every other formatter of the domain does it: a rate is six digits, and
+  // a float on the way to the screen is a float in the one value that multiplies every amount.
+  const decimal = decimalFromRate(rate.scaled)
+  const small = rate.scaled < RATE_SCALE
+  const number = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: small ? RATE_DIGITS : 2,
+  }).format(decimal)
+  return `${number} ${currencySign(rate.quote, locale)}/${currencySign(rate.base, locale)}`
+}
 
 /**
  * Where an official rate was read. The cache keeps the provider so that one pair is never built
@@ -229,6 +248,8 @@ export function rateFromAmd(
 /** The rate a trip snapshots, and — when that rate jumped — the last one before the jump. */
 export interface OfficialRate {
   readonly rate: ExchangeRate
+  /** Who published it: the trip keeps it, and the screen names the source it counts by (MOL-22). */
+  readonly provider: RateProvider
   /** A half of the pair jumped when it arrived (MOL-39, Р-19, Р-21): the screen warns. */
   readonly jumped: boolean
   /**
@@ -283,7 +304,7 @@ export function pickOfficialRate(
       : null
     const date = yerevanDate(rate.asOf)
     const previous = steady && isRateFresh(yerevanDate(steady.asOf), date) ? steady : null
-    return [{ provider, pick: { rate, jumped, previous }, date }]
+    return [{ provider, pick: { rate, provider, jumped, previous }, date }]
   })
 
   const central = candidates.find((candidate) => candidate.provider === 'cba')

@@ -673,6 +673,7 @@ describe('the trip', () => {
     finishedAt: null,
     currency: 'AMD',
     rate: null,
+    rateProvider: null,
     rateJump: null,
     rateStale: false,
     place: { id: 'b1e0f2a4-5c6d-4e8f-9a0b-1c2d3e4f5a6b', kind: 'store', name: 'Ереван Сити' },
