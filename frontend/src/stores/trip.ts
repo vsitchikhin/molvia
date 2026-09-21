@@ -34,8 +34,13 @@ function recall(actorId: string | null): TripView | null {
   }
 }
 
-/** The fields of a trip this build knows; a field it added is filled with what its absence means. */
-const TRIP_FIELDS = [
+/**
+ * The fields of a trip this build knows; a field it added is filled with what its absence means.
+ * Exported for the one test that has to exist beside it: a field added to the contract and
+ * forgotten here would be cut out of what is remembered, and the strict codec would then refuse
+ * the whole trip — the memory would go silently empty on the next launch (Ч-6).
+ */
+export const TRIP_FIELDS = [
   'id',
   'startedAt',
   'finishedAt',
@@ -63,7 +68,32 @@ function known(held: unknown): unknown {
   const fields = Object.fromEntries(
     TRIP_FIELDS.filter((field) => trip[field] !== undefined).map((field) => [field, trip[field]]),
   )
-  return { rateProvider: null, ...fields }
+  // The publisher is decided first: deciding it may also take the rate away, and a spread built
+  // before that would keep the rate it has just removed.
+  const rateProvider = publisher(fields)
+  return { ...fields, rateProvider }
+}
+
+/**
+ * Who published the rate of a remembered trip. A build before MOL-22 kept no such field, and
+ * filling it with «nobody» told the screen «not the central bank» and then named no one — the
+ * plain «Источник:» with nothing after it, and no link where the aggregator's terms want one
+ * (раунд 2, Д1). `official` is the central bank by definition, so it is filled in; a `fallback`
+ * whose publisher nothing recorded is a rate this build cannot describe, and the trip is
+ * remembered without it — the list is what the memory is for, the conversion comes with the
+ * server's next answer.
+ */
+function publisher(fields: Record<string, unknown>): unknown {
+  if (fields.rateProvider !== undefined) return fields.rateProvider
+  const rate = fields.rate
+  if (!isRecord(rate)) return null
+  if (rate.source === 'official') return 'cba'
+  // Nothing to name: the trip keeps its rows and loses only the rate.
+  fields.rate = null
+  fields.rateJump = null
+  fields.rateStale = false
+  fields.converted = null
+  return null
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

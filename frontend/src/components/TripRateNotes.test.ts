@@ -26,7 +26,11 @@ interface Over {
   readonly source?: 'official' | 'fallback' | 'personal'
   readonly provider?: 'cba' | 'cbr' | 'erapi' | null
   readonly stale?: boolean
-  readonly jump?: { previous?: string | null; choice?: 'jumped' | 'previous' | 'manual' | null }
+  readonly jump?: {
+    previous?: string | null
+    choice?: 'jumped' | 'previous' | 'manual' | null
+    manual?: string | null
+  }
 }
 
 const rate = (value: string, source = 'official') => ({
@@ -50,7 +54,7 @@ function trip(over: Over = {}): TripView {
       ? {
           jumped: rate('4.82', source),
           previous: over.jump.previous ? rate(over.jump.previous, source) : null,
-          manual: null,
+          manual: over.jump.manual ? { ...rate(over.jump.manual), source: 'personal' } : null,
           choice: over.jump.choice ?? null,
         }
       : null,
@@ -172,6 +176,16 @@ describe('TripRateNotes', () => {
 
       expect(chooseTripRate).toHaveBeenCalledWith(TRIP, { choice: 'previous' })
       expect(useTripStore().current?.rateJump?.choice).toBe('previous')
+    })
+
+    it('свой курс подставляется как число, а не как своя же печать (В3)', async () => {
+      const view = await render({ jump: { previous: null, choice: 'manual', manual: '4312.3' } })
+      await button(view, ru.trip.rate.choose).trigger('click')
+      await flushPromises()
+
+      const field = document.body.querySelector('dialog[open]')?.querySelector('input')
+      // «4 312,3» с неразрывным пробелом сервер не примет, «4312.300000» человек не набирал.
+      expect(field?.value).toBe('4312,3')
     })
 
     it('свой курс, который не курс, остаётся в поле, и шторка не закрывается', async () => {

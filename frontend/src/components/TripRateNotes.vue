@@ -10,7 +10,9 @@
 
     <!-- Not the central bank of Armenia. Named, not hinted at: the person trusts the number by
          where it came from, and the aggregator's terms require its name beside it. -->
-    <p v-if="fallback" class="note good">
+    <!-- Never «Источник:» with nothing after it: a rate whose publisher is unknown says nothing
+         about its source at all (раунд 2, Д1). -->
+    <p v-if="fallback && sourceName" class="note good">
       {{ t('trip.rate.fallback') }}
       <a v-if="link" class="link" :href="link" target="_blank" rel="noopener noreferrer">{{
         sourceName

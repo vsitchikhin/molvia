@@ -5,7 +5,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR, currentTripResponseSchema, tripViewCodec } from '@molvia/model'
 import type { TripView } from '@molvia/model'
 import { useActorStore } from '@/stores/actor'
-import { useTripStore } from '@/stores/trip'
+import { TRIP_FIELDS, useTripStore } from '@/stores/trip'
 
 const currentTrip = vi.fn<() => Promise<TripView | null>>()
 vi.mock('@/api', () => ({ api: { currentTrip: () => currentTrip() } }))
@@ -237,6 +237,48 @@ describe('trip store', () => {
     window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip.${ME}` }))
 
     expect(store.current?.id).toBe(OPEN)
+  })
+
+  // Ч-6: список знакомых полей — вторая точка правды рядом с контрактом. Разойдутся — поход
+  // будет молча пропадать при перезапуске.
+  it('список полей памяти совпадает с контрактом похода', () => {
+    expect([...TRIP_FIELDS].sort()).toEqual(Object.keys(tripViewCodec.def.shape).sort())
+  })
+
+  // Раунд 2, Д1: «Источник:» без источника — хуже, чем отсутствие плашки.
+  it('запасной курс без издателя не читается как курс, а поход остаётся', () => {
+    const remembered = currentTripResponseSchema.encode({ trip: trip(OPEN) })
+    const old = JSON.parse(JSON.stringify(remembered)) as { trip: Record<string, unknown> }
+    delete old.trip.rateProvider
+    old.trip.rate = {
+      base: 'RUB',
+      quote: 'AMD',
+      rate: '4.820000',
+      source: 'fallback',
+      asOf: '2026-09-18T12:00:00.000Z',
+    }
+    localStorage.setItem(`molvia.trip.${ME}`, JSON.stringify(old))
+
+    const store = fresh()
+    expect(store.current?.id).toBe(OPEN)
+    expect(store.current?.rate).toBeNull()
+    expect(store.current?.rateProvider).toBeNull()
+  })
+
+  it('официальный курс прошлой сборки читается как курс ЦБ РА', () => {
+    const remembered = currentTripResponseSchema.encode({ trip: trip(OPEN) })
+    const old = JSON.parse(JSON.stringify(remembered)) as { trip: Record<string, unknown> }
+    delete old.trip.rateProvider
+    old.trip.rate = {
+      base: 'RUB',
+      quote: 'AMD',
+      rate: '4.820000',
+      source: 'official',
+      asOf: '2026-09-18T12:00:00.000Z',
+    }
+    localStorage.setItem(`molvia.trip.${ME}`, JSON.stringify(old))
+
+    expect(fresh().current?.rateProvider).toBe('cba')
   })
 
   it('reads a broken memory as no trip rather than failing to start', () => {

@@ -87,6 +87,9 @@ export default defineComponent({
         // leaves what is remembered.
         void places.refresh().catch(() => undefined)
       },
+      // A sheet mounted already open — the way a test raises it, and the way a screen could — has
+      // no change to watch for, and would come up with an empty list.
+      { immediate: props.open },
     )
 
     const ready = computed(

@@ -94,6 +94,24 @@ function add(id: string, price = '520'): QueuedWrite {
   }
 }
 
+/** Поход, в котором эта покупка уже строка — с теми числами, какие назвали. */
+function answered(purchase: string, quantity: string, price: string): TripView {
+  const trip = answer(price)
+  return tripViewCodec.parse({
+    ...tripViewCodec.encode(trip),
+    expenses: [
+      {
+        id: purchase,
+        createdAt: '2026-09-19T08:05:00.000Z',
+        item: catalogueEntryCodec.encode(milk),
+        quantity: { value: quantity, unit: 'l' },
+        amount: { amount: price, currency: 'AMD' },
+        unitPrice: null,
+      },
+    ],
+  })
+}
+
 const offline = () => new ApiError(ERROR.INTERNAL, 'Failed to fetch')
 
 const started = (tripId = TRIP): QueuedWrite => ({
@@ -749,9 +767,7 @@ describe('trip queue', () => {
       )
     })
 
-    it('двойное нажатие «Начать поход» — один поход, даже когда id у тапов разные', async () => {
-      // Шторка на каждый тап придумывает свой id, поэтому дедупликацию делает не он: второй
-      // старт того же похода отсекать нечем, и защита здесь — в том, что шторка уходит сразу.
+    it('двойное нажатие с одним id — одна запись', async () => {
       startTrip.mockRejectedValue(offline())
       const queue = fresh()
       queue.enqueue(started())
@@ -759,6 +775,27 @@ describe('trip queue', () => {
       await queue.flush()
 
       expect(queue.pending).toHaveLength(1)
+    })
+
+    it('двойное нажатие с разными id — всё равно один поход (Ч-3)', async () => {
+      // Шторка придумывает свой id на каждый тап, так что дедупликация тут не при чём: второй
+      // старт получает `409` и переезжает в первый — того же магазина.
+      const SECOND = 'bbbbbbbb-0000-4000-8000-000000000015'
+      startTrip.mockResolvedValueOnce({ trip: answer('0.00'), created: true })
+      startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_OPEN, undefined, true))
+      currentTrip.mockResolvedValue(answer('0.00'))
+      addExpense.mockResolvedValue({ trip: answer('520.00'), created: true })
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(started(SECOND))
+      queue.enqueue({ ...add(MILK), tripId: SECOND })
+      await queue.flush()
+
+      expect(startTrip).toHaveBeenCalledTimes(2)
+      // Покупка второго тапа уехала в поход первого, а не осталась без похода.
+      expect(addExpense).toHaveBeenCalledWith(TRIP, expect.objectContaining({ id: MILK }))
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toEqual([])
     })
 
     it('«завершить» отвечает 204, и поход перестаёт быть текущим без второго запроса', async () => {
@@ -872,6 +909,34 @@ describe('trip queue', () => {
       expect(updateExpense).toHaveBeenCalledWith(TRIP, MILK, expect.objectContaining({}))
       expect(addExpense).toHaveBeenCalledTimes(1)
       expect(trips.current?.total[0]?.minor).toBe(75_000n)
+    })
+
+    it('ответ, где строка та же, что отправили, ничего за собой не тянет', async () => {
+      // И не роняет прогон: количество и цена — bigint, а через JSON он бы бросил (нашлось e2e).
+      addExpense.mockResolvedValue({ trip: answered(MILK, '0.9', '520'), created: true })
+      const queue = fresh()
+      queue.enqueue(add(MILK, '520'))
+      await queue.flush()
+
+      expect(updateExpense).not.toHaveBeenCalled()
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toEqual([])
+    })
+
+    it('ответ со старыми числами — правка уходит следом (Г1: ответ потерялся)', async () => {
+      // Сервер принял первую версию, ответ не дошёл; повтор с новой ценой он встречает своей
+      // строкой и отвечает 200 со старыми числами.
+      addExpense.mockResolvedValue({ trip: answered(MILK, '0.9', '520'), created: false })
+      updateExpense.mockResolvedValue(answered(MILK, '0.9', '750'))
+      const queue = fresh()
+      queue.enqueue(add(MILK, '750'))
+      await queue.flush()
+
+      expect(updateExpense).toHaveBeenCalledWith(TRIP, MILK, {
+        quantity: parseQuantity('0.9', 'l'),
+        amount: parseMoney('750', 'AMD'),
+      })
+      expect(queue.pending).toEqual([])
     })
 
     it('правка, положенная пока запись в пути, не уходит с ответом на прежнюю', async () => {

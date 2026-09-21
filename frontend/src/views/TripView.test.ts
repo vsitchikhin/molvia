@@ -441,7 +441,7 @@ describe('TripView', () => {
       queue.elsewhere = { tripId: TRIP, place: 'SAS', mine: 'Ереван Сити' }
       await flushPromises()
 
-      expect(view.text()).toContain('Уже открыт поход в „SAS“')
+      expect(view.text()).toContain('Уже открыт поход в «SAS»')
       expect(button(view, ru.trip.elsewhere.join).exists()).toBe(true)
       await button(view, ru.trip.elsewhere.finish).trigger('click')
       expect(queue.elsewhere).toBeNull()

@@ -61,6 +61,11 @@ describe('TripTotal', () => {
     expect(plain(view)).toContain('курс 4,82 ֏/₽ · 15 янв.')
   })
 
+  it('до переворота крупное число — факт, без признаков оценки', () => {
+    const view = render()
+    expect(view.get('.sum').classes()).not.toContain('guess')
+  })
+
   it('без курса пересчёта нет и переворачивать нечего', () => {
     const view = render({ trip: trip({ rate: null, converted: null }) })
     expect(view.text()).not.toContain('≈')
@@ -71,8 +76,9 @@ describe('TripTotal', () => {
     const view = render()
     await view.get('button').trigger('click')
 
-    // Крупным стал рубль, но признак оценки с него не снялся.
+    // Крупным стал рубль, но признаки оценки с него не снялись: «≈» и приглушённый цвет.
     expect(plain(view.get('.sum'))).toBe('≈ 1 347 ₽')
+    expect(view.get('.sum').classes()).toContain('guess')
     expect(plain(view.get('.rest'))).toContain('6 493,12 ֏')
 
     const again = render()
