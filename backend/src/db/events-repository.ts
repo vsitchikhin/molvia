@@ -51,6 +51,11 @@ export interface EventRepository {
    * among those who already bought — a threshold selected on the very thing it tests, and one
    * that could no longer say «no». Reading a domain table is not what the log's rule forbids;
    * duplicating it into the log is, which is why MOL-8's `session_started` stays withdrawn.
+   *
+   * **And only those whose access reached their fourth week** (Р-24). The numerator stays
+   * behind that same door, so a denominator of everyone who ever appeared counted people who
+   * had nothing to come back to. The condition is read from `actors.shared_until` and is
+   * approximate — see the statement, where the direction of the error is written down.
    */
   weekFourReturn(subject: CatalogueSubject, from: Date, to: Date): Promise<CohortReturn>
 }
@@ -112,6 +117,19 @@ export function createEventRepository(db: Conn): EventRepository {
           from ${actors}
           where ${actors.createdAt} >= ${from.toISOString()}::timestamptz
             and ${actors.createdAt} <  ${to.toISOString()}::timestamptz
+            -- Only those who could have answered the question (Р-24). The numerator is behind
+            -- a paid door — advice_viewed is written in the shared mode alone — so counting
+            -- everyone who ever appeared put people in the denominator who had nothing to come
+            -- back to, and the threshold read «stop» for a reason unrelated to the hypothesis
+            -- (adversarial round 2, G1).
+            --
+            -- Approximate, and knowingly: there is no history of grants, only the moment
+            -- access runs out, and it only ever moves forward. Someone who bought access after
+            -- their fourth week is counted as though they had it then, so the denominator errs
+            -- large and the return rate errs small — the gate errs towards «stop», which is
+            -- the safe side of this particular number. Exactness needs a table of grants, and
+            -- that is a task, not a line.
+            and ${actors.sharedUntil} >= ${actors.createdAt} + interval '504 hours'
         ),
         came_back as (
           select distinct c.actor_id

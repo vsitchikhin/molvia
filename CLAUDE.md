@@ -86,6 +86,15 @@ empty screen — or one made entirely of their own figures, which the threshold 
 contributors makes ordinary — counts as having come back for other people's data. They came for
 it; there was none.
 
+**The cohort is those who could have answered: access reaching their fourth week** (Р-24). The
+numerator stays behind the paid door, so a denominator of everyone who ever appeared counted
+people with nothing to come back to, and the threshold read «stop» for a reason unrelated to the
+hypothesis. It is read from `actors.shared_until` and is **approximate on purpose**: there is no
+history of grants, only the moment access runs out, and it only ever moves forward, so someone
+who bought later is counted as having had it then. The denominator errs large and the return
+rate errs small — the gate errs towards «stop», the safe side of this number. Exactness needs a
+table of grants, and that is a task rather than a line.
+
 **That question was asked and answered once already.** From MOL-12 the writer was the
 catalogue search, recording `catalogue_viewed` — and it measured entering, not reading, which
 the owner accepted knowingly while no screen showed anyone else's data. The condition was
