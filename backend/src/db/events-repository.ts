@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm'
+import { EVENT } from '@molvia/model'
 import type { CatalogueSubject, EventInput } from '@molvia/model'
 import type { Conn } from './index'
-import { events } from './schema'
+import { actors, events } from './schema'
 
 // The type and its payload travel together, so a catalogue view cannot be recorded
 // without the axis the 0.3 gate splits on.
@@ -20,8 +21,8 @@ export interface EventRepository {
   record(event: RecordedEvent): Promise<void>
   /**
    * Records the event unless this actor already has the same one — same type, same payload —
-   * in the current day of their own life: days counted from their first event, exactly as
-   * `weekFourReturn` counts weeks. `true` when a row was written.
+   * in the current day of their own life: days counted from `actors.created_at`, exactly as
+   * `weekFourReturn` counts weeks from it. `true` when a row was written.
    *
    * Not a rolling 24 hours from the last row: that window slid across the gate's week line, and
    * a visit early in week four was swallowed by an evening in week three — a person who came
@@ -33,7 +34,29 @@ export interface EventRepository {
    * keystroke, and two overlapping requests would otherwise both see no row and both write.
    */
   recordOncePerDay(event: RecordedEvent): Promise<boolean>
-  /** Gate 0.3: of those first seen in a window, how many came back in their fourth week. */
+  /**
+   * Gate 0.3: of those who appeared in a window, how many came back in their fourth week —
+   * and came back *to read other people's data*, which is what the threshold actually asks.
+   *
+   * It counts `advice_viewed` (MOL-31, Р-15), not `catalogue_viewed`. The search wrote that
+   * one while nothing on any screen came from anyone else, so it meant «came back to enter a
+   * purchase»; once «Что брать» shows other people's figures, the visit that answers this
+   * gate is the one to that screen. The rows the search already wrote stay where they are —
+   * the log is append-only — and nothing reads them.
+   *
+   * The cohort comes from `actors.created_at`, not from a first event (Р-20). With one writer
+   * left, and that one behind a paid door, «first event» had become «first paid view»: a
+   * person without access never entered the denominator at all, and one with access had their
+   * fourth week counted from the day they paid. The gate would then have measured return
+   * among those who already bought — a threshold selected on the very thing it tests, and one
+   * that could no longer say «no». Reading a domain table is not what the log's rule forbids;
+   * duplicating it into the log is, which is why MOL-8's `session_started` stays withdrawn.
+   *
+   * **And only those whose access reached their fourth week** (Р-24). The numerator stays
+   * behind that same door, so a denominator of everyone who ever appeared counted people who
+   * had nothing to come back to. The condition is read from `actors.shared_until` and is
+   * approximate — see the statement, where the direction of the error is written down.
+   */
   weekFourReturn(subject: CatalogueSubject, from: Date, to: Date): Promise<CohortReturn>
 }
 
@@ -58,8 +81,12 @@ export function createEventRepository(db: Conn): EventRepository {
           sql`select pg_advisory_xact_lock(hashtext('events'), hashtext(${event.actorId}))`,
         )
         const rows = await tx.execute<{ id: string }>(sql`
+          -- From when the person appeared, not from their first event (MOL-31, Р-20). While
+          -- the log had a writer on the first visit the two were the same day; now the only
+          -- writer is «Что брать» in the shared mode, so a first event is a paid view — and
+          -- the days of this window have to fall on the weeks the gate counts.
           with first_seen as (
-            select min(occurred_at) as started from ${events} where actor_id = ${event.actorId}::uuid
+            select ${actors.createdAt} as started from ${actors} where ${actors.id} = ${event.actorId}::uuid
           )
           insert into ${events} (actor_id, type, payload)
           select ${event.actorId}::uuid, ${event.type}, ${payload}::jsonb
@@ -85,22 +112,30 @@ export function createEventRepository(db: Conn): EventRepository {
       // of `recordOncePerDay` have to fall on exactly these weeks. Hours mean the same in
       // every zone, so neither depends on a `timezone` someone sets later.
       const rows = await db.execute<{ cohort_size: number; returned: number }>(sql`
-        with first_seen as (
-          select actor_id, min(occurred_at) as started
-          from ${events}
-          group by actor_id
-        ),
-        cohort as (
-          select actor_id, started
-          from first_seen
-          where started >= ${from.toISOString()}::timestamptz
-            and started <  ${to.toISOString()}::timestamptz
+        with cohort as (
+          select ${actors.id} as actor_id, ${actors.createdAt} as started
+          from ${actors}
+          where ${actors.createdAt} >= ${from.toISOString()}::timestamptz
+            and ${actors.createdAt} <  ${to.toISOString()}::timestamptz
+            -- Only those who could have answered the question (Р-24). The numerator is behind
+            -- a paid door — advice_viewed is written in the shared mode alone — so counting
+            -- everyone who ever appeared put people in the denominator who had nothing to come
+            -- back to, and the threshold read «stop» for a reason unrelated to the hypothesis
+            -- (adversarial round 2, G1).
+            --
+            -- Approximate, and knowingly: there is no history of grants, only the moment
+            -- access runs out, and it only ever moves forward. Someone who bought access after
+            -- their fourth week is counted as though they had it then, so the denominator errs
+            -- large and the return rate errs small — the gate errs towards «stop», which is
+            -- the safe side of this particular number. Exactness needs a table of grants, and
+            -- that is a task, not a line.
+            and ${actors.sharedUntil} >= ${actors.createdAt} + interval '504 hours'
         ),
         came_back as (
           select distinct c.actor_id
           from cohort c
           join ${events} e on e.actor_id = c.actor_id
-          where e.type = 'catalogue_viewed'
+          where e.type = ${EVENT.ADVICE_VIEWED}
             and e.payload ->> 'subject' = ${subject}
             and e.occurred_at >= c.started + interval '504 hours'
             and e.occurred_at < c.started + interval '672 hours'

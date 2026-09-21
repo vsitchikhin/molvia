@@ -1,5 +1,5 @@
 {
-  "id": "d4dc232b-22d6-40d3-8ce1-bdb5b09cb53f",
+  "id": "d0cfbd8e-284b-4b92-bdf0-32d92a6a19ae",
   "prevId": "ee7fafcf-6ad9-4240-94e6-574fd76dee4c",
   "version": "7",
   "dialect": "postgresql",
@@ -12,6 +12,12 @@
           "name": "id",
           "type": "uuid",
           "primaryKey": true,
+          "notNull": true
+        },
+        "telegram_user_id": {
+          "name": "telegram_user_id",
+          "type": "bigint",
+          "primaryKey": false,
           "notNull": true
         },
         "country": {
@@ -56,9 +62,23 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "actors_telegram_user_id_key": {
+          "name": "actors_telegram_user_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["telegram_user_id"]
+        }
+      },
       "policies": {},
       "checkConstraints": {
+        "actors_telegram_user_id_positive": {
+          "name": "actors_telegram_user_id_positive",
+          "value": "\"actors\".\"telegram_user_id\" > 0"
+        },
+        "actors_telegram_user_id_safe": {
+          "name": "actors_telegram_user_id_safe",
+          "value": "\"actors\".\"telegram_user_id\" < 9007199254740992"
+        },
         "actors_country_iso": {
           "name": "actors_country_iso",
           "value": "\"actors\".\"country\" ~ '^[A-Z]{2}$'"
@@ -827,12 +847,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "rate_provider": {
-          "name": "rate_provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "rate_jumped": {
           "name": "rate_jumped",
           "type": "boolean",
@@ -969,14 +983,6 @@
         "trips_rate_quote_known": {
           "name": "trips_rate_quote_known",
           "value": "\"trips\".\"rate_quote\" is null or \"trips\".\"rate_quote\" in ('AMD', 'RUB', 'USD', 'EUR')"
-        },
-        "trips_rate_provider_known": {
-          "name": "trips_rate_provider_known",
-          "value": "\"trips\".\"rate_provider\" is null or \"trips\".\"rate_provider\" in ('cba', 'cbr', 'erapi')"
-        },
-        "trips_rate_provider_matches_source": {
-          "name": "trips_rate_provider_matches_source",
-          "value": "(\"trips\".\"rate_source\" is null or \"trips\".\"rate_source\" = 'personal') = (\"trips\".\"rate_provider\" is null)\n        and ((\"trips\".\"rate_source\" = 'official') = (\"trips\".\"rate_provider\" = 'cba')) is not false"
         },
         "trips_rate_source_known": {
           "name": "trips_rate_source_known",

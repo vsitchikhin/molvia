@@ -59,7 +59,11 @@ afterAll(async () => {
 describe('the migration chain on a database that already holds rows', () => {
   it('repairs what it makes illegal instead of refusing to start', async () => {
     const upTo0006 = journal.entries.filter((entry) => entry.idx <= 6)
-    const rest = journal.entries.filter((entry) => entry.idx > 6)
+    // Up to 0011 and no further. 0012 does not repair the rows below — it deletes them along
+    // with their owner, because a Telegram identity cannot be invented for a row already
+    // written (MOL-52, Р-2). Running it here would wipe the evidence this test is about, and
+    // what it does instead is pinned by `migration-0012.integration.test.ts`.
+    const rest = journal.entries.filter((entry) => entry.idx > 6 && entry.idx < 12)
     expect(rest.length).toBeGreaterThan(0)
 
     for (const entry of upTo0006) await apply(entry)

@@ -3,9 +3,9 @@ import type { ZodType } from 'zod'
 import {
   ACTOR_HEADER,
   ERROR,
-  INVITE_HEADER,
   ISSUE,
   actorCodec,
+  adviceResponseSchema,
   addExpenseBodySchema,
   catalogueEntryCodec,
   catalogueSearchResponseSchema,
@@ -26,7 +26,8 @@ import {
   verdictPathSchema,
 } from '@molvia/model'
 import type {
-  Actor,
+  ActorView,
+  AdviceResponse,
   AddExpenseBody,
   CatalogueEntry,
   ExpensePatch,
@@ -114,14 +115,18 @@ export interface ClientOptions {
 
 export interface MolviaClient {
   health(): Promise<HealthResponse>
-  /** The first visit. The code comes from the link the person opened, once per device. */
-  createActor(inviteCode: string): Promise<Actor>
+  /**
+   * The first visit, through the development seam (MOL-52). It exists only outside
+   * production — the real door is the Telegram login of MOL-54 — and a client that calls it
+   * against a production server gets a 404, because the address is not in that build.
+   */
+  createActor(): Promise<ActorView>
   /**
    * Whether an identity is still alive. With no argument it asks about the one this client
    * speaks for; with one, about that identifier and **without touching anything else** —
    * which is what makes «check before restoring» possible instead of «replace and hope».
    */
-  me(identifier?: string): Promise<Actor>
+  me(identifier?: string): Promise<ActorView>
   /**
    * The catalogue lookup behind «что взяли?», ranked by the server — the query goes as typed.
    * The screen searches while the person types, so a search the next keystroke made stale is
@@ -174,6 +179,12 @@ export interface MolviaClient {
   withdrawVerdict(itemId: string): Promise<void>
   /** «Оценки»: bought and not rated, one card per item, and how many wait in all. */
   pendingVerdicts(): Promise<PendingVerdicts>
+  /**
+   * «Что брать»: the rated rows in three groups, with prices where a price is allowed.
+   * Takes nothing — whose figures come back follows from the person's access (MOL-31, Р-11)
+   * and is said in `scope`, so there is no parameter with which to ask for anyone else's.
+   */
+  advice(): Promise<AdviceResponse>
 }
 
 /**
@@ -348,19 +359,15 @@ export function createClient({
   return {
     health: () => request('/health', healthResponseSchema),
 
-    // `async` so that a refused code arrives as a rejection rather than a synchronous
-    // throw: a caller writing `createActor(code).catch(…)` would never see the latter, and
-    // «everything this module throws is an ApiError» has to mean «through the promise».
-    createActor: async (inviteCode) => {
-      const headers = new Headers()
-      header(INVITE_HEADER, inviteCode, headers)
-
+    // `async` so that a refusal arrives as a rejection rather than a synchronous throw: a
+    // caller writing `createActor().catch(…)` would never see the latter, and «everything
+    // this module throws is an ApiError» has to mean «through the promise».
+    createActor: async () =>
       // No timeout on the first visit, and this is the one place it is right to wait. An
       // abort here says nothing about whether the INSERT landed, so a retry after one
       // creates a **second** identity — and rows in `actors` are the denominator of the
       // 0.2 gate. A cold VPS answering slowly is the ordinary case, not the failure.
-      return request('/actors', actorCodec, { method: 'POST', headers, timeout: null })
-    },
+      request('/dev/actors', actorCodec, { method: 'POST', timeout: null }),
 
     me: (identifier) =>
       request('/actors/me', actorCodec, identifier === undefined ? {} : { as: identifier }),
@@ -451,5 +458,7 @@ export function createClient({
       request(verdictPath(itemId), z.undefined(), { method: 'DELETE' }),
 
     pendingVerdicts: async () => request('/verdicts/pending', pendingVerdictsCodec),
+
+    advice: async () => request('/advice', adviceResponseSchema),
   }
 }

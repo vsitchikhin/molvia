@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { actorPatchSchema, actorSchema, newActorSchema } from '#model/entities/actor'
+import {
+  actorPatchSchema,
+  actorSchema,
+  hasSharedAccess,
+  newActorSchema,
+  telegramUserIdSchema,
+} from '#model/entities/actor'
 
 const actor = {
   id: '3f2b1c6e-9a4d-4c1b-8f7e-2d5a6b8c9e01',
+  telegramUserId: 777_000_123,
   country: 'AM',
   city: 'Гюмри',
   spendCurrency: 'AMD',
   incomeCurrency: 'RUB',
+  sharedUntil: null,
   createdAt: new Date('2026-09-08T10:00:00Z'),
   updatedAt: new Date('2026-09-08T10:00:00Z'),
 }
@@ -33,6 +41,32 @@ describe('actorSchema', () => {
   })
 })
 
+describe('telegramUserIdSchema', () => {
+  it('takes the id Telegram issues today, and the largest one it promised never to exceed', () => {
+    // 2^53 − 1. The promise is what makes `number` safe here and `bigint` unnecessary — and
+    // it is the same bound `actors_telegram_user_id_safe` holds in the database.
+    expect(telegramUserIdSchema.parse(777_000_123)).toBe(777_000_123)
+    expect(telegramUserIdSchema.parse(9_007_199_254_740_991)).toBe(9_007_199_254_740_991)
+  })
+
+  it('refuses 2^53 itself, where a number stops being able to tell itself from its neighbour', () => {
+    expect(() => telegramUserIdSchema.parse(9_007_199_254_740_992)).toThrow()
+  })
+
+  it('refuses what is not an account: zero, a negative, a fraction, a string', () => {
+    for (const value of [0, -1, -777_000_123, 1.5, '777000123', null]) {
+      expect(() => telegramUserIdSchema.parse(value)).toThrow()
+    }
+  })
+
+  it('is required on the entity: an owner nobody can come back to is not one', () => {
+    const without: Record<string, unknown> = { ...actor }
+    delete without.telegramUserId
+
+    expect(() => actorSchema.parse(without)).toThrow()
+  })
+})
+
 describe('newActorSchema', () => {
   const settings = {
     country: 'AM' as const,
@@ -52,6 +86,11 @@ describe('newActorSchema', () => {
   it('refuses the timestamps the server owns', () => {
     expect(() => newActorSchema.parse({ ...settings, createdAt: new Date() })).toThrow()
     expect(() => newActorSchema.parse({ ...settings, updatedAt: new Date() })).toThrow()
+  })
+
+  it('has no place for access to other people\u2019s data — it is granted, never asked for', () => {
+    expect(() => newActorSchema.parse({ ...settings, sharedUntil: new Date() })).toThrow()
+    expect(() => actorPatchSchema.parse({ sharedUntil: new Date() })).toThrow()
   })
 
   it('refuses a half-filled screen: all four travel together or none do', () => {
@@ -92,10 +131,29 @@ describe('actorPatchSchema', () => {
   it('refuses fields the server owns, so a client cannot smuggle them in', () => {
     for (const smuggled of [
       { id: actor.id },
+      { telegramUserId: 42 },
       { createdAt: new Date() },
       { updatedAt: new Date() },
     ]) {
       expect(() => actorPatchSchema.parse({ city: 'Ереван', ...smuggled })).toThrow()
     }
+  })
+})
+
+describe('hasSharedAccess', () => {
+  const now = new Date('2026-09-20T12:00:00Z')
+
+  it('says no when access was never granted', () => {
+    expect(hasSharedAccess({ sharedUntil: null }, now)).toBe(false)
+  })
+
+  it('says no the second it runs out — the boundary is exactly now', () => {
+    expect(hasSharedAccess({ sharedUntil: new Date('2026-09-20T11:59:59Z') }, now)).toBe(false)
+    expect(hasSharedAccess({ sharedUntil: now }, now)).toBe(false)
+  })
+
+  it('says yes while it lasts', () => {
+    expect(hasSharedAccess({ sharedUntil: new Date('2026-09-20T12:00:01Z') }, now)).toBe(true)
+    expect(hasSharedAccess({ sharedUntil: new Date('2026-10-20T00:00:00Z') }, now)).toBe(true)
   })
 })

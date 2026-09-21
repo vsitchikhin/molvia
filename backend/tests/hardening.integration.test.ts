@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { DomainError, ERROR } from '@molvia/model'
 import type { Money, Quantity } from '@molvia/model'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, ownPrices, telegramId } from './fixtures'
 import { createActorRepository } from '@/db/actors-repository'
 import { createExpenseRepository } from '@/db/expenses-repository'
 import { createItemRepository } from '@/db/items-repository'
@@ -152,8 +152,8 @@ describe('предел выборки', () => {
       })
     }
 
-    expect(await expenses.cheapestFor(actorId, [itemId], 2)).toHaveLength(2)
-    expect(await expenses.cheapestFor(actorId, [itemId])).toHaveLength(4)
+    expect(await expenses.cheapestFor(ownPrices(actorId, [itemId], 2))).toHaveLength(2)
+    expect(await expenses.cheapestFor(ownPrices(actorId, [itemId]))).toHaveLength(4)
   })
 })
 
@@ -169,7 +169,7 @@ describe('негодный идентификатор', () => {
     expect(await catalogue.byIds(['не-uuid'])).toEqual([])
     expect(await places.byIds(['не-uuid'])).toEqual([])
     expect(await expenses.forTrip('не-uuid', actorId)).toEqual([])
-    expect(await expenses.cheapestFor(actorId, ['не-uuid'])).toEqual([])
+    expect(await expenses.cheapestFor(ownPrices(actorId, ['не-uuid']))).toEqual([])
   })
 
   it('на правке и удалении — тем же, чем чужое', async () => {
@@ -228,11 +228,20 @@ describe('уникальность чужой строки — это конфл
 
   it('повторный первый визит владельца — тоже конфликт, а не пятисотка', async () => {
     const id = randomUUID()
-    await actors.create(id, settings)
+    await actors.create(id, telegramId(), settings)
 
-    const again = actors.create(id, settings)
+    const again = actors.create(id, telegramId(), settings)
     await expect(again).rejects.toThrow(DomainError)
     await expect(again).rejects.toMatchObject({ code: ERROR.CONFLICT })
+  })
+
+  it('второй владелец на тот же Telegram-id — конфликт: аккаунт один (MOL-52)', async () => {
+    const shared = telegramId()
+    await actors.create(randomUUID(), shared, settings)
+
+    const twin = actors.create(randomUUID(), shared, settings)
+    await expect(twin).rejects.toThrow(DomainError)
+    await expect(twin).rejects.toMatchObject({ code: ERROR.CONFLICT })
   })
 })
 

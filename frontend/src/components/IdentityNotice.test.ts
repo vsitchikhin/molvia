@@ -50,14 +50,6 @@ describe('IdentityNotice', () => {
     expect(view.text()).toBe('')
   })
 
-  it('asks for the invite link, and offers nothing to dismiss', () => {
-    // Nothing is behind this one to get on with, so a «got it» button would be a lie.
-    const { view } = render('uninvited')
-
-    expect(view.text()).toContain(en.identity.uninvited.title)
-    expect(view.find('button').exists()).toBe(false)
-  })
-
   it('does not stay silent when the identity could not be loaded at all', () => {
     // While it is not up, every request the app makes goes out without an owner — an app
     // that looked normal and could not save a thing was the worst of the options.
@@ -76,7 +68,6 @@ describe('IdentityNotice', () => {
 
     expect(retry).toHaveBeenCalled()
     expect(render('offline').view.find('button').exists()).toBe(false)
-    expect(render('uninvited').view.find('button').exists()).toBe(false)
   })
 
   it('offers to bring the old data back when there is something to bring back', async () => {
@@ -105,10 +96,10 @@ describe('IdentityNotice', () => {
   })
 
   // Until MOL-19 a lost identity interrupted. But the notice is drawn again over every screen,
-  // and an interruption on every move cut off the heading the move had just focused — «needs an
-  // invite link» cannot even be dismissed. The owner made every notice polite (MOL-19, Р-9).
+  // and an interruption on every move cut off the heading the move had just focused. The owner
+  // made every notice polite (MOL-19, Р-9).
   it('never interrupts: it is drawn again on every screen the person moves to', () => {
-    for (const state of ['lost', 'uninvited', 'error', 'offline'] as const) {
+    for (const state of ['lost', 'error', 'offline'] as const) {
       expect(render(state).view.find('[role="alert"]').exists()).toBe(false)
     }
   })
@@ -121,7 +112,6 @@ describe('IdentityNotice', () => {
     ['error', 'bad', 'status'],
     ['offline', 'warn', 'status'],
     ['lost', 'warn', 'status'],
-    ['uninvited', 'warn', 'status'],
   ] as const)('draws %s in %s and announces it as %s', (state, tone, role) => {
     const { view } = render(state)
     expect(view.get('.state').classes()).toContain(tone)

@@ -9,7 +9,8 @@ import { events } from '@/db/schema'
 const { db, close } = connectDrizzle()
 const repository = createEventRepository(db)
 
-const DAY = 24 * 60 * 60 * 1000
+const HOUR = 60 * 60 * 1000
+const DAY = 24 * HOUR
 const now = Date.now()
 const daysAgo = (days: number): Date => new Date(now - days * DAY)
 
@@ -29,10 +30,18 @@ afterAll(async () => {
   await close()
 })
 
+/**
+ * A person who appeared on that day **and could see other people's data in their fourth
+ * week** — the cohort of the gate (MOL-31, Р-20 and Р-24). Nothing is written to the log: the
+ * cohort is read from `actors`, and the fixture used to seed `session_started` — an event no
+ * code writes since MOL-8 withdrew it. A fixture describing a path the product does not take
+ * is what kept the gate's own defect hidden (adversarial round 1, F2).
+ */
 async function actorSeenAt(started: Date): Promise<string> {
-  const actorId = await insertActor(db)
-  await repository.record({ actorId, type: EVENT.SESSION_STARTED, occurredAt: started })
-  return actorId
+  return insertActor(db, {
+    createdAt: started,
+    sharedUntil: new Date(started.getTime() + 40 * DAY),
+  })
 }
 
 describe('week-four return', () => {
@@ -47,7 +56,7 @@ describe('week-four return', () => {
     const actorId = await actorSeenAt(daysAgo(35))
     await repository.record({
       actorId,
-      type: EVENT.CATALOGUE_VIEWED,
+      type: EVENT.ADVICE_VIEWED,
       payload: { subject: 'product' },
       occurredAt: daysAgo(35 - 24), // day 24 of their own life, inside week four
     })
@@ -62,7 +71,7 @@ describe('week-four return', () => {
     const actorId = await actorSeenAt(daysAgo(35))
     await repository.record({
       actorId,
-      type: EVENT.CATALOGUE_VIEWED,
+      type: EVENT.ADVICE_VIEWED,
       payload: { subject: 'venue' },
       occurredAt: daysAgo(35 - 24),
     })
@@ -81,7 +90,7 @@ describe('week-four return', () => {
     const early = await actorSeenAt(daysAgo(35))
     await repository.record({
       actorId: early,
-      type: EVENT.CATALOGUE_VIEWED,
+      type: EVENT.ADVICE_VIEWED,
       payload: { subject: 'product' },
       occurredAt: daysAgo(35 - 20), // day 20 — still the third week
     })
@@ -89,7 +98,7 @@ describe('week-four return', () => {
     const late = await actorSeenAt(daysAgo(35))
     await repository.record({
       actorId: late,
-      type: EVENT.CATALOGUE_VIEWED,
+      type: EVENT.ADVICE_VIEWED,
       payload: { subject: 'product' },
       occurredAt: daysAgo(35 - 28), // day 28 — the fifth week has begun
     })
@@ -105,7 +114,7 @@ describe('week-four return', () => {
     for (const day of [22, 24, 26]) {
       await repository.record({
         actorId,
-        type: EVENT.CATALOGUE_VIEWED,
+        type: EVENT.ADVICE_VIEWED,
         payload: { subject: 'product' },
         occurredAt: daysAgo(35 - day),
       })
@@ -117,11 +126,73 @@ describe('week-four return', () => {
     })
   })
 
+  it('does not count the search: its event answered a question the gate no longer asks', async () => {
+    // `catalogue_viewed` meant «came back to enter a purchase». The gate asks about coming
+    // back to *read* other people's data, so from MOL-31 it counts `advice_viewed` and
+    // nothing else — the old rows stay in the log and are not read (Р-15, Р-18).
+    const actorId = await actorSeenAt(daysAgo(35))
+    await repository.record({
+      actorId,
+      type: EVENT.CATALOGUE_VIEWED,
+      payload: { subject: 'product' },
+      occurredAt: daysAgo(35 - 24),
+    })
+
+    await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
+      cohortSize: 1,
+      returned: 0,
+    })
+  })
+
+  it('counts a person who never wrote a single event — the denominator is not the log', async () => {
+    // Someone who could see other people's data and never came to look. Nothing of theirs is
+    // in the log, and the gate must still be able to see that they did not come back:
+    // building the cohort from the log put them outside it forever and left the threshold
+    // measuring only those who had already returned (adversarial round 1, F2).
+    await actorSeenAt(daysAgo(35))
+
+    await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
+      cohortSize: 1,
+      returned: 0,
+    })
+  })
+
+  it('leaves out a person who never had access: they had nothing to come back to', async () => {
+    // The numerator is behind a paid door, so a denominator of everyone who ever appeared
+    // counts people who could not have produced an event at all, and the threshold reads
+    // «stop» for a reason unrelated to the hypothesis (adversarial round 2, G1).
+    await insertActor(db, { createdAt: daysAgo(35) })
+
+    await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
+      cohortSize: 0,
+      returned: 0,
+    })
+  })
+
+  it('leaves out a person whose access ran out before their fourth week', async () => {
+    // Exactly the boundary: the fourth week opens at 504 hours, so access ending an hour
+    // earlier is access they never had when the question was asked.
+    const started = daysAgo(35)
+    await insertActor(db, {
+      createdAt: started,
+      sharedUntil: new Date(started.getTime() + 503 * HOUR),
+    })
+    await insertActor(db, {
+      createdAt: started,
+      sharedUntil: new Date(started.getTime() + 504 * HOUR),
+    })
+
+    await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
+      cohortSize: 1,
+      returned: 0,
+    })
+  })
+
   it('ignores actors first seen outside the cohort window', async () => {
     const actorId = await actorSeenAt(daysAgo(5))
     await repository.record({
       actorId,
-      type: EVENT.CATALOGUE_VIEWED,
+      type: EVENT.ADVICE_VIEWED,
       payload: { subject: 'product' },
       occurredAt: daysAgo(1),
     })
@@ -134,14 +205,13 @@ describe('week-four return', () => {
 })
 
 describe("recording at most once a day of the person's own life", () => {
-  const HOUR = 60 * 60 * 1000
   const view = (actorId: string, subject: 'product' | 'venue' = 'product') =>
-    ({ actorId, type: EVENT.CATALOGUE_VIEWED, payload: { subject } }) as const
+    ({ actorId, type: EVENT.ADVICE_VIEWED, payload: { subject } }) as const
   const ago = (ms: number) => new Date(Date.now() - ms)
 
   async function viewsOf(actorId: string) {
     return (await db.select().from(events)).filter(
-      (row) => row.actorId === actorId && row.type === EVENT.CATALOGUE_VIEWED,
+      (row) => row.actorId === actorId && row.type === EVENT.ADVICE_VIEWED,
     )
   }
 
@@ -153,8 +223,8 @@ describe("recording at most once a day of the person's own life", () => {
   })
 
   it('writes nothing more in the same day of their life', async () => {
-    const actorId = await insertActor(db)
-    // First seen ten days and three hours ago: today of their life began three hours ago.
+    // Appeared ten days and three hours ago: today of their life began three hours ago.
+    const actorId = await insertActor(db, { createdAt: ago(10 * DAY + 3 * HOUR) })
     await repository.record({ ...view(actorId), occurredAt: ago(10 * DAY + 3 * HOUR) })
     await repository.record({ ...view(actorId), occurredAt: ago(2 * HOUR) })
 
@@ -165,8 +235,12 @@ describe("recording at most once a day of the person's own life", () => {
   it('writes a visit in week four even when the last row is under a day old', async () => {
     // The rolling window lost exactly this: an evening in week three swallowed the next
     // morning in week four, and the gate saw a person who came back as one who did not.
-    const actorId = await insertActor(db)
     const started = ago(21 * DAY + HOUR) // week four of their life began an hour ago
+    // With access, because only then is there a visit to write and a cohort to count them in.
+    const actorId = await insertActor(db, {
+      createdAt: started,
+      sharedUntil: new Date(started.getTime() + 40 * DAY),
+    })
     await repository.record({ ...view(actorId), occurredAt: started })
     await repository.record({ ...view(actorId), occurredAt: ago(2 * HOUR) }) // still week three
 

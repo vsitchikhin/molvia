@@ -9,6 +9,7 @@ function fakeActors(overrides: Partial<ActorRepository> = {}): ActorRepository {
   return {
     create: () => Promise.reject(new Error('create was not expected')),
     byId: () => Promise.reject(new Error('byId was not expected')),
+    byTelegramUserId: () => Promise.reject(new Error('byTelegramUserId was not expected')),
     update: () => Promise.reject(new Error('update was not expected')),
     ...overrides,
   }
@@ -16,10 +17,12 @@ function fakeActors(overrides: Partial<ActorRepository> = {}): ActorRepository {
 
 const actor = actorSchema.parse({
   id: ID,
+  telegramUserId: 777_000_123,
   country: 'AM',
   city: 'Гюмри',
   spendCurrency: 'AMD',
   incomeCurrency: 'RUB',
+  sharedUntil: null,
   createdAt: new Date('2026-09-16T10:00:00.000Z'),
   updatedAt: new Date('2026-09-16T10:00:00.000Z'),
 })

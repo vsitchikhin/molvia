@@ -1,6 +1,5 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
-import process from 'node:process'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
@@ -14,14 +13,6 @@ import type { Page } from '@playwright/test'
  */
 
 const KEY = 'molvia.actor'
-
-function inviteCode(): string {
-  const code = process.env.SIGNUP_CODE
-  if (!code) {
-    throw new Error("SIGNUP_CODE is not set. Run `make setup` to generate this copy's .env.")
-  }
-  return code
-}
 
 /** A word no catalogue holds, so the search finds this test's item and nothing else. */
 function nonsense(): string {
@@ -42,9 +33,12 @@ interface Setting {
   readonly current: () => Promise<{ expenses: unknown[]; place: { name: string } } | null>
 }
 
-/** A device with an identity and one item of its own in the catalogue — but no trip yet. */
+/**
+ * A device with an identity and one item of its own in the catalogue — but no trip yet. The
+ * identity arrives by itself on the first visit (the invite door of MOL-8 is gone, MOL-52).
+ */
 async function device(page: Page): Promise<Setting> {
-  await page.goto(`/?c=${inviteCode()}`)
+  await page.goto('/')
   const stored = () => page.evaluate((key) => localStorage.getItem(key) ?? '', KEY)
   await expect.poll(stored).toMatch(/^[0-9a-f-]{36}$/)
   const headers = { 'x-molvia-actor': await stored() }
@@ -89,7 +83,8 @@ async function addItem(page: Page, word: string, price: string): Promise<void> {
   await sheet(page).getByLabel('How much').fill('1')
   await sheet(page).getByLabel('Price as on the tag').fill(price)
   await sheet(page).getByRole('button', { name: 'Add to the trip' }).click()
-  await expect(page).toHaveURL(/\/$/)
+  // The path, not the whole address: what the query string carries is not this test's business.
+  expect(new URL(page.url()).pathname).toBe('/')
 }
 
 test.describe('the trip', () => {

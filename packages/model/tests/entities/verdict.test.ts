@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { ERROR, ISSUE } from '#model/support/errors'
 import {
+  AGGREGATE_MIN_CONTRIBUTIONS,
+  averageScore,
   newVerdictSchema,
   newVerdictSchemaFor,
   placeMatchesKind,
@@ -96,13 +98,25 @@ describe('verdictLevel', () => {
     expect(verdictLevel(1, 1)).toBe('never')
   })
 
-  it('holds the same thresholds on an average, which is what 0.3 brings', () => {
+  it('holds the same thresholds on an average, which is what the shared mode brings', () => {
     // Exactly 4.0 and exactly 2.5 are the two values a float would fumble.
     expect(verdictLevel(8, 2)).toBe('take') // 4.0
     expect(verdictLevel(39, 10)).toBe('if_cheap') // 3.9
     expect(verdictLevel(5, 2)).toBe('if_cheap') // 2.5
-    expect(verdictLevel(249, 100)).toBe('never') // 2.49
     expect(verdictLevel(9, 2)).toBe('take') // 4.5
+  })
+
+  it('decides by the number the screen prints, not by the fraction behind it (Р-22)', () => {
+    // 3.95 prints as «4.0», and a row saying «4,0 из 5» in «только если дёшево» is a
+    // contradiction nothing on the screen can explain (adversarial round 1, F6).
+    expect(averageScore(79, 20)).toBe('4.0')
+    expect(verdictLevel(79, 20)).toBe('take')
+    // The same at the other boundary: 2.45 prints as «2.5» and belongs with the 2.5s.
+    expect(averageScore(49, 20)).toBe('2.5')
+    expect(verdictLevel(49, 20)).toBe('if_cheap')
+    // 2.449 still prints «2.4» and stays below.
+    expect(averageScore(2449, 1000)).toBe('2.4')
+    expect(verdictLevel(2449, 1000)).toBe('never')
   })
 
   it('refuses an aggregate that no set of ratings could produce', () => {
@@ -191,5 +205,55 @@ describe('the review of a verdict', () => {
       'Пахнет крахмалом.\nМясом — нет',
     )
     expect(verdictPatchSchema.parse({ review }).review).toBe('Пахнет крахмалом.\nМясом — нет')
+  })
+})
+
+describe('averageScore', () => {
+  it('writes one person\u2019s own score with a tenth, so the field never changes shape', () => {
+    expect(averageScore(5, 1)).toBe('5.0')
+    expect(averageScore(1, 1)).toBe('1.0')
+  })
+
+  it('averages several and rounds half away from zero', () => {
+    expect(averageScore(13, 3)).toBe('4.3') // 4.333…
+    expect(averageScore(9, 2)).toBe('4.5')
+    expect(averageScore(14, 3)).toBe('4.7') // 4.666…
+    expect(averageScore(5, 2)).toBe('2.5')
+    // 4.25 and 4.35 sit exactly between two tenths: half goes away from zero, both times.
+    expect(averageScore(17, 4)).toBe('4.3')
+    expect(averageScore(87, 20)).toBe('4.4')
+  })
+
+  it('never produces a number outside the scale it claims', () => {
+    expect(averageScore(50, 10)).toBe('5.0')
+    expect(averageScore(10, 10)).toBe('1.0')
+  })
+
+  it('refuses an aggregate no set of ratings could produce, exactly as verdictLevel does', () => {
+    for (const [sum, count] of [
+      [0, 0],
+      [3, 0],
+      [0, 1],
+      [6, 1],
+      [3, 10],
+      [51, 10],
+    ] as const) {
+      expect(() => averageScore(sum, count)).toThrow(
+        expect.objectContaining({ code: ERROR.INVALID_SCORE }),
+      )
+    }
+  })
+
+  it('agrees with verdictLevel on where the groups start', () => {
+    expect(averageScore(8, 2)).toBe('4.0')
+    expect(verdictLevel(8, 2)).toBe('take')
+    expect(averageScore(5, 2)).toBe('2.5')
+    expect(verdictLevel(5, 2)).toBe('if_cheap')
+  })
+})
+
+describe('AGGREGATE_MIN_CONTRIBUTIONS', () => {
+  it('is three: with two, subtracting one\u2019s own score gives away the other', () => {
+    expect(AGGREGATE_MIN_CONTRIBUTIONS).toBe(3)
   })
 })

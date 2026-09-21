@@ -26,10 +26,12 @@ const TRIP = 'd2f1a3b4-5c6d-4e7f-8a9b-0c1d2e3f4a5b'
 
 const actor: Actor = actorSchema.parse({
   id: ACTOR,
+  telegramUserId: 777_000_123,
   country: 'AM',
   city: 'Gyumri',
   spendCurrency: 'AMD',
   incomeCurrency: 'RUB',
+  sharedUntil: null,
   createdAt: new Date('2026-09-01T10:00:00.000Z'),
   updatedAt: new Date('2026-09-01T10:00:00.000Z'),
 })
@@ -118,6 +120,7 @@ function fakeRepositories(
       unratedFor: unexpected('expenses.unratedFor'),
       pendingVerdictsFor: unexpected('expenses.pendingVerdictsFor'),
       cheapestFor: unexpected('expenses.cheapestFor'),
+      medianPriceFor: unexpected('expenses.medianPriceFor'),
       ...overrides.expenses,
     },
     places: {

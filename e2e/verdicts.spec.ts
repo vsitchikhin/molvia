@@ -1,20 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import process from 'node:process'
 import { expect, test } from '@playwright/test'
 import type { APIRequestContext, Page } from '@playwright/test'
-
-/**
- * «Оценки» through a real browser and the real API (MOL-28): the purchases are made over the
- * API — the trip screen is another task — and everything after them happens on the screen.
- */
-
-function inviteCode(): string {
-  const code = process.env.SIGNUP_CODE
-  if (!code) {
-    throw new Error("SIGNUP_CODE is not set. Run `make setup` to generate this copy's .env.")
-  }
-  return code
-}
 
 interface Person {
   readonly id: string
@@ -23,9 +9,7 @@ interface Person {
 
 /** A new person for each test: the queue is personal, so nothing leaks between tests. */
 async function person(request: APIRequestContext, page: Page): Promise<Person> {
-  const created = await request.post('/api/actors', {
-    headers: { 'x-molvia-invite': inviteCode() },
-  })
+  const created = await request.post('/api/dev/actors')
   expect(created.status()).toBe(201)
   const { id } = (await created.json()) as { id: string }
   await page.addInitScript((actor) => {

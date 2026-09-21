@@ -27,16 +27,20 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 Migrations run when the API starts, so there is no separate step to remember and no
 window where the schema lags the code deployed against it.
 
-## `SIGNUP_CODE` is required, and the API refuses to start without it
+## Nobody can sign in yet, and that is the current state rather than a fault
 
-The first visit has a door: `POST /actors` creates an identity, and without a code it would
-do that for the whole internet — each call a row, and the 0.2 gate counts arrivals as its
-denominator. The code lives in `.env.prod`, and the link handed to people carries it:
-`https://<domain>/?c=<code>`. After the first open it lives on the device, so the parameter
-is needed once per person.
+**Do not deploy this expecting people to use it.** The invite code of MOL-8 is gone together
+with `POST /actors` (MOL-52): the epic opened the door to everyone with a Telegram account, and
+taking the code off while leaving a handle that writes a row per call would have been worse
+than either. What creates an identity in development is `POST /dev/actors`, and that address
+**does not exist in the production image** — the bundler folds its guard to a constant and
+drops the module, which a test asserts against the built file.
 
-The API validates it at boot and exits if it is missing. That is deliberate: a server nobody
-can sign into is easier to notice than one anybody can.
+The real door is the Telegram login of MOL-54. Until it ships, a production deployment serves
+the app to a person who will see «could not be identified» and a «try again» that cannot help.
+`SIGNUP_CODE` is no longer read by anything: it is out of `backend/src/env.ts`, out of
+`bin/init-env.sh` and out of `docker-compose.prod.yml`. A leftover value in `.env.prod` is
+harmless and should be deleted.
 
 ## Trying the production stack locally
 
@@ -56,3 +60,13 @@ same command ending in `down -v`.
 There is no workflow that SSHs into the machine and deploys. Until a machine exists there
 are no secrets to configure, and a deploy job that cannot run is worse than none: it looks
 like a safety net and is not one. The two commands above are the whole deploy.
+
+## The Postgres image has to carry ICU
+
+«Что брать» orders names with `collate "und-x-icu"` (MOL-31): the database is created with
+`en_US.utf8`, where «Ёжик» sorts before «Ежевика» and a name typed in lower case falls below
+every capitalised one, and one answer must not come back in two alphabets. `postgres:17-alpine`
+carries the ICU collations, and the compose file pins that image — but an image built without
+ICU would make those queries **fail**, not degrade: `ORDER BY` on a collation the server does
+not know is an error. So the image is part of the contract, and swapping it is a migration-sized
+decision rather than a version bump.
