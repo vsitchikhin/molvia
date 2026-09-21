@@ -95,7 +95,7 @@ function add(id: string, price = '520'): QueuedWrite {
 }
 
 /** Поход, в котором эта покупка уже строка — с теми числами, какие назвали. */
-function answered(purchase: string, quantity: string, price: string): TripView {
+function answered1(purchase: string, quantity: string, price: string): TripView {
   const trip = answer(price)
   return tripViewCodec.parse({
     ...tripViewCodec.encode(trip),
@@ -913,7 +913,7 @@ describe('trip queue', () => {
 
     it('ответ, где строка та же, что отправили, ничего за собой не тянет', async () => {
       // И не роняет прогон: количество и цена — bigint, а через JSON он бы бросил (нашлось e2e).
-      addExpense.mockResolvedValue({ trip: answered(MILK, '0.9', '520'), created: true })
+      addExpense.mockResolvedValue({ trip: answered1(MILK, '0.9', '520'), created: true })
       const queue = fresh()
       queue.enqueue(add(MILK, '520'))
       await queue.flush()
@@ -926,8 +926,8 @@ describe('trip queue', () => {
     it('ответ со старыми числами — правка уходит следом (Г1: ответ потерялся)', async () => {
       // Сервер принял первую версию, ответ не дошёл; повтор с новой ценой он встречает своей
       // строкой и отвечает 200 со старыми числами.
-      addExpense.mockResolvedValue({ trip: answered(MILK, '0.9', '520'), created: false })
-      updateExpense.mockResolvedValue(answered(MILK, '0.9', '750'))
+      addExpense.mockResolvedValue({ trip: answered1(MILK, '0.9', '520'), created: false })
+      updateExpense.mockResolvedValue(answered1(MILK, '0.9', '750'))
       const queue = fresh()
       queue.enqueue(add(MILK, '750'))
       await queue.flush()
@@ -1117,6 +1117,24 @@ describe('trip queue', () => {
   })
 
   describe('очередь за сиротой (раунд 4, Ж1)', () => {
+    it('«Убрать» у отвергнутого старта уносит и покупки этого похода', async () => {
+      startTrip.mockRejectedValue(new ApiError(ERROR.CONFLICT, undefined, true))
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      await queue.flush()
+      expect(queue.heldBack(TRIP)).toBe(1)
+
+      const refusal = queue.rejected[0]
+      if (!refusal) throw new Error('нет отказа на старт')
+      queue.dismiss(refusal)
+
+      // Ни покупки, ни отказа: висеть в очереди вечно им больше негде.
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toEqual([])
+      expect(fresh().pending).toEqual([])
+    })
+
     it('покупки мёртвого похода стоят, а следующий поход уходит', async () => {
       const NEXT = 'bbbbbbbb-0000-4000-8000-000000000031'
       startTrip.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, undefined, true))
@@ -1137,6 +1155,30 @@ describe('trip queue', () => {
       // Покупка мёртвого похода по-прежнему на телефоне и не получила своего отказа.
       expect(queue.pending.filter((write) => write.kind === 'add')).toHaveLength(1)
       expect(queue.rejected).toHaveLength(1)
+    })
+  })
+
+  describe('покупка, отменённая в полёте, и догоняющая правка (П-3)', () => {
+    it('правка не уходит за покупкой, которую уже отменили', async () => {
+      let answered: (trip: { trip: TripView; created: boolean }) => void = () => undefined
+      addExpense.mockReturnValueOnce(
+        new Promise((resolve) => {
+          answered = resolve
+        }),
+      )
+      removeExpense.mockResolvedValue(answer('0.00'))
+      const queue = fresh()
+      queue.enqueue(add(MILK, '750'))
+      await settled()
+
+      queue.dropPurchase(TRIP, MILK)
+      // Сервер отвечает строкой со старой ценой — обычно за этим уходит догоняющая правка.
+      answered({ trip: answered1(MILK, '0.9', '520'), created: false })
+      await queue.flush()
+
+      expect(updateExpense).not.toHaveBeenCalled()
+      expect(removeExpense).toHaveBeenCalledWith(TRIP, MILK)
+      expect(queue.rejected).toEqual([])
     })
   })
 

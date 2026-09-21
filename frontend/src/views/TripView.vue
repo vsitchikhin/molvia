@@ -51,7 +51,7 @@
             {{ t('trip.rejected.fix') }}
           </AppButton>
           <AppButton variant="ghost" @click="queue.dismiss(item)">
-            {{ t('trip.rejected.drop') }}
+            {{ heldBack(item) > 0 ? t('trip.rejected.drop_trip') : t('trip.rejected.drop') }}
           </AppButton>
         </div>
       </template>
@@ -365,11 +365,17 @@ export default defineComponent({
      * the next trip has been started (Т-11). Those of the trip on screen are lines of it, with
      * their own mark and their own caveat under the total; these have nowhere else to be said.
      */
-    const unsent = computed(
-      () =>
-        queue.pending.filter((write) => write.kind === 'add' && write.tripId !== tripId.value)
-          .length,
-    )
+    const unsent = computed(() => {
+      // Purchases of a trip the server refused are not «not sent yet»: they are not going
+      // anywhere, and the notice about that trip is where they are counted (раунд 5, З1).
+      const refused = new Set(
+        queue.rejected.flatMap((item) => (item.write.kind === 'start' ? [item.write.tripId] : [])),
+      )
+      return queue.pending.filter(
+        (write) =>
+          write.kind === 'add' && write.tripId !== tripId.value && !refused.has(write.tripId),
+      ).length
+    })
 
     // Its own name on the phone: two refusals about one row differ in nothing a screen can see,
     // and Vue would reuse one's node for the other (review 7, В2-8).
@@ -401,8 +407,16 @@ export default defineComponent({
      */
     const refusalReason = (item: RejectedWrite): string => {
       const key = item.code.startsWith('error.') ? item.code : null
-      return key ? t(key) : t('trip.rejected.unknown', { code: item.code })
+      const why = key ? t(key) : t('trip.rejected.unknown', { code: item.code })
+      // A refused trip holds its purchases, and nothing else on screen says so: «N ещё не
+      // отправлено» promises they will go, and they will not (раунд 5, З1).
+      const waiting = heldBack(item)
+      return waiting > 0 ? `${why} · ${t('trip.rejected.orphaned', { n: waiting }, waiting)}` : why
     }
+
+    /** Purchases that will never be written because this trip was not (раунд 5, З1). */
+    const heldBack = (item: RejectedWrite): number =>
+      item.write.kind === 'start' ? queue.heldBack(item.write.tripId) : 0
 
     /** Only a purchase can be corrected, and only one whose card the phone can still read. */
     const correctable = (item: RejectedWrite): boolean =>
@@ -533,6 +547,7 @@ export default defineComponent({
       load: () => void load(),
       refusalKey,
       refusalTitle,
+      heldBack,
       refusalReason,
       correctable,
       correct,

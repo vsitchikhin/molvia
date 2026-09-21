@@ -710,6 +710,12 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     const id = actor.id
     sync(id)
     rejected.value = rejected.value.filter((entry) => entry.key !== item.key)
+    // A trip the server refused takes its purchases with it: they name a trip that will never
+    // exist, and left behind they would wait for ever with nothing on screen about them (раунд 5,
+    // З1). The screen says so before it asks.
+    if (item.write.kind === 'start') {
+      kept = kept.filter((entry) => entry.write.tripId !== item.write.tripId)
+    }
     persist(id)
   }
 
@@ -786,6 +792,11 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     )
   }
 
+  /** How many purchases are waiting on a trip that will never be written (раунд 5, З1). */
+  function heldBack(tripId: string): number {
+    return kept.filter((item) => item.write.kind === 'add' && item.write.tripId === tripId).length
+  }
+
   /**
    * Whether this purchase is already a row of its trip: a repeat of `add` would then be answered
    * «yes» and change nothing, so the correction goes as an amendment instead (А1).
@@ -804,6 +815,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     enqueue,
     dismiss,
     dropPurchase,
+    heldBack,
     joinElsewhere,
     finishElsewhere,
     flush,

@@ -59,7 +59,9 @@
       "named": "«{name}» was not accepted",
       "unknown": "The server did not accept the record ({code})",
       "fix": "Correct it",
-      "drop": "Dismiss"
+      "drop": "Dismiss",
+      "orphaned": "it holds {n} purchase, and it is waiting | it holds {n} purchases, and they are waiting",
+      "drop_trip": "Drop the trip and its purchases"
     },
     "rate_line": "rate {rate} · {date}",
     "flip": "Show in the other currency",

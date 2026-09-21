@@ -14,6 +14,7 @@ import TripView from '@/views/TripView.vue'
 
 const currentTrip = vi.fn<() => Promise<TripViewModel | null>>()
 const recentPlaces = vi.fn<() => Promise<{ id: string; kind: 'store'; name: string }[]>>()
+const startTrip = vi.fn()
 const addExpense = vi.fn()
 vi.mock('@/api', () => ({
   api: {
@@ -22,7 +23,7 @@ vi.mock('@/api', () => ({
     addExpense: (...args: unknown[]) => addExpense(...args),
     updateExpense: () => new Promise(() => undefined),
     removeExpense: () => new Promise(() => undefined),
-    startTrip: () => new Promise(() => undefined),
+    startTrip: (...args: unknown[]) => startTrip(...args),
     finishTrip: () => new Promise(() => undefined),
   },
 }))
@@ -163,6 +164,8 @@ describe('TripView', () => {
     currentTrip.mockResolvedValue(null)
     recentPlaces.mockReset()
     recentPlaces.mockResolvedValue([])
+    startTrip.mockReset()
+    startTrip.mockReturnValue(new Promise(() => undefined))
     addExpense.mockReset()
     addExpense.mockReturnValue(new Promise(() => undefined))
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
@@ -513,6 +516,32 @@ describe('TripView', () => {
       expect(view.text()).toContain(ru.trip.none.title)
       expect(view.text()).toContain(ru.trip.rejected.drop)
       expect(queue.rejected).toHaveLength(1)
+    })
+
+    it('отвергнутый поход говорит, что держит покупки, и уносит их вместе с собой (З1)', async () => {
+      currentTrip.mockResolvedValue(null)
+      // Сервер отказал в самом походе: покупки в нём никуда не уйдут.
+      startTrip.mockRejectedValue(new ApiError(ERROR.CONFLICT, undefined, true))
+      const { view, queue } = await render()
+      const own = 'bbbbbbbb-0000-4000-8000-000000000041'
+      queue.enqueue({
+        kind: 'start',
+        tripId: own,
+        place: { kind: 'store', name: 'Рынок' },
+        startedAt: new Date(),
+      })
+      queue.enqueue({ ...queued('eeeeeeee-0000-4000-8000-000000000042'), tripId: own })
+      await queue.flush()
+      await flushPromises()
+
+      expect(view.text()).toContain('ждёт решения')
+      // И обещания «уйдут, когда появится сеть» про них больше нет.
+      expect(view.text()).not.toContain('покупка ещё не отправлена')
+
+      await button(view, ru.trip.rejected.drop_trip).trigger('click')
+      await flushPromises()
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toEqual([])
     })
 
     it('«Убрать» снимает запись с телефона', async () => {
