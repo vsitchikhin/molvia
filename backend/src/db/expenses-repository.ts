@@ -306,7 +306,12 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
               -- bag at home — belongs to the visit it was bought on, which is the same answer.
               ${trips.startedAt} as bought_at,
               ${trips.actorId} as actor_id,
-              ${mine} as mine
+              ${mine} as mine,
+              -- Whether the place is in this person's own city. Read by the order alone: the
+              -- shared mode shows «mine or my city», and without it a person's own receipt
+              -- from another city stood first in the list — that is, under the word «Дешевле
+              -- всего» (adversarial round 2, G4).
+              (${places.country} = ${query.country} and ${places.city} = ${query.city}) as nearby
             from ${expenses}
             join ${trips} on ${trips.id} = ${expenses.tripId}
             join ${places} on ${places.id} = ${trips.placeId}
@@ -545,7 +550,12 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
         -- Currency and unit are part of the key, so they belong in the order as well:
         -- without them two rows of one place are tied, and a tie is an order the planner is
         -- free to change between two loads of the same screen.
-        order by item_id, min(unit_price), place_name collate "und-x-icu", currency, unit, place_id
+        -- This person's own city first (Р-26). «Cheaper» across a city means «elsewhere»
+        -- rather than «cheaper», which is the whole reason Р-10 exists; since the shared mode
+        -- shows «mine or my city», without this a Gyumri resident's own Erevan receipt stood
+        -- above a Gyumri place and took the superlative with it (adversarial round 2, G4).
+        order by item_id, bool_or(nearby) desc, min(unit_price),
+                 place_name collate "und-x-icu", currency, unit, place_id
         ${priced.limit}
       `)
 

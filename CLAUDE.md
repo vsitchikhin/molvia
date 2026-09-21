@@ -382,7 +382,11 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   only when the asker shopped there, with their own price. Expenses are private, and one
   stranger's price in one shop is their basket. Ratings travel with the person; **prices are
   filtered by the asker's own country and city**, because «cheaper» across cities means
-  «elsewhere».
+  «elsewhere». **One's own purchases are the exception, and then the city decides the order**
+  (Р-26): the city rule is about other people's prices, so filtering it before «mine or theirs»
+  took away the Erevan prices a Gyumri resident could see for free — and leaving it out
+  entirely put their own Erevan receipt first, under the word «Дешевле всего». Own city first,
+  then by price.
 - **The threshold of «только если дёшево» is the lower median, from three purchases**
   (`PRICE_MEDIAN_MIN_OBSERVATIONS`, MOL-33's answer) — `percentile_disc(0.5)`, a price someone
   actually paid, the same rule `isRateJump` follows. Fewer than three and the field is `null`,

@@ -192,6 +192,34 @@ describe('общий режим', () => {
     expect(await expenses.cheapestFor(sharedPrices(me, [itemId]))).toEqual([])
   })
 
+  it('ставит свой город впереди: «дешевле» через город значит «в другом городе»', async () => {
+    // Свой чек из Еревана дешевле гюмрийского места и без этого правила встаёт первым — то
+    // есть ровно под словом «Дешевле всего» (адверсариальный раунд 2, G4).
+    const me = await insertActor(db)
+    const itemId = await insertItem(db)
+    const erevan = await insertPlace(db, { name: 'SAS Ереван', city: 'Ереван' })
+    const gyumri = await insertPlace(db, { name: 'Carrefour Гюмри', city: 'Гюмри' })
+    await bought(me, itemId, erevan, amd(200_000))
+    for (const minor of [300_000, 310_000, 320_000]) {
+      await bought(await insertActor(db), itemId, gyumri, amd(minor))
+    }
+
+    const rows = await expenses.cheapestFor(sharedPrices(me, [itemId]))
+    expect(rows.map((row) => row.placeName)).toEqual(['Carrefour Гюмри', 'SAS Ереван'])
+  })
+
+  it('внутри своего города порядок по-прежнему по цене', async () => {
+    const me = await insertActor(db)
+    const itemId = await insertItem(db)
+    const dear = await insertPlace(db, { name: 'Дорогое', city: 'Гюмри' })
+    const cheap = await insertPlace(db, { name: 'Дешёвое', city: 'Гюмри' })
+    await bought(me, itemId, dear, amd(400_000))
+    await bought(me, itemId, cheap, amd(300_000))
+
+    const rows = await expenses.cheapestFor(sharedPrices(me, [itemId]))
+    expect(rows.map((row) => row.placeName)).toEqual(['Дешёвое', 'Дорогое'])
+  })
+
   it('в своём режиме мои покупки видны из любого города', async () => {
     const me = await insertActor(db)
     const itemId = await insertItem(db)
