@@ -677,7 +677,13 @@ database access. In a product about data integrity, two write paths will silentl
   aggregate, and an aggregate is not shown until it holds several independent
   contributions — three of them, and a contribution is a person, not a row
   (`AGGREGATE_MIN_CONTRIBUTIONS`). Otherwise someone's basket can be derived from the
-  "average price". **The threshold closes the still picture, not the moving one:** a row that
+  "average price". **An open place discloses exact prices, not blurred ones:** once three
+  buyers open it, the minimum is one person's actual receipt and the median of three is a
+  second — and the median's is in no list of places. Both are accepted: the number of three is
+  argued from the arithmetic of an _average_, and neither of these averages anything. Closing
+  it means giving up the threshold, since a middle built from what is already shown almost
+  never has three places behind it. **The threshold closes the still picture, not the moving
+  one:** a row that
   read «4.3 · 3 оценки» yesterday and «4.5 · 4 оценки» today hands the fourth person's score
   to whoever looked twice, and the same holds for prices. Closing that needs noise or delayed
   publication, neither of which 0.1 has — a known limit, not an oversight.
