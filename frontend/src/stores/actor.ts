@@ -2,19 +2,16 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
-import type { Actor } from '@molvia/model'
+import type { ActorView } from '@molvia/model'
 import { api } from '@/api'
 import {
   IDENTITY_KEY,
   commitRestore,
   currentIdentity,
-  forgetInviteCode,
-  inviteCode,
   isIdentifier,
   lostIdentities,
   rememberIdentity,
   setAsideIdentity,
-  takeInviteCodeFromUrl,
 } from '@/stores/identity'
 import { forget, read, write } from '@/stores/storage'
 
@@ -28,13 +25,12 @@ const CLAIM_HEARTBEAT_MS = 5_000
 /**
  * What the identity is doing, so a screen can show the right one of four states.
  *
- * `lost` and `uninvited` are kept apart although both end in «you cannot use this yet»: one
- * means the data of this device is unreachable and a new identity has already been started,
- * the other that the app cannot get one at all — no link, or a code the door refused. One
- * sentence would be wrong for whichever case it was not written for.
+ * `uninvited` went with the invite door (MOL-52): there is no code to be missing any more, so
+ * the state had become one nothing could reach. `lost` stays and still means its own thing —
+ * the data of this device is unreachable and a new identity has already been started. MOL-56
+ * rewrites what is left of these under «the session ended, sign in again».
  */
-export type IdentityState =
-  'idle' | 'loading' | 'ready' | 'offline' | 'error' | 'lost' | 'uninvited'
+export type IdentityState = 'idle' | 'loading' | 'ready' | 'offline' | 'error' | 'lost'
 
 function isMissingActor(error: unknown): boolean {
   return error instanceof ApiError && error.code === ERROR.NO_ACTOR
@@ -110,7 +106,7 @@ async function waitForAnotherTab(): Promise<boolean> {
 }
 
 export const useActorStore = defineStore('actor', () => {
-  const actor = ref<Actor | null>(null)
+  const actor = ref<ActorView | null>(null)
   const id = ref<string | null>(currentIdentity())
   const state = ref<IdentityState>('idle')
   /** Identifiers that can still be brought back. A ref, so a screen sees it change (М-23). */
@@ -120,7 +116,7 @@ export const useActorStore = defineStore('actor', () => {
   /** True while `start` is in flight, so a retry button cannot queue a second one. */
   let running = false
 
-  function settle(loaded: Actor): void {
+  function settle(loaded: ActorView): void {
     actor.value = loaded
     id.value = loaded.id
     // The success path writes back too: a tab that adopted an identifier from another one
@@ -140,25 +136,13 @@ export const useActorStore = defineStore('actor', () => {
   }
 
   async function create(): Promise<void> {
-    const code = inviteCode()
-    if (!code) {
-      // Without a code the server refuses, and it is right to: the link people are given
-      // carries it. Saying so here beats a 401 the screen cannot explain.
-      state.value = 'uninvited'
-      return
-    }
-
     try {
-      settle(await api.createActor(code))
+      settle(await api.createActor())
       state.value = 'ready'
     } catch (error) {
-      if (isMissingActor(error)) {
-        // The door refused this code — rotated, mistyped, or from another deployment.
-        // Keeping it would make every retry the same 401 with the same wrong explanation.
-        forgetInviteCode()
-        state.value = 'uninvited'
-        return
-      }
+      // Nothing to explain away any more: until MOL-54 the only way to an identity is the
+      // development seam, and a server that does not carry it — production — answers 404 like
+      // any other failure. The person is told the app is broken, which is the truth there.
       fail(error)
     }
   }
@@ -225,10 +209,6 @@ export const useActorStore = defineStore('actor', () => {
     running = true
     state.value = 'loading'
     try {
-      // Scrubbed on every start, not only while creating an identity: a device that already
-      // has one, opened from the same link again, kept the code in its address bar (М-20).
-      takeInviteCodeFromUrl()
-
       if (!navigator.onLine) {
         // An identifier already on the device is usable without a network — a PWA precached
         // for the shelf shows its cached screens as this person — but it has not been

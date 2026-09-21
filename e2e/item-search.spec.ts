@@ -1,6 +1,5 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
-import process from 'node:process'
 import { expect, test } from '@playwright/test'
 import type { APIResponse, Page } from '@playwright/test'
 
@@ -17,14 +16,6 @@ import type { APIResponse, Page } from '@playwright/test'
 
 const KEY = 'molvia.actor'
 
-function inviteCode(): string {
-  const code = process.env.SIGNUP_CODE
-  if (!code) {
-    throw new Error("SIGNUP_CODE is not set. Run `make setup` to generate this copy's .env.")
-  }
-  return code
-}
-
 /** A word no catalogue holds: letters only, so it grounds a search and matches nothing else. */
 function nonsense(): string {
   const consonants = 'бвгджзклмнпрстфхцчш'
@@ -40,9 +31,9 @@ function nonsense(): string {
 const field = (page: Page) => page.getByRole('combobox', { name: 'What did you pick up?' })
 const options = (page: Page) => page.getByRole('option')
 
-/** A device with an identity, the way a person gets one: through the invite link. */
+/** A device with an identity, the way a person gets one until MOL-54: the seam. */
 async function arrive(page: Page): Promise<string> {
-  await page.goto(`/?c=${inviteCode()}`)
+  await page.goto('/')
   const stored = () => page.evaluate((key) => localStorage.getItem(key) ?? '', KEY)
   // The first visit happens after the first paint, so the identity appears a moment later.
   await expect.poll(stored).toMatch(/^[0-9a-f-]{36}$/)
