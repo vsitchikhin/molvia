@@ -37,6 +37,7 @@ import { drawsNothing, newPlaceSchema, pastedLine } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import { newId } from '@/ids'
 import { useRecentPlacesStore } from '@/stores/recentPlaces'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -96,9 +97,9 @@ export default defineComponent({
       if (drawsNothing(place)) return
       queue.enqueue({
         kind: 'start',
-        // Lower case only: the server refuses anything else, and the phone must find its own
-        // trip in the answer (MOL-21).
-        tripId: crypto.randomUUID().toLowerCase(),
+        // Named by the device, in lower case, and never by `crypto.randomUUID` alone: a phone on
+        // the LAN over plain http has no such function, and the tap would throw (В2-10).
+        tripId: newId(),
         place: { kind: 'store', name: place },
         startedAt: new Date(),
       })

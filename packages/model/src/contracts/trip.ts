@@ -105,9 +105,13 @@ export const tripViewCodec = z.strictObject({
    */
   rate: rateCodec.nullable(),
   /**
-   * Who published the rate the trip snapshotted (MOL-22). Null without a snapshot and for one the
-   * person entered themselves. `source: 'fallback'` alone cannot be shown: the screen has to name
-   * the bank or the aggregator it counts by, and the aggregator's terms require the name.
+   * Who published the rate the trip **snapshotted** (MOL-22) — not necessarily the rate above:
+   * after a jump the person may count by their own, and `rate.source` is then `personal` while
+   * this still names the bank the trip took its snapshot from. Null only when there is no
+   * snapshot at all.
+   *
+   * `source: 'fallback'` alone cannot be shown: the screen has to name the bank or the aggregator
+   * it counts by, and the aggregator's terms require the name.
    */
   rateProvider: rateProviderSchema.nullable(),
   /**

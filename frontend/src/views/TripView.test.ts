@@ -122,6 +122,19 @@ function button(view: VueWrapper, text: string): DOMWrapper<HTMLButtonElement> {
 /** Пока шторка не поднялась, она не берёт нажатий: второй тап двойного не должен её закрыть. */
 let clock = 0
 
+const queued = (id: string, price = '600') =>
+  ({
+    kind: 'add' as const,
+    tripId: TRIP,
+    entry: milk,
+    body: {
+      id,
+      itemId: milk.id,
+      quantity: parseQuantity('2', 'l'),
+      amount: parseMoney(price, 'AMD'),
+    },
+  }) as const
+
 const mounted: VueWrapper[] = []
 
 async function render({ memory = null as TripViewModel | null } = {}) {
@@ -229,19 +242,6 @@ describe('TripView', () => {
   })
 
   describe('очередь на экране', () => {
-    const queued = (id: string, price = '600') =>
-      ({
-        kind: 'add' as const,
-        tripId: TRIP,
-        entry: milk,
-        body: {
-          id,
-          itemId: milk.id,
-          quantity: parseQuantity('2', 'l'),
-          amount: parseMoney(price, 'AMD'),
-        },
-      }) as const
-
     it('правка ещё не ушедшей покупки заменяет её, а не добавляет вторую', async () => {
       currentTrip.mockResolvedValue(trip())
       const { view, queue } = await render()
@@ -314,6 +314,39 @@ describe('TripView', () => {
       expect(document.body.querySelector('dialog[open]')).toBeNull()
     })
 
+    it('покупка, чей ответ потерялся, показана один раз, а не дважды', async () => {
+      // Связь оборвалась после записи, но до ответа: очередь держит запись, а сервер строку уже
+      // отдал (адверсариальная В2-2).
+      currentTrip.mockResolvedValue(
+        trip([{ id: ASHKHAR, name: 'Молоко «Ашхар»', value: '570', quantity: ['1', 'l'] }]),
+      )
+      const { view, queue } = await render()
+      queue.enqueue({ ...queued(ASHKHAR), body: { ...queued(ASHKHAR).body, id: ASHKHAR } })
+      await flushPromises()
+
+      expect(view.findAll('.row')).toHaveLength(1)
+      expect(view.get('.row').text()).not.toContain(ru.trip.queued.waiting)
+    })
+
+    it('ждущую покупку можно убрать прямо из шторки', async () => {
+      currentTrip.mockResolvedValue(trip())
+      const { view, queue } = await render()
+      const purchase = 'eeeeeeee-0000-4000-8000-000000000007'
+      queue.enqueue(queued(purchase))
+      await flushPromises()
+
+      await view.get('.row').trigger('click')
+      await flushPromises()
+      clock += 1000
+      inside(document.body.querySelector('dialog[open]'), ru.item.delete).click()
+      await flushPromises()
+
+      expect(queue.pending.filter((write) => write.kind === 'add')).toEqual([])
+      // Строки списка — те, что в карточке: у шторки свой `.row` для количества и единицы.
+      expect(view.findAll('.card .row')).toHaveLength(0)
+      expect(view.text()).toContain(ru.trip.empty.title)
+    })
+
     it('записи чужого похода в список не попадают', async () => {
       currentTrip.mockResolvedValue(trip(handoff()))
       const { view, queue } = await render()
@@ -324,6 +357,38 @@ describe('TripView', () => {
       await flushPromises()
 
       expect(view.findAll('.row')).toHaveLength(2)
+    })
+  })
+
+  describe('после «Завершить» и в чужом магазине (адверсариальные В1, Б1)', () => {
+    it('неотправленные покупки не исчезают вместе с завершённым походом', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      addExpense.mockReturnValue(new Promise(() => undefined))
+      const { view, queue } = await render()
+      queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000009'))
+      await flushPromises()
+
+      await button(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      clock += 1000
+      inside(document.body.querySelector('dialog[open]'), ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+
+      expect(view.text()).toContain(ru.trip.none.title)
+      // На iOS фонового обмена нет: молчание здесь — это покупка, о которой никто не узнает.
+      expect(view.text()).toContain('1 покупка ещё не отправлена')
+    })
+
+    it('поход открыт в другом магазине — экран называет оба и предлагает выбор', async () => {
+      currentTrip.mockResolvedValue(null)
+      const { view, queue } = await render()
+      queue.elsewhere = { tripId: TRIP, place: 'SAS', mine: 'Ереван Сити' }
+      await flushPromises()
+
+      expect(view.text()).toContain('Уже открыт поход в «SAS»')
+      expect(button(view, 'Дописать в «SAS»').exists()).toBe(true)
+      await button(view, ru.trip.elsewhere.finish).trigger('click')
+      expect(queue.elsewhere).toBeNull()
     })
   })
 

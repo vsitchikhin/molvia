@@ -14,6 +14,13 @@ import { trips } from './schema'
  */
 export interface TripSnapshot {
   readonly rate: ExchangeRate
+  /**
+   * Who published it — `null` only for a rate the person entered themselves, which is MOL-40's.
+   * The type cannot hold the pair together (`OfficialRate` carries the wide `RateSource`), so the
+   * agreement between this and `rate.source` — `official` is `cba` and nothing else — is held
+   * where it can be: `tripSchema`'s refine and the `trips_rate_provider_matches_source` check,
+   * both of which every write goes through (В2-14).
+   */
   readonly provider: RateProvider | null
   readonly jumped: boolean
   readonly previous: ExchangeRate | null

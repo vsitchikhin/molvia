@@ -70,6 +70,8 @@ export interface RejectedWrite {
 
 /** A trip is open somewhere else, so the purchases of this one are waiting (adversarial Б1). */
 export interface TripElsewhere {
+  /** The trip the server holds open: the person may take it over or close it. */
+  readonly tripId: string
   /** Where the open trip is, and where the person thinks they are. */
   readonly place: string
   readonly mine: string
@@ -338,6 +340,8 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   const rejected = ref<RejectedWrite[]>([])
   /** Set when a trip started here met one open in another shop; cleared as soon as it is not so. */
   const elsewhere = ref<TripElsewhere | null>(null)
+  /** The person said «write them into that trip anyway»: the next reroute goes through. */
+  let yielded = false
   // A shelf refused the last write: until every shelf takes one, memory is ahead of storage and
   // is the truth — one refusing shelf still answers `read` with what it held before (Б3).
   let ahead = false
@@ -399,11 +403,14 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     },
   )
 
-  // Another window changed the queue: what this one shows follows.
+  // Another window changed the queue: what this one shows follows. The trip it wrote with the
+  // same hand is re-read too — a purchase that left one window's queue must arrive in the other's
+  // list, not vanish between the two (adversarial Б4).
   window.addEventListener('storage', (event) => {
     const id = actor.id
     if (id && (event.key === `${QUEUE_KEY}.${id}` || event.key === `${REJECTED_KEY}.${id}`)) {
       sync(id)
+      trips.reread()
     }
   })
 
@@ -531,11 +538,12 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       return false
     }
 
-    if (head.write.place.name !== open.place.name) {
-      elsewhere.value = { place: open.place.name, mine: head.write.place.name }
+    if (head.write.place.name !== open.place.name && !yielded) {
+      elsewhere.value = { tripId: open.id, place: open.place.name, mine: head.write.place.name }
       retryLater()
       return false
     }
+    yielded = false
     elsewhere.value = null
 
     trips.apply(open)
@@ -591,6 +599,33 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   }
 
   /**
+   * «Дописать в тот поход»: the purchases waiting behind a start go into the trip the server
+   * holds open, wherever it is. Only the person can say this — the queue itself refuses to move a
+   * price into another shop (Б1).
+   */
+  function joinElsewhere(): void {
+    yielded = true
+    elsewhere.value = null
+    void flush()
+  }
+
+  /**
+   * «Сначала завершить тот»: the open trip is closed, and the trip started here goes out after
+   * it. The finish jumps the queue — everything waiting names a trip the server will only accept
+   * once the other one is over.
+   */
+  function finishElsewhere(): void {
+    const id = actor.id
+    const open = elsewhere.value
+    if (!open) return
+    sync(id)
+    kept = [{ key: newKey(), write: { kind: 'finish', tripId: open.tripId } }, ...kept]
+    elsewhere.value = null
+    persist(id)
+    void flush()
+  }
+
+  /**
    * Takes a purchase out of the queue before it has gone anywhere (adversarial В2): the wrong
    * thing picked up at a shelf with no signal is undone by dropping the write, not by sending it
    * and deleting the row it becomes. Only what is still waiting — once the server has it, the
@@ -622,5 +657,15 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     return trip.expenses.some((row) => row.id === write.body.id)
   }
 
-  return { pending, rejected, elsewhere, enqueue, dismiss, dropPurchase, flush }
+  return {
+    pending,
+    rejected,
+    elsewhere,
+    enqueue,
+    dismiss,
+    dropPurchase,
+    joinElsewhere,
+    finishElsewhere,
+    flush,
+  }
 })

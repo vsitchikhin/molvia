@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { ApiError } from '@molvia/client'
-import { ERROR, tripViewCodec } from '@molvia/model'
+import { ERROR, currentTripResponseSchema, tripViewCodec } from '@molvia/model'
 import type { TripView } from '@molvia/model'
 import { useActorStore } from '@/stores/actor'
 import { useTripStore } from '@/stores/trip'
@@ -211,6 +211,32 @@ describe('trip store', () => {
     await loading
 
     expect(store.current).toBeNull()
+  })
+
+  // Адверсариальная Б3: строгий кодек правилен для ответов сервера, но своя память — не ответ.
+  it('поход, запомненный прошлой сборкой, не пропадает после обновления', () => {
+    const remembered = currentTripResponseSchema.encode({ trip: trip(OPEN) })
+    const old = JSON.parse(JSON.stringify(remembered)) as { trip: Record<string, unknown> }
+    delete old.trip.rateProvider
+    localStorage.setItem(`molvia.trip.${ME}`, JSON.stringify(old))
+
+    const store = fresh()
+    expect(store.current?.id).toBe(OPEN)
+    expect(store.current?.rateProvider).toBeNull()
+  })
+
+  // Адверсариальная Б4: очередь общая между окнами, и поход обязан быть таким же.
+  it('второе окно узнаёт о походе, который записало первое', () => {
+    const store = fresh()
+    expect(store.current).toBeNull()
+
+    localStorage.setItem(
+      `molvia.trip.${ME}`,
+      JSON.stringify(currentTripResponseSchema.encode({ trip: trip(OPEN) })),
+    )
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip.${ME}` }))
+
+    expect(store.current?.id).toBe(OPEN)
   })
 
   it('reads a broken memory as no trip rather than failing to start', () => {

@@ -3,7 +3,7 @@ import { ERROR, ISSUE } from '#model/support/errors'
 import type { Expense } from '#model/entities/expense'
 import { formatMoney, money, parseMoney } from '#model/values/money'
 import { parseRate } from '#model/values/rates'
-import type { ExchangeRate } from '#model/values/rates'
+import type { ExchangeRate, RateSource } from '#model/values/rates'
 import {
   convertMoney,
   effectiveRate,
@@ -17,7 +17,7 @@ import { formatUnitPrice, parseQuantity, unitPrice } from '#model/values/units'
 
 const digits = (text: string): string => text.replace(/[\s\u00a0\u202f]/g, '')
 
-const rate = (value: string, source: 'personal' | 'official' = 'official'): ExchangeRate => ({
+const rate = (value: string, source: RateSource = 'official'): ExchangeRate => ({
   base: 'RUB',
   quote: 'AMD',
   scaled: parseRate(value),

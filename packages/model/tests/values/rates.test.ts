@@ -383,6 +383,7 @@ describe('pickOfficialRate: скачок', () => {
     ]
     expect(pickOfficialRate('RUB', 'AMD', rows, sunday)).toEqual({
       jumped: true,
+      // Прежний — того же издателя и того же источника: пара из двух источников не пара.
       provider: 'cba',
       rate: expect.objectContaining({
         scaled: 431_230_000n,
@@ -393,6 +394,19 @@ describe('pickOfficialRate: скачок', () => {
         source: 'official',
         asOf: yerevanMidnight('2026-09-17'),
       }) as unknown,
+    })
+  })
+
+  it('у запасного издателя и прежний курс — его же, а не банка', () => {
+    const rows = [
+      amd('RUB', '431.23', '2026-09-18', 'cbr', true),
+      amd('RUB', '4.3050', '2026-09-17', 'cbr'),
+      amd('RUB', '4.3123', '2026-09-01'),
+    ]
+    expect(pickOfficialRate('RUB', 'AMD', rows, sunday)).toMatchObject({
+      provider: 'cbr',
+      rate: { source: 'fallback' },
+      previous: { source: 'fallback', scaled: 4_305_000n },
     })
   })
 

@@ -68,12 +68,17 @@ export const useTripStore = defineStore('trip', () => {
     },
   )
 
+  /** What storage holds now — another window may have written it. */
+  function reread(): void {
+    current.value = recall(actor.id)
+  }
+
   // Another window of the same person wrote the trip: the installed app and a tab from the bot
   // share the queue through storage and must share this too, or one of them keeps showing a trip
   // the other has already filled, finished or started (adversarial Б4).
   window.addEventListener('storage', (event) => {
     const id = actor.id
-    if (id && event.key === keyOf(id)) current.value = recall(id)
+    if (id && event.key === keyOf(id)) reread()
   })
 
   /**
@@ -135,5 +140,5 @@ export const useTripStore = defineStore('trip', () => {
     set(trip)
   }
 
-  return { current, apply, closed, load }
+  return { current, apply, closed, reread, load }
 })

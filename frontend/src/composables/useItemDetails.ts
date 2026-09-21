@@ -25,6 +25,7 @@ import type {
   TripView,
   UnitPrice,
 } from '@molvia/model'
+import { newId } from '@/ids'
 
 export type DetailsField = 'quantity' | 'amount'
 
@@ -54,20 +55,6 @@ function parsed<T>(text: string, parse: (text: string) => T): Parsed<T> {
   } catch {
     return INVALID
   }
-}
-
-/**
- * A purchase is named by the device (MOL-21). `randomUUID` exists only in a secure context, and a
- * phone on the LAN over plain http — `PWA_EXPOSE=1 make dev` without `make certs` — is not one
- * (review Р-6); `getRandomValues` is there everywhere.
- */
-function newId(): string {
-  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
-  const bytes = crypto.getRandomValues(new Uint8Array(16))
-  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40
-  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80
-  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
 function valueOf<T>(field: Parsed<T>): T | null {

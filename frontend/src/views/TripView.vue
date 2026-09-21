@@ -57,6 +57,29 @@
       </template>
     </ScreenState>
 
+    <!-- A trip is open in another shop: the purchases wait rather than move there by themselves,
+         because «item + place» is the key the product rests on. The choice is the person's
+         (adversarial Б1, owner's decision). -->
+    <ScreenState
+      v-if="queue.elsewhere"
+      class="notice"
+      kind="attention"
+      inline
+      :title="t('trip.elsewhere.title', { place: queue.elsewhere.place })"
+      :body="t('trip.elsewhere.body', { mine: queue.elsewhere.mine })"
+    >
+      <template #action>
+        <div class="refusal-actions">
+          <AppButton variant="ghost" @click="queue.joinElsewhere()">
+            {{ t('trip.elsewhere.join', { place: queue.elsewhere.place }) }}
+          </AppButton>
+          <AppButton variant="ghost" @click="queue.finishElsewhere()">
+            {{ t('trip.elsewhere.finish') }}
+          </AppButton>
+        </div>
+      </template>
+    </ScreenState>
+
     <!-- Finished with no signal: the trip is over on the phone, and what it still holds must not
          go quiet with it — on iOS nothing is sent in the background, and an app that was closed
          here would never say a word (adversarial В1). -->
