@@ -1,5 +1,5 @@
 <template>
-  <div v-if="jump || fallback || stale" class="notes">
+  <div class="notes">
     <!-- A jump is flagged, never refused (MOL-39, owner's decision): the rate may have truly
          moved, and only the person knows which number their money changed at. -->
     <div v-if="jump" class="note warn">
@@ -20,6 +20,9 @@
 
     <p v-if="stale" class="note quiet">{{ stale }}</p>
 
+    <!-- Outside anything conditional, like the sheets of «Поход»: the trip can lose its jump
+         while the sheet is up — finished on another device — and a sheet taken away mid-air
+         leaves its history entry behind (MOL-18; В2, мелочи). -->
     <TripRateSheet v-model:open="choosing" :trip="trip" />
   </div>
 </template>
@@ -95,6 +98,11 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* No notes and no sheet up — nothing to take room: the screen has enough of its own. */
+.notes:not(:has(.note)) {
+  display: contents;
+}
+
 .notes {
   display: grid;
   gap: var(--space-2);

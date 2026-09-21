@@ -113,7 +113,10 @@ describe('TripRateNotes', () => {
   })
 
   it('обычный курс ЦБ РА не требует ни слова', async () => {
-    expect((await render()).text()).toBe('')
+    // Шторка выбора смонтирована всегда и закрыта — на экране от неё ничего нет.
+    const view = await render()
+    expect(view.findAll('.note')).toHaveLength(0)
+    expect(document.body.querySelector('dialog[open]')).toBeNull()
   })
 
   it('запасной источник назван по имени, а не «какой-то другой»', async () => {
