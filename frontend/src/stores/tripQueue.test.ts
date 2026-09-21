@@ -114,10 +114,10 @@ function answered(purchase: string, quantity: string, price: string): TripView {
 
 const offline = () => new ApiError(ERROR.INTERNAL, 'Failed to fetch')
 
-const started = (tripId = TRIP): QueuedWrite => ({
+const started = (tripId = TRIP, place = 'Ереван Сити'): QueuedWrite => ({
   kind: 'start',
   tripId,
-  place: { kind: 'store', name: 'Ереван Сити' },
+  place: { kind: 'store', name: place },
   startedAt: new Date('2026-09-19T08:00:00.000Z'),
 })
 
@@ -1116,16 +1116,58 @@ describe('trip queue', () => {
     })
   })
 
+  describe('очередь за сиротой (раунд 4, Ж1)', () => {
+    it('покупки мёртвого похода стоят, а следующий поход уходит', async () => {
+      const NEXT = 'bbbbbbbb-0000-4000-8000-000000000031'
+      startTrip.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, undefined, true))
+      startTrip.mockResolvedValue({ trip: answer('0.00', NEXT), created: true })
+      addExpense.mockResolvedValue({ trip: answer('520.00', NEXT), created: true })
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      await queue.flush()
+
+      // Следующий поход и его покупка встали за сиротой — и не должны ждать её вечно.
+      queue.enqueue({ ...started(NEXT, 'Рынок') })
+      queue.enqueue({ ...add(BREAD), tripId: NEXT })
+      await queue.flush()
+
+      expect(startTrip).toHaveBeenCalledTimes(2)
+      expect(addExpense).toHaveBeenCalledWith(NEXT, expect.objectContaining({ id: BREAD }))
+      // Покупка мёртвого похода по-прежнему на телефоне и не получила своего отказа.
+      expect(queue.pending.filter((write) => write.kind === 'add')).toHaveLength(1)
+      expect(queue.rejected).toHaveLength(1)
+    })
+  })
+
   describe('ждущую покупку можно убрать (адверсариальная В2)', () => {
-    it('снимается из очереди и не уходит на сервер вовсе', async () => {
+    it('покупка уходит из очереди, а вслед за ней — удаление: его может ждать другое окно', async () => {
       addExpense.mockRejectedValue(offline())
+      removeExpense.mockRejectedValue(offline())
       const queue = fresh()
       queue.enqueue(add(MILK))
       await queue.flush()
 
       expect(queue.dropPurchase(TRIP, MILK)).toBe(true)
+      await queue.flush()
+
+      // Самой покупки в очереди нет, есть только её отмена — и она переживёт перезапуск.
+      expect(queue.pending.filter((write) => write.kind === 'add')).toEqual([])
+      expect(queue.pending.filter((write) => write.kind === 'remove')).toHaveLength(1)
+      expect(fresh().pending.filter((write) => write.kind === 'remove')).toHaveLength(1)
+    })
+
+    it('удаление строки, которой сервер не знает, — не отказ, а тот же итог', async () => {
+      addExpense.mockRejectedValue(offline())
+      removeExpense.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, undefined, true))
+      const queue = fresh()
+      queue.enqueue(add(MILK))
+      await queue.flush()
+      queue.dropPurchase(TRIP, MILK)
+      await queue.flush()
+
+      expect(queue.rejected).toEqual([])
       expect(queue.pending).toEqual([])
-      expect(fresh().pending).toEqual([])
     })
 
     it('покупку, которой в очереди нет, не трогает', () => {

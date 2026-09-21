@@ -281,6 +281,25 @@ describe('trip store', () => {
     expect(fresh().current?.rateProvider).toBe('cba')
   })
 
+  // П-2: у своего курса издателя нет по определению — это не «описать нечем».
+  it('свой курс прошлой сборки остаётся курсом', () => {
+    const remembered = currentTripResponseSchema.encode({ trip: trip(OPEN) })
+    const old = JSON.parse(JSON.stringify(remembered)) as { trip: Record<string, unknown> }
+    delete old.trip.rateProvider
+    old.trip.rate = {
+      base: 'RUB',
+      quote: 'AMD',
+      rate: '4.600000',
+      source: 'personal',
+      asOf: '2026-09-18T12:00:00.000Z',
+    }
+    localStorage.setItem(`molvia.trip.${ME}`, JSON.stringify(old))
+
+    const store = fresh()
+    expect(store.current?.rate?.source).toBe('personal')
+    expect(store.current?.rateProvider).toBeNull()
+  })
+
   it('reads a broken memory as no trip rather than failing to start', () => {
     localStorage.setItem(`molvia.trip.${ME}`, '{"trip":{"id":"not a trip"}}')
     expect(fresh().current).toBeNull()

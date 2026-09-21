@@ -88,6 +88,9 @@ function publisher(fields: Record<string, unknown>): unknown {
   const rate = fields.rate
   if (!isRecord(rate)) return null
   if (rate.source === 'official') return 'cba'
+  // A rate the person entered themselves has no publisher by definition, and «none» is its right
+  // value rather than a gap: the trip keeps the rate it was counting by (П-2).
+  if (rate.source === 'personal') return null
   // Nothing to name: the trip keeps its rows and loses only the rate.
   fields.rate = null
   fields.rateJump = null

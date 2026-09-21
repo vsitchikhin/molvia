@@ -520,13 +520,13 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     for (;;) {
       if (actor.id !== owner) return
       sync(owner)
-      const head = kept[0]
+      // The writes of a trip the server refused are stepped over, not sent and not waited on:
+      // sent, each would earn its own `404` and its own notice about a purchase that is not the
+      // problem (раунд 2, Г2); waited on, they would hold everything queued behind them —
+      // the next trip and its purchases — until the person noticed a notice about the first
+      // (раунд 4, Ж1). They stay on the phone; the queue goes on.
+      const head = kept.find((item) => !orphaned(item.write.tripId))
       if (!head) break
-
-      // The trip this write belongs to was refused: sent on, every purchase behind it would earn
-      // its own `404` and its own notice about a purchase that is not the problem. They stay on
-      // the phone — not only for this run, which is what `return` alone gave (раунд 2, Г2).
-      if (orphaned(head.write.tripId)) return
 
       let refusal: WireCode | null = null
       let answered: TripView | null = null
@@ -583,7 +583,12 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       // (раунд 2, Г1). Queued after the re-read above, or storage would hand the queue back
       // without it.
       const write = head.write
-      if (answered && write.kind === 'add' && !answeredAsSent(answered, write.body)) {
+      // …unless the purchase has been undone meanwhile: the amendment would reach a row that is
+      // about to go and come back as «не принято» about a thing the person threw away (П-3).
+      const undoing =
+        write.kind === 'add' &&
+        kept.some((item) => item.write.kind === 'remove' && item.write.expenseId === write.body.id)
+      if (answered && !undoing && write.kind === 'add' && !answeredAsSent(answered, write.body)) {
         kept = [
           ...kept,
           {
@@ -760,16 +765,17 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     if (at !== -1) kept = kept.filter((_, index) => index !== at)
     // Refused and then undone: the notice about it goes with the purchase (Т-3).
     if (refused) rejected.value = rejected.value.filter((item) => item.key !== refused.key)
-    if (flying) {
-      // Sent between the tap and here: the removal goes into the queue at once rather than being
-      // remembered until the answer (раунд 3, Е2, Е3). In the queue it survives the window that
-      // was sending, the app being closed, and an answer that never comes — and behind the `add`
-      // it is in order, so the server sees the row appear and go.
+    if (!refused) {
+      // The removal goes into the queue whether or not this window was the one sending: another
+      // window may be holding the purchase in the air right now, and it cannot be asked (раунд 3,
+      // Е2). A removal of a row nobody wrote costs one request and is answered `404`, which counts
+      // as the outcome asked for (`DONE_ENOUGH`); a purchase the person undid and the server keeps
+      // for ever costs them the trust in the total.
       kept = [...kept, { key: newKey(), write: { kind: 'remove', tripId, expenseId: purchaseId } }]
     }
 
     persist(id)
-    if (flying) void flush()
+    void flush()
     return true
   }
 
