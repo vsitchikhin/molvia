@@ -98,6 +98,24 @@ export const PRICE_MEDIAN_MIN_OBSERVATIONS = 3
 export const ADVICE_LIMIT = 200
 
 /**
+ * How many of those rows are held for other people's «не брать нигде» (MOL-31, Р-25).
+ *
+ * Р-23 keeps this person's own rows and every warning from the cut, and it kept them in that
+ * order: «own» ranked above «warning», so once someone had `ADVICE_LIMIT` rows of their own,
+ * a stranger's warning was the first thing dropped — the one thing on the screen they could
+ * not have learnt for themselves, and the thing they opened access for (adversarial round 2,
+ * G2).
+ *
+ * A reserve rather than a reordering, because putting warnings first is worse than the
+ * defect: in the shared mode there is no bound on how many of them exist, and measured on a
+ * shelf of 250 the page came back as 200 warnings and not one recommendation. Twenty of two
+ * hundred is a tenth — enough to carry the warnings a person actually meets, cheap enough
+ * that it costs twenty of their own rows only when they have two hundred. Below that it
+ * never binds: warnings reach the page on their rating like anything else.
+ */
+export const ADVICE_WARNINGS_RESERVED = 20
+
+/**
  * `GET /advice`. An object rather than a bare list, so a field beside the rows does not break
  * a client, and `scope` is that field: it is the one thing the screen cannot work out itself.
  */

@@ -399,7 +399,12 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   fives deleted the one «не брать нигде» the screen exists for. What survives the cut is this
   person's own rows and every warning; what stands at the top of the screen is still the
   rating. Two orders in one statement, on purpose, and `total` beside the rows so a truncated
-  list can say that it is one.
+  list can say that it is one. **«Own» and «warning» are not the same tier, and the order
+  between them mattered** (Р-25): with «own» first, a person holding `ADVICE_LIMIT` rows lost
+  every stranger's «не брать нигде» — the one thing on that screen they could not have learnt
+  themselves. So `ADVICE_WARNINGS_RESERVED` of the rows are held for them. A reserve and not a
+  reordering, because warnings have no bound in the shared mode: putting all of them first
+  returned, on a shelf of 250, a page of two hundred warnings and not one recommendation.
 - **The server names no superlative.** It returns the places sorted by price and nothing else;
   whether that reads «Дешевле всего» or «Брали здесь» is the screen's to decide by their number
   (MOL-34's answer). And a review is always the asker's own: words are not an aggregate, there

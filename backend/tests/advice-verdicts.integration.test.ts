@@ -1,6 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { and, eq, sql } from 'drizzle-orm'
-import { AGGREGATE_MIN_CONTRIBUTIONS, NEVER_BELOW_TENTHS } from '@molvia/model'
+import {
+  ADVICE_WARNINGS_RESERVED,
+  AGGREGATE_MIN_CONTRIBUTIONS,
+  NEVER_BELOW_TENTHS,
+} from '@molvia/model'
 import type { AdviceScope } from '@molvia/model'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace } from './fixtures'
@@ -10,28 +14,27 @@ import { verdicts as verdictsTable } from '@/db/schema'
 const { db, close } = connectDrizzle()
 const verdicts = createVerdictRepository(db)
 
-async function rowsFor(actorId: string, scope: AdviceScope = 'own', limit = 50) {
-  const { rows } = await verdicts.adviceRowsFor({
+/** The query «Что брать» makes, with the domain's numbers — written once, so a new one
+ * cannot be forgotten in half the callers. */
+function query(actorId: string, scope: AdviceScope, limit: number) {
+  return {
     actorId,
     scope,
     minContributions: AGGREGATE_MIN_CONTRIBUTIONS,
     neverBelowTenths: NEVER_BELOW_TENTHS,
+    warningsReserved: ADVICE_WARNINGS_RESERVED,
     limit,
-  })
+  }
+}
+
+async function rowsFor(actorId: string, scope: AdviceScope = 'own', limit = 50) {
+  const { rows } = await verdicts.adviceRowsFor(query(actorId, scope, limit))
   return rows
 }
 
 /** The counter travels with the page, so the two can be read apart. */
 function totalFor(actorId: string, scope: AdviceScope = 'own', limit = 50) {
-  return verdicts
-    .adviceRowsFor({
-      actorId,
-      scope,
-      minContributions: AGGREGATE_MIN_CONTRIBUTIONS,
-      neverBelowTenths: NEVER_BELOW_TENTHS,
-      limit,
-    })
-    .then((answer) => answer.total)
+  return verdicts.adviceRowsFor(query(actorId, scope, limit)).then((answer) => answer.total)
 }
 
 /** Rates without going through the repository: the read is what these tests are about. */
@@ -223,6 +226,50 @@ describe('порядок и предел', () => {
 
   it('отвечают пустым списком на личность, которой не бывает', async () => {
     expect(await rowsFor('не-uuid')).toEqual([])
+  })
+
+  it('держат места для чужих предупреждений, когда своих строк хватает на всю страницу', async () => {
+    // Своё стояло выше предупреждения, и чужое «не брать нигде» вылетало первым — то есть
+    // ровно то, ради чего человек открывал доступ (адверсариальный раунд 2, G2).
+    const me = await insertActor(db)
+    const crowd = [await insertActor(db), await insertActor(db), await insertActor(db)]
+    const page = 10
+    const reserved = 2
+
+    for (let n = 0; n < page; n += 1) {
+      await rate(me, await insertItem(db, { name: `Моё ${String(n).padStart(2, '0')}` }), 5)
+    }
+    for (let n = 0; n < 5; n += 1) {
+      const itemId = await insertItem(db, { name: `Чужая отрава ${String(n).padStart(2, '0')}` })
+      for (const who of crowd) await rate(who, itemId, 1)
+    }
+
+    const rows = await verdicts.adviceRowsFor({
+      ...query(me, 'shared', page),
+      warningsReserved: reserved,
+    })
+
+    expect(rows.total).toBe(page + 5)
+    expect(rows.rows).toHaveLength(page)
+    // Ровно столько чужих предупреждений, сколько мест для них отведено, — и ни одним больше.
+    const strangers = rows.rows.filter((row) => row.count === crowd.length)
+    expect(strangers).toHaveLength(reserved)
+    expect(rows.rows.filter((row) => row.count === 1)).toHaveLength(page - reserved)
+  })
+
+  it('не занимают резерв, когда предупреждений меньше: место не простаивает', async () => {
+    const me = await insertActor(db)
+    const crowd = [await insertActor(db), await insertActor(db), await insertActor(db)]
+    for (let n = 0; n < 10; n += 1) {
+      await rate(me, await insertItem(db, { name: `Моё ${String(n).padStart(2, '0')}` }), 5)
+    }
+    const only = await insertItem(db, { name: 'Чужая отрава' })
+    for (const who of crowd) await rate(who, only, 1)
+
+    const rows = await verdicts.adviceRowsFor({ ...query(me, 'shared', 10), warningsReserved: 5 })
+
+    expect(rows.rows.filter((row) => row.count === 3)).toHaveLength(1)
+    expect(rows.rows.filter((row) => row.count === 1)).toHaveLength(9)
   })
 
   it('считают всё, что есть, а не только страницу', async () => {

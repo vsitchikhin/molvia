@@ -75,6 +75,11 @@ export interface AdviceQuery {
    * (Р-23) — and holds no threshold of its own.
    */
   readonly neverBelowTenths: number
+  /**
+   * The domain's `ADVICE_WARNINGS_RESERVED`: how many of the rows are held for other people's
+   * warnings (Р-25). Also only ever read by the cut.
+   */
+  readonly warningsReserved: number
   readonly limit: number
 }
 
@@ -318,7 +323,14 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
       return rows.map(toVerdict)
     },
 
-    async adviceRowsFor({ actorId, scope, minContributions, neverBelowTenths, limit }) {
+    async adviceRowsFor({
+      actorId,
+      scope,
+      minContributions,
+      neverBelowTenths,
+      warningsReserved,
+      limit,
+    }) {
       if (idOrNull(actorId) === null) return { rows: [], total: 0 }
 
       /*
@@ -381,6 +393,18 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             round(score_sum * 10.0 / contributors) as tenths,
             count(*) over () as total
           from shown
+        ),
+        ranked as (
+          select
+            scored.*,
+            -- Where this row stands among other people's warnings, best first. Only the
+            -- first warningsReserved of them are held back from the cut (Р-25); the rest
+            -- take their chances on rating like everything else.
+            row_number() over (
+              partition by (tenths < ${neverBelowTenths} and not is_mine)
+              order by score_sum::numeric / contributors desc, item_id
+            ) as warning_rank
+          from scored
         )
         select "itemId", name, sum, count, review, total
         from (
@@ -402,12 +426,27 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             -- catalogue holds Russian, Armenian and Latin names, and no single language
             -- should decide for all three.
             name collate "und-x-icu" as sort_name
-          from scored
-          -- What the limit may not cut (Р-23): this person's own rows first, then «не брать
-          -- нигде». The list is ordered by rating, so the worst lie at its end, and the limit
-          -- used to eat exactly them — two hundred strangers' fives deleted the one warning
-          -- the screen exists for (adversarial round 1, F8, and С-4 of the self-review).
-          order by is_mine desc, (tenths < ${neverBelowTenths}) desc, rating desc, sort_name asc, item_id asc
+          from ranked
+          /*
+           * What the limit may not cut (Р-23). The list is ordered by rating, so the worst lie
+           * at its end, and the limit used to eat exactly them — two hundred strangers' fives
+           * deleted the one warning the screen exists for (adversarial round 1, F8).
+           *
+           * Three tiers, in this order (Р-25):
+           *   1. other people's «не брать нигде», up to warningsReserved of them,
+           *   2. this person's own rows,
+           *   3. everything else, by rating.
+           * The reserve goes first because tier 2 alone can fill the page, and then a
+           * stranger's warning — the one thing the person could not have learnt themselves —
+           * was the first row dropped (adversarial round 2, G2). It is a reserve and not a
+           * reordering: warnings have no bound in the shared mode, and putting all of them
+           * above tier 2 returned a page of two hundred warnings and no recommendation at all.
+           */
+          order by
+            (tenths < ${neverBelowTenths} and not is_mine and warning_rank <= ${warningsReserved}) desc,
+            is_mine desc,
+            (tenths < ${neverBelowTenths}) desc,
+            rating desc, sort_name asc, item_id asc
           limit ${rowLimit(limit)}
         ) page
         -- And the page is shown by rating down, then by name (Р-6). Two orders on purpose:

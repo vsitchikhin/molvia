@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   ADVICE_LIMIT,
+  ADVICE_WARNINGS_RESERVED,
   AGGREGATE_MIN_CONTRIBUTIONS,
   DomainError,
   ERROR,
@@ -64,6 +65,7 @@ export async function advice(
     scope,
     minContributions: AGGREGATE_MIN_CONTRIBUTIONS,
     neverBelowTenths: NEVER_BELOW_TENTHS,
+    warningsReserved: ADVICE_WARNINGS_RESERVED,
     limit: ADVICE_LIMIT,
   })
 
