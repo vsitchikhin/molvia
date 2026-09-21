@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEVICE_NAME_MAX,
   LOGIN_CODE_MAX,
+  deviceNameOrNull,
   deviceNameSchema,
   loginCodeSchema,
   loginRequestSchema,
@@ -44,7 +45,7 @@ describe('deviceNameSchema', () => {
   it('refuses a name that draws nothing — the measure is the same as any other line', () => {
     // U+2800 is the case that mattered: a braille blank draws nothing and is not `\\s`, which
     // is why the project measures a line by `visibleLine` rather than by whitespace.
-    for (const name of ['', '   ', '⠀⠀', '​']) {
+    for (const name of ['', '   ', '\u2800\u2800', '\u200B']) {
       expect(deviceNameSchema.safeParse(name).success).toBe(false)
     }
   })
@@ -52,6 +53,57 @@ describe('deviceNameSchema', () => {
   it('stops at the same length the column does', () => {
     expect(deviceNameSchema.parse('a'.repeat(DEVICE_NAME_MAX))).toHaveLength(DEVICE_NAME_MAX)
     expect(deviceNameSchema.safeParse('a'.repeat(DEVICE_NAME_MAX + 1)).success).toBe(false)
+  })
+})
+
+describe('deviceNameOrNull', () => {
+  it('keeps a name that fits, trimmed, and turns an empty one into nothing', () => {
+    expect(deviceNameOrNull('  iPhone · Safari  ')).toBe('iPhone · Safari')
+    expect(deviceNameOrNull(null)).toBeNull()
+  })
+
+  it('cuts a name that is merely too long instead of losing it', () => {
+    // The whole distinction (adversarial Р5): «too long» still tells a person which device
+    // they are looking at, «draws nothing» does not. Before, both became null.
+    const long = `iPhone · Safari ${'a'.repeat(200)}`
+
+    const cut = deviceNameOrNull(long)
+
+    expect(cut).toHaveLength(DEVICE_NAME_MAX)
+    expect(cut?.startsWith('iPhone · Safari')).toBe(true)
+  })
+
+  it('never cuts a character in half', () => {
+    // The branch nothing else reaches: the 80th UTF-16 unit is the high half of an emoji, and
+    // the low half is on the other side of the cut. Half a character is not a shorter name.
+    const surrogate = `${'a'.repeat(79)}\u{1F600}${'b'.repeat(40)}`
+    expect(surrogate.codePointAt(79)).toBe(0x1f600)
+
+    const cut = deviceNameOrNull(surrogate)
+
+    expect(cut).toBe('a'.repeat(79))
+    expect(cut).toHaveLength(79)
+    // And the pair survives whole when it fits: 78 letters leave room for both units.
+    expect(deviceNameOrNull(`${'a'.repeat(78)}\u{1F600}${'b'.repeat(40)}`)).toBe(
+      `${'a'.repeat(78)}\u{1F600}`,
+    )
+  })
+
+  it('trims again when the cut lands on a space, so no name ends in one', () => {
+    const cut = deviceNameOrNull(`${'a'.repeat(79)} tail`)
+
+    expect(cut).toBe('a'.repeat(79))
+  })
+
+  it('takes exactly the limit untouched, and one more is cut rather than dropped', () => {
+    expect(deviceNameOrNull('a'.repeat(DEVICE_NAME_MAX))).toHaveLength(DEVICE_NAME_MAX)
+    expect(deviceNameOrNull('a'.repeat(DEVICE_NAME_MAX + 1))).toHaveLength(DEVICE_NAME_MAX)
+  })
+
+  it('turns a name that draws nothing into null, however long it is', () => {
+    for (const name of ['', '   ', '\u2800\u2800', '\u200B', '\u2800'.repeat(200)]) {
+      expect(deviceNameOrNull(name)).toBeNull()
+    }
   })
 })
 

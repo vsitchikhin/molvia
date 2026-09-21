@@ -39,13 +39,19 @@ describe('the production bundle', () => {
 
   it('does not carry the address in the sourcemap either, which ships in the same image', () => {
     // Checked because the claim was made about «the artifact», and the map is part of it:
-    // `COPY --from=build /repo/backend/dist ./dist` takes the whole directory. What the map
-    // **does** carry is the module's name and its source, since esbuild records every input it
-    // read — so «the route is absent» is a statement about the code that runs, not about every
-    // byte in the image (adversarial А11). That is the honest scope, and it is enough: a name
-    // in a map registers no route. The address itself is nowhere, and this pins that.
+    // `COPY --from=build /repo/backend/dist ./dist` takes the whole directory.
+    //
+    // What the map carries is narrower than it first looked, and the difference is the point of
+    // saying it here at all (selfreview С-15, С-17). The seam module is **not** among the map's
+    // `sources` — it was shaken out before the map was written, so its own source is nowhere in
+    // the image. What remains is its *name*, twice, inside the recorded source of `server.ts`:
+    // the import line and the call in the branch that folded away. So «the route is absent» is
+    // a statement about the code that runs, and the residue is a file name in a comment-like
+    // position — which registers no route. The address is nowhere at all, and this pins that.
     const map = readFileSync(`${root}backend/dist/index.js.map`, 'utf8')
+    const { sources } = JSON.parse(map) as { sources: string[] }
 
     expect(map).not.toContain('/dev/actors')
+    expect(sources.filter((source) => source.includes('dev-actors'))).toEqual([])
   })
 })
