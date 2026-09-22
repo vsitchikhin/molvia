@@ -103,6 +103,25 @@
       "body": "The purchases of this one («{mine}») are still on the phone: prices from one shop cannot be written to another — they are what comparisons are made of",
       "join": "Add them to that trip",
       "finish": "Finish that trip"
+    },
+    "history": {
+      "title": "Trip history",
+      "finished_title": "Completed trip",
+      "empty_title": "Your trips will appear here",
+      "empty_body": "Finish a trip to add forgotten purchases or correct them here.",
+      "error_title": "Could not load trips",
+      "error_body": "Saved data is still on this device. Try again.",
+      "offline_title": "Offline — saved trips",
+      "offline_body": "Only data saved on this device is available. The rest will load when connected.",
+      "cached": "Showing data saved on this device.",
+      "local_finish": "Finished on this device — not sent yet",
+      "more": "Show more",
+      "finished_at": "Finished · {when}",
+      "missing_title": "Trip unavailable",
+      "missing_body": "This trip could not be found in your account. Return to history.",
+      "pending": "Changes are on this device. We will send them when connected.",
+      "no_purchases": "No purchases in this trip yet. Add anything you forgot.",
+      "go_trip": "Go to trip"
     }
   },
   "item": {

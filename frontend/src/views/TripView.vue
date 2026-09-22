@@ -136,6 +136,8 @@
       </template>
     </template>
 
+    <AppButton variant="ghost" @click="history">{{ t('trip.history.title') }}</AppButton>
+
     <!-- The one permanent place money is converted, and it stays put while the list scrolls. -->
     <!-- On the skeleton too, with a dash for the sum: the strip is part of the frame, and a screen
          that grows it after the answer jumps under the thumb (требования §5, В2-7). -->
@@ -183,7 +185,6 @@ import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPlus from '~icons/mdi/plus'
-import { unitPrice } from '@molvia/model'
 import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -196,7 +197,8 @@ import ScreenState from '@/components/ScreenState.vue'
 import TripRateNotes from '@/components/TripRateNotes.vue'
 import TripRow from '@/components/TripRow.vue'
 import TripTotal from '@/components/TripTotal.vue'
-import type { RowMark, TripRowView } from '@/components/tripRow'
+import type { TripRowView } from '@/components/tripRow'
+import { useTripRows } from '@/composables/useTripRows'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import type { RetryPurchase } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
@@ -204,7 +206,7 @@ import { purchaseDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
-import type { QueuedWrite, RejectedWrite } from '@/stores/tripQueue'
+import type { RejectedWrite } from '@/stores/tripQueue'
 
 /** What the sheet is open on: a row being amended, or a refused purchase being corrected. */
 interface Opened {
@@ -292,71 +294,7 @@ export default defineComponent({
         : null
     })
 
-    /** What the queue still holds about this trip, by the row it is about. */
-    const held = computed(() => {
-      const marks = new Map<string, RowMark>()
-      const added: QueuedWrite[] = []
-      for (const write of queue.pending) {
-        if (write.tripId !== tripId.value) continue
-        if (write.kind === 'add') added.push(write)
-        // «Удаляется» outlasts «правка не ушла»: the row is going, whatever else was asked of it.
-        if (write.kind === 'update' && marks.get(write.expenseId) !== 'removing') {
-          marks.set(write.expenseId, 'editing')
-        }
-        if (write.kind === 'remove') marks.set(write.expenseId, 'removing')
-      }
-      return { marks, added }
-    })
-
-    const rows = computed<TripRowView[]>(() => {
-      // A purchase the server already has, queued again, is a correction on its way: it says so
-      // on the row it is about, and never as a second line (Т-12).
-      const correcting = new Set(
-        held.value.added.flatMap((write) => (write.kind === 'add' ? [write.body.id] : [])),
-      )
-      const server = (trip.value?.expenses ?? []).map((expense): TripRowView => ({
-        key: expense.id,
-        name: expense.item.name,
-        quantity: expense.quantity,
-        amount: expense.amount,
-        unitPrice: expense.unitPrice,
-        mark: held.value.marks.get(expense.id) ?? (correcting.has(expense.id) ? 'editing' : null),
-        entry: expense.item,
-        expense,
-      }))
-      const written = new Set(server.map((row) => row.key))
-      const queued = held.value.added.flatMap((write): TripRowView[] =>
-        // The server answered it while the queue still holds the write — the connection dropped
-        // between the write and its answer, or the purchase is being corrected and goes as an
-        // amendment. One purchase, one line, and the line says the correction is on its way
-        // (В2-2, Т-12).
-        write.kind === 'add' && !written.has(write.body.id)
-          ? [
-              {
-                key: write.body.id,
-                name: write.entry?.name ?? t('trip.queued.unnamed'),
-                quantity: write.body.quantity ?? null,
-                amount: write.body.amount ?? null,
-                unitPrice:
-                  write.body.amount && write.body.quantity
-                    ? unitPrice(write.body.amount, write.body.quantity)
-                    : null,
-                mark: 'waiting',
-                entry: write.entry,
-                expense: null,
-              },
-            ]
-          : [],
-      )
-      return [...server, ...queued]
-    })
-
-    /**
-     * Purchases of this trip the server has not taken yet — exactly what the total is missing
-     * (review 6). An edit or a removal also leaves it behind, but by no whole item, and «+1
-     * позиция ещё не ушла» about a row being deleted would be the wrong direction.
-     */
-    const waiting = computed(() => rows.value.filter((row) => row.mark === 'waiting').length)
+    const { rows, waiting } = useTripRows(tripId, trip, () => t('trip.queued.unnamed'))
 
     const rejected = computed(() => queue.rejected)
 
@@ -555,6 +493,7 @@ export default defineComponent({
       amend,
       putAway,
       find,
+      history: () => void router.push({ name: 'trip-history' }),
     }
   },
 })

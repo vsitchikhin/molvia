@@ -94,6 +94,7 @@ interface Options {
   /** What `GET /trips/current` answers; the trip in memory unless said otherwise. */
   readonly server?: TripView | null | 'down'
   readonly locale?: 'ru' | 'en'
+  readonly selected?: TripView
 }
 
 async function render(options: Options = {}) {
@@ -112,6 +113,7 @@ async function render(options: Options = {}) {
 
   const view = mount(ItemDetailsSheet, {
     props: {
+      ...(options.selected ? { tripId: options.selected.id, tripContext: options.selected } : {}),
       entry: options.entry ?? milk,
       query: options.query ?? null,
       expense: options.expense ?? null,
@@ -151,6 +153,25 @@ const perUnit = (view: VueWrapper) =>
     .replace(/[\s\u00a0\u202f]/g, '')
 
 describe('ItemDetailsSheet', () => {
+  it('uses the selected completed trip currency and rate, never the active trip', async () => {
+    const selected = {
+      ...trip('400'),
+      id: 'bbbbbbbb-0000-4000-8000-000000000009',
+      finishedAt: new Date('2026-09-19T09:00:00Z'),
+    }
+    const active = { ...trip(), currency: 'EUR' as const }
+    const { view, queue } = await render({ trip: active, selected })
+    await type(view, 'quantity', '1')
+    await type(view, 'amount', '800')
+    expect(perUnit(view)).toBe('800,00֏/л')
+    expect(view.text().replace(/\s/g, ' ')).toContain('≈ 2 ₽')
+    await button(view, 'Добавить в поход').trigger('click')
+    const write = queue.pending.find((row) => row.kind === 'add')
+    expect(write?.tripId).toBe(selected.id)
+    expect(write?.body.amount?.currency).toBe('AMD')
+    expect(useTripStore().current?.id).toBe(TRIP)
+  })
+
   it('opens on the item, with nothing to show per unit yet', async () => {
     const { view } = await render()
     expect(view.get('dialog').element.open).toBe(true)

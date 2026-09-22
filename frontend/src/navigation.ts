@@ -57,9 +57,21 @@ export async function settleColdStart(router: Router): Promise<void> {
   const parent = route.meta.parent
   if (!parent || router.options.history.state.back) return
 
-  const target = route.fullPath
-  await router.replace({ name: parent })
-  await router.push(target)
+  const ancestors: string[] = []
+  let cursor = router.resolve(route.fullPath)
+  while (cursor.meta.parent) {
+    const ancestor = router.resolve({
+      name: cursor.meta.parent,
+      params: cursor.meta.parent === 'finished-trip' ? { tripId: cursor.params.tripId } : {},
+    })
+    ancestors.unshift(ancestor.fullPath)
+    cursor = ancestor
+  }
+  const root = ancestors.shift()
+  if (!root) return
+  await router.replace(root)
+  for (const path of ancestors) await router.push(path)
+  await router.push(route.fullPath)
 }
 
 function prefersReducedMotion(): boolean {
@@ -119,9 +131,15 @@ export function useNavigation(): {
   async function goBack(): Promise<void> {
     const parent = route.meta.parent
     if (!parent || stepping) return
-    const move = backMove(parent, entryBelow(router))
+    const destination = router.resolve({
+      name: parent,
+      params: parent === 'finished-trip' ? { tripId: route.params.tripId } : {},
+    })
+    const below: unknown = router.options.history.state.back
+    const matches = typeof below === 'string' && router.resolve(below).path === destination.path
+    const move = backMove(parent, matches ? parent : undefined)
     if (move === 'back') stepBack(router)
-    else await router.replace({ name: move.replace })
+    else await router.replace(destination.fullPath)
   }
 
   return { goTab, goBack }
