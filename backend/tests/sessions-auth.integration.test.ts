@@ -5,8 +5,9 @@
  * Репозиторий эти же свойства проверяет у себя (`sessions.integration`), и это не дубль: там
  * проверяется `WHERE`, здесь — то, что до него доезжает заголовок и что уезжает обратно.
  */
-import { execFileSync } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
@@ -18,10 +19,12 @@ import {
 } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { sessions } from '@/db/schema'
+import { createActorRepository } from '@/db/actors-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
+import { signIn } from '@/usecases/sign-in'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { aStrangersCookie, anHourFromNow, clearAll, insertActor } from './fixtures'
+import { aStrangersCookie, anHourFromNow, clearAll, insertActor, telegramId } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const repository = createSessionRepository(db)
@@ -44,6 +47,26 @@ afterAll(async () => {
 })
 
 const HOUR = 3_600_000
+
+/**
+ * The code of a file with its comments taken out — prose that merely *names* `Set-Cookie` is
+ * not a second place that sets one, and the guard below must not mistake the two. Crude on
+ * purpose: it is looking for a header name, so a `//` swallowed inside a string costs nothing.
+ */
+function codeOf(path: string): string {
+  return readFileSync(path, 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/.*/g, ' ')
+}
+
+/** Every `.ts` under a directory, however deep — the guard below must not miss a new folder. */
+function walk(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) return walk(path)
+    return entry.name.endsWith('.ts') ? [path] : []
+  })
+}
 
 function aToken(): string {
   return randomBytes(32).toString('base64url')
@@ -237,16 +260,24 @@ describe('две сессии одного человека', () => {
 
 describe('ни один ответ с cookie не кешируется', () => {
   it('держится тем, что выставить её может ровно один модуль', () => {
-    // Проверка Р-6 в той форме, в какой она и держится: `set-cookie` пишется в одном файле,
-    // и там же ставится `no-store`. Список ручек устарел бы на следующей задаче — а это нет.
-    const backend = fileURLToPath(new URL('../src', import.meta.url))
-    const writers = execFileSync('grep', ['-rl', "'set-cookie'", backend], { encoding: 'utf8' })
-      .trim()
-      .split('\n')
-      .map((path) => path.slice(backend.length + 1))
-      .filter((path) => !path.endsWith('.test.ts'))
+    // Проверка Р-6 в той форме, в какой она и держится: заголовок `Set-Cookie` называет ровно
+    // один файл, и он же ставит `no-store`. Список ручек устарел бы на следующей задаче — а это
+    // нет.
+    //
+    // Ищется **имя заголовка в любом написании** (MOL-53, А8), а не литерал в одинарных
+    // кавычках: прежняя версия звала `grep -rl "'set-cookie'"` и не увидела бы ни
+    // `reply.header("set-cookie", …)`, ни `setHeader(\`set-cookie\`, …)`, ни `reply.setCookie`
+    // из плагина. Чего не поймает никакая такая проверка — имени, собранного из кусков; это
+    // предел метода, и он назван.
+    const root = fileURLToPath(new URL('../src', import.meta.url))
+    const names = /set-?cookie/i
 
-    expect(writers).toEqual(['cookie.ts'])
+    const guilty = walk(root)
+      .filter((path) => !path.endsWith('.test.ts'))
+      .filter((path) => names.test(codeOf(path)))
+      .map((path) => path.slice(root.length + 1))
+
+    expect(guilty).toEqual(['cookie.ts'])
   })
 
   it('и видно это на первой же ручке, которая продлевает сессию', async () => {
@@ -285,5 +316,120 @@ describe('токен не только url-safe', () => {
 
     expect(mine.status).toBe(200)
     expect(String(mine.headers['set-cookie'])).toContain(`${SESSION_COOKIE}=${padded}`)
+  })
+})
+
+/**
+ * Фиксация сессии (MOL-53, А2, А3). Поставить cookie на этот хост может не только владелец
+ * домена: в разработке — соседнее приложение на другом порту, потому что порт в «сайт» не
+ * входит; позже — поддомен или XSS. Браузер шлёт более специфичный путь первым (RFC 6265 §5.4),
+ * так что чужая cookie оказывается впереди нашей.
+ */
+describe('две cookie одного имени', () => {
+  it('не исполняют запрос от чужого имени', async () => {
+    const mine = await signedIn()
+    const attacker = await signedIn()
+
+    const both = await whoAmI(
+      `${SESSION_COOKIE}=${attacker.cookie.split('=')[1] ?? ''}; ${mine.cookie}`,
+    )
+
+    expect(both.status).toBe(401)
+    expect(JSON.parse(both.raw) as unknown).toEqual({ code: ERROR.NO_ACTOR })
+  })
+
+  it('и не дают стереть живую cookie чужой', async () => {
+    // Гашение адресует имя, путь и домен, а не значение: оно сняло бы нашу, на `Path=/`, и
+    // оставило чужую на более глубоком пути. Попытка подмены превратилась бы в запрет навсегда.
+    const mine = await signedIn()
+
+    const refused = await whoAmI(`${SESSION_COOKIE}=${aToken()}; ${mine.cookie}`)
+
+    expect(refused.status).toBe(401)
+    expect(refused.headers['set-cookie']).toBeUndefined()
+    // И сессия цела: убрали чужую — снова свой.
+    expect((await whoAmI(mine.cookie)).status).toBe(200)
+  })
+
+  it('пустое значение впереди живой — тоже две, и тоже отказ без гашения', async () => {
+    const mine = await signedIn()
+
+    const refused = await whoAmI(`${SESSION_COOKIE}=; ${mine.cookie}`)
+
+    expect(refused.status).toBe(401)
+    expect(refused.headers['set-cookie']).toBeUndefined()
+  })
+
+  it('контроль: одна живая cookie по-прежнему отвечает своим владельцем', async () => {
+    const mine = await signedIn()
+
+    const ok = await whoAmI(mine.cookie)
+
+    expect(ok.status).toBe(200)
+    expect(ok.headers['set-cookie']).toBeUndefined()
+  })
+})
+
+describe('шов входа не слушается чужой страницы', () => {
+  const login = (headers: Record<string, string>) =>
+    app.inject({ method: 'POST', url: '/dev/login', headers })
+
+  it('кросс-сайтовый POST не получает сессии — для него адреса нет', async () => {
+    // `SameSite=Lax` тут не помогает: он про отправку cookie, а не про установку. Без тела
+    // предварительного запроса не бывает, так что чужая страница дотянулась бы (А5).
+    const forced = await login({
+      origin: 'https://evil.example',
+      'sec-fetch-site': 'cross-site',
+      'sec-fetch-mode': 'no-cors',
+    })
+
+    expect(forced.statusCode).toBe(404)
+    expect(forced.headers['set-cookie']).toBeUndefined()
+    expect(await db.select().from(sessions)).toHaveLength(0)
+  })
+
+  it('и соседний сайт того же домена — тоже не получает', async () => {
+    const sibling = await login({ 'sec-fetch-site': 'same-site' })
+
+    expect(sibling.statusCode).toBe(404)
+  })
+
+  it('контроль: своё приложение, адресная строка и curl входят как входили', async () => {
+    for (const headers of [{ 'sec-fetch-site': 'same-origin' }, { 'sec-fetch-site': 'none' }, {}]) {
+      const allowed = await login(headers)
+
+      expect(allowed.statusCode).toBe(201)
+      expect(String(allowed.headers['set-cookie'])).toContain(`${SESSION_COOKIE}=`)
+    }
+  })
+})
+
+describe('два входа одним Telegram-аккаунтом', () => {
+  it('одновременно — это один владелец и две сессии, а не CONFLICT', async () => {
+    // Двойное нажатие кнопки в боте или повторная доставка апдейта (MOL-53, А4). Чтение и
+    // запись — не один оператор, поэтому оба входа читают пусто и оба вставляют; проигравший
+    // встречает уникальный индекс и **перечитывает**, а не отказывает человеку.
+    const telegramUserId = telegramId()
+    const actors = createActorRepository(db)
+
+    const [first, second] = await Promise.all([
+      signIn(actors, repository, telegramUserId),
+      signIn(actors, repository, telegramUserId),
+    ])
+
+    expect(first.actor.id).toBe(second.actor.id)
+    expect(first.token).not.toBe(second.token)
+    expect(await db.select().from(sessions)).toHaveLength(2)
+  })
+
+  it('последовательно — то же самое', async () => {
+    const telegramUserId = telegramId()
+    const actors = createActorRepository(db)
+
+    const first = await signIn(actors, repository, telegramUserId)
+    const second = await signIn(actors, repository, telegramUserId)
+
+    expect(second.actor.id).toBe(first.actor.id)
+    expect(second.token).not.toBe(first.token)
   })
 })

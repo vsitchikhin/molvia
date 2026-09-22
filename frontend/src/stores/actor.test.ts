@@ -311,6 +311,54 @@ describe('a session the server does not know', () => {
   })
 })
 
+describe('когда владелец оказался другим', () => {
+  it('говорит об этом, а не меняет человека молча', async () => {
+    // Ящики прежнего владельца — очередь похода, недавние товары, черновики оценок — остаются
+    // на устройстве и становятся недостижимы (MOL-53, Б1). Переносить их нельзя: они принадлежат
+    // тому аккаунту. Экран, который скажет это человеку, — MOL-56; до тех пор хотя бы строчка.
+    localStorage.setItem(KEY, FIRST.id)
+    const said = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { store } = await freshStore()
+    me.mockRejectedValue(await refusal())
+    devLogin.mockResolvedValue(SECOND)
+
+    await store.start()
+
+    expect(store.id).toBe(SECOND.id)
+    expect(said).toHaveBeenCalledWith(expect.stringContaining('владелец сменился'), FIRST.id)
+  })
+
+  it('и молчит, когда владелец тот же', async () => {
+    localStorage.setItem(KEY, FIRST.id)
+    const said = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { store } = await freshStore()
+    me.mockResolvedValue(FIRST)
+
+    await store.start()
+
+    expect(store.state).toBe('ready')
+    expect(said).not.toHaveBeenCalled()
+  })
+})
+
+describe('в прод-сборке входить нечем', () => {
+  it('не тратит второй запрос на то, чего в этой сборке не бывает', async () => {
+    // Второй вопрос существует, чтобы поймать сессию, открытую соседней вкладкой; открыть её в
+    // прод-сборке нечем до MOL-54, так что и замок, и запрос уходили впустую — а `recover()`
+    // повторял это на каждый возврат во вкладку (MOL-53, Б3).
+    vi.stubEnv('DEV', false)
+    const { store } = await freshStore()
+    me.mockRejectedValue(await refusal())
+
+    await store.start()
+
+    expect(store.state).toBe('error')
+    expect(me).toHaveBeenCalledTimes(1)
+    expect(devLogin).not.toHaveBeenCalled()
+    vi.unstubAllEnvs()
+  })
+})
+
 describe('two tabs opened at once', () => {
   it('asks again under the lock instead of opening a second session', async () => {
     // The old machinery published an identifier through storage and the other tab adopted it.

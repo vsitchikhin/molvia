@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SESSION_COOKIE } from '@molvia/model'
-import { clearSessionCookie, readCookie, setSessionCookie } from './cookie'
+import { clearSessionCookie, readCookieValues, setSessionCookie } from './cookie'
+import { secretOrNull } from './secret'
 
 /** The part of a reply the module touches, recording instead of answering. */
 function sink() {
@@ -16,49 +17,60 @@ function sink() {
 
 const TOKEN = 'Zm9vYmFyLXRva2VuLTMyLWJ5dGVzLWJhc2U2NHVybA'
 
-describe('reading one cookie out of the header', () => {
+/** Что вернул бы прежний `readCookie`: первое значение или ничего. */
+const first = (header: string | undefined) => readCookieValues(header, SESSION_COOKIE)[0] ?? null
+
+describe('reading the cookies of one name out of the header', () => {
   it('finds it among others, whatever the spacing', () => {
-    expect(readCookie(`a=1; ${SESSION_COOKIE}=${TOKEN}; b=2`, SESSION_COOKIE)).toBe(TOKEN)
-    expect(readCookie(`a=1;${SESSION_COOKIE}=${TOKEN}`, SESSION_COOKIE)).toBe(TOKEN)
-    expect(readCookie(`  ${SESSION_COOKIE}  =  ${TOKEN}  `, SESSION_COOKIE)).toBe(TOKEN)
+    expect(first(`a=1; ${SESSION_COOKIE}=${TOKEN}; b=2`)).toBe(TOKEN)
+    expect(first(`a=1;${SESSION_COOKIE}=${TOKEN}`)).toBe(TOKEN)
+    expect(first(`  ${SESSION_COOKIE}  =  ${TOKEN}  `)).toBe(TOKEN)
   })
 
-  it('answers nothing when there is no header, no such name, or no value', () => {
-    expect(readCookie(undefined, SESSION_COOKIE)).toBeNull()
-    expect(readCookie('', SESSION_COOKIE)).toBeNull()
-    expect(readCookie('a=1; b=2', SESSION_COOKIE)).toBeNull()
-    expect(readCookie(`${SESSION_COOKIE}=`, SESSION_COOKIE)).toBeNull()
+  it('answers nothing when there is no header and no such name', () => {
+    expect(readCookieValues(undefined, SESSION_COOKIE)).toEqual([])
+    expect(readCookieValues('', SESSION_COOKIE)).toEqual([])
+    expect(readCookieValues('a=1; b=2', SESSION_COOKIE)).toEqual([])
     // A pair without `=` at all is not a pair; it used to take the whole header down.
-    expect(readCookie(`nonsense; ${SESSION_COOKIE}=${TOKEN}`, SESSION_COOKIE)).toBe(TOKEN)
+    expect(first(`nonsense; ${SESSION_COOKIE}=${TOKEN}`)).toBe(TOKEN)
   })
 
   it('does not mistake a longer name for ours', () => {
     // `molvia_session_x` can be set by a page on a neighbouring origin. Read by prefix it would
     // have been our cookie, and a stranger would have chosen the token we look up.
-    expect(readCookie(`${SESSION_COOKIE}_x=${TOKEN}`, SESSION_COOKIE)).toBeNull()
-    expect(readCookie(`x_${SESSION_COOKIE}=${TOKEN}`, SESSION_COOKIE)).toBeNull()
+    expect(readCookieValues(`${SESSION_COOKIE}_x=${TOKEN}`, SESSION_COOKIE)).toEqual([])
+    expect(readCookieValues(`x_${SESSION_COOKIE}=${TOKEN}`, SESSION_COOKIE)).toEqual([])
   })
 
-  it('takes the first of two values under one name', () => {
-    // Browsers send the more specific path first, and there is no answer more right than the
-    // one the browser itself prefers.
-    expect(readCookie(`${SESSION_COOKIE}=first; ${SESSION_COOKIE}=second`, SESSION_COOKIE)).toBe(
-      'first',
-    )
+  it('returns both values under one name, in the order they arrived', () => {
+    // The whole point of returning a list (А2): the caller refuses two rather than picking one,
+    // because the first is the one whoever set it gave the deeper path — the attacker's.
+    expect(
+      readCookieValues(`${SESSION_COOKIE}=first; ${SESSION_COOKIE}=second`, SESSION_COOKIE),
+    ).toEqual(['first', 'second'])
+  })
+
+  it('counts an empty value as a value instead of stopping at it', () => {
+    // `molvia_session=; molvia_session=<live>` used to answer «no cookie at all»: the empty one
+    // cut the walk short and the live token behind it was never read (А3).
+    expect(
+      readCookieValues(`${SESSION_COOKIE}=; ${SESSION_COOKIE}=${TOKEN}`, SESSION_COOKIE),
+    ).toEqual(['', TOKEN])
+    expect(readCookieValues(`${SESSION_COOKIE}=`, SESSION_COOKIE)).toEqual([''])
   })
 
   it('leaves the value exactly as it arrived', () => {
     // Nothing here ever encodes, so decoding on the way in would be a transformation with no
     // counterpart on the way out — and two strings on the wire would become one token.
-    expect(readCookie(`${SESSION_COOKIE}=a%3Db`, SESSION_COOKIE)).toBe('a%3Db')
-    expect(readCookie(`${SESSION_COOKIE}="quoted"`, SESSION_COOKIE)).toBe('"quoted"')
+    expect(first(`${SESSION_COOKIE}=a%3Db`)).toBe('a%3Db')
+    expect(first(`${SESSION_COOKIE}="quoted"`)).toBe('"quoted"')
     // `=` inside a value is legal and must not cut the value short.
-    expect(readCookie(`${SESSION_COOKIE}=a=b=c`, SESSION_COOKIE)).toBe('a=b=c')
+    expect(first(`${SESSION_COOKIE}=a=b=c`)).toBe('a=b=c')
   })
 
   it('survives a header of junk', () => {
     const junk = `${'x'.repeat(10_000)}; ${SESSION_COOKIE}=${TOKEN}`
-    expect(readCookie(junk, SESSION_COOKIE)).toBe(TOKEN)
+    expect(first(junk)).toBe(TOKEN)
   })
 })
 
@@ -101,16 +113,43 @@ describe('setting the session cookie', () => {
   })
 
   it('takes any token the session repository would take, not only a url-safe one', () => {
-    // The repository accepts printable ASCII, and says why: a narrower rule there would have
-    // made a single `.toString('base64')` a 500 on every login (MOL-52, Р4). A narrower rule
-    // here would bring the same trap one layer up — such a session reads fine and then crashes
-    // on the day its term is due to slide.
+    // A narrower rule refuses the `=` a plain `.toString('base64')` ends with, and that would
+    // make a single such call a 500 on every login (MOL-52, Р4).
     const padded = 'YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXphYmNkZWZnaGlqa2w='
     const reply = sink()
 
     setSessionCookie(reply, padded, new Date(Date.now() + 1000))
 
     expect(reply.headers.get('set-cookie')).toContain(`${SESSION_COOKIE}=${padded}`)
+  })
+
+  it('agrees with the repository on every printable character there is', () => {
+    // The two rules were two copies and drifted by four characters — `"`, `,`, `;`, `\` — which
+    // cost a 500 a day after every login with a token holding one (А1). They are one rule now,
+    // and this walks every code point rather than trusting that, exactly as `text.ts` does for
+    // `INVISIBLE` (CLAUDE.md: «two copies drifted twice»).
+    const disagreed: string[] = []
+    for (let code = 0x20; code <= 0x7f; code += 1) {
+      const character = String.fromCharCode(code)
+      const token = character.repeat(2) + 'a'.repeat(41)
+      const takenByRepository = secretOrNull(token) !== null
+      let takenByCookie = true
+      try {
+        setSessionCookie(sink(), token, new Date(Date.now() + 1000))
+      } catch {
+        takenByCookie = false
+      }
+      if (takenByRepository !== takenByCookie) disagreed.push(character)
+    }
+
+    expect(disagreed).toEqual([])
+  })
+
+  it('and neither of them takes what a cookie value cannot hold', () => {
+    // Said separately, so «they agree» cannot be satisfied by both being wrong.
+    for (const bad of ['"', ',', ';', '\\', ' ']) {
+      expect(secretOrNull(bad.repeat(2) + 'a'.repeat(41))).toBeNull()
+    }
   })
 })
 

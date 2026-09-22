@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto'
 import { ZodError } from 'zod'
-import { ISSUE } from '@molvia/model'
+import { DomainError, ERROR, ISSUE } from '@molvia/model'
 import type { TelegramUserId } from '@molvia/model'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { answerWithActor } from '@/routes/actors'
@@ -45,6 +45,32 @@ import type { SignedIn } from '@/usecases/sign-in'
  * Refused through the body seam, which is what turns it into a 400 naming the field — the route
  * assigns no status itself.
  */
+/**
+ * A seam that hands out a session must not be reachable from somebody else's page (MOL-53, А5).
+ *
+ * `SameSite=Lax` does not help here, and the difference is easy to miss: it governs whether a
+ * cookie is **sent**, not whether one may be **set**. A cross-site `fetch(url, {method: 'POST',
+ * mode: 'no-cors'})` needs no preflight when it carries no body — and this handle is documented
+ * as carrying none — so any page could make a developer's browser log in as a brand-new owner,
+ * writing over the session they were working with and leaving that account unreachable. It also
+ * wrote a row into `actors` each time, which is the denominator of the 0.2 gate.
+ *
+ * `Sec-Fetch-Site` is set by the browser and cannot be written by the page that triggers the
+ * request, so it is the right thing to read. `same-origin` is the PWA and its proxy; `none` is
+ * the address bar; absent is `curl`, the tests, and browsers older than the header — refusing
+ * those would break the very people this seam exists for.
+ *
+ * **404, not 403**, and through the registry like everything else: to a caller that has no
+ * business here the address simply does not exist — the same answer production gives, where the
+ * module is not in the bundle at all.
+ */
+function refuseCrossSite(request: FastifyRequest): Promise<void> {
+  const site = request.headers['sec-fetch-site']
+  if (site === undefined || site === 'same-origin' || site === 'none') return Promise.resolve()
+
+  throw new DomainError(ERROR.NOT_FOUND)
+}
+
 function refuseAnyBody(request: FastifyRequest): Promise<void> {
   const { 'content-length': length, 'content-type': type } = request.headers
   const announced =
@@ -61,16 +87,20 @@ export function devLoginRoute(
   app: FastifyInstance,
   api: { signIn(id: TelegramUserId): Promise<SignedIn> },
 ): void {
-  app.post('/dev/login', { onRequest: refuseAnyBody }, async (_request, reply) => {
-    // A Telegram account this person does not have. Random rather than counted, because two
-    // seams running side by side (a test file and a dev server on the same database) would
-    // otherwise hand out the same number and the second call would answer CONFLICT. Well
-    // inside 2^40, so it can never be mistaken for the safe-integer ceiling the column checks.
-    const { actor, token, expiresAt } = await api.signIn(randomInt(1, 2 ** 40))
+  app.post(
+    '/dev/login',
+    { onRequest: [refuseCrossSite, refuseAnyBody] },
+    async (_request, reply) => {
+      // A Telegram account this person does not have. Random rather than counted, because two
+      // seams running side by side (a test file and a dev server on the same database) would
+      // otherwise hand out the same number and the second call would answer CONFLICT. Well
+      // inside 2^40, so it can never be mistaken for the safe-integer ceiling the column checks.
+      const { actor, token, expiresAt } = await api.signIn(randomInt(1, 2 ** 40))
 
-    // The token leaves the server exactly once and only here. `no-store` travels with it — the
-    // one function that can set a cookie is the one that says so (Р-6).
-    setSessionCookie(reply, token, expiresAt)
-    return answerWithActor(reply.code(201), actor)
-  })
+      // The token leaves the server exactly once and only here. `no-store` travels with it — the
+      // one function that can set a cookie is the one that says so (Р-6).
+      setSessionCookie(reply, token, expiresAt)
+      return answerWithActor(reply.code(201), actor)
+    },
+  )
 }

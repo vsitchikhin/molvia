@@ -47,6 +47,7 @@ export const useActorStore = defineStore('actor', () => {
   let running = false
 
   function settle(loaded: ActorView): void {
+    const was = currentIdentity()
     actor.value = loaded
     id.value = loaded.id
     // Written down because the app needs it **before** the server can be asked: at the shelf
@@ -54,6 +55,21 @@ export const useActorStore = defineStore('actor', () => {
     // nobody to ask who we are (MOL-53, Р-9). It is not a credential any more — nothing sends
     // it anywhere — it is the name of a drawer.
     rememberIdentity(loaded.id)
+
+    // **A different owner than last time leaves the previous one's drawers where they are, and
+    // out of reach** (MOL-53, Б1/Б2): the trip queue, the recent items and the verdict drafts
+    // are all filed under the owner's id, so purchases entered with no signal stay on the device
+    // and are never sent. Nothing here moves them — they belong to that account, and sending
+    // them as this one would put somebody's shopping into another person's history.
+    //
+    // In production this is rare by construction: signing in through Telegram finds the *same*
+    // owner, so the drawer comes back with them — that is the whole promise of the epic. It
+    // happens when the person genuinely changes account, and every time in development, where
+    // the seam mints a new Telegram id on each call. Said out loud here because the screen that
+    // could say it to a person is MOL-56's, and until then a log line is better than silence.
+    if (was !== null && was !== loaded.id) {
+      console.warn('[molvia] владелец сменился: записи прежнего остались на устройстве', was)
+    }
   }
 
   function fail(error: unknown): void {
@@ -62,19 +78,14 @@ export const useActorStore = defineStore('actor', () => {
   }
 
   /**
-   * The development seam, and the branch exists only in a development build: `import.meta.env.DEV`
-   * is a literal Vite folds, so the production bundle has no call to an address the production
-   * server does not carry — the same shape the seam has on the server (MOL-52, Р-14).
+   * The development seam. Its only caller stands behind `import.meta.env.DEV`, a literal Vite
+   * folds, so a production bundle holds no call to an address the production server does not
+   * carry — the same shape the seam has on the server (MOL-52, Р-14).
    *
    * In production, until MOL-54, there is simply no way in, and the honest state for that is
    * `error`. MOL-56 replaces it with a screen that offers the Telegram login.
    */
   async function signIn(): Promise<void> {
-    if (!import.meta.env.DEV) {
-      state.value = 'error'
-      return
-    }
-
     try {
       settle(await api.devLogin())
       state.value = 'ready'
@@ -108,8 +119,22 @@ export const useActorStore = defineStore('actor', () => {
       settle(await api.me())
       state.value = 'ready'
     } catch (error) {
-      if (isMissingActor(error)) return claiming(askAgainOrSignIn)
-      fail(error)
+      if (!isMissingActor(error)) {
+        fail(error)
+        return
+      }
+
+      // **The second ask is only worth making where signing in is possible** (MOL-53, Б3). It
+      // exists to catch a session another tab opened while this one waited for the lock — and
+      // in a production build there is no way to open one until MOL-54, so both the lock and
+      // the second request are spent on nothing. `recover()` comes back on every return to the
+      // tab, so «nothing» was two requests each time.
+      if (!import.meta.env.DEV) {
+        state.value = 'error'
+        return
+      }
+
+      return claiming(askAgainOrSignIn)
     }
   }
 

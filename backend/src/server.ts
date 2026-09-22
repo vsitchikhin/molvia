@@ -84,7 +84,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     if (error instanceof DomainError) {
       const status = STATUS_BY_CODE[error.code] ?? 400
       // RFC 9110 §15.5.2 makes a challenge mandatory on a 401. The scheme is this project's
-      // own: the credential is a header carrying an identifier, not Basic or Bearer.
+      // own, and it names nothing a browser could answer by itself — the credential is a
+      // session cookie the server hands out, so there is no dialog to offer and none is shown.
       if (status === 401) void reply.header('www-authenticate', 'Molvia realm="molvia"')
       return reply.status(status).send({ code: error.code })
     }

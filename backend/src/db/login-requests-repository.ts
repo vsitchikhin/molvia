@@ -7,7 +7,8 @@ import {
   telegramUserIdSchema,
 } from '@molvia/model'
 import type { LoginRequest, TelegramUserId } from '@molvia/model'
-import { secretOrNull, sha256Hex } from './digest'
+import { sha256Hex } from './digest'
+import { secretOrNull } from '@/secret'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'

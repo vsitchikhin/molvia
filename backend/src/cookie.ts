@@ -1,4 +1,5 @@
 import { SESSION_COOKIE } from '@molvia/model'
+import { secretOrNull } from '@/secret'
 
 /*
  * The one place a cookie is read and the one place a cookie is written (MOL-53). Beside
@@ -10,25 +11,12 @@ import { SESSION_COOKIE } from '@molvia/model'
  * dependency in the API and one more link in the supply chain for that.
  */
 
-/**
- * What a value has to look like to be put into a header. It exists because a value that did not
- * would end the response with a `;` or a newline in it — that is, another cookie, or another
- * header.
- *
- * **RFC 6265's `cookie-octet`, not «base64url»**, and the difference is a trap this project has
- * already paid for once. `secretOrNull` in `db/digest.ts` accepts any printable ASCII, and it
- * says why in its own comment: the first version of *that* rule was narrower, and a single
- * `.toString('base64')` would have made every login a 500 that no test there could have shown
- * (MOL-52, Р4). A narrower rule here would bring the same trap back one layer up — a session
- * whose token carries `+` or `=` is written and read perfectly well, and then crashes on the day
- * its term is due to slide. So the rule is the one the wire itself has: everything printable
- * except the four characters a cookie value cannot hold.
- *
- * A plain `Error`, as the repositories do for a token this server could not have minted: it
- * means the caller went around the one path that mints one, and there is nothing to answer a
- * client with.
+/*
+ * What a value may look like is **not decided here**: `@/secret` holds that rule, and every
+ * caller — this module and both repositories — asks the same one (MOL-53, А1). Two copies of it
+ * drifted by four characters and cost a 500 a day after every login with a token holding one of
+ * them; the reasoning is written down where the rule now lives.
  */
-const VALUE = /^[\x21\x23-\x2B\x2D-\x3A\x3C-\x5B\x5D-\x7E]{1,512}$/
 
 /**
  * Only the part of a reply this module needs, so its test does not have to build a Fastify one.
@@ -39,7 +27,20 @@ export interface HeaderSink {
 }
 
 /**
- * The value of one cookie out of the `Cookie:` header, or `null`.
+ * **Every** value the `Cookie:` header carries under one name, in the order it sent them.
+ *
+ * It returns a list rather than the first match, and that is the whole of the fix for a session
+ * fixation this code was open to (MOL-53, А2). A browser sends the more specific path first
+ * (RFC 6265 §5.4), so anything able to set a cookie on this host — a sibling app on another port
+ * in development, where the port is not part of «site»; a subdomain or an XSS later — could put
+ * `molvia_session` with a longer `Path` in front of the real one. Reading the first match meant
+ * the server answered **as the attacker**, and everything the person entered afterwards went
+ * into that account. The caller now refuses when there is more than one, because «which of these
+ * is ours» has no honest answer here.
+ *
+ * An empty value is a value: it counts towards that number and does not cut the walk short.
+ * Before, `molvia_session=; molvia_session=<live>` returned nothing at all and the live token in
+ * second place was never read (А3).
  *
  * Three things it deliberately does **not** do:
  *
@@ -52,22 +53,19 @@ export interface HeaderSink {
  * - **It compares the name whole.** Split first, compare after — otherwise
  *   `molvia_session_x=…` is read as `molvia_session`, which is a cookie a page on a neighbouring
  *   origin could set.
- *
- * Duplicates take the first: browsers send the more specific path first, and there is no answer
- * that is more right than «the one the browser prefers».
  */
-export function readCookie(header: string | undefined, name: string): string | null {
-  if (header === undefined) return null
+export function readCookieValues(header: string | undefined, name: string): string[] {
+  if (header === undefined) return []
 
+  const values: string[] = []
   for (const pair of header.split(';')) {
     const at = pair.indexOf('=')
     if (at === -1) continue
     if (pair.slice(0, at).trim() !== name) continue
 
-    const value = pair.slice(at + 1).trim()
-    return value === '' ? null : value
+    values.push(pair.slice(at + 1).trim())
   }
-  return null
+  return values
 }
 
 /**
@@ -108,7 +106,7 @@ function maxAgeSeconds(expiresAt: Date): number {
  * request happened to be, so `/advice` or `/trips/current` becomes `no-store` for that reply.
  */
 export function setSessionCookie(reply: HeaderSink, token: string, expiresAt: Date): void {
-  if (!VALUE.test(token)) {
+  if (secretOrNull(token) === null) {
     throw new Error('a token this server could not have minted reached the cookie')
   }
 

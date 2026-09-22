@@ -1,7 +1,8 @@
 import { and, eq, gt, sql } from 'drizzle-orm'
 import { actorSchema, deviceNameOrNull, newSessionSchema, sessionSchema } from '@molvia/model'
 import type { Actor, Session } from '@molvia/model'
-import { secretOrNull, sha256Hex } from './digest'
+import { sha256Hex } from './digest'
+import { secretOrNull } from '@/secret'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
@@ -63,6 +64,13 @@ export interface SessionRepository {
    *
    * `now()` throughout, never a `Date` from this process: the same clock that wrote
    * `created_at` and the same one `liveByToken` judges life by.
+   *
+   * **Known limit, named rather than met later** (MOL-53, А6): the new expiry is
+   * `now() + lifetimeDays` whatever the row was issued with, so a session deliberately given a
+   * short life becomes a full one the first time it is used. Nothing in 0.1 issues a short
+   * session except the fixtures, and there it is harmless. If MOL-54 or MOL-57 want one — «sign
+   * in on this device for a day» — this method has to learn the term the row was issued with,
+   * and that is a column, not a line.
    */
   touch(id: string, afterHours: number, lifetimeDays: number): Promise<Date | null>
 

@@ -39,8 +39,8 @@ drops the module, which a test asserts against the built file.
 The real door is the Telegram login of MOL-54. Until it ships, a production deployment serves
 the app to a person who will see «could not be identified» and a «try again» that cannot help.
 `SIGNUP_CODE` is no longer read by anything: it is out of `backend/src/env.ts`, out of
-`bin/init-env.sh`, out of `docker-compose.prod.yml` и из `.env.prod.example`. Оставшееся
-значение в `.env.prod` безвредно, и его стоит удалить.
+`bin/init-env.sh`, out of `docker-compose.prod.yml` and out of `.env.prod.example`. A leftover
+value in `.env.prod` is harmless and should be deleted.
 
 ## Trying the production stack locally
 
