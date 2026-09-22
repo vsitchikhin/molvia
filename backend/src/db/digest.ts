@@ -22,27 +22,12 @@ export function sha256Hex(value: string): string {
 }
 
 /**
- * What a secret has to look like to reach a digest column.
+ * **What may reach this function lives in `@/secret`**, and every caller checks it there
+ * (MOL-53, А1).
  *
- * It exists because `sha256Hex` is **not** injective over arbitrary JavaScript strings: a lone
- * surrogate becomes U+FFFD on the way to UTF-8, so two different tokens would share a digest
- * and open one session (MOL-52, adversarial А6). Rather than change how the hash is taken —
- * hex is what a person compares against in `psql` — what reaches it has to be a string that
- * survives the trip to UTF-8 unchanged.
- *
- * **Printable ASCII, and deliberately not «base64url or hex».** That narrower rule was the
- * first version, and it was a trap: 32 bytes as plain `base64` end in `=`, which it refused —
- * so a single `.toString('base64')` in MOL-53, where the minting actually happens, would have
- * made **every** login a 500, and no test here would have shown it, because the tests all mint
- * correctly (adversarial Р4). The property this guard is for is the round trip, so the round
- * trip is what it checks; the encoding is the minter's business.
- *
- * The floor of 32 characters is not a security rule (how long a token is belongs to MOL-53):
- * it is what makes «this could not have come from us» decidable here at all.
+ * That guard exists because `sha256Hex` is **not** injective over arbitrary JavaScript strings:
+ * a lone surrogate becomes U+FFFD on the way to UTF-8, so two different tokens would share a
+ * digest and open one session (MOL-52, А6). The rule used to live here, beside the hash — and a
+ * second, wider copy of it lived in `cookie.ts`. The two drifted by four characters, and the
+ * price was a 500 a day after every login with a token holding one of them. One rule, one home.
  */
-const SECRET = /^[\x21-\x7E]{32,512}$/
-
-/** The secret as it reached us, or `null` when this server could not have minted it. */
-export function secretOrNull(value: string): string | null {
-  return SECRET.test(value) ? value : null
-}

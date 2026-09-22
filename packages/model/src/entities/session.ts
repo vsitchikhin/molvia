@@ -86,6 +86,23 @@ export function deviceNameOrNull(value: string | null): string | null {
 }
 
 /**
+ * How long a session lives from the last time it was used, and how stale «last used» has to get
+ * before that is written down (MOL-53, owner's decision 22.09.2026 — «ориентир полгода» from the
+ * task, confirmed as 180 days).
+ *
+ * **The term slides**, so the only person it ever throws out is one who did not open the app for
+ * half a year; every visit pushes the date forward. And the two numbers belong together: the
+ * same write moves `last_seen_at` and `expires_at`, because a term extended without moving
+ * `last_seen_at` would put a date in MOL-57's device list that means nothing.
+ *
+ * Here rather than in the backend because they are facts about the domain's own entity — how
+ * long a way in is good for — and because the cookie's `Max-Age` and the database's interval
+ * have to be the same number or the browser drops a session the server still holds.
+ */
+export const SESSION_LIFETIME_DAYS = 180
+export const SESSION_TOUCH_AFTER_HOURS = 24
+
+/**
  * A live way into an account: how a device says who it is, once MOL-53 stops reading the
  * identifier off a header.
  *

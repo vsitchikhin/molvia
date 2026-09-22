@@ -7,15 +7,14 @@ import { healthRoutes } from '@/routes/health'
 import { withActor } from '@/routes/actor'
 import { actorMeRoute } from '@/routes/actors'
 import { adviceRoutes } from '@/routes/advice'
-import { devActorRoute } from '@/routes/dev-actors'
+import { devLoginRoute } from '@/routes/dev-login'
 import { catalogueRoutes } from '@/routes/catalogue'
 import { placeRoutes } from '@/routes/places'
 import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
 import { advice } from '@/usecases/advice'
-import { createActor } from '@/usecases/create-actor'
+import { authenticate } from '@/usecases/authenticate'
 import { currentTrip } from '@/usecases/current-trip'
-import { getActor } from '@/usecases/get-actor'
 import { proposeItem } from '@/usecases/propose-item'
 import { recentPlaces } from '@/usecases/recent-places'
 import { rateItem } from '@/usecases/rate-item'
@@ -23,12 +22,14 @@ import { amendVerdict } from '@/usecases/amend-verdict'
 import { withdrawVerdict } from '@/usecases/withdraw-verdict'
 import { pendingVerdicts } from '@/usecases/pending-verdicts'
 import { searchCatalogue } from '@/usecases/search-catalogue'
+import { signIn } from '@/usecases/sign-in'
 import { chooseTripRate } from '@/usecases/choose-trip-rate'
 import { startTrip } from '@/usecases/start-trip'
 import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
 import { createActorRepository } from '@/db/actors-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
+import { createSessionRepository } from '@/db/sessions-repository'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { databaseIsReachable, getDb } from '@/db'
@@ -83,7 +84,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     if (error instanceof DomainError) {
       const status = STATUS_BY_CODE[error.code] ?? 400
       // RFC 9110 §15.5.2 makes a challenge mandatory on a 401. The scheme is this project's
-      // own: the credential is a header carrying an identifier, not Basic or Bearer.
+      // own, and it names nothing a browser could answer by itself — the credential is a
+      // session cookie the server hands out, so there is no dialog to offer and none is shown.
       if (status === 401) void reply.header('www-authenticate', 'Molvia realm="molvia"')
       return reply.status(status).send({ code: error.code })
     }
@@ -121,6 +123,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const events = createEventRepository(db)
     const tripData = tripRepositories(db)
     const transact = transactOn(db)
+    const sessions = createSessionRepository(db)
     const verdicts = createVerdictRepository(db)
 
     healthRoutes(instance, { databaseIsReachable })
@@ -128,7 +131,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).
     // `bin/bundle.mjs` replaces this exact expression with the literal `'production'`, so in
     // the production bundle the condition folds to `false`, the branch goes, and with its
-    // last reference gone `dev-actors` is tree-shaken out entirely — the address does not
+    // last reference gone `dev-login` is tree-shaken out entirely — the address does not
     // exist there rather than being switched off. Two things keep that true, and both are
     // easy to undo without noticing: esbuild only substitutes an *unbound* `process`, so this
     // file must never `import process from 'node:process'`, and the parsed `env` object is no
@@ -136,7 +139,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     // promise is neither comment but `bundle-seam.integration.test.ts`, which greps the built
     // file.
     if (process.env.NODE_ENV !== 'production') {
-      devActorRoute(instance, { create: (telegramUserId) => createActor(actors, telegramUserId) })
+      devLoginRoute(instance, {
+        signIn: (telegramUserId) => signIn(actors, sessions, telegramUserId),
+      })
     }
 
     // Everything that needs an owner is registered inside this scope, and the scope is here
@@ -144,7 +149,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     // is only true if the guarded place is where routes are actually added. MOL-21 and MOL-27
     // add theirs next to these.
     void instance.register((guarded, _guardedOptions, guardedDone) => {
-      withActor(guarded, (id) => getActor(actors, id))
+      withActor(guarded, (token) => authenticate(sessions, token))
       actorMeRoute(guarded)
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items }, actorId, query),

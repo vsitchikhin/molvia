@@ -15,9 +15,10 @@ import type { FastifyInstance, FastifyReply } from 'fastify'
  * «fail loudly» — measured, it did nothing at all, because the codec had already done it
  * (adversarial Б2). The safeguard that does work is that the view is an allowlist.
  *
- * `no-store` travels with it. Until MOL-53 the identifier is still the proof of identity —
- * whoever reads it is the owner — so a shared cache or a disk cache holding this reply is the
- * whole account sitting in a file nobody meant to write.
+ * `no-store` travels with it, and the reason changed with MOL-53 rather than going away. The
+ * identifier is no longer a password — a session token is — so a cached copy of this reply is
+ * not the account itself any more. It is still one person's settings sitting in a file a shared
+ * cache may hand to the next reader, which is reason enough on a reply that names somebody.
  */
 export function answerWithActor(reply: FastifyReply, actor: Actor): FastifyReply {
   return reply.header('cache-control', 'no-store').send(z.encode(actorCodec, actor))

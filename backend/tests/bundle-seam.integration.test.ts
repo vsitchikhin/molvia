@@ -30,10 +30,10 @@ describe('the production bundle', () => {
 
     // The address, and the module's own name for good measure: if either survives, the branch
     // did not fold and the seam shipped.
-    expect(bundle).not.toContain('/dev/actors')
-    expect(bundle).not.toContain('devActorRoute')
+    expect(bundle).not.toContain('/dev/login')
+    expect(bundle).not.toContain('devLoginRoute')
     // A guard against the test passing for the wrong reason — an empty or half-built file
-    // contains no `/dev/actors` either.
+    // contains no `/dev/login` either.
     expect(bundle).toContain('/actors/me')
   })
 
@@ -51,7 +51,7 @@ describe('the production bundle', () => {
     const map = readFileSync(`${root}backend/dist/index.js.map`, 'utf8')
     const { sources } = JSON.parse(map) as { sources: string[] }
 
-    expect(map).not.toContain('/dev/actors')
-    expect(sources.filter((source) => source.includes('dev-actors'))).toEqual([])
+    expect(map).not.toContain('/dev/login')
+    expect(sources.filter((source) => source.includes('dev-login'))).toEqual([])
   })
 })

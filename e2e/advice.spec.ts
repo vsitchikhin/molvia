@@ -1,28 +1,31 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import type { APIRequestContext, Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { liveRegion, recordLiveRegion } from './live-region'
+import { asBrowser, signedIn } from './session'
 
 interface Person {
   readonly id: string
   call(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown): Promise<unknown>
 }
 
-/** A new person for each test: «Что брать» is personal, so nothing leaks between tests. */
-async function person(request: APIRequestContext, page: Page): Promise<Person> {
-  const created = await request.post('/api/dev/actors')
-  expect(created.status()).toBe(201)
-  const { id } = (await created.json()) as { id: string }
-  await page.addInitScript((actor) => {
-    localStorage.setItem('molvia.actor', actor)
-  }, id)
+/**
+ * A new person for each test: «Что брать» is personal, so nothing leaks between tests.
+ *
+ * Signed in through the page, so the session the seam hands out is the browser's own and every
+ * call below goes out as that person without naming anybody (MOL-53). `asBrowser` says why the
+ * cookie is attached by hand rather than left to `page.request`.
+ */
+async function person(page: Page): Promise<Person> {
+  const id = await signedIn(page)
+  const headers = await asBrowser(page)
 
   return {
     id,
     async call(method, path, body) {
-      const response = await request.fetch(`/api${path}`, {
+      const response = await page.request.fetch(`/api${path}`, {
         method,
-        headers: { 'x-molvia-actor': id },
+        headers,
         ...(body === undefined ? {} : { data: body }),
       })
       expect(response.ok(), `${method} ${path}: ${String(response.status())}`).toBe(true)
@@ -61,9 +64,8 @@ async function openSheet(page: Page): Promise<void> {
 
 test('a rated purchase becomes a recommendation with the place and the price per unit', async ({
   page,
-  request,
 }) => {
-  const who = await person(request, page)
+  const who = await person(page)
   const name = `Молоко «Ашхар» ${tag}`
   await ratedPurchase(who, name, 5)
 
@@ -85,9 +87,8 @@ test('a rated purchase becomes a recommendation with the place and the price per
 
 test('a bad verdict carries no price and no place: there is nothing to be cheap with', async ({
   page,
-  request,
 }) => {
-  const who = await person(request, page)
+  const who = await person(page)
   const name = `Колбаса «Молочная» ${tag}`
   await ratedPurchase(who, name, 1)
 
@@ -104,9 +105,8 @@ test('a bad verdict carries no price and no place: there is nothing to be cheap 
 
 test('nothing rated yet: the empty state explains the link and leads to «Ratings»', async ({
   page,
-  request,
 }) => {
-  await person(request, page)
+  await person(page)
 
   await page.goto('/advice')
 
@@ -118,12 +118,8 @@ test('nothing rated yet: the empty state explains the link and leads to «Rating
 
 // The commonest break at a shelf: the connection goes while the answer is on its way. It is
 // offline, yellow and polite — not the red error the first cut of MOL-19 drew (A1).
-test('a connection lost mid-request is offline, not an error', async ({
-  page,
-  context,
-  request,
-}) => {
-  await person(request, page)
+test('a connection lost mid-request is offline, not an error', async ({ page, context }) => {
+  await person(page)
   let release: () => void = () => undefined
   const held = new Promise<void>((resolve) => {
     release = resolve
@@ -151,9 +147,8 @@ test('a connection lost mid-request is offline, not an error', async ({
 // is held back rather than slowed down, so the check does not race a fast local API.
 test('the skeleton is there while the answer is on its way, and the region says so', async ({
   page,
-  request,
 }) => {
-  await person(request, page)
+  await person(page)
   let release: () => void = () => undefined
   const held = new Promise<void>((resolve) => {
     release = resolve
@@ -177,11 +172,8 @@ test('the skeleton is there while the answer is on its way, and the region says 
 })
 
 // The server broke rather than the connection: red, an alert, and a way to ask again.
-test('reports a failure instead of an empty screen, and recovers on retry', async ({
-  page,
-  request,
-}) => {
-  await person(request, page)
+test('reports a failure instead of an empty screen, and recovers on retry', async ({ page }) => {
+  await person(page)
   await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
   await page.goto('/advice')
 
@@ -205,9 +197,7 @@ test('offline without an identity: one notice, and the screen comes back with th
   })
   await page.goto('/advice')
 
-  await expect(
-    page.getByRole('heading', { name: "This device isn't identified yet" }),
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Not signed in yet' })).toBeVisible()
   await expect(
     page.getByRole('heading', { name: 'The list will show up once you are online' }),
   ).toHaveCount(0)
@@ -221,11 +211,8 @@ test('offline without an identity: one notice, and the screen comes back with th
   await expect(page.getByRole('heading', { name: 'Nothing to advise yet' })).toBeVisible()
 })
 
-test('the action of the empty state is large enough to hit with a thumb', async ({
-  page,
-  request,
-}) => {
-  await person(request, page)
+test('the action of the empty state is large enough to hit with a thumb', async ({ page }) => {
+  await person(page)
   await page.goto('/advice')
 
   const button = page.getByRole('button', { name: 'Rate a purchase' })
@@ -237,9 +224,8 @@ test('the action of the empty state is large enough to hit with a thumb', async 
 
 test('a mis-tapped verdict is amended where it is met, and withdrawn from there too', async ({
   page,
-  request,
 }) => {
-  const who = await person(request, page)
+  const who = await person(page)
   const name = `Сыр «Чанах» ${tag}`
   await ratedPurchase(who, name, 1)
 
@@ -269,11 +255,8 @@ test('a mis-tapped verdict is amended where it is met, and withdrawn from there 
 // Loading breathes, and stands still for whoever asked for less motion. The only place the
 // skeleton's animation is checked against real CSS — happy-dom has none — and it went missing
 // with `home.spec.ts` (MOL-32, МР-5).
-test('the skeleton breathes, and stops for someone who asked for less motion', async ({
-  page,
-  request,
-}) => {
-  await person(request, page)
+test('the skeleton breathes, and stops for someone who asked for less motion', async ({ page }) => {
+  await person(page)
   await page.route('**/api/advice', () => new Promise(() => undefined))
   const bars = page.locator('.skeleton .bars')
   const animation = () => bars.evaluate((element) => getComputedStyle(element).animationName)

@@ -24,7 +24,7 @@ import { createRateRepository } from '@/db/rates-repository'
 import { places, searchPicks, trips } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem } from './fixtures'
+import { clearAll, insertActor, insertItem, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 
@@ -61,7 +61,7 @@ async function call(
   const response = await app.inject({
     method,
     url,
-    headers: actor === null ? {} : { 'x-molvia-actor': actor },
+    headers: actor === null ? {} : { cookie: await signIn(db, actor) },
     ...(body === undefined ? {} : { payload: body as Record<string, unknown> }),
   })
   return {

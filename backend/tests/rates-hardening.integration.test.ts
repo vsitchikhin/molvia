@@ -16,7 +16,7 @@ import type { Published, RateFeed } from '@/rates/feed'
 import { buildServer } from '@/server'
 import { FALLBACK_AFTER_FAILURES, officialRatesRefresh } from '@/usecases/refresh-official-rates'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem } from './fixtures'
+import { clearAll, insertActor, insertItem, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
@@ -53,7 +53,7 @@ async function call(method: 'GET' | 'POST' | 'PUT', url: string, actor: string, 
   const response = await app.inject({
     method,
     url,
-    headers: { 'x-molvia-actor': actor },
+    headers: { cookie: await signIn(db, actor) },
     ...(body === undefined ? {} : { payload: body as Record<string, unknown> }),
   })
   return {

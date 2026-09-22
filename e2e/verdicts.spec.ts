@@ -1,27 +1,31 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import type { APIRequestContext, Page } from '@playwright/test'
+import { asBrowser, signedIn } from './session'
+import type { Page } from '@playwright/test'
 
 interface Person {
   readonly id: string
   call(method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown): Promise<unknown>
 }
 
-/** A new person for each test: the queue is personal, so nothing leaks between tests. */
-async function person(request: APIRequestContext, page: Page): Promise<Person> {
-  const created = await request.post('/api/dev/actors')
-  expect(created.status()).toBe(201)
-  const { id } = (await created.json()) as { id: string }
-  await page.addInitScript((actor) => {
-    localStorage.setItem('molvia.actor', actor)
-  }, id)
+/**
+ * A new person for each test: the queue is personal, so nothing leaks between tests.
+ *
+ * Signed in through `page.request`, which shares the browser context's cookie jar — so the
+ * session the seam hands out is the page's own, and every call below goes out as that person
+ * without naming anybody (MOL-53). The standalone `request` fixture has a jar of its own and
+ * would have logged in a second, invisible person.
+ */
+async function person(page: Page): Promise<Person> {
+  const id = await signedIn(page)
+  const headers = await asBrowser(page)
 
   return {
     id,
     async call(method, path, body) {
-      const response = await request.fetch(`/api${path}`, {
+      const response = await page.request.fetch(`/api${path}`, {
         method,
-        headers: { 'x-molvia-actor': id },
+        headers,
         ...(body === undefined ? {} : { data: body }),
       })
       expect(response.ok(), `${method} ${path}: ${String(response.status())}`).toBe(true)
@@ -59,9 +63,8 @@ const tag = randomUUID().slice(0, 8)
 
 test('rates the purchases one by one, puts one off, and ends at «Everything is rated»', async ({
   page,
-  request,
 }) => {
-  const who = await person(request, page)
+  const who = await person(page)
   const milk = `Молоко ${tag}`
   const bread = `Хлеб ${tag}`
   await bought(who, [milk, bread])
@@ -112,9 +115,8 @@ test('rates the purchases one by one, puts one off, and ends at «Everything is 
 test('7: rated without a connection — «saved», and it goes by itself once online', async ({
   page,
   context,
-  request,
 }) => {
-  const who = await person(request, page)
+  const who = await person(page)
   await bought(who, [`Сыр ${tag}`])
 
   await page.goto('/verdicts')
@@ -137,9 +139,8 @@ test('7: rated without a connection — «saved», and it goes by itself once on
 test('7: rated without a connection and the app closed — sent when it is opened again', async ({
   page,
   context,
-  request,
 }) => {
-  const who = await person(request, page)
+  const who = await person(page)
   await bought(who, [`Творог ${tag}`, `Сметана ${tag}`])
 
   await page.goto('/verdicts')
@@ -162,12 +163,12 @@ test('7: rated without a connection and the app closed — sent when it is opene
   await expect(again.getByText('1 purchase is waiting to be rated')).toBeVisible()
 })
 
-test('the queue that could not load is red and loads again on «Try again»', async ({
-  page,
-  request,
-}) => {
-  const who = await person(request, page)
-  await bought(who, [`Кефир ${tag}`])
+test('the queue that could not load is red and loads again on «Try again»', async ({ page }) => {
+  const who = await person(page)
+  // Не «Кефир»: справочник разработки общий, а `item-search` ищет это слово — строка отсюда
+  // стала бы там первой строкой ответа и уронила бы чужой тест (правило соседних файлов:
+  // «имена — те, которых никто не набирает»).
+  await bought(who, [`Айран ${tag}`])
   await page.route('**/api/verdicts/pending', (route) => route.abort())
 
   await page.goto('/verdicts')
@@ -176,5 +177,5 @@ test('the queue that could not load is red and loads again on «Try again»', as
   await page.unroute('**/api/verdicts/pending')
   await page.getByRole('button', { name: 'Try again' }).click()
 
-  await expect(page.getByRole('heading', { level: 2 })).toContainText('Кефир')
+  await expect(page.getByRole('heading', { level: 2 })).toContainText('Айран')
 })

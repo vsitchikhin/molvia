@@ -2,6 +2,7 @@
 // DOM for the code inside page.evaluate, which runs in the browser.
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { asBrowser, signedIn } from './session'
 import type { Page } from '@playwright/test'
 
 /**
@@ -13,8 +14,6 @@ import type { Page } from '@playwright/test'
  * Each test arrives as a new device with its own trip, so the rows it counts are its own. The item
  * is named with a word no catalogue holds, so the search finds it and nothing else.
  */
-
-const KEY = 'molvia.actor'
 
 function nonsense(): string {
   const consonants = 'бвгджзклмнпрстфхцчш'
@@ -41,13 +40,16 @@ interface Setting {
   readonly rows: () => Promise<Row[]>
 }
 
-/** A device with an identity, a trip open in a shop, and one item of its own in the catalogue. */
+/**
+ * A device signed in, a trip open in a shop, and one item of its own in the catalogue.
+ *
+ * `page.request` and not the standalone `request` fixture: it shares the browser context's
+ * cookie jar, so these calls go out as the very person the page is (MOL-53). The old header is
+ * gone, and with it the need to read an identifier out of storage to speak as somebody.
+ */
 async function onTrip(page: Page): Promise<Setting> {
-  await page.goto('/')
-  const stored = () => page.evaluate((key) => localStorage.getItem(key) ?? '', KEY)
-  await expect.poll(stored).toMatch(/^[0-9a-f-]{36}$/)
-  const actor = await stored()
-  const headers = { 'x-molvia-actor': actor }
+  const actor = await signedIn(page)
+  const headers = await asBrowser(page)
 
   const word = nonsense()
   const proposed = await page.request.post('/api/catalogue/items', {

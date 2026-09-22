@@ -310,7 +310,7 @@ describe('AppScreen', () => {
       defineComponent(() => () => h(AppScreen, { title: 'Trip' })),
       { global: { plugins: [router, pinia, createAppI18n('en')] } },
     )
-    useActorStore(pinia).state = 'lost'
+    useActorStore(pinia).state = 'error'
     await nextTick()
     const order = [...view.element.querySelectorAll('.head, .notice, .content')].map((node) =>
       ['head', 'notice', 'content'].find((name) => node.classList.contains(name)),

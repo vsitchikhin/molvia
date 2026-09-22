@@ -666,8 +666,8 @@ database access. In a product about data integrity, two write paths will silentl
   shelf with no signal still knows where a purchase goes — but **the memory is for when the
   server cannot be asked, not instead of asking**: the sheet asks every time it opens, and a
   trip answered finished stops being the current one.
-- **Identity is proved by a session; `actors.id` proves only ownership (MOL-52).** The two
-  were one thing until now, and everything awkward about 0.1 followed from it: `created_by`
+- **Identity is proved by a session; `actors.id` proves only ownership (MOL-52, MOL-53).** The
+  two were one thing until now, and everything awkward about 0.1 followed from it: `created_by`
   hidden from a catalogue card, a header that must not be logged, `no-store` on every reply
   carrying an identifier. What a person comes back by is `actors.telegram_user_id` — unique,
   so one Telegram account is one owner — and what a request proves itself with is a session
@@ -678,6 +678,50 @@ database access. In a product about data integrity, two write paths will silentl
   verdict is data with a reader (the gate counts it), a session is a key, and a discarded key
   has no readers. Deletion also makes «revoked», «expired» and «never existed» one answer for
   free, where a flag would need every later query to remember it.
+- **The token rides in a cookie, and `backend/src/cookie.ts` is the only module that touches
+  one (MOL-53).** `__Host-molvia_session`, with `HttpOnly` so an XSS cannot carry the account
+  away and so ITP's seven-day cap — which applies to what a _script_ writes — never reaches it;
+  `Secure` always, with no branch for the environment, because a branch saying «here it is not
+  needed» eventually reaches production; `SameSite=Lax`, since every handle that writes is
+  `POST`, `PUT` or `DELETE` and `Strict` would additionally refuse the one navigation the epic is
+  built around — the person coming back from the bot; `Path=/` with no `Domain`, because the
+  browser sees `/api/…` and both Caddy and the Vite proxy strip that prefix; `Max-Age` rather
+  than `Expires`, so the clock of the device does not decide. The **`__Host-` prefix** is the
+  browser holding the last three of those for us, and it buys the half the server cannot: nothing
+  else on this host may set a cookie of that name at a deeper path. **Setting it and saying
+  `no-store` are one act** — that is how «a cookie is never handed out by a reply that can be
+  cached» holds without anyone remembering it, and a test asserts that no second module writes
+  `set-cookie`. The one price, named: over plain http on the LAN (`PWA_EXPOSE=1 make dev`)
+  `Secure` means no session — the same place the camera already needs `make certs`.
+- **What a secret may look like is one rule, in `backend/src/secret.ts`** — RFC 6265's
+  `cookie-octet`, because the only thing a session token or a login request's secret ever travels
+  in is a cookie. It was two rules once, and they drifted by four characters: a token holding
+  `"`, `,`, `;` or `\` was written and read perfectly well and then cost a 500 the day its term
+  came due, or — for `;`, the header's own separator — a row no request could ever open. A test
+  walks every printable code point and holds the rule and the cookie to the same answer, as
+  `text.ts` does for `INVISIBLE`. Narrowing does **not** bring back MOL-52's Р4: `+`, `/` and `=`
+  all pass, so plain base64 is still a token.
+- **More than one cookie of that name is refused, and a refusal then clears nothing.** A browser
+  sends the more specific path first, so anything able to set a cookie on this host — a sibling
+  app on another port in development, where the port is not part of «site» — could put its own
+  session in front of the real one and be answered as. «Which of these is ours» has no honest
+  answer; and clearing would delete ours at `Path=/` while leaving theirs, turning an attempt at
+  fixation into a lockout. Only a lone cookie that was refused is put out.
+- **The term slides, and one write a day moves it (MOL-53).** 180 days from the last use
+  (`SESSION_LIFETIME_DAYS`), and both `last_seen_at` and `expires_at` move together, at most
+  once in `SESSION_TOUCH_AFTER_HOURS` — a term extended without moving `last_seen_at` would put
+  a date in MOL-57's device list that means nothing. The condition lives inside the `UPDATE`'s
+  `WHERE`, not only in the caller, so two requests arriving together write once; the caller
+  checks it too, off the row it already holds, because an `UPDATE` on **every** request would
+  bloat the one table every request touches. The cookie is re-set by the same write, or the
+  browser would drop a session the server still holds.
+- **Four refusals, one answer.** No cookie, a token nobody was issued, a token of a revoked
+  session, a token of an expired one: `401` with `error.no_actor`, identical byte for byte.
+  Nothing arranges that — they fail one `WHERE` in the repository, and a value this server could
+  not have minted is refused before Postgres sees it, so «malformed» cannot become a third,
+  distinguishable answer. Our own refusal also puts the cookie out (`Max-Age=0`) when one was
+  sent, which a 401 from Caddy or a shop's captive portal never can, because it never reaches
+  this code.
 - **Verdict and expense are separate tables with separate write paths.** Do not merge
   them into one input screen: they have different frequencies and different motivations.
 - **A withdrawn verdict is still a row (MOL-27).** `DELETE /verdicts/:itemId` sets
@@ -1010,10 +1054,26 @@ migration **emptied the owners and everything hanging off them**, because a Tele
 cannot be invented for a row already written; the catalogue and the places survived, with
 `created_by` nulled (owner's decision, 20.09.2026). **The invite door of MOL-8 is gone with
 its handle**: `POST /actors`, `withInvite`, `INVITE_HEADER`, `SIGNUP_CODE` and the `?c=` link.
-Until MOL-54 an identity comes from `POST /dev/actors`, a seam that **is not in the production
+MOL-53 put the session under every request: `withActor` reads the cookie, `liveByToken` answers
+with the session and its owner in one statement, and `X-Molvia-Actor` is gone from the model, the
+client, the PWA and the tests — the client has no way left to name an owner at all. On the device
+the uuid stays, but as **the name of a drawer**: the trip queue, the recent items and the verdict
+drafts are filed under it and read at the shelf before the server can be asked who we are. With
+the header went everything that existed because the device held a password — the set-aside keys,
+«вернуть прежние данные», the claim two tabs negotiated over and the state `lost`; «the session
+ended, sign in again» is MOL-56's, together with the screen that can act on it.
+**The owner of an account does not change** (owner's decision 22.09.2026). The seam used to mint
+a fresh Telegram id on every call, so a session that ran out came back as somebody else — and the
+trip queue, the recent items and the verdict drafts, all filed on the device under the owner's
+id, were left where no screen could reach them. A cookie of its own now remembers the account
+this browser was given, which is what Telegram itself becomes in MOL-54; clearing the browser's
+cookies is the one thing that still makes a new person, and that is the development counterpart
+of losing the Telegram account.
+Until MOL-54 a session comes from `POST /dev/login`, a seam that **is not in the production
 bundle at all** — the bundler folds its guard to a constant and the module is tree-shaken away,
-which a test asserts against the built file rather than against the intention. The price is
-named: in production there is no way to create an identity until MOL-54 exists.
+which a test asserts against the built file rather than against the intention; the PWA's call to
+it is behind `import.meta.env.DEV`, so the production bundle does not hold it either. The price is
+named: in production there is no way in until MOL-54 exists.
 
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
@@ -1059,7 +1119,10 @@ The shape worth knowing here:
 `getUserMedia` only runs in a secure context, and over the LAN a self-signed certificate
 is refused exactly like plain http. `make certs` issues one from a locally trusted
 authority (mkcert); `PWA_EXPOSE=1 make dev` puts the dev server on the network. Without a
-certificate the dev server stays on http, which is right for everything except the camera.
+certificate the dev server stays on http, which is right for everything except the camera —
+**and, since MOL-53, except signing in**: the session cookie is `Secure`, and over plain http
+on the LAN the browser will not keep it. On the loopback nothing changes, because
+`http://127.0.0.1` counts as a trustworthy origin.
 
 ## Several clones in parallel
 

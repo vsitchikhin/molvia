@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
 import { expect, test } from '@playwright/test'
+import { asBrowser, signedIn } from './session'
 import type { APIResponse, Page } from '@playwright/test'
 
 /**
@@ -14,8 +15,6 @@ import type { APIResponse, Page } from '@playwright/test'
  * from yesterday — but the whole suite shares it while running in parallel, which is why the
  * names are ones nobody else types and a proposal answered «already there» is as good as a new one.
  */
-
-const KEY = 'molvia.actor'
 
 /** A word no catalogue holds: letters only, so it grounds a search and matches nothing else. */
 function nonsense(): string {
@@ -32,18 +31,13 @@ function nonsense(): string {
 const field = (page: Page) => page.getByRole('combobox', { name: 'What did you pick up?' })
 const options = (page: Page) => page.getByRole('option')
 
-/** A device with an identity, the way a person gets one until MOL-54: the seam. */
+/** A device signed in, the way a person gets in until MOL-54: the seam. */
 async function arrive(page: Page): Promise<string> {
-  await page.goto('/')
-  const stored = () => page.evaluate((key) => localStorage.getItem(key) ?? '', KEY)
-  // The first visit happens after the first paint, so the identity appears a moment later.
-  await expect.poll(stored).toMatch(/^[0-9a-f-]{36}$/)
-  return stored()
+  return signedIn(page)
 }
 
 async function propose(
   page: Page,
-  actor: string,
   item: {
     readonly name: string
     readonly defaultUnit: 'kg' | 'l' | 'piece'
@@ -51,7 +45,7 @@ async function propose(
   },
 ): Promise<APIResponse> {
   const response = await page.request.post('/api/catalogue/items', {
-    headers: { 'x-molvia-actor': actor },
+    headers: await asBrowser(page),
     data: { kind: 'product', ...item },
   })
   expect([200, 201]).toContain(response.status())
@@ -71,8 +65,8 @@ const KVIRTA_KEFIR = { name: 'Кефир «Квирта»', defaultUnit: 'l' } a
  */
 async function withKvirta(page: Page, options: { recent?: boolean } = {}): Promise<void> {
   const actor = await arrive(page)
-  const milk: unknown = await (await propose(page, actor, KVIRTA_MILK)).json()
-  await propose(page, actor, KVIRTA_KEFIR)
+  const milk: unknown = await (await propose(page, KVIRTA_MILK)).json()
+  await propose(page, KVIRTA_KEFIR)
   if (options.recent) {
     await page.evaluate(
       ([key, cards]) => {
@@ -165,11 +159,11 @@ test.describe('from the keyboard', () => {
   test('the active row is never left under the pinned bar, going down or wrapping to the top', async ({
     page,
   }) => {
-    const actor = await arrive(page)
+    await arrive(page)
     const sorts = ['альфа', 'бета', 'гамма', 'дельта', 'эпсилон', 'дзета', 'эта', 'тета', 'йота']
     const more = ['каппа', 'лямбда', 'мю', 'ню', 'кси', 'омикрон', 'пи', 'ро', 'сигма', 'тау', 'фи']
     for (const sort of [...sorts, ...more]) {
-      await propose(page, actor, { name: `Квирта ${sort}`, defaultUnit: 'piece' })
+      await propose(page, { name: `Квирта ${sort}`, defaultUnit: 'piece' })
     }
     await page.goto('/trip/add')
     await field(page).fill('квирта')
@@ -289,7 +283,9 @@ test.describe('without the server', () => {
     })
     await context.setOffline(false)
 
-    await expect(options(page).first()).toContainText(KVIRTA_KEFIR.name)
+    // Среди строк, а не первой: справочник разработки общий и копится, а проверяется здесь то,
+    // что поиск сам ушёл на сервер, когда связь вернулась, — не порядок выдачи.
+    await expect(options(page).filter({ hasText: KVIRTA_KEFIR.name })).toHaveCount(1)
     expect(searches.length).toBeGreaterThan(0)
   })
 

@@ -10,7 +10,7 @@ import type { FastifyInstance } from 'fastify'
 import { events, expenses } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 
@@ -35,7 +35,7 @@ async function pending(actor: string | null) {
   const response = await app.inject({
     method: 'GET',
     url: '/verdicts/pending',
-    headers: actor === null ? {} : { 'x-molvia-actor': actor },
+    headers: actor === null ? {} : { cookie: await signIn(db, actor) },
   })
   return { status: response.statusCode, headers: response.headers, body: response.body }
 }
@@ -53,11 +53,11 @@ async function bought(actorId: string, itemId: string, placeId: string, at: stri
   await db.insert(expenses).values({ id: randomUUID(), tripId, itemId, createdAt: new Date(at) })
 }
 
-function rate(actor: string, itemId: string, score = 4) {
+async function rate(actor: string, itemId: string, score = 4) {
   return app.inject({
     method: 'PUT',
     url: `/verdicts/${itemId}`,
-    headers: { 'x-molvia-actor': actor },
+    headers: { cookie: await signIn(db, actor) },
     payload: { score },
   })
 }
@@ -108,7 +108,7 @@ describe('GET /verdicts/pending', () => {
     await app.inject({
       method: 'DELETE',
       url: `/verdicts/${milk}`,
-      headers: { 'x-molvia-actor': actor },
+      headers: { cookie: await signIn(db, actor) },
     })
     expect((await queue(actor)).total).toBe(1)
   })

@@ -15,7 +15,7 @@ import { createTripRepository } from '@/db/trips-repository'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { buildServer } from '@/server'
 import { connect, connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const trips = createTripRepository(db)
@@ -63,7 +63,7 @@ async function call(
   const response = await app.inject({
     method,
     url: `/verdicts/${encodeURIComponent(itemId)}`,
-    headers: actor === null ? {} : { 'x-molvia-actor': actor },
+    headers: actor === null ? {} : { cookie: await signIn(db, actor) },
     ...(body === undefined ? {} : { payload: body as Record<string, unknown> }),
   })
   return {
@@ -274,7 +274,7 @@ describe('PUT — поставить оценку', () => {
     const proposed = await app.inject({
       method: 'POST',
       url: '/catalogue/items',
-      headers: { 'x-molvia-actor': actor },
+      headers: { cookie: await signIn(db, actor) },
       payload: { kind: 'product', name: 'Marianna moloko', defaultUnit: 'l' },
     })
     const { id } = JSON.parse(proposed.body) as { id: string }

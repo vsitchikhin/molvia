@@ -7,12 +7,12 @@ import type { ActorView } from '@molvia/model'
 // with its own in-memory identifier — the assertions would then read a value the code under
 // test never wrote.
 
-const createActor = vi.fn<() => Promise<ActorView>>()
-const me = vi.fn<(identifier?: string) => Promise<ActorView>>()
+const devLogin = vi.fn<() => Promise<ActorView>>()
+const me = vi.fn<() => Promise<ActorView>>()
 vi.mock('@/api', () => ({
   api: {
-    createActor: () => createActor(),
-    me: (identifier?: string) => me(identifier),
+    devLogin: () => devLogin(),
+    me: () => me(),
   },
 }))
 
@@ -32,7 +32,6 @@ function actorWith(id: string): ActorView {
 
 const FIRST = actorWith('9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f')
 const SECOND = actorWith('2c4e6a80-1111-4222-8333-444455556666')
-const THIRD = actorWith('7a5b3c10-2222-4333-8444-555566667777')
 
 function online(value: boolean): void {
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(value)
@@ -61,10 +60,10 @@ function withBrokenLocalStorage(run: () => Promise<void>): Promise<void> {
  * A fresh module graph, so the identity module's in-memory value does not leak between
  * tests — and `ApiError` from that same graph.
  *
- * The class matters: the store decides that an identity is gone with `error instanceof
+ * The class matters: the store decides that a session is gone with `error instanceof
  * ApiError`, and after `vi.resetModules()` a class imported at the top of this file is a
  * different one from the class the store compares against. A rejection built with it would
- * be read as an ordinary failure, and every test about a refused code or a dead identity
+ * be read as an ordinary failure, and every test about a refused code or a dead session
  * would prove the opposite of what it says.
  */
 async function freshStore() {
@@ -86,7 +85,7 @@ beforeEach(() => {
   setActivePinia(createPinia())
   localStorage.clear()
   sessionStorage.clear()
-  createActor.mockReset()
+  devLogin.mockReset()
   me.mockReset()
   online(true)
 })
@@ -97,15 +96,33 @@ afterEach(() => {
 })
 
 describe('the first launch', () => {
-  it('creates an identity, stores it and stops asking', async () => {
-    createActor.mockResolvedValue(FIRST)
+  it('asks who it is first, and signs in only when the answer is «nobody»', async () => {
+    // The cookie decides, and the app cannot see it — so there is nothing on the device to
+    // consult before asking. `me()` first is not an extra round trip: it is the only way to
+    // know whether this browser is already carrying a session.
     const { store } = await freshStore()
+    me.mockRejectedValue(await refusal())
+    devLogin.mockResolvedValue(FIRST)
 
     await store.start()
 
-    expect(createActor).toHaveBeenCalledWith()
-    expect(localStorage.getItem(KEY)).toBe(FIRST.id)
+    expect(me).toHaveBeenCalled()
+    expect(devLogin).toHaveBeenCalledWith()
     expect(store.state).toBe('ready')
+  })
+
+  it('keeps the owner id as the name of a drawer, not as a credential', async () => {
+    // Nothing sends it anywhere any more; it is what the trip queue, the recent items and the
+    // verdict drafts are filed under, and at the shelf with no signal they are read before the
+    // server can be asked (Р-9).
+    const { store } = await freshStore()
+    me.mockRejectedValue(await refusal())
+    devLogin.mockResolvedValue(FIRST)
+
+    await store.start()
+
+    expect(localStorage.getItem(KEY)).toBe(FIRST.id)
+    expect(store.id).toBe(FIRST.id)
   })
 
   it('says «offline» instead of hanging, and recovers when the network returns', async () => {
@@ -114,10 +131,10 @@ describe('the first launch', () => {
 
     await store.start()
     expect(store.state).toBe('offline')
-    expect(createActor).not.toHaveBeenCalled()
+    expect(me).not.toHaveBeenCalled()
 
     online(true)
-    createActor.mockResolvedValue(FIRST)
+    me.mockResolvedValue(FIRST)
     window.dispatchEvent(new Event('online'))
     await vi.waitFor(() => {
       expect(store.state).toBe('ready')
@@ -128,7 +145,6 @@ describe('the first launch', () => {
     // `navigator.onLine` is true on a captive portal and on wifi with no route out, so the
     // commonest way to have no internet lands in `error` — and the listener used to watch
     // only `offline`, the state that case never reaches.
-    localStorage.setItem(KEY, FIRST.id)
     const { store } = await freshStore()
     me.mockRejectedValue(new Error('fetch failed'))
 
@@ -152,7 +168,7 @@ describe('the first launch', () => {
     expect(store.state).toBe('offline')
 
     online(true)
-    createActor.mockResolvedValue(FIRST)
+    me.mockResolvedValue(FIRST)
     document.dispatchEvent(new Event('visibilitychange'))
     await vi.waitFor(() => {
       expect(store.state).toBe('ready')
@@ -160,7 +176,6 @@ describe('the first launch', () => {
   })
 
   it('does not start over on coming into view when it is fine', async () => {
-    localStorage.setItem(KEY, FIRST.id)
     const { store } = await freshStore()
     me.mockResolvedValue(FIRST)
     await store.start()
@@ -185,7 +200,7 @@ describe('the first launch', () => {
     })
 
     try {
-      createActor.mockResolvedValue(FIRST)
+      me.mockResolvedValue(FIRST)
       const { store } = await freshStore()
 
       await expect(store.start()).resolves.toBeUndefined()
@@ -199,14 +214,14 @@ describe('the first launch', () => {
 })
 
 describe('a device whose storage refuses writes', () => {
-  it('still carries the identity in every request for the rest of the session', async () => {
-    // The whole point: the store used to call itself ready while the client read the header
-    // straight out of `localStorage`, so every request went out anonymous — and the app it
-    // happened in believed it was fine.
-    createActor.mockResolvedValue(FIRST)
+  it('still knows which drawer is its own for the rest of the session', async () => {
+    // The identifier is held in memory as well as written down, so a phone in private mode
+    // still finds its queue and its recent items while the tab lives.
+    devLogin.mockResolvedValue(FIRST)
 
     await withBrokenLocalStorage(async () => {
       const { store, identity } = await freshStore()
+      me.mockRejectedValue(await refusal())
 
       await store.start()
 
@@ -215,25 +230,31 @@ describe('a device whose storage refuses writes', () => {
     })
   })
 
-  it('does not hand out a new identity on the next launch of the same session', async () => {
-    // Rows in `actors` are the denominator of the 0.2 gate; an iPhone in private mode used
-    // to inflate it by itself, one row per launch.
-    createActor.mockResolvedValueOnce(FIRST).mockResolvedValueOnce(SECOND)
-    me.mockResolvedValue(FIRST)
+  it('does not open a second session on the next launch, because the cookie survived', async () => {
+    // Rows in `actors` are the denominator of the 0.2 gate. What keeps them from multiplying
+    // is no longer the stored identifier — which private mode loses — but the cookie, which
+    // the browser keeps whatever it does with `localStorage`.
+    devLogin.mockResolvedValue(FIRST)
 
     await withBrokenLocalStorage(async () => {
-      await (await freshStore()).store.start()
+      const first = await freshStore()
+      // Дважды: под блокировкой сценарий переспрашивает сервер, прежде чем заводить кого-то.
+      me.mockRejectedValue(await refusal())
+      await first.store.start()
+
+      me.mockReset()
+      me.mockResolvedValue(FIRST)
       const { store } = await freshStore()
       await store.start()
 
-      expect(createActor).toHaveBeenCalledTimes(1)
+      expect(devLogin).toHaveBeenCalledTimes(1)
       expect(store.id).toBe(FIRST.id)
     })
   })
 })
 
-describe('an offline launch with an identity already stored', () => {
-  it('does not call itself ready for an identity nothing has checked', async () => {
+describe('an offline launch with an owner already known', () => {
+  it('does not call itself ready for a session nothing has checked', async () => {
     // «Ready» used to mean two things: «the server confirmed, here is the entity» and «a
     // row exists, nothing could be asked». Everything reading `actor` — the settings screen
     // of MOL-41, a trip's currency — got null where the state promised otherwise.
@@ -245,54 +266,39 @@ describe('an offline launch with an identity already stored', () => {
 
     expect(store.state).toBe('offline')
     expect(store.actor).toBeNull()
-    // Usable all the same: the identifier is there, and a precached screen can be shown as
-    // this person. What is missing is the confirmation, not the identity.
+    // Usable all the same: the drawer has a name, and a precached screen can be shown as this
+    // person. What is missing is the confirmation, not the identity.
     expect(store.id).toBe(FIRST.id)
   })
 })
 
-describe('a launch with an identity already stored', () => {
-  it('asks whether it is still alive instead of creating another', async () => {
+describe('a session the server does not know', () => {
+  it('signs in again and takes the new owner as its own', async () => {
     localStorage.setItem(KEY, FIRST.id)
-    me.mockResolvedValue(FIRST)
-    const { store } = await freshStore()
+    const { store, identity } = await freshStore()
+    me.mockRejectedValue(await refusal())
+    devLogin.mockResolvedValue(SECOND)
 
     await store.start()
 
-    expect(me).toHaveBeenCalled()
-    expect(createActor).not.toHaveBeenCalled()
     expect(store.state).toBe('ready')
-  })
-
-  it('sets the old identifier aside rather than deleting it, and says what happened', async () => {
-    localStorage.setItem(KEY, FIRST.id)
-    const { store, identity } = await freshStore()
-    me.mockRejectedValue(await refusal())
-    createActor.mockResolvedValue(SECOND)
-
-    await store.start()
-
     expect(localStorage.getItem(KEY)).toBe(SECOND.id)
-    expect(identity.lostIdentities()).toContain(FIRST.id)
-    expect(store.state).toBe('lost')
+    expect(identity.currentIdentity()).toBe(SECOND.id)
   })
 
-  it('keeps the old identifier even when the replacement fails', async () => {
-    // A 401 is not proof that the row is gone: a database restored from the wrong backup, an
-    // API pointed at the wrong place, a proxy in front of it. Deleting first left a valid
-    // identifier nowhere at all — and the data behind it unreachable for good.
-    localStorage.setItem(KEY, FIRST.id)
-    const { store, identity } = await freshStore()
+  it('says «error» when it cannot sign in either', async () => {
+    const { store } = await freshStore()
     me.mockRejectedValue(await refusal())
-    createActor.mockRejectedValue(new Error('fetch failed'))
+    devLogin.mockRejectedValue(new Error('fetch failed'))
 
     await store.start()
 
     expect(store.state).toBe('error')
-    expect(identity.lostIdentities()).toContain(FIRST.id)
   })
 
-  it('does not throw the identity away when the network is at fault', async () => {
+  it('does not sign in again when the network is at fault', async () => {
+    // A failure that is not «no such session» must not start a second account: the cookie may
+    // be perfectly alive behind a captive portal.
     localStorage.setItem(KEY, FIRST.id)
     me.mockRejectedValue(new Error('fetch failed'))
     const { store } = await freshStore()
@@ -301,51 +307,77 @@ describe('a launch with an identity already stored', () => {
 
     expect(store.state).toBe('error')
     expect(localStorage.getItem(KEY)).toBe(FIRST.id)
-    expect(createActor).not.toHaveBeenCalled()
+    expect(devLogin).not.toHaveBeenCalled()
+  })
+})
+
+describe('когда владелец оказался другим', () => {
+  it('говорит об этом, а не меняет человека молча', async () => {
+    // Ящики прежнего владельца — очередь похода, недавние товары, черновики оценок — остаются
+    // на устройстве и становятся недостижимы (MOL-53, Б1). Переносить их нельзя: они принадлежат
+    // тому аккаунту. Экран, который скажет это человеку, — MOL-56; до тех пор хотя бы строчка.
+    localStorage.setItem(KEY, FIRST.id)
+    const said = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { store } = await freshStore()
+    me.mockRejectedValue(await refusal())
+    devLogin.mockResolvedValue(SECOND)
+
+    await store.start()
+
+    expect(store.id).toBe(SECOND.id)
+    expect(said).toHaveBeenCalledWith(expect.stringContaining('владелец сменился'), FIRST.id)
+  })
+
+  it('и молчит, когда владелец тот же', async () => {
+    localStorage.setItem(KEY, FIRST.id)
+    const said = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { store } = await freshStore()
+    me.mockResolvedValue(FIRST)
+
+    await store.start()
+
+    expect(store.state).toBe('ready')
+    expect(said).not.toHaveBeenCalled()
+  })
+})
+
+describe('в прод-сборке входить нечем', () => {
+  it('не тратит второй запрос на то, чего в этой сборке не бывает', async () => {
+    // Второй вопрос существует, чтобы поймать сессию, открытую соседней вкладкой; открыть её в
+    // прод-сборке нечем до MOL-54, так что и замок, и запрос уходили впустую — а `recover()`
+    // повторял это на каждый возврат во вкладку (MOL-53, Б3).
+    vi.stubEnv('DEV', false)
+    const { store } = await freshStore()
+    me.mockRejectedValue(await refusal())
+
+    await store.start()
+
+    expect(store.state).toBe('error')
+    expect(me).toHaveBeenCalledTimes(1)
+    expect(devLogin).not.toHaveBeenCalled()
+    vi.unstubAllEnvs()
   })
 })
 
 describe('two tabs opened at once', () => {
-  it('adopts what the other tab published instead of creating a second identity', async () => {
-    localStorage.setItem('molvia.actor.claiming', String(Date.now()))
-    me.mockResolvedValue(FIRST)
+  it('asks again under the lock instead of opening a second session', async () => {
+    // The old machinery published an identifier through storage and the other tab adopted it.
+    // A cookie needs none of that: it belongs to the origin, so the tab that waited simply
+    // asks the server again and is recognised.
     const { store } = await freshStore()
+    me.mockRejectedValueOnce(await refusal()).mockResolvedValue(FIRST)
 
-    const started = store.start()
-    // The other tab finished and published; happy-dom does not deliver storage events
-    // between «tabs», so this is the event that tab would have sent.
-    localStorage.setItem(KEY, FIRST.id)
-    window.dispatchEvent(new StorageEvent('storage', { key: KEY, newValue: FIRST.id }))
-    await started
+    await store.start()
 
-    expect(createActor).not.toHaveBeenCalled()
+    expect(devLogin).not.toHaveBeenCalled()
     expect(store.id).toBe(FIRST.id)
     expect(store.state).toBe('ready')
   })
 
-  it('ignores a published value that could not be an identifier', async () => {
-    // Whatever arrives in a storage event used to become this device's identity: the store
-    // then held one id in memory, another in `actor`, and nothing in storage.
-    localStorage.setItem('molvia.actor.claiming', String(Date.now()))
-    createActor.mockResolvedValue(SECOND)
-    const { store } = await freshStore()
-
-    const started = store.start()
-    window.dispatchEvent(new StorageEvent('storage', { key: KEY, newValue: 'not-a-uuid' }))
-    localStorage.setItem(KEY, FIRST.id)
-    window.dispatchEvent(new StorageEvent('storage', { key: KEY, newValue: FIRST.id }))
-    me.mockResolvedValue(FIRST)
-    await started
-
-    expect(store.id).toBe(FIRST.id)
-    expect(store.id).toBe(store.actor?.id)
-  })
-
   it('refuses to start twice in the same tab while the first attempt is running', async () => {
     // `retry` is the store's public name for `start`, and a retry button is wired to it.
-    // Without a guard the second call queued behind a claim this tab set itself.
     let release: (actor: ActorView) => void = () => undefined
-    createActor.mockReturnValue(
+    me.mockReturnValue(
       new Promise<ActorView>((resolve) => {
         release = resolve
       }),
@@ -357,135 +389,7 @@ describe('two tabs opened at once', () => {
     release(FIRST)
     await Promise.all([first, second])
 
-    expect(createActor).toHaveBeenCalledTimes(1)
+    expect(me).toHaveBeenCalledTimes(1)
     expect(store.state).toBe('ready')
-  })
-})
-
-describe('two tabs that both meet a dead identity', () => {
-  it('does not let the slower one delete what the faster one just created', async () => {
-    // Both tabs were reloaded after `make db-reset` and both hold X. A deletes X, creates Y
-    // and stores it. B's 401 arrives later: it used to clear the key that already held Y,
-    // then create Z — one person, three identifiers, the middle one unreachable.
-    localStorage.setItem(KEY, FIRST.id)
-    const { store, identity } = await freshStore()
-    me.mockRejectedValue(await refusal())
-    createActor.mockImplementation(() => {
-      // The other tab finished while this one was between the 401 and its own claim.
-      localStorage.setItem(KEY, SECOND.id)
-      return Promise.resolve(SECOND)
-    })
-
-    await store.start()
-
-    expect(localStorage.getItem(KEY)).toBe(SECOND.id)
-    expect(identity.lostIdentities()).toContain(FIRST.id)
-  })
-})
-
-describe('a set-aside identity', () => {
-  it('can be brought back, and the one it replaces is set aside in its turn', async () => {
-    // The old identifier was kept so a server-side mistake stays recoverable — and nothing
-    // read it. The person was told their data was out of reach while it sat on the device.
-    localStorage.setItem(KEY, FIRST.id)
-    const { store, identity } = await freshStore()
-    me.mockRejectedValueOnce(await refusal())
-    createActor.mockResolvedValue(SECOND)
-
-    await store.start()
-    expect(store.state).toBe('lost')
-    expect(store.lost).toContain(FIRST.id)
-
-    me.mockResolvedValue(FIRST)
-    await store.restore()
-
-    expect(me).toHaveBeenLastCalledWith(FIRST.id)
-    expect(store.id).toBe(FIRST.id)
-    expect(store.state).toBe('ready')
-    expect(identity.currentIdentity()).toBe(FIRST.id)
-    // Nothing is thrown away by a restore either: the identity it displaced is recoverable
-    // in its turn, and anything written under it is still reachable.
-    expect(store.lost).toContain(SECOND.id)
-  })
-
-  it('changes nothing when the server does not know the old identifier either', async () => {
-    // The likeliest press of this button is right after the server refused — so the case
-    // where it refuses again cannot be the one that costs a person the identity they have.
-    localStorage.setItem(KEY, FIRST.id)
-    const { store, identity } = await freshStore()
-    me.mockRejectedValueOnce(await refusal())
-    createActor.mockResolvedValue(SECOND)
-
-    await store.start()
-
-    me.mockRejectedValue(await refusal())
-    await store.restore()
-
-    expect(store.restoreFailed).toBe(true)
-    expect(store.state).toBe('lost')
-    expect(identity.currentIdentity()).toBe(SECOND.id)
-    // Still offered: the key was not spent on a failed attempt.
-    expect(store.lost).toContain(FIRST.id)
-  })
-
-  it('is not spent by a press that lands while another attempt is running', async () => {
-    // `start()` bails out on `running`, and the earlier restore wrote storage before
-    // calling it — so a press in that window consumed the only copy for nothing: the
-    // button vanished and the data could never be brought back (Р-1).
-    localStorage.setItem(KEY, FIRST.id)
-    const { store, identity } = await freshStore()
-    me.mockRejectedValueOnce(await refusal())
-    createActor.mockResolvedValue(SECOND)
-
-    await store.start()
-
-    let release: (actor: ActorView) => void = () => undefined
-    me.mockReturnValue(
-      new Promise<ActorView>((resolve) => {
-        release = resolve
-      }),
-    )
-    void store.retry()
-    await Promise.resolve()
-
-    await store.restore()
-
-    expect(store.lost).toContain(FIRST.id)
-    // And nothing was signed with the refused key in the meantime.
-    expect(identity.currentIdentity()).toBe(SECOND.id)
-    release(SECOND)
-  })
-
-  it('keeps every identifier it has had to set aside, not only the last one', async () => {
-    // Two resets in a week — `make db-reset`, or a database restored from backup twice —
-    // used to leave only the second identity recoverable, and the first, with the real
-    // trips behind it, gone for good (Р-2).
-    localStorage.setItem(KEY, FIRST.id)
-    const { store } = await freshStore()
-    me.mockRejectedValueOnce(await refusal())
-    createActor.mockResolvedValueOnce(SECOND)
-
-    await store.start()
-
-    me.mockRejectedValue(await refusal())
-    createActor.mockResolvedValueOnce(THIRD)
-    await store.retry()
-
-    expect(store.lost).toContain(FIRST.id)
-    expect(store.lost).toContain(SECOND.id)
-  })
-})
-
-describe('the identity module', () => {
-  it('keeps a set-aside identifier readable, so a server-side mistake stays recoverable', async () => {
-    localStorage.setItem(KEY, FIRST.id)
-    const { store, identity } = await freshStore()
-    me.mockRejectedValue(await refusal())
-    createActor.mockResolvedValue(SECOND)
-
-    await store.start()
-
-    expect(identity.lostIdentities()).toContain(FIRST.id)
-    expect(identity.currentIdentity()).not.toBe(FIRST.id)
   })
 })

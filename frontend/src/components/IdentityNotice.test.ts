@@ -7,13 +7,9 @@ import IdentityNotice from '@/components/IdentityNotice.vue'
 import { useActorStore } from '@/stores/actor'
 import type { IdentityState } from '@/stores/actor'
 
-const LOST_ID = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
-
-function render(state: IdentityState, options: { lost?: string[]; failed?: boolean } = {}) {
+function render(state: IdentityState) {
   const store = useActorStore()
   store.state = state
-  store.lost = options.lost ?? []
-  store.restoreFailed = options.failed ?? false
 
   // Через фабрику приложения, а не руками: собранный вручную i18n молча расходится с продом
   // (без `pluralRules` счётчик считает по-английски, без `fallbackLocale` пропущенный ключ
@@ -31,23 +27,6 @@ describe('IdentityNotice', () => {
   it('says nothing while the identity is fine', () => {
     expect(render('ready').view.text()).toBe('')
     expect(render('loading').view.text()).toBe('')
-  })
-
-  it('tells the person their data is out of reach instead of showing an empty app', () => {
-    // The owner chose this over silence when the plan was reviewed: an app that quietly
-    // reappears empty looks broken, and the trips behind the old identifier are gone.
-    const { view } = render('lost')
-
-    expect(view.text()).toContain(en.identity.lost.title)
-    expect(view.text()).toContain(en.identity.lost.body)
-  })
-
-  it('lets that message be dismissed: a new identity already works', async () => {
-    const { view } = render('lost')
-
-    await view.get('button').trigger('click')
-
-    expect(view.text()).toBe('')
   })
 
   it('does not stay silent when the identity could not be loaded at all', () => {
@@ -70,36 +49,11 @@ describe('IdentityNotice', () => {
     expect(render('offline').view.find('button').exists()).toBe(false)
   })
 
-  it('offers to bring the old data back when there is something to bring back', async () => {
-    // Keeping the identifier «so a server-side mistake stays recoverable» means nothing
-    // until a person can act on it — and until then the message is simply untrue.
-    const { view, store } = render('lost', { lost: [LOST_ID] })
-    const restore = vi.spyOn(store, 'restore').mockResolvedValue(undefined)
-
-    await view.get('button').trigger('click')
-
-    expect(view.text()).toContain(en.identity.restore)
-    expect(restore).toHaveBeenCalled()
-  })
-
-  it('does not offer it when nothing was set aside', () => {
-    expect(render('lost').view.text()).not.toContain(en.identity.restore)
-  })
-
-  it('says so when the restore was refused, instead of leaving the press unanswered', () => {
-    // The button is likeliest to be pressed right after the server refused, so «it did not
-    // work, and nothing changed» is the outcome a person most needs spelled out.
-    const { view } = render('lost', { lost: [LOST_ID], failed: true })
-
-    expect(view.text()).toContain(en.identity.restore_failed)
-    expect(view.text()).toContain(en.identity.restore)
-  })
-
   // Until MOL-19 a lost identity interrupted. But the notice is drawn again over every screen,
   // and an interruption on every move cut off the heading the move had just focused. The owner
   // made every notice polite (MOL-19, Р-9).
   it('never interrupts: it is drawn again on every screen the person moves to', () => {
-    for (const state of ['lost', 'error', 'offline'] as const) {
+    for (const state of ['error', 'offline'] as const) {
       expect(render(state).view.find('[role="alert"]').exists()).toBe(false)
     }
   })
@@ -111,7 +65,6 @@ describe('IdentityNotice', () => {
   it.each([
     ['error', 'bad', 'status'],
     ['offline', 'warn', 'status'],
-    ['lost', 'warn', 'status'],
   ] as const)('draws %s in %s and announces it as %s', (state, tone, role) => {
     const { view } = render(state)
     expect(view.get('.state').classes()).toContain(tone)
@@ -129,9 +82,17 @@ describe('IdentityNotice', () => {
   it('takes every word from i18n, not from the markup', () => {
     // Not a single string lives in a template: the plan is other languages without a
     // rebrand, and hardcoded text is the cheapest mistake today, the dearest one later.
-    const { view } = render('lost')
+    const { view } = render('error')
 
     expect(view.text()).not.toContain('identity.')
-    expect(view.html()).not.toContain('Данные')
+    expect(view.html()).not.toContain('Не удалось')
+  })
+
+  // MOL-53 сняло состояние `lost` вместе с миром, который оно описывало: ключ держало
+  // устройство, поэтому его потеря была потерей данных. Сессия — не данные, и «войдите заново»
+  // рисует MOL-56 вместе с экраном, который умеет это сделать.
+  it('has no notice left for a session that ended: that screen is MOL-56’s', () => {
+    expect(en.identity).not.toHaveProperty('lost')
+    expect(en.identity).not.toHaveProperty('restore')
   })
 })

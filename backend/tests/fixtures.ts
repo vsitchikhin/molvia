@@ -1,5 +1,6 @@
-import { createHash, randomInt, randomUUID } from 'node:crypto'
-import { AGGREGATE_MIN_CONTRIBUTIONS } from '@molvia/model'
+import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto'
+import { AGGREGATE_MIN_CONTRIBUTIONS, SESSION_COOKIE } from '@molvia/model'
+import { createSessionRepository } from '@/db/sessions-repository'
 import type { Db } from '@/db/index'
 import type { PriceQuery } from '@/db/expenses-repository'
 import {
@@ -112,6 +113,36 @@ export async function insertSession(
     ...patch,
   })
   return id
+}
+
+/**
+ * A session for an actor a test already built, as the header a request carries it in (MOL-53).
+ *
+ * **Integration tests do not go through the development seam** (Р-7). They build their owners
+ * with `insertActor`, so the seam would have to widen to «hand a session to whoever I name» —
+ * and that is precisely the door the epic closes. A row written here instead keeps the seam
+ * narrow: only a new person, only outside production.
+ *
+ * The token is minted the way the API mints one, and the repository hashes it itself — no
+ * caller here ever holds a method that could put a raw token in the column (MOL-52, Р-6).
+ */
+export async function signIn(
+  db: Db,
+  actorId: string,
+  expiresAt = anHourFromNow(),
+): Promise<string> {
+  const token = randomBytes(32).toString('base64url')
+  await createSessionRepository(db).create(randomUUID(), actorId, token, null, expiresAt)
+  return `${SESSION_COOKIE}=${token}`
+}
+
+/**
+ * A session cookie nobody holds: the same 32 bytes in the same alphabet, and no row behind
+ * them. What a stranger's request looks like — and what an expired or revoked one is
+ * indistinguishable from (MOL-53, Р-3).
+ */
+export function aStrangersCookie(): string {
+  return `${SESSION_COOKIE}=${randomBytes(32).toString('base64url')}`
 }
 
 export async function insertLoginRequest(

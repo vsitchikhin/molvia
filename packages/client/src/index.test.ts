@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ACTOR_HEADER, ERROR, ISSUE } from '@molvia/model'
+import { ERROR, ISSUE } from '@molvia/model'
 import { ApiError, createClient } from '#client/index'
 
 function clientAnswering(status: number, body: unknown) {
@@ -22,13 +22,19 @@ function clientServing(body: BodyInit | null, init: ResponseInit = {}) {
 }
 
 /** Keeps what the client actually sent, which is the half a mocked reply cannot show. */
-function clientRecording(options: { actorId?: () => string | null } = {}) {
-  const calls: { url: string; method: string; headers: Headers }[] = []
+function clientRecording(options: { credentials?: 'omit' | 'same-origin' | 'include' } = {}) {
+  const calls: {
+    url: string
+    method: string
+    headers: Headers
+    credentials: string | undefined
+  }[] = []
   const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     calls.push({
       url: input instanceof URL ? input.href : typeof input === 'string' ? input : input.url,
       method: init?.method ?? 'GET',
       headers: new Headers(init?.headers),
+      credentials: init?.credentials,
     })
     return Promise.resolve(
       new Response(JSON.stringify(actorWire), {
@@ -146,7 +152,7 @@ describe('everything the client throws is an ApiError', () => {
         }),
     })
 
-    const actor = await client.createActor()
+    const actor = await client.devLogin()
 
     expect(aborted).toBe(false)
     expect(actor.id).toBe(actorWire.id)
@@ -211,59 +217,37 @@ describe('a 401 only means «this identity is gone» when the API says so', () =
   })
 })
 
-describe('the identity the client speaks for', () => {
-  it('is read at call time, not captured when the client is built', async () => {
-    // The PWA builds the client before it has an identity; a value captured here would be
-    // null for the rest of the session.
-    let id: string | null = null
-    const { client, calls } = clientRecording({ actorId: () => id })
-
-    id = actorWire.id
-    await client.me()
-
-    expect(calls[0]?.headers.get(ACTOR_HEADER)).toBe(actorWire.id)
-  })
-
-  it('is left off entirely when there is none, rather than sent as «null»', async () => {
-    const { client, calls } = clientRecording({ actorId: () => null })
-
-    await client.me()
-
-    expect(calls[0]?.headers.has(ACTOR_HEADER)).toBe(false)
-  })
-
-  it('is never stored here: without a getter there is no header at all', async () => {
+describe('what the client knows about identity', () => {
+  it('is nothing at all: there is no way to name an owner', async () => {
+    // MOL-53 took the header away with the thing it carried — the owner's own uuid, which was
+    // a name and a password in one value. What proves a request now is a cookie the browser
+    // attaches and this code cannot read, so there is no option, no getter and no argument
+    // here that could speak as anybody.
     const { client, calls } = clientRecording()
 
     await client.me()
 
-    expect(calls[0]?.headers.has(ACTOR_HEADER)).toBe(false)
+    expect([...(calls[0]?.headers.keys() ?? [])]).not.toContain('x-molvia-actor')
+    expect(client).not.toHaveProperty('as')
   })
 
-  it('can be asked about one identifier without adopting it', async () => {
-    // "Is this old key still alive?" has to be answerable without touching what the client
-    // currently speaks for — otherwise checking and committing are the same act, and a
-    // check that fails has already thrown away the identity in use (Р-1).
-    const { client, calls } = clientRecording({
-      actorId: () => 'b1b1b1b1-1111-4111-8111-111111111111',
-    })
+  it('lets the browser attach its cookies, and says so out loud', async () => {
+    // `same-origin` is every browser's default, and it is passed explicitly because since
+    // MOL-53 it is the whole of how a request proves who it is: a silent `omit` would log
+    // everybody out and nothing here would have noticed.
+    const { client, calls } = clientRecording()
 
-    await client.me(actorWire.id)
+    await client.me()
 
-    expect(calls[0]?.headers.get(ACTOR_HEADER)).toBe(actorWire.id)
+    expect(calls[0]?.credentials).toBe('same-origin')
   })
 
-  it('is refused rather than crashing the call when it cannot become a header', async () => {
-    // `localStorage` is a string bucket anyone can write to. A value with a line break used
-    // to take the whole call down as a TypeError from `Headers.set`, which the store reads
-    // as «the server did not answer» — a value that cannot be sent names no subject.
-    const client = createClient({
-      baseUrl: 'http://api',
-      fetch: () => Promise.resolve(new Response(JSON.stringify(actorWire), { status: 200 })),
-      actorId: () => 'abc\r\nX-Molvia-Actor: 9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f',
-    })
+  it('can be told otherwise, which is what a client outside a browser is', async () => {
+    const { client, calls } = clientRecording({ credentials: 'omit' })
 
-    expect(await codeOf(client.me())).toBe(ERROR.NO_ACTOR)
+    await client.me()
+
+    expect(calls[0]?.credentials).toBe('omit')
   })
 })
 
@@ -271,19 +255,19 @@ describe('the first visit', () => {
   it('posts to the development seam, with no body at all', async () => {
     const { client, calls } = clientRecording()
 
-    await client.createActor()
+    await client.devLogin()
 
     expect(calls[0]?.method).toBe('POST')
     // Not `/actors`: the invite door and the handle behind it went together (MOL-52), and
     // what is left exists only outside production. Against a production server this is a 404,
     // and that is the point — the real door is the Telegram login of MOL-54.
-    expect(calls[0]?.url).toBe('http://api/dev/actors')
+    expect(calls[0]?.url).toBe('http://api/dev/login')
   })
 
   it('hands back the domain entity, with dates rather than the strings on the wire', async () => {
     const { client } = clientRecording()
 
-    const actor = await client.createActor()
+    const actor = await client.devLogin()
 
     expect(actor.createdAt).toBeInstanceOf(Date)
     expect(actor.createdAt.toISOString()).toBe(actorWire.createdAt)
@@ -322,7 +306,7 @@ describe('the catalogue', () => {
         }),
       )
     }
-    const client = createClient({ baseUrl: 'http://api', fetch, actorId: () => actorWire.id })
+    const client = createClient({ baseUrl: 'http://api', fetch })
     return { client, calls }
   }
 
@@ -486,7 +470,6 @@ describe('the catalogue', () => {
     expect(calls[0]?.method).toBe('POST')
     expect(new URL(calls[0]?.url ?? '').pathname).toBe('/catalogue/items')
     expect(calls[0]?.headers.get('content-type')).toBe('application/json')
-    expect(calls[0]?.headers.get(ACTOR_HEADER)).toBe(actorWire.id)
     expect(calls[0]?.body).toEqual({
       kind: 'product',
       name: 'Молоко «Ашхар»',
@@ -551,7 +534,7 @@ describe('the verdict', () => {
             }),
       )
     }
-    const client = createClient({ baseUrl: 'http://api', fetch, actorId: () => actorWire.id })
+    const client = createClient({ baseUrl: 'http://api', fetch })
     return { client, calls }
   }
 
@@ -565,7 +548,6 @@ describe('the verdict', () => {
 
     expect(calls[0]?.method).toBe('PUT')
     expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/verdicts/${MILK}`)
-    expect(calls[0]?.headers.get(ACTOR_HEADER)).toBe(actorWire.id)
     expect(calls[0]?.body).toEqual({ score: 2, review: 'Пахнет крахмалом.\nМясом — нет' })
     expect(verdict.ratedAt).toEqual(new Date(cardWire.ratedAt))
     expect(created).toBe(true)
@@ -715,7 +697,7 @@ describe('the trip', () => {
             }),
       )
     }
-    const client = createClient({ baseUrl: 'http://api', fetch, actorId: () => actorWire.id })
+    const client = createClient({ baseUrl: 'http://api', fetch })
     return { client, calls }
   }
 
