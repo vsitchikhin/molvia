@@ -129,9 +129,7 @@ test('offline, nothing offers a second «Try again», and the screen comes back 
 
   // One «No connection», the screen's: the identity notice names its own trouble (B3).
   await expect(page.getByRole('heading', { name: 'No connection' })).toHaveCount(1)
-  await expect(
-    page.getByRole('heading', { name: "This device isn't identified yet" }),
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Not signed in yet' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0)
 
   await page.evaluate(() => {
@@ -180,15 +178,13 @@ test('the same answer after «Try again» is said again', async ({ page }) => {
   const said = await recordLiveRegion(page)
   await page.route('**/api/dev/login**', (route) => route.fulfill({ status: 500, body: '{}' }))
   await page.goto('/')
-  await expect(
-    page.getByRole('heading', { name: 'This device could not be identified' }),
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Could not sign in' })).toBeVisible()
   await expect
-    .poll(async () => (await said()).filter((text) => text.includes('could not be identified')))
+    .poll(async () => (await said()).filter((text) => text.includes('Could not sign in')))
     .toHaveLength(1)
 
   await page.getByRole('button', { name: 'Try again' }).click()
   await expect
-    .poll(async () => (await said()).filter((text) => text.includes('could not be identified')))
+    .poll(async () => (await said()).filter((text) => text.includes('Could not sign in')))
     .toHaveLength(2)
 })

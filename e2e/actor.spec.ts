@@ -2,34 +2,64 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 /**
- * The identity through a real browser: storage that survives a reload, and a header on the
- * requests that follow. Neither can be proved with a mocked fetch — the component test
- * pretends the storage, and this one has the browser's own.
+ * How a request proves who it is, through a real browser (MOL-53). None of this can be shown
+ * with a mocked fetch: `HttpOnly` is the browser's own rule, a cookie surviving a reload is the
+ * browser's own jar, and «no identifier travels any more» is a fact about the wire.
  */
 const KEY = 'molvia.actor'
+const COOKIE = 'molvia_session'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
-async function storedIdentity(page: Page): Promise<string | null> {
+async function knownOwner(page: Page): Promise<string | null> {
   return page.evaluate((key) => localStorage.getItem(key), KEY)
 }
 
-test('keeps the identity across a reload and carries it in the header', async ({ page }) => {
-  const sent: string[] = []
+async function sessionCookie(page: Page) {
+  const cookies = await page.context().cookies()
+  return cookies.find((cookie) => cookie.name === COOKIE)
+}
+
+test('keeps the session across a reload, and no script can read it', async ({ page }) => {
+  const identifiers: string[] = []
   page.on('request', (request) => {
+    // The header is gone with the thing it carried. Watched rather than assumed: the client
+    // could grow it back and every unit test would still pass.
     const header = request.headers()['x-molvia-actor']
-    if (header) sent.push(header)
+    if (header) identifiers.push(header)
   })
 
   await page.goto('/')
 
-  // The first visit happens after the first paint, so the identity appears a moment later.
-  await expect.poll(() => storedIdentity(page)).toMatch(UUID)
-  const id = await storedIdentity(page)
+  // Signing in happens after the first paint, so the cookie appears a moment later.
+  await expect.poll(async () => (await sessionCookie(page))?.value).toMatch(/^[A-Za-z0-9_-]{43}$/)
+  const session = await sessionCookie(page)
+
+  expect(session?.httpOnly).toBe(true)
+  expect(session?.path).toBe('/')
+  expect(session?.sameSite).toBe('Lax')
+  // Persistent, not a session cookie: closing the browser must not be a way out. Playwright
+  // reports a session cookie as `expires === -1`.
+  expect(session?.expires).toBeGreaterThan(Date.now() / 1000)
+
+  // The whole point of `HttpOnly`: an XSS cannot carry the account away.
+  expect(await page.evaluate(() => document.cookie)).not.toContain(COOKIE)
 
   await page.reload()
 
-  expect(await storedIdentity(page)).toBe(id)
-  // The reload asked the API who it is, and did so as the same person: without this the
-  // identity would be stored and never used, which no unit test would notice.
-  await expect.poll(() => sent).toContain(id)
+  expect((await sessionCookie(page))?.value).toBe(session?.value)
+  await expect(page.getByRole('heading', { name: 'Could not sign in' })).toBeHidden()
+  expect(identifiers).toEqual([])
+})
+
+test('remembers whose drawer this is, so an offline launch finds its own', async ({ page }) => {
+  // The owner id stays on the device — not as a credential, as the key the trip queue and the
+  // recent items are filed under, read before the server can be asked (MOL-53, Р-9).
+  await page.goto('/')
+
+  await expect.poll(() => knownOwner(page)).toMatch(UUID)
+  const owner = await knownOwner(page)
+
+  await page.reload()
+
+  expect(await knownOwner(page)).toBe(owner)
 })

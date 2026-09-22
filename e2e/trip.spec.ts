@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
 import { expect, test } from '@playwright/test'
+import { asBrowser, signedIn } from './session'
 import type { Page } from '@playwright/test'
 
 /**
@@ -11,8 +12,6 @@ import type { Page } from '@playwright/test'
  *
  * Each test arrives as a new device with its own identity, so what it counts is its own.
  */
-
-const KEY = 'molvia.actor'
 
 /** A word no catalogue holds, so the search finds this test's item and nothing else. */
 function nonsense(): string {
@@ -34,14 +33,13 @@ interface Setting {
 }
 
 /**
- * A device with an identity and one item of its own in the catalogue — but no trip yet. The
- * identity arrives by itself on the first visit (the invite door of MOL-8 is gone, MOL-52).
+ * A device signed in and one item of its own in the catalogue — but no trip yet. The session
+ * arrives by itself on the first visit, through the seam (MOL-52, MOL-53), and `page.request`
+ * shares the browser context's cookie jar, so these calls are that person's own.
  */
 async function device(page: Page): Promise<Setting> {
-  await page.goto('/')
-  const stored = () => page.evaluate((key) => localStorage.getItem(key) ?? '', KEY)
-  await expect.poll(stored).toMatch(/^[0-9a-f-]{36}$/)
-  const headers = { 'x-molvia-actor': await stored() }
+  await signedIn(page)
+  const headers = await asBrowser(page)
 
   const word = nonsense()
   const proposed = await page.request.post('/api/catalogue/items', {
