@@ -1,7 +1,9 @@
 <template>
   <section class="group" :class="GROUPS[level].tone">
     <h2 class="head">
-      <VerdictBadge :level="level" compact large />
+      <!-- The circle repeats what the word beside it says: named again, a screen reader would
+           read every group heading twice. -->
+      <span aria-hidden="true" class="mark"><VerdictBadge :level="level" compact large /></span>
       <span class="caption">{{ t(GROUPS[level].title) }}</span>
     </h2>
     <slot />
@@ -59,6 +61,10 @@ export default defineComponent({
 .never {
   padding-top: var(--space-3);
   border-top: var(--hairline) solid var(--border);
+}
+
+.mark {
+  display: inline-flex;
 }
 
 .head {

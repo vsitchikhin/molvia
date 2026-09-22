@@ -958,9 +958,22 @@ repeat). «Не сейчас» puts a card behind the others until the item is b
 answer is remembered for offline. MOL-31 the API of «Что брать» — the three groups, where it is
 cheaper, the threshold of «только если дёшево» — **and with it the paid layer, pulled into 0.1
 by the owner on 20.09.2026**: free is one's own data, `actors.shared_until` opens other
-people's, and the 0.3 gate moved from the search's event to this screen's. «Поход» and the
-screen of «Что брать» itself are still placeholders. Release 0.1 is broken into epics and tasks
-in Jira.
+people's, and the 0.3 gate moved from the search's event to this screen's. MOL-22 built the
+trip screen; MOL-32 «Что брать» itself, and with it the last placeholder is gone. **The verdict
+decides how much matter a row gets** — a card, a row, a line of text — so the product's rule is
+the layout and not a caption: in the last group there is nothing to be cheap with. The screen
+computes nothing about the data except one word: one place is «Брали здесь», two and more
+«Дешевле всего» (MOL-34), because how many there are is visible to it alone. **The last answer
+lives on the phone**, under its owner and parsed back by the same schema, so offline is a strip
+naming the age of the list to the minute rather than an empty screen; without a memory it is the
+yellow state, and neither offers a button, because the screen comes back with the connection.
+`scope` is said in words — the subtitle, and a footnote saying the reviews and prices are still
+one's own. **A verdict is amended where it is met** (MOL-28 left this here): a tap on any row
+opens a sheet with the 1–5 scale, the review and «Снять оценку», and until it existed a
+mis-tapped «1» stood until the item was bought again. **In the shared mode the sheet offers no
+score pre-chosen** — the figure on the row is an average over several people, and a save would
+have written it down as this person's opinion. Withdrawing asks nothing and says instead what it
+does; rating again brings the same row back. Release 0.1 is broken into epics and tasks in Jira.
 MOL-52 put the schema under accounts: the Telegram identity on the owner, `sessions` and
 `login_requests`, and the repositories over them — the routes are MOL-53 and MOL-54. Its
 migration **emptied the owners and everything hanging off them**, because a Telegram identity

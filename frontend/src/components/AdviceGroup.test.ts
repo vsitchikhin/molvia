@@ -18,11 +18,12 @@ describe('AdviceGroup', () => {
     expect(render('never').get('h2').text()).toBe('Не брать нигде')
   })
 
-  it('carries the badge as a circle, named for a screen reader', () => {
-    // The word beside it is for the eye; the circle is an image and says the whole phrase.
-    expect(render('if_cheap').get('[role="img"]').attributes('aria-label')).toBe(
-      'Только если дёшево',
-    )
+  it('the circle is not named twice: the word is right beside it', () => {
+    // Left as an image with a label of its own, every group heading was read out twice.
+    const view = render('if_cheap')
+
+    expect(view.get('h2').text()).toBe('Только если дёшево')
+    expect(view.get('.mark').attributes('aria-hidden')).toBe('true')
   })
 
   it('draws whatever rows the screen puts inside — the three groups are not the same shape', () => {
