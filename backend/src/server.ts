@@ -24,6 +24,9 @@ import { pendingVerdicts } from '@/usecases/pending-verdicts'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { signIn } from '@/usecases/sign-in'
 import { chooseTripRate } from '@/usecases/choose-trip-rate'
+import { createSettingsRepository } from '@/db/settings-repository'
+import { saveSettings } from '@/usecases/save-settings'
+import { settingsRoute } from '@/routes/settings'
 import { startTrip } from '@/usecases/start-trip'
 import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
 import { createActorRepository } from '@/db/actors-repository'
@@ -151,6 +154,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     void instance.register((guarded, _guardedOptions, guardedDone) => {
       withActor(guarded, (token) => authenticate(sessions, token))
       actorMeRoute(guarded)
+      settingsRoute(guarded, (owner, input) =>
+        saveSettings(createSettingsRepository(db), owner, input),
+      )
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items }, actorId, query),
         propose: (actorId, input) => proposeItem(items, actorId, input),

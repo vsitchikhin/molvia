@@ -4,6 +4,7 @@ import {
   ERROR,
   ISSUE,
   actorCodec,
+  settingsUpdateSchema,
   adviceResponseSchema,
   addExpenseBodySchema,
   catalogueEntryCodec,
@@ -26,6 +27,7 @@ import {
 } from '@molvia/model'
 import type {
   ActorView,
+  SettingsUpdate,
   AdviceResponse,
   AddExpenseBody,
   CatalogueEntry,
@@ -122,6 +124,7 @@ export interface MolviaClient {
   devLogin(): Promise<ActorView>
   /** Who this browser is, according to the session it is carrying — or `error.no_actor`. */
   me(): Promise<ActorView>
+  saveSettings(input: SettingsUpdate): Promise<ActorView>
   /**
    * The catalogue lookup behind «что взяли?», ranked by the server — the query goes as typed.
    * The screen searches while the person types, so a search the next keystroke made stale is
@@ -352,6 +355,11 @@ export function createClient({
       request('/dev/login', actorCodec, { method: 'POST', timeout: null }),
 
     me: () => request('/actors/me', actorCodec),
+    saveSettings: async (input) =>
+      request('/actors/me/settings', actorCodec, {
+        method: 'PUT',
+        body: encode(settingsUpdateSchema, input),
+      }),
 
     searchCatalogue: async (query, options = {}) => {
       // URLSearchParams, not a template: «&», «#», «+» and «%» in a query would otherwise
