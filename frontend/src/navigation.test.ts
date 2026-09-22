@@ -86,11 +86,14 @@ describe('settleColdStart', () => {
     expect(await stepBack(router)).toBe('/')
   })
 
-  it.each(['/', '/advice', '/verdicts'])('leaves the section %s alone', async (path) => {
-    const router = await openCold(path)
-    expect(router.currentRoute.value.fullPath).toBe(path)
-    expect(router.options.history.state.back).toBeNull()
-  })
+  it.each(['/', '/advice', '/verdicts', '/settings'])(
+    'leaves the section %s alone',
+    async (path) => {
+      const router = await openCold(path)
+      expect(router.currentRoute.value.fullPath).toBe(path)
+      expect(router.options.history.state.back).toBeNull()
+    },
+  )
 
   // A reload keeps the history state: the parent is already there and must not be doubled.
   it('adds nothing when the parent is already underneath', async () => {

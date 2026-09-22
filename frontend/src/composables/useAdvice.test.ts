@@ -120,6 +120,41 @@ describe('useAdvice', () => {
     expect(names(held.groups.value.take)).toEqual(['Позиция 2'])
   })
 
+  it('labels the previous city offline, then hides its rows while the new city loads', async () => {
+    advice.mockResolvedValue(answer([row(1, 'take')]))
+    const held = await mounted()
+    online(false)
+    advice.mockRejectedValue(new TypeError('network'))
+    localStorage.setItem(
+      `molvia.settings.${ME}`,
+      JSON.stringify({
+        country: 'AM',
+        city: 'Ереван',
+        spendCurrency: 'AMD',
+        incomeCurrency: 'RUB',
+      }),
+    )
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.settings.${ME}` }))
+    await flushPromises()
+    expect(held.shown.value).toBe(1)
+    expect(held.otherCity.value).toEqual({ oldCity: 'Гюмри', city: 'Ереван' })
+    expect(held.stale.value).toBe('offline')
+    online(true)
+    let land: ((value: AdviceResponse) => void) | undefined
+    advice.mockReturnValue(
+      new Promise((resolve) => {
+        land = resolve
+      }),
+    )
+    const pending = held.retry()
+    expect(held.shown.value).toBe(0)
+    expect(held.cityReloading.value).toBe('Ереван')
+    land?.({ ...answer([row(2, 'take')]), geography: { country: 'AM', city: 'Ереван' } })
+    await pending
+    expect(held.otherCity.value).toBeNull()
+    expect(held.cityReloading.value).toBeNull()
+  })
+
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()

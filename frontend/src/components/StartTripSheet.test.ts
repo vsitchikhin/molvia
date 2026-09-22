@@ -33,6 +33,10 @@ const mounted: VueWrapper[] = []
 
 async function render() {
   localStorage.setItem('molvia.actor', ME)
+  localStorage.setItem(
+    `molvia.settings.${ME}`,
+    JSON.stringify({ country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+  )
   const pinia = createPinia()
   setActivePinia(pinia)
   const router = createRouter({ history: createMemoryHistory(), routes })
@@ -93,7 +97,7 @@ describe('StartTripSheet', () => {
 
   it('без сети список берётся с телефона, и поход всё равно начинается', async () => {
     localStorage.setItem(
-      `molvia.places.${ME}`,
+      `molvia.places.${ME}.${JSON.stringify(['AM', 'Гюмри'])}`,
       JSON.stringify({ places: [{ id: city.id, kind: 'store', name: city.name }] }),
     )
     recentPlaces.mockRejectedValue(new Error('Failed to fetch'))

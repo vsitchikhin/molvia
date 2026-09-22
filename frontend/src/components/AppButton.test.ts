@@ -97,3 +97,20 @@ describe('AppButton', () => {
     expect(clicked).not.toHaveBeenCalled()
   })
 })
+
+it.each(['busy', 'inactive'] as const)(
+  'keeps %s buttons focusable but suppresses clicks and submission',
+  async (state) => {
+    const clicked = vi.fn()
+    const view = mount(AppButton, { props: { [state]: true, type: 'submit', onClick: clicked } })
+    const event = new MouseEvent('click', { cancelable: true })
+    view.element.dispatchEvent(event)
+    expect(view.attributes('disabled')).toBeUndefined()
+    expect(view.attributes('aria-disabled')).toBe('true')
+    expect(event.defaultPrevented).toBe(true)
+    expect(clicked).not.toHaveBeenCalled()
+    await view.setProps({ [state]: false })
+    await view.trigger('click')
+    expect(clicked).toHaveBeenCalledOnce()
+  },
+)

@@ -213,6 +213,12 @@
     "offline": {
       "title": "The list will show up once you are online",
       "body": "Verdicts are worked out on the server — we will show the list the moment you are back"
+    },
+    "city_reloading": "City changed to {city} — reloading the list",
+    "stale_other_city": "List for {oldCity} from {day} at {time}. Prices for {city} will appear when the connection returns.",
+    "cities_genitive": {
+      "Гюмри": "Gyumri",
+      "Ереван": "Yerevan"
     }
   },
   "verdict": {
@@ -308,40 +314,30 @@
   },
   "settings": {
     "title": "Settings",
-    "region": "Where you shop",
     "country": "Country",
     "armenia": "Armenia",
     "city": "City",
-    "spendCurrency": "Purchase currency",
+    "spendCurrency": "Spending currency",
     "incomeCurrency": "Conversion currency",
     "currencies": {
-      "AMD": "AMD · Armenian dram",
-      "RUB": "RUB · Russian ruble",
-      "USD": "USD · US dollar",
-      "EUR": "EUR · euro"
+      "AMD": "Armenian dram · AMD",
+      "RUB": "Russian ruble · RUB",
+      "USD": "US dollar · USD",
+      "EUR": "Euro · EUR"
     },
-    "conversion_hint": "See approximate prices in a familiar currency. This does not record income.",
-    "intro": "Your city helps find nearby prices. Currencies apply to new trips.",
-    "scope": "Saved trips and trips already started stay unchanged.",
-    "unsaved": "Unsaved changes. You can visit another section and return to this draft.",
-    "saved": "Settings saved. They apply to new trips.",
-    "save": "Save settings",
+    "conversion_hint": "Shows what your purchases cost in this currency. This is not an income record.",
+    "scope": "New settings apply to future trips. Trips already started keep their currency and rate.",
+    "saved": "Settings saved",
+    "save": "Save",
     "saving": "Saving…",
     "overwrite": "Apply my changes",
     "cancel": "Discard changes",
     "offline": {
-      "title": "Settings offline",
-      "body": "You can prepare changes. Save when connected — they will not be sent automatically."
+      "title": "No connection",
+      "body": "Settings will appear when the connection returns",
+      "strip": "No connection. You can save changes when the internet returns."
     },
     "context_missing": "This device has no confirmed settings yet. Connect to load them.",
-    "error": {
-      "title": "Could not confirm settings",
-      "body": "Your changes are still here. Check the connection and try again."
-    },
-    "storage": {
-      "title": "Draft kept in this tab only",
-      "body": "The device could not store it reliably. Keep the app open until you save."
-    },
     "conflict": {
       "title": "Settings changed on another device",
       "body": "Saved now: {country}, {city}; purchases — {spendCurrency}, conversion — {incomeCurrency}. Your edits are below. Apply them or discard to use saved settings."
@@ -351,6 +347,31 @@
       "body": "This trip started in an earlier version. Check where and in which currency you shopped. All items are waiting on this phone.",
       "action": "Review trip settings",
       "confirm": "Confirm and send"
+    },
+    "group_place": "Where you live",
+    "group_currencies": "Currencies",
+    "city_hint": "Used for new trips and prices near you",
+    "city_changed": "What to buy will show prices for the new city. Your previous purchases will stay.",
+    "spend_hint": "The default for new trips. Each purchase can use a different currency.",
+    "same_currencies": "The currencies match — no conversion needed",
+    "changed": "changed",
+    "changed_announced": "changed, not saved",
+    "save_needs_network": "You can save when the connection returns",
+    "draft": {
+      "title": "You have unsaved changes",
+      "volatile": "Changes will remain only while the app is open"
+    },
+    "load_error": {
+      "title": "Could not load settings",
+      "body": "Please try again"
+    },
+    "save_error": {
+      "title": "Could not save changes",
+      "body": "Your edits are still here. Please try again."
+    },
+    "save_unknown": {
+      "title": "Connection lost while saving",
+      "body": "We will check with the server when it returns. Your edits will stay here."
     }
   }
 }

@@ -145,6 +145,20 @@
 
     <!-- Mounted always and led by `open`, as «Предложить товар» is: under a `v-if` the sheet
          would be gone before it could step back off its own history entry (MOL-18; review 5). -->
+    <ScreenState
+      v-if="queue.needsContext"
+      kind="attention"
+      inline
+      :title="t('settings.legacy.title')"
+      :body="t('settings.legacy.body')"
+    >
+      <template #action
+        ><AppButton @click="clarifying = true">{{
+          t('settings.legacy.action')
+        }}</AppButton></template
+      >
+    </ScreenState>
+    <TripContextSheet v-model:open="clarifying" />
     <StartTripSheet v-model:open="starting" />
 
     <!-- Asked before, not undone after: a trip cannot be reopened in 0.1, and «Завершить» is one
@@ -191,6 +205,7 @@ import AppScreen from '@/components/AppScreen.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import TripContextSheet from '@/components/TripContextSheet.vue'
 import StartTripSheet from '@/components/StartTripSheet.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import TripRateNotes from '@/components/TripRateNotes.vue'
@@ -243,6 +258,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     StartTripSheet,
+    TripContextSheet,
     TripRateNotes,
     TripRow,
     TripTotal,
@@ -259,6 +275,7 @@ export default defineComponent({
     const asked = ref(trips.current !== null)
     const trouble = ref<'offline' | 'error' | null>(null)
     const starting = ref(false)
+    const clarifying = ref(false)
     const finishing = ref(false)
 
     async function load(): Promise<void> {
@@ -542,6 +559,7 @@ export default defineComponent({
       unsent,
       opened,
       starting,
+      clarifying,
       finishing,
       finish,
       load: () => void load(),

@@ -136,3 +136,30 @@ export function writeList(key: string, values: readonly string[]): void {
   }
   write(key, JSON.stringify(values))
 }
+
+/** A form draft belongs to one window; another window must not overwrite it on save. */
+export function readSession(key: string): string | null {
+  try {
+    return window.sessionStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+export function writeSession(key: string, value: string): boolean {
+  try {
+    window.sessionStorage.setItem(key, value)
+    return true
+  } catch {
+    forgetSession(key)
+    return false
+  }
+}
+
+export function forgetSession(key: string): void {
+  try {
+    window.sessionStorage.removeItem(key)
+  } catch {
+    /* Memory keeps the draft. */
+  }
+}

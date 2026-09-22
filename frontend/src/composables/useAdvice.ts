@@ -35,6 +35,8 @@ export interface Advice {
    * request still on its way, no connection, or a server that broke.
    */
   readonly stale: ComputedRef<Stale | null>
+  readonly cityReloading: ComputedRef<string | null>
+  readonly otherCity: ComputedRef<{ oldCity: string; city: string } | null>
   readonly fetchedAt: ComputedRef<Date | null>
   retry(): Promise<void>
 }
@@ -100,14 +102,17 @@ export function useAdvice(): Advice {
   /** Whether what is shown came from an answer of this session, rather than from the phone. */
   const confirmed = ref(false)
 
+  const cityChanged = ref(false)
   const location = computed(() => (actor.settings ? geographyKey(actor.settings) : null))
 
   function adopt(id: string | null): void {
     owner.value = id
     const cached = id ? recall(`${KEY}.${id}`) : null
+    cityChanged.value =
+      !!cached && !!location.value && geographyKey(cached.answer.geography) !== location.value
     remembered.value =
-      cached && geographyKey(cached.answer.geography) === location.value ? cached : null
-    failure.value = null
+      cached && location.value && (!cityChanged.value || !navigator.onLine) ? cached : null
+    failure.value = navigator.onLine ? null : 'offline'
     confirmed.value = false
   }
 
@@ -172,11 +177,22 @@ export function useAdvice(): Advice {
       // connection lost while the answer was on its way is the commonest break at a shelf,
       // and it is not the server's fault and never red.
       failure.value = navigator.onLine ? 'error' : 'offline'
+      if (!navigator.onLine && location.value && !remembered.value)
+        remembered.value = recall(`${KEY}.${id}`)
     }
   }
 
   async function load(): Promise<void> {
     if (!actor.id) return
+    if (
+      navigator.onLine &&
+      remembered.value &&
+      geographyKey(remembered.value.answer.geography) !== location.value
+    ) {
+      remembered.value = null
+      failure.value = null
+      confirmed.value = false
+    }
     asks += 1
     if (running) return
     const token = {}
@@ -225,6 +241,16 @@ export function useAdvice(): Advice {
       if (remembered.value === null || confirmed.value) return null
       return failure.value ?? 'loading'
     }),
+    cityReloading: computed(() =>
+      cityChanged.value && phase.value === 'loading' ? (actor.settings?.city ?? null) : null,
+    ),
+    otherCity: computed(() =>
+      remembered.value &&
+      actor.settings &&
+      geographyKey(remembered.value.answer.geography) !== location.value
+        ? { oldCity: remembered.value.answer.geography.city, city: actor.settings.city }
+        : null,
+    ),
     fetchedAt: computed(() => remembered.value?.fetchedAt ?? null),
     retry: load,
   }

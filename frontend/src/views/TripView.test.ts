@@ -140,6 +140,10 @@ const mounted: VueWrapper[] = []
 
 async function render({ memory = null as TripViewModel | null } = {}) {
   localStorage.setItem('molvia.actor', ME)
+  localStorage.setItem(
+    `molvia.settings.${ME}`,
+    JSON.stringify({ country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+  )
   const pinia = createPinia()
   setActivePinia(pinia)
   const trips = useTripStore()
@@ -195,6 +199,10 @@ describe('TripView', () => {
   it('пока сервера не спросили и памяти нет — скелетон, а не «Новый поход»', async () => {
     currentTrip.mockReturnValue(new Promise(() => undefined))
     localStorage.setItem('molvia.actor', ME)
+    localStorage.setItem(
+      `molvia.settings.${ME}`,
+      JSON.stringify({ country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+    )
     const pinia = createPinia()
     setActivePinia(pinia)
     const router = createRouter({ history: createMemoryHistory(), routes })
