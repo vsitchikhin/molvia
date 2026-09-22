@@ -32,7 +32,7 @@ function actor(sharedUntil: Date | null = null): Actor {
 }
 
 function rated(patch: Partial<AdviceVerdictRow> & { sum: number }): AdviceVerdictRow {
-  return { itemId: BEEF, name: 'Говядина, вырезка', count: 1, review: null, ...patch }
+  return { itemId: BEEF, name: 'Говядина, вырезка', count: 1, review: null, isMine: true, ...patch }
 }
 
 function price(patch: Partial<PlacePrice> & { scaledMinor: bigint }): PlacePrice {
@@ -144,7 +144,25 @@ describe('три группы', () => {
       rating: '1.0',
       ratingsCount: 1,
       review: 'Пахнет крахмалом',
+      isMine: true,
     })
+  })
+
+  it('говорит, своя ли за строкой оценка: в общем режиме строка бывает целиком чужой', async () => {
+    // Иначе экран предлагает изменить мнение, которого человек не высказывал, и любое
+    // сохранение упирается в 404 (MOL-32, А2). Отличить нечем: отзыв у чужой строки пуст
+    // ровно так же, как у своей оценки без отзыва.
+    const rows = [
+      rated({ sum: 5, count: 1, itemId: BEEF }),
+      rated({ sum: 12, count: 3, itemId: CHEESE, name: 'Сыр «Чанах»', isMine: false }),
+    ]
+
+    const answer = await advice(
+      deps({ actor: actor(new Date(Date.now() + 86_400_000)), rows }),
+      ACTOR,
+    )
+
+    expect(answer.rows.map((row) => row.isMine)).toEqual([true, false])
   })
 })
 

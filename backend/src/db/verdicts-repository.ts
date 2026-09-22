@@ -99,6 +99,14 @@ export interface AdviceVerdictRow {
    * stays theirs until a release decides otherwise (MOL-31, Р-19).
    */
   readonly review: string | null
+  /**
+   * Whether this person has a verdict of their own behind the row (MOL-32, А2). In the own
+   * mode always true; in the shared one a row may be entirely other people's, and the screen
+   * cannot tell — a review is empty there exactly as it is on one's own verdict without one.
+   * Told apart, the sheet offers «Оценить» rather than «Изменить», and does not offer to
+   * withdraw what was never given.
+   */
+  readonly isMine: boolean
 }
 
 /**
@@ -354,6 +362,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         sum: string
         count: string
         review: string | null
+        isMine: boolean
         total: string
       }>(sql`
         with rated as (
@@ -406,7 +415,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             ) as warning_rank
           from scored
         )
-        select "itemId", name, sum, count, review, total
+        select "itemId", name, sum, count, review, "isMine", total
         from (
           select
             item_id as "itemId",
@@ -414,6 +423,9 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             score_sum::text as sum,
             contributors::text as count,
             own_review as review,
+            -- Already computed above for the warnings reserve; handed out since MOL-32 so the
+            -- screen knows whose verdict it is looking at.
+            is_mine as "isMine",
             total::text as total,
             -- ::numeric rather than a float: the order of a product decision must not depend
             -- on how two doubles compare.
@@ -463,6 +475,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
           sum: Number(row.sum),
           count: Number(row.count),
           review: row.review,
+          isMine: row.isMine,
         })),
         total: Number(rows[0]?.total ?? 0),
       }

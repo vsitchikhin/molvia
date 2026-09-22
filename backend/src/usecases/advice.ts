@@ -196,6 +196,7 @@ function rowOf(
     rating: averageScore(row.sum, row.count),
     ratingsCount: row.count,
     review: row.review,
+    isMine: row.isMine,
   }
   // The rule the whole product rests on, and the only place it is written as code: «не брать
   // нигде» gets no price, no place and no threshold — the row has no field to put them in.

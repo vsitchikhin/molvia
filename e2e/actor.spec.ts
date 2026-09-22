@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { recordLiveRegion } from './live-region'
 
 /**
  * The identity through a real browser: storage that survives a reload, and a header on the
@@ -32,4 +33,23 @@ test('keeps the identity across a reload and carries it in the header', async ({
   // The reload asked the API who it is, and did so as the same person: without this the
   // identity would be stored and never used, which no unit test would notice.
   await expect.poll(() => sent).toContain(id)
+})
+
+// The identity's error is polite, so the region is its only way to a screen reader. «Try again»
+// failing the same way must be heard again, not swallowed as «no change» (MOL-19, C1).
+test('the same answer after «Try again» is said again', async ({ page }) => {
+  const said = await recordLiveRegion(page)
+  await page.route('**/api/dev/actors**', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await page.goto('/')
+  await expect(
+    page.getByRole('heading', { name: 'This device could not be identified' }),
+  ).toBeVisible()
+  await expect
+    .poll(async () => (await said()).filter((text) => text.includes('could not be identified')))
+    .toHaveLength(1)
+
+  await page.getByRole('button', { name: 'Try again' }).click()
+  await expect
+    .poll(async () => (await said()).filter((text) => text.includes('could not be identified')))
+    .toHaveLength(2)
 })

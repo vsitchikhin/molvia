@@ -5,23 +5,7 @@
       {{ card.name }}<br />{{ t('verdict.question_tail') }}
     </h2>
 
-    <div class="scale" role="group" :aria-label="t('verdict.scale_group')">
-      <button
-        v-for="value in SCORES"
-        :key="value"
-        class="key"
-        type="button"
-        :aria-pressed="score === value ? 'true' : 'false'"
-        :aria-label="t('verdict.scale_label', { n: value })"
-        @click="choose(value)"
-      >
-        {{ value }}
-      </button>
-    </div>
-    <div class="ends" aria-hidden="true">
-      <span>{{ t('verdict.scale_low') }}</span>
-      <span>{{ t('verdict.scale_high') }}</span>
-    </div>
+    <RatingScale v-model="score" />
 
     <AppField
       v-model="review"
@@ -53,11 +37,11 @@ import type { ErrorCode, PendingVerdict, WireCode } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
+import RatingScale from '@/components/RatingScale.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { purchaseDay } from '@/days'
+import { SCORES } from '@/components/rating'
 import type { Score, VerdictDraft } from '@/stores/verdictDrafts'
-
-const SCORES = [1, 2, 3, 4, 5] as const satisfies readonly Score[]
 
 /** The review's own bound (`newVerdictSchema`), kept by the field so it cannot be passed. */
 const REVIEW_MAX = 500
@@ -86,7 +70,7 @@ function domainCode(code: WireCode | null | undefined): ErrorCode | null {
  */
 export default defineComponent({
   name: 'VerdictCard',
-  components: { AppButton, AppCard, AppField },
+  components: { AppButton, AppCard, AppField, RatingScale },
   props: {
     card: { type: Object as PropType<PendingVerdict>, required: true },
     /** What the phone kept for this item: words typed before, or a refusal to show. */
@@ -132,10 +116,6 @@ export default defineComponent({
       { flush: 'sync' },
     )
 
-    function choose(value: Score): void {
-      score.value = score.value === value ? null : value
-    }
-
     function save(): void {
       if (saved) return
       if (score.value === null) {
@@ -161,7 +141,6 @@ export default defineComponent({
 
     return {
       t,
-      SCORES,
       REVIEW_MAX,
       titleId,
       title,
@@ -170,7 +149,6 @@ export default defineComponent({
       error,
       unsupported,
       day,
-      choose,
       save,
     }
   },
@@ -203,49 +181,6 @@ export default defineComponent({
   }
 }
 
-.scale {
-  display: flex;
-  gap: var(--space-2);
-  justify-content: space-between;
-}
-
-.key {
-  flex: 1;
-  min-height: var(--rating-key);
-  border: var(--hairline) solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-2);
-  color: var(--text);
-  font-family: var(--font);
-  font-size: var(--text-body);
-  font-variant-numeric: tabular-nums;
-  font-weight: var(--weight-bold);
-  cursor: pointer;
-  transition:
-    background-color var(--dur-fast) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out);
-  -webkit-tap-highlight-color: transparent;
-
-  &[aria-pressed='true'] {
-    border-color: var(--accent-solid);
-    background: var(--accent-solid);
-    color: var(--on-accent);
-  }
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
-.ends {
-  display: flex;
-  justify-content: space-between;
-  margin-top: var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-}
-
 .review {
   margin-top: var(--space-6);
 }
@@ -264,11 +199,5 @@ export default defineComponent({
 .skip {
   color: var(--text-muted);
   font-size: var(--text-callout);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .key {
-    transition: none;
-  }
 }
 </style>

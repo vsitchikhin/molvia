@@ -24,6 +24,7 @@ const take = {
   rating: '4.3',
   ratingsCount: 3,
   review: null,
+  isMine: true,
   places: [market],
 }
 
@@ -34,6 +35,7 @@ const never = {
   rating: '2.0',
   ratingsCount: 1,
   review: 'Пахнет крахмалом, а не мясом',
+  isMine: true,
 }
 
 describe('adviceRowSchema', () => {
@@ -65,6 +67,14 @@ describe('adviceRowSchema', () => {
     ]) {
       expect(adviceRowSchema.safeParse({ ...never, ...smuggled }).success).toBe(false)
     }
+  })
+
+  it('says whose verdict stands behind it — nothing else in the row does', () => {
+    // In the shared mode a row may be entirely other people's, and a review is empty there
+    // exactly as it is on one's own verdict without one (MOL-32, А2).
+    expect(adviceRowSchema.parse({ ...never, isMine: false }).isMine).toBe(false)
+    // Not optional: «whose is it» is a thing the server says, not one it omits.
+    expect(adviceRowSchema.safeParse({ ...never, isMine: undefined }).success).toBe(false)
   })
 
   it('refuses a level nobody decided on', () => {

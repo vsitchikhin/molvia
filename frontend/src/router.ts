@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
-import HomeView from '@/views/HomeView.vue'
+import AdviceView from '@/views/AdviceView.vue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 import TripView from '@/views/TripView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
@@ -32,7 +32,7 @@ export const routes = [
   {
     path: '/advice',
     name: 'advice',
-    component: HomeView,
+    component: AdviceView,
     meta: { titleKey: 'advice.title', tab: 'advice' },
   },
   {

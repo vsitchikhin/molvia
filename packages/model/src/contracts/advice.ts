@@ -49,6 +49,16 @@ const ratedFields = {
     .refine((value) => Number(value) <= 5),
   ratingsCount: z.int().positive(),
   review: verdictFields.shape.review,
+  /**
+   * Whether this person has a verdict of their own behind the row (MOL-32, А2).
+   *
+   * In the own mode it is always true. In the shared one a row may be entirely other
+   * people's, and **nothing else in the row says so**: `review` is empty there exactly as it
+   * is on one's own verdict without one, and `ratingsCount` of three or more happens either
+   * way. Without it the screen offered to amend an opinion the person had never given, and
+   * every save came back 404 with «try again» — a refusal a repeat cannot fix.
+   */
+  isMine: z.boolean(),
 }
 
 /**
@@ -64,12 +74,20 @@ export const adviceRowSchema = z.discriminatedUnion('level', [
   z.strictObject({
     ...ratedFields,
     level: z.literal('take'),
-    /** By ascending unit price. Empty when the item was rated but never bought. */
+    /**
+     * The asker's own city first, then by ascending unit price (MOL-31, Р-26) — **not by
+     * price alone**, and the difference is the screen's to carry: a cheaper receipt from
+     * another city stands below a dearer place at home, because «cheaper elsewhere» is not
+     * somewhere one can go. So the first place is not always the cheapest, and only a screen
+     * that compares the prices may call it so (MOL-32, А1). Empty when the item was rated but
+     * never bought.
+     */
     places: z.array(advicePlaceSchema),
   }),
   z.strictObject({
     ...ratedFields,
     level: z.literal('if_cheap'),
+    /** The asker's city first, then by price — as with «take» above. */
     places: z.array(advicePlaceSchema),
     /**
      * «Стоит брать дешевле …»: the lower median of the unit prices seen (MOL-31, Р-2, and

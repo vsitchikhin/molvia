@@ -165,6 +165,8 @@
   "advice": {
     "title": "What to buy",
     "own_data_only": "Your own ratings only, for now",
+    "shared_data": "Average ratings from everyone who rated",
+    "shared_note": "Reviews and prices are yours alone",
     "group_take": "Buy it",
     "group_if_cheap": "Only if it is cheap",
     "group_never": "Not worth buying anywhere",
@@ -172,11 +174,32 @@
     "badge_if_cheap": "IF CHEAP",
     "badge_never": "DO NOT",
     "cheapest_at": "Cheapest at {place}",
+    "bought_at": "Bought here: {place}",
     "also_at": "Also: {places}",
+    "also_place": "{place} {price}",
     "threshold": "Worth buying below {price}",
     "no_price_shown": "The price is left out on purpose: there is nothing to compare",
     "rating": "{value} out of 5",
     "ratings_count": "{n} rating | {n} ratings",
+    "rating_line": "{rating} · {count}",
+    "truncated": "Showing {shown} of {total}",
+    "stale": "The list as of {day} at {time} — we will refresh once you are back online",
+    "stale_error": "The list as of {day} at {time} — the server did not answer",
+    "stale_loading": "The list as of {day} at {time} — refreshing",
+    "edit_action": "Change the rating",
+    "edit": {
+      "meta": "Only your own rating changes",
+      "meta_new": "You have not rated this yet",
+      "save_new": "Rate it",
+      "keeps_score": "The rating stays as it was. To take it back, withdraw it",
+      "withdraw": "Withdraw the rating",
+      "withdraw_hint": "The item leaves this screen, and the purchase goes back to «Ratings»",
+      "withdraw_hint_shared": "Your rating leaves the average, and the purchase goes back to «Ratings»",
+      "not_mine": "You have no rating here — refresh the list",
+      "nothing_changed": "Nothing has changed",
+      "failed": "Could not save it. Try again",
+      "offline": "A rating can be changed once you are online"
+    },
     "empty": {
       "title": "Nothing to advise yet",
       "body": "Rate your first purchase — and what to buy will show up here",
@@ -187,9 +210,8 @@
       "body": "Verdicts are worked out on the server, there is no local copy"
     },
     "offline": {
-      "title": "Showing yesterday's data",
-      "body": "{count}, loaded {when}. We will refresh once you are back online",
-      "action": "Show it as is"
+      "title": "The list will show up once you are online",
+      "body": "Verdicts are worked out on the server — we will show the list the moment you are back"
     }
   },
   "verdict": {
@@ -264,7 +286,6 @@
     "restore_failed": "The server did not recognise the old key either. Nothing changed — the current record is untouched."
   },
   "dev": {
-    "connected": "Server is up, version {version}",
     "kit": {
       "title": "Kit",
       "buttons": "Buttons",

@@ -73,7 +73,14 @@ describe('свои данные', () => {
     await rate(actorId, itemId, 5, 'Лучшее мясо в городе')
 
     expect(await rowsFor(actorId)).toEqual([
-      { itemId, name: 'Говядина, вырезка', sum: 5, count: 1, review: 'Лучшее мясо в городе' },
+      {
+        itemId,
+        name: 'Говядина, вырезка',
+        sum: 5,
+        count: 1,
+        review: 'Лучшее мясо в городе',
+        isMine: true,
+      },
     ])
   })
 
@@ -181,6 +188,31 @@ describe('общие данные', () => {
     }
 
     expect((await rowsFor(me, 'shared'))[0]?.review).toBeNull()
+  })
+
+  it('говорят, своя ли за строкой оценка: отзыв этого не скажет (MOL-32, А2)', async () => {
+    const me = await insertActor(db)
+    const mine = await insertItem(db, { name: 'Говядина' })
+    const theirs = await insertItem(db, { name: 'Колбаса' })
+    // Своя оценка без отзыва — ровно то, что на проводе неотличимо от чужой строки.
+    await rate(me, mine, 5)
+    for (let n = 0; n < 3; n += 1) await rate(await insertActor(db), theirs, 2)
+
+    const rows = await rowsFor(me, 'shared')
+
+    expect(rows.map((row) => [row.itemId, row.isMine])).toEqual([
+      [mine, true],
+      [theirs, false],
+    ])
+    expect(rows.every((row) => row.review === null)).toBe(true)
+  })
+
+  it('в своём режиме строка всегда своя', async () => {
+    const me = await insertActor(db)
+    const itemId = await insertItem(db)
+    await rate(me, itemId, 4)
+
+    expect((await rowsFor(me, 'own'))[0]?.isMine).toBe(true)
   })
 })
 

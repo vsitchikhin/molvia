@@ -16,6 +16,16 @@ export function purchaseDay(when: Date, locale: string, now = new Date()): strin
   return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(when)
 }
 
+/**
+ * The clock beside that day: «21:40» (MOL-32). The age of a remembered answer is named
+ * exactly — «вчера в 21:40» is what a person judges by, while «данные могут быть неактуальны»
+ * says nothing — and the two halves travel as separate placeholders because the word between
+ * them is a word of the language, not of the code.
+ */
+export function timeOfDay(when: Date, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(when)
+}
+
 const DAY_MS = 86_400_000
 
 // Local midnight, so the difference counts calendar days; `round` absorbs the hour a change to
