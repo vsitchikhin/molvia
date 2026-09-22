@@ -172,6 +172,7 @@ describe('три группы', () => {
     const raw = JSON.parse(reply.body) as { rows: Record<string, unknown>[] }
 
     expect(Object.keys(raw.rows[0] ?? {}).sort()).toEqual([
+      'isMine',
       'itemId',
       'level',
       'name',

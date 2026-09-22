@@ -109,6 +109,9 @@ test('rates the purchases one by one, puts one off, and ends at «Everything is 
   await expect(page.getByRole('heading', { name: 'What to buy' })).toBeVisible()
 })
 
+// The state's heading, not its words: `ScreenState` also hands «title. body» to the app's live
+// region, so a plain getByText matches two nodes from ~200 ms onwards and the assertion becomes
+// a race the machine wins or loses (MOL-60, measured).
 test('7: rated without a connection — «saved», and it goes by itself once online', async ({
   page,
   context,
@@ -122,13 +125,13 @@ test('7: rated without a connection — «saved», and it goes by itself once on
   await context.setOffline(true)
   await rate(page, 5)
 
-  await expect(page.getByText('The rating is saved')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'The rating is saved' })).toBeVisible()
   await expect(page.getByText('Everything is rated')).toHaveCount(0)
   expect(await page.locator('.bad').count()).toBe(0)
 
   await context.setOffline(false)
 
-  await expect(page.getByText('The rating is saved')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'The rating is saved' })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Everything is rated' })).toBeVisible()
   expect(await waiting(who)).toBe(0)
 })
@@ -145,7 +148,7 @@ test('7: rated without a connection and the app closed — sent when it is opene
 
   await context.setOffline(true)
   await rate(page, 3)
-  await expect(page.getByText('The rating is saved')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'The rating is saved' })).toBeVisible()
   await page.close()
   expect(await waiting(who)).toBe(2)
 

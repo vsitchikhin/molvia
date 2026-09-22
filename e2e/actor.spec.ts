@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { SESSION_COOKIE } from '@molvia/model'
 import type { Page } from '@playwright/test'
+import { recordLiveRegion } from './live-region'
 
 /**
  * How a request proves who it is, through a real browser (MOL-53). None of this can be shown
@@ -82,4 +83,21 @@ test('a session that is gone brings back the same owner, not a new person', asyn
 
   await expect.poll(async () => (await sessionCookie(page))?.value).toMatch(/^[A-Za-z0-9_-]{43}$/)
   expect(await knownOwner(page)).toBe(owner)
+})
+
+// The identity's error is polite, so the region is its only way to a screen reader. «Try again»
+// failing the same way must be heard again, not swallowed as «no change» (MOL-19, C1).
+test('the same answer after «Try again» is said again', async ({ page }) => {
+  const said = await recordLiveRegion(page)
+  await page.route('**/api/dev/login**', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Could not sign in' })).toBeVisible()
+  await expect
+    .poll(async () => (await said()).filter((text) => text.includes('Could not sign in')))
+    .toHaveLength(1)
+
+  await page.getByRole('button', { name: 'Try again' }).click()
+  await expect
+    .poll(async () => (await said()).filter((text) => text.includes('Could not sign in')))
+    .toHaveLength(2)
 })

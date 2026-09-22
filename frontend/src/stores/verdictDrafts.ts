@@ -4,10 +4,15 @@ import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE, isWireCode, pendingVerdictCodec, ratingSchema } from '@molvia/model'
 import type { PendingVerdict, Rating, WireCode } from '@molvia/model'
 import { api } from '@/api'
+import type { Score } from '@/components/rating'
 import { useActorStore } from '@/stores/actor'
 import { read, write } from '@/stores/storage'
 
-export type Score = Rating['score']
+/**
+ * Re-exported rather than declared again: the scale of MOL-32 owns it (`components/rating.ts`),
+ * and two identical `Rating['score']` in two files are two places to change (МР-9).
+ */
+export type { Score }
 
 /**
  * A verdict on the phone before the server has it. `typing` is what the card holds while the

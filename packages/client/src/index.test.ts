@@ -852,6 +852,7 @@ describe('the trip', () => {
       rating: '4.3',
       ratingsCount: 3,
       review: null,
+      isMine: true,
       places: [
         {
           placeId: MARKET,
