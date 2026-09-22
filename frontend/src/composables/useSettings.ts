@@ -214,6 +214,7 @@ export function useSettings(): {
   hasAnnouncer: boolean
 } {
   const form = useSettingsStore()
+  const online = ref(navigator.onLine)
   const { t } = useI18n()
   const announce = useAnnouncer()
   let withdraw: (() => void) | undefined
@@ -224,7 +225,7 @@ export function useSettings(): {
         title: t('settings.save_unknown.title'),
         body: t('settings.save_unknown.body'),
       }
-    if (form.saveError)
+    if (form.saveError && online.value)
       return {
         tone: 'error',
         title: t('settings.save_error.title'),
@@ -241,7 +242,6 @@ export function useSettings(): {
     },
     { immediate: true },
   )
-  const online = ref(navigator.onLine)
   const offline = (): void => {
     online.value = false
   }

@@ -106,3 +106,18 @@ it('preserves an unsupported saved city while allowing currency changes', async 
   await view.findAll('select')[2]?.setValue('EUR')
   expect(view.get('.actions button').attributes('aria-disabled')).toBeUndefined()
 })
+
+it('replaces a previous write error with the offline notice when the connection drops', async () => {
+  const view = await render()
+  await view.get('select').setValue('Ереван')
+  save.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+  await view.get('.actions button').trigger('click')
+  await flushPromises()
+  expect(view.find('[role="alert"]').exists()).toBe(true)
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  window.dispatchEvent(new Event('offline'))
+  await flushPromises()
+  expect(view.find('[role="alert"]').exists()).toBe(false)
+  expect(view.get('.actions button').text()).toBe(en.settings.save)
+  expect(view.get('.actions button').attributes('aria-disabled')).toBe('true')
+})

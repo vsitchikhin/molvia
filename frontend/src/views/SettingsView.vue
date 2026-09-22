@@ -88,11 +88,11 @@
           :aria-describedby="notice || !online ? `${id}-notice` : undefined"
           @click="form.save"
         >
-          <template v-if="form.saveError && !form.saving" #icon><IconRefresh /></template>
+          <template v-if="form.saveError && online && !form.saving" #icon><IconRefresh /></template>
           {{
             form.saving
               ? t('settings.saving')
-              : form.saveError
+              : form.saveError && online
                 ? t('state.retry')
                 : form.conflict
                   ? t('settings.overwrite')
