@@ -265,3 +265,25 @@ describe('ни один ответ с cookie не кешируется', () => {
     expect(seen).not.toHaveLength(0)
   })
 })
+
+describe('токен не только url-safe', () => {
+  it('сессия с обычным base64 живёт и продлевается, а не падает на вторые сутки', async () => {
+    // Репозиторий принимает любой печатный ASCII (MOL-52, Р4), а cookie — алфавит RFC 6265.
+    // Пока эти два правила расходились, такая сессия прекрасно читалась и падала пятисоткой
+    // ровно в тот день, когда приходил срок её продлить.
+    const actorId = await insertActor(db)
+    const padded = randomBytes(32).toString('base64')
+    expect(padded.endsWith('=')).toBe(true)
+    const id = randomUUID()
+    await repository.create(id, actorId, padded, null, anHourFromNow())
+    await db
+      .update(sessions)
+      .set({ lastSeenAt: new Date(Date.now() - (SESSION_TOUCH_AFTER_HOURS + 1) * HOUR) })
+      .where(eq(sessions.id, id))
+
+    const mine = await whoAmI(`${SESSION_COOKIE}=${padded}`)
+
+    expect(mine.status).toBe(200)
+    expect(String(mine.headers['set-cookie'])).toContain(`${SESSION_COOKIE}=${padded}`)
+  })
+})

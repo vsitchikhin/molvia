@@ -11,15 +11,24 @@ import { SESSION_COOKIE } from '@molvia/model'
  */
 
 /**
- * What a value has to look like to be put into a header. `token` is 32 bytes of `randomBytes`
- * as base64url, so it passes; the check exists because a value that did not would end the
- * response with a `;` or a newline in it — that is, another cookie, or another header.
+ * What a value has to look like to be put into a header. It exists because a value that did not
+ * would end the response with a `;` or a newline in it — that is, another cookie, or another
+ * header.
+ *
+ * **RFC 6265's `cookie-octet`, not «base64url»**, and the difference is a trap this project has
+ * already paid for once. `secretOrNull` in `db/digest.ts` accepts any printable ASCII, and it
+ * says why in its own comment: the first version of *that* rule was narrower, and a single
+ * `.toString('base64')` would have made every login a 500 that no test there could have shown
+ * (MOL-52, Р4). A narrower rule here would bring the same trap back one layer up — a session
+ * whose token carries `+` or `=` is written and read perfectly well, and then crashes on the day
+ * its term is due to slide. So the rule is the one the wire itself has: everything printable
+ * except the four characters a cookie value cannot hold.
  *
  * A plain `Error`, as the repositories do for a token this server could not have minted: it
  * means the caller went around the one path that mints one, and there is nothing to answer a
  * client with.
  */
-const VALUE = /^[A-Za-z0-9_-]{1,512}$/
+const VALUE = /^[\x21\x23-\x2B\x2D-\x3A\x3C-\x5B\x5D-\x7E]{1,512}$/
 
 /**
  * Only the part of a reply this module needs, so its test does not have to build a Fastify one.

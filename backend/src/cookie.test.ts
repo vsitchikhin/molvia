@@ -93,11 +93,24 @@ describe('setting the session cookie', () => {
   it('refuses a value that would end the header and start another one', () => {
     // A token this server could not have minted means a caller went around the path that mints
     // one; without the guard the reply would have carried a second cookie, or a second header.
-    for (const bad of ['a; Domain=evil.example', 'a\r\nSet-Cookie: x=y', 'a b', '']) {
+    for (const bad of ['a; Domain=evil.example', 'a\r\nSet-Cookie: x=y', 'a b', 'a"b', 'a,b', '']) {
       expect(() => {
         setSessionCookie(sink(), bad, new Date(Date.now() + 1000))
       }).toThrow(/could not have minted/)
     }
+  })
+
+  it('takes any token the session repository would take, not only a url-safe one', () => {
+    // The repository accepts printable ASCII, and says why: a narrower rule there would have
+    // made a single `.toString('base64')` a 500 on every login (MOL-52, Р4). A narrower rule
+    // here would bring the same trap one layer up — such a session reads fine and then crashes
+    // on the day its term is due to slide.
+    const padded = 'YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXphYmNkZWZnaGlqa2w='
+    const reply = sink()
+
+    setSessionCookie(reply, padded, new Date(Date.now() + 1000))
+
+    expect(reply.headers.get('set-cookie')).toContain(`${SESSION_COOKIE}=${padded}`)
   })
 })
 
