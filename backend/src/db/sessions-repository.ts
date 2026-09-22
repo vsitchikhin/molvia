@@ -1,11 +1,17 @@
 import { and, eq, gt, sql } from 'drizzle-orm'
-import { deviceNameOrNull, newSessionSchema, sessionSchema } from '@molvia/model'
-import type { Session } from '@molvia/model'
+import { actorSchema, deviceNameOrNull, newSessionSchema, sessionSchema } from '@molvia/model'
+import type { Actor, Session } from '@molvia/model'
 import { secretOrNull, sha256Hex } from './digest'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
-import { theRow } from './rows'
-import { sessions } from './schema'
+import { idOrNull, theRow } from './rows'
+import { actors, sessions } from './schema'
+
+/** A live session and the owner behind it — what every request to the API needs at once. */
+export interface LiveSession {
+  readonly session: Session
+  readonly actor: Actor
+}
 
 export interface SessionRepository {
   /**
@@ -30,14 +36,35 @@ export interface SessionRepository {
   ): Promise<Session>
 
   /**
-   * The owner of a live session, or nothing.
+   * The live session behind a token **and the owner behind it**, or nothing.
    *
    * A token nobody issued, a token of a session that was revoked, and a token of one that ran
    * out all return `null` — not by agreement between three branches, but because there is one
    * `WHERE` and they all fail it. That is what lets MOL-53 answer every one of them with the
    * same 401 without having to remember to.
+   *
+   * **One statement, with a join** (MOL-53, Р-5). It was `byToken`, returning the session alone,
+   * and then the owner had to be read separately — two trips to the database on **every**
+   * request to the API. There is no second method beside this one for the same reason there was
+   * no reason to keep the old shape: two places that answer «whose request is this» are two
+   * places that can drift.
    */
-  byToken(token: string): Promise<Session | null>
+  liveByToken(token: string): Promise<LiveSession | null>
+
+  /**
+   * Moves `last_seen_at` and slides `expires_at` — but only if the row has not been touched for
+   * `afterHours`. Answers the new expiry when it wrote, and `null` when it did not.
+   *
+   * **The «is it due» test is inside the `WHERE` and not in the caller**, although the caller
+   * checks it too (to avoid a pointless round trip). Two requests arriving together would
+   * otherwise both decide it is time and both write; here the second matches no row, answers
+   * nothing, and simply does not re-set the cookie — which is the right outcome rather than a
+   * failure.
+   *
+   * `now()` throughout, never a `Date` from this process: the same clock that wrote
+   * `created_at` and the same one `liveByToken` judges life by.
+   */
+  touch(id: string, afterHours: number, lifetimeDays: number): Promise<Date | null>
 
   /**
    * **Two methods this table needs and does not have here: removing a session and listing an
@@ -87,7 +114,7 @@ export function createSessionRepository(db: Conn): SessionRepository {
       })
     },
 
-    async byToken(token) {
+    async liveByToken(token) {
       // A token that could never have been minted here matches nothing, and says so as `null`
       // rather than by hashing something else: `sha256Hex` folds a lone surrogate into U+FFFD,
       // so two such strings share a digest (adversarial А6). Refusing the shape at the door
@@ -98,11 +125,36 @@ export function createSessionRepository(db: Conn): SessionRepository {
       // still alive, the same clock that wrote `created_at`. A server whose time drifted
       // would otherwise hand out minutes of life that the database does not agree exist.
       const [row] = await db
-        .select()
+        .select({ session: sessions, actor: actors })
         .from(sessions)
+        .innerJoin(actors, eq(actors.id, sessions.actorId))
         .where(and(eq(sessions.tokenHash, sha256Hex(token)), gt(sessions.expiresAt, sql`now()`)))
         .limit(1)
-      return row ? toSession(row) : null
+      return row ? { session: toSession(row.session), actor: actorSchema.parse(row.actor) } : null
+    },
+
+    async touch(id, afterHours, lifetimeDays) {
+      // A malformed identifier is not this server's defect to raise a `22P02` over — it matches
+      // no row, which is what `null` already says. The same guard the login repository applies.
+      if (idOrNull(id) === null) return null
+
+      const [row] = await db
+        .update(sessions)
+        .set({
+          lastSeenAt: sql`now()`,
+          expiresAt: sql`now() + make_interval(days => ${lifetimeDays}::int)`,
+        })
+        .where(
+          and(
+            eq(sessions.id, id),
+            sql`${sessions.lastSeenAt} < now() - make_interval(hours => ${afterHours}::int)`,
+            // A session that ran out between being read and being touched must not be brought
+            // back to life by the very statement that extends it.
+            gt(sessions.expiresAt, sql`now()`),
+          ),
+        )
+        .returning({ expiresAt: sessions.expiresAt })
+      return row?.expiresAt ?? null
     },
   }
 }

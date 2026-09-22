@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { ZodError } from 'zod'
-import { DomainError, ERROR } from '@molvia/model'
+import { DomainError, ERROR, SESSION_LIFETIME_DAYS, SESSION_TOUCH_AFTER_HOURS } from '@molvia/model'
 import { createSessionRepository } from '@/db/sessions-repository'
 import { sessions } from '@/db/schema'
 import { connectDrizzle } from './db'
@@ -14,6 +14,14 @@ const repository = createSessionRepository(db)
 /** 32 bytes, the way the API will mint one — the length is what makes sha256 the right hash. */
 function token(): string {
   return randomBytes(32).toString('base64url')
+}
+
+/**
+ * Живая сессия без владельца рядом — то, о чём спрашивает большинство проверок ниже.
+ * Сам владелец приезжает тем же оператором (Р-5) и проверяется отдельным тестом.
+ */
+async function sessionFor(secret: string) {
+  return (await repository.liveByToken(secret))?.session ?? null
 }
 
 beforeEach(async () => {
@@ -45,10 +53,26 @@ describe('сессия — ключ, и в базе от него только �
     const mine = token()
     await repository.create(randomUUID(), actorId, mine, null, anHourFromNow())
 
-    const found = await repository.byToken(mine)
+    const found = await sessionFor(mine)
 
     expect(found?.actorId).toBe(actorId)
     expect(found?.deviceName).toBeNull()
+  })
+
+  it('отдаёт владельца тем же оператором, а не вторым походом в базу', async () => {
+    // Р-5: раньше метод возвращал одну сессию, и владельца приходилось читать отдельно — два
+    // запроса на **каждый** запрос к API. Проверяется не план запроса, а обещание интерфейса:
+    // владелец приходит вместе с сессией и это именно её владелец.
+    const actorId = await insertActor(db)
+    const mine = token()
+    await repository.create(randomUUID(), actorId, mine, null, anHourFromNow())
+
+    const live = await repository.liveByToken(mine)
+
+    expect(live?.actor.id).toBe(actorId)
+    expect(live?.actor.id).toBe(live?.session.actorId)
+    // Сущность целиком, а не огрызок строки: дальше её читает «Что брать» и берёт оттуда доступ.
+    expect(live?.actor.spendCurrency).toBe('AMD')
   })
 
   it('чужой, мусорный и истёкший токен дают один и тот же ничего', async () => {
@@ -69,10 +93,10 @@ describe('сессия — ключ, и в базе от него только �
       })
       .where(eq(sessions.id, expiredId))
 
-    expect(await repository.byToken(token())).toBeNull()
-    expect(await repository.byToken('не токен вовсе')).toBeNull()
-    expect(await repository.byToken('')).toBeNull()
-    expect(await repository.byToken(expired)).toBeNull()
+    expect(await sessionFor(token())).toBeNull()
+    expect(await sessionFor('не токен вовсе')).toBeNull()
+    expect(await sessionFor('')).toBeNull()
+    expect(await sessionFor(expired)).toBeNull()
   })
 
   it('отозванная сессия не находится, а соседние устройства целы', async () => {
@@ -87,8 +111,8 @@ describe('сессия — ключ, и в базе от него только �
 
     await db.delete(sessions).where(eq(sessions.id, phoneId))
 
-    expect(await repository.byToken(phone)).toBeNull()
-    expect((await repository.byToken(laptop))?.deviceName).toBe('MacBook · Chrome')
+    expect(await sessionFor(phone)).toBeNull()
+    expect((await sessionFor(laptop))?.deviceName).toBe('MacBook · Chrome')
   })
 
   it('имя устройства, которое нечем показать, становится «без имени», а не отказом', async () => {
@@ -105,8 +129,8 @@ describe('сессия — ключ, и в базе от него только �
     await repository.create(randomUUID(), actorId, first, '\u2800\u2800', anHourFromNow())
     await repository.create(randomUUID(), actorId, second, '   ', anHourFromNow())
 
-    expect((await repository.byToken(first))?.deviceName).toBeNull()
-    expect((await repository.byToken(second))?.deviceName).toBeNull()
+    expect((await sessionFor(first))?.deviceName).toBeNull()
+    expect((await sessionFor(second))?.deviceName).toBeNull()
     await expect(db.select().from(sessions)).resolves.toHaveLength(2)
   })
 
@@ -157,7 +181,7 @@ describe('сессия — ключ, и в базе от него только �
       anHourFromNow(),
     )
 
-    const name = (await repository.byToken(secret))?.deviceName
+    const name = (await sessionFor(secret))?.deviceName
     expect(name).toHaveLength(80)
     expect(name?.startsWith('iPhone · Safari')).toBe(true)
   })
@@ -171,7 +195,7 @@ describe('сессия — ключ, и в базе от него только �
 
     await repository.create(randomUUID(), actorId, padded, null, anHourFromNow())
 
-    expect((await repository.byToken(padded))?.actorId).toBe(actorId)
+    expect((await sessionFor(padded))?.actorId).toBe(actorId)
   })
 
   it('токен, которого этот сервер не мог выдать, не пишется и ничего не находит', async () => {
@@ -185,9 +209,9 @@ describe('сессия — ключ, и в базе от него только �
     await expect(
       repository.create(randomUUID(), actorId, '\uD800', null, anHourFromNow()),
     ).rejects.toThrow('could not have minted')
-    expect(await repository.byToken('\uD800')).toBeNull()
-    expect(await repository.byToken('\uDFFF')).toBeNull()
-    expect(await repository.byToken('короткий')).toBeNull()
+    expect(await sessionFor('\uD800')).toBeNull()
+    expect(await sessionFor('\uDFFF')).toBeNull()
+    expect(await sessionFor('короткий')).toBeNull()
     await expect(db.select().from(sessions)).resolves.toHaveLength(0)
   })
 
@@ -206,7 +230,93 @@ describe('сессия — ключ, и в базе от него только �
     await repository.create(randomUUID(), actorId, phone, 'iPhone · Safari', anHourFromNow())
     await repository.create(randomUUID(), actorId, laptop, 'MacBook · Chrome', anHourFromNow())
 
-    expect((await repository.byToken(phone))?.id).not.toBe((await repository.byToken(laptop))?.id)
+    expect((await sessionFor(phone))?.id).not.toBe((await sessionFor(laptop))?.id)
     await expect(db.select().from(sessions)).resolves.toHaveLength(2)
+  })
+})
+
+/**
+ * Скользящий срок (MOL-53, Р-2). Здесь — половина базы: когда `UPDATE` находит строку, а когда
+ * нет. Вторая половина — «сценарий вообще не ходит в базу, пока не пора» — в юнит-тесте
+ * `authenticate`, потому что проверяется там именно отсутствие похода.
+ */
+describe('срок продлевается использованием, но не чаще раза в сутки', () => {
+  const HOUR = 3_600_000
+
+  /** Строка, которой столько-то не пользовались, — как её состарило бы само время. */
+  async function seen(hoursAgo: number): Promise<{ id: string; secret: string }> {
+    const actorId = await insertActor(db)
+    const secret = token()
+    const id = randomUUID()
+    await repository.create(id, actorId, secret, null, anHourFromNow())
+    await db
+      .update(sessions)
+      .set({ lastSeenAt: new Date(Date.now() - hoursAgo * HOUR) })
+      .where(eq(sessions.id, id))
+    return { id, secret }
+  }
+
+  it('двигает и `last_seen_at`, и `expires_at` одной записью', async () => {
+    // Порознь их двигать нельзя: продлённый срок без сдвинутого `last_seen_at` — это дата в
+    // списке устройств MOL-57, которая ничего не значит.
+    const { id } = await seen(SESSION_TOUCH_AFTER_HOURS + 1)
+
+    const until = await repository.touch(id, SESSION_TOUCH_AFTER_HOURS, SESSION_LIFETIME_DAYS)
+
+    const [row] = await db.select().from(sessions).where(eq(sessions.id, id))
+    expect(until).not.toBeNull()
+    expect(row?.expiresAt).toEqual(until)
+    expect(row?.lastSeenAt.getTime()).toBeGreaterThan(Date.now() - HOUR)
+    const days = ((until?.getTime() ?? 0) - Date.now()) / (24 * HOUR)
+    expect(days).toBeGreaterThan(SESSION_LIFETIME_DAYS - 1)
+    expect(days).toBeLessThanOrEqual(SESSION_LIFETIME_DAYS)
+  })
+
+  it('до суток не пишет ничего и говорит об этом «ничем»', async () => {
+    const { id } = await seen(SESSION_TOUCH_AFTER_HOURS - 1)
+    const [before] = await db.select().from(sessions).where(eq(sessions.id, id))
+
+    expect(await repository.touch(id, SESSION_TOUCH_AFTER_HOURS, SESSION_LIFETIME_DAYS)).toBeNull()
+
+    const [after] = await db.select().from(sessions).where(eq(sessions.id, id))
+    expect(after?.lastSeenAt).toEqual(before?.lastSeenAt)
+    expect(after?.expiresAt).toEqual(before?.expiresAt)
+  })
+
+  it('второй одновременный запрос не продлевает второй раз', async () => {
+    // Условие «пора» живёт в самом `WHERE`, поэтому гонку решает база, а не порядок вызовов:
+    // второй `UPDATE` не находит строки. Проверяется исход, а не расписание.
+    const { id } = await seen(SESSION_TOUCH_AFTER_HOURS + 1)
+
+    const both = await Promise.all([
+      repository.touch(id, SESSION_TOUCH_AFTER_HOURS, SESSION_LIFETIME_DAYS),
+      repository.touch(id, SESSION_TOUCH_AFTER_HOURS, SESSION_LIFETIME_DAYS),
+    ])
+
+    expect(both.filter((until) => until !== null)).toHaveLength(1)
+  })
+
+  it('истёкшую не воскрешает', async () => {
+    // Между чтением и продлением сессия может кончиться, и продление не должно стать способом
+    // вернуть её к жизни — у истёкшей нет читателя, как и у отозванной.
+    const actorId = await insertActor(db)
+    const id = randomUUID()
+    await repository.create(id, actorId, token(), null, anHourFromNow())
+    await db
+      .update(sessions)
+      .set({
+        createdAt: new Date(Date.now() - 2 * HOUR),
+        lastSeenAt: new Date(Date.now() - 2 * HOUR),
+        expiresAt: new Date(Date.now() - HOUR),
+      })
+      .where(eq(sessions.id, id))
+
+    expect(await repository.touch(id, SESSION_TOUCH_AFTER_HOURS, SESSION_LIFETIME_DAYS)).toBeNull()
+  })
+
+  it('негодный идентификатор — ничего, а не 22P02', async () => {
+    expect(
+      await repository.touch('не uuid', SESSION_TOUCH_AFTER_HOURS, SESSION_LIFETIME_DAYS),
+    ).toBeNull()
   })
 })

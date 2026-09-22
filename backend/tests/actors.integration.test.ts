@@ -1,16 +1,18 @@
 /**
- * The whole path of an identity, through the server rather than around it: the door, the
- * header, the hook and the central error handler all take part, and every one of them is a
+ * The whole path of an identity, through the server rather than around it: the seam, the
+ * cookie, the hook and the central error handler all take part, and every one of them is a
  * place where a wrong answer would only show up here.
  */
+import { randomBytes } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { ERROR, actorWireSchema } from '@molvia/model'
+import { ERROR, SESSION_COOKIE, actorWireSchema } from '@molvia/model'
 import type { ActorWire } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { actors, events } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
+import { signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 
@@ -50,15 +52,26 @@ async function firstVisit(): Promise<Reply> {
   })
 }
 
-async function asActor(id: string | null): Promise<Reply> {
+/** «Кто я» с любым заголовком `Cookie`, каким бы он ни был, — или вовсе без него. */
+async function withCookie(cookie: string | null): Promise<Reply> {
   return served(async (app) => {
     const response = await app.inject({
       method: 'GET',
       url: '/actors/me',
-      headers: id === null ? {} : { 'x-molvia-actor': id },
+      headers: cookie === null ? {} : { cookie },
     })
     return { status: response.statusCode, body: JSON.parse(response.body) as unknown }
   })
+}
+
+/** «Кто я» от лица владельца, которому только что выдали сессию. */
+async function asActor(id: string | null): Promise<Reply> {
+  return withCookie(id === null ? null : await signIn(db, id))
+}
+
+/** 32 байта, как чеканит сам сервер: такой токен есть кому не найти, а не нечем прочитать. */
+function aToken(): string {
+  return randomBytes(32).toString('base64url')
 }
 
 beforeEach(async () => {
@@ -123,7 +136,7 @@ describe('the first visit', () => {
   })
 })
 
-describe('a request that names its owner', () => {
+describe('a request that proves who it is', () => {
   it('gets back that owner and nobody else', async () => {
     const mine = actorIn((await firstVisit()).body)
     const other = actorIn((await firstVisit()).body)
@@ -135,36 +148,46 @@ describe('a request that names its owner', () => {
     expect(actorIn(body).id).not.toBe(other.id)
   })
 
-  it('is refused with 401 when the header is missing', async () => {
+  it('is refused with 401 when there is no cookie at all', async () => {
     expect(await asActor(null)).toEqual({ status: 401, body: { code: ERROR.NO_ACTOR } })
   })
 
-  it('is refused the same way when the header is not a uuid', async () => {
-    // Postgres answers 22P02 to a malformed uuid, which used to be a 500. The repository
-    // turns it into «nothing found», and the reply must be indistinguishable from unknown.
-    for (const bad of ['abc', '', ' ', '11111111-1111-4111-8111']) {
-      expect(await asActor(bad)).toEqual({ status: 401, body: { code: ERROR.NO_ACTOR } })
+  it('is refused the same way for a value this server could not have minted', async () => {
+    // The repository refuses the shape before Postgres sees it, so «not a token» is nothing
+    // found rather than an error about its form — which would be a third distinguishable
+    // answer where the whole point is that there is one.
+    for (const bad of ['abc', ' ', 'не токен вовсе', UNKNOWN_ID]) {
+      expect(await withCookie(`${SESSION_COOKIE}=${bad}`)).toEqual({
+        status: 401,
+        body: { code: ERROR.NO_ACTOR },
+      })
     }
   })
 
-  it('is refused when the uuid is well formed but belongs to nobody', async () => {
-    expect(await asActor(UNKNOWN_ID)).toEqual({ status: 401, body: { code: ERROR.NO_ACTOR } })
+  it('is refused when the token is well formed but nobody holds it', async () => {
+    expect(await withCookie(`${SESSION_COOKIE}=${aToken()}`)).toEqual({
+      status: 401,
+      body: { code: ERROR.NO_ACTOR },
+    })
   })
 
-  it('does not create an identity for an unknown identifier', async () => {
-    await asActor(UNKNOWN_ID)
+  it('does not create an identity for a token nobody holds', async () => {
+    await withCookie(`${SESSION_COOKIE}=${aToken()}`)
 
     expect(await db.select().from(actors)).toHaveLength(0)
   })
 
-  it('reads the header whatever case it arrives in', async () => {
+  it('finds its cookie among other people’s', async () => {
+    // A browser at one origin carries whatever anything there has set. Read by prefix, a
+    // neighbouring `molvia_session_x` would have been ours.
     const actor = actorIn((await firstVisit()).body)
+    const mine = await signIn(db, actor.id)
 
-    const response = await served((app) =>
-      app.inject({ method: 'GET', url: '/actors/me', headers: { 'X-Molvia-Actor': actor.id } }),
-    )
+    const found = await withCookie(`ab=1; ${SESSION_COOKIE}_x=${aToken()}; ${mine}; z=2`)
+    expect(found.status).toBe(200)
 
-    expect(response.statusCode).toBe(200)
+    const only = await withCookie(`${SESSION_COOKIE}_x=${aToken()}`)
+    expect(only.status).toBe(401)
   })
 
   it('leaves the row exactly as the first visit wrote it', async () => {

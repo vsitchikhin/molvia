@@ -12,6 +12,7 @@ import { actors, events } from '@/db/schema'
 import { buildServer } from '@/server'
 import { withActor } from '@/routes/actor'
 import { connectDrizzle } from './db'
+import { signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 
@@ -152,7 +153,7 @@ describe('the replies that carry the identity', () => {
     const mine = await app.inject({
       method: 'GET',
       url: '/actors/me',
-      headers: { 'x-molvia-actor': id },
+      headers: { cookie: await signIn(db, id) },
     })
 
     expect(created.headers['cache-control']).toBe('no-store')

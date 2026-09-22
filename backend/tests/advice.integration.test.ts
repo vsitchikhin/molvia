@@ -12,7 +12,15 @@ import type { FastifyInstance } from 'fastify'
 import { actors, events, expenses, verdicts } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
+import {
+  aStrangersCookie,
+  clearAll,
+  insertActor,
+  insertItem,
+  insertPlace,
+  insertTrip,
+  signIn,
+} from './fixtures'
 
 const { db, close } = connectDrizzle()
 
@@ -41,7 +49,7 @@ async function ask(actor: string | null) {
   const response = await app.inject({
     method: 'GET',
     url: '/advice',
-    headers: actor === null ? {} : { 'x-molvia-actor': actor },
+    headers: actor === null ? {} : { cookie: await signIn(db, actor) },
   })
   return { status: response.statusCode, headers: response.headers, body: response.body }
 }
@@ -385,7 +393,8 @@ describe('журнал событий', () => {
   })
 
   it('не пишет просмотр тому, кого нет', async () => {
-    await ask(randomUUID())
+    // Чужая cookie, а не чужой uuid: назвать владельца снаружи больше нечем (MOL-53).
+    await app.inject({ method: 'GET', url: '/advice', headers: { cookie: aStrangersCookie() } })
 
     expect(await db.select().from(events)).toHaveLength(0)
   })

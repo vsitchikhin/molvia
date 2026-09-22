@@ -14,7 +14,7 @@ import { expenses, places, searchPicks } from '@/db/schema'
 import { searchQueryKey } from '@/db/items-repository'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem } from './fixtures'
+import { clearAll, insertActor, insertItem, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 // The test pool holds one connection, so a second server needs its own to run beside the first,
@@ -56,7 +56,7 @@ async function call(
   const response = await server.inject({
     method,
     url,
-    headers: { 'x-molvia-actor': actor },
+    headers: { cookie: await signIn(db, actor) },
     ...(body === undefined ? {} : { payload: body as Record<string, unknown> }),
   })
   return {

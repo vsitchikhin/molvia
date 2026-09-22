@@ -13,9 +13,9 @@ import { placeRoutes } from '@/routes/places'
 import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
 import { advice } from '@/usecases/advice'
+import { authenticate } from '@/usecases/authenticate'
 import { createActor } from '@/usecases/create-actor'
 import { currentTrip } from '@/usecases/current-trip'
-import { getActor } from '@/usecases/get-actor'
 import { proposeItem } from '@/usecases/propose-item'
 import { recentPlaces } from '@/usecases/recent-places'
 import { rateItem } from '@/usecases/rate-item'
@@ -29,6 +29,7 @@ import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases
 import { createActorRepository } from '@/db/actors-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
+import { createSessionRepository } from '@/db/sessions-repository'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { databaseIsReachable, getDb } from '@/db'
@@ -121,6 +122,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const events = createEventRepository(db)
     const tripData = tripRepositories(db)
     const transact = transactOn(db)
+    const sessions = createSessionRepository(db)
     const verdicts = createVerdictRepository(db)
 
     healthRoutes(instance, { databaseIsReachable })
@@ -144,7 +146,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     // is only true if the guarded place is where routes are actually added. MOL-21 and MOL-27
     // add theirs next to these.
     void instance.register((guarded, _guardedOptions, guardedDone) => {
-      withActor(guarded, (id) => getActor(actors, id))
+      withActor(guarded, (token) => authenticate(sessions, token))
       actorMeRoute(guarded)
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items }, actorId, query),

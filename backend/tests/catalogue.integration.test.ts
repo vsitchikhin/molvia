@@ -11,6 +11,7 @@ import {
   ERROR,
   ISSUE,
   catalogueEntryCodec,
+  SESSION_COOKIE,
   catalogueSearchResponseSchema,
 } from '@molvia/model'
 import type { CatalogueEntry, NewItem } from '@molvia/model'
@@ -21,13 +22,11 @@ import { createSearchPickRepository } from '@/db/search-picks-repository'
 import { SEARCH_LIMIT } from '@/usecases/search-catalogue'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor } from './fixtures'
+import { aStrangersCookie, clearAll, insertActor, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const repository = createItemRepository(db)
 const picks = createSearchPickRepository(db)
-
-const UNKNOWN_ID = '11111111-1111-4111-8111-111111111111'
 
 let app: FastifyInstance
 
@@ -58,7 +57,7 @@ async function search(actor: string | null, query: string): Promise<Reply> {
   const response = await app.inject({
     method: 'GET',
     url: `/catalogue/search${query}`,
-    headers: actor === null ? {} : { 'x-molvia-actor': actor },
+    headers: actor === null ? {} : { cookie: await signIn(db, actor) },
   })
   return {
     status: response.statusCode,
@@ -74,7 +73,7 @@ async function propose(actor: string | null, body: unknown): Promise<Reply> {
   const response = await app.inject({
     method: 'POST',
     url: '/catalogue/items',
-    headers: actor === null ? {} : { 'x-molvia-actor': actor },
+    headers: actor === null ? {} : { cookie: await signIn(db, actor) },
     payload: body as Record<string, unknown>,
   })
   return {
@@ -106,9 +105,23 @@ describe('GET /catalogue/search — the door', () => {
     const actor = await insertActor(db)
     await add({ name: 'Молоко «Ашхар»' })
 
-    const missing = await search(null, q('молоко'))
-    const malformed = await search('not-a-uuid', q('молоко'))
-    const unknown = await search(UNKNOWN_ID, q('молоко'))
+    // Не через `search`: тот входит за названного владельца, а здесь проверяется как раз то,
+    // что владельца никто не назвал — ни cookie, ни негодной, ни чужой.
+    const asked = async (cookie?: string) => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/catalogue/search${q('молоко')}`,
+        headers: cookie === undefined ? {} : { cookie },
+      })
+      return {
+        status: response.statusCode,
+        raw: response.body,
+        body: JSON.parse(response.body) as unknown,
+      }
+    }
+    const missing = await asked()
+    const malformed = await asked(`${SESSION_COOKIE}=not-a-token`)
+    const unknown = await asked(aStrangersCookie())
 
     expect(missing.status).toBe(401)
     expect(missing.body).toEqual({ code: ERROR.NO_ACTOR })
@@ -135,7 +148,7 @@ describe('GET /catalogue/search — the door', () => {
     const response = await app.inject({
       method: 'HEAD',
       url: `/catalogue/search${q('молоко')}`,
-      headers: { 'x-molvia-actor': actor },
+      headers: { cookie: await signIn(db, actor) },
     })
 
     expect(response.statusCode).toBe(404)
@@ -421,11 +434,14 @@ describe('POST /catalogue/items — «Предложить товар»', () => 
     const second = buildServer({ db: other.db })
     await second.ready()
     try {
+      // Одна сессия на обе стороны: гонка тут между двумя серверами над одной базой, а не
+      // между двумя входами — второй вход только добавил бы строку, ничего не проверяя.
+      const cookie = await signIn(db, actor)
       const inject = (server: FastifyInstance) =>
         server.inject({
           method: 'POST',
           url: '/catalogue/items',
-          headers: { 'x-molvia-actor': actor },
+          headers: { cookie },
           payload: cheese,
         })
       const replies = await Promise.all([inject(app), inject(second)])

@@ -2,14 +2,29 @@ import { z } from 'zod'
 import { actorSchema } from '#model/entities/actor'
 
 /**
- * The header a request names its owner with. Part of the contract rather than of the route,
- * because both ends need it: the API reads it, the client writes it, and a name spelled twice
- * is a name that can drift.
+ * The cookie a request proves itself with (MOL-53). It replaced `X-Molvia-Actor`, a header
+ * carrying the owner's own uuid — that is, a name and a password that were one value.
  *
- * Not the path and not a query parameter: both land in the access log, in browser history and
- * in `Referer`, and this identifier is a bearer key — whoever reads it is the owner. Not a
- * cookie either: a cookie travels on requests started by other sites, which is CSRF, and the
- * bot has no cookie jar at all.
+ * Here rather than in the route although only the server ever touches it: the server sets it,
+ * the end-to-end suite asserts it and MOL-54 hands out the same one, and a name spelled three
+ * times is a name that can drift. The **client never reads it** — that is the point of
+ * `HttpOnly`, and `@molvia/client` has no notion of identity left at all.
+ *
+ * The comment this replaced argued *against* a cookie on two grounds, and both fell away with
+ * the thing they described. «A cookie travels on requests started by other sites» — it does
+ * not, with `SameSite`, and every handle that writes is `POST`, `PUT` or `DELETE`. «The bot has
+ * no cookie jar» — the bot stopped being a client with an identity: in MOL-54 it reaches the
+ * API over an internal channel with its own secret, not as a person.
+ *
+ * What did not change is why this is not a path or a query parameter: both land in the access
+ * log, in browser history and in `Referer`, and the value is still a bearer key.
+ */
+export const SESSION_COOKIE = 'molvia_session'
+
+/**
+ * What it replaced. The server stopped reading it in this very commit; it stays alive for one
+ * more because `@molvia/client` and the PWA still write it, and they are taken off it — with
+ * everything else that treated `actors.id` as a password — in the commit after this one.
  */
 export const ACTOR_HEADER = 'x-molvia-actor'
 
