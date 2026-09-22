@@ -185,10 +185,18 @@
     "truncated": "Showing {shown} of {total}",
     "stale": "The list as of {day} at {time} — we will refresh once you are back online",
     "stale_error": "The list as of {day} at {time} — the server did not answer",
+    "stale_loading": "The list as of {day} at {time} — refreshing",
+    "edit_action": "Change the rating",
     "edit": {
       "meta": "Only your own rating changes",
+      "meta_new": "You have not rated this yet",
+      "save_new": "Rate it",
+      "keeps_score": "The rating stays as it was. To take it back, withdraw it",
       "withdraw": "Withdraw the rating",
       "withdraw_hint": "The item leaves this screen, and the purchase goes back to «Ratings»",
+      "withdraw_hint_shared": "Your rating leaves the average, and the purchase goes back to «Ratings»",
+      "not_mine": "You have no rating here — refresh the list",
+      "nothing_changed": "Nothing has changed",
       "failed": "Could not save it. Try again",
       "offline": "A rating can be changed once you are online"
     },

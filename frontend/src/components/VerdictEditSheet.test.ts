@@ -1,11 +1,11 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
-import { ERROR } from '@molvia/model'
-import type { VerdictAmendment, VerdictCard } from '@molvia/model'
+import { ERROR, ISSUE } from '@molvia/model'
+import type { Rating, VerdictAmendment, VerdictCard } from '@molvia/model'
 import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
 import type { Score } from '@/components/rating'
 import { createAppI18n } from '@/i18n'
@@ -13,10 +13,13 @@ import { routes } from '@/router'
 
 const amendVerdict = vi.fn<(itemId: string, patch: VerdictAmendment) => Promise<VerdictCard>>()
 const withdrawVerdict = vi.fn<(itemId: string) => Promise<void>>()
+const rateItem =
+  vi.fn<(itemId: string, rating: Rating) => Promise<{ verdict: VerdictCard; created: boolean }>>()
 vi.mock('@/api', () => ({
   api: {
     amendVerdict: (itemId: string, patch: VerdictAmendment) => amendVerdict(itemId, patch),
     withdrawVerdict: (itemId: string) => withdrawVerdict(itemId),
+    rateItem: (itemId: string, rating: Rating) => rateItem(itemId, rating),
   },
 }))
 
@@ -39,6 +42,7 @@ beforeEach(() => {
   setActivePinia(createPinia())
   amendVerdict.mockReset()
   withdrawVerdict.mockReset()
+  rateItem.mockReset()
   vi.restoreAllMocks()
   online(true)
   clock = 0
@@ -53,6 +57,9 @@ afterEach(() => {
 interface Options {
   readonly ownScore?: Score | null
   readonly ownReview?: string | null
+  /** Whether there is a verdict of this person's behind the row (`AdviceRow.isMine`). */
+  readonly mine?: boolean
+  readonly shared?: boolean
 }
 
 async function render(options: Options = {}) {
@@ -63,6 +70,8 @@ async function render(options: Options = {}) {
     props: {
       itemId: ITEM,
       name: 'Колбаса «Молочная»',
+      mine: options.mine ?? true,
+      shared: options.shared ?? false,
       ownScore: options.ownScore ?? null,
       ownReview: options.ownReview ?? null,
     },
@@ -140,6 +149,92 @@ describe('VerdictEditSheet', () => {
 
     expect(key(view, 4).attributes('aria-pressed')).toBe('false')
     expect(button(view, 'Save the rating').attributes('disabled')).toBeDefined()
+  })
+
+  it('А7: a space typed into an empty review is no change, and nothing is sent', async () => {
+    // `tidyText` eats the space inside `save()`, so the patch used to leave as `{}` and come
+    // back refused, under «Попробуйте ещё раз» — which a repeat could not fix.
+    const { view } = await render({ ownScore: 3, ownReview: null })
+
+    await view.get('textarea').setValue(' ')
+    expect(button(view, 'Save the rating').attributes('disabled')).toBeUndefined()
+
+    await button(view, 'Save the rating').trigger('click')
+    await flushPromises()
+
+    expect(amendVerdict).not.toHaveBeenCalled()
+    expect(view.text()).not.toContain('Could not save it')
+  })
+
+  it('А5: a cleared scale says the rating stays, rather than leaving it to be discovered', async () => {
+    const { view } = await render({ ownScore: 3, ownReview: 'Крахмал' })
+
+    expect(view.text()).not.toContain('The rating stays as it was')
+
+    await key(view, 3).trigger('click')
+
+    expect(view.text()).toContain('The rating stays as it was')
+  })
+
+  it('А2: a row nobody of one`s own stands behind is rated, not amended', async () => {
+    rateItem.mockResolvedValue({ verdict: card(), created: true })
+    const { view } = await render({ mine: false, shared: true })
+
+    // Nothing to amend and nothing to withdraw: the sheet says so and offers neither.
+    expect(view.text()).toContain('You have not rated this yet')
+    expect(view.findAll('button').map((b) => b.text())).not.toContain('Withdraw the rating')
+    // A first verdict needs a score: a review alone is not a verdict.
+    expect(button(view, 'Rate it').attributes('disabled')).toBeDefined()
+
+    await key(view, 5).trigger('click')
+    await button(view, 'Rate it').trigger('click')
+    await flushPromises()
+
+    expect(rateItem).toHaveBeenCalledWith(ITEM, { score: 5 })
+    expect(amendVerdict).not.toHaveBeenCalled()
+    expect(view.emitted('saved')).toHaveLength(1)
+  })
+
+  it('МР-3: withdrawing says what it does, and that differs in the shared mode', async () => {
+    const own = await render({ ownScore: 1 })
+    expect(own.view.text()).toContain('The item leaves this screen')
+
+    const shared = await render({ ownScore: null, shared: true })
+    expect(shared.view.text()).toContain('Your rating leaves the average')
+    expect(shared.view.text()).not.toContain('The item leaves this screen')
+  })
+
+  it('МР-4: a refusal the domain has words for gets them, instead of «try again»', async () => {
+    amendVerdict.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'HTTP 404'))
+    const { view } = await render({ ownScore: 1 })
+
+    await key(view, 5).trigger('click')
+    await button(view, 'Save the rating').trigger('click')
+    await flushPromises()
+
+    expect(view.text()).toContain('You have no rating here')
+    expect(view.text()).not.toContain('Try again')
+
+    amendVerdict.mockRejectedValue(new ApiError(ISSUE.PATCH_EMPTY, 'HTTP 400'))
+    await key(view, 4).trigger('click')
+    await button(view, 'Save the rating').trigger('click')
+    await flushPromises()
+
+    expect(view.text()).toContain('Nothing has changed')
+  })
+
+  it('МР-6: a refusal goes as soon as the text is touched', async () => {
+    amendVerdict.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 502'))
+    const { view } = await render({ ownScore: 1 })
+
+    await key(view, 5).trigger('click')
+    await button(view, 'Save the rating').trigger('click')
+    await flushPromises()
+    expect(view.text()).toContain('Could not save it')
+
+    await view.get('textarea').setValue('Пахнет крахмалом')
+
+    expect(view.text()).not.toContain('Could not save it')
   })
 
   it('a failure keeps the sheet open and says whether it was the server or the connection', async () => {
