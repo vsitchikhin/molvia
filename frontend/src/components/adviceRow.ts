@@ -1,4 +1,6 @@
-import type { AdvicePlace, AdviceRow } from '@molvia/model'
+import type { AdvicePlace, AdviceRow, AdviceScope } from '@molvia/model'
+import { SCORES } from '@/components/rating'
+import type { Score } from '@/components/rating'
 
 /**
  * The three shapes of row, each named on its own: a component takes the one it draws, so a
@@ -47,4 +49,18 @@ export function formatRating(rating: string, locale: string): string {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   }).format(Number(rating))
+}
+
+/**
+ * The person's own score behind a row, when the row carries it — and `null` when it does not.
+ *
+ * In the shared mode the figure is an average over several people (MOL-31, Р-13), and their
+ * average is not this person's opinion: offered pre-chosen in the sheet, a save would write it
+ * down as one. In the own mode the row is a single verdict, so the figure is a whole number
+ * and it is theirs. Checked rather than assumed: a fraction means the row is not one person's.
+ */
+export function ownScore(rating: string, scope: AdviceScope): Score | null {
+  if (scope !== 'own') return null
+  const value = Number(rating)
+  return SCORES.find((score) => score === value) ?? null
 }

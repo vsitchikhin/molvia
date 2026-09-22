@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AdvicePlace } from '@molvia/model'
-import { placesView } from '@/components/adviceRow'
+import { ownScore, placesView } from '@/components/adviceRow'
 
 function place(name: string, amount: bigint): AdvicePlace {
   return {
@@ -37,5 +37,22 @@ describe('placesView', () => {
     // is not in the row at all, so a screen that sorted again would undo that rule blindly.
     expect(placesView([sas, market]).kind).toBe('cheapest')
     expect(placesView([sas, market])).toMatchObject({ best: sas, rest: [market] })
+  })
+})
+
+describe('ownScore', () => {
+  it('in the own mode the figure on the row is this person`s score', () => {
+    expect(ownScore('4.0', 'own')).toBe(4)
+    expect(ownScore('1.0', 'own')).toBe(1)
+  })
+
+  it('in the shared mode nothing is offered: an average is nobody`s opinion', () => {
+    // Pre-chosen, a save would write four other people's average down as this person's score.
+    expect(ownScore('4.0', 'shared')).toBeNull()
+    expect(ownScore('4.3', 'shared')).toBeNull()
+  })
+
+  it('a fraction means the row is not one person`s, whatever the mode says', () => {
+    expect(ownScore('4.3', 'own')).toBeNull()
   })
 })

@@ -1,5 +1,5 @@
 <template>
-  <div class="row">
+  <button class="row" type="button" @click="$emit('edit')">
     <VerdictBadge level="if_cheap" compact />
 
     <span class="body">
@@ -11,7 +11,7 @@
       <span v-if="places.kind !== 'none'" class="price">{{ unitPrice(places.best) }}</span>
       <AdviceRating :rating="row.rating" :count="row.ratingsCount" />
     </span>
-  </div>
+  </button>
 </template>
 
 <script lang="ts">
@@ -43,6 +43,9 @@ export default defineComponent({
   components: { AdviceRating, VerdictBadge },
   props: {
     row: { type: Object as PropType<CheapRow>, required: true },
+  },
+  emits: {
+    edit: () => true,
   },
   setup(props) {
     const { t, locale } = useI18n()
@@ -82,10 +85,21 @@ export default defineComponent({
   display: flex;
   gap: var(--space-3);
   align-items: center;
+  width: 100%;
+  min-height: var(--touch-target);
   padding: var(--space-2) var(--space-3);
   border: var(--hairline) dashed var(--warn);
   border-radius: var(--radius);
   background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
 }
 
 .row + .row {

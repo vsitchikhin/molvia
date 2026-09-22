@@ -74,6 +74,12 @@ async function recordLiveRegion(page: Page): Promise<() => Promise<string[]>> {
   return () => page.evaluate(() => (window as unknown as { __said: string[] }).__said)
 }
 
+/** Waits for the sheet to be up: until it has risen it deliberately takes no tap at all. */
+async function openSheet(page: Page): Promise<void> {
+  await expect(page.locator('dialog[open]')).toBeVisible()
+  await page.waitForTimeout(400)
+}
+
 /** What the app's live region holds now — what browse mode would still find in it. */
 async function liveRegion(page: Page): Promise<string> {
   return (await page.locator('.announcer').textContent()) ?? ''
@@ -251,4 +257,35 @@ test('the action of the empty state is large enough to hit with a thumb', async 
 
   const box = await button.boundingBox()
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+})
+
+test('a mis-tapped verdict is amended where it is met, and withdrawn from there too', async ({
+  page,
+  request,
+}) => {
+  const who = await person(request, page)
+  const name = `Сыр «Чанах» ${tag}`
+  await ratedPurchase(who, name, 1)
+
+  await page.goto('/advice')
+  await expect(page.locator('section.never').getByText(name)).toBeVisible()
+
+  // A «1» given by mistake used to stand until the item was bought again: «Ratings» only ever
+  // asks about purchases with no verdict at all.
+  await page.locator('section.never').getByRole('button').first().click()
+  // The sheet takes no tap until it has come up: the second tap of a double tap must not
+  // press anything inside it (MOL-18).
+  await openSheet(page)
+  await page.getByRole('button', { name: 'Rating 5 out of 5' }).click()
+  await page.getByRole('button', { name: 'Save the rating' }).click()
+
+  await expect(page.locator('section.take').getByText(name)).toBeVisible()
+  await expect(page.locator('section.never')).toHaveCount(0)
+
+  // Withdrawn, it leaves the screen altogether — and the purchase goes back to «Ratings».
+  await page.locator('section.take').getByRole('button').first().click()
+  await openSheet(page)
+  await page.getByRole('button', { name: 'Withdraw the rating' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Nothing to advise yet' })).toBeVisible()
 })

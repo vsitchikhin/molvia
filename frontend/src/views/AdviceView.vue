@@ -59,15 +59,30 @@
         </div>
 
         <AdviceGroup v-if="groups.take.length > 0" level="take">
-          <AdviceTakeCard v-for="row in groups.take" :key="row.itemId" :row="row" />
+          <AdviceTakeCard
+            v-for="row in groups.take"
+            :key="row.itemId"
+            :row="row"
+            @edit="edit(row)"
+          />
         </AdviceGroup>
 
         <AdviceGroup v-if="groups.if_cheap.length > 0" level="if_cheap">
-          <AdviceCheapRow v-for="row in groups.if_cheap" :key="row.itemId" :row="row" />
+          <AdviceCheapRow
+            v-for="row in groups.if_cheap"
+            :key="row.itemId"
+            :row="row"
+            @edit="edit(row)"
+          />
         </AdviceGroup>
 
         <AdviceGroup v-if="groups.never.length > 0" level="never">
-          <AdviceNeverRow v-for="row in groups.never" :key="row.itemId" :row="row" />
+          <AdviceNeverRow
+            v-for="row in groups.never"
+            :key="row.itemId"
+            :row="row"
+            @edit="edit(row)"
+          />
           <p class="tail">{{ t('advice.no_price_shown') }}</p>
         </AdviceGroup>
 
@@ -75,12 +90,25 @@
         <p v-if="scope === 'shared'" class="foot">{{ t('advice.shared_note') }}</p>
       </template>
     </template>
+
+    <!-- Mounted on a tap and put away from `onClosed`: each opening starts from the row as the
+         server last described it, so a withdrawal and a second thought never share a state. -->
+    <VerdictEditSheet
+      v-if="editing"
+      :item-id="editing.itemId"
+      :name="editing.name"
+      :own-score="editing.score"
+      :own-review="editing.review"
+      :on-closed="putAway"
+      @saved="retry"
+    />
   </AppScreen>
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { AdviceRow } from '@molvia/model'
 import IconStar from '~icons/mdi/star-outline'
 import AdviceCheapRow from '@/components/AdviceCheapRow.vue'
 import AdviceGroup from '@/components/AdviceGroup.vue'
@@ -90,6 +118,9 @@ import AppButton from '@/components/AppButton.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
+import { ownScore } from '@/components/adviceRow'
+import type { Score } from '@/components/rating'
 import { useAdvice } from '@/composables/useAdvice'
 import { purchaseDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
@@ -123,11 +154,28 @@ export default defineComponent({
     AppScreen,
     ScreenSkeleton,
     ScreenState,
+    VerdictEditSheet,
   },
   setup() {
     const { t, locale } = useI18n()
     const { goTab } = useNavigation()
     const advice = useAdvice()
+    /** The row whose verdict is being amended, as the last answer described it. */
+    const editing = ref<{
+      itemId: string
+      name: string
+      score: Score | null
+      review: string | null
+    } | null>(null)
+
+    function edit(row: AdviceRow): void {
+      editing.value = {
+        itemId: row.itemId,
+        name: row.name,
+        score: ownScore(row.rating, advice.scope.value ?? 'own'),
+        review: row.review,
+      }
+    }
 
     return {
       t,
@@ -139,6 +187,11 @@ export default defineComponent({
       total: advice.total,
       stale: advice.stale,
       fetchedAt: advice.fetchedAt,
+      editing,
+      edit,
+      putAway: () => {
+        editing.value = null
+      },
       retry: () => void advice.retry(),
       day: (when: Date) => purchaseDay(when, locale.value),
       time: (when: Date) => timeOfDay(when, locale.value),

@@ -1,11 +1,11 @@
 <template>
-  <div class="row">
+  <button class="row" type="button" @click="$emit('edit')">
     <span class="line">
       <span class="name">{{ row.name }}</span>
       <AdviceRating :rating="row.rating" :count="row.ratingsCount" />
     </span>
     <span v-if="row.review" class="review">{{ row.review }}</span>
-  </div>
+  </button>
 </template>
 
 <script lang="ts">
@@ -33,12 +33,30 @@ export default defineComponent({
   props: {
     row: { type: Object as PropType<NeverRow>, required: true },
   },
+  emits: {
+    edit: () => true,
+  },
 })
 </script>
 
 <style scoped lang="scss">
 .row {
-  padding: var(--space-1) var(--space-1);
+  display: block;
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-1);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
 }
 
 .line {

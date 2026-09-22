@@ -1,19 +1,21 @@
 <template>
   <AppCard as="article" tone="take" class="card">
-    <span class="head">
-      <VerdictBadge level="take" />
-      <AdviceRating :rating="row.rating" :count="row.ratingsCount" />
-    </span>
-
-    <span class="name">{{ row.name }}</span>
-
-    <template v-if="places.kind !== 'none'">
-      <span class="best">
-        <span class="where">{{ where }}</span>
-        <span class="price">{{ unitPrice(places.best) }}</span>
+    <button class="tap" type="button" @click="$emit('edit')">
+      <span class="head">
+        <VerdictBadge level="take" />
+        <AdviceRating :rating="row.rating" :count="row.ratingsCount" />
       </span>
-      <span v-if="places.rest.length > 0" class="more">{{ also }}</span>
-    </template>
+
+      <span class="name">{{ row.name }}</span>
+
+      <template v-if="places.kind !== 'none'">
+        <span class="best">
+          <span class="where">{{ where }}</span>
+          <span class="price">{{ unitPrice(places.best) }}</span>
+        </span>
+        <span v-if="places.rest.length > 0" class="more">{{ also }}</span>
+      </template>
+    </button>
   </AppCard>
 </template>
 
@@ -46,6 +48,9 @@ export default defineComponent({
   components: { AdviceRating, AppCard, VerdictBadge },
   props: {
     row: { type: Object as PropType<TakeRow>, required: true },
+  },
+  emits: {
+    edit: () => true,
   },
   setup(props) {
     const { t, locale } = useI18n()
@@ -86,7 +91,26 @@ export default defineComponent({
 <style scoped lang="scss">
 .card {
   display: block;
+  padding: 0;
+}
+
+/* The whole card is the tap: a verdict is amended where it is met (MOL-32, В-1). */
+.tap {
+  display: block;
+  width: 100%;
   padding: var(--space-3) var(--space-4);
+  border: none;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
 }
 
 .card + .card {

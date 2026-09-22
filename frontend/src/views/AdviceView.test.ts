@@ -55,6 +55,9 @@ const sausage: AdviceRow = {
   review: 'Пахнет крахмалом, а не мясом',
 }
 
+/** How a row looks in the own mode: one verdict, so the figure is whole and it is the asker's. */
+const mine: AdviceRow = { ...sausage, rating: '1.0', ratingsCount: 1 }
+
 function answer(rows: AdviceRow[], over: Partial<AdviceResponse> = {}): AdviceResponse {
   return { scope: 'own', rows, total: rows.length, ...over }
 }
@@ -193,8 +196,8 @@ describe('AdviceView', () => {
 
     expect(view.text()).toContain(milk.name)
     expect(view.text()).toContain('The list as of today at')
-    // The list is there, so there is nothing to press: it refreshes by itself.
-    expect(view.findAll('button')).toHaveLength(0)
+    // The connection will come back by itself, so the strip offers nothing to press.
+    expect(view.findAll('button').map((button) => button.text())).not.toContain(en.state.retry)
   })
 
   it('the server broke with a list remembered: the strip offers the retry the screen cannot make', async () => {
@@ -207,6 +210,41 @@ describe('AdviceView', () => {
     expect(view.text()).toContain('the server did not answer')
     const retry = view.findAll('button').find((button) => button.text() === en.state.retry)
     expect(retry).toBeDefined()
+  })
+
+  it('a tap on a row opens the sheet on that row, and a save asks the server again', async () => {
+    advice.mockResolvedValue(answer([milk, mine]))
+    const { view } = await render()
+
+    await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')
+    await flushPromises()
+
+    const sheet = view.findComponent({ name: 'VerdictEditSheet' })
+    expect(sheet.exists()).toBe(true)
+    expect(sheet.props('itemId')).toBe(mine.itemId)
+    // Own mode: the figure on the row is this person's, so the scale opens on it.
+    expect(sheet.props('ownScore')).toBe(1)
+    expect(sheet.props('ownReview')).toBe(mine.review)
+
+    // A saved verdict moves the row to another group, or out of the list: the screen asks the
+    // server again rather than moving it itself.
+    advice.mockResolvedValue(answer([milk]))
+    sheet.vm.$emit('saved')
+    await flushPromises()
+
+    expect(advice).toHaveBeenCalledTimes(2)
+    expect(view.findAllComponents({ name: 'AdviceNeverRow' })).toHaveLength(0)
+  })
+
+  it('in the shared mode the sheet is opened with no score chosen', async () => {
+    // The same row that opens pre-chosen in the own mode: here the figure is an average.
+    advice.mockResolvedValue(answer([mine], { scope: 'shared' }))
+    const { view } = await render()
+
+    await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')
+    await flushPromises()
+
+    expect(view.findComponent({ name: 'VerdictEditSheet' }).props('ownScore')).toBeNull()
   })
 
   it('without an identity the screen asks for nothing and shows no failure of its own', async () => {

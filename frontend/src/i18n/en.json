@@ -185,6 +185,13 @@
     "truncated": "Showing {shown} of {total}",
     "stale": "The list as of {day} at {time} — we will refresh once you are back online",
     "stale_error": "The list as of {day} at {time} — the server did not answer",
+    "edit": {
+      "meta": "Only your own rating changes",
+      "withdraw": "Withdraw the rating",
+      "withdraw_hint": "The item leaves this screen, and the purchase goes back to «Ratings»",
+      "failed": "Could not save it. Try again",
+      "offline": "A rating can be changed once you are online"
+    },
     "empty": {
       "title": "Nothing to advise yet",
       "body": "Rate your first purchase — and what to buy will show up here",
