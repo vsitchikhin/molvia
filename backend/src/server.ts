@@ -3,6 +3,8 @@ import type { FastifyError, FastifyInstance } from 'fastify'
 import { DomainError, ERROR, ISSUE, errorResponseSchema, isWireCode } from '@molvia/model'
 import type { ErrorCode, ErrorResponse } from '@molvia/model'
 import { InvalidBody } from '@/parse'
+import { startLoginCleanup } from '@/login-cleanup'
+import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { healthRoutes } from '@/routes/health'
 import { withActor } from '@/routes/actor'
 import { actorMeRoute } from '@/routes/actors'
@@ -118,6 +120,20 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   // name a repository would be a route that could reach the database.
   app.register((instance, _options, done) => {
     const db = options.db ?? getDb()
+    const loginRequests = createLoginRequestRepository(db)
+    let stopCleanup: (() => Promise<void>) | undefined
+    instance.addHook('onReady', (ready) => {
+      stopCleanup = startLoginCleanup(
+        () => loginRequests.removeExpired(),
+        () => {
+          instance.log.error('login request cleanup failed')
+        },
+      )
+      ready()
+    })
+    instance.addHook('onClose', async () => {
+      await stopCleanup?.()
+    })
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
     const events = createEventRepository(db)

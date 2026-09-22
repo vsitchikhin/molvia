@@ -1,5 +1,10 @@
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import {
+  DomainError,
+  ERROR,
+  LOGIN_LIFETIME_SECONDS,
+  LOGIN_WINDOW_LIMIT,
+  LOGIN_WINDOW_SECONDS,
   deviceNameOrNull,
   loginCodeSchema,
   loginRequestSchema,
@@ -17,6 +22,14 @@ import { loginRequests } from './schema'
 export interface LoginRequestRepository {
   /** Lock before checking time: waiting for another write must not extend a login. */
   lock(id: string, secret: string): Promise<void>
+  createLimited(
+    id: string,
+    code: string,
+    secret: string,
+    deviceName: string | null,
+  ): Promise<LoginRequest>
+  removeExpired(): Promise<void>
+
   /**
    * Takes the browser's secret itself and writes only its digest, as sessions do (Р-6), and
    * judges what it was given **before** a row exists (`newLoginRequestSchema`) — a code the
@@ -99,6 +112,46 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
   const live = sql`${loginRequests.consumedAt} is null and ${loginRequests.expiresAt} > clock_timestamp()`
 
   return {
+    async removeExpired() {
+      await db.delete(loginRequests).where(sql`${loginRequests.expiresAt} <= clock_timestamp()`)
+    },
+
+    async createLimited(id, code, secret, deviceName) {
+      return db.transaction(async (tx) => {
+        // One quota for this database, including concurrent starts and process restarts.
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended('molvia:login-quota', 0))`,
+        )
+        const repository = createLoginRequestRepository(tx)
+        await repository.removeExpired()
+        const [count] = await tx
+          .select({ value: sql<number>`count(*)`.mapWith(Number) })
+          .from(loginRequests)
+          .where(
+            sql`${loginRequests.createdAt} > clock_timestamp() - make_interval(secs => ${LOGIN_WINDOW_SECONDS})`,
+          )
+        if ((count?.value ?? 0) >= LOGIN_WINDOW_LIMIT)
+          throw new DomainError(ERROR.LOGIN_RATE_LIMITED)
+        // Read the clock after the quota lock, not at the transaction's earlier start.
+        const [clock] = await tx.execute<{ at: string }>(sql`select clock_timestamp()::text as at`)
+        if (!clock) throw new Error('database returned no login clock')
+        const createdAt = new Date(clock.at)
+        const request = await repository.create(
+          id,
+          code,
+          secret,
+          deviceName,
+          new Date(createdAt.getTime() + LOGIN_LIFETIME_SECONDS * 1000),
+        )
+        const [row] = await tx
+          .update(loginRequests)
+          .set({ createdAt })
+          .where(eq(loginRequests.id, request.id))
+          .returning()
+        return toLoginRequest(theRow(row, 'login_requests'))
+      })
+    },
+
     async lock(id, secret) {
       if (idOrNull(id) === null || secretOrNull(secret) === null) return
       await db
