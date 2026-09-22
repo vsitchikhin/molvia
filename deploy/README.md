@@ -27,27 +27,31 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 Migrations run when the API starts, so there is no separate step to remember and no
 window where the schema lags the code deployed against it.
 
-## Nobody can sign in yet, and that is the current state rather than a fault
+## Login configuration (MOL-54)
 
-**Do not deploy this expecting people to use it.** The invite code of MOL-8 is gone together
-with `POST /actors` (MOL-52): the epic opened the door to everyone with a Telegram account, and
-taking the code off while leaving a handle that writes a row per call would have been worse
-than either. What signs a person in during development is `POST /dev/login`, and that address
-**does not exist in the production image** — the bundler folds its guard to a constant and
-drops the module, which a test asserts against the built file.
+The API now supports Telegram login. The bot commands (MOL-55) and the PWA login screen
+(MOL-56) still need to be connected before people can use the complete flow.
+`POST /dev/login` remains a development seam and is absent from the production bundle.
 
-The real door is the Telegram login of MOL-54. Until it ships, a production deployment serves
-the app to a person who will see «could not be identified» and a «try again» that cannot help.
-`SIGNUP_CODE` is no longer read by anything: it is out of `backend/src/env.ts`, out of
-`bin/init-env.sh`, out of `docker-compose.prod.yml` and out of `.env.prod.example`. A leftover
-value in `.env.prod` is harmless and should be deleted.
+Set `TELEGRAM_BOT_USERNAME` without `@` and generate `BOT_API_SECRET` using the command in
+`.env.prod.example`. This secret belongs to the internal API channel and is **not** the
+Telegram bot token. The backend and bot receive the same internal secret; only the bot
+receives `TELEGRAM_BOT_TOKEN`. Production refuses to start without the username and internal
+secret. Caddy returns 404 for `/api/internal` and `/api/internal/*`; the bot calls
+`http://backend:3300/internal/...` directly over the compose network and authenticates there.
+
+In a development copy with an older `.env`, run `bin/init-env.sh <index> --force` once. It
+preserves the Telegram token, username and internal secret, generating the latter only if
+missing. Set that copy's own bot username afterward. Without these settings, development
+still supports `/dev/login`, while starting a real login returns `503 error.login_disabled`.
+No real Telegram request is made by the login API itself.
 
 ## Trying the production stack locally
 
 ```bash
 DOMAIN=localhost POSTGRES_DB=molvia POSTGRES_USER=molvia POSTGRES_PASSWORD=localtest \
 HTTP_PORT=8080 HTTPS_PORT=8443 \
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 
 curl -k https://localhost:8443/api/health
 ```

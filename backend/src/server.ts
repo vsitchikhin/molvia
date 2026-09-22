@@ -96,7 +96,7 @@ export interface ServerOptions {
 export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const app = Fastify({
     logger: {
-      redact: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]'],
+      redact: ['req.headers.cookie', 'req.headers.authorization', 'res.headers'],
     },
   })
 

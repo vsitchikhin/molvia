@@ -678,12 +678,30 @@ database access. In a product about data integrity, two write paths will silentl
   verdict is data with a reader (the gate counts it), a session is a key, and a discarded key
   has no readers. Deletion also makes «revoked», «expired» and «never existed» one answer for
   free, where a flag would need every later query to remember it.
+- **A login is a five-minute, one-use request (MOL-54).** The link carries a public code;
+  `__Host-molvia_login` carries an independent secret, stored only as a hash. The bot confirms
+  the code with a Telegram id, but only the browser holding the secret can collect a session.
+  Collection locks the row before checking the current database clock, then consumes it,
+  finds or creates the owner and writes the session in one transaction. A concurrent first
+  login uses `ON CONFLICT DO NOTHING` and a new read, not a caught unique violation inside an
+  already-aborted transaction. Nothing updates the existing owner's settings.
+  **The cookie is sent after commit, only once.** A lost response means checking `/actors/me`
+  and starting again if it never arrived, not replaying the token. One pending request per
+  browser cookie store; a new start replaces its secret. Polls never clear that cookie, since
+  an old response could erase a newer request. Safari and an installed PWA have separate stores.
+  Start and GET poll require `X-Molvia-Login: 1`, reject foreign fetch metadata and expose no
+  CORS; HEAD cannot consume. This GET is the deliberate exception to the usual read-only rule.
+  All auth replies are `no-store`, including refusals. The bot uses a separate `BOT_API_SECRET`,
+  never the Telegram token; Caddy additionally blocks its internal paths from outside.
+  **Thirty starts in a rolling minute, across the database**, including consumed requests:
+  the quota is serialized with an advisory lock. Its shared denial-of-service price is accepted.
+  Expired requests are removed at start, at boot and every minute; no login writes `events`.
 - **The token rides in a cookie, and `backend/src/cookie.ts` is the only module that touches
   one (MOL-53).** `__Host-molvia_session`, with `HttpOnly` so an XSS cannot carry the account
   away and so ITP's seven-day cap — which applies to what a _script_ writes — never reaches it;
   `Secure` always, with no branch for the environment, because a branch saying «here it is not
-  needed» eventually reaches production; `SameSite=Lax`, since every handle that writes is
-  `POST`, `PUT` or `DELETE` and `Strict` would additionally refuse the one navigation the epic is
+  needed» eventually reaches production; `SameSite=Lax`, with the special-header guard above
+  for the login GET; `Strict` would additionally refuse the one navigation the epic is
   built around — the person coming back from the bot; `Path=/` with no `Domain`, because the
   browser sees `/api/…` and both Caddy and the Vite proxy strip that prefix; `Max-Age` rather
   than `Expires`, so the clock of the device does not decide. The **`__Host-` prefix** is the
@@ -1069,11 +1087,13 @@ id, were left where no screen could reach them. A cookie of its own now remember
 this browser was given, which is what Telegram itself becomes in MOL-54; clearing the browser's
 cookies is the one thing that still makes a new person, and that is the development counterpart
 of losing the Telegram account.
-Until MOL-54 a session comes from `POST /dev/login`, a seam that **is not in the production
+Development still gets a session from `POST /dev/login`, a seam that **is not in the production
 bundle at all** — the bundler folds its guard to a constant and the module is tree-shaken away,
 which a test asserts against the built file rather than against the intention; the PWA's call to
-it is behind `import.meta.env.DEV`, so the production bundle does not hold it either. The price is
-named: in production there is no way in until MOL-54 exists.
+it is behind `import.meta.env.DEV`, so the production bundle does not hold it either.
+MOL-54 added the real API: browser start/poll and internal bot preview/confirm/decline, shared
+contracts and separate clients. Production requires `TELEGRAM_BOT_USERNAME` and `BOT_API_SECRET`.
+The user-facing flow still needs bot commands (MOL-55) and the PWA screen (MOL-56).
 
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 

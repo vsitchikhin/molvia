@@ -7,7 +7,7 @@ import { secretOrNull } from '@/secret'
  *
  * **Thirty lines instead of `@fastify/cookie`** — the owner's decision of 22.09.2026 (В-3).
  * What is needed here is one name out of one header and one line with flags known in advance:
- * no signing, no several cookies, no parsing of anybody else's. The plugin would be a
+ * no signing, no parsing of anybody else's. The plugin would be a
  * dependency in the API and one more link in the supply chain for that.
  */
 
@@ -79,9 +79,9 @@ export function readCookieValues(header: string | undefined, name: string): stri
  *   `PWA_EXPOSE=1 make dev` over plain http to a phone, and there the answer is `make certs`,
  *   the same as for the camera. A conditional `Secure` would be a branch saying «here it is not
  *   needed», and that branch eventually reaches production.
- * - `SameSite=Lax` (owner's decision, В-1) — every handle that writes is `POST`, `PUT` or
- *   `DELETE`, and `Lax` withholds the cookie from all of them when another site started the
- *   request. `Strict` would refuse it on the one navigation the epic is built around as well —
+ * - `SameSite=Lax` (owner's decision, В-1) — withholds the cookie from cross-site writes.
+ *   The login GET is an exception (MOL-54), guarded by a required custom header and fetch
+ *   metadata. `Strict` would refuse the navigation the epic is built around as well —
  *   the person coming back from the bot.
  * - `Path=/`, no `Domain` — the browser sees `/api/…`, both Caddy and the Vite proxy strip the
  *   prefix before the server; without `Domain` the cookie belongs to exactly the host that set
