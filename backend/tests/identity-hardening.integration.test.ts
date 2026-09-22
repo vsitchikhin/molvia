@@ -145,13 +145,28 @@ describe('a body is a body, whatever is inside it', () => {
   })
 })
 
+/**
+ * The seam sends two cookies now: the session and the Telegram account this browser comes back
+ * by (MOL-53, «the owner of an account must not change»). Picked by name rather than by
+ * position, so neither test is a hostage to their order.
+ */
+function cookieNamed(headers: Record<string, unknown>, name: string): string {
+  const set = headers['set-cookie']
+  const all = typeof set === 'string' ? [set] : Array.isArray(set) ? set : []
+  return (
+    all
+      .filter((one): one is string => typeof one === 'string')
+      .find((one) => one.startsWith(`${name}=`)) ?? ''
+  )
+}
+
 describe('the seam hands out a session, not an identifier', () => {
   it('sets the cookie with every flag, and `no-store` beside it', async () => {
     // The whole of «a cookie is not handed out by a reply that can be cached» (Р-6): the one
     // function that can set one is the one that says `no-store`, and this is where it shows.
     const response = await firstVisit()
 
-    const cookie = String(response.headers['set-cookie'])
+    const cookie = cookieNamed(response.headers, SESSION_COOKIE)
     expect(cookie).toMatch(new RegExp(`^${SESSION_COOKIE}=[A-Za-z0-9_-]{43};`))
     expect(cookie).toContain('HttpOnly')
     expect(cookie).toContain('Secure')
@@ -167,7 +182,7 @@ describe('the seam hands out a session, not an identifier', () => {
     const mine = await app.inject({
       method: 'GET',
       url: '/actors/me',
-      headers: { cookie: String(created.headers['set-cookie']).split(';')[0] ?? '' },
+      headers: { cookie: cookieNamed(created.headers, SESSION_COOKIE).split(';')[0] ?? '' },
     })
 
     expect(mine.statusCode).toBe(200)
@@ -176,7 +191,10 @@ describe('the seam hands out a session, not an identifier', () => {
 
   it('writes the token nowhere but the cookie', async () => {
     const created = await firstVisit()
-    const token = String(created.headers['set-cookie']).split(';')[0]?.split('=')[1] ?? ''
+    const token =
+      cookieNamed(created.headers, SESSION_COOKIE)
+        .split(';')[0]
+        ?.slice(SESSION_COOKIE.length + 1) ?? ''
 
     const [row] = await db.select().from(sessions)
     expect(token).toHaveLength(43)

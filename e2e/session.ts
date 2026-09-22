@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test'
+import { SESSION_COOKIE } from '@molvia/model'
 import type { Page } from '@playwright/test'
 
 /**
@@ -14,7 +15,6 @@ import type { Page } from '@playwright/test'
  * Отдельный модуль, а не копия в каждом файле: ровно этот довод пришлось бы объяснять пять раз.
  */
 const OWNER_KEY = 'molvia.actor'
-const SESSION_COOKIE = 'molvia_session'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /** Открывает приложение и ждёт, пока оно само войдёт через шов. Отдаёт id владельца. */

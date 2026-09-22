@@ -33,13 +33,13 @@ export interface HeaderSink {
  * fixation this code was open to (MOL-53, А2). A browser sends the more specific path first
  * (RFC 6265 §5.4), so anything able to set a cookie on this host — a sibling app on another port
  * in development, where the port is not part of «site»; a subdomain or an XSS later — could put
- * `molvia_session` with a longer `Path` in front of the real one. Reading the first match meant
+ * `__Host-molvia_session` with a longer `Path` in front of the real one. Reading the first match meant
  * the server answered **as the attacker**, and everything the person entered afterwards went
  * into that account. The caller now refuses when there is more than one, because «which of these
  * is ours» has no honest answer here.
  *
  * An empty value is a value: it counts towards that number and does not cut the walk short.
- * Before, `molvia_session=; molvia_session=<live>` returned nothing at all and the live token in
+ * Before, `…session=; …session=<live>` returned nothing at all and the live token in
  * second place was never read (А3).
  *
  * Three things it deliberately does **not** do:
@@ -51,7 +51,7 @@ export interface HeaderSink {
  * - **It does not strip quotes.** RFC 6265 allows a quoted value; we never write one, and a
  *   client that adds quotes is not holding our token.
  * - **It compares the name whole.** Split first, compare after — otherwise
- *   `molvia_session_x=…` is read as `molvia_session`, which is a cookie a page on a neighbouring
+ *   `__Host-molvia_session_x=…` is read as `__Host-molvia_session`, which is a cookie a page on a neighbouring
  *   origin could set.
  */
 export function readCookieValues(header: string | undefined, name: string): string[] {
@@ -89,6 +89,12 @@ export function readCookieValues(header: string | undefined, name: string): stri
  */
 const FLAGS = 'Path=/; HttpOnly; Secure; SameSite=Lax'
 
+/** The name the development seam remembers a browser's account by; see `setDevAccountCookie`. */
+export const DEV_ACCOUNT_COOKIE = '__Host-molvia_dev_account'
+
+/** A year: long enough that no working day of development ever reaches the end of it. */
+const DEV_ACCOUNT_MAX_AGE = 365 * 24 * 3600
+
 /**
  * `Max-Age` and not `Expires`: a relative number does not depend on the clock of the device.
  * Persistent and not a session cookie — closing the browser must not be a way out.
@@ -114,6 +120,32 @@ export function setSessionCookie(reply: HeaderSink, token: string, expiresAt: Da
   reply.header(
     'set-cookie',
     `${SESSION_COOKIE}=${token}; Max-Age=${String(maxAgeSeconds(expiresAt))}; ${FLAGS}`,
+  )
+}
+
+/**
+ * The Telegram account the development seam gave this browser, remembered in a cookie of its
+ * own (MOL-53, owner's decision 22.09.2026: «the owner of an account must not change»).
+ *
+ * **Why a second cookie and not a wider seam.** The seam cannot be asked to sign in as somebody
+ * named — that is the door the epic closes. But it minted a fresh Telegram id on every call, so
+ * a session that ran out or was revoked came back as a **different owner**, and the trip queue,
+ * the recent items and the verdict drafts — all filed under the owner's id — were left on the
+ * device out of reach. What this cookie does is stand in for Telegram: it is the thing the
+ * browser comes back by, so `signIn` finds the same owner, exactly as it will in MOL-54.
+ *
+ * Longer-lived than the session on purpose: an account outlives any one way into it. Clearing
+ * the browser's cookies is the one thing that still makes a new person, and that is honest —
+ * it is the development counterpart of losing the Telegram account itself.
+ *
+ * Lives here because this is the one module that writes cookies (Р-6), and it is used by the
+ * seam alone, which is not in the production bundle.
+ */
+export function setDevAccountCookie(reply: HeaderSink, telegramUserId: number): void {
+  reply.header('cache-control', 'no-store')
+  reply.header(
+    'set-cookie',
+    `${DEV_ACCOUNT_COOKIE}=${String(telegramUserId)}; Max-Age=${String(DEV_ACCOUNT_MAX_AGE)}; ${FLAGS}`,
   )
 }
 

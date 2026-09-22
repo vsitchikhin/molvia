@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { SESSION_COOKIE } from '@molvia/model'
 import type { Page } from '@playwright/test'
 
 /**
@@ -7,7 +8,6 @@ import type { Page } from '@playwright/test'
  * browser's own jar, and «no identifier travels any more» is a fact about the wire.
  */
 const KEY = 'molvia.actor'
-const COOKIE = 'molvia_session'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 async function knownOwner(page: Page): Promise<string | null> {
@@ -16,7 +16,7 @@ async function knownOwner(page: Page): Promise<string | null> {
 
 async function sessionCookie(page: Page) {
   const cookies = await page.context().cookies()
-  return cookies.find((cookie) => cookie.name === COOKIE)
+  return cookies.find((cookie) => cookie.name === SESSION_COOKIE)
 }
 
 test('keeps the session across a reload, and no script can read it', async ({ page }) => {
@@ -42,7 +42,7 @@ test('keeps the session across a reload, and no script can read it', async ({ pa
   expect(session?.expires).toBeGreaterThan(Date.now() / 1000)
 
   // The whole point of `HttpOnly`: an XSS cannot carry the account away.
-  expect(await page.evaluate(() => document.cookie)).not.toContain(COOKIE)
+  expect(await page.evaluate(() => document.cookie)).not.toContain(SESSION_COOKIE)
 
   await page.reload()
 
@@ -61,5 +61,25 @@ test('remembers whose drawer this is, so an offline launch finds its own', async
 
   await page.reload()
 
+  expect(await knownOwner(page)).toBe(owner)
+})
+
+test('a session that is gone brings back the same owner, not a new person', async ({ page }) => {
+  // Решение владельца от 22.09.2026: «владелец аккаунта не должен меняться». До этого шов чеканил
+  // новый Telegram-id на каждый вызов, и истёкшая сессия делала человека другим — а всё, что
+  // устройство сложило под прежнего (неотправленная очередь похода в первую очередь), оставалось
+  // недостижимым. Проверяется в браузере, потому что держится это на двух настоящих cookie.
+  await page.goto('/')
+  await expect.poll(() => knownOwner(page)).toMatch(UUID)
+  const owner = await knownOwner(page)
+
+  // Ровно то, что делает истечение или отзыв: сессии нет, аккаунт остался.
+  const kept = (await page.context().cookies()).filter((one) => one.name !== SESSION_COOKIE)
+  await page.context().clearCookies()
+  await page.context().addCookies(kept)
+
+  await page.reload()
+
+  await expect.poll(async () => (await sessionCookie(page))?.value).toMatch(/^[A-Za-z0-9_-]{43}$/)
   expect(await knownOwner(page)).toBe(owner)
 })

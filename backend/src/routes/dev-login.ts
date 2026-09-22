@@ -1,10 +1,15 @@
 import { randomInt } from 'node:crypto'
 import { ZodError } from 'zod'
-import { DomainError, ERROR, ISSUE } from '@molvia/model'
+import { DomainError, ERROR, ISSUE, telegramUserIdSchema } from '@molvia/model'
 import type { TelegramUserId } from '@molvia/model'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { answerWithActor } from '@/routes/actors'
-import { setSessionCookie } from '@/cookie'
+import {
+  DEV_ACCOUNT_COOKIE,
+  readCookieValues,
+  setDevAccountCookie,
+  setSessionCookie,
+} from '@/cookie'
 import { InvalidBody } from '@/parse'
 import type { SignedIn } from '@/usecases/sign-in'
 
@@ -22,9 +27,15 @@ import type { SignedIn } from '@/usecases/sign-in'
  * owner, `/dev/login` signs one in. It is meant to be replaced, not kept.
  *
  * **It stays as narrow as it is on purpose.** It cannot be asked to sign in as somebody named,
- * only as a new person — that would be the very door the epic closes. Integration tests, which
- * build their owners as fixtures, therefore write a session row directly instead of coming
- * through here (`signIn` in `tests/fixtures.ts`).
+ * only as this browser or as a new person — being able to name an owner would be the very door
+ * the epic closes. Integration tests, which build their owners as fixtures, therefore write a
+ * session row directly instead of coming through here (`signIn` in `tests/fixtures.ts`).
+ *
+ * **«This browser» is the whole of the owner's decision of 22.09.2026: the owner of an account
+ * must not change.** The seam used to mint a fresh Telegram id on every call, so a session that
+ * ran out came back as somebody else, and everything the device had filed under the previous
+ * owner — the unsent trip queue above all — was left unreachable. A cookie of its own now
+ * remembers the account, which is what Telegram itself will be in MOL-54.
  */
 
 /**
@@ -71,6 +82,21 @@ function refuseCrossSite(request: FastifyRequest): Promise<void> {
   throw new DomainError(ERROR.NOT_FOUND)
 }
 
+/**
+ * The Telegram account this browser was given before, or nothing.
+ *
+ * Exactly one cookie of that name, for the same reason the session insists on one (А2): two mean
+ * somebody else put one there, and picking either is guessing. A value the column could never
+ * hold is nothing too — it says the cookie was edited by hand, and there is no owner behind it.
+ */
+function accountOf(request: FastifyRequest): TelegramUserId | null {
+  const sent = readCookieValues(request.headers.cookie, DEV_ACCOUNT_COOKIE)
+  if (sent.length !== 1) return null
+
+  const parsed = telegramUserIdSchema.safeParse(Number(sent[0]))
+  return parsed.success ? parsed.data : null
+}
+
 function refuseAnyBody(request: FastifyRequest): Promise<void> {
   const { 'content-length': length, 'content-type': type } = request.headers
   const announced =
@@ -90,13 +116,23 @@ export function devLoginRoute(
   app.post(
     '/dev/login',
     { onRequest: [refuseCrossSite, refuseAnyBody] },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // The account this browser came back by, if it has one. A number it could not have been
+      // given is treated as none at all: the cookie is ours to write, so a value outside the
+      // column's own bounds means somebody has been editing it by hand, and inventing an owner
+      // out of it would write a row nothing can read back.
+      const remembered = accountOf(request)
+
       // A Telegram account this person does not have. Random rather than counted, because two
       // seams running side by side (a test file and a dev server on the same database) would
       // otherwise hand out the same number and the second call would answer CONFLICT. Well
       // inside 2^40, so it can never be mistaken for the safe-integer ceiling the column checks.
-      const { actor, token, expiresAt } = await api.signIn(randomInt(1, 2 ** 40))
+      const telegramUserId = remembered ?? randomInt(1, 2 ** 40)
+      const { actor, token, expiresAt } = await api.signIn(telegramUserId)
 
+      // Written back even when it was read, so a year of development never runs the cookie out
+      // from under a browser that keeps using it.
+      setDevAccountCookie(reply, telegramUserId)
       // The token leaves the server exactly once and only here. `no-store` travels with it — the
       // one function that can set a cookie is the one that says so (Р-6).
       setSessionCookie(reply, token, expiresAt)

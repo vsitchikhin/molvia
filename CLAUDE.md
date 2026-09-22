@@ -670,18 +670,34 @@ database access. In a product about data integrity, two write paths will silentl
   has no readers. Deletion also makes «revoked», «expired» and «never existed» one answer for
   free, where a flag would need every later query to remember it.
 - **The token rides in a cookie, and `backend/src/cookie.ts` is the only module that touches
-  one (MOL-53).** `molvia_session`, with `HttpOnly` so an XSS cannot carry the account away and
-  so ITP's seven-day cap — which applies to what a _script_ writes — never reaches it; `Secure`
-  always, with no branch for the environment, because a branch saying «here it is not needed»
-  eventually reaches production; `SameSite=Lax`, since every handle that writes is `POST`, `PUT`
-  or `DELETE` and `Strict` would additionally refuse the one navigation the epic is built
-  around — the person coming back from the bot; `Path=/` with no `Domain`, because the browser
-  sees `/api/…` and both Caddy and the Vite proxy strip that prefix; `Max-Age` rather than
-  `Expires`, so the clock of the device does not decide. **Setting it and saying `no-store` are
-  one act** — that is how «a cookie is never handed out by a reply that can be cached» holds
-  without anyone remembering it, and a test asserts that no second module writes `set-cookie`.
-  The one price, named: over plain http on the LAN (`PWA_EXPOSE=1 make dev`) `Secure` means no
-  session — the same place the camera already needs `make certs`.
+  one (MOL-53).** `__Host-molvia_session`, with `HttpOnly` so an XSS cannot carry the account
+  away and so ITP's seven-day cap — which applies to what a _script_ writes — never reaches it;
+  `Secure` always, with no branch for the environment, because a branch saying «here it is not
+  needed» eventually reaches production; `SameSite=Lax`, since every handle that writes is
+  `POST`, `PUT` or `DELETE` and `Strict` would additionally refuse the one navigation the epic is
+  built around — the person coming back from the bot; `Path=/` with no `Domain`, because the
+  browser sees `/api/…` and both Caddy and the Vite proxy strip that prefix; `Max-Age` rather
+  than `Expires`, so the clock of the device does not decide. The **`__Host-` prefix** is the
+  browser holding the last three of those for us, and it buys the half the server cannot: nothing
+  else on this host may set a cookie of that name at a deeper path. **Setting it and saying
+  `no-store` are one act** — that is how «a cookie is never handed out by a reply that can be
+  cached» holds without anyone remembering it, and a test asserts that no second module writes
+  `set-cookie`. The one price, named: over plain http on the LAN (`PWA_EXPOSE=1 make dev`)
+  `Secure` means no session — the same place the camera already needs `make certs`.
+- **What a secret may look like is one rule, in `backend/src/secret.ts`** — RFC 6265's
+  `cookie-octet`, because the only thing a session token or a login request's secret ever travels
+  in is a cookie. It was two rules once, and they drifted by four characters: a token holding
+  `"`, `,`, `;` or `\` was written and read perfectly well and then cost a 500 the day its term
+  came due, or — for `;`, the header's own separator — a row no request could ever open. A test
+  walks every printable code point and holds the rule and the cookie to the same answer, as
+  `text.ts` does for `INVISIBLE`. Narrowing does **not** bring back MOL-52's Р4: `+`, `/` and `=`
+  all pass, so plain base64 is still a token.
+- **More than one cookie of that name is refused, and a refusal then clears nothing.** A browser
+  sends the more specific path first, so anything able to set a cookie on this host — a sibling
+  app on another port in development, where the port is not part of «site» — could put its own
+  session in front of the real one and be answered as. «Which of these is ours» has no honest
+  answer; and clearing would delete ours at `Path=/` while leaving theirs, turning an attempt at
+  fixation into a lockout. Only a lone cookie that was refused is put out.
 - **The term slides, and one write a day moves it (MOL-53).** 180 days from the last use
   (`SESSION_LIFETIME_DAYS`), and both `last_seen_at` and `expires_at` move together, at most
   once in `SESSION_TOUCH_AFTER_HOURS` — a term extended without moving `last_seen_at` would put
@@ -1003,6 +1019,13 @@ drafts are filed under it and read at the shelf before the server can be asked w
 the header went everything that existed because the device held a password — the set-aside keys,
 «вернуть прежние данные», the claim two tabs negotiated over and the state `lost`; «the session
 ended, sign in again» is MOL-56's, together with the screen that can act on it.
+**The owner of an account does not change** (owner's decision 22.09.2026). The seam used to mint
+a fresh Telegram id on every call, so a session that ran out came back as somebody else — and the
+trip queue, the recent items and the verdict drafts, all filed on the device under the owner's
+id, were left where no screen could reach them. A cookie of its own now remembers the account
+this browser was given, which is what Telegram itself becomes in MOL-54; clearing the browser's
+cookies is the one thing that still makes a new person, and that is the development counterpart
+of losing the Telegram account.
 Until MOL-54 a session comes from `POST /dev/login`, a seam that **is not in the production
 bundle at all** — the bundler folds its guard to a constant and the module is tree-shaken away,
 which a test asserts against the built file rather than against the intention; the PWA's call to

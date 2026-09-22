@@ -36,7 +36,7 @@ describe('reading the cookies of one name out of the header', () => {
   })
 
   it('does not mistake a longer name for ours', () => {
-    // `molvia_session_x` can be set by a page on a neighbouring origin. Read by prefix it would
+    // `…molvia_session_x` can be set by a page on a neighbouring origin. Read by prefix it would
     // have been our cookie, and a stranger would have chosen the token we look up.
     expect(readCookieValues(`${SESSION_COOKIE}_x=${TOKEN}`, SESSION_COOKIE)).toEqual([])
     expect(readCookieValues(`x_${SESSION_COOKIE}=${TOKEN}`, SESSION_COOKIE)).toEqual([])
@@ -51,7 +51,7 @@ describe('reading the cookies of one name out of the header', () => {
   })
 
   it('counts an empty value as a value instead of stopping at it', () => {
-    // `molvia_session=; molvia_session=<live>` used to answer «no cookie at all»: the empty one
+    // `…session=; …session=<live>` used to answer «no cookie at all»: the empty one
     // cut the walk short and the live token behind it was never read (А3).
     expect(
       readCookieValues(`${SESSION_COOKIE}=; ${SESSION_COOKIE}=${TOKEN}`, SESSION_COOKIE),

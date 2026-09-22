@@ -179,7 +179,7 @@ describe('a request that proves who it is', () => {
 
   it('finds its cookie among other people’s', async () => {
     // A browser at one origin carries whatever anything there has set. Read by prefix, a
-    // neighbouring `molvia_session_x` would have been ours.
+    // neighbouring `…molvia_session_x` would have been ours.
     const actor = actorIn((await firstVisit()).body)
     const mine = await signIn(db, actor.id)
 

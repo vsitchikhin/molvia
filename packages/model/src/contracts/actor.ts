@@ -18,8 +18,16 @@ import { actorSchema } from '#model/entities/actor'
  *
  * What did not change is why this is not a path or a query parameter: both land in the access
  * log, in browser history and in `Referer`, and the value is still a bearer key.
+ *
+ * **The `__Host-` prefix is a promise the browser keeps for us** (owner's decision 22.09.2026).
+ * A cookie so named is refused unless it carries `Secure`, has `Path=/` and names no `Domain` —
+ * all three of which this one already does. What it buys is the half we could not hold
+ * ourselves: **nothing else on this host may set a cookie of this name with a deeper path**. The
+ * server refuses two cookies of one name anyway (А2), so this is a second lock on the same door
+ * rather than the only one; the difference is that the browser turns the attempt away before it
+ * is ever sent, instead of the person meeting a 401 they cannot clear.
  */
-export const SESSION_COOKIE = 'molvia_session'
+export const SESSION_COOKIE = '__Host-molvia_session'
 
 /**
  * The owner as anyone outside the server sees them: the settings, without the identity behind

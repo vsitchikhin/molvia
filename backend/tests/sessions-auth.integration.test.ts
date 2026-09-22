@@ -18,10 +18,11 @@ import {
   SESSION_TOUCH_AFTER_HOURS,
 } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { sessions } from '@/db/schema'
+import { actors, sessions } from '@/db/schema'
 import { createActorRepository } from '@/db/actors-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
 import { signIn } from '@/usecases/sign-in'
+import { DEV_ACCOUNT_COOKIE } from '@/cookie'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aStrangersCookie, anHourFromNow, clearAll, insertActor, telegramId } from './fixtures'
@@ -431,5 +432,94 @@ describe('два входа одним Telegram-аккаунтом', () => {
 
     expect(second.actor.id).toBe(first.actor.id)
     expect(second.token).not.toBe(first.token)
+  })
+})
+
+/**
+ * «Владелец аккаунта не должен меняться» — решение владельца от 22.09.2026 (MOL-53, Б1/Б2).
+ *
+ * Шов чеканил новый Telegram-id на каждый вызов, поэтому истёкшая или отозванная сессия
+ * возвращалась **другим человеком**, а всё, что устройство сложило под прежнего владельца —
+ * прежде всего неотправленная очередь похода, — оставалось недостижимым. Теперь шов помнит
+ * аккаунт этого браузера своей cookie: ровно то, чем в MOL-54 станет сам Telegram.
+ */
+describe('шов помнит аккаунт браузера', () => {
+  const login = (cookie?: string) =>
+    app.inject({
+      method: 'POST',
+      url: '/dev/login',
+      ...(cookie === undefined ? {} : { headers: { cookie } }),
+    })
+
+  /** Все строки `Set-Cookie` ответа, сколько бы их ни было — одна или список. */
+  function setCookies(headers: Record<string, unknown>): string[] {
+    const set = headers['set-cookie']
+    if (typeof set === 'string') return [set]
+    return Array.isArray(set) ? set.filter((line): line is string => typeof line === 'string') : []
+  }
+
+  /** Одна из них по имени — то, что браузер приложит в следующий раз. */
+  function cookieNamed(headers: Record<string, unknown>, name: string): string {
+    const mine = setCookies(headers).find((line) => line.startsWith(`${name}=`)) ?? ''
+    return mine.split(';')[0] ?? ''
+  }
+
+  it('второй вход того же браузера — тот же владелец и новая сессия', async () => {
+    const first = await login()
+    const account = cookieNamed(first.headers, DEV_ACCOUNT_COOKIE)
+    expect(account).toContain(DEV_ACCOUNT_COOKIE)
+
+    const second = await login(account)
+
+    const was = (JSON.parse(first.body) as { id: string }).id
+    const now = (JSON.parse(second.body) as { id: string }).id
+    expect(now).toBe(was)
+    expect(await db.select().from(actors)).toHaveLength(1)
+    // Сессия всё равно новая: аккаунт — не ключ от него.
+    expect(await db.select().from(sessions)).toHaveLength(2)
+  })
+
+  it('браузер без этой cookie — по-прежнему новый человек', async () => {
+    const first = await login()
+    const second = await login()
+
+    expect((JSON.parse(second.body) as { id: string }).id).not.toBe(
+      (JSON.parse(first.body) as { id: string }).id,
+    )
+  })
+
+  it('подделанная или чужая cookie аккаунта не открывает чужого владельца', async () => {
+    const mine = await login()
+    const account = cookieNamed(mine.headers, DEV_ACCOUNT_COOKIE)
+
+    // Число, которого колонка не примет; две cookie одного имени; не число вовсе.
+    for (const bad of [
+      `${DEV_ACCOUNT_COOKIE}=0`,
+      `${DEV_ACCOUNT_COOKIE}=-1`,
+      `${DEV_ACCOUNT_COOKIE}=9007199254740993`,
+      `${DEV_ACCOUNT_COOKIE}=не число`,
+      `${DEV_ACCOUNT_COOKIE}=`,
+      `${account}; ${account}`,
+    ]) {
+      const forged = await login(bad)
+
+      expect(forged.statusCode).toBe(201)
+      // Не владелец из подделки и не ошибка — просто новый человек.
+      expect((JSON.parse(forged.body) as { id: string }).id).not.toBe(
+        (JSON.parse(mine.body) as { id: string }).id,
+      )
+    }
+  })
+
+  it('cookie аккаунта живёт дольше сессии и никем не читается из скрипта', async () => {
+    const all = setCookies((await login()).headers)
+    const account = all.find((one) => one.startsWith(`${DEV_ACCOUNT_COOKIE}=`)) ?? ''
+    const session = all.find((one) => one.startsWith(`${SESSION_COOKIE}=`)) ?? ''
+
+    expect(account).toContain('HttpOnly')
+    expect(account).toContain('Secure')
+    expect(account).toContain('Path=/')
+    const age = (line: string) => Number(/Max-Age=(\d+)/.exec(line)?.[1] ?? '0')
+    expect(age(account)).toBeGreaterThan(age(session))
   })
 })
