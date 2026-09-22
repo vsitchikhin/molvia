@@ -27,6 +27,7 @@ function place(name: string, scaledMinor: bigint): AdvicePlace {
 
 const milk: AdviceRow = {
   level: 'take',
+  isMine: true,
   itemId: 'cccccccc-0000-4000-8000-000000000001',
   name: 'Молоко «Ашхар»',
   rating: '4.6',
@@ -37,6 +38,7 @@ const milk: AdviceRow = {
 
 const cheese: AdviceRow = {
   level: 'if_cheap',
+  isMine: true,
   itemId: 'cccccccc-0000-4000-8000-000000000002',
   name: 'Сыр «Чанах»',
   rating: '2.8',
@@ -48,6 +50,7 @@ const cheese: AdviceRow = {
 
 const sausage: AdviceRow = {
   level: 'never',
+  isMine: true,
   itemId: 'cccccccc-0000-4000-8000-000000000003',
   name: 'Колбаса «Молочная»',
   rating: '1.4',
@@ -225,6 +228,7 @@ describe('AdviceView', () => {
     // Own mode: the figure on the row is this person's, so the scale opens on it.
     expect(sheet.props('ownScore')).toBe(1)
     expect(sheet.props('ownReview')).toBe(mine.review)
+    expect(sheet.props('mine')).toBe(true)
 
     // A saved verdict moves the row to another group, or out of the list: the screen asks the
     // server again rather than moving it itself.
@@ -244,7 +248,45 @@ describe('AdviceView', () => {
     await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')
     await flushPromises()
 
-    expect(view.findComponent({ name: 'VerdictEditSheet' }).props('ownScore')).toBeNull()
+    const sheet = view.findComponent({ name: 'VerdictEditSheet' })
+    expect(sheet.props('ownScore')).toBeNull()
+    expect(sheet.props('shared')).toBe(true)
+  })
+
+  it('А2: a stranger`s row opens the sheet as «rate it», not as «amend»', async () => {
+    advice.mockResolvedValue(answer([{ ...mine, isMine: false }], { scope: 'shared' }))
+    const { view } = await render()
+
+    await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')
+    await flushPromises()
+
+    expect(view.findComponent({ name: 'VerdictEditSheet' }).props('mine')).toBe(false)
+  })
+
+  it('А4: the age of a remembered list is on the screen while the answer is still coming', async () => {
+    advice.mockResolvedValue(answer([milk]))
+    await render()
+
+    advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+    const { view } = await render()
+
+    expect(view.text()).toContain(milk.name)
+    expect(view.find('.stale').exists()).toBe(true)
+    expect(view.text()).toContain('The list as of today at')
+    // Nothing to press: the request it is waiting for is already in the air.
+    expect(view.findAll('button').map((button) => button.text())).not.toContain(en.state.retry)
+  })
+
+  it('С-4: an empty list from the phone is dated too', async () => {
+    advice.mockResolvedValue(answer([]))
+    await render()
+
+    online(false)
+    advice.mockRejectedValue(broke())
+    const { view } = await render()
+
+    expect(view.text()).toContain(en.advice.empty.title)
+    expect(view.text()).toContain('The list as of today at')
   })
 
   it('without an identity the screen asks for nothing and shows no failure of its own', async () => {

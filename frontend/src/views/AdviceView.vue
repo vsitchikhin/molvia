@@ -8,6 +8,19 @@
 
     <!-- Without an identity there is nobody to advise; the notice above says why. -->
     <template v-else-if="phase !== 'idle'">
+      <!-- The rows come from the phone, and the strip says how old they are — while the
+           request is still on its way as well, not only once it has failed (А4). Above the
+           branch, so an empty list from memory is dated too (С-4). -->
+      <div v-if="stale && fetchedAt" class="stale">
+        <p class="stale-text">
+          {{ t(STALE[stale], { day: day(fetchedAt), time: time(fetchedAt) }) }}
+        </p>
+        <!-- Only the server breaking leaves nothing that would fire again by itself. -->
+        <AppButton v-if="stale === 'error'" variant="ghost" @click="retry">
+          {{ t('state.retry') }}
+        </AppButton>
+      </div>
+
       <ScreenState
         v-if="phase === 'error'"
         kind="error"
@@ -42,27 +55,12 @@
       </ScreenState>
 
       <template v-else>
-        <!-- From memory: without a connection it refreshes by itself; with one, the server
-             broke and nothing will fire again on its own — so the person gets the button. -->
-        <div v-if="stale && fetchedAt" class="stale">
-          <p class="stale-text">
-            {{
-              t(stale === 'offline' ? 'advice.stale' : 'advice.stale_error', {
-                day: day(fetchedAt),
-                time: time(fetchedAt),
-              })
-            }}
-          </p>
-          <AppButton v-if="stale === 'error'" variant="ghost" @click="retry">
-            {{ t('state.retry') }}
-          </AppButton>
-        </div>
-
         <AdviceGroup v-if="groups.take.length > 0" level="take">
           <AdviceTakeCard
             v-for="row in groups.take"
             :key="row.itemId"
             :row="row"
+            :scope="scope ?? 'own'"
             @edit="edit(row)"
           />
         </AdviceGroup>
@@ -72,6 +70,7 @@
             v-for="row in groups.if_cheap"
             :key="row.itemId"
             :row="row"
+            :scope="scope ?? 'own'"
             @edit="edit(row)"
           />
         </AdviceGroup>
@@ -81,6 +80,7 @@
             v-for="row in groups.never"
             :key="row.itemId"
             :row="row"
+            :scope="scope ?? 'own'"
             @edit="edit(row)"
           />
           <p class="tail">{{ t('advice.no_price_shown') }}</p>
@@ -97,6 +97,8 @@
       v-if="editing"
       :item-id="editing.itemId"
       :name="editing.name"
+      :mine="editing.mine"
+      :shared="editing.shared"
       :own-score="editing.score"
       :own-review="editing.review"
       :on-closed="putAway"
@@ -124,6 +126,17 @@ import type { Score } from '@/components/rating'
 import { useAdvice } from '@/composables/useAdvice'
 import { purchaseDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
+
+/**
+ * What the strip over a remembered list says, by what became of the request behind it.
+ * Written out rather than assembled: a key built out of a string is invisible to the linter
+ * and to `vue-tsc` alike (MOL-16, О-12).
+ */
+const STALE = {
+  loading: 'advice.stale_loading',
+  offline: 'advice.stale',
+  error: 'advice.stale_error',
+} as const
 
 /**
  * «Что брать» (MOL-32) — the screen the whole product exists for. The other three fill its
@@ -164,15 +177,22 @@ export default defineComponent({
     const editing = ref<{
       itemId: string
       name: string
+      mine: boolean
+      shared: boolean
       score: Score | null
       review: string | null
     } | null>(null)
 
     function edit(row: AdviceRow): void {
+      const scope = advice.scope.value ?? 'own'
       editing.value = {
         itemId: row.itemId,
         name: row.name,
-        score: ownScore(row.rating, advice.scope.value ?? 'own'),
+        // Whether there is a verdict of this person's to amend at all (А2). In the shared mode
+        // a row may be entirely other people's, and nothing else in it says so.
+        mine: row.isMine,
+        shared: scope === 'shared',
+        score: ownScore(row.rating, scope),
         review: row.review,
       }
     }
@@ -180,6 +200,7 @@ export default defineComponent({
     return {
       t,
       IconStar,
+      STALE,
       phase: advice.phase,
       scope: advice.scope,
       groups: advice.groups,

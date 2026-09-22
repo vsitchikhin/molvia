@@ -30,11 +30,17 @@ export interface Advice {
   /** How many rows are on the screen, and how many there are in all — «Показаны 200 из 340». */
   readonly shown: ComputedRef<number>
   readonly total: ComputedRef<number>
-  /** The rows come from memory: the last load failed, without a connection or with one. */
-  readonly stale: ComputedRef<'offline' | 'error' | null>
+  /**
+   * The rows come from the phone rather than from an answer of this session, and why: a
+   * request still on its way, no connection, or a server that broke.
+   */
+  readonly stale: ComputedRef<Stale | null>
   readonly fetchedAt: ComputedRef<Date | null>
   retry(): Promise<void>
 }
+
+/** Why the list on the screen is not an answer of this session (MOL-32, А4). */
+export type Stale = 'loading' | 'offline' | 'error'
 
 const KEY = 'molvia.advice'
 
@@ -91,11 +97,14 @@ export function useAdvice(): Advice {
   const owner = ref<string | null>(null)
   const remembered = ref<Remembered | null>(null)
   const failure = ref<'offline' | 'error' | null>(null)
+  /** Whether what is shown came from an answer of this session, rather than from the phone. */
+  const confirmed = ref(false)
 
   function adopt(id: string | null): void {
     owner.value = id
     remembered.value = id ? recall(`${KEY}.${id}`) : null
     failure.value = null
+    confirmed.value = false
   }
 
   function remember(): void {
@@ -120,26 +129,57 @@ export function useAdvice(): Advice {
     return 'loading'
   })
 
-  let loadingFor: string | null = null
+  /**
+   * One request at a time, and only the newest may be written down.
+   *
+   * `running` used to be an identifier, and a second call for the same person simply returned
+   * — but `retry` is this same function, so a save that happened while a refresh was in the
+   * air updated nothing and the screen kept the figures the older answer brought (А3). And
+   * two changes of identity, A → B → A, slipped two requests for A past that guard: the
+   * slower one landed last and overwrote the fresher list, on the screen and on the phone
+   * alike (А6). So an ask that arrives while a request is in the air is remembered rather
+   * than dropped, and every answer carries the number of the request that asked for it.
+   */
+  let running = false
+  let latest = 0
+  /** How many times a fresh list has been asked for; the loop below serves the last ask. */
+  let asks = 0
 
-  async function load(): Promise<void> {
-    const id = actor.id
-    if (!id || loadingFor === id) return
-    loadingFor = id
+  async function ask(id: string): Promise<void> {
+    const mine = ++latest
     try {
       const fresh = await api.advice()
-      if (owner.value !== id) return
+      if (owner.value !== id || mine !== latest) return
       remembered.value = { answer: fresh, fetchedAt: new Date() }
       failure.value = null
+      confirmed.value = true
       remember()
     } catch {
-      if (owner.value !== id) return
+      if (owner.value !== id || mine !== latest) return
       // Decided after the failure, never narrowed from a check before the request: a
       // connection lost while the answer was on its way is the commonest break at a shelf,
       // and it is not the server's fault and never red.
       failure.value = navigator.onLine ? 'error' : 'offline'
+    }
+  }
+
+  async function load(): Promise<void> {
+    if (!actor.id) return
+    asks += 1
+    if (running) return
+    running = true
+    try {
+      let served = 0
+      while (served !== asks) {
+        served = asks
+        // Read afresh every round: the identity may have changed while the last answer was on
+        // its way, and the next request belongs to whoever the person is now.
+        const id = actor.id
+        if (!id) break
+        await ask(id)
+      }
     } finally {
-      if (loadingFor === id) loadingFor = null
+      running = false
     }
   }
 
@@ -160,7 +200,15 @@ export function useAdvice(): Advice {
     groups: computed(() => split(rows.value)),
     shown: computed(() => rows.value.length),
     total: computed(() => remembered.value?.answer.total ?? 0),
-    stale: computed(() => (remembered.value === null ? null : failure.value)),
+    /**
+     * Nothing to say when the list came from this session's own answer. Otherwise the reason
+     * it did not: a request still in the air is one of them — the same yesterday's prices
+     * looked freshly loaded until the failure arrived (А4).
+     */
+    stale: computed<Stale | null>(() => {
+      if (remembered.value === null || confirmed.value) return null
+      return failure.value ?? 'loading'
+    }),
     fetchedAt: computed(() => remembered.value?.fetchedAt ?? null),
     retry: load,
   }

@@ -31,6 +31,7 @@ function row(n: number, level: AdviceRow['level'], rating = '4.5'): AdviceRow {
     rating,
     ratingsCount: 1,
     review: null,
+    isMine: true,
   }
   if (level === 'never') return { ...rated, level }
   if (level === 'take') return { ...rated, level, places: [place('SAS', 570_000_000n)] }
@@ -190,6 +191,7 @@ describe('useAdvice', () => {
       rating: '1.4',
       ratingsCount: 1,
       review: null,
+      isMine: true,
       level: 'never',
       places: [
         {
@@ -227,6 +229,87 @@ describe('useAdvice', () => {
     const held = await mounted()
     expect(held.phase.value).toBe('ready')
     expect(names(held.groups.value.never)).toEqual(['Колбаса «Молочная»'])
+  })
+
+  it('А4: a list from the phone says its age while the answer is still on its way', async () => {
+    // The same yesterday's prices looked freshly loaded until the request failed: the strip
+    // was printed by the failure, not by where the rows came from.
+    advice.mockResolvedValue(answer([row(1, 'take')]))
+    await mounted()
+
+    unmountAll()
+    freshPinia()
+    advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+    const held = await mounted()
+
+    expect(held.phase.value).toBe('ready')
+    expect(held.stale.value).toBe('loading')
+    expect(held.fetchedAt.value).toBeInstanceOf(Date)
+  })
+
+  it('А4: an answer of this session is not stale, however old the phone`s copy was', async () => {
+    advice.mockResolvedValue(answer([row(1, 'take')]))
+    await mounted()
+
+    unmountAll()
+    freshPinia()
+    const held = await mounted()
+
+    expect(held.stale.value).toBeNull()
+  })
+
+  it('А3: an ask that arrives while a request is in the air is served, not dropped', async () => {
+    // `retry` is this same function, and the screen calls it after a verdict is amended: a
+    // refresh in flight used to swallow the ask, leaving the old figures on the screen.
+    let land: ((response: AdviceResponse) => void) | undefined
+    advice.mockReturnValue(
+      new Promise<AdviceResponse>((resolve) => {
+        land = resolve
+      }),
+    )
+    const held = await mounted()
+    expect(advice).toHaveBeenCalledTimes(1)
+
+    void held.retry()
+    await flushPromises()
+    // Still one: the ask is remembered rather than run beside the first request.
+    expect(advice).toHaveBeenCalledTimes(1)
+
+    advice.mockResolvedValue(answer([row(1, 'take'), row(2, 'take')]))
+    land?.(answer([row(1, 'take')]))
+    await flushPromises()
+
+    expect(advice).toHaveBeenCalledTimes(2)
+    expect(held.shown.value).toBe(2)
+  })
+
+  it('А6: a request left over from two identities ago cannot land on the newest list', async () => {
+    const landings: ((response: AdviceResponse) => void)[] = []
+    advice.mockImplementation(
+      () =>
+        new Promise<AdviceResponse>((resolve) => {
+          landings.push(resolve)
+        }),
+    )
+
+    const held = await mounted()
+    const actor = useActorStore()
+    actor.id = OTHER
+    await flushPromises()
+    actor.id = ME
+    await flushPromises()
+
+    // The newest answer arrives first — which is what happens when the first request hangs.
+    landings[landings.length - 1]?.(answer([row(1, 'take', '4.7')]))
+    await flushPromises()
+    expect(held.groups.value.take[0]?.rating).toBe('4.7')
+
+    // And then the one nobody waits for any more: it changes neither the screen nor the phone.
+    landings[0]?.(answer([row(2, 'take', '2.0')]))
+    await flushPromises()
+
+    expect(held.groups.value.take[0]?.rating).toBe('4.7')
+    expect(localStorage.getItem(`molvia.advice.${ME}`)).not.toContain('2.0')
   })
 
   it('comes back by itself when the connection does', async () => {
