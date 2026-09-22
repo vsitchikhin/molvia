@@ -88,7 +88,7 @@ test('pages through all history and adds, amends and removes in an old trip whil
   expect(
     await page.locator('.row .name').evaluate((node) => node.scrollWidth <= node.clientWidth),
   ).toBe(true)
-  await page.screenshot({ path: '/private/tmp/mol25-finished-trip.png', fullPage: true })
+  await page.screenshot({ path: test.info().outputPath('finished-trip.png'), fullPage: true })
   await page.locator('.row').click()
   await page.waitForTimeout(400)
   await sheet(page).getByRole('button', { name: 'Remove the item' }).click()
