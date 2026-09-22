@@ -93,9 +93,13 @@ export default defineComponent({
     const failure = ref<'offline' | 'failed' | null>(null)
     const unsupported = ref(false)
 
-    const changed = computed(
-      () => score.value !== props.ownScore || review.value !== (props.ownReview ?? ''),
-    )
+    // A score taken back is not a change the server can be asked for: a verdict without a
+    // score does not exist, and the only way to have none is to withdraw it. Counted as a
+    // change, «Сохранить» stayed enabled and sent an empty patch, which comes back as a
+    // refusal the person cannot act on.
+    const scoreChanged = computed(() => score.value !== null && score.value !== props.ownScore)
+    const reviewChanged = computed(() => review.value !== (props.ownReview ?? ''))
+    const changed = computed(() => scoreChanged.value || reviewChanged.value)
 
     const status = computed(() => {
       if (failure.value === 'offline') return t('advice.edit.offline')
@@ -132,9 +136,9 @@ export default defineComponent({
       unsupported.value = false
 
       const patch: VerdictAmendment = {
-        ...(score.value !== null && score.value !== props.ownScore ? { score: score.value } : {}),
+        ...(scoreChanged.value && score.value !== null ? { score: score.value } : {}),
         // `null` is the one way to erase the text, and an emptied field means exactly that.
-        ...(review.value !== (props.ownReview ?? '') ? { review: review.value || null } : {}),
+        ...(reviewChanged.value ? { review: review.value || null } : {}),
       }
       void send(() => api.amendVerdict(props.itemId, patch))
     }

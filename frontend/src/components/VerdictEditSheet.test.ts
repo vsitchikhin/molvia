@@ -132,6 +132,16 @@ describe('VerdictEditSheet', () => {
     expect(view.emitted('saved')).toHaveLength(1)
   })
 
+  it('a score taken back is not a change: an empty patch is a refusal nobody can act on', async () => {
+    const { view } = await render({ ownScore: 4 })
+
+    // A second tap on the chosen digit clears the scale — the only undo it has.
+    await key(view, 4).trigger('click')
+
+    expect(key(view, 4).attributes('aria-pressed')).toBe('false')
+    expect(button(view, 'Save the rating').attributes('disabled')).toBeDefined()
+  })
+
   it('a failure keeps the sheet open and says whether it was the server or the connection', async () => {
     amendVerdict.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 502'))
     const { view } = await render({ ownScore: 1 })

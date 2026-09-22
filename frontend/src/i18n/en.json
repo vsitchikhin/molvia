@@ -203,7 +203,7 @@
     },
     "offline": {
       "title": "The list will show up once you are online",
-      "body": "Verdicts are worked out on the server — we will show them the moment it is back"
+      "body": "Verdicts are worked out on the server — we will show the list the moment you are back"
     }
   },
   "verdict": {
