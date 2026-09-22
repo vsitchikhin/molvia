@@ -302,6 +302,11 @@
     "conflict": "That is already taken",
     "no_actor": "This device is no longer recognised",
     "trip_open": "Another trip is still open",
-    "internal": "Something went wrong"
+    "internal": "Something went wrong",
+    "login_unavailable": "This login request is no longer available. Start again",
+    "login_forbidden": "Open sign-in from the app",
+    "login_rate_limited": "Too many login requests. Try again in a minute",
+    "login_disabled": "Telegram sign-in is not configured yet",
+    "bot_unauthorized": "The bot could not authenticate"
   }
 }

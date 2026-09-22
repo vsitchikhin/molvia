@@ -35,6 +35,8 @@ services:
     environment:
       NODE_ENV: production
       API_PORT: 3300
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:?set TELEGRAM_BOT_USERNAME}
+      BOT_API_SECRET: ${BOT_API_SECRET:?set BOT_API_SECRET}
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     depends_on:
       postgres:
@@ -54,9 +56,9 @@ services:
       NODE_ENV: production
       API_PORT: 3300
       API_BASE_URL: http://backend:3300
-      # Optional: a stack without a bot is a valid deployment, and the bot exits
-      # cleanly when the token is empty rather than crash-looping.
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      BOT_API_SECRET: ${BOT_API_SECRET:?set BOT_API_SECRET}
+      # Real login requires the bot to run (MOL-54).
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN}
     depends_on:
       - backend
 

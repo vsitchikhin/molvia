@@ -1,5 +1,6 @@
 import Fastify from 'fastify'
 import type { LoginConfiguration } from '@/login-config'
+import { loginConfig } from '@/env'
 import { authRoutes } from '@/routes/auth'
 import { internalAuthRoutes } from '@/routes/internal-auth'
 import { startLogin } from '@/usecases/start-login'
@@ -165,7 +166,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const verdicts = createVerdictRepository(db)
 
     healthRoutes(instance, { databaseIsReachable })
-    const login = options.login ?? null
+    const login = options.login === undefined ? loginConfig : options.login
     authRoutes(instance, {
       start: (name) => {
         if (!login) throw new DomainError(ERROR.LOGIN_DISABLED)

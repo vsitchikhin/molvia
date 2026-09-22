@@ -38,8 +38,15 @@ fi
 # MOL-60 сделал --force обязательным для всех уже заведённых копий, и без переноса
 # документированная починка стоила бы бота.
 kept_token=""
+kept_bot_secret=""
+kept_bot_username=""
 if [ -e "$env_path" ]; then
   kept_token="$(sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$env_path" | head -n 1)"
+  kept_bot_secret="$(sed -n 's/^BOT_API_SECRET=//p' "$env_path" | head -n 1)"
+  kept_bot_username="$(sed -n 's/^TELEGRAM_BOT_USERNAME=//p' "$env_path" | head -n 1)"
+fi
+if [ -z "$kept_bot_secret" ]; then
+  kept_bot_secret="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
 fi
 
 offset=$(( index * 10 ))
@@ -87,6 +94,9 @@ E2E_DATABASE_URL=postgres://molvia:molvia@127.0.0.1:${pg_port}/molvia_${index}_e
 # апдейты через long polling — молча и невоспроизводимо. Завести отдельного
 # в BotFather, если эта копия будет работать параллельно с другой.
 TELEGRAM_BOT_TOKEN=${kept_token}
+# Username without @, set by the owner. The internal secret is generated once per copy.
+TELEGRAM_BOT_USERNAME=${kept_bot_username}
+BOT_API_SECRET=${kept_bot_secret}
 
 # Открытый API ЦБ Армении, ключа не требует
 CBA_RATES_URL=https://cb.am/latest.json.php
