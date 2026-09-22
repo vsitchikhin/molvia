@@ -32,15 +32,15 @@ window where the schema lags the code deployed against it.
 **Do not deploy this expecting people to use it.** The invite code of MOL-8 is gone together
 with `POST /actors` (MOL-52): the epic opened the door to everyone with a Telegram account, and
 taking the code off while leaving a handle that writes a row per call would have been worse
-than either. What creates an identity in development is `POST /dev/actors`, and that address
+than either. What signs a person in during development is `POST /dev/login`, and that address
 **does not exist in the production image** — the bundler folds its guard to a constant and
 drops the module, which a test asserts against the built file.
 
 The real door is the Telegram login of MOL-54. Until it ships, a production deployment serves
 the app to a person who will see «could not be identified» and a «try again» that cannot help.
 `SIGNUP_CODE` is no longer read by anything: it is out of `backend/src/env.ts`, out of
-`bin/init-env.sh` and out of `docker-compose.prod.yml`. A leftover value in `.env.prod` is
-harmless and should be deleted.
+`bin/init-env.sh`, out of `docker-compose.prod.yml` и из `.env.prod.example`. Оставшееся
+значение в `.env.prod` безвредно, и его стоит удалить.
 
 ## Trying the production stack locally
 

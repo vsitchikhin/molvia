@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import type { ZodType } from 'zod'
 import {
-  ACTOR_HEADER,
   ERROR,
   ISSUE,
   actorCodec,
@@ -83,14 +82,6 @@ const CODE_BY_STATUS: Readonly<Record<number, WireCode>> = Object.freeze({
   404: ERROR.NOT_FOUND,
 })
 
-/**
- * A header value has to survive `Headers.set`, which throws a TypeError on anything outside
- * Latin-1 or containing a line break. Both values here come from outside the code — the
- * identifier from storage anyone can write to, the invite code from a link someone typed —
- * so they are checked rather than trusted.
- */
-const HEADER_SAFE = /^[ -~]+$/
-
 /** How long a request may hang before it is called a failure. */
 const DEFAULT_TIMEOUT_MS = 15_000
 
@@ -98,14 +89,19 @@ export interface ClientOptions {
   readonly baseUrl: string
   readonly fetch?: typeof globalThis.fetch
   /**
-   * The identity this client speaks for, read at call time rather than at construction.
-   * A getter and not a value on purpose: the PWA builds the client before it has an
-   * identity, and a captured `null` would be sent for the rest of the session.
+   * Whether the browser's cookies travel with a request. `same-origin` is the default in every
+   * browser that matters, and it is written out because since MOL-53 it is **the whole of how a
+   * request proves who it is**: a line that silently changed to `omit` would log everybody out.
    *
-   * Reading storage is deliberately not this package's business — the bot is a client too
-   * and has neither `localStorage` nor, in 0.1, an identity at all.
+   * There is nothing else here about identity, and that is the point. The client cannot name an
+   * owner, cannot read the session and cannot speak as anybody: what it sends is whatever the
+   * browser attached, and in Node — where the bot runs — that is nothing at all.
+   *
+   * Spelled out rather than taken from `RequestCredentials`: the backend and the bot compile
+   * this source without the DOM library, and a name that only exists in a browser's types would
+   * fail to build for them.
    */
-  readonly actorId?: () => string | null
+  readonly credentials?: 'omit' | 'same-origin' | 'include'
   /**
    * How long a request may hang. A test sets it to milliseconds; nothing else should need
    * to — a constant here would make every suite that covers the timeout wait for it.
@@ -124,12 +120,8 @@ export interface MolviaClient {
    * cookie, which the browser keeps and this code never sees.
    */
   devLogin(): Promise<ActorView>
-  /**
-   * Whether an identity is still alive. With no argument it asks about the one this client
-   * speaks for; with one, about that identifier and **without touching anything else** —
-   * which is what makes «check before restoring» possible instead of «replace and hope».
-   */
-  me(identifier?: string): Promise<ActorView>
+  /** Who this browser is, according to the session it is carrying — or `error.no_actor`. */
+  me(): Promise<ActorView>
   /**
    * The catalogue lookup behind «что взяли?», ranked by the server — the query goes as typed.
    * The screen searches while the person types, so a search the next keystroke made stale is
@@ -197,22 +189,12 @@ export interface MolviaClient {
 export function createClient({
   baseUrl,
   fetch = globalThis.fetch,
-  actorId,
+  credentials = 'same-origin',
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: ClientOptions): MolviaClient {
-  function header(name: string, value: string, headers: Headers): void {
-    // A stored identifier with a newline in it would otherwise take the whole call down as
-    // a TypeError from `Headers.set` — and a value that cannot be sent names no subject, so
-    // it is refused with the code that means exactly that.
-    if (!HEADER_SAFE.test(value)) throw new ApiError(ERROR.NO_ACTOR, name)
-    headers.set(name, value)
-  }
-
   interface Options {
     readonly method?: string
     readonly headers?: Headers
-    /** The identity to speak as, when it is not the one the client carries. */
-    readonly as?: string
     /** `null` means «wait as long as it takes» — see `devLogin`. */
     readonly timeout?: number | null
     /** Sent as JSON. Already on the wire's side: the caller encodes through the schema. */
@@ -228,10 +210,6 @@ export function createClient({
   ): Promise<{ status: number; data: T }> {
     const headers = new Headers(options.headers)
     if (options.body !== undefined) headers.set('content-type', 'application/json')
-    const id = options.as ?? actorId?.()
-    // Set only when there is one: `X-Molvia-Actor: null` is the string «null», which the
-    // server refuses for a reason the caller cannot act on.
-    if (id) header(ACTOR_HEADER, id, headers)
 
     // `AbortController` and a timer rather than `AbortSignal.timeout`, which Safari only
     // learned in 16.0: on iOS 15 the call itself threw, inside the try below, and turned
@@ -264,6 +242,7 @@ export function createClient({
         response = await fetch(`${baseUrl}${path}`, {
           ...(options.method === undefined ? {} : { method: options.method }),
           ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+          credentials,
           headers,
           signal: controller.signal,
         })
@@ -372,8 +351,7 @@ export function createClient({
       // 0.2 gate. A cold VPS answering slowly is the ordinary case, not the failure.
       request('/dev/login', actorCodec, { method: 'POST', timeout: null }),
 
-    me: (identifier) =>
-      request('/actors/me', actorCodec, identifier === undefined ? {} : { as: identifier }),
+    me: () => request('/actors/me', actorCodec),
 
     searchCatalogue: async (query, options = {}) => {
       // URLSearchParams, not a template: «&», «#», «+» and «%» in a query would otherwise

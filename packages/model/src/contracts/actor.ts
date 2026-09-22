@@ -22,13 +22,6 @@ import { actorSchema } from '#model/entities/actor'
 export const SESSION_COOKIE = 'molvia_session'
 
 /**
- * What it replaced. The server stopped reading it in this very commit; it stays alive for one
- * more because `@molvia/client` and the PWA still write it, and they are taken off it — with
- * everything else that treated `actors.id` as a password — in the commit after this one.
- */
-export const ACTOR_HEADER = 'x-molvia-actor'
-
-/**
  * The owner as anyone outside the server sees them: the settings, without the identity behind
  * them (MOL-52).
  *
