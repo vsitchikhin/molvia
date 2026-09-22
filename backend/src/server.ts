@@ -1,4 +1,11 @@
 import Fastify from 'fastify'
+import type { LoginConfiguration } from '@/login-config'
+import { authRoutes } from '@/routes/auth'
+import { internalAuthRoutes } from '@/routes/internal-auth'
+import { startLogin } from '@/usecases/start-login'
+import { completeLogin } from '@/usecases/complete-login'
+import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
+import { authTransactOn } from '@/db/auth-unit-of-work'
 import type { FastifyError, FastifyInstance } from 'fastify'
 import { DomainError, ERROR, ISSUE, errorResponseSchema, isWireCode } from '@molvia/model'
 import type { ErrorCode, ErrorResponse } from '@molvia/model'
@@ -41,6 +48,11 @@ import type { Db } from '@/db'
 // themselves, so a code cannot mean 400 in one place and 404 in another.
 const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.NOT_FOUND]: 404,
+  [ERROR.LOGIN_UNAVAILABLE]: 404,
+  [ERROR.LOGIN_FORBIDDEN]: 403,
+  [ERROR.LOGIN_RATE_LIMITED]: 429,
+  [ERROR.LOGIN_DISABLED]: 503,
+  [ERROR.BOT_UNAUTHORIZED]: 401,
   // The request is well formed; another row already holds what it claims — a barcode that
   // belongs to another item. Not 400: nothing about the request itself is wrong.
   [ERROR.CONFLICT]: 409,
@@ -77,12 +89,17 @@ export interface ServerOptions {
    * rows passes while proving nothing.
    */
   readonly db?: Db
+  readonly login?: LoginConfiguration | null
 }
 
 export function buildServer(options: ServerOptions = {}): FastifyInstance {
-  const app = Fastify({ logger: true })
+  const app = Fastify({
+    logger: {
+      redact: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]'],
+    },
+  })
 
-  app.setErrorHandler((error: FastifyError, _request, reply) => {
+  app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof DomainError) {
       const status = STATUS_BY_CODE[error.code] ?? 400
       // RFC 9110 §15.5.2 makes a challenge mandatory on a 401. The scheme is this project's
@@ -111,7 +128,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       return reply.status(400).send(answer({ code, ...(details ? { details } : {}) }))
     }
 
-    app.log.error(error)
+    // Driver errors can carry SQL parameters; an auth failure must never log credentials.
+    if (request.url.startsWith('/auth/') || request.url.startsWith('/internal/auth/')) {
+      app.log.error({ errorName: error.name }, 'authentication failed')
+    } else {
+      app.log.error(error)
+    }
     return reply.status(error.statusCode ?? 500).send({ code: ERROR.INTERNAL })
   })
 
@@ -143,6 +165,20 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const verdicts = createVerdictRepository(db)
 
     healthRoutes(instance, { databaseIsReachable })
+    const login = options.login ?? null
+    authRoutes(instance, {
+      start: (name) => {
+        if (!login) throw new DomainError(ERROR.LOGIN_DISABLED)
+        return startLogin(loginRequests, login.username, name)
+      },
+      poll: (id, secret) => completeLogin(authTransactOn(db), id, secret),
+    })
+    internalAuthRoutes(instance, {
+      secret: login?.botSecret ?? null,
+      preview: (code) => previewLogin(loginRequests, code),
+      confirm: (code, telegramId) => confirmLogin(loginRequests, code, telegramId),
+      decline: (code) => declineLogin(loginRequests, code),
+    })
 
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).
     // `bin/bundle.mjs` replaces this exact expression with the literal `'production'`, so in

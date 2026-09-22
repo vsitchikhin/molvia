@@ -1,4 +1,4 @@
-import { SESSION_COOKIE } from '@molvia/model'
+import { LOGIN_COOKIE, SESSION_COOKIE } from '@molvia/model'
 import { secretOrNull } from '@/secret'
 
 /*
@@ -160,4 +160,14 @@ export function setDevAccountCookie(reply: HeaderSink, telegramUserId: number): 
 export function clearSessionCookie(reply: HeaderSink): void {
   reply.header('cache-control', 'no-store')
   reply.header('set-cookie', `${SESSION_COOKIE}=; Max-Age=0; ${FLAGS}`)
+}
+
+/** No clearing on poll: an old response must not erase a newer request's secret. */
+export function setLoginCookie(reply: HeaderSink, secret: string, expiresAt: Date): void {
+  if (secretOrNull(secret) === null) throw new Error('invalid login cookie secret')
+  reply.header('cache-control', 'no-store')
+  reply.header(
+    'set-cookie',
+    `${LOGIN_COOKIE}=${secret}; Max-Age=${String(maxAgeSeconds(expiresAt))}; ${FLAGS}`,
+  )
 }
