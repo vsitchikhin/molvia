@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { recordLiveRegion } from './live-region'
 
 /**
  * The identity through a real browser: storage that survives a reload, and a header on the
@@ -33,28 +34,6 @@ test('keeps the identity across a reload and carries it in the header', async ({
   // identity would be stored and never used, which no unit test would notice.
   await expect.poll(() => sent).toContain(id)
 })
-
-/**
- * Everything the app's live region says, in order: each announcement is a node of its own, and
- * an added node is what a screen reader reads — so the region's text at one moment proves
- * little, and its additions are what is recorded.
- */
-async function recordLiveRegion(page: Page): Promise<() => Promise<string[]>> {
-  await page.addInitScript(() => {
-    const w = window as unknown as { __said: string[] }
-    w.__said = []
-    new MutationObserver((records) => {
-      for (const record of records) {
-        if (!(record.target instanceof Element) || !record.target.matches('[role="status"]'))
-          continue
-        for (const node of record.addedNodes) {
-          if (node.textContent) w.__said.push(node.textContent)
-        }
-      }
-    }).observe(document, { subtree: true, childList: true })
-  })
-  return () => page.evaluate(() => (window as unknown as { __said: string[] }).__said)
-}
 
 // The identity's error is polite, so the region is its only way to a screen reader. «Try again»
 // failing the same way must be heard again, not swallowed as «no change» (MOL-19, C1).

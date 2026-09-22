@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { APIRequestContext, Page } from '@playwright/test'
+import { liveRegion, recordLiveRegion } from './live-region'
 
 interface Person {
   readonly id: string
@@ -52,37 +53,10 @@ async function ratedPurchase(who: Person, name: string, score: number): Promise<
   await who.call('PUT', `/verdicts/${entry.id}`, { score })
 }
 
-/**
- * Everything the app's live region says, in order: each announcement is a node of its own, and
- * an added node is what a screen reader reads — so the region's text at one moment proves
- * little, and its additions are what is recorded.
- */
-async function recordLiveRegion(page: Page): Promise<() => Promise<string[]>> {
-  await page.addInitScript(() => {
-    const w = window as unknown as { __said: string[] }
-    w.__said = []
-    new MutationObserver((records) => {
-      for (const record of records) {
-        if (!(record.target instanceof Element) || !record.target.matches('[role="status"]'))
-          continue
-        for (const node of record.addedNodes) {
-          if (node.textContent) w.__said.push(node.textContent)
-        }
-      }
-    }).observe(document, { subtree: true, childList: true })
-  })
-  return () => page.evaluate(() => (window as unknown as { __said: string[] }).__said)
-}
-
 /** Waits for the sheet to be up: until it has risen it deliberately takes no tap at all. */
 async function openSheet(page: Page): Promise<void> {
   await expect(page.locator('dialog[open]')).toBeVisible()
   await page.waitForTimeout(400)
-}
-
-/** What the app's live region holds now — what browse mode would still find in it. */
-async function liveRegion(page: Page): Promise<string> {
-  return (await page.locator('.announcer').textContent()) ?? ''
 }
 
 test('a rated purchase becomes a recommendation with the place and the price per unit', async ({
@@ -104,7 +78,9 @@ test('a rated purchase becomes a recommendation with the place and the price per
   // One place, so no superlative: «Bought here» is what one observation can honestly say.
   await expect(take.getByText('Bought here: SAS')).toBeVisible()
   await expect(take.getByText('577.78')).toBeVisible()
-  await expect(take.getByText('5.0 out of 5 · 1 rating')).toBeVisible()
+  // The own mode leaves the count out: it is always one, and the subtitle says so (МР-12).
+  await expect(take.getByText('5.0 out of 5', { exact: true })).toBeVisible()
+  await expect(take.getByText('1 rating')).toHaveCount(0)
 })
 
 test('a bad verdict carries no price and no place: there is nothing to be cheap with', async ({
@@ -288,4 +264,24 @@ test('a mis-tapped verdict is amended where it is met, and withdrawn from there 
   await page.getByRole('button', { name: 'Withdraw the rating' }).click()
 
   await expect(page.getByRole('heading', { name: 'Nothing to advise yet' })).toBeVisible()
+})
+
+// Loading breathes, and stands still for whoever asked for less motion. The only place the
+// skeleton's animation is checked against real CSS — happy-dom has none — and it went missing
+// with `home.spec.ts` (MOL-32, МР-5).
+test('the skeleton breathes, and stops for someone who asked for less motion', async ({
+  page,
+  request,
+}) => {
+  await person(request, page)
+  await page.route('**/api/advice', () => new Promise(() => undefined))
+  const bars = page.locator('.skeleton .bars')
+  const animation = () => bars.evaluate((element) => getComputedStyle(element).animationName)
+
+  await page.goto('/advice')
+  await expect(bars).toBeVisible()
+  expect(await animation()).not.toBe('none')
+
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  expect(await animation()).toBe('none')
 })
