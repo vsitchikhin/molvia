@@ -375,6 +375,7 @@ export const trips = pgTable(
       .notNull()
       .default(sql`clock_timestamp()`),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
+    finishedOnDeviceAt: timestamp('finished_on_device_at', { withTimezone: true }),
   },
   (table) => [
     // The list of trips, the running one, and «what is still unrated» all walk one actor

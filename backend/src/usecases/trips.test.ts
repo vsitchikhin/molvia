@@ -108,6 +108,7 @@ function fakeRepositories(
       lock: unexpected('trips.lock'),
       latestUnfinishedFor: unexpected('trips.latestUnfinishedFor'),
       listFor: unexpected('trips.listFor'),
+      history: unexpected('trips.history'),
       finish: unexpected('trips.finish'),
       chooseRate: unexpected('trips.chooseRate'),
       ...overrides.trips,

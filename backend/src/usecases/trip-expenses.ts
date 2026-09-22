@@ -96,7 +96,8 @@ export async function finishTrip(
   trips: TripRepository,
   actorId: string,
   tripId: string,
+  deviceAt?: Date,
 ): Promise<void> {
-  const trip = await trips.finish(tripId, actorId)
+  const trip = await trips.finish(tripId, actorId, undefined, deviceAt)
   if (!trip) throw new DomainError(ERROR.NOT_FOUND)
 }

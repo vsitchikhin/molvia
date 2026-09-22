@@ -1,11 +1,20 @@
-import { and, desc, eq, isNull, sql } from 'drizzle-orm'
-import { DomainError, ERROR, tripSchema } from '@molvia/model'
-import type { Currency, ExchangeRate, NewTrip, RateChoice, RateProvider, Trip } from '@molvia/model'
+import { and, desc, eq, isNull, isNotNull, sql } from 'drizzle-orm'
+import { DomainError, ERROR, TRIP_HISTORY_PAGE_SIZE, tripSchema } from '@molvia/model'
+import type {
+  TripHistory,
+  TripHistoryCursor,
+  Currency,
+  ExchangeRate,
+  NewTrip,
+  RateChoice,
+  RateProvider,
+  Trip,
+} from '@molvia/model'
 import { rateFrom, rateTo, sideRateFrom } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit, theRow } from './rows'
-import { trips } from './schema'
+import { trips, places } from './schema'
 
 /**
  * The rate a trip is started with, as the trip keeps it: who published it, whether it jumped when
@@ -70,6 +79,7 @@ export interface TripRepository {
    */
   latestUnfinishedFor(actorId: string): Promise<Trip | null>
   listFor(actorId: string, limit: number): Promise<Trip[]>
+  history(actorId: string, cursor?: TripHistoryCursor): Promise<TripHistory>
   /**
    * The moment comes from the database unless one is handed in, and that default is the
    * whole point: `started_at` is stamped by `clock_timestamp()` in microseconds, while a
@@ -85,7 +95,7 @@ export interface TripRepository {
    * Finishing twice moves nothing (MOL-21): a repeat from a queue is not a later finish, and
    * the moment a trip ended is a fact. The trip comes back as it was.
    */
-  finish(id: string, actorId: string, at?: Date): Promise<Trip | null>
+  finish(id: string, actorId: string, at?: Date, deviceAt?: Date): Promise<Trip | null>
   /**
    * Which rate a trip counts by, when its snapshot jumped (MOL-39, Р-19, Р-21), and the
    * person's own when that is the choice. The snapshot is not rewritten. Whether the choice is
@@ -116,6 +126,7 @@ function toTrip(row: TripRow): Trip {
     rateChoice: row.rateChoice,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
+    finishedOnDeviceAt: row.finishedOnDeviceAt,
   })
 }
 
@@ -214,7 +225,43 @@ export function createTripRepository(db: Conn): TripRepository {
       return rows.map(toTrip)
     },
 
-    async finish(id, actorId, at) {
+    async history(actorId, cursor) {
+      const time = sql`coalesce(${trips.finishedOnDeviceAt}, ${trips.finishedAt})`
+      const rows = await db
+        .select({
+          id: trips.id,
+          place: { id: places.id, kind: places.kind, name: places.name },
+          startedAt: trips.startedAt,
+          finishedAt: trips.finishedAt,
+          finishedOnDeviceAt: trips.finishedOnDeviceAt,
+          cursorAt: sql<string>`to_char(${time} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+        })
+        .from(trips)
+        .innerJoin(places, eq(places.id, trips.placeId))
+        .where(
+          and(
+            eq(trips.actorId, actorId),
+            isNotNull(trips.finishedAt),
+            cursor
+              ? sql`(${time}, ${trips.id}) < (${cursor.at}::timestamptz, ${cursor.id}::uuid)`
+              : undefined,
+          ),
+        )
+        .orderBy(sql`${time} desc`, desc(trips.id))
+        .limit(TRIP_HISTORY_PAGE_SIZE + 1)
+      const page = rows.slice(0, TRIP_HISTORY_PAGE_SIZE)
+      const last = page.at(-1)
+      return {
+        trips: page.map(({ id, place, startedAt, finishedAt, finishedOnDeviceAt }) => {
+          if (!finishedAt) throw new Error('history contained an unfinished trip')
+          return { id, place, startedAt, finishedAt, finishedOnDeviceAt }
+        }),
+        nextCursor:
+          rows.length > TRIP_HISTORY_PAGE_SIZE && last ? { at: last.cursorAt, id: last.id } : null,
+      }
+    },
+
+    async finish(id, actorId, at, deviceAt) {
       // Someone else's trip and a trip that never existed answer the same `null`: telling
       // them apart is how an identifier gets guessed by the difference in the reply.
       //
@@ -226,7 +273,7 @@ export function createTripRepository(db: Conn): TripRepository {
 
       const [row] = await db
         .update(trips)
-        .set({ finishedAt: at ?? sql`clock_timestamp()` })
+        .set({ finishedAt: at ?? sql`clock_timestamp()`, finishedOnDeviceAt: deviceAt ?? null })
         .where(and(ownedBy(id, actorId), isNull(trips.finishedAt)))
         .returning()
       if (row) return toTrip(row)

@@ -1,0 +1,1 @@
+ALTER TABLE "trips" ADD COLUMN "finished_on_device_at" timestamp with time zone;

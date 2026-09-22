@@ -238,24 +238,20 @@ describe('PUT — поставить оценку', () => {
     expect(await rows(itemId)).toHaveLength(0)
   })
 
-  it('11: позиции нет — 404; адрес не uuid — 400 с именем параметра', async () => {
+  it('11: malformed and missing are 404; uppercase is the same item (MOL-25)', async () => {
     const actor = await insertActor(db)
-
-    expect(await rate(actor, UNKNOWN_ID, { score: 4 })).toMatchObject({
-      status: 404,
-      body: { code: ERROR.NOT_FOUND },
-    })
-    expect(await rate(actor, 'молоко', { score: 4 })).toMatchObject({
-      status: 400,
-      body: { code: ISSUE.PATH_INVALID, details: 'itemId' },
-    })
-    // Д: one resource, one address — the card would otherwise answer with another `itemId`.
+    for (const id of [UNKNOWN_ID, 'молоко']) {
+      expect(await rate(actor, id, { score: 4 })).toMatchObject({
+        status: 404,
+        body: { code: ERROR.NOT_FOUND },
+      })
+    }
     const itemId = await insertItem(db)
     expect(await rate(actor, itemId.toUpperCase(), { score: 4 })).toMatchObject({
-      status: 400,
-      body: { code: ISSUE.PATH_INVALID, details: 'itemId' },
+      status: 201,
+      body: { itemId },
     })
-    expect(await rows(itemId)).toHaveLength(0)
+    expect(await rows(itemId)).toHaveLength(1)
   })
 
   it('12: блюдо, попавшее в справочник мимо API, — 400, а не 500', async () => {
