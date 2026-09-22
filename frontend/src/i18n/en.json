@@ -100,9 +100,10 @@
     },
     "elsewhere": {
       "title": "A trip in «{place}» is already open",
-      "body": "The purchases of this one («{mine}») are still on the phone: prices from one shop cannot be written to another — they are what comparisons are made of",
+      "body": "Continue the open trip, or finish it and start a new one in «{mine}»? Purchases for the new trip are saved on this device and will wait for your choice.",
       "join": "Add them to that trip",
-      "finish": "Finish that trip"
+      "finish": "Finish that trip",
+      "choose": "Choose trip"
     },
     "history": {
       "title": "Trip history",

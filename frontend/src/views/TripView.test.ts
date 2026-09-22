@@ -445,9 +445,12 @@ describe('TripView', () => {
       await flushPromises()
 
       expect(view.text()).toContain('Уже открыт поход в «SAS»')
-      expect(button(view, ru.trip.elsewhere.join).exists()).toBe(true)
-      await button(view, ru.trip.elsewhere.finish).trigger('click')
-      expect(queue.elsewhere).toBeNull()
+      const finish = vi.spyOn(queue, 'finishElsewhere')
+      await button(view, ru.trip.elsewhere.choose).trigger('click')
+      await flushPromises()
+      clock += 1000
+      inside(document.body.querySelector('dialog[open]'), ru.trip.elsewhere.finish).click()
+      expect(finish).toHaveBeenCalledWith(queue.elsewhere)
     })
   })
 

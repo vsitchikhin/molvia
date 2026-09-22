@@ -57,7 +57,7 @@
       </template>
     </ScreenState>
 
-    <!-- A trip is open in another shop: the purchases wait rather than move there by themselves,
+    <!-- A trip is already open: the purchases wait rather than move there by themselves,
          because «item + place» is the key the product rests on. The choice is the person's
          (adversarial Б1, owner's decision). -->
     <ScreenState
@@ -69,14 +69,7 @@
       :body="t('trip.elsewhere.body', { mine: queue.elsewhere.mine })"
     >
       <template #action>
-        <div class="refusal-actions">
-          <AppButton variant="ghost" @click="queue.joinElsewhere()">
-            {{ t('trip.elsewhere.join') }}
-          </AppButton>
-          <AppButton variant="ghost" @click="queue.finishElsewhere()">
-            {{ t('trip.elsewhere.finish') }}
-          </AppButton>
-        </div>
+        <AppButton variant="ghost" @click="chooseTrip">{{ t('trip.elsewhere.choose') }}</AppButton>
       </template>
     </ScreenState>
 
@@ -164,6 +157,17 @@
       </template>
     </BottomSheet>
 
+    <BottomSheet v-model:open="choosing">
+      <template #title>{{ t('trip.elsewhere.title', { place: choice?.place ?? '' }) }}</template>
+      <p class="confirm">{{ t('trip.elsewhere.body', { mine: choice?.mine ?? '' }) }}</p>
+      <template #footer>
+        <AppButton size="large" block @click="joinTrip">{{ t('trip.elsewhere.join') }}</AppButton>
+        <AppButton variant="ghost" block @click="finishOtherTrip">{{
+          t('trip.elsewhere.finish')
+        }}</AppButton>
+      </template>
+    </BottomSheet>
+
     <!-- Mounted on a tap and put away from `onClosed`, as the search does it: one opening, one
          purchase. One step back — the trip is the screen under it. -->
     <ItemDetailsSheet
@@ -206,6 +210,7 @@ import { purchaseDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import type { TripElsewhere } from '@/stores/tripQueue'
 import type { RejectedWrite } from '@/stores/tripQueue'
 
 /** What the sheet is open on: a row being amended, or a refused purchase being corrected. */
@@ -255,6 +260,21 @@ export default defineComponent({
     const actor = useActorStore()
     const trips = useTripStore()
     const queue = useTripQueueStore()
+    const choosing = ref(false)
+    const choice = ref<TripElsewhere | null>(null)
+    function chooseTrip(): void {
+      choice.value = queue.elsewhere
+      choosing.value = choice.value !== null
+    }
+    function joinTrip(): void {
+      if (choice.value) queue.joinElsewhere(choice.value)
+      choosing.value = false
+    }
+    function finishOtherTrip(): void {
+      if (choice.value) queue.finishElsewhere(choice.value)
+      choosing.value = false
+    }
+
     const { trip, local, tripId } = useCurrentTrip()
 
     /** Asked once at the start; the memory covers every later opening (MOL-24, Н-7). */
@@ -466,6 +486,11 @@ export default defineComponent({
     })
 
     return {
+      choosing,
+      choice,
+      chooseTrip,
+      joinTrip,
+      finishOtherTrip,
       t,
       IconPlus,
       queue,
