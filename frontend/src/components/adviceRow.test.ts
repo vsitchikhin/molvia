@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AdvicePlace } from '@molvia/model'
-import { placesView } from '@/components/advicePlaces'
+import { placesView } from '@/components/adviceRow'
 
 function place(name: string, amount: bigint): AdvicePlace {
   return {

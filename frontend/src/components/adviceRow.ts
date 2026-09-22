@@ -1,4 +1,12 @@
-import type { AdvicePlace } from '@molvia/model'
+import type { AdvicePlace, AdviceRow } from '@molvia/model'
+
+/**
+ * The three shapes of row, each named on its own: a component takes the one it draws, so a
+ * card that looks for a price cannot be handed a row that has none (MOL-31, Р-8).
+ */
+export type TakeRow = Extract<AdviceRow, { level: 'take' }>
+export type CheapRow = Extract<AdviceRow, { level: 'if_cheap' }>
+export type NeverRow = Extract<AdviceRow, { level: 'never' }>
 
 /**
  * How a row's places read, and it is the **only** thing the screen decides about the data
@@ -24,4 +32,19 @@ export function placesView(places: readonly AdvicePlace[]): PlacesView {
   const [best, ...rest] = places
   if (!best) return { kind: 'none' }
   return { kind: rest.length === 0 ? 'sole' : 'cheapest', best, rest }
+}
+
+/**
+ * «4.3» → «4,3»: the rating as the screen prints it, in the app's language.
+ *
+ * The figure crosses the wire as a decimal string, because one person's whole five and an
+ * average over many share the field (MOL-31, Р-12). It has exactly one decimal by contract,
+ * so the round trip through a number is exact — and a rating is not money in any case: the
+ * rule that forbids floats is about amounts, and this is a score out of five.
+ */
+export function formatRating(rating: string, locale: string): string {
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(Number(rating))
 }
