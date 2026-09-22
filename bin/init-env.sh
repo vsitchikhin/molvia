@@ -33,13 +33,28 @@ if [ -e "$env_path" ] && [ "$force" -eq 0 ]; then
   exit 1
 fi
 
+# Токен бота переживает --force. Всё остальное в файле вычисляется из индекса, а он
+# вписан руками и в BotFather повторно не показывается: перевыпуск отзывает старый.
+# MOL-60 сделал --force обязательным для всех уже заведённых копий, и без переноса
+# документированная починка стоила бы бота.
+kept_token=""
+if [ -e "$env_path" ]; then
+  kept_token="$(sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$env_path" | head -n 1)"
+fi
+
 offset=$(( index * 10 ))
 api_port=$(( 3300 + offset ))
 pwa_port=$(( 5300 + offset ))
 pg_port=$((  5500 + offset ))
+# Полоса копии — десять портов, так что соседний свободен всегда. Сквозной прогон
+# занимает именно его и потому уживается с работающим make dev, а не конкурирует с ним.
+e2e_api_port=$(( api_port + 1 ))
+e2e_pwa_port=$(( pwa_port + 1 ))
 
+# Все пять портов, которые займёт копия, а не три: против чужого процесса на соседнем
+# порту полоса не помогает, а предупреждение здесь — да.
 busy=""
-for p in "$api_port" "$pwa_port" "$pg_port"; do
+for p in "$api_port" "$pwa_port" "$pg_port" "$e2e_api_port" "$e2e_pwa_port"; do
   if lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then busy="$busy $p"; fi
 done
 
@@ -61,18 +76,30 @@ DATABASE_URL=postgres://molvia:molvia@127.0.0.1:${pg_port}/molvia_${index}
 # never truncate the data you have been entering by hand.
 TEST_DATABASE_URL=postgres://molvia:molvia@127.0.0.1:${pg_port}/molvia_${index}_test
 
+# End-to-end gets the same protection, and its own ports with it (MOL-60): the run
+# is dropped and recreated before every pass, and it cannot reach the dev stack even
+# when \`make dev\` is up, because that one listens elsewhere.
+E2E_API_PORT=${e2e_api_port}
+E2E_PWA_PORT=${e2e_pwa_port}
+E2E_DATABASE_URL=postgres://molvia:molvia@127.0.0.1:${pg_port}/molvia_${index}_e2e
+
 # У КАЖДОЙ КОПИИ СВОЙ БОТ. Два процесса на одном токене воруют друг у друга
 # апдейты через long polling — молча и невоспроизводимо. Завести отдельного
 # в BotFather, если эта копия будет работать параллельно с другой.
-TELEGRAM_BOT_TOKEN=
+TELEGRAM_BOT_TOKEN=${kept_token}
 
 # Открытый API ЦБ Армении, ключа не требует
 CBA_RATES_URL=https://cb.am/latest.json.php
 ENV
 
 echo ".env создан: CLONE_INDEX=$index, api=$api_port pwa=$pwa_port postgres=$pg_port, база molvia_$index"
+echo "                e2e: api=$e2e_api_port pwa=$e2e_pwa_port, база molvia_${index}_e2e"
 [ -n "$busy" ] && echo "ВНИМАНИЕ порты заняты:$busy — другая копия уже поднята или индекс совпал" >&2
-echo "Осталось вписать TELEGRAM_BOT_TOKEN."
+if [ -n "$kept_token" ]; then
+  echo "TELEGRAM_BOT_TOKEN перенесён из прежнего .env."
+else
+  echo "Осталось вписать TELEGRAM_BOT_TOKEN."
+fi
 # Кода приглашения больше нет (MOL-52): дверь снята, а личность до MOL-54 заводит
 # шов POST /dev/actors, которого нет в прод-сборке. Ссылка — просто адрес копии.
 echo "Приложение: http://127.0.0.1:$pwa_port/"

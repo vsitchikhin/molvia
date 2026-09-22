@@ -10,8 +10,9 @@ import type { APIResponse, Page } from '@playwright/test'
  * whole road — the field, the proxy, the server, the ranking — answers the way the screen expects.
  *
  * The items are added the way the screen adds them, through «Предложить товар» on the API. The
- * development database is shared with whoever uses this copy, so the names are ones nobody types,
- * and a proposal answered «already there» is as good as a new one.
+ * database is the run's own and is recreated before it (MOL-60), so nothing here is inherited
+ * from yesterday — but the whole suite shares it while running in parallel, which is why the
+ * names are ones nobody else types and a proposal answered «already there» is as good as a new one.
  */
 
 const KEY = 'molvia.actor'

@@ -849,8 +849,24 @@ shelf, so a desktop-only pass would prove nothing about the screen that matters.
   **separate database** on the same server (`molvia_<index>_test`), created and migrated
   by the vitest global setup — a test run can never truncate data entered by hand. This is
   why `make check` needs `make up` first, and why CI runs a Postgres service.
+- **End-to-end has a database of its own too, and it is dropped before every run**
+  (`molvia_<index>_e2e`, MOL-60). Until then the suite started the API without a
+  `DATABASE_URL` of its own and wrote into the dev database, so every pass left a catalogue
+  item and a purchase behind: a leftover «Кефир 4a2d4992» outranked the canonical item a
+  test expected — deterministically, and only on a machine with history. `bin/e2e-database.mjs`
+  recreates it (and refuses any name not ending in `_e2e`); the API migrates it at boot, so
+  there is no second migrator. Recreated rather than truncated: it also makes the schema
+  match the migrations after a branch switch, with no hand-kept list of tables. Not the
+  `_test` database, because that one is never cleaned between runs — its tests own their
+  rows — and `pre-push` runs both suites back to back.
+- **The run also has its own ports** (`E2E_API_PORT`, `E2E_PWA_PORT` — the neighbouring port
+  in this copy's band). A database alone would not have closed it: `reuseExistingServer`
+  handed the suite the dev API whenever `make dev` was up, so no `DATABASE_URL` of ours
+  reached a process — and `pre-push` runs e2e exactly then. Now the two stacks coexist.
 - **When a test fails, look for the bug in the code first** — do not adjust the test to
-  match the behaviour. A test proves the app works, not the other way round.
+  match the behaviour. A test proves the app works, not the other way round. And **never by
+  making it tolerate leftovers**: that hides the cause and leaves the suite depending on the
+  machine's history.
 - **Maximize corner cases.** Mandatory checklist:
   - NULL / legacy — the field is empty but the entity still falls under the rule
   - alternative write path — the same outcome reached by a different route
@@ -1081,12 +1097,25 @@ the tasks. The command is in `docs/tracker.md`.
 **Isolation between copies rests on `CLONE_INDEX` from `.env`.** Ports are base plus
 `CLONE_INDEX*10`; the database and compose project names get a suffix. The main copy is `0`.
 
-|          | Copy 0     | Copy 2     |
-| -------- | ---------- | ---------- |
-| API      | 3300       | 3320       |
-| PWA      | 5300       | 5320       |
-| Postgres | 5500       | 5520       |
-| Database | `molvia_0` | `molvia_2` |
+|              | Copy 0         | Copy 2         |
+| ------------ | -------------- | -------------- |
+| API          | 3300           | 3320           |
+| PWA          | 5300           | 5320           |
+| Postgres     | 5500           | 5520           |
+| Database     | `molvia_0`     | `molvia_2`     |
+| API in e2e   | 3301           | 3321           |
+| PWA in e2e   | 5301           | 5321           |
+| e2e database | `molvia_0_e2e` | `molvia_2_e2e` |
+
+The band is ten ports wide, so the neighbouring one is always free: a run at `+1` coexists
+with `make dev` instead of taking it over. **A copy whose `.env` predates MOL-60 needs
+`bin/init-env.sh <index> --force` once** — `make setup` keeps an existing `.env`, and
+without the three `E2E_*` values playwright refuses to start and says exactly that.
+**`--force` carries `TELEGRAM_BOT_TOKEN` over**: everything else in the file is computed
+from the index, that one is typed in by hand, and BotFather does not show it twice — a
+reissue revokes the old one. Regenerating was a once-per-copy event until MOL-60 made it
+compulsory for every existing copy, which is what turned the loss from unlikely into
+documented.
 
 Molvia has its own port band rather than the defaults: the machine already has the work
 project's Postgres and Vite listening on 5432 and 5173, so with the defaults Molvia would
