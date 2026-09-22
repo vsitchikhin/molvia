@@ -15,6 +15,8 @@ import { idOrNull, theRow } from './rows'
 import { loginRequests } from './schema'
 
 export interface LoginRequestRepository {
+  /** Lock before checking time: waiting for another write must not extend a login. */
+  lock(id: string, secret: string): Promise<void>
   /**
    * Takes the browser's secret itself and writes only its digest, as sessions do (Р-6), and
    * judges what it was given **before** a row exists (`newLoginRequestSchema`) — a code the
@@ -94,9 +96,18 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
    * promise: a value no row could carry has to answer with the same nothing, not with an error
    * from Postgres about its shape.
    */
-  const live = sql`${loginRequests.consumedAt} is null and ${loginRequests.expiresAt} > now()`
+  const live = sql`${loginRequests.consumedAt} is null and ${loginRequests.expiresAt} > clock_timestamp()`
 
   return {
+    async lock(id, secret) {
+      if (idOrNull(id) === null || secretOrNull(secret) === null) return
+      await db
+        .select({ id: loginRequests.id })
+        .from(loginRequests)
+        .where(and(eq(loginRequests.id, id), eq(loginRequests.secretHash, sha256Hex(secret))))
+        .for('update')
+    },
+
     async create(id, code, secret, deviceName, expiresAt) {
       // As in the session repository: a secret this server could not have minted means a caller
       // went around the path that mints one, and there is nothing to answer a client with.
