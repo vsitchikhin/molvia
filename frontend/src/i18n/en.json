@@ -271,7 +271,6 @@
     "restore_failed": "The server did not recognise the old key either. Nothing changed — the current record is untouched."
   },
   "dev": {
-    "connected": "Server is up, version {version}",
     "kit": {
       "title": "Kit",
       "buttons": "Buttons",

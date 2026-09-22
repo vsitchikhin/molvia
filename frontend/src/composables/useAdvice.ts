@@ -3,6 +3,7 @@ import type { ComputedRef } from 'vue'
 import { adviceResponseSchema } from '@molvia/model'
 import type { AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
 import { api } from '@/api'
+import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { read, write } from '@/stores/storage'
@@ -10,11 +11,15 @@ import { read, write } from '@/stores/storage'
 /** `idle` — no identity, so there is nobody to advise. */
 export type AdvicePhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'offline'
 
-/** The rows of one answer, split by verdict — the shape the screen draws. */
+/**
+ * The rows of one answer, split by verdict — the shape the screen draws. Each group carries
+ * its own kind of row, so a card that prints a price cannot be handed a row that has none:
+ * the product's rule is held by the type checker here too, not only on the wire.
+ */
 export interface AdviceGroups {
-  readonly take: AdviceRow[]
-  readonly if_cheap: AdviceRow[]
-  readonly never: AdviceRow[]
+  readonly take: TakeRow[]
+  readonly if_cheap: CheapRow[]
+  readonly never: NeverRow[]
 }
 
 export interface Advice {
@@ -54,11 +59,17 @@ function recall(key: string): Remembered | null {
 }
 
 function split(rows: readonly AdviceRow[]): AdviceGroups {
-  const groups: AdviceGroups = { take: [], if_cheap: [], never: [] }
+  const take: TakeRow[] = []
+  const if_cheap: CheapRow[] = []
+  const never: NeverRow[] = []
   // No sorting: the server orders by rating down, and the levels are decided by that same
   // printed tenth, so the three groups already lie in the answer one after another (Р-22).
-  for (const row of rows) groups[row.level].push(row)
-  return groups
+  for (const row of rows) {
+    if (row.level === 'take') take.push(row)
+    else if (row.level === 'if_cheap') if_cheap.push(row)
+    else never.push(row)
+  }
+  return { take, if_cheap, never }
 }
 
 /**
