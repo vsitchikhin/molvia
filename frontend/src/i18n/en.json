@@ -165,6 +165,8 @@
   "advice": {
     "title": "What to buy",
     "own_data_only": "Your own ratings only, for now",
+    "shared_data": "Average ratings from everyone who rated",
+    "shared_note": "Reviews and prices are yours alone",
     "group_take": "Buy it",
     "group_if_cheap": "Only if it is cheap",
     "group_never": "Not worth buying anywhere",
@@ -172,11 +174,17 @@
     "badge_if_cheap": "IF CHEAP",
     "badge_never": "DO NOT",
     "cheapest_at": "Cheapest at {place}",
+    "bought_at": "Bought here: {place}",
     "also_at": "Also: {places}",
+    "also_place": "{place} {price}",
     "threshold": "Worth buying below {price}",
     "no_price_shown": "The price is left out on purpose: there is nothing to compare",
     "rating": "{value} out of 5",
     "ratings_count": "{n} rating | {n} ratings",
+    "rating_line": "{rating} · {count}",
+    "truncated": "Showing {shown} of {total}",
+    "stale": "The list as of {day} at {time} — we will refresh once you are back online",
+    "stale_error": "The list as of {day} at {time} — the server did not answer",
     "empty": {
       "title": "Nothing to advise yet",
       "body": "Rate your first purchase — and what to buy will show up here",
@@ -187,9 +195,8 @@
       "body": "Verdicts are worked out on the server, there is no local copy"
     },
     "offline": {
-      "title": "Showing yesterday's data",
-      "body": "{count}, loaded {when}. We will refresh once you are back online",
-      "action": "Show it as is"
+      "title": "The list will show up once you are online",
+      "body": "Verdicts are worked out on the server — we will show them the moment it is back"
     }
   },
   "verdict": {
