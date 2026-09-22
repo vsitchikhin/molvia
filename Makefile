@@ -120,3 +120,4 @@ icons: ## Regenerate the app icons from the mark in favicon.svg
 ports: ## Show this copy's index and ports
 	$(REQUIRE_ENV)
 	@echo "copy $(CLONE_INDEX): api $(API_PORT) · pwa $(PWA_PORT) · postgres $(POSTGRES_PORT) · db $(POSTGRES_DB)"
+	@echo "       in e2e: api $(E2E_API_PORT) · pwa $(E2E_PWA_PORT) · db $(POSTGRES_DB)_e2e"
