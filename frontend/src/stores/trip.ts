@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { currentTripResponseSchema } from '@molvia/model'
 import type { TripView } from '@molvia/model'
 import { api } from '@/api'
+import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useActorStore } from '@/stores/actor'
 import { read, writeEverywhere } from '@/stores/storage'
 
@@ -44,6 +45,7 @@ export const TRIP_FIELDS = [
   'id',
   'startedAt',
   'finishedAt',
+  'finishedOnDeviceAt',
   'currency',
   'rate',
   'rateProvider',
@@ -165,6 +167,7 @@ export const useTripStore = defineStore('trip', () => {
    * the server would accept them, and the old trip would grow after it ended.
    */
   function apply(trip: TripView): void {
+    useTripHistoryStore().apply(trip)
     const same = current.value?.id === trip.id
     applied += 1
     if (trip.finishedAt !== null) {

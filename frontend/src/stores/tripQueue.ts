@@ -22,6 +22,7 @@ import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
 import { isIdentifier } from '@/stores/identity'
 import { read, writeEverywhere } from '@/stores/storage'
+import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripStore } from '@/stores/trip'
 
 /**
@@ -41,7 +42,7 @@ export type QueuedWrite =
        */
       readonly startedAt: Date
     }
-  | { readonly kind: 'finish'; readonly tripId: string }
+  | { readonly kind: 'finish'; readonly tripId: string; readonly finishedOnDeviceAt?: Date }
   | {
       readonly kind: 'add'
       readonly tripId: string
@@ -138,7 +139,12 @@ function encode(entry: QueuedWrite): Loose {
         startedAt: entry.startedAt.toISOString(),
       }
     case 'finish':
-      return { ...entry }
+      return {
+        ...entry,
+        ...(entry.finishedOnDeviceAt
+          ? { finishedOnDeviceAt: entry.finishedOnDeviceAt.toISOString() }
+          : {}),
+      }
     case 'add':
       return {
         kind: 'add',
@@ -171,7 +177,11 @@ function decode(raw: unknown): QueuedWrite | null {
     if (!body.success || startedAt === null || Number.isNaN(startedAt.getTime())) return null
     return { kind, tripId, place: body.data.place, startedAt }
   }
-  if (kind === 'finish') return { kind, tripId }
+  if (kind === 'finish') {
+    if (raw.finishedOnDeviceAt === undefined) return { kind, tripId }
+    const at = typeof raw.finishedOnDeviceAt === 'string' ? new Date(raw.finishedOnDeviceAt) : null
+    return at && Number.isFinite(at.getTime()) ? { kind, tripId, finishedOnDeviceAt: at } : null
+  }
   if (kind === 'add') {
     const body = addExpenseBodySchema.safeParse(knownFields(raw.body, BODY_FIELDS))
     return body.success ? { kind, tripId, body: body.data, entry: cardOf(raw.entry) } : null
@@ -284,7 +294,7 @@ function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
     case 'start':
       return api.startTrip({ id: entry.tripId, place: entry.place }).then(({ trip }) => trip)
     case 'finish':
-      return api.finishTrip(entry.tripId).then(() => null)
+      return api.finishTrip(entry.tripId, entry.finishedOnDeviceAt).then(() => null)
     case 'add':
       return written
         ? api.updateExpense(entry.tripId, entry.body.id, {
@@ -565,7 +575,10 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       // «Завершить» answers `204`, so there is nothing to apply: the trip the person closed stops
       // being the one they are on here, without waiting for a connection to say so again. Only on
       // success — a refused finish did not close anything (adversarial, second pass).
-      if (!refusal && head.write.kind === 'finish') trips.closed(head.write.tripId)
+      if (!refusal && head.write.kind === 'finish') {
+        trips.closed(head.write.tripId)
+        void useTripHistoryStore().completed(head.write.tripId)
+      }
       sync(owner)
       // Corrected while it was out: the correction is in the queue under its own key, and what
       // came back is about a body nobody holds any more. Neither refusal nor answer is news about
@@ -686,6 +699,23 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function enqueue(entry: QueuedWrite): void {
     const id = actor.id
     sync(id)
+    if (entry.kind === 'finish') {
+      const at = entry.finishedOnDeviceAt ?? new Date()
+      const start = kept.find(
+        (item) => item.write.kind === 'start' && item.write.tripId === entry.tripId,
+      )?.write
+      const trip = trips.current?.id === entry.tripId ? trips.current : null
+      if (trip || start?.kind === 'start') {
+        useTripHistoryStore().capture(
+          entry.tripId,
+          trip?.place.name ?? (start?.kind === 'start' ? start.place.name : ''),
+          trip?.startedAt ?? (start?.kind === 'start' ? start.startedAt : at),
+          at,
+          trip?.currency ?? actor.actor?.spendCurrency ?? 'AMD',
+          trip,
+        )
+      }
+    }
     const replaceable = entry.kind !== 'update' && entry.kind !== 'remove'
     const at = replaceable ? kept.findIndex((item) => sameWrite(item.write, entry)) : -1
     if (at === -1) {

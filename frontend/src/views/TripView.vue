@@ -498,7 +498,7 @@ export default defineComponent({
      */
     function finish(): void {
       const id = tripId.value
-      if (id) queue.enqueue({ kind: 'finish', tripId: id })
+      if (id) queue.enqueue({ kind: 'finish', tripId: id, finishedOnDeviceAt: new Date() })
       finishing.value = false
     }
 
