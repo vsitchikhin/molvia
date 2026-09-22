@@ -116,11 +116,14 @@ export interface ClientOptions {
 export interface MolviaClient {
   health(): Promise<HealthResponse>
   /**
-   * The first visit, through the development seam (MOL-52). It exists only outside
+   * The first visit, through the development seam (MOL-52, MOL-53). It exists only outside
    * production — the real door is the Telegram login of MOL-54 — and a client that calls it
    * against a production server gets a 404, because the address is not in that build.
+   *
+   * What comes back is the owner; what matters more is what comes back beside it — the session
+   * cookie, which the browser keeps and this code never sees.
    */
-  createActor(): Promise<ActorView>
+  devLogin(): Promise<ActorView>
   /**
    * Whether an identity is still alive. With no argument it asks about the one this client
    * speaks for; with one, about that identifier and **without touching anything else** —
@@ -210,7 +213,7 @@ export function createClient({
     readonly headers?: Headers
     /** The identity to speak as, when it is not the one the client carries. */
     readonly as?: string
-    /** `null` means «wait as long as it takes» — see `createActor`. */
+    /** `null` means «wait as long as it takes» — see `devLogin`. */
     readonly timeout?: number | null
     /** Sent as JSON. Already on the wire's side: the caller encodes through the schema. */
     readonly body?: unknown
@@ -360,14 +363,14 @@ export function createClient({
     health: () => request('/health', healthResponseSchema),
 
     // `async` so that a refusal arrives as a rejection rather than a synchronous throw: a
-    // caller writing `createActor().catch(…)` would never see the latter, and «everything
+    // caller writing `devLogin().catch(…)` would never see the latter, and «everything
     // this module throws is an ApiError» has to mean «through the promise».
-    createActor: async () =>
+    devLogin: async () =>
       // No timeout on the first visit, and this is the one place it is right to wait. An
       // abort here says nothing about whether the INSERT landed, so a retry after one
       // creates a **second** identity — and rows in `actors` are the denominator of the
       // 0.2 gate. A cold VPS answering slowly is the ordinary case, not the failure.
-      request('/dev/actors', actorCodec, { method: 'POST', timeout: null }),
+      request('/dev/login', actorCodec, { method: 'POST', timeout: null }),
 
     me: (identifier) =>
       request('/actors/me', actorCodec, identifier === undefined ? {} : { as: identifier }),

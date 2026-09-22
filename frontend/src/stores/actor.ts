@@ -137,7 +137,7 @@ export const useActorStore = defineStore('actor', () => {
 
   async function create(): Promise<void> {
     try {
-      settle(await api.createActor())
+      settle(await api.devLogin())
       state.value = 'ready'
     } catch (error) {
       // Nothing to explain away any more: until MOL-54 the only way to an identity is the

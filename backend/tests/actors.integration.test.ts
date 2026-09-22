@@ -47,7 +47,7 @@ function actorIn(body: unknown): ActorWire {
 /** The first visit through the development seam that replaced the invite door (MOL-52). */
 async function firstVisit(): Promise<Reply> {
   return served(async (app) => {
-    const response = await app.inject({ method: 'POST', url: '/dev/actors' })
+    const response = await app.inject({ method: 'POST', url: '/dev/login' })
     return { status: response.statusCode, body: JSON.parse(response.body) as unknown }
   })
 }

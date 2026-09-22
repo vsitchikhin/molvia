@@ -7,11 +7,11 @@ import type { ActorView } from '@molvia/model'
 // with its own in-memory identifier — the assertions would then read a value the code under
 // test never wrote.
 
-const createActor = vi.fn<() => Promise<ActorView>>()
+const devLogin = vi.fn<() => Promise<ActorView>>()
 const me = vi.fn<(identifier?: string) => Promise<ActorView>>()
 vi.mock('@/api', () => ({
   api: {
-    createActor: () => createActor(),
+    devLogin: () => devLogin(),
     me: (identifier?: string) => me(identifier),
   },
 }))
@@ -86,7 +86,7 @@ beforeEach(() => {
   setActivePinia(createPinia())
   localStorage.clear()
   sessionStorage.clear()
-  createActor.mockReset()
+  devLogin.mockReset()
   me.mockReset()
   online(true)
 })
@@ -98,12 +98,12 @@ afterEach(() => {
 
 describe('the first launch', () => {
   it('creates an identity, stores it and stops asking', async () => {
-    createActor.mockResolvedValue(FIRST)
+    devLogin.mockResolvedValue(FIRST)
     const { store } = await freshStore()
 
     await store.start()
 
-    expect(createActor).toHaveBeenCalledWith()
+    expect(devLogin).toHaveBeenCalledWith()
     expect(localStorage.getItem(KEY)).toBe(FIRST.id)
     expect(store.state).toBe('ready')
   })
@@ -114,10 +114,10 @@ describe('the first launch', () => {
 
     await store.start()
     expect(store.state).toBe('offline')
-    expect(createActor).not.toHaveBeenCalled()
+    expect(devLogin).not.toHaveBeenCalled()
 
     online(true)
-    createActor.mockResolvedValue(FIRST)
+    devLogin.mockResolvedValue(FIRST)
     window.dispatchEvent(new Event('online'))
     await vi.waitFor(() => {
       expect(store.state).toBe('ready')
@@ -152,7 +152,7 @@ describe('the first launch', () => {
     expect(store.state).toBe('offline')
 
     online(true)
-    createActor.mockResolvedValue(FIRST)
+    devLogin.mockResolvedValue(FIRST)
     document.dispatchEvent(new Event('visibilitychange'))
     await vi.waitFor(() => {
       expect(store.state).toBe('ready')
@@ -185,7 +185,7 @@ describe('the first launch', () => {
     })
 
     try {
-      createActor.mockResolvedValue(FIRST)
+      devLogin.mockResolvedValue(FIRST)
       const { store } = await freshStore()
 
       await expect(store.start()).resolves.toBeUndefined()
@@ -203,7 +203,7 @@ describe('a device whose storage refuses writes', () => {
     // The whole point: the store used to call itself ready while the client read the header
     // straight out of `localStorage`, so every request went out anonymous — and the app it
     // happened in believed it was fine.
-    createActor.mockResolvedValue(FIRST)
+    devLogin.mockResolvedValue(FIRST)
 
     await withBrokenLocalStorage(async () => {
       const { store, identity } = await freshStore()
@@ -218,7 +218,7 @@ describe('a device whose storage refuses writes', () => {
   it('does not hand out a new identity on the next launch of the same session', async () => {
     // Rows in `actors` are the denominator of the 0.2 gate; an iPhone in private mode used
     // to inflate it by itself, one row per launch.
-    createActor.mockResolvedValueOnce(FIRST).mockResolvedValueOnce(SECOND)
+    devLogin.mockResolvedValueOnce(FIRST).mockResolvedValueOnce(SECOND)
     me.mockResolvedValue(FIRST)
 
     await withBrokenLocalStorage(async () => {
@@ -226,7 +226,7 @@ describe('a device whose storage refuses writes', () => {
       const { store } = await freshStore()
       await store.start()
 
-      expect(createActor).toHaveBeenCalledTimes(1)
+      expect(devLogin).toHaveBeenCalledTimes(1)
       expect(store.id).toBe(FIRST.id)
     })
   })
@@ -260,7 +260,7 @@ describe('a launch with an identity already stored', () => {
     await store.start()
 
     expect(me).toHaveBeenCalled()
-    expect(createActor).not.toHaveBeenCalled()
+    expect(devLogin).not.toHaveBeenCalled()
     expect(store.state).toBe('ready')
   })
 
@@ -268,7 +268,7 @@ describe('a launch with an identity already stored', () => {
     localStorage.setItem(KEY, FIRST.id)
     const { store, identity } = await freshStore()
     me.mockRejectedValue(await refusal())
-    createActor.mockResolvedValue(SECOND)
+    devLogin.mockResolvedValue(SECOND)
 
     await store.start()
 
@@ -284,7 +284,7 @@ describe('a launch with an identity already stored', () => {
     localStorage.setItem(KEY, FIRST.id)
     const { store, identity } = await freshStore()
     me.mockRejectedValue(await refusal())
-    createActor.mockRejectedValue(new Error('fetch failed'))
+    devLogin.mockRejectedValue(new Error('fetch failed'))
 
     await store.start()
 
@@ -301,7 +301,7 @@ describe('a launch with an identity already stored', () => {
 
     expect(store.state).toBe('error')
     expect(localStorage.getItem(KEY)).toBe(FIRST.id)
-    expect(createActor).not.toHaveBeenCalled()
+    expect(devLogin).not.toHaveBeenCalled()
   })
 })
 
@@ -318,7 +318,7 @@ describe('two tabs opened at once', () => {
     window.dispatchEvent(new StorageEvent('storage', { key: KEY, newValue: FIRST.id }))
     await started
 
-    expect(createActor).not.toHaveBeenCalled()
+    expect(devLogin).not.toHaveBeenCalled()
     expect(store.id).toBe(FIRST.id)
     expect(store.state).toBe('ready')
   })
@@ -327,7 +327,7 @@ describe('two tabs opened at once', () => {
     // Whatever arrives in a storage event used to become this device's identity: the store
     // then held one id in memory, another in `actor`, and nothing in storage.
     localStorage.setItem('molvia.actor.claiming', String(Date.now()))
-    createActor.mockResolvedValue(SECOND)
+    devLogin.mockResolvedValue(SECOND)
     const { store } = await freshStore()
 
     const started = store.start()
@@ -345,7 +345,7 @@ describe('two tabs opened at once', () => {
     // `retry` is the store's public name for `start`, and a retry button is wired to it.
     // Without a guard the second call queued behind a claim this tab set itself.
     let release: (actor: ActorView) => void = () => undefined
-    createActor.mockReturnValue(
+    devLogin.mockReturnValue(
       new Promise<ActorView>((resolve) => {
         release = resolve
       }),
@@ -357,7 +357,7 @@ describe('two tabs opened at once', () => {
     release(FIRST)
     await Promise.all([first, second])
 
-    expect(createActor).toHaveBeenCalledTimes(1)
+    expect(devLogin).toHaveBeenCalledTimes(1)
     expect(store.state).toBe('ready')
   })
 })
@@ -370,7 +370,7 @@ describe('two tabs that both meet a dead identity', () => {
     localStorage.setItem(KEY, FIRST.id)
     const { store, identity } = await freshStore()
     me.mockRejectedValue(await refusal())
-    createActor.mockImplementation(() => {
+    devLogin.mockImplementation(() => {
       // The other tab finished while this one was between the 401 and its own claim.
       localStorage.setItem(KEY, SECOND.id)
       return Promise.resolve(SECOND)
@@ -390,7 +390,7 @@ describe('a set-aside identity', () => {
     localStorage.setItem(KEY, FIRST.id)
     const { store, identity } = await freshStore()
     me.mockRejectedValueOnce(await refusal())
-    createActor.mockResolvedValue(SECOND)
+    devLogin.mockResolvedValue(SECOND)
 
     await store.start()
     expect(store.state).toBe('lost')
@@ -414,7 +414,7 @@ describe('a set-aside identity', () => {
     localStorage.setItem(KEY, FIRST.id)
     const { store, identity } = await freshStore()
     me.mockRejectedValueOnce(await refusal())
-    createActor.mockResolvedValue(SECOND)
+    devLogin.mockResolvedValue(SECOND)
 
     await store.start()
 
@@ -435,7 +435,7 @@ describe('a set-aside identity', () => {
     localStorage.setItem(KEY, FIRST.id)
     const { store, identity } = await freshStore()
     me.mockRejectedValueOnce(await refusal())
-    createActor.mockResolvedValue(SECOND)
+    devLogin.mockResolvedValue(SECOND)
 
     await store.start()
 
@@ -463,12 +463,12 @@ describe('a set-aside identity', () => {
     localStorage.setItem(KEY, FIRST.id)
     const { store } = await freshStore()
     me.mockRejectedValueOnce(await refusal())
-    createActor.mockResolvedValueOnce(SECOND)
+    devLogin.mockResolvedValueOnce(SECOND)
 
     await store.start()
 
     me.mockRejectedValue(await refusal())
-    createActor.mockResolvedValueOnce(THIRD)
+    devLogin.mockResolvedValueOnce(THIRD)
     await store.retry()
 
     expect(store.lost).toContain(FIRST.id)
@@ -481,7 +481,7 @@ describe('the identity module', () => {
     localStorage.setItem(KEY, FIRST.id)
     const { store, identity } = await freshStore()
     me.mockRejectedValue(await refusal())
-    createActor.mockResolvedValue(SECOND)
+    devLogin.mockResolvedValue(SECOND)
 
     await store.start()
 

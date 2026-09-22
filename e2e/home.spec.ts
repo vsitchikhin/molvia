@@ -178,7 +178,7 @@ test('the live region does not keep what is no longer on the screen', async ({ p
 // failing the same way must be heard again, not swallowed as «no change» (MOL-19, C1).
 test('the same answer after «Try again» is said again', async ({ page }) => {
   const said = await recordLiveRegion(page)
-  await page.route('**/api/dev/actors**', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await page.route('**/api/dev/login**', (route) => route.fulfill({ status: 500, body: '{}' }))
   await page.goto('/')
   await expect(
     page.getByRole('heading', { name: 'This device could not be identified' }),

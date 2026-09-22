@@ -1,14 +1,16 @@
 import { randomInt } from 'node:crypto'
 import { ZodError } from 'zod'
 import { ISSUE } from '@molvia/model'
-import type { Actor, TelegramUserId } from '@molvia/model'
+import type { TelegramUserId } from '@molvia/model'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { answerWithActor } from '@/routes/actors'
+import { setSessionCookie } from '@/cookie'
 import { InvalidBody } from '@/parse'
+import type { SignedIn } from '@/usecases/sign-in'
 
 /**
- * A first visit with no Telegram in it — the seam development and the end-to-end suite log in
- * through until MOL-54 builds the real door (MOL-52, Р-3).
+ * A login with no Telegram in it — the seam development and the end-to-end suite come in
+ * through until MOL-54 builds the real door (MOL-52, Р-3; MOL-53, Р-7).
  *
  * It replaces `POST /actors` and the invite code of MOL-8, which went together: the code was
  * there because the handle was open to the whole internet and every call wrote a row. Taking
@@ -16,8 +18,13 @@ import { InvalidBody } from '@/parse'
  * place is not a door but an absence — **this module is not in the production bundle at all**
  * (see `server.ts` and `bin/bundle.mjs`), so there is nothing to guess and nothing to guard.
  *
- * The address says what it is. MOL-53 turns it into the seam that hands out a session instead
- * of an identity; it is meant to be replaced, not kept.
+ * The address says what it is, and it changed with what it does: `/dev/actors` created an
+ * owner, `/dev/login` signs one in. It is meant to be replaced, not kept.
+ *
+ * **It stays as narrow as it is on purpose.** It cannot be asked to sign in as somebody named,
+ * only as a new person — that would be the very door the epic closes. Integration tests, which
+ * build their owners as fixtures, therefore write a session row directly instead of coming
+ * through here (`signIn` in `tests/fixtures.ts`).
  */
 
 /**
@@ -50,15 +57,20 @@ function refuseAnyBody(request: FastifyRequest): Promise<void> {
     new ZodError([{ code: 'custom', path: ['body'], message: ISSUE.BODY_INVALID, input: null }]),
   )
 }
-export function devActorRoute(
+export function devLoginRoute(
   app: FastifyInstance,
-  api: { create(id: TelegramUserId): Promise<Actor> },
+  api: { signIn(id: TelegramUserId): Promise<SignedIn> },
 ): void {
-  app.post('/dev/actors', { onRequest: refuseAnyBody }, async (_request, reply) => {
+  app.post('/dev/login', { onRequest: refuseAnyBody }, async (_request, reply) => {
     // A Telegram account this person does not have. Random rather than counted, because two
     // seams running side by side (a test file and a dev server on the same database) would
     // otherwise hand out the same number and the second call would answer CONFLICT. Well
     // inside 2^40, so it can never be mistaken for the safe-integer ceiling the column checks.
-    return answerWithActor(reply.code(201), await api.create(randomInt(1, 2 ** 40)))
+    const { actor, token, expiresAt } = await api.signIn(randomInt(1, 2 ** 40))
+
+    // The token leaves the server exactly once and only here. `no-store` travels with it — the
+    // one function that can set a cookie is the one that says so (Р-6).
+    setSessionCookie(reply, token, expiresAt)
+    return answerWithActor(reply.code(201), actor)
   })
 }

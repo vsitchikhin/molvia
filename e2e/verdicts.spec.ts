@@ -9,7 +9,7 @@ interface Person {
 
 /** A new person for each test: the queue is personal, so nothing leaks between tests. */
 async function person(request: APIRequestContext, page: Page): Promise<Person> {
-  const created = await request.post('/api/dev/actors')
+  const created = await request.post('/api/dev/login')
   expect(created.status()).toBe(201)
   const { id } = (await created.json()) as { id: string }
   await page.addInitScript((actor) => {

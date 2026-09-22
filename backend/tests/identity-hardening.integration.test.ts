@@ -6,9 +6,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import process from 'node:process'
 import Fastify from 'fastify'
-import { ISSUE } from '@molvia/model'
+import { ISSUE, SESSION_COOKIE } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { actors, events } from '@/db/schema'
+import { actors, events, sessions } from '@/db/schema'
 import { buildServer } from '@/server'
 import { withActor } from '@/routes/actor'
 import { connectDrizzle } from './db'
@@ -25,6 +25,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.delete(events)
+  // Сессии уходят каскадом от владельца, но не в тех проверках, где владельцев не заводили.
+  await db.delete(sessions)
   await db.delete(actors)
 })
 
@@ -43,7 +45,7 @@ afterAll(async () => {
 function firstVisit(payload?: string) {
   return app.inject({
     method: 'POST',
-    url: '/dev/actors',
+    url: '/dev/login',
     headers: payload === undefined ? {} : { 'content-type': 'application/json' },
     ...(payload === undefined ? {} : { payload }),
   })
@@ -103,7 +105,7 @@ describe('the seam that replaced the door', () => {
       const production = buildServer({ db })
       await production.ready()
       try {
-        const response = await production.inject({ method: 'POST', url: '/dev/actors' })
+        const response = await production.inject({ method: 'POST', url: '/dev/login' })
 
         expect(response.statusCode).toBe(404)
         expect(await db.select().from(actors)).toHaveLength(0)
@@ -128,7 +130,7 @@ describe('a body is a body, whatever is inside it', () => {
       ['{', '', '{}'].map(async (payload) => {
         const response = await app.inject({
           method: 'POST',
-          url: '/dev/actors',
+          url: '/dev/login',
           headers: { 'content-type': 'application/json' },
           payload,
         })
@@ -140,6 +142,46 @@ describe('a body is a body, whatever is inside it', () => {
     expect(new Set(answers.map((answer) => answer.body)).size).toBe(1)
     expect(JSON.parse(answers[0]?.body ?? '')).toMatchObject({ code: ISSUE.BODY_INVALID })
     expect(await db.select().from(actors)).toHaveLength(0)
+  })
+})
+
+describe('the seam hands out a session, not an identifier', () => {
+  it('sets the cookie with every flag, and `no-store` beside it', async () => {
+    // The whole of «a cookie is not handed out by a reply that can be cached» (Р-6): the one
+    // function that can set one is the one that says `no-store`, and this is where it shows.
+    const response = await firstVisit()
+
+    const cookie = String(response.headers['set-cookie'])
+    expect(cookie).toMatch(new RegExp(`^${SESSION_COOKIE}=[A-Za-z0-9_-]{43};`))
+    expect(cookie).toContain('HttpOnly')
+    expect(cookie).toContain('Secure')
+    expect(cookie).toContain('SameSite=Lax')
+    expect(cookie).toContain('Path=/')
+    expect(response.headers['cache-control']).toBe('no-store')
+  })
+
+  it('hands out a session that actually opens the account it just made', async () => {
+    const created = await firstVisit()
+    const id = (JSON.parse(created.body) as { id: string }).id
+
+    const mine = await app.inject({
+      method: 'GET',
+      url: '/actors/me',
+      headers: { cookie: String(created.headers['set-cookie']).split(';')[0] ?? '' },
+    })
+
+    expect(mine.statusCode).toBe(200)
+    expect((JSON.parse(mine.body) as { id: string }).id).toBe(id)
+  })
+
+  it('writes the token nowhere but the cookie', async () => {
+    const created = await firstVisit()
+    const token = String(created.headers['set-cookie']).split(';')[0]?.split('=')[1] ?? ''
+
+    const [row] = await db.select().from(sessions)
+    expect(token).toHaveLength(43)
+    expect(JSON.stringify(row)).not.toContain(token)
+    expect(created.body).not.toContain(token)
   })
 })
 

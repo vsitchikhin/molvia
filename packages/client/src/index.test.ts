@@ -146,7 +146,7 @@ describe('everything the client throws is an ApiError', () => {
         }),
     })
 
-    const actor = await client.createActor()
+    const actor = await client.devLogin()
 
     expect(aborted).toBe(false)
     expect(actor.id).toBe(actorWire.id)
@@ -271,19 +271,19 @@ describe('the first visit', () => {
   it('posts to the development seam, with no body at all', async () => {
     const { client, calls } = clientRecording()
 
-    await client.createActor()
+    await client.devLogin()
 
     expect(calls[0]?.method).toBe('POST')
     // Not `/actors`: the invite door and the handle behind it went together (MOL-52), and
     // what is left exists only outside production. Against a production server this is a 404,
     // and that is the point — the real door is the Telegram login of MOL-54.
-    expect(calls[0]?.url).toBe('http://api/dev/actors')
+    expect(calls[0]?.url).toBe('http://api/dev/login')
   })
 
   it('hands back the domain entity, with dates rather than the strings on the wire', async () => {
     const { client } = clientRecording()
 
-    const actor = await client.createActor()
+    const actor = await client.devLogin()
 
     expect(actor.createdAt).toBeInstanceOf(Date)
     expect(actor.createdAt.toISOString()).toBe(actorWire.createdAt)
