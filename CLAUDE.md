@@ -409,10 +409,19 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   themselves. So `ADVICE_WARNINGS_RESERVED` of the rows are held for them. A reserve and not a
   reordering, because warnings have no bound in the shared mode: putting all of them first
   returned, on a shelf of 250, a page of two hundred warnings and not one recommendation.
-- **The server names no superlative.** It returns the places sorted by price and nothing else;
-  whether that reads «Дешевле всего» or «Брали здесь» is the screen's to decide by their number
-  (MOL-34's answer). And a review is always the asker's own: words are not an aggregate, there
-  is nothing in them to average and nothing to hide behind.
+- **The server names no superlative.** It returns the places and nothing else; whether that
+  reads «Дешевле всего» or «Брали здесь» is the screen's to decide (MOL-34's answer). **It
+  decides by comparing the prices, not by counting the places** (MOL-32, А1): the list comes
+  own city first and only then by price (Р-26), so the first place is the one to name but not
+  always the cheapest — and «Дешевле всего» over 4 790 ֏/кг with «Ещё: 3 000 ֏/кг» under it was
+  a lie the screen printed for a person who shops in two cities. And a review is always the
+  asker's own: words are not an aggregate, there is nothing in them to average and nothing to
+  hide behind.
+- **Every row says whose verdict stands behind it** (`isMine`, MOL-32, А2). Nothing else in it
+  does: in the shared mode a row may be entirely other people's, and a review is empty there
+  exactly as it is on one's own verdict without one. The flag was already in the statement, for
+  the warnings reserve; handing it out is what lets the screen offer «Оценить» where there is
+  nothing to amend, instead of a `PATCH` that answers 404 under the word «повторите».
 
 **Telegram Mini App was dropped:** `getUserMedia` is broken on both platforms and the
 native scanner only reads QR. Native is a 1.0 question.
@@ -967,13 +976,18 @@ computes nothing about the data except one word: one place is «Брали зд�
 lives on the phone**, under its owner and parsed back by the same schema, so offline is a strip
 naming the age of the list to the minute rather than an empty screen; without a memory it is the
 yellow state, and neither offers a button, because the screen comes back with the connection.
+**The strip is printed by where the rows came from, not by what became of the request** (А4):
+while an answer is still on its way yesterday's prices used to look freshly loaded.
 `scope` is said in words — the subtitle, and a footnote saying the reviews and prices are still
 one's own. **A verdict is amended where it is met** (MOL-28 left this here): a tap on any row
 opens a sheet with the 1–5 scale, the review and «Снять оценку», and until it existed a
 mis-tapped «1» stood until the item was bought again. **In the shared mode the sheet offers no
 score pre-chosen** — the figure on the row is an average over several people, and a save would
-have written it down as this person's opinion. Withdrawing asks nothing and says instead what it
-does; rating again brings the same row back. Release 0.1 is broken into epics and tasks in Jira.
+have written it down as this person's opinion — and on a row that is nobody's of one's own it
+rates rather than amends (`isMine`). Withdrawing asks nothing and says instead what it does;
+rating again brings the same row back. **The count of ratings is printed only in the shared
+mode**: in the own one it is always one, and the subtitle says as much. Release 0.1 is broken
+into epics and tasks in Jira.
 MOL-52 put the schema under accounts: the Telegram identity on the owner, `sessions` and
 `login_requests`, and the repositories over them — the routes are MOL-53 and MOL-54. Its
 migration **emptied the owners and everything hanging off them**, because a Telegram identity
