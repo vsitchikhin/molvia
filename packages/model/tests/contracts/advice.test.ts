@@ -107,7 +107,12 @@ describe('adviceRowSchema', () => {
 
 describe('adviceResponseSchema', () => {
   it('says whose figures it carries', () => {
-    const wire = { scope: 'shared', rows: [take, never], total: 2 }
+    const wire = {
+      geography: { country: 'AM', city: 'Гюмри' },
+      scope: 'shared',
+      rows: [take, never],
+      total: 2,
+    }
     const answer = adviceResponseSchema.parse(wire)
 
     expect(answer.scope).toBe('shared')
@@ -115,15 +120,39 @@ describe('adviceResponseSchema', () => {
   })
 
   it('answers an empty catalogue with an empty list, not with a missing field', () => {
-    expect(adviceResponseSchema.parse({ scope: 'own', rows: [], total: 0 }).rows).toEqual([])
-    expect(adviceResponseSchema.safeParse({ scope: 'own', total: 0 }).success).toBe(false)
-    expect(adviceResponseSchema.safeParse({ scope: 'own', rows: [] }).success).toBe(false)
+    expect(
+      adviceResponseSchema.parse({
+        geography: { country: 'AM', city: 'Гюмри' },
+        scope: 'own',
+        rows: [],
+        total: 0,
+      }).rows,
+    ).toEqual([])
+    expect(
+      adviceResponseSchema.safeParse({
+        geography: { country: 'AM', city: 'Гюмри' },
+        scope: 'own',
+        total: 0,
+      }).success,
+    ).toBe(false)
+    expect(
+      adviceResponseSchema.safeParse({
+        geography: { country: 'AM', city: 'Гюмри' },
+        scope: 'own',
+        rows: [],
+      }).success,
+    ).toBe(false)
   })
 
   it('refuses a mode a client invented', () => {
-    expect(adviceResponseSchema.safeParse({ scope: 'everyone', rows: [], total: 0 }).success).toBe(
-      false,
-    )
+    expect(
+      adviceResponseSchema.safeParse({
+        geography: { country: 'AM', city: 'Гюмри' },
+        scope: 'everyone',
+        rows: [],
+        total: 0,
+      }).success,
+    ).toBe(false)
   })
 
   it('stops at the limit rather than carrying a list nobody bounded', () => {
@@ -131,13 +160,30 @@ describe('adviceResponseSchema', () => {
 
     const total = rows.length
     expect(
-      adviceResponseSchema.safeParse({ scope: 'own', rows: rows.slice(1), total }).success,
+      adviceResponseSchema.safeParse({
+        geography: { country: 'AM', city: 'Гюмри' },
+        scope: 'own',
+        rows: rows.slice(1),
+        total,
+      }).success,
     ).toBe(true)
-    expect(adviceResponseSchema.safeParse({ scope: 'own', rows, total }).success).toBe(false)
+    expect(
+      adviceResponseSchema.safeParse({
+        geography: { country: 'AM', city: 'Гюмри' },
+        scope: 'own',
+        rows,
+        total,
+      }).success,
+    ).toBe(false)
     // Счётчик не может быть меньше страницы, которую он сопровождает.
-    expect(adviceResponseSchema.safeParse({ scope: 'own', rows: [take], total: 0 }).success).toBe(
-      false,
-    )
+    expect(
+      adviceResponseSchema.safeParse({
+        geography: { country: 'AM', city: 'Гюмри' },
+        scope: 'own',
+        rows: [take],
+        total: 0,
+      }).success,
+    ).toBe(false)
   })
 })
 

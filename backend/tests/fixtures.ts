@@ -1,5 +1,7 @@
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto'
-import { AGGREGATE_MIN_CONTRIBUTIONS, SESSION_COOKIE } from '@molvia/model'
+import type { ActorSettings } from '@molvia/model'
+import { eq } from 'drizzle-orm'
+import { actorSettingsSchema, AGGREGATE_MIN_CONTRIBUTIONS, SESSION_COOKIE } from '@molvia/model'
 import { createSessionRepository } from '@/db/sessions-repository'
 import type { Db } from '@/db/index'
 import type { PriceQuery } from '@/db/expenses-repository'
@@ -191,4 +193,17 @@ export function ownPrices(actorId: string, itemIds: readonly string[], limit?: n
     city: 'Гюмри',
     ...(limit === undefined ? {} : { limit }),
   }
+}
+
+/** Settings captured by the client before a new trip is sent. */
+export async function tripContext(db: Db, owner: string): Promise<ActorSettings> {
+  const [row] = await db.select().from(actors).where(eq(actors.id, owner))
+  return actorSettingsSchema.parse(
+    row && {
+      country: row.country,
+      city: row.city,
+      spendCurrency: row.spendCurrency,
+      incomeCurrency: row.incomeCurrency,
+    },
+  )
 }

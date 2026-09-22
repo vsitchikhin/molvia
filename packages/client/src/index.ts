@@ -28,6 +28,7 @@ import {
 import type {
   ActorView,
   SettingsUpdate,
+  SettingsGeography,
   AdviceResponse,
   AddExpenseBody,
   CatalogueEntry,
@@ -140,7 +141,7 @@ export interface MolviaClient {
    */
   proposeItem(input: ProposedItem): Promise<{ entry: CatalogueEntry; created: boolean }>
   /** The places this person shopped in lately, to tap at the door instead of typing. */
-  recentPlaces(): Promise<TripPlace[]>
+  recentPlaces(geography?: SettingsGeography): Promise<TripPlace[]>
   /**
    * «Начать поход». The identifier is the device's own, so sending it again after a lost reply
    * is safe: `created` is then `false` and the trip is the one already there. Another open trip
@@ -384,7 +385,15 @@ export function createClient({
       return { entry: data, created: status === 201 }
     },
 
-    recentPlaces: async () => (await request('/places/recent', recentPlacesResponseSchema)).places,
+    recentPlaces: async (geography) =>
+      (
+        await request(
+          geography
+            ? `/places/recent?${new URLSearchParams(geography).toString()}`
+            : '/places/recent',
+          recentPlacesResponseSchema,
+        )
+      ).places,
 
     // `async` everywhere below for the reason `proposeItem` has it: a body the schema refuses
     // must arrive as a rejection. Ordinary timeouts: every one of these is safe to repeat — the

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { and, asc, desc, eq, inArray, max, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { placeSchema } from '@molvia/model'
-import type { NewPlace, Place } from '@molvia/model'
+import type { NewPlace, Place, SettingsGeography } from '@molvia/model'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
 import { placeIdentity, places, trips } from './schema'
@@ -13,7 +13,7 @@ export interface PlaceRepository {
   byId(id: string): Promise<Place | null>
   byIds(ids: readonly string[]): Promise<Place[]>
   /** Places this person has already shopped in, the most recent first. */
-  recentFor(actorId: string, limit: number): Promise<Place[]>
+  recentFor(actorId: string, limit: number, geography?: SettingsGeography): Promise<Place[]>
 }
 
 type PlaceRow = typeof places.$inferSelect
@@ -98,7 +98,7 @@ export function createPlaceRepository(db: Conn): PlaceRepository {
       return rows.map(toPlace)
     },
 
-    async recentFor(actorId, limit) {
+    async recentFor(actorId, limit, geography) {
       if (idOrNull(actorId) === null) return []
 
       // Grouped by place rather than listing trips: a person who shops in the same three
@@ -108,7 +108,14 @@ export function createPlaceRepository(db: Conn): PlaceRepository {
         .select({ place: places })
         .from(places)
         .innerJoin(trips, eq(trips.placeId, places.id))
-        .where(eq(trips.actorId, actorId))
+        .where(
+          and(
+            eq(trips.actorId, actorId),
+            geography
+              ? and(eq(places.country, geography.country), eq(places.city, geography.city))
+              : undefined,
+          ),
+        )
         .groupBy(places.id)
         .orderBy(desc(max(trips.startedAt)), asc(places.id))
         .limit(rowLimit(limit))

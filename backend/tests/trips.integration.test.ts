@@ -24,7 +24,7 @@ import { createRateRepository } from '@/db/rates-repository'
 import { places, searchPicks, trips } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, signIn } from './fixtures'
+import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
 
 const { db, close } = connectDrizzle()
 
@@ -74,8 +74,12 @@ async function call(
 const trip = (reply: Reply): TripView => tripViewCodec.parse(reply.body)
 const code = (reply: Reply): unknown => (reply.body as { code?: unknown } | undefined)?.code
 
-function start(actor: string, name = 'Ереван Сити', id: string = randomUUID()) {
-  return call('POST', '/trips', actor, { id, place: { kind: 'store', name } })
+async function start(actor: string, name = 'Ереван Сити', id: string = randomUUID()) {
+  return call('POST', '/trips', actor, {
+    context: await tripContext(db, actor),
+    id,
+    place: { kind: 'store', name },
+  })
 }
 
 function add(actor: string, tripId: string, body: Record<string, unknown>) {
@@ -443,6 +447,7 @@ describe('тело запроса', () => {
   it('заведение до 0.3 — 400', async () => {
     const actor = await insertActor(db)
     const reply = await call('POST', '/trips', actor, {
+      context: await tripContext(db, actor),
       id: randomUUID(),
       place: { kind: 'venue', name: 'Кафе' },
     })
@@ -451,7 +456,10 @@ describe('тело запроса', () => {
 
   it('поход без id — 400: назвать его может только устройство', async () => {
     const actor = await insertActor(db)
-    const reply = await call('POST', '/trips', actor, { place: { kind: 'store', name: 'SAS' } })
+    const reply = await call('POST', '/trips', actor, {
+      context: await tripContext(db, actor),
+      place: { kind: 'store', name: 'SAS' },
+    })
     expect(reply.status).toBe(400)
   })
 

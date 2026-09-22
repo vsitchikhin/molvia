@@ -1,9 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { actorCodec, ERROR, settingsOf } from '@molvia/model'
+import { actorCodec, ERROR, settingsOf, tripViewCodec } from '@molvia/model'
 import type { ActorSettings } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { actors } from '@/db/schema'
+import { actors, places } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
@@ -97,5 +98,58 @@ describe('settings and offline trip context', () => {
     expect((await save(cookie, legacy, { ...legacy, incomeCurrency: 'AMD' })).statusCode).toBe(200)
     expect((await save(cookie, legacy, { ...legacy, city: 'Батуми' })).statusCode).toBe(400)
     expect((await save(cookie, { ...legacy, incomeCurrency: 'AMD' }, initial)).statusCode).toBe(200)
+  })
+
+  it('starts a queued trip in its captured city/currencies after another device changes settings', async () => {
+    const owner = await insertActor(db)
+    const cookie = await signIn(db, owner)
+    await save(cookie, initial, changed)
+    const id = randomUUID()
+    const response = await app.inject({
+      method: 'POST',
+      url: '/trips',
+      headers: { cookie },
+      payload: { id, context: initial, place: { kind: 'store', name: 'SAS' } },
+    })
+    expect(response.statusCode).toBe(201)
+    const trip = tripViewCodec.parse(response.json())
+    expect(trip.currency).toBe('AMD')
+    expect(await db.select().from(places).where(eq(places.id, trip.place.id))).toMatchObject([
+      { country: 'AM', city: 'Гюмри' },
+    ])
+    const repeat = await app.inject({
+      method: 'POST',
+      url: '/trips',
+      headers: { cookie },
+      payload: { id, place: { kind: 'store', name: 'SAS' } },
+    })
+    expect(repeat.statusCode).toBe(200)
+    expect(repeat.json()).toEqual(response.json())
+    const here = await app.inject({
+      method: 'GET',
+      url: '/places/recent?country=AM&city=' + encodeURIComponent('Гюмри'),
+      headers: { cookie },
+    })
+    const there = await app.inject({
+      method: 'GET',
+      url: '/places/recent?country=AM&city=' + encodeURIComponent('Ереван'),
+      headers: { cookie },
+    })
+    expect(here.json()).toMatchObject({ places: [{ name: 'SAS' }] })
+    expect(there.json()).toEqual({ places: [] })
+  })
+
+  it('holds an unknown legacy start without creating a place or trip', async () => {
+    const owner = await insertActor(db)
+    const cookie = await signIn(db, owner)
+    const response = await app.inject({
+      method: 'POST',
+      url: '/trips',
+      headers: { cookie },
+      payload: { id: randomUUID(), place: { kind: 'store', name: 'Unknown city' } },
+    })
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toMatchObject({ code: ERROR.TRIP_CONTEXT_REQUIRED })
+    expect(await db.select().from(places)).toEqual([])
   })
 })

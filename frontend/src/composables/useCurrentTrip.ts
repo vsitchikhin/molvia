@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 import type { ComputedRef } from 'vue'
 import { currencySchema } from '@molvia/model'
-import type { Currency, TripView } from '@molvia/model'
+import type { ActorSettings, Currency, TripView } from '@molvia/model'
 import { useActorStore } from '@/stores/actor'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -10,6 +10,7 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 export interface LocalTrip {
   readonly id: string
   readonly placeName: string
+  readonly context?: ActorSettings
   readonly startedAt: Date
 }
 
@@ -48,7 +49,12 @@ export function useCurrentTrip(): CurrentTrip {
     let started: LocalTrip | null = null
     for (const write of queue.pending) {
       if (write.kind === 'start') {
-        started = { id: write.tripId, placeName: write.place.name, startedAt: write.startedAt }
+        started = {
+          id: write.tripId,
+          placeName: write.place.name,
+          startedAt: write.startedAt,
+          ...(write.context ? { context: write.context } : {}),
+        }
       } else if (write.kind === 'finish' && started?.id === write.tripId) {
         started = null
       }
@@ -68,7 +74,11 @@ export function useCurrentTrip(): CurrentTrip {
   const tripId = computed(() => local.value?.id ?? trip.value?.id ?? null)
 
   const currency = computed(
-    () => trip.value?.currency ?? actor.actor?.spendCurrency ?? currencySchema.enum.AMD,
+    () =>
+      trip.value?.currency ??
+      local.value?.context?.spendCurrency ??
+      actor.settings?.spendCurrency ??
+      currencySchema.enum.AMD,
   )
 
   return { trip, local, tripId, currency }

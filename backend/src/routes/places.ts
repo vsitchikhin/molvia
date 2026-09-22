@@ -1,10 +1,11 @@
 import { z } from 'zod'
-import { recentPlacesResponseSchema, tripPlaceOf } from '@molvia/model'
-import type { Place } from '@molvia/model'
+import { parseQuery } from '@/parse'
+import { recentPlacesResponseSchema, tripPlaceOf, settingsGeographySchema } from '@molvia/model'
+import type { Place, SettingsGeography } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 
 export interface PlacesApi {
-  recent(actorId: string): Promise<Place[]>
+  recent(actorId: string, geography?: SettingsGeography): Promise<Place[]>
 }
 
 /**
@@ -13,7 +14,13 @@ export interface PlacesApi {
  */
 export function placeRoutes(app: FastifyInstance, api: PlacesApi): void {
   app.get('/places/recent', { exposeHeadRoute: false }, async (request, reply) => {
-    const places = await api.recent(request.actorId)
+    const query = parseQuery(z.union([settingsGeographySchema, z.strictObject({})]), request.query)
+    const places = await api.recent(
+      request.actorId,
+      typeof query.country === 'string' && typeof query.city === 'string'
+        ? { country: query.country, city: query.city }
+        : undefined,
+    )
     return reply
       .header('cache-control', 'no-store')
       .send(z.encode(recentPlacesResponseSchema, { places: places.map(tripPlaceOf) }))

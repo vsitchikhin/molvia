@@ -37,6 +37,7 @@ export const ERROR = {
    * the screen reads exactly this code to ask.
    */
   TRIP_OPEN: 'error.trip_open',
+  TRIP_CONTEXT_REQUIRED: 'error.trip_context_required',
   INTERNAL: 'error.internal',
 } as const
 

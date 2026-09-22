@@ -1,3 +1,4 @@
+import { nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import type { TripPlace } from '@molvia/model'
@@ -18,6 +19,10 @@ const city: TripPlace = {
 
 function fresh(identity = ME) {
   localStorage.setItem('molvia.actor', identity)
+  localStorage.setItem(
+    `molvia.settings.${identity}`,
+    JSON.stringify({ country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+  )
   setActivePinia(createPinia())
   // Личность живёт в модуле, а не в хранилище: без этого второй `fresh` остаётся первым.
   useActorStore().id = identity
@@ -25,6 +30,25 @@ function fresh(identity = ME) {
 }
 
 describe('recent places', () => {
+  it('does not offer the previous city’s places after settings change', async () => {
+    recentPlaces.mockResolvedValue([city])
+    const store = fresh()
+    await store.refresh()
+    expect(store.places).toEqual([city])
+    localStorage.setItem(
+      `molvia.settings.${ME}`,
+      JSON.stringify({
+        country: 'AM',
+        city: 'Ереван',
+        spendCurrency: 'AMD',
+        incomeCurrency: 'RUB',
+      }),
+    )
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.settings.${ME}` }))
+    await nextTick()
+    expect(store.places).toEqual([])
+  })
+
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()

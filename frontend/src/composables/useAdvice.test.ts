@@ -39,7 +39,7 @@ function row(n: number, level: AdviceRow['level'], rating = '4.5'): AdviceRow {
 }
 
 function answer(rows: AdviceRow[], total = rows.length, scope: AdviceResponse['scope'] = 'own') {
-  return { scope, rows, total }
+  return { scope, rows, total, geography: { country: 'AM', city: 'Гюмри' } }
 }
 
 function online(value: boolean): void {
@@ -77,6 +77,11 @@ async function mounted(): Promise<Advice> {
  * cleared `localStorage` alone would leave the previous identity in memory.
  */
 function freshPinia(id: string | null = ME): void {
+  if (id)
+    localStorage.setItem(
+      `molvia.settings.${id}`,
+      JSON.stringify({ country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+    )
   setActivePinia(createPinia())
   useActorStore().id = id
 }
@@ -84,6 +89,37 @@ function freshPinia(id: string | null = ME): void {
 const names = (rows: readonly AdviceRow[]) => rows.map((item) => item.name)
 
 describe('useAdvice', () => {
+  it('drops the previous city immediately and ignores its late response', async () => {
+    advice.mockResolvedValue(answer([row(1, 'take')]))
+    const held = await mounted()
+    const landings: ((value: AdviceResponse) => void)[] = []
+    advice.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          landings.push(resolve)
+        }),
+    )
+    void held.retry()
+    localStorage.setItem(
+      `molvia.settings.${ME}`,
+      JSON.stringify({
+        country: 'AM',
+        city: 'Ереван',
+        spendCurrency: 'AMD',
+        incomeCurrency: 'RUB',
+      }),
+    )
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.settings.${ME}` }))
+    await flushPromises()
+    expect(held.shown.value).toBe(0)
+    landings[1]?.({ ...answer([row(2, 'take')]), geography: { country: 'AM', city: 'Ереван' } })
+    await flushPromises()
+    expect(names(held.groups.value.take)).toEqual(['Позиция 2'])
+    landings[0]?.(answer([row(1, 'take')]))
+    await flushPromises()
+    expect(names(held.groups.value.take)).toEqual(['Позиция 2'])
+  })
+
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()
@@ -205,7 +241,12 @@ describe('useAdvice', () => {
     localStorage.setItem(
       `molvia.advice.${ME}`,
       JSON.stringify({
-        answer: { scope: 'own', rows: [never], total: 1 },
+        answer: {
+          geography: { country: 'AM', city: 'Гюмри' },
+          scope: 'own',
+          rows: [never],
+          total: 1,
+        },
         fetchedAt: new Date().toISOString(),
       }),
     )
@@ -221,7 +262,12 @@ describe('useAdvice', () => {
     localStorage.setItem(
       `molvia.advice.${ME}`,
       JSON.stringify({
-        answer: { scope: 'own', rows: [clean], total: 1 },
+        answer: {
+          geography: { country: 'AM', city: 'Гюмри' },
+          scope: 'own',
+          rows: [clean],
+          total: 1,
+        },
         fetchedAt: new Date().toISOString(),
       }),
     )

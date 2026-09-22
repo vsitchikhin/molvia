@@ -11,6 +11,7 @@ import {
   startTripBodySchema,
 } from '@molvia/model'
 import type {
+  ActorSettings,
   AddExpenseBody,
   CatalogueEntry,
   ExpensePatch,
@@ -33,6 +34,7 @@ import { useTripStore } from '@/stores/trip'
 export type QueuedWrite =
   | {
       readonly kind: 'start'
+      readonly context?: ActorSettings
       readonly tripId: string
       readonly place: StartTripBody['place']
       /**
@@ -135,6 +137,7 @@ function encode(entry: QueuedWrite): Loose {
         kind: 'start',
         tripId: entry.tripId,
         place: { ...entry.place },
+        ...(entry.context ? { context: entry.context } : {}),
         startedAt: entry.startedAt.toISOString(),
       }
     case 'finish':
@@ -166,10 +169,20 @@ function decode(raw: unknown): QueuedWrite | null {
   if (kind === 'start') {
     // Through the body's own schema, so a name the server would refuse never waits in the queue
     // for a connection that will only bring a `400`.
-    const body = startTripBodySchema.safeParse({ id: tripId, place: raw.place })
+    const body = startTripBodySchema.safeParse({
+      id: tripId,
+      place: raw.place,
+      context: raw.context,
+    })
     const startedAt = typeof raw.startedAt === 'string' ? new Date(raw.startedAt) : null
     if (!body.success || startedAt === null || Number.isNaN(startedAt.getTime())) return null
-    return { kind, tripId, place: body.data.place, startedAt }
+    return {
+      kind,
+      tripId,
+      place: body.data.place,
+      startedAt,
+      ...(body.data.context ? { context: body.data.context } : {}),
+    }
   }
   if (kind === 'finish') return { kind, tripId }
   if (kind === 'add') {
@@ -282,7 +295,13 @@ function recallRejected(key: string): { items: RejectedWrite[]; named: boolean }
 function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
   switch (entry.kind) {
     case 'start':
-      return api.startTrip({ id: entry.tripId, place: entry.place }).then(({ trip }) => trip)
+      return api
+        .startTrip({
+          id: entry.tripId,
+          place: entry.place,
+          ...(entry.context ? { context: entry.context } : {}),
+        })
+        .then(({ trip }) => trip)
     case 'finish':
       return api.finishTrip(entry.tripId).then(() => null)
     case 'add':
@@ -393,6 +412,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   const rejected = ref<RejectedWrite[]>([])
   /** Set when a trip started here met one open in another shop; cleared as soon as it is not so. */
   const elsewhere = ref<TripElsewhere | null>(null)
+  const needsContext = ref<string | null>(null)
   /**
    * The trip the person agreed to write into, by its identifier — never a bare «yes» (Т-1): a
    * reroute that did not happen (the connection went, that trip was closed) would otherwise leave
@@ -407,6 +427,13 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
 
   function show(): void {
     pending.value = kept.map((item) => item.write)
+    if (
+      needsContext.value &&
+      !pending.value.some(
+        (write) => write.kind === 'start' && write.tripId === needsContext.value && !write.context,
+      )
+    )
+      needsContext.value = null
   }
 
   /** What storage holds now — another window may have changed it. */
@@ -450,6 +477,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
 
   function load(id: string | null): void {
     ahead = false
+    needsContext.value = null
     kept = []
     rejected.value = []
     sync(id)
@@ -541,6 +569,19 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
           return
         }
         const start = head.write
+        if (code === ERROR.TRIP_CONTEXT_REQUIRED && start.kind === 'start') {
+          if (
+            actor.id === owner &&
+            kept.some(
+              (item) =>
+                item.write.kind === 'start' &&
+                item.write.tripId === start.tripId &&
+                !item.write.context,
+            )
+          )
+            needsContext.value = start.tripId
+          return
+        }
         if (code === ERROR.TRIP_OPEN && start.kind === 'start') {
           if (!(await rerouted(owner, { key: head.key, write: start }))) return
           if (immediate++ > 0) {
@@ -604,7 +645,10 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       }
       // A start the server has taken answers the question about a trip open elsewhere: there is
       // nothing left to choose (раунд 2, Г3; Ч-1).
-      if (write.kind === 'start') elsewhere.value = null
+      if (write.kind === 'start') {
+        elsewhere.value = null
+        needsContext.value = null
+      }
       persist(owner)
 
       // A trip the server would not take leaves its purchases naming a trip that does not exist:
@@ -651,7 +695,12 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       return true
     }
 
-    if (!samePlace(head.write.place.name, open.place.name) && yielded !== open.id) {
+    // A name alone no longer proves the same shop: settings may have changed on another
+    // device. A captured start needs an explicit choice before its purchases move.
+    if (
+      (head.write.context || !samePlace(head.write.place.name, open.place.name)) &&
+      yielded !== open.id
+    ) {
       elsewhere.value = { tripId: open.id, place: open.place.name, mine: head.write.place.name }
       // No timer while a question is on screen (Т-7): nothing changes until the person answers,
       // and asking the server every fifteen seconds only spends their battery.
@@ -808,7 +857,17 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     return trip.expenses.some((row) => row.id === write.body.id)
   }
 
+  function supplyContext(tripId: string, context: ActorSettings): void {
+    sync(actor.id)
+    const entry = kept.find((item) => item.write.kind === 'start' && item.write.tripId === tripId)
+    if (entry?.write.kind !== 'start' || entry.write.context) return
+    needsContext.value = null
+    enqueue({ ...entry.write, context })
+  }
+
   return {
+    needsContext,
+    supplyContext,
     pending,
     rejected,
     elsewhere,

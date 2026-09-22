@@ -62,7 +62,13 @@ const sausage: AdviceRow = {
 const mine: AdviceRow = { ...sausage, rating: '1.0', ratingsCount: 1 }
 
 function answer(rows: AdviceRow[], over: Partial<AdviceResponse> = {}): AdviceResponse {
-  return { scope: 'own', rows, total: rows.length, ...over }
+  return {
+    geography: { country: 'AM', city: 'Гюмри' },
+    scope: 'own',
+    rows,
+    total: rows.length,
+    ...over,
+  }
 }
 
 function online(value: boolean): void {
@@ -75,6 +81,10 @@ const mounted: VueWrapper[] = []
 
 async function render({ identity = true } = {}) {
   localStorage.setItem('molvia.actor', ME)
+  localStorage.setItem(
+    `molvia.settings.${ME}`,
+    JSON.stringify({ country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+  )
   const pinia = createPinia()
   setActivePinia(pinia)
   useActorStore().id = identity ? ME : null
@@ -137,7 +147,9 @@ describe('AdviceView', () => {
     expect(own.view.text()).toContain(en.advice.own_data_only)
     expect(own.view.text()).not.toContain(en.advice.shared_note)
 
-    advice.mockResolvedValue(answer([milk], { scope: 'shared' }))
+    advice.mockResolvedValue(
+      answer([milk], { geography: { country: 'AM', city: 'Гюмри' }, scope: 'shared' }),
+    )
     const shared = await render()
     expect(shared.view.text()).toContain(en.advice.shared_data)
     expect(shared.view.text()).toContain(en.advice.shared_note)
@@ -242,7 +254,9 @@ describe('AdviceView', () => {
 
   it('in the shared mode the sheet is opened with no score chosen', async () => {
     // The same row that opens pre-chosen in the own mode: here the figure is an average.
-    advice.mockResolvedValue(answer([mine], { scope: 'shared' }))
+    advice.mockResolvedValue(
+      answer([mine], { geography: { country: 'AM', city: 'Гюмри' }, scope: 'shared' }),
+    )
     const { view } = await render()
 
     await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')
@@ -254,7 +268,12 @@ describe('AdviceView', () => {
   })
 
   it('А2: a stranger`s row opens the sheet as «rate it», not as «amend»', async () => {
-    advice.mockResolvedValue(answer([{ ...mine, isMine: false }], { scope: 'shared' }))
+    advice.mockResolvedValue(
+      answer([{ ...mine, isMine: false }], {
+        geography: { country: 'AM', city: 'Гюмри' },
+        scope: 'shared',
+      }),
+    )
     const { view } = await render()
 
     await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')

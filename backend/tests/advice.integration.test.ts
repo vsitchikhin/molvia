@@ -135,7 +135,12 @@ describe('дверь', () => {
   it('пустой экран — пустой список, а не ошибка', async () => {
     const actorId = await insertActor(db)
 
-    expect(await screen(actorId)).toEqual({ scope: 'own', rows: [], total: 0 })
+    expect(await screen(actorId)).toEqual({
+      scope: 'own',
+      rows: [],
+      total: 0,
+      geography: { country: 'AM', city: 'Гюмри' },
+    })
   })
 })
 

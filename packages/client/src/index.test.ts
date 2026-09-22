@@ -864,7 +864,12 @@ describe('the trip', () => {
     }
 
     it('reads the three groups and says whose figures they are', async () => {
-      const { client, calls } = clientReplying(200, { scope: 'shared', rows: [beef], total: 1 })
+      const { client, calls } = clientReplying(200, {
+        geography: { country: 'AM', city: 'Гюмри' },
+        scope: 'shared',
+        rows: [beef],
+        total: 1,
+      })
 
       const answer = await client.advice()
 
@@ -880,6 +885,7 @@ describe('the trip', () => {
     it('refuses a «не брать нигде» that arrived with a price', async () => {
       const never = { ...beef, level: 'never', places: undefined }
       const { client } = clientReplying(200, {
+        geography: { country: 'AM', city: 'Гюмри' },
         scope: 'own',
         rows: [{ ...never, places: beef.places }],
       })

@@ -48,6 +48,7 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   // Also well formed: another trip of the same person is still open, and which of the two goes
   // on is the person's choice (MOL-21). The screen reads the code, the status only groups it.
   [ERROR.TRIP_OPEN]: 409,
+  [ERROR.TRIP_CONTEXT_REQUIRED]: 409,
   // Not 400: the request is well formed, it simply names no subject the server can find.
   // The PWA reads exactly this to decide that its stored identity is gone (MOL-8, Р-4).
   [ERROR.NO_ACTOR]: 401,
@@ -161,7 +162,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         search: (actorId, query) => searchCatalogue({ items }, actorId, query),
         propose: (actorId, input) => proposeItem(items, actorId, input),
       })
-      placeRoutes(guarded, { recent: (actorId) => recentPlaces(tripData.places, actorId) })
+      placeRoutes(guarded, {
+        recent: (actorId, geography) => recentPlaces(tripData.places, actorId, geography),
+      })
       tripRoutes(guarded, {
         start: (actor, body) => startTrip(transact, actor, body),
         current: (actorId) => currentTrip(tripData, actorId),

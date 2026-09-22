@@ -114,7 +114,10 @@ function answered1(purchase: string, quantity: string, price: string): TripView 
 
 const offline = () => new ApiError(ERROR.INTERNAL, 'Failed to fetch')
 
-const started = (tripId = TRIP, place = 'Ереван Сити'): QueuedWrite => ({
+const started = (
+  tripId = TRIP,
+  place = 'Ереван Сити',
+): Extract<QueuedWrite, { kind: 'start' }> => ({
   kind: 'start',
   tripId,
   place: { kind: 'store', name: place },
@@ -131,6 +134,61 @@ function fresh(identity = ME) {
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('trip queue', () => {
+  it('does not merge a captured start into a same-named shop without asking', async () => {
+    startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_OPEN, 'open trip'))
+    currentTrip.mockResolvedValue(answer('0', OTHER, null, 'Ереван Сити'))
+    const queue = fresh()
+    queue.enqueue({
+      ...started(),
+      context: { country: 'AM', city: 'Ереван', spendCurrency: 'USD', incomeCurrency: 'EUR' },
+    })
+    queue.enqueue(add(MILK))
+    await queue.flush()
+    expect(queue.elsewhere?.tripId).toBe(OTHER)
+    expect(queue.pending).toHaveLength(2)
+    expect(addExpense).not.toHaveBeenCalled()
+  })
+
+  it('holds a legacy start and its purchases until the person supplies context', async () => {
+    startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_CONTEXT_REQUIRED, 'context required'))
+    const queue = fresh()
+    queue.enqueue(started())
+    queue.enqueue(add(MILK))
+    await queue.flush()
+    expect(queue.needsContext).toBe(TRIP)
+    expect(queue.pending).toHaveLength(2)
+    expect(queue.rejected).toEqual([])
+    const context = {
+      country: 'AM',
+      city: 'Гюмри',
+      spendCurrency: 'AMD',
+      incomeCurrency: 'RUB',
+    } as const
+    startTrip.mockResolvedValue({ trip: answer('0'), created: true })
+    addExpense.mockResolvedValue({ trip: answer('520'), created: true })
+    queue.supplyContext(TRIP, context)
+    await queue.flush()
+    expect(startTrip).toHaveBeenLastCalledWith(expect.objectContaining({ id: TRIP, context }))
+    expect(queue.pending).toEqual([])
+  })
+
+  it('keeps captured context through storage and ignores changed account settings', async () => {
+    startTrip.mockRejectedValue(offline())
+    const context = {
+      country: 'AM',
+      city: 'Гюмри',
+      spendCurrency: 'USD',
+      incomeCurrency: 'EUR',
+    } as const
+    const queue = fresh()
+    queue.enqueue({ ...started(), context })
+    await queue.flush()
+    const restored = fresh()
+    await restored.flush()
+    expect(startTrip).toHaveBeenLastCalledWith(expect.objectContaining({ context }))
+    expect(restored.pending[0]).toMatchObject({ context })
+  })
+
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()

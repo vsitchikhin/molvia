@@ -7,7 +7,8 @@
     "trip": "Trip",
     "advice": "What to buy",
     "verdicts": "Ratings",
-    "back_label": "Back"
+    "back_label": "Back",
+    "settings": "Settings"
   },
   "state": {
     "loading": "Loading…",
@@ -302,6 +303,54 @@
     "conflict": "That is already taken",
     "no_actor": "This device is no longer recognised",
     "trip_open": "Another trip is still open",
-    "internal": "Something went wrong"
+    "internal": "Something went wrong",
+    "trip_context_required": "Set the trip’s city and currencies before sending"
+  },
+  "settings": {
+    "title": "Settings",
+    "region": "Where you shop",
+    "country": "Country",
+    "armenia": "Armenia",
+    "city": "City",
+    "spendCurrency": "Purchase currency",
+    "incomeCurrency": "Conversion currency",
+    "currencies": {
+      "AMD": "AMD · Armenian dram",
+      "RUB": "RUB · Russian ruble",
+      "USD": "USD · US dollar",
+      "EUR": "EUR · euro"
+    },
+    "conversion_hint": "See approximate prices in a familiar currency. This does not record income.",
+    "intro": "Your city helps find nearby prices. Currencies apply to new trips.",
+    "scope": "Saved trips and trips already started stay unchanged.",
+    "unsaved": "Unsaved changes. You can visit another section and return to this draft.",
+    "saved": "Settings saved. They apply to new trips.",
+    "save": "Save settings",
+    "saving": "Saving…",
+    "overwrite": "Apply my changes",
+    "cancel": "Discard changes",
+    "offline": {
+      "title": "Settings offline",
+      "body": "You can prepare changes. Save when connected — they will not be sent automatically."
+    },
+    "context_missing": "This device has no confirmed settings yet. Connect to load them.",
+    "error": {
+      "title": "Could not confirm settings",
+      "body": "Your changes are still here. Check the connection and try again."
+    },
+    "storage": {
+      "title": "Draft kept in this tab only",
+      "body": "The device could not store it reliably. Keep the app open until you save."
+    },
+    "conflict": {
+      "title": "Settings changed on another device",
+      "body": "Saved now: {country}, {city}; purchases — {spendCurrency}, conversion — {incomeCurrency}. Your edits are below. Apply them or discard to use saved settings."
+    },
+    "legacy": {
+      "title": "Confirm this trip’s city and currencies",
+      "body": "This trip started in an earlier version. Check where and in which currency you shopped. All items are waiting on this phone.",
+      "action": "Review trip settings",
+      "confirm": "Confirm and send"
+    }
   }
 }

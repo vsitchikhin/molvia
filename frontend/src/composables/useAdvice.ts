@@ -1,6 +1,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
-import { adviceResponseSchema } from '@molvia/model'
+import { adviceResponseSchema, geographyKey } from '@molvia/model'
 import type { AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
 import { api } from '@/api'
 import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
@@ -100,9 +100,13 @@ export function useAdvice(): Advice {
   /** Whether what is shown came from an answer of this session, rather than from the phone. */
   const confirmed = ref(false)
 
+  const location = computed(() => (actor.settings ? geographyKey(actor.settings) : null))
+
   function adopt(id: string | null): void {
     owner.value = id
-    remembered.value = id ? recall(`${KEY}.${id}`) : null
+    const cached = id ? recall(`${KEY}.${id}`) : null
+    remembered.value =
+      cached && geographyKey(cached.answer.geography) === location.value ? cached : null
     failure.value = null
     confirmed.value = false
   }
@@ -140,22 +144,30 @@ export function useAdvice(): Advice {
    * alike (А6). So an ask that arrives while a request is in the air is remembered rather
    * than dropped, and every answer carries the number of the request that asked for it.
    */
-  let running = false
+  let running: object | null = null
   let latest = 0
   /** How many times a fresh list has been asked for; the loop below serves the last ask. */
   let asks = 0
 
   async function ask(id: string): Promise<void> {
     const mine = ++latest
+    const where = location.value
     try {
       const fresh = await api.advice()
-      if (owner.value !== id || mine !== latest) return
+      if (owner.value !== id || mine !== latest || location.value !== where) return
+      // The server names the geography it actually used; a second device may have moved it.
+      if (location.value && geographyKey(fresh.geography) !== location.value) {
+        const loaded = await api.me()
+        if (owner.value !== id || mine !== latest || loaded.id !== id) return
+        actor.apply(loaded)
+        return
+      }
       remembered.value = { answer: fresh, fetchedAt: new Date() }
       failure.value = null
       confirmed.value = true
       remember()
     } catch {
-      if (owner.value !== id || mine !== latest) return
+      if (owner.value !== id || mine !== latest || location.value !== where) return
       // Decided after the failure, never narrowed from a check before the request: a
       // connection lost while the answer was on its way is the commonest break at a shelf,
       // and it is not the server's fault and never red.
@@ -167,7 +179,8 @@ export function useAdvice(): Advice {
     if (!actor.id) return
     asks += 1
     if (running) return
-    running = true
+    const token = {}
+    running = token
     try {
       let served = 0
       while (served !== asks) {
@@ -177,17 +190,20 @@ export function useAdvice(): Advice {
         const id = actor.id
         if (!id) break
         await ask(id)
+        if (running !== token) break
       }
     } finally {
-      running = false
+      if (running === token) running = null
     }
   }
 
   adopt(actor.id)
   watch(
-    () => actor.id,
-    (id) => {
-      adopt(id)
+    () => [actor.id, location.value],
+    () => {
+      latest += 1
+      running = null
+      adopt(actor.id)
       void load()
     },
   )

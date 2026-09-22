@@ -1,4 +1,4 @@
-import { pickOfficialRate, yerevanDate } from '@molvia/model'
+import { DomainError, ERROR, pickOfficialRate, yerevanDate } from '@molvia/model'
 import type { Actor, AmdRate, OfficialRate, StartTripBody, TripView } from '@molvia/model'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
 import { tripViewFor } from './trip-view'
@@ -33,17 +33,20 @@ export async function startTrip(
     const already = await repositories.trips.byId(body.id, actor.id)
     if (already) return { trip: await tripViewFor(repositories, already), created: false }
 
+    const context = body.context
+    if (!context) throw new DomainError(ERROR.TRIP_CONTEXT_REQUIRED)
+
     const place = await repositories.places.ensure({
       kind: body.place.kind,
       name: body.place.name,
-      country: actor.country,
-      city: actor.city,
+      country: context.country,
+      city: context.city,
     })
-    const official = await officialRateFor(repositories, actor, now)
+    const official = await officialRateFor(repositories, context, now)
     const { trip, created } = await repositories.trips.start(
       actor.id,
       { id: body.id, placeId: place.id },
-      actor.spendCurrency,
+      context.spendCurrency,
       official,
     )
     return { trip: await tripViewFor(repositories, trip), created }
@@ -59,7 +62,7 @@ export async function startTrip(
  */
 async function officialRateFor(
   { rates }: Pick<TripRepositories, 'rates'>,
-  actor: Actor,
+  actor: Pick<Actor, 'incomeCurrency' | 'spendCurrency'>,
   now: Date,
 ): Promise<OfficialRate | null> {
   const base = actor.incomeCurrency
