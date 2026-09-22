@@ -247,21 +247,14 @@
     "home_currency": "My currency"
   },
   "identity": {
-    "lost": {
-      "title": "The server did not recognise this device",
-      "body": "Your earlier trips and ratings are still there, but the server no longer counts them as this device's — so a new record has been started. The old key is kept: if this was a mistake on the server, the data can be brought back."
-    },
     "error": {
-      "title": "This device could not be identified",
+      "title": "Could not sign in",
       "body": "Until that works, the app cannot save anything — there is nowhere to put it."
     },
     "offline": {
-      "title": "This device isn't identified yet",
-      "body": "We will identify this device as soon as you are back online. Until then nothing new can be saved."
-    },
-    "action": "Got it",
-    "restore": "Bring back the old data",
-    "restore_failed": "The server did not recognise the old key either. Nothing changed — the current record is untouched."
+      "title": "Not signed in yet",
+      "body": "We will sign in as soon as you are back online. Until then nothing new can be saved."
+    }
   },
   "dev": {
     "connected": "Server is up, version {version}",
