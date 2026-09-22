@@ -43,8 +43,8 @@ export interface TripsApi {
 }
 
 /**
- * Identifiers in the path are passed on as they came. A malformed one matches nothing in the
- * repositories (`idOrNull`), so it answers 404 exactly as a stranger's or a missing one does —
+ * Identifiers in the path accept either case and are normalised by `resourceId`. A malformed
+ * one answers 404 exactly as a stranger's or a missing one does —
  * a third answer for it would be one more way to tell them apart.
  */
 interface TripParams {
@@ -55,7 +55,7 @@ interface ExpenseParams extends TripParams {
 }
 
 /**
- * Expenses are private always (CLAUDE.md), and the owner travels in a header: a shared cache
+ * Expenses are private always (CLAUDE.md), and the owner is proved by a session: a shared cache
  * holding one of these would show one device what another one bought.
  */
 function answer(reply: FastifyReply, trip: TripView) {

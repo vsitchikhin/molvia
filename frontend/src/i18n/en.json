@@ -122,7 +122,11 @@
       "missing_body": "This trip could not be found in your account. Return to history.",
       "pending": "Changes are on this device. We will send them when connected.",
       "no_purchases": "No purchases in this trip yet. Add anything you forgot.",
-      "go_trip": "Go to trip"
+      "go_trip": "Go to trip",
+      "rejected_title": "A change was not accepted",
+      "rejected_body": "Purchases remain on this device. The Trip screen shows the reason and lets you correct the entry.",
+      "review": "Review the refusal",
+      "unfinished": "This trip is still open"
     }
   },
   "item": {

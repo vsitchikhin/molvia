@@ -245,20 +245,20 @@ export type RateChoiceBody = z.infer<typeof rateChoiceBodySchema>
 
 /** Old queued finishes have no device time; retries preserve whichever time first arrived. */
 export const finishTripBodySchema = z.strictObject({
-  finishedOnDeviceAt: isoDate.optional(),
+  finishedOnDeviceAt: isoDate.refine((at) => at.getUTCFullYear() > 0).optional(),
 })
 export type FinishTripBody = z.output<typeof finishTripBodySchema>
 
 export const TRIP_HISTORY_PAGE_SIZE = 20
 export const tripHistoryCursorSchema = z.strictObject({
   // Keep PostgreSQL microseconds on the wire: decoding to Date would skip boundary rows.
-  at: z.iso.datetime(),
+  at: z.iso.datetime().refine((at) => !at.startsWith('0000-')),
   id: z.uuid(),
 })
 export type TripHistoryCursor = z.infer<typeof tripHistoryCursorSchema>
 export const tripHistoryQuerySchema = z
   .strictObject({
-    before: z.iso.datetime().optional(),
+    before: tripHistoryCursorSchema.shape.at.optional(),
     beforeId: z.uuid().optional(),
   })
   .refine((q) => (q.before === undefined) === (q.beforeId === undefined))

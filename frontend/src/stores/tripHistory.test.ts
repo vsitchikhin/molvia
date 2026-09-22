@@ -85,6 +85,40 @@ describe('history memory', () => {
     expect(store.selected.currency).toBe('EUR')
   })
 
+  it('keeps completions made by two windows even before storage events arrive', () => {
+    const first = useTripHistoryStore()
+    const second = useTripHistoryStore(createPinia())
+    first.capture(A, 'Рынок', new Date(), new Date(), 'AMD', view(A))
+    second.capture(B, 'SAS', new Date(), new Date(), 'AMD', view(B))
+    expect(restart().local.map((row) => row.id)).toEqual([A, B])
+  })
+
+  it('does not replace this window’s selection when another window opens a different trip', async () => {
+    const first = useTripHistoryStore()
+    trip.mockResolvedValueOnce(view(A)).mockResolvedValueOnce(view(B))
+    await first.open(A)
+    const second = useTripHistoryStore(createPinia())
+    await second.open(B)
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${OWNER}` }))
+    expect(first.selected?.id).toBe(A)
+  })
+
+  it('does not replace the first answered write with an earlier uncached read', async () => {
+    const store = useTripHistoryStore()
+    let resolve: ((value: TripView) => void) | undefined
+    trip.mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done
+        }),
+    )
+    const loading = store.open(A)
+    store.apply({ ...view(A), currency: 'EUR' })
+    resolve?.(view(A))
+    await loading
+    expect(store.selected?.currency).toBe('EUR')
+  })
+
   it('caches the original first-page cursor, not the cursor after appended pages', async () => {
     const store = useTripHistoryStore()
     const first = { trips: [], nextCursor: { at: '2026-09-01T00:00:00.123456Z', id: A } }

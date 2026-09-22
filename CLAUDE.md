@@ -1008,6 +1008,16 @@ is open answers `409 error.trip_open`, and the screen asks whether to continue t
 it first. A finished trip still takes rows — the soy sauce found in the bag at home belongs to the
 trip it was bought on. The trip and its rows are named by the device, so a queue sent twice is one
 purchase.
+**MOL-25 makes completed trips reachable through the whole history**, in pages of twenty, and
+lets a purchase be added, amended or removed there while another trip stays current. The selected
+trip owns the currency, rate and total of its sheet. The phone remembers the first history page,
+the last selected trip and snapshots of completions still synchronising; the queue remains the
+only source of pending writes. **Every conflicting start asks**, including the same shop. A choice
+is tied to the owner, the queued start's key and the open trip, checked again under the queue lock.
+**Completion has two clocks:** `finished_at` remains the server's receipt, while
+`finished_on_device_at` records the first tap kept in the queue. History uses the device's time,
+with the server's as fallback for old rows. It may precede the server start after an offline trip;
+it changes neither rate snapshots nor gates nor purchase dates. Finishing twice moves neither time.
 MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
 MOL-39 the official rate — a cache refreshed hourly, snapshotted by every new trip, a jump
 left to the person; MOL-24 the sheet «сколько, в чём, почём» — a live unit price, a price in any

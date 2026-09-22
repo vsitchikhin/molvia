@@ -21,7 +21,7 @@ describe('history of completed trips', () => {
   it('returns none for a new owner and never exposes another owner', async () => {
     const actor = await insertActor(db)
     const other = await insertActor(db)
-    const place = await insertPlace(db)
+    const place = await insertPlace(db, { name: `History ${randomUUID()}` })
     const trip = await insertTrip(db, { actorId: other, placeId: place })
     const cookie = await signIn(db, actor)
     const page = await app.inject({ url: '/trips/history', headers: { cookie } })
@@ -37,7 +37,7 @@ describe('history of completed trips', () => {
 
   it('keeps the first device time even when it is before the server start', async () => {
     const actor = await insertActor(db)
-    const place = await insertPlace(db)
+    const place = await insertPlace(db, { name: `History ${randomUUID()}` })
     const id = await insertTrip(db, { actorId: actor, placeId: place })
     const cookie = await signIn(db, actor)
     const finish = (time: string) =>
@@ -64,7 +64,7 @@ describe('history of completed trips', () => {
     'paginates %i completed rows without losing microsecond boundaries',
     async (count) => {
       const actor = await insertActor(db)
-      const place = await insertPlace(db)
+      const place = await insertPlace(db, { name: `History ${randomUUID()}` })
       const ids: string[] = []
       for (let i = 0; i < count; i += 1) {
         const id = await insertTrip(db, {
@@ -93,7 +93,7 @@ describe('history of completed trips', () => {
 
   it('sorts by device completion with a server fallback for legacy rows', async () => {
     const actor = await insertActor(db)
-    const place = await insertPlace(db)
+    const place = await insertPlace(db, { name: `History ${randomUUID()}` })
     const legacy = await insertTrip(db, {
       actorId: actor,
       placeId: place,
@@ -114,8 +114,11 @@ describe('history of completed trips', () => {
   it('rejects invalid device timestamps and incomplete cursors', async () => {
     const actor = await insertActor(db)
     const cookie = await signIn(db, actor)
-    const id = await insertTrip(db, { actorId: actor, placeId: await insertPlace(db) })
-    for (const time of ['tomorrow', '2026-02-31T00:00:00Z', 42]) {
+    const id = await insertTrip(db, {
+      actorId: actor,
+      placeId: await insertPlace(db, { name: `History ${randomUUID()}` }),
+    })
+    for (const time of ['tomorrow', '2026-02-31T00:00:00Z', '0000-01-01T00:00:00Z', 42]) {
       expect(
         (
           await app.inject({

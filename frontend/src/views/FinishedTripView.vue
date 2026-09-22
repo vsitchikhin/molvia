@@ -30,6 +30,19 @@
         :body="t('trip.history.offline_body')"
       />
       <p v-if="available && stale" class="note">{{ t('trip.history.cached') }}</p>
+      <ScreenState
+        v-if="rejected"
+        kind="attention"
+        inline
+        :title="t('trip.history.rejected_title')"
+        :body="t('trip.history.rejected_body')"
+      >
+        <template #action
+          ><AppButton variant="ghost" @click="review">{{
+            t('trip.history.review')
+          }}</AppButton></template
+        >
+      </ScreenState>
       <p v-if="pending" class="note">{{ t('trip.history.pending') }}</p>
       <template v-if="available">
         <TripRateNotes v-if="trip" :trip="trip" />

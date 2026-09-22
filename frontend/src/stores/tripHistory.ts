@@ -38,18 +38,29 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   let firstPage: TripHistory = empty()
   let generation = 0
   let selection = 0
+  let ahead = false
+  const revisions = new Map<string, number>()
+
+  function recall(): z.output<typeof cacheCodec> | null {
+    try {
+      const raw = actor.id ? read(`${KEY}.${actor.id}`) : null
+      const parsed = raw ? cacheCodec.safeParse(JSON.parse(raw)) : null
+      return parsed?.success ? parsed.data : null
+    } catch {
+      return null
+    }
+  }
+
+  // Storage events may arrive after a tap in another window. Read its pending snapshots first.
+  function syncLocal(): void {
+    if (!ahead) local.value = recall()?.local ?? []
+  }
 
   function restore(): void {
     generation += 1
     selection += 1
-    let held: z.output<typeof cacheCodec> | null = null
-    try {
-      const raw = actor.id ? read(`${KEY}.${actor.id}`) : null
-      const parsed = raw ? cacheCodec.safeParse(JSON.parse(raw)) : null
-      held = parsed?.success ? parsed.data : null
-    } catch {
-      /* Corrupt read memory is not an empty server answer. */
-    }
+    ahead = false
+    const held = recall()
     firstPage = held?.page ?? empty()
     page.value = firstPage
     selected.value = held?.selected ?? null
@@ -59,12 +70,18 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   restore()
   watch(() => actor.id, restore)
   window.addEventListener('storage', (event) => {
-    if (event.key === `${KEY}.${actor.id ?? ''}`) restore()
+    if (event.key !== `${KEY}.${actor.id ?? ''}` || ahead) return
+    const viewing = selected.value
+    restore()
+    // A different window selecting B does not replace A on this window's screen.
+    if (viewing && selected.value?.id !== viewing.id) {
+      selected.value = local.value.find((row) => row.id === viewing.id)?.view ?? viewing
+    }
   })
 
   function persist(): void {
     if (!actor.id) return
-    writeEverywhere(
+    ahead = !writeEverywhere(
       `${KEY}.${actor.id}`,
       JSON.stringify(
         cacheCodec.encode({
@@ -73,6 +90,15 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
           local: local.value,
         }),
       ),
+      (past) => {
+        try {
+          const held = cacheCodec.parse(JSON.parse(past))
+          held.local = held.local.filter((row) => local.value.some((now) => now.id === row.id))
+          return JSON.stringify(cacheCodec.encode(held))
+        } catch {
+          return null
+        }
+      },
     )
   }
 
@@ -84,6 +110,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     currency: Currency,
     view: TripView | null,
   ): void {
+    syncLocal()
     if (!local.value.some((trip) => trip.id === id)) {
       local.value = [...local.value, { id, name, startedAt, completedAt, currency, view }]
       generation += 1
@@ -105,6 +132,8 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
 
   /** Every write updates its own selection; it never chooses the current trip. */
   function apply(trip: TripView): void {
+    syncLocal()
+    revisions.set(trip.id, (revisions.get(trip.id) ?? 0) + 1)
     generation += 1
     if (selected.value?.id === trip.id) {
       selection += 1
@@ -127,6 +156,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   }
 
   function forgetLocal(id: string): void {
+    syncLocal()
     local.value = local.value.filter((held) => held.id !== id)
     generation += 1
     persist()
@@ -139,6 +169,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     if (more && !cursor) return
     const answer = await api.tripHistory(cursor ?? undefined)
     if (owner !== actor.id || version !== generation) return
+    syncLocal()
     if (!more) firstPage = answer
     local.value = local.value.filter((held) => !answer.trips.some((row) => row.id === held.id))
     const existing = more ? page.value.trips : []
@@ -162,9 +193,10 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   async function open(id: string): Promise<void> {
     const owner = actor.id
     const token = ++selection
+    const revision = revisions.get(id) ?? 0
     selected.value = known(id)
     const answer = await api.trip(id)
-    if (owner !== actor.id || token !== selection) return
+    if (owner !== actor.id || token !== selection || revision !== (revisions.get(id) ?? 0)) return
     selected.value = answer
     apply(answer)
   }

@@ -384,7 +384,7 @@ describe('DELETE — снять оценку', () => {
     expect((await withdraw(owner, itemId)).status).toBe(204)
     expect((await withdraw(owner, itemId)).status).toBe(404)
     expect((await withdraw(owner, lonely)).status).toBe(404)
-    expect((await withdraw(owner, 'молоко')).status).toBe(400)
+    expect((await withdraw(owner, 'молоко')).status).toBe(404)
   })
 
   it('19: оценка после снятия — 201, та же строка, время первой оценки прежнее, старый текст не вернулся', async () => {

@@ -46,6 +46,16 @@ export function useTripHistory(): TripHistoryScreen {
         },
       ]),
     )
+    // A cached selection may be older than the first page. Offline it still needs an entrance.
+    const saved = history.selected
+    if (history.stale && saved?.finishedAt && !rows.has(saved.id)) {
+      rows.set(saved.id, {
+        id: saved.id,
+        name: saved.place.name,
+        at: saved.finishedOnDeviceAt ?? saved.finishedAt,
+        pending: false,
+      })
+    }
     for (const row of history.local) {
       const refused = queue.rejected.some(
         (item) => item.write.tripId === row.id && item.write.kind === 'start',
@@ -55,7 +65,9 @@ export function useTripHistory(): TripHistoryScreen {
           id: row.id,
           name: row.name,
           at: row.completedAt,
-          pending: !row.view?.finishedAt,
+          pending: queue.pending.some(
+            (write) => write.kind === 'finish' && write.tripId === row.id,
+          ),
         })
     }
     return [...rows.values()].sort(
@@ -66,6 +78,7 @@ export function useTripHistory(): TripHistoryScreen {
     if (!actor.id) return
     const token = ++run
     loading.value = true
+    history.stale = true
     try {
       await history.load(more)
       if (token === run) trouble.value = null

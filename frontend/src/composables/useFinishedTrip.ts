@@ -24,6 +24,8 @@ interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
   waiting: ComputedRef<number>
   opened: Ref<OpenedPurchase | null>
   pending: ComputedRef<boolean>
+  rejected: ComputedRef<boolean>
+  review(): void
   amend(row: TripRowView): void
   close(): void
   find(): void
@@ -54,7 +56,7 @@ export function useFinishedTrip(): FinishedTrip {
             timeStyle: 'short',
           }).format(finished.value),
         })
-      : t('trip.history.local_finish'),
+      : t('trip.history.unfinished'),
   )
   const opened = ref<OpenedPurchase | null>(null)
   let opening = 0
@@ -90,6 +92,10 @@ export function useFinishedTrip(): FinishedTrip {
     opened,
     amend,
     pending,
+    rejected: computed(() =>
+      queue.rejected.some((item) => item.write.tripId === selected.id.value),
+    ),
+    review: () => void router.push({ name: 'trip' }),
     close: () => {
       opened.value = null
     },

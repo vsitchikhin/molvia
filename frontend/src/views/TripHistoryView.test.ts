@@ -125,3 +125,24 @@ it('does not offer writing into a missing or foreign trip', async () => {
   expect(view.findComponent({ name: 'ScreenState' }).props('kind')).toBe('attention')
   view.unmount()
 })
+
+it('does not call an unfinished trip completed when opened by a direct link', async () => {
+  trip.mockResolvedValue({ ...answer(), finishedAt: null, finishedOnDeviceAt: null })
+  const { view } = await render(true)
+  await flushPromises()
+  expect(view.text()).toContain(ru.trip.history.unfinished)
+  expect(view.text()).not.toContain(ru.trip.history.local_finish)
+  view.unmount()
+})
+
+it('offers the last cached selection offline even when it is beyond the first page', async () => {
+  const saved = useTripHistoryStore()
+  saved.selected = answer()
+  saved.page = { trips: [], nextCursor: null }
+  history.mockRejectedValue(new Error('offline'))
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  const { view } = await render()
+  await flushPromises()
+  expect(view.get('.history-row').text()).toContain('Рынок')
+  view.unmount()
+})
