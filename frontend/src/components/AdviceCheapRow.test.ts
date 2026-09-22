@@ -26,6 +26,7 @@ const market = place('Рынок в Гюмри', 335_000_000_000n)
 function row(places: AdvicePlace[], threshold: UnitPrice | null): CheapRow {
   return {
     level: 'if_cheap',
+    isMine: true,
     itemId: 'cccccccc-0000-4000-8000-000000000002',
     name: 'Сыр «Чанах»',
     rating: '2.8',
@@ -36,9 +37,13 @@ function row(places: AdvicePlace[], threshold: UnitPrice | null): CheapRow {
   }
 }
 
-const render = (places: AdvicePlace[], threshold: UnitPrice | null) =>
+const render = (
+  places: AdvicePlace[],
+  threshold: UnitPrice | null,
+  scope: 'own' | 'shared' = 'shared',
+) =>
   mount(AdviceCheapRow, {
-    props: { row: row(places, threshold) },
+    props: { row: row(places, threshold), scope },
     global: { plugins: [createAppI18n('ru')] },
   })
 
@@ -63,6 +68,15 @@ describe('AdviceCheapRow', () => {
     expect(view.find('.second').exists()).toBe(false)
     expect(view.find('.price').exists()).toBe(false)
     expect(plain(view.text())).toContain('2,8 из 5 · 4 оценки')
+  })
+
+  it('А1: the price shown belongs to the place named, and the word matches the prices', () => {
+    // Own city first, then by price: the first place can be the dearer one, and then it is
+    // «Брали здесь» rather than «Дешевле всего».
+    const view = render([market, sas], null)
+
+    expect(plain(view.get('.second').text())).toBe('Брали здесь: Рынок в Гюмри')
+    expect(plain(view.get('.price').text())).toBe('3 350,00 ֏/кг')
   })
 
   it('carries the verdict as a circle, so the row reads without colour', () => {

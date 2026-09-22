@@ -1,5 +1,6 @@
 <template>
   <button class="row" type="button" @click="$emit('edit')">
+    <span class="hidden">{{ t('advice.edit_action') }}</span>
     <VerdictBadge level="if_cheap" compact />
 
     <span class="body">
@@ -9,7 +10,7 @@
 
     <span class="figures">
       <span v-if="places.kind !== 'none'" class="price">{{ unitPrice(places.best) }}</span>
-      <AdviceRating :rating="row.rating" :count="row.ratingsCount" />
+      <AdviceRating :rating="row.rating" :count="row.ratingsCount" :scope="scope" />
     </span>
   </button>
 </template>
@@ -18,11 +19,10 @@
 import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatUnitPrice } from '@molvia/model'
-import type { AdvicePlace } from '@molvia/model'
+import type { AdvicePlace, AdviceScope } from '@molvia/model'
 import AdviceRating from '@/components/AdviceRating.vue'
 import VerdictBadge from '@/components/VerdictBadge.vue'
-import { placesView } from '@/components/adviceRow'
+import { placesView, unitPriceText, whereKey } from '@/components/adviceRow'
 import type { CheapRow } from '@/components/adviceRow'
 
 /**
@@ -43,6 +43,8 @@ export default defineComponent({
   components: { AdviceRating, VerdictBadge },
   props: {
     row: { type: Object as PropType<CheapRow>, required: true },
+    /** Whose figures the row carries: in the own mode the count of one is not worth printing. */
+    scope: { type: String as PropType<AdviceScope>, required: true },
   },
   emits: {
     edit: () => true,
@@ -52,30 +54,20 @@ export default defineComponent({
 
     const places = computed(() => placesView(props.row.places))
 
-    function unitPrice(place: AdvicePlace): string {
-      return t('item.unit_price_value', {
-        amount: formatUnitPrice(place.unitPrice, locale.value),
-        unit: t(`item.unit_${place.unitPrice.unit}`),
-      })
-    }
+    const unitPrice = (place: AdvicePlace): string =>
+      unitPriceText(place.unitPrice, t, locale.value)
 
     const second = computed(() => {
       const threshold = props.row.threshold
       if (threshold) {
-        return t('advice.threshold', {
-          price: t('item.unit_price_value', {
-            amount: formatUnitPrice(threshold, locale.value),
-            unit: t(`item.unit_${threshold.unit}`),
-          }),
-        })
+        return t('advice.threshold', { price: unitPriceText(threshold, t, locale.value) })
       }
       const view = places.value
       if (view.kind === 'none') return ''
-      const key = view.kind === 'sole' ? 'advice.bought_at' : 'advice.cheapest_at'
-      return t(key, { place: view.best.name })
+      return t(whereKey(view), { place: view.best.name })
     })
 
-    return { places, second, unitPrice }
+    return { t, places, second, unitPrice }
   },
 })
 </script>
@@ -104,6 +96,10 @@ export default defineComponent({
 
 .row + .row {
   margin-top: var(--space-2);
+}
+
+.hidden {
+  @include visually-hidden;
 }
 
 .body {

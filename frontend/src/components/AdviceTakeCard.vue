@@ -1,9 +1,10 @@
 <template>
   <AppCard as="article" tone="take" class="card">
     <button class="tap" type="button" @click="$emit('edit')">
+      <span class="hidden">{{ t('advice.edit_action') }}</span>
       <span class="head">
         <VerdictBadge level="take" />
-        <AdviceRating :rating="row.rating" :count="row.ratingsCount" />
+        <AdviceRating :rating="row.rating" :count="row.ratingsCount" :scope="scope" />
       </span>
 
       <span class="name">{{ row.name }}</span>
@@ -23,12 +24,11 @@
 import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatUnitPrice } from '@molvia/model'
-import type { AdvicePlace } from '@molvia/model'
+import type { AdvicePlace, AdviceScope } from '@molvia/model'
 import AdviceRating from '@/components/AdviceRating.vue'
 import AppCard from '@/components/AppCard.vue'
 import VerdictBadge from '@/components/VerdictBadge.vue'
-import { placesView } from '@/components/adviceRow'
+import { placesView, unitPriceText, whereKey } from '@/components/adviceRow'
 import type { TakeRow } from '@/components/adviceRow'
 
 /**
@@ -48,6 +48,8 @@ export default defineComponent({
   components: { AdviceRating, AppCard, VerdictBadge },
   props: {
     row: { type: Object as PropType<TakeRow>, required: true },
+    /** Whose figures the row carries: in the own mode the count of one is not worth printing. */
+    scope: { type: String as PropType<AdviceScope>, required: true },
   },
   emits: {
     edit: () => true,
@@ -57,21 +59,16 @@ export default defineComponent({
 
     const places = computed(() => placesView(props.row.places))
 
-    function unitPrice(place: AdvicePlace): string {
-      return t('item.unit_price_value', {
-        amount: formatUnitPrice(place.unitPrice, locale.value),
-        unit: t(`item.unit_${place.unitPrice.unit}`),
-      })
-    }
+    const unitPrice = (place: AdvicePlace): string =>
+      unitPriceText(place.unitPrice, t, locale.value)
 
-    // One place is «Брали здесь», two and more «Дешевле всего»: the superlative is named only
-    // by whoever has something to compare, and how many places there are is visible to the
-    // screen alone (MOL-34, answered in MOL-31).
+    // The word is «Дешевле всего» only where that is true: the places come own city first,
+    // then by price (Р-26), so the named one is not always the cheapest (MOL-32, А1). How many
+    // there are, and which of them is dearest, is visible to the screen alone (MOL-34).
     const where = computed(() => {
       const view = places.value
       if (view.kind === 'none') return ''
-      const key = view.kind === 'sole' ? 'advice.bought_at' : 'advice.cheapest_at'
-      return t(key, { place: view.best.name })
+      return t(whereKey(view), { place: view.best.name })
     })
 
     const also = computed(() => {
@@ -83,7 +80,7 @@ export default defineComponent({
       return t('advice.also_at', { places: rest.join(' · ') })
     })
 
-    return { places, where, also, unitPrice }
+    return { t, places, where, also, unitPrice }
   },
 })
 </script>
@@ -92,6 +89,10 @@ export default defineComponent({
 .card {
   display: block;
   padding: 0;
+}
+
+.hidden {
+  @include visually-hidden;
 }
 
 /* The whole card is the tap: a verdict is amended where it is met (MOL-32, В-1). */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AdvicePlace } from '@molvia/model'
-import { ownScore, placesView } from '@/components/adviceRow'
+import { ownScore, placesView, whereKey } from '@/components/adviceRow'
 
 function place(name: string, amount: bigint): AdvicePlace {
   return {
@@ -20,23 +20,45 @@ describe('placesView', () => {
     expect(placesView([])).toEqual({ kind: 'none' })
   })
 
-  it('one place is «Брали здесь»: a superlative out of one observation is a conclusion from nothing', () => {
-    expect(placesView([market])).toEqual({ kind: 'sole', best: market, rest: [] })
+  it('one place is no comparison: nothing to be cheapest among', () => {
+    expect(placesView([market])).toEqual({
+      kind: 'places',
+      best: market,
+      rest: [],
+      cheapest: false,
+    })
   })
 
-  it('two and more is «Дешевле всего», and the rest go into «Ещё»', () => {
+  it('the named place is the cheapest when it really is, and the rest go into «Ещё»', () => {
     expect(placesView([market, sas, carrefour])).toEqual({
-      kind: 'cheapest',
+      kind: 'places',
       best: market,
       rest: [sas, carrefour],
+      cheapest: true,
     })
   })
 
   it('the order is the answer`s and is never rearranged', () => {
-    // The server sorts by unit price with the asker's own city first (MOL-31, Р-26); the city
-    // is not in the row at all, so a screen that sorted again would undo that rule blindly.
-    expect(placesView([sas, market]).kind).toBe('cheapest')
+    // The server sorts own city first, then by price (MOL-31, Р-26); the city is not in the
+    // row at all, so a screen that sorted again would undo that rule blindly.
     expect(placesView([sas, market])).toMatchObject({ best: sas, rest: [market] })
+  })
+
+  it('А1: the first place is not always the cheapest, and then it is not called so', () => {
+    // Own city first means a dearer place at home stands above a cheaper one a city away.
+    const view = placesView([sas, market])
+
+    expect(view).toMatchObject({ cheapest: false })
+    expect(whereKey(view)).toBe('advice.bought_at')
+    expect(whereKey(placesView([market, sas]))).toBe('advice.cheapest_at')
+    expect(whereKey(placesView([market]))).toBe('advice.bought_at')
+    expect(whereKey(placesView([]))).toBe('advice.bought_at')
+  })
+
+  it('prices of two currencies are no comparison either, so the word goes', () => {
+    const inRubles = { ...sas, unitPrice: { ...sas.unitPrice, currency: 'RUB' as const } }
+
+    expect(placesView([market, inRubles])).toMatchObject({ cheapest: false })
   })
 })
 

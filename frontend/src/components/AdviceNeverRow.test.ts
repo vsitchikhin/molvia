@@ -11,6 +11,7 @@ const plain = (text: string): string => text.replaceAll(NBSP, ' ')
 function row(review: string | null): NeverRow {
   return {
     level: 'never',
+    isMine: true,
     itemId: 'cccccccc-0000-4000-8000-000000000003',
     name: 'Колбаса «Молочная»',
     rating: '1.4',
@@ -19,8 +20,11 @@ function row(review: string | null): NeverRow {
   }
 }
 
-const render = (review: string | null = null) =>
-  mount(AdviceNeverRow, { props: { row: row(review) }, global: { plugins: [createAppI18n('ru')] } })
+const render = (review: string | null = null, scope: 'own' | 'shared' = 'shared') =>
+  mount(AdviceNeverRow, {
+    props: { row: row(review), scope },
+    global: { plugins: [createAppI18n('ru')] },
+  })
 
 describe('AdviceNeverRow', () => {
   it('the name struck through and the figure behind the verdict', () => {

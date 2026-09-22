@@ -25,6 +25,7 @@ const carrefour = place('Carrefour', 524_000_000_000n)
 function row(places: AdvicePlace[], review: string | null = null): TakeRow {
   return {
     level: 'take',
+    isMine: true,
     itemId: 'cccccccc-0000-4000-8000-000000000001',
     name: 'Говядина, вырезка',
     rating: '4.8',
@@ -34,9 +35,13 @@ function row(places: AdvicePlace[], review: string | null = null): TakeRow {
   }
 }
 
-const render = (places: AdvicePlace[], review: string | null = null) =>
+const render = (
+  places: AdvicePlace[],
+  review: string | null = null,
+  scope: 'own' | 'shared' = 'shared',
+) =>
   mount(AdviceTakeCard, {
-    props: { row: row(places, review) },
+    props: { row: row(places, review), scope },
     global: { plugins: [createAppI18n('ru')] },
   })
 
@@ -56,6 +61,15 @@ describe('AdviceTakeCard', () => {
     expect(view.find('.more').exists()).toBe(false)
   })
 
+  it('А1: a dearer first place is named without the superlative', () => {
+    // The places come own city first, then by price (Р-26), so the named one may be the
+    // dearest — and «Дешевле всего» over it, with a cheaper line under «Ещё», was a lie.
+    const view = render([sas, market])
+
+    expect(plain(view.get('.where').text())).toBe('Брали здесь: SAS')
+    expect(plain(view.get('.more').text())).toBe('Ещё: Рынок в Гюмри 4 790,00 ֏/кг')
+  })
+
   it('rated but never bought: no price block at all, rather than an empty one', () => {
     const view = render([])
 
@@ -66,6 +80,12 @@ describe('AdviceTakeCard', () => {
 
   it('names the verdict and the figure it stands on', () => {
     expect(plain(render([market]).get('.head').text())).toBe('БРАТЬ4,8 из 5 · 3 оценки')
+    // In the own mode the count is always one, and the subtitle above already says so.
+    expect(plain(render([market], null, 'own').get('.head').text())).toBe('БРАТЬ4,8 из 5')
+  })
+
+  it('says that a tap changes the rating — the row is a button with no other name', () => {
+    expect(render([market]).get('button .hidden').text()).toBe('Изменить оценку')
   })
 
   it('says nothing about the shops but their name and their price', () => {

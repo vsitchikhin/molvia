@@ -1,8 +1,9 @@
 <template>
   <button class="row" type="button" @click="$emit('edit')">
+    <span class="hidden">{{ t('advice.edit_action') }}</span>
     <span class="line">
       <span class="name">{{ row.name }}</span>
-      <AdviceRating :rating="row.rating" :count="row.ratingsCount" />
+      <AdviceRating :rating="row.rating" :count="row.ratingsCount" :scope="scope" />
     </span>
     <span v-if="row.review" class="review">{{ row.review }}</span>
   </button>
@@ -11,6 +12,8 @@
 <script lang="ts">
 import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
+import { useI18n } from 'vue-i18n'
+import type { AdviceScope } from '@molvia/model'
 import AdviceRating from '@/components/AdviceRating.vue'
 import type { NeverRow } from '@/components/adviceRow'
 
@@ -32,9 +35,14 @@ export default defineComponent({
   components: { AdviceRating },
   props: {
     row: { type: Object as PropType<NeverRow>, required: true },
+    /** Whose figures the row carries: in the own mode the count of one is not worth printing. */
+    scope: { type: String as PropType<AdviceScope>, required: true },
   },
   emits: {
     edit: () => true,
+  },
+  setup() {
+    return { t: useI18n().t }
   },
 })
 </script>
@@ -57,6 +65,10 @@ export default defineComponent({
   &:focus-visible {
     @include focus-ring;
   }
+}
+
+.hidden {
+  @include visually-hidden;
 }
 
 .line {

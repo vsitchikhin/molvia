@@ -1,4 +1,5 @@
-import type { AdvicePlace, AdviceRow, AdviceScope } from '@molvia/model'
+import { formatUnitPrice } from '@molvia/model'
+import type { AdvicePlace, AdviceRow, AdviceScope, UnitPrice } from '@molvia/model'
 import { SCORES } from '@/components/rating'
 import type { Score } from '@/components/rating'
 
@@ -14,26 +15,64 @@ export type NeverRow = Extract<AdviceRow, { level: 'never' }>
  * How a row's places read, and it is the **only** thing the screen decides about the data
  * (MOL-32, Р-2; the answer to MOL-34).
  *
- * The server returns the places sorted by unit price, own city first, and nothing else: a
- * field like `sole: true` would be a fact derivable from the list itself, and a superlative
- * should be named only by whoever has something to compare. How many places there are is
- * visible to the screen alone, so the word is the screen's.
+ * The server returns the places **own city first, then by price** (MOL-31, Р-26), not by price
+ * alone: a cheaper receipt from another city stands below a dearer place at home, because
+ * «cheaper elsewhere» is not somewhere one can go. So the first place is the one to name — and
+ * it is not always the cheapest.
  *
- * - `none` — rated but never bought: the card has no price block at all, rather than an empty one;
- * - `sole` — «Брали здесь: Рынок в Гюмри». Honest, and it does not pretend to be a comparison;
- * - `cheapest` — «Дешевле всего: …» plus «Ещё: …» for the rest.
+ * `cheapest` says whether it happens to be. **The superlative is said only when it is true**
+ * (MOL-32, А1): «Дешевле всего: Рынок в Гюмри — 4 000 ֏/кг» over a line reading «Ещё: SAS
+ * Ереван 3 000 ֏/кг» is a lie the screen was printing, and the price it points at is the one
+ * the person decides by. Otherwise the place is named without a claim: «Брали здесь».
  *
  * In a module of its own rather than in the component: an SFC exports a component, and a type
  * exported beside it is read as `any` by everything that is not the Vue compiler (as `tripRow.ts`).
  */
 export type PlacesView =
   | { readonly kind: 'none' }
-  | { readonly kind: 'sole' | 'cheapest'; readonly best: AdvicePlace; readonly rest: AdvicePlace[] }
+  | {
+      readonly kind: 'places'
+      readonly best: AdvicePlace
+      readonly rest: readonly AdvicePlace[]
+      readonly cheapest: boolean
+    }
 
 export function placesView(places: readonly AdvicePlace[]): PlacesView {
   const [best, ...rest] = places
   if (!best) return { kind: 'none' }
-  return { kind: rest.length === 0 ? 'sole' : 'cheapest', best, rest }
+  return {
+    kind: 'places',
+    best,
+    rest,
+    // One place is no comparison at all, so there is nothing to be cheapest among. Prices of
+    // two currencies or two units are no comparison either — the server sends one pair per
+    // item (Р-4), and if that ever stops being true the word goes rather than the screen.
+    cheapest: rest.length > 0 && rest.every((place) => dearer(place, best)),
+  }
+}
+
+function dearer(place: AdvicePlace, best: AdvicePlace): boolean {
+  const [a, b] = [place.unitPrice, best.unitPrice]
+  return a.currency === b.currency && a.unit === b.unit && a.scaledMinor >= b.scaledMinor
+}
+
+/** The key of the word over the named place: a superlative only where it is the truth. */
+export const whereKey = (view: PlacesView): string =>
+  view.kind === 'places' && view.cheapest ? 'advice.cheapest_at' : 'advice.bought_at'
+
+/** What a translator has to be able to do for the helpers here — `useI18n().t`, and nothing more. */
+type Translate = (key: string, named: Record<string, unknown>) => string
+
+/**
+ * «570,00 ֏/л» — a unit price as this screen prints it. One copy for both forms of row that
+ * show one: the card and the line say the same number the same way, or the eye catches the
+ * difference before any test does.
+ */
+export function unitPriceText(price: UnitPrice, t: Translate, locale: string): string {
+  return t('item.unit_price_value', {
+    amount: formatUnitPrice(price, locale),
+    unit: t(`item.unit_${price.unit}`, {}),
+  })
 }
 
 /**
