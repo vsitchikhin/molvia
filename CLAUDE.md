@@ -1084,6 +1084,11 @@ The band is ten ports wide, so the neighbouring one is always free: a run at `+1
 with `make dev` instead of taking it over. **A copy whose `.env` predates MOL-60 needs
 `bin/init-env.sh <index> --force` once** — `make setup` keeps an existing `.env`, and
 without the three `E2E_*` values playwright refuses to start and says exactly that.
+**`--force` carries `TELEGRAM_BOT_TOKEN` over**: everything else in the file is computed
+from the index, that one is typed in by hand, and BotFather does not show it twice — a
+reissue revokes the old one. Regenerating was a once-per-copy event until MOL-60 made it
+compulsory for every existing copy, which is what turned the loss from unlikely into
+documented.
 
 Molvia has its own port band rather than the defaults: the machine already has the work
 project's Postgres and Vite listening on 5432 and 5173, so with the defaults Molvia would

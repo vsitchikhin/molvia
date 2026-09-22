@@ -14,13 +14,25 @@ try {
 // up — and pre-push runs e2e exactly then — so no DATABASE_URL of ours would ever reach a
 // process. Its own database because a run used to leave a catalogue item and a purchase in
 // the one a person types into by hand, and the suite degraded from that.
-const apiPort = process.env.E2E_API_PORT ?? '3301'
-const pwaPort = process.env.E2E_PWA_PORT ?? '5301'
+// All three are required, and none has a default: a default here is the ports of copy 0,
+// so a copy whose .env lost only the ports would quietly move into another copy's band and
+// fight it for 3301 — harder to diagnose than not starting at all.
+const apiPort = process.env.E2E_API_PORT
+const pwaPort = process.env.E2E_PWA_PORT
 const databaseUrl = process.env.E2E_DATABASE_URL
-if (!databaseUrl) {
+if (!apiPort || !pwaPort || !databaseUrl) {
+  const missing = Object.entries({
+    E2E_API_PORT: apiPort,
+    E2E_PWA_PORT: pwaPort,
+    E2E_DATABASE_URL: databaseUrl,
+  })
+    .filter(([, value]) => !value)
+    .map(([name]) => name)
+  // Each name carries its own verb rather than sharing one: this text is grepped for a
+  // single variable at least as often as it is read whole.
   throw new Error(
-    'E2E_DATABASE_URL is not set. A copy whose .env predates MOL-60 needs it once: ' +
-      'bin/init-env.sh <index> --force',
+    `${missing.map((name) => `${name} is not set`).join(', ')}. A copy whose .env predates ` +
+      'MOL-60 needs them once: bin/init-env.sh <index> --force',
   )
 }
 

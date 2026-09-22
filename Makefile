@@ -120,4 +120,10 @@ icons: ## Regenerate the app icons from the mark in favicon.svg
 ports: ## Show this copy's index and ports
 	$(REQUIRE_ENV)
 	@echo "copy $(CLONE_INDEX): api $(API_PORT) · pwa $(PWA_PORT) · postgres $(POSTGRES_PORT) · db $(POSTGRES_DB)"
-	@echo "       in e2e: api $(E2E_API_PORT) · pwa $(E2E_PWA_PORT) · db $(POSTGRES_DB)_e2e"
+	@# The e2e database is named by E2E_DATABASE_URL, so it is read from there rather than
+	@# assembled here: a second place that decides the name is a second place to drift.
+	@if [ -n "$(E2E_API_PORT)" ]; then \
+		echo "       in e2e: api $(E2E_API_PORT) · pwa $(E2E_PWA_PORT) · db $(notdir $(E2E_DATABASE_URL))"; \
+	else \
+		echo "       in e2e: this .env predates MOL-60 — run: bin/init-env.sh $(CLONE_INDEX) --force"; \
+	fi
