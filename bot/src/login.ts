@@ -10,8 +10,20 @@ import { timeAgo } from './when'
 /** Telegram's limit on `callback_data`, in bytes. */
 const CALLBACK_DATA_MAX = 64
 
-const CONFIRM = 'login:ok:'
-const DECLINE = 'login:no:'
+/**
+ * What a button carries, written once and read back by the expression built from it.
+ *
+ * Written and read by two hand-kept strings at first, and the reading was `slice(CONFIRM.length)`
+ * — correct only while both prefixes happen to be the same length. Renaming one of them would
+ * have cut the code in the wrong place and refused a perfectly good login, silently.
+ *
+ * The code is matched as `(.*)`, not `(.+)`: an empty one then reaches the same refusal as any
+ * other dead link, whereas an update this filter does not match at all would leave the spinner
+ * turning under the person's finger forever.
+ */
+const PREFIX = 'login:'
+const buttonData = (action: 'ok' | 'no', code: string): string => `${PREFIX}${action}:${code}`
+const BUTTON_DATA = new RegExp(`^${PREFIX}(ok|no):(.*)$`, 's')
 
 export interface LoginDeps {
   readonly api: MolviaBotClient
@@ -65,8 +77,8 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
 
   function keyboard(code: string, language: string | undefined): InlineKeyboard {
     return new InlineKeyboard()
-      .text(t(language, 'login.confirm'), `${CONFIRM}${code}`)
-      .text(t(language, 'login.decline'), `${DECLINE}${code}`)
+      .text(t(language, 'login.confirm'), buttonData('ok', code))
+      .text(t(language, 'login.decline'), buttonData('no', code))
   }
 
   /** The answer replaces the question, so the buttons go with it (Q6). */
@@ -92,7 +104,7 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
     // A code we could not put on a button is one we cannot ask about: the prompt without its
     // buttons would be the very thing this task exists to prevent. Today's codes are 43
     // characters and the schema allows 64, so this is a guard on a future change, not on input.
-    if (Buffer.byteLength(`${CONFIRM}${code}`) > CALLBACK_DATA_MAX) {
+    if (Buffer.byteLength(buttonData('ok', code)) > CALLBACK_DATA_MAX) {
       await ctx.reply(t(language, 'login.unavailable'))
       return
     }
@@ -111,10 +123,9 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
     }
   })
 
-  privately.callbackQuery(new RegExp(`^(?:${CONFIRM}|${DECLINE})`), async (ctx) => {
-    const data = ctx.callbackQuery.data
-    const confirming = data.startsWith(CONFIRM)
-    const code = data.slice(CONFIRM.length)
+  privately.callbackQuery(BUTTON_DATA, async (ctx) => {
+    const [, action, code = ''] = ctx.match
+    const confirming = action === 'ok'
     try {
       if (confirming) {
         // `ctx.from.id` and nothing else: the account is Telegram's word, which is the only

@@ -254,6 +254,19 @@ describe('кнопки', () => {
     expect(calls.some((call) => call.method === 'answerCallbackQuery')).toBe(true)
   })
 
+  it('кнопка с пустым кодом — мёртвая ссылка, а не вечный часик', async () => {
+    // Фильтр, который такую кнопку не узнаёт, оставил бы часик крутиться навсегда: обработчик
+    // не вызвался бы вовсе. Пустой код доходит до клиента и получает тот же отказ, что мусор.
+    const declineLogin = vi.fn().mockRejectedValue(new ApiError(ISSUE.PATH_INVALID, 'code'))
+    const { bot, calls } = harness({ declineLogin })
+
+    await bot.handleUpdate(press('login:no:'))
+
+    expect(declineLogin).toHaveBeenCalledExactlyOnceWith('')
+    expect(sent(calls, 'editMessageText')?.text).toContain('больше не действует')
+    expect(calls.some((call) => call.method === 'answerCallbackQuery')).toBe(true)
+  })
+
   it('сообщение, которое нельзя переписать, отвечается новым', async () => {
     const { bot, calls } = harness(
       { declineLogin: vi.fn().mockResolvedValue(undefined) },
