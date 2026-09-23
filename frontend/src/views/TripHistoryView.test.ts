@@ -163,6 +163,26 @@ it('does not paint a trip whose start is still in the queue as broken', async ()
   view.unmount()
 })
 
+it('draws the queued rows of a trip the server has never heard of', async () => {
+  // Start still in the queue, no local completion, an honest 404. Without this the screen had a
+  // fifth state — no skeleton, no «not found», no error, no offline and no rows (В4).
+  const queue = useTripQueueStore()
+  queue.enqueue({
+    kind: 'start',
+    tripId: ID,
+    place: { kind: 'store', name: 'Рынок' },
+    startedAt: new Date('2026-09-01T10:00:00Z'),
+  })
+  trip.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, undefined, true))
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+  const { view } = await render(true)
+  await flushPromises()
+  expect(view.text()).toContain(ru.trip.history.unfinished)
+  expect(view.text()).toContain(ru.trip.history.pending)
+  expect(view.find('button.add').exists()).toBe(true)
+  view.unmount()
+})
+
 it('offers the last cached selection offline even when it is beyond the first page', async () => {
   const saved = useTripHistoryStore()
   saved.selected = answer()

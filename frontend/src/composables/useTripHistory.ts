@@ -17,7 +17,7 @@ interface TripHistoryScreen {
   t: ReturnType<typeof useI18n>['t']
   history: ReturnType<typeof useTripHistoryStore>
   rows: ComputedRef<HistoryRow[]>
-  loading: Ref<boolean>
+  loading: ComputedRef<boolean>
   trouble: Ref<'error' | 'offline' | null>
   when(date: Date): string
   load(): void
@@ -31,7 +31,13 @@ export function useTripHistory(): TripHistoryScreen {
   const actor = useActorStore()
   const router = useRouter()
   const { t, locale } = useI18n()
-  const loading = ref(false)
+  const busy = ref(false)
+  /**
+   * Loading covers «the owner is not known yet»: the first launch is still making an identity,
+   * and «Здесь будут ваши походы» would be a statement about data nobody has asked for. Computed
+   * rather than a flag the early return leaves set — that return goes past no `finally` (В-4).
+   */
+  const loading = computed(() => busy.value || !actor.id)
   const trouble = ref<'error' | 'offline' | null>(null)
   let run = 0
   const rows = computed(() => {
@@ -75,11 +81,9 @@ export function useTripHistory(): TripHistoryScreen {
     )
   })
   async function load(more = false): Promise<void> {
-    // Loading before the owner is known, not «nothing to show»: without this the screen flashed
-    // «Здесь будут ваши походы» while the first launch was still making an identity (З-9).
-    const token = ++run
-    loading.value = true
     if (!actor.id) return
+    const token = ++run
+    busy.value = true
     history.stale = true
     try {
       await history.load(more)
@@ -87,7 +91,7 @@ export function useTripHistory(): TripHistoryScreen {
     } catch {
       if (token === run) trouble.value = navigator.onLine ? 'error' : 'offline'
     } finally {
-      if (token === run) loading.value = false
+      if (token === run) busy.value = false
     }
   }
   watch(

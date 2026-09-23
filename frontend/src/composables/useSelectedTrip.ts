@@ -34,7 +34,21 @@ export function useSelectedTrip(target: MaybeRefOrGetter<string | null>): Select
   let request = 0
   const local = computed(() => history.local.find((row) => row.id === id.value) ?? null)
   const trip = computed(() => (id.value && !missing.value ? history.known(id.value) : null))
-  const available = computed(() => !missing.value && (trip.value !== null || local.value !== null))
+  /**
+   * Whether the screen has anything to draw about this trip. A trip the server has never heard
+   * of is still one the phone knows, as long as the queue holds its writes: its start went in at
+   * the shelf with no signal, and its purchases are lines of it. Without this the screen had a
+   * fifth state — no skeleton, no «not found», no error, no offline and no rows, just the header
+   * (В4), reachable by the plain address `/trip/history/<id>` from a link or a reload.
+   */
+  const queued = computed(
+    () =>
+      queue.pending.some((write) => write.tripId === id.value) ||
+      queue.rejected.some((item) => item.write.tripId === id.value),
+  )
+  const available = computed(
+    () => !missing.value && (trip.value !== null || local.value !== null || queued.value),
+  )
   async function load(): Promise<void> {
     const selected = id.value
     if (!selected || !actor.id) return
