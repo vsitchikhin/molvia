@@ -681,6 +681,14 @@ database access. In a product about data integrity, two write paths will silentl
 - **A login is a five-minute, one-use request (MOL-54).** The link carries a public code;
   `__Host-molvia_login` carries an independent secret, stored only as a hash. The bot confirms
   the code with a Telegram id, but only the browser holding the secret can collect a session.
+  **Whose Telegram confirms is not checked against anything** (adversarial А1, owner's decision
+  23.09.2026): someone who sees the link within its five minutes can confirm it with their own
+  account, and the browser that started it silently collects _that_ account — its purchases
+  then land there — and anyone holding the code can decline it. Accepted while the code goes
+  from the browser straight into Telegram on the same device; a QR or a login from another
+  device reopens the question. The term is the database clock's alone: the row takes both of
+  its times from `clock_timestamp()` and the cookie's `Max-Age` is the lifetime itself, so an
+  API clock off Postgres neither refuses a start nor shortens the cookie.
   Collection locks the row before checking the current database clock, then consumes it,
   finds or creates the owner and writes the session in one transaction. A concurrent first
   login uses `ON CONFLICT DO NOTHING` and a new read, not a caught unique violation inside an
@@ -691,7 +699,8 @@ database access. In a product about data integrity, two write paths will silentl
   an old response could erase a newer request. Safari and an installed PWA have separate stores.
   Start and GET poll require `X-Molvia-Login: 1`, reject foreign fetch metadata and expose no
   CORS; HEAD cannot consume. This GET is the deliberate exception to the usual read-only rule.
-  All auth replies are `no-store`, including refusals. The bot uses a separate `BOT_API_SECRET`,
+  All auth replies are `no-store`, including refusals and what Fastify answers itself under
+  those paths — no route, a path that does not decode. The bot uses a separate `BOT_API_SECRET`,
   never the Telegram token; Caddy additionally blocks its internal paths from outside.
   **Thirty starts in a rolling minute, across the database**, including consumed requests:
   the quota is serialized with an advisory lock. Its shared denial-of-service price is accepted.
