@@ -1,9 +1,3 @@
-import { ApiError, createTransport } from './transport'
-import type { ClientOptions } from './transport'
-export { ApiError } from './transport'
-export type { ClientOptions } from './transport'
-export { createBotClient } from './bot'
-export type { MolviaBotClient, BotClientOptions } from './bot'
 import { z } from 'zod'
 import type { ZodType } from 'zod'
 import {
@@ -50,6 +44,13 @@ import type {
   VerdictAmendment,
   VerdictCard,
 } from '@molvia/model'
+import { ApiError, createTransport } from './transport'
+import type { ClientOptions } from './transport'
+
+export { ApiError } from './transport'
+export type { ClientOptions } from './transport'
+export { createBotClient } from './bot'
+export type { MolviaBotClient, BotClientOptions } from './bot'
 
 export interface MolviaClient {
   startLogin(options?: { readonly signal?: AbortSignal }): Promise<LoginStarted>
