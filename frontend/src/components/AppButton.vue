@@ -55,7 +55,10 @@ export default defineComponent({
     }
     function click(event: MouseEvent): void {
       if (props.disabled || props.inactive || props.busy) {
+        // Stopped as well as prevented: a `disabled` button fires no click at all, and an
+        // inactive one must not reach a handler above it either (MOL-65, review).
         event.preventDefault()
+        event.stopPropagation()
         return
       }
       emit('click', event)

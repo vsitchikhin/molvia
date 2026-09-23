@@ -8,6 +8,7 @@ import type { CatalogueEntry, TripView as TripViewModel, WireCode } from '@molvi
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
+import { useActorStore } from '@/stores/actor'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import TripView from '@/views/TripView.vue'
@@ -61,7 +62,13 @@ function trip(rows: readonly Row[] = [], over: Partial<Record<'id', string>> = {
     rateProvider: null,
     rateJump: null,
     rateStale: false,
-    place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
+    place: {
+      id: 'aaaaaaaa-0000-4000-8000-000000000001',
+      kind: 'store',
+      name: 'Ереван Сити',
+      country: 'AM',
+      city: 'Гюмри',
+    },
     expenses: rows.map((row) => ({
       id: row.id,
       createdAt: new Date().toISOString(),
@@ -138,12 +145,13 @@ const queued = (id: string, price = '600') =>
 
 const mounted: VueWrapper[] = []
 
-async function render({ memory = null as TripViewModel | null } = {}) {
+async function render({ memory = null as TripViewModel | null, settings = true } = {}) {
   localStorage.setItem('molvia.actor', ME)
-  localStorage.setItem(
-    `molvia.settings.${ME}`,
-    JSON.stringify({ country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
-  )
+  if (settings)
+    localStorage.setItem(
+      `molvia.settings.${ME}`,
+      JSON.stringify({ country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+    )
   const pinia = createPinia()
   setActivePinia(pinia)
   const trips = useTripStore()
@@ -456,6 +464,65 @@ describe('TripView', () => {
       expect(button(view, ru.trip.elsewhere.join).exists()).toBe(true)
       await button(view, ru.trip.elsewhere.finish).trigger('click')
       expect(queue.elsewhere).toBeNull()
+    })
+  })
+
+  describe('старый старт без контекста (MOL-65)', () => {
+    const LEGACY = 'bbbbbbbb-0000-4000-8000-000000000031'
+    const legacy = () => ({
+      kind: 'start' as const,
+      tripId: LEGACY,
+      place: { kind: 'store' as const, name: 'Рынок' },
+      startedAt: new Date('2026-09-19T08:00:00.000Z'),
+    })
+
+    /** Сервер отвечает «назовите город и валюты», очередь встаёт и ждёт человека. */
+    async function held(settings = true) {
+      startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_CONTEXT_REQUIRED, undefined, true))
+      const rendered = await render({ settings })
+      rendered.queue.enqueue(legacy())
+      await flushPromises()
+      return rendered
+    }
+
+    it('экран зовёт уточнить, а шторка отправляет поход с настройками телефона', async () => {
+      const { view, queue } = await held()
+      expect(view.text()).toContain(ru.settings.legacy.title)
+      expect(queue.needsContext).toBe(LEGACY)
+
+      clock += 1000
+      await button(view, ru.settings.legacy.action).trigger('click')
+      await flushPromises()
+      clock += 1000
+      startTrip.mockReturnValue(new Promise(() => undefined))
+      inside(document.body.querySelector('dialog[open]'), ru.settings.legacy.confirm).click()
+      await flushPromises()
+
+      expect(queue.needsContext).toBeNull()
+      expect(queue.pending.find((write) => write.kind === 'start')?.context).toEqual({
+        country: 'AM',
+        city: 'Гюмри',
+        spendCurrency: 'AMD',
+        incomeCurrency: 'RUB',
+      })
+      // Одна запись, а не вторая рядом: уточнение заменяет старт на месте.
+      expect(queue.pending.filter((write) => write.kind === 'start')).toHaveLength(1)
+    })
+
+    it('без подтверждённых настроек шторка не отправляет ничего', async () => {
+      const { view, queue } = await held(false)
+      expect(useActorStore().settings).toBeNull()
+
+      clock += 1000
+      await button(view, ru.settings.legacy.action).trigger('click')
+      await flushPromises()
+      const sheet = document.body.querySelector('dialog[open]')
+      expect(sheet?.textContent).toContain(ru.settings.context_missing)
+      inside(sheet, ru.settings.legacy.confirm).click()
+      await flushPromises()
+
+      expect(queue.needsContext).toBe(LEGACY)
+      expect(queue.pending.find((write) => write.kind === 'start')?.context).toBeUndefined()
     })
   })
 

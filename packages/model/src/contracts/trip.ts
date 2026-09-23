@@ -72,8 +72,20 @@ const isoDate = z.codec(z.iso.datetime(), z.date(), {
   encode: (date) => date.toISOString(),
 })
 
-/** What the trip screen shows of a place: the name in «Ереван Сити · сегодня», and no more. */
-const tripPlaceSchema = placeSchema.pick({ id: true, kind: true, name: true })
+/**
+ * What the trip screen shows of a place: the name in «Ереван Сити · сегодня» — and the
+ * geography, which nothing draws. The offline queue compares it: a name alone does not prove
+ * one shop, since the settings may have moved on another device, and without the country and
+ * the city every second start in the same shop asked the person a question about it (MOL-65,
+ * adversarial В1). Not a secret: it is the place this person's own trip is in.
+ */
+const tripPlaceSchema = placeSchema.pick({
+  id: true,
+  kind: true,
+  name: true,
+  country: true,
+  city: true,
+})
 export type TripPlace = z.infer<typeof tripPlaceSchema>
 
 const tripExpenseCodec = z.strictObject({
@@ -171,7 +183,13 @@ function estimate(total: Money, rate: ExchangeRate): Money | null {
 
 /** The one way a place becomes what the trip screen sees of it. */
 export function tripPlaceOf(place: Place): TripPlace {
-  return { id: place.id, kind: place.kind, name: place.name }
+  return {
+    id: place.id,
+    kind: place.kind,
+    name: place.name,
+    country: place.country,
+    city: place.city,
+  }
 }
 
 /**

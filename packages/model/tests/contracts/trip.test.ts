@@ -248,7 +248,7 @@ describe('tripViewCodec', () => {
     const wire = z.encode(tripViewCodec, view())
     expect(tripViewCodec.safeParse({ ...wire, actorId: CREATOR }).success).toBe(false)
     expect(
-      tripViewCodec.safeParse({ ...wire, place: { ...wire.place, country: 'AM' } }).success,
+      tripViewCodec.safeParse({ ...wire, place: { ...wire.place, createdBy: CREATOR } }).success,
     ).toBe(false)
   })
 

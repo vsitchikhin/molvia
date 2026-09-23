@@ -26,6 +26,8 @@ const city: TripPlace = {
   id: 'aaaaaaaa-0000-4000-8000-000000000001',
   kind: 'store',
   name: 'Ереван Сити',
+  country: 'AM',
+  city: 'Гюмри',
 }
 
 let clock = 0
@@ -98,7 +100,7 @@ describe('StartTripSheet', () => {
   it('без сети список берётся с телефона, и поход всё равно начинается', async () => {
     localStorage.setItem(
       `molvia.places.${ME}.${JSON.stringify(['AM', 'Гюмри'])}`,
-      JSON.stringify({ places: [{ id: city.id, kind: 'store', name: city.name }] }),
+      JSON.stringify({ places: [city] }),
     )
     recentPlaces.mockRejectedValue(new Error('Failed to fetch'))
     const { view, queue } = await render()

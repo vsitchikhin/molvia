@@ -24,7 +24,10 @@ test('settings draft survives tabs and offline; another device produces an expli
   await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toBeDisabled()
   await page.context().setOffline(false)
   await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toBeEnabled()
-  const rival = { ...previous, incomeCurrency: 'EUR' }
+  // The same choice on both devices: since MOL-65 a choice nobody here touched follows the
+  // other device instead of being overwritten, so only this is a conflict.
+  await page.getByLabel('Валюта трат', { exact: true }).selectOption('USD')
+  const rival = { ...previous, spendCurrency: 'EUR' }
   const response = await page.request.put('/api/actors/me/settings', {
     headers,
     data: { previous, settings: rival },
@@ -39,6 +42,7 @@ test('settings draft survives tabs and offline; another device produces an expli
   await expect(page.getByText('Настройки сохранены', { exact: true })).toBeVisible()
   await page.reload()
   await expect(city).toHaveValue('Ереван')
+  await expect(page.getByLabel('Валюта трат', { exact: true })).toHaveValue('USD')
   await expect(page.getByLabel('Валюта для пересчёта', { exact: true })).toHaveValue('RUB')
   await testInfo.attach('settings-light', {
     body: await page.screenshot(),
@@ -103,6 +107,59 @@ test('an offline trip keeps the context captured before another device changed s
       return ((await response.json()) as { trip: { currency: string } | null }).trip?.currency
     })
     .toBe(previous.spendCurrency)
+})
+
+test('a trip started by the old app asks for its city and currencies before it is sent', async ({
+  page,
+}) => {
+  const owner = await signedIn(page)
+  const tripId = '7b2f1c4e-0000-4000-8000-00000000c001'
+  // A start written by the version before MOL-65: no context at all, which is the one branch
+  // the server answers `error.trip_context_required` to.
+  await page.evaluate(
+    ([key, id]) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify([
+          {
+            key: 'aa00bb11cc22dd33ee44ff55',
+            write: {
+              kind: 'start',
+              tripId: id,
+              place: { kind: 'store', name: 'Старый магазин' },
+              startedAt: new Date().toISOString(),
+            },
+          },
+        ]),
+      )
+    },
+    [`molvia.trip-queue.${owner}`, tripId],
+  )
+  await page.reload()
+  // By the action, not by the title: the sheet below carries the same words, mounted and hidden.
+  const clarify = page.getByRole('button', { name: 'Уточнить настройки похода', exact: true })
+  await expect(clarify).toBeVisible()
+  await clarify.click()
+  const sheet = page.locator('dialog[open]')
+  await expect(sheet).toBeVisible()
+  await page.waitForTimeout(400)
+  const sent = page.waitForRequest(
+    (request) => request.method() === 'POST' && request.url().endsWith('/api/trips'),
+  )
+  await sheet.getByRole('button', { name: 'Подтвердить и отправить', exact: true }).click()
+  expect((await sent).postDataJSON()).toMatchObject({
+    id: tripId,
+    context: { country: 'AM', city: 'Гюмри' },
+  })
+  await expect(clarify).toHaveCount(0)
+  const headers = await asBrowser(page)
+  await expect
+    .poll(async () => {
+      const response = await page.request.get('/api/trips/current', { headers })
+      return ((await response.json()) as { trip: { place: { name: string } } | null }).trip?.place
+        .name
+    })
+    .toBe('Старый магазин')
 })
 
 test('lost save responses remain uncertain until a read confirms the result', async ({

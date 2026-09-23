@@ -143,8 +143,6 @@
       <TripTotal :trip="trip" :pending="waiting" :local="local !== null" />
     </template>
 
-    <!-- Mounted always and led by `open`, as «Предложить товар» is: under a `v-if` the sheet
-         would be gone before it could step back off its own history entry (MOL-18; review 5). -->
     <ScreenState
       v-if="queue.needsContext"
       kind="attention"
@@ -158,6 +156,8 @@
         }}</AppButton></template
       >
     </ScreenState>
+    <!-- Mounted always and led by `open`, as «Предложить товар» is: under a `v-if` the sheet
+         would be gone before it could step back off its own history entry (MOL-18; review 5). -->
     <TripContextSheet v-model:open="clarifying" />
     <StartTripSheet v-model:open="starting" />
 

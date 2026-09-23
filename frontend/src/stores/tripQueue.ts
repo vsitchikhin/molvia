@@ -374,6 +374,22 @@ function samePlace(a: string, b: string): boolean {
   return plain(a) === plain(b)
 }
 
+/**
+ * Whether the trip the server has open is in the shop this start names.
+ *
+ * The name alone does not prove it: «Ереван Сити» stands in both cities, and the settings may
+ * have moved on another device while this start waited. So the geography is compared too —
+ * the trip's place carries it (MOL-65). A start with no context at all is from the old queue,
+ * and there the name is all there ever was.
+ */
+function sameShop(start: Extract<QueuedWrite, { kind: 'start' }>, open: TripView): boolean {
+  if (!samePlace(start.place.name, open.place.name)) return false
+  return (
+    !start.context ||
+    (start.context.country === open.place.country && samePlace(start.context.city, open.place.city))
+  )
+}
+
 /** Runs `work` alone across every window of the app where the browser can say so. */
 function exclusively(name: string, work: () => Promise<void>): Promise<void> {
   // The DOM types promise `navigator.locks`; older WebViews do not have it (see stores/actor.ts).
@@ -695,12 +711,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       return true
     }
 
-    // A name alone no longer proves the same shop: settings may have changed on another
-    // device. A captured start needs an explicit choice before its purchases move.
-    if (
-      (head.write.context || !samePlace(head.write.place.name, open.place.name)) &&
-      yielded !== open.id
-    ) {
+    if (!sameShop(head.write, open) && yielded !== open.id) {
       elsewhere.value = { tripId: open.id, place: open.place.name, mine: head.write.place.name }
       // No timer while a question is on screen (Т-7): nothing changes until the person answers,
       // and asking the server every fifteen seconds only spends their battery.

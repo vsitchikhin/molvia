@@ -5,7 +5,7 @@
     <SettingsFields v-if="draft" v-model="draft" />
     <p v-else>{{ t('settings.context_missing') }}</p>
     <template #footer
-      ><AppButton size="large" block :disabled="!valid" @click="confirm">{{
+      ><AppButton size="large" block :inactive="!valid" @click="confirm">{{
         t('settings.legacy.confirm')
       }}</AppButton></template
     >

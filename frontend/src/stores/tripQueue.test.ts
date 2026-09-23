@@ -11,6 +11,7 @@ import {
   tripViewCodec,
 } from '@molvia/model'
 import type {
+  ActorSettings,
   AddExpenseBody,
   CatalogueEntry,
   ExpensePatch,
@@ -72,7 +73,13 @@ function answer(
     rateProvider: null,
     rateJump: null,
     rateStale: false,
-    place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: place },
+    place: {
+      id: 'aaaaaaaa-0000-4000-8000-000000000001',
+      kind: 'store',
+      name: place,
+      country: 'AM',
+      city: 'Гюмри',
+    },
     expenses: [],
     total: [{ amount: total, currency: 'AMD' }],
     converted: null,
@@ -117,12 +124,22 @@ const offline = () => new ApiError(ERROR.INTERNAL, 'Failed to fetch')
 const started = (
   tripId = TRIP,
   place = 'Ереван Сити',
+  context?: ActorSettings,
 ): Extract<QueuedWrite, { kind: 'start' }> => ({
   kind: 'start',
   tripId,
   place: { kind: 'store', name: place },
   startedAt: new Date('2026-09-19T08:00:00.000Z'),
+  ...(context ? { context } : {}),
 })
+
+/** Настройки, с которыми начат поход: те же, что у места в `answer`. */
+const here: ActorSettings = {
+  country: 'AM',
+  city: 'Гюмри',
+  spendCurrency: 'AMD',
+  incomeCurrency: 'RUB',
+}
 
 function fresh(identity = ME) {
   localStorage.setItem('molvia.actor', identity)
@@ -1144,6 +1161,33 @@ describe('trip queue', () => {
 
       expect(queue.elsewhere).toBeNull()
       expect(addExpense).toHaveBeenCalledWith(OPEN, expect.objectContaining({ id: MILK }))
+    })
+
+    it('В1: тот же магазин и тот же город — переезд молча, даже с контекстом', async () => {
+      // Контекст есть у каждого нового старта, и пока он один решал вопрос, приложение
+      // спрашивало «поход открыт в другом месте» про то же самое место.
+      startTrip.mockRejectedValue(tripOpen())
+      currentTrip.mockResolvedValue(answer('0.00', OPEN))
+      addExpense.mockResolvedValue({ trip: answer('520.00', OPEN), created: true })
+      const queue = fresh()
+      queue.enqueue(started(TRIP, 'Ереван Сити', here))
+      queue.enqueue(add(MILK))
+      await queue.flush()
+
+      expect(queue.elsewhere).toBeNull()
+      expect(addExpense).toHaveBeenCalledWith(OPEN, expect.objectContaining({ id: MILK }))
+    })
+
+    it('В1: то же имя в другом городе — вопрос, ради которого контекст и сверяют', async () => {
+      startTrip.mockRejectedValue(tripOpen())
+      currentTrip.mockResolvedValue(answer('0.00', OPEN))
+      const queue = fresh()
+      queue.enqueue(started(TRIP, 'Ереван Сити', { ...here, city: 'Ереван' }))
+      queue.enqueue(add(MILK))
+      await queue.flush()
+
+      expect(addExpense).not.toHaveBeenCalled()
+      expect(queue.elsewhere).toMatchObject({ tripId: OPEN, place: 'Ереван Сити' })
     })
 
     it('тот же магазин — переезд молча, как и было', async () => {
