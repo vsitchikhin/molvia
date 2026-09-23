@@ -44,7 +44,7 @@ export function authRoutes(
     scope.post('/auth/login', async (request, reply) => {
       parseQuery(z.strictObject({}), request.query)
       const { view, secret } = await api.start(deviceName(request.headers['user-agent']))
-      setLoginCookie(reply, secret, view.expiresAt)
+      setLoginCookie(reply, secret)
       return reply.code(201).send(z.encode(loginStartedCodec, view))
     })
     // Fastify's implicit HEAD would run the GET handler and silently consume the login.

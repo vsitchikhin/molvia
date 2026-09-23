@@ -1,4 +1,4 @@
-import { LOGIN_COOKIE, SESSION_COOKIE } from '@molvia/model'
+import { LOGIN_COOKIE, LOGIN_LIFETIME_SECONDS, SESSION_COOKIE } from '@molvia/model'
 import { secretOrNull } from '@/secret'
 
 /*
@@ -162,12 +162,19 @@ export function clearSessionCookie(reply: HeaderSink): void {
   reply.header('set-cookie', `${SESSION_COOKIE}=; Max-Age=0; ${FLAGS}`)
 }
 
-/** No clearing on poll: an old response must not erase a newer request's secret. */
-export function setLoginCookie(reply: HeaderSink, secret: string, expiresAt: Date): void {
+/**
+ * No clearing on poll: an old response must not erase a newer request's secret.
+ *
+ * The term is the request's lifetime itself, not the distance from this process's clock to the
+ * row's `expires_at`: that date is read off the database's clock, and with the API four minutes
+ * ahead a five-minute request came with a one-minute cookie (adversarial А5). It is set in the
+ * reply to the start that has just written the row, so the two begin together.
+ */
+export function setLoginCookie(reply: HeaderSink, secret: string): void {
   if (secretOrNull(secret) === null) throw new Error('invalid login cookie secret')
   reply.header('cache-control', 'no-store')
   reply.header(
     'set-cookie',
-    `${LOGIN_COOKIE}=${secret}; Max-Age=${String(maxAgeSeconds(expiresAt))}; ${FLAGS}`,
+    `${LOGIN_COOKIE}=${secret}; Max-Age=${String(LOGIN_LIFETIME_SECONDS)}; ${FLAGS}`,
   )
 }

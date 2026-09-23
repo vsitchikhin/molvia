@@ -11,7 +11,7 @@ import {
   newLoginRequestSchema,
   telegramUserIdSchema,
 } from '@molvia/model'
-import type { LoginRequest, TelegramUserId } from '@molvia/model'
+import type { LoginRequest, NewLoginRequest, TelegramUserId } from '@molvia/model'
 import { sha256Hex } from './digest'
 import { secretOrNull } from '@/secret'
 import { translateFailures } from './failure'
@@ -99,6 +99,32 @@ function codeOrNull(code: string): string | null {
   return loginCodeSchema.safeParse(code).success ? code : null
 }
 
+async function insert(
+  db: Conn,
+  secret: string,
+  fields: Omit<NewLoginRequest, 'deviceName'> & { readonly deviceName: string | null },
+): Promise<LoginRequest> {
+  // As in the session repository: a secret this server could not have minted means a caller
+  // went around the path that mints one, and there is nothing to answer a client with.
+  if (secretOrNull(secret) === null) {
+    throw new Error('a secret this server could not have minted reached the login repository')
+  }
+
+  const input = newLoginRequestSchema.parse({
+    ...fields,
+    // Decoration: cut if too long, `null` if it draws nothing — the rule sessions apply.
+    deviceName: deviceNameOrNull(fields.deviceName),
+  })
+
+  return translateFailures(async () => {
+    const [row] = await db
+      .insert(loginRequests)
+      .values({ ...input, secretHash: sha256Hex(secret) })
+      .returning()
+    return toLoginRequest(theRow(row, 'login_requests'))
+  })
+}
+
 export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
   /**
    * Alive: not spent, not put out, not run out. Every read below starts here, which is what
@@ -132,23 +158,18 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
           )
         if ((count?.value ?? 0) >= LOGIN_WINDOW_LIMIT)
           throw new DomainError(ERROR.LOGIN_RATE_LIMITED)
-        // Read the clock after the quota lock, not at the transaction's earlier start.
+        // Read the clock after the quota lock, not at the transaction's earlier start, and
+        // write it in the same statement: the quota above counts by this very column.
         const [clock] = await tx.execute<{ at: string }>(sql`select clock_timestamp()::text as at`)
         if (!clock) throw new Error('database returned no login clock')
         const createdAt = new Date(clock.at)
-        const request = await repository.create(
+        return insert(tx, secret, {
           id,
           code,
-          secret,
           deviceName,
-          new Date(createdAt.getTime() + LOGIN_LIFETIME_SECONDS * 1000),
-        )
-        const [row] = await tx
-          .update(loginRequests)
-          .set({ createdAt })
-          .where(eq(loginRequests.id, request.id))
-          .returning()
-        return toLoginRequest(theRow(row, 'login_requests'))
+          createdAt,
+          expiresAt: new Date(createdAt.getTime() + LOGIN_LIFETIME_SECONDS * 1000),
+        })
       })
     },
 
@@ -162,27 +183,7 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
     },
 
     async create(id, code, secret, deviceName, expiresAt) {
-      // As in the session repository: a secret this server could not have minted means a caller
-      // went around the path that mints one, and there is nothing to answer a client with.
-      if (secretOrNull(secret) === null) {
-        throw new Error('a secret this server could not have minted reached the login repository')
-      }
-
-      const input = newLoginRequestSchema.parse({
-        id,
-        code,
-        // Decoration: cut if too long, `null` if it draws nothing — the rule sessions apply.
-        deviceName: deviceNameOrNull(deviceName),
-        expiresAt,
-      })
-
-      return translateFailures(async () => {
-        const [row] = await db
-          .insert(loginRequests)
-          .values({ ...input, secretHash: sha256Hex(secret) })
-          .returning()
-        return toLoginRequest(theRow(row, 'login_requests'))
-      })
+      return insert(db, secret, { id, code, deviceName, expiresAt })
     },
 
     async byCode(code) {
