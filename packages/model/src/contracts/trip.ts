@@ -98,6 +98,7 @@ export const tripViewCodec = z.strictObject({
   id: z.uuid(),
   startedAt: isoDate,
   finishedAt: isoDate.nullable(),
+  finishedOnDeviceAt: isoDate.nullable().optional(),
   currency: currencySchema,
   /**
    * The rate the trip counts by: the snapshot, or — when it jumped and the person chose — the rate
@@ -210,6 +211,7 @@ export function tripViewOf(
     id: trip.id,
     startedAt: trip.startedAt,
     finishedAt: trip.finishedAt,
+    finishedOnDeviceAt: trip.finishedOnDeviceAt ?? null,
     currency: trip.currency,
     rate,
     rateProvider: trip.rateProvider,
@@ -240,3 +242,61 @@ export const rateChoiceBodySchema = z.discriminatedUnion('choice', [
   z.strictObject({ choice: z.literal('manual'), rate: z.string().max(40) }),
 ])
 export type RateChoiceBody = z.infer<typeof rateChoiceBodySchema>
+
+/**
+ * The earliest moment a phone may claim it closed a trip.
+ *
+ * It is the only key the history is ordered by, so a date no phone could have produced
+ * rearranges the whole list for ever — and `0001-01-01`, which the driver hands back as
+ * `2001-01-01`, would print one year on the card and sort by another two thousand apart (Б1).
+ *
+ * **Both ends are judged where the clock is — in the use case — and neither is a refusal**
+ * (Р-33). The floor lived in the schema for a day, and that made the two ends behave in
+ * opposite ways: a phone whose clock ran ahead had its time dropped and its trip closed, while
+ * one whose clock had fallen back got a 400. The queue never retries a refusal, so that trip
+ * could never be closed at all, and the local mark of its completion was dropped beside it —
+ * and a battery that died is the ordinary way a clock falls back (В2, Г1).
+ */
+export const DEVICE_TIME_EPOCH = new Date('2000-01-01T00:00:00.000Z')
+
+/** How far ahead of the server a phone's clock may be and still be believed. */
+export const DEVICE_TIME_AHEAD_MS = 24 * 60 * 60 * 1000
+
+/** Whether a moment a phone named is one it could plausibly have lived through. */
+export function isDeviceTime(at: Date, now: Date): boolean {
+  return at >= DEVICE_TIME_EPOCH && at.getTime() - now.getTime() <= DEVICE_TIME_AHEAD_MS
+}
+
+/** Old queued finishes have no device time; retries preserve whichever time first arrived. */
+export const finishTripBodySchema = z.strictObject({
+  finishedOnDeviceAt: isoDate.optional(),
+})
+export type FinishTripBody = z.output<typeof finishTripBodySchema>
+
+export const TRIP_HISTORY_PAGE_SIZE = 20
+export const tripHistoryCursorSchema = z.strictObject({
+  // Keep PostgreSQL microseconds on the wire: decoding to Date would skip boundary rows.
+  at: z.iso.datetime().refine((at) => !at.startsWith('0000-')),
+  id: z.uuid(),
+})
+export type TripHistoryCursor = z.infer<typeof tripHistoryCursorSchema>
+export const tripHistoryQuerySchema = z
+  .strictObject({
+    before: tripHistoryCursorSchema.shape.at.optional(),
+    beforeId: z.uuid().optional(),
+  })
+  .refine((q) => (q.before === undefined) === (q.beforeId === undefined))
+
+export const tripHistoryEntryCodec = z.strictObject({
+  id: z.uuid(),
+  place: tripPlaceSchema.strict(),
+  startedAt: isoDate,
+  finishedAt: isoDate,
+  finishedOnDeviceAt: isoDate.nullable(),
+})
+export type TripHistoryEntry = z.output<typeof tripHistoryEntryCodec>
+export const tripHistoryCodec = z.strictObject({
+  trips: z.array(tripHistoryEntryCodec).max(TRIP_HISTORY_PAGE_SIZE),
+  nextCursor: tripHistoryCursorSchema.nullable(),
+})
+export type TripHistory = z.output<typeof tripHistoryCodec>

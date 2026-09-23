@@ -30,5 +30,7 @@ blob-report/
 # os / editor
 .DS_Store
 
-# adversarial attack files: copied into backend/tests to run, they belong to .scratch
+# adversarial attack files: copied in to run, they belong to .scratch. Both halves, because
+# `git add -A` would otherwise carry the frontend's into a commit (MOL-25, round 3).
 backend/tests/*.attack.*
+frontend/src/*.attack.*

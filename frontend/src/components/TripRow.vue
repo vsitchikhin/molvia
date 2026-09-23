@@ -133,6 +133,7 @@ button.row {
 }
 
 .name {
+  overflow-wrap: anywhere;
   font-size: var(--text-headline);
   font-weight: var(--weight-medium);
 }

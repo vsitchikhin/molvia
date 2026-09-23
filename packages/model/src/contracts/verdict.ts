@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ISSUE } from '#model/support/errors'
+import { isResourceId } from '#model/support/resource'
 import { itemSchema } from '#model/entities/item'
 import { placeSchema } from '#model/entities/place'
 import { newVerdictSchema, verdictFields, verdictPatchSchema } from '#model/entities/verdict'
@@ -13,11 +14,13 @@ import type { Verdict } from '#model/entities/verdict'
  * made offline right after rating with nowhere to go.
  */
 export const verdictPathSchema = z.strictObject({
-  // Lower case only, the spelling every identifier leaves this server in. `z.uuid()` and
-  // Postgres take either case, so an upper-case address was rated and answered with a card
-  // whose `itemId` was not the one sent — and a draft kept under the id it was sent with
-  // would no longer match its own reply (adversarial pass, Д). One resource, one address.
-  itemId: z.uuid({ error: ISSUE.PATH_INVALID }).regex(/^[\da-f-]+$/, { error: ISSUE.PATH_INVALID }),
+  // Resource addresses are case-insensitive; the client holds the canonical key (MOL-25). The
+  // rule itself is `support/resource`, which the API's own path parser reads too — it lived in
+  // three places and the copies had already drifted over the case (З-6).
+  itemId: z
+    .string()
+    .refine(isResourceId, { error: ISSUE.PATH_INVALID })
+    .transform((id) => id.toLowerCase()),
 })
 export type VerdictPath = z.infer<typeof verdictPathSchema>
 

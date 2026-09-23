@@ -4,6 +4,8 @@ import { CATALOGUE_QUERY_MAX } from '#model/contracts/catalogue'
 import {
   addExpenseBodySchema,
   currentTripResponseSchema,
+  finishTripBodySchema,
+  isDeviceTime,
   startTripBodySchema,
   tripViewCodec,
   tripViewOf,
@@ -389,5 +391,38 @@ describe('С-11: an estimate that does not fit is none, not a refusal', () => {
     const view = tripViewOf(tiny, place, [huge], [bread])
     expect(view.total).toEqual([{ minor: 9_000_000_000_000_000_000n, currency: 'AMD' }])
     expect(view.converted).toBeNull()
+  })
+})
+
+describe('a moment a phone names for itself (Б1)', () => {
+  const body = (at: string) => finishTripBodySchema.safeParse({ finishedOnDeviceAt: at })
+
+  it('refuses nothing a phone can send: the schema has no clock to judge it by', () => {
+    // Both ends belong to the use case (Р-33). A refusal here would be final — the queue never
+    // retries one — and a phone whose battery died calls it 1970 (В2, Г1).
+    for (const at of [
+      '0001-01-01T00:00:00.000Z',
+      '1970-01-01T00:00:00.000Z',
+      '1999-12-31T23:59:59.999Z',
+      '2000-01-01T00:00:00.000Z',
+      '9999-12-31T23:59:59.999Z',
+    ]) {
+      expect(body(at).success).toBe(true)
+    }
+    expect(body('не дата').success).toBe(false)
+  })
+
+  it('judges both ends by the same rule, in the one place that has a clock', () => {
+    const now = new Date('2026-09-23T12:00:00.000Z')
+    expect(isDeviceTime(new Date('9999-12-31T23:59:59.999Z'), now)).toBe(false)
+    expect(isDeviceTime(new Date('2026-09-24T12:00:00.000Z'), now)).toBe(true)
+    expect(isDeviceTime(new Date('2026-09-24T12:00:00.001Z'), now)).toBe(false)
+    expect(isDeviceTime(new Date('1970-01-01T00:00:00.000Z'), now)).toBe(false)
+    expect(isDeviceTime(new Date('1999-12-31T23:59:59.999Z'), now)).toBe(false)
+    expect(isDeviceTime(new Date('2000-01-01T00:00:00.000Z'), now)).toBe(true)
+  })
+
+  it('has nothing to say about a body that names no time at all', () => {
+    expect(finishTripBodySchema.parse({})).toEqual({})
   })
 })

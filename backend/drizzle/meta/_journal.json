@@ -113,6 +113,13 @@
       "when": 1790014219047,
       "tag": "0015_trip_rate_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790104022082,
+      "tag": "0016_trip_device_completion",
+      "breakpoints": true
     }
   ]
 }

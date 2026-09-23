@@ -720,6 +720,15 @@ database access. In a product about data integrity, two write paths will silentl
   cached» holds without anyone remembering it, and a test asserts that no second module writes
   `set-cookie`. The one price, named: over plain http on the LAN (`PWA_EXPOSE=1 make dev`)
   `Secure` means no session — the same place the camera already needs `make certs`.
+- **What an address of a resource may look like is one rule, in `packages/model/src/support/resource.ts`
+  (MOL-25, Р-3).** An identifier in a path is taken in either case and answered in lower case:
+  Postgres compares uuids without case and answers in lower case, so a path spelled `AB12…` would
+  reach a row whose id comes back `ab12…` and the device would not recognise its own row in the
+  reply. A malformed one is **404, not 400** — malformed, missing and someone else's are one
+  answer, or an identifier could be guessed by the difference. Bodies that _create_ a row are the
+  other way round and stay strict (`deviceIdSchema`), so the answer and the draft on the phone
+  agree on one spelling. The rule lived in three places and two of them had already drifted over
+  the case; tests on both sides hold the callers to it, as they do for `INVISIBLE`.
 - **What a secret may look like is one rule, in `backend/src/secret.ts`** — RFC 6265's
   `cookie-octet`, because the only thing a session token or a login request's secret ever travels
   in is a cookie. It was two rules once, and they drifted by four characters: a token holding
@@ -1035,6 +1044,16 @@ is open answers `409 error.trip_open`, and the screen asks whether to continue t
 it first. A finished trip still takes rows — the soy sauce found in the bag at home belongs to the
 trip it was bought on. The trip and its rows are named by the device, so a queue sent twice is one
 purchase.
+**MOL-25 makes completed trips reachable through the whole history**, in pages of twenty, and
+lets a purchase be added, amended or removed there while another trip stays current. The selected
+trip owns the currency, rate and total of its sheet. The phone remembers the first history page,
+the last selected trip and snapshots of completions still synchronising; the queue remains the
+only source of pending writes. **Every conflicting start asks**, including the same shop. A choice
+is tied to the owner, the queued start's key and the open trip, checked again under the queue lock.
+**Completion has two clocks:** `finished_at` remains the server's receipt, while
+`finished_on_device_at` records the first tap kept in the queue. History uses the device's time,
+with the server's as fallback for old rows. It may precede the server start after an offline trip;
+it changes neither rate snapshots nor gates nor purchase dates. Finishing twice moves neither time.
 MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
 MOL-39 the official rate — a cache refreshed hourly, snapshotted by every new trip, a jump
 left to the person; MOL-24 the sheet «сколько, в чём, почём» — a live unit price, a price in any
@@ -1131,11 +1150,21 @@ The shape worth knowing here:
   the code deployed against it is the worse of the two failures. `make migrate`, the test
   setup and the boot path all go through the same code, so a migration cannot behave one
   way locally and another in production.
-- **A migration applied anywhere is never rewritten.** drizzle decides what to run by the
-  journal's `created_at` alone and never compares a file with what was applied: a rewritten
-  migration is skipped silently if its stamp is older, and fails on its first `CREATE` if newer
-  — then the API does not start. Folding a task's migrations into one is safe only while no
-  database has run them; MOL-39 checked every copy's journal before and after doing it.
+- **A merged migration is never rewritten.** drizzle decides what to run by the journal's
+  `created_at` alone and never compares a file with what was applied: a rewritten migration is
+  skipped silently if its stamp is older, and fails on its first `CREATE` if newer — then the
+  API does not start.
+
+  **The line is the merge of the pull request, not the first database to run it** (owner's
+  decision, 23.09.2026). The rule is about the production database and about branches other
+  people build on; a working copy's database is pushed around all through development anyway.
+  So while the task is still open, a task's migrations may be folded into one — and then **every
+  database that already ran the old file is brought into line by hand, in the same sitting**,
+  because those are the ones drizzle will silently skip. MOL-39 checked every copy's journal
+  before and after doing it; MOL-25 did the same and applied the added index to this copy's
+  three databases with the very statement the file now carries. After the merge the file is
+  frozen and a change to the schema is a new migration, always.
+
 - **Postgres publishes no port.** It is reachable only over the compose network.
 - **The PWA calls `/api/...`** and Caddy strips the prefix — the same shape the Vite dev
   proxy has, so nothing about the origin differs between development and production.

@@ -1,6 +1,31 @@
 <template>
   <AppScreen :title="t('item.search_title')">
+    <ScreenSkeleton
+      v-if="selectedId && selectedLoading && !selectedAvailable"
+      :groups="[72, 54, 84]"
+    />
+    <ScreenState
+      v-else-if="selectedId && selectedMissing"
+      kind="attention"
+      :title="t('trip.history.missing_title')"
+      :body="t('trip.history.missing_body')"
+    />
+    <ScreenState
+      v-else-if="selectedId && !selectedAvailable && selectedTrouble === 'error'"
+      kind="error"
+      :title="t('trip.history.error_title')"
+      :body="t('trip.history.error_body')"
+      @retry="selectedLoad"
+    />
+    <ScreenState
+      v-else-if="selectedId && !selectedAvailable && selectedTrouble === 'offline'"
+      kind="offline"
+      tone="warn"
+      :title="t('trip.history.offline_title')"
+      :body="t('trip.history.offline_body')"
+    />
     <CatalogueCombobox
+      v-if="!selectedId || selectedAvailable"
       v-model="query"
       :items="rows"
       :heading="heading"
@@ -70,9 +95,12 @@
     <!-- Mounted on a pick and put away from `onClosed`: each opening is its own purchase. Two
          steps back on «Добавить в поход» — the sheet and this screen, back to the trip. -->
     <ItemDetailsSheet
-      v-if="picked"
+      v-if="picked && (!selectedId || selectedAvailable)"
       :key="opened"
       :entry="picked.entry"
+      :trip-id="selectedId"
+      :trip-context="selectedId ? selectedTrip : undefined"
+      :trip-currency="selectedLocal?.currency ?? undefined"
       :query="picked.query"
       :close-steps="2"
       :on-closed="putAway"
@@ -83,6 +111,8 @@
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { useSelectedTrip } from '@/composables/useSelectedTrip'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import type { CatalogueEntry } from '@molvia/model'
@@ -125,6 +155,12 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18n()
+    const route = useRoute()
+    const selected = useSelectedTrip(() =>
+      route.name === 'finished-search' && typeof route.params.tripId === 'string'
+        ? route.params.tripId
+        : null,
+    )
     const query = ref('')
     const { phase, results, stale, answered, retry } = useCatalogueSearch(query)
     const recent = useRecentItemsStore()
@@ -229,6 +265,14 @@ export default defineComponent({
     })
 
     return {
+      selectedId: selected.id,
+      selectedLoading: selected.loading,
+      selectedAvailable: selected.available,
+      selectedMissing: selected.missing,
+      selectedTrouble: selected.trouble,
+      selectedLoad: selected.load,
+      selectedTrip: selected.trip,
+      selectedLocal: selected.local,
       t,
       query,
       phase,

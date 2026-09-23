@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { ZodType } from 'zod'
 import {
+  ERROR,
   LOGIN_HEADER,
   loginStartedCodec,
   loginPollCodec,
@@ -12,6 +13,8 @@ import {
   catalogueSearchResponseSchema,
   currentTripResponseSchema,
   expensePatchSchema,
+  finishTripBodySchema,
+  tripHistoryCodec,
   healthResponseSchema,
   isWireCode,
   proposedItemSchema,
@@ -33,6 +36,8 @@ import type {
   AddExpenseBody,
   CatalogueEntry,
   ExpensePatch,
+  TripHistory,
+  TripHistoryCursor,
   HealthResponse,
   PendingVerdicts,
   ProposedItem,
@@ -91,13 +96,15 @@ export interface MolviaClient {
   startTrip(body: StartTripBody): Promise<{ trip: TripView; created: boolean }>
   /** The trip the screen opens on, or null — «Новый поход». */
   currentTrip(): Promise<TripView | null>
+  trip(id: string): Promise<TripView>
+  tripHistory(cursor?: TripHistoryCursor): Promise<TripHistory>
   /** «Добавить в поход». The same identifier again is one purchase, and `created` is `false`. */
   addExpense(tripId: string, body: AddExpenseBody): Promise<{ trip: TripView; created: boolean }>
   /** «Добавить цену», «Сохранить»: `null` clears a field, a missing one leaves it be. */
   updateExpense(tripId: string, expenseId: string, patch: ExpensePatch): Promise<TripView>
   removeExpense(tripId: string, expenseId: string): Promise<TripView>
   /** «Завершить». Finishing twice is not an error. */
-  finishTrip(tripId: string): Promise<void>
+  finishTrip(tripId: string, finishedOnDeviceAt?: Date): Promise<void>
   /**
    * «Считать по новому курсу / по прежнему / по своему» when the rate the trip took jumped
    * (`rateJump`). Safe to repeat; a trip with nothing to choose between rejects with
@@ -139,7 +146,10 @@ export function createClient(options: ClientOptions): MolviaClient {
    */
   function verdictPath(itemId: string): string {
     const path = verdictPathSchema.safeParse({ itemId })
-    if (!path.success) throw new ApiError(ISSUE.PATH_INVALID, 'itemId')
+    // `answered: false` — nothing was sent, so this is not the API's word. It is the code the
+    // server answers a real 404 with, and `useSelectedTrip` tells «no such trip» from «could not
+    // ask» by exactly that flag; the default `true` would have made this refusal final (З-5).
+    if (!path.success) throw new ApiError(ERROR.NOT_FOUND, 'itemId', false)
     return `/verdicts/${path.data.itemId}`
   }
 
@@ -235,6 +245,14 @@ export function createClient(options: ClientOptions): MolviaClient {
     },
 
     currentTrip: async () => (await request('/trips/current', currentTripResponseSchema)).trip,
+    trip: (id) => request(`/trips/${segment(id.toLowerCase())}`, tripViewCodec),
+    tripHistory: (cursor) =>
+      request(
+        cursor
+          ? `/trips/history?${new URLSearchParams({ before: cursor.at, beforeId: cursor.id })}`
+          : '/trips/history',
+        tripHistoryCodec,
+      ),
 
     addExpense: async (tripId, body) => {
       const { status, data } = await exchange(`/trips/${segment(tripId)}/expenses`, tripViewCodec, {
@@ -262,8 +280,13 @@ export function createClient(options: ClientOptions): MolviaClient {
       }),
 
     // 204 has no body, and nothing else is a success here.
-    finishTrip: async (tripId) => {
-      await request(`/trips/${segment(tripId)}/finish`, z.undefined(), { method: 'POST' })
+    finishTrip: async (tripId, finishedOnDeviceAt) => {
+      await request(`/trips/${segment(tripId)}/finish`, z.undefined(), {
+        method: 'POST',
+        ...(finishedOnDeviceAt
+          ? { body: encode(finishTripBodySchema, { finishedOnDeviceAt }) }
+          : {}),
+      })
     },
     rateItem: async (itemId, rating) => {
       const { status, data } = await exchange(verdictPath(itemId), verdictCardCodec, {

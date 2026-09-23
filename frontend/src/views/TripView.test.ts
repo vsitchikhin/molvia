@@ -439,14 +439,95 @@ describe('TripView', () => {
     })
 
     it('поход открыт в другом магазине — экран называет оба и предлагает выбор', async () => {
+      // A real conflict, not a planted `elsewhere`: the answer is checked by what the queue
+      // does with it, so a change inside the store cannot leave the screen silently broken.
+      const open = trip([], { id: 'bbbbbbbb-0000-4000-8000-000000000031' })
       currentTrip.mockResolvedValue(null)
+      startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_OPEN, undefined, true))
       const { view, queue } = await render()
-      queue.elsewhere = { tripId: TRIP, place: 'SAS', mine: 'Ереван Сити' }
+      currentTrip.mockResolvedValue({ ...open, place: { ...open.place, name: 'SAS' } })
+      queue.enqueue({
+        kind: 'start',
+        tripId: 'bbbbbbbb-0000-4000-8000-000000000032',
+        place: { kind: 'store', name: 'Ереван Сити' },
+        startedAt: new Date(),
+      })
       await flushPromises()
 
       expect(view.text()).toContain('Уже открыт поход в «SAS»')
-      expect(button(view, ru.trip.elsewhere.join).exists()).toBe(true)
-      await button(view, ru.trip.elsewhere.finish).trigger('click')
+      // The shops differ, so moving the purchases across is said in words (Р-2, З-4).
+      expect(view.text()).toContain('цены одного магазина нельзя записывать другому')
+      await button(view, ru.trip.elsewhere.choose).trigger('click')
+      await flushPromises()
+      clock += 1000
+      const sheet = document.body.querySelector('dialog[open]')
+      expect(sheet?.textContent).toContain('запишутся магазину «SAS»')
+      inside(sheet, ru.trip.elsewhere.finish).click()
+      await flushPromises()
+
+      expect(queue.elsewhere).toBeNull()
+      expect(queue.pending.some((write) => write.kind === 'finish')).toBe(true)
+    })
+
+    it('в том же магазине ничего не говорит про перенос цен в чужой', async () => {
+      const open = trip([], { id: 'bbbbbbbb-0000-4000-8000-000000000035' })
+      currentTrip.mockResolvedValue(null)
+      startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_OPEN, undefined, true))
+      const { view, queue } = await render()
+      currentTrip.mockResolvedValue(open)
+      queue.enqueue({
+        kind: 'start',
+        tripId: 'bbbbbbbb-0000-4000-8000-000000000036',
+        place: { kind: 'store', name: open.place.name },
+        startedAt: new Date(),
+      })
+      await flushPromises()
+
+      expect(view.text()).toContain(`Уже открыт поход в «${open.place.name}»`)
+      expect(view.text()).not.toContain('цены одного магазина нельзя записывать другому')
+    })
+
+    it('тот же магазин, написанный иначе, — тоже тот же', async () => {
+      // Сервер сводит места через `placeIdentity`; экран обязан отвечать так же, иначе он
+      // обещает порчу данных, которой не будет (В3).
+      currentTrip.mockResolvedValue(null)
+      const { view, queue } = await render()
+      const body = (view.vm as unknown as { elsewhereBody: (a: unknown) => string }).elsewhereBody
+      const warning = 'цены одного магазина нельзя записывать другому'
+
+      expect(body({ tripId: TRIP, place: 'Ереван Сити ', mine: 'ереван сити' })).not.toContain(
+        warning,
+      )
+      // А два пробела внутри имени сервер как раз не схлопывает: это разные места.
+      expect(body({ tripId: TRIP, place: 'Ереван  Сити', mine: 'Ереван Сити' })).toContain(warning)
+      expect(body({ tripId: TRIP, place: 'SAS', mine: 'Ереван Сити' })).toContain(warning)
+      expect(queue.elsewhere).toBeNull()
+    })
+
+    it('тот же вопрос, заданный заново, не теряет ответ из уже открытой шторки', async () => {
+      const open = trip([], { id: 'bbbbbbbb-0000-4000-8000-000000000033' })
+      currentTrip.mockResolvedValue(null)
+      startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_OPEN, undefined, true))
+      const { view, queue } = await render()
+      currentTrip.mockResolvedValue({ ...open, place: { ...open.place, name: 'SAS' } })
+      queue.enqueue({
+        kind: 'start',
+        tripId: 'bbbbbbbb-0000-4000-8000-000000000034',
+        place: { kind: 'store', name: 'Ереван Сити' },
+        startedAt: new Date(),
+      })
+      await flushPromises()
+      await button(view, ru.trip.elsewhere.choose).trigger('click')
+      await flushPromises()
+
+      // The phone went into a pocket and came back: `useReconnect` sends `flush()` again, and
+      // the same question is asked with a new object behind it (А3).
+      await queue.flush()
+      await flushPromises()
+      clock += 1000
+      inside(document.body.querySelector('dialog[open]'), ru.trip.elsewhere.join).click()
+      await flushPromises()
+
       expect(queue.elsewhere).toBeNull()
     })
   })

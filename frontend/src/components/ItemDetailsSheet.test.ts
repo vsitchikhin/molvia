@@ -11,11 +11,13 @@ import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useTripStore } from '@/stores/trip'
+import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
 // Every write fails as a dropped connection would, so what the sheet queued stays to be read.
 const offline = vi.hoisted(() => () => Promise.reject(new Error('Failed to fetch')))
 const currentTrip = vi.hoisted(() => vi.fn<() => Promise<unknown>>())
+const readTrip = vi.hoisted(() => vi.fn<(id: string) => Promise<unknown>>())
 vi.mock('@/api', async () => {
   const { ApiError } = await import('@molvia/client')
   const { ERROR } = await import('@molvia/model')
@@ -24,7 +26,13 @@ vi.mock('@/api', async () => {
       throw new ApiError(ERROR.INTERNAL, String(error))
     })
   return {
-    api: { addExpense: fail, updateExpense: fail, removeExpense: fail, currentTrip },
+    api: {
+      addExpense: fail,
+      updateExpense: fail,
+      removeExpense: fail,
+      currentTrip,
+      trip: (id: string) => readTrip(id),
+    },
   }
 })
 
@@ -77,6 +85,8 @@ beforeEach(() => {
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
   currentTrip.mockReset()
   currentTrip.mockResolvedValue(null)
+  readTrip.mockReset()
+  readTrip.mockRejectedValue(new Error('Failed to fetch'))
 })
 
 afterEach(() => {
@@ -94,6 +104,14 @@ interface Options {
   /** What `GET /trips/current` answers; the trip in memory unless said otherwise. */
   readonly server?: TripView | null | 'down'
   readonly locale?: 'ru' | 'en'
+  readonly selected?: TripView
+}
+
+async function router() {
+  const made = createRouter({ history: createMemoryHistory(), routes })
+  await made.push('/')
+  await made.push('/trip/add')
+  return made
 }
 
 async function render(options: Options = {}) {
@@ -105,20 +123,19 @@ async function render(options: Options = {}) {
     const memory = options.trip === undefined ? trip() : options.trip
     currentTrip.mockResolvedValue(options.server === undefined ? memory : options.server)
   }
-  const router = createRouter({ history: createMemoryHistory(), routes })
-  await router.push('/')
-  await router.push('/trip/add')
-  const go = vi.spyOn(router, 'go')
+  const made = await router()
+  const go = vi.spyOn(made, 'go')
 
   const view = mount(ItemDetailsSheet, {
     props: {
+      ...(options.selected ? { tripId: options.selected.id, tripContext: options.selected } : {}),
       entry: options.entry ?? milk,
       query: options.query ?? null,
       expense: options.expense ?? null,
       closeSteps: options.closeSteps ?? 1,
     },
     attachTo: document.body,
-    global: { plugins: [router, pinia, createAppI18n(options.locale ?? 'ru')] },
+    global: { plugins: [made, pinia, createAppI18n(options.locale ?? 'ru')] },
   })
   // Past the moment the sheet rises: until then it takes no tap at all.
   clock += 1000
@@ -151,6 +168,25 @@ const perUnit = (view: VueWrapper) =>
     .replace(/[\s\u00a0\u202f]/g, '')
 
 describe('ItemDetailsSheet', () => {
+  it('uses the selected completed trip currency and rate, never the active trip', async () => {
+    const selected = {
+      ...trip('400'),
+      id: 'bbbbbbbb-0000-4000-8000-000000000009',
+      finishedAt: new Date('2026-09-19T09:00:00Z'),
+    }
+    const active = { ...trip(), currency: 'EUR' as const }
+    const { view, queue } = await render({ trip: active, selected })
+    await type(view, 'quantity', '1')
+    await type(view, 'amount', '800')
+    expect(perUnit(view)).toBe('800,00֏/л')
+    expect(view.text().replace(/\s/g, ' ')).toContain('≈ 2 ₽')
+    await button(view, 'Добавить в поход').trigger('click')
+    const write = queue.pending.find((row) => row.kind === 'add')
+    expect(write?.tripId).toBe(selected.id)
+    expect(write?.body.amount?.currency).toBe('AMD')
+    expect(useTripStore().current?.id).toBe(TRIP)
+  })
+
   it('opens on the item, with nothing to show per unit yet', async () => {
     const { view } = await render()
     expect(view.get('dialog').element.open).toBe(true)
@@ -271,6 +307,37 @@ describe('ItemDetailsSheet', () => {
     await vi.waitFor(() => {
       expect(view.text()).toContain('Сначала начните поход')
     })
+  })
+
+  it('asks about the current trip when a refusal being corrected names an older one', async () => {
+    // «Исправить» on «Поход» carries the trip that refused the purchase, and that trip is not
+    // the one going on. Asked through the history, the sheet put the selected trip out and
+    // skipped the very check the branch exists for (А5). Only a screen handing the sheet a trip
+    // of its own — the finished one — reads through the history.
+    const older = 'bbbbbbbb-0000-4000-8000-000000000099'
+    const history = useTripHistoryStore()
+    history.selected = { ...trip(), id: TRIP, finishedAt: new Date('2026-09-19T09:00:00.000Z') }
+    const view = mount(ItemDetailsSheet, {
+      props: {
+        entry: milk,
+        tripId: older,
+        retry: {
+          id: 'eeeeeeee-0000-4000-8000-000000000001',
+          quantity: null,
+          amount: null,
+          query: null,
+        },
+        closeSteps: 1,
+      },
+      attachTo: document.body,
+      global: { plugins: [await router(), pinia, createAppI18n('ru')] },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 5))
+
+    expect(currentTrip).toHaveBeenCalledTimes(1)
+    expect(readTrip).not.toHaveBeenCalled()
+    expect(history.selected.id).toBe(TRIP)
+    view.unmount()
   })
 
   it('keeps the trip it remembers when the server cannot be asked', async () => {

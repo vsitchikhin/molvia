@@ -22,6 +22,7 @@ import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
 import { isIdentifier } from '@/stores/identity'
 import { read, writeEverywhere } from '@/stores/storage'
+import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripStore } from '@/stores/trip'
 
 /**
@@ -41,7 +42,7 @@ export type QueuedWrite =
        */
       readonly startedAt: Date
     }
-  | { readonly kind: 'finish'; readonly tripId: string }
+  | { readonly kind: 'finish'; readonly tripId: string; readonly finishedOnDeviceAt?: Date }
   | {
       readonly kind: 'add'
       readonly tripId: string
@@ -138,7 +139,12 @@ function encode(entry: QueuedWrite): Loose {
         startedAt: entry.startedAt.toISOString(),
       }
     case 'finish':
-      return { ...entry }
+      return {
+        ...entry,
+        ...(entry.finishedOnDeviceAt
+          ? { finishedOnDeviceAt: entry.finishedOnDeviceAt.toISOString() }
+          : {}),
+      }
     case 'add':
       return {
         kind: 'add',
@@ -171,7 +177,11 @@ function decode(raw: unknown): QueuedWrite | null {
     if (!body.success || startedAt === null || Number.isNaN(startedAt.getTime())) return null
     return { kind, tripId, place: body.data.place, startedAt }
   }
-  if (kind === 'finish') return { kind, tripId }
+  if (kind === 'finish') {
+    if (raw.finishedOnDeviceAt === undefined) return { kind, tripId }
+    const at = typeof raw.finishedOnDeviceAt === 'string' ? new Date(raw.finishedOnDeviceAt) : null
+    return at && Number.isFinite(at.getTime()) ? { kind, tripId, finishedOnDeviceAt: at } : null
+  }
   if (kind === 'add') {
     const body = addExpenseBodySchema.safeParse(knownFields(raw.body, BODY_FIELDS))
     return body.success ? { kind, tripId, body: body.data, entry: cardOf(raw.entry) } : null
@@ -284,7 +294,7 @@ function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
     case 'start':
       return api.startTrip({ id: entry.tripId, place: entry.place }).then(({ trip }) => trip)
     case 'finish':
-      return api.finishTrip(entry.tripId).then(() => null)
+      return api.finishTrip(entry.tripId, entry.finishedOnDeviceAt).then(() => null)
     case 'add':
       return written
         ? api.updateExpense(entry.tripId, entry.body.id, {
@@ -343,18 +353,6 @@ function sameWrite(a: QueuedWrite, b: QueuedWrite): boolean {
   return a.kind === b.kind && a.tripId === b.tripId && subject(a) === subject(b)
 }
 
-/**
- * Whether two shop names are the same shop, as nearly as the phone can tell: the server decides
- * this with `placeIdentity` in SQL — NFKC, emoji selectors dropped, lower case, trimmed — and the
- * phone repeats what it can of it (Т-6). A name that differs only by something this misses asks
- * the person a needless question; a name that differs in earnest never passes silently, and that
- * is the side to err on (Б1).
- */
-function samePlace(a: string, b: string): boolean {
-  const plain = (name: string) => name.normalize('NFKC').toLowerCase().replace(/\s+/gu, ' ').trim()
-  return plain(a) === plain(b)
-}
-
 /** Runs `work` alone across every window of the app where the browser can say so. */
 function exclusively(name: string, work: () => Promise<void>): Promise<void> {
   // The DOM types promise `navigator.locks`; older WebViews do not have it (see stores/actor.ts).
@@ -391,14 +389,16 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   let kept: Kept[] = []
   const pending = ref<QueuedWrite[]>([])
   const rejected = ref<RejectedWrite[]>([])
-  /** Set when a trip started here met one open in another shop; cleared as soon as it is not so. */
+  /** Every conflicting start waits for a choice, including the same shop. */
   const elsewhere = ref<TripElsewhere | null>(null)
-  /**
-   * The trip the person agreed to write into, by its identifier — never a bare «yes» (Т-1): a
-   * reroute that did not happen (the connection went, that trip was closed) would otherwise leave
-   * the agreement standing, and the next trip started anywhere would move into a third shop.
-   */
-  let yielded: string | null = null
+  let conflict: { owner: string; key: string; tripId: string } | null = null
+  let decision: {
+    owner: string
+    key: string
+    tripId: string
+    kind: 'join' | 'finish'
+    at: Date
+  } | null = null
   // A shelf refused the last write: until every shelf takes one, memory is ahead of storage and
   // is the truth — one refusing shelf still answers `read` with what it held before (Б3).
   let ahead = false
@@ -449,6 +449,9 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   }
 
   function load(id: string | null): void {
+    elsewhere.value = null
+    conflict = null
+    decision = null
     ahead = false
     kept = []
     rejected.value = []
@@ -528,6 +531,11 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       const head = kept.find((item) => !orphaned(item.write.tripId))
       if (!head) break
 
+      // A choice is checked against a fresh read while holding the queue's cross-window lock.
+      if (head.write.kind === 'start' && decision) {
+        if (!(await rerouted(owner, { key: head.key, write: head.write }))) return
+        continue
+      }
       let refusal: WireCode | null = null
       let answered: TripView | null = null
       inFlight = head.write
@@ -565,7 +573,10 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       // «Завершить» answers `204`, so there is nothing to apply: the trip the person closed stops
       // being the one they are on here, without waiting for a connection to say so again. Only on
       // success — a refused finish did not close anything (adversarial, second pass).
-      if (!refusal && head.write.kind === 'finish') trips.closed(head.write.tripId)
+      if (!refusal && head.write.kind === 'finish') {
+        trips.closed(head.write.tripId)
+        void useTripHistoryStore().completed(head.write.tripId)
+      }
       sync(owner)
       // Corrected while it was out: the correction is in the queue under its own key, and what
       // came back is about a body nobody holds any more. Neither refusal nor answer is news about
@@ -574,6 +585,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         (item) => item.key !== head.key && sameWrite(item.write, head.write),
       )
       if (refusal && !superseded) {
+        if (head.write.kind === 'finish') useTripHistoryStore().forgetLocal(head.write.tripId)
         console.warn(`[trip queue] ${head.write.kind} refused: ${refusal}`)
         rejected.value = [...rejected.value, { key: newKey(), write: head.write, code: refusal }]
       }
@@ -604,7 +616,11 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       }
       // A start the server has taken answers the question about a trip open elsewhere: there is
       // nothing left to choose (раунд 2, Г3; Ч-1).
-      if (write.kind === 'start') elsewhere.value = null
+      if (write.kind === 'start') {
+        elsewhere.value = null
+        conflict = null
+        decision = null
+      }
       persist(owner)
 
       // A trip the server would not take leaves its purchases naming a trip that does not exist:
@@ -616,19 +632,8 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   }
 
   /**
-   * A trip started with no signal met one the server already has open (MOL-22, Р-1). The person
-   * was writing purchases at a shelf, not asking for a second trip, so the purchases behind this
-   * start move into the open trip instead of failing one by one with `404`.
-   *
-   * **Only into a trip in the same shop** (adversarial Б1, owner's decision). «Item + place» is
-   * the key the whole product rests on: a price seen in «Ереван Сити» written against a trip
-   * somebody left open in «SAS» is not a cheaper shop, it is a wrong fact that nothing later can
-   * tell apart. A trip open somewhere else is a question for the person — until they answer it
-   * the queue holds, and the screen says so.
-   *
-   * `false` means the queue stopped: the open trip could not be read, is in another shop, or
-   * there is none — and dropping the start now would leave every purchase pointing at a trip that
-   * does not exist.
+   * A conflicting start keeps its purchases until the person chooses. Approval names the owner,
+   * the exact queued start and the open trip; a new answer requires a new choice (MOL-25).
    */
   async function rerouted(
     owner: string,
@@ -646,20 +651,49 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     // Nothing open any more — it was finished while this start waited, and the start itself is
     // good again: sent at once rather than after a wait nothing depends on (Т-7). A question that
     // was on screen about that trip is answered by its disappearance (Т-2).
+    if (!kept.some((item) => item.key === head.key)) {
+      decision = null
+      conflict = null
+      elsewhere.value = null
+      return true
+    }
     if (!open) {
+      decision = null
+      conflict = null
       elsewhere.value = null
       return true
     }
 
-    if (!samePlace(head.write.place.name, open.place.name) && yielded !== open.id) {
+    const chosen = decision
+    if (chosen?.owner !== owner || chosen.key !== head.key || chosen.tripId !== open.id) {
+      decision = null
+      conflict = { owner, key: head.key, tripId: open.id }
       elsewhere.value = { tripId: open.id, place: open.place.name, mine: head.write.place.name }
-      // No timer while a question is on screen (Т-7): nothing changes until the person answers,
-      // and asking the server every fifteen seconds only spends their battery.
       clearTimeout(retry)
       return false
     }
-    yielded = null
+    decision = null
+    conflict = null
     elsewhere.value = null
+    if (chosen.kind === 'finish') {
+      useTripHistoryStore().capture(
+        open.id,
+        open.place.name,
+        open.startedAt,
+        chosen.at,
+        open.currency,
+        open,
+      )
+      kept = [
+        {
+          key: newKey(),
+          write: { kind: 'finish', tripId: open.id, finishedOnDeviceAt: chosen.at },
+        },
+        ...kept,
+      ]
+      persist(owner)
+      return true
+    }
 
     trips.apply(open)
     const from = head.write.tripId
@@ -670,6 +704,19 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
           ? []
           : [{ key: item.key, write: { ...item.write, tripId: open.id } }],
     )
+    const history = useTripHistoryStore()
+    const completion = history.local.find((row) => row.id === from)
+    if (completion) {
+      history.capture(
+        open.id,
+        open.place.name,
+        open.startedAt,
+        completion.completedAt,
+        open.currency,
+        open,
+      )
+      history.forgetLocal(from)
+    }
     persist(owner)
     return true
   }
@@ -686,6 +733,27 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function enqueue(entry: QueuedWrite): void {
     const id = actor.id
     sync(id)
+    if (entry.kind === 'finish') {
+      const earlier = kept.find((item) => sameWrite(item.write, entry))?.write
+      if (earlier?.kind === 'finish' && earlier.finishedOnDeviceAt) {
+        entry = { ...entry, finishedOnDeviceAt: earlier.finishedOnDeviceAt }
+      }
+      const at = entry.finishedOnDeviceAt ?? new Date()
+      const start = kept.find(
+        (item) => item.write.kind === 'start' && item.write.tripId === entry.tripId,
+      )?.write
+      const trip = trips.current?.id === entry.tripId ? trips.current : null
+      if (trip || start?.kind === 'start') {
+        useTripHistoryStore().capture(
+          entry.tripId,
+          trip?.place.name ?? (start?.kind === 'start' ? start.place.name : ''),
+          trip?.startedAt ?? (start?.kind === 'start' ? start.startedAt : at),
+          at,
+          trip?.currency ?? actor.actor?.spendCurrency ?? null,
+          trip,
+        )
+      }
+    }
     const replaceable = entry.kind !== 'update' && entry.kind !== 'remove'
     const at = replaceable ? kept.findIndex((item) => sameWrite(item.write, entry)) : -1
     if (at === -1) {
@@ -714,6 +782,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     // exist, and left behind they would wait for ever with nothing on screen about them (раунд 5,
     // З1). The screen says so before it asks.
     if (item.write.kind === 'start') {
+      useTripHistoryStore().forgetLocal(item.write.tripId)
       kept = kept.filter((entry) => entry.write.tripId !== item.write.tripId)
     }
     persist(id)
@@ -724,26 +793,32 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
    * holds open, wherever it is. Only the person can say this — the queue itself refuses to move a
    * price into another shop (Б1).
    */
-  function joinElsewhere(): void {
-    yielded = elsewhere.value?.tripId ?? null
+  function choose(kind: 'join' | 'finish', expected?: TripElsewhere): void {
+    // The same question about the same trip is the same question, even though `rerouted` built
+    // a new object for it: `flush()` runs by itself — `useReconnect` sends it on `online` and
+    // when the app comes back into view — so a phone in a pocket re-asked between the sheet
+    // opening and the tap, and the answer was dropped while the sheet reported it taken (А3).
+    const asked = elsewhere.value
+    if (
+      expected &&
+      (expected.tripId !== asked?.tripId ||
+        expected.place !== asked.place ||
+        expected.mine !== asked.mine)
+    ) {
+      return
+    }
+    if (actor.id !== conflict?.owner || elsewhere.value?.tripId !== conflict.tripId) return
+    decision = { ...conflict, kind, at: new Date() }
     elsewhere.value = null
     void flush()
   }
 
-  /**
-   * «Сначала завершить тот»: the open trip is closed, and the trip started here goes out after
-   * it. The finish jumps the queue — everything waiting names a trip the server will only accept
-   * once the other one is over.
-   */
-  function finishElsewhere(): void {
-    const id = actor.id
-    const open = elsewhere.value
-    if (!open) return
-    sync(id)
-    kept = [{ key: newKey(), write: { kind: 'finish', tripId: open.tripId } }, ...kept]
-    elsewhere.value = null
-    persist(id)
-    void flush()
+  function joinElsewhere(expected?: TripElsewhere): void {
+    choose('join', expected)
+  }
+
+  function finishElsewhere(expected?: TripElsewhere): void {
+    choose('finish', expected)
   }
 
   /**
@@ -803,7 +878,8 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
    */
   function alreadyWritten(write: QueuedWrite): boolean {
     if (write.kind !== 'add') return false
-    const trip = trips.current
+    const trip =
+      trips.current?.id === write.tripId ? trips.current : useTripHistoryStore().known(write.tripId)
     if (trip?.id !== write.tripId) return false
     return trip.expenses.some((row) => row.id === write.body.id)
   }

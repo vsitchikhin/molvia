@@ -21,7 +21,7 @@ import { advice } from '@/usecases/advice'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { completeLogin } from '@/usecases/complete-login'
-import { currentTrip } from '@/usecases/current-trip'
+import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
 import { recentPlaces } from '@/usecases/recent-places'
 import { rateItem } from '@/usecases/rate-item'
@@ -279,11 +279,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       tripRoutes(guarded, {
         start: (actor, body) => startTrip(transact, actor, body),
         current: (actorId) => currentTrip(tripData, actorId),
+        selected: (actorId, id) => selectedTrip(tripData, actorId, id),
+        history: (actorId, cursor) => tripData.trips.history(actorId, cursor),
         add: (actorId, tripId, body) => addExpense(transact, actorId, tripId, body),
         update: (actorId, tripId, expenseId, patch) =>
           updateExpense(transact, actorId, tripId, expenseId, patch),
         remove: (actorId, tripId, expenseId) => removeExpense(transact, actorId, tripId, expenseId),
-        finish: (actorId, tripId) => finishTrip(tripData.trips, actorId, tripId),
+        finish: (actorId, tripId, deviceAt) =>
+          finishTrip(tripData.trips, actorId, tripId, deviceAt),
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
       })
       adviceRoutes(guarded, {
