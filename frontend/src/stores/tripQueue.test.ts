@@ -190,6 +190,24 @@ describe('trip queue', () => {
     expect(queue.pending).toEqual([])
   })
 
+  it('keeps the question while its start waits, through another window and through a purchase', async () => {
+    startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_CONTEXT_REQUIRED, 'context unusable'))
+    const stale = { ...here, country: 'GE', city: 'Тбилиси' } as const
+    const queue = fresh()
+    queue.enqueue(started(TRIP, 'Ереван Сити', stale))
+    await queue.flush()
+    expect(queue.needsContext).toBe(TRIP)
+
+    // Another window of the same app writes the queue; and the person, with no signal, puts a
+    // purchase in. Both go through `sync`, and neither is an answer to the question.
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-queue.${ME}` }))
+    expect(queue.needsContext).toBe(TRIP)
+    queue.enqueue(add(MILK))
+    await queue.flush()
+    expect(queue.needsContext).toBe(TRIP)
+    expect(queue.pending).toHaveLength(2)
+  })
+
   it('holds a legacy start and its purchases until the person supplies context', async () => {
     startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_CONTEXT_REQUIRED, 'context required'))
     const queue = fresh()

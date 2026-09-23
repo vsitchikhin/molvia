@@ -2,7 +2,9 @@
   <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
     <template #title>{{ t('settings.legacy.title') }}</template>
     <p>{{ t('settings.legacy.body') }}</p>
-    <SettingsFields v-if="draft" v-model="draft" />
+    <!-- Keyed by the opening: the sheet stays in the tree, and a form that stayed with it
+         would offer the city of the previous visit (MOL-65, review 3). -->
+    <SettingsFields v-if="draft" :key="opening" v-model="draft" />
     <p v-else>{{ t('settings.context_missing') }}</p>
     <template #footer
       ><AppButton size="large" block :inactive="!valid" @click="confirm">{{

@@ -443,11 +443,13 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
 
   function show(): void {
     pending.value = kept.map((item) => item.write)
+    // The question stands while its start does — whether or not that start carries a context:
+    // one that is there and unusable waits for the same answer (MOL-65, review 3). The third
+    // copy of this condition was left behind and put the banner out on any `sync`, which is
+    // every purchase made at the shelf with no signal.
     if (
       needsContext.value &&
-      !pending.value.some(
-        (write) => write.kind === 'start' && write.tripId === needsContext.value && !write.context,
-      )
+      !pending.value.some((write) => write.kind === 'start' && write.tripId === needsContext.value)
     )
       needsContext.value = null
   }

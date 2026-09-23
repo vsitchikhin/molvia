@@ -67,7 +67,7 @@
   </fieldset>
 </template>
 <script lang="ts">
-import { computed, defineComponent, ref, useId, watch } from 'vue'
+import { computed, defineComponent, useId } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { actorSettingsSchema, currencySchema, SETTINGS_CITIES } from '@molvia/model'
@@ -99,18 +99,13 @@ export default defineComponent({
      * (adversarial Б1). Its option used to vanish on the first change, and nothing but
      * «Отменить» brought it back.
      */
-    const opened = ref({ country: props.modelValue.country, city: props.modelValue.city })
-    // Without a base the fields live inside a sheet that stays in the tree between openings,
-    // so the origin follows a model handed to it afresh — otherwise the second opening offers
-    // the city of the first (MOL-65, review 2).
-    watch(
-      () => props.modelValue,
-      (value) => {
-        if (!props.base && !cities.includes(value.city))
-          opened.value = { country: value.country, city: value.city }
-      },
-    )
-    const origin = computed(() => props.base ?? opened.value)
+    // Read once: with no base the form is the one it was mounted with. The sheet that has no
+    // base mounts these fields afresh at every opening (`TripContextSheet`), which is what
+    // keeps this honest — a watcher trying to follow the model instead let a city the person
+    // had left behind stand in the list, and it was the one city the server would refuse
+    // (MOL-65, review 3, Ж2).
+    const opened = { country: props.modelValue.country, city: props.modelValue.city }
+    const origin = computed(() => props.base ?? opened)
     const historical = computed(() => (cities.includes(origin.value.city) ? null : origin.value))
     const cityOptions = computed(() =>
       (historical.value ? [historical.value.city, ...cities] : cities).map((city) => ({

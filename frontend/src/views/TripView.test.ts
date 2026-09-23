@@ -509,6 +509,40 @@ describe('TripView', () => {
       expect(queue.pending.filter((write) => write.kind === 'start')).toHaveLength(1)
     })
 
+    it('Ж2: второе открытие показывает нынешний город, а не город первого', async () => {
+      // Город вне списка виден в шторке, потому что человек мог покупать именно там. Но стоит
+      // настройкам переехать — предлагать его дальше значит предлагать единственный город,
+      // который сервер откажется принять.
+      const { view } = await held()
+      const whereAt = (city: string, country: string, day: string) => ({
+        id: ME,
+        country,
+        city,
+        spendCurrency: 'AMD' as const,
+        incomeCurrency: 'RUB' as const,
+        createdAt: new Date('2026-09-01T00:00:00.000Z'),
+        updatedAt: new Date(day),
+      })
+      useActorStore().apply(whereAt('Тбилиси', 'GE', '2026-09-22T00:00:00.000Z'))
+      await flushPromises()
+      clock += 1000
+      await button(view, ru.settings.legacy.action).trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('dialog[open]')?.textContent).toContain('Тбилиси')
+
+      // Шторка закрыта, настройки переехали, шторка открыта снова.
+      await view.findComponent({ name: 'TripContextSheet' }).vm.$emit('update:open', false)
+      await flushPromises()
+      useActorStore().apply(whereAt('Гюмри', 'AM', '2026-09-23T00:00:00.000Z'))
+      await flushPromises()
+      clock += 1000
+      await button(view, ru.settings.legacy.action).trigger('click')
+      await flushPromises()
+      const sheet = document.body.querySelector('dialog[open]')
+      expect(sheet?.textContent).not.toContain('Тбилиси')
+      expect(sheet?.textContent).toContain('Гюмри')
+    })
+
     it('без подтверждённых настроек шторка не отправляет ничего', async () => {
       const { view, queue } = await held(false)
       expect(useActorStore().settings).toBeNull()
