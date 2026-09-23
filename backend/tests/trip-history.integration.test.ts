@@ -118,7 +118,16 @@ describe('history of completed trips', () => {
       actorId: actor,
       placeId: await insertPlace(db, { name: `History ${randomUUID()}` }),
     })
-    for (const time of ['tomorrow', '2026-02-31T00:00:00Z', '0000-01-01T00:00:00Z', 42]) {
+    // `0001-01-01` is stored faithfully and handed back by the driver as `2001-01-01`: the card
+    // would print one year and the pagination sort by another, two thousand apart (Б1).
+    for (const time of [
+      'tomorrow',
+      '2026-02-31T00:00:00Z',
+      '0000-01-01T00:00:00Z',
+      '0001-01-01T00:00:00.000Z',
+      '1970-01-01T00:00:00.000Z',
+      42,
+    ]) {
       expect(
         (
           await app.inject({
@@ -135,5 +144,80 @@ describe('history of completed trips', () => {
         .statusCode,
     ).toBe(400)
     expect((await createTripRepository(db).byId(id, actor))?.finishedAt).toBeNull()
+  })
+
+  it('walks the history in index order instead of sorting every trip of the owner', async () => {
+    // A handful of rows is cheaper to sort than to walk, so sorting and sequential scans are
+    // taken away from the planner: what is being pinned is that the index can serve this exact
+    // order at all. Without it every page sorts all of the owner's trips again (Б2).
+    const actor = await insertActor(db)
+    const place = await insertPlace(db, { name: `History ${randomUUID()}` })
+    for (let i = 0; i < 3; i += 1) {
+      await insertTrip(db, {
+        actorId: actor,
+        placeId: place,
+        startedAt: new Date(`2026-01-0${String(i + 1)}`),
+        finishedAt: new Date(`2026-01-0${String(i + 2)}`),
+      })
+    }
+    const plan = await db.transaction(async (tx) => {
+      await tx.execute(sql`set local enable_seqscan = off`)
+      await tx.execute(sql`set local enable_sort = off`)
+      const rows = await tx.execute(sql`
+        explain (costs off)
+        select id from trips
+        where actor_id = ${actor} and finished_at is not null
+        order by coalesce(finished_on_device_at, finished_at) desc, id desc
+        limit 21`)
+      return (rows as unknown as { 'QUERY PLAN': string }[])
+        .map((row) => row['QUERY PLAN'])
+        .join('\n')
+    })
+    expect(plan).toContain('trips_actor_finished_idx')
+    expect(plan).not.toContain('Sort')
+  })
+
+  it('drops a device time from the future instead of refusing to finish the trip', async () => {
+    // The queue never retries a refusal, so a phone whose clock runs ahead would be left with a
+    // trip it could never close. The trip is finished by the server's clock instead (Б1).
+    const actor = await insertActor(db)
+    const cookie = await signIn(db, actor)
+    const id = await insertTrip(db, {
+      actorId: actor,
+      placeId: await insertPlace(db, { name: `History ${randomUUID()}` }),
+    })
+    const answer = await app.inject({
+      method: 'POST',
+      url: `/trips/${id}/finish`,
+      headers: { cookie },
+      payload: { finishedOnDeviceAt: '9999-12-31T23:59:59.999Z' },
+    })
+    expect(answer.statusCode).toBe(204)
+    const trip = await createTripRepository(db).byId(id, actor)
+    expect(trip?.finishedOnDeviceAt).toBeNull()
+    expect(trip?.finishedAt).not.toBeNull()
+    const page = await createTripRepository(db).history(actor)
+    expect(page.trips[0]?.finishedOnDeviceAt).toBeNull()
+  })
+
+  it('believes a device an hour ahead of the server', async () => {
+    const actor = await insertActor(db)
+    const cookie = await signIn(db, actor)
+    const id = await insertTrip(db, {
+      actorId: actor,
+      placeId: await insertPlace(db, { name: `History ${randomUUID()}` }),
+    })
+    const ahead = new Date(Date.now() + 60 * 60 * 1000)
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: `/trips/${id}/finish`,
+          headers: { cookie },
+          payload: { finishedOnDeviceAt: ahead.toISOString() },
+        })
+      ).statusCode,
+    ).toBe(204)
+    expect((await createTripRepository(db).byId(id, actor))?.finishedOnDeviceAt).toEqual(ahead)
   })
 })

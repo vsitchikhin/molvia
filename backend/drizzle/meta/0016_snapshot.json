@@ -1125,6 +1125,34 @@
           "method": "btree",
           "with": {}
         },
+        "trips_actor_finished_idx": {
+          "name": "trips_actor_finished_idx",
+          "columns": [
+            {
+              "expression": "actor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "coalesce(\"finished_on_device_at\", \"finished_at\") desc",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "\"id\" desc",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"trips\".\"finished_at\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "trips_place_idx": {
           "name": "trips_place_idx",
           "columns": [

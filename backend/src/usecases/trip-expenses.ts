@@ -1,4 +1,4 @@
-import { DomainError, ERROR } from '@molvia/model'
+import { DomainError, ERROR, isDeviceTime } from '@molvia/model'
 import type { AddExpenseBody, ExpensePatch, Trip, TripView } from '@molvia/model'
 import type { TripRepository } from '@/db/trips-repository'
 import type { Transact } from '@/db/unit-of-work'
@@ -98,6 +98,11 @@ export async function finishTrip(
   tripId: string,
   deviceAt?: Date,
 ): Promise<void> {
-  const trip = await trips.finish(tripId, actorId, undefined, deviceAt)
+  // The clock is here and not in the schema, as it is for a rate (`values/rates.ts`): a schema
+  // that answers differently depending on the moment it runs is not a schema. A phone whose
+  // clock runs ahead has its time dropped rather than its «Завершить» refused — the queue never
+  // retries a refusal, and a trip nobody can close is worse than one timed by the server (Б1).
+  const believable = deviceAt && isDeviceTime(deviceAt, new Date()) ? deviceAt : undefined
+  const trip = await trips.finish(tripId, actorId, undefined, believable)
   if (!trip) throw new DomainError(ERROR.NOT_FOUND)
 }

@@ -381,6 +381,17 @@ export const trips = pgTable(
     // The list of trips, the running one, and «what is still unrated» all walk one actor
     // in time order.
     index('trips_actor_started_idx').on(table.actorId, table.startedAt),
+    // «Что брали» walks one actor's finished trips newest first, by the time the device named
+    // and the server's where there is none — the expression the history orders and pages by.
+    // Without it every page sorts all of that actor's trips again, which is exactly what the
+    // cursor exists to avoid (MOL-25, Б2). Partial, because the query always says so.
+    index('trips_actor_finished_idx')
+      .on(
+        table.actorId,
+        sql`coalesce(${table.finishedOnDeviceAt}, ${table.finishedAt}) desc`,
+        sql`${table.id} desc`,
+      )
+      .where(sql`${table.finishedAt} is not null`),
     // «Where is it cheaper» joins expenses to trips to places and filters by city: this is
     // the one foreign key of 0.1 that a product query walks, not merely a delete.
     index('trips_place_idx').on(table.placeId),

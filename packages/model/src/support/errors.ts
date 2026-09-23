@@ -85,6 +85,8 @@ export const ISSUE = {
    */
   RATE_PROVIDER_UNMATCHED: 'issue.rate_provider_unmatched',
   TRIP_FINISHED_BEFORE_START: 'issue.trip_finished_before_start',
+  /** A moment a phone named for itself that no phone could have lived through (MOL-25). */
+  DEVICE_TIME_IMPLAUSIBLE: 'issue.device_time_implausible',
   VERDICT_UPDATED_BEFORE_RATED: 'issue.verdict_updated_before_rated',
   VERDICT_PLACE_NOT_FOR_KIND: 'issue.verdict_place_not_for_kind',
 } as const

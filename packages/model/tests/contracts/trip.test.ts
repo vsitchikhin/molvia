@@ -4,6 +4,8 @@ import { CATALOGUE_QUERY_MAX } from '#model/contracts/catalogue'
 import {
   addExpenseBodySchema,
   currentTripResponseSchema,
+  finishTripBodySchema,
+  isDeviceTime,
   startTripBodySchema,
   tripViewCodec,
   tripViewOf,
@@ -13,7 +15,7 @@ import { itemSchema } from '#model/entities/item'
 import type { Item } from '#model/entities/item'
 import { placeSchema } from '#model/entities/place'
 import type { Trip } from '#model/entities/trip'
-import { DomainError } from '#model/support/errors'
+import { DomainError, ISSUE } from '#model/support/errors'
 import { parseMoney } from '#model/values/money'
 import { parseRate } from '#model/values/rates'
 import { formatUnitPrice, parseQuantity, unitPriceCodec } from '#model/values/units'
@@ -389,5 +391,37 @@ describe('С-11: an estimate that does not fit is none, not a refusal', () => {
     const view = tripViewOf(tiny, place, [huge], [bread])
     expect(view.total).toEqual([{ minor: 9_000_000_000_000_000_000n, currency: 'AMD' }])
     expect(view.converted).toBeNull()
+  })
+})
+
+describe('a moment a phone names for itself (Б1)', () => {
+  const body = (at: string) => finishTripBodySchema.safeParse({ finishedOnDeviceAt: at })
+
+  it('refuses what no phone could have lived through, and says which rule refused it', () => {
+    // `0001-01-01` is the case worth naming: Postgres stores it, and the driver hands it back
+    // as `2001-01-01` — the card would print one year and the order sort by another.
+    for (const at of ['0001-01-01T00:00:00.000Z', '1970-01-01T00:00:00.000Z']) {
+      const refusal = body(at)
+      expect(refusal.success).toBe(false)
+      expect(refusal.error?.issues[0]?.message).toBe(ISSUE.DEVICE_TIME_IMPLAUSIBLE)
+    }
+    expect(body('1999-12-31T23:59:59.999Z').success).toBe(false)
+    expect(body('2000-01-01T00:00:00.000Z').success).toBe(true)
+  })
+
+  it('leaves the future to the use case, which has a clock', () => {
+    // The floor is a rule about the calendar; «not from the future» is a rule about now, and a
+    // schema that answers differently depending on when it runs is not a schema (`rates.ts`).
+    expect(body('9999-12-31T23:59:59.999Z').success).toBe(true)
+    const now = new Date('2026-09-23T12:00:00.000Z')
+    expect(isDeviceTime(new Date('9999-12-31T23:59:59.999Z'), now)).toBe(false)
+    expect(isDeviceTime(new Date('2026-09-24T12:00:00.000Z'), now)).toBe(true)
+    expect(isDeviceTime(new Date('2026-09-24T12:00:00.001Z'), now)).toBe(false)
+    expect(isDeviceTime(new Date('1999-12-31T23:59:59.999Z'), now)).toBe(false)
+    expect(isDeviceTime(new Date('2000-01-01T00:00:00.000Z'), now)).toBe(true)
+  })
+
+  it('has nothing to say about a body that names no time at all', () => {
+    expect(finishTripBodySchema.parse({})).toEqual({})
   })
 })

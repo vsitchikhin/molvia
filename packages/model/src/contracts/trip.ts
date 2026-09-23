@@ -13,6 +13,7 @@ import {
   tripTotal,
 } from '#model/entities/trip'
 import type { Trip } from '#model/entities/trip'
+import { ISSUE } from '#model/support/errors'
 import { INT8_MAX } from '#model/support/decimal'
 import { currencySchema, moneyCodec } from '#model/values/money'
 import type { Money } from '#model/values/money'
@@ -243,9 +244,30 @@ export const rateChoiceBodySchema = z.discriminatedUnion('choice', [
 ])
 export type RateChoiceBody = z.infer<typeof rateChoiceBodySchema>
 
+/**
+ * The earliest moment a phone may claim it closed a trip. The same shape the rate cache has:
+ * a floor here, in a schema with no clock of its own, and «not from the future» in the use case
+ * that writes it (`values/rates.ts`).
+ *
+ * It is the only key the history is ordered by, so a date no phone could have produced
+ * rearranges the whole list for ever — and `0001-01-01`, which the driver hands back as
+ * `2001-01-01`, would print one year on the card and sort by another two thousand apart (Б1).
+ */
+export const DEVICE_TIME_EPOCH = new Date('2000-01-01T00:00:00.000Z')
+
+/** How far ahead of the server a phone's clock may be and still be believed. */
+export const DEVICE_TIME_AHEAD_MS = 24 * 60 * 60 * 1000
+
+/** Whether a moment a phone named is one it could plausibly have lived through. */
+export function isDeviceTime(at: Date, now: Date): boolean {
+  return at >= DEVICE_TIME_EPOCH && at.getTime() - now.getTime() <= DEVICE_TIME_AHEAD_MS
+}
+
 /** Old queued finishes have no device time; retries preserve whichever time first arrived. */
 export const finishTripBodySchema = z.strictObject({
-  finishedOnDeviceAt: isoDate.refine((at) => at.getUTCFullYear() > 0).optional(),
+  finishedOnDeviceAt: isoDate
+    .refine((at) => at >= DEVICE_TIME_EPOCH, { error: ISSUE.DEVICE_TIME_IMPLAUSIBLE })
+    .optional(),
 })
 export type FinishTripBody = z.output<typeof finishTripBodySchema>
 
