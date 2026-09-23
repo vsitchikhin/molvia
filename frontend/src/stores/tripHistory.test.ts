@@ -165,14 +165,73 @@ describe('history memory', () => {
     expect(store.local.map((row) => row.id)).toEqual([B])
   })
 
-  it('forgets a local completion the server has taken, even off the first page', async () => {
+  it('drops the snapshot of a completion the server has taken, keeping the row', async () => {
     const store = useTripHistoryStore()
     store.capture(A, 'Рынок', new Date(), new Date(), 'AMD', view(A))
     trip.mockResolvedValue(view(A))
     tripHistory.mockResolvedValue({ trips: [entry(B)], nextCursor: null })
     await store.completed(A)
+    // The heavy `TripView` goes; the row waits for a page to carry it (А6 + В1).
+    expect(store.local.map((row) => [row.id, row.view])).toEqual([[A, null]])
+    expect(restart().local.map((row) => row.id)).toEqual([A])
+  })
+
+  it('keeps a completion when the list after it never arrived', async () => {
+    const store = useTripHistoryStore()
+    store.capture(A, 'Рынок', new Date(), new Date(), 'AMD', view(A))
+    trip.mockResolvedValue(view(A))
+    tripHistory.mockRejectedValue(new Error('offline'))
+    await store.completed(A)
+    // Neither a storage event from another window nor a restart may take it away: `page.value`
+    // is rebuilt from what was written to the phone, and that is `firstPage` (В1).
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${OWNER}` }))
+    expect(store.local.map((row) => row.id)).toEqual([A])
+    expect(restart().local.map((row) => row.id)).toEqual([A])
+  })
+
+  it('drops the row once a page carries it', async () => {
+    const store = useTripHistoryStore()
+    store.capture(A, 'Рынок', new Date(), new Date(), 'AMD', view(A))
+    trip.mockResolvedValue(view(A))
+    tripHistory.mockResolvedValue({ trips: [entry(A)], nextCursor: null })
+    await store.completed(A)
     expect(store.local).toEqual([])
-    expect(restart().local).toEqual([])
+  })
+
+  it('reads the tail again when the first page has moved under it', async () => {
+    const store = useTripHistoryStore()
+    tripHistory
+      .mockResolvedValueOnce({ trips: [entry(A, '2026-09-03T10:00:00Z')], nextCursor: cursor(A) })
+      .mockResolvedValueOnce({ trips: [entry(B, '2026-09-02T10:00:00Z')], nextCursor: null })
+      // A completion arrived while the second page was being read: the first page now ends
+      // somewhere else, and the rows in between could never be reached (В-1).
+      .mockResolvedValueOnce({ trips: [entry(C, '2026-09-04T10:00:00Z')], nextCursor: cursor(C) })
+    await store.load()
+    await store.load(true)
+    await store.load()
+    expect(store.page.trips.map((row) => row.id)).toEqual([C])
+    expect(store.page.nextCursor).toEqual(cursor(C))
+  })
+
+  it('does not throw away the next page when a write reaches a finished trip', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({
+      trips: [entry(A, '2026-09-03T10:00:00Z')],
+      nextCursor: cursor(A),
+    })
+    await store.load()
+    let resolve: ((value: TripHistory) => void) | undefined
+    tripHistory.mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done
+        }),
+    )
+    const loading = store.load(true)
+    store.apply(view(C))
+    resolve?.({ trips: [entry(B, '2026-09-02T10:00:00Z')], nextCursor: null })
+    await loading
+    expect(store.page.trips.map((row) => row.id)).toContain(B)
   })
 
   it('keeps the pages already loaded when the first page is refreshed', async () => {

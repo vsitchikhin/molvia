@@ -56,6 +56,10 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   const beyond = (rows: TripHistoryEntry[], row: TripHistoryEntry): boolean =>
     !rows.some((held) => held.id === row.id)
 
+  /** Where a page ended: the same row and the same microsecond, or a different boundary. */
+  const sameCursor = (a: TripHistory['nextCursor'], b: TripHistory['nextCursor']): boolean =>
+    a === null || b === null ? a === b : a.at === b.at && a.id === b.id
+
   /** The first page, then what was loaded past it — and the deepest cursor of the two. */
   function spread(): TripHistory {
     return {
@@ -184,9 +188,15 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
       // does, the snapshot has nothing left to stand in for. Only `load()` used to drop it, and
       // only for a completion the first page still carries — one sent after twenty fresher ones
       // kept its own full `TripView` for ever (А6).
-      local.value = row
-        ? local.value.filter((held) => held.id !== trip.id)
-        : local.value.map((held) => (held.id === trip.id ? { ...held, view: trip } : held))
+      //
+      // The **row** stays until a page carries it: `apply` puts it in `page.value`, but what is
+      // written to the phone is `firstPage`, which only `load()` moves. Dropping the row here
+      // left the trip in one place that the next `restore()` or `load()` rebuilds from
+      // `spread()` — so a completion whose follow-up list was lost vanished from the phone
+      // altogether (В1).
+      local.value = local.value.map((held) =>
+        held.id === trip.id ? { ...held, view: row ? null : trip } : held,
+      )
       moved = true
     }
     if (row) {
@@ -221,7 +231,10 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     const cursor = more ? page.value.nextCursor : null
     if (more && !cursor) return
     const answer = await api.tripHistory(cursor ?? undefined)
-    if (owner !== actor.id || version !== generation) return
+    // A next page cannot be cancelled by a change somewhere else: it lies deeper than anything
+    // held, and it is merged by id. Under the shared guard a correction sent to a trip finished
+    // last week threw it away, and «Показать ещё» did nothing at all (В5).
+    if (owner !== actor.id || (!more && version !== generation)) return
     syncLocal()
     local.value = local.value.filter((held) => !answer.trips.some((row) => row.id === held.id))
     if (more) {
@@ -234,8 +247,19 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
       // is read from the top down, and a background success used to collapse it under the thumb
       // and put «Показать ещё» back. It also keeps a row the newest page pushed off the first
       // one — before, that row simply disappeared from the screen.
+      //
+      // Unless the boundary itself moved. The cursor of what was loaded past it points deeper
+      // than the new first page ends, so the rows in between could never be read: the list kept
+      // a hole and, once the tail had reached the end, claimed to be complete (В-1). Then the
+      // tail is read again from the new boundary — the data under it really did change.
+      const boundary = firstPage.nextCursor
       firstPage = answer
-      deeper = deeper.filter((row) => beyond(answer.trips, row))
+      if (deeper.length > 0 && !sameCursor(boundary, answer.nextCursor)) {
+        deeper = []
+        deepCursor = null
+      } else {
+        deeper = deeper.filter((row) => beyond(answer.trips, row))
+      }
       page.value = spread()
     }
     stale.value = false
