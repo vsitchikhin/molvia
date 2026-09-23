@@ -8,6 +8,12 @@
           {{ modelValue.country === 'AM' ? t('settings.armenia') : modelValue.country }}
         </p>
         <div>
+          <!-- A city the two of 0.1 do not carry: the person keeps it (В-4а) and is told why it
+               is there, with the whole of it readable — a native select clips it (кадр 5b). -->
+          <p v-if="historical" :id="`${id}-city-kept`" class="kept">
+            <span>{{ t('settings.city_current', { city: historical.city }) }}</span>
+            <span class="note">{{ t('settings.city_not_listed') }}</span>
+          </p>
           <AppField
             :model-value="modelValue.city"
             :label="t('settings.city')"
@@ -61,7 +67,7 @@
   </fieldset>
 </template>
 <script lang="ts">
-import { computed, defineComponent, useId } from 'vue'
+import { computed, defineComponent, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { actorSettingsSchema, currencySchema, SETTINGS_CITIES } from '@molvia/model'
@@ -93,8 +99,18 @@ export default defineComponent({
      * (adversarial Б1). Its option used to vanish on the first change, and nothing but
      * «Отменить» brought it back.
      */
-    const opened = { country: props.modelValue.country, city: props.modelValue.city }
-    const origin = computed(() => props.base ?? opened)
+    const opened = ref({ country: props.modelValue.country, city: props.modelValue.city })
+    // Without a base the fields live inside a sheet that stays in the tree between openings,
+    // so the origin follows a model handed to it afresh — otherwise the second opening offers
+    // the city of the first (MOL-65, review 2).
+    watch(
+      () => props.modelValue,
+      (value) => {
+        if (!props.base && !cities.includes(value.city))
+          opened.value = { country: value.country, city: value.city }
+      },
+    )
+    const origin = computed(() => props.base ?? opened.value)
     const historical = computed(() => (cities.includes(origin.value.city) ? null : origin.value))
     const cityOptions = computed(() =>
       (historical.value ? [historical.value.city, ...cities] : cities).map((city) => ({
@@ -122,13 +138,18 @@ export default defineComponent({
       !!props.base && props.base[field] !== props.modelValue[field]
     const id = useId()
     const describedBy = (field: keyof ActorSettings): string =>
-      [`${id}-${field}-hint`, ...(changed(field) ? [`${id}-${field}-changed`] : [])].join(' ')
+      [
+        ...(field === 'city' && historical.value ? [`${id}-city-kept`] : []),
+        `${id}-${field}-hint`,
+        ...(changed(field) ? [`${id}-${field}-changed`] : []),
+      ].join(' ')
     return {
       t,
       id,
       cityOptions,
       currencyOptions,
       currencyFields,
+      historical,
       change,
       changed,
       describedBy,
@@ -204,6 +225,21 @@ export default defineComponent({
 
   svg {
     color: inherit;
+  }
+}
+
+.kept {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: var(--text-footnote);
+  overflow-wrap: anywhere;
+
+  .note {
+    color: var(--text-muted);
   }
 }
 

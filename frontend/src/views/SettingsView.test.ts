@@ -103,6 +103,11 @@ it('preserves an unsupported saved city while allowing currency changes', async 
   expect((view.get('select').element as HTMLSelectElement).value).toBe(
     'Ванадзор, Лорийская область',
   )
+  // Д1: the whole name is readable above the field, and it says why it is in the list at all.
+  const kept = view.get('.kept')
+  expect(kept.text()).toContain('Ванадзор, Лорийская область')
+  expect(kept.text()).toContain(en.settings.city_not_listed)
+  expect(view.get('select').attributes('aria-describedby')).toContain(kept.attributes('id'))
   await view.findAll('select')[2]?.setValue('EUR')
   expect(view.get('.actions button').attributes('aria-disabled')).toBeUndefined()
 })
@@ -119,6 +124,7 @@ it('Б1: an unsupported city can be returned to, and keeps its own country', asy
     'Тбилиси',
   )
   await city.setValue('Тбилиси')
+  expect(view.find('.kept').exists()).toBe(true)
   save.mockResolvedValue(legacy)
   expect(view.get('.actions button').attributes('aria-disabled')).toBe('true')
   expect(view.find('.badge').exists()).toBe(false)

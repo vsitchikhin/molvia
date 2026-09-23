@@ -9,12 +9,14 @@ import type { ActorSettings } from '@molvia/model'
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
-import { forgetSession, readSession, writeSession } from '@/stores/storage'
+import { forget, read, writeEverywhere } from '@/stores/storage'
 
 const keyOf = (owner: string): string => `molvia.settings-draft.${owner}`
 
-// A store keeps a draft when the router unmounts the form. Each window keeps its own base:
-// another window saving must produce a conflict, never quietly rebase unsaved edits.
+// A store keeps a draft when the router unmounts the form. Each window keeps its own base **in
+// memory**: another window saving must produce a conflict, never quietly rebase unsaved edits.
+// On the device the draft belongs to the account, so the app being closed does not lose it;
+// two windows editing at once share the shelf, and the one that writes last wins there.
 const useSettingsStore = defineStore('settingsForm', () => {
   const actor = useActorStore()
   const base = ref<ActorSettings | null>(null)
@@ -48,15 +50,23 @@ const useSettingsStore = defineStore('settingsForm', () => {
    * `conflict` then means what the word says: both devices changed the same one. The place is
    * one choice and not two fields — the country travels with the city — and `base` stays equal
    * to the row for everything untouched, so the conditional `UPDATE` still matches.
+   *
+   * A choice follows the account when it was not touched **or when the edit is what the account
+   * now holds**: two devices that chose the same city are not in conflict, and a form warning
+   * about a value already saved is an alarm that means nothing (adversarial Е3).
    */
   function settled(
     was: ActorSettings,
     edited: ActorSettings,
     now: ActorSettings,
   ): { base: ActorSettings; draft: ActorSettings } {
-    const place = was.country === edited.country && was.city === edited.city
-    const spend = was.spendCurrency === edited.spendCurrency
-    const income = was.incomeCurrency === edited.incomeCurrency
+    const place =
+      (was.country === edited.country && was.city === edited.city) ||
+      (now.country === edited.country && now.city === edited.city)
+    const spend =
+      was.spendCurrency === edited.spendCurrency || now.spendCurrency === edited.spendCurrency
+    const income =
+      was.incomeCurrency === edited.incomeCurrency || now.incomeCurrency === edited.incomeCurrency
     return {
       base: {
         country: place ? now.country : was.country,
@@ -88,7 +98,7 @@ const useSettingsStore = defineStore('settingsForm', () => {
     current.value = base.value
     if (!actor.id) return
     try {
-      const raw = readSession(keyOf(actor.id))
+      const raw = read(keyOf(actor.id))
       const data = raw ? (JSON.parse(raw) as Record<string, unknown>) : null
       const parsed = settingsUpdateSchema.safeParse(
         data ? { previous: data.previous, settings: data.settings } : null,
@@ -108,11 +118,15 @@ const useSettingsStore = defineStore('settingsForm', () => {
     if (!actor.id || !base.value || !draft.value) return
     if (!dirty.value) {
       returned.value = false
-      forgetSession(keyOf(actor.id))
+      forget(keyOf(actor.id))
       stored.value = true
       return
     }
-    stored.value = writeSession(
+    // Under the account's key on the device, as the design says and as `verdictDrafts` are
+    // kept: the system closes an installed app by itself, and a draft that lived in
+    // `sessionStorage` was gone by the next launch with nothing on screen to warn of it
+    // (adversarial Е1). `stored` again means what the notice says — a shelf refused it.
+    stored.value = writeEverywhere(
       keyOf(actor.id),
       JSON.stringify({ previous: base.value, settings: draft.value, pending: !!pending.value }),
     )

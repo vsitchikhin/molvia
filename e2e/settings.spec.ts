@@ -15,13 +15,35 @@ test('settings draft survives tabs and offline; another device produces an expli
   await page.getByRole('link', { name: 'Что брать', exact: true }).click()
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
   await expect(city).toHaveValue('Ереван')
+  // On the device, not only in the store: between the tabs the form is never unmounted, so
+  // the value alone came back from memory and said nothing about the draft (adversarial Е2).
+  // The whole page is thrown away, `sessionStorage` with it: the draft belongs to the account
+  // and comes back at the next launch, the way the app is really closed on a phone (Е1).
+  await page.evaluate(() => {
+    sessionStorage.clear()
+  })
+  await page.reload()
+  await expect(city).toHaveValue('Ереван')
+  await expect(page.getByText('Есть несохранённые изменения', { exact: true })).toBeVisible()
+  await expect(
+    page.getByText('Изменения останутся только пока приложение открыто', { exact: true }),
+  ).toHaveCount(0)
   const headers = await asBrowser(page)
   const current = actorCodec.parse(
     await (await page.request.get('/api/actors/me', { headers })).json(),
   )
   const previous = settingsOf(current)
   await page.context().setOffline(true)
-  await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toBeDisabled()
+  const save = page.getByRole('button', { name: 'Сохранить', exact: true })
+  // «Inactive» is `aria-disabled`, never the native attribute: the button has to keep its
+  // focus and its hint. `toBeDisabled()` alone accepts both, so it held neither (Е4).
+  await expect(save).toHaveAttribute('aria-disabled', 'true')
+  expect(await save.evaluate((node: HTMLButtonElement) => node.disabled)).toBe(false)
+  await save.focus()
+  await expect(save).toBeFocused()
+  const hint = await save.getAttribute('aria-describedby')
+  expect(hint).toBeTruthy()
+  await expect(page.locator(`#${hint ?? ''}`)).toHaveText('Сохранить можно, когда появится связь')
   await page.context().setOffline(false)
   await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toBeEnabled()
   // The same choice on both devices: since MOL-65 a choice nobody here touched follows the
@@ -190,7 +212,9 @@ test('lost save responses remain uncertain until a read confirms the result', as
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
   await expect(page.getByText('Настройки сохранены', { exact: true })).toBeVisible()
   await expect(city).toHaveValue('Ереван')
-  await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toBeDisabled()
+  const save = page.getByRole('button', { name: 'Сохранить', exact: true })
+  await expect(save).toHaveAttribute('aria-disabled', 'true')
+  expect(await save.evaluate((node: HTMLButtonElement) => node.disabled)).toBe(false)
 })
 
 test.describe('narrow English settings', () => {

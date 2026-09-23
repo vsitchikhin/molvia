@@ -351,6 +351,8 @@
     "group_place": "Where you live",
     "group_currencies": "Currencies",
     "city_hint": "Used for new trips and prices near you",
+    "city_current": "Now: {city}",
+    "city_not_listed": "This city is not in the list — keep it or choose an available one",
     "city_changed": "What to buy will show prices for the new city. Your previous purchases will stay.",
     "spend_hint": "The default for new trips. Each purchase can use a different currency.",
     "same_currencies": "The currencies match — no conversion needed",

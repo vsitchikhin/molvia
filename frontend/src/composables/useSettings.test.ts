@@ -87,6 +87,35 @@ describe('settings drafts', () => {
     expect(useActorStore().settings?.city).toBe('Ереван')
     expect(again.form.dirty).toBe(false)
   })
+  it('Е1: the draft comes back in a new session of the same account, and not in another one', async () => {
+    const { form } = await render()
+    form.edit(settingsOf(changed))
+    expect(form.stored).toBe(true)
+
+    // A new launch: the store is gone with the window, and only the device is left.
+    for (const view of wrappers.splice(0)) view.unmount()
+    sessionStorage.clear()
+    setActivePinia(createPinia())
+    const actor = useActorStore()
+    actor.id = initial.id
+    actor.apply(initial)
+    const again = await render()
+    expect(again.form.draft?.city).toBe('Ереван')
+    expect(again.form.dirty).toBe(true)
+
+    // Another account sees nothing of it: the key carries the owner.
+    for (const view of wrappers.splice(0)) view.unmount()
+    setActivePinia(createPinia())
+    const other = { ...initial, id: '1a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d' }
+    const store = useActorStore()
+    store.id = other.id
+    store.apply(other)
+    me.mockResolvedValue(other)
+    const stranger = await render()
+    expect(stranger.form.draft?.city).toBe('Гюмри')
+    expect(stranger.form.dirty).toBe(false)
+  })
+
   it('preserves edits at a conflict over the same choice, and applies only after another tap', async () => {
     const { form } = await render()
     const mine = { ...initial, spendCurrency: 'USD' as const }
@@ -123,11 +152,28 @@ describe('settings drafts', () => {
       settings: { ...settingsOf(changed), incomeCurrency: 'EUR' },
     })
   })
+  it('Е3: the same choice made on both devices is not a conflict', async () => {
+    const { form } = await render()
+    form.edit(settingsOf(changed))
+    save.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'conflict'))
+    // The other device chose the very city this person is choosing: nothing to argue about.
+    me.mockResolvedValue(changed)
+    await form.save()
+
+    expect(form.conflict).toBe(false)
+    expect(form.dirty).toBe(false)
+    expect(form.draft?.city).toBe('Ереван')
+    expect(form.base?.city).toBe('Ереван')
+  })
+
   it('never saves offline and keeps a draft if storage refuses it', async () => {
     const { form } = await render()
-    vi.spyOn(window, 'sessionStorage', 'get').mockImplementation(() => {
-      throw new Error('quota')
-    })
+    // Storage blocked outright — an embedded WebView, a policy: the draft lives in memory and
+    // the screen says so. The account's shelf is what the notice is about since Е1.
+    for (const shelf of ['localStorage', 'sessionStorage'] as const)
+      vi.spyOn(window, shelf, 'get').mockImplementation(() => {
+        throw new Error('blocked')
+      })
     form.edit(settingsOf(changed))
     expect(form.stored).toBe(false)
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
