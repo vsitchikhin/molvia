@@ -4,8 +4,8 @@
  * place where a wrong answer would only show up here.
  */
 import { randomBytes } from 'node:crypto'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { eq, inArray, notInArray } from 'drizzle-orm'
 import { ERROR, SESSION_COOKIE, actorWireSchema } from '@molvia/model'
 import type { ActorWire } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
@@ -74,14 +74,38 @@ function aToken(): string {
   return randomBytes(32).toString('base64url')
 }
 
-beforeEach(async () => {
-  await db.delete(events)
-  await db.delete(actors)
+/**
+ * Every assertion here is about the rows *this file* made, and so is every delete.
+ *
+ * It used to wipe `actors` outright, which reads as «a clean slate» and is really «someone
+ * else's rows too»: the `_test` database is shared and never cleaned between runs, so a file
+ * owns what it wrote and nothing more (CLAUDE.md). Whether that blew up depended on the order
+ * vitest happened to run the files in — `delete from actors` fails outright once another file's
+ * trips point at them — so the suite passed locally and failed on CI, off the same commit.
+ */
+let before: string[] = []
+
+const mine = () => notInArray(actors.id, before.length > 0 ? before : [UNKNOWN_ID])
+
+async function madeHere(): Promise<(typeof actors.$inferSelect)[]> {
+  return db.select().from(actors).where(mine())
+}
+
+async function forget(): Promise<void> {
+  const made = (await madeHere()).map((row) => row.id)
+  if (made.length === 0) return
+  await db.delete(events).where(inArray(events.actorId, made))
+  await db.delete(actors).where(inArray(actors.id, made))
+}
+
+beforeAll(async () => {
+  before = (await db.select({ id: actors.id }).from(actors)).map((row) => row.id)
 })
 
+beforeEach(forget)
+
 afterAll(async () => {
-  await db.delete(events)
-  await db.delete(actors)
+  await forget()
   await close()
 })
 
@@ -115,7 +139,7 @@ describe('the first visit', () => {
     expect(body).not.toHaveProperty('telegramUserId')
     expect(actorIn(body)).not.toHaveProperty('telegramUserId')
 
-    const [row] = await db.select().from(actors)
+    const [row] = await madeHere()
     expect(row?.telegramUserId).toBeGreaterThan(0)
   })
 
@@ -124,15 +148,15 @@ describe('the first visit', () => {
     const second = actorIn((await firstVisit()).body)
 
     expect(first.id).not.toBe(second.id)
-    expect(await db.select().from(actors)).toHaveLength(2)
+    expect(await madeHere()).toHaveLength(2)
   })
 
   it('writes nothing to the event log at all', async () => {
     // The log holds only what no domain table can answer, and «when this person first
     // appeared» is `actors.created_at`. MOL-12 writes the first event there is.
-    await firstVisit()
+    const actor = actorIn((await firstVisit()).body)
 
-    expect(await db.select().from(events)).toHaveLength(0)
+    expect(await db.select().from(events).where(eq(events.actorId, actor.id))).toHaveLength(0)
   })
 })
 
@@ -174,7 +198,7 @@ describe('a request that proves who it is', () => {
   it('does not create an identity for a token nobody holds', async () => {
     await withCookie(`${SESSION_COOKIE}=${aToken()}`)
 
-    expect(await db.select().from(actors)).toHaveLength(0)
+    expect(await madeHere()).toHaveLength(0)
   })
 
   it('finds its cookie among other people’s', async () => {
