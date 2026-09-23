@@ -4,13 +4,14 @@ import { defineComponent, h } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
-import type { AdvicePlace, AdviceResponse, AdviceRow } from '@molvia/model'
+import type { ActorView, AdvicePlace, AdviceResponse, AdviceRow } from '@molvia/model'
 import { useAdvice } from '@/composables/useAdvice'
 import type { Advice } from '@/composables/useAdvice'
 import { useActorStore } from '@/stores/actor'
 
 const advice = vi.fn<() => Promise<AdviceResponse>>()
-vi.mock('@/api', () => ({ api: { advice: () => advice() } }))
+const me = vi.fn<() => Promise<ActorView>>()
+vi.mock('@/api', () => ({ api: { advice: () => advice(), me: () => me() } }))
 
 const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const OTHER = '1a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d'
@@ -40,6 +41,19 @@ function row(n: number, level: AdviceRow['level'], rating = '4.5'): AdviceRow {
 
 function answer(rows: AdviceRow[], total = rows.length, scope: AdviceResponse['scope'] = 'own') {
   return { scope, rows, total, geography: { country: 'AM', city: 'Гюмри' } }
+}
+
+function actorIn(city: string): ActorView {
+  return {
+    id: ME,
+    country: 'AM',
+    city,
+    spendCurrency: 'AMD',
+    incomeCurrency: 'RUB',
+    sharedUntil: null,
+    createdAt: new Date('2026-09-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-09-20T00:00:00.000Z'),
+  }
 }
 
 function online(value: boolean): void {
@@ -159,6 +173,7 @@ describe('useAdvice', () => {
     localStorage.clear()
     sessionStorage.clear()
     advice.mockReset()
+    me.mockReset()
     vi.restoreAllMocks()
     online(true)
     freshPinia()
@@ -391,6 +406,54 @@ describe('useAdvice', () => {
 
     expect(held.groups.value.take[0]?.rating).toBe('4.7')
     expect(localStorage.getItem(`molvia.advice.${ME}`)).not.toContain('2.0')
+  })
+
+  it('А3: an answer about another city is taken when the settings do not move', async () => {
+    // The screen used to leave this branch having set nothing at all, and `phase === 'loading'`
+    // draws a skeleton, which carries no «Повторить»: the two devices' race ended in grey bars
+    // that a restart could not clear. `me` answering the city it already holds is that race.
+    advice.mockResolvedValue({
+      ...answer([row(1, 'take')]),
+      geography: { country: 'AM', city: 'Ереван' },
+    })
+    me.mockResolvedValue(actorIn('Гюмри'))
+    const held = await mounted()
+
+    expect(held.phase.value).toBe('ready')
+    expect(names(held.groups.value.take)).toEqual(['Позиция 1'])
+    expect(advice).toHaveBeenCalledTimes(1)
+    await held.retry()
+    expect(held.phase.value).toBe('ready')
+
+    // The control: the settings really did move, so nothing is taken here — the watcher asks
+    // again for the city the answer is about.
+    unmountAll()
+    freshPinia()
+    me.mockResolvedValue(actorIn('Ереван'))
+    const moved = await mounted()
+    await flushPromises()
+    expect(moved.phase.value).toBe('ready')
+    expect(advice.mock.calls.length).toBeGreaterThan(1)
+  })
+
+  it('А2: a remembered list is shown even when the city is not known yet', async () => {
+    advice.mockResolvedValue(answer([row(1, 'take')]))
+    await mounted()
+
+    // A cold start with the list on the phone but no settings snapshot: the first one after an
+    // update, or a `localStorage` that dropped the smaller key. Yesterday's prices are still
+    // true, and the strip above them says how old they are.
+    unmountAll()
+    localStorage.removeItem(`molvia.settings.${ME}`)
+    setActivePinia(createPinia())
+    useActorStore().id = ME
+    online(false)
+    advice.mockRejectedValue(new TypeError('network'))
+    const held = await mounted()
+
+    expect(held.phase.value).toBe('ready')
+    expect(held.stale.value).toBe('offline')
+    expect(held.fetchedAt.value).toBeInstanceOf(Date)
   })
 
   it('comes back by itself when the connection does', async () => {

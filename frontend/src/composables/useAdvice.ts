@@ -44,6 +44,13 @@ export interface Advice {
 /** Why the list on the screen is not an answer of this session (MOL-32, А4). */
 export type Stale = 'loading' | 'offline' | 'error'
 
+/**
+ * Whatever is written here is read back by `adviceResponseSchema`, which is strict: a change
+ * in the shape of the answer empties the memory of every phone that already had one, and the
+ * first walk to the shop without a connection after an update shows nothing (adversarial А1).
+ * Accepted knowingly — 0.1 is not released, and a lenient read would mean carrying «this
+ * answer does not know its own city» through three comparisons below.
+ */
 const KEY = 'molvia.advice'
 
 interface Remembered {
@@ -110,9 +117,12 @@ export function useAdvice(): Advice {
     const cached = id ? recall(`${KEY}.${id}`) : null
     cityChanged.value =
       !!cached && !!location.value && geographyKey(cached.answer.geography) !== location.value
-    remembered.value =
-      cached && location.value && (!cityChanged.value || !navigator.onLine) ? cached : null
-    failure.value = navigator.onLine ? null : 'offline'
+    // Without a settings snapshot the city is unknown — which does not make yesterday's prices
+    // untrue, and the strip above them names their age to the minute (adversarial А2). The
+    // first cold start after an update is exactly that case, and it is at the shelf.
+    remembered.value = cached && (!cityChanged.value || !navigator.onLine) ? cached : null
+    // Decided after the failure, never before the request (MOL-19, A1).
+    failure.value = null
     confirmed.value = false
   }
 
@@ -165,7 +175,12 @@ export function useAdvice(): Advice {
         const loaded = await api.me()
         if (owner.value !== id || mine !== latest || loaded.id !== id) return
         actor.apply(loaded)
-        return
+        // Only a moved `location` fires the watcher and asks again. It does not move when the
+        // other device put the city back, or when `apply` refuses a row older than the one
+        // held — and then returning here left the screen on a skeleton that has no «Повторить»
+        // and no way out but the server changing its mind (adversarial А3). Which city the
+        // answer is about is the server's to know, so the answer is taken as it is.
+        if (location.value !== where) return
       }
       remembered.value = { answer: fresh, fetchedAt: new Date() }
       failure.value = null
@@ -177,8 +192,7 @@ export function useAdvice(): Advice {
       // connection lost while the answer was on its way is the commonest break at a shelf,
       // and it is not the server's fault and never red.
       failure.value = navigator.onLine ? 'error' : 'offline'
-      if (!navigator.onLine && location.value && !remembered.value)
-        remembered.value = recall(`${KEY}.${id}`)
+      if (!navigator.onLine && !remembered.value) remembered.value = recall(`${KEY}.${id}`)
     }
   }
 
@@ -187,6 +201,7 @@ export function useAdvice(): Advice {
     if (
       navigator.onLine &&
       remembered.value &&
+      location.value &&
       geographyKey(remembered.value.answer.geography) !== location.value
     ) {
       remembered.value = null
