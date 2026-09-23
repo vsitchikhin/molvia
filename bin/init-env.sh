@@ -74,6 +74,8 @@ COMPOSE_PROJECT=molvia_${index}
 API_PORT=${api_port}
 PWA_PORT=${pwa_port}
 POSTGRES_PORT=${pg_port}
+# Адрес приложения — им бот отвечает на /start без кода. В проде это домен.
+APP_BASE_URL=http://127.0.0.1:${pwa_port}
 
 POSTGRES_DB=molvia_${index}
 POSTGRES_USER=molvia

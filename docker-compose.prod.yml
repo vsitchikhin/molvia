@@ -56,6 +56,8 @@ services:
       NODE_ENV: production
       API_PORT: 3300
       API_BASE_URL: http://backend:3300
+      # Where the greeting points people: the same host Caddy serves the PWA on.
+      APP_BASE_URL: https://${DOMAIN:?set DOMAIN}
       BOT_API_SECRET: ${BOT_API_SECRET:?set BOT_API_SECRET}
       # Real login requires the bot to run (MOL-54).
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN}
