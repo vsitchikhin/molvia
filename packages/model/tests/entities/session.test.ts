@@ -191,6 +191,16 @@ describe('newLoginRequestSchema', () => {
     ).toBe(false)
   })
 
+  it('judges the term against the database clock when it is given, not the process clock', () => {
+    // Adversarial А5: the database six minutes behind the API is not a login that ends early.
+    const createdAt = new Date(Date.now() - 6 * 60_000)
+    const expiresAt = new Date(createdAt.getTime() + 5 * 60_000)
+    expect(newLoginRequestSchema.safeParse({ ...asked, createdAt, expiresAt }).success).toBe(true)
+    expect(
+      newLoginRequestSchema.safeParse({ ...asked, createdAt, expiresAt: createdAt }).success,
+    ).toBe(false)
+  })
+
   it('has no place for the secret or for the account, which arrive later or hashed', () => {
     expect(newLoginRequestSchema.safeParse({ ...asked, secretHash: 'a'.repeat(64) }).success).toBe(
       false,

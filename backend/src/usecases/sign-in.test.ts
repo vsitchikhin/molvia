@@ -29,6 +29,7 @@ const returning = actorFrom(RETURNING_ID, TELEGRAM_ID, {
 function fakeActors(overrides: Partial<ActorRepository> = {}): ActorRepository {
   return {
     create: () => Promise.reject(new Error('create was not expected')),
+    createIfMissing: () => Promise.reject(new Error('createIfMissing was not expected')),
     byId: () => Promise.reject(new Error('byId was not expected')),
     byTelegramUserId: () => Promise.reject(new Error('byTelegramUserId was not expected')),
     update: () => Promise.reject(new Error('update was not expected')),
@@ -75,7 +76,8 @@ describe('вход', () => {
   it('нового заводит с настройками первого визита', async () => {
     const actors = fakeActors({
       byTelegramUserId: () => Promise.resolve(null),
-      create: (id, telegramUserId, input) => Promise.resolve(actorFrom(id, telegramUserId, input)),
+      createIfMissing: (id, telegramUserId, input) =>
+        Promise.resolve(actorFrom(id, telegramUserId, input)),
     })
 
     const { actor } = await signIn(actors, fakeSessions(), TELEGRAM_ID)
