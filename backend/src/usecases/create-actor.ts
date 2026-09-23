@@ -30,7 +30,7 @@ const FIRST_VISIT: NewActor = Object.freeze(
  * the bot, and until then the development seam mints one (MOL-52, Р-3).
  */
 export async function createActor(
-  actors: ActorRepository,
+  actors: Pick<ActorRepository, 'create'>,
   telegramUserId: TelegramUserId,
 ): Promise<Actor> {
   return actors.create(randomUUID(), telegramUserId, FIRST_VISIT)

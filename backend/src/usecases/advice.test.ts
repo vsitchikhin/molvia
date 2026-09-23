@@ -69,6 +69,7 @@ function deps(world: World = {}) {
 
   const actors: ActorRepository = {
     create: () => Promise.reject(new Error('create was not expected')),
+    createIfMissing: () => Promise.reject(new Error('createIfMissing was not expected')),
     byId: () => Promise.resolve(world.actor === undefined ? actor() : world.actor),
     byTelegramUserId: () => Promise.reject(new Error('byTelegramUserId was not expected')),
     update: () => Promise.reject(new Error('update was not expected')),

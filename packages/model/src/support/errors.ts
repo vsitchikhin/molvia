@@ -38,6 +38,11 @@ export const ERROR = {
    */
   TRIP_OPEN: 'error.trip_open',
   INTERNAL: 'error.internal',
+  LOGIN_UNAVAILABLE: 'error.login_unavailable',
+  LOGIN_FORBIDDEN: 'error.login_forbidden',
+  LOGIN_RATE_LIMITED: 'error.login_rate_limited',
+  LOGIN_DISABLED: 'error.login_disabled',
+  BOT_UNAUTHORIZED: 'error.bot_unauthorized',
 } as const
 
 export type ErrorCode = (typeof ERROR)[keyof typeof ERROR]

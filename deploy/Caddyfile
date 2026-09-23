@@ -6,6 +6,14 @@
 
 	# The PWA calls /api/... so that the origin is never hardcoded in the client — the
 	# same shape the Vite dev proxy has, so nothing differs between dev and production.
+	# Internal bot operations are reached directly over the compose network.
+	handle /api/internal/* {
+		respond 404
+	}
+	handle /api/internal {
+		respond 404
+	}
+
 	handle /api/* {
 		uri strip_prefix /api
 		reverse_proxy backend:3300

@@ -122,7 +122,7 @@ test.describe('the trip', () => {
     await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
 
     // Over on the phone at once, and over on the server as soon as the queue has been out.
-    await expect(page.getByText('A new trip')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'A new trip', exact: true })).toBeVisible()
     await expect.poll(setting.current).toBeNull()
   })
 
@@ -142,7 +142,7 @@ test.describe('the trip', () => {
     await page.waitForTimeout(400)
     await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
     // The trip is over on the phone at once, though nothing has reached the server.
-    await expect(page.getByText('A new trip')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'A new trip', exact: true })).toBeVisible()
     expect(await setting.current()).not.toBeNull()
 
     await startTrip(page, 'Ереван Сити')

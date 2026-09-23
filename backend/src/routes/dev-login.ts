@@ -1,6 +1,5 @@
 import { randomInt } from 'node:crypto'
-import { ZodError } from 'zod'
-import { DomainError, ERROR, ISSUE, telegramUserIdSchema } from '@molvia/model'
+import { DomainError, ERROR, telegramUserIdSchema } from '@molvia/model'
 import type { TelegramUserId } from '@molvia/model'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { answerWithActor } from '@/routes/actors'
@@ -10,7 +9,7 @@ import {
   setDevAccountCookie,
   setSessionCookie,
 } from '@/cookie'
-import { InvalidBody } from '@/parse'
+import { refuseAnyBody } from './empty-body'
 import type { SignedIn } from '@/usecases/sign-in'
 
 /**
@@ -97,18 +96,6 @@ function accountOf(request: FastifyRequest): TelegramUserId | null {
   return parsed.success ? parsed.data : null
 }
 
-function refuseAnyBody(request: FastifyRequest): Promise<void> {
-  const { 'content-length': length, 'content-type': type } = request.headers
-  const announced =
-    type !== undefined ||
-    request.headers['transfer-encoding'] !== undefined ||
-    (length !== undefined && length !== '0')
-  if (!announced) return Promise.resolve()
-
-  throw new InvalidBody(
-    new ZodError([{ code: 'custom', path: ['body'], message: ISSUE.BODY_INVALID, input: null }]),
-  )
-}
 export function devLoginRoute(
   app: FastifyInstance,
   api: { signIn(id: TelegramUserId): Promise<SignedIn> },
