@@ -131,7 +131,7 @@ test('7: rated without a connection — «saved», and it goes by itself once on
   await rate(page, 5)
 
   await expect(page.getByRole('heading', { name: 'The rating is saved' })).toBeVisible()
-  await expect(page.getByText('Everything is rated')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Everything is rated' })).toHaveCount(0)
   expect(await page.locator('.bad').count()).toBe(0)
 
   await context.setOffline(false)
@@ -177,7 +177,9 @@ test('the queue that could not load is red and loads again on «Try again»', as
   await page.route('**/api/verdicts/pending', (route) => route.abort())
 
   await page.goto('/verdicts')
-  await expect(page.getByText('The list of purchases did not load')).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'The list of purchases did not load' }),
+  ).toBeVisible()
 
   await page.unroute('**/api/verdicts/pending')
   await page.getByRole('button', { name: 'Try again' }).click()

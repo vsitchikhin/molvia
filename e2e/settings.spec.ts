@@ -57,8 +57,14 @@ test('settings draft survives tabs and offline; another device produces an expli
   })
   expect(response.ok()).toBe(true)
   await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  // The state by its heading: `ScreenState` hands «title. body» to the app's live region as
+  // well, and `getByText` would match the announcement too (MOL-64). The notices below stay as
+  // they are — the draft card and the docked notice are paragraphs, with no heading to take.
   await expect(
-    page.getByText('Настройки изменились на другом устройстве', { exact: true }),
+    page.getByRole('heading', {
+      name: 'Настройки изменились на другом устройстве',
+      exact: true,
+    }),
   ).toBeVisible()
   await expect(city).toHaveValue('Ереван')
   await page.getByRole('button', { name: 'Применить мои изменения', exact: true }).click()
