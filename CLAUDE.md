@@ -1087,13 +1087,19 @@ the other device's move back silently, with nothing on the screen to say which f
 go. **A trip names its own geography** (`context`): the settings as the phone knew them when it
 started, which offline may be older than the row, so a move made elsewhere neither renames the
 shop nor changes the currency of a trip already begun. A start from the old queue carries none,
-and the server answers `error.trip_context_required`; the queue **holds it without a retry**
-until the person names the city and the currencies, because nothing else knows where that trip
-was. **What a trip may name is the rule the settings refuse by** — `geographyAllowed`: one's own
+and so does one naming a geography nothing may be written under — **one answer,
+`error.trip_context_required`, because it is one question for the person**; the queue **holds it
+without a retry** until they name the city and the currencies, because nothing else knows where
+that trip was. A 400 there would have been the end of that trip: the queue sets a start it cannot
+send aside, and the purchases behind it go too. **What a trip may name is the rule the settings refuse by** — `geographyAllowed`: one's own
 current city, or AM with one of `SETTINGS_CITIES`. `places` is a table everyone shares, and «the
 country is fixed as Armenia» must not be held by the form alone. The city is read by the fold
 `places.ensure` stores it under, never by the exact spelling, or a shop written «гюмри» once
-falls out of its own owner's prices. «Что брать» answers with the geography it counted by, and
+falls out of its own owner's prices. **The form's draft belongs to the account and not to the
+window**: it is kept under the owner's key on the device, as verdict drafts are, because the
+system closes an installed app by itself — and «изменения останутся только пока приложение
+открыто» is then what it says, a shelf that refused, rather than a permanent condition nobody
+is told about. «Что брать» answers with the geography it counted by, and
 the phone compares it with its own: a different city is a list to load again, and an answer the
 settings will not move to is taken as it is — the screen used to stay on a skeleton for good.
 
