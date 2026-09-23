@@ -613,9 +613,9 @@ describe('the verdict', () => {
   it('sends nothing for an item that is not an identifier, or one that would change the address', async () => {
     const { client, calls } = clientReplying(201, cardWire)
 
-    for (const itemId of ['молоко', '../actors/me', `${MILK}?x=1`, '', MILK.toUpperCase()]) {
-      expect(await codeOf(client.rateItem(itemId, { score: 2 })), itemId).toBe(ISSUE.PATH_INVALID)
-      expect(await codeOf(client.withdrawVerdict(itemId)), itemId).toBe(ISSUE.PATH_INVALID)
+    for (const itemId of ['молоко', '../actors/me', `${MILK}?x=1`, '']) {
+      expect(await codeOf(client.rateItem(itemId, { score: 2 })), itemId).toBe(ERROR.NOT_FOUND)
+      expect(await codeOf(client.withdrawVerdict(itemId)), itemId).toBe(ERROR.NOT_FOUND)
     }
     expect(calls).toHaveLength(0)
   })
@@ -658,13 +658,7 @@ describe('the trip', () => {
     rateProvider: null,
     rateJump: null,
     rateStale: false,
-    place: {
-      id: 'b1e0f2a4-5c6d-4e8f-9a0b-1c2d3e4f5a6b',
-      kind: 'store',
-      name: 'Ереван Сити',
-      country: 'AM',
-      city: 'Гюмри',
-    },
+    place: { id: 'b1e0f2a4-5c6d-4e8f-9a0b-1c2d3e4f5a6b', kind: 'store', name: 'Ереван Сити' },
     expenses: [
       {
         id: EXPENSE,

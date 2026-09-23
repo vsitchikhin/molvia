@@ -57,7 +57,7 @@
       </template>
     </ScreenState>
 
-    <!-- A trip is open in another shop: the purchases wait rather than move there by themselves,
+    <!-- A trip is already open: the purchases wait rather than move there by themselves,
          because «item + place» is the key the product rests on. The choice is the person's
          (adversarial Б1, owner's decision). -->
     <ScreenState
@@ -66,17 +66,10 @@
       kind="attention"
       inline
       :title="t('trip.elsewhere.title', { place: queue.elsewhere.place })"
-      :body="t('trip.elsewhere.body', { mine: queue.elsewhere.mine })"
+      :body="elsewhereBody(queue.elsewhere)"
     >
       <template #action>
-        <div class="refusal-actions">
-          <AppButton variant="ghost" @click="queue.joinElsewhere()">
-            {{ t('trip.elsewhere.join') }}
-          </AppButton>
-          <AppButton variant="ghost" @click="queue.finishElsewhere()">
-            {{ t('trip.elsewhere.finish') }}
-          </AppButton>
-        </div>
+        <AppButton variant="ghost" @click="chooseTrip">{{ t('trip.elsewhere.choose') }}</AppButton>
       </template>
     </ScreenState>
 
@@ -136,6 +129,12 @@
       </template>
     </template>
 
+    <!-- Under the list, and only once there is a screen to put it under: over the skeleton it
+         was the one thing drawn while everything else was still loading (З-9). -->
+    <AppButton v-if="phase !== 'loading'" class="history" variant="ghost" block @click="history">{{
+      t('trip.history.title')
+    }}</AppButton>
+
     <!-- The one permanent place money is converted, and it stays put while the list scrolls. -->
     <!-- On the skeleton too, with a dash for the sum: the strip is part of the frame, and a screen
          that grows it after the answer jumps under the thumb (требования §5, В2-7). -->
@@ -176,6 +175,17 @@
       </template>
     </BottomSheet>
 
+    <BottomSheet v-model:open="choosing">
+      <template #title>{{ t('trip.elsewhere.title', { place: choice?.place ?? '' }) }}</template>
+      <p class="confirm">{{ choice ? elsewhereBody(choice) : '' }}</p>
+      <template #footer>
+        <AppButton size="large" block @click="joinTrip">{{ t('trip.elsewhere.join') }}</AppButton>
+        <AppButton variant="ghost" block @click="finishOtherTrip">{{
+          t('trip.elsewhere.finish')
+        }}</AppButton>
+      </template>
+    </BottomSheet>
+
     <!-- Mounted on a tap and put away from `onClosed`, as the search does it: one opening, one
          purchase. One step back — the trip is the screen under it. -->
     <ItemDetailsSheet
@@ -197,7 +207,7 @@ import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPlus from '~icons/mdi/plus'
-import { unitPrice } from '@molvia/model'
+import { isSamePlaceName } from '@molvia/model'
 import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -211,7 +221,8 @@ import ScreenState from '@/components/ScreenState.vue'
 import TripRateNotes from '@/components/TripRateNotes.vue'
 import TripRow from '@/components/TripRow.vue'
 import TripTotal from '@/components/TripTotal.vue'
-import type { RowMark, TripRowView } from '@/components/tripRow'
+import type { TripRowView } from '@/components/tripRow'
+import { useTripRows } from '@/composables/useTripRows'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import type { RetryPurchase } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
@@ -219,7 +230,8 @@ import { purchaseDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
-import type { QueuedWrite, RejectedWrite } from '@/stores/tripQueue'
+import type { TripElsewhere } from '@/stores/tripQueue'
+import type { RejectedWrite } from '@/stores/tripQueue'
 
 /** What the sheet is open on: a row being amended, or a refused purchase being corrected. */
 interface Opened {
@@ -269,6 +281,34 @@ export default defineComponent({
     const actor = useActorStore()
     const trips = useTripStore()
     const queue = useTripQueueStore()
+    const choosing = ref(false)
+    const choice = ref<TripElsewhere | null>(null)
+    /**
+     * Moving purchases into a trip of another shop is said in words before it is offered (Р-2):
+     * «item + place» is the key the product rests on, and a price of «Ереван Сити» written down
+     * against «SAS» is later indistinguishable from a real one. For the same shop the sentence
+     * would be untrue, so it is a second key rather than a longer one (З-4).
+     *
+     * «The same shop» is the database's own answer, not equal strings: a trailing space made the
+     * screen promise damage that the server's own index rules out (В3).
+     */
+    const elsewhereBody = (asked: TripElsewhere): string =>
+      isSamePlaceName(asked.place, asked.mine)
+        ? t('trip.elsewhere.body', { mine: asked.mine })
+        : t('trip.elsewhere.body_other', { mine: asked.mine, place: asked.place })
+    function chooseTrip(): void {
+      choice.value = queue.elsewhere
+      choosing.value = choice.value !== null
+    }
+    function joinTrip(): void {
+      if (choice.value) queue.joinElsewhere(choice.value)
+      choosing.value = false
+    }
+    function finishOtherTrip(): void {
+      if (choice.value) queue.finishElsewhere(choice.value)
+      choosing.value = false
+    }
+
     const { trip, local, tripId } = useCurrentTrip()
 
     /** Asked once at the start; the memory covers every later opening (MOL-24, Н-7). */
@@ -309,71 +349,7 @@ export default defineComponent({
         : null
     })
 
-    /** What the queue still holds about this trip, by the row it is about. */
-    const held = computed(() => {
-      const marks = new Map<string, RowMark>()
-      const added: QueuedWrite[] = []
-      for (const write of queue.pending) {
-        if (write.tripId !== tripId.value) continue
-        if (write.kind === 'add') added.push(write)
-        // «Удаляется» outlasts «правка не ушла»: the row is going, whatever else was asked of it.
-        if (write.kind === 'update' && marks.get(write.expenseId) !== 'removing') {
-          marks.set(write.expenseId, 'editing')
-        }
-        if (write.kind === 'remove') marks.set(write.expenseId, 'removing')
-      }
-      return { marks, added }
-    })
-
-    const rows = computed<TripRowView[]>(() => {
-      // A purchase the server already has, queued again, is a correction on its way: it says so
-      // on the row it is about, and never as a second line (Т-12).
-      const correcting = new Set(
-        held.value.added.flatMap((write) => (write.kind === 'add' ? [write.body.id] : [])),
-      )
-      const server = (trip.value?.expenses ?? []).map((expense): TripRowView => ({
-        key: expense.id,
-        name: expense.item.name,
-        quantity: expense.quantity,
-        amount: expense.amount,
-        unitPrice: expense.unitPrice,
-        mark: held.value.marks.get(expense.id) ?? (correcting.has(expense.id) ? 'editing' : null),
-        entry: expense.item,
-        expense,
-      }))
-      const written = new Set(server.map((row) => row.key))
-      const queued = held.value.added.flatMap((write): TripRowView[] =>
-        // The server answered it while the queue still holds the write — the connection dropped
-        // between the write and its answer, or the purchase is being corrected and goes as an
-        // amendment. One purchase, one line, and the line says the correction is on its way
-        // (В2-2, Т-12).
-        write.kind === 'add' && !written.has(write.body.id)
-          ? [
-              {
-                key: write.body.id,
-                name: write.entry?.name ?? t('trip.queued.unnamed'),
-                quantity: write.body.quantity ?? null,
-                amount: write.body.amount ?? null,
-                unitPrice:
-                  write.body.amount && write.body.quantity
-                    ? unitPrice(write.body.amount, write.body.quantity)
-                    : null,
-                mark: 'waiting',
-                entry: write.entry,
-                expense: null,
-              },
-            ]
-          : [],
-      )
-      return [...server, ...queued]
-    })
-
-    /**
-     * Purchases of this trip the server has not taken yet — exactly what the total is missing
-     * (review 6). An edit or a removal also leaves it behind, but by no whole item, and «+1
-     * позиция ещё не ушла» about a row being deleted would be the wrong direction.
-     */
-    const waiting = computed(() => rows.value.filter((row) => row.mark === 'waiting').length)
+    const { rows, waiting } = useTripRows(tripId, trip, () => t('trip.queued.unnamed'))
 
     const rejected = computed(() => queue.rejected)
 
@@ -515,7 +491,7 @@ export default defineComponent({
      */
     function finish(): void {
       const id = tripId.value
-      if (id) queue.enqueue({ kind: 'finish', tripId: id })
+      if (id) queue.enqueue({ kind: 'finish', tripId: id, finishedOnDeviceAt: new Date() })
       finishing.value = false
     }
 
@@ -545,6 +521,12 @@ export default defineComponent({
     })
 
     return {
+      choosing,
+      choice,
+      chooseTrip,
+      elsewhereBody,
+      joinTrip,
+      finishOtherTrip,
       t,
       IconPlus,
       queue,
@@ -573,6 +555,7 @@ export default defineComponent({
       amend,
       putAway,
       find,
+      history: () => void router.push({ name: 'trip-history' }),
     }
   },
 })
@@ -640,6 +623,10 @@ export default defineComponent({
   flex: none;
   width: 1.375rem;
   height: 1.375rem;
+}
+
+.history {
+  margin-top: var(--space-6);
 }
 
 .footnote {

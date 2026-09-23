@@ -86,6 +86,14 @@ describe('settleColdStart', () => {
     expect(await stepBack(router)).toBe('/')
   })
 
+  it('lays the full chain under a cold history search, keeping the trip id', async () => {
+    const id = 'aaaaaaaa-0000-4000-8000-000000000012'
+    const router = await openCold(`/trip/history/${id}/add`)
+    expect(await stepBack(router)).toBe(`/trip/history/${id}`)
+    expect(await stepBack(router)).toBe('/trip/history')
+    expect(await stepBack(router)).toBe('/')
+  })
+
   it.each(['/', '/advice', '/verdicts', '/settings'])(
     'leaves the section %s alone',
     async (path) => {

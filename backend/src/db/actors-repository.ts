@@ -14,6 +14,7 @@ export interface ActorRepository {
    * a database default would be a second place that decides.
    */
   create(id: string, telegramUserId: TelegramUserId, input: NewActor): Promise<Actor>
+  createIfMissing(id: string, telegramUserId: TelegramUserId, input: NewActor): Promise<Actor>
   byId(id: string): Promise<Actor | null>
 
   /**
@@ -66,6 +67,25 @@ export function createActorRepository(db: Conn): ActorRepository {
           .values({ id, telegramUserId, ...input })
           .returning()
         return toActor(theRow(row, 'actors'))
+      })
+    },
+
+    async createIfMissing(id, telegramUserId, input) {
+      telegramUserIdSchema.parse(telegramUserId)
+      return translateFailures(async () => {
+        // A uniqueness error aborts an enclosing login transaction. DO NOTHING keeps it
+        // usable; a separate statement then sees the other transaction's committed owner.
+        const [created] = await db
+          .insert(actors)
+          .values({ id, telegramUserId, ...input })
+          .onConflictDoNothing({ target: actors.telegramUserId })
+          .returning()
+        if (created) return toActor(created)
+        const [found] = await db
+          .select()
+          .from(actors)
+          .where(eq(actors.telegramUserId, telegramUserId))
+        return toActor(theRow(found, 'actors'))
       })
     },
 

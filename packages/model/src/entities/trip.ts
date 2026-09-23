@@ -50,6 +50,8 @@ const tripFields = z.object({
   rateChoice: rateChoiceSchema.nullable().default(null),
   startedAt: z.date(),
   finishedAt: z.date().nullable(),
+  /** Device completion is a separate clock: an offline finish may precede server start. */
+  finishedOnDeviceAt: z.date().nullable().optional(),
 })
 
 export const tripSchema = tripFields

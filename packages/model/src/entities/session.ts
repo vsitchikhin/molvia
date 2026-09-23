@@ -205,12 +205,21 @@ export type LoginRequest = z.infer<typeof loginRequestSchema>
  * refused the same way and for the same reason: the code and the date are both this server's to
  * mint, so a bad one is a defect here rather than something to answer a caller with.
  */
-export const newLoginRequestSchema = z.strictObject({
-  id: z.uuid(),
-  code: loginCodeSchema,
-  deviceName: deviceNameSchema.nullable(),
-  expiresAt: z.date().refine((at) => at.getTime() > Date.now(), {
+export const newLoginRequestSchema = z
+  .strictObject({
+    id: z.uuid(),
+    code: loginCodeSchema,
+    deviceName: deviceNameSchema.nullable(),
+    /**
+     * The database's clock when the caller read one. The term is then judged against it and
+     * not against the process's clock: two clocks in one request put every start out the
+     * moment the API ran six minutes ahead of Postgres (adversarial А5).
+     */
+    createdAt: z.date().optional(),
+    expiresAt: z.date(),
+  })
+  .refine(({ createdAt, expiresAt }) => expiresAt > (createdAt ?? new Date()), {
+    path: ['expiresAt'],
     error: 'a login request cannot expire before it starts',
-  }),
-})
+  })
 export type NewLoginRequest = z.infer<typeof newLoginRequestSchema>

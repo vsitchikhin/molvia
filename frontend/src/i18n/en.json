@@ -101,9 +101,34 @@
     },
     "elsewhere": {
       "title": "A trip in «{place}» is already open",
-      "body": "The purchases of this one («{mine}») are still on the phone: prices from one shop cannot be written to another — they are what comparisons are made of",
+      "body": "Continue the open trip, or finish it and start a new one in «{mine}»? Purchases for the new trip are saved on this device and will wait for your choice.",
+      "body_other": "Purchases for the new trip («{mine}») are saved on this device. Added to the open trip, they are recorded against «{place}» — prices of one shop must not be written down against another, they are what the comparison rests on.",
       "join": "Add them to that trip",
-      "finish": "Finish that trip"
+      "finish": "Finish that trip",
+      "choose": "Choose trip"
+    },
+    "history": {
+      "title": "Trip history",
+      "finished_title": "Completed trip",
+      "empty_title": "Your trips will appear here",
+      "empty_body": "Finish a trip to add forgotten purchases or correct them here.",
+      "error_title": "Could not load trips",
+      "error_body": "Saved data is still on this device. Try again.",
+      "offline_title": "Offline — saved trips",
+      "offline_body": "Only data saved on this device is available. The rest will load when connected.",
+      "cached": "Showing data saved on this device.",
+      "local_finish": "Finished on this device — not sent yet",
+      "more": "Show more",
+      "finished_at": "Finished · {when}",
+      "missing_title": "Trip unavailable",
+      "missing_body": "This trip could not be found in your account. Return to history.",
+      "pending": "Changes are on this device. We will send them when connected.",
+      "no_purchases": "No purchases in this trip yet. Add anything you forgot.",
+      "go_trip": "Go to trip",
+      "rejected_title": "A change was not accepted",
+      "rejected_body": "Purchases remain on this device. The Trip screen shows the reason and lets you correct the entry.",
+      "review": "Review the refusal",
+      "unfinished": "This trip is still open"
     }
   },
   "item": {
@@ -310,7 +335,12 @@
     "no_actor": "This device is no longer recognised",
     "trip_open": "Another trip is still open",
     "internal": "Something went wrong",
-    "trip_context_required": "Set the trip’s city and currencies before sending"
+    "trip_context_required": "Set the trip’s city and currencies before sending",
+    "login_unavailable": "This login request is no longer available. Start again",
+    "login_forbidden": "Open sign-in from the app",
+    "login_rate_limited": "Too many login requests. Try again in a minute",
+    "login_disabled": "Telegram sign-in is not configured yet",
+    "bot_unauthorized": "The bot could not authenticate"
   },
   "settings": {
     "title": "Settings",

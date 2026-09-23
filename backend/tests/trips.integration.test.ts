@@ -484,7 +484,7 @@ describe('последние места', () => {
     expect(second.place.id).toBe(first.place.id)
     const reply = await call('GET', '/places/recent', actor)
     expect(recentPlacesResponseSchema.parse(reply.body).places).toEqual([
-      { id: first.place.id, kind: 'store', name: 'Ереван Сити', country: 'AM', city: 'Гюмри' },
+      { id: first.place.id, kind: 'store', name: 'Ереван Сити' },
     ])
   })
 

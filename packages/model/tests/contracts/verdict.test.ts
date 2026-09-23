@@ -124,10 +124,8 @@ describe('verdictPathSchema', () => {
     )
   })
 
-  it('takes the identifier in the one spelling it is issued in — lower case', () => {
-    expect(
-      verdictPathSchema.safeParse({ itemId: ITEM.toUpperCase() }).error?.issues[0]?.message,
-    ).toBe(ISSUE.PATH_INVALID)
+  it('normalises either spelling of a resource address', () => {
+    expect(verdictPathSchema.parse({ itemId: ITEM.toUpperCase() })).toEqual({ itemId: ITEM })
   })
 })
 

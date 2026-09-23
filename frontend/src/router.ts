@@ -3,6 +3,8 @@ import type { RouteRecordRaw } from 'vue-router'
 import SettingsView from '@/views/SettingsView.vue'
 import AdviceView from '@/views/AdviceView.vue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
+import TripHistoryView from '@/views/TripHistoryView.vue'
+import FinishedTripView from '@/views/FinishedTripView.vue'
 import TripView from '@/views/TripView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
 import { watchBrowserAnimatedBack } from '@/transitions'
@@ -10,7 +12,16 @@ import { watchBrowserAnimatedBack } from '@/transitions'
 /** The four sections of the tab bar. «trip» is home: the main scenario of the product. */
 export type Tab = 'trip' | 'advice' | 'verdicts' | 'settings'
 
-export type RouteName = 'trip' | 'advice' | 'verdicts' | 'settings' | 'item-search' | 'kit'
+export type RouteName =
+  | 'trip'
+  | 'advice'
+  | 'verdicts'
+  | 'settings'
+  | 'item-search'
+  | 'trip-history'
+  | 'finished-trip'
+  | 'finished-search'
+  | 'kit'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -26,7 +37,7 @@ declare module 'vue-router' {
   }
 }
 
-// Not lazy: five small screens, and a chunk per route would turn the first tap on a tab into
+// Not lazy: eight small screens, and a chunk per route would turn the first tap on a tab into
 // a network request exactly where the connection drops.
 export const routes = [
   {
@@ -53,6 +64,24 @@ export const routes = [
     name: 'item-search',
     component: ItemSearchView,
     meta: { titleKey: 'item.search_title', parent: 'trip' },
+  },
+  {
+    path: '/trip/history',
+    name: 'trip-history',
+    component: TripHistoryView,
+    meta: { titleKey: 'trip.history.title', parent: 'trip' },
+  },
+  {
+    path: '/trip/history/:tripId',
+    name: 'finished-trip',
+    component: FinishedTripView,
+    meta: { titleKey: 'trip.history.finished_title', parent: 'trip-history' },
+  },
+  {
+    path: '/trip/history/:tripId/add',
+    name: 'finished-search',
+    component: ItemSearchView,
+    meta: { titleKey: 'item.search_title', parent: 'finished-trip' },
   },
   // Every piece of the kit in every state, and the sheet in a real history — for the eye in both
   // schemes and for the end-to-end tests, before any screen uses them (MOL-18). Development only:

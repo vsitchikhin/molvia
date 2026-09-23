@@ -5,11 +5,10 @@ import {
   verdictAmendmentSchema,
   verdictCardCodec,
   verdictCardOf,
-  verdictPathSchema,
 } from '@molvia/model'
 import type { PendingVerdicts, Rating, Verdict, VerdictAmendment } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
-import { parseBody, parseParams } from '@/parse'
+import { parseBody, resourceId } from '@/parse'
 
 export interface VerdictApi {
   /** The use cases, already bound to their repositories by the composition point. */
@@ -46,8 +45,8 @@ export function verdictRoutes(app: FastifyInstance, api: VerdictApi): void {
    * was withdrawn — and 200 for one replaced: repeating a draft that already arrived is an
    * ordinary path for a screen that sends when the network is back.
    */
-  app.put('/verdicts/:itemId', async (request, reply) => {
-    const { itemId } = parseParams(verdictPathSchema, request.params)
+  app.put<{ Params: { itemId: string } }>('/verdicts/:itemId', async (request, reply) => {
+    const itemId = resourceId(request.params.itemId)
     const rating = parseBody(ratingSchema, request.body)
     const { verdict, created } = await api.rate(request.actorId, itemId, rating)
 
@@ -55,16 +54,16 @@ export function verdictRoutes(app: FastifyInstance, api: VerdictApi): void {
   })
 
   /** «Изменить оценку»: part of it, and `review: null` is how the text is erased. */
-  app.patch('/verdicts/:itemId', async (request, reply) => {
-    const { itemId } = parseParams(verdictPathSchema, request.params)
+  app.patch<{ Params: { itemId: string } }>('/verdicts/:itemId', async (request, reply) => {
+    const itemId = resourceId(request.params.itemId)
     const patch = parseBody(verdictAmendmentSchema, request.body)
 
     return answer(reply, await api.amend(request.actorId, itemId, patch))
   })
 
   /** «Снять оценку»: 204, nothing to send back — the verdict is no longer there to show. */
-  app.delete('/verdicts/:itemId', async (request, reply) => {
-    const { itemId } = parseParams(verdictPathSchema, request.params)
+  app.delete<{ Params: { itemId: string } }>('/verdicts/:itemId', async (request, reply) => {
+    const itemId = resourceId(request.params.itemId)
     await api.withdraw(request.actorId, itemId)
 
     return reply.code(204).header('cache-control', 'no-store').send()

@@ -5,12 +5,17 @@ import {
   addExpenseBodySchema,
   currentTripResponseSchema,
   expensePatchSchema,
+  finishTripBodySchema,
+  tripHistoryCodec,
+  tripHistoryQuerySchema,
   rateChoiceBodySchema,
   startTripBodySchema,
   tripViewCodec,
 } from '@molvia/model'
 import type {
   Actor,
+  TripHistory,
+  TripHistoryCursor,
   AddExpenseBody,
   ExpensePatch,
   RateChoiceBody,
@@ -18,12 +23,14 @@ import type {
   TripView,
 } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
-import { parseBody } from '@/parse'
+import { parseBody, parseQuery, resourceId } from '@/parse'
 
 export interface TripsApi {
   /** The use cases, already bound to their repositories by the composition point. */
   start(actor: Actor, body: StartTripBody): Promise<{ trip: TripView; created: boolean }>
   current(actorId: string): Promise<TripView | null>
+  selected(actorId: string, id: string): Promise<TripView>
+  history(actorId: string, cursor?: TripHistoryCursor): Promise<TripHistory>
   add(
     actorId: string,
     tripId: string,
@@ -31,13 +38,13 @@ export interface TripsApi {
   ): Promise<{ trip: TripView; created: boolean }>
   update(actorId: string, tripId: string, expenseId: string, patch: ExpensePatch): Promise<TripView>
   remove(actorId: string, tripId: string, expenseId: string): Promise<TripView>
-  finish(actorId: string, tripId: string): Promise<void>
+  finish(actorId: string, tripId: string, deviceAt?: Date): Promise<void>
   chooseRate(actorId: string, tripId: string, body: RateChoiceBody): Promise<TripView>
 }
 
 /**
- * Identifiers in the path are passed on as they came. A malformed one matches nothing in the
- * repositories (`idOrNull`), so it answers 404 exactly as a stranger's or a missing one does —
+ * Identifiers in the path accept either case and are normalised by `resourceId`. A malformed
+ * one answers 404 exactly as a stranger's or a missing one does —
  * a third answer for it would be one more way to tell them apart.
  */
 interface TripParams {
@@ -48,7 +55,7 @@ interface ExpenseParams extends TripParams {
 }
 
 /**
- * Expenses are private always (CLAUDE.md), and the owner travels in a header: a shared cache
+ * Expenses are private always (CLAUDE.md), and the owner is proved by a session: a shared cache
  * holding one of these would show one device what another one bought.
  */
 function answer(reply: FastifyReply, trip: TripView) {
@@ -84,13 +91,32 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
       .send(z.encode(currentTripResponseSchema, { trip }))
   })
 
+  app.get('/trips/history', { exposeHeadRoute: false }, async (request, reply) => {
+    const query = parseQuery(tripHistoryQuerySchema, request.query)
+    const cursor =
+      query.before && query.beforeId ? { at: query.before, id: query.beforeId } : undefined
+    const page = await api.history(request.actorId, cursor)
+    return reply.header('cache-control', 'no-store').send(z.encode(tripHistoryCodec, page))
+  })
+
+  app.get<{ Params: TripParams }>(
+    '/trips/:tripId',
+    { exposeHeadRoute: false },
+    async (request, reply) =>
+      answer(reply, await api.selected(request.actorId, resourceId(request.params.tripId))),
+  )
+
   /**
    * «Добавить в поход». 201 for a new expense, 200 for the same identifier sent again — the
    * queue after a lost reply — and the whole trip either way, total included.
    */
   app.post<{ Params: TripParams }>('/trips/:tripId/expenses', async (request, reply) => {
     const body = parseBody(addExpenseBodySchema, request.body)
-    const { trip, created } = await api.add(request.actorId, request.params.tripId, body)
+    const { trip, created } = await api.add(
+      request.actorId,
+      resourceId(request.params.tripId),
+      body,
+    )
     return answer(reply.code(created ? 201 : 200), trip)
   })
 
@@ -98,7 +124,8 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
     '/trips/:tripId/expenses/:expenseId',
     async (request, reply) => {
       const patch = parseBody(expensePatchSchema, request.body)
-      const { tripId, expenseId } = request.params
+      const tripId = resourceId(request.params.tripId)
+      const expenseId = resourceId(request.params.expenseId)
       return answer(reply, await api.update(request.actorId, tripId, expenseId, patch))
     },
   )
@@ -106,14 +133,17 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
   app.delete<{ Params: ExpenseParams }>(
     '/trips/:tripId/expenses/:expenseId',
     async (request, reply) => {
-      const { tripId, expenseId } = request.params
+      const tripId = resourceId(request.params.tripId)
+      const expenseId = resourceId(request.params.expenseId)
       return answer(reply, await api.remove(request.actorId, tripId, expenseId))
     },
   )
 
   /** 204: the screen goes back to «Новый поход», and there is nothing for it to read. */
   app.post<{ Params: TripParams }>('/trips/:tripId/finish', async (request, reply) => {
-    await api.finish(request.actorId, request.params.tripId)
+    const id = resourceId(request.params.tripId)
+    const body = parseBody(finishTripBodySchema, request.body ?? {})
+    await api.finish(request.actorId, id, body.finishedOnDeviceAt)
     return reply.code(204).header('cache-control', 'no-store').send()
   })
 
@@ -125,6 +155,9 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
    */
   app.put<{ Params: TripParams }>('/trips/:tripId/rate-choice', async (request, reply) => {
     const body = parseBody(rateChoiceBodySchema, request.body)
-    return answer(reply, await api.chooseRate(request.actorId, request.params.tripId, body))
+    return answer(
+      reply,
+      await api.chooseRate(request.actorId, resourceId(request.params.tripId), body),
+    )
   })
 }

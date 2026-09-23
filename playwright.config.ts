@@ -59,7 +59,13 @@ export default defineConfig({
       command: 'node bin/e2e-database.mjs && npm run start -w @molvia/backend',
       url: `http://127.0.0.1:${apiPort}/health`,
       // No central bank in a test run: its answer would decide the outcome (MOL-39).
-      env: { RATES_REFRESH: 'off', API_PORT: apiPort, DATABASE_URL: databaseUrl },
+      env: {
+        RATES_REFRESH: 'off',
+        API_PORT: apiPort,
+        DATABASE_URL: databaseUrl,
+        TELEGRAM_BOT_USERNAME: 'molvia_test_bot',
+        BOT_API_SECRET: 'e'.repeat(43),
+      },
       // Never reuse: on these ports there is nothing of ours to reuse, and a server left by
       // a crashed run must fail loudly instead of quietly answering with old code.
       reuseExistingServer: false,

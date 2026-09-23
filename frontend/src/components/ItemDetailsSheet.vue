@@ -74,12 +74,20 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconMenuDown from '~icons/mdi/menu-down'
 import { currencySchema, currencySign, formatEstimate, formatUnitPrice } from '@molvia/model'
-import type { BaseUnit, CatalogueEntry, Money, TripExpenseView } from '@molvia/model'
+import type {
+  BaseUnit,
+  CatalogueEntry,
+  Currency,
+  Money,
+  TripExpenseView,
+  TripView,
+} from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useItemDetails } from '@/composables/useItemDetails'
 import type { DetailsField, RetryPurchase } from '@/composables/useItemDetails'
@@ -118,6 +126,8 @@ export default defineComponent({
      * was up (MOL-24, С-3; MOL-22, review 8).
      */
     tripId: { type: String as PropType<string | null>, default: null },
+    tripContext: { type: Object as PropType<TripView | null | undefined>, default: undefined },
+    tripCurrency: { type: String as PropType<Currency | undefined>, default: undefined },
     closeSteps: { type: Number as PropType<1 | 2>, default: 1 },
     onClosed: { type: Function as PropType<() => void>, default: undefined },
   },
@@ -136,9 +146,30 @@ export default defineComponent({
     // Both places that know whether a trip is going on: without the queue the sheet would say
     // «start a trip first» at a shelf where one was started with no signal (MOL-22, Р-2).
     const current = useCurrentTrip()
-    const { trip, currency } = current
+    const history = useTripHistoryStore()
+    const localContext = computed(() => history.local.find((row) => row.id === props.tripId))
+    const trip = computed(() =>
+      props.tripContext !== undefined
+        ? props.tripContext
+        : props.tripId && props.tripId !== current.tripId.value
+          ? history.known(props.tripId)
+          : current.trip.value,
+    )
+    const currency = computed(
+      () =>
+        trip.value?.currency ??
+        props.tripCurrency ??
+        localContext.value?.currency ??
+        current.currency.value,
+    )
     // The trip the caller named, or the one going on — the search and a first purchase name none.
-    const writeInto = computed(() => props.tripId ?? current.tripId.value)
+    const writeInto = computed(() =>
+      props.tripId
+        ? trip.value || localContext.value || props.retry
+          ? props.tripId
+          : null
+        : current.tripId.value,
+    )
     const editing = computed(() => props.expense !== null)
     /**
      * «Удалить позицию» is for anything already written down, whether the server has heard of it
@@ -228,7 +259,16 @@ export default defineComponent({
       // The server is asked every time the sheet opens: the trip in memory is for when it cannot
       // be asked, not instead of asking — finished or started anew on another device, it would
       // otherwise take purchases for ever (review Р-2). A failure keeps the memory (В-6).
-      trips.load().catch(() => undefined)
+      //
+      // Which trip to ask about is decided by the caller, not by comparing identifiers: only the
+      // finished-trip screen hands the sheet a trip of its own, and a refusal being corrected on
+      // «Поход» names the trip that refused it — an old one. Asked through the history that put
+      // the selected trip out and skipped the check this branch exists for (А5).
+      if (props.tripId && props.tripContext !== undefined) {
+        void history.open(props.tripId).catch(() => undefined)
+      } else {
+        void trips.load().catch(() => undefined)
+      }
     })
     onUnmounted(() => {
       window.removeEventListener('online', listen)

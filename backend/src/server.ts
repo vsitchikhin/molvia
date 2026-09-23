@@ -1,11 +1,16 @@
 import Fastify from 'fastify'
-import type { FastifyError, FastifyInstance } from 'fastify'
+import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { DomainError, ERROR, ISSUE, errorResponseSchema, isWireCode } from '@molvia/model'
 import type { ErrorCode, ErrorResponse } from '@molvia/model'
 import { InvalidBody } from '@/parse'
+import { loginConfig } from '@/env'
+import type { LoginConfiguration } from '@/login-config'
+import { startLoginCleanup } from '@/login-cleanup'
 import { healthRoutes } from '@/routes/health'
+import { internalAuthRoutes } from '@/routes/internal-auth'
 import { withActor } from '@/routes/actor'
 import { actorMeRoute } from '@/routes/actors'
+import { authRoutes } from '@/routes/auth'
 import { adviceRoutes } from '@/routes/advice'
 import { devLoginRoute } from '@/routes/dev-login'
 import { catalogueRoutes } from '@/routes/catalogue'
@@ -14,7 +19,9 @@ import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
 import { advice } from '@/usecases/advice'
 import { authenticate } from '@/usecases/authenticate'
-import { currentTrip } from '@/usecases/current-trip'
+import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
+import { completeLogin } from '@/usecases/complete-login'
+import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
 import { recentPlaces } from '@/usecases/recent-places'
 import { rateItem } from '@/usecases/rate-item'
@@ -28,11 +35,14 @@ import { createSettingsRepository } from '@/db/settings-repository'
 import { saveSettings } from '@/usecases/save-settings'
 import { settingsRoute } from '@/routes/settings'
 import { startTrip } from '@/usecases/start-trip'
+import { startLogin } from '@/usecases/start-login'
 import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
 import { createActorRepository } from '@/db/actors-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
+import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
+import { authTransactOn } from '@/db/auth-unit-of-work'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { databaseIsReachable, getDb } from '@/db'
@@ -42,6 +52,11 @@ import type { Db } from '@/db'
 // themselves, so a code cannot mean 400 in one place and 404 in another.
 const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.NOT_FOUND]: 404,
+  [ERROR.LOGIN_UNAVAILABLE]: 404,
+  [ERROR.LOGIN_FORBIDDEN]: 403,
+  [ERROR.LOGIN_RATE_LIMITED]: 429,
+  [ERROR.LOGIN_DISABLED]: 503,
+  [ERROR.BOT_UNAUTHORIZED]: 401,
   // The request is well formed; another row already holds what it claims — a barcode that
   // belongs to another item. Not 400: nothing about the request itself is wrong.
   [ERROR.CONFLICT]: 409,
@@ -71,6 +86,39 @@ function isBodyFault(error: FastifyError): boolean {
   return typeof error.code === 'string' && error.code.startsWith('FST_ERR_CTP_')
 }
 
+/**
+ * The driver's code behind a failure — a SQLSTATE such as `23505`, or `CONNECTION_ENDED` — and
+ * nothing else of it: without this every 500 of a login reads as the one word `Error`, and the
+ * message beside it is exactly what carries the query's parameters.
+ */
+function failureCode(error: Error): string | undefined {
+  const cause: unknown = error.cause
+  const code = typeof cause === 'object' && cause !== null && 'code' in cause ? cause.code : null
+  return typeof code === 'string' && /^[\dA-Z_]{1,64}$/.test(code) ? code : undefined
+}
+
+/**
+ * Where every reply is `no-store` and an error is logged by name only.
+ *
+ * Judged by the route that matched, not by how the URL was spelt: the router decodes static
+ * segments too, so `/internal/%61uth/…` reached `confirm` while a prefix test on the raw URL
+ * said «not auth» and logged the driver's message whole (adversarial Б2). With no route — a 404,
+ * or a URL refused before routing — the decoded path stands in for it.
+ */
+function isAuthRequest(request: FastifyRequest): boolean {
+  const path = request.routeOptions.url ?? decodedPath(request.url)
+  return path.startsWith('/auth/') || path.startsWith('/internal/auth/')
+}
+
+function decodedPath(url: string): string {
+  const path = url.split('?', 1)[0] ?? ''
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
+}
+
 export interface ServerOptions {
   /**
    * The connection the repositories are built on. Integration tests point it at their own
@@ -79,12 +127,51 @@ export interface ServerOptions {
    * rows passes while proving nothing.
    */
   readonly db?: Db
+  readonly login?: LoginConfiguration | null
+  /** Where the log goes instead of stdout — for the test that reads what an auth failure logs. */
+  readonly logStream?: { write(line: string): void }
 }
 
 export function buildServer(options: ServerOptions = {}): FastifyInstance {
-  const app = Fastify({ logger: true })
+  const app = Fastify({
+    logger: {
+      // Fastify's default serializers write no headers at all, so today this hides nothing; it
+      // is here for the day a serializer is widened. What keeps credentials out of the log now
+      // is the error handler below, and a test holds that, not this line.
+      redact: ['req.headers.cookie', 'req.headers.authorization', 'res.headers'],
+      ...(options.logStream ? { stream: options.logStream } : {}),
+    },
+    // No limit of the router's own: every parameter is judged by the schema of its route, which
+    // answers a value no row could carry with the same nothing as any other (`login_unavailable`,
+    // `path_invalid`). The default of 100 answered before the route did, and differently
+    // (adversarial Б1). Node's own limit on the request line is the ceiling that remains.
+    maxParamLength: 16 * 1024,
+    // A path that does not decode (`%E0`) is refused before any hook runs, so its reply is
+    // built here, in the API's own shape and — under the auth paths — `no-store` like the rest.
+    frameworkErrors: (error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
+      if (isAuthRequest(request)) void reply.header('cache-control', 'no-store')
+      // Both are the caller's: a path that does not decode, and one past a raised header limit.
+      if (error.code === 'FST_ERR_BAD_URL' || error.code === 'FST_ERR_MAX_PARAM_LENGTH') {
+        void reply
+          .status(error.code === 'FST_ERR_BAD_URL' ? 400 : 414)
+          .send({ code: ISSUE.PATH_INVALID })
+        return
+      }
+      app.log.error({ errorName: error.name }, 'request refused by the framework')
+      void reply.status(500).send({ code: ERROR.INTERNAL })
+    },
+  })
 
-  app.setErrorHandler((error: FastifyError, _request, reply) => {
+  // The auth scopes set `no-store` on what their routes answer, but a path no route matches
+  // and a URL Fastify cannot decode are answered before any scope is entered (adversarial А4).
+  // The body of those stays Fastify's own: the client reads a code it does not recognise as
+  // «the API did not answer», and that is the truth for an address the API does not have.
+  app.addHook('onRequest', (request, reply, next) => {
+    if (isAuthRequest(request)) void reply.header('cache-control', 'no-store')
+    next()
+  })
+
+  app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof DomainError) {
       const status = STATUS_BY_CODE[error.code] ?? 400
       // RFC 9110 §15.5.2 makes a challenge mandatory on a 401. The scheme is this project's
@@ -113,7 +200,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       return reply.status(400).send(answer({ code, ...(details ? { details } : {}) }))
     }
 
-    app.log.error(error)
+    // Driver errors can carry SQL parameters; an auth failure must never log credentials.
+    if (isAuthRequest(request)) {
+      app.log.error({ errorName: error.name, code: failureCode(error) }, 'authentication failed')
+    } else {
+      app.log.error(error)
+    }
     return reply.status(error.statusCode ?? 500).send({ code: ERROR.INTERNAL })
   })
 
@@ -122,6 +214,20 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   // name a repository would be a route that could reach the database.
   app.register((instance, _options, done) => {
     const db = options.db ?? getDb()
+    const loginRequests = createLoginRequestRepository(db)
+    let stopCleanup: (() => Promise<void>) | undefined
+    instance.addHook('onReady', (ready) => {
+      stopCleanup = startLoginCleanup(
+        () => loginRequests.removeExpired(),
+        () => {
+          instance.log.error('login request cleanup failed')
+        },
+      )
+      ready()
+    })
+    instance.addHook('onClose', async () => {
+      await stopCleanup?.()
+    })
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
     const events = createEventRepository(db)
@@ -131,6 +237,20 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const verdicts = createVerdictRepository(db)
 
     healthRoutes(instance, { databaseIsReachable })
+    const login = options.login === undefined ? loginConfig : options.login
+    authRoutes(instance, {
+      start: (name) => {
+        if (!login) throw new DomainError(ERROR.LOGIN_DISABLED)
+        return startLogin(loginRequests, login.username, name)
+      },
+      poll: (id, secret) => completeLogin(authTransactOn(db), id, secret),
+    })
+    internalAuthRoutes(instance, {
+      secret: login?.botSecret ?? null,
+      preview: (code) => previewLogin(loginRequests, code),
+      confirm: (code, telegramId) => confirmLogin(loginRequests, code, telegramId),
+      decline: (code) => declineLogin(loginRequests, code),
+    })
 
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).
     // `bin/bundle.mjs` replaces this exact expression with the literal `'production'`, so in
@@ -168,11 +288,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       tripRoutes(guarded, {
         start: (actor, body) => startTrip(transact, actor, body),
         current: (actorId) => currentTrip(tripData, actorId),
+        selected: (actorId, id) => selectedTrip(tripData, actorId, id),
+        history: (actorId, cursor) => tripData.trips.history(actorId, cursor),
         add: (actorId, tripId, body) => addExpense(transact, actorId, tripId, body),
         update: (actorId, tripId, expenseId, patch) =>
           updateExpense(transact, actorId, tripId, expenseId, patch),
         remove: (actorId, tripId, expenseId) => removeExpense(transact, actorId, tripId, expenseId),
-        finish: (actorId, tripId) => finishTrip(tripData.trips, actorId, tripId),
+        finish: (actorId, tripId, deviceAt) =>
+          finishTrip(tripData.trips, actorId, tripId, deviceAt),
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
       })
       adviceRoutes(guarded, {

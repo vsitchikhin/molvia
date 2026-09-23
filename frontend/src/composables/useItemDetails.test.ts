@@ -37,8 +37,6 @@ function trip(rate: string | null = null): TripView {
       id: 'aaaaaaaa-0000-4000-8000-000000000001',
       kind: 'store',
       name: 'Ереван Сити',
-      country: 'AM',
-      city: 'Гюмри',
     },
     expenses: [],
     total: [],

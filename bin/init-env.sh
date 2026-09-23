@@ -33,13 +33,20 @@ if [ -e "$env_path" ] && [ "$force" -eq 0 ]; then
   exit 1
 fi
 
-# Токен бота переживает --force. Всё остальное в файле вычисляется из индекса, а он
+# Токен, username и внутренний секрет бота переживают --force. Токен
 # вписан руками и в BotFather повторно не показывается: перевыпуск отзывает старый.
 # MOL-60 сделал --force обязательным для всех уже заведённых копий, и без переноса
 # документированная починка стоила бы бота.
 kept_token=""
+kept_bot_secret=""
+kept_bot_username=""
 if [ -e "$env_path" ]; then
   kept_token="$(sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$env_path" | head -n 1)"
+  kept_bot_secret="$(sed -n 's/^BOT_API_SECRET=//p' "$env_path" | head -n 1)"
+  kept_bot_username="$(sed -n 's/^TELEGRAM_BOT_USERNAME=//p' "$env_path" | head -n 1)"
+fi
+if [ -z "$kept_bot_secret" ]; then
+  kept_bot_secret="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
 fi
 
 offset=$(( index * 10 ))
@@ -87,6 +94,9 @@ E2E_DATABASE_URL=postgres://molvia:molvia@127.0.0.1:${pg_port}/molvia_${index}_e
 # апдейты через long polling — молча и невоспроизводимо. Завести отдельного
 # в BotFather, если эта копия будет работать параллельно с другой.
 TELEGRAM_BOT_TOKEN=${kept_token}
+# Username without @, set by the owner. The internal secret is generated once per copy.
+TELEGRAM_BOT_USERNAME=${kept_bot_username}
+BOT_API_SECRET=${kept_bot_secret}
 
 # Открытый API ЦБ Армении, ключа не требует
 CBA_RATES_URL=https://cb.am/latest.json.php
@@ -100,6 +110,6 @@ if [ -n "$kept_token" ]; then
 else
   echo "Осталось вписать TELEGRAM_BOT_TOKEN."
 fi
-# Кода приглашения больше нет (MOL-52): дверь снята, а личность до MOL-54 заводит
-# шов POST /dev/actors, которого нет в прод-сборке. Ссылка — просто адрес копии.
+# Кода приглашения больше нет (MOL-52). Вход API — MOL-54; до экрана MOL-56
+# разработка использует POST /dev/login. Ссылка — просто адрес копии.
 echo "Приложение: http://127.0.0.1:$pwa_port/"

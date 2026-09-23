@@ -1,3 +1,5 @@
+import { resourceIdOf } from '@molvia/model'
+
 /**
  * `RETURNING` on a write that succeeded always yields its row, so an empty result is not an
  * ordinary outcome here — it means the statement did something other than what this code
@@ -13,8 +15,6 @@ export function theRow<T>(row: T | undefined, table: string): T {
   return row
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
 /**
  * An identifier that reached a query, or `null` when it could never match a row.
  *
@@ -25,7 +25,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  * differently again. Read paths take the `null` and return nothing found.
  */
 export function idOrNull(id: string): string | null {
-  return UUID.test(id) ? id : null
+  return resourceIdOf(id)
 }
 
 /**

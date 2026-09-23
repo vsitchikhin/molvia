@@ -1,3 +1,4 @@
+import { DomainError, ERROR, resourceIdOf } from '@molvia/model'
 import type { ZodError, ZodType } from 'zod'
 
 /*
@@ -43,4 +44,11 @@ export function parseQuery<T>(schema: ZodType<T>, query: unknown): T {
 /** And for the parameters of a path, for the same reason. */
 export function parseParams<T>(schema: ZodType<T>, params: unknown): T {
   return parseBody(schema, params)
+}
+
+/** Resource addresses accept either case; malformed, missing and private all look absent. */
+export function resourceId(value: unknown): string {
+  const id = resourceIdOf(value)
+  if (id === null) throw new DomainError(ERROR.NOT_FOUND)
+  return id
 }

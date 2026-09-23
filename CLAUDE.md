@@ -680,12 +680,39 @@ database access. In a product about data integrity, two write paths will silentl
   verdict is data with a reader (the gate counts it), a session is a key, and a discarded key
   has no readers. Deletion also makes «revoked», «expired» and «never existed» one answer for
   free, where a flag would need every later query to remember it.
+- **A login is a five-minute, one-use request (MOL-54).** The link carries a public code;
+  `__Host-molvia_login` carries an independent secret, stored only as a hash. The bot confirms
+  the code with a Telegram id, but only the browser holding the secret can collect a session.
+  **Whose Telegram confirms is not checked against anything** (adversarial А1, owner's decision
+  23.09.2026): someone who sees the link within its five minutes can confirm it with their own
+  account, and the browser that started it silently collects _that_ account — its purchases
+  then land there — and anyone holding the code can decline it. Accepted while the code goes
+  from the browser straight into Telegram on the same device; a QR or a login from another
+  device reopens the question. The term is the database clock's alone: the row takes both of
+  its times from `clock_timestamp()` and the cookie's `Max-Age` is the lifetime itself, so an
+  API clock off Postgres neither refuses a start nor shortens the cookie.
+  Collection locks the row before checking the current database clock, then consumes it,
+  finds or creates the owner and writes the session in one transaction. A concurrent first
+  login uses `ON CONFLICT DO NOTHING` and a new read, not a caught unique violation inside an
+  already-aborted transaction. Nothing updates the existing owner's settings.
+  **The cookie is sent after commit, only once.** A lost response means checking `/actors/me`
+  and starting again if it never arrived, not replaying the token. One pending request per
+  browser cookie store; a new start replaces its secret. Polls never clear that cookie, since
+  an old response could erase a newer request. Safari and an installed PWA have separate stores.
+  Start and GET poll require `X-Molvia-Login: 1`, reject foreign fetch metadata and expose no
+  CORS; HEAD cannot consume. This GET is the deliberate exception to the usual read-only rule.
+  All auth replies are `no-store`, including refusals and what Fastify answers itself under
+  those paths — no route, a path that does not decode. The bot uses a separate `BOT_API_SECRET`,
+  never the Telegram token; Caddy additionally blocks its internal paths from outside.
+  **Thirty starts in a rolling minute, across the database**, including consumed requests:
+  the quota is serialized with an advisory lock. Its shared denial-of-service price is accepted.
+  Expired requests are removed at start, at boot and every minute; no login writes `events`.
 - **The token rides in a cookie, and `backend/src/cookie.ts` is the only module that touches
   one (MOL-53).** `__Host-molvia_session`, with `HttpOnly` so an XSS cannot carry the account
   away and so ITP's seven-day cap — which applies to what a _script_ writes — never reaches it;
   `Secure` always, with no branch for the environment, because a branch saying «here it is not
-  needed» eventually reaches production; `SameSite=Lax`, since every handle that writes is
-  `POST`, `PUT` or `DELETE` and `Strict` would additionally refuse the one navigation the epic is
+  needed» eventually reaches production; `SameSite=Lax`, with the special-header guard above
+  for the login GET; `Strict` would additionally refuse the one navigation the epic is
   built around — the person coming back from the bot; `Path=/` with no `Domain`, because the
   browser sees `/api/…` and both Caddy and the Vite proxy strip that prefix; `Max-Age` rather
   than `Expires`, so the clock of the device does not decide. The **`__Host-` prefix** is the
@@ -695,6 +722,15 @@ database access. In a product about data integrity, two write paths will silentl
   cached» holds without anyone remembering it, and a test asserts that no second module writes
   `set-cookie`. The one price, named: over plain http on the LAN (`PWA_EXPOSE=1 make dev`)
   `Secure` means no session — the same place the camera already needs `make certs`.
+- **What an address of a resource may look like is one rule, in `packages/model/src/support/resource.ts`
+  (MOL-25, Р-3).** An identifier in a path is taken in either case and answered in lower case:
+  Postgres compares uuids without case and answers in lower case, so a path spelled `AB12…` would
+  reach a row whose id comes back `ab12…` and the device would not recognise its own row in the
+  reply. A malformed one is **404, not 400** — malformed, missing and someone else's are one
+  answer, or an identifier could be guessed by the difference. Bodies that _create_ a row are the
+  other way round and stay strict (`deviceIdSchema`), so the answer and the draft on the phone
+  agree on one spelling. The rule lived in three places and two of them had already drifted over
+  the case; tests on both sides hold the callers to it, as they do for `INVISIBLE`.
 - **What a secret may look like is one rule, in `backend/src/secret.ts`** — RFC 6265's
   `cookie-octet`, because the only thing a session token or a login request's secret ever travels
   in is a cookie. It was two rules once, and they drifted by four characters: a token holding
@@ -1010,6 +1046,16 @@ is open answers `409 error.trip_open`, and the screen asks whether to continue t
 it first. A finished trip still takes rows — the soy sauce found in the bag at home belongs to the
 trip it was bought on. The trip and its rows are named by the device, so a queue sent twice is one
 purchase.
+**MOL-25 makes completed trips reachable through the whole history**, in pages of twenty, and
+lets a purchase be added, amended or removed there while another trip stays current. The selected
+trip owns the currency, rate and total of its sheet. The phone remembers the first history page,
+the last selected trip and snapshots of completions still synchronising; the queue remains the
+only source of pending writes. **Every conflicting start asks**, including the same shop. A choice
+is tied to the owner, the queued start's key and the open trip, checked again under the queue lock.
+**Completion has two clocks:** `finished_at` remains the server's receipt, while
+`finished_on_device_at` records the first tap kept in the queue. History uses the device's time,
+with the server's as fallback for old rows. It may precede the server start after an offline trip;
+it changes neither rate snapshots nor gates nor purchase dates. Finishing twice moves neither time.
 MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
 MOL-39 the official rate — a cache refreshed hourly, snapshotted by every new trip, a jump
 left to the person; MOL-24 the sheet «сколько, в чём, почём» — a live unit price, a price in any
@@ -1071,11 +1117,13 @@ id, were left where no screen could reach them. A cookie of its own now remember
 this browser was given, which is what Telegram itself becomes in MOL-54; clearing the browser's
 cookies is the one thing that still makes a new person, and that is the development counterpart
 of losing the Telegram account.
-Until MOL-54 a session comes from `POST /dev/login`, a seam that **is not in the production
+Development still gets a session from `POST /dev/login`, a seam that **is not in the production
 bundle at all** — the bundler folds its guard to a constant and the module is tree-shaken away,
 which a test asserts against the built file rather than against the intention; the PWA's call to
-it is behind `import.meta.env.DEV`, so the production bundle does not hold it either. The price is
-named: in production there is no way in until MOL-54 exists.
+it is behind `import.meta.env.DEV`, so the production bundle does not hold it either.
+MOL-54 added the real API: browser start/poll and internal bot preview/confirm/decline, shared
+contracts and separate clients. Production requires `TELEGRAM_BOT_USERNAME` and `BOT_API_SECRET`.
+The user-facing flow still needs bot commands (MOL-55) and the PWA screen (MOL-56).
 
 MOL-65 gave the person their four fields and a fourth tab: Armenia, Гюмри or Ереван, the currency
 purchases are written in and the one they are converted into. `PUT /actors/me/settings` compares
@@ -1133,11 +1181,21 @@ The shape worth knowing here:
   the code deployed against it is the worse of the two failures. `make migrate`, the test
   setup and the boot path all go through the same code, so a migration cannot behave one
   way locally and another in production.
-- **A migration applied anywhere is never rewritten.** drizzle decides what to run by the
-  journal's `created_at` alone and never compares a file with what was applied: a rewritten
-  migration is skipped silently if its stamp is older, and fails on its first `CREATE` if newer
-  — then the API does not start. Folding a task's migrations into one is safe only while no
-  database has run them; MOL-39 checked every copy's journal before and after doing it.
+- **A merged migration is never rewritten.** drizzle decides what to run by the journal's
+  `created_at` alone and never compares a file with what was applied: a rewritten migration is
+  skipped silently if its stamp is older, and fails on its first `CREATE` if newer — then the
+  API does not start.
+
+  **The line is the merge of the pull request, not the first database to run it** (owner's
+  decision, 23.09.2026). The rule is about the production database and about branches other
+  people build on; a working copy's database is pushed around all through development anyway.
+  So while the task is still open, a task's migrations may be folded into one — and then **every
+  database that already ran the old file is brought into line by hand, in the same sitting**,
+  because those are the ones drizzle will silently skip. MOL-39 checked every copy's journal
+  before and after doing it; MOL-25 did the same and applied the added index to this copy's
+  three databases with the very statement the file now carries. After the merge the file is
+  frozen and a change to the schema is a new migration, always.
+
 - **Postgres publishes no port.** It is reachable only over the compose network.
 - **The PWA calls `/api/...`** and Caddy strips the prefix — the same shape the Vite dev
   proxy has, so nothing about the origin differs between development and production.

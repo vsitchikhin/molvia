@@ -1,12 +1,17 @@
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import {
+  DomainError,
+  ERROR,
+  LOGIN_LIFETIME_SECONDS,
+  LOGIN_WINDOW_LIMIT,
+  LOGIN_WINDOW_SECONDS,
   deviceNameOrNull,
   loginCodeSchema,
   loginRequestSchema,
   newLoginRequestSchema,
   telegramUserIdSchema,
 } from '@molvia/model'
-import type { LoginRequest, TelegramUserId } from '@molvia/model'
+import type { LoginRequest, NewLoginRequest, TelegramUserId } from '@molvia/model'
 import { sha256Hex } from './digest'
 import { secretOrNull } from '@/secret'
 import { translateFailures } from './failure'
@@ -15,6 +20,16 @@ import { idOrNull, theRow } from './rows'
 import { loginRequests } from './schema'
 
 export interface LoginRequestRepository {
+  /** Lock before checking time: waiting for another write must not extend a login. */
+  lock(id: string, secret: string): Promise<void>
+  createLimited(
+    id: string,
+    code: string,
+    secret: string,
+    deviceName: string | null,
+  ): Promise<LoginRequest>
+  removeExpired(): Promise<void>
+
   /**
    * Takes the browser's secret itself and writes only its digest, as sessions do (Р-6), and
    * judges what it was given **before** a row exists (`newLoginRequestSchema`) — a code the
@@ -84,6 +99,32 @@ function codeOrNull(code: string): string | null {
   return loginCodeSchema.safeParse(code).success ? code : null
 }
 
+async function insert(
+  db: Conn,
+  secret: string,
+  fields: Omit<NewLoginRequest, 'deviceName'> & { readonly deviceName: string | null },
+): Promise<LoginRequest> {
+  // As in the session repository: a secret this server could not have minted means a caller
+  // went around the path that mints one, and there is nothing to answer a client with.
+  if (secretOrNull(secret) === null) {
+    throw new Error('a secret this server could not have minted reached the login repository')
+  }
+
+  const input = newLoginRequestSchema.parse({
+    ...fields,
+    // Decoration: cut if too long, `null` if it draws nothing — the rule sessions apply.
+    deviceName: deviceNameOrNull(fields.deviceName),
+  })
+
+  return translateFailures(async () => {
+    const [row] = await db
+      .insert(loginRequests)
+      .values({ ...input, secretHash: sha256Hex(secret) })
+      .returning()
+    return toLoginRequest(theRow(row, 'login_requests'))
+  })
+}
+
 export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
   /**
    * Alive: not spent, not put out, not run out. Every read below starts here, which is what
@@ -94,31 +135,55 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
    * promise: a value no row could carry has to answer with the same nothing, not with an error
    * from Postgres about its shape.
    */
-  const live = sql`${loginRequests.consumedAt} is null and ${loginRequests.expiresAt} > now()`
+  const live = sql`${loginRequests.consumedAt} is null and ${loginRequests.expiresAt} > clock_timestamp()`
 
   return {
+    async removeExpired() {
+      await db.delete(loginRequests).where(sql`${loginRequests.expiresAt} <= clock_timestamp()`)
+    },
+
+    async createLimited(id, code, secret, deviceName) {
+      return db.transaction(async (tx) => {
+        // One quota for this database, including concurrent starts and process restarts.
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended('molvia:login-quota', 0))`,
+        )
+        const repository = createLoginRequestRepository(tx)
+        await repository.removeExpired()
+        const [count] = await tx
+          .select({ value: sql<number>`count(*)`.mapWith(Number) })
+          .from(loginRequests)
+          .where(
+            sql`${loginRequests.createdAt} > clock_timestamp() - make_interval(secs => ${LOGIN_WINDOW_SECONDS})`,
+          )
+        if ((count?.value ?? 0) >= LOGIN_WINDOW_LIMIT)
+          throw new DomainError(ERROR.LOGIN_RATE_LIMITED)
+        // Read the clock after the quota lock, not at the transaction's earlier start, and
+        // write it in the same statement: the quota above counts by this very column.
+        const [clock] = await tx.execute<{ at: string }>(sql`select clock_timestamp()::text as at`)
+        if (!clock) throw new Error('database returned no login clock')
+        const createdAt = new Date(clock.at)
+        return insert(tx, secret, {
+          id,
+          code,
+          deviceName,
+          createdAt,
+          expiresAt: new Date(createdAt.getTime() + LOGIN_LIFETIME_SECONDS * 1000),
+        })
+      })
+    },
+
+    async lock(id, secret) {
+      if (idOrNull(id) === null || secretOrNull(secret) === null) return
+      await db
+        .select({ id: loginRequests.id })
+        .from(loginRequests)
+        .where(and(eq(loginRequests.id, id), eq(loginRequests.secretHash, sha256Hex(secret))))
+        .for('update')
+    },
+
     async create(id, code, secret, deviceName, expiresAt) {
-      // As in the session repository: a secret this server could not have minted means a caller
-      // went around the path that mints one, and there is nothing to answer a client with.
-      if (secretOrNull(secret) === null) {
-        throw new Error('a secret this server could not have minted reached the login repository')
-      }
-
-      const input = newLoginRequestSchema.parse({
-        id,
-        code,
-        // Decoration: cut if too long, `null` if it draws nothing — the rule sessions apply.
-        deviceName: deviceNameOrNull(deviceName),
-        expiresAt,
-      })
-
-      return translateFailures(async () => {
-        const [row] = await db
-          .insert(loginRequests)
-          .values({ ...input, secretHash: sha256Hex(secret) })
-          .returning()
-        return toLoginRequest(theRow(row, 'login_requests'))
-      })
+      return insert(db, secret, { id, code, deviceName, expiresAt })
     },
 
     async byCode(code) {

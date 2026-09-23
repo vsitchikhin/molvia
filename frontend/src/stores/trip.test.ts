@@ -27,8 +27,6 @@ function trip(id: string, over: { finishedAt?: string | null; amount?: string } 
       id: 'aaaaaaaa-0000-4000-8000-000000000001',
       kind: 'store',
       name: 'Ереван Сити',
-      country: 'AM',
-      city: 'Гюмри',
     },
     expenses: [],
     total: over.amount ? [{ amount: over.amount, currency: 'AMD' }] : [],

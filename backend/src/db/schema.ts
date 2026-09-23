@@ -81,8 +81,11 @@ const BLANKS = String.raw` \t\r\n\u00A0\u200B\u200C\u200D\uFEFF`
 const SELECTORS = String.raw`[\uFE00-\uFE0F\U000E0100-\U000E01EF]`
 
 /**
- * The identity of a place as the unique index below computes it. Exported because the
- * repository has to repeat it word for word: `ON CONFLICT` infers an index over expressions
+ * The identity of a place as the unique index below computes it. Its twin in TypeScript is
+ * `placeNameIdentity` in `packages/model`, for the screen that has to know the same thing with
+ * no request to make; an integration test runs a corpus through both and holds them equal.
+ *
+ * Exported because the repository has to repeat it word for word: `ON CONFLICT` infers an index over expressions
  * only from the very same expressions, and naming the columns instead answers `42P10` on the
  * first duplicate \u2014 measured in the review of MOL-6. One definition, two call sites, so the
  * index and the conflict target cannot drift apart.
@@ -381,11 +384,23 @@ export const trips = pgTable(
       .notNull()
       .default(sql`clock_timestamp()`),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
+    finishedOnDeviceAt: timestamp('finished_on_device_at', { withTimezone: true }),
   },
   (table) => [
     // The list of trips, the running one, and «what is still unrated» all walk one actor
     // in time order.
     index('trips_actor_started_idx').on(table.actorId, table.startedAt),
+    // «Что брали» walks one actor's finished trips newest first, by the time the device named
+    // and the server's where there is none — the expression the history orders and pages by.
+    // Without it every page sorts all of that actor's trips again, which is exactly what the
+    // cursor exists to avoid (MOL-25, Б2). Partial, because the query always says so.
+    index('trips_actor_finished_idx')
+      .on(
+        table.actorId,
+        sql`coalesce(${table.finishedOnDeviceAt}, ${table.finishedAt}) desc`,
+        sql`${table.id} desc`,
+      )
+      .where(sql`${table.finishedAt} is not null`),
     // «Where is it cheaper» joins expenses to trips to places and filters by city: this is
     // the one foreign key of 0.1 that a product query walks, not merely a delete.
     index('trips_place_idx').on(table.placeId),
