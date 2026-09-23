@@ -1100,7 +1100,9 @@ falls out of its own owner's prices. **The form's draft belongs to the account a
 window**: it is kept under the owner's key on the device, as verdict drafts are, because the
 system closes an installed app by itself — and «изменения останутся только пока приложение
 открыто» is then what it says, a shelf that refused, rather than a permanent condition nobody
-is told about. «Что брать» answers with the geography it counted by, and
+is told about. It is written to both shelves and **read from this window's own one first**, so
+a new launch takes the last draft written while two windows open at once keep the forms they
+are typing into. «Что брать» answers with the geography it counted by, and
 the phone compares it with its own: a different city is a list to load again, and an answer the
 settings will not move to is taken as it is — the screen used to stay on a skeleton for good.
 
