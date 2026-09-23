@@ -893,6 +893,35 @@ database access. In a product about data integrity, two write paths will silentl
   page scrolls»**: a panel over the screen has no window of its own, so it scrolls itself and
   the page under it is held still.
 
+## The bot, and what it is allowed to know (MOL-55)
+
+The bot is the second half of the login and nothing else in 0.1: the one place a person is
+shown **which device** they are letting in and says «yes» to it by hand. Rating reminders are
+0.2.
+
+- **The i18n rule of the frontend covers the bot too, and this is the line that says so.** Not a
+  string of text in the code — every message is a key, Russian first, English mirroring it. The
+  dictionaries are `.ts` rather than `.json`, unlike the PWA's: there Vite loads them, here the
+  module is read by `tsx` and bundled by esbuild, where a JSON import in ESM wants attributes.
+  The keys become a type as a result, so **the two languages mirror each other by the type
+  checker**, and the test is left to cover what types cannot see — an empty value and a lost
+  substitution. The language is `pickLocale` of `packages/model`, the very rule the PWA uses:
+  Telegram's `language_code` is an IETF tag like any other, and a second copy of that decision
+  would be a second place to drift.
+- **The bot keeps no state of its own.** The login code rides in the button's `callback_data`,
+  which is Telegram's memory rather than ours, and everything else is asked of the API — the
+  only write path there is. So nothing survives a restart, because nothing needs to.
+- **It repeats none of the API's rules.** The five-minute term, the one-use rule, the quota and
+  «expired, spent, declined and unknown are one answer» belong to MOL-54 and are read off its
+  refusals. The bot adds exactly two things: the account, which only Telegram can vouch for,
+  and the person's explicit consent.
+- **Telegram updates are never logged whole** (the privacy page, п. 4.3): an update carries a
+  name, a username and a language we deliberately do not store. What goes to the log is the code
+  of the error and the operation that failed.
+- **A copy without `TELEGRAM_BOT_TOKEN` or without `BOT_API_SECRET` does not start**, says so in
+  one line and exits 0 — «this copy has no bot» must not become a restart loop under compose.
+  Such a copy signs in through `POST /dev/login` and cannot use Telegram at all.
+
 ## Code rules
 
 - **Minimal diff** — change only what the task requires. No drive-by refactoring, no
@@ -1121,7 +1150,11 @@ which a test asserts against the built file rather than against the intention; t
 it is behind `import.meta.env.DEV`, so the production bundle does not hold it either.
 MOL-54 added the real API: browser start/poll and internal bot preview/confirm/decline, shared
 contracts and separate clients. Production requires `TELEGRAM_BOT_USERNAME` and `BOT_API_SECRET`.
-The user-facing flow still needs bot commands (MOL-55) and the PWA screen (MOL-56).
+MOL-55 gave the bot its half: `/start <code>` names the device and the age of the request and
+offers «Войти» and «Это не я», the answer replaces the question so its buttons go with it, and
+five kinds of dead code get one reply. With it the bot got a dictionary of its own and
+`pickLocale` moved into `packages/model`, where the PWA now reads it from too. The user-facing
+flow still needs the PWA screen (MOL-56).
 
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
@@ -1251,7 +1284,10 @@ by hand.
   other, and silently: the second copy sees a foreign schema and assumes the migration is
   already applied.
 - **Each copy gets its own bot.** Two processes on one token steal each other's updates via
-  long polling — silently and unreproducibly. Register a separate bot in BotFather.
+  long polling — silently and unreproducibly. Register a separate bot in BotFather. **A copy
+  without a token cannot sign in through Telegram at all** — its only door is `POST /dev/login`,
+  and the same holds without `TELEGRAM_BOT_USERNAME`, which is what the API builds the link
+  from: starting a real login there answers `503 error.login_disabled`.
 
 **Plans and requirements live in `.scratch/tasks/`, not in the working copy and not on the
 Jira issue.** A copy is temporary and a task is not; `.scratch` is the shared directory, so

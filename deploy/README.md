@@ -27,17 +27,19 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 Migrations run when the API starts, so there is no separate step to remember and no
 window where the schema lags the code deployed against it.
 
-## Login configuration (MOL-54)
+## Login configuration (MOL-54, MOL-55)
 
-The API now supports Telegram login. The bot commands (MOL-55) and the PWA login screen
-(MOL-56) still need to be connected before people can use the complete flow.
+The API supports Telegram login and the bot confirms it. The PWA login screen (MOL-56) still
+needs to be connected before people can use the complete flow.
 `POST /dev/login` remains a development seam and is absent from the production bundle.
 
 Set `TELEGRAM_BOT_USERNAME` without `@` and generate `BOT_API_SECRET` using the command in
 `.env.prod.example`. This secret belongs to the internal API channel and is **not** the
 Telegram bot token. The backend and bot receive the same internal secret; only the bot
 receives `TELEGRAM_BOT_TOKEN`. Production refuses to start without the username and internal
-secret. Caddy returns 404 for `/api/internal` and `/api/internal/*`; the bot calls
+secret, and the bot itself exits without either its token or the internal secret.
+`APP_BASE_URL` is what the bot's greeting points people at: compose derives it from `DOMAIN`,
+and a working copy that leaves it out gets its own PWA port. Caddy returns 404 for `/api/internal` and `/api/internal/*`; the bot calls
 `http://backend:3300/internal/...` directly over the compose network and authenticates there.
 
 In a development copy with an older `.env`, run `bin/init-env.sh <index> --force` once. It
