@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { actorCodec, settingsOf } from '@molvia/model'
 import { asBrowser, signedIn } from './session'
@@ -135,7 +136,9 @@ test('a trip started by the old app asks for its city and currencies before it i
   page,
 }) => {
   const owner = await signedIn(page)
-  const tripId = '7b2f1c4e-0000-4000-8000-00000000c001'
+  // Fresh, never fixed: the identifier is the trip's key on the server, and the e2e database is
+  // shared by the workers — a constant one collides with another run's trip and answers 409.
+  const tripId = randomUUID()
   // A start written by the version before MOL-65: no context at all, which is the one branch
   // the server answers `error.trip_context_required` to.
   await page.evaluate(
