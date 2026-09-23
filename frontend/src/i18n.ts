@@ -1,9 +1,9 @@
 import { createI18n } from 'vue-i18n'
 import type { I18n } from 'vue-i18n'
+import { pickLocale } from '@molvia/model'
+import type { AppLocale } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
-import { pickLocale } from '@/i18n/locale'
-import type { AppLocale } from '@/i18n/locale'
 import { pluralRu } from '@/i18n/plural-ru'
 
 /**

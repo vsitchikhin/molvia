@@ -2,6 +2,13 @@ export const LOCALES = ['ru', 'en'] as const
 export type AppLocale = (typeof LOCALES)[number]
 
 /**
+ * Which language a person is shown, from whatever tag the platform hands us — in one place.
+ *
+ * It lived in the PWA until MOL-55, when the bot needed the same rule: Telegram's
+ * `language_code` is the same kind of IETF tag as `navigator.languages`, and a second copy of
+ * this decision would have been a second place to drift — the way `INVISIBLE` and the resource
+ * identifier both drifted before they were brought together.
+ *
  * Russian is the default and English is the exception — deliberately, and not the other way
  * round.
  *
