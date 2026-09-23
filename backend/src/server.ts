@@ -93,9 +93,26 @@ function failureCode(error: Error): string | undefined {
   return typeof code === 'string' && /^[\dA-Z_]{1,64}$/.test(code) ? code : undefined
 }
 
-/** Where every reply is `no-store` and an error is logged by name only. */
-function isAuthPath(url: string): boolean {
-  return url.startsWith('/auth/') || url.startsWith('/internal/auth/')
+/**
+ * Where every reply is `no-store` and an error is logged by name only.
+ *
+ * Judged by the route that matched, not by how the URL was spelt: the router decodes static
+ * segments too, so `/internal/%61uth/…` reached `confirm` while a prefix test on the raw URL
+ * said «not auth» and logged the driver's message whole (adversarial Б2). With no route — a 404,
+ * or a URL refused before routing — the decoded path stands in for it.
+ */
+function isAuthRequest(request: FastifyRequest): boolean {
+  const path = request.routeOptions.url ?? decodedPath(request.url)
+  return path.startsWith('/auth/') || path.startsWith('/internal/auth/')
+}
+
+function decodedPath(url: string): string {
+  const path = url.split('?', 1)[0] ?? ''
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
 }
 
 export interface ServerOptions {
@@ -120,12 +137,20 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       redact: ['req.headers.cookie', 'req.headers.authorization', 'res.headers'],
       ...(options.logStream ? { stream: options.logStream } : {}),
     },
+    // No limit of the router's own: every parameter is judged by the schema of its route, which
+    // answers a value no row could carry with the same nothing as any other (`login_unavailable`,
+    // `path_invalid`). The default of 100 answered before the route did, and differently
+    // (adversarial Б1). Node's own limit on the request line is the ceiling that remains.
+    maxParamLength: 16 * 1024,
     // A path that does not decode (`%E0`) is refused before any hook runs, so its reply is
     // built here, in the API's own shape and — under the auth paths — `no-store` like the rest.
     frameworkErrors: (error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
-      if (isAuthPath(request.url)) void reply.header('cache-control', 'no-store')
-      if (error.code === 'FST_ERR_BAD_URL') {
-        void reply.status(400).send({ code: ISSUE.PATH_INVALID })
+      if (isAuthRequest(request)) void reply.header('cache-control', 'no-store')
+      // Both are the caller's: a path that does not decode, and one past a raised header limit.
+      if (error.code === 'FST_ERR_BAD_URL' || error.code === 'FST_ERR_MAX_PARAM_LENGTH') {
+        void reply
+          .status(error.code === 'FST_ERR_BAD_URL' ? 400 : 414)
+          .send({ code: ISSUE.PATH_INVALID })
         return
       }
       app.log.error({ errorName: error.name }, 'request refused by the framework')
@@ -138,7 +163,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   // The body of those stays Fastify's own: the client reads a code it does not recognise as
   // «the API did not answer», and that is the truth for an address the API does not have.
   app.addHook('onRequest', (request, reply, next) => {
-    if (isAuthPath(request.url)) void reply.header('cache-control', 'no-store')
+    if (isAuthRequest(request)) void reply.header('cache-control', 'no-store')
     next()
   })
 
@@ -172,7 +197,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     }
 
     // Driver errors can carry SQL parameters; an auth failure must never log credentials.
-    if (isAuthPath(request.url)) {
+    if (isAuthRequest(request)) {
       app.log.error({ errorName: error.name, code: failureCode(error) }, 'authentication failed')
     } else {
       app.log.error(error)
