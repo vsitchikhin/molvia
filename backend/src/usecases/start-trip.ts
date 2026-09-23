@@ -1,7 +1,6 @@
-import { DomainError, ERROR, pickOfficialRate, tripContextSchema, yerevanDate } from '@molvia/model'
+import { DomainError, ERROR, geographyAllowed, pickOfficialRate, yerevanDate } from '@molvia/model'
 import type { Actor, AmdRate, OfficialRate, StartTripBody, TripView } from '@molvia/model'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
-import { parseBody } from '@/parse'
 import { tripViewFor } from './trip-view'
 
 export interface Started {
@@ -35,12 +34,19 @@ export async function startTrip(
     const already = await repositories.trips.byId(body.id, actor.id)
     if (already) return { trip: await tripViewFor(repositories, already), created: false }
 
-    if (!body.context) throw new DomainError(ERROR.TRIP_CONTEXT_REQUIRED)
     // Checked against the actor rather than by the body's own schema: `places` is a table
     // everyone shares, and without this the two cities the settings form offers are held by
     // the form alone — one `POST` away from a shop in a city that does not exist (MOL-65,
     // review 1). The same predicate `PUT /actors/me/settings` refuses by.
-    const context = parseBody(tripContextSchema(actor), body.context)
+    //
+    // «Not named» and «named in a way nothing may be written under» are one answer, because
+    // they are one question for the person: name the city and the currencies of this trip.
+    // A 400 would have been the end of that trip —
+    // the queue sets a start it cannot send aside, and its purchases go with it, which is the
+    // very thing the context exists to prevent (MOL-65, review 2, замечание 9). It happens to
+    // a geography granted by hand, outside the form's two cities, after the person moves on.
+    const context = body.context && geographyAllowed(body.context, actor) ? body.context : null
+    if (!context) throw new DomainError(ERROR.TRIP_CONTEXT_REQUIRED)
 
     const place = await repositories.places.ensure({
       kind: body.place.kind,

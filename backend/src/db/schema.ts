@@ -91,6 +91,12 @@ export function placeIdentity(value: AnyPgColumn | SQL): SQL {
   return sql`btrim(lower(regexp_replace(normalize(${value}, NFKC), E'${sql.raw(SELECTORS)}', '', 'g')), E'${sql.raw(BLANKS)}')`
 }
 
+/** The same fold applied to a value rather than to a column — what a query compares against. */
+export function identityOf(value: string): SQL {
+  // `::text` on purpose: `normalize()` takes text, and a bare parameter arrives as unknown.
+  return placeIdentity(sql`${value}::text`)
+}
+
 /**
  * A `sha256` written down as hex, which is the only shape either digest column ever holds.
  * Same rule twice, so the two cannot drift into meaning different things.

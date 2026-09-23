@@ -586,14 +586,13 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         }
         const start = head.write
         if (code === ERROR.TRIP_CONTEXT_REQUIRED && start.kind === 'start') {
+          // The context this start carries may be there and still unusable — a geography the
+          // person no longer holds, which the settings form cannot offer either (MOL-65,
+          // review 2). Either way the answer is the same question, and the queue waits for it
+          // rather than setting the start aside with every purchase behind it.
           if (
             actor.id === owner &&
-            kept.some(
-              (item) =>
-                item.write.kind === 'start' &&
-                item.write.tripId === start.tripId &&
-                !item.write.context,
-            )
+            kept.some((item) => item.write.kind === 'start' && item.write.tripId === start.tripId)
           )
             needsContext.value = start.tripId
           return
@@ -871,7 +870,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function supplyContext(tripId: string, context: ActorSettings): void {
     sync(actor.id)
     const entry = kept.find((item) => item.write.kind === 'start' && item.write.tripId === tripId)
-    if (entry?.write.kind !== 'start' || entry.write.context) return
+    if (entry?.write.kind !== 'start') return
     needsContext.value = null
     enqueue({ ...entry.write, context })
   }

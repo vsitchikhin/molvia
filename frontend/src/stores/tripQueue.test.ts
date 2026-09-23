@@ -166,6 +166,30 @@ describe('trip queue', () => {
     expect(addExpense).not.toHaveBeenCalled()
   })
 
+  it('asks again when the context it carries is one the server will not write under', async () => {
+    // A geography granted by hand, left behind by a move: the server answers the same
+    // question rather than a 400, and the queue must not set the start aside with every
+    // purchase behind it (MOL-65, review 2, замечание 9).
+    startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_CONTEXT_REQUIRED, 'context unusable'))
+    const stale = { ...here, country: 'GE', city: 'Тбилиси' } as const
+    const queue = fresh()
+    queue.enqueue(started(TRIP, 'Ереван Сити', stale))
+    queue.enqueue(add(MILK))
+    await queue.flush()
+
+    expect(queue.needsContext).toBe(TRIP)
+    expect(queue.pending).toHaveLength(2)
+    expect(queue.rejected).toEqual([])
+
+    startTrip.mockResolvedValue({ trip: answer('0'), created: true })
+    addExpense.mockResolvedValue({ trip: answer('520'), created: true })
+    queue.supplyContext(TRIP, here)
+    await queue.flush()
+
+    expect(startTrip).toHaveBeenLastCalledWith(expect.objectContaining({ id: TRIP, context: here }))
+    expect(queue.pending).toEqual([])
+  })
+
   it('holds a legacy start and its purchases until the person supplies context', async () => {
     startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_CONTEXT_REQUIRED, 'context required'))
     const queue = fresh()

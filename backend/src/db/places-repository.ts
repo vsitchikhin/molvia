@@ -1,11 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, desc, eq, inArray, max, sql } from 'drizzle-orm'
-import type { SQL } from 'drizzle-orm'
 import { placeSchema } from '@molvia/model'
 import type { NewPlace, Place, SettingsGeography } from '@molvia/model'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
-import { placeIdentity, places, trips } from './schema'
+import { identityOf, placeIdentity, places, trips } from './schema'
 
 export interface PlaceRepository {
   /** The place that is already there, or a new one — never a second card for one shop. */
@@ -20,12 +19,6 @@ type PlaceRow = typeof places.$inferSelect
 
 function toPlace(row: PlaceRow): Place {
   return placeSchema.parse(row)
-}
-
-/** The fold the index applies to a column, applied to a value instead. */
-function identityOf(value: string): SQL {
-  // `::text` on purpose: `normalize()` takes text, and a bare parameter arrives as unknown.
-  return placeIdentity(sql`${value}::text`)
 }
 
 export function createPlaceRepository(db: Conn): PlaceRepository {

@@ -150,9 +150,14 @@ describe('settings and offline trip context', () => {
         payload: { id: randomUUID(), context, place: { kind: 'store', name } },
       })
     const legacy = { ...initial, country: 'GE', city: 'Тбилиси' }
-    expect((await start({ ...initial, city: 'Батуми' }, 'Гудвилл')).statusCode).toBe(400)
+    // «No context» and «a context nothing may be written under» are one answer, because they
+    // are one question for the person — and a 400 would have taken the trip's purchases with
+    // it (review 2, замечание 9).
+    const refused = await start({ ...initial, city: 'Батуми' }, 'Гудвилл')
+    expect(refused.statusCode).toBe(409)
+    expect(refused.json()).toMatchObject({ code: ERROR.TRIP_CONTEXT_REQUIRED })
     expect((await start({ ...initial, country: 'ZZ', city: 'Нигде' }, 'Лавка')).statusCode).toBe(
-      400,
+      409,
     )
     // The city is the one the person holds, so the trip is theirs to start; and so is one of
     // today's two, which is what an offline start made before a move carries.
@@ -176,7 +181,7 @@ describe('settings and offline trip context', () => {
         place: { kind: 'store', name: 'SAS' },
       },
     })
-    expect(response.statusCode).toBe(400)
+    expect(response.statusCode).toBe(409)
     await db.insert(places).values({
       id: randomUUID(),
       kind: 'store',

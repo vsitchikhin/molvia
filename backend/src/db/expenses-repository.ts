@@ -14,7 +14,7 @@ import { moneyFrom, moneyTo, quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
-import { expenses, items, placeIdentity, places, trips, verdicts } from './schema'
+import { expenses, identityOf, items, placeIdentity, places, trips, verdicts } from './schema'
 
 /** An expense to add, named by the device that adds it (MOL-21, В-2). */
 export type ExpenseToAdd = NewExpense & { readonly id: string }
@@ -289,7 +289,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
     // keeps whichever spelling was written first, so «гюмри» and «Гюмри» are one shop when a
     // place is created and must stay one when its prices are read (MOL-65, adversarial Г2).
     const here = sql`${places.country} = ${query.country}
-      and ${placeIdentity(places.city)} = ${placeIdentity(sql`${query.city}::text`)}`
+      and ${placeIdentity(places.city)} = ${identityOf(query.city)}`
     const visible = query.scope === 'own' ? mine : sql`${mine} or (${here})`
 
     return {

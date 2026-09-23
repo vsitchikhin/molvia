@@ -68,12 +68,3 @@ export const settingsUpdateSchema = z
     error: ISSUE.BODY_INVALID,
   })
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>
-
-/** The settings a trip names, as the person holding `settings` is allowed to name them. */
-export function tripContextSchema(
-  settings: Pick<ActorSettings, 'country' | 'city'>,
-): z.ZodType<ActorSettings> {
-  return actorSettingsSchema.refine((value) => geographyAllowed(value, settings), {
-    error: ISSUE.BODY_INVALID,
-  })
-}
