@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
-import { recentPlacesResponseSchema } from '@molvia/model'
+import { computed, ref, watch } from 'vue'
+import { geographyKey, recentPlacesResponseSchema } from '@molvia/model'
 import type { TripPlace } from '@molvia/model'
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
@@ -32,10 +32,14 @@ function recall(actorId: string | null): TripPlace[] {
  */
 export const useRecentPlacesStore = defineStore('recentPlaces', () => {
   const actor = useActorStore()
-  const places = ref<TripPlace[]>(recall(actor.id))
+  const location = computed(() => (actor.settings ? geographyKey(actor.settings) : null))
+  const cacheId = computed(() =>
+    actor.id && location.value ? `${actor.id}.${location.value}` : null,
+  )
+  const places = ref<TripPlace[]>(recall(cacheId.value))
 
   watch(
-    () => actor.id,
+    () => cacheId.value,
     (id) => {
       places.value = recall(id)
     },
@@ -43,9 +47,13 @@ export const useRecentPlacesStore = defineStore('recentPlaces', () => {
 
   /** Asks the server and keeps the answer. A failure leaves what is remembered — it is still true. */
   async function refresh(): Promise<void> {
-    const owner = actor.id
-    const answer = await api.recentPlaces()
-    if (actor.id !== owner || !owner) return
+    const owner = cacheId.value
+    if (!owner || !actor.settings) return
+    const answer = await api.recentPlaces({
+      country: actor.settings.country,
+      city: actor.settings.city,
+    })
+    if (cacheId.value !== owner) return
     places.value = [...answer]
     write(keyOf(owner), JSON.stringify(recentPlacesResponseSchema.encode({ places: answer })))
   }

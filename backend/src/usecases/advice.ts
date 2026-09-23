@@ -98,7 +98,12 @@ export async function advice(
 
   // Encoded here rather than only in the route, the way `tripViewFor` is: an answer the wire
   // cannot carry has to fail where it was built, beside the data that made it.
-  const answer = { scope, rows, total: rated.total }
+  const answer = {
+    scope,
+    rows,
+    total: rated.total,
+    geography: { country: actor.country, city: actor.city },
+  }
   z.encode(adviceResponseSchema, answer)
 
   /*

@@ -4,6 +4,9 @@
       {{ scope === 'shared' ? t('advice.shared_data') : t('advice.own_data_only') }}
     </template>
 
+    <p v-if="cityReloading" class="city-reloading">
+      <IconSync aria-hidden="true" />{{ t('advice.city_reloading', { city: cityReloading }) }}
+    </p>
     <ScreenSkeleton v-if="phase === 'loading'" :groups="[40, 78, 62, 78]" />
 
     <!-- Without an identity there is nobody to advise; the notice above says why. -->
@@ -13,7 +16,17 @@
            branch, so an empty list from memory is dated too (С-4). -->
       <div v-if="stale && fetchedAt" class="stale">
         <p class="stale-text">
-          {{ t(STALE[stale], { day: day(fetchedAt), time: time(fetchedAt) }) }}
+          <IconCloud v-if="otherCity" aria-hidden="true" />
+          {{
+            otherCity
+              ? t('advice.stale_other_city', {
+                  oldCity: cityGenitive(otherCity.oldCity),
+                  city: cityGenitive(otherCity.city),
+                  day: day(fetchedAt),
+                  time: time(fetchedAt),
+                })
+              : t(STALE[stale], { day: day(fetchedAt), time: time(fetchedAt) })
+          }}
         </p>
         <!-- Only the server breaking leaves nothing that would fire again by itself. -->
         <AppButton v-if="stale === 'error'" variant="ghost" @click="retry">
@@ -111,6 +124,8 @@
 import { defineComponent, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { AdviceRow } from '@molvia/model'
+import IconCloud from '~icons/mdi/cloud-off-outline'
+import IconSync from '~icons/mdi/sync'
 import IconStar from '~icons/mdi/star-outline'
 import AdviceCheapRow from '@/components/AdviceCheapRow.vue'
 import AdviceGroup from '@/components/AdviceGroup.vue'
@@ -159,6 +174,8 @@ const STALE = {
 export default defineComponent({
   name: 'AdviceView',
   components: {
+    IconCloud,
+    IconSync,
     AdviceCheapRow,
     AdviceGroup,
     AdviceNeverRow,
@@ -170,7 +187,8 @@ export default defineComponent({
     VerdictEditSheet,
   },
   setup() {
-    const { t, locale } = useI18n()
+    const i18n = useI18n()
+    const { t, locale } = i18n
     const { goTab } = useNavigation()
     const advice = useAdvice()
     /** The row whose verdict is being amended, as the last answer described it. */
@@ -208,6 +226,10 @@ export default defineComponent({
       total: advice.total,
       stale: advice.stale,
       fetchedAt: advice.fetchedAt,
+      cityReloading: advice.cityReloading,
+      otherCity: advice.otherCity,
+      cityGenitive: (city: string) =>
+        i18n.te(`advice.cities_genitive.${city}`) ? t(`advice.cities_genitive.${city}`) : city,
       editing,
       edit,
       putAway: () => {
@@ -232,10 +254,22 @@ export default defineComponent({
   margin-bottom: var(--space-3);
 }
 
+.city-reloading,
 .stale-text {
+  svg {
+    width: var(--space-4);
+    height: var(--space-4);
+    vertical-align: middle;
+    margin-right: var(--space-2);
+  }
+
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
+}
+
+.city-reloading {
+  margin-bottom: var(--space-3);
 }
 
 .tail {

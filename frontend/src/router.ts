@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import SettingsView from '@/views/SettingsView.vue'
 import AdviceView from '@/views/AdviceView.vue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 import TripHistoryView from '@/views/TripHistoryView.vue'
@@ -8,13 +9,14 @@ import TripView from '@/views/TripView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
 import { watchBrowserAnimatedBack } from '@/transitions'
 
-/** The three sections of the tab bar. «trip» is home: the main scenario of the product. */
-export type Tab = 'trip' | 'advice' | 'verdicts'
+/** The four sections of the tab bar. «trip» is home: the main scenario of the product. */
+export type Tab = 'trip' | 'advice' | 'verdicts' | 'settings'
 
 export type RouteName =
   | 'trip'
   | 'advice'
   | 'verdicts'
+  | 'settings'
   | 'item-search'
   | 'trip-history'
   | 'finished-trip'
@@ -35,9 +37,15 @@ declare module 'vue-router' {
   }
 }
 
-// Not lazy: four small screens, and a chunk per route would turn the first tap on a tab into
+// Not lazy: eight small screens, and a chunk per route would turn the first tap on a tab into
 // a network request exactly where the connection drops.
 export const routes = [
+  {
+    path: '/settings',
+    name: 'settings',
+    component: SettingsView,
+    meta: { titleKey: 'settings.title', tab: 'settings' },
+  },
   { path: '/', name: 'trip', component: TripView, meta: { titleKey: 'trip.title', tab: 'trip' } },
   {
     path: '/advice',

@@ -18,6 +18,8 @@
           <template #icon><IconRefresh /></template>
           {{ t('state.retry') }}
         </AppButton>
+        <AppButton busy>{{ t('settings.saving') }}</AppButton>
+        <AppButton inactive>{{ t('settings.save') }}</AppButton>
         <AppButton disabled>{{ t('verdict.save') }}</AppButton>
       </div>
     </section>
@@ -35,6 +37,7 @@
       </AppField>
       <AppField v-model="review" :label="t('verdict.review_label')" kind="multiline" />
       <AppField v-model="date" :label="t('dev.kit.date')" kind="date" readonly />
+      <AppField v-model="city" :label="t('settings.city')" kind="select" :options="cities" />
       <SegmentedControl v-model="unit" :legend="t('item.unit')" :options="units" />
     </section>
 
@@ -83,7 +86,14 @@
 <script lang="ts">
 import { computed, defineComponent, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ERROR, VERDICT_LEVEL, currencySign, formatMoney, money } from '@molvia/model'
+import {
+  ERROR,
+  VERDICT_LEVEL,
+  currencySign,
+  formatMoney,
+  money,
+  SETTINGS_CITIES,
+} from '@molvia/model'
 import IconClose from '~icons/mdi/close'
 import IconPlus from '~icons/mdi/plus'
 import IconRefresh from '~icons/mdi/refresh'
@@ -137,6 +147,8 @@ export default defineComponent({
       quantity: ref('1'),
       price: ref('57о'),
       review: ref(''),
+      city: ref(SETTINGS_CITIES[0]),
+      cities: SETTINGS_CITIES.map((city) => ({ value: city, label: city })),
       date: ref('2026-09-19'),
       unit: ref('l'),
       sheetOpen: ref(false),

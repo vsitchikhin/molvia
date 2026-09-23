@@ -16,7 +16,7 @@ import type { Published, RateFeed } from '@/rates/feed'
 import { buildServer } from '@/server'
 import { FALLBACK_AFTER_FAILURES, officialRatesRefresh } from '@/usecases/refresh-official-rates'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, signIn } from './fixtures'
+import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
@@ -62,8 +62,12 @@ async function call(method: 'GET' | 'POST' | 'PUT', url: string, actor: string, 
   }
 }
 
-const start = (actor: string, id: string = randomUUID()) =>
-  call('POST', '/trips', actor, { id, place: { kind: 'store', name: 'Ереван Сити' } })
+const start = async (actor: string, id: string = randomUUID()) =>
+  call('POST', '/trips', actor, {
+    context: await tripContext(db, actor),
+    id,
+    place: { kind: 'store', name: 'Ереван Сити' },
+  })
 const view = (reply: { body: unknown }): TripView => tripViewCodec.parse(reply.body)
 
 /** A CBA answer from the recorded fixture, re-dated and with RUB replaced. */

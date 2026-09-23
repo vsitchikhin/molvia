@@ -32,7 +32,11 @@ function serverTrip(currency = 'AMD'): TripView {
     rateProvider: null,
     rateJump: null,
     rateStale: false,
-    place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
+    place: {
+      id: 'aaaaaaaa-0000-4000-8000-000000000001',
+      kind: 'store',
+      name: 'Ереван Сити',
+    },
     expenses: [],
     total: [],
     converted: null,

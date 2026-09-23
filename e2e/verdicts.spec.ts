@@ -1,3 +1,4 @@
+import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { asBrowser, signedIn } from './session'
@@ -37,7 +38,11 @@ async function person(page: Page): Promise<Person> {
 /** Bought in one trip, in this order — so the last one is the newest and comes first. */
 async function bought(who: Person, names: readonly string[]): Promise<void> {
   const tripId = randomUUID()
-  await who.call('POST', '/trips', { id: tripId, place: { kind: 'store', name: 'SAS' } })
+  await who.call('POST', '/trips', {
+    context: settingsOf(actorCodec.parse(await who.call('GET', '/actors/me'))),
+    id: tripId,
+    place: { kind: 'store', name: 'SAS' },
+  })
   for (const name of names) {
     const entry = (await who.call('POST', '/catalogue/items', {
       kind: 'product',

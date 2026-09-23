@@ -1,4 +1,4 @@
-import type { Place } from '@molvia/model'
+import type { Place, SettingsGeography } from '@molvia/model'
 import type { PlaceRepository } from '@/db/places-repository'
 
 /**
@@ -7,6 +7,10 @@ import type { PlaceRepository } from '@/db/places-repository'
  */
 export const RECENT_PLACES = 5
 
-export async function recentPlaces(places: PlaceRepository, actorId: string): Promise<Place[]> {
-  return places.recentFor(actorId, RECENT_PLACES)
+export async function recentPlaces(
+  places: PlaceRepository,
+  actorId: string,
+  geography?: SettingsGeography,
+): Promise<Place[]> {
+  return places.recentFor(actorId, RECENT_PLACES, geography)
 }

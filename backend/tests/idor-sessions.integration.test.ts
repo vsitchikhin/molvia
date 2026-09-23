@@ -13,7 +13,7 @@ import { ERROR } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, signIn } from './fixtures'
+import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
 
 const { db, close } = connectDrizzle()
 
@@ -69,6 +69,7 @@ async function scene() {
 
   const tripId = randomUUID()
   await call('POST', '/trips', mine, {
+    context: await tripContext(db, anna),
     id: tripId,
     place: { kind: 'store', name: 'Ереван Сити' },
   })

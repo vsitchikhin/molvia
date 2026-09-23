@@ -3,6 +3,7 @@ import {
   DomainError,
   ERROR,
   actorSchema,
+  settingsOf,
   itemSchema,
   parseRate,
   placeSchema,
@@ -193,6 +194,7 @@ describe('startTrip', () => {
 
     const { trip: view, created } = await startTrip(transactWith(repositories), actor, {
       id: TRIP,
+      context: settingsOf(actor),
       place: { kind: 'store', name: 'Ереван Сити' },
     })
 
@@ -216,6 +218,7 @@ describe('startTrip', () => {
 
     const { created } = await startTrip(transactWith(repositories), actor, {
       id: TRIP,
+      context: settingsOf(actor),
       place: { kind: 'store', name: 'Ереван Сити' },
     })
     expect(created).toBe(false)
@@ -234,6 +237,7 @@ describe('startTrip', () => {
     await expect(
       startTrip(transactWith(repositories), actor, {
         id: TRIP,
+        context: settingsOf(actor),
         place: { kind: 'store', name: 'Ереван Сити' },
       }),
     ).rejects.toThrow(ERROR.TRIP_OPEN)
@@ -255,7 +259,11 @@ describe('startTrip', () => {
       return work(repositories)
     }
 
-    await startTrip(counting, actor, { id: TRIP, place: { kind: 'store', name: 'Ереван Сити' } })
+    await startTrip(counting, actor, {
+      id: TRIP,
+      context: settingsOf(actor),
+      place: { kind: 'store', name: 'Ереван Сити' },
+    })
     expect(transactions).toBe(1)
   })
 })
@@ -293,7 +301,7 @@ describe('startTrip: the official rate (MOL-39)', () => {
     return startTrip(
       transactWith(repositories),
       person,
-      { id: TRIP, place: { kind: 'store', name: 'Ереван Сити' } },
+      { id: TRIP, context: settingsOf(person), place: { kind: 'store', name: 'Ереван Сити' } },
       now,
     ).then(() => ({ rate, asked }))
   }
@@ -339,7 +347,7 @@ describe('startTrip: the official rate (MOL-39)', () => {
     const { trip: view } = await startTrip(
       transactWith(repositories),
       actor,
-      { id: TRIP, place: { kind: 'store', name: 'Ереван Сити' } },
+      { id: TRIP, context: settingsOf(actor), place: { kind: 'store', name: 'Ереван Сити' } },
       sunday,
     )
 
@@ -400,6 +408,7 @@ describe('startTrip: a repeat', () => {
 
     const { trip: view, created } = await startTrip(transactWith(repositories), actor, {
       id: TRIP,
+      context: settingsOf(actor),
       place: { kind: 'store', name: 'Другое имя' },
     })
 
@@ -467,7 +476,7 @@ describe('recentPlaces', () => {
     }).places
 
     expect(await recentPlaces(places, ACTOR)).toEqual([place])
-    expect(calls).toEqual([[ACTOR, RECENT_PLACES]])
+    expect(calls).toEqual([[ACTOR, RECENT_PLACES, undefined]])
   })
 })
 

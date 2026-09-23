@@ -8,10 +8,15 @@ import AppField from '@/components/AppField.vue'
 
 type Props = InstanceType<typeof AppField>['$props']
 
-function render(props: Partial<Props> = {}, slots: Record<string, string> = {}) {
+function render(
+  props: Partial<Props> = {},
+  slots: Record<string, string> = {},
+  attrs: Record<string, string> = {},
+) {
   return mount(AppField, {
     props: { modelValue: '', label: 'How much', ...props },
     slots,
+    attrs,
     attachTo: document.body,
     global: { plugins: [createAppI18n('en')] },
   })
@@ -143,4 +148,26 @@ describe('AppField', () => {
     expect(input.classes()).not.toContain('price')
     expect(view.classes()).toContain('price')
   })
+})
+
+it('opens native select, preserves its label and all descriptions, and emits the selection', async () => {
+  const view = render(
+    {
+      kind: 'select',
+      placeholder: 'Choose',
+      options: [{ value: 'AMD', label: 'Dram' }],
+      error: ERROR.INVALID_AMOUNT,
+    },
+    {},
+    { 'aria-describedby': 'city-hint' },
+  )
+  const select = view.get('select')
+  expect(view.get('label').attributes('for')).toBe(select.attributes('id'))
+  expect(view.get('option[value=""]').attributes('disabled')).toBeDefined()
+  expect(select.attributes('aria-describedby')).toBe(
+    `city-hint ${view.get('.error').attributes('id') ?? ''}`,
+  )
+  await select.setValue('AMD')
+  expect(view.emitted('update:modelValue')).toEqual([['AMD']])
+  view.unmount()
 })

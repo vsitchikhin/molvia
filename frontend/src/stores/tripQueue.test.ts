@@ -11,6 +11,7 @@ import {
   tripViewCodec,
 } from '@molvia/model'
 import type {
+  ActorSettings,
   AddExpenseBody,
   CatalogueEntry,
   ExpensePatch,
@@ -73,7 +74,11 @@ function answer(
     rateProvider: null,
     rateJump: null,
     rateStale: false,
-    place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: place },
+    place: {
+      id: 'aaaaaaaa-0000-4000-8000-000000000001',
+      kind: 'store',
+      name: place,
+    },
     expenses: [],
     total: [{ amount: total, currency: 'AMD' }],
     converted: null,
@@ -115,12 +120,25 @@ function answered1(purchase: string, quantity: string, price: string): TripView 
 
 const offline = () => new ApiError(ERROR.INTERNAL, 'Failed to fetch')
 
-const started = (tripId = TRIP, place = 'Ереван Сити'): QueuedWrite => ({
+const started = (
+  tripId = TRIP,
+  place = 'Ереван Сити',
+  context?: ActorSettings,
+): Extract<QueuedWrite, { kind: 'start' }> => ({
   kind: 'start',
   tripId,
   place: { kind: 'store', name: place },
   startedAt: new Date('2026-09-19T08:00:00.000Z'),
+  ...(context ? { context } : {}),
 })
+
+/** Настройки, с которыми начат поход: те же, что у места в `answer`. */
+const here: ActorSettings = {
+  country: 'AM',
+  city: 'Гюмри',
+  spendCurrency: 'AMD',
+  incomeCurrency: 'RUB',
+}
 
 function fresh(identity = ME) {
   localStorage.setItem('molvia.actor', identity)
@@ -132,6 +150,103 @@ function fresh(identity = ME) {
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('trip queue', () => {
+  it('does not merge a captured start into a same-named shop without asking', async () => {
+    startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_OPEN, 'open trip'))
+    currentTrip.mockResolvedValue(answer('0', OTHER, null, 'Ереван Сити'))
+    const queue = fresh()
+    queue.enqueue({
+      ...started(),
+      context: { country: 'AM', city: 'Ереван', spendCurrency: 'USD', incomeCurrency: 'EUR' },
+    })
+    queue.enqueue(add(MILK))
+    await queue.flush()
+    expect(queue.elsewhere?.tripId).toBe(OTHER)
+    expect(queue.pending).toHaveLength(2)
+    expect(addExpense).not.toHaveBeenCalled()
+  })
+
+  it('asks again when the context it carries is one the server will not write under', async () => {
+    // A geography granted by hand, left behind by a move: the server answers the same
+    // question rather than a 400, and the queue must not set the start aside with every
+    // purchase behind it (MOL-65, review 2, замечание 9).
+    startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_CONTEXT_REQUIRED, 'context unusable'))
+    const stale = { ...here, country: 'GE', city: 'Тбилиси' } as const
+    const queue = fresh()
+    queue.enqueue(started(TRIP, 'Ереван Сити', stale))
+    queue.enqueue(add(MILK))
+    await queue.flush()
+
+    expect(queue.needsContext).toBe(TRIP)
+    expect(queue.pending).toHaveLength(2)
+    expect(queue.rejected).toEqual([])
+
+    startTrip.mockResolvedValue({ trip: answer('0'), created: true })
+    addExpense.mockResolvedValue({ trip: answer('520'), created: true })
+    queue.supplyContext(TRIP, here)
+    await queue.flush()
+
+    expect(startTrip).toHaveBeenLastCalledWith(expect.objectContaining({ id: TRIP, context: here }))
+    expect(queue.pending).toEqual([])
+  })
+
+  it('keeps the question while its start waits, through another window and through a purchase', async () => {
+    startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_CONTEXT_REQUIRED, 'context unusable'))
+    const stale = { ...here, country: 'GE', city: 'Тбилиси' } as const
+    const queue = fresh()
+    queue.enqueue(started(TRIP, 'Ереван Сити', stale))
+    await queue.flush()
+    expect(queue.needsContext).toBe(TRIP)
+
+    // Another window of the same app writes the queue; and the person, with no signal, puts a
+    // purchase in. Both go through `sync`, and neither is an answer to the question.
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-queue.${ME}` }))
+    expect(queue.needsContext).toBe(TRIP)
+    queue.enqueue(add(MILK))
+    await queue.flush()
+    expect(queue.needsContext).toBe(TRIP)
+    expect(queue.pending).toHaveLength(2)
+  })
+
+  it('holds a legacy start and its purchases until the person supplies context', async () => {
+    startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_CONTEXT_REQUIRED, 'context required'))
+    const queue = fresh()
+    queue.enqueue(started())
+    queue.enqueue(add(MILK))
+    await queue.flush()
+    expect(queue.needsContext).toBe(TRIP)
+    expect(queue.pending).toHaveLength(2)
+    expect(queue.rejected).toEqual([])
+    const context = {
+      country: 'AM',
+      city: 'Гюмри',
+      spendCurrency: 'AMD',
+      incomeCurrency: 'RUB',
+    } as const
+    startTrip.mockResolvedValue({ trip: answer('0'), created: true })
+    addExpense.mockResolvedValue({ trip: answer('520'), created: true })
+    queue.supplyContext(TRIP, context)
+    await queue.flush()
+    expect(startTrip).toHaveBeenLastCalledWith(expect.objectContaining({ id: TRIP, context }))
+    expect(queue.pending).toEqual([])
+  })
+
+  it('keeps captured context through storage and ignores changed account settings', async () => {
+    startTrip.mockRejectedValue(offline())
+    const context = {
+      country: 'AM',
+      city: 'Гюмри',
+      spendCurrency: 'USD',
+      incomeCurrency: 'EUR',
+    } as const
+    const queue = fresh()
+    queue.enqueue({ ...started(), context })
+    await queue.flush()
+    const restored = fresh()
+    await restored.flush()
+    expect(startTrip).toHaveBeenLastCalledWith(expect.objectContaining({ context }))
+    expect(restored.pending[0]).toMatchObject({ context })
+  })
+
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()
