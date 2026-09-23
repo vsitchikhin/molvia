@@ -1,4 +1,4 @@
-import { DomainError, ERROR } from '@molvia/model'
+import { DomainError, ERROR, resourceIdOf } from '@molvia/model'
 import type { ZodError, ZodType } from 'zod'
 
 /*
@@ -48,11 +48,7 @@ export function parseParams<T>(schema: ZodType<T>, params: unknown): T {
 
 /** Resource addresses accept either case; malformed, missing and private all look absent. */
 export function resourceId(value: unknown): string {
-  if (
-    typeof value !== 'string' ||
-    !/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(value)
-  ) {
-    throw new DomainError(ERROR.NOT_FOUND)
-  }
-  return value.toLowerCase()
+  const id = resourceIdOf(value)
+  if (id === null) throw new DomainError(ERROR.NOT_FOUND)
+  return id
 }

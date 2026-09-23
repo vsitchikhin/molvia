@@ -313,7 +313,10 @@ export function createClient({
    */
   function verdictPath(itemId: string): string {
     const path = verdictPathSchema.safeParse({ itemId })
-    if (!path.success) throw new ApiError(ERROR.NOT_FOUND)
+    // `answered: false` — nothing was sent, so this is not the API's word. It is the code the
+    // server answers a real 404 with, and `useSelectedTrip` tells «no such trip» from «could not
+    // ask» by exactly that flag; the default `true` would have made this refusal final (З-5).
+    if (!path.success) throw new ApiError(ERROR.NOT_FOUND, 'itemId', false)
     return `/verdicts/${path.data.itemId}`
   }
 
