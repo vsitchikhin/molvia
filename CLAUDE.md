@@ -945,6 +945,20 @@ shelf, so a desktop-only pass would prove nothing about the screen that matters.
   in this copy's band). A database alone would not have closed it: `reuseExistingServer`
   handed the suite the dev API whenever `make dev` was up, so no `DATABASE_URL` of ours
   reached a process — and `pre-push` runs e2e exactly then. Now the two stacks coexist.
+- **A screen's state is taken end-to-end by its heading, never by its words** (MOL-64).
+  `ScreenState` hands «title. body» to the app's live region as well, so
+  `getByText('<the state's title>')` matches two nodes — the `h2` and the announcement — and
+  playwright's strict mode refuses. That is a failure the machine's speed decides: measured on
+  «Оценки», one match at once and two from 200 ms onwards. `getByRole('heading', { name: … })`
+  makes the assertion what it is called, about the screen rather than the live region, and
+  strict mode is right here — two nodes really do match, and it is resolved with a locator,
+  never muted with `.first()`. The block itself is not the place to fix this: the announcement
+  is MOL-19's decision, a screen reader hears the state whole. Two things are easy to get
+  wrong. **Not every state speaks** — a full-screen `error` or `attention` carries
+  `role="alert"` and says nothing to the region, so only `empty`, `offline` and anything
+  `inline` double; that is why four of MOL-64's five places were not failing yet and were
+  fixed anyway. And **`exact: true` saves by luck**, only while the title has a `body`: where
+  it has none the announcement equals the title and matches exactly too.
 - **When a test fails, look for the bug in the code first** — do not adjust the test to
   match the behaviour. A test proves the app works, not the other way round. And **never by
   making it tolerate leftovers**: that hides the cause and leaves the suite depending on the
