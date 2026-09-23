@@ -487,6 +487,23 @@ describe('TripView', () => {
       expect(view.text()).not.toContain('цены одного магазина нельзя записывать другому')
     })
 
+    it('тот же магазин, написанный иначе, — тоже тот же', async () => {
+      // Сервер сводит места через `placeIdentity`; экран обязан отвечать так же, иначе он
+      // обещает порчу данных, которой не будет (В3).
+      currentTrip.mockResolvedValue(null)
+      const { view, queue } = await render()
+      const body = (view.vm as unknown as { elsewhereBody: (a: unknown) => string }).elsewhereBody
+      const warning = 'цены одного магазина нельзя записывать другому'
+
+      expect(body({ tripId: TRIP, place: 'Ереван Сити ', mine: 'ереван сити' })).not.toContain(
+        warning,
+      )
+      // А два пробела внутри имени сервер как раз не схлопывает: это разные места.
+      expect(body({ tripId: TRIP, place: 'Ереван  Сити', mine: 'Ереван Сити' })).toContain(warning)
+      expect(body({ tripId: TRIP, place: 'SAS', mine: 'Ереван Сити' })).toContain(warning)
+      expect(queue.elsewhere).toBeNull()
+    })
+
     it('тот же вопрос, заданный заново, не теряет ответ из уже открытой шторки', async () => {
       const open = trip([], { id: 'bbbbbbbb-0000-4000-8000-000000000033' })
       currentTrip.mockResolvedValue(null)

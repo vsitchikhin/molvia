@@ -81,8 +81,11 @@ const BLANKS = String.raw` \t\r\n\u00A0\u200B\u200C\u200D\uFEFF`
 const SELECTORS = String.raw`[\uFE00-\uFE0F\U000E0100-\U000E01EF]`
 
 /**
- * The identity of a place as the unique index below computes it. Exported because the
- * repository has to repeat it word for word: `ON CONFLICT` infers an index over expressions
+ * The identity of a place as the unique index below computes it. Its twin in TypeScript is
+ * `placeNameIdentity` in `packages/model`, for the screen that has to know the same thing with
+ * no request to make; an integration test runs a corpus through both and holds them equal.
+ *
+ * Exported because the repository has to repeat it word for word: `ON CONFLICT` infers an index over expressions
  * only from the very same expressions, and naming the columns instead answers `42P10` on the
  * first duplicate \u2014 measured in the review of MOL-6. One definition, two call sites, so the
  * index and the conflict target cannot drift apart.

@@ -193,6 +193,7 @@ import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPlus from '~icons/mdi/plus'
+import { isSamePlaceName } from '@molvia/model'
 import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -271,9 +272,12 @@ export default defineComponent({
      * «item + place» is the key the product rests on, and a price of «Ереван Сити» written down
      * against «SAS» is later indistinguishable from a real one. For the same shop the sentence
      * would be untrue, so it is a second key rather than a longer one (З-4).
+     *
+     * «The same shop» is the database's own answer, not equal strings: a trailing space made the
+     * screen promise damage that the server's own index rules out (В3).
      */
     const elsewhereBody = (asked: TripElsewhere): string =>
-      asked.place === asked.mine
+      isSamePlaceName(asked.place, asked.mine)
         ? t('trip.elsewhere.body', { mine: asked.mine })
         : t('trip.elsewhere.body_other', { mine: asked.mine, place: asked.place })
     function chooseTrip(): void {
