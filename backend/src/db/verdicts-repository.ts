@@ -5,7 +5,7 @@ import type { AdviceScope, NewVerdict, Verdict, VerdictPatch } from '@molvia/mod
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
-import { items, verdicts } from './schema'
+import { actors, items, verdicts } from './schema'
 
 export interface RatedVerdict {
   readonly verdict: Verdict
@@ -51,6 +51,37 @@ export interface VerdictRepository {
    * Products only: a dish is rated where it was served, and 0.1 has no dishes.
    */
   adviceRowsFor(query: AdviceQuery): Promise<AdviceRows>
+  /**
+   * Gate 0.2: of those who appeared in `[from, to)`, how many gave `ratings` verdicts within
+   * `windowHours` of appearing (MOL-49). A query over this table, never an event: the log
+   * must not repeat what a domain table already knows.
+   *
+   * **The one reader that counts withdrawn verdicts.** The gate asks whether someone *gave*
+   * five, and «rated five, took one back» is five (MOL-27, the owner's decision). Rating again
+   * brings back the same row with its `rated_at`, so withdrawing and re-rating cannot move
+   * anyone here, and one row per «actor + item + place» makes a re-rating one verdict.
+   *
+   * `from` is the release of 0.2, and the caller passes it: sign-in is open since 0.1, so the
+   * people who arrived before there was anything of 0.2 to use would sit in the denominator
+   * (MOL-51). And only those whose window has closed are counted — someone who came last week
+   * has not failed to reach five, they have not had the time.
+   */
+  reachedRatings(query: RatingsGateQuery): Promise<CohortReached>
+}
+
+/** What gate 0.2 asks: the domain's two numbers and the window of people it looks at. */
+export interface RatingsGateQuery {
+  readonly from: Date
+  readonly to: Date
+  /** The domain's `GATE_RATINGS`. */
+  readonly ratings: number
+  /** The domain's `GATE_RATINGS_WINDOW_HOURS`. */
+  readonly windowHours: number
+}
+
+export interface CohortReached {
+  readonly cohortSize: number
+  readonly reached: number
 }
 
 /**
@@ -479,6 +510,38 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         })),
         total: Number(rows[0]?.total ?? 0),
       }
+    },
+
+    async reachedRatings({ from, to, ratings, windowHours }) {
+      // Counted from `actors.created_at`, in hours, as gate 0.3 counts its weeks: both halves
+      // of the gates stand on one axis, and hours mean the same in every time zone.
+      const rows = await db.execute<{ cohort_size: number; reached: number }>(sql`
+        with cohort as (
+          select ${actors.id} as actor_id, ${actors.createdAt} as started
+          from ${actors}
+          where ${actors.createdAt} >= ${from.toISOString()}::timestamptz
+            and ${actors.createdAt} <  ${to.toISOString()}::timestamptz
+            -- A window still open is no answer yet: counted now, a person who came last week
+            -- reads as one who failed, and the gate errs towards «stop» for no reason.
+            and ${actors.createdAt} + make_interval(hours => ${windowHours}::int) <= now()
+        ),
+        reached as (
+          select c.actor_id
+          from cohort c
+          join ${verdicts} v on v.actor_id = c.actor_id
+          where v.rated_at < c.started + make_interval(hours => ${windowHours}::int)
+            -- No deleted_at filter: the gate is the one reader that counts withdrawn
+            -- verdicts (MOL-27). Every other reader of this table must have it.
+          group by c.actor_id
+          having count(*) >= ${ratings}::int
+        )
+        select
+          (select count(*) from cohort)::int as cohort_size,
+          (select count(*) from reached)::int as reached
+      `)
+
+      const row = rows[0]
+      return { cohortSize: row?.cohort_size ?? 0, reached: row?.reached ?? 0 }
     },
   }
 }
