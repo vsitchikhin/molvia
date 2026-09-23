@@ -111,8 +111,14 @@ export function createPlaceRepository(db: Conn): PlaceRepository {
         .where(
           and(
             eq(trips.actorId, actorId),
+            // By the fold the place was stored under, never by the exact spelling: `ensure`
+            // keeps the first spelling anyone wrote, so a shop created as «гюмри» is the same
+            // shop as «Гюмри» and must not fall out of the list (MOL-65, adversarial Г2).
             geography
-              ? and(eq(places.country, geography.country), eq(places.city, geography.city))
+              ? and(
+                  eq(places.country, geography.country),
+                  eq(placeIdentity(places.city), identityOf(geography.city)),
+                )
               : undefined,
           ),
         )

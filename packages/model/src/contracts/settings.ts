@@ -39,15 +39,41 @@ export function geographyKey(value: Pick<ActorSettings, 'country' | 'city'>): st
   return JSON.stringify([value.country, value.city])
 }
 
+/**
+ * Whether a geography may be written down at all: one of today's two cities, or exactly the
+ * one the person already has — a historical row from before the form existed stays usable,
+ * and so does an offline trip that carries the settings of the day it was started.
+ *
+ * One predicate for both write paths on purpose (MOL-65, review 1). While the trip's
+ * geography came from `actors`, «the country is fixed as Armenia» was held by the form alone;
+ * with a trip naming its own, a second rule here would mean `PUT /actors/me/settings` refusing
+ * what `POST /trips` writes into `places` — the table everyone shares.
+ */
+export function geographyAllowed(
+  value: Pick<ActorSettings, 'country' | 'city'>,
+  held: Pick<ActorSettings, 'country' | 'city'>,
+): boolean {
+  return (
+    (value.country === held.country && value.city === held.city) ||
+    (value.country === 'AM' && SETTINGS_CITIES.some((city) => city === value.city))
+  )
+}
+
 export const settingsUpdateSchema = z
   .strictObject({
     previous: actorSettingsSchema,
     settings: actorSettingsSchema,
   })
-  .refine(
-    ({ previous, settings }) =>
-      (settings.country === previous.country && settings.city === previous.city) ||
-      (settings.country === 'AM' && SETTINGS_CITIES.some((city) => city === settings.city)),
-    { error: ISSUE.BODY_INVALID },
-  )
+  .refine(({ previous, settings }) => geographyAllowed(settings, previous), {
+    error: ISSUE.BODY_INVALID,
+  })
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>
+
+/** The settings a trip names, as the person holding `settings` is allowed to name them. */
+export function tripContextSchema(
+  settings: Pick<ActorSettings, 'country' | 'city'>,
+): z.ZodType<ActorSettings> {
+  return actorSettingsSchema.refine((value) => geographyAllowed(value, settings), {
+    error: ISSUE.BODY_INVALID,
+  })
+}

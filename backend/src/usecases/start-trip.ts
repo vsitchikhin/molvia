@@ -1,6 +1,7 @@
-import { DomainError, ERROR, pickOfficialRate, yerevanDate } from '@molvia/model'
+import { DomainError, ERROR, pickOfficialRate, tripContextSchema, yerevanDate } from '@molvia/model'
 import type { Actor, AmdRate, OfficialRate, StartTripBody, TripView } from '@molvia/model'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
+import { parseBody } from '@/parse'
 import { tripViewFor } from './trip-view'
 
 export interface Started {
@@ -12,8 +13,9 @@ export interface Started {
 /**
  * «Начать поход».
  *
- * The place is named, not picked: the country and the city are the person's own settings, and
- * `places.ensure` meets «ЕРЕВАН СИТИ» and «ереван сити» at the one shop. «Yerevan City» is a
+ * The place is named, not picked: the country and the city come from the trip's own context —
+ * the settings as the phone knew them when it started, which offline may be older than the
+ * row — and `places.ensure` meets «ЕРЕВАН СИТИ» and «ереван сити» at the one shop. «Yerevan City» is a
  * second shop, accepted for 0.1 — merging places is 0.2's, as merging items is (MOL-21, В-11).
  *
  * The currency is a snapshot of the person's setting, and so is the rate: the official one, read
@@ -33,8 +35,12 @@ export async function startTrip(
     const already = await repositories.trips.byId(body.id, actor.id)
     if (already) return { trip: await tripViewFor(repositories, already), created: false }
 
-    const context = body.context
-    if (!context) throw new DomainError(ERROR.TRIP_CONTEXT_REQUIRED)
+    if (!body.context) throw new DomainError(ERROR.TRIP_CONTEXT_REQUIRED)
+    // Checked against the actor rather than by the body's own schema: `places` is a table
+    // everyone shares, and without this the two cities the settings form offers are held by
+    // the form alone — one `POST` away from a shop in a city that does not exist (MOL-65,
+    // review 1). The same predicate `PUT /actors/me/settings` refuses by.
+    const context = parseBody(tripContextSchema(actor), body.context)
 
     const place = await repositories.places.ensure({
       kind: body.place.kind,

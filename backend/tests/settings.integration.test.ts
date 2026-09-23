@@ -139,6 +139,72 @@ describe('settings and offline trip context', () => {
     expect(there.json()).toEqual({ places: [] })
   })
 
+  it('refuses a trip in a geography the settings would refuse, and keeps the historical one', async () => {
+    const owner = await insertActor(db, { country: 'GE', city: 'Тбилиси' })
+    const cookie = await signIn(db, owner)
+    const start = async (context: ActorSettings, name: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/trips',
+        headers: { cookie },
+        payload: { id: randomUUID(), context, place: { kind: 'store', name } },
+      })
+    const legacy = { ...initial, country: 'GE', city: 'Тбилиси' }
+    expect((await start({ ...initial, city: 'Батуми' }, 'Гудвилл')).statusCode).toBe(400)
+    expect((await start({ ...initial, country: 'ZZ', city: 'Нигде' }, 'Лавка')).statusCode).toBe(
+      400,
+    )
+    // The city is the one the person holds, so the trip is theirs to start; and so is one of
+    // today's two, which is what an offline start made before a move carries.
+    expect((await start(legacy, 'Гудвилл')).statusCode).toBe(201)
+    expect((await start(initial, 'SAS')).statusCode).toBe(409)
+    expect(await db.select({ city: places.city }).from(places)).toEqual([{ city: 'Тбилиси' }])
+  })
+
+  it('finds a place whose city was written in another case, and ignores a stray query parameter', async () => {
+    const owner = await insertActor(db)
+    const cookie = await signIn(db, owner)
+    const recent = async (query: string) =>
+      app.inject({ method: 'GET', url: `/places/recent${query}`, headers: { cookie } })
+    const response = await app.inject({
+      method: 'POST',
+      url: '/trips',
+      headers: { cookie },
+      payload: {
+        id: randomUUID(),
+        context: { ...initial, city: 'гюмри' },
+        place: { kind: 'store', name: 'SAS' },
+      },
+    })
+    expect(response.statusCode).toBe(400)
+    await db.insert(places).values({
+      id: randomUUID(),
+      kind: 'store',
+      name: 'SAS',
+      country: 'AM',
+      city: 'гюмри',
+    })
+    const started = await app.inject({
+      method: 'POST',
+      url: '/trips',
+      headers: { cookie },
+      payload: { id: randomUUID(), context: initial, place: { kind: 'store', name: 'SAS' } },
+    })
+    expect(started.statusCode).toBe(201)
+    const city = encodeURIComponent('Гюмри')
+    expect((await recent(`?country=AM&city=${city}`)).json()).toMatchObject({
+      places: [{ name: 'SAS' }],
+    })
+    // A parameter this server never wrote — a cache-buster, one a portal appended — and half
+    // a pair: answered, and answered without a filter, never with 400.
+    expect((await recent(`?country=AM&city=${city}&t=1`)).statusCode).toBe(200)
+    expect((await recent('?t=1')).json()).toMatchObject({ places: [{ name: 'SAS' }] })
+    expect((await recent('?country=AM')).json()).toMatchObject({ places: [{ name: 'SAS' }] })
+    expect((await recent(`?country=am&city=${city}`)).json()).toMatchObject({
+      places: [{ name: 'SAS' }],
+    })
+  })
+
   it('holds an unknown legacy start without creating a place or trip', async () => {
     const owner = await insertActor(db)
     const cookie = await signIn(db, owner)
