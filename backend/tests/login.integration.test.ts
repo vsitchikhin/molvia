@@ -1,10 +1,12 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ERROR,
+  ISSUE,
   LOGIN_COOKIE,
   LOGIN_HEADER,
+  LOGIN_LIFETIME_SECONDS,
   SESSION_COOKIE,
   loginStartedCodec,
   loginPollCodec,
@@ -311,4 +313,65 @@ describe('Telegram login over HTTP', () => {
       await disabled.close()
     }
   })
+
+  it('is no-store even where Fastify answers itself, and a path that does not decode is ours', async () => {
+    // Adversarial А4: no route, or a URL refused before any hook, used to leave the auth prefix
+    // without `no-store`.
+    for (const [method, url] of [
+      ['GET', '/auth/login'],
+      ['PUT', '/auth/login'],
+      ['DELETE', '/auth/login/x'],
+      ['GET', '/internal/auth/nothing'],
+    ] as const) {
+      const response = await app.inject({ method, url, headers: browserHeaders })
+      expect(response.statusCode).toBe(404)
+      expect(response.headers['cache-control']).toBe('no-store')
+    }
+    const undecodable = await app.inject({
+      method: 'GET',
+      url: '/auth/login/%E0',
+      headers: browserHeaders,
+    })
+    expect(undecodable.statusCode).toBe(400)
+    expect(undecodable.headers['cache-control']).toBe('no-store')
+    expect(undecodable.json()).toEqual({ code: ISSUE.PATH_INVALID })
+  })
+
+  it('must not fire: a reply outside the auth paths does not become no-store', async () => {
+    const response = await app.inject({ method: 'GET', url: '/nowhere/%E0' })
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({ code: ISSUE.PATH_INVALID })
+    expect(response.headers['cache-control']).toBeUndefined()
+  })
+})
+
+describe('the term of a login is the database clock alone', () => {
+  afterEach(() => vi.useRealTimers())
+
+  // Adversarial А5: the row's term came from Postgres, but its check and the cookie's `Max-Age`
+  // from this process. Six minutes ahead made every start a 500; four made the cookie a minute.
+  it.each([-6, -4, 4, 6])(
+    'the API %i minutes off Postgres still gives five minutes',
+    async (minutes) => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date(Date.now() + minutes * 60_000))
+      const response = await app.inject({
+        method: 'POST',
+        url: '/auth/login',
+        headers: browserHeaders,
+      })
+      expect(response.statusCode).toBe(201)
+      expect(String(response.headers['set-cookie'])).toContain(
+        `Max-Age=${String(LOGIN_LIFETIME_SECONDS)}`,
+      )
+      const code = new URL(loginStartedCodec.parse(response.json()).url).searchParams.get('start')
+      const preview = await app.inject({
+        method: 'GET',
+        url: `/internal/auth/login/${code ?? ''}`,
+        headers: botHeaders,
+      })
+      const row = loginPreviewCodec.parse(preview.json())
+      expect(row.expiresAt.getTime() - row.createdAt.getTime()).toBe(LOGIN_LIFETIME_SECONDS * 1000)
+    },
+  )
 })
