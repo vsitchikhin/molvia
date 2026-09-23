@@ -7,7 +7,7 @@ import TripView from '@/views/TripView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
 import { watchBrowserAnimatedBack } from '@/transitions'
 
-/** The three sections of the tab bar. «trip» is home: the main scenario of the product. */
+/** The four sections of the tab bar. «trip» is home: the main scenario of the product. */
 export type Tab = 'trip' | 'advice' | 'verdicts' | 'settings'
 
 export type RouteName = 'trip' | 'advice' | 'verdicts' | 'settings' | 'item-search' | 'kit'
@@ -26,7 +26,7 @@ declare module 'vue-router' {
   }
 }
 
-// Not lazy: four small screens, and a chunk per route would turn the first tap on a tab into
+// Not lazy: five small screens, and a chunk per route would turn the first tap on a tab into
 // a network request exactly where the connection drops.
 export const routes = [
   {

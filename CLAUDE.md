@@ -660,7 +660,9 @@ database access. In a product about data integrity, two write paths will silentl
   While a shelf refuses, what came after lives in memory only, and a PWA killed before it sends
   loses that — there is nowhere left to keep it. No connection, a 5xx, an answer off the contract (a shop's
   captive portal) and a 401 hold the queue, and so does a code the API did not say itself
-  (`ApiError.answered === false` — a portal's 404 page); any other refusal is set aside in
+  (`ApiError.answered === false` — a portal's 404 page). `error.trip_context_required` holds it
+  too, and holds it **without a timer**: nothing changes until the person names the city and the
+  currencies of a trip the old app started (MOL-65). Any other refusal is set aside in
   `rejected` and never retried — sent again it would be refused again and hold everything behind
   it. The last known trip is remembered per identity for the same reason: the app opened at the
   shelf with no signal still knows where a purchase goes — but **the memory is for when the
@@ -1074,6 +1076,25 @@ bundle at all** — the bundler folds its guard to a constant and the module is 
 which a test asserts against the built file rather than against the intention; the PWA's call to
 it is behind `import.meta.env.DEV`, so the production bundle does not hold it either. The price is
 named: in production there is no way in until MOL-54 exists.
+MOL-65 gave the person their four fields and a fourth tab: Armenia, Гюмри or Ереван, the currency
+purchases are written in and the one they are converted into. `PUT /actors/me/settings` compares
+the four it was handed **inside the `UPDATE`**, so two devices cannot both overwrite one form,
+and an exact repeat after a lost answer is successful because the target matches as well. The
+form is settled **choice by choice**: one nobody here touched follows whatever the account holds
+now, and «conflict» means both devices changed the same one — sending the whole stale form took
+the other device's move back silently, with nothing on the screen to say which field was about to
+go. **A trip names its own geography** (`context`): the settings as the phone knew them when it
+started, which offline may be older than the row, so a move made elsewhere neither renames the
+shop nor changes the currency of a trip already begun. A start from the old queue carries none,
+and the server answers `error.trip_context_required`; the queue **holds it without a retry**
+until the person names the city and the currencies, because nothing else knows where that trip
+was. **What a trip may name is the rule the settings refuse by** — `geographyAllowed`: one's own
+current city, or AM with one of `SETTINGS_CITIES`. `places` is a table everyone shares, and «the
+country is fixed as Armenia» must not be held by the form alone. The city is read by the fold
+`places.ensure` stores it under, never by the exact spelling, or a shop written «гюмри» once
+falls out of its own owner's prices. «Что брать» answers with the geography it counted by, and
+the phone compares it with its own: a different city is a list to load again, and an answer the
+settings will not move to is taken as it is — the screen used to stay on a skeleton for good.
 
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
