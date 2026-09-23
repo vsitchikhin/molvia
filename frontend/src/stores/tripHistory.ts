@@ -28,7 +28,13 @@ const cacheCodec = z.strictObject({
 const KEY = 'molvia.trip-history'
 const empty = (): TripHistory => ({ trips: [], nextCursor: null })
 
-/** A bounded read cache. Only unsynchronised completions keep additional full snapshots. */
+/**
+ * A bounded read cache. A full snapshot is kept only for a completion the server has not
+ * confirmed: the first answer about that trip takes it away, wherever the answer comes from —
+ * the read after «Завершить», a purchase written into it later, or the row being opened. A
+ * completion whose confirming read was lost keeps its snapshot until the trip is read again,
+ * which is the first tap on its row (А6).
+ */
 export const useTripHistoryStore = defineStore('tripHistory', () => {
   const actor = useActorStore()
   const page = ref<TripHistory>(empty())
@@ -36,10 +42,25 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   const local = ref<LocalFinishedTrip[]>([])
   const stale = ref(true)
   let firstPage: TripHistory = empty()
+  // What «Показать ещё» brought, and the cursor standing after it. Only the first page is
+  // remembered on the phone; these live for as long as the screen does.
+  let deeper: TripHistoryEntry[] = []
+  let deepCursor: TripHistory['nextCursor'] = null
   let generation = 0
   let selection = 0
   let ahead = false
   const revisions = new Map<string, number>()
+
+  const beyond = (rows: TripHistoryEntry[], row: TripHistoryEntry): boolean =>
+    !rows.some((held) => held.id === row.id)
+
+  /** The first page, then what was loaded past it — and the deepest cursor of the two. */
+  function spread(): TripHistory {
+    return {
+      trips: [...firstPage.trips, ...deeper],
+      nextCursor: deeper.length > 0 ? deepCursor : firstPage.nextCursor,
+    }
+  }
 
   function recall(): z.output<typeof cacheCodec> | null {
     try {
@@ -56,23 +77,35 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     if (!ahead) local.value = recall()?.local ?? []
   }
 
-  function restore(): void {
+  /**
+   * `keepDeeper` is for a write by another window: the list is read from the top down, and a
+   * background success must not take «Показать ещё» back from under the thumb (А4). A change of
+   * owner keeps nothing — those rows are someone else's.
+   */
+  function restore(keepDeeper = false): void {
     generation += 1
     selection += 1
     ahead = false
     const held = recall()
     firstPage = held?.page ?? empty()
-    page.value = firstPage
+    deeper = keepDeeper ? deeper.filter((row) => beyond(firstPage.trips, row)) : []
+    if (!keepDeeper) deepCursor = null
+    page.value = spread()
     selected.value = held?.selected ?? null
     local.value = held?.local ?? []
     stale.value = true
   }
   restore()
-  watch(() => actor.id, restore)
+  watch(
+    () => actor.id,
+    () => {
+      restore()
+    },
+  )
   window.addEventListener('storage', (event) => {
     if (event.key !== `${KEY}.${actor.id ?? ''}` || ahead) return
     const viewing = selected.value
-    restore()
+    restore(true)
     // A different window selecting B does not replace A on this window's screen.
     if (viewing && selected.value?.id !== viewing.id) {
       selected.value = local.value.find((row) => row.id === viewing.id)?.view ?? viewing
@@ -134,13 +167,26 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   function apply(trip: TripView): void {
     syncLocal()
     revisions.set(trip.id, (revisions.get(trip.id) ?? 0) + 1)
-    generation += 1
+    // `generation` cancels a history answer that arrived after this window changed the list
+    // under it — so it is raised by a change and not by a write. A purchase sent to the trip
+    // going on touches neither the page nor the local completions, and used to throw away the
+    // page the screen was waiting for, leaving «походов ещё нет» over a full history (А1).
+    let moved = false
     if (selected.value?.id === trip.id) {
       selection += 1
       selected.value = trip
     }
-    local.value = local.value.map((held) => (held.id === trip.id ? { ...held, view: trip } : held))
     const row = summary(trip)
+    if (local.value.some((held) => held.id === trip.id)) {
+      // While the server does not hold the trip finished, the snapshot is refreshed; once it
+      // does, the snapshot has nothing left to stand in for. Only `load()` used to drop it, and
+      // only for a completion the first page still carries — one sent after twenty fresher ones
+      // kept its own full `TripView` for ever (А6).
+      local.value = row
+        ? local.value.filter((held) => held.id !== trip.id)
+        : local.value.map((held) => (held.id === trip.id ? { ...held, view: trip } : held))
+      moved = true
+    }
     if (row) {
       selected.value ??= trip
       page.value = {
@@ -151,12 +197,17 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
               (a.finishedOnDeviceAt ?? a.finishedAt).getTime() || b.id.localeCompare(a.id),
         ),
       }
+      // Kept in place rather than dropped: a row of a page already loaded stays on that page.
+      deeper = deeper.map((held) => (held.id === row.id ? row : held))
+      moved = true
     }
+    if (moved) generation += 1
     persist()
   }
 
   function forgetLocal(id: string): void {
     syncLocal()
+    if (!local.value.some((held) => held.id === id)) return
     local.value = local.value.filter((held) => held.id !== id)
     generation += 1
     persist()
@@ -170,15 +221,20 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     const answer = await api.tripHistory(cursor ?? undefined)
     if (owner !== actor.id || version !== generation) return
     syncLocal()
-    if (!more) firstPage = answer
     local.value = local.value.filter((held) => !answer.trips.some((row) => row.id === held.id))
-    const existing = more ? page.value.trips : []
-    page.value = {
-      trips: [
-        ...existing,
-        ...answer.trips.filter((row) => !existing.some((held) => held.id === row.id)),
-      ],
-      nextCursor: answer.nextCursor,
+    if (more) {
+      const added = answer.trips.filter((row) => beyond(page.value.trips, row))
+      deeper = [...deeper, ...added]
+      deepCursor = answer.nextCursor
+      page.value = { trips: [...page.value.trips, ...added], nextCursor: answer.nextCursor }
+    } else {
+      // A refresh of the first page does not take back the pages already loaded (А4): the list
+      // is read from the top down, and a background success used to collapse it under the thumb
+      // and put «Показать ещё» back. It also keeps a row the newest page pushed off the first
+      // one — before, that row simply disappeared from the screen.
+      firstPage = answer
+      deeper = deeper.filter((row) => beyond(answer.trips, row))
+      page.value = spread()
     }
     stale.value = false
     persist()
@@ -194,7 +250,12 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     const owner = actor.id
     const token = ++selection
     const revision = revisions.get(id) ?? 0
-    selected.value = known(id)
+    // Only what there is to show: a tap on a trip this phone has never read must not take away
+    // the one it holds. Without a connection the read fails and nothing puts the old snapshot
+    // back — and the next write would save the emptiness over it (А2). The screen reads through
+    // `known(id)`, so someone else's trip is not shown by this either.
+    const held = known(id)
+    if (held) selected.value = held
     const answer = await api.trip(id)
     if (owner !== actor.id || token !== selection || revision !== (revisions.get(id) ?? 0)) return
     selected.value = answer
