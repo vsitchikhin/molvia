@@ -455,14 +455,36 @@ describe('TripView', () => {
       await flushPromises()
 
       expect(view.text()).toContain('Уже открыт поход в «SAS»')
+      // The shops differ, so moving the purchases across is said in words (Р-2, З-4).
+      expect(view.text()).toContain('цены одного магазина нельзя записывать другому')
       await button(view, ru.trip.elsewhere.choose).trigger('click')
       await flushPromises()
       clock += 1000
-      inside(document.body.querySelector('dialog[open]'), ru.trip.elsewhere.finish).click()
+      const sheet = document.body.querySelector('dialog[open]')
+      expect(sheet?.textContent).toContain('запишутся магазину «SAS»')
+      inside(sheet, ru.trip.elsewhere.finish).click()
       await flushPromises()
 
       expect(queue.elsewhere).toBeNull()
       expect(queue.pending.some((write) => write.kind === 'finish')).toBe(true)
+    })
+
+    it('в том же магазине ничего не говорит про перенос цен в чужой', async () => {
+      const open = trip([], { id: 'bbbbbbbb-0000-4000-8000-000000000035' })
+      currentTrip.mockResolvedValue(null)
+      startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_OPEN, undefined, true))
+      const { view, queue } = await render()
+      currentTrip.mockResolvedValue(open)
+      queue.enqueue({
+        kind: 'start',
+        tripId: 'bbbbbbbb-0000-4000-8000-000000000036',
+        place: { kind: 'store', name: open.place.name },
+        startedAt: new Date(),
+      })
+      await flushPromises()
+
+      expect(view.text()).toContain(`Уже открыт поход в «${open.place.name}»`)
+      expect(view.text()).not.toContain('цены одного магазина нельзя записывать другому')
     })
 
     it('тот же вопрос, заданный заново, не теряет ответ из уже открытой шторки', async () => {

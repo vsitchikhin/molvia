@@ -66,7 +66,7 @@
       kind="attention"
       inline
       :title="t('trip.elsewhere.title', { place: queue.elsewhere.place })"
-      :body="t('trip.elsewhere.body', { mine: queue.elsewhere.mine })"
+      :body="elsewhereBody(queue.elsewhere)"
     >
       <template #action>
         <AppButton variant="ghost" @click="chooseTrip">{{ t('trip.elsewhere.choose') }}</AppButton>
@@ -159,7 +159,7 @@
 
     <BottomSheet v-model:open="choosing">
       <template #title>{{ t('trip.elsewhere.title', { place: choice?.place ?? '' }) }}</template>
-      <p class="confirm">{{ t('trip.elsewhere.body', { mine: choice?.mine ?? '' }) }}</p>
+      <p class="confirm">{{ choice ? elsewhereBody(choice) : '' }}</p>
       <template #footer>
         <AppButton size="large" block @click="joinTrip">{{ t('trip.elsewhere.join') }}</AppButton>
         <AppButton variant="ghost" block @click="finishOtherTrip">{{
@@ -262,6 +262,16 @@ export default defineComponent({
     const queue = useTripQueueStore()
     const choosing = ref(false)
     const choice = ref<TripElsewhere | null>(null)
+    /**
+     * Moving purchases into a trip of another shop is said in words before it is offered (Р-2):
+     * «item + place» is the key the product rests on, and a price of «Ереван Сити» written down
+     * against «SAS» is later indistinguishable from a real one. For the same shop the sentence
+     * would be untrue, so it is a second key rather than a longer one (З-4).
+     */
+    const elsewhereBody = (asked: TripElsewhere): string =>
+      asked.place === asked.mine
+        ? t('trip.elsewhere.body', { mine: asked.mine })
+        : t('trip.elsewhere.body_other', { mine: asked.mine, place: asked.place })
     function chooseTrip(): void {
       choice.value = queue.elsewhere
       choosing.value = choice.value !== null
@@ -489,6 +499,7 @@ export default defineComponent({
       choosing,
       choice,
       chooseTrip,
+      elsewhereBody,
       joinTrip,
       finishOtherTrip,
       t,

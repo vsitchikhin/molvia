@@ -103,7 +103,8 @@
       "body": "Continue the open trip, or finish it and start a new one in «{mine}»? Purchases for the new trip are saved on this device and will wait for your choice.",
       "join": "Add them to that trip",
       "finish": "Finish that trip",
-      "choose": "Choose trip"
+      "choose": "Choose trip",
+      "body_other": "Purchases for the new trip («{mine}») are saved on this device. Added to the open trip, they are recorded against «{place}» — prices of one shop must not be written down against another, they are what the comparison rests on."
     },
     "history": {
       "title": "Trip history",
