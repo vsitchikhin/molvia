@@ -117,7 +117,7 @@ test('a trip started by the old app asks for its city and currencies before it i
   // A start written by the version before MOL-65: no context at all, which is the one branch
   // the server answers `error.trip_context_required` to.
   await page.evaluate(
-    ([key, id]) => {
+    ({ key, id }: { key: string; id: string }) => {
       localStorage.setItem(
         key,
         JSON.stringify([
@@ -133,7 +133,7 @@ test('a trip started by the old app asks for its city and currencies before it i
         ]),
       )
     },
-    [`molvia.trip-queue.${owner}`, tripId],
+    { key: `molvia.trip-queue.${owner}`, id: tripId },
   )
   await page.reload()
   // By the action, not by the title: the sheet below carries the same words, mounted and hidden.

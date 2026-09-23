@@ -658,7 +658,13 @@ describe('the trip', () => {
     rateProvider: null,
     rateJump: null,
     rateStale: false,
-    place: { id: 'b1e0f2a4-5c6d-4e8f-9a0b-1c2d3e4f5a6b', kind: 'store', name: 'Ереван Сити' },
+    place: {
+      id: 'b1e0f2a4-5c6d-4e8f-9a0b-1c2d3e4f5a6b',
+      kind: 'store',
+      name: 'Ереван Сити',
+      country: 'AM',
+      city: 'Гюмри',
+    },
     expenses: [
       {
         id: EXPENSE,
