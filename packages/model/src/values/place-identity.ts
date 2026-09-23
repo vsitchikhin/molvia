@@ -35,8 +35,29 @@ const SELECTORS = String.raw`\uFE00-\uFE0F\u{E0100}-\u{E01EF}`
 const DRAWN = new RegExp(`[${SELECTORS}]`, 'gu')
 const EDGES = new RegExp(`^(?:${BLANKS})+|(?:${BLANKS})+$`, 'gu')
 
+/**
+ * `lower()` in Postgres folds each character on its own, with none of the contextual rules
+ * `String.prototype.toLowerCase` applies to a whole string — and the two disagreed on the first
+ * day this file existed (Д3, Г-1). A final Greek sigma is the dangerous half: the database reads
+ * «ΑΣ» and «Ας» as two places, JavaScript read them as one, and the screen would then keep quiet
+ * about prices moving into another shop. So the fold is per character, which leaves «Σ» as «σ»
+ * wherever it stands, and `İ` is named outright: its full mapping adds a combining dot that the
+ * database's simple mapping does not.
+ *
+ * A test sweeps the whole Basic Multilingual Plane through both, so a third case cannot hide.
+ */
+const DOTTED_CAPITAL_I = '\u0130'
+
+function lowerAsPostgresDoes(text: string): string {
+  let folded = ''
+  for (const character of text) {
+    folded += character === DOTTED_CAPITAL_I ? 'i' : character.toLowerCase()
+  }
+  return folded
+}
+
 export function placeNameIdentity(name: string): string {
-  return name.normalize('NFKC').replace(DRAWN, '').toLowerCase().replace(EDGES, '')
+  return lowerAsPostgresDoes(name.normalize('NFKC').replace(DRAWN, '')).replace(EDGES, '')
 }
 
 /** Whether two names would reach the same row of `places`. */
