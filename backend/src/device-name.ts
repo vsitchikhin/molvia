@@ -13,8 +13,9 @@ const CHROME = /\(KHTML, like Gecko\) Chrome\/[\d.]+ (?:Mobile )?Safari\/[\d.]+$
  * A label for confirmation, never a claim about the device's identity.
  *
  * It is what a person reads in the bot before «this was not me», so a wrong word costs more than
- * a missing one (adversarial А2, Б3): iPadOS asks for the desktop site and says «Macintosh», so
- * Safari there is named for both; a browser that cannot be named for certain leaves the label
+ * a missing one (adversarial А2, Б3, В1): iPadOS asks for the desktop site and says «Macintosh»,
+ * so Safari there is named for both, and an Android tablet asking for it says «X11; Linux» —
+ * Samsung Internet exists on Android alone; a browser that cannot be named for certain leaves the label
  * to the system alone.
  */
 export function deviceName(userAgent: string | undefined): string | null {
@@ -41,7 +42,7 @@ export function deviceName(userAgent: string | undefined): string | null {
     ? 'iPhone'
     : userAgent.includes('iPad')
       ? 'iPad'
-      : userAgent.includes('Android')
+      : userAgent.includes('Android') || browser === 'Samsung Internet'
         ? 'Android'
         : userAgent.includes('Windows')
           ? 'Windows'
@@ -50,7 +51,7 @@ export function deviceName(userAgent: string | undefined): string | null {
               ? 'Mac / iPad'
               : 'Mac'
             : userAgent.includes('Linux')
-              ? 'Linux'
+              ? 'Linux / Android'
               : null
   if (!os) return null
   return deviceNameOrNull(browser ? `${os} · ${browser}` : os)

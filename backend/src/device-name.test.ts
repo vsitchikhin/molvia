@@ -33,7 +33,20 @@ it.each([
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
     'iPhone',
   ],
-  ['Mozilla/5.0 (X11; Linux x86_64) Firefox/128.0', 'Linux · Firefox'],
+  ['Mozilla/5.0 (X11; Linux x86_64) Firefox/128.0', 'Linux / Android · Firefox'],
+  // Adversarial В1: an Android tablet asking for the desktop site.
+  [
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    'Linux / Android · Chrome',
+  ],
+  [
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0.0.0 Safari/537.36',
+    'Android · Samsung Internet',
+  ],
+  [
+    'Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    'Android · Chrome',
+  ],
   // Adversarial Б3: Chromium that is not Chrome is named by its system, or by its own token.
   [
     'Mozilla/5.0 (Linux; U; Android 12; ru-ru; M2101K6G Build/SKQ1.210908.001) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/112.0.5615.136 Mobile Safari/537.36 XiaoMi/MiuiBrowser/14.4.0-g',
