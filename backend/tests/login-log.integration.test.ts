@@ -21,23 +21,31 @@ beforeAll(async () => {
 })
 afterAll(() => app.close())
 
-it('a failed login logs the name and the driver code, never the query or its parameters', async () => {
-  const account = telegramId()
-  const response = await app.inject({
-    method: 'POST',
-    url: `/internal/auth/login/${randomBytes(32).toString('base64url')}/confirm`,
-    headers: { authorization: `Bearer ${botSecret}` },
-    payload: { telegramUserId: account },
-  })
-  expect(response.statusCode).toBe(500)
-  expect(response.json()).toEqual({ code: ERROR.INTERNAL })
+it.each([
+  '/internal/auth/login',
+  // Adversarial Б2: the router decodes this to the same route, and it must log the same way.
+  '/internal/%61uth/login',
+])(
+  'a failed login at %s logs the name and the driver code, never the query or its parameters',
+  async (prefix) => {
+    lines.length = 0
+    const account = telegramId()
+    const response = await app.inject({
+      method: 'POST',
+      url: `${prefix}/${randomBytes(32).toString('base64url')}/confirm`,
+      headers: { authorization: `Bearer ${botSecret}` },
+      payload: { telegramUserId: account },
+    })
+    expect(response.statusCode).toBe(500)
+    expect(response.json()).toEqual({ code: ERROR.INTERNAL })
 
-  const log = lines.join('')
-  expect(log).not.toContain(String(account))
-  expect(log).not.toMatch(/Failed query|login_requests|params/i)
-  const failure = lines
-    .map((line) => JSON.parse(line) as { msg?: string; errorName?: string; code?: string })
-    .find((entry) => entry.msg === 'authentication failed')
-  expect(failure?.errorName).toBeTruthy()
-  expect(failure?.code).toMatch(/^[\dA-Z_]+$/)
-})
+    const log = lines.join('')
+    expect(log).not.toContain(String(account))
+    expect(log).not.toMatch(/Failed query|login_requests|params/i)
+    const failure = lines
+      .map((line) => JSON.parse(line) as { msg?: string; errorName?: string; code?: string })
+      .find((entry) => entry.msg === 'authentication failed')
+    expect(failure?.errorName).toBeTruthy()
+    expect(failure?.code).toMatch(/^[\dA-Z_]+$/)
+  },
+)

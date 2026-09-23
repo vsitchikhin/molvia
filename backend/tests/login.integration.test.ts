@@ -337,6 +337,44 @@ describe('Telegram login over HTTP', () => {
     expect(undecodable.json()).toEqual({ code: ISSUE.PATH_INVALID })
   })
 
+  it('a parameter longer than the router used to allow is judged by its route, not refused as a 500', async () => {
+    // Adversarial Б1: the router's default limit of 100 fell through `frameworkErrors` into 500.
+    const long = 'a'.repeat(101)
+    const poll = await app.inject({
+      method: 'GET',
+      url: `/auth/login/${long}`,
+      headers: { ...browserHeaders, cookie: `${LOGIN_COOKIE}=${'s'.repeat(43)}` },
+    })
+    expect(poll.statusCode).toBe(404)
+    expect(poll.json()).toEqual({ code: ERROR.LOGIN_UNAVAILABLE })
+    const preview = await app.inject({
+      method: 'GET',
+      url: `/internal/auth/login/${long}`,
+      headers: botHeaders,
+    })
+    expect(preview.statusCode).toBe(404)
+    for (const [method, url] of [
+      ['POST', `/trips/${long}/finish`],
+      ['DELETE', `/verdicts/${long}`],
+    ] as const) {
+      expect((await app.inject({ method, url })).statusCode).toBe(401)
+    }
+  })
+
+  it('knows an auth path by its route, however the URL spells it', async () => {
+    // Adversarial Б2: the router decodes `%61` to `a`, a prefix test on the raw URL did not.
+    const response = await app.inject({
+      method: 'GET',
+      url: '/%61uth/nothing',
+      headers: browserHeaders,
+    })
+    expect(response.statusCode).toBe(404)
+    expect(response.headers['cache-control']).toBe('no-store')
+    const matched = await app.inject({ method: 'POST', url: '/%61uth/login' })
+    expect(matched.statusCode).toBe(403)
+    expect(matched.headers['cache-control']).toBe('no-store')
+  })
+
   it('must not fire: a reply outside the auth paths does not become no-store', async () => {
     const response = await app.inject({ method: 'GET', url: '/nowhere/%E0' })
     expect(response.statusCode).toBe(400)
