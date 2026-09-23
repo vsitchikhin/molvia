@@ -183,6 +183,31 @@ it('draws the queued rows of a trip the server has never heard of', async () => 
   view.unmount()
 })
 
+it('does not call a trip empty when all it has lost is its snapshot', async () => {
+  // The completion reached the server, the list after it did not, so the row is kept without its
+  // snapshot. Counting that row as «something to show» put the offline notice inline and «В этом
+  // походе ничего не записано» under it — about a trip whose purchases were on screen a minute
+  // ago (Д1).
+  const saved = useTripHistoryStore()
+  saved.capture(
+    ID,
+    'Рынок',
+    new Date('2026-09-01T10:00:00Z'),
+    new Date('2026-09-01T11:00:00Z'),
+    'AMD',
+    null,
+  )
+  trip.mockRejectedValue(new Error('offline'))
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  const { view } = await render(true)
+  await flushPromises()
+  const state = view.findComponent({ name: 'ScreenState' })
+  expect(state.props('kind')).toBe('offline')
+  expect(state.props('inline')).toBe(false)
+  expect(view.text()).not.toContain(ru.trip.history.no_purchases)
+  view.unmount()
+})
+
 it('offers the last cached selection offline even when it is beyond the first page', async () => {
   const saved = useTripHistoryStore()
   saved.selected = answer()

@@ -41,13 +41,19 @@ export function useSelectedTrip(target: MaybeRefOrGetter<string | null>): Select
    * fifth state — no skeleton, no «not found», no error, no offline and no rows, just the header
    * (В4), reachable by the plain address `/trip/history/<id>` from a link or a reload.
    */
-  const queued = computed(
-    () =>
-      queue.pending.some((write) => write.tripId === id.value) ||
-      queue.rejected.some((item) => item.write.tripId === id.value),
-  )
+  const queued = computed(() => queue.pending.some((write) => write.tripId === id.value))
+  /**
+   * What the phone can say about this trip: the trip itself, a snapshot of it, or the writes
+   * still waiting. A local row that has **lost its snapshot** is not one of them — it is a name
+   * and a date, kept until a page of the history carries it. Counting it drew the offline notice
+   * as a line and «В этом походе ничего не записано» under it, which reads as «the trip was
+   * empty» about a trip whose purchases the same screen showed a minute ago (Д1).
+   *
+   * Refused writes do not count either: a start the server would not take names a trip that will
+   * never exist, and the notice about that refusal is what the screen has to say (Г-3).
+   */
   const available = computed(
-    () => !missing.value && (trip.value !== null || local.value !== null || queued.value),
+    () => !missing.value && (trip.value !== null || local.value?.view != null || queued.value),
   )
   async function load(): Promise<void> {
     const selected = id.value

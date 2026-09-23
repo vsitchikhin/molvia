@@ -234,7 +234,13 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     // A next page cannot be cancelled by a change somewhere else: it lies deeper than anything
     // held, and it is merged by id. Under the shared guard a correction sent to a trip finished
     // last week threw it away, and «Показать ещё» did nothing at all (В5).
+    //
+    // What it cannot survive is the boundary it was read from moving while it was in flight: a
+    // completion landing in the first page pushes its last row out, and the page that comes back
+    // starts below where that row now is. Appended, it left the row in no page at all and the
+    // list called itself complete — the hole `sameCursor` closes below, reached by a race (Д2).
     if (owner !== actor.id || (!more && version !== generation)) return
+    if (more && !sameCursor(cursor, page.value.nextCursor)) return
     syncLocal()
     local.value = local.value.filter((held) => !answer.trips.some((row) => row.id === held.id))
     if (more) {

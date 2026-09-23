@@ -198,6 +198,34 @@ describe('history memory', () => {
     expect(store.local).toEqual([])
   })
 
+  it('drops a next page read from a boundary that moved while it was in flight', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({
+      trips: [entry(A, '2026-09-03T10:00:00Z')],
+      nextCursor: cursor(A),
+    })
+    await store.load()
+    let second: ((value: TripHistory) => void) | undefined
+    tripHistory.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          second = done
+        }),
+    )
+    const more = store.load(true)
+    // While it is out, a completion lands in the first page and pushes its last row off: the
+    // page still on its way starts below where that row now is (Д2).
+    tripHistory.mockResolvedValueOnce({
+      trips: [entry(C, '2026-09-04T10:00:00Z')],
+      nextCursor: cursor(C),
+    })
+    await store.load()
+    second?.({ trips: [entry(B, '2026-09-02T10:00:00Z')], nextCursor: null })
+    await more
+    expect(store.page.trips.map((row) => row.id)).toEqual([C])
+    expect(store.page.nextCursor).toEqual(cursor(C))
+  })
+
   it('reads the tail again when the first page has moved under it', async () => {
     const store = useTripHistoryStore()
     tripHistory
