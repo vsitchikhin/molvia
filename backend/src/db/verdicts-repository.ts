@@ -65,6 +65,13 @@ export interface VerdictRepository {
    * people who arrived before there was anything of 0.2 to use would sit in the denominator
    * (MOL-51). And only those whose window has closed are counted — someone who came last week
    * has not failed to reach five, they have not had the time.
+   *
+   * **A verdict is dated by the server receiving it, and that bias is accepted** (adversarial
+   * pass, А1; owner's decision 23.09.2026). «Сохранить» keeps it on the phone and the queue
+   * sends it later — hours later with no signal or an expired session — so a fifth given in the
+   * last hour of the second week can arrive in the third and not count. The error only ever
+   * lowers the numerator, which is the gate erring towards «stop», the safe side, as with
+   * Р-24. The device's clock is not an option: the plan keeps it out of the gates altogether.
    */
   reachedRatings(query: RatingsGateQuery): Promise<CohortReached>
 }
@@ -513,6 +520,17 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
     },
 
     async reachedRatings({ from, to, ratings, windowHours }) {
+      // Refused loudly rather than answered: a fractional window is a Postgres error, and zero
+      // or a negative number gives a figure that looks true — nobody «reaches» zero through a
+      // join, a negative window takes in people who have not come yet (adversarial pass, А2).
+      // The domain's constants always pass; a first caller with input from outside may not.
+      const whole = (n: number) => Number.isInteger(n) && n > 0
+      if (!whole(ratings) || !whole(windowHours) || !(from.getTime() < to.getTime())) {
+        throw new RangeError(
+          `reachedRatings: ratings ${String(ratings)}, window ${String(windowHours)}h, [${String(from)}, ${String(to)})`,
+        )
+      }
+
       // Counted from `actors.created_at`, in hours, as gate 0.3 counts its weeks: both halves
       // of the gates stand on one axis, and hours mean the same in every time zone.
       const rows = await db.execute<{ cohort_size: number; reached: number }>(sql`

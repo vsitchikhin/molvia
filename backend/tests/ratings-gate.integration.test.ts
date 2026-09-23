@@ -52,22 +52,19 @@ function personSeen(started: Date = daysAgo(30)): Promise<string> {
   return insertActor(db, { createdAt: started })
 }
 
-async function startOf(actorId: string): Promise<Date> {
-  const rows = await db.execute<{ created_at: string }>(
-    sql`select created_at from actors where id = ${actorId}::uuid`,
-  )
-  return new Date(rows[0]?.created_at ?? Number.NaN)
-}
-
-/** A verdict given through `put`, then placed `hour` hours into the person's own life. */
+/**
+ * A verdict given through `put`, then placed `hour` hours into the person's own life. Placed in
+ * Postgres, from `created_at` itself: a JavaScript date keeps milliseconds and `created_at`
+ * keeps microseconds, so a verdict put «exactly on the line» from JavaScript lands a fraction
+ * before it (adversarial pass, test remark).
+ */
 async function rateAt(actorId: string, hour: number, itemId?: string): Promise<string> {
   const item = itemId ?? (await insertItem(db))
   await verdicts.put(actorId, { itemId: item, score: 4 })
-  const ratedAt = new Date((await startOf(actorId)).getTime() + hour * HOUR)
-  await db
-    .update(verdictsTable)
-    .set({ ratedAt })
-    .where(and(eq(verdictsTable.actorId, actorId), eq(verdictsTable.itemId, item)))
+  await db.execute(sql`
+    update verdicts v set rated_at = a.created_at + make_interval(secs => ${hour * 3600}::double precision)
+    from actors a
+    where a.id = v.actor_id and v.actor_id = ${actorId}::uuid and v.item_id = ${item}::uuid`)
   return item
 }
 
@@ -195,5 +192,66 @@ describe('gate 0.2: five verdicts in two weeks', () => {
     await personSeen(daysAgo(5))
 
     await expect(gate()).resolves.toEqual({ cohortSize: 0, reached: 0 })
+  })
+
+  it('counts in hours across a daylight-saving change, whatever the session zone', async () => {
+    // Europe/Berlin moves to summer time on 29.03.2026: fourteen calendar days from 20.03 noon
+    // are 335 hours there, and a statement adding '14 days' would drop a verdict at 335:30.
+    const inWindow = await personSeen(new Date('2026-03-20T12:00:00Z'))
+    await rateMany(inWindow, 4)
+    await rateAt(inWindow, GATE_RATINGS_WINDOW_HOURS - 0.5)
+    const past = await personSeen(new Date('2026-03-20T12:00:00Z'))
+    await rateMany(past, 4)
+    await rateAt(past, GATE_RATINGS_WINDOW_HOURS)
+
+    const answer = await db.transaction(async (tx) => {
+      await tx.execute(sql`set local timezone = 'Europe/Berlin'`)
+      return createVerdictRepository(tx).reachedRatings({
+        from: new Date('2026-03-01T00:00:00Z'),
+        to: new Date('2026-04-01T00:00:00Z'),
+        ratings: GATE_RATINGS,
+        windowHours: GATE_RATINGS_WINDOW_HOURS,
+      })
+    })
+
+    expect(answer).toEqual({ cohortSize: 2, reached: 1 })
+  })
+
+  it('draws the line to the microsecond `created_at` carries', async () => {
+    const actorId = await personSeen()
+    await db.execute(
+      sql`update actors set created_at = created_at - interval '0.000700 seconds' where id = ${actorId}::uuid`,
+    )
+    await rateMany(actorId, 4)
+    const fifth = await rateAt(actorId, GATE_RATINGS_WINDOW_HOURS - 1 / 3600 / 1_000_000)
+
+    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 1 })
+
+    await rateAt(actorId, GATE_RATINGS_WINDOW_HOURS, fifth)
+
+    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 0 })
+  })
+})
+
+describe('gate 0.2: what it refuses to answer', () => {
+  it.each([
+    ['a fractional window', { windowHours: 335.5 }],
+    ['a negative window', { windowHours: -2 }],
+    ['a zero threshold', { ratings: 0 }],
+    ['a fractional threshold', { ratings: 4.5 }],
+    ['an invalid date', { from: new Date('not a date') }],
+    ['an empty window', { to: from }],
+  ])('refuses %s before the database is asked', async (_, patch) => {
+    await personSeen()
+
+    await expect(
+      verdicts.reachedRatings({
+        from,
+        to,
+        ratings: GATE_RATINGS,
+        windowHours: GATE_RATINGS_WINDOW_HOURS,
+        ...patch,
+      }),
+    ).rejects.toThrow(RangeError)
   })
 })
