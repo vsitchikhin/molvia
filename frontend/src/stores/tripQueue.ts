@@ -794,7 +794,19 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
    * price into another shop (Б1).
    */
   function choose(kind: 'join' | 'finish', expected?: TripElsewhere): void {
-    if (expected && expected !== elsewhere.value) return
+    // The same question about the same trip is the same question, even though `rerouted` built
+    // a new object for it: `flush()` runs by itself — `useReconnect` sends it on `online` and
+    // when the app comes back into view — so a phone in a pocket re-asked between the sheet
+    // opening and the tap, and the answer was dropped while the sheet reported it taken (А3).
+    const asked = elsewhere.value
+    if (
+      expected &&
+      (expected.tripId !== asked?.tripId ||
+        expected.place !== asked.place ||
+        expected.mine !== asked.mine)
+    ) {
+      return
+    }
     if (actor.id !== conflict?.owner || elsewhere.value?.tripId !== conflict.tripId) return
     decision = { ...conflict, kind, at: new Date() }
     elsewhere.value = null
