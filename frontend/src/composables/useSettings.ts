@@ -15,8 +15,9 @@ const keyOf = (owner: string): string => `molvia.settings-draft.${owner}`
 
 // A store keeps a draft when the router unmounts the form. Each window keeps its own base **in
 // memory**: another window saving must produce a conflict, never quietly rebase unsaved edits.
-// On the device the draft belongs to the account, so the app being closed does not lose it;
-// two windows editing at once share the shelf, and the one that writes last wins there.
+// On the device the draft belongs to the account, so the app being closed does not lose it: it
+// is written to both shelves, and a new launch reads the last one written. A window that is
+// already open reads its own shelf first, so two of them do not take each other's form.
 const useSettingsStore = defineStore('settingsForm', () => {
   const actor = useActorStore()
   const base = ref<ActorSettings | null>(null)
@@ -98,7 +99,9 @@ const useSettingsStore = defineStore('settingsForm', () => {
     current.value = base.value
     if (!actor.id) return
     try {
-      const raw = read(keyOf(actor.id))
+      // This window's own copy first: the shared shelf is what a new launch reads (Е1), while
+      // a window that is already editing must find what it typed, not a neighbour's form.
+      const raw = read(keyOf(actor.id), true)
       const data = raw ? (JSON.parse(raw) as Record<string, unknown>) : null
       const parsed = settingsUpdateSchema.safeParse(
         data ? { previous: data.previous, settings: data.settings } : null,

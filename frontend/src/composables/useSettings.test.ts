@@ -116,6 +116,22 @@ describe('settings drafts', () => {
     expect(stranger.form.dirty).toBe(false)
   })
 
+  it("takes this window's own draft over the one a neighbour left on the shared shelf", async () => {
+    const key = `molvia.settings-draft.${initial.id}`
+    const drafted = (settings: Record<string, unknown>) =>
+      JSON.stringify({ previous: settingsOf(initial), settings, pending: false })
+    // What another window of the same app wrote, and what this one is editing.
+    localStorage.setItem(key, drafted({ ...settingsOf(initial), spendCurrency: 'USD' }))
+    sessionStorage.setItem(key, drafted(settingsOf(changed)))
+    setActivePinia(createPinia())
+    const actor = useActorStore()
+    actor.id = initial.id
+    actor.apply(initial)
+
+    const { form } = await render()
+    expect(form.draft).toMatchObject({ city: 'Ереван', spendCurrency: 'AMD' })
+  })
+
   it('preserves edits at a conflict over the same choice, and applies only after another tap', async () => {
     const { form } = await render()
     const mine = { ...initial, spendCurrency: 'USD' as const }
