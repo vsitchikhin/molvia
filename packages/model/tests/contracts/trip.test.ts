@@ -15,7 +15,7 @@ import { itemSchema } from '#model/entities/item'
 import type { Item } from '#model/entities/item'
 import { placeSchema } from '#model/entities/place'
 import type { Trip } from '#model/entities/trip'
-import { DomainError, ISSUE } from '#model/support/errors'
+import { DomainError } from '#model/support/errors'
 import { parseMoney } from '#model/values/money'
 import { parseRate } from '#model/values/rates'
 import { formatUnitPrice, parseQuantity, unitPriceCodec } from '#model/values/units'
@@ -397,26 +397,27 @@ describe('С-11: an estimate that does not fit is none, not a refusal', () => {
 describe('a moment a phone names for itself (Б1)', () => {
   const body = (at: string) => finishTripBodySchema.safeParse({ finishedOnDeviceAt: at })
 
-  it('refuses what no phone could have lived through, and says which rule refused it', () => {
-    // `0001-01-01` is the case worth naming: Postgres stores it, and the driver hands it back
-    // as `2001-01-01` — the card would print one year and the order sort by another.
-    for (const at of ['0001-01-01T00:00:00.000Z', '1970-01-01T00:00:00.000Z']) {
-      const refusal = body(at)
-      expect(refusal.success).toBe(false)
-      expect(refusal.error?.issues[0]?.message).toBe(ISSUE.DEVICE_TIME_IMPLAUSIBLE)
+  it('refuses nothing a phone can send: the schema has no clock to judge it by', () => {
+    // Both ends belong to the use case (Р-33). A refusal here would be final — the queue never
+    // retries one — and a phone whose battery died calls it 1970 (В2, Г1).
+    for (const at of [
+      '0001-01-01T00:00:00.000Z',
+      '1970-01-01T00:00:00.000Z',
+      '1999-12-31T23:59:59.999Z',
+      '2000-01-01T00:00:00.000Z',
+      '9999-12-31T23:59:59.999Z',
+    ]) {
+      expect(body(at).success).toBe(true)
     }
-    expect(body('1999-12-31T23:59:59.999Z').success).toBe(false)
-    expect(body('2000-01-01T00:00:00.000Z').success).toBe(true)
+    expect(body('не дата').success).toBe(false)
   })
 
-  it('leaves the future to the use case, which has a clock', () => {
-    // The floor is a rule about the calendar; «not from the future» is a rule about now, and a
-    // schema that answers differently depending on when it runs is not a schema (`rates.ts`).
-    expect(body('9999-12-31T23:59:59.999Z').success).toBe(true)
+  it('judges both ends by the same rule, in the one place that has a clock', () => {
     const now = new Date('2026-09-23T12:00:00.000Z')
     expect(isDeviceTime(new Date('9999-12-31T23:59:59.999Z'), now)).toBe(false)
     expect(isDeviceTime(new Date('2026-09-24T12:00:00.000Z'), now)).toBe(true)
     expect(isDeviceTime(new Date('2026-09-24T12:00:00.001Z'), now)).toBe(false)
+    expect(isDeviceTime(new Date('1970-01-01T00:00:00.000Z'), now)).toBe(false)
     expect(isDeviceTime(new Date('1999-12-31T23:59:59.999Z'), now)).toBe(false)
     expect(isDeviceTime(new Date('2000-01-01T00:00:00.000Z'), now)).toBe(true)
   })

@@ -98,10 +98,10 @@ export async function finishTrip(
   tripId: string,
   deviceAt?: Date,
 ): Promise<void> {
-  // The clock is here and not in the schema, as it is for a rate (`values/rates.ts`): a schema
-  // that answers differently depending on the moment it runs is not a schema. A phone whose
-  // clock runs ahead has its time dropped rather than its «Завершить» refused — the queue never
-  // retries a refusal, and a trip nobody can close is worse than one timed by the server (Б1).
+  // Both ends of the window are judged here, where the clock is, and neither is a refusal
+  // (Р-33): the queue never retries a refusal, so a trip nobody can close is worse than one
+  // timed by the server — and that holds for a clock that fell back exactly as it does for one
+  // that ran ahead. A battery that died is the ordinary way a clock reaches 1970 (В2, Г1).
   const believable = deviceAt && isDeviceTime(deviceAt, new Date()) ? deviceAt : undefined
   const trip = await trips.finish(tripId, actorId, undefined, believable)
   if (!trip) throw new DomainError(ERROR.NOT_FOUND)

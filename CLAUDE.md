@@ -1121,11 +1121,21 @@ The shape worth knowing here:
   the code deployed against it is the worse of the two failures. `make migrate`, the test
   setup and the boot path all go through the same code, so a migration cannot behave one
   way locally and another in production.
-- **A migration applied anywhere is never rewritten.** drizzle decides what to run by the
-  journal's `created_at` alone and never compares a file with what was applied: a rewritten
-  migration is skipped silently if its stamp is older, and fails on its first `CREATE` if newer
-  — then the API does not start. Folding a task's migrations into one is safe only while no
-  database has run them; MOL-39 checked every copy's journal before and after doing it.
+- **A merged migration is never rewritten.** drizzle decides what to run by the journal's
+  `created_at` alone and never compares a file with what was applied: a rewritten migration is
+  skipped silently if its stamp is older, and fails on its first `CREATE` if newer — then the
+  API does not start.
+
+  **The line is the merge of the pull request, not the first database to run it** (owner's
+  decision, 23.09.2026). The rule is about the production database and about branches other
+  people build on; a working copy's database is pushed around all through development anyway.
+  So while the task is still open, a task's migrations may be folded into one — and then **every
+  database that already ran the old file is brought into line by hand, in the same sitting**,
+  because those are the ones drizzle will silently skip. MOL-39 checked every copy's journal
+  before and after doing it; MOL-25 did the same and applied the added index to this copy's
+  three databases with the very statement the file now carries. After the merge the file is
+  frozen and a change to the schema is a new migration, always.
+
 - **Postgres publishes no port.** It is reachable only over the compose network.
 - **The PWA calls `/api/...`** and Caddy strips the prefix — the same shape the Vite dev
   proxy has, so nothing about the origin differs between development and production.

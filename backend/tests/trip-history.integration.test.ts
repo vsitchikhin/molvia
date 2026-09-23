@@ -118,16 +118,9 @@ describe('history of completed trips', () => {
       actorId: actor,
       placeId: await insertPlace(db, { name: `History ${randomUUID()}` }),
     })
-    // `0001-01-01` is stored faithfully and handed back by the driver as `2001-01-01`: the card
-    // would print one year and the pagination sort by another, two thousand apart (Б1).
-    for (const time of [
-      'tomorrow',
-      '2026-02-31T00:00:00Z',
-      '0000-01-01T00:00:00Z',
-      '0001-01-01T00:00:00.000Z',
-      '1970-01-01T00:00:00.000Z',
-      42,
-    ]) {
+    // Only what is not a moment at all: a day that does not exist, a word, a number. Whether a
+    // real moment is believable is the use case's to say, and it says it by dropping (Р-33).
+    for (const time of ['tomorrow', '2026-02-31T00:00:00Z', '2026-09-23T24:00:00Z', 42]) {
       expect(
         (
           await app.inject({
@@ -177,9 +170,16 @@ describe('history of completed trips', () => {
     expect(plan).not.toContain('Sort')
   })
 
-  it('drops a device time from the future instead of refusing to finish the trip', async () => {
-    // The queue never retries a refusal, so a phone whose clock runs ahead would be left with a
-    // trip it could never close. The trip is finished by the server's clock instead (Б1).
+  // Both ends behave alike, and neither refuses (Р-33): the queue never retries a refusal, so a
+  // refusal would leave a trip nobody could ever close — and a phone whose battery died says
+  // 1970 exactly as often as a phone with a clock running ahead says 2099 (В2, Г1).
+  it.each([
+    ['from the future', '9999-12-31T23:59:59.999Z'],
+    ['from before the phone existed', '1970-01-01T00:00:00.000Z'],
+    ['the year the driver hands back as 2001', '0001-01-01T00:00:00.000Z'],
+    ['a millisecond below the floor', '1999-12-31T23:59:59.999Z'],
+    ['in a year that never was', '0000-01-01T00:00:00Z'],
+  ])('drops a device time %s instead of refusing to finish the trip', async (_name, time) => {
     const actor = await insertActor(db)
     const cookie = await signIn(db, actor)
     const id = await insertTrip(db, {
@@ -190,7 +190,7 @@ describe('history of completed trips', () => {
       method: 'POST',
       url: `/trips/${id}/finish`,
       headers: { cookie },
-      payload: { finishedOnDeviceAt: '9999-12-31T23:59:59.999Z' },
+      payload: { finishedOnDeviceAt: time },
     })
     expect(answer.statusCode).toBe(204)
     const trip = await createTripRepository(db).byId(id, actor)
