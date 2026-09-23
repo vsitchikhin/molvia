@@ -259,7 +259,12 @@ export default defineComponent({
       // The server is asked every time the sheet opens: the trip in memory is for when it cannot
       // be asked, not instead of asking — finished or started anew on another device, it would
       // otherwise take purchases for ever (review Р-2). A failure keeps the memory (В-6).
-      if (props.tripId && props.tripId !== current.tripId.value) {
+      //
+      // Which trip to ask about is decided by the caller, not by comparing identifiers: only the
+      // finished-trip screen hands the sheet a trip of its own, and a refusal being corrected on
+      // «Поход» names the trip that refused it — an old one. Asked through the history that put
+      // the selected trip out and skipped the check this branch exists for (А5).
+      if (props.tripId && props.tripContext !== undefined) {
         void history.open(props.tripId).catch(() => undefined)
       } else {
         void trips.load().catch(() => undefined)

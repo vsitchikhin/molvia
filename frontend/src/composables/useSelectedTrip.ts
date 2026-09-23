@@ -49,9 +49,12 @@ export function useSelectedTrip(target: MaybeRefOrGetter<string | null>): Select
     } catch (error) {
       if (token !== request) return
       const localStart = queue.pending.some((w) => w.kind === 'start' && w.tripId === selected)
-      missing.value =
-        !localStart && error instanceof ApiError && error.answered && error.code === ERROR.NOT_FOUND
-      trouble.value = navigator.onLine ? 'error' : 'offline'
+      const absent = error instanceof ApiError && error.answered && error.code === ERROR.NOT_FOUND
+      missing.value = !localStart && absent
+      // A trip whose start is still in the queue is not a breakage, and red always offers
+      // «Попробовать ещё раз» — here there is nothing to try (MOL-19, З-3). The screen shows the
+      // rows it holds; the strip below already says the completion has not been sent.
+      trouble.value = localStart && absent ? null : navigator.onLine ? 'error' : 'offline'
       stale.value = true
     } finally {
       if (token === request) loading.value = false

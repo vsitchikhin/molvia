@@ -11,11 +11,13 @@ import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useTripStore } from '@/stores/trip'
+import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
 // Every write fails as a dropped connection would, so what the sheet queued stays to be read.
 const offline = vi.hoisted(() => () => Promise.reject(new Error('Failed to fetch')))
 const currentTrip = vi.hoisted(() => vi.fn<() => Promise<unknown>>())
+const readTrip = vi.hoisted(() => vi.fn<(id: string) => Promise<unknown>>())
 vi.mock('@/api', async () => {
   const { ApiError } = await import('@molvia/client')
   const { ERROR } = await import('@molvia/model')
@@ -24,7 +26,13 @@ vi.mock('@/api', async () => {
       throw new ApiError(ERROR.INTERNAL, String(error))
     })
   return {
-    api: { addExpense: fail, updateExpense: fail, removeExpense: fail, currentTrip },
+    api: {
+      addExpense: fail,
+      updateExpense: fail,
+      removeExpense: fail,
+      currentTrip,
+      trip: (id: string) => readTrip(id),
+    },
   }
 })
 
@@ -77,6 +85,8 @@ beforeEach(() => {
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
   currentTrip.mockReset()
   currentTrip.mockResolvedValue(null)
+  readTrip.mockReset()
+  readTrip.mockRejectedValue(new Error('Failed to fetch'))
 })
 
 afterEach(() => {
@@ -97,6 +107,13 @@ interface Options {
   readonly selected?: TripView
 }
 
+async function router() {
+  const made = createRouter({ history: createMemoryHistory(), routes })
+  await made.push('/')
+  await made.push('/trip/add')
+  return made
+}
+
 async function render(options: Options = {}) {
   if (options.trip !== null) useTripStore().apply(options.trip ?? trip())
   // The sheet asks the server every time it opens; unless a test says otherwise, the server
@@ -106,10 +123,8 @@ async function render(options: Options = {}) {
     const memory = options.trip === undefined ? trip() : options.trip
     currentTrip.mockResolvedValue(options.server === undefined ? memory : options.server)
   }
-  const router = createRouter({ history: createMemoryHistory(), routes })
-  await router.push('/')
-  await router.push('/trip/add')
-  const go = vi.spyOn(router, 'go')
+  const made = await router()
+  const go = vi.spyOn(made, 'go')
 
   const view = mount(ItemDetailsSheet, {
     props: {
@@ -120,7 +135,7 @@ async function render(options: Options = {}) {
       closeSteps: options.closeSteps ?? 1,
     },
     attachTo: document.body,
-    global: { plugins: [router, pinia, createAppI18n(options.locale ?? 'ru')] },
+    global: { plugins: [made, pinia, createAppI18n(options.locale ?? 'ru')] },
   })
   // Past the moment the sheet rises: until then it takes no tap at all.
   clock += 1000
@@ -292,6 +307,37 @@ describe('ItemDetailsSheet', () => {
     await vi.waitFor(() => {
       expect(view.text()).toContain('Сначала начните поход')
     })
+  })
+
+  it('asks about the current trip when a refusal being corrected names an older one', async () => {
+    // «Исправить» on «Поход» carries the trip that refused the purchase, and that trip is not
+    // the one going on. Asked through the history, the sheet put the selected trip out and
+    // skipped the very check the branch exists for (А5). Only a screen handing the sheet a trip
+    // of its own — the finished one — reads through the history.
+    const older = 'bbbbbbbb-0000-4000-8000-000000000099'
+    const history = useTripHistoryStore()
+    history.selected = { ...trip(), id: TRIP, finishedAt: new Date('2026-09-19T09:00:00.000Z') }
+    const view = mount(ItemDetailsSheet, {
+      props: {
+        entry: milk,
+        tripId: older,
+        retry: {
+          id: 'eeeeeeee-0000-4000-8000-000000000001',
+          quantity: null,
+          amount: null,
+          query: null,
+        },
+        closeSteps: 1,
+      },
+      attachTo: document.body,
+      global: { plugins: [await router(), pinia, createAppI18n('ru')] },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 5))
+
+    expect(currentTrip).toHaveBeenCalledTimes(1)
+    expect(readTrip).not.toHaveBeenCalled()
+    expect(history.selected.id).toBe(TRIP)
+    view.unmount()
   })
 
   it('keeps the trip it remembers when the server cannot be asked', async () => {

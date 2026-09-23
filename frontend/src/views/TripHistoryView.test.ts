@@ -10,6 +10,7 @@ import ru from '@/i18n/ru.json'
 import { routes } from '@/router'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripStore } from '@/stores/trip'
+import { useTripQueueStore } from '@/stores/tripQueue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import TripHistoryView from './TripHistoryView.vue'
 import FinishedTripView from './FinishedTripView.vue'
@@ -132,6 +133,33 @@ it('does not call an unfinished trip completed when opened by a direct link', as
   await flushPromises()
   expect(view.text()).toContain(ru.trip.history.unfinished)
   expect(view.text()).not.toContain(ru.trip.history.local_finish)
+  view.unmount()
+})
+
+it('does not paint a trip whose start is still in the queue as broken', async () => {
+  // Opened from history while the queue waits for a choice about another trip: the server has
+  // never heard of it, and red would promise «Попробовать ещё раз» with nothing to try (З-3).
+  useTripQueueStore().enqueue({
+    kind: 'start',
+    tripId: ID,
+    place: { kind: 'store', name: 'Рынок' },
+    startedAt: new Date('2026-09-01T10:00:00Z'),
+  })
+  useTripHistoryStore().capture(
+    ID,
+    'Рынок',
+    new Date('2026-09-01T10:00:00Z'),
+    new Date('2026-09-01T11:00:00Z'),
+    'AMD',
+    null,
+  )
+  trip.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, undefined, true))
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+  const { view } = await render(true)
+  await flushPromises()
+  const states = view.findAllComponents({ name: 'ScreenState' })
+  expect(states.map((state) => state.props('kind'))).not.toContain('error')
+  expect(view.text()).toContain(ru.trip.history.pending)
   view.unmount()
 })
 
