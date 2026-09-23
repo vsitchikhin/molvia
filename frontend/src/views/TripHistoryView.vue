@@ -97,6 +97,9 @@ export default defineComponent({
 .place {
   display: block;
   font-weight: var(--weight-medium);
+
+  // A shop's full name has no spaces to break at — the same reason `TripRow` wraps its own.
+  overflow-wrap: anywhere;
 }
 
 .when,

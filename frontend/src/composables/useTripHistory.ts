@@ -75,9 +75,11 @@ export function useTripHistory(): TripHistoryScreen {
     )
   })
   async function load(more = false): Promise<void> {
-    if (!actor.id) return
+    // Loading before the owner is known, not «nothing to show»: without this the screen flashed
+    // «Здесь будут ваши походы» while the first launch was still making an identity (З-9).
     const token = ++run
     loading.value = true
+    if (!actor.id) return
     history.stale = true
     try {
       await history.load(more)

@@ -1,5 +1,5 @@
 import { useRoute, useRouter } from 'vue-router'
-import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
+import type { RouteLocationNormalizedLoaded, RouteParams, Router } from 'vue-router'
 import type { RouteName, Tab } from '@/router'
 
 /**
@@ -46,6 +46,20 @@ function entryBelow(router: Router): RouteName | undefined {
 }
 
 /**
+ * Where a parent is, with the parameters it needs. Taken from the route below rather than
+ * listed: this used to be spelled out in `settleColdStart` and in `goBack` both, and the next
+ * parameterised parent would have had to be added twice — a place forgotten there breaks «назад»
+ * with nothing on screen to say so (З-9).
+ */
+function parentOf(
+  router: Router,
+  route: { meta: { parent?: RouteName }; params: RouteParams },
+): ReturnType<Router['resolve']> | null {
+  const parent = route.meta.parent
+  return parent ? router.resolve({ name: parent, params: route.params }) : null
+}
+
+/**
  * A nested screen opened cold — a reload, a tab the phone unloaded and restored, a link — has
  * nothing of ours underneath, and the system «back» would leave the app while the chevron
  * promises the parent. The parent is laid underneath, out of sight, before the first paint:
@@ -59,13 +73,11 @@ export async function settleColdStart(router: Router): Promise<void> {
 
   const ancestors: string[] = []
   let cursor = router.resolve(route.fullPath)
-  while (cursor.meta.parent) {
-    const ancestor = router.resolve({
-      name: cursor.meta.parent,
-      params: cursor.meta.parent === 'finished-trip' ? { tripId: cursor.params.tripId } : {},
-    })
+  let ancestor = parentOf(router, cursor)
+  while (ancestor) {
     ancestors.unshift(ancestor.fullPath)
     cursor = ancestor
+    ancestor = parentOf(router, cursor)
   }
   const root = ancestors.shift()
   if (!root) return
@@ -131,10 +143,8 @@ export function useNavigation(): {
   async function goBack(): Promise<void> {
     const parent = route.meta.parent
     if (!parent || stepping) return
-    const destination = router.resolve({
-      name: parent,
-      params: parent === 'finished-trip' ? { tripId: route.params.tripId } : {},
-    })
+    const destination = parentOf(router, route)
+    if (!destination) return
     const below: unknown = router.options.history.state.back
     const matches = typeof below === 'string' && router.resolve(below).path === destination.path
     const move = backMove(parent, matches ? parent : undefined)

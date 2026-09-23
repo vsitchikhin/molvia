@@ -66,7 +66,7 @@
       :retry="opened.retry"
       :trip-id="id"
       :trip-context="trip"
-      :trip-currency="local?.currency"
+      :trip-currency="local?.currency ?? undefined"
       :close-steps="1"
       :on-closed="close"
     />

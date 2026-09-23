@@ -100,7 +100,7 @@
       :entry="picked.entry"
       :trip-id="selectedId"
       :trip-context="selectedId ? selectedTrip : undefined"
-      :trip-currency="selectedLocal?.currency"
+      :trip-currency="selectedLocal?.currency ?? undefined"
       :query="picked.query"
       :close-steps="2"
       :on-closed="putAway"

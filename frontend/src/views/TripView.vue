@@ -129,7 +129,11 @@
       </template>
     </template>
 
-    <AppButton variant="ghost" @click="history">{{ t('trip.history.title') }}</AppButton>
+    <!-- Under the list, and only once there is a screen to put it under: over the skeleton it
+         was the one thing drawn while everything else was still loading (З-9). -->
+    <AppButton v-if="phase !== 'loading'" class="history" variant="ghost" block @click="history">{{
+      t('trip.history.title')
+    }}</AppButton>
 
     <!-- The one permanent place money is converted, and it stays put while the list scrolls. -->
     <!-- On the skeleton too, with a dash for the sum: the strip is part of the frame, and a screen
@@ -597,6 +601,10 @@ export default defineComponent({
   flex: none;
   width: 1.375rem;
   height: 1.375rem;
+}
+
+.history {
+  margin-top: var(--space-6);
 }
 
 .footnote {

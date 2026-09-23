@@ -749,7 +749,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
           trip?.place.name ?? (start?.kind === 'start' ? start.place.name : ''),
           trip?.startedAt ?? (start?.kind === 'start' ? start.startedAt : at),
           at,
-          trip?.currency ?? actor.actor?.spendCurrency ?? 'AMD',
+          trip?.currency ?? actor.actor?.spendCurrency ?? null,
           trip,
         )
       }

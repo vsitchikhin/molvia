@@ -16,7 +16,9 @@ const localCodec = z.strictObject({
   name: z.string(),
   startedAt: date,
   completedAt: date,
-  currency: currencySchema,
+  // Unknown rather than invented: without a trip and before the owner is read there is no
+  // currency to name, and a made-up one is a number in the wrong money (З-9).
+  currency: currencySchema.nullable(),
   view: tripViewCodec.nullable(),
 })
 export type LocalFinishedTrip = z.output<typeof localCodec>
@@ -140,7 +142,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     name: string,
     startedAt: Date,
     completedAt: Date,
-    currency: Currency,
+    currency: Currency | null,
     view: TripView | null,
   ): void {
     syncLocal()

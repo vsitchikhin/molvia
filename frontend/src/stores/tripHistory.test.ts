@@ -79,22 +79,27 @@ describe('history memory', () => {
     expect(restart().selected?.id).toBe(A)
   })
 
-  it('does not let an older selected read replace an answered write', async () => {
-    const store = useTripHistoryStore()
-    store.selected = view(A)
-    let resolve: ((value: TripView) => void) | undefined
-    trip.mockImplementation(
-      () =>
-        new Promise((done) => {
-          resolve = done
-        }),
-    )
-    const loading = store.open(A)
-    store.apply({ ...view(A), currency: 'EUR' })
-    resolve?.(view(A))
-    await loading
-    expect(store.selected.currency).toBe('EUR')
-  })
+  // Both ways in: with the trip already on the phone and without it. They used to be two tests
+  // that differed only in that line and asserted the same thing (З-9).
+  it.each([true, false])(
+    'does not let an older read replace an answered write (cached: %s)',
+    async (cached) => {
+      const store = useTripHistoryStore()
+      if (cached) store.selected = view(A)
+      let resolve: ((value: TripView) => void) | undefined
+      trip.mockImplementation(
+        () =>
+          new Promise((done) => {
+            resolve = done
+          }),
+      )
+      const loading = store.open(A)
+      store.apply({ ...view(A), currency: 'EUR' })
+      resolve?.(view(A))
+      await loading
+      expect(store.selected?.currency).toBe('EUR')
+    },
+  )
 
   it('keeps completions made by two windows even before storage events arrive', () => {
     const first = useTripHistoryStore()

@@ -693,6 +693,15 @@ database access. In a product about data integrity, two write paths will silentl
   cached» holds without anyone remembering it, and a test asserts that no second module writes
   `set-cookie`. The one price, named: over plain http on the LAN (`PWA_EXPOSE=1 make dev`)
   `Secure` means no session — the same place the camera already needs `make certs`.
+- **What an address of a resource may look like is one rule, in `packages/model/src/support/resource.ts`
+  (MOL-25, Р-3).** An identifier in a path is taken in either case and answered in lower case:
+  Postgres compares uuids without case and answers in lower case, so a path spelled `AB12…` would
+  reach a row whose id comes back `ab12…` and the device would not recognise its own row in the
+  reply. A malformed one is **404, not 400** — malformed, missing and someone else's are one
+  answer, or an identifier could be guessed by the difference. Bodies that _create_ a row are the
+  other way round and stay strict (`deviceIdSchema`), so the answer and the draft on the phone
+  agree on one spelling. The rule lived in three places and two of them had already drifted over
+  the case; tests on both sides hold the callers to it, as they do for `INVISIBLE`.
 - **What a secret may look like is one rule, in `backend/src/secret.ts`** — RFC 6265's
   `cookie-octet`, because the only thing a session token or a login request's secret ever travels
   in is a cookie. It was two rules once, and they drifted by four characters: a token holding
