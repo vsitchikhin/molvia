@@ -50,7 +50,6 @@ function actorIn(city: string): ActorView {
     city,
     spendCurrency: 'AMD',
     incomeCurrency: 'RUB',
-    sharedUntil: null,
     createdAt: new Date('2026-09-01T00:00:00.000Z'),
     updatedAt: new Date('2026-09-20T00:00:00.000Z'),
   }

@@ -107,6 +107,39 @@ it('preserves an unsupported saved city while allowing currency changes', async 
   expect(view.get('.actions button').attributes('aria-disabled')).toBeUndefined()
 })
 
+it('Б1: an unsupported city can be returned to, and keeps its own country', async () => {
+  // Its option used to disappear on the first change, and the body the form built for it
+  // named Armenia — which the server answers 400 to.
+  const legacy = { ...initial, country: 'GE', city: 'Тбилиси' }
+  me.mockResolvedValue(legacy)
+  const view = await render(false)
+  const city = view.get('select')
+  await city.setValue('Ереван')
+  expect(view.findAll('select option').map((option) => option.attributes('value'))).toContain(
+    'Тбилиси',
+  )
+  await city.setValue('Тбилиси')
+  save.mockResolvedValue(legacy)
+  expect(view.get('.actions button').attributes('aria-disabled')).toBe('true')
+  expect(view.find('.badge').exists()).toBe(false)
+})
+
+it('names the country and the currencies of a conflict in the words the form uses', async () => {
+  const view = await render()
+  // The same choice on both devices, which is what a conflict is since Б2.
+  await view.findAll('select')[1]?.setValue('EUR')
+  save.mockRejectedValue(new ApiError(ERROR.CONFLICT))
+  me.mockResolvedValue({ ...initial, spendCurrency: 'USD' })
+  await view.get('.actions button').trigger('click')
+  await flushPromises()
+  const said = en.settings.conflict.body
+    .replace('{country}', en.settings.armenia)
+    .replace('{city}', 'Гюмри')
+    .replace('{spendCurrency}', en.settings.currencies.USD)
+    .replace('{incomeCurrency}', en.settings.currencies.RUB)
+  expect(view.text()).toContain(said)
+})
+
 it('replaces a previous write error with the offline notice when the connection drops', async () => {
   const view = await render()
   await view.get('select').setValue('Ереван')

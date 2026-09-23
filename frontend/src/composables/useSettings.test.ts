@@ -87,20 +87,40 @@ describe('settings drafts', () => {
     expect(useActorStore().settings?.city).toBe('Ереван')
     expect(again.form.dirty).toBe(false)
   })
-  it('preserves edits at a conflict and applies only after another explicit tap', async () => {
+  it('preserves edits at a conflict over the same choice, and applies only after another tap', async () => {
+    const { form } = await render()
+    const mine = { ...initial, spendCurrency: 'USD' as const }
+    form.edit(settingsOf(mine))
+    save.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'conflict'))
+    const rival = { ...initial, spendCurrency: 'EUR' as const }
+    me.mockResolvedValue(rival)
+    await form.save()
+    expect(form.conflict).toBe(true)
+    expect(form.draft?.spendCurrency).toBe('USD')
+    expect(save).toHaveBeenCalledTimes(1)
+    await form.save()
+    expect(save).toHaveBeenLastCalledWith({
+      previous: settingsOf(rival),
+      settings: settingsOf(mine),
+    })
+  })
+
+  it('Б2: a choice nobody here touched follows the other device instead of being overwritten', async () => {
+    // The whole draft used to go, so «Применить мои изменения» took the other device's move
+    // back — and the city it was about to overwrite stood on screen with no mark on it.
     const { form } = await render()
     form.edit(settingsOf(changed))
     save.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'conflict'))
     const rival = { ...initial, incomeCurrency: 'EUR' as const }
     me.mockResolvedValue(rival)
     await form.save()
-    expect(form.conflict).toBe(true)
-    expect(form.draft?.city).toBe('Ереван')
-    expect(save).toHaveBeenCalledTimes(1)
+
+    expect(form.conflict).toBe(false)
+    expect(form.draft).toMatchObject({ city: 'Ереван', incomeCurrency: 'EUR' })
     await form.save()
     expect(save).toHaveBeenLastCalledWith({
       previous: settingsOf(rival),
-      settings: settingsOf(changed),
+      settings: { ...settingsOf(changed), incomeCurrency: 'EUR' },
     })
   })
   it('never saves offline and keeps a draft if storage refuses it', async () => {

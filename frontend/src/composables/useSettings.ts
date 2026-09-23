@@ -38,6 +38,41 @@ const useSettingsStore = defineStore('settingsForm', () => {
       dirty.value && !!base.value && !!current.value && !sameSettings(base.value, current.value),
   )
 
+  /**
+   * What the form holds after another device saved: a choice this person has not touched
+   * follows the account, one they are editing stays theirs.
+   *
+   * Sending the whole stale form was silent in the worst way — «Применить мои изменения» took
+   * the other device's move back, and the city it was about to overwrite stood on the screen
+   * without a mark, since «changed» is counted from the base (adversarial Б2). Per choice,
+   * `conflict` then means what the word says: both devices changed the same one. The place is
+   * one choice and not two fields — the country travels with the city — and `base` stays equal
+   * to the row for everything untouched, so the conditional `UPDATE` still matches.
+   */
+  function settled(
+    was: ActorSettings,
+    edited: ActorSettings,
+    now: ActorSettings,
+  ): { base: ActorSettings; draft: ActorSettings } {
+    const place = was.country === edited.country && was.city === edited.city
+    const spend = was.spendCurrency === edited.spendCurrency
+    const income = was.incomeCurrency === edited.incomeCurrency
+    return {
+      base: {
+        country: place ? now.country : was.country,
+        city: place ? now.city : was.city,
+        spendCurrency: spend ? now.spendCurrency : was.spendCurrency,
+        incomeCurrency: income ? now.incomeCurrency : was.incomeCurrency,
+      },
+      draft: {
+        country: place ? now.country : edited.country,
+        city: place ? now.city : edited.city,
+        spendCurrency: spend ? now.spendCurrency : edited.spendCurrency,
+        incomeCurrency: income ? now.incomeCurrency : edited.incomeCurrency,
+      },
+    }
+  }
+
   function adopt(): void {
     generation += 1
     loading.value = false
@@ -120,6 +155,11 @@ const useSettingsStore = defineStore('settingsForm', () => {
       if (!changed) {
         base.value = current.value
         draft.value = { ...current.value }
+      } else if (base.value && draft.value) {
+        const next = settled(base.value, draft.value, current.value)
+        base.value = next.base
+        draft.value = next.draft
+        keep()
       }
       failure.value = false
       return true

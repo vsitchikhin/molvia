@@ -13,7 +13,7 @@
             :label="t('settings.city')"
             kind="select"
             :options="cityOptions"
-            :aria-describedby="`${id}-city-hint ${changed('city') ? `${id}-city-changed` : ''}`"
+            :aria-describedby="describedBy('city')"
             @update:model-value="change('city', $event)"
           >
             <template v-if="changed('city')" #label-extra>
@@ -39,7 +39,7 @@
             :label="t(`settings.${field}`)"
             kind="select"
             :options="currencyOptions"
-            :aria-describedby="`${id}-${field}-hint ${changed(field) ? `${id}-${field}-changed` : ''}`"
+            :aria-describedby="describedBy(field)"
             @update:model-value="change(field, $event)"
           >
             <template v-if="changed(field)" #label-extra>
@@ -86,10 +86,21 @@ export default defineComponent({
     const { t } = useI18n()
     const cities: readonly string[] = SETTINGS_CITIES
     const currencyFields = ['spendCurrency', 'incomeCurrency'] as const
+    /**
+     * The geography the form opened on. A city outside today's two — a settings row written
+     * before the form existed — stays in the list and keeps its own country, so choosing it
+     * again is a geography that has not changed rather than a body the server answers 400 to
+     * (adversarial Б1). Its option used to vanish on the first change, and nothing but
+     * «Отменить» brought it back.
+     */
+    const opened = { country: props.modelValue.country, city: props.modelValue.city }
+    const origin = computed(() => props.base ?? opened)
+    const historical = computed(() => (cities.includes(origin.value.city) ? null : origin.value))
     const cityOptions = computed(() =>
-      (cities.includes(props.modelValue.city) ? cities : [props.modelValue.city, ...cities]).map(
-        (city) => ({ value: city, label: city }),
-      ),
+      (historical.value ? [historical.value.city, ...cities] : cities).map((city) => ({
+        value: city,
+        label: city,
+      })),
     )
     const currencyOptions = computed(() =>
       currencySchema.options.map((currency) => ({
@@ -101,13 +112,27 @@ export default defineComponent({
       const value = actorSettingsSchema.safeParse({
         ...props.modelValue,
         [field]: next,
-        ...(field === 'city' ? { country: 'AM' } : {}),
+        ...(field === 'city'
+          ? { country: next === historical.value?.city ? historical.value.country : 'AM' }
+          : {}),
       })
       if (value.success) emit('update:modelValue', value.data)
     }
     const changed = (field: keyof ActorSettings): boolean =>
       !!props.base && props.base[field] !== props.modelValue[field]
-    return { t, id: useId(), cityOptions, currencyOptions, currencyFields, change, changed }
+    const id = useId()
+    const describedBy = (field: keyof ActorSettings): string =>
+      [`${id}-${field}-hint`, ...(changed(field) ? [`${id}-${field}-changed`] : [])].join(' ')
+    return {
+      t,
+      id,
+      cityOptions,
+      currencyOptions,
+      currencyFields,
+      change,
+      changed,
+      describedBy,
+    }
   },
 })
 </script>

@@ -45,7 +45,7 @@
         kind="attention"
         inline
         :title="t('settings.conflict.title')"
-        :body="t('settings.conflict.body', form.current)"
+        :body="t('settings.conflict.body', saidIn(form.current))"
       />
       <form class="form" @submit.prevent="form.save">
         <SettingsFields
@@ -106,6 +106,7 @@
 <script lang="ts">
 import { defineComponent, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { ActorSettings } from '@molvia/model'
 import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconPencil from '~icons/mdi/pencil-outline'
 import IconCheck from '~icons/mdi/check'
@@ -135,7 +136,17 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18n()
-    return { t, id: useId(), ...useSettings() }
+    /**
+     * The same words the form beside it uses: the notice printed `AM` and `AMD` where the
+     * fields say «Армения» and «Армянский драм · AMD», and it is the line a person decides by.
+     */
+    const saidIn = (value: ActorSettings): Record<string, string> => ({
+      country: value.country === 'AM' ? t('settings.armenia') : value.country,
+      city: value.city,
+      spendCurrency: t(`settings.currencies.${value.spendCurrency}`),
+      incomeCurrency: t(`settings.currencies.${value.incomeCurrency}`),
+    })
+    return { t, saidIn, id: useId(), ...useSettings() }
   },
 })
 </script>
