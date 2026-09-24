@@ -110,6 +110,19 @@ One consequence of MOL-6 is open and worth knowing before it is met: the log poi
 and the gate queries lose the half they measure by) or that deletion becomes the single
 written exception to append-only. It is a product decision, not a schema detail.
 
+**The 0.2 gate is `VerdictRepository.reachedRatings` (MOL-49):** of those who appeared in a
+window, how many have `GATE_RATINGS` rows in `verdicts` within `GATE_RATINGS_WINDOW_HOURS` of
+`actors.created_at` — the same axis and the same hours as 0.3. It is the one reader of
+`verdicts` without `deleted_at IS NULL`: «rated five, took one back» is five (MOL-27). **Its
+`from` is the release of 0.2, and the caller passes it** — sign-in is open since 0.1, so
+counting from the first actor would fill the denominator with people who had nothing of 0.2
+to use (MOL-51). **A window still open is left out of the cohort**: counted, someone who came
+last week reads as someone who failed. **A verdict counts from when the server received it**,
+not from when the person pressed «Сохранить»: the drafts queue can hold it past the window, and
+that lowers the rate — towards «stop», the safe side, like Р-24 — accepted rather than trusting
+the device's clock, which stays out of the gates. A person deleted on request (MOL-58) leaves
+both halves of the fraction and no trace; counting deletions separately is 0.2's.
+
 ## Money
 
 Access is a monthly resource: ~10 ratings = a month, or $1. Contribution does not expire

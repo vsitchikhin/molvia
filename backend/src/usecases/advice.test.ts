@@ -83,6 +83,7 @@ function deps(world: World = {}) {
     listFor: () => Promise.reject(new Error('listFor was not expected')),
     adviceRowsFor: () =>
       Promise.resolve({ rows: world.rows ?? [], total: world.total ?? (world.rows ?? []).length }),
+    reachedRatings: () => Promise.reject(new Error('reachedRatings was not expected')),
   }
 
   const expenses: ExpenseRepository = {
