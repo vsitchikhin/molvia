@@ -33,6 +33,7 @@ import {
   placeKindSchema,
   rateChoiceSchema,
   rateProviderSchema,
+  ratePreferenceSchema,
   rateSourceSchema,
 } from '@molvia/model'
 import type {
@@ -44,6 +45,7 @@ import type {
   AmdRate,
   RateChoice,
   RateProvider,
+  RatePreference,
   RateSource,
 } from '@molvia/model'
 
@@ -202,6 +204,13 @@ export const actors = pgTable(
      * (`hasSharedAccess`), not a default here.
      */
     sharedUntil: timestamp('shared_until', { withTimezone: true }),
+    /**
+     * Which rate a new trip takes (MOL-40, В-3): `personal` — the person's own, from their
+     * exchanges, when there is one for the pair, and the official one otherwise — or always
+     * `official`. Beside the settings rather than among them: it is switched on the screen of
+     * exchanges, and the form of MOL-65 compares its four fields and nothing else.
+     */
+    ratePreference: text('rate_preference').$type<RatePreference>().notNull().default('personal'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.
@@ -218,6 +227,10 @@ export const actors = pgTable(
     check('actors_country_iso', sql`${table.country} ~ '^[A-Z]{2}$'`),
     check('actors_spend_currency_known', oneOf(table.spendCurrency, currencySchema.options)),
     check('actors_income_currency_known', oneOf(table.incomeCurrency, currencySchema.options)),
+    check(
+      'actors_rate_preference_known',
+      oneOf(table.ratePreference, ratePreferenceSchema.options),
+    ),
   ],
 )
 
@@ -695,6 +708,54 @@ export const officialRates = pgTable(
       sql`${oneOf(table.currency, currencySchema.options)} and ${table.currency} <> 'AMD'`,
     ),
     check('official_rates_positive', sql`${table.scaled} > 0`),
+  ],
+)
+
+/**
+ * Money changed from one currency into another (MOL-40): the amounts given and received and the
+ * day, as the person names them. The rate is not a column — it is what the two amounts say, and
+ * the person's own rate is computed from these rows when a trip starts, never stored beside them.
+ *
+ * Private and nobody else's reader: no aggregate reads it and the log of events does not either.
+ * Cascade from the owner, unlike trips and verdicts: those are data other rules still count, and
+ * this is one person's record of their own money with no reader but them.
+ */
+export const exchanges = pgTable(
+  'exchanges',
+  {
+    // Named by the device, as a trip is: a tap sent twice is one exchange.
+    id: uuid('id').primaryKey(),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    givenMinor: bigint('given_minor', { mode: 'bigint' }).notNull(),
+    givenCurrency: char('given_currency', { length: 3 }).$type<Currency>().notNull(),
+    receivedMinor: bigint('received_minor', { mode: 'bigint' }).notNull(),
+    receivedCurrency: char('received_currency', { length: 3 }).$type<Currency>().notNull(),
+    // A day in Yerevan, as the rates are dated — the person names the day, not the minute.
+    exchangedOn: date('exchanged_on').notNull(),
+    // How much of the received currency was held just before; in that currency, so no column
+    // of its own. Null is «not said», which is not zero (MOL-40, В-2).
+    heldBeforeMinor: bigint('held_before_minor', { mode: 'bigint' }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    // The owner's exchanges in the order the wallet walks them.
+    index('exchanges_actor_day_idx').on(table.actorId, table.exchangedOn, table.createdAt),
+    check('exchanges_given_positive', sql`${table.givenMinor} > 0`),
+    check('exchanges_received_positive', sql`${table.receivedMinor} > 0`),
+    check(
+      'exchanges_held_not_negative',
+      sql`${table.heldBeforeMinor} is null or ${table.heldBeforeMinor} >= 0`,
+    ),
+    check('exchanges_given_currency_known', oneOf(table.givenCurrency, currencySchema.options)),
+    check(
+      'exchanges_received_currency_known',
+      oneOf(table.receivedCurrency, currencySchema.options),
+    ),
+    check('exchanges_currencies_differ', sql`${table.givenCurrency} <> ${table.receivedCurrency}`),
   ],
 )
 
