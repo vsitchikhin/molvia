@@ -1,10 +1,10 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref, watch } from 'vue'
+import type { AppLocale } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
-import type { AppLocale } from '@/i18n/locale'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 

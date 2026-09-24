@@ -11,10 +11,31 @@ const at = new Date('2026-09-22T12:00:00Z')
 
 describe('login wire contracts', () => {
   it('round-trips dates, including an unknown device', () => {
-    const preview = { deviceName: null, createdAt: at, expiresAt: at }
+    const preview = { deviceName: null, createdAt: at, expiresAt: at, confirmed: false }
     expect(loginPreviewCodec.parse(z.encode(loginPreviewCodec, preview))).toEqual(preview)
     const pending = { status: 'pending', expiresAt: at } as const
     expect(loginPollCodec.parse(z.encode(loginPollCodec, pending))).toEqual(pending)
+  })
+
+  it('говорит, что запрос подтверждён, но не кем именно', () => {
+    // Р-11: Telegram-id не покидает сервер. Боту нужно отличить «уже подтверждён» от «мёртв»
+    // (MOL-55, О-2), и для этого хватает булева — чей это аккаунт, ему знать незачем.
+    const confirmed = {
+      deviceName: 'iPhone · Safari',
+      createdAt: at,
+      expiresAt: at,
+      confirmed: true,
+    }
+    expect(loginPreviewCodec.parse(z.encode(loginPreviewCodec, confirmed))).toEqual(confirmed)
+    expect(
+      loginPreviewCodec.safeParse({
+        deviceName: null,
+        createdAt: at.toISOString(),
+        expiresAt: at.toISOString(),
+        confirmed: true,
+        telegramUserId: 777,
+      }).success,
+    ).toBe(false)
   })
 
   it('refuses secrets and account identifiers in a waiting response', () => {

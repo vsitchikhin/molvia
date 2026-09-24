@@ -12,6 +12,8 @@ export async function previewLogin(
     deviceName: request.deviceName,
     createdAt: request.createdAt,
     expiresAt: request.expiresAt,
+    // Whether, not who: the Telegram id does not leave the server (Р-11).
+    confirmed: request.telegramUserId !== null,
   }
 }
 

@@ -4,10 +4,10 @@ import { defineComponent, h, nextTick, ref, watch, type VNodeArrayChildren } fro
 import IconPlus from '~icons/mdi/plus'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
+import type { AppLocale } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
-import type { AppLocale } from '@/i18n/locale'
 import ScreenState from '@/components/ScreenState.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 

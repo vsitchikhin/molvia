@@ -130,15 +130,31 @@ describe('истёкший, использованный и несуществу
     await expect(db.select().from(loginRequests)).resolves.toHaveLength(1)
   })
 
-  it('бот не видит ни истёкшего, ни уже подтверждённого кода', async () => {
+  it('бот не видит истёкшего кода, но видит уже подтверждённый', async () => {
+    // Подтверждённый запрос бот не видел вовсе, и потерянный ответ API превращался в две
+    // неправды подряд: «не получилось», а на повторно открытую ссылку — «начните вход заново»,
+    // пока браузер уже забирал сессию (MOL-55, О-2). Теперь запрос виден, а чей он — нет.
     const stale = await asked()
     await expire(stale.id)
     const confirmed = await asked()
     await repository.confirm(confirmed.code, TELEGRAM_ID)
 
     expect(await repository.byCode(stale.code)).toBeNull()
-    expect(await repository.byCode(confirmed.code)).toBeNull()
+    expect((await repository.byCode(confirmed.code))?.telegramUserId).toBe(TELEGRAM_ID)
     expect(await repository.byCode('никогда-не-существовавший')).toBeNull()
+  })
+
+  it('погашенный и отклонённый по-прежнему не видны', async () => {
+    // Живость решает `consumed_at`, и «выдан» с «это не я» ставят именно его: видимым стал
+    // только подтверждённый и ещё не забранный запрос, а не всё подряд.
+    const spent = await asked()
+    await repository.confirm(spent.code, TELEGRAM_ID)
+    await repository.consume(spent.id, spent.secret)
+    const refused = await asked()
+    await repository.decline(refused.code)
+
+    expect(await repository.byCode(spent.code)).toBeNull()
+    expect(await repository.byCode(refused.code)).toBeNull()
   })
 })
 
@@ -229,6 +245,22 @@ describe('кнопку в боте нажали', () => {
     expect(confirmed?.telegramUserId).toBe(TELEGRAM_ID)
     expect(confirmed?.consumedAt).toBeNull()
     expect(confirmed?.deviceName).toBe('iPhone · Safari')
+  })
+
+  it('тот же аккаунт подтверждает повторно — успех, и ничего не сдвинулось', async () => {
+    // Ответ, потерянный после записи, — единственная причина этому быть идемпотентным
+    // (MOL-55, О-2): бот не отличает «не записано» от «записано, ответ не доехал», и выбирал
+    // неверное. Повтор ничего не меняет: аккаунт записан один раз, время — тоже.
+    const request = await asked()
+    const first = await repository.confirm(request.code, TELEGRAM_ID)
+
+    const again = await repository.confirm(request.code, TELEGRAM_ID)
+
+    expect(again?.telegramUserId).toBe(TELEGRAM_ID)
+    expect(again?.createdAt).toEqual(first?.createdAt)
+    expect(again?.expiresAt).toEqual(first?.expiresAt)
+    expect(again?.consumedAt).toBeNull()
+    await expect(db.select().from(loginRequests)).resolves.toHaveLength(1)
   })
 
   it('нажатая повторно, не выдаёт второго входа и не переписывает аккаунт', async () => {

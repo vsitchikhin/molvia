@@ -30,7 +30,9 @@ describe('login clients', () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ deviceName: null, createdAt: expiresAt, expiresAt })),
+        new Response(
+          JSON.stringify({ deviceName: null, createdAt: expiresAt, expiresAt, confirmed: false }),
+        ),
       )
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))

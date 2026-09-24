@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@grammyjs/runner": "^2.0.3",
     "@molvia/client": "*",
     "@molvia/model": "*",
     "grammy": "^1.46.0",

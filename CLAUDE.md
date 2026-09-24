@@ -153,7 +153,7 @@ the load is I/O-bound, with three orders of magnitude of headroom.
 | Scanner           | `zxing-wasm`, live viewfinder via `getUserMedia`        | we need EAN, not QR                                                                        |
 | API               | Fastify + Zod                                           | Zod schemas shared with the frontend and the bot                                           |
 | DB                | PostgreSQL + Drizzle                                    | schema in TS, generated migrations, honest drop into raw SQL                               |
-| Bot               | grammY                                                  | distribution, auth, rating reminders                                                       |
+| Bot               | grammY + `@grammyjs/runner`                             | distribution, auth, rating reminders; the runner is what makes it serve two people at once |
 | Receipt OCR (1.0) | separate Python service                                 | the TS ecosystem has nothing here                                                          |
 | Tests             | Vitest (domain, use case, component) + Playwright (e2e) | three vitest projects, so the domain keeps running without a DOM                           |
 | Lint              | ESLint 9 type-aware + Stylelint + Prettier              | strictest tier; SFCs go through the same type checker as `.ts`                             |
@@ -908,6 +908,106 @@ database access. In a product about data integrity, two write paths will silentl
   page scrolls»**: a panel over the screen has no window of its own, so it scrolls itself and
   the page under it is held still.
 
+## The bot, and what it is allowed to know (MOL-55)
+
+The bot is the second half of the login and nothing else in 0.1: the one place a person is
+shown **which device** they are letting in and says «yes» to it by hand. Rating reminders are
+0.2.
+
+- **The i18n rule of the frontend covers the bot too, and this is the line that says so.** Not a
+  string of text in the code — every message is a key, Russian first, English mirroring it. The
+  dictionaries are `.ts` rather than `.json`, unlike the PWA's: there Vite loads them, here the
+  module is read by `tsx` and bundled by esbuild, where a JSON import in ESM wants attributes.
+  The keys become a type as a result, so **the two languages mirror each other by the type
+  checker**, and the test is left to cover what types cannot see — an empty value and a lost
+  substitution. The language is `pickLocale` of `packages/model`, the very rule the PWA uses:
+  Telegram's `language_code` is an IETF tag like any other, and a second copy of that decision
+  would be a second place to drift.
+- **The bot keeps no state of its own.** The login code rides in the button's `callback_data`,
+  which is Telegram's memory rather than ours, and everything else is asked of the API — the
+  only write path there is. So nothing survives a restart, because nothing needs to.
+- **Updates of different people are handled at once; updates of one person, in order** — and
+  both halves are load-bearing (MOL-55, О-4). `bot.start()` handles updates strictly one after
+  another, which is grammY's ordering guarantee and was measured costing the next person their
+  whole turn: while the API thought for 300 ms, their request did not leave at all, and a queue
+  measured in whole timeouts outlives the login requests standing in it. `@grammyjs/runner` is
+  the answer — a dependency the owner agreed to on 24.09.2026 — with `sequentialize` by chat
+  keeping the other half: «Войти» and «Это не я» pressed one after the other must end where the
+  second press says, not where the faster answer does. Both succeed on their own — `confirm` is
+  idempotent and `decline` works on a confirmed request — so unordered they would leave «Вход
+  подтверждён» standing over a request that was in fact put out. **The price of that ordering is
+  named** (Е1): presses of one chat queue behind each other, so somebody tapping a silent API
+  waits a whole `API_TIMEOUT_MS` per tap. Nothing can fix it here — the alert _is_ the answer to
+  a press, a press is answered once, and the answer is unknown until the API replies.
+- **The question is asked from the account owner's side** (З-2, owner's decision 24.09.2026):
+  «Впустить это устройство в ваш аккаунт Molvia?», and the last line names what it costs to
+  get it wrong. «Войти в Molvia?» over a button labelled «Войти» read as «log _me_ in» — the
+  wrong way round for the one attack the button exists to stop, where a stranger's link makes
+  your tap let **their** browser into **your** account.
+- **An outcome is written into the message; a refusal is only shown over it** (О-1). Both
+  presses of a double tap leave before the first edit lands — the buttons are still on screen,
+  which at a shelf on a slow connection is ordinary — so the second was refused by the API,
+  correctly, and used to **overwrite «Вход подтверждён» with «Начните вход заново»** over a
+  session already granted. A refusal goes to `answerCallbackQuery`, which cannot rewrite what
+  is written. The buttons then go only if the link is dead: «the API did not answer, try again»
+  has to keep the very buttons it asks for.
+- **Confirming twice from the same account is a success, not a refusal** (О-2). A confirmation
+  that was written while its answer was lost left the bot unable to tell that from «not written»
+  — and it chose wrong, twice: «не получилось», and then «начните вход заново» on the link
+  opened again. So `confirm` is idempotent for the same account (another one is still refused —
+  that is what the button is for), and a preview says `confirmed`, **whether and not who** (Р-11).
+  The bot then says the one true thing: it is confirmed, go back to the app — **and offers «Это
+  не я» with it** (Б1). That sentence reaches two people, because «whether» cannot tell them
+  apart: the one who just pressed the button, and the person whose link leaked and was confirmed
+  from a stranger's Telegram, whose browser is about to collect a session of **somebody else's**
+  account. Pure reassurance at that moment is worse than the confusing «ссылка больше не
+  действует» they used to get, and `decline` still works on a confirmed request until it is
+  collected — the button is the only way to reach it. Telling the two apart needs no id to leave
+  the server (the preview could take the asker's), and until it is asked for, the answer is the
+  same for both and safe for both.
+- **A refusal is shown over the message and written nowhere — and that rule has no exceptions**
+  (О-1, and two rounds of trying to make one). Telegram will not answer a callback query that
+  aged out while the API was thinking, and then the refusal reaches nobody (В1). Both cures were
+  worse than the disease. A **new message** stayed in the chat for good, so the successful retry
+  it asked for rewrote the question above it and the last word was a refusal over a login that
+  had happened (Г1). **Editing the question** was worse still: it rested on «the API did not
+  answer, so no press of this message can have succeeded», which is false — the API can answer
+  one press and time out on the next, which is the very case idempotent `confirm` exists for —
+  and it erased «Вход подтверждён», handed the buttons back, and «Это не я» among them would
+  then put out the person's own confirmed login (Д1). So when the alert cannot be shown, nothing
+  is said: the buttons are still there, and the next press carries a **fresh** query that can be
+  answered. What that press is made cheap by is the **bot's own API timeout — five seconds, not
+  fifteen** (`API_TIMEOUT_MS`): the answer has to be given while the finger is still on the
+  button, the API's work here is one indexed row, and a press given up on early is safe to
+  repeat. The residue is named: if the alert cannot be shown, that press produces no words at
+  all — for a dead link the buttons go instead, and opening the link again says it in full.
+- **The spinner is cosmetic, and its failure is not news.** `answerCallbackQuery` throws on an
+  aged-out query; on the success path it stands in a `finally` after the outcome is written, and
+  letting it out wrote «update failed» in the log about a login that had just succeeded (Г2) —
+  the same wrong-thing-named-as-broken that З-4 removed from the other path.
+- **The «Это не я» of an already-confirmed request reaches anyone holding the link**,
+  so a stranger can put out a login somebody else confirmed — a denial of service, not a
+  takeover, since confirming with their own account is still refused (В2, owner's decision
+  24.09.2026). Accepted for the asymmetry: a cancelled login costs seconds and is visible, while
+  the hijack that button rescues is silent and permanent. The same power over an _unconfirmed_
+  request has always been there — the prompt itself carries «Это не я».
+- **«message is not modified» is an answer, not a failure.** An idempotent second confirmation
+  rewrites the message with the text it already carries, Telegram refuses that, and reading the
+  refusal as «the message is gone» put a duplicate reply in the chat on every double tap (Б2).
+  And the **outcome is written before the press is answered**, with the answer in `finally`:
+  `answerCallbackQuery` throws on a query Telegram has aged out, and with it first that left the
+  login made but the message still showing the question (П-2).
+- **It repeats none of the API's rules.** The five-minute term, the one-use rule, the quota and
+  «expired, spent, declined and unknown are one answer» belong to MOL-54 and are read off its
+  refusals. The bot adds exactly two things: the account, which only Telegram can vouch for,
+  and the person's explicit consent.
+- **Telegram updates are never logged whole** (the privacy page, п. 4.3): an update carries a
+  name, a username and a language we deliberately do not store. What goes to the log is the code
+  of the error and the operation that failed.
+- **A copy without `TELEGRAM_BOT_TOKEN` or without `BOT_API_SECRET` does not start**, says so in
+  one line and exits 0 — «this copy has no bot» must not become a restart loop under compose.
+  Such a copy signs in through `POST /dev/login` and cannot use Telegram at all.
+
 ## Code rules
 
 - **Minimal diff** — change only what the task requires. No drive-by refactoring, no
@@ -1163,7 +1263,15 @@ which a test asserts against the built file rather than against the intention; t
 it is behind `import.meta.env.DEV`, so the production bundle does not hold it either.
 MOL-54 added the real API: browser start/poll and internal bot preview/confirm/decline, shared
 contracts and separate clients. Production requires `TELEGRAM_BOT_USERNAME` and `BOT_API_SECRET`.
-The user-facing flow still needs bot commands (MOL-55) and the PWA screen (MOL-56).
+MOL-55 gave the bot its half: `/start <code>` names the device and the age of the request and
+offers «Войти» and «Это не я», the answer replaces the question so its buttons go with it, and
+five kinds of dead code get one reply. With it the bot got a dictionary of its own and
+`pickLocale` moved into `packages/model`, where the PWA now reads it from too. The user-facing
+flow still needs the PWA screen (MOL-56). **And that screen inherits one thing from the bot's
+review:** the «Это не я» above rescues a hijacked login only while the browser is not polling.
+With the login screen open and polling, a stranger confirms and the session is collected in a
+cycle or two — before the person can even open Telegram. Only the screen can close that, by
+showing **whose** account was entered before letting anyone further in.
 
 MOL-65 gave the person their four fields and a fourth tab: Armenia, Гюмри or Ереван, the currency
 purchases are written in and the one they are converted into. `PUT /actors/me/settings` compares
@@ -1322,7 +1430,10 @@ by hand.
   other, and silently: the second copy sees a foreign schema and assumes the migration is
   already applied.
 - **Each copy gets its own bot.** Two processes on one token steal each other's updates via
-  long polling — silently and unreproducibly. Register a separate bot in BotFather.
+  long polling — silently and unreproducibly. Register a separate bot in BotFather. **A copy
+  without a token cannot sign in through Telegram at all** — its only door is `POST /dev/login`,
+  and the same holds without `TELEGRAM_BOT_USERNAME`, which is what the API builds the link
+  from: starting a real login there answers `503 error.login_disabled`.
 
 **Plans and requirements live in `.scratch/tasks/`, not in the working copy and not on the
 Jira issue.** A copy is temporary and a task is not; `.scratch` is the shared directory, so

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { botApiSecretSchema } from '@molvia/model'
 
 export interface LoginConfiguration {
   readonly username: string
@@ -11,7 +12,7 @@ const loginEnvironmentSchema = z
     TELEGRAM_BOT_USERNAME: z
       .union([z.literal(''), z.string().regex(/^[A-Za-z0-9_]{5,32}$/)])
       .default(''),
-    BOT_API_SECRET: z.union([z.literal(''), z.string().regex(/^[A-Za-z0-9_-]{43}$/)]).default(''),
+    BOT_API_SECRET: z.union([z.literal(''), botApiSecretSchema]).default(''),
   })
   .refine(
     (value) =>

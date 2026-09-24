@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { and, eq, isNull, or, sql } from 'drizzle-orm'
 import {
   DomainError,
   ERROR,
@@ -44,7 +44,14 @@ export interface LoginRequestRepository {
     expiresAt: Date,
   ): Promise<LoginRequest>
 
-  /** What the bot has in hand after `/start <code>`: a request still waiting for an answer. */
+  /**
+   * What the bot has in hand after `/start <code>`: a live request, **confirmed or not**.
+   *
+   * It used to exclude a confirmed one, and that is what made a lost answer read as a lie
+   * (MOL-55, О-2): the person was told the link no longer worked while the session was being
+   * collected. Who confirmed it stays here — the row carries `telegramUserId`, and by Р-11 that
+   * number does not leave the server; what the bot is told is only *that* it is confirmed.
+   */
   byCode(code: string): Promise<LoginRequest | null>
 
   /**
@@ -55,6 +62,12 @@ export interface LoginRequestRepository {
    * no row could carry answers `null`, the same nothing an unknown code answers. It used to
    * depend on the order they were checked in, so one bad account id could be silence or a 500
    * depending on which code travelled beside it (adversarial Р2).
+   *
+   * **The same account confirming again is answered as a success** (MOL-55, О-2): a reply that
+   * never arrived left the bot unable to tell «not written» from «written, answer lost», and it
+   * chose the wrong one. Nothing moves on that second call — the account a request names is
+   * still written exactly once — so it is idempotent rather than repeated. **Another** account
+   * is still refused, which is the whole point of the button.
    */
   confirm(code: string, telegramUserId: TelegramUserId): Promise<LoginRequest | null>
 
@@ -192,7 +205,7 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
       const [row] = await db
         .select()
         .from(loginRequests)
-        .where(and(eq(loginRequests.code, code), live, isNull(loginRequests.telegramUserId)))
+        .where(and(eq(loginRequests.code, code), live))
         .limit(1)
       return row ? toLoginRequest(row) : null
     },
@@ -205,13 +218,23 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
       const named = telegramUserIdSchema.safeParse(telegramUserId).success
       if (codeOrNull(code) === null || !named) return null
 
-      // Only while unconfirmed: pressing the button twice must not move the account the
-      // request names. The second press finds nothing and says so, which is what MOL-55 shows
-      // as «this link has already been used».
+      // Unconfirmed, or confirmed by this very account. Pressing the button twice must not
+      // move the account a request names — and it cannot: the second press matches a row that
+      // already holds this id and writes the same value over it. Another account matches
+      // nothing, which is the refusal the button exists for.
       const [row] = await db
         .update(loginRequests)
         .set({ telegramUserId })
-        .where(and(eq(loginRequests.code, code), live, isNull(loginRequests.telegramUserId)))
+        .where(
+          and(
+            eq(loginRequests.code, code),
+            live,
+            or(
+              isNull(loginRequests.telegramUserId),
+              eq(loginRequests.telegramUserId, telegramUserId),
+            ),
+          ),
+        )
         .returning()
       return row ? toLoginRequest(row) : null
     },
