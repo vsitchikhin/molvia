@@ -15,7 +15,7 @@ endif
 REQUIRE_ENV = @test -f .env || { echo "no .env in this copy — run: make setup"; exit 1; }
 NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json is missing) — this target goes live once the workspaces land"; exit 1; }
 
-.PHONY: help setup hooks up down reup ps logs psql migrate db-reset dev format lint typecheck test e2e check prod-build certs icons ports
+.PHONY: help setup hooks up down reup ps logs psql migrate forget db-reset dev format lint typecheck test e2e check prod-build certs icons ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -67,6 +67,10 @@ db-reset: ## Drop this copy's database volume and start clean (DESTRUCTIVE)
 migrate: ## Apply migrations
 	$(NEED_SCAFFOLD)
 	npm run migrate
+
+forget: ## Erase a person by Telegram id: make forget TG=<id> [YES=1] (dry run without YES)
+	$(NEED_SCAFFOLD)
+	./bin/forget-actor.sh $(TG) $(if $(YES),--yes)
 
 dev: ## Run api, pwa and bot for this copy
 	$(NEED_SCAFFOLD)
