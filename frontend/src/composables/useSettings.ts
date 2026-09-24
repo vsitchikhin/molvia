@@ -180,11 +180,9 @@ const useSettingsStore = defineStore('settingsForm', () => {
       }
       failure.value = false
       return true
-    } catch (error) {
-      if (mine === generation) {
-        failure.value = true
-        if (error instanceof ApiError && error.code === ERROR.NO_ACTOR) actor.state = 'error'
-      }
+    } catch {
+      // A session that ended is heard by the seam in `@/api`, not by every caller (MOL-56).
+      if (mine === generation) failure.value = true
       return false
     } finally {
       if (mine === generation) loading.value = false
@@ -229,7 +227,6 @@ const useSettingsStore = defineStore('settingsForm', () => {
       if (answered) pending.value = null
       saveError.value = answered && error.code !== ERROR.CONFLICT
       keep()
-      if (answered && error.code === ERROR.NO_ACTOR) actor.state = 'error'
       // Refresh only reads. A lost response never causes an automatic second write.
       saving.value = false
       await refresh()

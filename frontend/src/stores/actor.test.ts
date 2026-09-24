@@ -9,10 +9,15 @@ import type { ActorView } from '@molvia/model'
 
 const devLogin = vi.fn<() => Promise<ActorView>>()
 const me = vi.fn<() => Promise<ActorView>>()
+/** What the store registers on the seam, captured so a test can pull it like a real refusal. */
+let missing: (() => void) | undefined
 vi.mock('@/api', () => ({
   api: {
     devLogin: () => devLogin(),
     me: () => me(),
+  },
+  onMissingActor: (told: () => void) => {
+    missing = told
   },
 }))
 
@@ -83,6 +88,7 @@ async function refusal(): Promise<Error> {
 
 beforeEach(() => {
   setActivePinia(createPinia())
+  missing = undefined
   localStorage.clear()
   sessionStorage.clear()
   devLogin.mockReset()
@@ -96,19 +102,31 @@ afterEach(() => {
 })
 
 describe('the first launch', () => {
-  it('asks who it is first, and signs in only when the answer is «nobody»', async () => {
+  it('asks who it is, and «nobody» is the login screen rather than a failure', async () => {
     // The cookie decides, and the app cannot see it — so there is nothing on the device to
     // consult before asking. `me()` first is not an extra round trip: it is the only way to
     // know whether this browser is already carrying a session.
     const { store } = await freshStore()
     me.mockRejectedValue(await refusal())
-    devLogin.mockResolvedValue(FIRST)
 
     await store.start()
 
     expect(me).toHaveBeenCalled()
-    expect(devLogin).toHaveBeenCalledWith()
-    expect(store.state).toBe('ready')
+    expect(store.state).toBe('signed-out')
+    // Nothing signs in by itself any more: the seam is a button on the login screen, and in a
+    // production build it is not in the bundle at all (MOL-56).
+    expect(devLogin).not.toHaveBeenCalled()
+  })
+
+  it('does not take «nobody» from a failure that is not one', async () => {
+    // A captive portal, a proxy, a 502 during a deploy: the session may be perfectly alive,
+    // and answering with the login screen would empty the app over a wifi splash page.
+    const { store } = await freshStore()
+    me.mockRejectedValue(new Error('fetch failed'))
+
+    await store.start()
+
+    expect(store.state).toBe('error')
   })
 
   it('keeps the owner id as the name of a drawer, not as a credential', async () => {
@@ -116,8 +134,7 @@ describe('the first launch', () => {
     // verdict drafts are filed under, and at the shelf with no signal they are read before the
     // server can be asked (Р-9).
     const { store } = await freshStore()
-    me.mockRejectedValue(await refusal())
-    devLogin.mockResolvedValue(FIRST)
+    me.mockResolvedValue(FIRST)
 
     await store.start()
 
@@ -126,6 +143,7 @@ describe('the first launch', () => {
   })
 
   it('says «offline» instead of hanging, and recovers when the network returns', async () => {
+    localStorage.setItem(KEY, FIRST.id)
     online(false)
     const { store } = await freshStore()
 
@@ -162,6 +180,7 @@ describe('the first launch', () => {
   // MOL-19 the offline notice has no button, so coming back into view is the other way back
   // (Р-8, B2).
   it('recovers when the app comes back into view, even with no «online» to hear', async () => {
+    localStorage.setItem(KEY, FIRST.id)
     online(false)
     const { store } = await freshStore()
     await store.start()
@@ -224,6 +243,7 @@ describe('a device whose storage refuses writes', () => {
       me.mockRejectedValue(await refusal())
 
       await store.start()
+      await store.signIn()
 
       expect(store.state).toBe('ready')
       expect(identity.currentIdentity()).toBe(FIRST.id)
@@ -238,9 +258,9 @@ describe('a device whose storage refuses writes', () => {
 
     await withBrokenLocalStorage(async () => {
       const first = await freshStore()
-      // Дважды: под блокировкой сценарий переспрашивает сервер, прежде чем заводить кого-то.
       me.mockRejectedValue(await refusal())
       await first.store.start()
+      await first.store.signIn()
 
       me.mockReset()
       me.mockResolvedValue(FIRST)
@@ -273,32 +293,34 @@ describe('an offline launch with an owner already known', () => {
 })
 
 describe('a session the server does not know', () => {
-  it('signs in again and takes the new owner as its own', async () => {
+  it('asks to sign in again and leaves the drawer where it is', async () => {
+    // Losing a session is not losing the data: the trip queue, the recent items and the verdict
+    // drafts stay filed under this owner, and Telegram brings the same owner back (MOL-56).
     localStorage.setItem(KEY, FIRST.id)
     const { store, identity } = await freshStore()
     me.mockRejectedValue(await refusal())
-    devLogin.mockResolvedValue(SECOND)
 
     await store.start()
 
-    expect(store.state).toBe('ready')
-    expect(localStorage.getItem(KEY)).toBe(SECOND.id)
-    expect(identity.currentIdentity()).toBe(SECOND.id)
+    expect(store.state).toBe('signed-out')
+    expect(localStorage.getItem(KEY)).toBe(FIRST.id)
+    expect(identity.currentIdentity()).toBe(FIRST.id)
   })
 
-  it('says «error» when it cannot sign in either', async () => {
+  it('says «error» when the seam cannot sign in either', async () => {
     const { store } = await freshStore()
     me.mockRejectedValue(await refusal())
     devLogin.mockRejectedValue(new Error('fetch failed'))
 
     await store.start()
+    await store.signIn()
 
     expect(store.state).toBe('error')
   })
 
-  it('does not sign in again when the network is at fault', async () => {
-    // A failure that is not «no such session» must not start a second account: the cookie may
-    // be perfectly alive behind a captive portal.
+  it('does not call it a lost session when the network is at fault', async () => {
+    // A failure that is not «no such session» must not show the door: the cookie may be
+    // perfectly alive behind a captive portal.
     localStorage.setItem(KEY, FIRST.id)
     me.mockRejectedValue(new Error('fetch failed'))
     const { store } = await freshStore()
@@ -323,6 +345,7 @@ describe('когда владелец оказался другим', () => {
     devLogin.mockResolvedValue(SECOND)
 
     await store.start()
+    await store.signIn()
 
     expect(store.id).toBe(SECOND.id)
     expect(said).toHaveBeenCalledWith(expect.stringContaining('владелец сменился'), FIRST.id)
@@ -341,39 +364,80 @@ describe('когда владелец оказался другим', () => {
   })
 })
 
-describe('в прод-сборке входить нечем', () => {
-  it('не тратит второй запрос на то, чего в этой сборке не бывает', async () => {
-    // Второй вопрос существует, чтобы поймать сессию, открытую соседней вкладкой; открыть её в
-    // прод-сборке нечем до MOL-54, так что и замок, и запрос уходили впустую — а `recover()`
-    // повторял это на каждый возврат во вкладку (MOL-53, Б3).
-    vi.stubEnv('DEV', false)
+describe('без сети и без владельца на устройстве', () => {
+  it('показывает дверь, а не приложение без данных', async () => {
+    // Пускать некуда: ящиков под этим браузером нет, кешированных ответов тоже, и человек,
+    // который здесь не входил, всё равно ничего не начнёт. Это офлайн-состояние экрана входа,
+    // а не плашка над пустым приложением (MOL-56, Q5).
+    online(false)
     const { store } = await freshStore()
-    me.mockRejectedValue(await refusal())
 
     await store.start()
 
-    expect(store.state).toBe('error')
-    expect(me).toHaveBeenCalledTimes(1)
-    expect(devLogin).not.toHaveBeenCalled()
-    vi.unstubAllEnvs()
+    expect(store.state).toBe('signed-out')
+    expect(me).not.toHaveBeenCalled()
+  })
+})
+
+describe('когда сессию открыли в другом месте', () => {
+  it('переспрашивает, ничего не мигая на экране', async () => {
+    // Экран входа виден минутами, и за это время вход мог случиться в соседней вкладке или на
+    // другом устройстве того же человека. `start()` мигнул бы скелетом на каждый возврат.
+    const { store } = await freshStore()
+    me.mockRejectedValue(await refusal())
+    await store.start()
+    expect(store.state).toBe('signed-out')
+
+    me.mockResolvedValue(FIRST)
+    await store.recheck()
+
+    expect(store.state).toBe('ready')
+    expect(store.id).toBe(FIRST.id)
+  })
+
+  it('и молчит, когда сессии по-прежнему нет', async () => {
+    const { store } = await freshStore()
+    me.mockRejectedValue(await refusal())
+    await store.start()
+
+    await store.recheck()
+
+    expect(store.state).toBe('signed-out')
+  })
+
+  it('берёт владельца, которого забрал опрос входа', async () => {
+    // Что зовёт экран входа, когда `GET /auth/login/:id` ответил `authenticated`.
+    const { store, identity } = await freshStore()
+    me.mockRejectedValue(await refusal())
+    await store.start()
+
+    store.adopt(FIRST)
+
+    expect(store.state).toBe('ready')
+    expect(store.id).toBe(FIRST.id)
+    expect(identity.currentIdentity()).toBe(FIRST.id)
+  })
+})
+
+describe('401 посреди работы', () => {
+  it('поднимает экран входа, с какого бы запроса отказ ни пришёл', async () => {
+    // Шов живёт в `@/api` и зовёт вот это; проверка самого шва — в `api.test.ts`.
+    localStorage.setItem(KEY, FIRST.id)
+    const { store } = await freshStore()
+    me.mockResolvedValue(FIRST)
+    await store.start()
+    expect(store.state).toBe('ready')
+
+    missing?.()
+
+    expect(store.state).toBe('signed-out')
+    // Ящик на месте: сессия — не данные, и тот же аккаунт вернётся через Telegram.
+    expect(store.id).toBe(FIRST.id)
+    expect(localStorage.getItem(KEY)).toBe(FIRST.id)
   })
 })
 
 describe('two tabs opened at once', () => {
-  it('asks again under the lock instead of opening a second session', async () => {
-    // The old machinery published an identifier through storage and the other tab adopted it.
-    // A cookie needs none of that: it belongs to the origin, so the tab that waited simply
-    // asks the server again and is recognised.
-    const { store } = await freshStore()
-    me.mockRejectedValueOnce(await refusal()).mockResolvedValue(FIRST)
-
-    await store.start()
-
-    expect(devLogin).not.toHaveBeenCalled()
-    expect(store.id).toBe(FIRST.id)
-    expect(store.state).toBe('ready')
-  })
-
   it('refuses to start twice in the same tab while the first attempt is running', async () => {
     // `retry` is the store's public name for `start`, and a retry button is wired to it.
     let release: (actor: ActorView) => void = () => undefined

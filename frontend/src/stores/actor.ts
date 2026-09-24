@@ -9,40 +9,28 @@ import {
   rememberSettings,
   settingsKey,
 } from '@/stores/settingsMemory'
-import { api } from '@/api'
-import { IDENTITY_KEY, currentIdentity, isIdentifier, rememberIdentity } from '@/stores/identity'
+import { api, onMissingActor } from '@/api'
+import { currentIdentity, isIdentifier, rememberIdentity } from '@/stores/identity'
 
 /**
- * What the identity is doing, so a screen can show the right one of four states.
+ * What the identity is doing, so a screen can show the right one of its states.
  *
- * Two of them have gone, each with the world it described. `uninvited` went with the invite
- * door (MOL-52). `lost` went with MOL-53: it meant «the data of this device is unreachable and
- * a new identity has been started», and neither half is true any more — a session is not the
- * data, and losing one is a reason to sign in again rather than to begin empty. MOL-56 brings
- * the state that replaces it, together with the screen that can act on it.
+ * Two have gone and one has arrived. `uninvited` went with the invite door (MOL-52). `lost`
+ * went with MOL-53: it meant «the data of this device is unreachable and a new identity has
+ * been started», and neither half was true any more — a session is not the data, and losing one
+ * is a reason to sign in again rather than to begin empty. **`signed-out` is what replaces it**
+ * (MOL-56): there is no session, the app draws the login screen instead of any of its own, and
+ * nothing on the device has been lost — the drawers are still filed under the same owner and
+ * the same account comes back through Telegram.
+ *
+ * `error` keeps its own meaning and is not the same thing: the server could not be asked at
+ * all. A session may be perfectly alive behind a captive portal, so that case shows the app
+ * with a notice rather than a door.
  */
-export type IdentityState = 'idle' | 'loading' | 'ready' | 'offline' | 'error'
+export type IdentityState = 'idle' | 'loading' | 'ready' | 'offline' | 'error' | 'signed-out'
 
 function isMissingActor(error: unknown): boolean {
   return error instanceof ApiError && error.code === ERROR.NO_ACTOR
-}
-
-/**
- * One tab signs in, the others wait and then simply ask again.
- *
- * Before MOL-53 this was an elaborate affair: the identity lived in storage, so two tabs
- * reading an empty one created two accounts and split a person's data in two, and the fallback
- * for browsers without `navigator.locks` kept a heartbeat claim in storage to narrow the race.
- * A cookie is one per origin and the browser owns it, so the second tab does not need to be
- * told what the first got — it re-asks the server and is recognised. What is left is a lock to
- * keep both from opening a session at once, and where there is no lock the cost is one extra
- * account in development, on the seam, in a browser older than Firefox 96.
- */
-async function claiming<T>(run: () => Promise<T>): Promise<T> {
-  // The DOM types promise `navigator.locks` is always there; Firefox before 96 and older
-  // WebViews say otherwise, and a phone at a shelf is exactly where an old WebView turns up.
-  const locks = (navigator as unknown as Record<string, unknown>).locks as LockManager | undefined
-  return locks ? locks.request(IDENTITY_KEY, run) : run()
 }
 
 export const useActorStore = defineStore('actor', () => {
@@ -111,9 +99,10 @@ export const useActorStore = defineStore('actor', () => {
     //
     // In production this is rare by construction: signing in through Telegram finds the *same*
     // owner, so the drawer comes back with them — that is the whole promise of the epic. It
-    // happens when the person genuinely changes account, and every time in development, where
-    // the seam mints a new Telegram id on each call. Said out loud here because the screen that
-    // could say it to a person is MOL-56's, and until then a log line is better than silence.
+    // happens when the person genuinely changes account. Since MOL-56 a person is shown *which*
+    // account they landed in before the app lets them any further, so this line is no longer
+    // the only warning there is — it is the one a developer sees, where the change of owner is
+    // an ordinary consequence of clearing the browser's cookies.
     if (was !== null && was !== loaded.id) {
       console.warn('[molvia] владелец сменился: записи прежнего остались на устройстве', was)
     }
@@ -125,14 +114,16 @@ export const useActorStore = defineStore('actor', () => {
   }
 
   /**
-   * The development seam. Its only caller stands behind `import.meta.env.DEV`, a literal Vite
-   * folds, so a production bundle holds no call to an address the production server does not
-   * carry — the same shape the seam has on the server (MOL-52, Р-14).
+   * The development seam, and since MOL-56 it is a button rather than something that happens by
+   * itself: the login screen shows it, and only in a development build — its caller stands
+   * behind `import.meta.env.DEV`, a literal Vite folds, so a production bundle holds no call to
+   * an address the production server does not carry (MOL-52, Р-14).
    *
-   * In production, until MOL-54, there is simply no way in, and the honest state for that is
-   * `error`. MOL-56 replaces it with a screen that offers the Telegram login.
+   * It signed the app in automatically until now, which made the screen this epic exists for
+   * invisible in every working copy and unreachable to the end-to-end suite.
    */
   async function signIn(): Promise<void> {
+    state.value = 'loading'
     try {
       settle(await api.devLogin())
       state.value = 'ready'
@@ -141,48 +132,41 @@ export const useActorStore = defineStore('actor', () => {
     }
   }
 
-  /**
-   * Under the lock, and it asks again before signing in: between requesting the lock and
-   * getting it, another tab may have signed this browser in — and the cookie it got is already
-   * ours, because cookies belong to the origin rather than to a tab.
-   */
-  async function askAgainOrSignIn(): Promise<void> {
-    try {
-      settle(await api.me())
-      state.value = 'ready'
-      return
-    } catch (error) {
-      if (!isMissingActor(error)) {
-        fail(error)
-        return
-      }
-    }
-
-    return signIn()
-  }
-
   async function load(): Promise<void> {
     try {
       settle(await api.me())
       state.value = 'ready'
     } catch (error) {
-      if (!isMissingActor(error)) {
-        fail(error)
-        return
-      }
-
-      // **The second ask is only worth making where signing in is possible** (MOL-53, Б3). It
-      // exists to catch a session another tab opened while this one waited for the lock — and
-      // in a production build there is no way to open one until MOL-54, so both the lock and
-      // the second request are spent on nothing. `recover()` comes back on every return to the
-      // tab, so «nothing» was two requests each time.
-      if (!import.meta.env.DEV) {
-        state.value = 'error'
-        return
-      }
-
-      return claiming(askAgainOrSignIn)
+      // **«Nobody» is an answer, not a failure** (MOL-56). The app stops here and draws the
+      // login screen; nothing on the device is touched, because the drawers are filed under the
+      // owner and Telegram brings the same one back.
+      //
+      // The lock and the second `me()` that used to stand here went with the automatic sign-in
+      // they existed for: two tabs racing to create an account is not a thing that can happen
+      // when a person has to tap a button (MOL-53, Б3).
+      if (isMissingActor(error)) state.value = 'signed-out'
+      else fail(error)
     }
+  }
+
+  /**
+   * Asks again without disturbing what is on screen — for the login screen, which is shown for
+   * minutes at a time while another tab, or another device of the same person, may sign this
+   * browser in. A plain `start()` would flash its skeleton on every return to the tab.
+   */
+  async function recheck(): Promise<void> {
+    if (state.value !== 'signed-out') return
+    try {
+      adopt(await api.me())
+    } catch {
+      // Still nobody, or nobody to ask. The screen keeps what it is showing.
+    }
+  }
+
+  /** What the login screen calls with the owner its poll collected. */
+  function adopt(loaded: ActorView): void {
+    settle(loaded)
+    state.value = 'ready'
   }
 
   /** Called once after the app mounts, and again by the retry control. */
@@ -196,8 +180,16 @@ export const useActorStore = defineStore('actor', () => {
         // for the shelf shows its cached screens as this person — but nothing has been
         // checked, and saying «ready» would promise an entity nothing has fetched. The state
         // stays «offline», which is both true and the one the offline text belongs to.
+        //
+        // **With no owner on the device there is nothing to show** (MOL-56, Q5): no drawers, no
+        // cached answers, and a person who has never signed in on this phone cannot start. That
+        // is the login screen's offline state and not a notice over an empty app.
         const known = currentIdentity()
-        if (isIdentifier(known)) id.value = known
+        if (!isIdentifier(known)) {
+          state.value = 'signed-out'
+          return
+        }
+        id.value = known
         state.value = 'offline'
         return
       }
@@ -232,5 +224,12 @@ export const useActorStore = defineStore('actor', () => {
     state.value = 'ready'
   }
 
-  return { actor, id, settings, state, start, apply, retry: start }
+  // The one place that hears «this browser has no session any more», whichever call earned the
+  // refusal. Registered here rather than in a screen: a screen that is not mounted hears
+  // nothing, and the queue sends in the background from `App.vue` (MOL-56).
+  onMissingActor(() => {
+    state.value = 'signed-out'
+  })
+
+  return { actor, id, settings, state, start, apply, adopt, recheck, signIn, retry: start }
 })
