@@ -340,7 +340,8 @@
     "login_forbidden": "Open sign-in from the app",
     "login_rate_limited": "Too many login requests. Try again in a minute",
     "login_disabled": "Telegram sign-in is not configured yet",
-    "bot_unauthorized": "The bot could not authenticate"
+    "bot_unauthorized": "The bot could not authenticate",
+    "exchange_in_future": "An exchange cannot be dated in the future"
   },
   "settings": {
     "title": "Settings",

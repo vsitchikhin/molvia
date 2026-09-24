@@ -340,7 +340,8 @@
     "login_forbidden": "Откройте вход из приложения",
     "login_rate_limited": "Слишком много запросов входа. Попробуйте через минуту",
     "login_disabled": "Вход через Telegram пока не настроен",
-    "bot_unauthorized": "Бот не прошёл проверку доступа"
+    "bot_unauthorized": "Бот не прошёл проверку доступа",
+    "exchange_in_future": "Этот день ещё не наступил"
   },
   "settings": {
     "title": "Настройки",
