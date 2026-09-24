@@ -241,6 +241,10 @@ describe('gate 0.2: what it refuses to answer', () => {
     ['a fractional threshold', { ratings: 4.5 }],
     ['an invalid date', { from: new Date('not a date') }],
     ['an empty window', { to: from }],
+    ['a window past int4', { windowHours: 2 ** 31 }],
+    ['a threshold past int4', { ratings: 2 ** 31 }],
+    ['a `to` at the end of JavaScript time', { to: new Date(8.64e15) }],
+    ['a `from` at the start of JavaScript time', { from: new Date(-8.64e15) }],
   ])('refuses %s before the database is asked', async (_, patch) => {
     await personSeen()
 
@@ -253,5 +257,18 @@ describe('gate 0.2: what it refuses to answer', () => {
         ...patch,
       }),
     ).rejects.toThrow(RangeError)
+  })
+
+  it('answers at the edges it accepts: the largest int4, and year 9999 as «until forever»', async () => {
+    await personSeen()
+
+    await expect(
+      verdicts.reachedRatings({
+        from: new Date('0001-01-01T00:00:00Z'),
+        to: new Date('9999-12-31T23:59:59.999Z'),
+        ratings: 2 ** 31 - 1,
+        windowHours: GATE_RATINGS_WINDOW_HOURS,
+      }),
+    ).resolves.toEqual({ cohortSize: 1, reached: 0 })
   })
 })

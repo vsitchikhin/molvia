@@ -86,6 +86,10 @@ export interface RatingsGateQuery {
   readonly windowHours: number
 }
 
+const INT4_MAX = 2 ** 31 - 1
+const FIRST_READABLE = Date.parse('0001-01-01T00:00:00Z')
+const PAST_READABLE = Date.parse('+010000-01-01T00:00:00Z')
+
 export interface CohortReached {
   readonly cohortSize: number
   readonly reached: number
@@ -524,8 +528,17 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
       // or a negative number gives a figure that looks true — nobody «reaches» zero through a
       // join, a negative window takes in people who have not come yet (adversarial pass, А2).
       // The domain's constants always pass; a first caller with input from outside may not.
-      const whole = (n: number) => Number.isInteger(n) && n > 0
-      if (!whole(ratings) || !whole(windowHours) || !(from.getTime() < to.getTime())) {
+      // So is what Postgres cannot read: past `int4`, or outside the years 1–9999 that
+      // `toISOString` writes in the form a `timestamptz` accepts (adversarial round 2, Б1, Б2).
+      const whole = (n: number) => Number.isInteger(n) && n > 0 && n <= INT4_MAX
+      const readable = (d: Date) => d.getTime() >= FIRST_READABLE && d.getTime() < PAST_READABLE
+      if (
+        !whole(ratings) ||
+        !whole(windowHours) ||
+        !readable(from) ||
+        !readable(to) ||
+        !(from.getTime() < to.getTime())
+      ) {
         throw new RangeError(
           `reachedRatings: ratings ${String(ratings)}, window ${String(windowHours)}h, [${String(from)}, ${String(to)})`,
         )
