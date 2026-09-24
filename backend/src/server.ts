@@ -20,6 +20,7 @@ import { verdictRoutes } from '@/routes/verdicts'
 import { advice } from '@/usecases/advice'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
+import { eraseMe } from '@/usecases/erase-me'
 import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
@@ -42,6 +43,7 @@ import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
+import { createErasureRepository } from '@/db/erasure-repository'
 import { authTransactOn } from '@/db/auth-unit-of-work'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
@@ -107,7 +109,7 @@ function failureCode(error: Error): string | undefined {
  */
 function isAuthRequest(request: FastifyRequest): boolean {
   const path = request.routeOptions.url ?? decodedPath(request.url)
-  return path.startsWith('/auth/') || path.startsWith('/internal/auth/')
+  return path.startsWith('/auth/') || path.startsWith('/internal/')
 }
 
 function decodedPath(url: string): string {
@@ -250,6 +252,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       preview: (code) => previewLogin(loginRequests, code),
       confirm: (code, telegramId) => confirmLogin(loginRequests, code, telegramId),
       decline: (code) => declineLogin(loginRequests, code),
+      erase: (telegramUserId) => eraseMe(createErasureRepository(db), telegramUserId),
     })
 
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).

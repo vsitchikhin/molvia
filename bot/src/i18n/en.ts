@@ -32,5 +32,18 @@ export const en: Dictionary = {
   'login.failed': 'No answer came back. Please try again in a minute.',
   'start.greeting':
     'Molvia — what is worth buying, and where.\n\n' +
-    'Signing in starts in the app: {url} — and I will send the confirmation here.',
+    'Signing in starts in the app: {url} — and I will send the confirmation here.\n\n' +
+    'To delete all your data — /delete.',
+  'erase.prompt':
+    'Delete all your data in Molvia?\n\n' +
+    'Your purchases, ratings and reviews, settings and sign-ins on every device will go. ' +
+    'Items you added to the shared catalogue will stay — without your name.\n\n' +
+    'This cannot be undone.',
+  'erase.confirm': 'Delete for good',
+  'erase.cancel': 'Cancel',
+  'erase.done':
+    'Done: Molvia holds no data of yours. You can sign in again — it will be a new, empty account.',
+  'erase.cancelled': 'Nothing was deleted.',
+  'erase.expired': 'This button has expired. Send /delete again.',
+  'erase.failed': 'No answer came back. Please try again in a minute.',
 }

@@ -79,7 +79,30 @@ export const ru = {
   'login.failed': 'Не дождался ответа. Попробуйте ещё раз через минуту.',
   'start.greeting':
     'Molvia — что стоит покупать и где.\n\n' +
-    'Вход начинается в приложении: {url} — а я пришлю сюда подтверждение.',
+    'Вход начинается в приложении: {url} — а я пришлю сюда подтверждение.\n\n' +
+    'Удалить все свои данные — /delete.',
+  /**
+   * The person erasing themselves (MOL-58). What stays is named as plainly as what goes: the
+   * catalogue keeps the items they added, and hearing that afterwards would feel like a lie.
+   */
+  'erase.prompt':
+    'Удалить все ваши данные в Molvia?\n\n' +
+    'Уйдут покупки, оценки и отзывы, настройки и входы на всех устройствах. ' +
+    'Товары, которые вы добавили в общий справочник, останутся — без вашего имени.\n\n' +
+    'Отменить это нельзя.',
+  'erase.confirm': 'Удалить навсегда',
+  'erase.cancel': 'Отмена',
+  /**
+   * One sentence for «erased» and «there was nothing to erase», because a double tap produces
+   * both — the second press finds nobody — and the second must not overwrite the first with
+   * something that sounds different. This one is true either way.
+   */
+  'erase.done':
+    'Готово: ваших данных в Molvia нет. Войти снова можно — это будет новый пустой аккаунт.',
+  'erase.cancelled': 'Ничего не удалено.',
+  /** A prompt answered long after it was sent is not the «yes» it was asking for. */
+  'erase.expired': 'Эта кнопка устарела. Отправьте /delete ещё раз.',
+  'erase.failed': 'Не дождался ответа. Попробуйте ещё раз через минуту.',
 } as const
 
 /**

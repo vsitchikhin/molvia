@@ -58,3 +58,10 @@ export const loginPreviewCodec = z.strictObject({
 export type LoginPreview = z.infer<typeof loginPreviewCodec>
 
 export const confirmLoginSchema = z.strictObject({ telegramUserId: telegramUserIdSchema })
+
+/**
+ * «Erase me», sent by the bot for the person who pressed the button (MOL-58). The id is the one
+ * Telegram vouched for in that update — the channel's secret is what stops anyone else from
+ * naming one — and a repeat is as good as the first: whoever had nothing left gets the same 204.
+ */
+export const eraseMeSchema = z.strictObject({ telegramUserId: telegramUserIdSchema })
