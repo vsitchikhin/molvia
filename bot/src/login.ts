@@ -110,6 +110,26 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
     }
   }
 
+  /**
+   * A refusal, shown **over** the message and never written into it (О-1).
+   *
+   * The alert is the whole channel here, so its failure cannot be the end of the matter: a
+   * press that waited out the client's fifteen-second timeout is exactly what this branch
+   * meets, and Telegram refuses to answer a query that old. That left «не дождался ответа»
+   * reaching nobody at all — the chat still showed the question, as if nothing had been
+   * pressed (adversarial В1). A plain message is a poorer place for it and the right fallback.
+   */
+  async function refuse(ctx: Context, key: MessageKey): Promise<void> {
+    const text = t(ctx.from?.language_code, key)
+    try {
+      // Over the message rather than under the top edge of the screen: this is the one thing
+      // the person has to read, and a toast at a shelf is easy to miss.
+      await ctx.answerCallbackQuery({ text, show_alert: true })
+    } catch {
+      await ctx.reply(text)
+    }
+  }
+
   /** Buttons that can no longer do anything, taken away without touching what was written. */
   async function dropKeyboard(ctx: Context): Promise<void> {
     try {
@@ -138,7 +158,9 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
     try {
       const request = await api.previewLogin(code)
       // Already said «yes» to, and the session not collected yet — the link opened again after
-      // an answer that never arrived (О-2). No buttons: there is nothing left to decide.
+      // an answer that never arrived (О-2). Nothing left to confirm, so «Войти» goes; «Это не
+      // я» stays, because the bot cannot tell this person from the one whose link was confirmed
+      // by a stranger (Б1), and for that one the button is the only way out.
       if (request.confirmed) {
         await ctx.reply(t(language, 'login.already'), {
           reply_markup: declineOnly(code, language),
@@ -209,13 +231,15 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
       return
     }
 
-    await ctx.answerCallbackQuery({
-      text: t(ctx.from.language_code, refused),
-      // Over the message rather than under the top edge of the screen: this is the one thing
-      // the person has to read, and a toast at a shelf is easy to miss.
-      show_alert: true,
-    })
-    if (refused === 'login.unavailable') await dropKeyboard(ctx)
+    try {
+      await refuse(ctx, refused)
+    } finally {
+      // Outside the answer, deliberately. Standing after it, it was skipped by the very press
+      // this branch is most likely to meet — one that waited out the client's fifteen-second
+      // timeout, which Telegram by then refuses to answer (adversarial В1). The dead link then
+      // kept its buttons, and the next tap на них would find the same nothing.
+      if (refused === 'login.unavailable') await dropKeyboard(ctx)
+    }
   })
 
   /**
@@ -224,11 +248,11 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
    * chats forever, so without this the spinner under that finger never stops (О-7).
    */
   privately.on('callback_query', async (ctx) => {
-    await ctx.answerCallbackQuery({
-      text: t(ctx.from.language_code, 'login.unavailable'),
-      show_alert: true,
-    })
-    await dropKeyboard(ctx)
+    try {
+      await refuse(ctx, 'login.unavailable')
+    } finally {
+      await dropKeyboard(ctx)
+    }
   })
 
   // Anything else **written** to the bot: the greeting, so it never looks dead. By MOL-58 this

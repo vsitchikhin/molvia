@@ -946,6 +946,17 @@ shown **which device** they are letting in and says «yes» to it by hand. Ratin
   collected — the button is the only way to reach it. Telling the two apart needs no id to leave
   the server (the preview could take the asker's), and until it is asked for, the answer is the
   same for both and safe for both.
+- **A refusal that cannot be shown is still said, and the buttons still go.** The alert is the
+  only channel a refusal has, and Telegram will not answer a press that waited out the client's
+  fifteen-second timeout — which is precisely the press this branch meets, because that timeout
+  _is_ the refusal. The alert failing left «не дождался ответа» reaching nobody and a dead link
+  keeping its buttons (В1); now a plain message is the fallback and `dropKeyboard` sits outside
+  the answer. **The «Это не я» of an already-confirmed request reaches anyone holding the link**,
+  so a stranger can put out a login somebody else confirmed — a denial of service, not a
+  takeover, since confirming with their own account is still refused (В2, owner's decision
+  24.09.2026). Accepted for the asymmetry: a cancelled login costs seconds and is visible, while
+  the hijack that button rescues is silent and permanent. The same power over an _unconfirmed_
+  request has always been there — the prompt itself carries «Это не я».
 - **«message is not modified» is an answer, not a failure.** An idempotent second confirmation
   rewrites the message with the text it already carries, Telegram refuses that, and reading the
   refusal as «the message is gone» put a duplicate reply in the chat on every double tap (Б2).
@@ -1189,6 +1200,12 @@ Development still gets a session from `POST /dev/login`, a seam that **is not in
 bundle at all** — the bundler folds its guard to a constant and the module is tree-shaken away,
 which a test asserts against the built file rather than against the intention; the PWA's call to
 it is behind `import.meta.env.DEV`, so the production bundle does not hold it either.
+**MOL-56 inherits one thing from the bot's review:** the «Это не я» above rescues a hijacked
+login only while the browser is not polling. With the login screen open and polling, a stranger
+confirms and the session is collected in a cycle or two — before the person can even open
+Telegram. Only the screen can close that, by showing **whose** account was entered before
+letting anyone further in.
+
 MOL-54 added the real API: browser start/poll and internal bot preview/confirm/decline, shared
 contracts and separate clients. Production requires `TELEGRAM_BOT_USERNAME` and `BOT_API_SECRET`.
 MOL-55 gave the bot its half: `/start <code>` names the device and the age of the request and

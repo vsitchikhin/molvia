@@ -302,9 +302,11 @@ describe('кнопки', () => {
     expect(calls.filter((call) => call.method === 'answerCallbackQuery')).toHaveLength(2)
   })
 
-  it('второе нажатие после чужого подтверждения не выдаёт второго входа и не затирает текст', async () => {
-    // Чужой аккаунт API отвергает — в этом и смысл кнопки. Бот обязан не превратить отказ в
-    // ложь: он показывается **над** сообщением и оставляет исход последним словом (О-1).
+  it('второе нажатие после того, как сессию забрали, не затирает исход', async () => {
+    // Второй `confirm` того же аккаунта успешен, пока запрос жив (О-2). Отказ здесь означает,
+    // что запрос уже погашен — сессию забрали или её погасило «Это не я». Бот обязан не
+    // превратить это в ложь: отказ показывается **над** сообщением и оставляет исход
+    // последним словом (О-1).
     const confirmLogin = vi
       .fn()
       .mockResolvedValueOnce(undefined)
@@ -378,6 +380,39 @@ describe('кнопки', () => {
     await expect(bot.handleUpdate(press(`login:ok:${CODE}`))).rejects.toThrow()
 
     expect(calls.some((call) => call.method === 'answerCallbackQuery')).toBe(true)
+  })
+
+  it('устаревшее нажатие не глотает отказ: он приходит строкой в чат', async () => {
+    // Всплывашка — единственный канал отказа с О-1, и именно её Telegram отвергает на
+    // нажатии, прождавшем таймаут клиента. А таймаут клиента — это и есть «не дождался
+    // ответа»: раньше отказ не доходил никуда, и в чате оставался вопрос с кнопками, как
+    // будто нажатия не было (адверсариальный В1).
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { bot, calls } = harness(
+      { confirmLogin: vi.fn().mockRejectedValue(new ApiError(ERROR.INTERNAL, 'aborted', false)) },
+      { failing: ['answerCallbackQuery'] },
+    )
+
+    await bot.handleUpdate(press(`login:ok:${CODE}`))
+
+    expect(String(sent(calls, 'sendMessage')?.text)).toContain('Не дождался ответа')
+    // Отказ «попробуйте ещё раз» кнопки не снимает — повторять должно быть чем (О-3).
+    expect(calls.filter((call) => call.method === 'editMessageReplyMarkup')).toEqual([])
+    expect(calls.filter((call) => call.method === 'editMessageText')).toEqual([])
+  })
+
+  it('мёртвая ссылка на устаревшем нажатии всё равно теряет кнопки', async () => {
+    // `dropKeyboard` стоял после ответа на нажатие и вместе с ним пропускался: у мёртвой
+    // ссылки оставались кнопки, и следующий тап находил то же самое ничто (В1).
+    const { bot, calls } = harness(
+      { declineLogin: vi.fn().mockRejectedValue(new ApiError(ERROR.LOGIN_UNAVAILABLE)) },
+      { failing: ['answerCallbackQuery'] },
+    )
+
+    await bot.handleUpdate(press(`login:no:${CODE}`))
+
+    expect(String(sent(calls, 'sendMessage')?.text)).toContain('больше не действует')
+    expect(calls.some((call) => call.method === 'editMessageReplyMarkup')).toBe(true)
   })
 
   it('устаревшее нажатие не мешает записать исход', async () => {
