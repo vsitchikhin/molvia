@@ -27,6 +27,7 @@ describe('routes', () => {
     ['/', 'trip', 'trip'],
     ['/advice', 'advice', 'advice'],
     ['/verdicts', 'verdicts', 'verdicts'],
+    ['/settings', 'settings', 'settings'],
   ])('%s is the %s section and shows the tab bar', async (path, name, tab) => {
     const route = await resolveAt(path)
     expect(route.name).toBe(name)

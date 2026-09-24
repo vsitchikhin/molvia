@@ -16,18 +16,20 @@ async function render(path: string, locale: AppLocale = 'en') {
 }
 
 describe('TabBar', () => {
-  it('is a labelled navigation region with the three sections in order', async () => {
+  it('is a labelled navigation region with the four sections in order', async () => {
     const view = await render('/')
     expect(view.get('nav').attributes('aria-label')).toBe(en.nav.label)
     expect(view.findAll('a').map((link) => link.text())).toEqual([
       en.nav.trip,
       en.nav.advice,
       en.nav.verdicts,
+      en.nav.settings,
     ])
     expect(view.findAll('a').map((link) => link.attributes('href'))).toEqual([
       '/',
       '/advice',
       '/verdicts',
+      '/settings',
     ])
   })
 
@@ -37,6 +39,7 @@ describe('TabBar', () => {
       ru.nav.trip,
       ru.nav.advice,
       ru.nav.verdicts,
+      ru.nav.settings,
     ])
   })
 
@@ -44,10 +47,11 @@ describe('TabBar', () => {
     ['/', 0],
     ['/advice', 1],
     ['/verdicts', 2],
+    ['/settings', 3],
   ])('on %s only the matching tab is the current page', async (path, index) => {
     const view = await render(path)
     const current = view.findAll('a').map((link) => link.attributes('aria-current'))
-    expect(current).toEqual([0, 1, 2].map((i) => (i === index ? 'page' : undefined)))
+    expect(current).toEqual([0, 1, 2, 3].map((i) => (i === index ? 'page' : undefined)))
   })
 
   // The trip tab must not claim the nested search as «the current page»: the search is a step

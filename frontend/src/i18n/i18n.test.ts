@@ -106,6 +106,9 @@ describe('словарь: повторяющиеся тексты', () => {
       Поход: ['nav.trip', 'trip.title'],
       'Что брать': ['advice.title', 'nav.advice'],
       Оценки: ['nav.verdicts', 'verdict.title'],
+      Настройки: ['nav.settings', 'settings.title'],
+      // The settings handoff names its own save action, independently of purchase editing.
+      Сохранить: ['item.save_edit', 'settings.save'],
       // Цена Р-2: одно состояние, написанное для трёх экранов.
       'Сервер не ответил': ['advice.error.title', 'item.error.title', 'trip.error.title'],
     })
@@ -120,6 +123,9 @@ describe('словарь: повторяющиеся тексты', () => {
       Trip: ['nav.trip', 'trip.title'],
       'What to buy': ['advice.title', 'nav.advice'],
       Ratings: ['nav.verdicts', 'verdict.title'],
+      Settings: ['nav.settings', 'settings.title'],
+      Save: ['item.save_edit', 'settings.save'],
+      'No connection': ['item.offline.title', 'settings.offline.title'],
       'The server did not answer': ['advice.error.title', 'item.error.title', 'trip.error.title'],
       // Английский не различает отмену диалога и отмену ввода; русский различает.
       Cancel: ['item.cancel', 'trip.finish_confirm.cancel'],

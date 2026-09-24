@@ -259,6 +259,8 @@ test.describe('nothing found', () => {
   })
 })
 
+// A state is taken by its heading: `ScreenState` hands «title. body» to the app's live region
+// as well, so `getByText` matches the announcement too and strict mode rightly refuses (MOL-64).
 test.describe('without the server', () => {
   test('offline: says so without red, searches the recent items, and comes back by itself', async ({
     page,
@@ -270,7 +272,7 @@ test.describe('without the server', () => {
     await context.setOffline(true)
     await field(page).fill('квирт')
 
-    await expect(page.getByText('No connection')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'No connection', exact: true })).toBeVisible()
     await expect(page.locator('.tone-bad')).toHaveCount(0)
     await expect(options(page)).toHaveText([new RegExp(KVIRTA_MILK.name)])
 
@@ -295,7 +297,9 @@ test.describe('without the server', () => {
 
     await field(page).fill('квирта')
 
-    await expect(page.getByText('The server did not answer')).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'The server did not answer', exact: true }),
+    ).toBeVisible()
     await page.getByRole('button', { name: 'Pick from recent' }).click()
     await expect(options(page)).toHaveText([new RegExp(KVIRTA_MILK.name)])
 

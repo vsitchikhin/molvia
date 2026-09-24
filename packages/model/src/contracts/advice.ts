@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { settingsGeographySchema } from './settings'
 import { ISSUE } from '#model/support/errors'
 import { itemSchema } from '#model/entities/item'
 import { placeSchema } from '#model/entities/place'
@@ -140,6 +141,7 @@ export const ADVICE_WARNINGS_RESERVED = 20
 export const adviceResponseSchema = z
   .strictObject({
     scope: adviceScopeSchema,
+    geography: settingsGeographySchema,
     rows: z.array(adviceRowSchema).max(ADVICE_LIMIT),
     /**
      * How many rated items there are in all, so a truncated list can say so (MOL-31, Р-23).

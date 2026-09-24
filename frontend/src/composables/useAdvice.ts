@@ -1,6 +1,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
-import { adviceResponseSchema } from '@molvia/model'
+import { adviceResponseSchema, geographyKey } from '@molvia/model'
 import type { AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
 import { api } from '@/api'
 import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
@@ -35,6 +35,8 @@ export interface Advice {
    * request still on its way, no connection, or a server that broke.
    */
   readonly stale: ComputedRef<Stale | null>
+  readonly cityReloading: ComputedRef<string | null>
+  readonly otherCity: ComputedRef<{ oldCity: string; city: string } | null>
   readonly fetchedAt: ComputedRef<Date | null>
   retry(): Promise<void>
 }
@@ -42,6 +44,13 @@ export interface Advice {
 /** Why the list on the screen is not an answer of this session (MOL-32, А4). */
 export type Stale = 'loading' | 'offline' | 'error'
 
+/**
+ * Whatever is written here is read back by `adviceResponseSchema`, which is strict: a change
+ * in the shape of the answer empties the memory of every phone that already had one, and the
+ * first walk to the shop without a connection after an update shows nothing (adversarial А1).
+ * Accepted knowingly — 0.1 is not released, and a lenient read would mean carrying «this
+ * answer does not know its own city» through three comparisons below.
+ */
 const KEY = 'molvia.advice'
 
 interface Remembered {
@@ -100,9 +109,19 @@ export function useAdvice(): Advice {
   /** Whether what is shown came from an answer of this session, rather than from the phone. */
   const confirmed = ref(false)
 
+  const cityChanged = ref(false)
+  const location = computed(() => (actor.settings ? geographyKey(actor.settings) : null))
+
   function adopt(id: string | null): void {
     owner.value = id
-    remembered.value = id ? recall(`${KEY}.${id}`) : null
+    const cached = id ? recall(`${KEY}.${id}`) : null
+    cityChanged.value =
+      !!cached && !!location.value && geographyKey(cached.answer.geography) !== location.value
+    // Without a settings snapshot the city is unknown — which does not make yesterday's prices
+    // untrue, and the strip above them names their age to the minute (adversarial А2). The
+    // first cold start after an update is exactly that case, and it is at the shelf.
+    remembered.value = cached && (!cityChanged.value || !navigator.onLine) ? cached : null
+    // Decided after the failure, never before the request (MOL-19, A1).
     failure.value = null
     confirmed.value = false
   }
@@ -140,34 +159,59 @@ export function useAdvice(): Advice {
    * alike (А6). So an ask that arrives while a request is in the air is remembered rather
    * than dropped, and every answer carries the number of the request that asked for it.
    */
-  let running = false
+  let running: object | null = null
   let latest = 0
   /** How many times a fresh list has been asked for; the loop below serves the last ask. */
   let asks = 0
 
   async function ask(id: string): Promise<void> {
     const mine = ++latest
+    const where = location.value
     try {
       const fresh = await api.advice()
-      if (owner.value !== id || mine !== latest) return
+      if (owner.value !== id || mine !== latest || location.value !== where) return
+      // The server names the geography it actually used; a second device may have moved it.
+      if (location.value && geographyKey(fresh.geography) !== location.value) {
+        const loaded = await api.me()
+        if (owner.value !== id || mine !== latest || loaded.id !== id) return
+        actor.apply(loaded)
+        // Only a moved `location` fires the watcher and asks again. It does not move when the
+        // other device put the city back, or when `apply` refuses a row older than the one
+        // held — and then returning here left the screen on a skeleton that has no «Повторить»
+        // and no way out but the server changing its mind (adversarial А3). Which city the
+        // answer is about is the server's to know, so the answer is taken as it is.
+        if (location.value !== where) return
+      }
       remembered.value = { answer: fresh, fetchedAt: new Date() }
       failure.value = null
       confirmed.value = true
       remember()
     } catch {
-      if (owner.value !== id || mine !== latest) return
+      if (owner.value !== id || mine !== latest || location.value !== where) return
       // Decided after the failure, never narrowed from a check before the request: a
       // connection lost while the answer was on its way is the commonest break at a shelf,
       // and it is not the server's fault and never red.
       failure.value = navigator.onLine ? 'error' : 'offline'
+      if (!navigator.onLine && !remembered.value) remembered.value = recall(`${KEY}.${id}`)
     }
   }
 
   async function load(): Promise<void> {
     if (!actor.id) return
+    if (
+      navigator.onLine &&
+      remembered.value &&
+      location.value &&
+      geographyKey(remembered.value.answer.geography) !== location.value
+    ) {
+      remembered.value = null
+      failure.value = null
+      confirmed.value = false
+    }
     asks += 1
     if (running) return
-    running = true
+    const token = {}
+    running = token
     try {
       let served = 0
       while (served !== asks) {
@@ -177,17 +221,20 @@ export function useAdvice(): Advice {
         const id = actor.id
         if (!id) break
         await ask(id)
+        if (running !== token) break
       }
     } finally {
-      running = false
+      if (running === token) running = null
     }
   }
 
   adopt(actor.id)
   watch(
-    () => actor.id,
-    (id) => {
-      adopt(id)
+    () => [actor.id, location.value],
+    () => {
+      latest += 1
+      running = null
+      adopt(actor.id)
       void load()
     },
   )
@@ -209,6 +256,16 @@ export function useAdvice(): Advice {
       if (remembered.value === null || confirmed.value) return null
       return failure.value ?? 'loading'
     }),
+    cityReloading: computed(() =>
+      cityChanged.value && phase.value === 'loading' ? (actor.settings?.city ?? null) : null,
+    ),
+    otherCity: computed(() =>
+      remembered.value &&
+      actor.settings &&
+      geographyKey(remembered.value.answer.geography) !== location.value
+        ? { oldCity: remembered.value.answer.geography.city, city: actor.settings.city }
+        : null,
+    ),
     fetchedAt: computed(() => remembered.value?.fetchedAt ?? null),
     retry: load,
   }

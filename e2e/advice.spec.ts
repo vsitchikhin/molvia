@@ -1,3 +1,4 @@
+import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
@@ -41,7 +42,11 @@ const tag = randomUUID().slice(0, 8)
 /** Bought once in «SAS», at 520 ֏ for 0,9 l, and rated — which is the whole path to this screen. */
 async function ratedPurchase(who: Person, name: string, score: number): Promise<void> {
   const tripId = randomUUID()
-  await who.call('POST', '/trips', { id: tripId, place: { kind: 'store', name: 'SAS' } })
+  await who.call('POST', '/trips', {
+    context: settingsOf(actorCodec.parse(await who.call('GET', '/actors/me'))),
+    id: tripId,
+    place: { kind: 'store', name: 'SAS' },
+  })
   const entry = (await who.call('POST', '/catalogue/items', {
     kind: 'product',
     name,

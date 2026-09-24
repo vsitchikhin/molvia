@@ -5,7 +5,7 @@ import type { AdviceScope, NewVerdict, Verdict, VerdictPatch } from '@molvia/mod
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
-import { items, verdicts } from './schema'
+import { actors, items, verdicts } from './schema'
 
 export interface RatedVerdict {
   readonly verdict: Verdict
@@ -51,6 +51,44 @@ export interface VerdictRepository {
    * Products only: a dish is rated where it was served, and 0.1 has no dishes.
    */
   adviceRowsFor(query: AdviceQuery): Promise<AdviceRows>
+  /**
+   * Gate 0.2: of those who appeared in `[from, to)`, how many gave `ratings` verdicts within
+   * `windowHours` of appearing (MOL-49). A query over this table, never an event: the log
+   * must not repeat what a domain table already knows.
+   *
+   * **The one reader that counts withdrawn verdicts.** The gate asks whether someone *gave*
+   * five, and «rated five, took one back» is five (MOL-27, the owner's decision). Rating again
+   * brings back the same row with its `rated_at`, so withdrawing and re-rating cannot move
+   * anyone here, and one row per «actor + item + place» makes a re-rating one verdict.
+   *
+   * `from` is the release of 0.2, and the caller passes it: sign-in is open since 0.1, so the
+   * people who arrived before there was anything of 0.2 to use would sit in the denominator
+   * (MOL-51). And only those whose window has closed are counted — someone who came last week
+   * has not failed to reach five, they have not had the time.
+   *
+   * **A verdict is dated by the server receiving it, and that bias is accepted** (adversarial
+   * pass, А1; owner's decision 23.09.2026). «Сохранить» keeps it on the phone and the queue
+   * sends it later — hours later with no signal or an expired session — so a fifth given in the
+   * last hour of the second week can arrive in the third and not count. The error only ever
+   * lowers the numerator, which is the gate erring towards «stop», the safe side, as with
+   * Р-24. The device's clock is not an option: the plan keeps it out of the gates altogether.
+   */
+  reachedRatings(query: RatingsGateQuery): Promise<CohortReached>
+}
+
+/** What gate 0.2 asks: the domain's two numbers and the window of people it looks at. */
+export interface RatingsGateQuery {
+  readonly from: Date
+  readonly to: Date
+  /** The domain's `GATE_RATINGS`. */
+  readonly ratings: number
+  /** The domain's `GATE_RATINGS_WINDOW_HOURS`. */
+  readonly windowHours: number
+}
+
+export interface CohortReached {
+  readonly cohortSize: number
+  readonly reached: number
 }
 
 /**
@@ -143,6 +181,12 @@ function toVerdict(row: VerdictShape): Verdict {
     updatedAt: asDate(row.updatedAt),
   })
 }
+
+// The edges of what `reachedRatings` can hand Postgres: `int4`, and the years `toISOString`
+// writes in a form a `timestamptz` reads.
+const INT4_MAX = 2 ** 31 - 1
+const FIRST_READABLE = Date.parse('0001-01-01T00:00:00Z')
+const PAST_READABLE = Date.parse('+010000-01-01T00:00:00Z')
 
 export function createVerdictRepository(db: Conn): VerdictRepository {
   return {
@@ -479,6 +523,58 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         })),
         total: Number(rows[0]?.total ?? 0),
       }
+    },
+
+    async reachedRatings({ from, to, ratings, windowHours }) {
+      // Refused loudly rather than answered: a fractional window is a Postgres error, and zero
+      // or a negative number gives a figure that looks true — nobody «reaches» zero through a
+      // join, a negative window takes in people who have not come yet (adversarial pass, А2).
+      // The domain's constants always pass; a first caller with input from outside may not.
+      // So is what Postgres cannot read: past `int4`, or outside the years 1–9999 that
+      // `toISOString` writes in the form a `timestamptz` accepts (adversarial round 2, Б1, Б2).
+      const whole = (n: number) => Number.isInteger(n) && n > 0 && n <= INT4_MAX
+      const readable = (d: Date) => d.getTime() >= FIRST_READABLE && d.getTime() < PAST_READABLE
+      if (
+        !whole(ratings) ||
+        !whole(windowHours) ||
+        !readable(from) ||
+        !readable(to) ||
+        !(from.getTime() < to.getTime())
+      ) {
+        throw new RangeError(
+          `reachedRatings: ratings ${String(ratings)}, window ${String(windowHours)}h, [${String(from)}, ${String(to)})`,
+        )
+      }
+
+      // Counted from `actors.created_at`, in hours, as gate 0.3 counts its weeks: both halves
+      // of the gates stand on one axis, and hours mean the same in every time zone.
+      const rows = await db.execute<{ cohort_size: number; reached: number }>(sql`
+        with cohort as (
+          select ${actors.id} as actor_id, ${actors.createdAt} as started
+          from ${actors}
+          where ${actors.createdAt} >= ${from.toISOString()}::timestamptz
+            and ${actors.createdAt} <  ${to.toISOString()}::timestamptz
+            -- A window still open is no answer yet: counted now, a person who came last week
+            -- reads as one who failed, and the gate errs towards «stop» for no reason.
+            and ${actors.createdAt} + make_interval(hours => ${windowHours}::int) <= now()
+        ),
+        reached as (
+          select c.actor_id
+          from cohort c
+          join ${verdicts} v on v.actor_id = c.actor_id
+          where v.rated_at < c.started + make_interval(hours => ${windowHours}::int)
+            -- No deleted_at filter: the gate is the one reader that counts withdrawn
+            -- verdicts (MOL-27). Every other reader of this table must have it.
+          group by c.actor_id
+          having count(*) >= ${ratings}::int
+        )
+        select
+          (select count(*) from cohort)::int as cohort_size,
+          (select count(*) from reached)::int as reached
+      `)
+
+      const row = rows[0]
+      return { cohortSize: row?.cohort_size ?? 0, reached: row?.reached ?? 0 }
     },
   }
 }

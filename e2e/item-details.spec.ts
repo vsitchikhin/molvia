@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
+import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { asBrowser, signedIn } from './session'
@@ -58,9 +59,12 @@ async function onTrip(page: Page): Promise<Setting> {
   })
   expect([200, 201]).toContain(proposed.status())
 
+  const context = settingsOf(
+    actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+  )
   const started = await page.request.post('/api/trips', {
     headers,
-    data: { id: randomUUID(), place: { kind: 'store', name: 'Ереван Сити' } },
+    data: { context, id: randomUUID(), place: { kind: 'store', name: 'Ереван Сити' } },
   })
   expect(started.status()).toBe(201)
 

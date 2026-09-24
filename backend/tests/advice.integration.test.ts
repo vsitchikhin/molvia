@@ -135,7 +135,12 @@ describe('дверь', () => {
   it('пустой экран — пустой список, а не ошибка', async () => {
     const actorId = await insertActor(db)
 
-    expect(await screen(actorId)).toEqual({ scope: 'own', rows: [], total: 0 })
+    expect(await screen(actorId)).toEqual({
+      scope: 'own',
+      rows: [],
+      total: 0,
+      geography: { country: 'AM', city: 'Гюмри' },
+    })
   })
 })
 
@@ -347,6 +352,24 @@ describe('чужое', () => {
 
     const [row] = (await screen(me)).rows
     expect(row?.level === 'take' && row.places).toEqual([])
+  })
+
+  it('считает своим городом место, город которого записан другим регистром', async () => {
+    // `places.ensure` хранит первое написание, поэтому читать город точным сравнением
+    // значит потерять магазин, в который человек ходит каждую неделю (MOL-65, Г2).
+    const me = await insertActor(db, { city: 'Гюмри' })
+    await grantAccess(me)
+    const sas = await insertPlace(db, { name: 'SAS', city: 'гюмри' })
+    const itemId = await insertItem(db)
+    await rate(me, itemId, 5)
+    for (let n = 0; n < 3; n += 1) {
+      const other = await insertActor(db, { city: 'Гюмри' })
+      await rate(other, itemId, 5)
+      await bought(other, itemId, sas, amd(100_000))
+    }
+
+    const [row] = (await screen(me)).rows
+    expect(row?.level === 'take' && row.places).toHaveLength(1)
   })
 
   it('отдаёт мой отзыв и никогда чужой', async () => {

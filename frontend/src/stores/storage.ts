@@ -28,8 +28,16 @@ function shelves(): Storage[] {
   return found
 }
 
-export function read(key: string): string | null {
-  for (const shelf of shelves()) {
+/**
+ * `ownFirst` asks this window's own shelf before the shared one. What a draft is for is the
+ * window that is editing it, and two windows write one key: without this a reload of the one
+ * editing the city came back holding the other one's currency, and «the answer may have been
+ * lost» could be overwritten by a neighbour that never sent anything (MOL-65, review 3).
+ * The shared shelf still answers when the window has nothing of its own — a new launch.
+ */
+export function read(key: string, ownFirst = false): string | null {
+  const order = shelves()
+  for (const shelf of ownFirst ? order.reverse() : order) {
     try {
       const value = shelf.getItem(key)
       if (value) return value
@@ -73,8 +81,11 @@ export function writeEverywhere(
   value: string,
   salvage?: (past: string) => string | null,
 ): boolean {
-  let everywhere = true
-  for (const shelf of shelves()) {
+  const found = shelves()
+  // None at all — storage blocked outright — is «nowhere», not «everywhere»: the loop below
+  // would otherwise report a value kept on a device that refuses to keep anything.
+  let everywhere = found.length > 0
+  for (const shelf of found) {
     try {
       shelf.setItem(key, value)
     } catch {

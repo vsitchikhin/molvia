@@ -59,7 +59,11 @@ function trip(over: Over = {}): TripView {
         }
       : null,
     rateStale: over.stale ?? false,
-    place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
+    place: {
+      id: 'aaaaaaaa-0000-4000-8000-000000000001',
+      kind: 'store',
+      name: 'Ереван Сити',
+    },
     expenses: [],
     total: [],
     converted: null,

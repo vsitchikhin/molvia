@@ -7,7 +7,8 @@
     "trip": "Trip",
     "advice": "What to buy",
     "verdicts": "Ratings",
-    "back_label": "Back"
+    "back_label": "Back",
+    "settings": "Settings"
   },
   "state": {
     "loading": "Loading…",
@@ -237,6 +238,12 @@
     "offline": {
       "title": "The list will show up once you are online",
       "body": "Verdicts are worked out on the server — we will show the list the moment you are back"
+    },
+    "city_reloading": "City changed to {city} — reloading the list",
+    "stale_other_city": "List for {oldCity} from {day} at {time}. Prices for {city} will appear when the connection returns.",
+    "cities_genitive": {
+      "Гюмри": "Gyumri",
+      "Ереван": "Yerevan"
     }
   },
   "verdict": {
@@ -328,10 +335,75 @@
     "no_actor": "This device is no longer recognised",
     "trip_open": "Another trip is still open",
     "internal": "Something went wrong",
+    "trip_context_required": "Set the trip’s city and currencies before sending",
     "login_unavailable": "This login request is no longer available. Start again",
     "login_forbidden": "Open sign-in from the app",
     "login_rate_limited": "Too many login requests. Try again in a minute",
     "login_disabled": "Telegram sign-in is not configured yet",
     "bot_unauthorized": "The bot could not authenticate"
+  },
+  "settings": {
+    "title": "Settings",
+    "country": "Country",
+    "armenia": "Armenia",
+    "city": "City",
+    "spendCurrency": "Spending currency",
+    "incomeCurrency": "Conversion currency",
+    "currencies": {
+      "AMD": "Armenian dram · AMD",
+      "RUB": "Russian ruble · RUB",
+      "USD": "US dollar · USD",
+      "EUR": "Euro · EUR"
+    },
+    "conversion_hint": "Shows what your purchases cost in this currency. This is not an income record.",
+    "scope": "New settings apply to future trips. Trips already started keep their currency and rate.",
+    "saved": "Settings saved",
+    "save": "Save",
+    "saving": "Saving…",
+    "overwrite": "Apply my changes",
+    "cancel": "Discard changes",
+    "offline": {
+      "title": "No connection",
+      "body": "Settings will appear when the connection returns",
+      "strip": "No connection. You can save changes when the internet returns."
+    },
+    "context_missing": "This device has no confirmed settings yet. Connect to load them.",
+    "conflict": {
+      "title": "Settings changed on another device",
+      "body": "Saved now: {country}, {city}; purchases — {spendCurrency}, conversion — {incomeCurrency}. Your edits are below. Apply them or discard to use saved settings."
+    },
+    "legacy": {
+      "title": "Confirm this trip’s city and currencies",
+      "body": "This trip started in an earlier version. Check where and in which currency you shopped. All items are waiting on this phone.",
+      "action": "Review trip settings",
+      "confirm": "Confirm and send"
+    },
+    "group_place": "Where you live",
+    "group_currencies": "Currencies",
+    "city_hint": "Used for new trips and prices near you",
+    "city_current": "Now: {city}",
+    "city_not_listed": "This city is not in the list — keep it or choose an available one",
+    "city_changed": "What to buy will show prices for the new city. Your previous purchases will stay.",
+    "spend_hint": "The default for new trips. Each purchase can use a different currency.",
+    "same_currencies": "The currencies match — no conversion needed",
+    "changed": "changed",
+    "changed_announced": "changed, not saved",
+    "save_needs_network": "You can save when the connection returns",
+    "draft": {
+      "title": "You have unsaved changes",
+      "volatile": "Changes will remain only while the app is open"
+    },
+    "load_error": {
+      "title": "Could not load settings",
+      "body": "Please try again"
+    },
+    "save_error": {
+      "title": "Could not save changes",
+      "body": "Your edits are still here. Please try again."
+    },
+    "save_unknown": {
+      "title": "Connection lost while saving",
+      "body": "We will check with the server when it returns. Your edits will stay here."
+    }
   }
 }
