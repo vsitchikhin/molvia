@@ -48,6 +48,7 @@ function harness(
   options: { readonly failing?: readonly string[] } = {},
 ): { bot: Bot; calls: Call[] } {
   const calls: Call[] = []
+  let shown: unknown
   const bot = new Bot('42:TEST', { botInfo: BOT_INFO })
   const transformer: Transformer = (_prev, method, payload) => {
     calls.push({ method, payload: payload })
@@ -55,8 +56,21 @@ function harness(
       return Promise.resolve({
         ok: false,
         error_code: 400,
-        description: 'Bad Request: message is not modified',
+        description: 'Bad Request: message can not be edited',
       }) as never
+    }
+    // Telegram as it is: a message cannot be rewritten with the text it already carries. The
+    // bot has to tell that apart from «cannot be edited», so the fake has to produce it.
+    if (method === 'editMessageText') {
+      const body = payload as { readonly text?: unknown }
+      if (body.text === shown) {
+        return Promise.resolve({
+          ok: false,
+          error_code: 400,
+          description: 'Bad Request: message is not modified',
+        }) as never
+      }
+      shown = body.text
     }
     return Promise.resolve({ ok: true, result: { message_id: 1 } }) as never
   }
@@ -184,12 +198,27 @@ describe('/start с кодом', () => {
     await bot.handleUpdate(message(`/start ${CODE}`))
 
     const payload = sent(calls, 'sendMessage')
-    expect(payload?.text).toBe(
-      'Этот вход уже подтверждён. Вернитесь в Molvia — приложение узнает вас само.',
-    )
-    // Решать больше нечего, и подтверждать заново — тоже.
-    expect(payload?.reply_markup).toBeUndefined()
+    expect(String(payload?.text)).toContain('Этот вход уже подтверждён')
     expect(confirmLogin).not.toHaveBeenCalled()
+  })
+
+  it('на уже подтверждённом остаётся «Это не я» — кто подтвердил, бот не знает', async () => {
+    // Другая сторона Р-7: ссылка жертвы утекла, посторонний подтвердил её своим Telegram, и
+    // браузер жертвы вот-вот заберёт сессию **чужого** аккаунта. Превью говорит «подтверждён»,
+    // но не кем (Р-11), так что эту фразу читают оба — и тому, кого угоняют, чистое «вернитесь,
+    // приложение узнает вас само» было бы успокоением в худший момент (Б1). `decline` на
+    // подтверждённом живом запросе работает, и кнопка — единственный путь к нему.
+    const { bot, calls } = harness({
+      previewLogin: vi.fn().mockResolvedValue({ ...PREVIEW, confirmed: true }),
+    })
+
+    await bot.handleUpdate(message(`/start ${CODE}`))
+
+    const payload = sent(calls, 'sendMessage')
+    expect(String(payload?.text)).toContain('Если подтверждали не вы')
+    expect(payload?.reply_markup).toEqual({
+      inline_keyboard: [[{ text: 'Это не я', callback_data: `login:no:${CODE}` }]],
+    })
   })
 
   it('код, который не поместится на кнопку, не уходит даже в API', async () => {
@@ -249,11 +278,33 @@ describe('кнопки', () => {
     expect(sent(calls, 'editMessageText')?.text).toContain('Вход отклонён')
   })
 
-  it('второе нажатие не выдаёт второго входа и не затирает подтверждение', async () => {
+  it('второе нажатие своим же аккаунтом не добавляет в чат второй реплики', async () => {
     // Оба нажатия уходят раньше, чем правка первого долетела: кнопки ещё на экране, а у полки
-    // на медленной связи это обычное дело. Второго входа не выдаёт API — `confirm` берёт
-    // строку, только пока она ждёт ответа. А бот обязан не превратить это в ложь: отказ
-    // показывается **над** сообщением и оставляет «Вход подтверждён» последним словом (О-1).
+    // на медленной связи это обычное дело. **Второй `confirm` теперь успешен** — он идемпотентен
+    // для того же аккаунта (О-2), — и подделывать его отказом значило бы проверять путь, которого
+    // в продукте больше нет (селфревью П-1). Настоящий путь упирается в Telegram: правка тем же
+    // текстом отвергается, и раньше это читалось как «сообщения нет», а в чат уходил дубль (Б2).
+    const confirmLogin = vi.fn().mockResolvedValue(undefined)
+    const { bot, calls } = harness({ confirmLogin })
+
+    await bot.handleUpdate(press(`login:ok:${CODE}`))
+    await bot.handleUpdate(press(`login:ok:${CODE}`))
+
+    expect(confirmLogin).toHaveBeenCalledTimes(2)
+    expect(calls.filter((call) => call.method === 'sendMessage')).toEqual([])
+    const said = calls
+      .filter((call) => call.method === 'editMessageText')
+      .map((call) => String(call.payload.text))
+    expect(said).toEqual([
+      'Вход подтверждён. Вернитесь в Molvia — приложение узнает вас само.',
+      'Вход подтверждён. Вернитесь в Molvia — приложение узнает вас само.',
+    ])
+    expect(calls.filter((call) => call.method === 'answerCallbackQuery')).toHaveLength(2)
+  })
+
+  it('второе нажатие после чужого подтверждения не выдаёт второго входа и не затирает текст', async () => {
+    // Чужой аккаунт API отвергает — в этом и смысл кнопки. Бот обязан не превратить отказ в
+    // ложь: он показывается **над** сообщением и оставляет исход последним словом (О-1).
     const confirmLogin = vi
       .fn()
       .mockResolvedValueOnce(undefined)
@@ -263,7 +314,6 @@ describe('кнопки', () => {
     await bot.handleUpdate(press(`login:ok:${CODE}`))
     await bot.handleUpdate(press(`login:ok:${CODE}`))
 
-    expect(confirmLogin).toHaveBeenCalledTimes(2)
     const edits = calls.filter((call) => call.method === 'editMessageText')
     expect(edits).toHaveLength(1)
     expect(String(edits[0]?.payload.text)).toContain('Вход подтверждён')
@@ -328,6 +378,20 @@ describe('кнопки', () => {
     await expect(bot.handleUpdate(press(`login:ok:${CODE}`))).rejects.toThrow()
 
     expect(calls.some((call) => call.method === 'answerCallbackQuery')).toBe(true)
+  })
+
+  it('устаревшее нажатие не мешает записать исход', async () => {
+    // «query is too old» — то, чем Telegram считает нажатие, прождавшее таймаут клиента в
+    // пятнадцать секунд или перезапуск бота. С ответом на нажатие впереди исход не
+    // записывался вовсе: вход состоялся, а в сообщении оставался вопрос с кнопками (П-2).
+    const { bot, calls } = harness(
+      { confirmLogin: vi.fn().mockResolvedValue(undefined) },
+      { failing: ['answerCallbackQuery'] },
+    )
+
+    await expect(bot.handleUpdate(press(`login:ok:${CODE}`))).rejects.toThrow()
+
+    expect(String(sent(calls, 'editMessageText')?.text)).toContain('Вход подтверждён')
   })
 
   it('сбой Telegram после удачного подтверждения не называется сбоем входа', async () => {

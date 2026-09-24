@@ -1,4 +1,4 @@
-import { Composer, InlineKeyboard } from 'grammy'
+import { Composer, GrammyError, InlineKeyboard } from 'grammy'
 import type { Context } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
@@ -81,6 +81,11 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
       .text(t(language, 'login.decline'), buttonData('no', code))
   }
 
+  /** Nothing left to confirm, but putting the request out is still worth offering (Б1). */
+  function declineOnly(code: string, language: string | undefined): InlineKeyboard {
+    return new InlineKeyboard().text(t(language, 'login.decline'), buttonData('no', code))
+  }
+
   /**
    * The answer replaces the question, so the buttons go with it (Q6).
    *
@@ -92,7 +97,14 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
     try {
       // No `reply_markup`: Telegram drops the keyboard when an edit does not carry one.
       await ctx.editMessageText(text)
-    } catch {
+    } catch (error) {
+      // «message is not modified» is not a failure to answer — it means this very answer is
+      // already on screen, which is what a second press of an idempotent confirmation produces.
+      // Read as «the message is gone», it put a duplicate reply into the chat every double tap
+      // (adversarial Б2) — exactly the clutter Q6 removed by editing in place.
+      if (error instanceof GrammyError && error.description.includes('message is not modified')) {
+        return
+      }
       // Too old to edit, or the message is gone — the answer still has to arrive.
       await ctx.reply(text)
     }
@@ -128,7 +140,9 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
       // Already said «yes» to, and the session not collected yet — the link opened again after
       // an answer that never arrived (О-2). No buttons: there is nothing left to decide.
       if (request.confirmed) {
-        await ctx.reply(t(language, 'login.already'))
+        await ctx.reply(t(language, 'login.already'), {
+          reply_markup: declineOnly(code, language),
+        })
         return
       }
       await ctx.reply(
@@ -181,9 +195,17 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
     }
 
     if (refused === null) {
-      // Answered first, so the spinner stops even if the edit below cannot be made.
-      await ctx.answerCallbackQuery()
-      await settle(ctx, confirming ? 'login.confirmed' : 'login.declined')
+      // The outcome is written first and the press answered in `finally`, not the other way
+      // round: `answerCallbackQuery` throws on a query Telegram has already aged out — which is
+      // what a press waiting out the client's fifteen-second timeout becomes — and with the
+      // answer first that threw before anything was written. The login had happened and the
+      // message still showed the question with its buttons (selfreview П-2). The spinner is
+      // cosmetic; what the person reads is not.
+      try {
+        await settle(ctx, confirming ? 'login.confirmed' : 'login.declined')
+      } finally {
+        await ctx.answerCallbackQuery()
+      }
       return
     }
 

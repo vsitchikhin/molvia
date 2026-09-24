@@ -48,10 +48,23 @@ export const ru = {
    *
    * Told apart from a dead link on purpose, and it is the only place where telling two
    * outcomes apart is worth more than one answer for all of them: what the person did next
-   * after «не получилось» was open the link again, and «начните вход заново» over a session
-   * already granted was the second lie in a row (MOL-55, О-2).
+   * after «не дождался ответа» was open the link again, and «начните вход заново» over a
+   * session already granted was the second lie in a row (MOL-55, О-2).
+   *
+   * **And it offers «Это не я», because the bot cannot tell who confirmed** (adversarial Б1).
+   * `confirmed` says that, not by whom (Р-11), so this sentence reaches two people: the one who
+   * just pressed the button, and the victim of the other direction of Р-7 — their link leaked,
+   * a stranger confirmed it from their own Telegram, and the victim's browser is about to
+   * collect a session of **somebody else's** account. Saying «вернитесь, приложение узнает вас
+   * само» to the second one is pure reassurance at the worst possible moment; before О-2 they
+   * at least got a confusing «ссылка больше не действует» and started over. The API can still
+   * put such a request out — `decline` works on a confirmed one until it is collected — and the
+   * button is the only way to reach that path.
    */
-  'login.already': 'Этот вход уже подтверждён. Вернитесь в Molvia — приложение узнает вас само.',
+  'login.already':
+    'Этот вход уже подтверждён — вернитесь в Molvia.\n\n' +
+    'Если подтверждали не вы, нажмите «Это не я»: иначе приложение откроет чужой аккаунт, ' +
+    'а не ваш.',
   'login.declined': 'Вход отклонён. В аккаунт никто не вошёл.',
   /**
    * Expired, spent, declined, unknown and malformed — one answer for all five, because the

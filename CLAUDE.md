@@ -937,7 +937,21 @@ shown **which device** they are letting in and says «yes» to it by hand. Ratin
   — and it chose wrong, twice: «не получилось», and then «начните вход заново» on the link
   opened again. So `confirm` is idempotent for the same account (another one is still refused —
   that is what the button is for), and a preview says `confirmed`, **whether and not who** (Р-11).
-  The bot then says the one true thing: it is confirmed, go back to the app.
+  The bot then says the one true thing: it is confirmed, go back to the app — **and offers «Это
+  не я» with it** (Б1). That sentence reaches two people, because «whether» cannot tell them
+  apart: the one who just pressed the button, and the person whose link leaked and was confirmed
+  from a stranger's Telegram, whose browser is about to collect a session of **somebody else's**
+  account. Pure reassurance at that moment is worse than the confusing «ссылка больше не
+  действует» they used to get, and `decline` still works on a confirmed request until it is
+  collected — the button is the only way to reach it. Telling the two apart needs no id to leave
+  the server (the preview could take the asker's), and until it is asked for, the answer is the
+  same for both and safe for both.
+- **«message is not modified» is an answer, not a failure.** An idempotent second confirmation
+  rewrites the message with the text it already carries, Telegram refuses that, and reading the
+  refusal as «the message is gone» put a duplicate reply in the chat on every double tap (Б2).
+  And the **outcome is written before the press is answered**, with the answer in `finally`:
+  `answerCallbackQuery` throws on a query Telegram has aged out, and with it first that left the
+  login made but the message still showing the question (П-2).
 - **It repeats none of the API's rules.** The five-minute term, the one-use rule, the quota and
   «expired, spent, declined and unknown are one answer» belong to MOL-54 and are read off its
   refusals. The bot adds exactly two things: the account, which only Telegram can vouch for,

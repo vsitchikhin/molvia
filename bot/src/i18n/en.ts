@@ -24,7 +24,9 @@ export const en: Dictionary = {
   'login.decline': 'Not me',
   'login.confirmed': 'Signed in. Go back to Molvia — the app will recognise you by itself.',
   'login.already':
-    'This sign-in is already confirmed. Go back to Molvia — the app will recognise you by itself.',
+    'This sign-in is already confirmed — go back to Molvia.\n\n' +
+    'If it was not you who confirmed it, tap “Not me”: otherwise the app will open somebody ' +
+    "else's account instead of yours.",
   'login.declined': 'Sign-in declined. Nobody got into the account.',
   'login.unavailable': 'This link no longer works. Start signing in again in the app.',
   'login.failed': 'No answer came back. Please try again in a minute.',
