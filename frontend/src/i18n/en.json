@@ -65,6 +65,7 @@
       "drop_trip": "Drop the trip and its purchases"
     },
     "rate_line": "rate {rate} · {date}",
+    "rate_line_mine": "my rate {rate} · {date}",
     "flip": "Show in the other currency",
     "caveat": {
       "pending": "+ {n} item not sent yet | + {n} items not sent yet",
@@ -300,6 +301,56 @@
     "source_official": "official",
     "home_currency": "My currency"
   },
+  "exchange": {
+    "title": "Money exchange",
+    "my_rate": "My rate",
+    "basis_weighted": "average of what is left · since {date}",
+    "basis_last": "by the last exchange · since {date}",
+    "no_wallet": "No {base} → {quote} exchanges yet — new trips count by the Central Bank of Armenia rate",
+    "preference_legend": "New trips count",
+    "preference_personal": "by my rate",
+    "preference_official": "by the central bank rate",
+    "preference_hint": "My rate when there is an exchange; without one a trip takes the central bank rate anyway",
+    "record": "Record an exchange",
+    "list_title": "Exchanges",
+    "row_amounts": "{given} → {received}",
+    "row_rate": "{date} · {rate}",
+    "row_more": "{amount} more than the central bank ({rate}, {date})",
+    "row_less": "{amount} less than the central bank ({rate}, {date})",
+    "row_equal": "exactly the central bank rate ({rate}, {date})",
+    "row_no_official": "no central bank rate for this day — nothing to compare with",
+    "row_fallback": "not the central bank but {source}",
+    "remove": "Delete the exchange {amounts}",
+    "remove_note": "A deleted exchange no longer counts in the rate of new trips. Past trips do not change",
+    "empty": {
+      "title": "No exchanges yet",
+      "body": "Record what you gave and what you got — the rate is worked out for you. Until then trips count by the central bank rate"
+    },
+    "offline": {
+      "title": "No connection",
+      "body": "The exchanges will be shown when the connection is back",
+      "strip": "No connection — an exchange or the rate can be changed when it is back"
+    },
+    "load_error": {
+      "title": "Could not load the exchanges",
+      "body": "The server did not answer properly. Try again"
+    },
+    "failed": "That did not work. Check the connection and try again",
+    "sheet": {
+      "title": "Exchange",
+      "meta": "What you gave and what you got — the rate is worked out for you",
+      "given": "Gave",
+      "received": "Got",
+      "currency": "Currency",
+      "same_currency": "The same currency on both sides is not an exchange",
+      "day": "Day of the exchange",
+      "held": "{currency} held before the exchange",
+      "held_hint": "Optional. With it the rate accounts for what the money left over cost; without it the rate of this exchange is taken",
+      "held_estimate": "By the recorded spending ≈ {amount}",
+      "save": "Save the exchange",
+      "saving": "Saving the exchange…"
+    }
+  },
   "identity": {
     "error": {
       "title": "Could not sign in",
@@ -405,6 +456,7 @@
     "save_unknown": {
       "title": "Connection lost while saving",
       "body": "We will check with the server when it returns. Your edits will stay here."
-    }
+    },
+    "group_money": "Money"
   }
 }

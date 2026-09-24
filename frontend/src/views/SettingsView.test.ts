@@ -160,3 +160,12 @@ it('replaces a previous write error with the offline notice when the connection 
   expect(view.get('.actions button').text()).toBe(en.settings.save)
   expect(view.get('.actions button').attributes('aria-disabled')).toBe('true')
 })
+
+it('leads to «Обмен денег» from the money group, and hides «Доходы» until it exists', async () => {
+  const view = await render()
+  const entry = view.get('a.entry')
+  expect(entry.text()).toBe(en.exchange.title)
+  expect(entry.attributes('href')).toBe('/settings/exchange')
+  expect(view.text()).toContain(en.settings.group_money)
+  expect(view.text()).not.toMatch(/Income/)
+})
