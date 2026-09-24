@@ -58,8 +58,8 @@ test('settings draft survives tabs and offline; another device produces an expli
   expect(response.ok()).toBe(true)
   await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
   // The state by its heading: `ScreenState` hands «title. body» to the app's live region as
-  // well, and `getByText` would match the announcement too (MOL-64). The notices below stay as
-  // they are — the draft card and the docked notice are paragraphs, with no heading to take.
+  // well, and `getByText` would match the announcement too (MOL-64). The docked notice speaks in
+  // the same region through `useSettings`, and has no heading — so it is taken inside `.dock`.
   await expect(
     page.getByRole('heading', {
       name: 'Настройки изменились на другом устройстве',
@@ -68,7 +68,9 @@ test('settings draft survives tabs and offline; another device produces an expli
   ).toBeVisible()
   await expect(city).toHaveValue('Ереван')
   await page.getByRole('button', { name: 'Применить мои изменения', exact: true }).click()
-  await expect(page.getByText('Настройки сохранены', { exact: true })).toBeVisible()
+  await expect(
+    page.locator('.dock').getByText('Настройки сохранены', { exact: true }),
+  ).toBeVisible()
   await page.reload()
   await expect(city).toHaveValue('Ереван')
   await expect(page.getByLabel('Валюта трат', { exact: true })).toHaveValue('USD')
@@ -209,7 +211,7 @@ test('lost save responses remain uncertain until a read confirms the result', as
   })
   await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
   await expect(
-    page.getByText('Связь прервалась во время сохранения', { exact: true }),
+    page.locator('.dock').getByText('Связь прервалась во время сохранения', { exact: true }),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toBeDisabled()
   await testInfo.attach('settings-unknown', {
@@ -219,7 +221,9 @@ test('lost save responses remain uncertain until a read confirms the result', as
   await page.unroute('**/api/actors/me')
   await page.unroute('**/api/actors/me/settings')
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
-  await expect(page.getByText('Настройки сохранены', { exact: true })).toBeVisible()
+  await expect(
+    page.locator('.dock').getByText('Настройки сохранены', { exact: true }),
+  ).toBeVisible()
   await expect(city).toHaveValue('Ереван')
   const save = page.getByRole('button', { name: 'Сохранить', exact: true })
   await expect(save).toHaveAttribute('aria-disabled', 'true')
