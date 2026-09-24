@@ -217,7 +217,7 @@ export default defineComponent({
       },
       refuse: () => void login.refuse(),
       retry: () => void (login.request ? login.poll() : login.begin()),
-      devSignIn: () => void actor.signIn(),
+      devSignIn: () => void login.devSignIn(),
     }
   },
 })

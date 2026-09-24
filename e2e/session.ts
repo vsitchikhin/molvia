@@ -17,9 +17,39 @@ import type { Page } from '@playwright/test'
 const OWNER_KEY = 'molvia.actor'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
-/** Открывает приложение и ждёт, пока оно само войдёт через шов. Отдаёт id владельца. */
+/**
+ * Открывает адрес приложения и, если эта банка cookie ещё без сессии, входит швом разработки
+ * (MOL-56).
+ *
+ * До MOL-56 приложение входило само, и тесту хватало `page.goto`. Теперь всё приложение за
+ * экраном входа — это и есть то, что задача делает, — а швом входят там же, где хотели
+ * оказаться: лишняя навигация на `/` добавила бы записей в историю, по которой половина
+ * `navigation.spec` и меряет «назад».
+ *
+ * Шаг «в чей аккаунт вошли» шов не показывает намеренно: он существует ради чужого
+ * подтверждения по утёкшей ссылке, а здесь человек входит сам и никакого Telegram в этом нет.
+ */
+/**
+ * Оба языка, потому что вход стоит перед каждым экраном, а язык спеки выбирает сама:
+ * `settings.spec` идёт по-русски, остальные по-английски.
+ */
+export const DEV_SEAM = /^(Sign in for development|Войти для разработки)$/
+const LOGIN_TITLE = /^(Sign in|Вход)$/
+
+export async function open(page: Page, path = '/'): Promise<void> {
+  const first = !(await page.context().cookies()).some((one) => one.name === SESSION_COOKIE)
+  await page.goto(path)
+  if (!first) return
+  await page.getByRole('button', { name: DEV_SEAM }).click()
+  // Дождаться, пока дверь откроется, а не просто нажать: тест, который пойдёт дальше сразу,
+  // успевает перезагрузить страницу раньше, чем браузер запишет cookie сессии. Заголовок
+  // экрана входа — единственное, что есть у него и чего нет ни у одного экрана приложения.
+  await expect(page.getByRole('heading', { level: 1 })).not.toHaveText(LOGIN_TITLE)
+}
+
+/** Открывает приложение, входит и отдаёт id владельца. */
 export async function signedIn(page: Page): Promise<string> {
-  await page.goto('/')
+  await open(page)
   const owner = () => page.evaluate((key) => localStorage.getItem(key) ?? '', OWNER_KEY)
   // Вход случается после первой отрисовки, поэтому владелец появляется мгновением позже.
   await expect.poll(owner).toMatch(UUID)

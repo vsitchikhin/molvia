@@ -301,15 +301,17 @@ describe('a session the server does not know', () => {
     expect(identity.currentIdentity()).toBe(FIRST.id)
   })
 
-  it('says «error» when the seam cannot sign in either', async () => {
+  it('провал шва двери не открывает — что сказать, решает экран входа', async () => {
+    // `error` показывает приложение с плашкой (MOL-19), а здесь приложения ещё нет: человек
+    // только что нажал «войти», и ответ ему принадлежит этому экрану (MOL-56).
     const { store } = await freshStore()
     me.mockRejectedValue(await refusal())
     devLogin.mockRejectedValue(new Error('fetch failed'))
 
     await store.start()
-    await store.signIn()
 
-    expect(store.state).toBe('error')
+    await expect(store.signIn()).resolves.toBe(false)
+    expect(store.state).toBe('signed-out')
   })
 
   it('does not call it a lost session when the network is at fault', async () => {

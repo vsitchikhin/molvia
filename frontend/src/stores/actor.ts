@@ -122,13 +122,18 @@ export const useActorStore = defineStore('actor', () => {
    * It signed the app in automatically until now, which made the screen this epic exists for
    * invisible in every working copy and unreachable to the end-to-end suite.
    */
-  async function signIn(): Promise<void> {
+  async function signIn(): Promise<boolean> {
     state.value = 'loading'
     try {
       settle(await api.devLogin())
       state.value = 'ready'
+      return true
     } catch (error) {
-      fail(error)
+      // Провал входа дверь не открывает: `error` показывает приложение с плашкой, а здесь
+      // приложения ещё нет. Что сказать человеку, решает экран входа — своим состоянием.
+      console.error('[molvia] шов разработки не впустил', error)
+      state.value = 'signed-out'
+      return false
     }
   }
 

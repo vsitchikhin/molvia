@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { SESSION_COOKIE } from '@molvia/model'
 import type { Page } from '@playwright/test'
+import { open } from './session'
 import { recordLiveRegion } from './live-region'
 
 /**
@@ -29,9 +30,8 @@ test('keeps the session across a reload, and no script can read it', async ({ pa
     if (header) identifiers.push(header)
   })
 
-  await page.goto('/')
+  await open(page)
 
-  // Signing in happens after the first paint, so the cookie appears a moment later.
   await expect.poll(async () => (await sessionCookie(page))?.value).toMatch(/^[A-Za-z0-9_-]{43}$/)
   const session = await sessionCookie(page)
 
@@ -48,14 +48,14 @@ test('keeps the session across a reload, and no script can read it', async ({ pa
   await page.reload()
 
   expect((await sessionCookie(page))?.value).toBe(session?.value)
-  await expect(page.getByRole('heading', { name: 'Could not sign in' })).toBeHidden()
+  await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Sign in')
   expect(identifiers).toEqual([])
 })
 
 test('remembers whose drawer this is, so an offline launch finds its own', async ({ page }) => {
   // The owner id stays on the device — not as a credential, as the key the trip queue and the
   // recent items are filed under, read before the server can be asked (MOL-53, Р-9).
-  await page.goto('/')
+  await open(page)
 
   await expect.poll(() => knownOwner(page)).toMatch(UUID)
   const owner = await knownOwner(page)
@@ -70,16 +70,18 @@ test('a session that is gone brings back the same owner, not a new person', asyn
   // новый Telegram-id на каждый вызов, и истёкшая сессия делала человека другим — а всё, что
   // устройство сложило под прежнего (неотправленная очередь похода в первую очередь), оставалось
   // недостижимым. Проверяется в браузере, потому что держится это на двух настоящих cookie.
-  await page.goto('/')
+  await open(page)
   await expect.poll(() => knownOwner(page)).toMatch(UUID)
   const owner = await knownOwner(page)
 
   // Ровно то, что делает истечение или отзыв: сессии нет, аккаунт остался.
-  const kept = (await page.context().cookies()).filter((one) => one.name !== SESSION_COOKIE)
-  await page.context().clearCookies()
-  await page.context().addCookies(kept)
+  await page.context().clearCookies({ name: SESSION_COOKIE })
 
   await page.reload()
+
+  // Экран входа, а не пустое приложение и не новый человек (MOL-56): входим снова тем же швом.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in')
+  await page.getByRole('button', { name: 'Sign in for development' }).click()
 
   await expect.poll(async () => (await sessionCookie(page))?.value).toMatch(/^[A-Za-z0-9_-]{43}$/)
   expect(await knownOwner(page)).toBe(owner)
@@ -87,17 +89,21 @@ test('a session that is gone brings back the same owner, not a new person', asyn
 
 // The identity's error is polite, so the region is its only way to a screen reader. «Try again»
 // failing the same way must be heard again, not swallowed as «no change» (MOL-19, C1).
+//
+// Сервер, который не ответил, — это не «сессии нет»: сессия может быть жива за порталом кафе,
+// поэтому приложение показывается с плашкой, а не дверью (MOL-56).
 test('the same answer after «Try again» is said again', async ({ page }) => {
   const said = await recordLiveRegion(page)
-  await page.route('**/api/dev/login**', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await page.route('**/api/actors/me**', (route) => route.fulfill({ status: 500, body: '{}' }))
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Could not sign in' })).toBeVisible()
+  const notice = 'Could not check the sign-in'
+  await expect(page.getByRole('heading', { name: notice })).toBeVisible()
   await expect
-    .poll(async () => (await said()).filter((text) => text.includes('Could not sign in')))
+    .poll(async () => (await said()).filter((text) => text.includes(notice)))
     .toHaveLength(1)
 
   await page.getByRole('button', { name: 'Try again' }).click()
   await expect
-    .poll(async () => (await said()).filter((text) => text.includes('Could not sign in')))
+    .poll(async () => (await said()).filter((text) => text.includes(notice)))
     .toHaveLength(2)
 })

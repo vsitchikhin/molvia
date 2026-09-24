@@ -185,6 +185,15 @@ export const useLoginStore = defineStore('login', () => {
     }
   }
 
+  /**
+   * Вход швом разработки: в прод-сборке его нет вовсе, а здесь он такой же исход, как и
+   * настоящий вход, — и провал остаётся на этом экране, а не открывает приложение с плашкой.
+   */
+  async function devSignIn(): Promise<void> {
+    failure.value = null
+    if (!(await actor.signIn())) failure.value = navigator.onLine ? 'error' : 'offline'
+  }
+
   /** «Открыть Telegram» again — the same link, never a second request (see `begin`). */
   function again(): void {
     if (request.value) open(request.value.url)
@@ -276,6 +285,7 @@ export const useLoginStore = defineStore('login', () => {
     request,
     unconfirmed,
     begin,
+    devSignIn,
     again,
     restart,
     poll,
