@@ -221,9 +221,11 @@ describe('кнопки', () => {
     expect(sent(calls, 'editMessageText')?.text).toContain('Вход отклонён')
   })
 
-  it('нажатая второй раз кнопка второго входа не выдаёт', async () => {
-    // Держит это API: `confirm` берёт строку, только пока она ждёт ответа. Бот обязан
-    // показать это мёртвой ссылкой, а не «готово» второй раз.
+  it('второе нажатие не выдаёт второго входа и не затирает подтверждение', async () => {
+    // Оба нажатия уходят раньше, чем правка первого долетела: кнопки ещё на экране, а у полки
+    // на медленной связи это обычное дело. Второго входа не выдаёт API — `confirm` берёт
+    // строку, только пока она ждёт ответа. А бот обязан не превратить это в ложь: отказ
+    // показывается **над** сообщением и оставляет «Вход подтверждён» последним словом (О-1).
     const confirmLogin = vi
       .fn()
       .mockResolvedValueOnce(undefined)
@@ -235,23 +237,84 @@ describe('кнопки', () => {
 
     expect(confirmLogin).toHaveBeenCalledTimes(2)
     const edits = calls.filter((call) => call.method === 'editMessageText')
+    expect(edits).toHaveLength(1)
     expect(String(edits[0]?.payload.text)).toContain('Вход подтверждён')
-    expect(String(edits[1]?.payload.text)).toContain('больше не действует')
+    expect(calls.filter((call) => call.method === 'sendMessage')).toEqual([])
+    const answers = calls.filter((call) => call.method === 'answerCallbackQuery')
+    expect(String(answers.at(-1)?.payload.text)).toContain('больше не действует')
   })
 
-  it('часик на кнопке гасится и тогда, когда ответить не удалось вовсе', async () => {
-    // Ни переписать, ни прислать заново — то есть Telegram отказывает на обоих путях. Ответ
-    // человек потеряет, но крутящийся часик под пальцем остаётся навсегда, поэтому гашение
-    // стоит в `finally`, а не следом за удачей.
+  it('«Это не я» дважды — «никто не вошёл» остаётся последним словом', async () => {
+    // Зеркало предыдущего: человеку, который только что сказал «это не я», нельзя ответить
+    // предложением войти заново.
+    const declineLogin = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new ApiError(ERROR.LOGIN_UNAVAILABLE))
+    const { bot, calls } = harness({ declineLogin })
+
+    await bot.handleUpdate(press(`login:no:${CODE}`))
+    await bot.handleUpdate(press(`login:no:${CODE}`))
+
+    const said = calls
+      .filter((call) => call.method === 'editMessageText' || call.method === 'sendMessage')
+      .map((call) => String(call.payload.text))
+    expect(said).toEqual(['Вход отклонён. В аккаунт никто не вошёл.'])
+  })
+
+  it('сбой API оставляет кнопки на месте — «попробуйте ещё раз» иначе не о чем', async () => {
+    // Мёртвой ссылке нажимать нечего, и кнопки у неё снимаются. А у «API не ответил» —
+    // ровно наоборот: текст просит повторить, и повторять должно быть чем (О-3).
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { bot, calls } = harness({
+      confirmLogin: vi.fn().mockRejectedValue(new ApiError(ERROR.INTERNAL, 'down', false)),
+    })
+
+    await bot.handleUpdate(press(`login:ok:${CODE}`))
+
+    expect(calls.filter((call) => call.method === 'editMessageReplyMarkup')).toEqual([])
+    expect(calls.filter((call) => call.method === 'editMessageText')).toEqual([])
+    expect(String(sent(calls, 'answerCallbackQuery')?.text)).toContain('Попробуйте ещё раз')
+  })
+
+  it('мёртвая ссылка снимает кнопки, ничего не переписывая', async () => {
+    const { bot, calls } = harness({
+      confirmLogin: vi.fn().mockRejectedValue(new ApiError(ERROR.LOGIN_UNAVAILABLE)),
+    })
+
+    await bot.handleUpdate(press(`login:ok:${CODE}`))
+
+    expect(calls.filter((call) => call.method === 'editMessageText')).toEqual([])
+    expect(calls.some((call) => call.method === 'editMessageReplyMarkup')).toBe(true)
+  })
+
+  it('часик гасится и тогда, когда переписать сообщение не удалось вовсе', async () => {
+    // Подтверждение прошло, а Telegram отказывает на обоих путях ответа. Ответ человек
+    // потеряет, но часик под пальцем остаться крутиться не должен, поэтому гашение стоит
+    // впереди правки, а не следом за ней.
     const { bot, calls } = harness(
-      { confirmLogin: vi.fn().mockRejectedValue(new ApiError(ERROR.INTERNAL, 'down', false)) },
+      { confirmLogin: vi.fn().mockResolvedValue(undefined) },
       { failing: ['editMessageText', 'sendMessage'] },
     )
 
     await expect(bot.handleUpdate(press(`login:ok:${CODE}`))).rejects.toThrow()
 
     expect(calls.some((call) => call.method === 'answerCallbackQuery')).toBe(true)
+  })
+
+  it('сбой Telegram после удачного подтверждения не называется сбоем входа', async () => {
+    // Раньше `settle` стоял внутри того же `try`, что и вызов API: упавшая правка приводила
+    // к «Не получилось, попробуйте ещё раз» поверх уже выданной сессии и к строке в логе,
+    // называющей сломанным не то (З-4).
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { bot } = harness(
+      { confirmLogin: vi.fn().mockResolvedValue(undefined) },
+      { failing: ['editMessageText', 'sendMessage'] },
+    )
+
+    await expect(bot.handleUpdate(press(`login:ok:${CODE}`))).rejects.toThrow()
+
+    expect(log).not.toHaveBeenCalled()
   })
 
   it('кнопка с пустым кодом — мёртвая ссылка, а не вечный часик', async () => {
@@ -263,8 +326,22 @@ describe('кнопки', () => {
     await bot.handleUpdate(press('login:no:'))
 
     expect(declineLogin).toHaveBeenCalledExactlyOnceWith('')
-    expect(sent(calls, 'editMessageText')?.text).toContain('больше не действует')
-    expect(calls.some((call) => call.method === 'answerCallbackQuery')).toBe(true)
+    expect(String(sent(calls, 'answerCallbackQuery')?.text)).toContain('больше не действует')
+  })
+
+  it('кнопка формата, которого бот не знает, тоже гасится', async () => {
+    // Вопросы, уже разосланные людям, живут в чатах вечно, и смена формата кнопки —
+    // ровно то, что делал коммит 0708da3. Без этого часик у нажавшего не остановится (О-7).
+    const confirmLogin = vi.fn()
+    const { bot, calls } = harness({ confirmLogin })
+
+    await bot.handleUpdate(press(`auth:ok:${CODE}`))
+    await bot.handleUpdate(press('login:ok'))
+
+    expect(confirmLogin).not.toHaveBeenCalled()
+    const answers = calls.filter((call) => call.method === 'answerCallbackQuery')
+    expect(answers).toHaveLength(2)
+    for (const answer of answers) expect(String(answer.payload.text)).toContain('не действует')
   })
 
   it('сообщение, которое нельзя переписать, отвечается новым', async () => {
@@ -293,6 +370,33 @@ describe('чужой чат и прочие сообщения', () => {
 
     expect(previewLogin).not.toHaveBeenCalled()
     expect(confirmLogin).not.toHaveBeenCalled()
+    expect(calls).toEqual([])
+  })
+
+  it('служебные сообщения приветствием не встречаются', async () => {
+    // Telegram называет сообщением и закреп, и выданное право писать, и — с 0.3 — оплату
+    // звёздами за чаевые. «Вход начинается в приложении» в ответ на каждое из них — не то,
+    // о чём был Q5: там сказано «произвольный текст» (О-6).
+    const { bot, calls } = harness()
+    const service = (over: Record<string, unknown>): Update => ({
+      update_id: 3,
+      message: { message_id: 11, date: 0, chat: CHAT, from: FROM, ...over },
+    })
+
+    await bot.handleUpdate(service({ pinned_message: { message_id: 10, date: 0, chat: CHAT } }))
+    await bot.handleUpdate(service({ write_access_allowed: { from_request: true } }))
+    await bot.handleUpdate(
+      service({
+        successful_payment: {
+          currency: 'XTR',
+          total_amount: 50,
+          invoice_payload: 'tip',
+          telegram_payment_charge_id: 'c',
+          provider_payment_charge_id: 'p',
+        },
+      }),
+    )
+
     expect(calls).toEqual([])
   })
 

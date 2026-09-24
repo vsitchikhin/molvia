@@ -13,7 +13,7 @@ export const en: Dictionary = {
     'Sign in to Molvia?\n' +
     'Device: {device}\n' +
     'Requested {when}.\n\n' +
-    'If this was not you, tap «Not me» — nothing will happen.',
+    'If this was not you, tap “Not me” — nothing will happen.',
   'login.device_unknown': 'unknown device',
   'login.when.now': 'less than a minute ago',
   'login.when.one': 'a minute ago',

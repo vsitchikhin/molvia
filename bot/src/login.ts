@@ -81,7 +81,12 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
       .text(t(language, 'login.decline'), buttonData('no', code))
   }
 
-  /** The answer replaces the question, so the buttons go with it (Q6). */
+  /**
+   * The answer replaces the question, so the buttons go with it (Q6).
+   *
+   * **Only an outcome may be written here** — confirmed or declined. A refusal is shown over
+   * the message instead of in it, for the reason spelled out on the handler below.
+   */
   async function settle(ctx: Context, key: MessageKey): Promise<void> {
     const text = t(ctx.from?.language_code, key)
     try {
@@ -90,6 +95,15 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
     } catch {
       // Too old to edit, or the message is gone — the answer still has to arrive.
       await ctx.reply(text)
+    }
+  }
+
+  /** Buttons that can no longer do anything, taken away without touching what was written. */
+  async function dropKeyboard(ctx: Context): Promise<void> {
+    try {
+      await ctx.editMessageReplyMarkup()
+    } catch {
+      // Already gone, or the message is: neither changes what the person is looking at.
     }
   }
 
@@ -123,32 +137,79 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
     }
   })
 
+  /**
+   * A press. **An outcome is written into the message; a refusal is only shown over it.**
+   *
+   * The two were one path at first, and a double tap then ended in a lie (adversarial О-1):
+   * both presses leave before the first edit reaches the phone — the buttons are still on
+   * screen, which at a shelf on a slow connection is the ordinary case — so the second press
+   * was answered `login_unavailable` by the API, quite correctly, and **overwrote «Вход
+   * подтверждён» with «Начните вход заново»**. The login had happened; the last thing written
+   * in the chat said it had not, and a person who does as told starts a second one. «Это не я»
+   * had the mirror image of it: «в аккаунт никто не вошёл» replaced by an invitation to sign in.
+   *
+   * So a refusal goes to `answerCallbackQuery`, which is shown over whatever the message says
+   * and cannot rewrite it. What happens to the buttons then depends on the kind of refusal, and
+   * that distinction is the whole of О-3: a dead link has nothing left to press, while «the API
+   * did not answer, try again» must keep the very buttons it is asking for.
+   */
   privately.callbackQuery(BUTTON_DATA, async (ctx) => {
     const [, action, code = ''] = ctx.match
     const confirming = action === 'ok'
+
+    // The API call alone is inside the `try`. With the answer to the person in there too, a
+    // Telegram failure **after** a login had been confirmed was caught here and reported as a
+    // failure of the login — «Не получилось, попробуйте ещё раз» over a session already
+    // granted, and a log line naming the wrong thing as broken (selfreview З-4).
+    let refused: MessageKey | null = null
     try {
       if (confirming) {
         // `ctx.from.id` and nothing else: the account is Telegram's word, which is the only
         // thing in this flow the API cannot check for itself.
         await api.confirmLogin(code, ctx.from.id)
-        await settle(ctx, 'login.confirmed')
       } else {
         await api.declineLogin(code)
-        await settle(ctx, 'login.declined')
       }
     } catch (error) {
-      // A second press lands here: the request is no longer waiting, so it reads as a dead
-      // link — and no second session is handed out, because the API never gave one.
-      await settle(ctx, refusal(error, confirming ? 'confirm login' : 'decline login'))
-    } finally {
-      // Always, or the button keeps spinning under the person's finger.
-      await ctx.answerCallbackQuery()
+      refused = refusal(error, confirming ? 'confirm login' : 'decline login')
     }
+
+    if (refused === null) {
+      // Answered first, so the spinner stops even if the edit below cannot be made.
+      await ctx.answerCallbackQuery()
+      await settle(ctx, confirming ? 'login.confirmed' : 'login.declined')
+      return
+    }
+
+    await ctx.answerCallbackQuery({
+      text: t(ctx.from.language_code, refused),
+      // Over the message rather than under the top edge of the screen: this is the one thing
+      // the person has to read, and a toast at a shelf is easy to miss.
+      show_alert: true,
+    })
+    if (refused === 'login.unavailable') await dropKeyboard(ctx)
   })
 
-  // Anything else said to the bot: the greeting, so it never looks dead. By MOL-58 this is
-  // where a request to delete an account arrives, and silence would be the wrong answer to it.
-  privately.on('message', async (ctx) => {
+  /**
+   * A press this bot no longer understands — a button whose format has changed since it was
+   * sent, and `0708da3` is the commit that changed one. Questions already sent stay in their
+   * chats forever, so without this the spinner under that finger never stops (О-7).
+   */
+  privately.on('callback_query', async (ctx) => {
+    await ctx.answerCallbackQuery({
+      text: t(ctx.from.language_code, 'login.unavailable'),
+      show_alert: true,
+    })
+    await dropKeyboard(ctx)
+  })
+
+  // Anything else **written** to the bot: the greeting, so it never looks dead. By MOL-58 this
+  // is where a request to delete an account arrives, and silence would be the wrong answer.
+  //
+  // `message:text`, not `message`: Telegram calls a pinned message, a granted write permission
+  // and — from 0.3 — a Stars payment «messages» too, and every one of them was being greeted
+  // with «вход начинается в приложении» (О-6). Q5 said «произвольный текст», and this is that.
+  privately.on('message:text', async (ctx) => {
     await ctx.reply(t(ctx.from.language_code, 'start.greeting', { url: appUrl }))
   })
 

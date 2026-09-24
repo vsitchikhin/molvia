@@ -39,7 +39,9 @@ Telegram bot token. The backend and bot receive the same internal secret; only t
 receives `TELEGRAM_BOT_TOKEN`. Production refuses to start without the username and internal
 secret, and the bot itself exits without either its token or the internal secret.
 `APP_BASE_URL` is what the bot's greeting points people at: compose derives it from `DOMAIN`,
-and a working copy that leaves it out gets its own PWA port. Caddy returns 404 for `/api/internal` and `/api/internal/*`; the bot calls
+and a working copy that leaves it out gets its own PWA port. A variable that is present but
+malformed is a different matter: the bot names it and exits 1, so the mistake is not quietly
+restarted past. Caddy returns 404 for `/api/internal` and `/api/internal/*`; the bot calls
 `http://backend:3300/internal/...` directly over the compose network and authenticates there.
 
 In a development copy with an older `.env`, run `bin/init-env.sh <index> --force` once. It
