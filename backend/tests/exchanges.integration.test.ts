@@ -1,0 +1,299 @@
+import { randomUUID } from 'node:crypto'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { ERROR, exchangesResponseCodec, parseRate, yerevanDate } from '@molvia/model'
+import type { CachedRate, ExchangesResponse } from '@molvia/model'
+import type { FastifyInstance } from 'fastify'
+import { createRateRepository } from '@/db/rates-repository'
+import { exchanges } from '@/db/schema'
+import { buildServer } from '@/server'
+import { connectDrizzle } from './db'
+import { clearAll, insertActor, signIn } from './fixtures'
+
+const { db, close } = connectDrizzle()
+const rates = createRateRepository(db)
+let app: FastifyInstance
+
+beforeAll(async () => {
+  app = buildServer({ db })
+  await app.ready()
+})
+beforeEach(async () => {
+  await clearAll(db)
+})
+afterAll(async () => {
+  await app.close()
+  await clearAll(db)
+  await close()
+})
+
+const today = yerevanDate(new Date())
+const daysAgo = (days: number): string =>
+  yerevanDate(new Date(Date.now() - days * 24 * 60 * 60 * 1000))
+const rub = (value: string, date: string): CachedRate => ({
+  provider: 'cba',
+  currency: 'RUB',
+  date,
+  scaled: parseRate(value),
+  jump: false,
+})
+
+function payload(patch: Record<string, unknown> = {}) {
+  return {
+    id: randomUUID(),
+    given: { amount: '20000', currency: 'RUB' },
+    received: { amount: '100000', currency: 'AMD' },
+    exchangedOn: daysAgo(10),
+    ...patch,
+  }
+}
+
+function overviewOf(json: unknown): ExchangesResponse {
+  return exchangesResponseCodec.parse(json)
+}
+
+async function owner(): Promise<{ id: string; cookie: string }> {
+  const id = await insertActor(db)
+  return { id, cookie: await signIn(db, id) }
+}
+
+describe('«Обмен денег» через API (MOL-40)', () => {
+  it('без обменов: свой источник, пара из настроек, кошелька и подсказки нет', async () => {
+    const { cookie } = await owner()
+    const response = await app.inject({ method: 'GET', url: '/exchanges', headers: { cookie } })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.json()).toEqual({
+      preference: 'personal',
+      pair: { base: 'RUB', quote: 'AMD' },
+      wallet: null,
+      heldEstimate: null,
+      exchanges: [],
+    })
+  })
+
+  it('пример владельца: 20 000 → 100 000, потом 20 000 → 95 000 при остатке 20 000', async () => {
+    const { cookie } = await owner()
+    const first = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload({ exchangedOn: daysAgo(10) }),
+    })
+    expect(first.statusCode).toBe(201)
+    expect(first.json()).toMatchObject({ wallet: { rate: { rate: '5.000000' }, basis: 'last' } })
+
+    const second = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload({
+        received: { amount: '95000', currency: 'AMD' },
+        heldBefore: { amount: '20000', currency: 'AMD' },
+        exchangedOn: daysAgo(2),
+      }),
+    })
+    expect(second.statusCode).toBe(201)
+    expect(second.json()).toMatchObject({
+      wallet: {
+        rate: { base: 'RUB', quote: 'AMD', rate: '4.791667', source: 'personal' },
+        basis: 'weighted',
+      },
+      // Nothing spent since: what the last exchange left, and nothing else is known.
+      heldEstimate: { amount: '115000.00', currency: 'AMD' },
+    })
+    const list = overviewOf(second.json()).exchanges
+    expect(list.map((exchange) => exchange.exchangedOn)).toEqual([daysAgo(2), daysAgo(10)])
+  })
+
+  it('сравнивает каждый обмен с ЦБ РА на его день, со знаком', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(11)), rub('5.5000', daysAgo(3))])
+    const { cookie } = await owner()
+    await app.inject({ method: 'POST', url: '/exchanges', headers: { cookie }, payload: payload() })
+    const response = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload({ exchangedOn: daysAgo(2) }),
+    })
+
+    const { exchanges: list } = overviewOf(response.json())
+    // 20 000 × 5.5 = 110 000 ֏ at the bank; the exchanger gave 100 000.
+    expect(list[0]?.official).toMatchObject({
+      provider: 'cba',
+      difference: { minor: -1_000_000n, currency: 'AMD' },
+    })
+    // 20 000 × 4.3123 = 86 246 ֏; the exchanger gave 13 754 more.
+    expect(list[1]?.official?.difference).toEqual({ minor: 1_375_400n, currency: 'AMD' })
+    expect(list[1]?.official?.rate.scaled).toBe(parseRate('4.3123'))
+  })
+
+  it('без курса ЦБ на тот день обмен записан, но без сравнения', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(1))])
+    const { cookie } = await owner()
+    const response = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload(),
+    })
+    expect(response.statusCode).toBe(201)
+    expect(overviewOf(response.json()).exchanges[0]?.official).toBeNull()
+  })
+
+  it('повтор тем же id — 200 и один обмен', async () => {
+    const { cookie } = await owner()
+    const body = payload()
+    await app.inject({ method: 'POST', url: '/exchanges', headers: { cookie }, payload: body })
+    const again = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: body,
+    })
+    expect(again.statusCode).toBe(200)
+    expect(await db.select().from(exchanges)).toHaveLength(1)
+  })
+
+  it('завтрашний день — отказ; сегодняшний — можно', async () => {
+    const { cookie } = await owner()
+    const tomorrow = yerevanDate(new Date(Date.now() + 24 * 60 * 60 * 1000))
+    const future = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload({ exchangedOn: tomorrow }),
+    })
+    expect(future.statusCode).toBe(400)
+    expect(future.json()).toEqual({ code: ERROR.EXCHANGE_IN_FUTURE })
+
+    const now = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload({ exchangedOn: today }),
+    })
+    expect(now.statusCode).toBe(201)
+  })
+
+  it('тело чужого формата — 400 до записи', async () => {
+    const { cookie } = await owner()
+    for (const bad of [
+      payload({ actorId: randomUUID() }),
+      payload({ received: { amount: '5', currency: 'RUB' } }),
+      payload({ given: { amount: '0', currency: 'RUB' } }),
+      payload({ exchangedOn: '2026-02-31' }),
+    ]) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/exchanges',
+        headers: { cookie },
+        payload: bad,
+      })
+      expect(response.statusCode).toBe(400)
+    }
+    expect(await db.select().from(exchanges)).toEqual([])
+  })
+
+  it('чужой обмен: не виден, не удаляется, и его id не занять', async () => {
+    const stranger = await owner()
+    const me = await owner()
+    const body = payload()
+    await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: stranger.cookie },
+      payload: body,
+    })
+
+    const mine = await app.inject({
+      method: 'GET',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+    })
+    expect(mine.json()).toMatchObject({ exchanges: [] })
+
+    const taken = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: body,
+    })
+    expect(taken.statusCode).toBe(409)
+
+    for (const id of [body.id, randomUUID(), 'not-a-uuid']) {
+      const removed = await app.inject({
+        method: 'DELETE',
+        url: `/exchanges/${id}`,
+        headers: { cookie: me.cookie },
+      })
+      expect(removed.statusCode, id).toBe(200)
+    }
+    expect(await db.select().from(exchanges)).toHaveLength(1)
+  })
+
+  it('удаление своего пересчитывает кошелёк', async () => {
+    const { cookie } = await owner()
+    await app.inject({ method: 'POST', url: '/exchanges', headers: { cookie }, payload: payload() })
+    const second = payload({
+      received: { amount: '95000', currency: 'AMD' },
+      heldBefore: { amount: '20000', currency: 'AMD' },
+      exchangedOn: daysAgo(2),
+    })
+    await app.inject({ method: 'POST', url: '/exchanges', headers: { cookie }, payload: second })
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/exchanges/${second.id.toUpperCase()}`,
+      headers: { cookie },
+    })
+    expect(response.json()).toMatchObject({ wallet: { rate: { rate: '5.000000' }, basis: 'last' } })
+  })
+
+  it('источник переключается и держится', async () => {
+    const { cookie } = await owner()
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/actors/me/rate-preference',
+      headers: { cookie },
+      payload: { preference: 'official' },
+    })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({ preference: 'official' })
+    const read = await app.inject({ method: 'GET', url: '/exchanges', headers: { cookie } })
+    expect(read.json()).toMatchObject({ preference: 'official' })
+
+    const bad = await app.inject({
+      method: 'PUT',
+      url: '/actors/me/rate-preference',
+      headers: { cookie },
+      payload: { preference: 'fallback' },
+    })
+    expect(bad.statusCode).toBe(400)
+  })
+
+  it('без сессии — 401 на каждой ручке', async () => {
+    for (const [method, url] of [
+      ['GET', '/exchanges'],
+      ['POST', '/exchanges'],
+      ['DELETE', `/exchanges/${randomUUID()}`],
+      ['PUT', '/actors/me/rate-preference'],
+    ] as const) {
+      const response = await app.inject({ method, url, payload: {} })
+      expect(response.statusCode, url).toBe(401)
+    }
+  })
+
+  it('одна валюта в настройках — пары нет, но обмены показываются', async () => {
+    const id = await insertActor(db, { incomeCurrency: 'AMD' })
+    const cookie = await signIn(db, id)
+    const response = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload(),
+    })
+    expect(response.json()).toMatchObject({ pair: null, wallet: null, heldEstimate: null })
+    expect(overviewOf(response.json()).exchanges).toHaveLength(1)
+  })
+})

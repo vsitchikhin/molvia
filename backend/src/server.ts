@@ -17,6 +17,7 @@ import { catalogueRoutes } from '@/routes/catalogue'
 import { placeRoutes } from '@/routes/places'
 import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
+import { exchangeRoutes } from '@/routes/exchanges'
 import { advice } from '@/usecases/advice'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
@@ -31,6 +32,12 @@ import { pendingVerdicts } from '@/usecases/pending-verdicts'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { signIn } from '@/usecases/sign-in'
 import { chooseTripRate } from '@/usecases/choose-trip-rate'
+import {
+  chooseRatePreference,
+  exchangesOverview,
+  recordExchange,
+  removeExchange,
+} from '@/usecases/exchanges'
 import { createSettingsRepository } from '@/db/settings-repository'
 import { saveSettings } from '@/usecases/save-settings'
 import { settingsRoute } from '@/routes/settings'
@@ -297,6 +304,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         finish: (actorId, tripId, deviceAt) =>
           finishTrip(tripData.trips, actorId, tripId, deviceAt),
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
+      })
+      exchangeRoutes(guarded, {
+        overview: (actor) => exchangesOverview(tripData, actor),
+        record: (actor, body) => recordExchange(tripData, actor, body),
+        remove: (actor, id) => removeExchange(tripData, actor, id),
+        prefer: (actor, preference) => chooseRatePreference(tripData, actor, preference),
       })
       adviceRoutes(guarded, {
         advice: (actorId) =>

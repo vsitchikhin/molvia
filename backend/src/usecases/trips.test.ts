@@ -14,6 +14,7 @@ import type { ExpenseRepository } from '@/db/expenses-repository'
 import type { ItemRepository } from '@/db/items-repository'
 import type { PlaceRepository } from '@/db/places-repository'
 import type { RateRepository } from '@/db/rates-repository'
+import type { ExchangeRepository } from '@/db/exchanges-repository'
 import type { SearchPickRepository } from '@/db/search-picks-repository'
 import type { TripRepository, TripSnapshot } from '@/db/trips-repository'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
@@ -100,6 +101,7 @@ function fakeRepositories(
     items?: Partial<ItemRepository>
     searchPicks?: Partial<SearchPickRepository>
     rates?: Partial<RateRepository>
+    exchanges?: Partial<ExchangeRepository>
   } = {},
 ): TripRepositories {
   return {
@@ -150,6 +152,15 @@ function fakeRepositories(
       history: unexpected('rates.history'),
       lastFetchedAt: unexpected('rates.lastFetchedAt'),
       ...overrides.rates,
+    },
+    exchanges: {
+      add: unexpected('exchanges.add'),
+      remove: unexpected('exchanges.remove'),
+      list: unexpected('exchanges.list'),
+      spentSince: unexpected('exchanges.spentSince'),
+      preference: unexpected('exchanges.preference'),
+      setPreference: unexpected('exchanges.setPreference'),
+      ...overrides.exchanges,
     },
   }
 }
