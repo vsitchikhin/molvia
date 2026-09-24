@@ -1261,19 +1261,17 @@ Development still gets a session from `POST /dev/login`, a seam that **is not in
 bundle at all** — the bundler folds its guard to a constant and the module is tree-shaken away,
 which a test asserts against the built file rather than against the intention; the PWA's call to
 it is behind `import.meta.env.DEV`, so the production bundle does not hold it either.
-**MOL-56 inherits one thing from the bot's review:** the «Это не я» above rescues a hijacked
-login only while the browser is not polling. With the login screen open and polling, a stranger
-confirms and the session is collected in a cycle or two — before the person can even open
-Telegram. Only the screen can close that, by showing **whose** account was entered before
-letting anyone further in.
-
 MOL-54 added the real API: browser start/poll and internal bot preview/confirm/decline, shared
 contracts and separate clients. Production requires `TELEGRAM_BOT_USERNAME` and `BOT_API_SECRET`.
 MOL-55 gave the bot its half: `/start <code>` names the device and the age of the request and
 offers «Войти» and «Это не я», the answer replaces the question so its buttons go with it, and
 five kinds of dead code get one reply. With it the bot got a dictionary of its own and
 `pickLocale` moved into `packages/model`, where the PWA now reads it from too. The user-facing
-flow still needs the PWA screen (MOL-56).
+flow still needs the PWA screen (MOL-56). **And that screen inherits one thing from the bot's
+review:** the «Это не я» above rescues a hijacked login only while the browser is not polling.
+With the login screen open and polling, a stranger confirms and the session is collected in a
+cycle or two — before the person can even open Telegram. Only the screen can close that, by
+showing **whose** account was entered before letting anyone further in.
 
 MOL-65 gave the person their four fields and a fourth tab: Armenia, Гюмри or Ереван, the currency
 purchases are written in and the one they are converted into. `PUT /actors/me/settings` compares
