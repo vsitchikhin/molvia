@@ -111,13 +111,27 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
   }
 
   /**
-   * A refusal, shown **over** the message and never written into it (О-1).
+   * A refusal, shown **over** the message and never left in the chat under it (О-1).
    *
-   * The alert is the whole channel here, so its failure cannot be the end of the matter: a
-   * press that waited out the client's fifteen-second timeout is exactly what this branch
-   * meets, and Telegram refuses to answer a query that old. That left «не дождался ответа»
-   * reaching nobody at all — the chat still showed the question, as if nothing had been
-   * pressed (adversarial В1). A plain message is a poorer place for it and the right fallback.
+   * The alert is the whole channel, and its failure cannot be the end of the matter: a press
+   * that waited out the client's fifteen-second timeout is exactly what this branch meets, and
+   * Telegram will not answer a query that old. That left «не дождался ответа» reaching nobody —
+   * the chat still showed the question, as if nothing had been pressed (В1).
+   *
+   * **The fallback writes into the question, not under it, and only for a refusal that cannot
+   * be standing over a success.** A new message was the first fallback, and it brought О-1 back
+   * through the side door (Г1): «Не дождался ответа» stayed at the bottom of the chat for good,
+   * and the successful retry it asked for rewrote the question *above* it — so the last word in
+   * the chat was again a refusal over a login that had happened. Editing has no such tail: the
+   * retry rewrites the very line the refusal is on.
+   *
+   * `login.failed` is the only kind written this way, and that is what keeps О-1 whole.
+   * «API did not answer» means no press of this message can have succeeded — the same API
+   * answers them all. `login.unavailable` is the opposite: it is what a request answers once it
+   * has been **spent**, which a previous press may well have done, and its message may already
+   * carry «Вход подтверждён». So a dead link that could not be shown is shown by its buttons
+   * going instead (the caller drops them), and by the link itself, which the person can open
+   * again to hear it in words.
    */
   async function refuse(ctx: Context, key: MessageKey): Promise<void> {
     const text = t(ctx.from?.language_code, key)
@@ -125,8 +139,37 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
       // Over the message rather than under the top edge of the screen: this is the one thing
       // the person has to read, and a toast at a shelf is easy to miss.
       await ctx.answerCallbackQuery({ text, show_alert: true })
+      return
     } catch {
+      // Too old to answer. What is left is the message itself — see above for which refusals
+      // are allowed to reach it.
+    }
+    if (key !== 'login.failed') return
+
+    // The keyboard is put back as it was: «попробуйте ещё раз» has to keep the buttons it is
+    // asking about (О-3), and an edit without markup would take them away.
+    const markup = ctx.callbackQuery?.message?.reply_markup
+    try {
+      await ctx.editMessageText(text, markup ? { reply_markup: markup } : {})
+    } catch {
+      // The message is gone, so there is nothing left to contradict and nothing left to edit.
       await ctx.reply(text)
+    }
+  }
+
+  /**
+   * The spinner under the finger, stopped — and its failure swallowed.
+   *
+   * Telegram refuses to answer an aged-out query, and on the success path that answer stands in
+   * a `finally` after the outcome has been written. Letting it out put «update failed» in the
+   * log for a login that had just succeeded (Г2) — the very thing З-4 removed from the other
+   * path: a line naming the wrong thing as broken. The spinner is cosmetic; the outcome is not.
+   */
+  async function stopSpinner(ctx: Context): Promise<void> {
+    try {
+      await ctx.answerCallbackQuery()
+    } catch {
+      // Nothing to do and nothing to say: the answer is already on screen.
     }
   }
 
@@ -226,7 +269,7 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
       try {
         await settle(ctx, confirming ? 'login.confirmed' : 'login.declined')
       } finally {
-        await ctx.answerCallbackQuery()
+        await stopSpinner(ctx)
       }
       return
     }

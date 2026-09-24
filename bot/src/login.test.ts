@@ -82,6 +82,23 @@ function harness(
 const FROM = { id: 777, is_bot: false, first_name: 'Вова' }
 const CHAT = { id: 777, type: 'private' as const, first_name: 'Вова' }
 
+/** Нажатие всегда приходит от сообщения, у которого есть клавиатура. */
+const MESSAGE_WITH_BUTTONS = {
+  message_id: 10,
+  date: 0,
+  chat: CHAT,
+  from: { ...FROM, id: 42, is_bot: true },
+  text: 'Впустить это устройство в ваш аккаунт Molvia?',
+  reply_markup: {
+    inline_keyboard: [
+      [
+        { text: 'Войти', callback_data: `login:ok:${CODE}` },
+        { text: 'Это не я', callback_data: `login:no:${CODE}` },
+      ],
+    ],
+  },
+}
+
 function message(text: string, over: Record<string, unknown> = {}): Update {
   const command = text.startsWith('/')
   return {
@@ -382,51 +399,81 @@ describe('кнопки', () => {
     expect(calls.some((call) => call.method === 'answerCallbackQuery')).toBe(true)
   })
 
-  it('устаревшее нажатие не глотает отказ: он приходит строкой в чат', async () => {
+  it('устаревшее нажатие не глотает отказ: он встаёт в сам вопрос, а не под него', async () => {
     // Всплывашка — единственный канал отказа с О-1, и именно её Telegram отвергает на
     // нажатии, прождавшем таймаут клиента. А таймаут клиента — это и есть «не дождался
-    // ответа»: раньше отказ не доходил никуда, и в чате оставался вопрос с кнопками, как
-    // будто нажатия не было (адверсариальный В1).
+    // ответа»: сначала отказ не доходил никуда (В1), потом уходил новым сообщением и
+    // оставался последним словом в чате поверх удавшегося повтора (Г1). Правится сам вопрос:
+    // удачный повтор перепишет ту же строку на исход.
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const { bot, calls } = harness(
       { confirmLogin: vi.fn().mockRejectedValue(new ApiError(ERROR.INTERNAL, 'aborted', false)) },
       { failing: ['answerCallbackQuery'] },
     )
 
-    await bot.handleUpdate(press(`login:ok:${CODE}`))
+    await bot.handleUpdate(press(`login:ok:${CODE}`, { message: MESSAGE_WITH_BUTTONS }))
 
-    expect(String(sent(calls, 'sendMessage')?.text)).toContain('Не дождался ответа')
-    // Отказ «попробуйте ещё раз» кнопки не снимает — повторять должно быть чем (О-3).
+    expect(calls.filter((call) => call.method === 'sendMessage')).toEqual([])
+    const edit = sent(calls, 'editMessageText')
+    expect(String(edit?.text)).toContain('Не дождался ответа')
+    // Кнопки возвращаются как были: «попробуйте ещё раз» должно быть чем (О-3).
+    expect(edit?.reply_markup).toEqual(MESSAGE_WITH_BUTTONS.reply_markup)
     expect(calls.filter((call) => call.method === 'editMessageReplyMarkup')).toEqual([])
-    expect(calls.filter((call) => call.method === 'editMessageText')).toEqual([])
   })
 
-  it('мёртвая ссылка на устаревшем нажатии всё равно теряет кнопки', async () => {
+  it('удачный повтор переписывает тот же отказ на исход', async () => {
+    // Ради этого отказ и пишется в вопрос: в чате остаётся одна строка, и последняя её
+    // редакция — правда (Г1).
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const confirmLogin = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'aborted', false))
+      .mockResolvedValueOnce(undefined)
+    const { bot, calls } = harness({ confirmLogin }, { failing: ['answerCallbackQuery'] })
+
+    await bot.handleUpdate(press(`login:ok:${CODE}`, { message: MESSAGE_WITH_BUTTONS }))
+    await bot.handleUpdate(press(`login:ok:${CODE}`, { message: MESSAGE_WITH_BUTTONS }))
+
+    expect(calls.filter((call) => call.method === 'sendMessage')).toEqual([])
+    const said = calls
+      .filter((call) => call.method === 'editMessageText')
+      .map((call) => String(call.payload.text))
+    expect(said.at(-1)).toContain('Вход подтверждён')
+  })
+
+  it('мёртвая ссылка на устаревшем нажатии теряет кнопки и ничего не пишет', async () => {
     // `dropKeyboard` стоял после ответа на нажатие и вместе с ним пропускался: у мёртвой
-    // ссылки оставались кнопки, и следующий тап находил то же самое ничто (В1).
+    // ссылки оставались кнопки, и следующий тап находил то же самое ничто (В1). Сам отказ
+    // при этом не пишется никуда: «ссылка не действует» — то, чем отвечает уже погашенный
+    // запрос, а его мог погасить предыдущий тап, и тогда в сообщении стоит «Вход подтверждён»
+    // (Г1). Исчезнувшие кнопки — сигнал, а слова человек получит, открыв ссылку заново.
     const { bot, calls } = harness(
       { declineLogin: vi.fn().mockRejectedValue(new ApiError(ERROR.LOGIN_UNAVAILABLE)) },
       { failing: ['answerCallbackQuery'] },
     )
 
-    await bot.handleUpdate(press(`login:no:${CODE}`))
+    await bot.handleUpdate(press(`login:no:${CODE}`, { message: MESSAGE_WITH_BUTTONS }))
 
-    expect(String(sent(calls, 'sendMessage')?.text)).toContain('больше не действует')
+    expect(calls.filter((call) => call.method === 'sendMessage')).toEqual([])
+    expect(calls.filter((call) => call.method === 'editMessageText')).toEqual([])
     expect(calls.some((call) => call.method === 'editMessageReplyMarkup')).toBe(true)
   })
 
-  it('устаревшее нажатие не мешает записать исход', async () => {
+  it('устаревшее нажатие не мешает записать исход и не зовёт сбоем удавшийся вход', async () => {
     // «query is too old» — то, чем Telegram считает нажатие, прождавшее таймаут клиента в
     // пятнадцать секунд или перезапуск бота. С ответом на нажатие впереди исход не
-    // записывался вовсе: вход состоялся, а в сообщении оставался вопрос с кнопками (П-2).
+    // записывался вовсе (П-2), а его же ошибка, отпущенная наружу, писала в лог «update
+    // failed» о входе, который состоялся (Г2) — ровно то, что убирал З-4.
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const { bot, calls } = harness(
       { confirmLogin: vi.fn().mockResolvedValue(undefined) },
       { failing: ['answerCallbackQuery'] },
     )
 
-    await expect(bot.handleUpdate(press(`login:ok:${CODE}`))).rejects.toThrow()
+    await bot.handleUpdate(press(`login:ok:${CODE}`))
 
     expect(String(sent(calls, 'editMessageText')?.text)).toContain('Вход подтверждён')
+    expect(log).not.toHaveBeenCalled()
   })
 
   it('сбой Telegram после удачного подтверждения не называется сбоем входа', async () => {

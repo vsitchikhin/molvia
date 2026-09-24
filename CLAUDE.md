@@ -946,12 +946,23 @@ shown **which device** they are letting in and says «yes» to it by hand. Ratin
   collected — the button is the only way to reach it. Telling the two apart needs no id to leave
   the server (the preview could take the asker's), and until it is asked for, the answer is the
   same for both and safe for both.
-- **A refusal that cannot be shown is still said, and the buttons still go.** The alert is the
-  only channel a refusal has, and Telegram will not answer a press that waited out the client's
-  fifteen-second timeout — which is precisely the press this branch meets, because that timeout
-  _is_ the refusal. The alert failing left «не дождался ответа» reaching nobody and a dead link
-  keeping its buttons (В1); now a plain message is the fallback and `dropKeyboard` sits outside
-  the answer. **The «Это не я» of an already-confirmed request reaches anyone holding the link**,
+- **A refusal that cannot be shown is written into the question, never under it.** The alert is
+  the only channel a refusal has, and Telegram will not answer a press that waited out the
+  client's fifteen-second timeout — which is precisely the press this branch meets, because that
+  timeout _is_ the refusal. The alert failing left «не дождался ответа» reaching nobody and a
+  dead link keeping its buttons (В1). A new message was the first fallback, and it brought О-1
+  back through the side door (Г1): the refusal stayed at the bottom of the chat for good, while
+  the successful retry it had asked for rewrote the question _above_ it. **So the fallback edits
+  the question, and only for `login.failed`** — «the API did not answer» means no press of this
+  message can have succeeded, the same API answers them all; `login.unavailable` is what a
+  **spent** request answers, which a previous press may have spent, over a message that may
+  already say «Вход подтверждён». A dead link that could not be shown is shown by its buttons
+  going instead, and `dropKeyboard` sits outside the answer so that always happens.
+- **The spinner is cosmetic, and its failure is not news.** `answerCallbackQuery` throws on an
+  aged-out query; on the success path it stands in a `finally` after the outcome is written, and
+  letting it out wrote «update failed» in the log about a login that had just succeeded (Г2) —
+  the same wrong-thing-named-as-broken that З-4 removed from the other path.
+- **The «Это не я» of an already-confirmed request reaches anyone holding the link**,
   so a stranger can put out a login somebody else confirmed — a denial of service, not a
   takeover, since confirming with their own account is still refused (В2, owner's decision
   24.09.2026). Accepted for the asymmetry: a cancelled login costs seconds and is visible, while
