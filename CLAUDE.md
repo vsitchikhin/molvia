@@ -1008,6 +1008,75 @@ shown **which device** they are letting in and says «yes» to it by hand. Ratin
   one line and exits 0 — «this copy has no bot» must not become a restart loop under compose.
   Such a copy signs in through `POST /dev/login` and cannot use Telegram at all.
 
+## The way in, and what stands behind it (MOL-56)
+
+The login is the first screen a person without a session sees, and every other screen is behind
+it. The whole of it is three things the API and the bot cannot do: start the request, survive
+the round trip through Telegram, and ask whose account this turned out to be.
+
+- **It is a gate, not a route.** `App.vue` draws it instead of the router's view, so the address
+  is all along the one the person was going to: a link from the bot to `/advice` opens «Что
+  брать» the moment they are in. A `/login` entry would have to be written into the rules of
+  «back» (MOL-17) and would need to remember, separately from the address bar, where the person
+  was headed. The one price is the tab's title, which the screen sets and puts back.
+- **The door opens on a settled identity, not on the absence of a refusal.** `ready`, and also
+  `offline` and `error`, which show the app with a notice — a session may be perfectly alive
+  behind a captive portal. While the answer is still coming the login screen holds its own
+  loading state: rendering the app first and taking it away a moment later is a flash of
+  somebody's trip on a phone that is about to be asked to sign in.
+- **One tap is one request, and nothing starts a login by itself.** The quota is thirty starts a
+  minute **across the whole database**, so an app that started one every time the screen appeared
+  would close the door for everybody. «Открыть Telegram» reopens the same link; only «Начать
+  заново» asks for another, because a new start replaces the secret in `__Host-molvia_login` and
+  makes the previous request uncollectable.
+- **The device remembers the request and never the secret.** `{id, url}` under `molvia.login`,
+  because iOS unloads the PWA while the person is in Telegram and the confirmation they gave
+  would otherwise have nowhere to arrive. The secret stays in the `HttpOnly` cookie; putting it
+  on the device would be MOL-8's mistake again. What comes back off the shelf is checked before
+  it is opened — `https` and `t.me`, the same shape `loginStartedCodec` holds on the way in.
+- **«Истекло» is the server's word** (`error.login_unavailable`), never `expiresAt` minus the
+  device's clock: a phone whose clock has run away would otherwise be unable to sign in at all.
+  There is no countdown on the screen; the text says the link lives five minutes.
+- **The poll fires on the three ways a person comes back**: a three-second timer, the app
+  returning into view — on iOS a frozen PWA gets nothing else — and `online`. A hidden tab polls
+  nothing. Every refusal but a dead link keeps the request: the next poll is seconds away, and a
+  hiccup must not throw away a confirmation the person is about to give.
+- **Whose account this is, is asked before anyone is let in** (MOL-55's round 3). Whoever sees
+  the link within its five minutes can confirm it with their own Telegram, and the browser that
+  started the login collects _that_ session; the bot's «Это не я» rescues nobody once the screen
+  is polling. So the screen stops: it names what the wire carries — the city, the currencies and
+  the day the account appeared, «сегодня» for a fresh one — and waits. **The question is kept on
+  the device**, or reloading would be the way past it. «Это не я» does not end the stranger's
+  session — that handle is MOL-57's — but this browser stops using it and a fresh login starts;
+  the question stays until a session someone has claimed replaces it. The price is named and
+  accepted (owner's decision, 24.09.2026): one extra tap on every login, and one's own first
+  account is indistinguishable from a stranger's fresh one — which is the case with nothing yet
+  to take. Telling them apart needs the confirming Telegram's name on the wire, and that is a
+  task of its own.
+- **Nothing is sent while the door is shut.** The trip queue and the verdict drafts are held by
+  `App.vue`, not by a screen, and the account behind an unanswered question may not be this
+  person's. A door that has just opened is the other moment worth sending: what the queue held on
+  a `401` has been waiting for exactly that.
+- **A `401` anywhere is the login screen**, through one seam in `frontend/src/api.ts` wired in
+  `main.ts`. Before it, `error.no_actor` was read by three callers out of a dozen and a half and
+  every other screen said «что-то пошло не так» about an account that was simply not there.
+  Telling `error.no_actor` from a bare `401` stays where it was, in `packages/client`: a proxy, a
+  gateway and a shop's captive portal all answer `401` without knowing what an actor is.
+- **Nothing on the device is thrown away by any of this.** `molvia.actor` stays — it is the name
+  of a drawer, not a credential (MOL-53) — so the trip queue, the recent items and the verdict
+  drafts wait where they are, and Telegram brings the same owner back. The task's own line about
+  deleting it was written before MOL-53 and is answered by it (owner's decision, 24.09.2026).
+- **Offline with nobody on the device is the screen's own offline state**, not a notice over an
+  empty app: there are no drawers to open and no cached answers to show. Offline **with** an
+  owner opens the app, because a PWA at a shelf with no signal is the main scenario there is.
+- **The development seam is a button, and only in a development build.** It signed the app in by
+  itself until now, which made the screen this epic exists for invisible in every working copy
+  and unreachable to the end-to-end suite; `signedIn()` in `e2e/session.ts` now presses it, in
+  either language, and waits for the door rather than for the tap. Its failure stays on the login
+  screen instead of opening the app with a notice. It shows no «whose account» step: that exists
+  for a confirmation given elsewhere, and here the person signs themselves in with no Telegram
+  in it at all.
+
 ## Code rules
 
 - **Minimal diff** — change only what the task requires. No drive-by refactoring, no
@@ -1266,12 +1335,14 @@ contracts and separate clients. Production requires `TELEGRAM_BOT_USERNAME` and 
 MOL-55 gave the bot its half: `/start <code>` names the device and the age of the request and
 offers «Войти» and «Это не я», the answer replaces the question so its buttons go with it, and
 five kinds of dead code get one reply. With it the bot got a dictionary of its own and
-`pickLocale` moved into `packages/model`, where the PWA now reads it from too. The user-facing
-flow still needs the PWA screen (MOL-56). **And that screen inherits one thing from the bot's
-review:** the «Это не я» above rescues a hijacked login only while the browser is not polling.
-With the login screen open and polling, a stranger confirms and the session is collected in a
-cycle or two — before the person can even open Telegram. Only the screen can close that, by
-showing **whose** account was entered before letting anyone further in.
+`pickLocale` moved into `packages/model`, where the PWA now reads it from too.
+MOL-56 closed the epic's user-facing half: the login screen, the gate in front of every route,
+the request that survives the round trip through Telegram, and the one seam that turns any `401`
+into a door instead of «что-то пошло не так». **And it closed what the bot's review left open:**
+«Это не я» in the chat rescues a hijacked login only while the browser is not polling — with the
+screen open a stranger confirms and the session is collected in a cycle or two. So the screen
+names the account it landed in and waits to be told it is the right one. The rules are in «The
+way in, and what stands behind it» above; what remains of the epic is MOL-57, the way out.
 
 MOL-65 gave the person their four fields and a fourth tab: Armenia, Гюмри or Ереван, the currency
 purchases are written in and the one they are converted into. `PUT /actors/me/settings` compares
@@ -1429,11 +1500,17 @@ by hand.
 - **Each copy gets its own database.** A shared database plus parallel migrations kill each
   other, and silently: the second copy sees a foreign schema and assumes the migration is
   already applied.
-- **Each copy gets its own bot.** Two processes on one token steal each other's updates via
-  long polling — silently and unreproducibly. Register a separate bot in BotFather. **A copy
-  without a token cannot sign in through Telegram at all** — its only door is `POST /dev/login`,
-  and the same holds without `TELEGRAM_BOT_USERNAME`, which is what the API builds the link
-  from: starting a real login there answers `503 error.login_disabled`.
+- **One bot for development and one for production, and the development token lives in the one
+  copy that is testing the login** (owner's decision, 24.09.2026; MOL-56 asked again). Two
+  processes on one token do not each get a copy of an update — Telegram hands every update to
+  exactly one of them, at random. So with the token in two copies at once, the tap on «Войти»
+  reaches the bot of the _other_ copy, that bot asks _its_ API, which holds no such request, the
+  person reads «ссылка больше не действует», and the screen under test waits out its five
+  minutes. Nothing errors, and the next attempt may work. **A copy without a token cannot sign in
+  through Telegram at all** — it says one line, exits 0, and its only door is `POST /dev/login`;
+  the same holds without `TELEGRAM_BOT_USERNAME`, which is what the API builds the link from:
+  starting a real login there answers `503 error.login_disabled`. That is why moving the token
+  costs nothing: a copy without it is not broken, it is simply not the one being tested.
 
 **Plans and requirements live in `.scratch/tasks/`, not in the working copy and not on the
 Jira issue.** A copy is temporary and a task is not; `.scratch` is the shared directory, so
