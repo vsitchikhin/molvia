@@ -405,5 +405,53 @@
       "title": "Connection lost while saving",
       "body": "We will check with the server when it returns. Your edits will stay here."
     }
+  },
+  "privacy": {
+    "title": "Data and privacy",
+    "revised": "Revised 24 September 2026",
+    "summary": "Your purchases are shown to nobody. Others see ratings only as an average, and only once three people stand behind it. No ads, no trackers, no analytics.",
+    "stored": {
+      "title": "What we keep",
+      "telegram": {
+        "term": "Your Telegram account number",
+        "text": "To recognise you on any device. Your name, username and photo are not kept."
+      },
+      "purchases": {
+        "term": "Purchases",
+        "text": "What, where, when and for how much. This is the most personal part: it shows where you go. In the app only you see them."
+      },
+      "ratings": {
+        "term": "Ratings and reviews",
+        "text": "Only you see your review. Others see a rating only inside an average of three people."
+      },
+      "search": {
+        "term": "Search picks",
+        "text": "What you took for which query, so that next time it comes first."
+      },
+      "visits": {
+        "term": "Visit marks",
+        "text": "Whether you opened “What to buy” — at most once a day. This is how we learn whether people come back."
+      },
+      "devices": {
+        "term": "Sign-in devices",
+        "text": "The name of the phone and browser you signed in from."
+      },
+      "settings": {
+        "term": "Your settings",
+        "text": "Country, city and currencies."
+      }
+    },
+    "logs": {
+      "title": "Server logs",
+      "text": "Kept for no longer than 14 days. Your IP address and what you searched for are not written to them."
+    },
+    "storage": {
+      "title": "Cookies and the phone's memory",
+      "text": "Two cookies: the sign-in, and one more for five minutes while you sign in. The phone keeps purchases and ratings until they reach the server. All of it is needed for the app to work, so there is no banner."
+    },
+    "erase": {
+      "title": "Delete everything",
+      "text": "Send /delete to the bot you sign in with and confirm. Deletion is immediate and permanent: purchases, ratings, reviews, settings and sign-ins go. Items you added to the shared catalogue stay — without your name. You can sign in again, but it will be a new, empty account."
+    }
   }
 }

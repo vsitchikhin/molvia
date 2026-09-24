@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import SettingsView from '@/views/SettingsView.vue'
+import PrivacyView from '@/views/PrivacyView.vue'
 import AdviceView from '@/views/AdviceView.vue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 import TripHistoryView from '@/views/TripHistoryView.vue'
@@ -21,6 +22,7 @@ export type RouteName =
   | 'trip-history'
   | 'finished-trip'
   | 'finished-search'
+  | 'privacy'
   | 'kit'
 
 declare module 'vue-router' {
@@ -82,6 +84,13 @@ export const routes = [
     name: 'finished-search',
     component: ItemSearchView,
     meta: { titleKey: 'item.search_title', parent: 'finished-trip' },
+  },
+  // Under the settings, and open without a session: it is read before deciding to sign in (MOL-58).
+  {
+    path: '/privacy',
+    name: 'privacy',
+    component: PrivacyView,
+    meta: { titleKey: 'privacy.title', parent: 'settings' },
   },
   // Every piece of the kit in every state, and the sheet in a real history — for the eye in both
   // schemes and for the end-to-end tests, before any screen uses them (MOL-18). Development only:

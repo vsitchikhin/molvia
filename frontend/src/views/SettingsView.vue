@@ -58,6 +58,9 @@
         <p class="note">{{ t('settings.scope') }}</p>
       </form>
     </template>
+    <AppButton class="privacy" variant="ghost" block @click="privacy">{{
+      t('privacy.title')
+    }}</AppButton>
     <template #docked>
       <div class="actions">
         <div
@@ -106,6 +109,7 @@
 <script lang="ts">
 import { defineComponent, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import type { ActorSettings } from '@molvia/model'
 import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconPencil from '~icons/mdi/pencil-outline'
@@ -136,6 +140,7 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18n()
+    const router = useRouter()
     /**
      * The same words the form beside it uses: the notice printed `AM` and `AMD` where the
      * fields say «Армения» and «Армянский драм · AMD», and it is the line a person decides by.
@@ -146,11 +151,21 @@ export default defineComponent({
       spendCurrency: t(`settings.currencies.${value.spendCurrency}`),
       incomeCurrency: t(`settings.currencies.${value.incomeCurrency}`),
     })
-    return { t, saidIn, id: useId(), ...useSettings() }
+    return {
+      t,
+      saidIn,
+      id: useId(),
+      privacy: () => void router.push({ name: 'privacy' }),
+      ...useSettings(),
+    }
   },
 })
 </script>
 <style scoped lang="scss">
+.privacy {
+  margin-top: var(--space-6);
+}
+
 .form,
 .actions {
   display: grid;
