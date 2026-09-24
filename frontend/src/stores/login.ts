@@ -129,6 +129,21 @@ export const useLoginStore = defineStore('login', () => {
     return connected.value ? 'offer' : 'offline'
   })
 
+  /**
+   * **The question belongs to the browser, not to the window that asked it** (self-review).
+   *
+   * Two windows share one cookie jar, so a session collected in one is the session the other
+   * carries — and a window that was already open, with the app on screen, would walk into an
+   * account nobody has claimed. The request itself is deliberately **not** shared: each window
+   * owns its own attempt, and two of them polling one identifier would make the second read
+   * «ссылка больше не действует» about a login that worked.
+   */
+  window.addEventListener('storage', (event) => {
+    if (event.key !== KEY) return
+    const now = recall().unconfirmed ?? null
+    if (now !== unconfirmed.value) unconfirmed.value = now
+  })
+
   // A session that turned out to be gone takes the question with it: there is nobody left to
   // ask about. Without this the screen would hold «is this your account?» over no account.
   // `immediate`, because the store is created by the screen — that is, after the identity has

@@ -261,6 +261,34 @@ describe('в чей аккаунт вошли', () => {
     })
   })
 
+  it('вопрос закрывает дверь и во втором окне', async () => {
+    // Две вкладки делят банку cookie: сессия, забранная в одной, — это сессия и другой. Окно,
+    // которое уже было открыто, иначе вошло бы в аккаунт, которого никто не признавал.
+    const { login } = await signedOut()
+    expect(login.blocked).toBe(false)
+
+    localStorage.setItem(KEY, JSON.stringify({ unconfirmed: STRANGER.id }))
+    window.dispatchEvent(new StorageEvent('storage', { key: KEY }))
+
+    expect(login.blocked).toBe(true)
+  })
+
+  it('и открывает её, когда в соседнем окне ответили «да, это я»', async () => {
+    localStorage.setItem(KEY, JSON.stringify({ unconfirmed: STRANGER.id }))
+    localStorage.setItem(OWNER, STRANGER.id)
+    setActivePinia(createPinia())
+    const actor = useActorStore()
+    me.mockResolvedValue(STRANGER)
+    const login = useLoginStore()
+    await actor.start()
+    expect(login.blocked).toBe(true)
+
+    localStorage.removeItem(KEY)
+    window.dispatchEvent(new StorageEvent('storage', { key: KEY }))
+
+    expect(login.blocked).toBe(false)
+  })
+
   it('и вопрос уходит вместе с сессией, которой не стало', async () => {
     localStorage.setItem(KEY, JSON.stringify({ unconfirmed: STRANGER.id }))
     const { login } = await signedOut()

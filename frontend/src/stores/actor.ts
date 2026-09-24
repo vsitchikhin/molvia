@@ -123,6 +123,10 @@ export const useActorStore = defineStore('actor', () => {
    * invisible in every working copy and unreachable to the end-to-end suite.
    */
   async function signIn(): Promise<boolean> {
+    // The literal Vite folds, so the call to an address production does not carry is dropped
+    // from that bundle together with this branch — the property MOL-52 (Р-14) wrote down and a
+    // `v-if` in the template alone would not have kept.
+    if (!import.meta.env.DEV) return false
     state.value = 'loading'
     try {
       settle(await api.devLogin())

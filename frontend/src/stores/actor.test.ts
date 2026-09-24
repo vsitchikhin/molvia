@@ -415,6 +415,24 @@ describe('когда сессию открыли в другом месте', ()
   })
 })
 
+describe('шва разработки в прод-сборке нет', () => {
+  it('и его вызов туда не попадает', async () => {
+    // Литерал сворачивает Vite, и вместе с веткой из прод-сборки уходит вызов адреса, которого
+    // у прод-сервера нет (MOL-52, Р-14). `v-if` в разметке этого бы не дал: обработчик остался
+    // бы в бандле вместе со ссылкой на `api.devLogin`.
+    vi.stubEnv('DEV', false)
+    const { store } = await freshStore()
+    me.mockRejectedValue(await refusal())
+    await store.start()
+
+    await expect(store.signIn()).resolves.toBe(false)
+
+    expect(devLogin).not.toHaveBeenCalled()
+    expect(store.state).toBe('signed-out')
+    vi.unstubAllEnvs()
+  })
+})
+
 describe('401 посреди работы', () => {
   it('поднимает экран входа, с какого бы запроса отказ ни пришёл', async () => {
     // Шов живёт в `@/api`, а связывает их `main.ts`; проверка самого шва — в `api.test.ts`.
