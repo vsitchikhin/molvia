@@ -62,6 +62,13 @@ async function rate(page: Page, score: number): Promise<void> {
   await page.getByRole('button', { name: 'Save the rating' }).click()
 }
 
+/**
+ * The card's own question. Scoped to the card, because a heading is not one node either: a state
+ * draws an `h2` of the same level, and an inline notice — «the rating is saved», with a card still
+ * behind it — puts two on this screen. `{ level: 2 }` alone was that race waiting (MOL-64, Н3).
+ */
+const question = (page: Page) => page.locator('section.verdict').getByRole('heading', { level: 2 })
+
 // Unique per run: the catalogue is shared, and a name another run proposed would come back as
 // that item — still unrated for a new person, but the test would read someone else's name.
 const tag = randomUUID().slice(0, 8)
@@ -77,20 +84,20 @@ test('rates the purchases one by one, puts one off, and ends at «Everything is 
   await page.goto('/verdicts')
 
   await expect(page.getByText('2 purchases are waiting to be rated')).toBeVisible()
-  await expect(page.getByRole('heading', { level: 2 })).toContainText(bread)
+  await expect(question(page)).toContainText(bread)
   await expect(page.getByText(/today · SAS/i)).toBeVisible()
 
   await page.getByRole('button', { name: 'Rating 4 out of 5' }).click()
   await page.getByLabel('A couple of words — if you have any').fill('Мягкий\nна второй день тоже')
   await page.getByRole('button', { name: 'Save the rating' }).click()
 
-  await expect(page.getByRole('heading', { level: 2 })).toContainText(milk)
-  await expect(page.getByRole('heading', { level: 2 })).toBeFocused()
+  await expect(question(page)).toContainText(milk)
+  await expect(question(page)).toBeFocused()
   await expect(page.getByText('1 purchase is waiting to be rated')).toBeVisible()
 
   // Put off, and it is the only one left: it comes round again rather than «all rated».
   await page.getByRole('button', { name: 'Not now' }).click()
-  await expect(page.getByRole('heading', { level: 2 })).toContainText(milk)
+  await expect(question(page)).toContainText(milk)
 
   await rate(page, 2)
 
@@ -125,13 +132,13 @@ test('7: rated without a connection — «saved», and it goes by itself once on
   await bought(who, [`Сыр ${tag}`])
 
   await page.goto('/verdicts')
-  await expect(page.getByRole('heading', { level: 2 })).toContainText('Сыр')
+  await expect(question(page)).toContainText('Сыр')
 
   await context.setOffline(true)
   await rate(page, 5)
 
   await expect(page.getByRole('heading', { name: 'The rating is saved' })).toBeVisible()
-  await expect(page.getByText('Everything is rated')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Everything is rated' })).toHaveCount(0)
   expect(await page.locator('.bad').count()).toBe(0)
 
   await context.setOffline(false)
@@ -149,7 +156,7 @@ test('7: rated without a connection and the app closed — sent when it is opene
   await bought(who, [`Творог ${tag}`, `Сметана ${tag}`])
 
   await page.goto('/verdicts')
-  await expect(page.getByRole('heading', { level: 2 })).toContainText('Сметана')
+  await expect(question(page)).toContainText('Сметана')
 
   await context.setOffline(true)
   await rate(page, 3)
@@ -163,7 +170,7 @@ test('7: rated without a connection and the app closed — sent when it is opene
   const again = await context.newPage()
   await again.goto('/verdicts')
 
-  await expect(again.getByRole('heading', { level: 2 })).toContainText('Творог')
+  await expect(question(again)).toContainText('Творог')
   await expect.poll(() => waiting(who)).toBe(1)
   await expect(again.getByText('1 purchase is waiting to be rated')).toBeVisible()
 })
@@ -177,10 +184,12 @@ test('the queue that could not load is red and loads again on «Try again»', as
   await page.route('**/api/verdicts/pending', (route) => route.abort())
 
   await page.goto('/verdicts')
-  await expect(page.getByText('The list of purchases did not load')).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'The list of purchases did not load' }),
+  ).toBeVisible()
 
   await page.unroute('**/api/verdicts/pending')
   await page.getByRole('button', { name: 'Try again' }).click()
 
-  await expect(page.getByRole('heading', { level: 2 })).toContainText('Айран')
+  await expect(question(page)).toContainText('Айран')
 })

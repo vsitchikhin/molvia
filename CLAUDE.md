@@ -945,6 +945,33 @@ shelf, so a desktop-only pass would prove nothing about the screen that matters.
   in this copy's band). A database alone would not have closed it: `reuseExistingServer`
   handed the suite the dev API whenever `make dev` was up, so no `DATABASE_URL` of ours
   reached a process — and `pre-push` runs e2e exactly then. Now the two stacks coexist.
+- **Words that are said out loud are taken end-to-end by a locator outside the live region**
+  (MOL-64). The app has one polite region, in `App.vue` above the router, and **six things write
+  to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
+  count of an answer, and an empty answer's own words), `ItemDetailsSheet` (the price per unit),
+  `VerdictCard` («Pick a rating») and `useSettings` (the form's notice). Whatever any of them
+  says is on the screen twice, so a plain `getByText` matches two nodes and playwright's strict
+  mode refuses — a failure the machine's speed decides: measured, one match at once and two from
+  200 ms onwards. Strict mode is right, and it is answered with a locator, never muted with
+  `.first()`; the region is not the place to fix it either, since the whole announcement is
+  MOL-19's decision — a screen reader hears the state whole. **The heading when the block has
+  one** (`getByRole('heading', { name: … })`), **the block's own container when it has none** —
+  the search's `.not-found-text`, the settings' `.dock`. Three things are easy to get wrong.
+  **A heading needs its name where the level is shared:** `{ level: 2 }` alone is not outside
+  anything, because a state's `h2` is the level of a card's and a sheet's too, and an inline
+  notice puts two of them on one screen (MOL-64, Н3). The `h1` is the exception rather than a
+  loophole — `AppScreen` draws one per screen and the pinned copy of the title is `aria-hidden` —
+  so `getByRole('heading', { level: 1 })` is the screen's own title, and asserting its text is
+  what says which screen this is (`navigation.spec.ts`, `sheet.spec.ts`); naming it there would
+  only restate the answer. A second `h1` would make those two the same race. **Not every state speaks** — a full-screen `error` or `attention` carries
+  `role="alert"` and hands the region nothing, so of `ScreenState`'s own states only `empty`,
+  `offline` and anything `inline` double; that is why four of MOL-64's five places were not
+  failing yet and were fixed anyway. And **`exact: true` is not the rule and holds by
+  accident:** it saves only while the announcement is longer than what the screen shows.
+  `ScreenState` joins with `[title, body].filter(Boolean)`, so a title without a body is
+  announced alone and matches exactly too; `useSettings` writes `${title}. ${body}` unfiltered,
+  and the trailing «. » is the only reason two settings assertions were ever green (Н2). Two
+  ways of joining one string, and a locator must not depend on which one ran.
 - **When a test fails, look for the bug in the code first** — do not adjust the test to
   match the behaviour. A test proves the app works, not the other way round. And **never by
   making it tolerate leftovers**: that hides the cause and leaves the suite depending on the
