@@ -6,8 +6,20 @@
 
 name: molvia
 
+# Everything the containers write goes to the host's journal, and the journal keeps it for
+# fourteen days (MOL-58). Docker's default `json-file` keeps it forever, and rotating it by size
+# is not a term: at this traffic ten megabytes last for months. The term itself is set on the
+# machine — `deploy/README.md`, «Once, on a new machine». `docker compose logs` still works.
+# `LOG_DRIVER` exists only for trying the stack on a laptop: Docker Desktop has no journald and
+# refuses to start a container that asks for it.
+x-logging: &logging
+  driver: ${LOG_DRIVER:-journald}
+  options:
+    tag: 'molvia-{{.Name}}'
+
 services:
   postgres:
+    logging: *logging
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
@@ -25,6 +37,7 @@ services:
       retries: 10
 
   backend:
+    logging: *logging
     # Built by CI and pulled on the server, so the machine needs neither the source nor
     # a toolchain. `build` stays for building the same image locally.
     image: ghcr.io/vsitchikhin/molvia-backend:${IMAGE_TAG:-latest}
@@ -43,6 +56,7 @@ services:
         condition: service_healthy
 
   bot:
+    logging: *logging
     # Built by CI and pulled on the server, so the machine needs neither the source nor
     # a toolchain. `build` stays for building the same image locally.
     image: ghcr.io/vsitchikhin/molvia-bot:${IMAGE_TAG:-latest}
@@ -65,6 +79,7 @@ services:
       - backend
 
   frontend:
+    logging: *logging
     # Built by CI and pulled on the server, so the machine needs neither the source nor
     # a toolchain. `build` stays for building the same image locally.
     image: ghcr.io/vsitchikhin/molvia-frontend:${IMAGE_TAG:-latest}

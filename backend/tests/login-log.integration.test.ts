@@ -49,3 +49,17 @@ it.each([
     expect(failure?.code).toMatch(/^[\dA-Z_]+$/)
   },
 )
+
+it('erasure through the bot logs no Telegram id when the database fails either (MOL-58)', async () => {
+  lines.length = 0
+  const account = telegramId()
+  const response = await app.inject({
+    method: 'POST',
+    url: '/internal/actors/erase',
+    headers: { authorization: `Bearer ${botSecret}` },
+    payload: { telegramUserId: account },
+  })
+  expect(response.statusCode).toBe(500)
+  expect(lines.join('')).not.toContain(String(account))
+  expect(lines.join('')).not.toMatch(/Failed query|telegram_user_id|params/i)
+})

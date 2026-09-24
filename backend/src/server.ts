@@ -141,6 +141,18 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       // is here for the day a serializer is widened. What keeps credentials out of the log now
       // is the error handler below, and a test holds that, not this line.
       redact: ['req.headers.cookie', 'req.headers.authorization', 'res.headers'],
+      // A request is logged as its method and its path, and nothing else (MOL-58). Fastify's own
+      // serializer adds the address, the port and the host, and keeps the query string — which
+      // for `/catalogue/search?q=…` is what a person was looking for, the very behaviour the
+      // privacy page promises is not kept. The address today is Caddy's rather than a person's
+      // (no `trustProxy`), and this keeps it out on the day that changes.
+      serializers: {
+        req: (request: FastifyRequest) => ({
+          id: request.id,
+          method: request.method,
+          path: request.url.split('?', 1)[0],
+        }),
+      },
       ...(options.logStream ? { stream: options.logStream } : {}),
     },
     // No limit of the router's own: every parameter is judged by the schema of its route, which

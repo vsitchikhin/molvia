@@ -37,7 +37,11 @@ interface Call {
   readonly payload: Record<string, unknown>
 }
 
-function harness(api: Partial<MolviaBotClient> = {}, now = NOW): { bot: Bot; calls: Call[] } {
+function harness(
+  api: Partial<MolviaBotClient> = {},
+  now = NOW,
+  failing: readonly string[] = [],
+): { bot: Bot; calls: Call[] } {
   const calls: Call[] = []
   let shown: unknown
   const bot = assembleBot(
@@ -47,6 +51,9 @@ function harness(api: Partial<MolviaBotClient> = {}, now = NOW): { bot: Bot; cal
   )
   const transformer: Transformer = (_prev, method, payload) => {
     calls.push({ method, payload: payload })
+    if (failing.includes(method)) {
+      return Promise.resolve({ ok: false, error_code: 403, description: 'Forbidden' }) as never
+    }
     // Telegram refuses to rewrite a message with the text it already carries.
     if (method === 'editMessageText') {
       const body = payload as { readonly text?: unknown }
@@ -208,6 +215,19 @@ describe('/delete — человек удаляет себя сам (MOL-58)', (
     await bot.handleUpdate(command('/delete', { id: -100, type: 'group', title: 'Семья' }))
 
     expect(calls).toEqual([])
+  })
+
+  it('упавший ответ уходит в лог без апдейта: ни имени, ни username, ни языка', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { bot } = harness({}, NOW, ['sendMessage'])
+    const update = command('/delete')
+    Object.assign(update.message?.from ?? {}, { username: 'anya_gyumri', language_code: 'hy' })
+
+    // `handleUpdate` rethrows; the runner hands the error to `bot.catch`, and so does this.
+    await bot.handleUpdate(update).catch((error: unknown) => bot.errorHandler(error as never))
+
+    expect(log).toHaveBeenCalledTimes(1)
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/Аня|anya_gyumri|"hy"|777/)
   })
 
   it('приветствие называет /delete', () => {

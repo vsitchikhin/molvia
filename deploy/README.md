@@ -14,6 +14,20 @@ same machine and the same network; only Caddy is reachable from outside.
 4. Log the machine in to the registry once:
    `echo <token> | docker login ghcr.io -u <user> --password-stdin`
    The token needs `read:packages` and nothing else.
+5. Give the journal its term — **logs live fourteen days** (MOL-58). Every container logs to
+   journald (`docker-compose.prod.yml`, `x-logging`), and the term is the host's:
+
+   ```bash
+   sudo mkdir -p /etc/systemd/journald.conf.d
+   printf '[Journal]\nMaxRetentionSec=14day\nMaxFileSec=1day\n' \
+     | sudo tee /etc/systemd/journald.conf.d/molvia.conf
+   sudo systemctl restart systemd-journald
+   ```
+
+   `MaxFileSec` is not decoration: journald drops whole files, and a file that is never rotated
+   by time holds its oldest line for as long as it takes to fill by size. The API writes no
+   address and no query string, and Caddy keeps no access log, but Caddy's errors can carry an
+   address — this is what bounds them.
 
 ## Every release
 
@@ -54,14 +68,36 @@ No real Telegram request is made by the login API itself.
 
 ```bash
 DOMAIN=localhost POSTGRES_DB=molvia POSTGRES_USER=molvia POSTGRES_PASSWORD=localtest \
-HTTP_PORT=8080 HTTPS_PORT=8443 \
+HTTP_PORT=8080 HTTPS_PORT=8443 LOG_DRIVER=json-file \
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 
 curl -k https://localhost:8443/api/health
 ```
 
-Caddy issues an internal certificate for `localhost`, hence `-k`. Tear it down with the
-same command ending in `down -v`.
+Caddy issues an internal certificate for `localhost`, hence `-k`. `LOG_DRIVER=json-file`
+because Docker Desktop has no journald and refuses to start a container that asks for it. Tear
+it down with the same command ending in `down -v`.
+
+## Erasing a person by hand (MOL-58)
+
+People erase themselves: `/delete` in the bot, one confirmation, done in one transaction. This
+is the fallback for when the bot is down — not a channel people are told about.
+
+1. Find the Telegram id. In Telegram Desktop: Settings → Advanced → Experimental settings →
+   «Show Peer IDs»; the profile then shows the number. A username is not an id and is not kept.
+2. Look before erasing — without `--yes` nothing changes, it prints what would go:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml --env-file .env.prod \
+     exec backend node dist/forget.js <telegram-id>
+   ```
+
+3. The same command with `--yes` at the end erases. It cannot be undone and there are no backups.
+
+In a working copy the same thing is `make forget TG=<id>` and `make forget TG=<id> YES=1`.
+What goes: purchases and trips, ratings including withdrawn ones, search picks, the event log,
+sessions, login requests and the owner. What stays: catalogue items the person added, with no
+author, and every place.
 
 ## What is deliberately not automated
 
