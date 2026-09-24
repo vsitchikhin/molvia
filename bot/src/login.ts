@@ -125,6 +125,12 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
 
     try {
       const request = await api.previewLogin(code)
+      // Already said «yes» to, and the session not collected yet — the link opened again after
+      // an answer that never arrived (О-2). No buttons: there is nothing left to decide.
+      if (request.confirmed) {
+        await ctx.reply(t(language, 'login.already'))
+        return
+      }
       await ctx.reply(
         t(language, 'login.prompt', {
           device: request.deviceName ?? t(language, 'login.device_unknown'),

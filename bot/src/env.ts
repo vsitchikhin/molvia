@@ -1,6 +1,7 @@
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
+import { botApiSecretSchema } from '@molvia/model'
 
 try {
   process.loadEnvFile(fileURLToPath(new URL('../../.env', import.meta.url)))
@@ -37,7 +38,7 @@ const environmentSchema = z.object({
    * `error.bot_unauthorized`: that code is about a request the API turned down, and a copy whose
    * `.env` is simply missing a line deserves to be told that instead.
    */
-  BOT_API_SECRET: z.union([z.literal(''), z.string().regex(/^[A-Za-z0-9_-]{43}$/)]).default(''),
+  BOT_API_SECRET: z.union([z.literal(''), botApiSecretSchema]).default(''),
 })
 
 export interface BotEnvironment {

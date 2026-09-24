@@ -1,5 +1,12 @@
 import { z } from 'zod'
-import { ERROR, ISSUE, confirmLoginSchema, loginCodeSchema, loginPreviewCodec } from '@molvia/model'
+import {
+  ERROR,
+  ISSUE,
+  botApiSecretSchema,
+  confirmLoginSchema,
+  loginCodeSchema,
+  loginPreviewCodec,
+} from '@molvia/model'
 import type { LoginPreview, TelegramUserId } from '@molvia/model'
 import { ApiError, createTransport } from './transport'
 import type { ClientOptions } from './transport'
@@ -15,7 +22,7 @@ export interface MolviaBotClient {
 
 /** An internal client has no session and cannot attach its secret to an arbitrary API path. */
 export function createBotClient({ secret, ...options }: BotClientOptions): MolviaBotClient {
-  if (!/^[A-Za-z0-9_-]{43}$/.test(secret)) throw new ApiError(ERROR.BOT_UNAUTHORIZED)
+  if (!botApiSecretSchema.safeParse(secret).success) throw new ApiError(ERROR.BOT_UNAUTHORIZED)
   const { request } = createTransport({ ...options, credentials: 'omit', botSecret: secret })
   function path(code: string): string {
     if (!loginCodeSchema.safeParse(code).success) throw new ApiError(ISSUE.PATH_INVALID, 'code')

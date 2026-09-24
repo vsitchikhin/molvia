@@ -1,9 +1,8 @@
 import process from 'node:process'
-import { Bot } from 'grammy'
 import { createBotClient } from '@molvia/client'
+import { assembleBot, startBot } from './assemble'
 import { botToken, readEnvironment, refusedNames } from './env'
 import type { BotEnvironment } from './env'
-import { loginComposer } from './login'
 
 // Every working copy needs its own bot: two processes on one token steal each other's
 // updates through long polling, silently. A copy without a token simply does not start.
@@ -33,19 +32,19 @@ if (!environment.secret) {
   process.exit(0)
 }
 
-const bot = new Bot(botToken)
-
-bot.use(
-  loginComposer({
+const runner = startBot(
+  assembleBot(botToken, {
     api: createBotClient({ baseUrl: environment.apiBaseUrl, secret: environment.secret }),
     appUrl: environment.appBaseUrl,
   }),
 )
 
-// The last resort: a handler that throws must not take the process with it. The update itself
-// is deliberately not logged — it carries the person's name, username and language.
-bot.catch(({ error }) => {
-  console.error(`[molvia] update failed: ${error instanceof Error ? error.message : 'unknown'}`)
-})
+// The runner keeps fetching updates until it is told to stop, and a kill without this leaves
+// whatever it is holding half-handled. Compose sends SIGTERM on every deploy.
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(signal, () => {
+    void runner.stop()
+  })
+}
 
-await bot.start()
+await runner.task()

@@ -35,6 +35,7 @@ const PREVIEW: LoginPreview = {
   deviceName: 'iPhone · Safari',
   createdAt: new Date('2026-09-23T12:00:00Z'),
   expiresAt: new Date('2026-09-23T12:05:00Z'),
+  confirmed: false,
 }
 
 interface Call {
@@ -117,6 +118,10 @@ describe('/start с кодом', () => {
 
     expect(previewLogin).toHaveBeenCalledExactlyOnceWith(CODE)
     const payload = sent(calls, 'sendMessage')
+    // Вопрос задан от лица хозяина аккаунта, а не входящего, и называет последствие (З-2):
+    // «Войти в Molvia?» читается как «войти мне» — ровно наоборот тому, от чего кнопка.
+    expect(payload?.text).toContain('Впустить это устройство в ваш аккаунт Molvia?')
+    expect(payload?.text).toContain('получит доступ к вашим покупкам')
     expect(payload?.text).toContain('iPhone · Safari')
     expect(payload?.text).toContain('назад')
     expect(payload?.reply_markup).toEqual({
@@ -166,6 +171,27 @@ describe('/start с кодом', () => {
     expect(sent(junk.calls, 'sendMessage')?.text).toBe(text)
   })
 
+  it('уже подтверждённый код — «вернитесь в приложение», а не мёртвая ссылка', async () => {
+    // Человек открывает ссылку второй раз ровно после того, как бот сказал «попробуйте ещё
+    // раз»: подтверждение записано, ответ потерян. Сказать ему здесь «начните вход заново» —
+    // вторая неправда подряд, пока браузер уже забирает сессию (О-2).
+    const confirmLogin = vi.fn()
+    const { bot, calls } = harness({
+      previewLogin: vi.fn().mockResolvedValue({ ...PREVIEW, confirmed: true }),
+      confirmLogin,
+    })
+
+    await bot.handleUpdate(message(`/start ${CODE}`))
+
+    const payload = sent(calls, 'sendMessage')
+    expect(payload?.text).toBe(
+      'Этот вход уже подтверждён. Вернитесь в Molvia — приложение узнает вас само.',
+    )
+    // Решать больше нечего, и подтверждать заново — тоже.
+    expect(payload?.reply_markup).toBeUndefined()
+    expect(confirmLogin).not.toHaveBeenCalled()
+  })
+
   it('код, который не поместится на кнопку, не уходит даже в API', async () => {
     // Схема допускает 64 символа, кнопка Telegram — 64 байта вместе с префиксом. Показать
     // приглашение без кнопок нельзя: кнопка и есть смысл этой задачи.
@@ -186,7 +212,9 @@ describe('/start с кодом', () => {
 
     await bot.handleUpdate(message(`/start ${CODE}`))
 
-    expect(sent(calls, 'sendMessage')?.text).toBe('Не получилось. Попробуйте ещё раз через минуту.')
+    expect(sent(calls, 'sendMessage')?.text).toBe(
+      'Не дождался ответа. Попробуйте ещё раз через минуту.',
+    )
     expect(log).toHaveBeenCalledExactlyOnceWith('[molvia] preview login: error.internal')
     for (const [line] of log.mock.calls) {
       expect(String(line)).not.toContain(CODE)

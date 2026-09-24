@@ -140,7 +140,7 @@ the load is I/O-bound, with three orders of magnitude of headroom.
 | Scanner           | `zxing-wasm`, live viewfinder via `getUserMedia`        | we need EAN, not QR                                                                        |
 | API               | Fastify + Zod                                           | Zod schemas shared with the frontend and the bot                                           |
 | DB                | PostgreSQL + Drizzle                                    | schema in TS, generated migrations, honest drop into raw SQL                               |
-| Bot               | grammY                                                  | distribution, auth, rating reminders                                                       |
+| Bot               | grammY + `@grammyjs/runner`                             | distribution, auth, rating reminders; the runner is what makes it serve two people at once |
 | Receipt OCR (1.0) | separate Python service                                 | the TS ecosystem has nothing here                                                          |
 | Tests             | Vitest (domain, use case, component) + Playwright (e2e) | three vitest projects, so the domain keeps running without a DOM                           |
 | Lint              | ESLint 9 type-aware + Stylelint + Prettier              | strictest tier; SFCs go through the same type checker as `.ts`                             |
@@ -911,6 +911,33 @@ shown **which device** they are letting in and says «yes» to it by hand. Ratin
 - **The bot keeps no state of its own.** The login code rides in the button's `callback_data`,
   which is Telegram's memory rather than ours, and everything else is asked of the API — the
   only write path there is. So nothing survives a restart, because nothing needs to.
+- **Updates of different people are handled at once; updates of one person, in order** — and
+  both halves are load-bearing (MOL-55, О-4). `bot.start()` handles updates strictly one after
+  another, which is grammY's ordering guarantee and was measured costing the next person their
+  whole turn: while the API thought for 300 ms, their request did not leave at all, and at the
+  client's fifteen-second timeout a queue of twenty presses outlives the login requests in it.
+  `@grammyjs/runner` is the answer — a dependency the owner agreed to on 24.09.2026 — with
+  `sequentialize` by chat keeping the other half: two taps of one person must not be two
+  confirmations in flight, or which message they end up looking at is decided by whichever
+  answer came back first.
+- **The question is asked from the account owner's side** (З-2, owner's decision 24.09.2026):
+  «Впустить это устройство в ваш аккаунт Molvia?», and the last line names what it costs to
+  get it wrong. «Войти в Molvia?» over a button labelled «Войти» read as «log _me_ in» — the
+  wrong way round for the one attack the button exists to stop, where a stranger's link makes
+  your tap let **their** browser into **your** account.
+- **An outcome is written into the message; a refusal is only shown over it** (О-1). Both
+  presses of a double tap leave before the first edit lands — the buttons are still on screen,
+  which at a shelf on a slow connection is ordinary — so the second was refused by the API,
+  correctly, and used to **overwrite «Вход подтверждён» with «Начните вход заново»** over a
+  session already granted. A refusal goes to `answerCallbackQuery`, which cannot rewrite what
+  is written. The buttons then go only if the link is dead: «the API did not answer, try again»
+  has to keep the very buttons it asks for.
+- **Confirming twice from the same account is a success, not a refusal** (О-2). A confirmation
+  that was written while its answer was lost left the bot unable to tell that from «not written»
+  — and it chose wrong, twice: «не получилось», and then «начните вход заново» on the link
+  opened again. So `confirm` is idempotent for the same account (another one is still refused —
+  that is what the button is for), and a preview says `confirmed`, **whether and not who** (Р-11).
+  The bot then says the one true thing: it is confirmed, go back to the app.
 - **It repeats none of the API's rules.** The five-minute term, the one-use rule, the quota and
   «expired, spent, declined and unknown are one answer» belong to MOL-54 and are read off its
   refusals. The bot adds exactly two things: the account, which only Telegram can vouch for,

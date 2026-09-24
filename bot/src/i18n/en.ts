@@ -10,10 +10,11 @@ import type { Dictionary } from './ru'
  */
 export const en: Dictionary = {
   'login.prompt':
-    'Sign in to Molvia?\n' +
+    'Let this device into your Molvia account?\n' +
     'Device: {device}\n' +
     'Requested {when}.\n\n' +
-    'If this was not you, tap “Not me” — nothing will happen.',
+    'If you did not start this sign-in, tap “Not me”: otherwise whoever sent you the link ' +
+    'gets access to your purchases.',
   'login.device_unknown': 'unknown device',
   'login.when.now': 'less than a minute ago',
   'login.when.one': 'a minute ago',
@@ -22,9 +23,11 @@ export const en: Dictionary = {
   'login.confirm': 'Sign in',
   'login.decline': 'Not me',
   'login.confirmed': 'Signed in. Go back to Molvia — the app will recognise you by itself.',
+  'login.already':
+    'This sign-in is already confirmed. Go back to Molvia — the app will recognise you by itself.',
   'login.declined': 'Sign-in declined. Nobody got into the account.',
   'login.unavailable': 'This link no longer works. Start signing in again in the app.',
-  'login.failed': 'That did not work. Please try again in a minute.',
+  'login.failed': 'No answer came back. Please try again in a minute.',
   'start.greeting':
     'Molvia — what is worth buying, and where.\n\n' +
     'Signing in starts in the app: {url} — and I will send the confirmation here.',
