@@ -957,9 +957,13 @@ shelf, so a desktop-only pass would prove nothing about the screen that matters.
   MOL-19's decision — a screen reader hears the state whole. **The heading when the block has
   one** (`getByRole('heading', { name: … })`), **the block's own container when it has none** —
   the search's `.not-found-text`, the settings' `.dock`. Three things are easy to get wrong.
-  **A heading needs its name:** `{ level: 2 }` alone is not outside anything, because a state's
-  `h2` is the same level as a card's, and an inline notice puts two of them on one screen
-  (MOL-64, Н3). **Not every state speaks** — a full-screen `error` or `attention` carries
+  **A heading needs its name where the level is shared:** `{ level: 2 }` alone is not outside
+  anything, because a state's `h2` is the level of a card's and a sheet's too, and an inline
+  notice puts two of them on one screen (MOL-64, Н3). The `h1` is the exception rather than a
+  loophole — `AppScreen` draws one per screen and the pinned copy of the title is `aria-hidden` —
+  so `getByRole('heading', { level: 1 })` is the screen's own title, and asserting its text is
+  what says which screen this is (`navigation.spec.ts`, `sheet.spec.ts`); naming it there would
+  only restate the answer. A second `h1` would make those two the same race. **Not every state speaks** — a full-screen `error` or `attention` carries
   `role="alert"` and hands the region nothing, so of `ScreenState`'s own states only `empty`,
   `offline` and anything `inline` double; that is why four of MOL-64's five places were not
   failing yet and were fixed anyway. And **`exact: true` is not the rule and holds by
