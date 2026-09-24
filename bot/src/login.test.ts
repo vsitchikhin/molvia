@@ -399,12 +399,14 @@ describe('кнопки', () => {
     expect(calls.some((call) => call.method === 'answerCallbackQuery')).toBe(true)
   })
 
-  it('устаревшее нажатие не глотает отказ: он встаёт в сам вопрос, а не под него', async () => {
-    // Всплывашка — единственный канал отказа с О-1, и именно её Telegram отвергает на
-    // нажатии, прождавшем таймаут клиента. А таймаут клиента — это и есть «не дождался
-    // ответа»: сначала отказ не доходил никуда (В1), потом уходил новым сообщением и
-    // оставался последним словом в чате поверх удавшегося повтора (Г1). Правится сам вопрос:
-    // удачный повтор перепишет ту же строку на исход.
+  it('отказ, который не показать, не пишется никуда — ни в сообщение, ни под него', async () => {
+    // Всплывашка — единственный канал отказа (О-1), и когда Telegram её не принимает, бот
+    // молчит. Два запасных пути это опровергли: сообщение под вопросом оставалось в чате
+    // навсегда и удачный повтор переписывал вопрос **выше** него (Г1), а правка самого
+    // вопроса стирала «Вход подтверждён» и возвращала кнопки, потому что «API не ответил»
+    // вовсе не значит, что не удалось ни одно нажатие — API мог ответить первому и не
+    // ответить второму (Д1). Кнопки остаются, и следующее нажатие несёт свежий запрос,
+    // на который ответить можно.
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const { bot, calls } = harness(
       { confirmLogin: vi.fn().mockRejectedValue(new ApiError(ERROR.INTERNAL, 'aborted', false)) },
@@ -414,39 +416,36 @@ describe('кнопки', () => {
     await bot.handleUpdate(press(`login:ok:${CODE}`, { message: MESSAGE_WITH_BUTTONS }))
 
     expect(calls.filter((call) => call.method === 'sendMessage')).toEqual([])
-    const edit = sent(calls, 'editMessageText')
-    expect(String(edit?.text)).toContain('Не дождался ответа')
-    // Кнопки возвращаются как были: «попробуйте ещё раз» должно быть чем (О-3).
-    expect(edit?.reply_markup).toEqual(MESSAGE_WITH_BUTTONS.reply_markup)
+    expect(calls.filter((call) => call.method === 'editMessageText')).toEqual([])
     expect(calls.filter((call) => call.method === 'editMessageReplyMarkup')).toEqual([])
   })
 
-  it('удачный повтор переписывает тот же отказ на исход', async () => {
-    // Ради этого отказ и пишется в вопрос: в чате остаётся одна строка, и последняя её
-    // редакция — правда (Г1).
+  it('удавшийся вход не переписывается отказом следующего нажатия', async () => {
+    // Двойной тап, и API заболел ровно между ними: первое нажатие подтвердило вход, второе
+    // упёрлось в таймаут и устарело. В чате должен остаться исход, а не отказ с вернувшимися
+    // кнопками — среди которых «Это не я» погасило бы этому же человеку его собственный
+    // подтверждённый вход (Д1).
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const confirmLogin = vi
       .fn()
-      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'aborted', false))
       .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'aborted', false))
     const { bot, calls } = harness({ confirmLogin }, { failing: ['answerCallbackQuery'] })
 
     await bot.handleUpdate(press(`login:ok:${CODE}`, { message: MESSAGE_WITH_BUTTONS }))
     await bot.handleUpdate(press(`login:ok:${CODE}`, { message: MESSAGE_WITH_BUTTONS }))
 
-    expect(calls.filter((call) => call.method === 'sendMessage')).toEqual([])
     const said = calls
-      .filter((call) => call.method === 'editMessageText')
+      .filter((call) => call.method === 'editMessageText' || call.method === 'sendMessage')
       .map((call) => String(call.payload.text))
-    expect(said.at(-1)).toContain('Вход подтверждён')
+    expect(said).toEqual(['Вход подтверждён. Вернитесь в Molvia — приложение узнает вас само.'])
   })
 
   it('мёртвая ссылка на устаревшем нажатии теряет кнопки и ничего не пишет', async () => {
     // `dropKeyboard` стоял после ответа на нажатие и вместе с ним пропускался: у мёртвой
-    // ссылки оставались кнопки, и следующий тап находил то же самое ничто (В1). Сам отказ
-    // при этом не пишется никуда: «ссылка не действует» — то, чем отвечает уже погашенный
-    // запрос, а его мог погасить предыдущий тап, и тогда в сообщении стоит «Вход подтверждён»
-    // (Г1). Исчезнувшие кнопки — сигнал, а слова человек получит, открыв ссылку заново.
+    // ссылки оставались кнопки, и следующий тап находил то же самое ничто (В1). Слова человек
+    // получит, открыв ссылку заново, а исчезнувшие кнопки — сигнал, который писать в чат не
+    // нужно.
     const { bot, calls } = harness(
       { declineLogin: vi.fn().mockRejectedValue(new ApiError(ERROR.LOGIN_UNAVAILABLE)) },
       { failing: ['answerCallbackQuery'] },

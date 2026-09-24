@@ -111,49 +111,33 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
   }
 
   /**
-   * A refusal, shown **over** the message and never left in the chat under it (О-1).
+   * A refusal, shown **over** the message and written nowhere at all.
    *
-   * The alert is the whole channel, and its failure cannot be the end of the matter: a press
-   * that waited out the client's fifteen-second timeout is exactly what this branch meets, and
-   * Telegram will not answer a query that old. That left «не дождался ответа» reaching nobody —
-   * the chat still showed the question, as if nothing had been pressed (В1).
+   * This is О-1's rule, and it is absolute: the chat holds outcomes, and a refusal is a thing
+   * that appears, is read and goes. Two rounds of trying to make an exception for it are the
+   * argument for that (В1 → Г1 → Д1): a refusal put **under** the message stayed there for
+   * good, and the successful retry it asked for rewrote the question above it, so the last word
+   * in the chat was a refusal over a login that had happened. A refusal put **into** the message
+   * did worse — «API did not answer» was supposed to mean no press of this message could have
+   * succeeded, and that is simply false: the API can answer one press and time out on the next,
+   * which is the very case О-2 exists for. It erased «Вход подтверждён» and handed the buttons
+   * back, and «Это не я» among them would then put out the person's own confirmed login.
    *
-   * **The fallback writes into the question, not under it, and only for a refusal that cannot
-   * be standing over a success.** A new message was the first fallback, and it brought О-1 back
-   * through the side door (Г1): «Не дождался ответа» stayed at the bottom of the chat for good,
-   * and the successful retry it asked for rewrote the question *above* it — so the last word in
-   * the chat was again a refusal over a login that had happened. Editing has no such tail: the
-   * retry rewrites the very line the refusal is on.
-   *
-   * `login.failed` is the only kind written this way, and that is what keeps О-1 whole.
-   * «API did not answer» means no press of this message can have succeeded — the same API
-   * answers them all. `login.unavailable` is the opposite: it is what a request answers once it
-   * has been **spent**, which a previous press may well have done, and its message may already
-   * carry «Вход подтверждён». So a dead link that could not be shown is shown by its buttons
-   * going instead (the caller drops them), and by the link itself, which the person can open
-   * again to hear it in words.
+   * So when Telegram will not take the alert — a query aged out while the API was thinking —
+   * nothing is said. The buttons are still there, and the next press carries a **fresh** query
+   * that can be answered; the way that press is made cheap is the client's timeout below, not a
+   * second channel here. For a dead link the caller drops the buttons, and that is the signal.
    */
   async function refuse(ctx: Context, key: MessageKey): Promise<void> {
-    const text = t(ctx.from?.language_code, key)
     try {
       // Over the message rather than under the top edge of the screen: this is the one thing
       // the person has to read, and a toast at a shelf is easy to miss.
-      await ctx.answerCallbackQuery({ text, show_alert: true })
-      return
+      await ctx.answerCallbackQuery({
+        text: t(ctx.from?.language_code, key),
+        show_alert: true,
+      })
     } catch {
-      // Too old to answer. What is left is the message itself — see above for which refusals
-      // are allowed to reach it.
-    }
-    if (key !== 'login.failed') return
-
-    // The keyboard is put back as it was: «попробуйте ещё раз» has to keep the buttons it is
-    // asking about (О-3), and an edit without markup would take them away.
-    const markup = ctx.callbackQuery?.message?.reply_markup
-    try {
-      await ctx.editMessageText(text, markup ? { reply_markup: markup } : {})
-    } catch {
-      // The message is gone, so there is nothing left to contradict and nothing left to edit.
-      await ctx.reply(text)
+      // Nothing to fall back on, deliberately — see above.
     }
   }
 

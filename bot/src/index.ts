@@ -32,9 +32,26 @@ if (!environment.secret) {
   process.exit(0)
 }
 
+/**
+ * How long the bot waits for the API before calling it a failure — a third of the client's own
+ * default, and the number is about Telegram rather than about the API.
+ *
+ * Every one of these calls happens with a person's finger still on a button, and the answer to
+ * a press has to be given while Telegram still accepts it: a query that aged out cannot be
+ * answered at all, and a refusal then reaches nobody (adversarial В1). Waiting fifteen seconds
+ * for a neighbouring container to say one word buys nothing — the API's work here is one
+ * indexed row — and it is the surest way to arrive too late. A press given up on early is safe
+ * to repeat, because `confirm` is idempotent for the same account (О-2).
+ */
+const API_TIMEOUT_MS = 5_000
+
 const runner = startBot(
   assembleBot(botToken, {
-    api: createBotClient({ baseUrl: environment.apiBaseUrl, secret: environment.secret }),
+    api: createBotClient({
+      baseUrl: environment.apiBaseUrl,
+      secret: environment.secret,
+      timeoutMs: API_TIMEOUT_MS,
+    }),
     appUrl: environment.appBaseUrl,
   }),
 )

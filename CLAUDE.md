@@ -946,18 +946,22 @@ shown **which device** they are letting in and says «yes» to it by hand. Ratin
   collected — the button is the only way to reach it. Telling the two apart needs no id to leave
   the server (the preview could take the asker's), and until it is asked for, the answer is the
   same for both and safe for both.
-- **A refusal that cannot be shown is written into the question, never under it.** The alert is
-  the only channel a refusal has, and Telegram will not answer a press that waited out the
-  client's fifteen-second timeout — which is precisely the press this branch meets, because that
-  timeout _is_ the refusal. The alert failing left «не дождался ответа» reaching nobody and a
-  dead link keeping its buttons (В1). A new message was the first fallback, and it brought О-1
-  back through the side door (Г1): the refusal stayed at the bottom of the chat for good, while
-  the successful retry it had asked for rewrote the question _above_ it. **So the fallback edits
-  the question, and only for `login.failed`** — «the API did not answer» means no press of this
-  message can have succeeded, the same API answers them all; `login.unavailable` is what a
-  **spent** request answers, which a previous press may have spent, over a message that may
-  already say «Вход подтверждён». A dead link that could not be shown is shown by its buttons
-  going instead, and `dropKeyboard` sits outside the answer so that always happens.
+- **A refusal is shown over the message and written nowhere — and that rule has no exceptions**
+  (О-1, and two rounds of trying to make one). Telegram will not answer a callback query that
+  aged out while the API was thinking, and then the refusal reaches nobody (В1). Both cures were
+  worse than the disease. A **new message** stayed in the chat for good, so the successful retry
+  it asked for rewrote the question above it and the last word was a refusal over a login that
+  had happened (Г1). **Editing the question** was worse still: it rested on «the API did not
+  answer, so no press of this message can have succeeded», which is false — the API can answer
+  one press and time out on the next, which is the very case idempotent `confirm` exists for —
+  and it erased «Вход подтверждён», handed the buttons back, and «Это не я» among them would
+  then put out the person's own confirmed login (Д1). So when the alert cannot be shown, nothing
+  is said: the buttons are still there, and the next press carries a **fresh** query that can be
+  answered. What that press is made cheap by is the **bot's own API timeout — five seconds, not
+  fifteen** (`API_TIMEOUT_MS`): the answer has to be given while the finger is still on the
+  button, the API's work here is one indexed row, and a press given up on early is safe to
+  repeat. The residue is named: if the alert cannot be shown, that press produces no words at
+  all — for a dead link the buttons go instead, and opening the link again says it in full.
 - **The spinner is cosmetic, and its failure is not news.** `answerCallbackQuery` throws on an
   aged-out query; on the success path it stands in a `finally` after the outcome is written, and
   letting it out wrote «update failed» in the log about a login that had just succeeded (Г2) —
