@@ -86,10 +86,6 @@ export interface RatingsGateQuery {
   readonly windowHours: number
 }
 
-const INT4_MAX = 2 ** 31 - 1
-const FIRST_READABLE = Date.parse('0001-01-01T00:00:00Z')
-const PAST_READABLE = Date.parse('+010000-01-01T00:00:00Z')
-
 export interface CohortReached {
   readonly cohortSize: number
   readonly reached: number
@@ -185,6 +181,12 @@ function toVerdict(row: VerdictShape): Verdict {
     updatedAt: asDate(row.updatedAt),
   })
 }
+
+// The edges of what `reachedRatings` can hand Postgres: `int4`, and the years `toISOString`
+// writes in a form a `timestamptz` reads.
+const INT4_MAX = 2 ** 31 - 1
+const FIRST_READABLE = Date.parse('0001-01-01T00:00:00Z')
+const PAST_READABLE = Date.parse('+010000-01-01T00:00:00Z')
 
 export function createVerdictRepository(db: Conn): VerdictRepository {
   return {
