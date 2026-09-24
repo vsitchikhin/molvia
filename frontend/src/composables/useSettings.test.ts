@@ -59,14 +59,16 @@ afterEach(() => {
 })
 
 describe('settings drafts', () => {
-  it('keeps the draft after 401 and exposes the existing identity retry', async () => {
+  it('keeps the draft after 401 and does not send it a second time', async () => {
+    // Что кончившаяся сессия поднимает экран входа — теперь дело одного шва в `@/api`
+    // (MOL-56), а не проверки внутри формы. Здесь проверяется то, что формы и касается:
+    // введённое остаётся, и повторной отправки нет.
     const { form } = await render()
     form.edit(settingsOf(changed))
     save.mockRejectedValue(new ApiError(ERROR.NO_ACTOR, 'unauthorized'))
     me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR, 'unauthorized'))
     await form.save()
     expect(form.draft?.city).toBe('Ереван')
-    expect(useActorStore().state).toBe('error')
     expect(save).toHaveBeenCalledTimes(1)
   })
 

@@ -6,8 +6,9 @@ import { settleColdStart } from '@/navigation'
 import { router } from '@/router'
 import { installArrival, installViewTransitions } from '@/transitions'
 import { installSheetEntryGuard } from '@/composables/useSheetHistory'
-import { useActorStore } from '@/stores/actor'
+import { sessionEnded, useActorStore } from '@/stores/actor'
 import { forgetTheInviteDoor } from '@/stores/identity'
+import { onMissingActor } from '@/api'
 import '@/styles/main.scss'
 
 // Before the router reads the address: the door of MOL-8 is gone, and this clears what it left
@@ -29,6 +30,10 @@ app.config.errorHandler = (error, _instance, info) => {
 }
 
 app.use(createPinia()).use(router).use(i18n)
+
+// Одна дверь на все отказы «этого браузера мы больше не знаем», с какого бы запроса отказ ни
+// пришёл: экран входа, а не «что-то пошло не так» на пятнадцати экранах (MOL-56).
+onMissingActor(sessionEnded)
 
 // Mounted once the first route is settled: a nested screen opened cold gets its parent laid
 // underneath first, so the first paint is already the screen and not a flash of the parent.

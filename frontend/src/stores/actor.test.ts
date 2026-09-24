@@ -9,15 +9,10 @@ import type { ActorView } from '@molvia/model'
 
 const devLogin = vi.fn<() => Promise<ActorView>>()
 const me = vi.fn<() => Promise<ActorView>>()
-/** What the store registers on the seam, captured so a test can pull it like a real refusal. */
-let missing: (() => void) | undefined
 vi.mock('@/api', () => ({
   api: {
     devLogin: () => devLogin(),
     me: () => me(),
-  },
-  onMissingActor: (told: () => void) => {
-    missing = told
   },
 }))
 
@@ -74,10 +69,10 @@ function withBrokenLocalStorage(run: () => Promise<void>): Promise<void> {
 async function freshStore() {
   vi.resetModules()
   setActivePinia(createPinia())
-  const { useActorStore: fresh } = await import('@/stores/actor')
+  const { useActorStore: fresh, sessionEnded } = await import('@/stores/actor')
   const identity = await import('@/stores/identity')
   const { ApiError } = await import('@molvia/client')
-  return { store: fresh(), identity, ApiError }
+  return { store: fresh(), identity, ApiError, sessionEnded }
 }
 
 /** The rejection the client hands the store when the server does not recognise a request. */
@@ -88,7 +83,6 @@ async function refusal(): Promise<Error> {
 
 beforeEach(() => {
   setActivePinia(createPinia())
-  missing = undefined
   localStorage.clear()
   sessionStorage.clear()
   devLogin.mockReset()
@@ -421,14 +415,14 @@ describe('когда сессию открыли в другом месте', ()
 
 describe('401 посреди работы', () => {
   it('поднимает экран входа, с какого бы запроса отказ ни пришёл', async () => {
-    // Шов живёт в `@/api` и зовёт вот это; проверка самого шва — в `api.test.ts`.
+    // Шов живёт в `@/api`, а связывает их `main.ts`; проверка самого шва — в `api.test.ts`.
     localStorage.setItem(KEY, FIRST.id)
-    const { store } = await freshStore()
+    const { store, sessionEnded } = await freshStore()
     me.mockResolvedValue(FIRST)
     await store.start()
     expect(store.state).toBe('ready')
 
-    missing?.()
+    sessionEnded()
 
     expect(store.state).toBe('signed-out')
     // Ящик на месте: сессия — не данные, и тот же аккаунт вернётся через Telegram.

@@ -9,7 +9,7 @@ import {
   rememberSettings,
   settingsKey,
 } from '@/stores/settingsMemory'
-import { api, onMissingActor } from '@/api'
+import { api } from '@/api'
 import { currentIdentity, isIdentifier, rememberIdentity } from '@/stores/identity'
 
 /**
@@ -224,12 +224,15 @@ export const useActorStore = defineStore('actor', () => {
     state.value = 'ready'
   }
 
-  // The one place that hears «this browser has no session any more», whichever call earned the
-  // refusal. Registered here rather than in a screen: a screen that is not mounted hears
-  // nothing, and the queue sends in the background from `App.vue` (MOL-56).
-  onMissingActor(() => {
-    state.value = 'signed-out'
-  })
-
   return { actor, id, settings, state, start, apply, adopt, recheck, signIn, retry: start }
 })
+
+/**
+ * What any refusal of `error.no_actor` means, wherever it was earned (MOL-56). Wired to the
+ * seam in `main.ts` rather than registered by the store itself: a store that registers a
+ * global callback the moment it is created leaves two of them fighting over one slot, and the
+ * composition root is where a wire between two modules belongs.
+ */
+export function sessionEnded(): void {
+  useActorStore().state = 'signed-out'
+}
