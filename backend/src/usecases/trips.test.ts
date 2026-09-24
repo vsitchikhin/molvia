@@ -9,7 +9,17 @@ import {
   placeSchema,
   yerevanMidnight,
 } from '@molvia/model'
-import type { Actor, CachedRate, Expense, Item, Place, RateProvider, Trip } from '@molvia/model'
+import type {
+  Actor,
+  CachedRate,
+  Exchange,
+  Expense,
+  Item,
+  Place,
+  RatePreference,
+  RateProvider,
+  Trip,
+} from '@molvia/model'
 import type { ExpenseRepository } from '@/db/expenses-repository'
 import type { ItemRepository } from '@/db/items-repository'
 import type { PlaceRepository } from '@/db/places-repository'
@@ -156,9 +166,10 @@ function fakeRepositories(
     exchanges: {
       add: unexpected('exchanges.add'),
       remove: unexpected('exchanges.remove'),
-      list: unexpected('exchanges.list'),
+      list: () => Promise.resolve([]),
       spentSince: unexpected('exchanges.spentSince'),
-      preference: unexpected('exchanges.preference'),
+      // No exchanges is where every person starts, and every trip test before MOL-40 is there.
+      preference: () => Promise.resolve('personal'),
       setPreference: unexpected('exchanges.setPreference'),
       ...overrides.exchanges,
     },
@@ -406,6 +417,120 @@ describe('startTrip: the official rate (MOL-39)', () => {
     })
     expect(asked).toEqual([[['RUB', 'USD'], '2026-09-20']])
     expect(rate).toMatchObject({ rate: { base: 'RUB', quote: 'USD', scaled: 11_865n } })
+  })
+})
+
+describe('startTrip: the person’s own rate (MOL-40)', () => {
+  // Sunday 20.09 at noon in Yerevan.
+  const sunday = new Date('2026-09-20T08:00:00.000Z')
+  const exchange = (
+    exchangedOn: string,
+    given: bigint,
+    received: bigint,
+    held: bigint | null = null,
+    currencies: [Exchange['given']['currency'], Exchange['received']['currency']] = ['RUB', 'AMD'],
+  ): Exchange => ({
+    id: `00000000-0000-4000-8000-${exchangedOn.replaceAll('-', '').padStart(12, '0')}`,
+    actorId: ACTOR,
+    given: { minor: given, currency: currencies[0] },
+    received: { minor: received, currency: currencies[1] },
+    exchangedOn,
+    heldBefore: held === null ? null : { minor: held, currency: currencies[1] },
+    createdAt: new Date(`${exchangedOn}T09:00:00.000Z`),
+  })
+  const owners = [
+    exchange('2026-09-01', 2_000_000n, 10_000_000n),
+    exchange('2026-09-15', 2_000_000n, 9_500_000n, 2_000_000n),
+  ]
+
+  async function startedWith(
+    exchanges: readonly Exchange[],
+    preference: RatePreference = 'personal',
+    person: Actor = actor,
+    now: Date = sunday,
+  ): Promise<{ snapshot: TripSnapshot | null; askedOfficial: boolean }> {
+    let snapshot: TripSnapshot | null = null
+    let askedOfficial = false
+    const repositories = fakeRepositories({
+      ...viewReads,
+      places: { ...viewReads.places, ensure: () => Promise.resolve(place) },
+      trips: {
+        byId: () => Promise.resolve(null),
+        start: (_actorId, _input, currency, taken) => {
+          snapshot = taken
+          return Promise.resolve({ trip: { ...trip, currency, ...held(taken) }, created: true })
+        },
+      },
+      rates: {
+        latestOnOrBefore: () => {
+          askedOfficial = true
+          return Promise.resolve([
+            {
+              provider: 'cba',
+              currency: 'RUB',
+              date: '2026-09-18',
+              scaled: parseRate('4.3123'),
+              jump: false,
+            },
+          ])
+        },
+      },
+      exchanges: {
+        preference: () => Promise.resolve(preference),
+        list: () => Promise.resolve(exchanges),
+      },
+    })
+    await startTrip(
+      transactWith(repositories),
+      person,
+      { id: TRIP, context: settingsOf(person), place: { kind: 'store', name: 'Ереван Сити' } },
+      now,
+    )
+    return { snapshot, askedOfficial }
+  }
+
+  it('snapshots the wallet of the pair, dated by its last exchange, and never asks the bank', async () => {
+    const { snapshot, askedOfficial } = await startedWith(owners)
+
+    expect(snapshot).toEqual({
+      rate: {
+        base: 'RUB',
+        quote: 'AMD',
+        scaled: 4_791_667n,
+        source: 'personal',
+        asOf: yerevanMidnight('2026-09-15'),
+      },
+      provider: null,
+      jumped: false,
+      previous: null,
+    })
+    expect(askedOfficial).toBe(false)
+  })
+
+  it('takes the official rate when the person asked for it, exchanges or not', async () => {
+    const { snapshot } = await startedWith(owners, 'official')
+    expect(snapshot?.rate.source).toBe('official')
+    expect(snapshot?.provider).toBe('cba')
+  })
+
+  it('takes the official rate without an exchange of this pair', async () => {
+    const dollars = [exchange('2026-09-10', 10_000n, 3_800_000n, null, ['USD', 'AMD'])]
+    expect((await startedWith([])).snapshot?.rate.source).toBe('official')
+    expect((await startedWith(dollars)).snapshot?.rate.source).toBe('official')
+  })
+
+  it('counts an exchange of today in Yerevan and not one dated tomorrow', async () => {
+    const today = [exchange('2026-09-20', 2_000_000n, 9_000_000n)]
+    const tomorrow = [exchange('2026-09-21', 2_000_000n, 9_000_000n)]
+    expect((await startedWith(today)).snapshot?.rate.scaled).toBe(parseRate('4.5'))
+    expect((await startedWith(tomorrow)).snapshot?.rate.source).toBe('official')
+  })
+
+  it('asks nothing of the wallet when the two currencies are one', async () => {
+    const local = actorSchema.parse({ ...actor, incomeCurrency: 'AMD' })
+    const { snapshot, askedOfficial } = await startedWith(owners, 'personal', local)
+    expect(snapshot).toBeNull()
+    expect(askedOfficial).toBe(false)
   })
 })
 

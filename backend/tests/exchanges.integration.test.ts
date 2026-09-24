@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { ERROR, exchangesResponseCodec, parseRate, yerevanDate } from '@molvia/model'
+import { ERROR, exchangesResponseCodec, parseRate, tripViewCodec, yerevanDate } from '@molvia/model'
 import type { CachedRate, ExchangesResponse } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
 import { exchanges } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, signIn } from './fixtures'
+import { clearAll, insertActor, signIn, tripContext } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
@@ -295,5 +295,93 @@ describe('«Обмен денег» через API (MOL-40)', () => {
     })
     expect(response.json()).toMatchObject({ pair: null, wallet: null, heldEstimate: null })
     expect(overviewOf(response.json()).exchanges).toHaveLength(1)
+  })
+})
+
+describe('свой курс в походе (MOL-40)', () => {
+  async function start(owner: { id: string; cookie: string }, id = randomUUID()) {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/trips',
+      headers: { cookie: owner.cookie },
+      payload: {
+        id,
+        context: await tripContext(db, owner.id),
+        place: { kind: 'store', name: 'Ереван Сити' },
+      },
+    })
+    return { status: response.statusCode, trip: tripViewCodec.parse(response.json()) }
+  }
+
+  it('новый поход берёт курс кошелька: source personal, без издателя и без «устарел»', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(1))])
+    const me = await owner()
+    await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: payload({ received: { amount: '95000', currency: 'AMD' } }),
+    })
+
+    const { status, trip } = await start(me)
+    expect(status).toBe(201)
+    expect(trip.rate).toMatchObject({ base: 'RUB', quote: 'AMD', scaled: parseRate('4.75') })
+    expect(trip.rate?.source).toBe('personal')
+    expect(trip.rateProvider).toBeNull()
+    expect(trip.rateStale).toBe(false)
+    expect(trip.rateJump).toBeNull()
+  })
+
+  it('«официальный» — и поход берёт ЦБ РА при любых обменах', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(1))])
+    const me = await owner()
+    await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: payload(),
+    })
+    await app.inject({
+      method: 'PUT',
+      url: '/actors/me/rate-preference',
+      headers: { cookie: me.cookie },
+      payload: { preference: 'official' },
+    })
+
+    const { trip } = await start(me)
+    expect(trip.rate?.source).toBe('official')
+    expect(trip.rateProvider).toBe('cba')
+  })
+
+  it('обмен после старта не трогает открытый поход, и повтор старта — прежний снимок', async () => {
+    const me = await owner()
+    await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: payload(),
+    })
+    const id = randomUUID()
+    const first = await start(me, id)
+    expect(first.trip.rate?.scaled).toBe(parseRate('5'))
+
+    await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: payload({ received: { amount: '80000', currency: 'AMD' }, exchangedOn: today }),
+    })
+    const repeat = await start(me, id)
+    expect(repeat.status).toBe(200)
+    expect(repeat.trip.rate?.scaled).toBe(parseRate('5'))
+
+    const current = await app.inject({
+      method: 'GET',
+      url: '/trips/current',
+      headers: { cookie: me.cookie },
+    })
+    expect(current.json()).toMatchObject({
+      trip: { rate: { rate: '5.000000', source: 'personal' } },
+    })
   })
 })
