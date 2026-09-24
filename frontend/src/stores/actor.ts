@@ -1,8 +1,14 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ApiError } from '@molvia/client'
-import { ERROR } from '@molvia/model'
+import { ERROR, settingsOf } from '@molvia/model'
 import type { ActorView } from '@molvia/model'
+import {
+  recallSettings,
+  recallSettingsSnapshot,
+  rememberSettings,
+  settingsKey,
+} from '@/stores/settingsMemory'
 import { api } from '@/api'
 import { IDENTITY_KEY, currentIdentity, isIdentifier, rememberIdentity } from '@/stores/identity'
 
@@ -43,11 +49,50 @@ export const useActorStore = defineStore('actor', () => {
   const actor = ref<ActorView | null>(null)
   const id = ref<string | null>(currentIdentity())
   const state = ref<IdentityState>('idle')
+  const cachedSettings = ref(recallSettings(id.value))
+  const settings = computed(() =>
+    actor.value?.id === id.value ? settingsOf(actor.value) : cachedSettings.value,
+  )
+  watch(
+    id,
+    (owner) => {
+      cachedSettings.value = recallSettings(owner)
+    },
+    { flush: 'sync' },
+  )
+  watch(
+    actor,
+    (loaded) => {
+      if (loaded?.id === id.value) {
+        cachedSettings.value = settingsOf(loaded)
+        rememberSettings(loaded.id, cachedSettings.value, loaded.updatedAt)
+      }
+    },
+    { flush: 'sync' },
+  )
+  window.addEventListener('storage', (event) => {
+    if (id.value && event.key === settingsKey(id.value)) {
+      const snapshot = recallSettingsSnapshot(id.value)
+      if (
+        !snapshot ||
+        (actor.value && snapshot.updatedAt && actor.value.updatedAt > snapshot.updatedAt)
+      )
+        return
+      cachedSettings.value = snapshot.settings
+      if (actor.value)
+        actor.value = {
+          ...actor.value,
+          ...snapshot.settings,
+          updatedAt: snapshot.updatedAt ?? actor.value.updatedAt,
+        }
+    }
+  })
   /** True while `start` is in flight, so a retry button cannot queue a second one. */
   let running = false
 
   function settle(loaded: ActorView): void {
     const was = currentIdentity()
+    if (actor.value?.id === loaded.id && actor.value.updatedAt > loaded.updatedAt) return
     actor.value = loaded
     id.value = loaded.id
     // Written down because the app needs it **before** the server can be asked: at the shelf
@@ -55,6 +100,8 @@ export const useActorStore = defineStore('actor', () => {
     // nobody to ask who we are (MOL-53, Р-9). It is not a credential any more — nothing sends
     // it anywhere — it is the name of a drawer.
     rememberIdentity(loaded.id)
+    cachedSettings.value = settingsOf(loaded)
+    rememberSettings(loaded.id, cachedSettings.value, loaded.updatedAt)
 
     // **A different owner than last time leaves the previous one's drawers where they are, and
     // out of reach** (MOL-53, Б1/Б2): the trip queue, the recent items and the verdict drafts
@@ -175,5 +222,15 @@ export const useActorStore = defineStore('actor', () => {
     if (document.visibilityState === 'visible') recover()
   })
 
-  return { actor, id, state, start, retry: start }
+  function apply(loaded: ActorView): void {
+    if (
+      loaded.id !== id.value ||
+      (actor.value?.id === loaded.id && actor.value.updatedAt > loaded.updatedAt)
+    )
+      return
+    actor.value = loaded
+    state.value = 'ready'
+  }
+
+  return { actor, id, settings, state, start, apply, retry: start }
 })

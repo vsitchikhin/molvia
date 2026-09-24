@@ -23,6 +23,7 @@
 <script lang="ts">
 import { defineComponent, markRaw } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconCog from '~icons/mdi/cog-outline'
 import IconCart from '~icons/mdi/cart-outline'
 import IconLightbulb from '~icons/mdi/lightbulb-on-outline'
 import IconStar from '~icons/mdi/star-outline'
@@ -33,10 +34,11 @@ const tabs: { name: Tab; icon: object }[] = [
   { name: 'trip', icon: markRaw(IconCart) },
   { name: 'advice', icon: markRaw(IconLightbulb) },
   { name: 'verdicts', icon: markRaw(IconStar) },
+  { name: 'settings', icon: markRaw(IconCog) },
 ]
 
 /**
- * The three sections of 0.1. Which one is active is the router's to say — its exact match sets
+ * The four sections of 0.1. Which one is active is the router's to say — its exact match sets
  * `aria-current="page"`, and the style hangs on that attribute rather than on a class of its
  * own, so what a screen reader hears and what the eye sees cannot disagree.
  *
@@ -72,7 +74,7 @@ export default defineComponent({
   left: 0;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
 
   /* 74 + the home indicator, not the handoff's fixed 74 + 22: 22 is one iPhone's indicator,
      and a phone with buttons would get an empty strip. */

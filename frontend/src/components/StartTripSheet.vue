@@ -2,7 +2,15 @@
   <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
     <template #title>{{ t('trip.start.title') }}</template>
 
-    <div v-if="places.places.length > 0" class="recent">
+    <ScreenState
+      v-if="!actor.settings"
+      kind="offline"
+      tone="warn"
+      inline
+      :title="t('settings.offline.title')"
+      :body="t('settings.context_missing')"
+    />
+    <div v-if="actor.settings && places.places.length > 0" class="recent">
       <button
         v-for="place in places.places"
         :key="place.id"
@@ -38,6 +46,8 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { newId } from '@/ids'
+import { useActorStore } from '@/stores/actor'
+import ScreenState from '@/components/ScreenState.vue'
 import { useRecentPlacesStore } from '@/stores/recentPlaces'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -56,7 +66,7 @@ const NAME_MAX = 200
  */
 export default defineComponent({
   name: 'StartTripSheet',
-  components: { AppButton, AppField, BottomSheet },
+  components: { AppButton, AppField, BottomSheet, ScreenState },
   props: {
     open: { type: Boolean, required: true },
   },
@@ -66,6 +76,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n()
     const queue = useTripQueueStore()
+    const actor = useActorStore()
     const places = useRecentPlacesStore()
 
     const name = ref('')
@@ -93,13 +104,17 @@ export default defineComponent({
     )
 
     const ready = computed(
-      () => !drawsNothing(name.value) && newPlaceSchema.shape.name.safeParse(name.value).success,
+      () =>
+        !!actor.settings &&
+        !drawsNothing(name.value) &&
+        newPlaceSchema.shape.name.safeParse(name.value).success,
     )
 
     function start(place: string): void {
-      if (drawsNothing(place)) return
+      if (drawsNothing(place) || !actor.settings) return
       queue.enqueue({
         kind: 'start',
+        context: { ...actor.settings },
         // Named by the device, in lower case, and never by `crypto.randomUUID` alone: a phone on
         // the LAN over plain http has no such function, and the tap would throw (В2-10).
         tripId: newId(),
@@ -111,7 +126,7 @@ export default defineComponent({
 
     // The store itself, not its list: an array unwrapped here would stop following the store,
     // and the places the server answers with would never reach the screen.
-    return { t, name, ready, NAME_MAX, places, start }
+    return { t, name, ready, NAME_MAX, places, start, actor }
   },
 })
 </script>

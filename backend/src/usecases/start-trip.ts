@@ -1,4 +1,4 @@
-import { pickOfficialRate, yerevanDate } from '@molvia/model'
+import { DomainError, ERROR, geographyAllowed, pickOfficialRate, yerevanDate } from '@molvia/model'
 import type { Actor, AmdRate, OfficialRate, StartTripBody, TripView } from '@molvia/model'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
 import { tripViewFor } from './trip-view'
@@ -12,8 +12,9 @@ export interface Started {
 /**
  * «Начать поход».
  *
- * The place is named, not picked: the country and the city are the person's own settings, and
- * `places.ensure` meets «ЕРЕВАН СИТИ» and «ереван сити» at the one shop. «Yerevan City» is a
+ * The place is named, not picked: the country and the city come from the trip's own context —
+ * the settings as the phone knew them when it started, which offline may be older than the
+ * row — and `places.ensure` meets «ЕРЕВАН СИТИ» and «ереван сити» at the one shop. «Yerevan City» is a
  * second shop, accepted for 0.1 — merging places is 0.2's, as merging items is (MOL-21, В-11).
  *
  * The currency is a snapshot of the person's setting, and so is the rate: the official one, read
@@ -33,17 +34,31 @@ export async function startTrip(
     const already = await repositories.trips.byId(body.id, actor.id)
     if (already) return { trip: await tripViewFor(repositories, already), created: false }
 
+    // Checked against the actor rather than by the body's own schema: `places` is a table
+    // everyone shares, and without this the two cities the settings form offers are held by
+    // the form alone — one `POST` away from a shop in a city that does not exist (MOL-65,
+    // review 1). The same predicate `PUT /actors/me/settings` refuses by.
+    //
+    // «Not named» and «named in a way nothing may be written under» are one answer, because
+    // they are one question for the person: name the city and the currencies of this trip.
+    // A 400 would have been the end of that trip —
+    // the queue sets a start it cannot send aside, and its purchases go with it, which is the
+    // very thing the context exists to prevent (MOL-65, review 2, замечание 9). It happens to
+    // a geography granted by hand, outside the form's two cities, after the person moves on.
+    const context = body.context && geographyAllowed(body.context, actor) ? body.context : null
+    if (!context) throw new DomainError(ERROR.TRIP_CONTEXT_REQUIRED)
+
     const place = await repositories.places.ensure({
       kind: body.place.kind,
       name: body.place.name,
-      country: actor.country,
-      city: actor.city,
+      country: context.country,
+      city: context.city,
     })
-    const official = await officialRateFor(repositories, actor, now)
+    const official = await officialRateFor(repositories, context, now)
     const { trip, created } = await repositories.trips.start(
       actor.id,
       { id: body.id, placeId: place.id },
-      actor.spendCurrency,
+      context.spendCurrency,
       official,
     )
     return { trip: await tripViewFor(repositories, trip), created }
@@ -59,7 +74,7 @@ export async function startTrip(
  */
 async function officialRateFor(
   { rates }: Pick<TripRepositories, 'rates'>,
-  actor: Actor,
+  actor: Pick<Actor, 'incomeCurrency' | 'spendCurrency'>,
   now: Date,
 ): Promise<OfficialRate | null> {
   const base = actor.incomeCurrency

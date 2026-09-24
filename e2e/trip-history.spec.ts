@@ -2,6 +2,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { actorCodec, settingsOf } from '@molvia/model'
 import { asBrowser, signedIn } from './session'
 
 interface WireTrip {
@@ -12,9 +13,15 @@ interface WireTrip {
 }
 const sheet = (page: Page) => page.locator('dialog[open]')
 async function createTrip(page: Page, name: string): Promise<WireTrip> {
+  const headers = await asBrowser(page)
+  // A trip names the settings it was started with since MOL-65; the server takes its city and
+  // currencies from there, so a start without them is the old queue's and answers 409.
+  const context = settingsOf(
+    actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+  )
   const response = await page.request.post('/api/trips', {
-    headers: await asBrowser(page),
-    data: { id: randomUUID(), place: { name, kind: 'store' } },
+    headers,
+    data: { context, id: randomUUID(), place: { name, kind: 'store' } },
   })
   expect(response.status()).toBe(201)
   return (await response.json()) as WireTrip

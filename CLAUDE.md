@@ -673,7 +673,9 @@ database access. In a product about data integrity, two write paths will silentl
   While a shelf refuses, what came after lives in memory only, and a PWA killed before it sends
   loses that — there is nowhere left to keep it. No connection, a 5xx, an answer off the contract (a shop's
   captive portal) and a 401 hold the queue, and so does a code the API did not say itself
-  (`ApiError.answered === false` — a portal's 404 page); any other refusal is set aside in
+  (`ApiError.answered === false` — a portal's 404 page). `error.trip_context_required` holds it
+  too, and holds it **without a timer**: nothing changes until the person names the city and the
+  currencies of a trip the old app started (MOL-65). Any other refusal is set aside in
   `rejected` and never retried — sent again it would be refused again and hold everything behind
   it. The last known trip is remembered per identity for the same reason: the app opened at the
   shelf with no signal still knows where a purchase goes — but **the memory is for when the
@@ -956,6 +958,33 @@ shelf, so a desktop-only pass would prove nothing about the screen that matters.
   in this copy's band). A database alone would not have closed it: `reuseExistingServer`
   handed the suite the dev API whenever `make dev` was up, so no `DATABASE_URL` of ours
   reached a process — and `pre-push` runs e2e exactly then. Now the two stacks coexist.
+- **Words that are said out loud are taken end-to-end by a locator outside the live region**
+  (MOL-64). The app has one polite region, in `App.vue` above the router, and **six things write
+  to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
+  count of an answer, and an empty answer's own words), `ItemDetailsSheet` (the price per unit),
+  `VerdictCard` («Pick a rating») and `useSettings` (the form's notice). Whatever any of them
+  says is on the screen twice, so a plain `getByText` matches two nodes and playwright's strict
+  mode refuses — a failure the machine's speed decides: measured, one match at once and two from
+  200 ms onwards. Strict mode is right, and it is answered with a locator, never muted with
+  `.first()`; the region is not the place to fix it either, since the whole announcement is
+  MOL-19's decision — a screen reader hears the state whole. **The heading when the block has
+  one** (`getByRole('heading', { name: … })`), **the block's own container when it has none** —
+  the search's `.not-found-text`, the settings' `.dock`. Three things are easy to get wrong.
+  **A heading needs its name where the level is shared:** `{ level: 2 }` alone is not outside
+  anything, because a state's `h2` is the level of a card's and a sheet's too, and an inline
+  notice puts two of them on one screen (MOL-64, Н3). The `h1` is the exception rather than a
+  loophole — `AppScreen` draws one per screen and the pinned copy of the title is `aria-hidden` —
+  so `getByRole('heading', { level: 1 })` is the screen's own title, and asserting its text is
+  what says which screen this is (`navigation.spec.ts`, `sheet.spec.ts`); naming it there would
+  only restate the answer. A second `h1` would make those two the same race. **Not every state speaks** — a full-screen `error` or `attention` carries
+  `role="alert"` and hands the region nothing, so of `ScreenState`'s own states only `empty`,
+  `offline` and anything `inline` double; that is why four of MOL-64's five places were not
+  failing yet and were fixed anyway. And **`exact: true` is not the rule and holds by
+  accident:** it saves only while the announcement is longer than what the screen shows.
+  `ScreenState` joins with `[title, body].filter(Boolean)`, so a title without a body is
+  announced alone and matches exactly too; `useSettings` writes `${title}. ${body}` unfiltered,
+  and the trailing «. » is the only reason two settings assertions were ever green (Н2). Two
+  ways of joining one string, and a locator must not depend on which one ran.
 - **When a test fails, look for the bug in the code first** — do not adjust the test to
   match the behaviour. A test proves the app works, not the other way round. And **never by
   making it tolerate leftovers**: that hides the cause and leaves the suite depending on the
@@ -1135,6 +1164,35 @@ it is behind `import.meta.env.DEV`, so the production bundle does not hold it ei
 MOL-54 added the real API: browser start/poll and internal bot preview/confirm/decline, shared
 contracts and separate clients. Production requires `TELEGRAM_BOT_USERNAME` and `BOT_API_SECRET`.
 The user-facing flow still needs bot commands (MOL-55) and the PWA screen (MOL-56).
+
+MOL-65 gave the person their four fields and a fourth tab: Armenia, Гюмри or Ереван, the currency
+purchases are written in and the one they are converted into. `PUT /actors/me/settings` compares
+the four it was handed **inside the `UPDATE`**, so two devices cannot both overwrite one form,
+and an exact repeat after a lost answer is successful because the target matches as well. The
+form is settled **choice by choice**: one nobody here touched follows whatever the account holds
+now, and «conflict» means both devices changed the same one — sending the whole stale form took
+the other device's move back silently, with nothing on the screen to say which field was about to
+go. **A trip names its own geography** (`context`): the settings as the phone knew them when it
+started, which offline may be older than the row, so a move made elsewhere neither renames the
+shop nor changes the currency of a trip already begun. A start from the old queue carries none,
+and so does one naming a geography nothing may be written under — **one answer,
+`error.trip_context_required`, because it is one question for the person**; the queue **holds it
+without a retry** until they name the city and the currencies, because nothing else knows where
+that trip was. A 400 there would have been the end of that trip: the queue sets a start it cannot
+send aside, and the purchases behind it go too. **What a trip may name is the rule the settings
+refuse by** — `geographyAllowed`: one's own current city, or AM with one of `SETTINGS_CITIES`.
+`places` is a table everyone shares, and «the country is fixed as Armenia» must not be held by
+the form alone. The city is read by the fold
+`places.ensure` stores it under, never by the exact spelling, or a shop written «гюмри» once
+falls out of its own owner's prices. **The form's draft belongs to the account and not to the
+window**: it is kept under the owner's key on the device, as verdict drafts are, because the
+system closes an installed app by itself — and «изменения останутся только пока приложение
+открыто» is then what it says, a shelf that refused, rather than a permanent condition nobody
+is told about. It is written to both shelves and **read from this window's own one first**, so
+a new launch takes the last draft written while two windows open at once keep the forms they
+are typing into. «Что брать» answers with the geography it counted by, and
+the phone compares it with its own: a different city is a list to load again, and an answer the
+settings will not move to is taken as it is — the screen used to stay on a skeleton for good.
 
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 

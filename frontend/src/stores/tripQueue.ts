@@ -11,6 +11,7 @@ import {
   startTripBodySchema,
 } from '@molvia/model'
 import type {
+  ActorSettings,
   AddExpenseBody,
   CatalogueEntry,
   ExpensePatch,
@@ -34,6 +35,7 @@ import { useTripStore } from '@/stores/trip'
 export type QueuedWrite =
   | {
       readonly kind: 'start'
+      readonly context?: ActorSettings
       readonly tripId: string
       readonly place: StartTripBody['place']
       /**
@@ -136,6 +138,7 @@ function encode(entry: QueuedWrite): Loose {
         kind: 'start',
         tripId: entry.tripId,
         place: { ...entry.place },
+        ...(entry.context ? { context: entry.context } : {}),
         startedAt: entry.startedAt.toISOString(),
       }
     case 'finish':
@@ -172,10 +175,20 @@ function decode(raw: unknown): QueuedWrite | null {
   if (kind === 'start') {
     // Through the body's own schema, so a name the server would refuse never waits in the queue
     // for a connection that will only bring a `400`.
-    const body = startTripBodySchema.safeParse({ id: tripId, place: raw.place })
+    const body = startTripBodySchema.safeParse({
+      id: tripId,
+      place: raw.place,
+      context: raw.context,
+    })
     const startedAt = typeof raw.startedAt === 'string' ? new Date(raw.startedAt) : null
     if (!body.success || startedAt === null || Number.isNaN(startedAt.getTime())) return null
-    return { kind, tripId, place: body.data.place, startedAt }
+    return {
+      kind,
+      tripId,
+      place: body.data.place,
+      startedAt,
+      ...(body.data.context ? { context: body.data.context } : {}),
+    }
   }
   if (kind === 'finish') {
     if (raw.finishedOnDeviceAt === undefined) return { kind, tripId }
@@ -292,7 +305,13 @@ function recallRejected(key: string): { items: RejectedWrite[]; named: boolean }
 function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
   switch (entry.kind) {
     case 'start':
-      return api.startTrip({ id: entry.tripId, place: entry.place }).then(({ trip }) => trip)
+      return api
+        .startTrip({
+          id: entry.tripId,
+          place: entry.place,
+          ...(entry.context ? { context: entry.context } : {}),
+        })
+        .then(({ trip }) => trip)
     case 'finish':
       return api.finishTrip(entry.tripId, entry.finishedOnDeviceAt).then(() => null)
     case 'add':
@@ -391,6 +410,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   const rejected = ref<RejectedWrite[]>([])
   /** Every conflicting start waits for a choice, including the same shop. */
   const elsewhere = ref<TripElsewhere | null>(null)
+  const needsContext = ref<string | null>(null)
   let conflict: { owner: string; key: string; tripId: string } | null = null
   let decision: {
     owner: string
@@ -407,6 +427,15 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
 
   function show(): void {
     pending.value = kept.map((item) => item.write)
+    // The question stands while its start does — whether or not that start carries a context:
+    // one that is there and unusable waits for the same answer (MOL-65, review 3). The third
+    // copy of this condition was left behind and put the banner out on any `sync`, which is
+    // every purchase made at the shelf with no signal.
+    if (
+      needsContext.value &&
+      !pending.value.some((write) => write.kind === 'start' && write.tripId === needsContext.value)
+    )
+      needsContext.value = null
   }
 
   /** What storage holds now — another window may have changed it. */
@@ -453,6 +482,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     conflict = null
     decision = null
     ahead = false
+    needsContext.value = null
     kept = []
     rejected.value = []
     sync(id)
@@ -549,6 +579,18 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
           return
         }
         const start = head.write
+        if (code === ERROR.TRIP_CONTEXT_REQUIRED && start.kind === 'start') {
+          // The context this start carries may be there and still unusable — a geography the
+          // person no longer holds, which the settings form cannot offer either (MOL-65,
+          // review 2). Either way the answer is the same question, and the queue waits for it
+          // rather than setting the start aside with every purchase behind it.
+          if (
+            actor.id === owner &&
+            kept.some((item) => item.write.kind === 'start' && item.write.tripId === start.tripId)
+          )
+            needsContext.value = start.tripId
+          return
+        }
         if (code === ERROR.TRIP_OPEN && start.kind === 'start') {
           if (!(await rerouted(owner, { key: head.key, write: start }))) return
           if (immediate++ > 0) {
@@ -618,6 +660,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       // nothing left to choose (раунд 2, Г3; Ч-1).
       if (write.kind === 'start') {
         elsewhere.value = null
+        needsContext.value = null
         conflict = null
         decision = null
       }
@@ -884,7 +927,17 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     return trip.expenses.some((row) => row.id === write.body.id)
   }
 
+  function supplyContext(tripId: string, context: ActorSettings): void {
+    sync(actor.id)
+    const entry = kept.find((item) => item.write.kind === 'start' && item.write.tripId === tripId)
+    if (entry?.write.kind !== 'start') return
+    needsContext.value = null
+    enqueue({ ...entry.write, context })
+  }
+
   return {
+    needsContext,
+    supplyContext,
     pending,
     rejected,
     elsewhere,

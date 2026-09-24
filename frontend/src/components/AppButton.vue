@@ -5,6 +5,9 @@
     :type="type"
     :disabled="disabled"
     :aria-label="label"
+    :aria-disabled="inactive || busy ? true : undefined"
+    :aria-busy="busy || undefined"
+    @click="click"
   >
     <!-- An icon-only button draws its icon from the default slot; the label names it. -->
     <span v-if="variant === 'icon'" class="glyph" aria-hidden="true"><slot /></span>
@@ -31,7 +34,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger-ghost' |
  * button with text does not need one and should not get one, since it would replace the text
  * for voice control.
  *
- * No spinner and no loading state: saving is local and instant, sending is in the background.
+ * Network-backed actions can be busy; inactive keeps the action focusable and described.
  */
 export default defineComponent({
   name: 'AppButton',
@@ -40,13 +43,27 @@ export default defineComponent({
     size: { type: String as PropType<'regular' | 'large'>, default: 'regular' },
     block: { type: Boolean, default: false },
     type: { type: String as PropType<'button' | 'submit' | 'reset'>, default: 'button' },
+    busy: { type: Boolean, default: false },
+    inactive: { type: Boolean, default: false },
     disabled: { type: Boolean, default: false },
     label: { type: String, default: undefined },
   },
-  setup(props) {
+  emits: { click: (event: MouseEvent) => event instanceof MouseEvent },
+  setup(props, { emit }) {
     if (import.meta.env.DEV && props.variant === 'icon' && !props.label) {
       console.warn('[AppButton] an icon-only button needs a label: nothing else names it')
     }
+    function click(event: MouseEvent): void {
+      if (props.disabled || props.inactive || props.busy) {
+        // Stopped as well as prevented: a `disabled` button fires no click at all, and an
+        // inactive one must not reach a handler above it either (MOL-65, review).
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
+      emit('click', event)
+    }
+    return { click }
   },
 })
 </script>
@@ -72,7 +89,8 @@ export default defineComponent({
     @include focus-ring;
   }
 
-  &:disabled {
+  &:disabled,
+  &[aria-disabled='true']:not([aria-busy='true']) {
     opacity: 0.45;
     cursor: not-allowed;
   }

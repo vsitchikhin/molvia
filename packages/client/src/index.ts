@@ -7,6 +7,7 @@ import {
   loginPollCodec,
   ISSUE,
   actorCodec,
+  settingsUpdateSchema,
   adviceResponseSchema,
   addExpenseBodySchema,
   catalogueEntryCodec,
@@ -32,6 +33,8 @@ import type {
   LoginStarted,
   LoginPoll,
   ActorView,
+  SettingsUpdate,
+  SettingsGeography,
   AdviceResponse,
   AddExpenseBody,
   CatalogueEntry,
@@ -72,6 +75,7 @@ export interface MolviaClient {
   devLogin(): Promise<ActorView>
   /** Who this browser is, according to the session it is carrying — or `error.no_actor`. */
   me(): Promise<ActorView>
+  saveSettings(input: SettingsUpdate): Promise<ActorView>
   /**
    * The catalogue lookup behind «что взяли?», ranked by the server — the query goes as typed.
    * The screen searches while the person types, so a search the next keystroke made stale is
@@ -87,7 +91,7 @@ export interface MolviaClient {
    */
   proposeItem(input: ProposedItem): Promise<{ entry: CatalogueEntry; created: boolean }>
   /** The places this person shopped in lately, to tap at the door instead of typing. */
-  recentPlaces(): Promise<TripPlace[]>
+  recentPlaces(geography?: SettingsGeography): Promise<TripPlace[]>
   /**
    * «Начать поход». The identifier is the device's own, so sending it again after a lost reply
    * is safe: `created` is then `false` and the trip is the one already there. Another open trip
@@ -207,6 +211,11 @@ export function createClient(options: ClientOptions): MolviaClient {
       request('/dev/login', actorCodec, { method: 'POST', timeout: null }),
 
     me: () => request('/actors/me', actorCodec),
+    saveSettings: async (input) =>
+      request('/actors/me/settings', actorCodec, {
+        method: 'PUT',
+        body: encode(settingsUpdateSchema, input),
+      }),
 
     searchCatalogue: async (query, options = {}) => {
       // URLSearchParams, not a template: «&», «#», «+» and «%» in a query would otherwise
@@ -231,7 +240,15 @@ export function createClient(options: ClientOptions): MolviaClient {
       return { entry: data, created: status === 201 }
     },
 
-    recentPlaces: async () => (await request('/places/recent', recentPlacesResponseSchema)).places,
+    recentPlaces: async (geography) =>
+      (
+        await request(
+          geography
+            ? `/places/recent?${new URLSearchParams(geography).toString()}`
+            : '/places/recent',
+          recentPlacesResponseSchema,
+        )
+      ).places,
 
     // `async` everywhere below for the reason `proposeItem` has it: a body the schema refuses
     // must arrive as a rejection. Ordinary timeouts: every one of these is safe to repeat — the

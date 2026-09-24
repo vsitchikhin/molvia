@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { actorSettingsSchema } from './settings'
 import { CATALOGUE_QUERY_MAX, catalogueEntryCodec, catalogueEntryOf } from './catalogue'
 import type { Expense } from '#model/entities/expense'
 import { newExpenseSchema } from '#model/entities/expense'
@@ -43,6 +44,8 @@ const deviceIdSchema = z.uuid().regex(/^[0-9a-f-]+$/)
  */
 export const startTripBodySchema = z.strictObject({
   id: deviceIdSchema,
+  // Optional only for a repeat from the old queue; a new trip must supply it.
+  context: actorSettingsSchema.optional(),
   place: z.strictObject({
     kind: z.literal('store'),
     name: newPlaceSchema.shape.name,

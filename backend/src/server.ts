@@ -31,6 +31,9 @@ import { pendingVerdicts } from '@/usecases/pending-verdicts'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { signIn } from '@/usecases/sign-in'
 import { chooseTripRate } from '@/usecases/choose-trip-rate'
+import { createSettingsRepository } from '@/db/settings-repository'
+import { saveSettings } from '@/usecases/save-settings'
+import { settingsRoute } from '@/routes/settings'
 import { startTrip } from '@/usecases/start-trip'
 import { startLogin } from '@/usecases/start-login'
 import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
@@ -60,6 +63,7 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   // Also well formed: another trip of the same person is still open, and which of the two goes
   // on is the person's choice (MOL-21). The screen reads the code, the status only groups it.
   [ERROR.TRIP_OPEN]: 409,
+  [ERROR.TRIP_CONTEXT_REQUIRED]: 409,
   // Not 400: the request is well formed, it simply names no subject the server can find.
   // The PWA reads exactly this to decide that its stored identity is gone (MOL-8, Р-4).
   [ERROR.NO_ACTOR]: 401,
@@ -271,11 +275,16 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     void instance.register((guarded, _guardedOptions, guardedDone) => {
       withActor(guarded, (token) => authenticate(sessions, token))
       actorMeRoute(guarded)
+      settingsRoute(guarded, (owner, input) =>
+        saveSettings(createSettingsRepository(db), owner, input),
+      )
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items }, actorId, query),
         propose: (actorId, input) => proposeItem(items, actorId, input),
       })
-      placeRoutes(guarded, { recent: (actorId) => recentPlaces(tripData.places, actorId) })
+      placeRoutes(guarded, {
+        recent: (actorId, geography) => recentPlaces(tripData.places, actorId, geography),
+      })
       tripRoutes(guarded, {
         start: (actor, body) => startTrip(transact, actor, body),
         current: (actorId) => currentTrip(tripData, actorId),

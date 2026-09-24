@@ -14,7 +14,7 @@ import { expenses, places, searchPicks } from '@/db/schema'
 import { searchQueryKey } from '@/db/items-repository'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, signIn } from './fixtures'
+import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
 
 const { db, close } = connectDrizzle()
 // The test pool holds one connection, so a second server needs its own to run beside the first,
@@ -71,7 +71,11 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 async function startTrip(actor: string, name = 'Ереван Сити'): Promise<string> {
   const id = randomUUID()
-  const reply = await call(app, 'POST', '/trips', actor, { id, place: { kind: 'store', name } })
+  const reply = await call(app, 'POST', '/trips', actor, {
+    context: await tripContext(db, actor),
+    id,
+    place: { kind: 'store', name },
+  })
   expect(reply.status).toBe(201)
   return id
 }
@@ -210,6 +214,7 @@ describe('В. id устройства — только в нижнем реги�
       itemId: milk,
     })
     const started = await call(app, 'POST', '/trips', actor, {
+      context: await tripContext(db, actor),
       id: randomUUID().toUpperCase(),
       place: { kind: 'store', name: 'Рынок' },
     })
@@ -323,7 +328,11 @@ describe('Г. правка и удаление наперегонки с уда�
 describe('Д. невидимый знак по краю имени — то же место', () => {
   async function startAndFinish(actor: string, name: string) {
     const id = randomUUID()
-    const reply = await call(app, 'POST', '/trips', actor, { id, place: { kind: 'store', name } })
+    const reply = await call(app, 'POST', '/trips', actor, {
+      context: await tripContext(db, actor),
+      id,
+      place: { kind: 'store', name },
+    })
     expect(reply.status).toBe(201)
     expect((await call(app, 'POST', `/trips/${id}/finish`, actor)).status).toBe(204)
     return view(reply).place.id
@@ -360,7 +369,11 @@ describe('Д. невидимый знак по краю имени — то же
 describe('Д, заход 2: невидимый знак и перевод строки по краю вместе', () => {
   async function placeOf(actor: string, name: string) {
     const id = randomUUID()
-    const reply = await call(app, 'POST', '/trips', actor, { id, place: { kind: 'store', name } })
+    const reply = await call(app, 'POST', '/trips', actor, {
+      context: await tripContext(db, actor),
+      id,
+      place: { kind: 'store', name },
+    })
     expect(reply.status).toBe(201)
     expect((await call(app, 'POST', `/trips/${id}/finish`, actor)).status).toBe(204)
     return view(reply).place
@@ -388,7 +401,11 @@ describe('Д, заход 2: невидимый знак и перевод стр
 describe('заход 3: вид и тождество места — разные вопросы', () => {
   async function placeOf(actor: string, name: string) {
     const id = randomUUID()
-    const reply = await call(app, 'POST', '/trips', actor, { id, place: { kind: 'store', name } })
+    const reply = await call(app, 'POST', '/trips', actor, {
+      context: await tripContext(db, actor),
+      id,
+      place: { kind: 'store', name },
+    })
     expect(reply.status).toBe(201)
     expect((await call(app, 'POST', `/trips/${id}/finish`, actor)).status).toBe(204)
     return view(reply).place
@@ -413,6 +430,7 @@ describe('заход 3: вид и тождество места — разные
     const started = performance.now()
 
     const reply = await call(app, 'POST', '/trips', actor, {
+      context: await tripContext(db, actor),
       id: randomUUID(),
       place: { kind: 'store', name: `Рынок${'\u{e0020}'.repeat(64_000)}` },
     })
