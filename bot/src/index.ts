@@ -42,6 +42,14 @@ if (!environment.secret) {
  * for a neighbouring container to say one word buys nothing — the API's work here is one
  * indexed row — and it is the surest way to arrive too late. A press given up on early is safe
  * to repeat, because `confirm` is idempotent for the same account (О-2).
+ *
+ * **It bounds one call, not the age of a press, and the difference is real** (adversarial Е1):
+ * presses of one chat are handled in order (`assemble.ts` says why that ordering is not
+ * optional), so somebody tapping a silent API waits a whole timeout per tap — the third gets
+ * its answer after three of them, which is the fifteen seconds this number was lowered from.
+ * Nothing here can fix that: the alert **is** the answer to a press, a press can be answered
+ * only once, and the answer is not known until the API replies. What the number does is make
+ * the common case — one press, one call — comfortably fast, and that is all it claims.
  */
 const API_TIMEOUT_MS = 5_000
 

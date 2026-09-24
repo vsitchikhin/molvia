@@ -246,8 +246,8 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
     if (refused === null) {
       // The outcome is written first and the press answered in `finally`, not the other way
       // round: `answerCallbackQuery` throws on a query Telegram has already aged out — which is
-      // what a press waiting out the client's fifteen-second timeout becomes — and with the
-      // answer first that threw before anything was written. The login had happened and the
+      // what a press that waited out the client's timeout becomes — and with the answer first
+      // that threw before anything was written. The login had happened and the
       // message still showed the question with its buttons (selfreview П-2). The spinner is
       // cosmetic; what the person reads is not.
       try {
@@ -262,9 +262,9 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
       await refuse(ctx, refused)
     } finally {
       // Outside the answer, deliberately. Standing after it, it was skipped by the very press
-      // this branch is most likely to meet — one that waited out the client's fifteen-second
-      // timeout, which Telegram by then refuses to answer (adversarial В1). The dead link then
-      // kept its buttons, and the next tap на них would find the same nothing.
+      // this branch is most likely to meet — one that waited out the client's timeout, which
+      // Telegram by then refuses to answer (adversarial В1). The dead link then kept its
+      // buttons, and the next tap on them would find the same nothing.
       if (refused === 'login.unavailable') await dropKeyboard(ctx)
     }
   })

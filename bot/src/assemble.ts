@@ -21,13 +21,18 @@ export function assembleBot(token: string, deps: LoginDeps, config?: BotConfig<C
    *
    * `bot.start()` alone handles updates strictly one after another — grammY's own ordering
    * guarantee — and every handler here waits on the API. Measured: while the API thought about
-   * one person's request for 300 ms, the next person's did not leave at all (О-4). At fifteen
-   * seconds, the client's timeout, a queue of twenty presses is five minutes — the whole life
-   * of a login request, so codes at the back of the queue expire before anyone looks at them.
+   * one person's request for 300 ms, the next person's did not leave at all (О-4). At the
+   * client's timeout a queue is measured in whole timeouts — sixty presses at five seconds is
+   * the entire life of a login request — so codes at the back expire before anyone looks at
+   * them, and a queue built out of *different people* is the one there is no reason for.
    *
-   * `sequentialize` by chat is what keeps the other half true. Without it a double tap would be
-   * two confirmations in flight at once, and which message the person ends up looking at would
-   * be decided by whichever answer came back first.
+   * `sequentialize` by chat is what keeps the other half true, and it is not decoration: «Войти»
+   * and «Это не я» pressed one after the other must end where the second press says, not where
+   * the faster answer does. Both succeed on their own — `confirm` is idempotent and `decline`
+   * works on a confirmed request — so unordered they would leave «Вход подтверждён» standing
+   * over a request that was in fact put out. The price is named in `index.ts`: presses of one
+   * chat queue behind each other, so a person tapping a silent API waits a timeout per tap
+   * (adversarial Е1).
    */
   bot.use(sequentialize((ctx) => ctx.chat?.id.toString()))
   bot.use(loginComposer(deps))

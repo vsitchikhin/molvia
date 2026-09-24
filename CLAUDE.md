@@ -914,12 +914,16 @@ shown **which device** they are letting in and says «yes» to it by hand. Ratin
 - **Updates of different people are handled at once; updates of one person, in order** — and
   both halves are load-bearing (MOL-55, О-4). `bot.start()` handles updates strictly one after
   another, which is grammY's ordering guarantee and was measured costing the next person their
-  whole turn: while the API thought for 300 ms, their request did not leave at all, and at the
-  client's fifteen-second timeout a queue of twenty presses outlives the login requests in it.
-  `@grammyjs/runner` is the answer — a dependency the owner agreed to on 24.09.2026 — with
-  `sequentialize` by chat keeping the other half: two taps of one person must not be two
-  confirmations in flight, or which message they end up looking at is decided by whichever
-  answer came back first.
+  whole turn: while the API thought for 300 ms, their request did not leave at all, and a queue
+  measured in whole timeouts outlives the login requests standing in it. `@grammyjs/runner` is
+  the answer — a dependency the owner agreed to on 24.09.2026 — with `sequentialize` by chat
+  keeping the other half: «Войти» and «Это не я» pressed one after the other must end where the
+  second press says, not where the faster answer does. Both succeed on their own — `confirm` is
+  idempotent and `decline` works on a confirmed request — so unordered they would leave «Вход
+  подтверждён» standing over a request that was in fact put out. **The price of that ordering is
+  named** (Е1): presses of one chat queue behind each other, so somebody tapping a silent API
+  waits a whole `API_TIMEOUT_MS` per tap. Nothing can fix it here — the alert _is_ the answer to
+  a press, a press is answered once, and the answer is unknown until the API replies.
 - **The question is asked from the account owner's side** (З-2, owner's decision 24.09.2026):
   «Впустить это устройство в ваш аккаунт Molvia?», and the last line names what it costs to
   get it wrong. «Войти в Molvia?» over a button labelled «Войти» read as «log _me_ in» — the
