@@ -57,8 +57,7 @@
         />
         <p class="note">{{ t('settings.scope') }}</p>
       </form>
-      <!-- Entrances to the money screens (handoff MOL-41, кадр 8a): only the ones that exist —
-           «Доходы» joins when its screen does. -->
+      <!-- Entrances to the money screens (handoff MOL-41, кадр 8a). -->
       <section class="money">
         <h2 class="caption">{{ t('settings.group_money') }}</h2>
         <AppCard as="ul" list>
@@ -66,6 +65,13 @@
             <RouterLink class="entry" :to="{ name: 'exchange' }">
               <IconSwap class="entry-icon" aria-hidden="true" />
               <span class="entry-label">{{ t('exchange.title') }}</span>
+              <IconChevron class="entry-chevron" aria-hidden="true" />
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink class="entry" :to="{ name: 'incomes' }">
+              <IconCashPlus class="entry-icon" aria-hidden="true" />
+              <span class="entry-label">{{ t('income.title') }}</span>
               <IconChevron class="entry-chevron" aria-hidden="true" />
             </RouterLink>
           </li>
@@ -161,6 +167,7 @@ import IconCheck from '~icons/mdi/check'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconRefresh from '~icons/mdi/refresh'
 import IconSwap from '~icons/mdi/swap-horizontal'
+import IconCashPlus from '~icons/mdi/cash-plus'
 import IconChevron from '~icons/mdi/chevron-right'
 import IconDevices from '~icons/mdi/devices'
 import IconLogout from '~icons/mdi/logout'
@@ -191,6 +198,7 @@ export default defineComponent({
     IconAlert,
     IconRefresh,
     IconSwap,
+    IconCashPlus,
     IconChevron,
     IconDevices,
     IconLogout,

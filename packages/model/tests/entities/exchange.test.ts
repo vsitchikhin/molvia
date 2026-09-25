@@ -365,7 +365,11 @@ describe('walletRate through other currencies (MOL-42)', () => {
         ownRates([early, roubleDrams], 'USD', 'AMD', '2026-09-30', roubleRate, since),
       ).toMatchObject({
         wallet: null,
-        unknownAt: { exchange: roubleDrams, reason: 'oldReckoning' },
+        unknownAt: {
+          on: roubleDrams.exchangedOn,
+          given: roubleDrams.given.currency,
+          reason: 'oldReckoning',
+        },
       })
       expect([...rates.priced].sort()).toEqual([early.id, next.id].sort())
     })
@@ -418,7 +422,7 @@ describe('ownRates', () => {
     const airport = exchange('600 USD', '217200 AMD', '2026-09-05')
     const rates = ownRates([first, airport], 'RUB', 'AMD', '2026-09-30')
     expect(rates.wallet).toBeNull()
-    expect(rates.unknownAt).toEqual({ exchange: airport, reason: 'noRate' })
+    expect(rates.unknownAt).toEqual({ on: airport.exchangedOn, given: 'USD', reason: 'noRate' })
     // An exchange that starts the cost afresh finds it again.
     const next = exchange('20000 RUB', '95000 AMD', '2026-09-15')
     expect(ownRates([first, airport, next], 'RUB', 'AMD', '2026-09-30').unknownAt).toBeNull()

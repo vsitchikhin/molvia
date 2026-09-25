@@ -42,6 +42,21 @@ export function timeOfDay(when: Date, locale: string): string {
   return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(when)
 }
 
+/**
+ * A month of «Доходы» (MOL-66): «сентябрь 2026» from `2026-09`. The month and the year only —
+ * `Intl` adds «г.» to the Russian year, which the caption does not need.
+ */
+export function monthOf(month: string, locale: string): string {
+  const [year = '', number = ''] = month.split('-')
+  const parts = new Intl.DateTimeFormat(locale, {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).formatToParts(new Date(Date.UTC(Number(year), Number(number) - 1, 1)))
+  const part = (type: string) => parts.find((one) => one.type === type)?.value ?? ''
+  return `${part('month')} ${part('year')}`
+}
+
 const DAY_MS = 86_400_000
 
 // Local midnight, so the difference counts calendar days; `round` absorbs the hour a change to

@@ -220,21 +220,24 @@ export default defineComponent({
     const sign = (currency: Currency) => currencySign(currency, locale.value)
     const sameCurrency = computed(() => currencies.given === currencies.received)
 
-    /** The exchanges into `currency`, newest first — as the server lists them — this one aside. */
+    /**
+     * The money into `currency`, exchanges and incomes alike (MOL-66), newest first — as the server
+     * lists it — this exchange aside.
+     */
     const into = (currency: Currency) =>
-      props.overview.exchanges.filter(
-        (exchange) => exchange.received.currency === currency && exchange.id !== props.editing?.id,
+      props.overview.receipts.filter(
+        (receipt) => receipt.currency === currency && receipt.id !== props.editing?.id,
       )
 
-    /** Whether `currency` has a price on the chosen day: the latest exchange into it gave one. */
+    /** Whether `currency` has a price on the chosen day: the latest money into it gave one. */
     const hasPrice = (currency: Currency): boolean =>
-      !!into(currency).find(({ exchangedOn }) => exchangedOn <= day.value)?.priced
+      !!into(currency).find(({ on }) => on <= day.value)?.priced
 
     /**
      * Asked only where it weighs anything (MOL-42, Р-2), and that takes two things (round 5, О1):
      *
-     * - the received currency *has* a price on the chosen day — the latest exchange into it on or
-     *   before that day gave it one (`priced`, from the server's walk: a chain made before a change
+     * - the received currency *has* a price on the chosen day — the latest exchange or income into
+     *   it on or before that day gave it one (`priced`, from the server's walk: a chain made before a change
      *   of the currency of conversion does, a link of the old reckoning does not; round 3, П-1, М1;
      *   round 4, Н2) — and is not the currency of conversion, which always costs one;
      * - this exchange will *give* it one: paid in the currency of conversion, or in a currency with a
@@ -266,12 +269,16 @@ export default defineComponent({
       const hint = props.overview.heldEstimates.find(
         ({ held }) => held.currency === currencies.received,
       )
-      const latest = into(currencies.received).at(0)?.exchangedOn
+      const latest = into(currencies.received).at(0)?.on
       if (!hint || !asksHeld.value || (latest !== undefined && day.value < latest)) return null
       const amount = formatMoney(hint.held, locale.value)
-      return hint.whole
-        ? t('exchange.sheet.held_estimate', { amount })
-        : t('exchange.sheet.held_estimate_last', { amount })
+      if (hint.whole) return t('exchange.sheet.held_estimate', { amount })
+      return t(
+        hint.from === 'income'
+          ? 'exchange.sheet.held_estimate_last_income'
+          : 'exchange.sheet.held_estimate_last',
+        { amount },
+      )
     })
 
     /**

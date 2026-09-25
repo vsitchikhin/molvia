@@ -78,8 +78,8 @@ export async function startTrip(
 
 /**
  * The person's own rate of the trip's pair (MOL-40, В-3, В-4): the average cost of what they hold,
- * from their exchanges dated no later than today in Yerevan, through whatever currencies it was
- * bought with (MOL-42) — or none, and the official rate goes in instead: when they asked for the
+ * from their exchanges and incomes dated no later than today in Yerevan, through whatever
+ * currencies it was bought with (MOL-42, MOL-66) — or none, and the official rate goes in instead: when they asked for the
  * official one, when the two currencies are one, and when the cost of the spending currency is
  * not known. Never jumped, never with a provider: it is nobody's publication, and nothing to
  * measure a jump against.
@@ -89,7 +89,7 @@ export async function startTrip(
  * wallet of its own currency uncut: the cut is about the current one (Р-8).
  */
 async function personalRateFor(
-  repositories: Pick<TripRepositories, 'exchanges' | 'rates'>,
+  repositories: Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>,
   actor: Pick<Actor, 'id' | 'incomeCurrency'>,
   pair: Pick<Actor, 'incomeCurrency' | 'spendCurrency'>,
   now: Date,
@@ -101,16 +101,20 @@ async function personalRateFor(
   const { preference, since } = await exchanges.rateSettings(actor.id)
   if (preference !== 'personal') return null
 
-  const list = await exchanges.list(actor.id)
-  // Only exchanges paid with money that may need valuing ask the cache anything.
-  const cached = await officialRatesOn(
-    repositories,
-    list
+  const [list, incomes] = await Promise.all([
+    exchanges.list(actor.id),
+    repositories.incomes.list(actor.id),
+  ])
+  // Only money that may need valuing asks the cache anything: exchanges paid with it, and incomes
+  // in any currency but the one of conversion (MOL-66).
+  const cached = await officialRatesOn(repositories, [
+    ...list
       .filter(({ given, received }) => given.currency !== base && received.currency !== base)
       .map(({ exchangedOn }) => exchangedOn),
-  )
+    ...incomes.filter(({ amount }) => amount.currency !== base).map(({ receivedOn }) => receivedOn),
+  ])
   const wallet = walletRate(
-    list,
+    [...list, ...incomes],
     base,
     quote,
     yerevanDate(now),

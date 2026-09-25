@@ -43,6 +43,15 @@ import {
   removeExchange,
   restoreExchange,
 } from '@/usecases/exchanges'
+import {
+  amendIncome,
+  readIncomes,
+  recordIncome,
+  removeIncome,
+  restoreIncome,
+} from '@/usecases/incomes'
+import { incomeRoutes } from '@/routes/incomes'
+import { createIncomeRepository } from '@/db/incomes-repository'
 import { createSettingsRepository } from '@/db/settings-repository'
 import { saveSettings } from '@/usecases/save-settings'
 import { settingsRoute } from '@/routes/settings'
@@ -243,8 +252,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const db = options.db ?? getDb()
     const loginRequests = createLoginRequestRepository(db)
     const removedExchanges = createExchangeRepository(db)
+    const removedIncomes = createIncomeRepository(db)
     let stopCleanup: (() => Promise<void>) | undefined
     let stopExchangeCleanup: (() => Promise<void>) | undefined
+    let stopIncomeCleanup: (() => Promise<void>) | undefined
     let stopSessionCleanup: (() => Promise<void>) | undefined
     instance.addHook('onReady', (ready) => {
       stopCleanup = startLoginCleanup(
@@ -262,6 +273,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           instance.log.error('removed exchange cleanup failed')
         },
       )
+      // The same for incomes (MOL-66): one rule for removing one's own money.
+      stopIncomeCleanup = startLoginCleanup(
+        () => removedIncomes.purgeStale(),
+        () => {
+          instance.log.error('removed income cleanup failed')
+        },
+      )
       // An expired session has no reader, and it kept a device name for good while the privacy
       // page promises 180 days from the last use (MOL-57, owner's decision Q4).
       stopSessionCleanup = startLoginCleanup(
@@ -275,6 +293,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     instance.addHook('onClose', async () => {
       await stopCleanup?.()
       await stopExchangeCleanup?.()
+      await stopIncomeCleanup?.()
       await stopSessionCleanup?.()
     })
     const actors = createActorRepository(db)
@@ -360,6 +379,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         remove: (actor, id) => removeExchange(tripData, actor, id),
         restore: (actor, id) => restoreExchange(tripData, actor, id),
         prefer: (actor, preference) => chooseRatePreference(tripData, actor, preference),
+      })
+      incomeRoutes(guarded, {
+        overview: (actor) => readIncomes(tripData, actor),
+        record: (actor, body) => recordIncome(tripData, actor, body),
+        amend: (actor, id, body) => amendIncome(tripData, actor, id, body),
+        remove: (actor, id) => removeIncome(tripData, actor, id),
+        restore: (actor, id) => restoreIncome(tripData, actor, id),
       })
       adviceRoutes(guarded, {
         advice: (actorId) =>
