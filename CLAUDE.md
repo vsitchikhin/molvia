@@ -508,8 +508,13 @@ device, private always. The rate is what the two amounts say and is not stored b
   (owner's decision В-5). A removal marks the row (`deleted_at`) and hides it from every reader;
   «Вернуть» (`POST /exchanges/:id/restore`) clears the mark, so the exchange keeps its
   `created_at` — written anew it took the moment of the tap, which moved both the order of its day
-  and the hint. The owner's next request of the screen deletes marked rows for good: by then the
-  screen no longer offers them back, so «final» and «no longer undoable» are one moment.
+  and the hint. **A removal is final after ten minutes** (`EXCHANGE_UNDO_MINUTES`, owner's decision
+  В-7): the server's minute timer deletes older marks of everyone, and the owner's next request of
+  the screen deletes theirs sooner — the moment the screen stops offering them back. Both
+  «Вернуть» and a removal are safe to send again after a lost answer: an exchange already back
+  answers 200, and a removal never makes final the row it is marking. A «Вернуть» that comes too
+  late is told so, and the list is read again — not «check the connection», which sent people to
+  enter the exchange a second time.
 - **A repeat is the same exchange, or it is a conflict** (В-6). The same name with the same
   amounts, day and remainder answers 200; with anything else, 409 — that is a correction sent
   after an answer that never came, and answering it «saved» left the typo in the wallet. The
