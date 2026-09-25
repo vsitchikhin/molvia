@@ -509,15 +509,23 @@ device, private always. The rate is what the two amounts say and is not stored b
   carries `estimated` for as long as that part is in the mix. The official rate is taken by the
   rule a comparison uses (a jumped rate gives way to the one before it); none in the cache for
   that day, and the cost is unknown until an exchange starts it afresh — the trip then takes the
-  bank. The cache is read once per day of the list and serves both.
+  bank. Only a rate fresh for that day counts, by the week a trip allows — the rule for a trip falls
+  back to the freshest it has and says `rateStale`, and here nothing would say it (Ж3). The cache
+  is read once per day of the list, eight days at a time, and serves both. A wallet missing above
+  a list of exchanges says which exchange its cost was lost on (`walletUnknown`), never «no
+  exchanges yet».
 - **A change of the currency of conversion works forwards** (В-2, the owner's comment over the
   option they ticked): the wallet in the new currency is built from exchanges dated on or after
   `actors.income_currency_since`, which the settings' own `UPDATE` sets when the currency changes
-  and a repeat of the form does not move. Earlier exchanges stay in the list as they were; the
+  and a repeat of the form does not move — **and only when the old currency was in a live
+  exchange** (Ж2): the cut protects exchanges counted in it, and a first choice over the default
+  `RUB` by someone who never exchanged roubles has none; cutting there took their whole history. Earlier exchanges stay in the list as they were; the
   drams held from them have no cost in the new currency and are not weighed. A trip started
   offline with the old currency in its `context` is not cut — the cut is about the current one.
-- **Exact to the end.** `walletRate` keeps ratios of integers through the whole chain, reduced at
-  every link, and rounds once, to the snapshot's six digits, the way a cross rate is rounded.
+- **Exact to eighteen digits, rounded to six once.** `walletRate` keeps ratios of integers through
+  the chain, each link brought to 10¹⁸ (the exception under «Money and quantity rules»), and rounds
+  to the snapshot's six digits at the end, the way a cross rate is rounded. The screen walks the
+  chain once (`ownRates`) for the wallet, the prices and the reason a wallet is missing.
 - **A trip takes it at the start, like the official one, and never again** (В-4): with
   `actors.rate_preference = 'personal'` — the default — and an exchange of the pair dated no later
   than today in Yerevan, the snapshot is `source: 'personal'` with no provider and no jump;
@@ -531,7 +539,10 @@ device, private always. The rate is what the two amounts say and is not stored b
   place, `created_at` untouched so the exchange keeps its place in its day. It names the version it
   was made over (`revision`): the exchange already as sent is a repeat, 200 and no new version; a
   version another device moved on from is 409, as the settings form is; removed or someone else's
-  is 404. The row says «исправлен», the sheet shows the versions — which is what explains a trip
+  is 404, and a conflict keeps the sheet open with what was typed, over the version held now. A
+  remainder the exchange has is shown in the sheet whatever a new exchange would ask: an amendment
+  replaces the exchange whole, so a field not shown was a field cleared. The row is a button named
+  by its words — an `aria-label` silenced the rate and the comparison. The row says «исправлен», the sheet shows the versions — which is what explains a trip
   that took a rate the exchanges no longer say. The history goes with its exchange: a removal made
   final and erasure take it by cascade. «Где и заметка» is one private line, part of a repeat.
 - **Removing is still there, for an exchange that should not exist.** Trips already started keep
@@ -735,7 +746,11 @@ database access. In a product about data integrity, two write paths will silentl
 - **Compare by unit price only** (per kg / l / piece). Unit price is computed, never
   entered. 520 ֏ for 0.9 l is more expensive than 570 ֏ for a litre, and the user must
   not have to work that out in their head.
-- Rounding happens on output only — never in storage or in intermediate results.
+- Rounding happens on output only — never in storage or in intermediate results. **One written
+  exception: the links of the wallet's chain** are brought to eighteen digits (MOL-42, Ж1, owner's
+  decision 25.09.2026). Kept exact, the fraction grew by some ten digits an exchange and 800 of
+  them held the event loop — the whole API — for seconds; eighteen digits against the six a rate
+  is printed with never reach the sixth, not in ten thousand links.
 
 ## Data rules
 
