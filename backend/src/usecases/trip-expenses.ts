@@ -1,4 +1,4 @@
-import { DomainError, ERROR, isDeviceTime } from '@molvia/model'
+import { DomainError, ERROR, isDeviceTime, toSearchKey } from '@molvia/model'
 import type { AddExpenseBody, ExpensePatch, Trip, TripView } from '@molvia/model'
 import type { TripRepository } from '@/db/trips-repository'
 import type { Transact } from '@/db/unit-of-work'
@@ -44,7 +44,13 @@ export async function addExpense(
     if (created && query !== undefined) {
       await repositories.searchPicks.remember(actorId, query, body.itemId)
     }
-    if (created && missedQuery !== undefined) {
+    // The same query by its key is a pick, not a word of one's own: learnt as well, one purchase
+    // would count twice (adversarial Е).
+    if (
+      created &&
+      missedQuery !== undefined &&
+      (query === undefined || toSearchKey(missedQuery) !== toSearchKey(query))
+    ) {
       await repositories.searchPicks.learn(actorId, missedQuery, body.itemId)
     }
     return { trip: await tripViewFor(repositories, trip), created }

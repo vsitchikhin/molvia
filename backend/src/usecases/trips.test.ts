@@ -680,6 +680,19 @@ describe('addExpense', () => {
     expect(learnt).toEqual([[ACTOR, 'молочка', milk.id]])
   })
 
+  it('must not fire: a missed query that is the found one by its key is only a pick', async () => {
+    const picks: unknown[][] = []
+    const learnt: unknown[][] = []
+    await addExpense(transactWith(adding(true, picks, learnt)), ACTOR, TRIP, {
+      id: EXPENSE,
+      itemId: milk.id,
+      query: 'кефир ',
+      missedQuery: 'Кефир',
+    })
+    expect(picks).toEqual([[ACTOR, 'кефир ', milk.id]])
+    expect(learnt).toEqual([])
+  })
+
   it('must not fire: a repeat from the queue learns nothing a second time', async () => {
     const learnt: unknown[][] = []
     await addExpense(transactWith(adding(false, [], learnt)), ACTOR, TRIP, {
