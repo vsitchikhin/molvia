@@ -670,6 +670,12 @@ export const searchPicks = pgTable(
       .references(() => items.id),
     picks: integer('picks').notNull().default(1),
     lastPickedAt: timestamp('last_picked_at', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * The person's own synonym (MOL-45): this query found nothing, and the item was then taken
+     * by another one. Such a row lets its item into the answer to exactly this query — the one
+     * pick that admits what the search did not find, and only for the person who made it.
+     */
+    admits: boolean('admits').notNull().default(false),
   },
   (table) => [
     primaryKey({ columns: [table.actorId, table.queryKey, table.itemId] }),

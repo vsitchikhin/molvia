@@ -154,6 +154,7 @@ function fakeRepositories(
     },
     searchPicks: {
       remember: unexpected('searchPicks.remember'),
+      learn: unexpected('searchPicks.learn'),
       ...overrides.searchPicks,
     },
     rates: {
@@ -644,7 +645,7 @@ describe('recentPlaces', () => {
 describe('addExpense', () => {
   const EXPENSE = 'cc11bb22-cc33-4d44-8e55-ff6677889900'
 
-  function adding(created: boolean, picks: unknown[][]) {
+  function adding(created: boolean, picks: unknown[][], learnt: unknown[][] = []) {
     return fakeRepositories({
       ...viewReads,
       trips: { lock: () => Promise.resolve(trip) },
@@ -657,9 +658,38 @@ describe('addExpense', () => {
           picks.push(args)
           return Promise.resolve()
         },
+        learn: (...args) => {
+          learnt.push(args)
+          return Promise.resolve()
+        },
       },
     })
   }
+
+  it('learns the query that found nothing before, beside the one that found the item', async () => {
+    const picks: unknown[][] = []
+    const learnt: unknown[][] = []
+    await addExpense(transactWith(adding(true, picks, learnt)), ACTOR, TRIP, {
+      id: EXPENSE,
+      itemId: milk.id,
+      query: 'мол',
+      missedQuery: 'молочка',
+    })
+
+    expect(picks).toEqual([[ACTOR, 'мол', milk.id]])
+    expect(learnt).toEqual([[ACTOR, 'молочка', milk.id]])
+  })
+
+  it('must not fire: a repeat from the queue learns nothing a second time', async () => {
+    const learnt: unknown[][] = []
+    await addExpense(transactWith(adding(false, [], learnt)), ACTOR, TRIP, {
+      id: EXPENSE,
+      itemId: milk.id,
+      query: 'мол',
+      missedQuery: 'молочка',
+    })
+    expect(learnt).toEqual([])
+  })
 
   it('writes the purchase and remembers the query it was found by', async () => {
     const picks: unknown[][] = []

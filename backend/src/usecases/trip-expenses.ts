@@ -27,7 +27,9 @@ async function lockedTrip(trips: TripRepository, tripId: string, actorId: string
  *
  * The pick is remembered in the same transaction as the purchase (MOL-11), and only for a
  * purchase written now: a repeat from the queue is one purchase and one pick, and a purchase
- * refused leaves no pick lifting an item nobody took.
+ * refused leaves no pick lifting an item nobody took. The query that found nothing before it is
+ * learnt the same way (MOL-45) — and not checked against the search: the row is the person's
+ * alone, and checking would be a second search on every purchase.
  */
 export async function addExpense(
   transact: Transact,
@@ -37,10 +39,13 @@ export async function addExpense(
 ): Promise<Added> {
   return transact(async (repositories) => {
     const trip = await lockedTrip(repositories.trips, tripId, actorId)
-    const { query, ...fields } = body
+    const { query, missedQuery, ...fields } = body
     const { created } = await repositories.expenses.add(actorId, { ...fields, tripId: trip.id })
     if (created && query !== undefined) {
       await repositories.searchPicks.remember(actorId, query, body.itemId)
+    }
+    if (created && missedQuery !== undefined) {
+      await repositories.searchPicks.learn(actorId, missedQuery, body.itemId)
     }
     return { trip: await tripViewFor(repositories, trip), created }
   })
