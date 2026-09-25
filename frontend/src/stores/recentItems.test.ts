@@ -228,12 +228,14 @@ describe('recent items', () => {
       const store = relaunched()
       const nectar = entry(6, { name: 'Нектар персиковый 1 л' })
       const toilet = entry(7, { name: 'Туалетная вода Hugo Boss' })
-      const water = entry(8, { name: 'Вода Джермук' })
-      for (const item of [nectar, toilet, water]) store.remember(item)
+      const water = entry(8, { name: 'Вода минеральная Джермук' })
+      const young = entry(9, { name: 'Молодой картофель' })
+      for (const item of [nectar, toilet, water, young]) store.remember(item)
       expect(store.filter('сок').map((item) => item.id)).toEqual([nectar.id])
       expect(store.filter('сок персиковый').map((item) => item.id)).toEqual([nectar.id])
       expect(store.filter('сок яблочный')).toEqual([])
       expect(store.filter('минералка').map((item) => item.id)).toEqual([water.id])
+      expect(store.filter('картошка').map((item) => item.id)).toEqual([young.id])
     })
 
     it('not at all under an empty or blank query', () => {

@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
-import { itemSchema, nameIdentity, synonymKeys, toSearchKey } from '@molvia/model'
+import {
+  ADJECTIVE_WORD,
+  itemSchema,
+  nameIdentity,
+  synonymDescribes,
+  synonymKeys,
+  toSearchKey,
+} from '@molvia/model'
 import type { Item, NewItem } from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
@@ -137,6 +144,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     .slice(0, MAX_SYNONYMS)
   const synonymWords = synonyms.map(([synonym]) => synonym).join(' ')
   const synonymOf = synonyms.map(([, n]) => n).join(' ')
+  // A synonym that describes — «минеральная» — is never the kind, and counts as any word.
+  const synonymAnywhere = synonyms.map(([synonym]) => String(synonymDescribes(synonym))).join(' ')
   const expanded = [...new Set(synonyms.map(([, n]) => n))].join(' ')
   // Without a synonym every candidate of the index was found by what was typed, and asking the
   // operator again per row is what «мо» over 20 000 names paid for.
@@ -152,17 +161,32 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       : sql`case when exists (
                     select 1
                     from synonyms s
-                    where s.n = qw.n and s.word = split_part(c.search_key, ' ', 1)
+                    where s.n = qw.n
+                      and (s.word = split_part(c.search_key, ' ', c.kind_at)
+                           or s.anywhere
+                              and s.word = any(string_to_array(c.search_key, ' ')))
                   ) then 0 end`
-  // A synonym counts only as the first word of a name — where a shelf writes the kind (owner's
-  // decision on review, MOL-45 А): «Вода Джермук», not «Мицеллярная вода», not the tuna of a
-  // cat food. So its candidates are the names that begin with it, not those that resemble it:
-  // `%>` at 0.15 brought in half of 20 000 names for each of the eight fish of «рыба» and took
-  // six seconds. `like` is served by the same trigram index, one condition per word. The words
-  // are letters only (the dictionary's test), so nothing in them is a wildcard.
+  // A synonym counts only as the word of the kind — the first word of a name that is not an
+  // adjective, `kindKey` of the domain (owner's decisions on review, MOL-45 А and Н): «Вода
+  // Джермук», «Молодой картофель», and not the tuna of a cat food. So its candidates are the
+  // names that contain it, not those that resemble it: `%>` at 0.15 brought in half of 20 000
+  // names for each of the eight fish of «рыба» and took six seconds. `like` is served by the same
+  // trigram index, one condition per word. The words are letters only (the dictionary's test),
+  // so nothing in them is a wildcard.
   const bySynonym = [...new Set(synonyms.map(([synonym]) => synonym))].map(
-    (synonym) => sql` or ${items.searchKey} like ${`${synonym}%`}`,
+    (synonym) => sql` or ${items.searchKey} like ${`%${synonym}%`}`,
   )
+  // Where the kind stands: the first word of the name that is not an adjective, by the domain's
+  // own pattern. The adjectives are plain words, so the n-th word of the name is the n-th of
+  // the key. Past the end when every word describes — `split_part` then answers ''.
+  const kindAt =
+    synonyms.length === 0
+      ? sql`1`
+      : sql`coalesce((
+          select min(u.n)::int
+          from unnest(regexp_split_to_array(btrim(${items.name}), '\\s+')) with ordinality as u(w, n)
+          where u.w !~ ${ADJECTIVE_WORD}
+        ), 1000)`
 
   return sql`
     with query_words as (
@@ -176,9 +200,10 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
     ),
     synonyms as (
-      select s.word, s.n
+      select s.word, s.n, s.anywhere
       from unnest(string_to_array(${synonymWords}, ' '),
-                  string_to_array(${synonymOf}, ' ')::int[]) as s(word, n)
+                  string_to_array(${synonymOf}, ' ')::int[],
+                  string_to_array(${synonymAnywhere}, ' ')::boolean[]) as s(word, n, anywhere)
     ),
     admitted as (
       -- The person's own synonyms for exactly this query (MOL-45): it found nothing, and they
@@ -201,7 +226,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              -- Found by what was typed, not only by a synonym. The typed word's edit budget
              -- applies to these alone: a name brought in by «лори» for «сыр» is no candidate
              -- of «сыр», and measured against it anyway, «Рис» passed as two edits from \`sir\`.
-             ${typedHere} as typed
+             ${typedHere} as typed,
+             ${kindAt} as kind_at
       from ${items}
       where ${items.searchKey} %> ${key} or ${items.searchKey} = ${key}${sql.join(bySynonym)}
       -- Every candidate is ranked, with no ceiling. Any cut here is wrong in one of two ways:
@@ -218,7 +244,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       union all
       select ${items.id}, ${items.searchKey},
              word_similarity(${key}, ${items.searchKey}),
-             (${items.searchKey} %> ${key} or ${items.searchKey} = ${key})
+             (${items.searchKey} %> ${key} or ${items.searchKey} = ${key}),
+             ${kindAt}
       from ${items}
       join admitted a on a.id = ${items.id}
     ),
@@ -326,14 +353,20 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     -- what it did not, or memory would become a second search with rules of its own. The one
     -- exception is the person's own word (MOL-45), and it is let in, not lifted.
     where r.distance <= ${ACCEPTED_DISTANCE} or r.admitted
-    -- What the search found comes before what only a learnt word let in (owner's decision on
-    -- review, MOL-45 И): «кефир» learnt as the milk taken in its place stops standing above
-    -- the kefir the day the catalogue has one. Then what the person took before, above a
-    -- closer spelling — their own choice says more than a typo metric does. Among several, the
-    -- latest wins: after switching brands the new one is on top from the first trip. Then the
-    -- order of MOL-10, where ties stay ties («moloko» names «Ашхар» and «Марианна» alike) and
-    -- \`id\` only keeps two loads of one screen in one order.
-    order by coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) desc,
+    -- What only a learnt word let in stands below what the search found exactly or the person
+    -- took before, and above what it found by a typo (owner's decisions on review, MOL-45 И and
+    -- О): «кефир» learnt as the milk taken in its place stops standing above the kefir the day
+    -- the catalogue has one, and the potato learnt for «овощи» stays above the flour the
+    -- absolute budget finds there (MOL-46). Among what the search found this changes nothing:
+    -- a pick and an exact match were already above a typo. Then what the person took before,
+    -- above a closer spelling — their own choice says more than a typo metric does. Among
+    -- several, the latest wins: after switching brands the new one is on top from the first
+    -- trip. Then the order of MOL-10, where ties stay ties («moloko» names «Ашхар» and
+    -- «Марианна» alike) and \`id\` only keeps two loads of one screen in one order.
+    order by case when not coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) then 1
+                  when m.item_id is not null or r.distance = 0 then 0
+                  else 2
+             end,
              m.item_id is null,
              m.last_picked_at desc nulls last,
              m.picks desc nulls last,

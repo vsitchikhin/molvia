@@ -72,10 +72,9 @@ const NARROWER: readonly (readonly [readonly string[], readonly string[]])[] = [
     ['мясо', 'мяса'],
     ['говядина', 'свинина', 'баранина', 'телятина', 'фарш'],
   ],
-  [
-    ['минералка', 'минералки', 'минералку'],
-    ['вода', 'минеральная'],
-  ],
+  // «минеральная», not «вода»: the water is in «Вода туалетная» and «Вода мицеллярная» too, first
+  // word and all (review М). The price: «Вода Джермук», without the word, is not a «минералка».
+  [['минералка', 'минералки', 'минералку'], ['минеральная']],
   [
     ['газировка', 'газировки', 'газировку'],
     ['лимонад', 'газированная', 'газированный'],
@@ -137,6 +136,45 @@ const EXPANSIONS: ReadonlyMap<string, readonly string[]> = (() => {
  */
 export function synonymKeys(wordKey: string): readonly string[] {
   return EXPANSIONS.get(wordKey) ?? []
+}
+
+/**
+ * A word that describes rather than names — an adjective, by its ending, in Cyrillic: «Молодой»,
+ * «копчёная», «армянский». A pattern for Postgres as much as for this module, so it is written
+ * without `\p{…}` and without case folding, which the database does by its locale.
+ * Read off the name and not off the key, which collapses doubled letters: «солёный» is `soleni`
+ * there, ending like «огурцы» and «фисташки».
+ */
+export const ADJECTIVE_WORD = '^[а-яёА-ЯЁ]+(ый|ий|ой|ая|яя|ое|ее|ые|ие|ЫЙ|ИЙ|ОЙ|АЯ|ЯЯ|ОЕ|ЕЕ|ЫЕ|ИЕ)$'
+
+const ADJECTIVE = new RegExp(ADJECTIVE_WORD, 'u')
+
+/**
+ * The word of a name a synonym is compared with: the first one that is not an adjective, as a
+ * search key — where a shelf writes the kind («Вода Джермук», «Скумбрия х/к», «Молодой
+ * картофель»), and not the tuna of a cat food or the water of «Туалетная вода» (owner's decisions
+ * on review, MOL-45 А and Н). Empty when every word describes. The search takes it by the same
+ * pattern in SQL: the adjectives are plain words, so each is one word of the key as well.
+ */
+export function kindKey(name: string): string {
+  const words = name.trim().split(/\s+/u)
+  const at = words.findIndex((word) => !ADJECTIVE.test(word))
+  return at === -1 ? '' : (toSearchKey(name).split(' ')[at] ?? '')
+}
+
+const DESCRIBING: ReadonlySet<string> = new Set(
+  [...SAME.flat(), ...NARROWER.flatMap(([, tails]) => tails)]
+    .filter((word) => ADJECTIVE.test(word))
+    .map(toSearchKey),
+)
+
+/**
+ * Whether a synonym describes rather than names — «минеральная», «газированная», «гречневая».
+ * Such a word is never the kind, which skips adjectives, so it counts as any word of a name:
+ * it is precise enough that «Вода туалетная» does not carry it.
+ */
+export function synonymDescribes(key: string): boolean {
+  return DESCRIBING.has(key)
 }
 
 /**

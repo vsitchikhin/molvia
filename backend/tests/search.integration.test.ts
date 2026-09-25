@@ -602,12 +602,24 @@ describe('search — a word the shelf writes otherwise (MOL-45)', () => {
     expect(found).toEqual(['Картофель молодой', 'Картофель'])
   })
 
-  it('counts a synonym only as the first word of a name — where the shelf writes the kind (review, А)', async () => {
+  it('counts a synonym only as the word of the kind, not a taste or a purpose (review, А и М)', async () => {
+    await named('Вода минеральная Джермук 0,5 л')
     await named('Вода Джермук 0,5 л')
+    await named('Вода туалетная Hugo Boss')
     await named('Мицеллярная вода Garnier 400 мл')
     await named('Корм для кошек Whiskas тунец 85 г')
-    expect(await names('минералка')).toEqual(['Вода Джермук 0,5 л'])
+    // «вода» is no target of «минералка»: the price, named — the Jermuk without the word is missed.
+    expect(await names('минералка')).toEqual(['Вода минеральная Джермук 0,5 л'])
     expect(await names('рыба')).toEqual([])
+  })
+
+  it('skips the adjectives before the kind: «Молодой картофель», «Армянский лаваш» (review, Н)', async () => {
+    await named('Молодой картофель')
+    await named('Копчёная скумбрия')
+    await named('Армянский лаваш')
+    expect(await names('картошка')).toEqual(['Молодой картофель'])
+    expect(await names('рыба')).toEqual(['Копчёная скумбрия'])
+    expect(await names('хлеб')).toEqual(['Армянский лаваш'])
   })
 
   it('still measures a word with no synonym on a name a synonym brought: «памперсы хаггис» (review, Б)', async () => {
@@ -675,6 +687,19 @@ describe("search — a word of the person's own (MOL-45)", () => {
     expect(await namesFor(actorId, 'бахчевые спелые')).toEqual([])
     // The key, not the spelling: the same word in another case or script is the same query.
     expect(await namesFor(actorId, 'БАХЧЕВЫЕ')).toEqual(['Арбуз'])
+  })
+
+  it('puts the learnt item above what the search found only by a typo (review, О)', async () => {
+    // «овощи» finds the flour by two edits (MOL-46); the potato learnt for it stays first.
+    const actorId = await insertActor(db)
+    const potato = await named('Картофель')
+    await picks.learn(actorId, 'овощи', potato)
+    await named('Мука пшеничная высший сорт 2 кг')
+
+    expect(await namesFor(actorId, 'овощи')).toEqual([
+      'Картофель',
+      'Мука пшеничная высший сорт 2 кг',
+    ])
   })
 
   it('puts what the search found above what only the learnt word let in (review, И)', async () => {

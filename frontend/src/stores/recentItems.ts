@@ -4,6 +4,8 @@ import {
   INVISIBLE,
   catalogueEntryCodec,
   drawsNothing,
+  kindKey,
+  synonymDescribes,
   synonymKeys,
   toSearchKey,
 } from '@molvia/model'
@@ -128,11 +130,19 @@ export const useRecentItemsStore = defineStore('recentItems', () => {
       if (name.includes(needle)) return true
       if (entry.note !== null && comparable(entry.note).includes(needle)) return true
       if (!expands) return false
-      // As the search counts a synonym — the first word of the name, where the kind stands — and
-      // as it demands of every other word a pair of its own: «сок яблочный» is not the peach
-      // nectar, though «сок» alone is (adversarial Д).
-      const kind = toSearchKey(entry.name).split(' ')[0] ?? ''
-      return words.every(({ word, synonyms }) => name.includes(word) || synonyms.includes(kind))
+      // As the search counts a synonym — the word of the kind, `kindKey` — and as it demands of
+      // every other word a pair of its own: «сок яблочный» is not the peach nectar, though «сок»
+      // alone is (adversarial Д).
+      const kind = kindKey(entry.name)
+      const keyWords = toSearchKey(entry.name).split(' ')
+      return words.every(
+        ({ word, synonyms }) =>
+          name.includes(word) ||
+          synonyms.some(
+            (synonym) =>
+              synonym === kind || (synonymDescribes(synonym) && keyWords.includes(synonym)),
+          ),
+      )
     })
   }
 

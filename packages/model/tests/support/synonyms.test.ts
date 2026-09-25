@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { toSearchKey } from '#model/support/search-key'
-import { SYNONYM_TABLES, synonymKeys } from '#model/support/synonyms'
+import { SYNONYM_TABLES, kindKey, synonymDescribes, synonymKeys } from '#model/support/synonyms'
 
 const key = toSearchKey
 const { same, narrower } = SYNONYM_TABLES
@@ -94,5 +94,38 @@ describe('the synonym tables', () => {
       }
     })
     for (const [folded, owners] of byKey) expect(owners.size, folded).toBe(1)
+  })
+})
+
+describe('kindKey', () => {
+  it('is the first word of a name, where a shelf writes the kind', () => {
+    expect(kindKey('Вода Джермук 0,5 л')).toBe(key('вода'))
+    expect(kindKey('Корм для кошек Whiskas тунец')).toBe(key('корм'))
+  })
+
+  it('skips the adjectives before it: «Молодой картофель», «Копчёная скумбрия» (review Н)', () => {
+    expect(kindKey('Молодой картофель')).toBe(key('картофель'))
+    expect(kindKey('Копчёная скумбрия')).toBe(key('скумбрия'))
+    expect(kindKey('АРМЯНСКИЙ ЛАВАШ')).toBe(key('лаваш'))
+    expect(kindKey('Свежие маринованные огурчики')).toBe(key('огурчики'))
+  })
+
+  it('reads the adjective off the name, not the key, where «солёный» ends like «огурцы»', () => {
+    expect(kindKey('Огурцы солёные')).toBe(key('огурцы'))
+    expect(kindKey('Фисташки жареные')).toBe(key('фисташки'))
+  })
+
+  it('is empty when every word describes, and a brand first stays first — the price, named', () => {
+    expect(kindKey('Свежее')).toBe('')
+    expect(kindKey('Barilla спагетти')).toBe(key('barilla'))
+  })
+})
+
+describe('synonymDescribes', () => {
+  it('knows a synonym that describes, which counts as any word of a name', () => {
+    expect(synonymDescribes(key('минеральная'))).toBe(true)
+    expect(synonymDescribes(key('гречневая'))).toBe(true)
+    expect(synonymDescribes(key('картофель'))).toBe(false)
+    expect(synonymDescribes(key('вода'))).toBe(false)
   })
 })
