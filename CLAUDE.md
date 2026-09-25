@@ -1004,15 +1004,18 @@ database access. In a product about data integrity, two write paths will silentl
   `<dialog>` with an entry in the history**, laid through the router's own `history.push` at
   the same address — never a bare `pushState`, whose state lacks the `position` and `back` the
   rules of «back» read. Every close — ×, the scrim, Esc, Android «back» — steps back
-  off that entry, and only the pop closes it, so exactly one entry is ever taken. **Putting a
-  sheet away does not scroll** (MOL-63): a move to the same address is a sheet's or a refused
-  duplicate push, and neither moves the page; the router scrolling back to the number it saved
-  at the opening moved the list by whatever changed above it meanwhile — a list reread, a queued
-  row sent, a notice come or gone — which the browser had already kept out of sight. The first
-  navigation comes «from» `START_LOCATION`, whose address is «/», and is not a move to the same
-  address: read as one, the trip loaded again forgot where the person was, and only the trip. So e2e takes
-  «the list stayed» by where the opener stands on the screen, never by `scrollY`, which that
-  jump left equal. Any move of
+  off that entry, and only the pop closes it, so exactly one entry is ever taken. **The sheet puts
+  the page back by what it was opened from, never by a number** (MOL-63): it notes the element
+  pressed — iOS does not focus a tapped button — and where it stood on the screen, and after the
+  pop that lands on the same screen scrolls by the difference. A list that changed height above it
+  meanwhile — reread, a queued row sent, a notice come or gone — the browser has already kept still,
+  and the difference is nothing; a window the platform moved under the sheet — the iOS keyboard for
+  a field in it — comes back, since `overflow: hidden` stops a finger and not the platform. The
+  router's number did the second and broke the first, moving the list by the change. So the router
+  does not scroll a move to the same address, which is a sheet's or a refused duplicate push; the
+  first navigation comes «from» `START_LOCATION`, whose address is «/», and is not one — read as
+  one, the trip loaded again forgot where the person was. And e2e takes «the list stayed» by where
+  the opener stands on the screen, never by `scrollY`, which the jump left equal. Any move of
   the router under an open sheet — push, replace, a new query — closes it too; an entry no
   sheet holds — left by a reload or a move away — is stepped off by `installSheetEntryGuard`.
   `close(2)` closes it together with the screen under it, the sheets above and below included,
