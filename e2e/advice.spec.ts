@@ -190,9 +190,10 @@ test('reports a failure instead of an empty screen, and recovers on retry', asyn
   await expect(page.getByRole('heading', { name: 'Nothing to advise yet' })).toBeVisible()
 })
 
-// Offline and not identified yet: the identity's own notice says what is wrong, and the screen
-// asks the server for nothing — one «no connection» on a screen, never two (MOL-19, B3; Р-6).
-test('offline without an identity: one notice, and the screen comes back with the connection', async ({
+// Офлайн на устройстве, которое здесь ещё не входило: пускать некуда — ни ящиков, ни ответов
+// на телефоне нет, — и это офлайн-состояние экрана входа, а не плашка над пустым приложением
+// (MOL-56, решение Q5). Одно «нет связи» на экране, никогда два (MOL-19, B3; Р-6).
+test('offline without a session: the door says so, and the offer comes back with the connection', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -202,10 +203,11 @@ test('offline without an identity: one notice, and the screen comes back with th
   })
   await page.goto('/advice')
 
-  await expect(page.getByRole('heading', { name: 'Not signed in yet' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No internet, no sign-in' })).toBeVisible()
   await expect(
     page.getByRole('heading', { name: 'The list will show up once you are online' }),
   ).toHaveCount(0)
+  // Кнопки «Повторить» нет: экран попробует сам, когда связь вернётся.
   await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0)
 
   await page.evaluate(() => {
@@ -213,7 +215,7 @@ test('offline without an identity: one notice, and the screen comes back with th
     window.dispatchEvent(new Event('online'))
   })
 
-  await expect(page.getByRole('heading', { name: 'Nothing to advise yet' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Sign in with your Telegram' })).toBeVisible()
 })
 
 test('the action of the empty state is large enough to hit with a thumb', async ({ page }) => {
@@ -267,6 +269,8 @@ test('the skeleton breathes, and stops for someone who asked for less motion', a
   const animation = () => bars.evaluate((element) => getComputedStyle(element).animationName)
 
   await page.goto('/advice')
+  // Скелет именно этого экрана: пока личность не осела, свой скелет рисует и экран входа.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What to buy')
   await expect(bars).toBeVisible()
   expect(await animation()).not.toBe('none')
 

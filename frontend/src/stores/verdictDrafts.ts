@@ -6,6 +6,7 @@ import type { PendingVerdict, Rating, WireCode } from '@molvia/model'
 import { api } from '@/api'
 import type { Score } from '@/components/rating'
 import { useActorStore } from '@/stores/actor'
+import { useLoginStore } from '@/stores/login'
 import { read, write } from '@/stores/storage'
 
 /**
@@ -113,6 +114,7 @@ function ratingOf(draft: VerdictDraft & { score: Score }): Rating {
  */
 export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
   const actor = useActorStore()
+  const login = useLoginStore()
 
   const drafts = ref<Record<string, VerdictDraft>>({})
   const held = ref<Held | null>(null)
@@ -199,6 +201,19 @@ export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
    * identity is followed by one for the new identity.
    */
   function flush(): Promise<void> {
+    // **Ничего не уходит, пока сервер не сказал, кто мы** (MOL-56, адверсариальный Б1): до
+    // ответа «кто мы» — это имя ящика на устройстве, а оно ничего не знает про cookie.
+    //
+    // **И об этом говорится теми же словами, что и о неудавшейся отправке** (адверсариальный
+    // В1): раньше статус ставил провал попытки, и выход отсюда молча оставлял «Отправляем
+    // оценку…» навсегда — у полки без сигнала, то есть в главном сценарии продукта. «Не ушло»
+    // с кнопкой тут было бы хуже: кнопка зовёт эту же отправку и ничего не изменит, пока
+    // личность не осела. А осядет она сама — по `online`, по возвращению во вкладку или по
+    // «Повторить» на плашке личности.
+    if (actor.state !== 'ready' || login.rechecking) {
+      held.value = 'offline'
+      return Promise.resolve()
+    }
     if (!running) {
       const owner = actor.id
       running = drain(owner).finally(() => {

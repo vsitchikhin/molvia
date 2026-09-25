@@ -2,6 +2,7 @@
 // DOM for the code inside page.evaluate, which runs in the browser.
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { open } from './session'
 
 /**
  * The sheet in a real browser and a real history — what the component tests cannot show: that
@@ -29,7 +30,7 @@ async function scrollY(page: Page): Promise<number> {
 
 /** Opens the kit scrolled down to the opener — the list above it is long on purpose. */
 async function openSheet(page: Page): Promise<{ scrolled: number; length: number }> {
-  await page.goto('/_kit')
+  await open(page, '/_kit')
   await expect(heading(page)).toHaveText('Kit')
   await opener(page).scrollIntoViewIfNeeded()
   const scrolled = await scrollY(page)
@@ -209,7 +210,7 @@ test.describe('the sheet', () => {
 
   /** The opener in the middle of the screen, so a second tap there lands on the scrim. */
   async function centreOpener(page: Page): Promise<{ x: number; y: number }> {
-    await page.goto('/_kit')
+    await open(page, '/_kit')
     await expect(heading(page)).toHaveText('Kit')
     await opener(page).evaluate((element) => {
       element.scrollIntoView({ block: 'center', behavior: 'instant' })
@@ -275,7 +276,7 @@ test.describe('the sheet', () => {
 
 // The segment looks as in the handoff and still answers a thumb over the whole 44px (review Р-3).
 test('a segment answers a tap anywhere over the track’s 44px', async ({ page }) => {
-  await page.goto('/_kit')
+  await open(page, '/_kit')
   const segment = page
     .getByRole('group', { name: 'Unit' })
     .first()

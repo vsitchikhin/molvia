@@ -32,8 +32,10 @@ const removeExpense = vi.fn<(tripId: string, expenseId: string) => Promise<TripV
 const startTrip = vi.fn<(body: StartTripBody) => Promise<{ trip: TripView; created: boolean }>>()
 const finishTrip = vi.fn<(tripId: string, at?: Date) => Promise<void>>()
 const currentTrip = vi.fn<() => Promise<TripView | null>>()
+const me = vi.fn<() => Promise<never>>()
 vi.mock('@/api', () => ({
   api: {
+    me: () => me(),
     addExpense: (tripId: string, body: AddExpenseBody) => addExpense(tripId, body),
     updateExpense: (tripId: string, expenseId: string, patch: ExpensePatch) =>
       updateExpense(tripId, expenseId, patch),
@@ -143,7 +145,16 @@ const here: ActorSettings = {
 function fresh(identity = ME) {
   localStorage.setItem('molvia.actor', identity)
   setActivePinia(createPinia())
+  // Приложение с осевшей личностью: очередь отправляет только по ответу сервера (MOL-56).
+  useActorStore().state = 'ready'
   return useTripQueueStore()
+}
+
+/** Соседнее окно того же браузера: своя pinia, та же осевшая личность. */
+function otherWindow() {
+  const pinia = createPinia()
+  useActorStore(pinia).state = 'ready'
+  return useTripQueueStore(pinia)
 }
 
 /** Resolves when every promise already queued has run: the queue sends in the background. */
@@ -256,7 +267,33 @@ describe('trip queue', () => {
     startTrip.mockReset()
     finishTrip.mockReset()
     currentTrip.mockReset()
+    me.mockReset()
     vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  it('Г1: молчащий сервер пробуется снова и снова, с удвоением, и переспрашивает личность', async () => {
+    // Портал магазина: `onLine` всё время `true`, `online` не приходит вовсе, и без своего
+    // повтора покупка ждала бы возвращения во вкладку. Первая версия цепочки обрывалась на
+    // первом заходе: `start()` синхронно ставит `loading`, и `flush` уже не видел `error`.
+    vi.useFakeTimers()
+    const queue = fresh()
+    const actor = useActorStore()
+    actor.state = 'error'
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    queue.enqueue(add(MILK))
+
+    await queue.flush()
+    expect(addExpense).not.toHaveBeenCalled()
+
+    // Не один заход, а цепочка: пауза удваивается, поэтому считаем заходы, а не их часы.
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(me.mock.calls.length).toBeGreaterThanOrEqual(3)
+
+    // Портал отпустил: личность оседает, и покупка уходит сама.
+    actor.state = 'ready'
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(addExpense).toHaveBeenCalled()
   })
 
   it('sends a write and hands the answer to the trip', async () => {
@@ -486,22 +523,22 @@ describe('trip queue', () => {
     it('keep each other’s purchases: storage is the queue, not a copy', async () => {
       addExpense.mockRejectedValue(offline())
       fresh()
-      const pwa = useTripQueueStore(createPinia())
-      const tab = useTripQueueStore(createPinia())
+      const pwa = otherWindow()
+      const tab = otherWindow()
       pwa.enqueue(add(MILK))
       tab.enqueue(add(BREAD))
       await settled()
 
-      expect(idsOf(useTripQueueStore(createPinia()).pending)).toEqual([MILK, BREAD])
+      expect(idsOf(otherWindow().pending)).toEqual([MILK, BREAD])
     })
 
     it('do not bring back a purchase one of them sent and then removed', async () => {
       addExpense.mockRejectedValueOnce(offline())
       fresh()
-      const pwa = useTripQueueStore(createPinia())
+      const pwa = otherWindow()
       pwa.enqueue(add(MILK))
       await settled()
-      const tab = useTripQueueStore(createPinia())
+      const tab = otherWindow()
       expect(idsOf(tab.pending)).toEqual([MILK])
 
       addExpense.mockResolvedValue({ trip: answer('520.00'), created: true })
@@ -531,10 +568,10 @@ describe('trip queue', () => {
       try {
         addExpense.mockRejectedValueOnce(offline())
         fresh()
-        const pwa = useTripQueueStore(createPinia())
+        const pwa = otherWindow()
         pwa.enqueue(add(MILK))
         await settled()
-        const tab = useTripQueueStore(createPinia())
+        const tab = otherWindow()
 
         let release: (answered: { trip: TripView; created: boolean }) => void = () => undefined
         addExpense.mockImplementationOnce(

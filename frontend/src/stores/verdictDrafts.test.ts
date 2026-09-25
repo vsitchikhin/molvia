@@ -5,6 +5,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import type { PendingVerdict, Rating, VerdictCard } from '@molvia/model'
 import { useActorStore } from '@/stores/actor'
+import { useLoginStore } from '@/stores/login'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 
 const rateItem =
@@ -39,6 +40,8 @@ function answered(itemId: string, score: number): { verdict: VerdictCard; create
 function fresh() {
   localStorage.setItem('molvia.actor', ME)
   setActivePinia(createPinia())
+  // Приложение с осевшей личностью: очередь отправляет только по ответу сервера (MOL-56).
+  useActorStore().state = 'ready'
   return useVerdictDraftsStore()
 }
 
@@ -55,6 +58,43 @@ describe('verdict drafts', () => {
     sessionStorage.clear()
     rateItem.mockReset()
     vi.restoreAllMocks()
+  })
+
+  it('Б1: не отправляет ничего, пока сервер не сказал, кто мы', async () => {
+    // До ответа «кто мы» — это имя ящика на устройстве, а оно ничего не знает про cookie:
+    // сессия могла прийти мимо скрипта, и тогда отложенная оценка ушла бы в чужой аккаунт.
+    const drafts = fresh()
+    useActorStore().state = 'idle'
+    drafts.save(milk, 4, '')
+    await settled()
+
+    expect(rateItem).not.toHaveBeenCalled()
+    expect(drafts.waiting).toHaveLength(1)
+    // В1: и говорит об этом теми же словами, что и провал отправки, — «сохранено, уйдёт со
+    // связью». Молчание оставляло на экране «Отправляем оценку…» навсегда.
+    expect(drafts.held).toBe('offline')
+
+    useActorStore().state = 'ready'
+    await drafts.flush()
+
+    expect(rateItem).toHaveBeenCalledTimes(1)
+    expect(drafts.held).toBeNull()
+  })
+
+  it('и молчит, пока догоняет вход соседнего окна', async () => {
+    // Пока этот `me()` не ответил, «кто мы» — это ответ, полученный до чужого входа: писать
+    // под сессию, которая, возможно, уже не этого человека, нельзя (саморевью, раунд 4).
+    const drafts = fresh()
+    useLoginStore().rechecking = true
+    drafts.save(milk, 4, '')
+    await settled()
+
+    expect(rateItem).not.toHaveBeenCalled()
+
+    useLoginStore().rechecking = false
+    await drafts.flush()
+
+    expect(rateItem).toHaveBeenCalledTimes(1)
   })
 
   it('saves on the phone first, sends after, and forgets once the server has it', async () => {

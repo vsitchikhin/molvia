@@ -10,39 +10,27 @@ import {
   settingsKey,
 } from '@/stores/settingsMemory'
 import { api } from '@/api'
-import { IDENTITY_KEY, currentIdentity, isIdentifier, rememberIdentity } from '@/stores/identity'
+import { currentIdentity, isIdentifier, rememberIdentity } from '@/stores/identity'
 
 /**
- * What the identity is doing, so a screen can show the right one of four states.
+ * What the identity is doing, so a screen can show the right one of its states.
  *
- * Two of them have gone, each with the world it described. `uninvited` went with the invite
- * door (MOL-52). `lost` went with MOL-53: it meant «the data of this device is unreachable and
- * a new identity has been started», and neither half is true any more — a session is not the
- * data, and losing one is a reason to sign in again rather than to begin empty. MOL-56 brings
- * the state that replaces it, together with the screen that can act on it.
+ * Two have gone and one has arrived. `uninvited` went with the invite door (MOL-52). `lost`
+ * went with MOL-53: it meant «the data of this device is unreachable and a new identity has
+ * been started», and neither half was true any more — a session is not the data, and losing one
+ * is a reason to sign in again rather than to begin empty. **`signed-out` is what replaces it**
+ * (MOL-56): there is no session, the app draws the login screen instead of any of its own, and
+ * nothing on the device has been lost — the drawers are still filed under the same owner and
+ * the same account comes back through Telegram.
+ *
+ * `error` keeps its own meaning and is not the same thing: the server could not be asked at
+ * all. A session may be perfectly alive behind a captive portal, so that case shows the app
+ * with a notice rather than a door.
  */
-export type IdentityState = 'idle' | 'loading' | 'ready' | 'offline' | 'error'
+export type IdentityState = 'idle' | 'loading' | 'ready' | 'offline' | 'error' | 'signed-out'
 
 function isMissingActor(error: unknown): boolean {
   return error instanceof ApiError && error.code === ERROR.NO_ACTOR
-}
-
-/**
- * One tab signs in, the others wait and then simply ask again.
- *
- * Before MOL-53 this was an elaborate affair: the identity lived in storage, so two tabs
- * reading an empty one created two accounts and split a person's data in two, and the fallback
- * for browsers without `navigator.locks` kept a heartbeat claim in storage to narrow the race.
- * A cookie is one per origin and the browser owns it, so the second tab does not need to be
- * told what the first got — it re-asks the server and is recognised. What is left is a lock to
- * keep both from opening a session at once, and where there is no lock the cost is one extra
- * account in development, on the seam, in a browser older than Firefox 96.
- */
-async function claiming<T>(run: () => Promise<T>): Promise<T> {
-  // The DOM types promise `navigator.locks` is always there; Firefox before 96 and older
-  // WebViews say otherwise, and a phone at a shelf is exactly where an old WebView turns up.
-  const locks = (navigator as unknown as Record<string, unknown>).locks as LockManager | undefined
-  return locks ? locks.request(IDENTITY_KEY, run) : run()
 }
 
 export const useActorStore = defineStore('actor', () => {
@@ -89,8 +77,22 @@ export const useActorStore = defineStore('actor', () => {
   })
   /** True while `start` is in flight, so a retry button cannot queue a second one. */
   let running = false
+  /**
+   * How many questions about the identity are in flight. A refusal earned by one of them is the
+   * answer being waited for, not news — `sessionEnded` steps aside while it is non-zero, or a
+   * cold start with no session would ask twice and `verify` would ask itself forever.
+   */
+  let asking = 0
+  /**
+   * Bumped by every settled answer. A question about the identity that comes back after a newer
+   * one has already been answered is about a world that no longer exists — most sharply when
+   * the newer answer is a login and the older one is `error.no_actor` about the moment before
+   * it (adversarial А1).
+   */
+  let revision = 0
 
   function settle(loaded: ActorView): void {
+    revision += 1
     const was = currentIdentity()
     if (actor.value?.id === loaded.id && actor.value.updatedAt > loaded.updatedAt) return
     actor.value = loaded
@@ -111,9 +113,10 @@ export const useActorStore = defineStore('actor', () => {
     //
     // In production this is rare by construction: signing in through Telegram finds the *same*
     // owner, so the drawer comes back with them — that is the whole promise of the epic. It
-    // happens when the person genuinely changes account, and every time in development, where
-    // the seam mints a new Telegram id on each call. Said out loud here because the screen that
-    // could say it to a person is MOL-56's, and until then a log line is better than silence.
+    // happens when the person genuinely changes account. Since MOL-56 a person is shown *which*
+    // account they landed in before the app lets them any further, so this line is no longer
+    // the only warning there is — it is the one a developer sees, where the change of owner is
+    // an ordinary consequence of clearing the browser's cookies.
     if (was !== null && was !== loaded.id) {
       console.warn('[molvia] владелец сменился: записи прежнего остались на устройстве', was)
     }
@@ -125,64 +128,92 @@ export const useActorStore = defineStore('actor', () => {
   }
 
   /**
-   * The development seam. Its only caller stands behind `import.meta.env.DEV`, a literal Vite
-   * folds, so a production bundle holds no call to an address the production server does not
-   * carry — the same shape the seam has on the server (MOL-52, Р-14).
+   * The development seam, and since MOL-56 it is a button rather than something that happens by
+   * itself: the login screen shows it, and only in a development build — its caller stands
+   * behind `import.meta.env.DEV`, a literal Vite folds, so a production bundle holds no call to
+   * an address the production server does not carry (MOL-52, Р-14).
    *
-   * In production, until MOL-54, there is simply no way in, and the honest state for that is
-   * `error`. MOL-56 replaces it with a screen that offers the Telegram login.
+   * It signed the app in automatically until now, which made the screen this epic exists for
+   * invisible in every working copy and unreachable to the end-to-end suite.
    */
-  async function signIn(): Promise<void> {
+  async function signIn(): Promise<ActorView | null> {
+    // The literal Vite folds, so the call to an address production does not carry is dropped
+    // from that bundle together with this branch — the property MOL-52 (Р-14) wrote down and a
+    // `v-if` in the template alone would not have kept.
+    if (!import.meta.env.DEV) return null
+    state.value = 'loading'
+    asking += 1
     try {
-      settle(await api.devLogin())
+      const view = await api.devLogin()
+      settle(view)
+      state.value = 'ready'
+      return view
+    } catch (error) {
+      // Провал входа дверь не открывает: `error` показывает приложение с плашкой, а здесь
+      // приложения ещё нет. Что сказать человеку, решает экран входа — своим состоянием.
+      console.error('[molvia] шов разработки не впустил', error)
+      state.value = 'signed-out'
+      return null
+    } finally {
+      asking -= 1
+    }
+  }
+
+  async function load(): Promise<void> {
+    asking += 1
+    try {
+      settle(await api.me())
       state.value = 'ready'
     } catch (error) {
-      fail(error)
+      // **«Nobody» is an answer, not a failure** (MOL-56). The app stops here and draws the
+      // login screen; nothing on the device is touched, because the drawers are filed under the
+      // owner and Telegram brings the same one back.
+      //
+      // The lock and the second `me()` that used to stand here went with the automatic sign-in
+      // they existed for: two tabs racing to create an account is not a thing that can happen
+      // when a person has to tap a button (MOL-53, Б3).
+      if (isMissingActor(error)) state.value = 'signed-out'
+      else fail(error)
+    } finally {
+      asking -= 1
     }
   }
 
   /**
-   * Under the lock, and it asks again before signing in: between requesting the lock and
-   * getting it, another tab may have signed this browser in — and the cookie it got is already
-   * ours, because cookies belong to the origin rather than to a tab.
+   * **Asks the server who this browser is, and changes nothing it was not told** (MOL-56,
+   * adversarial А1). It is the answer to every «the session may not be what I think it is»:
+   * a refusal from a request that left earlier, another window's login, a return to the tab.
+   *
+   * What it deliberately does not do is take a refusal at face value. `error.no_actor` is the
+   * truth about the moment a request **left**, and answers still in flight outlive a login: one
+   * of them used to wipe the question «is this your account?» and let the next `me()` walk into
+   * the account a stranger had confirmed. So the seam asks again instead of concluding, and only
+   * a `me()` of its own may say «nobody». A server that cannot be reached says nothing at all
+   * and leaves the screen as it is.
+   *
+   * Re-entrancy matters more than it looks: the `me()` below goes through the same seam, so
+   * without the guard a dead session would ask forever.
    */
-  async function askAgainOrSignIn(): Promise<void> {
+  async function verify(): Promise<void> {
+    if (asking > 0) return
+    asking += 1
+    const at = revision
     try {
-      settle(await api.me())
-      state.value = 'ready'
-      return
+      const view = await api.me()
+      if (revision === at) adopt(view)
     } catch (error) {
-      if (!isMissingActor(error)) {
-        fail(error)
-        return
-      }
+      // A refusal earned before a login landed says nothing about after it: the session it was
+      // asking about is not the session this browser now holds (adversarial А1).
+      if (isMissingActor(error) && revision === at) state.value = 'signed-out'
+    } finally {
+      asking -= 1
     }
-
-    return signIn()
   }
 
-  async function load(): Promise<void> {
-    try {
-      settle(await api.me())
-      state.value = 'ready'
-    } catch (error) {
-      if (!isMissingActor(error)) {
-        fail(error)
-        return
-      }
-
-      // **The second ask is only worth making where signing in is possible** (MOL-53, Б3). It
-      // exists to catch a session another tab opened while this one waited for the lock — and
-      // in a production build there is no way to open one until MOL-54, so both the lock and
-      // the second request are spent on nothing. `recover()` comes back on every return to the
-      // tab, so «nothing» was two requests each time.
-      if (!import.meta.env.DEV) {
-        state.value = 'error'
-        return
-      }
-
-      return claiming(askAgainOrSignIn)
-    }
+  /** What the login screen calls with the owner its poll collected. */
+  function adopt(loaded: ActorView): void {
+    settle(loaded)
+    state.value = 'ready'
   }
 
   /** Called once after the app mounts, and again by the retry control. */
@@ -196,8 +227,16 @@ export const useActorStore = defineStore('actor', () => {
         // for the shelf shows its cached screens as this person — but nothing has been
         // checked, and saying «ready» would promise an entity nothing has fetched. The state
         // stays «offline», which is both true and the one the offline text belongs to.
+        //
+        // **With no owner on the device there is nothing to show** (MOL-56, Q5): no drawers, no
+        // cached answers, and a person who has never signed in on this phone cannot start. That
+        // is the login screen's offline state and not a notice over an empty app.
         const known = currentIdentity()
-        if (isIdentifier(known)) id.value = known
+        if (!isIdentifier(known)) {
+          state.value = 'signed-out'
+          return
+        }
+        id.value = known
         state.value = 'offline'
         return
       }
@@ -232,5 +271,30 @@ export const useActorStore = defineStore('actor', () => {
     state.value = 'ready'
   }
 
-  return { actor, id, settings, state, start, apply, retry: start }
+  return {
+    actor,
+    id,
+    settings,
+    state,
+    start,
+    apply,
+    adopt,
+    verify,
+    signIn,
+    busy: () => asking > 0,
+    retry: start,
+  }
 })
+
+/**
+ * What any refusal of `error.no_actor` means, wherever it was earned (MOL-56). Wired to the
+ * seam in `main.ts` rather than registered by the store itself: a store that registers a
+ * global callback the moment it is created leaves two of them fighting over one slot, and the
+ * composition root is where a wire between two modules belongs.
+ */
+export function sessionEnded(): void {
+  const actor = useActorStore()
+  // A question already in flight is about to answer this better than the refusal can.
+  if (actor.busy()) return
+  void actor.verify()
+}

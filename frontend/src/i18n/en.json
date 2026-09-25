@@ -366,12 +366,53 @@
   },
   "identity": {
     "error": {
-      "title": "Could not sign in",
-      "body": "Until that works, the app cannot save anything — there is nowhere to put it."
+      "title": "Could not check the sign-in",
+      "body": "The app is open, but nothing is sent until the server answers."
     },
     "offline": {
-      "title": "Not signed in yet",
-      "body": "We will sign in as soon as you are back online. Until then nothing new can be saved."
+      "title": "Working without a connection",
+      "body": "Purchases are kept on the phone and sent once the internet is back."
+    }
+  },
+  "login": {
+    "title": "Sign in",
+    "offer": {
+      "title": "Sign in with your Telegram",
+      "body": "Your trips and ratings then survive a change of phone. We store neither your name nor your number."
+    },
+    "start": "Sign in with Telegram",
+    "waiting": {
+      "title": "Open Telegram and tap «Sign in»",
+      "body": "The link lives five minutes. Come back here — the app will recognise you by itself."
+    },
+    "open": "Open Telegram",
+    "restart": "Start again",
+    "welcome": {
+      "title": "Signed in. Is this your account?",
+      "body": "Everything you write from here lands in it.",
+      "created": "Account created: {day}"
+    },
+    "confirm": "Yes, that is me",
+    "refuse": "That is not me",
+    "unavailable": {
+      "title": "This link no longer works",
+      "body": "Five minutes may have passed, or the login has been collected. Start again."
+    },
+    "rate_limited": {
+      "title": "Too many sign-in attempts",
+      "body": "That is everybody's requests together. Try in a minute."
+    },
+    "disabled": {
+      "title": "Signing in with Telegram is not set up",
+      "body": "This copy has no bot. That happens in development only."
+    },
+    "error": {
+      "title": "Could not sign in",
+      "body": "Something got in the way. Try again."
+    },
+    "offline": {
+      "title": "No internet, no sign-in",
+      "body": "We will try by ourselves once the connection is back."
     }
   },
   "dev": {
@@ -385,7 +426,9 @@
       "sample_milk": "Milk «Ashkhar»",
       "sample_meta": "UHT, 2.5%",
       "date": "Date"
-    }
+    },
+    "login_seam": "Sign in for development",
+    "login_insecure": "Signing in needs https: run make certs"
   },
   "error": {
     "invalid_amount": "That does not look like an amount",
