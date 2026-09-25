@@ -812,15 +812,20 @@ database access. In a product about data integrity, two write paths will silentl
   — they carry no foreign key, so no cascade reaches them — and the owner. Catalogue items the
   person added stay with `created_by` nulled, and **every place stays** (owner's decision
   24.09.2026). People erase themselves with `/delete` in the bot; the owner's fallback is
-  `dist/forget.js` in the API image (`make forget` in a copy), a dry run unless `--yes`, and
+  `dist/forget.js` in the API image (`make forget` in a copy — `TG` reaches the script through the
+  environment, never pasted into the recipe, where a value could close a quote and bring its own
+  `--yes`, П-3), a dry run unless `--yes`, and
   **a dry run is the real run, rolled back**, so its count cannot disagree with what erasure does.
   **A new table that points at `actors` must join erasure** — a test compares every foreign key
   on `actors` with `ACTOR_REFERENCES`, and another scans every table for the erased person's uuid
-  and Telegram id. **Its first lock is on the person's login requests, not on the owner**
-  (adversarial О-3): `for update` on an owner who does not exist yet locks nothing, and a login
-  collected meanwhile created an owner the transaction had already decided was not there — «nobody
-  to erase» over a live account. Collection locks its request row before creating the owner, so
-  the two take turns. **The page and the bot name what stays in full** — the items and the shops —
+  and Telegram id. **Its first lock is the account's, then the person's login requests, and only
+  then the owner** (adversarial О-3, П-2): `for update` on an owner who does not exist yet locks
+  nothing, and a login collected meanwhile created an owner the transaction had already decided
+  was not there — «nobody to erase» over a live account. Collection locks its request row before
+  creating the owner, so the two take turns; and a request not yet confirmed has no Telegram id to
+  be locked by, so confirmation and erasure share `lockTelegramAccount`, an advisory lock on the
+  account taken first by both. The bot's `sequentialize` happens to order one chat's presses too,
+  but that is another module's promise and the two API routes have no order of their own. **The page and the bot name what stays in full** — the items and the shops —
   and say that copies on the phone are out of the server's reach: nothing clears a device's
   storage for an owner the server no longer knows, since a 401 there is also an expired session.
 - **No third-party trackers or analytics, and so no cookie banner** (MOL-58). There are two
@@ -835,7 +840,9 @@ database access. In a product about data integrity, two write paths will silentl
   path** (adversarial О-1): name, driver code and stack frames through `describeFailure`, never
   its message — a driver's message is the query with its parameters, and a failed search wrote
   what was searched for and who asked, a dropped connection the hash of every session token in
-  flight. `forget` prints the same. An unknown address answers without echoing it and is not
+  flight. **The frames are what follows the stack's own header, cut off whole** (П-1): picked by
+  their shape, a line of a multi-line review written as `    at …` passed as a frame, with the
+  rest of the parameters behind it. `forget` prints the same. An unknown address answers without echoing it and is not
   logged with its query. What the privacy page (`/privacy`) says about data is a promise these
   rules keep: a change to either is a change to both — and it says only what they keep: other
   people's prices are shown in the shared mode (MOL-31), so «shown to nobody» is said of the list
@@ -960,7 +967,9 @@ Rating reminders are 0.2.
   tap cannot overwrite the first with something that sounds different. **«Отмена» is not an
   outcome** (adversarial О-2): it is shown over the message and takes the buttons away, and its
   words are true whichever button came first — written in, «Ничего не удалено» overwrote «Готово»
-  over an account already gone. The erase composer is installed **before** the login's, which
+  over an account already gone. When Telegram will not take the alert, the same words go under
+  the message as a reply, and the buttons go only once something was said (П-4): a refusal may be
+  silent because its buttons stay, and this one takes them. The erase composer is installed **before** the login's, which
   ends in a catch-all that greets every text.
 
 - **The i18n rule of the frontend covers the bot too, and this is the line that says so.** Not a
