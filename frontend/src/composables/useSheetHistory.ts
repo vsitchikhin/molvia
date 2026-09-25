@@ -23,9 +23,12 @@ import { stepBack } from '@/navigation'
  * «back» reaches it.
  */
 
-/** Where the element a sheet was opened from stood on the screen — see `putBack`. */
+/** How the page stood when a sheet was opened over it — see `putBack`. */
 export interface SheetAnchor {
-  element: Element
+  /** The window's scroll at the opening. */
+  scrolled: number
+  /** The element the sheet was opened from, and where it stood on the screen. */
+  element: Element | null
   top: number
 }
 
@@ -36,55 +39,77 @@ interface Holder {
   anchor: SheetAnchor | null
 }
 
-// What the person pressed last. iOS does not focus a tapped button, so focus alone cannot say what
-// opened a sheet; the press can.
-let pressed: Element | null = null
+// The element activated in the task now running. A click reaches it however it was activated — a
+// tap (iOS does not focus a tapped button), a mouse, Enter or Space, a screen reader — and it is
+// forgotten once the task is over: a sheet opened later, with no click of its own, must not be
+// measured by whatever was clicked before (review С-4, adversarial В3).
+let activated: Element | null = null
 let watching = false
 
-function watchPresses(): void {
+function watchActivations(): void {
   if (watching) return
   watching = true
   document.addEventListener(
-    'pointerdown',
+    'click',
     (event) => {
-      pressed = event.target instanceof Element ? event.target : null
+      activated = event.target instanceof Element ? event.target : null
+      setTimeout(() => {
+        activated = null
+      })
     },
     { capture: true, passive: true },
   )
 }
 
-function onPage(candidate: Element | null): candidate is Element {
+function inPage(candidate: Element | null): candidate is Element {
   return (
     candidate !== null &&
     candidate !== document.body &&
     candidate !== document.documentElement &&
-    candidate.isConnected &&
-    candidate.closest('dialog') === null
+    candidate.isConnected
   )
 }
 
 /**
- * The element the sheet is opened from — pressed, or else focused — and where it stands on the
- * screen. Taken before the sheet is shown: a sheet over a sheet was opened from inside a dialog,
- * which the page's scroll does not move, and it takes none.
+ * How the page stands as the sheet opens: its scroll, and the element the sheet is opened from —
+ * activated just now, or else focused — with where it stands on the screen. Taken before the sheet
+ * is shown. A sheet over a sheet is opened from inside a dialog, which the page's scroll does not
+ * move, and takes none.
  */
 export function pageAnchor(): SheetAnchor | null {
-  const element = [pressed, document.activeElement].find(onPage)
-  return element ? { element, top: element.getBoundingClientRect().top } : null
+  const element = [activated, document.activeElement].find(inPage) ?? null
+  if (element?.closest('dialog')) return null
+  return {
+    scrolled: window.scrollY,
+    element,
+    top: element ? element.getBoundingClientRect().top : 0,
+  }
 }
 
 /**
  * Puts the page back where it stood when the sheet opened. `overflow: hidden` stops a finger, not
  * the platform — the iOS keyboard for a field in the sheet may move the window — and nothing else
- * moves it back (adversarial В2). Measured by the element the sheet was opened from, never by a
- * saved `scrollY`: when the list changed height above it, the browser has already kept that
- * element still and there is nothing to put back, while a saved number moved the list by exactly
- * the change (MOL-63). An element gone meanwhile — the row the sheet deleted — puts back nothing.
+ * moves it back (adversarial В2).
+ *
+ * Measured by the element the sheet was opened from, never by a saved `scrollY`: when the list
+ * changed height above it, Chrome and Firefox have already kept that element still and there is
+ * nothing to put back, while a saved number moved the list by exactly the change (MOL-63); Safari,
+ * which keeps nothing still, gets the difference put back. An element gone meanwhile — the row the
+ * sheet deleted — puts back nothing.
+ *
+ * At the very top of the page the browser keeps nothing still on purpose: what arrived above the
+ * list — a notice — pushes it down and stays in sight. Measured by the element, it was scrolled
+ * out from under the bar (adversarial В4). There the top stays the top.
  */
 function putBack(anchor: SheetAnchor | null): void {
-  if (!anchor?.element.isConnected) return
+  if (!anchor) return
+  if (anchor.scrolled < 1) {
+    if (window.scrollY !== 0) window.scrollTo({ top: 0, behavior: 'auto' })
+    return
+  }
+  if (!anchor.element?.isConnected) return
   const shift = Math.round(anchor.element.getBoundingClientRect().top - anchor.top)
-  if (shift !== 0) window.scrollBy({ top: shift, behavior: 'instant' })
+  if (shift !== 0) window.scrollBy({ top: shift, behavior: 'auto' })
 }
 
 /**
@@ -125,7 +150,7 @@ export function useSheetHistory(onLeft: () => void): {
   const router = useRouter()
   const history = router.options.history
   const stack = stackOf(router)
-  watchPresses()
+  watchActivations()
   let holder: Holder | undefined
   let stopMoves: (() => void) | undefined
   // Whether the screen under the sheet has an entry of the app beneath it: `null` for a section
