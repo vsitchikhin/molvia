@@ -37,6 +37,8 @@ export function sessionRoutes(app: FastifyInstance, api: SessionsApi): void {
       request.params.sessionId,
     )
     if (endedCurrent) clearSessionCookie(reply)
-    return reply.code(204).send()
+    // Every reply about the keys to an account, not only the one that puts a cookie out
+    // (self-review С-7): one rule with no exceptions is the one that holds.
+    return reply.header('cache-control', 'no-store').code(204).send()
   })
 }

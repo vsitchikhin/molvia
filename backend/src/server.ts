@@ -264,7 +264,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       // An expired session has no reader, and it kept a device name for good while the privacy
       // page promises 180 days from the last use (MOL-57, owner's decision Q4).
       stopSessionCleanup = startLoginCleanup(
-        () => createSessionRepository(db).removeExpired(),
+        () => sessions.removeExpired(),
         () => {
           instance.log.error('expired session cleanup failed')
         },

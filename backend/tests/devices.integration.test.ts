@@ -258,6 +258,7 @@ describe('DELETE /sessions/:id', () => {
 
     const ended = await inject('DELETE', `/sessions/${laptop.id}`, phone.cookie)
     expect(ended.statusCode).toBe(204)
+    expect(ended.headers['cache-control']).toBe('no-store')
     // Завершили чужое устройство — своя cookie остаётся на месте.
     expect(setCookie(ended.headers)).toBeUndefined()
 
