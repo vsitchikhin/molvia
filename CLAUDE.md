@@ -1299,24 +1299,43 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   launch with an owner on the device — and show the next person at that laptop the last one's
   trips. `forgetOwner` takes every `molvia.*.<owner>` key and `molvia.actor` from both shelves,
   **by the suffix and not by a list**, so a store added later is swept without anyone remembering
-  to; `identity.test.ts` pins which keys exist, so a key that breaks the shape is a decision. It
-  runs under the trip queue's lock, or a window mid-send writes the queue back; `molvia.login`
-  goes too, and then the page is loaded afresh at `/`, the one sweep that forgets the stores'
-  memory as well. **Offline there is no way out at all** — the cookie is `HttpOnly`, the page
-  cannot put it out, and a session left alive is what the person came to end — and the sheet
-  says so.
-- **What would be lost is counted aloud** (owner's decision Q2): the trip queue, the saved
-  ratings and an unsaved settings form, asked to send first when the sheet opens. Both «Выйти»
-  and «Завершить» ask before acting, because neither can be undone — there is no «Вернуть» for a
-  deleted key, and the device ended goes through Telegram again.
-- **Another window lets the owner go by the drawer's disappearing**, without asking `me()`: the
-  window that erased it did so only after the `204`. Asking would have left a window with no
-  connection showing the app of the person who left until it was closed.
-- **«Устройства» keeps nothing on the phone.** Every other screen remembers its last answer for
-  the shelf; this one lists the keys to the account, and yesterday's list read as today's hides
-  the device a person came to end. Offline is the yellow state and nothing else. There is no
-  empty state: a live session is always in its own list. «Были» is a day, never a time —
-  `last_seen_at` moves once a day — and the current row says none.
+  to; `identity.test.ts` pins which keys exist, so a key that breaks the shape is a decision. The
+  login record loses only this owner's approval — a login another window has in progress stays.
+  **The owner is let go in this window first** (`release`: `id` to `null`, the revision moved), so
+  a rating answering after the erasure finds nobody to file itself under and a `me()` that left
+  before it cannot write the drawer's name back (adversarial Б1, self-review С-2); then the drawer
+  goes under the trip queue's lock, and the page is loaded afresh at `/`. **Offline there is no
+  way out at all** — the cookie is `HttpOnly`, the page cannot put it out, and a session left
+  alive is what the person came to end — and the sheet says so.
+- **A lost `204` is finished by the server's «no session»** (adversarial Б2). The intent,
+  `molvia.leaving`, is written before the request leaves: if the server deleted the session and
+  the answer never came, the first `401` closed the door on the settings and the erasure never
+  happened. Now the identity settling as signed out finishes it; settling as the same owner means
+  the request did not land, and the intent goes; a launch with no connection and the intent on
+  the device shows the login screen, not the app. Closing the sheet withdraws it — the person
+  decided to stay. The listener is a store of its own (`stores/signOut`), created with the app.
+- **What would be lost is counted aloud** (owner's decision Q2) — everything the erasure takes
+  that the server does not hold: the trip queue and the purchases it refused, every rating draft,
+  saved or still being typed, and an unsaved settings form (adversarial Б3). The app is asked to
+  send first when the sheet opens. Both «Выйти» and «Завершить» ask before acting, because
+  neither can be undone — there is no «Вернуть» for a deleted key.
+- **Another window lets the owner go by the drawer's disappearing, and erases its own shelves**
+  (adversarial А1). `sessionStorage` belongs to one tab, so the window where «Выйти» was pressed
+  cannot clear its neighbours' — and `read` falls back to it, so a neighbour's reload opened the
+  app of the person who left. It asks no `me()`: the window that erased did so after the `204`.
+- **«Это не я» and the login's poll take turns** (adversarial Г1). The way out's `Max-Age=0` is
+  addressed to the cookie's name, not to a token, so a poll that collected this person's own
+  session and answered first had it put out of the jar. `refuse` waits for a poll already on its
+  way — and if that one brought the person's own session, there is nobody to put out and no
+  login to begin — and holds the next poll until the way out has answered. The server still
+  clears by name, as the task asks: the race is closed where the requests are made.
+- **«Устройства» keeps nothing on the phone and reads the list again on every return** — to the
+  tab, or `online` — not only after a failure (adversarial В2): a list kept in memory for hours is
+  the copy it refuses to keep on the disk. A device ended leaves the list at once, not with the
+  next read (В1). There is no empty state: a live session is always in its own list. «Были» is a
+  day, never a time — `last_seen_at` moves once a day — the current row says none, and a date of
+  another year carries the year. An unknown device gets its own sentences rather than its label
+  put into somebody else's case.
 - **Where they live** (owner's decision Q3, brief of MOL-41): «Устройства ›» and «Выйти» are one
   group, «Аккаунт», on the settings screen, outside the form's states — the way into the account
   does not depend on whether its settings loaded. The current row in «Устройства» has no button:
