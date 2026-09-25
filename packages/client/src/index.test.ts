@@ -909,8 +909,11 @@ describe('the exchanges', () => {
         asOf: '2026-09-14T20:00:00.000Z',
       },
       basis: 'weighted',
+      estimated: false,
     },
-    heldEstimate: { held: { amount: '85000.00', currency: 'AMD' }, whole: true },
+    costs: [],
+    heldEstimates: [{ held: { amount: '85000.00', currency: 'AMD' }, whole: true }],
+    baseSince: null,
     exchanges: [],
   }
 
@@ -961,6 +964,27 @@ describe('the exchanges', () => {
 
     const repeat = clientReplying(200, overviewWire)
     expect((await repeat.client.recordExchange(body)).created).toBe(false)
+  })
+
+  it('amends an exchange inside its own path segment, over the version it was opened on', async () => {
+    const { client, calls } = clientReplying(200, overviewWire)
+    await client.amendExchange(EXCHANGE, {
+      revision: 2,
+      given: { minor: 2_000_000n, currency: 'RUB' },
+      received: { minor: 9_500_000n, currency: 'AMD' },
+      exchangedOn: '2026-09-15',
+      note: 'ВТБ',
+    })
+    expect(calls[0]).toMatchObject({
+      method: 'PUT',
+      body: {
+        revision: 2,
+        given: { amount: '20000.00', currency: 'RUB' },
+        received: { amount: '95000.00', currency: 'AMD' },
+        note: 'ВТБ',
+      },
+    })
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/exchanges/${EXCHANGE}`)
   })
 
   it('refuses an exchange of one currency before sending it', async () => {
