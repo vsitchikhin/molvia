@@ -150,11 +150,14 @@ describe('WORD_BREAK', () => {
   it('holds every White_Space code point — the one class the domain and Postgres both split by', () => {
     const breaks = new RegExp(`^${WORD_BREAK}$`, 'u')
     const space = /^\p{White_Space}$/u
+    // Collected and compared once: an assertion per code point is a million of them, and CI
+    // ran out of its five seconds on the walk.
+    const apart: string[] = []
     for (let code = 0; code <= 0x10ffff; code += 1) {
-      if (code >= 0xd800 && code <= 0xdfff) continue
       const char = String.fromCodePoint(code)
-      expect(breaks.test(char), code.toString(16)).toBe(space.test(char))
+      if (breaks.test(char) !== space.test(char)) apart.push(code.toString(16))
     }
+    expect(apart).toEqual([])
   })
 
   it('splits a name at a no-break space, as the key does (review У)', () => {
