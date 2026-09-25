@@ -214,7 +214,7 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     with query_words as (
       -- Cut to 255 here, once: levenshtein refuses longer arguments, and the prefix arm below
       -- cuts the name to the length of the query word, not to 255.
-      select n, left(word, 255) as q,
+      select n, left(word, 255) as q, number,
              -- A word is read as a unit by its place only while another word still grounds the
              -- query: in «2 суп» the soup is all there is, not two of «տուփ». A unit still being
              -- typed is a size against every name — the item must not blink out of the list on
@@ -226,7 +226,7 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       from (
         select *, bool_or(plain and not unit_like) over () as anchored
         from (
-          select n, word, last,
+          select n, word, last, number,
                  length(word) >= ${SHORT_WORD} and word !~ '[0-9]' and word not in ${UNIT_KEYS}
                    as plain,
                  after_number and exists (
@@ -241,6 +241,7 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
           from (
             select word, n,
                    n = max(n) over () as last,
+                   lag(word) over (order by n) as number,
                    coalesce(lag(word) over (order by n) ~ '[0-9]', false) as after_number
             from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
           ) w
@@ -267,18 +268,26 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       -- by MAX_QUERY_WORDS; measured in MOL-10, under 260 ms at every threshold in MOL-14.
     ),
     slipped as (
-      -- A slip is a size only against a name that prints the unit it slipped from; elsewhere
-      -- the word is what it spells. In «2 сом замороженный» the catfish is not «см», and read as
-      -- a size everywhere it let «Котлеты … замороженные» in beside the fish. Apart and joined,
-      -- not a subquery per row: a slip after a number is rare, so this is nearly always empty.
+      -- A slip is a size only against a name that prints the unit it slipped from, after the
+      -- very number the query has; elsewhere the word is what it spells. In «2 сом замороженный»
+      -- the catfish is not «см»: read as a size everywhere it let «Котлеты … замороженные» in
+      -- beside the fish, and against any «см» it let in «Пицца замороженная 30 см». The number
+      -- is what gives a slip away — «кефир 500 мд» and «Кефир 500 мл» share «500». The price:
+      -- «кефир 1 мд» does not reach «Кефир 1000 мл». Apart and joined, not a subquery per row:
+      -- a slip after a number is rare, so this is nearly always empty.
       select c.id, qw.n
       from query_words qw
       cross join candidates c
       where qw.slips
         and exists (
           select 1
-          from unnest(string_to_array(c.search_key, ' ')) as nw(unit)
-          where nw.unit in ${UNIT_KEYS} and ${slipsFromUnit(sql`qw.q`, sql`nw.unit`)}
+          from (
+            select unit, lag(unit) over (order by i) as number
+            from unnest(string_to_array(c.search_key, ' ')) with ordinality as t(unit, i)
+          ) nw
+          where nw.unit in ${UNIT_KEYS}
+            and nw.number = qw.number
+            and ${slipsFromUnit(sql`qw.q`, sql`nw.unit`)}
         )
     ),
     -- Materialized, so each word distance is taken once per row: inlined, the planner copied the

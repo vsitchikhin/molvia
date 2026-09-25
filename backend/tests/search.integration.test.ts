@@ -413,6 +413,17 @@ describe('search — a unit is a size, not a word (MOL-48)', () => {
     expect(await names('2 суп доширак')).toEqual([])
   })
 
+  it('reads a slip as a unit only after the number the query has: «30 см» is not «2 сом»', async () => {
+    // A name that prints the unit is not enough — the pizza's diameter is «см» too, and the
+    // noodles are «1 уп». What gives a slip away is the number beside it: «500 мд», «500 мл».
+    await named('Сом замороженный')
+    await named('Пицца замороженная 30 см')
+    await named('Doshirak суп курица')
+    await named('Doshirak лапша курица 1 уп')
+    expect(await names('2 сом замороженный')).toEqual(['Сом замороженный'])
+    expect(await names('2 суп доширак')).toEqual(['Doshirak суп курица'])
+  })
+
   it('keeps a name without a unit on every keystroke of one after the number', async () => {
     // A unit still being typed is a size against every name — «Батарейки Duracell AA» carries
     // none, and must not blink out between «4 ш» and «4 штук».
@@ -431,6 +442,12 @@ describe('search — a unit is a size, not a word (MOL-48)', () => {
     await named('Кефир 1 л')
     expect(await names('кефир 500 мд')).toEqual(['Кефир 500 мл'])
     expect(await names('кефир 500 мл')).toEqual(['Кефир 500 мл', 'Кефир 1 л'])
+  })
+
+  it('reads a slip only beside the same number: «кефир 1 мд» misses «1000 мл» — the price', async () => {
+    await named('Кефир 1000 мл')
+    expect(await names('кефир 1000 мд')).toEqual(['Кефир 1000 мл'])
+    expect(await names('кефир 1 мд')).toEqual([])
   })
 
   it('reads a word as a unit by its place only while another word grounds the query: «2 суп»', async () => {
