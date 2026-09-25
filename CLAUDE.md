@@ -504,7 +504,20 @@ device, private always. The rate is what the two amounts say and is not stored b
   a trip started that day would use — «на 8 754 ֏ больше» or «меньше», never «комиссия»: a good
   exchanger beats the bank, and the difference says nothing about why.
 - **No amending — delete and enter again** (plan, Р-4). A delete is a hard one: an exchange has no
-  gate counting it. Trips already started keep what they took.
+  gate counting it. Trips already started keep what they took. **The bin asks first, with the
+  amounts and the day, and «Вернуть» stays offered after** (owner's decision В-5): it writes the
+  same exchange again under the same name.
+- **A repeat is the same exchange, or it is a conflict** (В-6). The same name with the same
+  amounts, day and remainder answers 200; with anything else, 409 — that is a correction sent
+  after an answer that never came, and answering it «saved» left the typo in the wallet. The
+  screen then shows what was written and says to remove it and enter it again.
+- **An exchange no rate in the band says is refused where it is written** (`error.invalid_rate`),
+  never accepted and dropped from the wallet later: a zero too many once made the wallet vanish, the
+  trip take the bank in silence and the screen say there were no exchanges above a list of two.
+- **The hint counts what was spent after the exchange was written, in trips still open then** — a
+  purchase added to a finished trip was paid with the money held before. Without a remainder named
+  at the last exchange it speaks of that exchange's money only. A day's official rate that jumped
+  is never an exchange's measure: the rate before the jump is, or no comparison at all.
 
 ## Tracker and documentation
 
