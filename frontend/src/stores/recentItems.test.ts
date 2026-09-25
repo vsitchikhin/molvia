@@ -238,6 +238,20 @@ describe('recent items', () => {
       expect(store.filter('картошка').map((item) => item.id)).toEqual([young.id])
     })
 
+    it('takes an adjective of a group only as the kind: «Лапша гречневая» is no «гречка» (review С)', () => {
+      const store = relaunched()
+      const noodles = entry(10, { name: 'Лапша гречневая Sen Soy' })
+      const buckwheat = entry(11, { name: 'Гречневая крупа' })
+      for (const item of [noodles, buckwheat]) store.remember(item)
+      expect(store.filter('гречка')).toEqual([])
+      expect(
+        store
+          .filter('гречневая')
+          .map((item) => item.id)
+          .sort(),
+      ).toEqual([noodles.id, buckwheat.id].sort())
+    })
+
     it('not at all under an empty or blank query', () => {
       const store = withThree()
       expect(store.filter('')).toHaveLength(3)

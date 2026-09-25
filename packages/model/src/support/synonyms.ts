@@ -150,6 +150,36 @@ export const ADJECTIVE_WORD = '^[а-яёА-ЯЁ]+(ый|ий|ой|ая|яя|ое|
 const ADJECTIVE = new RegExp(ADJECTIVE_WORD, 'u')
 
 /**
+ * Nouns with an adjective's ending — the kind, not a property of it: «Пирожное Картошка» is a
+ * cake, not a potato (owner's decision on review, MOL-45 Р). Case is spelled out letter by letter,
+ * for Postgres, like `ADJECTIVE_WORD`. The price, named: a noun not on the list is read as an
+ * adjective all the same.
+ */
+const NOT_ADJECTIVES = ['пирожное', 'пирожные', 'мороженое', 'жаркое', 'шампанское', 'заливное']
+
+export const NOUN_WORD = `^(${NOT_ADJECTIVES.map((word) =>
+  word.replace(/./gu, (letter) => `[${letter}${letter.toUpperCase()}]`),
+).join('|')})$`
+
+const NOUN = new RegExp(NOUN_WORD, 'u')
+
+/** Whether a word of a name describes rather than names — by `ADJECTIVE_WORD` and `NOUN_WORD`. */
+function describes(word: string): boolean {
+  return ADJECTIVE.test(word) && !NOUN.test(word)
+}
+
+/**
+ * What separates the words of a name for `kindKey` — every Unicode `White_Space`, written out.
+ * Not `\s`: in JavaScript it takes the no-break space, in Postgres it does not, and «Молодой
+ * картофель» pasted from a site with U+00A0 between its words was two words on the phone and one
+ * in the database — found offline, missed online (review У, Р-4). The same trap as `INVISIBLE`, and
+ * held the same way: a test walks every code point.
+ */
+export const WORD_BREAK = '[\t-\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+'
+
+const BREAK = new RegExp(WORD_BREAK, 'u')
+
+/**
  * The word of a name a synonym is compared with: the first one that is not an adjective, as a
  * search key — where a shelf writes the kind («Вода Джермук», «Скумбрия х/к», «Молодой
  * картофель»), and not the tuna of a cat food or the water of «Туалетная вода» (owner's decisions
@@ -157,21 +187,24 @@ const ADJECTIVE = new RegExp(ADJECTIVE_WORD, 'u')
  * pattern in SQL: the adjectives are plain words, so each is one word of the key as well.
  */
 export function kindKey(name: string): string {
-  const words = name.trim().split(/\s+/u)
-  const at = words.findIndex((word) => !ADJECTIVE.test(word))
+  const words = name.split(BREAK).filter((word) => word !== '')
+  const at = words.findIndex((word) => !describes(word))
   return at === -1 ? '' : (toSearchKey(name).split(' ')[at] ?? '')
 }
 
+// Narrower targets only. An adjective of a group of the same thing — «гречневая», «овсяная» —
+// describes somebody else's product as often as its own («Лапша гречневая», «Мука овсяная»), and
+// counts only as the kind, like any word of the group (owner's decision on review, MOL-45 С).
 const DESCRIBING: ReadonlySet<string> = new Set(
-  [...SAME.flat(), ...NARROWER.flatMap(([, tails]) => tails)]
-    .filter((word) => ADJECTIVE.test(word))
+  NARROWER.flatMap(([, tails]) => tails)
+    .filter(describes)
     .map(toSearchKey),
 )
 
 /**
- * Whether a synonym describes rather than names — «минеральная», «газированная», «гречневая».
- * Such a word is never the kind, which skips adjectives, so it counts as any word of a name:
- * it is precise enough that «Вода туалетная» does not carry it.
+ * Whether a synonym describes rather than names — «минеральная», «газированная». Such a word is
+ * never the kind, which skips adjectives, so it counts as any word of a name: it is precise
+ * enough that «Вода туалетная» does not carry it.
  */
 export function synonymDescribes(key: string): boolean {
   return DESCRIBING.has(key)

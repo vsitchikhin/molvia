@@ -3,6 +3,8 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import {
   ADJECTIVE_WORD,
+  NOUN_WORD,
+  WORD_BREAK,
   itemSchema,
   nameIdentity,
   synonymDescribes,
@@ -184,8 +186,15 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       ? sql`1`
       : sql`coalesce((
           select min(u.n)::int
-          from unnest(regexp_split_to_array(btrim(${items.name}), '\\s+')) with ordinality as u(w, n)
-          where u.w !~ ${ADJECTIVE_WORD}
+          from (
+            -- Split by the domain's own class and counted over the words alone, as \`kindKey\`
+            -- does: a no-break space is a break there, and \`\\s\` of Postgres does not see it.
+            select w, row_number() over (order by at) as n
+            from unnest(regexp_split_to_array(${items.name}, ${WORD_BREAK}))
+                 with ordinality as s(w, at)
+            where w <> ''
+          ) u
+          where u.w !~ ${ADJECTIVE_WORD} or u.w ~ ${NOUN_WORD}
         ), 1000)`
 
   return sql`
@@ -309,7 +318,11 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                   -- screen sends halfway through typing it. Every word has to be found
                   -- exactly (the last one by its start). Digits alone never get here.
                   when bool_or(pw.lettered) and max(coalesce(pw.qd, 255)) = 0 then 0
-             end as distance
+             end as distance,
+             -- The words alone, the size aside: «Кефир Ашхар 0,5 л» for «кефир 1 л» is the kefir
+             -- asked for in another size, not a typo (review Т).
+             coalesce(ceil(avg(coalesce(pw.qd, 255))
+                             filter (where pw.grounds and not pw.by_synonym)), 0) as words_distance
       from candidates c
       join per_word_best pw on pw.id = c.id
       group by c.id, c.ws, c.search_key
@@ -353,18 +366,19 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     -- what it did not, or memory would become a second search with rules of its own. The one
     -- exception is the person's own word (MOL-45), and it is let in, not lifted.
     where r.distance <= ${ACCEPTED_DISTANCE} or r.admitted
-    -- What only a learnt word let in stands below what the search found exactly or the person
-    -- took before, and above what it found by a typo (owner's decisions on review, MOL-45 И and
-    -- О): «кефир» learnt as the milk taken in its place stops standing above the kefir the day
-    -- the catalogue has one, and the potato learnt for «овощи» stays above the flour the
-    -- absolute budget finds there (MOL-46). Among what the search found this changes nothing:
-    -- a pick and an exact match were already above a typo. Then what the person took before,
+    -- What only a learnt word let in stands below what the search found by its words or the
+    -- person took before, and above what it found by a typo (owner's decisions on review,
+    -- MOL-45 И, О and Т): «кефир» learnt as the milk taken in its place stops standing above the
+    -- kefir the day the catalogue has one — in any size, «кефир 1 л» against «0,5 л» — and the
+    -- potato learnt for «овощи» stays above the flour the absolute budget finds there (MOL-46).
+    -- Among what the search found, the words matched exactly now go before a typo in a word at
+    -- the same distance; nothing else moves. Then what the person took before,
     -- above a closer spelling — their own choice says more than a typo metric does. Among
     -- several, the latest wins: after switching brands the new one is on top from the first
     -- trip. Then the order of MOL-10, where ties stay ties («moloko» names «Ашхар» and
     -- «Марианна» alike) and \`id\` only keeps two loads of one screen in one order.
     order by case when not coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) then 1
-                  when m.item_id is not null or r.distance = 0 then 0
+                  when m.item_id is not null or r.words_distance = 0 then 0
                   else 2
              end,
              m.item_id is null,

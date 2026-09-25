@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { toSearchKey } from '#model/support/search-key'
-import { SYNONYM_TABLES, kindKey, synonymDescribes, synonymKeys } from '#model/support/synonyms'
+import {
+  SYNONYM_TABLES,
+  WORD_BREAK,
+  kindKey,
+  synonymDescribes,
+  synonymKeys,
+} from '#model/support/synonyms'
 
 const key = toSearchKey
 const { same, narrower } = SYNONYM_TABLES
@@ -115,6 +121,12 @@ describe('kindKey', () => {
     expect(kindKey('Фисташки жареные')).toBe(key('фисташки'))
   })
 
+  it('takes a noun with an adjective ending for the kind: «Пирожное Картошка» is a cake (review Р)', () => {
+    expect(kindKey('Пирожное Картошка')).toBe(key('пирожное'))
+    expect(kindKey('МОРОЖЕНОЕ пломбир')).toBe(key('мороженое'))
+    expect(kindKey('Шоколадное пирожное')).toBe(key('пирожное'))
+  })
+
   it('is empty when every word describes, and a brand first stays first — the price, named', () => {
     expect(kindKey('Свежее')).toBe('')
     expect(kindKey('Barilla спагетти')).toBe(key('barilla'))
@@ -124,8 +136,27 @@ describe('kindKey', () => {
 describe('synonymDescribes', () => {
   it('knows a synonym that describes, which counts as any word of a name', () => {
     expect(synonymDescribes(key('минеральная'))).toBe(true)
-    expect(synonymDescribes(key('гречневая'))).toBe(true)
+    expect(synonymDescribes(key('газированная'))).toBe(true)
+    // An adjective of a group of the same thing counts as the kind only (review С).
+    expect(synonymDescribes(key('гречневая'))).toBe(false)
     expect(synonymDescribes(key('картофель'))).toBe(false)
     expect(synonymDescribes(key('вода'))).toBe(false)
+  })
+})
+
+describe('WORD_BREAK', () => {
+  it('holds every White_Space code point — the one class the domain and Postgres both split by', () => {
+    const breaks = new RegExp(`^${WORD_BREAK}$`, 'u')
+    const space = /^\p{White_Space}$/u
+    for (let code = 0; code <= 0x10ffff; code += 1) {
+      if (code >= 0xd800 && code <= 0xdfff) continue
+      const char = String.fromCodePoint(code)
+      expect(breaks.test(char), code.toString(16)).toBe(space.test(char))
+    }
+  })
+
+  it('splits a name at a no-break space, as the key does (review У)', () => {
+    expect(kindKey('Молодой\u00a0картофель')).toBe(key('картофель'))
+    expect(kindKey('\u00a0Копчёная\u202fскумбрия ')).toBe(key('скумбрия'))
   })
 })

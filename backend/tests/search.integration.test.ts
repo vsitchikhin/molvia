@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { toSearchKey } from '@molvia/model'
+import { newItemSchema, toSearchKey } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { sql as raw } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
@@ -635,6 +635,27 @@ describe('search — a word the shelf writes otherwise (MOL-45)', () => {
     expect(await names('хлеб барадинский')).toEqual(['Хлеб Бородинский'])
   })
 
+  it('splits a name at every White_Space as the domain does — a no-break space too (review У)', async () => {
+    // The domain and Postgres split by one written-out class; `\\s` of each differs on U+00A0.
+    for (let code = 0; code <= 0x3000; code += 1) {
+      const space = String.fromCodePoint(code)
+      const name = `Молодой${space}картофель`
+      // Only what a name may carry: a tab or a line break is refused before it is ever stored.
+      if (!/^\p{White_Space}$/u.test(space) || !newItemSchema.shape.name.safeParse(name).success) {
+        continue
+      }
+      await clearAll(db)
+      await named(name)
+      expect(await names('картошка'), code.toString(16)).toEqual([name])
+    }
+  })
+
+  it('takes a noun with an adjective ending for the kind: «Пирожное Картошка» is no potato (review Р)', async () => {
+    await named('Пирожное Картошка')
+    await named('Молодой картофель')
+    expect(await names('картофель')).toEqual(['Молодой картофель'])
+  })
+
   it('reaches the index for every synonym, with no Seq Scan over the items', async () => {
     await named('Арахис солёный 150 г')
     const plan = await db.transaction(async (tx) => {
@@ -700,6 +721,15 @@ describe("search — a word of the person's own (MOL-45)", () => {
       'Картофель',
       'Мука пшеничная высший сорт 2 кг',
     ])
+  })
+
+  it('puts a find of the very words in another size above the learnt item (review, Т)', async () => {
+    const actorId = await insertActor(db)
+    const milk = await named('Молоко Ашхар 1 л')
+    await picks.learn(actorId, 'кефир 1 л', milk)
+    await named('Кефир Ашхар 0,5 л')
+
+    expect(await namesFor(actorId, 'кефир 1 л')).toEqual(['Кефир Ашхар 0,5 л', 'Молоко Ашхар 1 л'])
   })
 
   it('puts what the search found above what only the learnt word let in (review, И)', async () => {
