@@ -17,6 +17,7 @@ import { catalogueRoutes } from '@/routes/catalogue'
 import { placeRoutes } from '@/routes/places'
 import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
+import { exchangeRoutes } from '@/routes/exchanges'
 import { advice } from '@/usecases/advice'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
@@ -31,6 +32,13 @@ import { pendingVerdicts } from '@/usecases/pending-verdicts'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { signIn } from '@/usecases/sign-in'
 import { chooseTripRate } from '@/usecases/choose-trip-rate'
+import {
+  chooseRatePreference,
+  readExchanges,
+  recordExchange,
+  removeExchange,
+  restoreExchange,
+} from '@/usecases/exchanges'
 import { createSettingsRepository } from '@/db/settings-repository'
 import { saveSettings } from '@/usecases/save-settings'
 import { settingsRoute } from '@/routes/settings'
@@ -38,6 +46,7 @@ import { startTrip } from '@/usecases/start-trip'
 import { startLogin } from '@/usecases/start-login'
 import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
 import { createActorRepository } from '@/db/actors-repository'
+import { createExchangeRepository } from '@/db/exchanges-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
@@ -215,7 +224,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   app.register((instance, _options, done) => {
     const db = options.db ?? getDb()
     const loginRequests = createLoginRequestRepository(db)
+    const removedExchanges = createExchangeRepository(db)
     let stopCleanup: (() => Promise<void>) | undefined
+    let stopExchangeCleanup: (() => Promise<void>) | undefined
     instance.addHook('onReady', (ready) => {
       stopCleanup = startLoginCleanup(
         () => loginRequests.removeExpired(),
@@ -223,10 +234,20 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           instance.log.error('login request cleanup failed')
         },
       )
+      // The login timer's runner, reused — it owns only a minute timer and knows nothing of
+      // logins: a removed exchange is final ten minutes on, whether or not its owner opens the
+      // screen again (MOL-40, В-7).
+      stopExchangeCleanup = startLoginCleanup(
+        () => removedExchanges.purgeStale(),
+        () => {
+          instance.log.error('removed exchange cleanup failed')
+        },
+      )
       ready()
     })
     instance.addHook('onClose', async () => {
       await stopCleanup?.()
+      await stopExchangeCleanup?.()
     })
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
@@ -297,6 +318,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         finish: (actorId, tripId, deviceAt) =>
           finishTrip(tripData.trips, actorId, tripId, deviceAt),
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
+      })
+      exchangeRoutes(guarded, {
+        overview: (actor) => readExchanges(tripData, actor),
+        record: (actor, body) => recordExchange(tripData, actor, body),
+        remove: (actor, id) => removeExchange(tripData, actor, id),
+        restore: (actor, id) => restoreExchange(tripData, actor, id),
+        prefer: (actor, preference) => chooseRatePreference(tripData, actor, preference),
       })
       adviceRoutes(guarded, {
         advice: (actorId) =>

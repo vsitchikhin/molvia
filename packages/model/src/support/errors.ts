@@ -44,6 +44,11 @@ export const ERROR = {
   LOGIN_RATE_LIMITED: 'error.login_rate_limited',
   LOGIN_DISABLED: 'error.login_disabled',
   BOT_UNAUTHORIZED: 'error.bot_unauthorized',
+  /**
+   * An exchange dated after today in Yerevan (MOL-40). A rule of the clock, so the use case holds
+   * it rather than the schema — the same line `exchangeRateSchema` draws for «not from the future».
+   */
+  EXCHANGE_IN_FUTURE: 'error.exchange_in_future',
 } as const
 
 export type ErrorCode = (typeof ERROR)[keyof typeof ERROR]
@@ -93,6 +98,10 @@ export const ISSUE = {
   TRIP_FINISHED_BEFORE_START: 'issue.trip_finished_before_start',
   VERDICT_UPDATED_BEFORE_RATED: 'issue.verdict_updated_before_rated',
   VERDICT_PLACE_NOT_FOR_KIND: 'issue.verdict_place_not_for_kind',
+  /** An exchange that gives and receives one currency: nothing was exchanged (MOL-40). */
+  EXCHANGE_SAME_CURRENCY: 'issue.exchange_same_currency',
+  /** What was held before an exchange, named in a currency other than the one received. */
+  EXCHANGE_HELD_NOT_RECEIVED: 'issue.exchange_held_not_received',
 } as const
 
 export type IssueCode = (typeof ISSUE)[keyof typeof ISSUE]

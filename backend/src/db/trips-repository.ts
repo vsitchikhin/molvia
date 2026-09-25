@@ -19,12 +19,12 @@ import { trips, places } from './schema'
 /**
  * The rate a trip is started with, as the trip keeps it: who published it, whether it jumped when
  * it arrived, and the rate before the jump (MOL-39, Р-19, Р-21; MOL-22, Р-3). An `OfficialRate`
- * is one; `provider` is null only for a rate the person entered themselves, which is MOL-40's.
+ * is one; `provider` is null only for the person's own rate, from their exchanges (MOL-40).
  */
 export interface TripSnapshot {
   readonly rate: ExchangeRate
   /**
-   * Who published it — `null` only for a rate the person entered themselves, which is MOL-40's.
+   * Who published it — `null` only for the person's own rate, from their exchanges (MOL-40).
    * A discriminated union would say this in the type, and it is not used on purpose: `OfficialRate`
    * carries the wide `RateSource`, so every producer of a snapshot would have to narrow it, and the
    * rule would be stated in three places instead of two. The agreement between this and

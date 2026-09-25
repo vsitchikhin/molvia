@@ -894,3 +894,97 @@ describe('the trip', () => {
     })
   })
 })
+
+describe('the exchanges', () => {
+  const EXCHANGE = '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d'
+  const overviewWire = {
+    preference: 'personal',
+    pair: { base: 'RUB', quote: 'AMD' },
+    wallet: {
+      rate: {
+        base: 'RUB',
+        quote: 'AMD',
+        rate: '4.791667',
+        source: 'personal',
+        asOf: '2026-09-14T20:00:00.000Z',
+      },
+      basis: 'weighted',
+    },
+    heldEstimate: { held: { amount: '85000.00', currency: 'AMD' }, whole: true },
+    exchanges: [],
+  }
+
+  function clientReplying(status: number, body: unknown) {
+    const calls: { url: string; method: string; body: unknown }[] = []
+    const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      calls.push({
+        url: input instanceof URL ? input.href : typeof input === 'string' ? input : input.url,
+        method: init?.method ?? 'GET',
+        body: typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined,
+      })
+      return Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    }
+    const client = createClient({ baseUrl: 'http://api', fetch })
+    return { client, calls }
+  }
+
+  it('reads the screen whole, with the wallet decoded to a rate', async () => {
+    const { client, calls } = clientReplying(200, overviewWire)
+    const overview = await client.exchanges()
+    expect(overview.wallet?.rate.scaled).toBe(4_791_667n)
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe('/exchanges')
+  })
+
+  it('records an exchange and tells a new one from a repeat', async () => {
+    const body = {
+      id: EXCHANGE,
+      given: { minor: 2_000_000n, currency: 'RUB' as const },
+      received: { minor: 9_500_000n, currency: 'AMD' as const },
+      exchangedOn: '2026-09-15',
+    }
+    const fresh = clientReplying(201, overviewWire)
+    expect((await fresh.client.recordExchange(body)).created).toBe(true)
+    expect(fresh.calls[0]).toMatchObject({
+      method: 'POST',
+      body: {
+        id: EXCHANGE,
+        given: { amount: '20000.00', currency: 'RUB' },
+        received: { amount: '95000.00', currency: 'AMD' },
+        exchangedOn: '2026-09-15',
+      },
+    })
+
+    const repeat = clientReplying(200, overviewWire)
+    expect((await repeat.client.recordExchange(body)).created).toBe(false)
+  })
+
+  it('refuses an exchange of one currency before sending it', async () => {
+    const { client, calls } = clientReplying(201, overviewWire)
+    const same = {
+      id: EXCHANGE,
+      given: { minor: 100n, currency: 'AMD' as const },
+      received: { minor: 100n, currency: 'AMD' as const },
+      exchangedOn: '2026-09-15',
+    }
+    expect(await codeOf(client.recordExchange(same))).toBe(ISSUE.EXCHANGE_SAME_CURRENCY)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('removes an exchange inside its own path segment, and switches the preference', async () => {
+    const { client, calls } = clientReplying(200, overviewWire)
+    await client.removeExchange('../actors/me')
+    await client.chooseRatePreference('official')
+    expect(calls[0]?.method).toBe('DELETE')
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe('/exchanges/..%2Factors%2Fme')
+    expect(calls[1]).toMatchObject({ method: 'PUT', body: { preference: 'official' } })
+    expect(new URL(calls[1]?.url ?? '').pathname).toBe('/actors/me/rate-preference')
+    await client.restoreExchange(EXCHANGE)
+    expect(calls[2]?.method).toBe('POST')
+    expect(new URL(calls[2]?.url ?? '').pathname).toBe(`/exchanges/${EXCHANGE}/restore`)
+  })
+})

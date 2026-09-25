@@ -13,6 +13,8 @@ import {
   catalogueEntryCodec,
   catalogueSearchResponseSchema,
   currentTripResponseSchema,
+  exchangeBodySchema,
+  exchangesResponseCodec,
   expensePatchSchema,
   finishTripBodySchema,
   tripHistoryCodec,
@@ -20,6 +22,7 @@ import {
   isWireCode,
   proposedItemSchema,
   rateChoiceBodySchema,
+  ratePreferenceBodySchema,
   ratingSchema,
   pendingVerdictsCodec,
   recentPlacesResponseSchema,
@@ -38,6 +41,8 @@ import type {
   AdviceResponse,
   AddExpenseBody,
   CatalogueEntry,
+  ExchangeBody,
+  ExchangesResponse,
   ExpensePatch,
   TripHistory,
   TripHistoryCursor,
@@ -45,6 +50,7 @@ import type {
   PendingVerdicts,
   ProposedItem,
   RateChoiceBody,
+  RatePreference,
   Rating,
   StartTripBody,
   TripPlace,
@@ -115,6 +121,25 @@ export interface MolviaClient {
    * `error.conflict`, an own rate that is not a rate with `error.invalid_rate`.
    */
   chooseTripRate(tripId: string, body: RateChoiceBody): Promise<TripView>
+  /**
+   * «Обмен денег» whole (MOL-40): the preference, the wallet of the pair, the hint and every
+   * exchange with its comparison — all the server's, so the screen divides nothing.
+   */
+  exchanges(): Promise<ExchangesResponse>
+  /**
+   * «Записать обмен». Named by the device, so safe to repeat: `created` is `false` for the same
+   * identifier again. A day after today in Yerevan rejects with `error.exchange_in_future`.
+   */
+  recordExchange(body: ExchangeBody): Promise<{ exchanges: ExchangesResponse; created: boolean }>
+  /** Gone, whether it was there or not — the answer is the screen as it is now. */
+  removeExchange(id: string): Promise<ExchangesResponse>
+  /**
+   * «Вернуть»: the exchange just removed, back as it was. `error.not_found` once it is final —
+   * after any other request of the screen.
+   */
+  restoreExchange(id: string): Promise<ExchangesResponse>
+  /** «Мой / Официальный» for trips from now on. */
+  chooseRatePreference(preference: RatePreference): Promise<ExchangesResponse>
   /**
    * «Поставить оценку», or give it again — safe to repeat, which is what a draft sent when the
    * network is back needs. `created` is `true` for a first verdict, or one given after it was
@@ -294,6 +319,28 @@ export function createClient(options: ClientOptions): MolviaClient {
       request(`/trips/${segment(tripId)}/rate-choice`, tripViewCodec, {
         method: 'PUT',
         body: encode(rateChoiceBodySchema, body),
+      }),
+
+    exchanges: () => request('/exchanges', exchangesResponseCodec),
+
+    recordExchange: async (body) => {
+      const { status, data } = await exchange('/exchanges', exchangesResponseCodec, {
+        method: 'POST',
+        body: encode(exchangeBodySchema, body),
+      })
+      return { exchanges: data, created: status === 201 }
+    },
+
+    removeExchange: async (id) =>
+      request(`/exchanges/${segment(id)}`, exchangesResponseCodec, { method: 'DELETE' }),
+
+    restoreExchange: async (id) =>
+      request(`/exchanges/${segment(id)}/restore`, exchangesResponseCodec, { method: 'POST' }),
+
+    chooseRatePreference: async (preference) =>
+      request('/actors/me/rate-preference', exchangesResponseCodec, {
+        method: 'PUT',
+        body: encode(ratePreferenceBodySchema, { preference }),
       }),
 
     // 204 has no body, and nothing else is a success here.

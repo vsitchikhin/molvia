@@ -27,7 +27,7 @@ import { quantityCodec, unitPrice, unitPriceCodec } from '#model/values/units'
  * would not find its own row in the reply (MOL-21, adversarial round 2, В). Refused rather than
  * folded: folding would still leave the device holding the spelling it sent.
  */
-const deviceIdSchema = z.uuid().regex(/^[0-9a-f-]+$/)
+export const deviceIdSchema = z.uuid().regex(/^[0-9a-f-]+$/)
 
 /**
  * The body of «Начать поход».
@@ -111,8 +111,8 @@ export const tripViewCodec = z.strictObject({
   /**
    * Who published the rate the trip **snapshotted** (MOL-22) — not necessarily the rate above:
    * after a jump the person may count by their own, and `rate.source` is then `personal` while
-   * this still names the bank the trip took its snapshot from. Null only when there is no
-   * snapshot at all.
+   * this still names the bank the trip took its snapshot from. Null when there is no snapshot
+   * at all, and when the snapshot is the person's own rate from their exchanges (MOL-40).
    *
    * `source: 'fallback'` alone cannot be shown: the screen has to name the bank or the aggregator
    * it counts by, and the aggregator's terms require the name.

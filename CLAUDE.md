@@ -478,6 +478,59 @@ snapshot, and an inverse or a cross is rounded there to the snapshot's six digit
 - **An empty cache gives a trip no rate, for good** — the snapshot is written once and never
   filled in later (owner's decision, 19.09.2026).
 
+**The person's own rate comes from exchanges, never from a number typed in (MOL-40).** The plan's
+decisions of MOL-41 (22.09.2026) replaced «enter your rate once and edit it» with the operation a
+person actually performs: «gave 20 000 ₽, got 95 000 ֏, on this day» — `exchanges`, named by the
+device, private always. The rate is what the two amounts say and is not stored beside them.
+
+- **The wallet is the average cost of what is held, and spending does not move it** — it takes
+  money and its cost away in one proportion. Only a new exchange does, and the weight of the old
+  money in it is exactly how much was left at that moment: `heldBefore`, optional, asked from the
+  second exchange of the pair. Unknown, the wallet takes that exchange's rate and says so
+  (`basis: 'last'`) rather than counting the remainder as zero in silence; before the first there
+  is money of no known cost, so the first exchange never asks. Not derived from purchases: a price
+  is optional and spending outside a trip is not written, so a sum of expenses would be a wrong
+  weight presented as a right one — it is offered only as a hint, «по записанным тратам».
+- **Exact to the end.** `walletRate` keeps a ratio of integers through the whole chain and rounds
+  once, to the snapshot's six digits, the way a cross rate is rounded. Only exchanges of «currency
+  of conversion → currency of spending» count; another pair, the reverse one included, is the
+  money model's (chains, reversals, a change of base) and not guessed at here.
+- **A trip takes it at the start, like the official one, and never again** (В-4): with
+  `actors.rate_preference = 'personal'` — the default — and an exchange of the pair dated no later
+  than today in Yerevan, the snapshot is `source: 'personal'` with no provider and no jump;
+  otherwise MOL-39's branch as it was. Nothing is required of the person: without exchanges the
+  two preferences are the same answer. An exchange made while a trip is open moves the next one.
+- **Every exchange is set beside the central bank of its own day**, by the same `pickOfficialRate`
+  a trip started that day would use — «на 8 754 ֏ больше» or «меньше», never «комиссия»: a good
+  exchanger beats the bank, and the difference says nothing about why.
+- **No amending — delete and enter again** (plan, Р-4). Trips already started keep what they
+  took. **The bin asks first, with the amounts and the day, and «Вернуть» stays offered after**
+  (owner's decision В-5). A removal marks the row (`deleted_at`) and hides it from every reader;
+  «Вернуть» (`POST /exchanges/:id/restore`) clears the mark, so the exchange keeps its
+  `created_at` — written anew it took the moment of the tap, which moved both the order of its day
+  and the hint. **A removal is final after ten minutes** (`EXCHANGE_UNDO_MINUTES`, owner's decision
+  В-7): the server's minute timer deletes older marks of everyone, and the owner's next request of
+  the screen deletes theirs sooner — the moment the screen stops offering them back. The screen
+  withdraws the offer on an answer, never on a tap: a write lost on the way, or refused before it
+  reached that point, leaves the removal undoable, and «Вернуть» stays. Both
+  «Вернуть» and a removal are safe to send again after a lost answer: an exchange already back
+  answers 200, and a removal never makes final the row it is marking. A «Вернуть» that comes too
+  late is told so, and the list is read again — not «check the connection», which sent people to
+  enter the exchange a second time.
+- **A repeat is the same exchange, or it is a conflict** (В-6). The same name with the same
+  amounts, day and remainder answers 200; with anything else, 409 — that is a correction sent
+  after an answer that never came, and answering it «saved» left the typo in the wallet. The
+  screen then shows what was written and says to remove it and enter it again.
+- **An exchange no rate in the band says is refused where it is written** (`error.invalid_rate`),
+  never accepted and dropped from the wallet later: a zero too many once made the wallet vanish, the
+  trip take the bank in silence and the screen say there were no exchanges above a list of two.
+- **The hint counts what was spent after the exchange, in trips still open then** — a purchase
+  added to a finished trip was paid with the money held before. «After» is the moment the exchange
+  was written when that was on its own day, and the end of its day for one written later: counting
+  from the record threw away everything bought between the exchange and its entry. Without a remainder named
+  at the last exchange it speaks of that exchange's money only. A day's official rate that jumped
+  is never an exchange's measure: the rate before the jump is, or no comparison at all.
+
 ## Tracker and documentation
 
 They live outside the repository, on the same Atlassian site, reachable through the
@@ -1301,6 +1354,11 @@ a new launch takes the last draft written while two windows open at once keep th
 are typing into. «Что брать» answers with the geography it counted by, and
 the phone compares it with its own: a different city is a list to load again, and an answer the
 settings will not move to is taken as it is — the screen used to stay on a skeleton for good.
+
+MOL-40 put the person's own rate under the trip — «Обмен денег», nested under «Настройки»: the
+exchanges, the wallet worked out from them, the preference «мой / ЦБ РА», and every exchange
+beside the central bank of its day. The trip total says «мой курс» for it. Incomes and the rest
+of the money model are still their own tasks.
 
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
