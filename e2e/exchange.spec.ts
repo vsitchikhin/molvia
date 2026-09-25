@@ -56,3 +56,49 @@ test('an exchange becomes the rate of the next trip, and the preference takes it
   await page.reload()
   await expect(page.getByRole('radio', { name: 'по курсу ЦБ РА' })).toBeChecked()
 })
+
+/**
+ * A chain (MOL-42): roubles to dollars, dollars to drams. The price of the dollars travels into
+ * the drams, the screen shows the dollars at their own price, and the next trip takes the drams'.
+ */
+test('roubles to dollars to drams: the chain is the rate of the next trip', async ({ page }) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Обмен денег' }).click()
+  await expect(page.getByRole('heading', { name: 'Обменов пока нет' })).toBeVisible()
+
+  const sheet = page.locator('dialog[open]')
+  async function record(given: string, from: string, received: string, to: string) {
+    await page.getByRole('button', { name: 'Записать обмен' }).click()
+    await expect(sheet).toContainText('Сколько отдали и сколько получили')
+    await page.waitForTimeout(400)
+    const currencies = sheet.getByLabel('Валюта')
+    await currencies.nth(0).selectOption(from)
+    await currencies.nth(1).selectOption(to)
+    await sheet.getByLabel('Отдал').fill(given)
+    await sheet.getByLabel('Получил').fill(received)
+    await sheet.getByRole('button', { name: 'Сохранить обмен' }).click()
+    await expect(sheet).toBeHidden()
+  }
+
+  await record('20000', 'RUB', '224,63', 'USD')
+  await record('100', 'USD', '36150', 'AMD')
+
+  await expect(page.locator('.figure')).toHaveText('4,06 ֏/₽')
+  await expect(page.locator('.costs li')).toHaveText(/^\$: 89,04 ₽\/\$ · по последнему обмену/)
+
+  const headers = await asBrowser(page)
+  const me = actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json())
+  const started = await page.request.post('/api/trips', {
+    headers,
+    data: {
+      id: randomUUID(),
+      context: settingsOf(me),
+      place: { kind: 'store', name: 'Ереван Сити' },
+    },
+  })
+  expect(started.status()).toBe(201)
+  expect(await started.json()).toMatchObject({
+    rate: { base: 'RUB', quote: 'AMD', rate: '4.060187', source: 'personal' },
+  })
+})
