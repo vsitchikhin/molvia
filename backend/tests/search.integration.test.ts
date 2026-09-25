@@ -444,6 +444,25 @@ describe('search — a unit is a size, not a word (MOL-48)', () => {
     expect(await names('кефир 500 мл')).toEqual(['Кефир 500 мл', 'Кефир 1 л'])
   })
 
+  it('reads a slip beside a size written together: «ряженка 500 мд» finds «500мл»', async () => {
+    await named('Ряженка 500мл')
+    expect(await names('ряженка 500 мд')).toEqual(['Ряженка 500мл'])
+    expect(await names('ряженка 2 мд')).toEqual([])
+  })
+
+  it('takes a small count that matches the label for a slip: «1 суп доширак» — the price', async () => {
+    // `sup` is one edit from `up`, and «1» stands before both: a word of goods and a slip in a
+    // unit look alike to the query, and the number that tells them apart is the commonest one.
+    // The noodles come at the soup's distance, never closer.
+    await named('Doshirak суп курица')
+    await named('Doshirak лапша курица 1 уп')
+    expect((await names('1 суп доширак')).sort()).toEqual([
+      'Doshirak лапша курица 1 уп',
+      'Doshirak суп курица',
+    ])
+    expect(await names('2 суп доширак')).toEqual(['Doshirak суп курица'])
+  })
+
   it('reads a slip only beside the same number: «кефир 1 мд» misses «1000 мл» — the price', async () => {
     await named('Кефир 1000 мл')
     expect(await names('кефир 1000 мд')).toEqual(['Кефир 1000 мл'])

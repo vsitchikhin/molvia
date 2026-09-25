@@ -279,16 +279,24 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       from query_words qw
       cross join candidates c
       where qw.slips
-        and exists (
-          select 1
-          from (
-            select unit, lag(unit) over (order by i) as number
-            from unnest(string_to_array(c.search_key, ' ')) with ordinality as t(unit, i)
-          ) nw
-          where nw.unit in ${UNIT_KEYS}
-            and nw.number = qw.number
-            and ${slipsFromUnit(sql`qw.q`, sql`nw.unit`)}
-        )
+        and (exists (
+               select 1
+               from (
+                 select unit, lag(unit) over (order by i) as number
+                 from unnest(string_to_array(c.search_key, ' ')) with ordinality as t(unit, i)
+               ) nw
+               where nw.unit in ${UNIT_KEYS}
+                 and nw.number = qw.number
+                 and ${slipsFromUnit(sql`qw.q`, sql`nw.unit`)}
+             )
+             -- A size written together, «Ряженка 500мл», is one word of the key: \`500ml\`.
+             or exists (
+               select 1
+               from unnest(string_to_array(c.search_key, ' ')) as nw(word)
+               cross join unnest(${UNIT_ARRAY}) as u(unit)
+               where nw.word = qw.number || u.unit
+                 and ${slipsFromUnit(sql`qw.q`, sql`u.unit`)}
+             ))
     ),
     -- Materialized, so each word distance is taken once per row: inlined, the planner copied the
     -- subquery into the select list, the filter and the order by — and with \`slipped\` joined
