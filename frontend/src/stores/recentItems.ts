@@ -118,17 +118,22 @@ export const useRecentItemsStore = defineStore('recentItems', () => {
     // side: a pasted U+200B left the phase at «nothing typed» and the list empty (Р-14, B1).
     if (drawsNothing(query)) return items.value
     const needle = comparable(query).trim()
-    const synonyms = new Set(toSearchKey(query).split(' ').flatMap(synonymKeys))
-    return items.value.filter(
-      (entry) =>
-        comparable(entry.name).includes(needle) ||
-        (entry.note !== null && comparable(entry.note).includes(needle)) ||
-        // As the search counts a synonym: a whole word of the name, never a part of one.
-        (synonyms.size > 0 &&
-          toSearchKey(entry.name)
-            .split(' ')
-            .some((word) => synonyms.has(word))),
-    )
+    const words = needle.split(/\s+/u).map((word) => ({
+      word,
+      synonyms: toSearchKey(word).split(' ').flatMap(synonymKeys),
+    }))
+    const expands = words.some(({ synonyms }) => synonyms.length > 0)
+    return items.value.filter((entry) => {
+      const name = comparable(entry.name)
+      if (name.includes(needle)) return true
+      if (entry.note !== null && comparable(entry.note).includes(needle)) return true
+      if (!expands) return false
+      // As the search counts a synonym — the first word of the name, where the kind stands — and
+      // as it demands of every other word a pair of its own: «сок яблочный» is not the peach
+      // nectar, though «сок» alone is (adversarial Д).
+      const kind = toSearchKey(entry.name).split(' ')[0] ?? ''
+      return words.every(({ word, synonyms }) => name.includes(word) || synonyms.includes(kind))
+    })
   }
 
   return { items, sync, remember, filter }

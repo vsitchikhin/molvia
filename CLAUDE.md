@@ -305,8 +305,9 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   scores 0.429 against any «Малина» and 0.167 against the milk, and two hundred raspberries
   pushed it out. Unordered it drops by row age, that is the newest items, the ones «Предложить
   товар» just added. `order by id` is worse still: the planner walks the primary key and
-  filters every row. The cost is bounded by the catalogue and by taking at most twelve words
-  of a query: a two-letter query over 20 000 names answers in about 370 ms.
+  filters every row. The cost is bounded by the catalogue, by at most sixteen words of the
+  dictionary (MOL-45) and by taking at most twelve words of a query: a two-letter query over
+  20 000 names answers in about 370 ms.
 - **What the user picked is remembered.** A query and the item that went into a trip after
   it are stored under the query's search key, and next time that item comes first. No model,
   no image change, and it compounds from the first day — it is also the labelled set anything
@@ -330,29 +331,45 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   into the words it also stands for — a group of the same thing both ways, a wider word into
   narrower ones one way («арахис» never finds «Фисташки»). Only the query is expanded and
   nothing is stored, so **the dictionary is not frozen**: a word added is a commit, not a
-  migration. **A synonym counts only as a whole word of a name, at no cost**, and its candidates
-  come from `like '%word%'` on the same GIN index, not from `%>`: at 0.15 each of the eight
-  fish of «рыба» brought in half of 20 000 names and the query took six seconds. **The typed
-  word's edit budget applies only to the names it found itself** — brought in by «лори», «Рис»
-  passed as two edits from `sir`. **A target is a kind of product, never a brand**: expanding
-  into a maker would be a place in the results handed out by hand; the other way round is fine
-  («памперсы» → «подгузники» of every maker), and «белизна» is let in as the common name of a
-  kind. **No categories** — «овощи», «специи», «сладости» name a shelf, and reaching kefir from
-  «молочка» is what embeddings are for in 0.2. Measured on MOL-14's corpus: the six misses
-  found, «макароны» finds the spaghetti the shelf carries, nothing else moved; the words come
-  from the owner's expense log plus the usual pairs of a grocery. The prices, named: a typo in
-  the synonym itself is not expanded, and a name with no word of its kind («Coca-Cola 1 л» for
-  «газировка») stays out of reach.
+  migration. **A synonym counts only as the first word of a name, at no cost** (owner's
+  decision on review): the kind stands first on a shelf — «Вода Джермук», «Скумбрия х/к» — and
+  anywhere in the name it found «Мицеллярная вода» for «минералка», the tuna of a cat food for
+  «рыба», a pizza for «сыр»; the price is a name with its brand first («Barilla спагетти»), which
+  only its own word finds. Its candidates come from `like 'word%'` on the same GIN index, not
+  from `%>`: at 0.15 each of the eight fish of «рыба» brought in half of 20 000 names and the
+  query took six seconds. **The typed spelling is not measured only for a word whose synonym
+  brought the name in** — «лори» brings «Рис», and `sir` is two edits from `ris`; but «хаггис»
+  of «памперсы хаггис» is still measured against the «Huggies» that «подгузники» brought. **A
+  word found by its synonym stays out of the mean** of MOL-10: free, it lent its budget to the
+  next word, and «хлеб барадинский» found «Лаваш армянский». **At most sixteen words** of the
+  dictionary per query (`MAX_SYNONYMS`): twelve wide words expanded into fifty and held a
+  connection for a second and a half; now some 0.4 s against 0.3 s on master, and one- and
+  two-word queries do not reach the cap. **A target is a kind of product, never a brand**:
+  expanding into a maker would be a place in the results handed out by hand; the other way round
+  is fine («памперсы» → «подгузники» of every maker), and «белизна» is let in as the common name
+  of a kind. **No categories** — «овощи», «специи», «сладости» name a shelf, and reaching kefir
+  from «молочка» is what embeddings are for in 0.2. The forms people type are written out —
+  nominative, genitive and accusative, singular and plural; a form left out is a miss. Measured
+  on MOL-14's corpus: the six misses found, «макароны» finds the spaghetti the shelf carries,
+  nothing else moved; the words come from the owner's expense log plus the usual pairs of a
+  grocery. The prices, named: a typo in the synonym itself is not expanded, and a name with no
+  word of its kind («Coca-Cola 1 л» for «газировка») stays out of reach. Offline, «Часто берёте»
+  reads the dictionary by the same rules — the kind first, a pair for every word.
 - **And the person's own word (MOL-45).** A query the server found nothing for, followed on
   the same screen by a pick found by another word, is learnt with the purchase —
   `search_picks.admits` — and from then on **exactly that query** lets the item in: the one
   written exception to «never lets in what the search did not accept», and personal for the
-  reason memory is. Only the exact key, never its start or a word more; erasing back through
-  the word keeps it («бахч» on the way back from «бахчевые» is not the word); a pick from the
-  recent items or from «Предложить товар» learns nothing. It is not checked against the search:
-  «бахчевые» and then bread costs its owner one row on that exact query, and the next real pick
-  stands above it. A dictionary grown from everyone's words is 0.2's, and would need three
-  people, as any aggregate does.
+  reason memory is. **It is let in, not lifted**: what the search finds by itself comes first
+  (owner's decision on review) — «кефир» learnt as the milk taken in its place stops standing
+  above the kefir the day there is one. **Only the first sheet opened after a miss may take it
+  along**, and every pick uses it up: a milk looked at and put back does not make the bread
+  taken next the meaning of «кефир». Not when one query starts the other — «сыр» after «сыр
+  косичка» is the same query cut short, and «Кефир» is «кефир »; the server skips a missed query
+  with the key of the found one too. Erasing back keeps the word, compared as typed rather than by
+  key («дет» is not the start of `deцkoe`); a pick from the recent items or from «Предложить
+  товар» learns nothing. It is not checked against the search: a real substitution — no kefir,
+  milk taken — is learnt as it is, and costs its owner one row on that exact query. A dictionary
+  grown from everyone's words is 0.2's, and would need three people, as any aggregate does.
 
 **The thresholds — `word_similarity` > 0.15, edit distance <= 2 — were measured and kept
 (MOL-14).** The set: the owner's own words from the expense log («кола», «дошик», «туалетка», 73
