@@ -3,7 +3,9 @@ import { toSearchKey } from '#model/support/search-key'
 import {
   SYNONYM_TABLES,
   WORD_BREAK,
+  beforeKindKey,
   kindKey,
+  synonymBeforeKind,
   synonymDescribes,
   synonymKeys,
 } from '#model/support/synonyms'
@@ -158,5 +160,20 @@ describe('WORD_BREAK', () => {
   it('splits a name at a no-break space, as the key does (review У)', () => {
     expect(kindKey('Молодой\u00a0картофель')).toBe(key('картофель'))
     expect(kindKey('\u00a0Копчёная\u202fскумбрия ')).toBe(key('скумбрия'))
+  })
+})
+
+describe('an adjective of a group, right before the kind (review Ф)', () => {
+  it('is the word before the kind, or nothing when the kind stands first', () => {
+    expect(beforeKindKey('Гречневая крупа ядрица')).toBe(key('гречневая'))
+    expect(beforeKindKey('Сгущённое цельное молоко')).toBe(key('цельное'))
+    expect(beforeKindKey('Лапша гречневая')).toBe('')
+  })
+
+  it('counts for the adjectives of the groups, not the narrower targets or nouns', () => {
+    expect(synonymBeforeKind(key('гречневая'))).toBe(true)
+    expect(synonymBeforeKind(key('сгущённое'))).toBe(true)
+    expect(synonymBeforeKind(key('минеральная'))).toBe(false)
+    expect(synonymBeforeKind(key('гречка'))).toBe(false)
   })
 })

@@ -3,8 +3,10 @@ import { ref } from 'vue'
 import {
   INVISIBLE,
   catalogueEntryCodec,
+  beforeKindKey,
   drawsNothing,
   kindKey,
+  synonymBeforeKind,
   synonymDescribes,
   synonymKeys,
   toSearchKey,
@@ -134,13 +136,16 @@ export const useRecentItemsStore = defineStore('recentItems', () => {
       // every other word a pair of its own: «сок яблочный» is not the peach nectar, though «сок»
       // alone is (adversarial Д).
       const kind = kindKey(entry.name)
+      const before = beforeKindKey(entry.name)
       const keyWords = toSearchKey(entry.name).split(' ')
       return words.every(
         ({ word, synonyms }) =>
           name.includes(word) ||
           synonyms.some(
             (synonym) =>
-              synonym === kind || (synonymDescribes(synonym) && keyWords.includes(synonym)),
+              synonym === kind ||
+              (synonymDescribes(synonym) && keyWords.includes(synonym)) ||
+              (synonymBeforeKind(synonym) && synonym === before),
           ),
       )
     })

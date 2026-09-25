@@ -732,6 +732,19 @@ describe("search — a word of the person's own (MOL-45)", () => {
     expect(await namesFor(actorId, 'кефир 1 л')).toEqual(['Кефир Ашхар 0,5 л', 'Молоко Ашхар 1 л'])
   })
 
+  it("finds «Гречневая крупа» by the group's adjective right before the kind, above a learnt rice (review, Ф)", async () => {
+    const actorId = await insertActor(db)
+    const rice = await named('Рис длиннозёрный')
+    await picks.learn(actorId, 'гречка', rice)
+    await named('Гречневая крупа ядрица')
+    await named('Лапша гречневая Sen Soy')
+
+    const found = await namesFor(actorId, 'гречка')
+    expect(found.slice(0, 2)).toEqual(['Гречневая крупа ядрица', 'Рис длиннозёрный'])
+    // After the kind the adjective is a property of somebody else's product: a typo at most.
+    expect(found.at(-1)).toBe('Лапша гречневая Sen Soy')
+  })
+
   it('puts what the search found above what only the learnt word let in (review, И)', async () => {
     // «кефир» learnt as the milk taken in its place: once there is kefir, kefir comes first.
     const actorId = await insertActor(db)

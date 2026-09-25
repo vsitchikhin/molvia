@@ -238,12 +238,13 @@ describe('recent items', () => {
       expect(store.filter('картошка').map((item) => item.id)).toEqual([young.id])
     })
 
-    it('takes an adjective of a group only as the kind: «Лапша гречневая» is no «гречка» (review С)', () => {
+    it('takes an adjective of a group right before the kind only: «Лапша гречневая» is no «гречка» (review С, Ф)', () => {
       const store = relaunched()
       const noodles = entry(10, { name: 'Лапша гречневая Sen Soy' })
       const buckwheat = entry(11, { name: 'Гречневая крупа' })
       for (const item of [noodles, buckwheat]) store.remember(item)
-      expect(store.filter('гречка')).toEqual([])
+      // After the kind it is a property of the noodles; right before it, the groats (review Ф).
+      expect(store.filter('гречка').map((item) => item.id)).toEqual([buckwheat.id])
       expect(
         store
           .filter('гречневая')

@@ -7,6 +7,7 @@ import {
   WORD_BREAK,
   itemSchema,
   nameIdentity,
+  synonymBeforeKind,
   synonymDescribes,
   synonymKeys,
   toSearchKey,
@@ -81,7 +82,8 @@ const HAS_CONTENT = /[\p{L}\p{N}]/u
  * Each is one more condition on the index and one more set of candidates to rank: twelve wide
  * words — «мясо рыба сыр хлеб…» — expand into fifty and held a connection for a second and a
  * half (MOL-45, adversarial Ж). A shelf query is one or two words, and «рыба», the widest, is
- * eight; sixteen leaves both untouched.
+ * eight; sixteen leaves both untouched. Eight was measured too and wins little: what twelve wide
+ * words cost now is ranking the names that carry the synonyms, not finding them (review Х).
  */
 const MAX_SYNONYMS = 16
 
@@ -148,6 +150,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
   const synonymOf = synonyms.map(([, n]) => n).join(' ')
   // A synonym that describes — «минеральная» — is never the kind, and counts as any word.
   const synonymAnywhere = synonyms.map(([synonym]) => String(synonymDescribes(synonym))).join(' ')
+  // An adjective of a group — «гречневая» — counts right before the kind: «Гречневая крупа».
+  const synonymBefore = synonyms.map(([synonym]) => String(synonymBeforeKind(synonym))).join(' ')
   const expanded = [...new Set(synonyms.map(([, n]) => n))].join(' ')
   // Without a synonym every candidate of the index was found by what was typed, and asking the
   // operator again per row is what «мо» over 20 000 names paid for.
@@ -155,28 +159,35 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     synonyms.length === 0
       ? sql`true`
       : sql`(${items.searchKey} %> ${key} or ${items.searchKey} = ${key})`
-  // Measured only when there is a synonym at all: the query words of most searches have none,
-  // and a subquery per candidate and word to find that out doubled the time of «малако».
+  // Measured only when there is a synonym at all, and only for a word that has one: the query
+  // words of most searches have none, and a subquery per candidate and word to find that out
+  // doubled the time of «малако» — and of twelve wide words, which the cap leaves two or three
+  // words' worth of synonyms (review Х).
   const bySynonymWord =
     synonyms.length === 0
       ? sql`null::int`
-      : sql`case when exists (
+      : sql`case when qw.expanded and exists (
                     select 1
                     from synonyms s
                     where s.n = qw.n
                       and (s.word = split_part(c.search_key, ' ', c.kind_at)
                            or s.anywhere
-                              and s.word = any(string_to_array(c.search_key, ' ')))
+                              and s.word = any(string_to_array(c.search_key, ' '))
+                           or s.before_kind and c.kind_at > 1
+                              and s.word = split_part(c.search_key, ' ', c.kind_at - 1))
                   ) then 0 end`
   // A synonym counts only as the word of the kind — the first word of a name that is not an
   // adjective, `kindKey` of the domain (owner's decisions on review, MOL-45 А and Н): «Вода
   // Джермук», «Молодой картофель», and not the tuna of a cat food. So its candidates are the
   // names that contain it, not those that resemble it: `%>` at 0.15 brought in half of 20 000
-  // names for each of the eight fish of «рыба» and took six seconds. `like` is served by the same
-  // trigram index, one condition per word. The words are letters only (the dictionary's test),
-  // so nothing in them is a wildcard.
+  // names for each of the eight fish of «рыба» and took six seconds. And from the start of a
+  // word, not anywhere in one: `%lori%` brings every `kalorii` (review Х). `like` is served by the
+  // same trigram index, two conditions per word — one regular expression for all of them was
+  // measured slower still. The words are letters only (the dictionary's test), so nothing in them
+  // is a wildcard.
   const bySynonym = [...new Set(synonyms.map(([synonym]) => synonym))].map(
-    (synonym) => sql` or ${items.searchKey} like ${`%${synonym}%`}`,
+    (synonym) =>
+      sql` or ${items.searchKey} like ${`${synonym}%`} or ${items.searchKey} like ${`% ${synonym}%`}`,
   )
   // Where the kind stands: the first word of the name that is not an adjective, by the domain's
   // own pattern. The adjectives are plain words, so the n-th word of the name is the n-th of
@@ -209,10 +220,12 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
     ),
     synonyms as (
-      select s.word, s.n, s.anywhere
+      select s.word, s.n, s.anywhere, s.before_kind
       from unnest(string_to_array(${synonymWords}, ' '),
                   string_to_array(${synonymOf}, ' ')::int[],
-                  string_to_array(${synonymAnywhere}, ' ')::boolean[]) as s(word, n, anywhere)
+                  string_to_array(${synonymAnywhere}, ' ')::boolean[],
+                  string_to_array(${synonymBefore}, ' ')::boolean[])
+           as s(word, n, anywhere, before_kind)
     ),
     admitted as (
       -- The person's own synonyms for exactly this query (MOL-45): it found nothing, and they

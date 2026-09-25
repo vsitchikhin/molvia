@@ -210,6 +210,27 @@ export function synonymDescribes(key: string): boolean {
   return DESCRIBING.has(key)
 }
 
+// Adjectives of a group of the same thing — «гречневая», «сгущённое», «овсяные». Never the kind,
+// which skips adjectives, and not anywhere, where «Лапша гречневая» carries them (review С): they
+// count right before the kind, where a shelf writes «Гречневая крупа», «Сгущённое молоко»
+// (owner's decision on review, MOL-45 Ф). The price: «Гречневая лапша» is found by them too.
+const BEFORE_KIND: ReadonlySet<string> = new Set(SAME.flat().filter(describes).map(toSearchKey))
+
+/** Whether a synonym counts as the word right before the kind — see `BEFORE_KIND`. */
+export function synonymBeforeKind(key: string): boolean {
+  return BEFORE_KIND.has(key)
+}
+
+/**
+ * The word right before the kind, as a search key — the adjective a shelf puts there («Гречневая
+ * крупа») — or empty when the kind stands first. Split and counted as `kindKey` does.
+ */
+export function beforeKindKey(name: string): string {
+  const words = name.split(BREAK).filter((word) => word !== '')
+  const at = words.findIndex((word) => !describes(word))
+  return at > 0 ? (toSearchKey(name).split(' ')[at - 1] ?? '') : ''
+}
+
 /**
  * Exported for the test that holds the rules above — no brand as a target, one group per word —
  * to walk the real table rather than a copy of it. Nothing in the applications reads this.
