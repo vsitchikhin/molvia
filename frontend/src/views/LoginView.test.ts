@@ -1,11 +1,14 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { actorCodec, ERROR } from '@molvia/model'
 import type { ActorView, LoginPoll, LoginStarted } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
+import en from '@/i18n/en.json'
+import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
 import LoginView from './LoginView.vue'
@@ -49,10 +52,12 @@ async function render() {
   const actor = useActorStore()
   me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
   await actor.start()
-  const view = mount(LoginView, { global: { plugins: [pinia, createAppI18n('en')] } })
+  const router = createRouter({ history: createMemoryHistory(), routes })
+  await router.push('/')
+  const view = mount(LoginView, { global: { plugins: [pinia, router, createAppI18n('en')] } })
   views.push(view)
   await flushPromises()
-  return { view, actor, login: useLoginStore() }
+  return { view, actor, router, login: useLoginStore() }
 }
 
 function button(view: VueWrapper, name: string) {
@@ -236,4 +241,16 @@ describe('когда войти не вышло', () => {
     expect(view.find('.warn').exists()).toBe(true)
     expect(view.findAll('button')).toHaveLength(0)
   })
+})
+
+// MOL-58: what is kept and how to have it erased is read before deciding to sign in.
+it('leads to «Data and privacy», which opens without a session', async () => {
+  startLogin.mockReturnValue(new Promise(() => undefined))
+  const { view, router } = await render()
+  const link = view.findAll('a').find((one) => one.text() === en.privacy.title)
+  expect(link?.attributes('href')).toBe('/privacy')
+  await link?.trigger('click')
+  await flushPromises()
+  expect(router.currentRoute.value.name).toBe('privacy')
+  expect(router.currentRoute.value.meta.public).toBe(true)
 })

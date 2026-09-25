@@ -30,6 +30,7 @@ import AppCard from '@/components/AppCard.vue'
 const STORED = [
   'telegram',
   'purchases',
+  'exchanges',
   'places',
   'ratings',
   'search',

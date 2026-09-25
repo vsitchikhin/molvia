@@ -40,6 +40,13 @@ describe('routes', () => {
     expect(route.name).toBe('privacy')
     expect(route.meta.parent).toBe('settings')
     expect(route.meta.tab).toBeUndefined()
+    expect(route.meta.public).toBe(true)
+  })
+
+  it('no other route is drawn without a session (MOL-56, MOL-58)', () => {
+    expect(named.filter((route) => route.meta.public).map((route) => route.name)).toEqual([
+      'privacy',
+    ])
   })
 
   it('the catalogue search is nested under the trip and is not a section', async () => {

@@ -112,6 +112,9 @@
         @retry="retry"
       />
     </div>
+
+    <!-- What is kept and how to have it erased is read before signing in (MOL-58). -->
+    <RouterLink class="privacy" :to="{ name: 'privacy' }">{{ t('privacy.title') }}</RouterLink>
   </div>
 </template>
 
@@ -272,6 +275,16 @@ export default defineComponent({
 .hint {
   margin: var(--space-3) 0 0;
   color: var(--warn-ink);
+  font-size: var(--text-footnote);
+}
+
+.privacy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-target);
+  margin-bottom: calc(var(--space-2) + var(--safe-bottom));
+  color: var(--text-muted);
   font-size: var(--text-footnote);
 }
 </style>

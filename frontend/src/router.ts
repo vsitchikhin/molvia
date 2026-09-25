@@ -38,6 +38,12 @@ declare module 'vue-router' {
      * to it, so no screen has to know where it was opened from.
      */
     parent?: RouteName
+    /**
+     * Drawn without a session: `App.vue` puts the login screen in front of every other route
+     * (MOL-56). Only what is read before deciding to sign in may carry it — today «Данные и
+     * приватность» alone (MOL-58).
+     */
+    public?: boolean
   }
 }
 
@@ -98,7 +104,7 @@ export const routes = [
     path: '/privacy',
     name: 'privacy',
     component: PrivacyView,
-    meta: { titleKey: 'privacy.title', parent: 'settings' },
+    meta: { titleKey: 'privacy.title', parent: 'settings', public: true },
   },
   // Every piece of the kit in every state, and the sheet in a real history — for the eye in both
   // schemes and for the end-to-end tests, before any screen uses them (MOL-18). Development only:
