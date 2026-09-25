@@ -22,12 +22,14 @@ const chooseRatePreference = vi.fn<(preference: RatePreference) => Promise<Excha
 const removeExchange = vi.fn<(id: string) => Promise<ExchangesResponse>>()
 const recordExchange =
   vi.fn<(body: ExchangeBody) => Promise<{ exchanges: ExchangesResponse; created: boolean }>>()
+const restoreExchange = vi.fn<(id: string) => Promise<ExchangesResponse>>()
 vi.mock('@/api', () => ({
   api: {
     exchanges: () => exchanges(),
     chooseRatePreference: (preference: RatePreference) => chooseRatePreference(preference),
     removeExchange: (id: string) => removeExchange(id),
     recordExchange: (body: ExchangeBody) => recordExchange(body),
+    restoreExchange: (id: string) => restoreExchange(id),
   },
 }))
 
@@ -98,6 +100,7 @@ beforeEach(() => {
   chooseRatePreference.mockReset()
   removeExchange.mockReset()
   recordExchange.mockReset()
+  restoreExchange.mockReset()
   online(true)
   clock = 0
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -122,6 +125,29 @@ function confirmButton() {
   )
   if (!(found instanceof HTMLButtonElement)) throw new Error('no «Delete» in the sheet')
   return found
+}
+
+/** «Записать обмен» → the sheet → 20 000 ₽ → 95 000 ֏ → «Сохранить». */
+async function recordThroughSheet(view: VueWrapper): Promise<void> {
+  const record = view.findAll('button').find((button) => button.text() === en.exchange.record)
+  await record?.trigger('click')
+  await flushPromises()
+  clock += 1000
+  await new Promise((resolve) => setTimeout(resolve, 5))
+  const sheet = document.querySelector('dialog[open]')
+  const inputs = sheet?.querySelectorAll<HTMLInputElement>('input[inputmode="decimal"]') ?? []
+  for (const [index, value] of ['20000', '95000'].entries()) {
+    const input = inputs[index]
+    if (!input) throw new Error('no amount field')
+    input.value = value
+    input.dispatchEvent(new Event('input'))
+  }
+  await flushPromises()
+  const save = [...(sheet?.querySelectorAll('button') ?? [])].find(
+    (button) => button.textContent.trim() === en.exchange.sheet.save,
+  )
+  save?.click()
+  await flushPromises()
 }
 
 describe('ExchangeView: the four states', () => {
@@ -282,10 +308,10 @@ describe('ExchangeView: the rate and the list', () => {
     expect(removeExchange).not.toHaveBeenCalled()
   })
 
-  it('removes when confirmed and offers «Bring back», which writes the same exchange again', async () => {
+  it('removes when confirmed, puts the focus on «Bring back», which brings the same row back', async () => {
     exchanges.mockResolvedValue(overview())
     removeExchange.mockResolvedValue(overview({ exchanges: [], wallet: null }))
-    recordExchange.mockResolvedValue({ exchanges: overview(), created: true })
+    restoreExchange.mockResolvedValue(overview())
     const view = await render()
 
     await askToRemove(view)
@@ -293,17 +319,46 @@ describe('ExchangeView: the rate and the list', () => {
     await flushPromises()
     expect(removeExchange).toHaveBeenCalledWith(row().id)
     expect(view.text()).toContain('Exchange deleted')
+    // The bin went with its row: the focus lands one swipe from undoing it (Н-1).
+    expect(document.activeElement?.textContent.trim()).toBe(en.exchange.restore)
 
     const restore = view.findAll('button').find((button) => button.text() === en.exchange.restore)
     await restore?.trigger('click')
     await flushPromises()
-    expect(recordExchange).toHaveBeenCalledWith({
-      id: row().id,
-      given: row().given,
-      received: row().received,
-      exchangedOn: row().exchangedOn,
-    })
+    expect(restoreExchange).toHaveBeenCalledWith(row().id)
+    expect(recordExchange).not.toHaveBeenCalled()
     expect(view.text()).not.toContain('Exchange deleted')
+  })
+
+  it('«Bring back» that comes too late says so and stops offering it', async () => {
+    exchanges.mockResolvedValue(overview())
+    removeExchange.mockResolvedValue(overview({ exchanges: [], wallet: null }))
+    restoreExchange.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+
+    const restore = view.findAll('button').find((button) => button.text() === en.exchange.restore)
+    await restore?.trigger('click')
+    await flushPromises()
+    expect(view.get('[role="alert"]').text()).toBe(en.exchange.failed)
+    expect(view.text()).not.toContain(en.exchange.restore)
+  })
+
+  it('another owner gets none of the last one’s strips (Г1)', async () => {
+    exchanges.mockResolvedValue(overview())
+    removeExchange.mockResolvedValue(overview({ exchanges: [], wallet: null }))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    expect(view.text()).toContain('Exchange deleted')
+
+    useActorStore().id = 'aaaaaaaa-0000-4000-8000-000000000009'
+    await flushPromises()
+    expect(view.text()).not.toContain('Exchange deleted')
+    expect(view.text()).not.toContain(en.exchange.restore)
   })
 
   it('a correction sent under the old name closes the sheet and says to remove and re-enter (В-6)', async () => {
@@ -311,29 +366,26 @@ describe('ExchangeView: the rate and the list', () => {
     recordExchange.mockRejectedValue(new ApiError(ERROR.CONFLICT))
     const view = await render()
 
-    const record = view.findAll('button').find((button) => button.text() === en.exchange.record)
-    await record?.trigger('click')
-    await flushPromises()
-    clock += 1000
-    await new Promise((resolve) => setTimeout(resolve, 5))
-    const sheet = document.querySelector('dialog[open]')
-    const inputs = sheet?.querySelectorAll<HTMLInputElement>('input[inputmode="decimal"]') ?? []
-    for (const [index, value] of ['20000', '95000'].entries()) {
-      const input = inputs[index]
-      if (!input) throw new Error('no amount field')
-      input.value = value
-      input.dispatchEvent(new Event('input'))
-    }
-    await flushPromises()
-    const save = [...(sheet?.querySelectorAll('button') ?? [])].find(
-      (button) => button.textContent.trim() === en.exchange.sheet.save,
-    )
-    save?.click()
-    await flushPromises()
+    await recordThroughSheet(view)
 
     expect(view.text()).toContain(en.exchange.conflict)
     expect(exchanges).toHaveBeenCalledTimes(2)
     expect(document.querySelector('dialog[open]')).toBeNull()
+  })
+
+  it('a failure said once goes when the next write succeeds — a new exchange included (Г2)', async () => {
+    exchanges.mockResolvedValue(overview())
+    removeExchange.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    recordExchange.mockResolvedValue({ exchanges: overview(), created: true })
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    expect(view.text()).toContain(en.exchange.failed)
+
+    await recordThroughSheet(view)
+    expect(recordExchange).toHaveBeenCalledTimes(1)
+    expect(view.text()).not.toContain(en.exchange.failed)
   })
 
   it('a failed removal is said once and offers nothing to bring back', async () => {

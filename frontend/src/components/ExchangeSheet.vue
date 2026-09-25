@@ -27,7 +27,7 @@
         v-model="day"
         :label="t('exchange.sheet.day')"
         kind="date"
-        min="2000-01-01"
+        min="2000-01-02"
         :max="today"
         :error="dayError"
         :error-text="dayInvalid ? t('exchange.sheet.bad_day') : null"
@@ -154,7 +154,7 @@ export default defineComponent({
     const sign = (currency: Currency) => currencySign(currency, locale.value)
     const sameCurrency = computed(() => currencies.given === currencies.received)
 
-    /** The exchanges of the pair this form is about, in the order the wallet walks them. */
+    /** The exchanges of the pair this form is about, newest first — as the server lists them. */
     const ofPair = computed(() =>
       props.overview.exchanges.filter(
         (exchange) =>

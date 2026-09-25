@@ -8,7 +8,7 @@
       </p>
       <p v-if="failed" class="strip failed" role="alert">{{ t('exchange.failed') }}</p>
       <p v-if="conflicted" class="strip" role="alert">{{ t('exchange.conflict') }}</p>
-      <div v-if="removed" class="strip removed">
+      <div v-if="removed" ref="removedStrip" class="strip removed">
         <span class="removed-text">{{
           t('exchange.removed', { amounts: amountsOf(removed) })
         }}</span>
@@ -132,7 +132,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, onUnmounted, ref } from 'vue'
+import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { currencySign, formatMoney, formatRate, yerevanMidnight } from '@molvia/model'
 import type { Currency, ExchangeRate, ExchangeView as Row, RatePreference } from '@molvia/model'
@@ -149,6 +149,7 @@ import ExchangeSheet from '@/components/ExchangeSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExchanges } from '@/composables/useExchanges'
 import { purchaseDay } from '@/days'
 
@@ -185,6 +186,23 @@ export default defineComponent({
       target.value = exchange
       removeOpen.value = true
     }
+    // The bin that opened the sheet is gone with its row, so the dialog has nowhere to give the
+    // focus back: it goes to «Вернуть», one swipe from the person, and the removal is said out
+    // loud — the reason В-5 kept the offer on screen rather than on a timer (review Н-1).
+    const removedStrip = ref<HTMLElement | null>(null)
+    const announce = useAnnouncer()
+    let unsay: (() => void) | undefined
+    watch(exchanges.removed, async (exchange) => {
+      unsay?.()
+      unsay = exchange
+        ? announce?.(t('exchange.removed', { amounts: amountsOf(exchange) }))
+        : undefined
+      if (!exchange) return
+      await nextTick()
+      removedStrip.value?.querySelector('button')?.focus()
+    })
+    onUnmounted(() => unsay?.())
+
     function confirmRemove(): void {
       const exchange = target.value
       removeOpen.value = false
@@ -264,6 +282,7 @@ export default defineComponent({
       ...exchanges,
       sheetOpen,
       removeOpen,
+      removedStrip,
       target,
       ask,
       confirmRemove,

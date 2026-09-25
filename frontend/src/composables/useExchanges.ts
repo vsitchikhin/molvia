@@ -18,8 +18,8 @@ export interface Exchanges {
   /** A write that failed — said once, above the list, and cleared by the next one. */
   readonly failed: Ref<boolean>
   /**
-   * The exchange just removed, kept on the phone so «Вернуть» can write it back (В-5) — until the
-   * next write or until the screen is left.
+   * The exchange just removed, offered back by «Вернуть» (В-5) — until any other request of the
+   * screen, which makes it final on the server, or until the screen is left.
    */
   readonly removed: Ref<ExchangeView | null>
   /**
@@ -102,23 +102,17 @@ export function useExchanges(): Exchanges {
     }
   }
 
-  /** What the server needs to write the exchange again: the same name, the same amounts. */
-  function bodyOf(exchange: ExchangeView): ExchangeBody {
-    return {
-      id: exchange.id,
-      given: exchange.given,
-      received: exchange.received,
-      exchangedOn: exchange.exchangedOn,
-      ...(exchange.heldBefore ? { heldBefore: exchange.heldBefore } : {}),
-    }
-  }
-
   onMounted(() => void load())
   watch(
     () => actor.id,
     () => {
+      // Everything of the last owner goes with them — «Вернуть» with their amounts would write
+      // them into the next account (round 2, Г1).
       overview.value = null
       failure.value = null
+      failed.value = false
+      conflicted.value = false
+      removed.value = null
       void load()
     },
   )
@@ -137,6 +131,7 @@ export function useExchanges(): Exchanges {
     retry: load,
     async record(body) {
       conflicted.value = false
+      failed.value = false
       removed.value = null
       try {
         const { exchanges } = await api.recordExchange(body)
@@ -161,6 +156,8 @@ export function useExchanges(): Exchanges {
       const shown = overview.value
       if (!shown || busy.value || shown.preference === preference) return
       overview.value = { ...shown, preference }
+      // Any other request makes a removed exchange final on the server: nothing to offer back.
+      removed.value = null
       await write(() => api.chooseRatePreference(preference))
       // Read again after the wait: the owner may have changed meanwhile and taken the list away.
       const after = current()
@@ -172,15 +169,24 @@ export function useExchanges(): Exchanges {
       removed.value = null
       if (await write(() => api.removeExchange(exchange.id))) removed.value = exchange
     },
-    // The same name and the same amounts: the row is gone, so it is written anew — and a repeat
-    // of this after a lost answer is the ordinary repeat the server answers 200 to.
+    // The same row back, marked no longer removed: written anew it would take the moment of the
+    // tap and move the order of its day and the hint (round 2, В1, В2). Final already — another
+    // request of the screen came first — and there is nothing left to offer.
     async restore() {
       const exchange = removed.value
-      if (!exchange) return
-      if (
-        await write(() => api.recordExchange(bodyOf(exchange)).then((answer) => answer.exchanges))
-      ) {
+      if (!exchange || busy.value) return
+      busy.value = true
+      failed.value = false
+      try {
+        land(await api.restoreExchange(exchange.id))
         removed.value = null
+      } catch (caught) {
+        failed.value = true
+        if (caught instanceof ApiError && caught.code === ERROR.NOT_FOUND && caught.answered) {
+          removed.value = null
+        }
+      } finally {
+        busy.value = false
       }
     },
   }
