@@ -90,6 +90,35 @@ describe('settings and offline trip context', () => {
     expect((await save(first, settingsOf(winner), initial)).statusCode).toBe(200)
   })
 
+  const sinceOf = async (owner: string) =>
+    (await db.select().from(actors).where(eq(actors.id, owner)))[0]?.incomeCurrencySince ?? null
+
+  it('remembers when the currency of conversion changed, and nothing else moves it (MOL-42, В-2)', async () => {
+    const owner = await insertActor(db)
+    const cookie = await signIn(db, owner)
+    const since = () => sinceOf(owner)
+
+    expect(await since()).toBeNull()
+    // Another field changes: the currency of conversion did not.
+    const moved = { ...initial, city: 'Ереван', spendCurrency: 'USD' as const }
+    expect((await save(cookie, initial, moved)).statusCode).toBe(200)
+    expect(await since()).toBeNull()
+
+    const dollars = { ...moved, incomeCurrency: 'USD' as const }
+    expect((await save(cookie, moved, dollars)).statusCode).toBe(200)
+    const first = await since()
+    expect(first).toBeInstanceOf(Date)
+    // A retry after a lost answer finds the currency already there and leaves the day alone.
+    expect((await save(cookie, moved, dollars)).statusCode).toBe(200)
+    expect(await since()).toEqual(first)
+
+    // Back again: the latest change is the one that counts, exchanges or not — the screen names
+    // the day the current currency was chosen (round 2, Л2).
+    expect((await save(cookie, dollars, moved)).statusCode).toBe(200)
+    const second = await since()
+    expect(second?.getTime()).toBeGreaterThan(first?.getTime() ?? Infinity)
+  })
+
   it('requires a session and rejects unsupported new geography while preserving historical values', async () => {
     const owner = await insertActor(db, { country: 'GE', city: 'Тбилиси' })
     const cookie = await signIn(db, owner)

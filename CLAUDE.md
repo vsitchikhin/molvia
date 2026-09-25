@@ -487,16 +487,60 @@ device, private always. The rate is what the two amounts say and is not stored b
 
 - **The wallet is the average cost of what is held, and spending does not move it** — it takes
   money and its cost away in one proportion. Only a new exchange does, and the weight of the old
-  money in it is exactly how much was left at that moment: `heldBefore`, optional, asked from the
-  second exchange of the pair. Unknown, the wallet takes that exchange's rate and says so
+  money in it is exactly how much was left at that moment: `heldBefore`, optional, asked once the
+  received currency already came in by an exchange — never of the currency of conversion, which
+  always costs one. Unknown, the wallet takes that exchange's rate and says so
   (`basis: 'last'`) rather than counting the remainder as zero in silence; before the first there
   is money of no known cost, so the first exchange never asks. Not derived from purchases: a price
   is optional and spending outside a trip is not written, so a sum of expenses would be a wrong
   weight presented as a right one — it is offered only as a hint, «по записанным тратам».
-- **Exact to the end.** `walletRate` keeps a ratio of integers through the whole chain and rounds
-  once, to the snapshot's six digits, the way a cross rate is rounded. Only exchanges of «currency
-  of conversion → currency of spending» count; another pair, the reverse one included, is the
-  money model's (chains, reversals, a change of base) and not guessed at here.
+- **Every currency has a cost in the currency of conversion, and one rule moves them all (MOL-42).**
+  Receiving money costs what was given for it, at the cost of that; giving money away moves
+  nothing, as spending does not. So roubles → dollars → drams carries the price of the dollars
+  into the drams, an exchange back into the currency of conversion leaves the wallet where it was,
+  and dollars getting dearer later do not re-price drams already bought. The owner's own journal
+  is why this is 0.1: two thirds of their drams came through dollars, and the pair alone did not
+  see them. The screen lists the price of every currency a chain went through («$: 89,04 ₽/$») so
+  the drams' rate can be checked by eye. Stored per currency, never per account: a dollar on a card
+  and one in a pocket cost the same (MOL-43 decides accounts, not costs).
+- **Money of no known cost is valued at the official rate of the exchange's day, and says so**
+  (В-1): dollars brought from home, whose price in roubles nobody wrote down. What the person
+  named counts as named, what they did not comes from a source — never as zero — and the wallet
+  carries `estimated` for as long as that part is in the mix. The official rate is taken by the
+  rule a comparison uses (a jumped rate gives way to the one before it); none in the cache for
+  that day, and the cost is unknown until an exchange starts it afresh — the trip then takes the
+  bank. Only a rate fresh for that day counts, by the week a trip allows — the rule for a trip falls
+  back to the freshest it has and says `rateStale`, and here nothing would say it (Ж3). The cache
+  is read once per day of the list, eight days at a time, and serves both. A wallet missing above
+  a list of exchanges says which exchange its cost was lost on (`walletUnknown`), never «no
+  exchanges yet».
+- **A change of the currency of conversion works forwards** (В-2, the owner's comment over the
+  option they ticked): «what I exchanged before is not re-counted». `actors.income_currency_since`
+  is the day of the last change — the settings' own `UPDATE` sets it on every change, and a repeat
+  of the form does not move it — and **before it no price is ever taken from the bank**: an
+  exchange counts when what was given already has a price in the new currency without one — the
+  new currency itself (dollars to drams, for someone who now counts in dollars), or a currency
+  priced by the links counted so far (euros → dollars → drams, for someone who chose euros later).
+  Roubles to drams belonged to the old reckoning and are not re-valued; the drams they brought have
+  no price in the new currency, so the link makes their cost unknown rather than vanishing — a
+  vanished link let the next dollar exchange weigh rouble drams at the price of dollar ones (review
+  round 3, М1). The rows cannot tell a chosen currency from the default `RUB` every account starts
+  with, and this rule does not need them to: attempts that cut by the day alone took the whole
+  dollar history of anyone who once changed leftover roubles (Ж2, Л1). Which exchanges gave their
+  currency a price only the whole walk knows, so the server says it per row (`priced`) and the
+  sheet asks «сколько было до обмена» when the latest exchange into that currency on or before the
+  chosen day is priced — the currency _has_ a price then, not merely had one once (round 4, Н2) —
+  and when this exchange will give one: paid in the currency of conversion, in a currency with a
+  price that day, or on or after the day of the change in anything the bank can price (round 5,
+  О1). The flags are the server's; the one case the phone cannot see is a week of the bank's
+  silence, when it still asks in vain. A wallet lost to the old reckoning says so in its own words
+  (`walletUnknown.reason: 'oldReckoning'`), since «no bank rate that day» would be untrue (Н1). Earlier exchanges stay in
+  the list as they were. A trip started offline with the old currency in its `context`
+  is not cut — the cut is about the current one.
+- **Exact to eighteen digits, rounded to six once.** `walletRate` keeps ratios of integers through
+  the chain, each link brought to 10¹⁸ (the exception under «Money and quantity rules»), and rounds
+  to the snapshot's six digits at the end, the way a cross rate is rounded. The screen walks the
+  chain once (`ownRates`) for the wallet, the prices and the reason a wallet is missing.
 - **A trip takes it at the start, like the official one, and never again** (В-4): with
   `actors.rate_preference = 'personal'` — the default — and an exchange of the pair dated no later
   than today in Yerevan, the snapshot is `source: 'personal'` with no provider and no jump;
@@ -505,8 +549,21 @@ device, private always. The rate is what the two amounts say and is not stored b
 - **Every exchange is set beside the central bank of its own day**, by the same `pickOfficialRate`
   a trip started that day would use — «на 8 754 ֏ больше» or «меньше», never «комиссия»: a good
   exchanger beats the bank, and the difference says nothing about why.
-- **No amending — delete and enter again** (plan, Р-4). Trips already started keep what they
-  took. **The bin asks first, with the amounts and the day, and «Вернуть» stays offered after**
+- **An amendment keeps the version before it** (MOL-42, В-3): the rate of a past exchange is a
+  fact, so `PUT /exchanges/:id` writes the old version into `exchange_revisions` and the new one in
+  place, `created_at` untouched so the exchange keeps its place in its day. It names the version it
+  was made over (`revision`): the exchange already as sent is a repeat, 200 and no new version; a
+  version another device moved on from is 409, as the settings form is; removed or someone else's
+  is 404, and a conflict keeps the sheet open with what was typed, over the version held now —
+  which the sheet itself shows, remainder included, since the list that has it is under the sheet
+  (round 2, Л4; round 3, М2). A
+  remainder the exchange has is shown in the sheet whatever a new exchange would ask: an amendment
+  replaces the exchange whole, so a field not shown was a field cleared. The row is a button named
+  by its words — an `aria-label` silenced the rate and the comparison. The row says «исправлен», the sheet shows the versions — which is what explains a trip
+  that took a rate the exchanges no longer say. The history goes with its exchange: a removal made
+  final and erasure take it by cascade. «Где и заметка» is one private line, part of a repeat.
+- **Removing is still there, for an exchange that should not exist.** Trips already started keep
+  what they took. **The bin asks first, with the amounts and the day, and «Вернуть» stays offered after**
   (owner's decision В-5). A removal marks the row (`deleted_at`) and hides it from every reader;
   «Вернуть» (`POST /exchanges/:id/restore`) clears the mark, so the exchange keeps its
   `created_at` — written anew it took the moment of the tap, which moved both the order of its day
@@ -522,7 +579,7 @@ device, private always. The rate is what the two amounts say and is not stored b
 - **A repeat is the same exchange, or it is a conflict** (В-6). The same name with the same
   amounts, day and remainder answers 200; with anything else, 409 — that is a correction sent
   after an answer that never came, and answering it «saved» left the typo in the wallet. The
-  screen then shows what was written and says to remove it and enter it again.
+  screen then shows what was written and says to tap it and amend it.
 - **An exchange no rate in the band says is refused where it is written** (`error.invalid_rate`),
   never accepted and dropped from the wallet later: a zero too many once made the wallet vanish, the
   trip take the bank in silence and the screen say there were no exchanges above a list of two.
@@ -706,7 +763,13 @@ database access. In a product about data integrity, two write paths will silentl
 - **Compare by unit price only** (per kg / l / piece). Unit price is computed, never
   entered. 520 ֏ for 0.9 l is more expensive than 570 ֏ for a litre, and the user must
   not have to work that out in their head.
-- Rounding happens on output only — never in storage or in intermediate results.
+- Rounding happens on output only — never in storage or in intermediate results. **One written
+  exception: the links of the wallet's chain** are brought to eighteen digits (MOL-42, Ж1, owner's
+  decision 25.09.2026). Kept exact, the fraction grew by some ten digits an exchange and 800 of
+  them held the event loop — the whole API — for seconds. The error stays some twelve orders below
+  the sixth digit a rate is printed with — which can still turn on an exact half, where any error
+  decides the rounding: a chain may then print one unit of the sixth digit below the same price
+  made in one pair (round 2, Л3). A named price, not a hidden one.
 
 ## Data rules
 
@@ -1693,7 +1756,10 @@ settings will not move to is taken as it is — the screen used to stay on a ske
 
 MOL-40 put the person's own rate under the trip — «Обмен денег», nested under «Настройки»: the
 exchanges, the wallet worked out from them, the preference «мой / ЦБ РА», and every exchange
-beside the central bank of its day. The trip total says «мой курс» for it. Incomes and the rest
+beside the central bank of its day. The trip total says «мой курс» for it. MOL-42 made it every
+currency's cost rather than one pair's — chains, reversals, money of no known cost valued at the
+bank's rate of its day, a change of the currency of conversion that works forwards — and gave an
+exchange amendments with their history and a note. Incomes and the rest
 of the money model are still their own tasks.
 
 MOL-58 gave the people whose data this is the minimum 0.1 owes them: a page that says what is

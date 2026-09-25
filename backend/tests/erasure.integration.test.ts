@@ -10,6 +10,7 @@ import { lockTelegramAccount } from '@/db/telegram-lock'
 import {
   actors,
   events,
+  exchangeRevisions,
   exchanges,
   expenses,
   items,
@@ -86,14 +87,17 @@ async function aLife(
     receivedCurrency: 'AMD',
     exchangedOn: '2026-09-20',
   } as const
+  const exchangeId = randomUUID()
   await db.insert(exchanges).values([
-    { id: randomUUID(), ...exchange },
+    { id: exchangeId, ...exchange, revision: 2 },
     { id: randomUUID(), ...exchange, deletedAt: new Date() },
   ])
+  // An amendment's trace (MOL-42): it names the exchange, not the person, and goes with it.
+  await db.insert(exchangeRevisions).values({ exchangeId, revision: 1, ...exchange })
   await insertSession(db, { actorId })
   await insertLoginRequest(db, { telegramUserId }) // confirmed, not yet collected
   await insertLoginRequest(db, { telegramUserId, consumedAt: new Date() })
-  return { ownItem }
+  return { ownItem, exchangeId }
 }
 
 /** Every row of every table, as text — a new table cannot hide from this. */
@@ -143,7 +147,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
     const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
-    await aLife(anna, tg, shared)
+    const { exchangeId } = await aLife(anna, tg, shared)
 
     const report = await erasure.erase(tg, { dryRun: false })
 
@@ -164,6 +168,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     })
     expect(await rowsMentioning(anna)).toEqual([])
     expect(await rowsMentioning(String(tg), true)).toEqual([])
+    expect(await rowsMentioning(exchangeId)).toEqual([])
   })
 
   it('товар, который человек завёл, остаётся в справочнике без автора', async () => {

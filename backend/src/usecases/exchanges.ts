@@ -1,22 +1,31 @@
 import {
   DomainError,
   ERROR,
+  currencySchema,
   exchangeRateOf,
   heldEstimate,
+  isRateFresh,
+  lastReceipt,
   officialDifference,
+  ownRates,
   pickOfficialRate,
-  walletRate,
   yerevanDate,
   yerevanMidnight,
 } from '@molvia/model'
 import type {
   Actor,
   AmdRate,
+  CachedRate,
   Currency,
   Exchange,
+  ExchangeAmendBody,
   ExchangeBody,
+  ExchangeRate,
+  ExchangeRevision,
   ExchangeView,
   ExchangesResponse,
+  OfficialRate,
+  OfficialRateOf,
   RatePreference,
 } from '@molvia/model'
 import type { TripRepositories } from '@/db/unit-of-work'
@@ -24,47 +33,79 @@ import type { TripRepositories } from '@/db/unit-of-work'
 type Repositories = Pick<TripRepositories, 'exchanges' | 'rates'>
 type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
 
-function foreign(...currencies: Currency[]): AmdRate['currency'][] {
-  return currencies.filter((currency): currency is AmdRate['currency'] => currency !== 'AMD')
+const FOREIGN = currencySchema.options.filter(
+  (currency): currency is AmdRate['currency'] => currency !== 'AMD',
+)
+
+/** How many days of the cache are read at once: a long list must not take the whole pool (Ч-3). */
+const RATE_READS_AT_ONCE = 8
+
+/** The official rates cached on or before each of `days`, one query a day, a few at a time. */
+export async function officialRatesOn(
+  { rates }: Pick<Repositories, 'rates'>,
+  days: Iterable<string>,
+): Promise<ReadonlyMap<string, readonly CachedRate[]>> {
+  const distinct = [...new Set(days)]
+  const cached = new Map<string, readonly CachedRate[]>()
+  for (let start = 0; start < distinct.length; start += RATE_READS_AT_ONCE) {
+    const batch = distinct.slice(start, start + RATE_READS_AT_ONCE)
+    const read = await Promise.all(batch.map((day) => rates.latestOnOrBefore(FOREIGN, day)))
+    batch.forEach((day, index) => cached.set(day, read[index] ?? []))
+  }
+  return cached
+}
+
+/**
+ * A rate that jumped when it arrived is not a fact to measure by — it may be a comma in the wrong
+ * place at the bank (MOL-39, Р-19): the rate before the jump is used when there is one, and
+ * otherwise none (review С-5).
+ */
+function steadyOf(official: OfficialRate | null): ExchangeRate | null {
+  return official?.jumped ? official.previous : (official?.rate ?? null)
+}
+
+/**
+ * The official rate of `base` into a currency on an exchange's day, by the rule a trip started
+ * that day would have used — what money of no known cost is valued at (MOL-42, В-1). Only a rate
+ * fresh for that day, as a trip's is (a Friday rate on Sunday): the rule for a trip falls back to
+ * the freshest it has and says `rateStale`, and here nothing would say it — an old number would
+ * turn an honest «unknown» into a confident «valued» (adversarial Ж3).
+ */
+export function officialRateOf(
+  cached: ReadonlyMap<string, readonly CachedRate[]>,
+  base: Currency,
+): OfficialRateOf {
+  return (currency, day) => {
+    const rate = steadyOf(pickOfficialRate(base, currency, cached.get(day) ?? [], day))
+    return rate && isRateFresh(yerevanDate(rate.asOf), day) ? rate : null
+  }
+}
+
+/** The Yerevan day the currency of conversion changed on, or null when it never did. */
+export function sinceDay(since: Date | null): string | null {
+  return since ? yerevanDate(since) : null
 }
 
 /**
  * One exchange as the list shows it, compared with the official rate of its own day — the rate a
- * trip started that day would have taken, by the same rule (`pickOfficialRate`). The cache is
- * asked once per day and pair of the list, all at once.
- *
- * A rate that jumped when it arrived is not a fact to measure an exchange by — it may be a comma
- * in the wrong place at the bank (MOL-39, Р-19): the rate before the jump is used when there is
- * one, and otherwise the comparison is withheld and the row says why (review С-5).
+ * trip started that day would have taken, by the same rule (`pickOfficialRate`). A jumped rate is
+ * measured by the one before it, and without one the comparison is withheld and the row says why.
  */
-async function viewsOf(
-  { rates }: Pick<Repositories, 'rates'>,
+function viewsOf(
   exchanges: readonly Exchange[],
-): Promise<ExchangeView[]> {
-  const keyOf = ({ given, received, exchangedOn }: Exchange) =>
-    `${exchangedOn}:${given.currency}:${received.currency}`
-  const distinct = new Map(exchanges.map((exchange) => [keyOf(exchange), exchange]))
-  const cached = new Map(
-    await Promise.all(
-      [...distinct].map(
-        async ([key, { given, received, exchangedOn }]) =>
-          [
-            key,
-            await rates.latestOnOrBefore(foreign(given.currency, received.currency), exchangedOn),
-          ] as const,
-      ),
-    ),
-  )
-
+  cached: ReadonlyMap<string, readonly CachedRate[]>,
+  history: ReadonlyMap<string, readonly ExchangeRevision[]>,
+  priced: ReadonlySet<string>,
+): ExchangeView[] {
   return [...exchanges].reverse().map((exchange): ExchangeView => {
     const { given, received, exchangedOn } = exchange
     const official = pickOfficialRate(
       given.currency,
       received.currency,
-      cached.get(keyOf(exchange)) ?? [],
+      cached.get(exchangedOn) ?? [],
       exchangedOn,
     )
-    const measure = official?.jumped ? official.previous : (official?.rate ?? null)
+    const measure = steadyOf(official)
     const difference = measure ? officialDifference(exchange, measure) : null
     return {
       id: exchange.id,
@@ -72,6 +113,20 @@ async function viewsOf(
       given,
       received,
       heldBefore: exchange.heldBefore,
+      note: exchange.note,
+      revision: exchange.revision,
+      amendedAt: exchange.amendedAt,
+      history: (history.get(exchange.id) ?? []).map(
+        ({ given, received, exchangedOn, heldBefore, note, replacedAt }) => ({
+          given,
+          received,
+          exchangedOn,
+          heldBefore,
+          note,
+          replacedAt,
+        }),
+      ),
+      priced: priced.has(exchange.id),
       rate: exchangeRateOf(exchange),
       official:
         official && measure && difference
@@ -98,9 +153,13 @@ function spentFrom(exchange: Exchange): Date {
 }
 
 /**
- * «Обмен денег» whole (MOL-40): the preference, the pair a trip started today would convert by,
- * the wallet of that pair as of today, the hint for its next exchange, and every exchange, newest
- * first. Everything a figure on the screen is comes from here — the phone divides nothing.
+ * «Обмен денег» whole (MOL-40, MOL-42): the preference, the pair a trip started today would convert
+ * by, the wallet of that pair and the cost of every other currency held by exchange as of today,
+ * the hints for the next exchange into each currency, and every exchange, newest first. Everything
+ * a figure on the screen is comes from here — the phone divides nothing.
+ *
+ * The cache of official rates is read once for every day of the list: the same rows compare each
+ * exchange with the bank and value money whose cost nobody named.
  */
 export async function exchangesOverview(
   repositories: Repositories,
@@ -109,35 +168,59 @@ export async function exchangesOverview(
 ): Promise<ExchangesResponse> {
   const { exchanges } = repositories
   const today = yerevanDate(now)
-  const [preference, list] = await Promise.all([
-    exchanges.preference(owner.id),
+  const [{ preference, since }, list, history] = await Promise.all([
+    exchanges.rateSettings(owner.id),
     exchanges.list(owner.id),
+    exchanges.history(owner.id),
   ])
+  const cached = await officialRatesOn(
+    repositories,
+    list.map(({ exchangedOn }) => exchangedOn),
+  )
 
   const base = owner.incomeCurrency
   const quote = owner.spendCurrency
   const pair = base === quote ? null : { base, quote }
-  const wallet = pair ? walletRate(list, base, quote, today) : null
+  const baseSince = sinceDay(since)
+  const { wallet, costs, unknownAt, priced } = ownRates(
+    list,
+    base,
+    quote,
+    today,
+    officialRateOf(cached, base),
+    baseSince,
+  )
 
-  // The list is in the order the wallet walks it, so the last of the pair is the latest one.
-  const last = pair
-    ? list.findLast(
-        (exchange) =>
-          exchange.given.currency === base &&
-          exchange.received.currency === quote &&
-          exchange.exchangedOn <= today,
+  const received = [...new Set(list.map((exchange) => exchange.received.currency))].filter(
+    (currency) => currency !== base,
+  )
+  const heldEstimates = await Promise.all(
+    received.map(async (currency) => {
+      const last = lastReceipt(list, currency, today)
+      if (!last) return null
+      return heldEstimate(
+        list,
+        last,
+        await exchanges.spentSince(owner.id, currency, spentFrom(last)),
       )
-    : undefined
-  const held = last
-    ? heldEstimate(last, await exchanges.spentSince(owner.id, quote, spentFrom(last)))
-    : null
+    }),
+  )
 
   return {
     preference,
     pair,
     wallet,
-    heldEstimate: held,
-    exchanges: await viewsOf(repositories, list),
+    costs: [...costs],
+    walletUnknown: unknownAt
+      ? {
+          exchangedOn: unknownAt.exchange.exchangedOn,
+          given: unknownAt.exchange.given.currency,
+          reason: unknownAt.reason,
+        }
+      : null,
+    heldEstimates: heldEstimates.filter((estimate) => estimate !== null),
+    baseSince,
+    exchanges: viewsOf(list, cached, history, priced),
   }
 }
 
@@ -169,6 +252,24 @@ export async function recordExchange(
   await repositories.exchanges.purgeRemoved(owner.id)
   const { created } = await repositories.exchanges.add(owner.id, body)
   return { overview: await exchangesOverview(repositories, owner, now), created }
+}
+
+/**
+ * «Сохранить правку» (MOL-42, В-3): the exchange as it should now be, the version before it kept.
+ * The same «not after today» as a new exchange. Trips already started keep the rate they took;
+ * trips from now on count by the amended exchange — and its history says why the two differ.
+ */
+export async function amendExchange(
+  repositories: Repositories,
+  owner: Owner,
+  id: string,
+  body: ExchangeAmendBody,
+  now: Date = new Date(),
+): Promise<ExchangesResponse> {
+  if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
+  await repositories.exchanges.purgeRemoved(owner.id)
+  await repositories.exchanges.amend(owner.id, id, body)
+  return exchangesOverview(repositories, owner, now)
 }
 
 /**

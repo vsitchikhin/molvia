@@ -9,6 +9,7 @@ import {
 import type { Actor, AmdRate, OfficialRate, StartTripBody, TripView } from '@molvia/model'
 import type { TripSnapshot } from '@/db/trips-repository'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
+import { officialRateOf, officialRatesOn, sinceDay } from './exchanges'
 import { tripViewFor } from './trip-view'
 
 export interface Started {
@@ -63,7 +64,7 @@ export async function startTrip(
       city: context.city,
     })
     const snapshot =
-      (await personalRateFor(repositories, actor.id, context, now)) ??
+      (await personalRateFor(repositories, actor, context, now)) ??
       (await officialRateFor(repositories, context, now))
     const { trip, created } = await repositories.trips.start(
       actor.id,
@@ -77,23 +78,45 @@ export async function startTrip(
 
 /**
  * The person's own rate of the trip's pair (MOL-40, В-3, В-4): the average cost of what they hold,
- * from their exchanges dated no later than today in Yerevan — or none, and the official rate goes
- * in instead: when they asked for the official one, when the two currencies are one, and when
- * they have no exchange of this pair. Never jumped, never with a provider: it is nobody's
- * publication, and nothing to measure a jump against.
+ * from their exchanges dated no later than today in Yerevan, through whatever currencies it was
+ * bought with (MOL-42) — or none, and the official rate goes in instead: when they asked for the
+ * official one, when the two currencies are one, and when the cost of the spending currency is
+ * not known. Never jumped, never with a provider: it is nobody's publication, and nothing to
+ * measure a jump against.
+ *
+ * Only exchanges from the day the currency of conversion last changed count (В-2) — when the trip
+ * converts into that currency. A trip started offline with the one before it (MOL-65) takes the
+ * wallet of its own currency uncut: the cut is about the current one (Р-8).
  */
 async function personalRateFor(
-  { exchanges }: Pick<TripRepositories, 'exchanges'>,
-  owner: string,
+  repositories: Pick<TripRepositories, 'exchanges' | 'rates'>,
+  actor: Pick<Actor, 'id' | 'incomeCurrency'>,
   pair: Pick<Actor, 'incomeCurrency' | 'spendCurrency'>,
   now: Date,
 ): Promise<TripSnapshot | null> {
+  const { exchanges } = repositories
   const base = pair.incomeCurrency
   const quote = pair.spendCurrency
   if (base === quote) return null
-  if ((await exchanges.preference(owner)) !== 'personal') return null
+  const { preference, since } = await exchanges.rateSettings(actor.id)
+  if (preference !== 'personal') return null
 
-  const wallet = walletRate(await exchanges.list(owner), base, quote, yerevanDate(now))
+  const list = await exchanges.list(actor.id)
+  // Only exchanges paid with money that may need valuing ask the cache anything.
+  const cached = await officialRatesOn(
+    repositories,
+    list
+      .filter(({ given, received }) => given.currency !== base && received.currency !== base)
+      .map(({ exchangedOn }) => exchangedOn),
+  )
+  const wallet = walletRate(
+    list,
+    base,
+    quote,
+    yerevanDate(now),
+    officialRateOf(cached, base),
+    base === actor.incomeCurrency ? sinceDay(since) : null,
+  )
   return wallet ? { rate: wallet.rate, provider: null, jumped: false, previous: null } : null
 }
 

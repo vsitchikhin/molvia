@@ -211,6 +211,13 @@ export const actors = pgTable(
      * exchanges, and the form of MOL-65 compares its four fields and nothing else.
      */
     ratePreference: text('rate_preference').$type<RatePreference>().notNull().default('personal'),
+    /**
+     * When `income_currency` last changed (MOL-42, В-2): a change of the currency of conversion
+     * works forwards, so the person's own rate in the new one is built only from exchanges from
+     * that day on, and nothing before it is re-counted. Empty for whoever never changed it — then
+     * nothing is cut. Set by the settings' own `UPDATE`, in the same statement as the change.
+     */
+    incomeCurrencySince: timestamp('income_currency_since', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.
@@ -745,6 +752,13 @@ export const exchanges = pgTable(
     // exchange anew moved both (adversarial round 2, В1, В2). The owner's next request removes
     // such rows for good: by then the screen no longer offers them back.
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    // «Где и заметка» (MOL-42, В-4): one line, private as the exchange itself.
+    note: text('note'),
+    // Which version of the exchange this is (MOL-42, В-3): an amendment names the one it was made
+    // over, so two devices cannot both amend the same old version. Each earlier one is a row of
+    // `exchange_revisions`.
+    revision: integer('revision').notNull().default(1),
+    amendedAt: timestamp('amended_at', { withTimezone: true }),
   },
   (table) => [
     // The owner's exchanges in the order the wallet walks them.
@@ -761,6 +775,47 @@ export const exchanges = pgTable(
       oneOf(table.receivedCurrency, currencySchema.options),
     ),
     check('exchanges_currencies_differ', sql`${table.givenCurrency} <> ${table.receivedCurrency}`),
+    check('exchanges_revision_positive', sql`${table.revision} > 0`),
+  ],
+)
+
+/**
+ * The versions an exchange had before it was amended (MOL-42, В-3). The rate of a past exchange is
+ * a fact, so an amendment leaves a trace rather than rewriting it in silence — and the trace is
+ * what explains why a trip started last week took a rate the exchanges no longer say. Goes with
+ * its exchange: a removal made final takes the history too, and so does erasure (MOL-58).
+ */
+export const exchangeRevisions = pgTable(
+  'exchange_revisions',
+  {
+    exchangeId: uuid('exchange_id')
+      .notNull()
+      .references(() => exchanges.id, { onDelete: 'cascade' }),
+    revision: integer('revision').notNull(),
+    givenMinor: bigint('given_minor', { mode: 'bigint' }).notNull(),
+    givenCurrency: char('given_currency', { length: 3 }).$type<Currency>().notNull(),
+    receivedMinor: bigint('received_minor', { mode: 'bigint' }).notNull(),
+    receivedCurrency: char('received_currency', { length: 3 }).$type<Currency>().notNull(),
+    exchangedOn: date('exchanged_on').notNull(),
+    heldBeforeMinor: bigint('held_before_minor', { mode: 'bigint' }),
+    note: text('note'),
+    // When this version stopped being the exchange.
+    replacedAt: timestamp('replaced_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.exchangeId, table.revision] }),
+    check('exchange_revisions_given_positive', sql`${table.givenMinor} > 0`),
+    check('exchange_revisions_received_positive', sql`${table.receivedMinor} > 0`),
+    check(
+      'exchange_revisions_given_currency_known',
+      oneOf(table.givenCurrency, currencySchema.options),
+    ),
+    check(
+      'exchange_revisions_received_currency_known',
+      oneOf(table.receivedCurrency, currencySchema.options),
+    ),
   ],
 )
 

@@ -2,14 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { INT8_MAX } from '#model/support/decimal'
 import { ERROR, ISSUE } from '#model/support/errors'
 import {
+  currencyCosts,
   exchangeRateOf,
   exchangeSchema,
   heldEstimate,
   isPlausibleExchange,
+  lastReceipt,
   officialDifference,
+  ownRates,
   walletRate,
 } from '#model/entities/exchange'
-import type { Exchange } from '#model/entities/exchange'
+import type { Exchange, OfficialRateOf } from '#model/entities/exchange'
 import { convertMoney } from '#model/entities/trip'
 import { formatEstimate, money } from '#model/values/money'
 import type { Currency } from '#model/values/money'
@@ -20,7 +23,7 @@ const digits = (text: string): string => text.replace(/[\s\u00a0\u202f]/g, '')
 
 let sequence = 0
 
-/** An exchange in major units: `exchange('20000 RUB', '100000 AMD', '2026-09-01')`. */
+/** An exchange in major units: `exchange('20000 RUB', '224.63 USD', '2026-09-01')`. */
 function exchange(
   given: string,
   received: string,
@@ -29,7 +32,8 @@ function exchange(
 ): Exchange {
   const toMoney = (text: string) => {
     const [amount = '', currency = ''] = text.split(' ')
-    return money(BigInt(amount) * 100n, currency as Currency)
+    const [whole = '', cents = ''] = amount.split('.')
+    return money(BigInt(whole) * 100n + BigInt(cents.padEnd(2, '0')), currency as Currency)
   }
   sequence += 1
   return {
@@ -39,7 +43,10 @@ function exchange(
     received: toMoney(received),
     exchangedOn,
     heldBefore: heldBefore === null ? null : toMoney(heldBefore),
+    note: null,
+    revision: 1,
     createdAt: new Date(`${exchangedOn}T12:00:00Z`),
+    amendedAt: null,
   }
 }
 
@@ -75,6 +82,14 @@ describe('exchangeSchema', () => {
 
   it('refuses a day that is not one', () => {
     expect(exchangeSchema.safeParse({ ...first, exchangedOn: '2026-02-31' }).success).toBe(false)
+  })
+
+  it('keeps a note of one visible line, and refuses one that draws nothing (MOL-42, В-4)', () => {
+    expect(exchangeSchema.safeParse({ ...first, note: 'ВТБ банкомат (озон)' }).success).toBe(true)
+    expect(exchangeSchema.safeParse({ ...first, note: '\u200b' }).error?.issues[0]?.message).toBe(
+      ISSUE.TEXT_NOT_VISIBLE,
+    )
+    expect(exchangeSchema.safeParse({ ...first, note: 'x'.repeat(201) }).success).toBe(false)
   })
 })
 
@@ -149,11 +164,12 @@ describe('walletRate', () => {
     expect(walletRate([first], 'RUB', 'AMD', '2026-08-31')).toBeNull()
   })
 
-  it('is not moved by an exchange of another pair, the reverse one included', () => {
-    const dollars = exchange('100 USD', '38000 AMD', '2026-09-10', '1000 AMD')
-    const back = exchange('10000 AMD', '2000 RUB', '2026-09-12')
-    const wallet = walletRate([first, dollars, back, second], 'RUB', 'AMD', '2026-09-30')
+  it('is not moved by an exchange back into the currency of conversion', () => {
+    const back = exchange('10000 AMD', '2250 RUB', '2026-09-20')
+    const wallet = walletRate([first, second, back], 'RUB', 'AMD', '2026-09-30')
+    expect(wallet).toMatchObject({ basis: 'weighted', estimated: false })
     expect(wallet?.rate.scaled).toBe(4_791_667n)
+    expect(wallet?.rate.asOf).toEqual(yerevanMidnight('2026-09-15'))
   })
 
   it('is none without an exchange of the pair', () => {
@@ -168,6 +184,261 @@ describe('walletRate', () => {
       received: money((RATE_MAX / 1_000_000n) * 1000n, 'AMD'),
     }
     expect(walletRate([absurd], 'RUB', 'AMD', '2026-09-30')).toBeNull()
+  })
+})
+
+/** The official rate of RUB into `currency`, as the use case would hand it in. */
+function officialFrom(table: Partial<Record<Currency, string>>): OfficialRateOf {
+  return (currency, day) => {
+    const value = table[currency]
+    return value === undefined
+      ? null
+      : {
+          base: 'RUB',
+          quote: currency,
+          scaled: parseRate(value),
+          source: 'official',
+          asOf: yerevanMidnight(day),
+        }
+  }
+}
+
+// The owner's own journal (sheet «Обмен валюты»): roubles to a card in dollars, dollars to drams.
+const dollars = exchange('20000 RUB', '224.63 USD', '2026-08-31')
+const drams = exchange('100 USD', '36150 AMD', '2026-09-13')
+
+describe('walletRate through other currencies (MOL-42)', () => {
+  it('carries the price of the dollars into the drams bought with them', () => {
+    // 100 $ cost 100 × 20000 / 224.63 = 8 903.53 ₽, so 36 150 ֏ at 4.06018725.
+    const wallet = walletRate([dollars, drams], 'RUB', 'AMD', '2026-09-30')
+    expect(wallet).toMatchObject({ basis: 'last', estimated: false })
+    expect(wallet?.rate.scaled).toBe(4_060_187n)
+    expect(wallet?.rate.asOf).toEqual(yerevanMidnight('2026-09-13'))
+  })
+
+  it('weighs what was held by its own cost, whichever currency bought it', () => {
+    const before = exchange('7654.42 RUB', '30000 AMD', '2026-09-05')
+    const weighed = exchange('100 USD', '36150 AMD', '2026-09-13', '20000 AMD')
+    const wallet = walletRate([dollars, before, weighed], 'RUB', 'AMD', '2026-09-30')
+    expect(wallet?.basis).toBe('weighted')
+    expect(wallet?.rate.scaled).toBe(4_008_860n)
+  })
+
+  it('comes to the same rate by a chain as by the pair, when the sums say the same', () => {
+    const direct = walletRate([first], 'RUB', 'AMD', '2026-09-30')
+    const chain = walletRate(
+      [
+        exchange('20000 RUB', '250 USD', '2026-09-01'),
+        exchange('250 USD', '100000 AMD', '2026-09-01'),
+      ],
+      'RUB',
+      'AMD',
+      '2026-09-30',
+    )
+    expect(chain?.rate.scaled).toBe(direct?.rate.scaled)
+  })
+
+  it('does not re-price drams already bought when the dollars later get dearer', () => {
+    const dearer = exchange('20000 RUB', '200 USD', '2026-09-20')
+    const wallet = walletRate([dollars, drams, dearer], 'RUB', 'AMD', '2026-09-30')
+    expect(wallet?.rate.scaled).toBe(4_060_187n)
+  })
+
+  it('values money of no known cost at the official rate of the day, and says so (В-1)', () => {
+    // 600 $ brought from home: 600 / 0.011111 = 54 000.54 ₽ for 217 200 ֏.
+    const airport = exchange('600 USD', '217200 AMD', '2026-08-25')
+    const wallet = walletRate(
+      [airport],
+      'RUB',
+      'AMD',
+      '2026-09-30',
+      officialFrom({ USD: '0.011111' }),
+    )
+    expect(wallet).toMatchObject({ basis: 'last', estimated: true })
+    expect(wallet?.rate.scaled).toBe(4_022_182n)
+  })
+
+  it('keeps the estimate in a weighted cost, and drops it once a link starts afresh', () => {
+    const airport = exchange('600 USD', '217200 AMD', '2026-08-25')
+    const official = officialFrom({ USD: '0.011111' })
+    const weighed = exchange('20000 RUB', '95000 AMD', '2026-09-15', '100000 AMD')
+    expect(walletRate([airport, weighed], 'RUB', 'AMD', '2026-09-30', official)).toMatchObject({
+      basis: 'weighted',
+      estimated: true,
+    })
+    expect(walletRate([airport, weighed], 'RUB', 'AMD', '2026-09-30', official)?.rate.scaled).toBe(
+      4_346_651n,
+    )
+    const fresh = exchange('20000 RUB', '95000 AMD', '2026-09-15')
+    expect(walletRate([airport, fresh], 'RUB', 'AMD', '2026-09-30', official)).toMatchObject({
+      basis: 'last',
+      estimated: false,
+    })
+  })
+
+  it('without an official rate either, knows no cost until an exchange starts one afresh', () => {
+    const airport = exchange('600 USD', '217200 AMD', '2026-09-05')
+    expect(walletRate([first], 'RUB', 'AMD', '2026-09-10')?.rate.scaled).toBe(parseRate('5'))
+    expect(walletRate([first, airport], 'RUB', 'AMD', '2026-09-10')).toBeNull()
+    // What was held has no known cost to weigh by: the next exchange is taken alone.
+    const next = exchange('20000 RUB', '95000 AMD', '2026-09-15', '100000 AMD')
+    expect(walletRate([first, airport, next], 'RUB', 'AMD', '2026-09-30')).toMatchObject({
+      basis: 'last',
+      estimated: false,
+    })
+  })
+
+  it('ignores an official rate of any other pair', () => {
+    const airport = exchange('600 USD', '217200 AMD', '2026-08-25')
+    const foreign: OfficialRateOf = (currency, day) => ({
+      base: 'EUR',
+      quote: currency,
+      scaled: parseRate('1.08'),
+      source: 'official',
+      asOf: yerevanMidnight(day),
+    })
+    expect(walletRate([airport], 'RUB', 'AMD', '2026-09-30', foreign)).toBeNull()
+  })
+
+  describe('after the currency of conversion changed (В-2)', () => {
+    // Counting in roubles until the 15th, in dollars since.
+    const since = '2026-09-15'
+    const roubles = exchange('20000 RUB', '100000 AMD', '2026-09-01')
+    const dollarsBefore = exchange('100 USD', '38000 AMD', '2026-09-05')
+    const roubleRate: OfficialRateOf = (currency, day) => ({
+      base: 'USD',
+      quote: currency,
+      scaled: parseRate('90'),
+      source: 'official',
+      asOf: yerevanMidnight(day),
+    })
+
+    it('leaves out what was paid in another currency before it, even with a rate to value it', () => {
+      expect(walletRate([roubles], 'USD', 'AMD', '2026-09-30', roubleRate, since)).toBeNull()
+      expect(walletRate([roubles], 'USD', 'AMD', '2026-09-30', roubleRate, null)).toMatchObject({
+        estimated: true,
+      })
+    })
+
+    it('counts what was paid in the new currency before it: nothing there needs re-counting (Л1)', () => {
+      const wallet = walletRate(
+        [roubles, dollarsBefore],
+        'USD',
+        'AMD',
+        '2026-09-30',
+        roubleRate,
+        since,
+      )
+      expect(wallet?.rate.scaled).toBe(parseRate('380'))
+      // And the next exchange weighs what was held by it: (36 150 + 38 000) / (100 + 100).
+      const later = exchange('100 USD', '36150 AMD', since, '38000 AMD')
+      expect(
+        walletRate([roubles, dollarsBefore, later], 'USD', 'AMD', '2026-09-30', roubleRate, since),
+      ).toMatchObject({ basis: 'weighted', rate: { scaled: parseRate('370.75') } })
+    })
+
+    it('counts a chain made before it when every price in it is known without the bank (П-1)', () => {
+      // Euros to dollars to drams, for someone who chose euros only on the 25th.
+      const euros = exchange('1000 EUR', '1080 USD', '2026-09-01')
+      const drams = exchange('500 USD', '190000 AMD', '2026-09-02')
+      const wallet = walletRate([euros, drams], 'EUR', 'AMD', '2026-09-30', undefined, '2026-09-25')
+      expect(wallet?.rate.scaled).toBe(410_400_000n)
+      expect(wallet?.estimated).toBe(false)
+    })
+
+    it('does not weigh drams bought with roubles by the price of dollar ones (М1)', () => {
+      const early = exchange('100 USD', '38000 AMD', '2026-09-03')
+      const roubleDrams = exchange('20000 RUB', '100000 AMD', '2026-09-05', '38000 AMD')
+      // Everything held — the rouble drams too — named at the next dollar exchange.
+      const next = exchange('100 USD', '36150 AMD', since, '138000 AMD')
+      const rates = ownRates(
+        [early, roubleDrams, next],
+        'USD',
+        'AMD',
+        '2026-09-30',
+        roubleRate,
+        since,
+      )
+      expect(rates.wallet).toMatchObject({ basis: 'last', rate: { scaled: parseRate('361.5') } })
+      // Said with its own reason: «no rate of that day» would be untrue of it (Н1).
+      expect(
+        ownRates([early, roubleDrams], 'USD', 'AMD', '2026-09-30', roubleRate, since),
+      ).toMatchObject({
+        wallet: null,
+        unknownAt: { exchange: roubleDrams, reason: 'oldReckoning' },
+      })
+      expect([...rates.priced].sort()).toEqual([early.id, next.id].sort())
+    })
+  })
+
+  it('works in any currency of conversion, through any currency', () => {
+    const euros = exchange('1000 EUR', '1080 USD', '2026-09-01')
+    const spent = exchange('500 USD', '190000 AMD', '2026-09-02')
+    // 380 ֏ per $ at 1.08 $ per € — 410.4 ֏ per €.
+    expect(walletRate([euros, spent], 'EUR', 'AMD', '2026-09-30')?.rate.scaled).toBe(410_400_000n)
+    expect(walletRate([spent], 'USD', 'AMD', '2026-09-30')?.rate.scaled).toBe(parseRate('380'))
+    expect(walletRate([spent], 'AMD', 'AMD', '2026-09-30')).toBeNull()
+  })
+})
+
+describe('a long chain (Ж1)', () => {
+  it('stays fast however many links there are: each is bounded to eighteen digits', () => {
+    const chain = Array.from({ length: 2000 }, (_, index) => {
+      const day = new Date(Date.UTC(2020, 0, 2) + index * 86_400_000).toISOString().slice(0, 10)
+      return exchange(
+        `${String(20_000 + index)} RUB`,
+        `${String(95_000 + index * 7)} AMD`,
+        day,
+        '20000 AMD',
+      )
+    })
+    const started = performance.now()
+    const wallet = walletRate(chain, 'RUB', 'AMD', '2030-01-01')
+    expect(performance.now() - started).toBeLessThan(1000)
+    expect(wallet?.basis).toBe('weighted')
+  })
+
+  it('still gives the exact answers of short chains to the sixth digit', () => {
+    const third = exchange('10000 RUB', '47000 AMD', '2026-09-20', '30000 AMD')
+    expect(walletRate([first, second, third], 'RUB', 'AMD', '2026-09-30')?.rate.scaled).toBe(
+      4_735_294n,
+    )
+  })
+})
+
+describe('ownRates', () => {
+  it('walks once for the wallet and the prices, leaving the spending currency out of the prices', () => {
+    const rates = ownRates([dollars, drams], 'RUB', 'AMD', '2026-09-30')
+    expect(rates.wallet?.rate.scaled).toBe(4_060_187n)
+    expect(rates.costs.map(({ rate }) => rate.base)).toEqual(['USD'])
+    expect(rates.unknownAt).toBeNull()
+  })
+
+  it('names the exchange the cost was lost on, rather than «no exchanges» (С-4)', () => {
+    const airport = exchange('600 USD', '217200 AMD', '2026-09-05')
+    const rates = ownRates([first, airport], 'RUB', 'AMD', '2026-09-30')
+    expect(rates.wallet).toBeNull()
+    expect(rates.unknownAt).toEqual({ exchange: airport, reason: 'noRate' })
+    // An exchange that starts the cost afresh finds it again.
+    const next = exchange('20000 RUB', '95000 AMD', '2026-09-15')
+    expect(ownRates([first, airport, next], 'RUB', 'AMD', '2026-09-30').unknownAt).toBeNull()
+    // No exchange of the spending currency at all is not «lost».
+    expect(ownRates([dollars], 'RUB', 'AMD', '2026-09-30').unknownAt).toBeNull()
+  })
+})
+
+describe('currencyCosts', () => {
+  it('lists what every currency held by exchange cost, and never the base itself', () => {
+    const back = exchange('50 USD', '4500 RUB', '2026-09-14')
+    const costs = currencyCosts([dollars, drams, back], 'RUB', '2026-09-30')
+    expect(costs.map(({ rate }) => rate.base).sort()).toEqual(['AMD', 'USD'])
+    // The price of one dollar in roubles, 20000 / 224.63 — and handing dollars over, for drams or
+    // back for roubles, leaves it where it was.
+    expect(costs.find(({ rate }) => rate.base === 'USD')?.rate).toMatchObject({
+      quote: 'RUB',
+      scaled: 89_035_302n,
+      source: 'personal',
+    })
   })
 })
 
@@ -206,26 +477,43 @@ describe('officialDifference', () => {
   })
 })
 
+describe('lastReceipt', () => {
+  it('is the latest exchange into a currency, by day and then as written, up to a day', () => {
+    expect(lastReceipt([second, first, dollars], 'AMD', '2026-09-30')).toBe(second)
+    expect(lastReceipt([second, first], 'AMD', '2026-09-14')).toBe(first)
+    expect(lastReceipt([first], 'USD', '2026-09-30')).toBeUndefined()
+  })
+})
+
 describe('heldEstimate', () => {
   it('is what the last exchange left, less what was spent since, and says whether it is all', () => {
-    expect(heldEstimate(second, 3_000_000n)).toEqual({
+    expect(heldEstimate([first, second], second, 3_000_000n)).toEqual({
       held: money(8_500_000n, 'AMD'),
       whole: true,
     })
     // The first exchange never says what was there before: the hint is about its own money.
-    expect(heldEstimate(first, 3_000_000n)).toEqual({
+    expect(heldEstimate([first], first, 3_000_000n)).toEqual({
       held: money(7_000_000n, 'AMD'),
       whole: false,
     })
   })
 
+  it('takes away what later exchanges gave of it, as a purchase would (MOL-42, Р-3)', () => {
+    const back = exchange('10000 AMD', '2250 RUB', '2026-09-20')
+    const earlier = exchange('5000 AMD', '1000 RUB', '2026-09-10')
+    expect(heldEstimate([first, earlier, second, back], second, 3_000_000n)?.held).toEqual(
+      money(7_500_000n, 'AMD'),
+    )
+    expect(heldEstimate([dollars, drams], dollars, 0n)?.held).toEqual(money(12_463n, 'USD'))
+  })
+
   it('never goes below zero', () => {
-    expect(heldEstimate(first, 99_999_999n)?.held).toEqual(money(0n, 'AMD'))
+    expect(heldEstimate([first], first, 99_999_999n)?.held).toEqual(money(0n, 'AMD'))
   })
 
   it('is none when the sum is not money at all — it took the screen down once (А1)', () => {
     const absurd: Exchange = { ...second, heldBefore: money(INT8_MAX, 'AMD') }
-    expect(heldEstimate(absurd, 0n)).toBeNull()
+    expect(heldEstimate([absurd], absurd, 0n)).toBeNull()
   })
 })
 

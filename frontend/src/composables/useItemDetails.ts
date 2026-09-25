@@ -62,7 +62,7 @@ function valueOf<T>(field: Parsed<T>): T | null {
 }
 
 /** «1.000» → «1», «0.900» → «0,9» on a Russian keyboard: what a person types, not what the wire carries. */
-function shown(decimal: string, separator: string): string {
+export function shown(decimal: string, separator: string): string {
   const trimmed = decimal.includes('.') ? decimal.replace(/0+$/, '').replace(/\.$/, '') : decimal
   return trimmed.replace('.', separator)
 }

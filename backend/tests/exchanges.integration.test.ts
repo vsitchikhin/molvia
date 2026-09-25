@@ -4,7 +4,7 @@ import { ERROR, exchangesResponseCodec, parseRate, tripViewCodec, yerevanDate } 
 import type { CachedRate, ExchangesResponse } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
-import { exchanges, expenses } from '@/db/schema'
+import { exchangeRevisions, exchanges, expenses } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import {
@@ -75,7 +75,10 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       preference: 'personal',
       pair: { base: 'RUB', quote: 'AMD' },
       wallet: null,
-      heldEstimate: null,
+      costs: [],
+      heldEstimates: [],
+      baseSince: null,
+      walletUnknown: null,
       exchanges: [],
     })
   })
@@ -106,9 +109,11 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       wallet: {
         rate: { base: 'RUB', quote: 'AMD', rate: '4.791667', source: 'personal' },
         basis: 'weighted',
+        estimated: false,
       },
+      costs: [],
       // Nothing spent since: what the last exchange left, and nothing else is known.
-      heldEstimate: { held: { amount: '115000.00', currency: 'AMD' }, whole: true },
+      heldEstimates: [{ held: { amount: '115000.00', currency: 'AMD' }, whole: true }],
     })
     const list = overviewOf(second.json()).exchanges
     expect(list.map((exchange) => exchange.exchangedOn)).toEqual([daysAgo(2), daysAgo(10)])
@@ -315,7 +320,7 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       headers: { cookie },
       payload: payload(),
     })
-    expect(response.json()).toMatchObject({ pair: null, wallet: null, heldEstimate: null })
+    expect(response.json()).toMatchObject({ pair: null, wallet: null, costs: [] })
     expect(overviewOf(response.json()).exchanges).toHaveLength(1)
   })
 })
@@ -334,7 +339,7 @@ describe('«Обмен денег»: правки ревью', () => {
       }),
     })
     expect(absurd.statusCode).toBe(201)
-    expect(overviewOf(absurd.json()).heldEstimate).toBeNull()
+    expect(overviewOf(absurd.json()).heldEstimates).toEqual([])
     const read = await app.inject({ method: 'GET', url: '/exchanges', headers: { cookie } })
     expect(read.statusCode).toBe(200)
   })
@@ -398,7 +403,7 @@ describe('«Обмен денег»: правки ревью', () => {
       url: '/exchanges',
       headers: { cookie: me.cookie },
     })
-    expect(overviewOf(read.json()).heldEstimate?.held).toEqual({
+    expect(overviewOf(read.json()).heldEstimates[0]?.held).toEqual({
       minor: 11_000_000n,
       currency: 'AMD',
     })
@@ -532,7 +537,7 @@ describe('«Обмен денег»: правки второго захода', 
       headers: { cookie: me.cookie },
       payload: payload({ exchangedOn: daysAgo(3) }),
     })
-    expect(overviewOf(response.json()).heldEstimate?.held).toEqual({
+    expect(overviewOf(response.json()).heldEstimates[0]?.held).toEqual({
       minor: 7_000_000n,
       currency: 'AMD',
     })
@@ -652,5 +657,408 @@ describe('свой курс в походе (MOL-40)', () => {
     expect(current.json()).toMatchObject({
       trip: { rate: { rate: '5.000000', source: 'personal' } },
     })
+  })
+})
+
+describe('стоимость валют (MOL-42)', () => {
+  const usd = (value: string, date: string): CachedRate => ({
+    ...rub(value, date),
+    currency: 'USD',
+  })
+
+  async function record(me: { cookie: string }, patch: Record<string, unknown>) {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: payload(patch),
+    })
+    expect(response.statusCode).toBe(201)
+    return overviewOf(response.json())
+  }
+
+  async function start(me: { id: string; cookie: string }) {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/trips',
+      headers: { cookie: me.cookie },
+      payload: {
+        id: randomUUID(),
+        context: await tripContext(db, me.id),
+        place: { kind: 'store', name: 'Ереван Сити' },
+      },
+    })
+    expect(response.statusCode).toBe(201)
+    return tripViewCodec.parse(response.json())
+  }
+
+  it('цепочка RUB → USD → AMD: цена долларов переходит в драмы, и поход её берёт', async () => {
+    const me = await owner()
+    await record(me, {
+      received: { amount: '224.63', currency: 'USD' },
+      exchangedOn: daysAgo(10),
+    })
+    const overview = await record(me, {
+      given: { amount: '100', currency: 'USD' },
+      received: { amount: '36150', currency: 'AMD' },
+      exchangedOn: daysAgo(5),
+    })
+
+    expect(overview.wallet).toMatchObject({ basis: 'last', estimated: false })
+    expect(overview.wallet?.rate.scaled).toBe(4_060_187n)
+    // One dollar cost 20000 / 224.63 roubles.
+    expect(overview.costs.map(({ rate }) => [rate.base, rate.quote, rate.scaled])).toEqual([
+      ['USD', 'RUB', 89_035_302n],
+    ])
+    // Handing 100 $ over for drams leaves 124.63 $; the drams are all still held.
+    expect(overview.heldEstimates.map(({ held }) => held)).toEqual(
+      expect.arrayContaining([
+        { minor: 12_463n, currency: 'USD' },
+        { minor: 3_615_000n, currency: 'AMD' },
+      ]),
+    )
+
+    const trip = await start(me)
+    expect(trip.rate).toMatchObject({ source: 'personal', scaled: 4_060_187n })
+  })
+
+  it('привезённые доллары — по ЦБ РА на день обмена, с пометкой; поход берёт то же число', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(6)), usd('363.44', daysAgo(6))])
+    const me = await owner()
+    const overview = await record(me, {
+      given: { amount: '600', currency: 'USD' },
+      received: { amount: '217200', currency: 'AMD' },
+      exchangedOn: daysAgo(5),
+    })
+    expect(overview.wallet).toMatchObject({ basis: 'last', estimated: true })
+    expect(overview.wallet?.rate.scaled).toBe(4_295_130n)
+    // The dollars themselves were never bought: they have no cost of their own to list.
+    expect(overview.costs).toEqual([])
+
+    const trip = await start(me)
+    expect(trip.rate).toMatchObject({ source: 'personal', scaled: 4_295_130n })
+  })
+
+  it('без курса ЦБ на тот день стоимость неизвестна, и поход берёт официальный', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(1))])
+    const me = await owner()
+    const overview = await record(me, {
+      given: { amount: '600', currency: 'USD' },
+      received: { amount: '217200', currency: 'AMD' },
+      exchangedOn: daysAgo(5),
+    })
+    expect(overview.wallet).toBeNull()
+    // Said as it is, not «no exchanges yet» above the list (С-4).
+    expect(overview.walletUnknown).toEqual({
+      exchangedOn: daysAgo(5),
+      given: 'USD',
+      reason: 'noRate',
+    })
+    expect((await start(me)).rate?.source).toBe('official')
+  })
+
+  it('курс ЦБ давностью больше недели оценкой не служит: стоимость неизвестна (Ж3)', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(70)), usd('363.44', daysAgo(70))])
+    const me = await owner()
+    const overview = await record(me, {
+      given: { amount: '600', currency: 'USD' },
+      received: { amount: '217200', currency: 'AMD' },
+      exchangedOn: daysAgo(5),
+    })
+    expect(overview.wallet).toBeNull()
+    expect(overview.walletUnknown).toMatchObject({ given: 'USD' })
+    const trip = await start(me)
+    expect(trip.rate?.source).toBe('official')
+    expect(trip.rateStale).toBe(true)
+  })
+
+  it('обратный обмен курс не двигает и уменьшает подсказку остатка', async () => {
+    const me = await owner()
+    await record(me, {})
+    const overview = await record(me, {
+      given: { amount: '10000', currency: 'AMD' },
+      received: { amount: '2250', currency: 'RUB' },
+      exchangedOn: daysAgo(3),
+    })
+    expect(overview.wallet?.rate.scaled).toBe(parseRate('5'))
+    expect(overview.heldEstimates).toEqual([
+      { held: { minor: 9_000_000n, currency: 'AMD' }, whole: false },
+    ])
+  })
+
+  it('смена валюты действует вперёд: прошлые рубли в долларовый курс не входят, прошлые доллары входят (В-2, Л1)', async () => {
+    // A rate to value the roubles by is there: they are left out by the change, not by its absence.
+    await rates.upsert([rub('4.3123', daysAgo(11)), usd('363.44', daysAgo(11))])
+    const me = await owner()
+    // The default RUB, one exchange of roubles left over from home, then dollars.
+    await record(me, { exchangedOn: daysAgo(10) })
+    await record(me, {
+      given: { amount: '100', currency: 'USD' },
+      received: { amount: '38000', currency: 'AMD' },
+      heldBefore: { amount: '100000', currency: 'AMD' },
+      exchangedOn: daysAgo(3),
+    })
+    const before = await tripContext(db, me.id)
+    const settings = await app.inject({
+      method: 'PUT',
+      url: '/actors/me/settings',
+      headers: { cookie: me.cookie },
+      payload: { previous: before, settings: { ...before, incomeCurrency: 'USD' } },
+    })
+    expect(settings.statusCode).toBe(200)
+
+    const read = await app.inject({
+      method: 'GET',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+    })
+    const overview = overviewOf(read.json())
+    expect(overview).toMatchObject({ pair: { base: 'USD', quote: 'AMD' }, baseSince: today })
+    // The dollars count as they were paid; the roubles do not come back valued by the bank, so
+    // the drams held before the dollar exchange have no cost to weigh by.
+    expect(overview.wallet).toMatchObject({ basis: 'last', estimated: false })
+    expect(overview.wallet?.rate.scaled).toBe(parseRate('380'))
+    expect(overview.exchanges).toHaveLength(2)
+
+    const after = await record(me, {
+      given: { amount: '100', currency: 'USD' },
+      received: { amount: '36150', currency: 'AMD' },
+      heldBefore: { amount: '38000', currency: 'AMD' },
+      exchangedOn: today,
+    })
+    expect(after.wallet).toMatchObject({ basis: 'weighted', estimated: false })
+    expect(after.wallet?.rate.scaled).toBe(parseRate('370.75'))
+    expect((await start(me)).rate).toMatchObject({ source: 'personal', base: 'USD' })
+  })
+})
+
+describe('смена валюты пересчёта: старый счёт и цепочки (MOL-42, раунд 3)', () => {
+  async function record(me: { cookie: string }, patch: Record<string, unknown>) {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: payload(patch),
+    })
+    expect(response.statusCode).toBe(201)
+    return overviewOf(response.json())
+  }
+
+  async function choose(me: { id: string; cookie: string }, incomeCurrency: 'USD' | 'EUR') {
+    const before = await tripContext(db, me.id)
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/actors/me/settings',
+      headers: { cookie: me.cookie },
+      payload: { previous: before, settings: { ...before, incomeCurrency } },
+    })
+    expect(response.statusCode).toBe(200)
+  }
+
+  it('драмы за рубли до смены не взвешиваются по цене долларовых, и шторке сказано не спрашивать (М1)', async () => {
+    const me = await owner()
+    await record(me, {
+      given: { amount: '100', currency: 'USD' },
+      received: { amount: '38000', currency: 'AMD' },
+      exchangedOn: daysAgo(12),
+    })
+    await record(me, {
+      heldBefore: { amount: '38000', currency: 'AMD' },
+      exchangedOn: daysAgo(10),
+    })
+    await choose(me, 'USD')
+
+    // The rouble drams have no price in dollars: said as the old reckoning, not «no exchanges»
+    // and not «no bank rate» (Н1). The dollar exchange before them does not make the sheet ask
+    // for what is held: the rouble one after it took the price away (Н2).
+    const read = await app.inject({
+      method: 'GET',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+    })
+    expect(overviewOf(read.json())).toMatchObject({
+      wallet: null,
+      walletUnknown: { exchangedOn: daysAgo(10), given: 'RUB', reason: 'oldReckoning' },
+    })
+
+    // Everything held, the rouble drams too — what the sheet's hint says.
+    const overview = await record(me, {
+      given: { amount: '100', currency: 'USD' },
+      received: { amount: '36150', currency: 'AMD' },
+      heldBefore: { amount: '138000', currency: 'AMD' },
+      exchangedOn: today,
+    })
+    expect(overview.wallet).toMatchObject({ basis: 'last', rate: { scaled: parseRate('361.5') } })
+    const byDay = new Map(overview.exchanges.map((row) => [row.exchangedOn, row.priced]))
+    expect(byDay).toEqual(
+      new Map([
+        [today, true],
+        [daysAgo(10), false],
+        [daysAgo(12), true],
+      ]),
+    )
+  })
+
+  it('цепочка EUR → USD → AMD до смены входит целиком: пересчитывать в ней нечего (П-1)', async () => {
+    const me = await owner()
+    await record(me, {
+      given: { amount: '1000', currency: 'EUR' },
+      received: { amount: '1080', currency: 'USD' },
+      exchangedOn: daysAgo(20),
+    })
+    await record(me, {
+      given: { amount: '500', currency: 'USD' },
+      received: { amount: '190000', currency: 'AMD' },
+      exchangedOn: daysAgo(19),
+    })
+    await choose(me, 'EUR')
+    const read = await app.inject({
+      method: 'GET',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+    })
+    const overview = overviewOf(read.json())
+    expect(overview.wallet).toMatchObject({ estimated: false, rate: { scaled: 410_400_000n } })
+    expect(overview.exchanges.every((row) => row.priced)).toBe(true)
+  })
+})
+
+describe('правка обмена с историей (MOL-42)', () => {
+  async function recorded(me: { cookie: string }, patch: Record<string, unknown> = {}) {
+    const body = payload(patch)
+    const response = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: body,
+    })
+    expect(response.statusCode).toBe(201)
+    return body
+  }
+
+  function amend(cookie: string, id: string, patch: Record<string, unknown>) {
+    return app.inject({
+      method: 'PUT',
+      url: `/exchanges/${id}`,
+      headers: { cookie },
+      payload: {
+        given: { amount: '20000', currency: 'RUB' },
+        received: { amount: '100000', currency: 'AMD' },
+        exchangedOn: daysAgo(10),
+        revision: 1,
+        ...patch,
+      },
+    })
+  }
+
+  it('правит на месте, прежняя версия — в истории, место в дне и курс — по новой', async () => {
+    const me = await owner()
+    const { id } = await recorded(me, { note: 'ВТБ банкомат' })
+    const [before] = await db.select().from(exchanges)
+
+    const response = await amend(me.cookie, id, {
+      received: { amount: '95000', currency: 'AMD' },
+      note: 'ВТБ банкомат (озон)',
+    })
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['cache-control']).toBe('no-store')
+    const overview = overviewOf(response.json())
+    const [row] = overview.exchanges
+    expect(row).toMatchObject({
+      received: { minor: 9_500_000n, currency: 'AMD' },
+      note: 'ВТБ банкомат (озон)',
+      revision: 2,
+    })
+    expect(row?.amendedAt).toBeInstanceOf(Date)
+    expect(row?.history).toEqual([
+      {
+        given: { minor: 2_000_000n, currency: 'RUB' },
+        received: { minor: 10_000_000n, currency: 'AMD' },
+        exchangedOn: daysAgo(10),
+        heldBefore: null,
+        note: 'ВТБ банкомат',
+        replacedAt: row?.amendedAt,
+      },
+    ])
+    expect(overview.wallet?.rate.scaled).toBe(parseRate('4.75'))
+    const [after] = await db.select().from(exchanges)
+    expect(after?.createdAt).toEqual(before?.createdAt)
+  })
+
+  it('повтор той же правки после потерянного ответа — 200 и ни одной лишней версии', async () => {
+    const me = await owner()
+    const { id } = await recorded(me)
+    const patch = { received: { amount: '95000', currency: 'AMD' } }
+    expect((await amend(me.cookie, id, patch)).statusCode).toBe(200)
+    const again = await amend(me.cookie, id, patch)
+    expect(again.statusCode).toBe(200)
+    expect(overviewOf(again.json()).exchanges[0]).toMatchObject({ revision: 2 })
+    expect(overviewOf(again.json()).exchanges[0]?.history).toHaveLength(1)
+    // Nothing changed at all: no version is kept for it either.
+    const same = await amend(me.cookie, id, { ...patch, revision: 2 })
+    expect(overviewOf(same.json()).exchanges[0]?.history).toHaveLength(1)
+  })
+
+  it('два телефона правят одну версию — второй получает 409, а не молча затирает', async () => {
+    const me = await owner()
+    const second = await signIn(db, me.id)
+    const { id } = await recorded(me)
+    const replies = await Promise.all([
+      amend(me.cookie, id, { received: { amount: '95000', currency: 'AMD' } }),
+      amend(second, id, { received: { amount: '96000', currency: 'AMD' } }),
+    ])
+    expect(replies.map((reply) => reply.statusCode).sort()).toEqual([200, 409])
+    expect(replies.find((reply) => reply.statusCode === 409)?.json()).toMatchObject({
+      code: ERROR.CONFLICT,
+    })
+  })
+
+  it('чужой, удалённый, несуществующий и кривой адрес — один ответ, 404', async () => {
+    const me = await owner()
+    const other = await owner()
+    const { id } = await recorded(me)
+    expect((await amend(other.cookie, id, {})).statusCode).toBe(404)
+    expect((await amend(me.cookie, randomUUID(), {})).statusCode).toBe(404)
+    expect((await amend(me.cookie, 'not-a-uuid', {})).statusCode).toBe(404)
+    await app.inject({ method: 'DELETE', url: `/exchanges/${id}`, headers: { cookie: me.cookie } })
+    expect((await amend(me.cookie, id, { note: 'x' })).statusCode).toBe(404)
+  })
+
+  it('правит и день: цепочка перестраивается, и день из будущего не проходит', async () => {
+    const me = await owner()
+    const first = await recorded(me, { exchangedOn: daysAgo(10) })
+    await recorded(me, {
+      received: { amount: '95000', currency: 'AMD' },
+      heldBefore: { amount: '20000', currency: 'AMD' },
+      exchangedOn: daysAgo(5),
+    })
+    // Moved after the second, the first is now the last link: taken alone.
+    const moved = await amend(me.cookie, first.id, { exchangedOn: daysAgo(2) })
+    expect(overviewOf(moved.json()).wallet).toMatchObject({ basis: 'last' })
+    expect(overviewOf(moved.json()).wallet?.rate.scaled).toBe(parseRate('5'))
+
+    const future = await amend(me.cookie, first.id, { exchangedOn: '2999-01-01', revision: 2 })
+    expect(future.statusCode).toBe(400)
+  })
+
+  it('окончательное удаление уносит историю', async () => {
+    const me = await owner()
+    const { id } = await recorded(me)
+    await amend(me.cookie, id, { received: { amount: '95000', currency: 'AMD' } })
+    await app.inject({ method: 'DELETE', url: `/exchanges/${id}`, headers: { cookie: me.cookie } })
+    await app.inject({ method: 'GET', url: '/exchanges', headers: { cookie: me.cookie } })
+    expect(await db.select().from(exchangeRevisions)).toEqual([])
+  })
+
+  it('заметка — часть повтора: тот же id с другой заметкой — 409 (В-6)', async () => {
+    const me = await owner()
+    const body = await recorded(me, { note: 'аэропорт' })
+    const other = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: { ...body, note: 'обменник' },
+    })
+    expect(other.statusCode).toBe(409)
   })
 })

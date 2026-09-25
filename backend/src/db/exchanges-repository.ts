@@ -1,10 +1,17 @@
-import { and, asc, eq, gt, isNotNull, isNull, lte, ne, or, sql, sum } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, isNotNull, isNull, lte, ne, or, sql, sum } from 'drizzle-orm'
 import { DomainError, ERROR, EXCHANGE_UNDO_MINUTES, exchangeSchema } from '@molvia/model'
-import type { Currency, Exchange, ExchangeBody, RatePreference } from '@molvia/model'
+import type {
+  Currency,
+  Exchange,
+  ExchangeAmendBody,
+  ExchangeBody,
+  ExchangeRevision,
+  RatePreference,
+} from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
-import { actors, exchanges, expenses, trips } from './schema'
+import { actors, exchangeRevisions, exchanges, expenses, trips } from './schema'
 
 export interface ExchangeRepository {
   /**
@@ -18,6 +25,24 @@ export interface ExchangeRepository {
    * to remove it and enter it again. The same identifier under someone else is `CONFLICT` too.
    */
   add(actorId: string, input: ExchangeBody): Promise<{ exchange: Exchange; created: boolean }>
+
+  /**
+   * «Сохранить правку» (MOL-42, В-3): the owner's exchange as `input` says, the version before it
+   * kept in `exchange_revisions`, `created_at` unchanged so it keeps its place in its day.
+   *
+   * The exchange already as `input` says is a repeat — an answer lost, or nothing changed — and
+   * returns it with `amended: false`, leaving no version behind. Otherwise `input.revision` must
+   * be the version the row is at: an amendment made elsewhere in between is `CONFLICT`, not lost.
+   * A missing exchange, a removed one and someone else's are one answer, `NOT_FOUND`.
+   */
+  amend(
+    actorId: string,
+    id: string,
+    input: ExchangeAmendBody,
+  ): Promise<{ exchange: Exchange; amended: boolean }>
+
+  /** The versions of the owner's exchanges before their amendments, by exchange, newest first. */
+  history(actorId: string): Promise<ReadonlyMap<string, readonly ExchangeRevision[]>>
 
   /**
    * The owner's exchange, gone from every reader — marked, not yet deleted, so «Вернуть» can bring
@@ -65,13 +90,36 @@ export interface ExchangeRepository {
    */
   spentSince(actorId: string, currency: Currency, since: Date): Promise<bigint>
 
-  /** Which rate a new trip takes (В-3). The row always has one: the column has a default. */
-  preference(actorId: string): Promise<RatePreference>
+  /**
+   * Which rate a new trip takes (В-3) — the row always has one, the column has a default — and
+   * when the currency of conversion last changed, or null if it never did (MOL-42, В-2).
+   */
+  rateSettings(actorId: string): Promise<{ preference: RatePreference; since: Date | null }>
 
   setPreference(actorId: string, preference: RatePreference): Promise<void>
 }
 
 type Row = typeof exchanges.$inferSelect
+
+/** What an exchange says, in columns — what a repeat is compared by and an amendment writes. */
+function columnsOf(input: Omit<ExchangeBody, 'id'>) {
+  return {
+    givenMinor: input.given.minor,
+    givenCurrency: input.given.currency,
+    receivedMinor: input.received.minor,
+    receivedCurrency: input.received.currency,
+    exchangedOn: input.exchangedOn,
+    heldBeforeMinor: input.heldBefore?.minor ?? null,
+    note: input.note ?? null,
+  }
+}
+
+function says(row: Row, input: Omit<ExchangeBody, 'id'>): boolean {
+  const columns = columnsOf(input)
+  return (Object.keys(columns) as (keyof typeof columns)[]).every(
+    (column) => row[column] === columns[column],
+  )
+}
 
 /** The moment before which a removal can no longer be undone, by the database's clock. */
 function undoFrom() {
@@ -89,7 +137,10 @@ function toExchange(row: Row): Exchange {
       row.heldBeforeMinor === null
         ? null
         : { minor: row.heldBeforeMinor, currency: row.receivedCurrency },
+    note: row.note,
+    revision: row.revision,
     createdAt: row.createdAt,
+    amendedAt: row.amendedAt,
   })
 }
 
@@ -99,16 +150,7 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
       return translateFailures(async () => {
         const [inserted] = await db
           .insert(exchanges)
-          .values({
-            id: input.id,
-            actorId,
-            givenMinor: input.given.minor,
-            givenCurrency: input.given.currency,
-            receivedMinor: input.received.minor,
-            receivedCurrency: input.received.currency,
-            exchangedOn: input.exchangedOn,
-            heldBeforeMinor: input.heldBefore?.minor ?? null,
-          })
+          .values({ id: input.id, actorId, ...columnsOf(input) })
           .onConflictDoNothing({ target: exchanges.id })
           .returning()
         if (inserted) return { exchange: toExchange(inserted), created: true }
@@ -118,16 +160,86 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
         const held = theRow(same, 'exchanges')
         // A removed exchange still holds its name until it is final; «Вернуть» brings it back.
         if (held.deletedAt !== null) throw new DomainError(ERROR.CONFLICT)
-        const repeated =
-          held.givenMinor === input.given.minor &&
-          held.givenCurrency === input.given.currency &&
-          held.receivedMinor === input.received.minor &&
-          held.receivedCurrency === input.received.currency &&
-          held.exchangedOn === input.exchangedOn &&
-          held.heldBeforeMinor === (input.heldBefore?.minor ?? null)
-        if (!repeated) throw new DomainError(ERROR.CONFLICT)
+        if (!says(held, input)) throw new DomainError(ERROR.CONFLICT)
         return { exchange: toExchange(held), created: false }
       })
+    },
+
+    async amend(actorId, id, input) {
+      const own = idOrNull(id)
+      if (own === null) throw new DomainError(ERROR.NOT_FOUND)
+      return translateFailures(() =>
+        db.transaction(async (tx) => {
+          // Locked, so two amendments of one version are one after the other and the second
+          // finds the version moved.
+          const [row] = await tx
+            .select()
+            .from(exchanges)
+            .where(
+              and(
+                eq(exchanges.id, own),
+                eq(exchanges.actorId, actorId),
+                isNull(exchanges.deletedAt),
+              ),
+            )
+            .for('update')
+          if (!row) throw new DomainError(ERROR.NOT_FOUND)
+          if (says(row, input)) return { exchange: toExchange(row), amended: false }
+          if (row.revision !== input.revision) throw new DomainError(ERROR.CONFLICT)
+
+          await tx.insert(exchangeRevisions).values({
+            exchangeId: row.id,
+            revision: row.revision,
+            givenMinor: row.givenMinor,
+            givenCurrency: row.givenCurrency,
+            receivedMinor: row.receivedMinor,
+            receivedCurrency: row.receivedCurrency,
+            exchangedOn: row.exchangedOn,
+            heldBeforeMinor: row.heldBeforeMinor,
+            note: row.note,
+            // One moment for both: the version stopped being the exchange when the amendment
+            // was made. `now()` is the transaction's own, the same in both statements.
+            replacedAt: sql`now()`,
+          })
+          const [amended] = await tx
+            .update(exchanges)
+            .set({
+              ...columnsOf(input),
+              revision: row.revision + 1,
+              amendedAt: sql`now()`,
+            })
+            .where(eq(exchanges.id, row.id))
+            .returning()
+          return { exchange: toExchange(theRow(amended, 'exchanges')), amended: true }
+        }),
+      )
+    },
+
+    async history(actorId) {
+      const rows = await db
+        .select({ revision: exchangeRevisions })
+        .from(exchangeRevisions)
+        .innerJoin(exchanges, eq(exchanges.id, exchangeRevisions.exchangeId))
+        .where(and(eq(exchanges.actorId, actorId), isNull(exchanges.deletedAt)))
+        .orderBy(asc(exchangeRevisions.exchangeId), desc(exchangeRevisions.revision))
+      const byExchange = new Map<string, ExchangeRevision[]>()
+      for (const { revision: row } of rows) {
+        const versions = byExchange.get(row.exchangeId) ?? []
+        versions.push({
+          revision: row.revision,
+          given: { minor: row.givenMinor, currency: row.givenCurrency },
+          received: { minor: row.receivedMinor, currency: row.receivedCurrency },
+          exchangedOn: row.exchangedOn,
+          heldBefore:
+            row.heldBeforeMinor === null
+              ? null
+              : { minor: row.heldBeforeMinor, currency: row.receivedCurrency },
+          note: row.note,
+          replacedAt: row.replacedAt,
+        })
+        byExchange.set(row.exchangeId, versions)
+      }
+      return byExchange
     },
 
     async remove(actorId, id) {
@@ -204,14 +316,14 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
       return BigInt(row?.spent ?? '0')
     },
 
-    async preference(actorId) {
+    async rateSettings(actorId) {
       const [row] = await db
-        .select({ preference: actors.ratePreference })
+        .select({ preference: actors.ratePreference, since: actors.incomeCurrencySince })
         .from(actors)
         .where(eq(actors.id, actorId))
         .limit(1)
       if (!row) throw new DomainError(ERROR.NO_ACTOR)
-      return row.preference
+      return row
     },
 
     async setPreference(actorId, preference) {

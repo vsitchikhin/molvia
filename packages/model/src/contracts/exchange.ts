@@ -1,8 +1,15 @@
 import { z } from 'zod'
-import { deviceIdSchema } from './trip'
-import { exchangeDaySchema, isPlausibleExchange, walletBasisSchema } from '#model/entities/exchange'
+import { deviceIdSchema, isoDate } from './trip'
+import {
+  exchangeDaySchema,
+  exchangeNoteSchema,
+  isPlausibleExchange,
+  lostCostReasonSchema,
+  walletBasisSchema,
+} from '#model/entities/exchange'
 import { ERROR, ISSUE } from '#model/support/errors'
 import { currencySchema, moneyCodec, signedMoneyCodec } from '#model/values/money'
+import type { Money } from '#model/values/money'
 import { rateCodec, rateProviderSchema } from '#model/values/rates'
 
 /**
@@ -20,32 +27,57 @@ const positiveMoneyCodec = moneyCodec.refine((value) => value.minor > 0n, {
   error: ERROR.INVALID_AMOUNT,
 })
 
+/** What an exchange says, as the screen sends it — the same whether it is recorded or amended. */
+const exchangeFields = {
+  given: positiveMoneyCodec,
+  received: positiveMoneyCodec,
+  exchangedOn: exchangeDaySchema,
+  heldBefore: moneyCodec.optional(),
+  note: exchangeNoteSchema.optional(),
+}
+
+interface ExchangeFields {
+  readonly given: Money
+  readonly received: Money
+  readonly heldBefore?: Money | undefined
+}
+
+/** The rules of one exchange, held by both bodies and said under the field they are about. */
+function withExchangeRules<Schema extends z.ZodType<ExchangeFields>>(schema: Schema) {
+  return schema
+    .refine(({ given, received }) => given.currency !== received.currency, {
+      error: ISSUE.EXCHANGE_SAME_CURRENCY,
+      path: ['received'],
+    })
+    .refine(({ given, received }) => isPlausibleExchange(given, received), {
+      error: ERROR.INVALID_RATE,
+      path: ['received'],
+    })
+    .refine(
+      ({ heldBefore, received }) =>
+        heldBefore === undefined || heldBefore.currency === received.currency,
+      { error: ISSUE.EXCHANGE_HELD_NOT_RECEIVED, path: ['heldBefore'] },
+    )
+}
+
 /**
  * «Записать обмен». Named by the device, as a trip is, so a tap sent twice is one exchange. The
  * day is the person's; «not after today» is the use case's, which has the clock.
  */
-export const exchangeBodySchema = z
-  .strictObject({
-    id: deviceIdSchema,
-    given: positiveMoneyCodec,
-    received: positiveMoneyCodec,
-    exchangedOn: exchangeDaySchema,
-    heldBefore: moneyCodec.optional(),
-  })
-  .refine(({ given, received }) => given.currency !== received.currency, {
-    error: ISSUE.EXCHANGE_SAME_CURRENCY,
-    path: ['received'],
-  })
-  .refine(({ given, received }) => isPlausibleExchange(given, received), {
-    error: ERROR.INVALID_RATE,
-    path: ['received'],
-  })
-  .refine(
-    ({ heldBefore, received }) =>
-      heldBefore === undefined || heldBefore.currency === received.currency,
-    { error: ISSUE.EXCHANGE_HELD_NOT_RECEIVED, path: ['heldBefore'] },
-  )
+export const exchangeBodySchema = withExchangeRules(
+  z.strictObject({ id: deviceIdSchema, ...exchangeFields }),
+)
 export type ExchangeBody = z.infer<typeof exchangeBodySchema>
+
+/**
+ * «Сохранить правку» (MOL-42, В-3): the exchange whole as it should now be, and the version it was
+ * amended over — so an amendment made on another phone in between is a conflict rather than lost,
+ * as the settings form of MOL-65 is. Whatever is left out is cleared, as in a new exchange.
+ */
+export const exchangeAmendBodySchema = withExchangeRules(
+  z.strictObject({ revision: z.int().min(1), ...exchangeFields }),
+)
+export type ExchangeAmendBody = z.infer<typeof exchangeAmendBodySchema>
 
 /**
  * One exchange as the screen lists it. Its own rate and the comparison with the central bank are
@@ -57,6 +89,28 @@ export const exchangeViewCodec = z.strictObject({
   given: moneyCodec,
   received: moneyCodec,
   heldBefore: moneyCodec.nullable(),
+  note: z.string().nullable(),
+  /** The version an amendment names, so one made elsewhere in between is a conflict. */
+  revision: z.int().min(1),
+  /** When it was last amended, or null — «исправлен 25 сент.» on the row. */
+  amendedAt: isoDate.nullable(),
+  /** The versions before, newest first: what the sheet of an amendment shows (MOL-42, В-3). */
+  history: z.array(
+    z.strictObject({
+      given: moneyCodec,
+      received: moneyCodec,
+      exchangedOn: exchangeDaySchema,
+      heldBefore: moneyCodec.nullable(),
+      note: z.string().nullable(),
+      replacedAt: isoDate,
+    }),
+  ),
+  /**
+   * Whether it gave the received currency a known cost — the sheet asks «сколько было до обмена»
+   * by it. Only the whole walk knows: a chain made before a change of the currency of conversion
+   * counts, a link of the old reckoning does not (round 3, П-1, М1). The phone does not re-derive it.
+   */
+  priced: z.boolean(),
   /** Null only for amounts so far apart that no rate within the band says them. */
   rate: rateCodec.nullable(),
   /**
@@ -79,21 +133,58 @@ export const exchangeViewCodec = z.strictObject({
 })
 export type ExchangeView = z.output<typeof exchangeViewCodec>
 
+const currencyCostCodec = z.strictObject({
+  rate: rateCodec,
+  basis: walletBasisSchema,
+  estimated: z.boolean(),
+})
+
 /**
  * «Обмен денег» whole: the preference, the pair a trip would convert by today — the currency of
- * conversion into the spending one, or null when the two are one — the wallet of that pair, the
- * hint for the next exchange of it, and the exchanges, newest first.
+ * conversion into the spending one, or null when the two are one — the wallet of that pair, what
+ * the other currencies held by exchange cost, the hints for the next exchange into each, and the
+ * exchanges, newest first.
  */
 export const exchangesResponseCodec = z.strictObject({
   preference: ratePreferenceSchema,
   pair: z.strictObject({ base: currencySchema, quote: currencySchema }).nullable(),
-  wallet: z.strictObject({ rate: rateCodec, basis: walletBasisSchema }).nullable(),
   /**
-   * The hint for the next exchange of the pair: what is left by the recorded spending, and whether
-   * that is everything held (`whole`) or only the money of the last exchange, whose remainder
-   * before it was never said.
+   * `estimated`: part of the cost was never named by the person and was taken from the official
+   * rate of an exchange's day — dollars brought from home, say (MOL-42, В-1).
    */
-  heldEstimate: z.strictObject({ held: moneyCodec, whole: z.boolean() }).nullable(),
+  wallet: currencyCostCodec.nullable(),
+  /**
+   * What one unit of every other currency held by exchange cost in the currency of conversion —
+   * the dollars a chain of roubles to dollars to drams went through, as «89,04 ₽/$» — so the chain
+   * can be checked by eye (MOL-42, Р-4). Neither the currency of conversion nor the spending one
+   * is here.
+   */
+  costs: z.array(currencyCostCodec),
+  /**
+   * Why there is no wallet although the spending currency came in by exchanges: the exchange its
+   * cost was lost on, and why — money of no known price with no fresh official rate of that day
+   * (`noRate`), or money of the reckoning before the last change of the currency of conversion
+   * (`oldReckoning`). Null when there is a wallet, or nothing of the spending currency was ever
+   * received (С-4, round 4 Н1).
+   */
+  walletUnknown: z
+    .strictObject({
+      exchangedOn: exchangeDaySchema,
+      given: currencySchema,
+      reason: lostCostReasonSchema,
+    })
+    .nullable(),
+  /**
+   * The hints for the next exchange into each currency but the one of conversion: what is left
+   * by the recorded spending and exchanges, and whether that is everything held (`whole`) or only
+   * the money of the last exchange, whose remainder before it was never said.
+   */
+  heldEstimates: z.array(z.strictObject({ held: moneyCodec, whole: z.boolean() })),
+  /**
+   * The day the currency of conversion last changed, or null if it never did: the wallet counts
+   * exchanges from that day on, and the ones before it stand in the list as they were (В-2).
+   */
+  baseSince: exchangeDaySchema.nullable(),
   exchanges: z.array(exchangeViewCodec),
 })
 export type ExchangesResponse = z.output<typeof exchangesResponseCodec>

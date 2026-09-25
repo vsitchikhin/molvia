@@ -1,4 +1,4 @@
-import { and, eq, or } from 'drizzle-orm'
+import { and, eq, or, sql } from 'drizzle-orm'
 import { actorSchema } from '@molvia/model'
 import type { Actor, ActorSettings, SettingsUpdate } from '@molvia/model'
 import type { Conn } from './index'
@@ -24,7 +24,14 @@ export function createSettingsRepository(db: Conn): SettingsRepository {
       // The target also matches so a retry after a lost response is successful.
       const [row] = await db
         .update(actors)
-        .set(settings)
+        .set({
+          ...settings,
+          // The day the currency of conversion changed (MOL-42, В-2), decided by the row as it
+          // is: a retry of the same form finds the currency already there and moves nothing. Every
+          // change sets it — the wallet decides what the day cuts: only exchanges paid in another
+          // currency before it (round 2, Л1, Л2).
+          incomeCurrencySince: sql`case when ${actors.incomeCurrency} = ${settings.incomeCurrency} then ${actors.incomeCurrencySince} else clock_timestamp() end`,
+        })
         .where(and(eq(actors.id, owner), or(matches(previous), matches(settings))))
         .returning()
       return row ? actorSchema.parse(row) : null

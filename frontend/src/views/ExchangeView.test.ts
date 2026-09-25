@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { ERROR, parseRate, yerevanMidnight } from '@molvia/model'
 import type {
+  ExchangeAmendBody,
   ExchangeBody,
   ExchangeView as Row,
   ExchangesResponse,
@@ -23,6 +24,7 @@ const removeExchange = vi.fn<(id: string) => Promise<ExchangesResponse>>()
 const recordExchange =
   vi.fn<(body: ExchangeBody) => Promise<{ exchanges: ExchangesResponse; created: boolean }>>()
 const restoreExchange = vi.fn<(id: string) => Promise<ExchangesResponse>>()
+const amendExchange = vi.fn<(id: string, body: ExchangeAmendBody) => Promise<ExchangesResponse>>()
 vi.mock('@/api', () => ({
   api: {
     exchanges: () => exchanges(),
@@ -30,6 +32,7 @@ vi.mock('@/api', () => ({
     removeExchange: (id: string) => removeExchange(id),
     recordExchange: (body: ExchangeBody) => recordExchange(body),
     restoreExchange: (id: string) => restoreExchange(id),
+    amendExchange: (id: string, body: ExchangeAmendBody) => amendExchange(id, body),
   },
 }))
 
@@ -50,6 +53,10 @@ function row(patch: Partial<Row> = {}): Row {
     given: { minor: 2_000_000n, currency: 'RUB' },
     received: { minor: 9_500_000n, currency: 'AMD' },
     heldBefore: null,
+    note: null,
+    revision: 1,
+    amendedAt: null,
+    history: [],
     rate: rate('4.75', '2026-09-15'),
     official: {
       rate: rate('4.3123', '2026-09-15', 'official'),
@@ -57,6 +64,7 @@ function row(patch: Partial<Row> = {}): Row {
       difference: { minor: 875_400n, currency: 'AMD' },
     },
     officialDoubtful: false,
+    priced: true,
     ...patch,
   }
 }
@@ -65,8 +73,11 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
   return {
     preference: 'personal',
     pair: { base: 'RUB', quote: 'AMD' },
-    wallet: { rate: rate('4.791667', '2026-09-15'), basis: 'weighted' },
-    heldEstimate: null,
+    wallet: { rate: rate('4.791667', '2026-09-15'), basis: 'weighted', estimated: false },
+    costs: [],
+    heldEstimates: [],
+    baseSince: null,
+    walletUnknown: null,
     exchanges: [row()],
     ...patch,
   }
@@ -101,6 +112,7 @@ beforeEach(() => {
   removeExchange.mockReset()
   recordExchange.mockReset()
   restoreExchange.mockReset()
+  amendExchange.mockReset()
   online(true)
   clock = 0
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -196,10 +208,76 @@ describe('ExchangeView: the rate and the list', () => {
 
   it('says «by the last exchange» when what was held is unknown', async () => {
     exchanges.mockResolvedValue(
-      overview({ wallet: { rate: rate('4.75', '2026-09-15'), basis: 'last' } }),
+      overview({ wallet: { rate: rate('4.75', '2026-09-15'), basis: 'last', estimated: false } }),
     )
     const view = await render()
     expect(view.text()).toContain('by the last exchange')
+  })
+
+  it('says when part of the rate was priced by the bank, and prints each currency of a chain (MOL-42)', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        wallet: { rate: rate('4.060187', '2026-09-13'), basis: 'last', estimated: true },
+        costs: [
+          {
+            rate: {
+              base: 'USD',
+              quote: 'RUB',
+              scaled: parseRate('89.035302'),
+              source: 'personal',
+              asOf: yerevanMidnight('2026-08-31'),
+            },
+            basis: 'last',
+            estimated: false,
+          },
+        ],
+      }),
+    )
+    const view = await render()
+    expect(view.text()).toContain(en.exchange.estimated)
+    const [line] = view.findAll('.costs li')
+    expect(line?.text()).toContain('$: 89.04 ₽/$')
+    expect(line?.text()).toContain('by the last exchange')
+    expect(line?.text()).not.toContain('Central Bank')
+  })
+
+  it('says why the rate is unknown, not «no exchanges yet» above a list of them (С-4)', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        wallet: null,
+        walletUnknown: { exchangedOn: '2026-08-25', given: 'USD', reason: 'noRate' },
+      }),
+    )
+    const view = await render()
+    expect(view.text()).toContain('Rate unknown: the $ → ֏ exchange of')
+    expect(view.text()).not.toContain('exchanges yet')
+  })
+
+  it('names the old reckoning as the reason, not a missing bank rate (Н1)', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        wallet: null,
+        baseSince: '2026-09-25',
+        walletUnknown: { exchangedOn: '2026-09-05', given: 'EUR', reason: 'oldReckoning' },
+      }),
+    )
+    const view = await render()
+    expect(view.text()).toContain('Rate unknown: the ֏ bought on')
+    expect(view.text()).toContain('with € have no price in ₽')
+    expect(view.text()).not.toContain('exchanges yet')
+    expect(view.text()).not.toContain('Central Bank of Armenia rate for that day')
+  })
+
+  it('names the day the currency of conversion changed, and says nothing when it never did', async () => {
+    exchanges.mockResolvedValue(overview({ wallet: null, baseSince: '2026-09-18' }))
+    const view = await render()
+    expect(view.text()).toContain('Counting in ₽ since')
+    expect(view.find('.costs').exists()).toBe(false)
+
+    exchanges.mockResolvedValue(overview())
+    const plain = await render()
+    expect(plain.text()).not.toContain('Counting in')
+    expect(plain.text()).not.toContain(en.exchange.estimated)
   })
 
   it('compares with the bank in words — more, less, or nothing to compare with', async () => {
@@ -472,5 +550,85 @@ describe('ExchangeView: the rate and the list', () => {
 
     expect(view.text()).toContain(en.exchange.offline.strip)
     expect(view.get('button.remove').attributes('disabled')).toBeDefined()
+  })
+})
+
+describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
+  /** A tap on the row, and the sheet risen — until then it takes no tap. */
+  async function openRow(view: VueWrapper): Promise<void> {
+    await view.get('button.body').trigger('click')
+    await flushPromises()
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+
+  async function saveAmendment(): Promise<void> {
+    const save = [...document.querySelectorAll('dialog[open] button')].find(
+      (button) => button.textContent.trim() === en.exchange.sheet.save_amend,
+    )
+    if (!(save instanceof HTMLButtonElement)) throw new Error('no «Save the amendment»')
+    save.click()
+    await flushPromises()
+  }
+
+  it('marks an amended row and shows its note', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [row({ amendedAt: new Date('2026-09-25T09:00:00.000Z'), note: 'airport' })],
+      }),
+    )
+    const view = await render()
+    expect(view.get('.amended').text()).toContain('amended')
+    expect(view.get('.note').text()).toBe('airport')
+  })
+
+  it('opens the row in the sheet for an amendment, and lands the answer', async () => {
+    exchanges.mockResolvedValue(overview())
+    amendExchange.mockResolvedValue(overview({ exchanges: [row({ revision: 2 })] }))
+    const view = await render()
+    await openRow(view)
+    expect(document.querySelector('dialog[open]')?.textContent).toContain(
+      en.exchange.sheet.title_amend,
+    )
+    await saveAmendment()
+    expect(amendExchange).toHaveBeenCalledWith(row().id, expect.objectContaining({ revision: 1 }))
+  })
+
+  it('an amendment made over a version that moved on says so, reads the list again and keeps the sheet', async () => {
+    exchanges
+      .mockResolvedValueOnce(overview())
+      .mockResolvedValue(overview({ exchanges: [row({ revision: 2 })] }))
+    amendExchange.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT))
+    const view = await render()
+    await openRow(view)
+    await saveAmendment()
+    expect(view.text()).toContain(en.exchange.amend_conflict)
+    expect(exchanges).toHaveBeenCalledTimes(2)
+    expect(document.querySelector('dialog[open]')?.textContent).toContain(
+      en.exchange.sheet.amend_conflict,
+    )
+    // The second «Save» goes over the version the server holds now.
+    amendExchange.mockResolvedValue(overview())
+    await saveAmendment()
+    expect(amendExchange.mock.calls.at(-1)?.[1]).toMatchObject({ revision: 2 })
+  })
+
+  it('the row is named by its words, the rate and the comparison included (С-3)', async () => {
+    exchanges.mockResolvedValue(overview())
+    const view = await render()
+    const button = view.get('button.body')
+    expect(button.attributes('aria-label')).toBeUndefined()
+    expect(button.text()).toContain(en.exchange.edit)
+    expect(button.text()).toContain('more than the central bank')
+  })
+
+  it('an exchange removed elsewhere is said to be gone, not «check the connection»', async () => {
+    exchanges.mockResolvedValue(overview())
+    amendExchange.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
+    const view = await render()
+    await openRow(view)
+    await saveAmendment()
+    expect(view.text()).toContain(en.exchange.vanished)
+    expect(view.text()).not.toContain(en.exchange.failed)
   })
 })

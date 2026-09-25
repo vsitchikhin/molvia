@@ -2,11 +2,18 @@ import { z } from 'zod'
 import {
   DomainError,
   ERROR,
+  exchangeAmendBodySchema,
   exchangeBodySchema,
   exchangesResponseCodec,
   ratePreferenceBodySchema,
 } from '@molvia/model'
-import type { Actor, ExchangeBody, ExchangesResponse, RatePreference } from '@molvia/model'
+import type {
+  Actor,
+  ExchangeAmendBody,
+  ExchangeBody,
+  ExchangesResponse,
+  RatePreference,
+} from '@molvia/model'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { parseBody } from '@/parse'
 
@@ -17,6 +24,7 @@ export interface ExchangesApi {
     actor: Actor,
     body: ExchangeBody,
   ): Promise<{ overview: ExchangesResponse; created: boolean }>
+  amend(actor: Actor, id: string, body: ExchangeAmendBody): Promise<ExchangesResponse>
   remove(actor: Actor, id: string): Promise<ExchangesResponse>
   restore(actor: Actor, id: string): Promise<ExchangesResponse>
   prefer(actor: Actor, preference: RatePreference): Promise<ExchangesResponse>
@@ -48,6 +56,15 @@ export function exchangeRoutes(app: FastifyInstance, api: ExchangesApi): void {
     const body = parseBody(exchangeBodySchema, request.body)
     const { overview, created } = await api.record(ownerOf(request), body)
     return answer(reply.code(created ? 201 : 200), overview)
+  })
+
+  /**
+   * «Сохранить правку» (MOL-42): the screen whole, 200 for an amendment and for a repeat of it
+   * alike; 409 when the exchange moved on elsewhere, 404 when it is not the owner's to amend.
+   */
+  app.put<{ Params: { exchangeId: string } }>('/exchanges/:exchangeId', async (request, reply) => {
+    const body = parseBody(exchangeAmendBodySchema, request.body)
+    return answer(reply, await api.amend(ownerOf(request), request.params.exchangeId, body))
   })
 
   /**

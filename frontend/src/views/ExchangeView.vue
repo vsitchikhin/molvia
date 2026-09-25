@@ -8,6 +8,8 @@
       </p>
       <p v-if="failed" class="strip failed" role="alert">{{ t('exchange.failed') }}</p>
       <p v-if="conflicted" class="strip" role="alert">{{ t('exchange.conflict') }}</p>
+      <p v-if="amendConflicted" class="strip" role="alert">{{ t('exchange.amend_conflict') }}</p>
+      <p v-if="vanished" class="strip" role="alert">{{ t('exchange.vanished') }}</p>
       <p v-if="gone" class="strip" role="alert">{{ t('exchange.restore_gone') }}</p>
       <div v-if="removed" ref="removedStrip" class="strip removed">
         <span class="removed-text">{{
@@ -51,7 +53,7 @@
         :body="t('exchange.empty.body')"
       >
         <template #action>
-          <AppButton block :inactive="!online" @click="sheetOpen = true">
+          <AppButton block :inactive="!online" @click="compose">
             {{ t('exchange.record') }}
           </AppButton>
         </template>
@@ -72,11 +74,44 @@
                 )
               }}
             </p>
+            <p v-if="overview.wallet.estimated" class="meta">{{ t('exchange.estimated') }}</p>
           </template>
+          <!-- Exchanges of the spending currency are there, its cost is not: the words say why, not
+               «no exchanges yet» above a list of them (review С-4). -->
+          <p v-else-if="overview.pair && overview.walletUnknown" class="meta">
+            {{
+              t(
+                overview.walletUnknown.reason === 'oldReckoning'
+                  ? 'exchange.wallet_old_reckoning'
+                  : 'exchange.wallet_unknown',
+                {
+                  given: currencySignOf(overview.walletUnknown.given),
+                  ...pairSigns(overview.pair),
+                  date: dayOf(midnightOf(overview.walletUnknown.exchangedOn)),
+                },
+              )
+            }}
+          </p>
           <p v-else-if="overview.pair" class="meta">
             {{ t('exchange.no_wallet', pairSigns(overview.pair)) }}
           </p>
           <p v-else class="meta">{{ t('settings.same_currencies') }}</p>
+          <p v-if="overview.pair && overview.baseSince" class="meta">
+            {{
+              t('exchange.base_since', {
+                base: pairSigns(overview.pair).base,
+                date: dayOf(midnightOf(overview.baseSince)),
+              })
+            }}
+          </p>
+
+          <!-- The currencies a chain went through, each at its own price: the drams' rate above
+               is only as believable as the dollars' under it (MOL-42, Р-4). -->
+          <ul v-if="overview.costs.length > 0" class="costs">
+            <li v-for="cost in overview.costs" :key="cost.rate.base" class="meta">
+              {{ costLineOf(cost) }}
+            </li>
+          </ul>
 
           <SegmentedControl
             v-if="overview.pair"
@@ -92,7 +127,7 @@
 
         <p class="frozen"><IconCheck aria-hidden="true" />{{ t('money.rate_frozen') }}</p>
 
-        <AppButton ref="recordButton" block :inactive="!online || busy" @click="sheetOpen = true">
+        <AppButton ref="recordButton" block :inactive="!online || busy" @click="compose">
           <template #icon><IconPlus /></template>
           {{ t('exchange.record') }}
         </AppButton>
@@ -101,11 +136,27 @@
           <h2 class="caption">{{ t('exchange.list_title') }}</h2>
           <AppCard as="ul" list>
             <li v-for="exchange in overview.exchanges" :key="exchange.id" class="row">
-              <div class="body">
-                <p class="amounts">{{ amountsOf(exchange) }}</p>
-                <p class="meta">{{ rateLineOf(exchange) }}</p>
-                <p class="meta">{{ comparisonOf(exchange) }}</p>
-              </div>
+              <!-- The row is the way into its amendment (MOL-42, В-3), as a verdict is amended
+                   where it is met. -->
+              <!-- No `aria-label`: it would replace the name whole, and the rate, the comparison
+                   and the note would go silent (review С-3). The verb is said first, unseen. -->
+              <button
+                class="body"
+                type="button"
+                :disabled="!online || busy"
+                @click="edit(exchange)"
+              >
+                <span class="verb">{{ t('exchange.edit') }}</span>
+                <span class="amounts">
+                  {{ amountsOf(exchange) }}
+                  <span v-if="exchange.amendedAt" class="amended">{{
+                    t('exchange.amended', { date: dayOf(exchange.amendedAt) })
+                  }}</span>
+                </span>
+                <span class="meta">{{ rateLineOf(exchange) }}</span>
+                <span class="meta">{{ comparisonOf(exchange) }}</span>
+                <span v-if="exchange.note" class="meta note">{{ exchange.note }}</span>
+              </button>
               <button
                 class="remove"
                 type="button"
@@ -121,7 +172,14 @@
       </template>
     </template>
 
-    <ExchangeSheet v-if="overview" v-model:open="sheetOpen" :overview="overview" :record="record" />
+    <ExchangeSheet
+      v-if="overview"
+      v-model:open="sheetOpen"
+      :overview="overview"
+      :editing="editing"
+      :record="record"
+      :amend="amendEditing"
+    />
     <ExchangeRemoveSheet
       v-model:open="removeOpen"
       :exchange="target"
@@ -136,7 +194,14 @@
 import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { currencySign, formatMoney, formatRate, yerevanMidnight } from '@molvia/model'
-import type { Currency, ExchangeRate, ExchangeView as Row, RatePreference } from '@molvia/model'
+import type {
+  Currency,
+  CurrencyCost,
+  ExchangeAmendBody,
+  ExchangeRate,
+  ExchangeView as Row,
+  RatePreference,
+} from '@molvia/model'
 import IconCheck from '~icons/mdi/check-bold'
 import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconDelete from '~icons/mdi/trash-can-outline'
@@ -152,6 +217,7 @@ import ScreenState from '@/components/ScreenState.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExchanges } from '@/composables/useExchanges'
+import type { AmendOutcome } from '@/composables/useExchanges'
 import { purchaseDay } from '@/days'
 
 /**
@@ -180,6 +246,27 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const exchanges = useExchanges()
     const sheetOpen = ref(false)
+    // The exchange the sheet amends, or null when it records a new one.
+    const editing = ref<Row | null>(null)
+    function compose(): void {
+      editing.value = null
+      sheetOpen.value = true
+    }
+    function edit(exchange: Row): void {
+      editing.value = exchange
+      sheetOpen.value = true
+    }
+    // A conflict leaves the sheet open over the version the server holds now, so a second
+    // «Сохранить» goes over that one and nothing typed is lost (review Ч-2).
+    async function amendEditing(id: string, body: ExchangeAmendBody): Promise<AmendOutcome> {
+      const outcome = await exchanges.amend(id, body)
+      // Gone in the meantime: the sheet keeps the old one, and its next save is told so.
+      if (outcome === 'conflict') {
+        editing.value =
+          exchanges.overview.value?.exchanges.find((row) => row.id === id) ?? editing.value
+      }
+      return outcome
+    }
     // «Удалить обмен?» first, then «Вернуть» after (В-5): the bin never removes on its own.
     const removeOpen = ref(false)
     const target = ref<Row | null>(null)
@@ -282,6 +369,18 @@ export default defineComponent({
       return t(bank ? 'exchange.row_equal' : 'exchange.row_equal_other', words)
     }
 
+    /** «$: 89,04 ₽/$ · по последнему обмену · с 31 авг.» — and whether the bank priced part of it. */
+    function costLineOf(cost: CurrencyCost): string {
+      const words = {
+        currency: currencySign(cost.rate.base, locale.value),
+        rate: rateOf(cost.rate),
+        basis: t(cost.basis === 'weighted' ? 'exchange.basis_weighted' : 'exchange.basis_last', {
+          date: dayOf(cost.rate.asOf),
+        }),
+      }
+      return t(cost.estimated ? 'exchange.cost_line_estimated' : 'exchange.cost_line', words)
+    }
+
     function choose(value: string): void {
       if (value === 'personal' || value === 'official') {
         void exchanges.prefer(value satisfies RatePreference)
@@ -292,6 +391,10 @@ export default defineComponent({
       t,
       ...exchanges,
       sheetOpen,
+      editing,
+      compose,
+      edit,
+      amendEditing,
       removeOpen,
       removedStrip,
       recordButton,
@@ -302,7 +405,10 @@ export default defineComponent({
       preferenceOptions,
       rateOf,
       dayOf,
+      midnightOf,
+      currencySignOf: (currency: Currency) => currencySign(currency, locale.value),
       pairSigns,
+      costLineOf,
       rateLineOf,
       amountsOf,
       comparisonOf,
@@ -344,6 +450,13 @@ export default defineComponent({
 
 .preference {
   margin-top: var(--space-4);
+}
+
+.costs {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) 0 0;
+  border-top: var(--hairline) solid var(--border);
+  list-style: none;
 }
 
 .frozen,
@@ -400,8 +513,26 @@ export default defineComponent({
 }
 
 .body {
+  display: grid;
   flex: 1;
   min-width: 0;
+  min-height: var(--touch-target);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:disabled {
+    cursor: default;
+  }
 }
 
 .amounts {
@@ -409,6 +540,24 @@ export default defineComponent({
   font-size: var(--text-callout);
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
+}
+
+.verb {
+  @include visually-hidden;
+}
+
+.amended {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+  font-weight: var(--weight-regular);
+}
+
+.note {
+  overflow-wrap: anywhere;
 }
 
 .remove {

@@ -5,13 +5,20 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import { ERROR, parseRate, yerevanDate, yerevanMidnight } from '@molvia/model'
-import type { ExchangeBody, ExchangesResponse } from '@molvia/model'
+import type {
+  ExchangeAmendBody,
+  ExchangeBody,
+  ExchangesResponse,
+  ExchangeView,
+} from '@molvia/model'
 import ExchangeSheet from '@/components/ExchangeSheet.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
 
 const record = vi.fn<(body: ExchangeBody) => Promise<unknown>>()
+const amend =
+  vi.fn<(id: string, body: ExchangeAmendBody) => Promise<'saved' | 'conflict' | 'gone'>>()
 
 function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
   return {
@@ -26,8 +33,12 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
         asOf: yerevanMidnight('2026-09-01'),
       },
       basis: 'last',
+      estimated: false,
     },
-    heldEstimate: { held: { minor: 2_000_000n, currency: 'AMD' }, whole: true },
+    costs: [],
+    heldEstimates: [{ held: { minor: 2_000_000n, currency: 'AMD' }, whole: true }],
+    baseSince: null,
+    walletUnknown: null,
     exchanges: [
       {
         id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d',
@@ -35,9 +46,14 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
         given: { minor: 2_000_000n, currency: 'RUB' },
         received: { minor: 10_000_000n, currency: 'AMD' },
         heldBefore: null,
+        note: null,
+        revision: 1,
+        amendedAt: null,
+        history: [],
         rate: null,
         official: null,
         officialDoubtful: false,
+        priced: true,
       },
     ],
     ...patch,
@@ -49,6 +65,7 @@ let clock = 0
 beforeEach(() => {
   setActivePinia(createPinia())
   record.mockReset()
+  amend.mockReset()
   vi.restoreAllMocks()
   clock = 0
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -59,11 +76,14 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-async function render(state: ExchangesResponse = overview()): Promise<VueWrapper> {
+async function render(
+  state: ExchangesResponse = overview(),
+  editing: ExchangeView | null = null,
+): Promise<VueWrapper> {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/settings/exchange')
   const view = mount(ExchangeSheet, {
-    props: { open: true, overview: state, record },
+    props: { open: true, overview: state, record, amend, editing },
     attachTo: document.body,
     global: { plugins: [router, createPinia(), createAppI18n('en')] },
   })
@@ -106,7 +126,9 @@ describe('ExchangeSheet', () => {
     record.mockResolvedValue(undefined)
     const view = await render()
     await fill(view, '20 000', '95000,50')
-    const held = view.findAll('.field').at(-1)
+    const held = view
+      .findAll('.field')
+      .find((candidate) => candidate.get('label').text().includes('held before the exchange'))
     await held?.get('input').setValue('20000')
     await save(view)
 
@@ -122,7 +144,7 @@ describe('ExchangeSheet', () => {
   })
 
   it('asks what was held only from the second exchange of the pair, and hints at it', async () => {
-    const first = await render(overview({ wallet: null, heldEstimate: null, exchanges: [] }))
+    const first = await render(overview({ wallet: null, heldEstimates: [], exchanges: [] }))
     expect(first.text()).not.toContain('held before the exchange')
 
     const second = await render()
@@ -139,9 +161,78 @@ describe('ExchangeSheet', () => {
     expect(view.text()).toContain('held before the exchange')
   })
 
+  it('asks what was held of drams bought with dollars too, and never of the currency of conversion (MOL-42)', async () => {
+    const view = await render()
+    const [given, received] = view.findAll('select')
+    await given?.setValue('USD')
+    expect(view.text()).toContain('held before the exchange')
+    expect(view.text()).toContain('20,000.00')
+
+    // Roubles back for drams: the currency of conversion always costs one, nothing to weigh.
+    await given?.setValue('AMD')
+    await received?.setValue('RUB')
+    expect(view.text()).not.toContain('held before the exchange')
+
+    // Dollars nobody received by an exchange yet: their first link.
+    await given?.setValue('RUB')
+    await received?.setValue('USD')
+    expect(view.text()).not.toContain('held before the exchange')
+  })
+
+  it('asks by the exchanges the server says gave the currency a price, and no others (П-1, М1)', async () => {
+    const counted = await render(overview({ baseSince: '2026-09-10' }))
+    expect(counted.text()).toContain('held before the exchange')
+    counted.unmount()
+
+    const [base] = overview().exchanges
+    if (!base) throw new Error('the fixture has an exchange')
+    // A link of the old reckoning: the wallet does not count it, so nothing held is weighed.
+    const left = await render(overview({ exchanges: [{ ...base, priced: false }] }))
+    expect(left.text()).not.toContain('held before the exchange')
+    left.unmount()
+
+    // One that took the cost away after a priced one: it is the latest that decides (Н2).
+    const later = { ...base, id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5e', exchangedOn: '2026-09-05' }
+    const taken = await render(overview({ exchanges: [{ ...later, priced: false }, base] }))
+    expect(taken.text()).not.toContain('held before the exchange')
+    // Dated between them, the next exchange follows the priced one.
+    await field(taken, en.exchange.sheet.day).get('input').setValue('2026-09-03')
+    expect(taken.text()).toContain('held before the exchange')
+  })
+
+  it('asks only when this exchange will give a price: not for the old reckoning (О1)', async () => {
+    const [base] = overview().exchanges
+    if (!base) throw new Error('the fixture has an exchange')
+    // Dollars to drams on the 1st; counting in dollars since the 10th.
+    const dollars = { ...base, given: { minor: 10_000n, currency: 'USD' as const } }
+    const view = await render(
+      overview({
+        pair: { base: 'USD', quote: 'AMD' },
+        baseSince: '2026-09-10',
+        exchanges: [dollars],
+      }),
+    )
+    const [given] = view.findAll('select')
+    const day = field(view, en.exchange.sheet.day).get('input')
+
+    // Roubles for drams on the 5th: the old reckoning — what was held weighs nothing.
+    await given?.setValue('RUB')
+    await day.setValue('2026-09-05')
+    expect(view.text()).not.toContain('held before the exchange')
+    // The same on the 12th: the bank may price the roubles now.
+    await day.setValue('2026-09-12')
+    expect(view.text()).toContain('held before the exchange')
+    // Control: dollars on the 5th give the drams a price.
+    await given?.setValue('USD')
+    await day.setValue('2026-09-05')
+    expect(view.text()).toContain('held before the exchange')
+  })
+
   it('says the hint is about the last exchange alone when what was there before it is unknown', async () => {
     const view = await render(
-      overview({ heldEstimate: { held: { minor: 7_000_000n, currency: 'AMD' }, whole: false } }),
+      overview({
+        heldEstimates: [{ held: { minor: 7_000_000n, currency: 'AMD' }, whole: false }],
+      }),
     )
     expect(view.text()).toContain('Of the last exchange ≈')
     expect(view.text()).toContain('70,000.00')
@@ -168,12 +259,6 @@ describe('ExchangeSheet', () => {
     await fill(view, '20000', '95000')
     await save(view)
     expect(field(view, en.exchange.sheet.received).text()).toContain(en.error.invalid_rate)
-  })
-
-  it('does not ask what was held for an exchange of another pair', async () => {
-    const view = await render()
-    await view.findAll('select')[0]?.setValue('USD')
-    expect(view.text()).not.toContain('held before the exchange')
   })
 
   it('leaves the held amount out when it is left empty — unknown, not zero', async () => {
@@ -217,5 +302,124 @@ describe('ExchangeSheet', () => {
     await save(view)
     expect(record).toHaveBeenCalledTimes(2)
     expect(record.mock.calls[1]?.[0].id).toBe(record.mock.calls[0]?.[0].id)
+  })
+
+  it('keeps a note trimmed, leaves it out when empty, and refuses one that draws nothing (MOL-42)', async () => {
+    record.mockResolvedValue(undefined)
+    const view = await render()
+    await fill(view, '20000', '95000')
+    await field(view, en.exchange.sheet.note).get('input').setValue('\u200b')
+    await save(view)
+    expect(record).not.toHaveBeenCalled()
+    expect(field(view, en.exchange.sheet.note).text()).toContain(en.exchange.sheet.bad_note)
+
+    await field(view, en.exchange.sheet.note).get('input').setValue('  VTB cash machine ')
+    await save(view)
+    expect(record.mock.calls[0]?.[0]).toMatchObject({ note: 'VTB cash machine' })
+  })
+})
+
+describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
+  const [base] = overview().exchanges
+  if (!base) throw new Error('the fixture has an exchange')
+  const amended: ExchangeView = {
+    ...base,
+    received: { minor: 9_500_000n, currency: 'AMD' },
+    note: 'VTB',
+    revision: 2,
+    amendedAt: new Date('2026-09-25T09:00:00.000Z'),
+    history: [
+      {
+        given: { minor: 2_000_000n, currency: 'RUB' },
+        received: { minor: 10_000_000n, currency: 'AMD' },
+        exchangedOn: '2026-09-01',
+        heldBefore: null,
+        note: null,
+        replacedAt: new Date('2026-09-25T09:00:00.000Z'),
+      },
+    ],
+  }
+
+  it('starts from what the row says and shows the versions before it', async () => {
+    const view = await render(overview({ exchanges: [amended] }), amended)
+    expect(view.text()).toContain(en.exchange.sheet.title_amend)
+    const value = (label: string) =>
+      (field(view, label).get('input').element as HTMLInputElement).value
+    expect(value(en.exchange.sheet.given)).toBe('20000')
+    expect(value(en.exchange.sheet.received)).toBe('95000')
+    expect(value(en.exchange.sheet.day)).toBe('2026-09-01')
+    expect(value(en.exchange.sheet.note)).toBe('VTB')
+    expect(view.get('.versions').text()).toContain('100,000.00')
+    // Its own entry is not an earlier exchange: the first link is asked nothing.
+    expect(view.text()).not.toContain('held before the exchange')
+  })
+
+  it('saves over the version it was opened on, and says so on the button', async () => {
+    amend.mockResolvedValue('saved')
+    const view = await render(overview({ exchanges: [amended] }), amended)
+    await field(view, en.exchange.sheet.received).get('input').setValue('96000')
+    const button = view.findAll('button').find((one) => one.text() === en.exchange.sheet.save_amend)
+    await button?.trigger('click')
+    await flushPromises()
+
+    expect(record).not.toHaveBeenCalled()
+    expect(amend).toHaveBeenCalledWith(amended.id, {
+      revision: 2,
+      given: { minor: 2_000_000n, currency: 'RUB' },
+      received: { minor: 9_600_000n, currency: 'AMD' },
+      exchangedOn: '2026-09-01',
+      note: 'VTB',
+    })
+    expect(view.emitted('update:open')?.at(-1)).toEqual([false])
+  })
+
+  async function saveAmendment(view: VueWrapper): Promise<void> {
+    const button = view.findAll('button').find((one) => one.text() === en.exchange.sheet.save_amend)
+    await button?.trigger('click')
+    await flushPromises()
+  }
+
+  it('shows and keeps a remainder the exchange has, even where a new one would not ask (Ж4)', async () => {
+    amend.mockResolvedValue('saved')
+    const held: ExchangeView = { ...amended, heldBefore: { minor: 2_000_000n, currency: 'AMD' } }
+    for (const state of [
+      overview({ exchanges: [held], baseSince: '2026-09-10' }),
+      overview({ exchanges: [held], pair: null }),
+      overview({ exchanges: [held] }),
+    ]) {
+      amend.mockClear()
+      const view = await render(state, held)
+      expect(view.text()).toContain('held before the exchange')
+      await field(view, en.exchange.sheet.note).get('input').setValue('VTB cash machine')
+      await saveAmendment(view)
+      expect(amend.mock.calls[0]?.[1]).toMatchObject({
+        heldBefore: { minor: 2_000_000n, currency: 'AMD' },
+        note: 'VTB cash machine',
+      })
+      view.unmount()
+    }
+  })
+
+  it('a conflict keeps the sheet open with what was typed, and says so (Ч-2)', async () => {
+    amend.mockResolvedValue('conflict')
+    const view = await render(overview({ exchanges: [amended] }), amended)
+    await field(view, en.exchange.sheet.received).get('input').setValue('96000')
+    await saveAmendment(view)
+    expect(view.emitted('update:open')).toBeUndefined()
+    expect(view.text()).toContain(en.exchange.sheet.amend_conflict)
+    // What the other device wrote is in the sheet itself, not only in the list under it (Л4).
+    expect(view.get('.current').text()).toContain('Now recorded: ₽20,000.00 → ֏95,000.00')
+    expect(view.get('.current').text()).toContain('VTB')
+    expect(
+      (field(view, en.exchange.sheet.received).get('input').element as HTMLInputElement).value,
+    ).toBe('96000')
+  })
+
+  it('names the remainder in «now recorded» — a change of it alone is a change (М2)', async () => {
+    amend.mockResolvedValue('conflict')
+    const theirs: ExchangeView = { ...amended, heldBefore: { minor: 3_000_000n, currency: 'AMD' } }
+    const view = await render(overview({ exchanges: [theirs] }), theirs)
+    await saveAmendment(view)
+    expect(view.get('.current').text()).toContain('held before ֏30,000.00')
   })
 })

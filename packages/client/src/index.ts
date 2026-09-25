@@ -14,6 +14,7 @@ import {
   catalogueEntryCodec,
   catalogueSearchResponseSchema,
   currentTripResponseSchema,
+  exchangeAmendBodySchema,
   exchangeBodySchema,
   exchangesResponseCodec,
   expensePatchSchema,
@@ -43,6 +44,7 @@ import type {
   AdviceResponse,
   AddExpenseBody,
   CatalogueEntry,
+  ExchangeAmendBody,
   ExchangeBody,
   ExchangesResponse,
   ExpensePatch,
@@ -145,6 +147,12 @@ export interface MolviaClient {
    * identifier again. A day after today in Yerevan rejects with `error.exchange_in_future`.
    */
   recordExchange(body: ExchangeBody): Promise<{ exchanges: ExchangesResponse; created: boolean }>
+  /**
+   * «Сохранить правку» (MOL-42): the exchange whole as it should now be, over the version the
+   * screen showed. Safe to repeat. `error.conflict` when it was amended elsewhere in between,
+   * `error.not_found` when it is gone.
+   */
+  amendExchange(id: string, body: ExchangeAmendBody): Promise<ExchangesResponse>
   /** Gone, whether it was there or not — the answer is the screen as it is now. */
   removeExchange(id: string): Promise<ExchangesResponse>
   /**
@@ -367,6 +375,12 @@ export function createClient(options: ClientOptions): MolviaClient {
       })
       return { exchanges: data, created: status === 201 }
     },
+
+    amendExchange: async (id, body) =>
+      request(`/exchanges/${segment(id)}`, exchangesResponseCodec, {
+        method: 'PUT',
+        body: encode(exchangeAmendBodySchema, body),
+      }),
 
     removeExchange: async (id) =>
       request(`/exchanges/${segment(id)}`, exchangesResponseCodec, { method: 'DELETE' }),
