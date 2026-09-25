@@ -503,10 +503,13 @@ device, private always. The rate is what the two amounts say and is not stored b
 - **Every exchange is set beside the central bank of its own day**, by the same `pickOfficialRate`
   a trip started that day would use — «на 8 754 ֏ больше» or «меньше», never «комиссия»: a good
   exchanger beats the bank, and the difference says nothing about why.
-- **No amending — delete and enter again** (plan, Р-4). A delete is a hard one: an exchange has no
-  gate counting it. Trips already started keep what they took. **The bin asks first, with the
-  amounts and the day, and «Вернуть» stays offered after** (owner's decision В-5): it writes the
-  same exchange again under the same name.
+- **No amending — delete and enter again** (plan, Р-4). Trips already started keep what they
+  took. **The bin asks first, with the amounts and the day, and «Вернуть» stays offered after**
+  (owner's decision В-5). A removal marks the row (`deleted_at`) and hides it from every reader;
+  «Вернуть» (`POST /exchanges/:id/restore`) clears the mark, so the exchange keeps its
+  `created_at` — written anew it took the moment of the tap, which moved both the order of its day
+  and the hint. The owner's next request of the screen deletes marked rows for good: by then the
+  screen no longer offers them back, so «final» and «no longer undoable» are one moment.
 - **A repeat is the same exchange, or it is a conflict** (В-6). The same name with the same
   amounts, day and remainder answers 200; with anything else, 409 — that is a correction sent
   after an answer that never came, and answering it «saved» left the typo in the wallet. The
@@ -514,8 +517,10 @@ device, private always. The rate is what the two amounts say and is not stored b
 - **An exchange no rate in the band says is refused where it is written** (`error.invalid_rate`),
   never accepted and dropped from the wallet later: a zero too many once made the wallet vanish, the
   trip take the bank in silence and the screen say there were no exchanges above a list of two.
-- **The hint counts what was spent after the exchange was written, in trips still open then** — a
-  purchase added to a finished trip was paid with the money held before. Without a remainder named
+- **The hint counts what was spent after the exchange, in trips still open then** — a purchase
+  added to a finished trip was paid with the money held before. «After» is the moment the exchange
+  was written when that was on its own day, and the end of its day for one written later: counting
+  from the record threw away everything bought between the exchange and its entry. Without a remainder named
   at the last exchange it speaks of that exchange's money only. A day's official rate that jumped
   is never an exchange's measure: the rate before the jump is, or no comparison at all.
 
