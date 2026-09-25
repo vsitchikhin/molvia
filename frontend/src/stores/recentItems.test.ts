@@ -214,6 +214,16 @@ describe('recent items', () => {
       expect(store.filter('мацун')).toEqual([])
     })
 
+    it('by the search’s dictionary: «картошка» finds «Картофель», a whole word and nothing less', () => {
+      const store = relaunched()
+      const potato = entry(4, { name: 'Картофель молодой' })
+      const puree = entry(5, { name: 'Картофельное пюре' })
+      for (const item of [potato, puree]) store.remember(item)
+      expect(store.filter('картошка').map((item) => item.id)).toEqual([potato.id])
+      // An unfinished word is not looked up, as the search does not look it up.
+      expect(store.filter('картош')).toEqual([])
+    })
+
     it('not at all under an empty or blank query', () => {
       const store = withThree()
       expect(store.filter('')).toHaveLength(3)
