@@ -1149,8 +1149,8 @@ the round trip through Telegram, and ask whose account this turned out to be.
   and in the one case where the two disagree (a session that arrived without the script seeing
   it) a rating held back on a `401` went out into a stranger's account at the first
   `onMounted(send)`. So **the queue and the drafts send only once the server has said who we
-  are**: the rule sits in `flush()` of both, and **only** there — `App.vue` gives the occasion
-  and no second opinion. A gate there as well looked harmless and took away the queue's own
+  are**, and while another window's login is still being caught up with: the rule sits in
+  `flush()` of both, and **only** there — `App.vue` gives the occasion and no second opinion. A gate there as well looked harmless and took away the queue's own
   «the server is silent, try again later»: that timer is set by `flush`, and `flush` was never
   reached (adversarial Г1). The occasion is every settling of the identity, «error» included,
   which is what starts the doubling retry — and the retry asks about the identity first, waiting
@@ -1165,6 +1165,11 @@ the round trip through Telegram, and ask whose account this turned out to be.
   the person has not claimed, or draw its figures for a moment before the door shuts. Holding
   them would mean serialising every screen behind the identity and paying a round trip on every
   ordinary launch, to close a case that needs a session to have arrived unseen.
+- **What the screen says while it waits is «нет связи», and that is an exception to MOL-19's
+  rule rather than its new edition.** There, offline or error is decided by `navigator.onLine`
+  read after the failure; here nothing was even attempted, and behind a shop's captive portal
+  `onLine` is `true` while «Повторить» would call the same held-back send and change nothing.
+  Silence was worse: it left «Отправляем оценку…» standing forever at a shelf (adversarial В1).
 - **A `401` anywhere is the login screen**, through one seam in `frontend/src/api.ts` wired in
   `main.ts`. Before it, `error.no_actor` was read by three callers out of a dozen and a half and
   every other screen said «что-то пошло не так» about an account that was simply not there.

@@ -99,7 +99,13 @@ export const useLoginStore = defineStore('login', () => {
   const connected = ref(navigator.onLine)
   /** True while `POST /auth/login` is in flight, so the tap has a visible consequence at once. */
   const starting = ref(false)
-  /** True while another window's login is being caught up with — see the `storage` listener. */
+  /**
+   * True while another window's login is being caught up with — see the `storage` listener.
+   *
+   * Read by the queues as well: until that `me()` answers, this window's idea of who it is comes
+   * from before the neighbour's login, and a write of its own would leave under a session that
+   * may not be this person's (self-review, round 4's note).
+   */
   const rechecking = ref(false)
   /**
    * The owner the person has just said is not theirs. In memory only: it exists to keep the
@@ -125,10 +131,7 @@ export const useLoginStore = defineStore('login', () => {
    * stored, because a new start replaces the secret and kills whatever was there; only removal
    * and rewriting are checked against ownership.
    */
-  function keep(previous?: Request | null): void {
-    const stored = recall()
-    const mine = previous === undefined || stored.request?.id === previous?.id
-    const held = mine ? request.value : (stored.request ?? null)
+  function store(held: Request | null): void {
     if (!held && !claimed.value) {
       forget(KEY)
       return
@@ -140,6 +143,20 @@ export const useLoginStore = defineStore('login', () => {
         ...(claimed.value ? { claimed: claimed.value } : {}),
       }),
     )
+  }
+
+  /** Пишет запись целиком: свой запрос и признанного владельца. */
+  function keep(): void {
+    store(request.value)
+  }
+
+  /**
+   * Пишет признанного владельца, **не касаясь запроса**: тот мог начать соседнее окно, и
+   * окно без своего запроса записывало `{claimed}` поверх чужого — ровно то, что закрывало
+   * правило А3 (саморевью Р3-2).
+   */
+  function keepClaimOnly(): void {
+    store(recall().request ?? null)
   }
 
   /** Who the server last said this browser is, or — with nothing to ask — the drawer's name. */
@@ -293,7 +310,8 @@ export const useLoginStore = defineStore('login', () => {
   function drop(): void {
     const previous = request.value
     request.value = null
-    keep(previous)
+    const stored = recall().request ?? null
+    store(stored?.id === previous?.id ? null : stored)
   }
 
   /**
@@ -351,7 +369,9 @@ export const useLoginStore = defineStore('login', () => {
   function claim(owner: string): void {
     claimed.value = owner
     refusedOwner.value = null
-    keep()
+    // Свой запрос после признания аккаунта смысла не имеет и снимается; чужой остаётся (Р3-2).
+    if (request.value) drop()
+    else keepClaimOnly()
   }
 
   /**
@@ -390,6 +410,7 @@ export const useLoginStore = defineStore('login', () => {
     phase,
     blocked,
     closed,
+    rechecking,
     starting,
     failure,
     request,

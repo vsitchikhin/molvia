@@ -21,6 +21,7 @@ import type {
 } from '@molvia/model'
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
+import { useLoginStore } from '@/stores/login'
 import { isIdentifier } from '@/stores/identity'
 import { read, writeEverywhere } from '@/stores/storage'
 import { useTripHistoryStore } from '@/stores/tripHistory'
@@ -403,6 +404,7 @@ function exclusively(name: string, work: () => Promise<void>): Promise<void> {
  */
 export const useTripQueueStore = defineStore('tripQueue', () => {
   const actor = useActorStore()
+  const login = useLoginStore()
   const trips = useTripStore()
 
   let kept: Kept[] = []
@@ -546,7 +548,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     // Молчащий сервер при живой связи по-прежнему пробуется сам, с удваивающейся паузой: без
     // этого покупка, застрявшая за порталом магазина, ждала бы возвращения во вкладку, а
     // `online` за порталом не приходит вовсе — `onLine` там всё время `true` (MOL-24, Р-5).
-    if (actor.state !== 'ready') {
+    if (actor.state !== 'ready' || login.rechecking) {
       if (actor.state === 'error') retryLater()
       return Promise.resolve()
     }

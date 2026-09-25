@@ -581,6 +581,39 @@ describe('что лежит на устройстве, проверяется', 
     expect(login.phase).toBe('offer')
   })
 
+  it('Р3-2: «Да, это я» не стирает запрос соседнего окна', async () => {
+    // Окно без своего запроса писало `{claimed}` поверх чужого — ровно то, что закрывало А3.
+    localStorage.setItem(OWNER, STRANGER.id)
+    setActivePinia(createPinia())
+    const actor = useActorStore()
+    me.mockResolvedValue(STRANGER)
+    const login = useLoginStore()
+    await actor.start()
+    // Соседнее окно начало свой вход уже после того, как это окно открылось: запрос лежит на
+    // устройстве, но этому окну он не принадлежит.
+    const neighbour = { id: '11111111-2222-4333-8444-555555555555', url: REQUEST.url }
+    localStorage.setItem(KEY, JSON.stringify({ request: neighbour }))
+
+    login.confirm()
+
+    expect(login.closed).toBe(false)
+    expect(kept()).toEqual({ request: neighbour, claimed: STRANGER.id })
+  })
+
+  it('а свой запрос после признания аккаунта снимает', async () => {
+    opened()
+    const { login, actor } = await signedOut()
+    startLogin.mockResolvedValue(REQUEST)
+    await login.begin()
+    // Сессия пришла мимо скрипта: запрос на устройстве остался, а сервер зовёт нас MINE.
+    me.mockResolvedValue(MINE)
+    await actor.verify()
+
+    login.confirm()
+
+    expect(kept()).toEqual({ claimed: MINE.id })
+  })
+
   it('А3: окно с мёртвой ссылкой не стирает запрос соседнего окна', async () => {
     // Ключ общий, а запрос — личное дело окна: чужой `forget` уносил подтверждение, которому
     // потом некуда приходить, если соседнюю вкладку iOS уже выгрузил.

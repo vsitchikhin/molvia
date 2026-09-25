@@ -5,6 +5,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import type { PendingVerdict, Rating, VerdictCard } from '@molvia/model'
 import { useActorStore } from '@/stores/actor'
+import { useLoginStore } from '@/stores/login'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 
 const rateItem =
@@ -78,6 +79,22 @@ describe('verdict drafts', () => {
 
     expect(rateItem).toHaveBeenCalledTimes(1)
     expect(drafts.held).toBeNull()
+  })
+
+  it('и молчит, пока догоняет вход соседнего окна', async () => {
+    // Пока этот `me()` не ответил, «кто мы» — это ответ, полученный до чужого входа: писать
+    // под сессию, которая, возможно, уже не этого человека, нельзя (саморевью, раунд 4).
+    const drafts = fresh()
+    useLoginStore().rechecking = true
+    drafts.save(milk, 4, '')
+    await settled()
+
+    expect(rateItem).not.toHaveBeenCalled()
+
+    useLoginStore().rechecking = false
+    await drafts.flush()
+
+    expect(rateItem).toHaveBeenCalledTimes(1)
   })
 
   it('saves on the phone first, sends after, and forgets once the server has it', async () => {

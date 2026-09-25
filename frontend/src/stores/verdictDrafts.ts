@@ -6,6 +6,7 @@ import type { PendingVerdict, Rating, WireCode } from '@molvia/model'
 import { api } from '@/api'
 import type { Score } from '@/components/rating'
 import { useActorStore } from '@/stores/actor'
+import { useLoginStore } from '@/stores/login'
 import { read, write } from '@/stores/storage'
 
 /**
@@ -113,6 +114,7 @@ function ratingOf(draft: VerdictDraft & { score: Score }): Rating {
  */
 export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
   const actor = useActorStore()
+  const login = useLoginStore()
 
   const drafts = ref<Record<string, VerdictDraft>>({})
   const held = ref<Held | null>(null)
@@ -208,7 +210,7 @@ export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
     // с кнопкой тут было бы хуже: кнопка зовёт эту же отправку и ничего не изменит, пока
     // личность не осела. А осядет она сама — по `online`, по возвращению во вкладку или по
     // «Повторить» на плашке личности.
-    if (actor.state !== 'ready') {
+    if (actor.state !== 'ready' || login.rechecking) {
       held.value = 'offline'
       return Promise.resolve()
     }
