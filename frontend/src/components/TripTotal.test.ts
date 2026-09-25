@@ -65,6 +65,15 @@ describe('TripTotal', () => {
     expect(plain(view)).toContain('курс 4,82 ֏/₽ · 15 янв.')
   })
 
+  it('свой курс из обменов подписан как свой, а не как курс банка (MOL-40)', () => {
+    const own = trip()
+    const view = render({
+      trip: { ...own, rate: own.rate && { ...own.rate, source: 'personal' }, rateProvider: null },
+    })
+    expect(plain(view)).toContain('мой курс 4,82 ֏/₽ · 15 янв.')
+    expect(plain(view)).not.toContain('ЦБ')
+  })
+
   it('до переворота крупное число — факт, без признаков оценки', () => {
     const view = render()
     expect(view.get('.sum').classes()).not.toContain('guess')

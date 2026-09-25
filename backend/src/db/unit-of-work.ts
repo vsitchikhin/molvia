@@ -1,3 +1,5 @@
+import { createExchangeRepository } from './exchanges-repository'
+import type { ExchangeRepository } from './exchanges-repository'
 import { createExpenseRepository } from './expenses-repository'
 import type { ExpenseRepository } from './expenses-repository'
 import type { Conn, Db } from './index'
@@ -21,6 +23,11 @@ export interface TripRepositories {
   readonly searchPicks: SearchPickRepository
   /** Read by «Начать поход» to snapshot the official rate (MOL-39); written by the refresh. */
   readonly rates: RateRepository
+  /**
+   * The person's exchanges and which rate they want (MOL-40): read by «Начать поход» for their own
+   * rate, and the screen of exchanges is built from these and the rates above.
+   */
+  readonly exchanges: ExchangeRepository
 }
 
 export function tripRepositories(conn: Conn): TripRepositories {
@@ -31,6 +38,7 @@ export function tripRepositories(conn: Conn): TripRepositories {
     items: createItemRepository(conn),
     searchPicks: createSearchPickRepository(conn),
     rates: createRateRepository(conn),
+    exchanges: createExchangeRepository(conn),
   }
 }
 

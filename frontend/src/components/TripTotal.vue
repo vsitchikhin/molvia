@@ -122,7 +122,9 @@ export default defineComponent({
     const rateLine = computed(() => {
       const rate = props.trip?.rate
       if (!rate) return null
-      return t('trip.rate_line', {
+      // The person's own — from their exchanges, or entered for this trip after a jump — is said
+      // to be theirs: «мой курс» beside a number reads differently from the bank's (MOL-40).
+      return t(rate.source === 'personal' ? 'trip.rate_line_mine' : 'trip.rate_line', {
         rate: formatRate(rate, locale.value),
         date: purchaseDay(rate.asOf, locale.value),
       })
