@@ -1005,10 +1005,12 @@ database access. In a product about data integrity, two write paths will silentl
   the same address — never a bare `pushState`, whose state lacks the `position` and `back` the
   rules of «back» read. Every close — ×, the scrim, Esc, Android «back» — steps back
   off that entry, and only the pop closes it, so exactly one entry is ever taken. **Putting a
-  sheet away does not scroll** (MOL-63): a move to the same address is always a sheet's, the
-  page under it never moved, and the router scrolling back to the number it saved at the
-  opening moved the list by whatever changed above it meanwhile — a list reread, a queued row
-  sent, a notice come or gone — which the browser had already kept out of sight. So e2e takes
+  sheet away does not scroll** (MOL-63): a move to the same address is a sheet's or a refused
+  duplicate push, and neither moves the page; the router scrolling back to the number it saved
+  at the opening moved the list by whatever changed above it meanwhile — a list reread, a queued
+  row sent, a notice come or gone — which the browser had already kept out of sight. The first
+  navigation comes «from» `START_LOCATION`, whose address is «/», and is not a move to the same
+  address: read as one, the trip loaded again forgot where the person was, and only the trip. So e2e takes
   «the list stayed» by where the opener stands on the screen, never by `scrollY`, which that
   jump left equal. Any move of
   the router under an open sheet — push, replace, a new query — closes it too; an entry no
