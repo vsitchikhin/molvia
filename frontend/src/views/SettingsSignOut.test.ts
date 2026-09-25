@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import {
   ERROR,
+  ISSUE,
   actorCodec,
   addExpenseBodySchema,
   catalogueEntryCodec,
@@ -444,6 +445,46 @@ describe('ответ, который пришёл не вовремя', () => {
     expect(actor.state).toBe('ready')
     expect(localStorage.getItem('molvia.leaving')).toBeNull()
     expect(localStorage.getItem(`molvia.advice.${OWNER}`)).toBe('{}')
+    expect(replaced).toEqual([])
+  })
+
+  it('ответил портал магазина — выход до сервера не дошёл, намерения нет (round 4, Ж1)', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToLeave(view)
+    logout.mockRejectedValue(new ApiError(ISSUE.RESPONSE_INVALID, 'HTTP 200', false))
+    confirmButton().click()
+    await flushPromises()
+
+    expect(sheet().textContent).toContain(en.sign_out.error)
+    expect(localStorage.getItem('molvia.leaving')).toBeNull()
+    expect(localStorage.getItem(`molvia.advice.${OWNER}`)).toBe('{}')
+  })
+
+  it('пока выход ждал, вошёл другой — ящик ушедшего стёрт, пришедший не тронут (self-review Р3-2)', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToLeave(view)
+    logout.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'timeout', false))
+    confirmButton().click()
+    await flushPromises()
+    expect(localStorage.getItem('molvia.leaving')).toBe(OWNER)
+
+    const other = { ...initial, id: '0b6f6c1e-3f7a-4c2b-9a53-5b8a5d1e2f00' }
+    const actor = useActorStore()
+    actor.adopt(other)
+    await flushPromises()
+
+    expect(localStorage.getItem('molvia.leaving')).toBeNull()
+    expect(localStorage.getItem(`molvia.advice.${OWNER}`)).toBeNull()
+    expect(localStorage.getItem('molvia.actor')).toBe(other.id)
+    expect(actor.id).toBe(other.id)
+    expect(replaced).toEqual([])
+
+    // Через месяцы сессия пришедшего истекла — это его «сессии нет», не повод доделывать чужой выход.
+    me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    sessionEnded()
+    await flushPromises()
     expect(replaced).toEqual([])
   })
 

@@ -120,4 +120,24 @@ describe('устройства и выход (MOL-57)', () => {
     const client = createClient({ baseUrl: '/api', fetch })
     await expect(client.endSession(id)).rejects.toMatchObject({ code: ERROR.NOT_FOUND })
   })
+
+  it('портал, ответивший 200 своей страницей, — не выход и не завершение (round 4)', async () => {
+    const portal = () =>
+      Promise.resolve(
+        new Response('<html>Wi-Fi</html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        }),
+      )
+    const client = createClient({ baseUrl: '/api', fetch: vi.fn<typeof globalThis.fetch>(portal) })
+
+    await expect(client.logout()).rejects.toMatchObject({
+      code: ISSUE.RESPONSE_INVALID,
+      answered: false,
+    })
+    await expect(client.endSession(id)).rejects.toMatchObject({
+      code: ISSUE.RESPONSE_INVALID,
+      answered: false,
+    })
+  })
 })

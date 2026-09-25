@@ -1320,7 +1320,16 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   conclusion, and erasing on it threw away a purchase from the shelf while the session lived on.
   Closing the sheet after a failure does not withdraw the intent — the outcome is unknown — it
   asks the server; so does a return of the connection or of the app while the intent waits. The
-  listener is a store of its own (`stores/signOut`), created with the app. **The price, named:**
+  listener is a store of its own (`stores/signOut`), created with the app. **An answer that came,
+  and not from our API, is not unknown** (round 4, Ж1): a captive portal's page or a stranger's
+  `4xx` (`answered === false`, anything but `error.internal`) means the request never reached the
+  server, and the intent goes at once — kept, a portal at the till locked the app further into the
+  shop. **The way out succeeds on `204` and on nothing else**: a portal answers a redirected
+  request with `200` and a page of its own, which read as «no body», and the phone erased a drawer
+  for a session the server never heard about. **Somebody else signing in settles the intent too**
+  (self-review Р3-2): the cookie of the owner who left is gone, so their drawer is erased there and
+  then and the person now signed in is left as they are — `forgetOwner` removes the drawer's name
+  and the intent only when they name the owner being erased. **The price, named:**
   a connection lost while the request was on its way leaves the outcome unknown, and a launch with
   no connection then shows the login screen until the server can be asked — the drawer of someone
   who may have left is not opened on a guess.
@@ -1336,8 +1345,12 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   **A tab that slept through the event checks at every start** (round 2, Д2): a drawer on its own
   shelf with not one key of the owner on a shared shelf that works was erased elsewhere — a tab
   the browser unloaded, or one closed and reopened, gets its `sessionStorage` back without the
-  event. A shared shelf that refuses a probe write says nothing: then this tab's shelf is the only
-  one, legitimately (Safari's private mode). A tab that wakes with its memory — frozen by the
+  event. The drawer's name counts **by its value** (round 4, Ж2): once somebody else signed in, the
+  shared shelf names them. A shared shelf that refuses a probe write says nothing: then this tab's
+  shelf is the only one, legitimately (Safari's private mode). The premise was checked (self-review
+  Р3-1): Safari's seven-day cap clears `SessionStorage` together with `LocalStorage`, so ITP does
+  not leave a drawer on one shelf; clearing the shared one by hand still does, and then the tab's
+  copy goes too — a named limit, because a marker naming who left would keep their id on the device. A tab that wakes with its memory — frozen by the
   browser, or restored from the back-forward cache — checks on `visibilitychange` and `pageshow`
   too, because `recover` starts nothing from `ready`.
 - **«Это не я» and the login's poll take turns** (adversarial Г1). The way out's `Max-Age=0` is

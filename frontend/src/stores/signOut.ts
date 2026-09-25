@@ -1,9 +1,25 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import { ApiError } from '@molvia/client'
+import { ERROR } from '@molvia/model'
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
 import { clearLeaving, forgetOwner, leavingOwner, markLeaving } from '@/stores/identity'
 import { whileQueueIsStill } from '@/stores/tripQueue'
+
+/** Read afresh each time: the connection read before an `await` says nothing about after it. */
+function connected(): boolean {
+  return navigator.onLine
+}
+
+/**
+ * An answer that came, and not from our API — a captive portal's page, a stranger's 404 (round 4,
+ * Ж1). The request never reached the server, so nothing is unknown about it. A dropped connection,
+ * a timeout and a `5xx` stay unknown: the server may have done its part before the answer was lost.
+ */
+function notReached(error: unknown): boolean {
+  return error instanceof ApiError && !error.answered && error.code !== ERROR.INTERNAL
+}
 
 /**
  * «Выйти» on this device (MOL-57, owner's decisions Q1–Q3).
@@ -28,11 +44,6 @@ import { whileQueueIsStill } from '@/stores/tripQueue'
  * A store rather than a composable for that reason: it has to hear the identity settle from the
  * moment the app starts, the screen with the button or not.
  */
-/** Read afresh each time: the connection read before an `await` says nothing about after it. */
-function connected(): boolean {
-  return navigator.onLine
-}
-
 export const useSignOutStore = defineStore('signOut', () => {
   const actor = useActorStore()
   /** The request is on its way — the sheet holds its button. */
@@ -75,10 +86,14 @@ export const useSignOutStore = defineStore('signOut', () => {
     const before = actor.heard
     try {
       await api.logout()
-    } catch {
+    } catch (error) {
       // Decided after the failure (MOL-19, A1).
       failure.value = connected() ? 'error' : 'offline'
       leaving.value = false
+      if (notReached(error)) {
+        clearLeaving()
+        return
+      }
       // The server may have said «nobody» while this was in flight — its settling was skipped
       // then, and nothing will settle it again. Only that: an answer «this owner» given meanwhile
       // may be about the moment before the way out landed.
@@ -108,6 +123,22 @@ export const useSignOutStore = defineStore('signOut', () => {
     if (!owner || leaving.value) return
     if (actor.nobody) void finish(owner)
     else if (actor.id === owner) clearLeaving()
+    else void erase(owner)
+  }
+
+  /**
+   * Somebody else signed in while the intent waited (self-review Р3-2): the cookie that proved the
+   * owner who left has been replaced, and the server will say nothing more about them. Their drawer
+   * goes as they asked, and the person signed in now is left as they are — no release, no reload.
+   * Waiting instead let a `401` about the new session, months later, finish the old intent and let
+   * go of somebody who never pressed «Выйти».
+   */
+  async function erase(owner: string): Promise<void> {
+    clearLeaving()
+    await whileQueueIsStill(owner, () => {
+      forgetOwner(owner)
+      return Promise.resolve()
+    })
   }
 
   watch(() => actor.heard, settle)

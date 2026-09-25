@@ -131,6 +131,27 @@ describe('«Выйти» стирает ящик владельца (MOL-57)', (
     expect(currentIdentity()).toBeNull()
   })
 
+  it('после выхода вошёл другой — ящик прежнего всё равно стёрт, по значению (round 4, Ж2)', () => {
+    // Вкладка помнит OWNER в памяти и на своей полке — как проснувшаяся из bfcache; общая полка
+    // называет уже OTHER, вошедшего после выхода.
+    rememberIdentity(OWNER)
+    sessionStorage.setItem(`molvia.trip-queue.${OWNER}`, '[]')
+    localStorage.setItem('molvia.actor', OTHER)
+
+    expect(erasedWhileAway()).toBe(true)
+    expect(sessionStorage.getItem(`molvia.trip-queue.${OWNER}`)).toBeNull()
+    // Имя ящика пришедшего не тронуто.
+    expect(localStorage.getItem('molvia.actor')).toBe(OTHER)
+  })
+
+  it('forgetOwner не снимает ни ящик, ни намерение другого владельца (self-review Р3-2)', () => {
+    localStorage.setItem('molvia.actor', OTHER)
+    localStorage.setItem('molvia.leaving', OTHER)
+    forgetOwner(OWNER)
+    expect(localStorage.getItem('molvia.actor')).toBe(OTHER)
+    expect(localStorage.getItem('molvia.leaving')).toBe(OTHER)
+  })
+
   it('контроль: хоть один ключ владельца на общей полке — ящик жив', () => {
     sessionStorage.setItem('molvia.actor', OWNER)
     localStorage.setItem(`molvia.settings.${OWNER}`, '{}')

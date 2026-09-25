@@ -148,7 +148,7 @@ export function forgetWhere(match: (key: string) => boolean): void {
  * or refusing writes (Safari's private mode keeps `localStorage` readable and empty), which makes
  * the tab's own shelf the only one there is (MOL-57, round 2, Д2).
  */
-export function sharedHolds(match: (key: string) => boolean): boolean | null {
+export function sharedHolds(match: (key: string, value: string | null) => boolean): boolean | null {
   try {
     const shared = window.localStorage
     const probe = 'molvia.probe'
@@ -156,7 +156,7 @@ export function sharedHolds(match: (key: string) => boolean): boolean | null {
     shared.removeItem(probe)
     for (let index = 0; index < shared.length; index += 1) {
       const key = shared.key(index)
-      if (key !== null && match(key)) return true
+      if (key !== null && match(key, shared.getItem(key))) return true
     }
     return false
   } catch {

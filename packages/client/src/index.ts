@@ -183,6 +183,16 @@ export interface MolviaClient {
  */
 export function createClient(options: ClientOptions): MolviaClient {
   const { request, exchange } = createTransport(options)
+
+  /**
+   * A way out has one success, and it is `204` (MOL-57, round 4). A shop's captive portal answers
+   * a request it redirected with `200` and a page of its own, which reads as «no body» — exactly
+   * what `z.undefined()` accepts — and the phone erased a drawer for a session the server never
+   * heard about. Anything else is an answer off the contract, and not the API's.
+   */
+  function noContent({ status }: { readonly status: number }): void {
+    if (status !== 204) throw new ApiError(ISSUE.RESPONSE_INVALID, `HTTP ${String(status)}`, false)
+  }
   /**
    * A verdict is addressed by its item. Checked before anything is sent: an identifier that
    * is not one can only be refused, and one carrying «/» or «?» would reach another address.
@@ -251,14 +261,18 @@ export function createClient(options: ClientOptions): MolviaClient {
 
     me: () => request('/actors/me', actorCodec),
     sessions: async () => request('/sessions', sessionsResponseCodec),
-    endSession: async (id) =>
-      request(`/sessions/${segment(id)}`, z.undefined(), { method: 'DELETE' }),
+    endSession: async (id) => {
+      noContent(await exchange(`/sessions/${segment(id)}`, z.undefined(), { method: 'DELETE' }))
+    },
     // The login's header: the API refuses a way out that a page on another site could send.
-    logout: async () =>
-      request('/auth/logout', z.undefined(), {
-        method: 'POST',
-        headers: new Headers({ [LOGIN_HEADER]: '1' }),
-      }),
+    logout: async () => {
+      noContent(
+        await exchange('/auth/logout', z.undefined(), {
+          method: 'POST',
+          headers: new Headers({ [LOGIN_HEADER]: '1' }),
+        }),
+      )
+    },
     saveSettings: async (input) =>
       request('/actors/me/settings', actorCodec, {
         method: 'PUT',

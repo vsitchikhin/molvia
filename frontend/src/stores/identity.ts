@@ -75,13 +75,21 @@ export function erasedWhileAway(): boolean {
  * Every write of the app goes to both shelves, so a drawer only here, with **not one key of this
  * owner** on a shared shelf that works, is a drawer erased there. A shelf that cannot be written
  * says nothing (`null`): with it refusing, this tab's shelf is the only one, legitimately.
+ *
+ * **The premise, checked** (self-review Р3-1): Safari's seven-day cap on script-writable storage
+ * clears `SessionStorage` together with `LocalStorage` (WebKit, «Full Third-Party Cookie Blocking
+ * and More», 2020), so ITP does not produce a drawer on one shelf only. What still can is clearing
+ * the shared shelf by hand — the developer tools, an extension — and then this tab's copy goes too.
+ * A named limit: a marker naming who left would keep that owner's id on the device after they
+ * asked to be forgotten.
  */
 function erasedElsewhere(owner: string): boolean {
-  return (
-    sharedHolds(
-      (key) => key === KEY || (key.startsWith('molvia.') && key.endsWith(`.${owner}`)),
-    ) === false
+  // The drawer's name counts by its value, not by its presence (round 4, Ж2): after this owner left
+  // and somebody else signed in, the shared shelf names them, and this owner's drawer is gone.
+  const held = sharedHolds((key, value) =>
+    key === KEY ? value === owner : key.startsWith('molvia.') && key.endsWith(`.${owner}`),
   )
+  return held === false
 }
 
 /**
@@ -109,12 +117,11 @@ function erasedElsewhere(owner: string): boolean {
  */
 export function forgetOwner(owner: string): void {
   current = null
-  forgetWhere(
-    (key) =>
-      key === KEY ||
-      key === LEAVING_KEY ||
-      (key.startsWith('molvia.') && key.endsWith(`.${owner}`)),
-  )
+  forgetWhere((key) => key.startsWith('molvia.') && key.endsWith(`.${owner}`))
+  // The drawer's name and the intent go only when they are this owner's: once somebody else has
+  // signed in here, they name that person (self-review Р3-2).
+  reshape(KEY, (value) => (value === owner ? null : value))
+  reshape(LEAVING_KEY, (value) => (value === owner ? null : value))
   reshape(LOGIN_KEY, (value) => withoutClaimOf(owner, value))
 }
 
