@@ -12,6 +12,7 @@ import { lockTelegramAccount } from './telegram-lock'
 export const ACTOR_REFERENCES = [
   'events.actor_id',
   'exchanges.actor_id',
+  'incomes.actor_id',
   'items.created_by',
   'search_picks.actor_id',
   'sessions.actor_id',
@@ -28,6 +29,7 @@ export const ERASED_TABLES = [
   'expenses',
   'trips',
   'exchanges',
+  'incomes',
   'login_requests',
   'actors',
 ] as const
@@ -107,6 +109,7 @@ export function createErasureRepository(db: Db): ErasureRepository {
             expenses: 0,
             trips: 0,
             exchanges: 0,
+            incomes: 0,
             login_requests: 0,
             actors: 0,
           }
@@ -146,6 +149,10 @@ export function createErasureRepository(db: Db): ErasureRepository {
             // counted with it.
             erased.exchanges = await count(
               sql`delete from exchanges where actor_id = ${actorId} returning 1`,
+            )
+            // The same for incomes (MOL-66), their versions going by the cascade from `incomes`.
+            erased.incomes = await count(
+              sql`delete from incomes where actor_id = ${actorId} returning 1`,
             )
           }
           // No foreign key reaches these — on a first login the owner does not exist yet — so

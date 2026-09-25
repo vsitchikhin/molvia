@@ -13,6 +13,8 @@ import {
   exchangeRevisions,
   exchanges,
   expenses,
+  incomeRevisions,
+  incomes,
   items,
   loginRequests,
   places,
@@ -94,10 +96,24 @@ async function aLife(
   ])
   // An amendment's trace (MOL-42): it names the exchange, not the person, and goes with it.
   await db.insert(exchangeRevisions).values({ exchangeId, revision: 1, ...exchange })
+  // Money that came in (MOL-66): one live income with a version before it, one removed.
+  const income = {
+    actorId,
+    amountMinor: 9_961_500n,
+    currency: 'RUB',
+    receivedOn: '2026-09-15',
+    source: 'salary',
+  } as const
+  const incomeId = randomUUID()
+  await db.insert(incomes).values([
+    { id: incomeId, ...income, revision: 2 },
+    { id: randomUUID(), ...income, deletedAt: new Date() },
+  ])
+  await db.insert(incomeRevisions).values({ incomeId, revision: 1, ...income })
   await insertSession(db, { actorId })
   await insertLoginRequest(db, { telegramUserId }) // confirmed, not yet collected
   await insertLoginRequest(db, { telegramUserId, consumedAt: new Date() })
-  return { ownItem, exchangeId }
+  return { ownItem, exchangeId, incomeId }
 }
 
 /** Every row of every table, as text — a new table cannot hide from this. */
@@ -127,6 +143,7 @@ async function snapshot(actorId: string) {
       select e.* from expenses e join trips t on t.id = e.trip_id where t.actor_id = ${actorId}`),
     sessions: await db.execute(sql`select * from sessions where actor_id = ${actorId}`),
     exchanges: await db.select().from(exchanges).where(eq(exchanges.actorId, actorId)),
+    incomes: await db.select().from(incomes).where(eq(incomes.actorId, actorId)),
   }
 }
 
@@ -147,7 +164,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
     const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
-    const { exchangeId } = await aLife(anna, tg, shared)
+    const { exchangeId, incomeId } = await aLife(anna, tg, shared)
 
     const report = await erasure.erase(tg, { dryRun: false })
 
@@ -161,6 +178,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
         expenses: 2,
         trips: 1,
         exchanges: 2,
+        incomes: 2,
         login_requests: 2,
         actors: 1,
       },
@@ -169,6 +187,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     expect(await rowsMentioning(anna)).toEqual([])
     expect(await rowsMentioning(String(tg), true)).toEqual([])
     expect(await rowsMentioning(exchangeId)).toEqual([])
+    expect(await rowsMentioning(incomeId)).toEqual([])
   })
 
   it('товар, который человек завёл, остаётся в справочнике без автора', async () => {
