@@ -528,7 +528,10 @@ device, private always. The rate is what the two amounts say and is not stored b
   with, and this rule does not need them to: attempts that cut by the day alone took the whole
   dollar history of anyone who once changed leftover roubles (Ж2, Л1). Which exchanges gave their
   currency a price only the whole walk knows, so the server says it per row (`priced`) and the
-  sheet asks «сколько было до обмена» by that, never re-deriving the rule. Earlier exchanges stay in
+  sheet asks «сколько было до обмена» when the latest exchange into that currency on or before the
+  chosen day is priced — the currency _has_ a price then, not merely had one once (round 4, Н2) —
+  never re-deriving the rule. A wallet lost to the old reckoning says so in its own words
+  (`walletUnknown.reason: 'oldReckoning'`), since «no bank rate that day» would be untrue (Н1). Earlier exchanges stay in
   the list as they were. A trip started offline with the old currency in its `context`
   is not cut — the cut is about the current one.
 - **Exact to eighteen digits, rounded to six once.** `walletRate` keeps ratios of integers through
