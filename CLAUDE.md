@@ -325,50 +325,53 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   found and taken by its own name («марианна») does not move «молоко» at all. It is written when the item is
   added to a trip, not on a tap — a tap the sheet cancels is a changed mind. It never forgets;
   if a stale pick starts to hurt, decay is a task with a number, not a guess.
-- **What people call a thing the shelf writes otherwise is a dictionary (MOL-45).** «картошка»
-  for «Картофель», «орешки» for «Арахис»: no spelling rule and no threshold reaches them.
+- **What people call a thing the shelf writes otherwise is a dictionary (MOL-45).** «картошка» for
+  «Картофель», «орешки» for «Арахис»: no spelling rule and no threshold reaches them.
   `synonymKeys` in `packages/model` expands a word of the query, looked up by its **exact** key,
   into the words it also stands for — a group of the same thing both ways, a wider word into
-  narrower ones one way («арахис» never finds «Фисташки»). Only the query is expanded and
-  nothing is stored, so **the dictionary is not frozen**: a word added is a commit, not a
-  migration. **A synonym counts only as the word of the kind, at no cost** — the first word of
-  a name that is not an adjective, `kindKey` (owner's decisions on review): «Вода Джермук»,
-  «Скумбрия х/к», «Молодой картофель», «Армянский лаваш». Anywhere in the name it found
-  «Мицеллярная вода» for «минералка», the tuna of a cat food for «рыба», a pizza for «сыр»; the
-  first word alone missed every name with an adjective in front, which is how people write it.
-  An adjective is read off the name by its ending (`ADJECTIVE_WORD`, one pattern for the domain
-  and for Postgres), not off the key, which collapses «солёный» to `soleni`, the ending of
-  «огурцы»; nouns with that ending — «Пирожное», «Мороженое», «Жаркое» — are listed apart
-  (`NOUN_WORD`), or «Пирожное Картошка» was a potato. The words of a name are split by one
-  written-out class, `WORD_BREAK` — every Unicode `White_Space` — in both places: `\s` of
-  JavaScript takes the no-break space and `\s` of Postgres does not, and a name pasted with one
-  was found offline and missed online; a test walks every code point, as for `INVISIBLE`. A
-  narrower target that is itself an adjective — «минеральная», «газированная» — is never the
-  kind, and counts as any word of the name; an adjective of a group of the same thing —
-  «гречневая», «овсяная» — counts only as the kind, since it describes «Лапша гречневая» as
-  often as the groats (owner's decision on review). «вода» is no longer a target of «минералка»: the
-  water is in «Вода туалетная» first word and all. The prices: «Вода Джермук» without the word is
-  not a «минералка», a name with its brand first («Barilla спагетти») is found only by its own
-  word, and «Фарш рыбный» is meat to «мясо». Its candidates come from `like '%word%'` on the
-  same GIN index, not from `%>`: at 0.15 each of the eight fish of «рыба» brought in half of
-  20 000 names and the query took six seconds. **The typed spelling is not measured only for a word whose synonym
-  brought the name in** — «лори» brings «Рис», and `sir` is two edits from `ris`; but «хаггис»
-  of «памперсы хаггис» is still measured against the «Huggies» that «подгузники» brought. **A
-  word found by its synonym stays out of the mean** of MOL-10: free, it lent its budget to the
-  next word, and «хлеб барадинский» found «Лаваш армянский». **At most sixteen words** of the
-  dictionary per query (`MAX_SYNONYMS`): twelve wide words expanded into fifty and held a
-  connection for a second and a half; now some 0.4 s against 0.3 s on master, and one- and
-  two-word queries do not reach the cap. **A target is a kind of product, never a brand**:
+  narrower ones one way («арахис» never finds «Фисташки»). Only the query is expanded and nothing
+  is stored, so **the dictionary is not frozen**: a word added is a commit, not a migration. **A
+  synonym counts only as the word of the kind, at no cost** — the first word of a name that is not
+  an adjective, `kindKey` (owner's decisions on review): «Вода Джермук», «Скумбрия х/к», «Молодой
+  картофель», «Армянский лаваш». Anywhere in the name it found «Мицеллярная вода» for «минералка»,
+  the tuna of a cat food for «рыба», a pizza for «сыр»; the first word alone missed every name
+  with an adjective in front, which is how people write it. An adjective is read off the name by
+  its ending (`ADJECTIVE_WORD`, one pattern for the domain and for Postgres), not off the key,
+  which collapses «солёный» to `soleni`, the ending of «огурцы»; nouns with that ending —
+  «Пирожное», «Мороженое», «Жаркое» — are listed apart (`NOUN_WORD`), or «Пирожное Картошка» was a
+  potato. The words of a name are split by one written-out class, `WORD_BREAK` — every Unicode
+  `White_Space` — in both places: `\s` of JavaScript takes the no-break space and `\s` of Postgres
+  does not, and a name pasted with one was found offline and missed online; a test walks every
+  code point, as for `INVISIBLE`. A narrower target that is itself an adjective — «минеральная»,
+  «газированная» — is never the kind, and counts as any word of the name; an adjective of a group
+  of the same thing — «гречневая», «сгущённое» — counts right before the kind, where a shelf
+  writes «Гречневая крупа», «Сгущённое молоко», and not after it, where «Лапша гречневая» carries
+  it (owner's decisions on review; the price: «Гречневая лапша»). «вода» is no longer a target of
+  «минералка»: the water is in «Вода туалетная» first word and all. The prices: «Вода Джермук»
+  without the word is not a «минералка», a name with its brand first («Barilla спагетти») is found
+  only by its own word, and «Фарш рыбный» is meat to «мясо». Its candidates come from
+  `like 'word%'` and `like '% word%'` — the start of a word — on the same GIN index, not from
+  `%>`: at 0.15 each of the eight fish of «рыба» brought in half of 20 000 names and the query took six
+  seconds. **The typed spelling is not measured only for a word whose synonym brought the name
+  in** — «лори» brings «Рис», and `sir` is two edits from `ris`; but «хаггис» of «памперсы хаггис»
+  is still measured against the «Huggies» that «подгузники» brought. **A word found by its synonym
+  stays out of the mean** of MOL-10: free, it lent its budget to the next word, and «хлеб
+  барадинский» found «Лаваш армянский». **At most sixteen words** of the dictionary per query
+  (`MAX_SYNONYMS`): twelve wide words expanded into fifty and held a connection for a second and a
+  half. **The price, measured:** over 20 000 names built of the very words the dictionary expands
+  into, twelve wide words take about 0.5 s against 0.27 s on master, and a shelf query of one or
+  two words 30–60 ms more than master; the cost is ranking the names that carry the synonyms, not
+  finding them, so a smaller cap wins little. **A target is a kind of product, never a brand**:
   expanding into a maker would be a place in the results handed out by hand; the other way round
   is fine («памперсы» → «подгузники» of every maker), and «белизна» is let in as the common name
   of a kind. **No categories** — «овощи», «специи», «сладости» name a shelf, and reaching kefir
   from «молочка» is what embeddings are for in 0.2. The forms people type are written out —
-  nominative, genitive and accusative, singular and plural; a form left out is a miss. Measured
-  on MOL-14's corpus: the six misses found, «макароны» finds the spaghetti the shelf carries,
-  nothing else moved; the words come from the owner's expense log plus the usual pairs of a
-  grocery. The prices, named: a typo in the synonym itself is not expanded, and a name with no
-  word of its kind («Coca-Cola 1 л» for «газировка») stays out of reach. Offline, «Часто берёте»
-  reads the dictionary by the same rules — the word of the kind, a pair for every word.
+  nominative, genitive and accusative, singular and plural; a form left out is a miss. Measured on
+  MOL-14's corpus: the six misses found, «макароны» finds the spaghetti the shelf carries, nothing
+  else moved; the words come from the owner's expense log plus the usual pairs of a grocery. The
+  prices, named: a typo in the synonym itself is not expanded, and a name with no word of its kind
+  («Coca-Cola 1 л» for «газировка») stays out of reach. Offline, «Часто берёте» reads the
+  dictionary by the same rules — the word of the kind, a pair for every word.
 - **And the person's own word (MOL-45).** A query the server found nothing for, followed on
   the same screen by a pick found by another word, is learnt with the purchase —
   `search_picks.admits` — and from then on **exactly that query** lets the item in: the one
