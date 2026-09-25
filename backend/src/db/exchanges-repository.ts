@@ -1,5 +1,5 @@
-import { and, asc, eq, gt, isNotNull, isNull, or, sql, sum } from 'drizzle-orm'
-import { DomainError, ERROR, exchangeSchema } from '@molvia/model'
+import { and, asc, eq, gt, isNotNull, isNull, lte, ne, or, sql, sum } from 'drizzle-orm'
+import { DomainError, ERROR, EXCHANGE_UNDO_MINUTES, exchangeSchema } from '@molvia/model'
 import type { Currency, Exchange, ExchangeBody, RatePreference } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -29,15 +29,25 @@ export interface ExchangeRepository {
   /**
    * «Вернуть»: the owner's removed exchange, back with its own `created_at` — written anew it
    * would take the moment of the tap, and move both the order of its day and the hint (round 2,
-   * В1, В2). `false` when there is nothing to bring back: already final, or never removed.
+   * В1, В2). Repeatable: an exchange already back is `true` too, because the answer that said so
+   * may have been lost (round 3, Д1). `false` only when there is no such row of the owner's —
+   * already final, or never theirs.
    */
   restore(actorId: string, id: string): Promise<boolean>
 
   /**
-   * Removed exchanges of the owner, deleted for good. Called by every request of the screen but
-   * «Вернуть»: once another request is made, the screen no longer offers them back.
+   * Removed exchanges of the owner, deleted for good — all but `except`. Called by every request of
+   * the screen but «Вернуть»: once another request is made, the screen no longer offers them back.
+   * The exception is the exchange a removal is about: a removal sent again after a lost answer
+   * must not make final the very row it is marking (round 3, Д2).
    */
-  purgeRemoved(actorId: string): Promise<void>
+  purgeRemoved(actorId: string, except?: string): Promise<void>
+
+  /**
+   * Removed exchanges of everyone, deleted for good once `EXCHANGE_UNDO_MINUTES` have passed —
+   * the server's minute timer, for the owner who removed one and never came back (В-7).
+   */
+  purgeStale(): Promise<void>
 
   /** Every exchange of the owner, in the order the wallet walks them: by day, then as written. */
   list(actorId: string): Promise<readonly Exchange[]>
@@ -62,6 +72,11 @@ export interface ExchangeRepository {
 }
 
 type Row = typeof exchanges.$inferSelect
+
+/** The moment before which a removal can no longer be undone, by the database's clock. */
+function undoFrom() {
+  return sql`clock_timestamp() - make_interval(mins => ${EXCHANGE_UNDO_MINUTES})`
+}
 
 function toExchange(row: Row): Exchange {
   return exchangeSchema.parse({
@@ -136,17 +151,31 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
           and(
             eq(exchanges.id, own),
             eq(exchanges.actorId, actorId),
-            isNotNull(exchanges.deletedAt),
+            // Past its time a removal is final even before the timer comes round.
+            or(isNull(exchanges.deletedAt), gt(exchanges.deletedAt, undoFrom())),
           ),
         )
         .returning({ id: exchanges.id })
       return restored.length > 0
     },
 
-    async purgeRemoved(actorId) {
+    async purgeStale() {
       await db
         .delete(exchanges)
-        .where(and(eq(exchanges.actorId, actorId), isNotNull(exchanges.deletedAt)))
+        .where(and(isNotNull(exchanges.deletedAt), lte(exchanges.deletedAt, undoFrom())))
+    },
+
+    async purgeRemoved(actorId, except) {
+      const kept = except === undefined ? null : idOrNull(except)
+      await db
+        .delete(exchanges)
+        .where(
+          and(
+            eq(exchanges.actorId, actorId),
+            isNotNull(exchanges.deletedAt),
+            kept === null ? undefined : ne(exchanges.id, kept),
+          ),
+        )
     },
 
     async list(actorId) {

@@ -46,6 +46,7 @@ import { startTrip } from '@/usecases/start-trip'
 import { startLogin } from '@/usecases/start-login'
 import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
 import { createActorRepository } from '@/db/actors-repository'
+import { createExchangeRepository } from '@/db/exchanges-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
@@ -223,7 +224,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   app.register((instance, _options, done) => {
     const db = options.db ?? getDb()
     const loginRequests = createLoginRequestRepository(db)
+    const removedExchanges = createExchangeRepository(db)
     let stopCleanup: (() => Promise<void>) | undefined
+    let stopExchangeCleanup: (() => Promise<void>) | undefined
     instance.addHook('onReady', (ready) => {
       stopCleanup = startLoginCleanup(
         () => loginRequests.removeExpired(),
@@ -231,10 +234,19 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           instance.log.error('login request cleanup failed')
         },
       )
+      // The same minute timer: a removed exchange is final ten minutes on, whether or not its
+      // owner opens the screen again (MOL-40, В-7).
+      stopExchangeCleanup = startLoginCleanup(
+        () => removedExchanges.purgeStale(),
+        () => {
+          instance.log.error('removed exchange cleanup failed')
+        },
+      )
       ready()
     })
     instance.addHook('onClose', async () => {
       await stopCleanup?.()
+      await stopExchangeCleanup?.()
     })
     const actors = createActorRepository(db)
     const items = createItemRepository(db)

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { eq, sql } from 'drizzle-orm'
+import { eq, inArray, sql } from 'drizzle-orm'
 import { ERROR, money } from '@molvia/model'
 import type { ExchangeBody } from '@molvia/model'
 import { createExchangeRepository } from '@/db/exchanges-repository'
@@ -154,8 +154,30 @@ describe('exchanges: чтение и удаление', () => {
     expect(await repository.restore(owner, own.exchange.id)).toBe(true)
     const [back] = await repository.list(owner)
     expect(back?.createdAt).toEqual(own.exchange.createdAt)
-    // Nothing removed any more: a second «Вернуть» has nothing to bring back.
-    expect(await repository.restore(owner, own.exchange.id)).toBe(false)
+    // Again after a lost answer: the same success, and nothing moves (round 3, Д1).
+    expect(await repository.restore(owner, own.exchange.id)).toBe(true)
+    expect((await repository.list(owner))[0]?.createdAt).toEqual(own.exchange.createdAt)
+  })
+
+  it('через 10 минут удалённое не вернуть и таймер стирает его — у всех; свежее не трогает (В-7)', async () => {
+    const owner = await insertActor(db)
+    const stranger = await insertActor(db)
+    const old = await repository.add(owner, body())
+    const theirs = await repository.add(stranger, body())
+    const fresh = await repository.add(owner, body())
+    for (const id of [old.exchange.id, theirs.exchange.id, fresh.exchange.id]) {
+      await repository.remove(id === theirs.exchange.id ? stranger : owner, id)
+    }
+    await db
+      .update(exchanges)
+      .set({ deletedAt: new Date(Date.now() - 11 * 60 * 1000) })
+      .where(inArray(exchanges.id, [old.exchange.id, theirs.exchange.id]))
+
+    // Before the timer comes round a removal past its time already cannot be undone.
+    expect(await repository.restore(owner, old.exchange.id)).toBe(false)
+    await repository.purgeStale()
+    expect((await db.select().from(exchanges)).map((row) => row.id)).toEqual([fresh.exchange.id])
+    expect(await repository.restore(owner, fresh.exchange.id)).toBe(true)
   })
 
   it('удалённое держит имя, пока не стёрто, и стирается окончательно только своё', async () => {

@@ -174,7 +174,8 @@ export async function recordExchange(
 /**
  * «Удалить обмен» (Р-4): no amending, a wrong exchange is removed and entered again. Trips
  * already started keep the rate they took; only trips from now on see the wallet without it.
- * Removed and not yet final: the one removed before it is, since only the latest is offered back.
+ * Removed and not yet final: the one removed before it is, since only the latest is offered back
+ * — but never this one, when the removal is sent again after a lost answer (round 3, Д2).
  */
 export async function removeExchange(
   repositories: Repositories,
@@ -182,14 +183,15 @@ export async function removeExchange(
   id: string,
   now: Date = new Date(),
 ): Promise<ExchangesResponse> {
-  await repositories.exchanges.purgeRemoved(owner.id)
+  await repositories.exchanges.purgeRemoved(owner.id, id)
   await repositories.exchanges.remove(owner.id, id)
   return exchangesOverview(repositories, owner, now)
 }
 
 /**
- * «Вернуть» (В-5): the removed exchange as it was, `created_at` included. Nothing to bring back —
- * already final, or someone else's — answers as a missing row does.
+ * «Вернуть» (В-5): the removed exchange as it was, `created_at` included. Again after a lost answer
+ * it is the same success. Nothing to bring back — already final, or someone else's — answers as a
+ * missing row does.
  */
 export async function restoreExchange(
   repositories: Repositories,

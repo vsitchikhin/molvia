@@ -54,6 +54,14 @@ export const exchangeSchema = z
 export type Exchange = z.infer<typeof exchangeSchema>
 
 /**
+ * How long a removed exchange can be brought back (owner's decision В-7, 25.09.2026). After that it
+ * is deleted for good by the server's own minute timer — or sooner, by the owner's next request of
+ * the screen. «Removed and left» used to keep the amounts for as long as the screen went unopened,
+ * and removing an exchange is the one way to take one's figures away before MOL-58 (round 3, Д3).
+ */
+export const EXCHANGE_UNDO_MINUTES = 10
+
+/**
  * How the rate of a wallet was arrived at: weighted by what was left, or taken from the last
  * exchange alone because what was left before it is unknown (MOL-40, В-2). The screen says which
  * — an unknown remainder is not quietly counted as zero.

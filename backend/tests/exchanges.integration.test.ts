@@ -539,6 +539,34 @@ describe('«Обмен денег»: правки второго захода', 
   })
 })
 
+describe('«Обмен денег»: правки третьего захода', () => {
+  it('Д1: «Вернуть» ещё раз после потерянного ответа — снова 200, обмен на месте', async () => {
+    const { cookie } = await owner()
+    const one = payload()
+    await app.inject({ method: 'POST', url: '/exchanges', headers: { cookie }, payload: one })
+    await app.inject({ method: 'DELETE', url: `/exchanges/${one.id}`, headers: { cookie } })
+    const url = `/exchanges/${one.id}/restore`
+    expect((await app.inject({ method: 'POST', url, headers: { cookie } })).statusCode).toBe(200)
+    const again = await app.inject({ method: 'POST', url, headers: { cookie } })
+    expect(again.statusCode).toBe(200)
+    expect(overviewOf(again.json()).exchanges.map((row) => row.id)).toEqual([one.id])
+  })
+
+  it('Д2: удаление ещё раз после потерянного ответа не делает обмен окончательным', async () => {
+    const { cookie } = await owner()
+    const one = payload()
+    await app.inject({ method: 'POST', url: '/exchanges', headers: { cookie }, payload: one })
+    await app.inject({ method: 'DELETE', url: `/exchanges/${one.id}`, headers: { cookie } })
+    await app.inject({ method: 'DELETE', url: `/exchanges/${one.id}`, headers: { cookie } })
+    const back = await app.inject({
+      method: 'POST',
+      url: `/exchanges/${one.id}/restore`,
+      headers: { cookie },
+    })
+    expect(back.statusCode).toBe(200)
+  })
+})
+
 describe('свой курс в походе (MOL-40)', () => {
   async function start(owner: { id: string; cookie: string }, id = randomUUID()) {
     const response = await app.inject({
