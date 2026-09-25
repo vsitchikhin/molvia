@@ -178,9 +178,17 @@ describe('ExchangeSheet', () => {
     expect(view.text()).not.toContain('held before the exchange')
   })
 
-  it('does not ask for exchanges the wallet no longer counts after the currency changed (В-2)', async () => {
-    const view = await render(overview({ baseSince: '2026-09-10' }))
-    expect(view.text()).not.toContain('held before the exchange')
+  it('after the currency changed, asks only by earlier exchanges paid in the new one (В-2, Л1)', async () => {
+    // Roubles, the currency now counted in, paid before the change: the wallet counts that one.
+    const counted = await render(overview({ baseSince: '2026-09-10' }))
+    expect(counted.text()).toContain('held before the exchange')
+    counted.unmount()
+
+    const [base] = overview().exchanges
+    if (!base) throw new Error('the fixture has an exchange')
+    const dollars = { ...base, given: { minor: 10_000n, currency: 'USD' as const } }
+    const left = await render(overview({ baseSince: '2026-09-10', exchanges: [dollars] }))
+    expect(left.text()).not.toContain('held before the exchange')
   })
 
   it('says the hint is about the last exchange alone when what was there before it is unknown', async () => {
@@ -362,6 +370,9 @@ describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
     await saveAmendment(view)
     expect(view.emitted('update:open')).toBeUndefined()
     expect(view.text()).toContain(en.exchange.sheet.amend_conflict)
+    // What the other device wrote is in the sheet itself, not only in the list under it (Л4).
+    expect(view.get('.current').text()).toContain('Now recorded: ₽20,000.00 → ֏95,000.00')
+    expect(view.get('.current').text()).toContain('VTB')
     expect(
       (field(view, en.exchange.sheet.received).get('input').element as HTMLInputElement).value,
     ).toBe('96000')

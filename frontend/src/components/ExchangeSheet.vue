@@ -72,7 +72,12 @@
 
     <template #footer>
       <p v-if="failed" class="failed" role="alert">{{ t('exchange.failed') }}</p>
-      <p v-if="conflict" class="failed" role="alert">{{ t('exchange.sheet.amend_conflict') }}</p>
+      <!-- The version the other device wrote, here and not only in the list the sheet covers: a
+           second «Сохранить» must not go over it unseen (round 2, Л4). -->
+      <div v-if="conflict && editing" class="failed" role="alert">
+        <p class="conflict">{{ t('exchange.sheet.amend_conflict') }}</p>
+        <p class="conflict current">{{ currentOf(editing) }}</p>
+      </div>
       <AppButton size="large" block :busy="sending" :disabled="sending" @click="submit">
         {{
           sending
@@ -229,8 +234,8 @@ export default defineComponent({
     /**
      * Asked only where it weighs anything (MOL-42, Р-2): not for the currency of conversion, which
      * always costs one, and only when that currency already came in by an exchange on or before
-     * the chosen day — and not before the day the currency of conversion changed, whose earlier
-     * exchanges the wallet no longer counts. The chain is walked by days, not by the order of
+     * the chosen day that the wallet counts — before the day the currency of conversion changed,
+     * only one paid in the new currency (round 2, Л1). The chain is walked by days, not by the order of
      * entry, so an earlier day entered second is the first link, whose remainder is ignored
      * (review С-3). A choice of field, not a computation: the list is the server's.
      */
@@ -240,8 +245,9 @@ export default defineComponent({
         !!pair &&
         currencies.received !== pair.base &&
         intoReceived.value.some(
-          ({ exchangedOn }) =>
-            exchangedOn <= day.value && (baseSince === null || exchangedOn >= baseSince),
+          ({ exchangedOn, given }) =>
+            exchangedOn <= day.value &&
+            (baseSince === null || exchangedOn >= baseSince || given.currency === pair.base),
         )
       )
     })
@@ -287,6 +293,20 @@ export default defineComponent({
       return version.note
         ? t('exchange.sheet.version_note', { ...words, note: version.note })
         : t('exchange.sheet.version', words)
+    }
+
+    /** «Сейчас записано: 21 000,00 ₽ → 99 000,00 ֏ · 16 сент. · ВТБ банкомат» */
+    function currentOf(exchange: ExchangeView): string {
+      const words = {
+        amounts: t('exchange.row_amounts', {
+          given: formatMoney(exchange.given, locale.value),
+          received: formatMoney(exchange.received, locale.value),
+        }),
+        date: purchaseDay(yerevanMidnight(exchange.exchangedOn), locale.value),
+      }
+      return exchange.note
+        ? t('exchange.sheet.current_note', { ...words, note: exchange.note })
+        : t('exchange.sheet.current', words)
     }
 
     /** UX only: the server reads the same codecs and has the last word (CLAUDE.md). */
@@ -384,6 +404,7 @@ export default defineComponent({
       noteInvalid,
       noteMax: EXCHANGE_NOTE_MAX,
       versionOf,
+      currentOf,
       asksHeld,
       showsHeld,
       estimate,
@@ -432,6 +453,15 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   list-style: none;
+}
+
+.conflict {
+  margin: 0;
+}
+
+.current {
+  margin-top: var(--space-1);
+  font-weight: var(--weight-medium);
 }
 
 .failed {
