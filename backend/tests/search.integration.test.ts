@@ -333,7 +333,7 @@ describe('search — a unit is a size, not a word (MOL-48)', () => {
     ])
   })
 
-  it('finds by a unit alone only what carries it: «шт» is a word of letters, found exactly', async () => {
+  it('finds by a unit alone what carries it, and not by distance: «шт» is not two edits from «сок»', async () => {
     await named('Булочки с кунжутом 4 шт')
     await named('Сок Noy яблочный 1 л')
     expect(await names('шт')).toEqual(['Булочки с кунжутом 4 шт'])
@@ -354,6 +354,63 @@ describe('search — a unit is a size, not a word (MOL-48)', () => {
     // `chai` and it is out of the budget. Before MOL-48 it was one edit from `paketikov`.
     await named('Чай Ахмад 25 пакетиков')
     expect(await names('чай пакетики')).toEqual([])
+  })
+
+  it('grounds nothing on the units a label prints beside the piece: «см», «Вт», «տուփ»', async () => {
+    await named('Фольга алюминиевая 30 см')
+    await named('Лампочка LED 60 Вт')
+    await named('Թեյ Ահմադ 1 տուփ')
+    for (const query of ['сыр', 'суп', 'соль', 'сом', 'вата']) {
+      expect(await names(query), query).toEqual([])
+    }
+  })
+
+  it('keeps an item on every keystroke while its unit is typed after the number', async () => {
+    // The screen searches as the person types: «шту» is on its way to «штук», and read as a
+    // word it looked for a grounding pair the name no longer offers — empty, with «Предложить
+    // товар» under it, until the unit was typed in full.
+    const typed = [
+      ['Батарейки Duracell AA 4 шт', 'батарейки 4 шт'],
+      ['Яйца куриные 10 штук', 'яйца 10 штук'],
+      ['Витамин C 30 таблеток', 'витамин 30 таблеток'],
+      ['Чай Ахмад 25 пакетиков', 'чай 25 пакетиков'],
+    ] as const
+    for (const [name] of typed) await named(name)
+    for (const [name, query] of typed) {
+      for (let end = query.search(/\d \S/) + 3; end <= query.length; end += 1) {
+        const prefix = query.slice(0, end)
+        expect(await names(prefix), prefix).toContain(name)
+      }
+    }
+  })
+
+  it('reads a slip of the finger in a unit after a number as the unit: «мд», «кн»', async () => {
+    await named('Кефир 500 мл')
+    await named('Сахар 1 кг')
+    expect(await names('кефир 500 мд')).toEqual(['Кефир 500 мл'])
+    expect(await names('сахар 1 кн')).toEqual(['Сахар 1 кг'])
+  })
+
+  it('reads a word as a unit by its place only after a number: «чай пакет» is still a word', async () => {
+    await named('Чай Ахмад 25 пакетиков')
+    expect(await names('чай 25 пакет')).toEqual(['Чай Ахмад 25 пакетиков'])
+    expect(await names('чай пакет')).toEqual([])
+  })
+
+  it('loses a brand whose only word is a unit, when mistyped: «7 ап» — the price, pinned', async () => {
+    // `up` is «уп» of a label, so «7 Up» has no grounding word left and is found by its exact
+    // words only. Keeping «уп» out would let «суп» find «Яйца 10 уп» at one edit.
+    await named('Лимонад 7 Up 0,5 л')
+    expect(await names('7 up')).toEqual(['Лимонад 7 Up 0,5 л'])
+    expect(await names('7 ап')).toEqual([])
+  })
+
+  it('no longer lets a right unit carry a typo through the mean — the price, pinned', async () => {
+    // `shakalat` is three edits from `shokolad`; `gr` used to be a correct extra word and
+    // brought the mean to two. A size never did that, and a unit is a size now.
+    await named('Шоколад Alpen Gold 100 гр')
+    expect(await names('шакалат 100 гр')).toEqual([])
+    expect(await names('шакалат голд')).toEqual(['Шоколад Alpen Gold 100 гр'])
   })
 
   it('keeps every unit one word of letters the length rule would let through', () => {

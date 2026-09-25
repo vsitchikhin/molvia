@@ -70,7 +70,10 @@ const SHORT_WORD = 2
  * misses, and only the forms written after a number: «таблетки» and «капсулы» begin the names
  * of the very goods, and as units «табл» lost «Таблетки для посудомоечной машины» on the way
  * there. The price, accepted: a counting word in another form — «чай пакетики», «бумага
- * рулоны» — is measured as a word and misses (owner's decision, 25.09.2026).
+ * рулоны» — is measured as a word and misses (owner's decision, 25.09.2026). So does a real
+ * word that shares a unit's key, and not only when typed alone: `up` of «уп» is the «Up» of
+ * «7 Up», which «7 ап» no longer reaches, and `hat` of «հատ» is the Latin «hat». Kept anyway —
+ * without «уп» «суп» finds «Яйца 10 уп» at one edit, which is the defect itself.
  */
 export const UNIT_WORDS = [
   'шт',
@@ -80,6 +83,8 @@ export const UNIT_WORDS = [
   'кг',
   'гр',
   'мг',
+  'см',
+  'Вт',
   'уп',
   'упак',
   'рулон',
@@ -94,16 +99,28 @@ export const UNIT_WORDS = [
   'կգ',
   'գր',
   'մլ',
+  'սմ',
+  'տուփ',
   'pcs',
   'pc',
   'ml',
   'kg',
   'gr',
   'mg',
+  'cm',
   'pk',
 ] as const
 
 const UNIT_KEYS = [...new Set(UNIT_WORDS.map(toSearchKey))]
+
+/**
+ * How far a query word right after a number may stray from a unit and still be read as one.
+ * The screen searches while the person types, so «батарейки 4 шту» is on its way to «штук», and
+ * a finger slips to the key next door — «кефир 500 мд». Read as grounding, either looked for a
+ * grounding pair the name no longer offers and lost the item on every keystroke up to the full
+ * unit. Only after a number, where a size stands: «пакеты» alone still does not find the tea.
+ */
+const UNIT_SLIP = 1
 
 /**
  * How many words of a query are looked at. Every query word is compared with every word of
@@ -173,10 +190,24 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       -- cuts the name to the length of the query word, not to 255.
       select left(word, 255) as q,
              length(word) >= ${SHORT_WORD} and word !~ '[0-9]' and word not in ${UNIT_KEYS}
+               and not (after_number and exists (
+                 select 1
+                 from unnest(array[${sql.join(
+                   UNIT_KEYS.map((unit) => sql`${unit}`),
+                   sql`, `,
+                 )}]::text[]) as u(unit)
+                 where levenshtein(left(word, 255), unit) <= ${UNIT_SLIP}
+                    or (last and starts_with(unit, word))
+               ))
                as grounds,
              word ~ '[^0-9]' as lettered,
-             n = max(n) over () as last
-      from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
+             last
+      from (
+        select word,
+               n = max(n) over () as last,
+               coalesce(lag(word) over (order by n) ~ '[0-9]', false) as after_number
+        from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
+      ) w
     ),
     candidates as (
       -- The column goes first, and that is not style: \`search_key %> $1\` is the only form
