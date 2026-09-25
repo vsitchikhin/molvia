@@ -816,7 +816,13 @@ database access. In a product about data integrity, two write paths will silentl
   **a dry run is the real run, rolled back**, so its count cannot disagree with what erasure does.
   **A new table that points at `actors` must join erasure** — a test compares every foreign key
   on `actors` with `ACTOR_REFERENCES`, and another scans every table for the erased person's uuid
-  and Telegram id.
+  and Telegram id. **Its first lock is on the person's login requests, not on the owner**
+  (adversarial О-3): `for update` on an owner who does not exist yet locks nothing, and a login
+  collected meanwhile created an owner the transaction had already decided was not there — «nobody
+  to erase» over a live account. Collection locks its request row before creating the owner, so
+  the two take turns. **The page and the bot name what stays in full** — the items and the shops —
+  and say that copies on the phone are out of the server's reach: nothing clears a device's
+  storage for an owner the server no longer knows, since a 401 there is also an expired session.
 - **No third-party trackers or analytics, and so no cookie banner** (MOL-58). There are two
   cookies, both strictly necessary: the session and the five-minute one of a login in progress
   (MOL-54); what the phone keeps in its storage is the queue and the drafts the app needs to work.
@@ -825,8 +831,15 @@ database access. In a product about data integrity, two write paths will silentl
 - **Logs live fourteen days and carry no address and no query** (MOL-58). The API logs a request
   as its method and path — the query of `/catalogue/search` is what a person looked for; Caddy
   keeps no access log; every container writes to journald, and the term is the host's
-  (`MaxRetentionSec=14day`, `deploy/README.md`). What the privacy page (`/privacy`) says about
-  data is a promise these rules keep: a change to either is a change to both.
+  (`MaxRetentionSec=14day`, `deploy/README.md`). **A failure is logged by its kind, on every
+  path** (adversarial О-1): name, driver code and stack frames through `describeFailure`, never
+  its message — a driver's message is the query with its parameters, and a failed search wrote
+  what was searched for and who asked, a dropped connection the hash of every session token in
+  flight. `forget` prints the same. An unknown address answers without echoing it and is not
+  logged with its query. What the privacy page (`/privacy`) says about data is a promise these
+  rules keep: a change to either is a change to both — and it says only what they keep: other
+  people's prices are shown in the shared mode (MOL-31), so «shown to nobody» is said of the list
+  of purchases, and an address can reach Caddy's error log, so «no address» is said of requests.
 
 ## Frontend and styling rules
 
@@ -944,8 +957,11 @@ Rating reminders are 0.2.
   (`ERASE_BUTTON_SECONDS`); older, without a time or from the future, it is refused over the
   message and taken away. The API answers `204` whether there was anyone to erase or not, and the
   bot writes one sentence for both — «ваших данных в Molvia нет» — so the second press of a double
-  tap cannot overwrite the first with something that sounds different. The erase composer is
-  installed **before** the login's, which ends in a catch-all that greets every text.
+  tap cannot overwrite the first with something that sounds different. **«Отмена» is not an
+  outcome** (adversarial О-2): it is shown over the message and takes the buttons away, and its
+  words are true whichever button came first — written in, «Ничего не удалено» overwrote «Готово»
+  over an account already gone. The erase composer is installed **before** the login's, which
+  ends in a catch-all that greets every text.
 
 - **The i18n rule of the frontend covers the bot too, and this is the line that says so.** Not a
   string of text in the code — every message is a key, Russian first, English mirroring it. The
