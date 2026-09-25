@@ -72,6 +72,20 @@
         </AppCard>
       </section>
     </template>
+    <!-- Outside the form's states: the way into the account does not depend on whether its
+         settings loaded (MOL-57). -->
+    <section class="group">
+      <h2 class="caption">{{ t('settings.group_account') }}</h2>
+      <AppCard as="ul" list>
+        <li>
+          <RouterLink class="entry" :to="{ name: 'devices' }">
+            <IconDevices class="entry-icon" aria-hidden="true" />
+            <span class="entry-label">{{ t('devices.title') }}</span>
+            <IconChevron class="entry-chevron" aria-hidden="true" />
+          </RouterLink>
+        </li>
+      </AppCard>
+    </section>
     <AppButton class="privacy" variant="ghost" block @click="privacy">{{
       t('privacy.title')
     }}</AppButton>
@@ -132,6 +146,7 @@ import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconRefresh from '~icons/mdi/refresh'
 import IconSwap from '~icons/mdi/swap-horizontal'
 import IconChevron from '~icons/mdi/chevron-right'
+import IconDevices from '~icons/mdi/devices'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
@@ -155,6 +170,7 @@ export default defineComponent({
     IconRefresh,
     IconSwap,
     IconChevron,
+    IconDevices,
   },
   setup() {
     const { t } = useI18n()
@@ -267,7 +283,8 @@ export default defineComponent({
   color: var(--bad-ink);
 }
 
-.money {
+.money,
+.group {
   margin-top: var(--space-6);
 }
 

@@ -364,6 +364,33 @@
       "bad_day": "Choose the day of the exchange"
     }
   },
+  "devices": {
+    "title": "Devices",
+    "list_title": "Where you are signed in",
+    "this_device": "This device",
+    "unknown": "Unknown device",
+    "meta_current": "Signed in {signedIn}",
+    "meta": "Signed in {signedIn} · last seen {seen}",
+    "end": "Sign out",
+    "end_label": "Sign out {device}",
+    "end_sheet": {
+      "title": "Sign out {device}?",
+      "body": "Molvia will ask to sign in with Telegram again on that device. This cannot be undone from here.",
+      "confirm": "Sign out device"
+    },
+    "end_failed": "Could not sign that device out. Check the connection and try again.",
+    "ended": "{device} is signed out",
+    "more": "Showing the latest {shown} of {total}",
+    "note": "A signed-out device asks to sign in again the next time it is opened. What is saved on the device itself is beyond the server's reach.",
+    "load_error": {
+      "title": "The list did not load",
+      "body": "The server did not answer. Try again."
+    },
+    "offline": {
+      "title": "No connection",
+      "body": "The list of devices will be here when the connection is back."
+    }
+  },
   "identity": {
     "error": {
       "title": "Could not check the sign-in",
@@ -513,7 +540,8 @@
       "title": "Connection lost while saving",
       "body": "We will check with the server when it returns. Your edits will stay here."
     },
-    "group_money": "Money"
+    "group_money": "Money",
+    "group_account": "Account"
   },
   "privacy": {
     "title": "Data and privacy",

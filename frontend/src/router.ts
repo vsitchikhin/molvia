@@ -8,6 +8,7 @@ import TripHistoryView from '@/views/TripHistoryView.vue'
 import FinishedTripView from '@/views/FinishedTripView.vue'
 import TripView from '@/views/TripView.vue'
 import ExchangeView from '@/views/ExchangeView.vue'
+import DevicesView from '@/views/DevicesView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
 import { watchBrowserAnimatedBack } from '@/transitions'
 
@@ -20,6 +21,7 @@ export type RouteName =
   | 'verdicts'
   | 'settings'
   | 'exchange'
+  | 'devices'
   | 'item-search'
   | 'trip-history'
   | 'finished-trip'
@@ -61,6 +63,12 @@ export const routes = [
     name: 'exchange',
     component: ExchangeView,
     meta: { titleKey: 'exchange.title', parent: 'settings' },
+  },
+  {
+    path: '/settings/devices',
+    name: 'devices',
+    component: DevicesView,
+    meta: { titleKey: 'devices.title', parent: 'settings' },
   },
   { path: '/', name: 'trip', component: TripView, meta: { titleKey: 'trip.title', tab: 'trip' } },
   {
