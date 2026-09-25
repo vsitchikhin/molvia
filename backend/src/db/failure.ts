@@ -71,21 +71,35 @@ export interface FailureSummary {
  * `DrizzleQueryError` carries the whole query and its parameters — what a person searched for,
  * their uuid, the hash of their session token — and `postgres` adds `detail` with the values of
  * the row; a `ZodError` quotes the input it refused. So nothing here reads a message: the name,
- * the code from the chain `codeOf` walks, and the frames of the stack, taken line by line
- * because a multi-line message sits at its head.
+ * the code from the chain `codeOf` walks, and the frames of the stack.
+ *
+ * **The frames are what follows the stack's own header, and nothing is judged by its shape**
+ * (adversarial П-1). Picking the lines that look like `    at …` let a person's text through: a
+ * review is multi-line, it rides in the driver's message as a parameter, and a line of it written
+ * as a frame — or as a whole invented one — landed in `frames`, with the rest of the parameters
+ * behind it. V8 writes the stack as `name: message` and then the frames, so the header is cut off
+ * whole, however many lines it spans; a stack that does not begin with it gives no frames at all
+ * rather than a guess.
  */
 export function describeFailure(error: unknown): FailureSummary {
   const errorName = error instanceof Error ? error.name : typeof error
   const raw = codeOf(error)
   const code = raw !== undefined && /^[\dA-Z_]{1,64}$/.test(raw) ? raw : undefined
-  const frames =
-    error instanceof Error && typeof error.stack === 'string'
-      ? error.stack
-          .split('\n')
-          .filter((line) => line.startsWith('    at '))
-          .slice(0, 8)
-          .map((line) => line.trim())
-      : undefined
+  let frames: string[] | undefined
+  if (error instanceof Error && typeof error.stack === 'string') {
+    // With no message V8 writes the name alone, and some runners still add `: ` after it.
+    const headers = error.message
+      ? [`${error.name}: ${error.message}`]
+      : [`${error.name}: `, error.name]
+    const header = headers.find((candidate) => error.stack?.startsWith(`${candidate}\n`))
+    if (header !== undefined) {
+      frames = error.stack
+        .slice(header.length + 1)
+        .split('\n')
+        .slice(0, 8)
+        .map((line) => line.trim())
+    }
+  }
   return {
     errorName,
     ...(code === undefined ? {} : { code }),
