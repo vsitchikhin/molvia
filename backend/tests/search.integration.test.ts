@@ -3,7 +3,7 @@ import { toSearchKey } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { sql as raw } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
-import { createItemRepository, rankedCandidates } from '@/db/items-repository'
+import { UNIT_WORDS, createItemRepository, rankedCandidates } from '@/db/items-repository'
 import { createSearchPickRepository } from '@/db/search-picks-repository'
 import type { Conn } from '@/db/index'
 import { itemBarcodes, items } from '@/db/schema'
@@ -24,6 +24,14 @@ async function named(name: string): Promise<string> {
 
 async function names(query: string, limit = 20): Promise<string[]> {
   return (await repo.search(query, limit, nobody)).map((item) => item.name)
+}
+
+/** A candidate by trigrams, so a missing answer below is the distance speaking. */
+async function candidate(query: string, name: string): Promise<boolean> {
+  const [row] = await db.execute<{ ws: number }>(
+    raw`select word_similarity(${toSearchKey(query)}, ${toSearchKey(name)}) as ws`,
+  )
+  return Number(row?.ws) > 0.15
 }
 
 beforeEach(async () => {
@@ -284,6 +292,79 @@ describe('search — sizes written together', () => {
   })
 })
 
+describe('search — a unit is a size, not a word (MOL-48)', () => {
+  it('does not ground a match on a unit: «сыр» is two edits from `sht`, and finds nothing', async () => {
+    // A candidate by trigrams and two edits from «шт» — inside the budget until a unit stopped
+    // grounding, when every item sold by the piece answered «сыр».
+    await named('Булочки с кунжутом 4 шт')
+    await named('Сливки Марианна 20% 200 мл')
+    expect(await candidate('сыр', 'Булочки с кунжутом 4 шт')).toBe(true)
+    expect(await names('сыр')).toEqual([])
+    expect(await names('соль')).toEqual([])
+    expect(await names('мыло')).toEqual([])
+  })
+
+  it('reads a unit the same from three keyboards', async () => {
+    await named('Булочки 6 հատ')
+    await named('Eggs 10 pcs')
+    for (const [query, name] of [
+      ['хот', 'Булочки 6 հատ'],
+      ['пикс', 'Eggs 10 pcs'],
+    ] as const) {
+      expect(await candidate(query, name), query).toBe(true)
+      expect(await names(query), query).toEqual([])
+    }
+  })
+
+  it('still refines the ranking: «кефир 500 мл» puts its own size first', async () => {
+    // The rule holds on the query's side too: `ml` of the query grounds nothing, so it does
+    // not go looking for a grounding pair the name no longer offers.
+    await named('Кефир 1 л')
+    await named('Кефир 500 мл')
+    expect(await names('кефир 500 мл')).toEqual(['Кефир 500 мл', 'Кефир 1 л'])
+  })
+
+  it('makes a wrong count cost an edit, as a wrong size does: «4 шт» against «10 шт»', async () => {
+    await named('Батарейки Duracell AA 10 шт')
+    await named('Батарейки Duracell AA 4 шт')
+    expect(await names('батарейки 4 шт')).toEqual([
+      'Батарейки Duracell AA 4 шт',
+      'Батарейки Duracell AA 10 шт',
+    ])
+  })
+
+  it('finds by a unit alone only what carries it: «шт» is a word of letters, found exactly', async () => {
+    await named('Булочки с кунжутом 4 шт')
+    await named('Сок Noy яблочный 1 л')
+    expect(await names('шт')).toEqual(['Булочки с кунжутом 4 шт'])
+  })
+
+  it('takes a counting word only in the form written after a number', async () => {
+    // «пакетиков» is a unit: «пакеты» no longer finds tea. «Таблетки» is not — it begins the
+    // name of the goods, and as a unit «табл» lost them on the way to the word.
+    await named('Чай Ахмад 25 пакетиков')
+    await named('Таблетки для посудомоечной машины Finish 40 таблеток')
+    expect(await names('пакеты')).toEqual([])
+    expect(await names('табл')).toEqual(['Таблетки для посудомоечной машины Finish 40 таблеток'])
+    expect(await names('чай')).toEqual(['Чай Ахмад 25 пакетиков'])
+  })
+
+  it("misses a counting word in another form — the price, pinned (owner's decision)", async () => {
+    // `paketiki` is not in the list, so it grounds and finds no grounding pair: the mean of
+    // `chai` and it is out of the budget. Before MOL-48 it was one edit from `paketikov`.
+    await named('Чай Ахмад 25 пакетиков')
+    expect(await names('чай пакетики')).toEqual([])
+  })
+
+  it('keeps every unit one word of letters the length rule would let through', () => {
+    // A key with a space would never equal a word, one with a digit or of one letter is caught
+    // by the length rule already, and a duplicate says the list was not read.
+    const keys = UNIT_WORDS.map(toSearchKey)
+    for (const [at, key] of keys.entries()) expect(key, UNIT_WORDS[at]).toMatch(/^[^\s0-9]{2,}$/)
+    expect(new Set(UNIT_WORDS).size).toBe(UNIT_WORDS.length)
+  })
+})
+
 describe("search — names of short words: «M&M's»", () => {
   it('finds the brand in a longer name and while it is being typed', async () => {
     // No grounding word, but letters: every query word has to be found exactly, the last one
@@ -338,14 +419,6 @@ describe('search — while the word is being typed', () => {
 })
 
 describe('search — how the word distances fold (MOL-10)', () => {
-  /** A candidate by trigrams, so a missing answer below is the distance speaking. */
-  async function candidate(query: string, name: string): Promise<boolean> {
-    const [row] = await db.execute<{ ws: number }>(
-      raw`select word_similarity(${toSearchKey(query)}, ${toSearchKey(name)}) as ws`,
-    )
-    return Number(row?.ws) > 0.15
-  }
-
   it('folds grounding words by their mean, not their worst: 3 and 0 pass as 2', async () => {
     // `shakalat` is three edits from `shokolad`, `grand` is exact. The worst word would lose
     // the item; the mean keeps it — the rule that spares a correct extra word.

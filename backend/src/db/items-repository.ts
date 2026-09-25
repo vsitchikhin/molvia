@@ -59,6 +59,53 @@ const ACCEPTED_DISTANCE = 2
 const SHORT_WORD = 2
 
 /**
+ * A unit grounds nothing either, whatever its length — it is the size too, only spelled with
+ * letters. The length alone stopped «л» and let «шт» through: `sht` is two edits from `sir`,
+ * so «сыр» found every item sold by the piece, six of them on MOL-14's shelf (MOL-48). The
+ * same on both sides, or «кефир 500 мл» would ask for a grounding pair of `ml` and lose
+ * «Кефир 500 мл».
+ *
+ * Words as a label prints them, keyed by the function the name goes through, so the list
+ * follows the alphabet by itself and nothing stored depends on it. Only what the length rule
+ * misses, and only the forms written after a number: «таблетки» and «капсулы» begin the names
+ * of the very goods, and as units «табл» lost «Таблетки для посудомоечной машины» on the way
+ * there. The price, accepted: a counting word in another form — «чай пакетики», «бумага
+ * рулоны» — is measured as a word and misses (owner's decision, 25.09.2026).
+ */
+export const UNIT_WORDS = [
+  'шт',
+  'штук',
+  'штуки',
+  'мл',
+  'кг',
+  'гр',
+  'мг',
+  'уп',
+  'упак',
+  'рулон',
+  'рулона',
+  'рулонов',
+  'пакетик',
+  'пакетика',
+  'пакетиков',
+  'таблеток',
+  'капсул',
+  'հատ',
+  'կգ',
+  'գր',
+  'մլ',
+  'pcs',
+  'pc',
+  'ml',
+  'kg',
+  'gr',
+  'mg',
+  'pk',
+] as const
+
+const UNIT_KEYS = [...new Set(UNIT_WORDS.map(toSearchKey))]
+
+/**
  * How many words of a query are looked at. Every query word is compared with every word of
  * every candidate, so the cost grows with the query — 42 KB of it held a connection for
  * three seconds. No name on a shelf needs more words than this to be found.
@@ -125,7 +172,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       -- Cut to 255 here, once: levenshtein refuses longer arguments, and the prefix arm below
       -- cuts the name to the length of the query word, not to 255.
       select left(word, 255) as q,
-             length(word) >= ${SHORT_WORD} and word !~ '[0-9]' as grounds,
+             length(word) >= ${SHORT_WORD} and word !~ '[0-9]' and word not in ${UNIT_KEYS}
+               as grounds,
              word ~ '[^0-9]' as lettered,
              n = max(n) over () as last
       from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
@@ -168,7 +216,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                from unnest(string_to_array(c.search_key, ' ')) as w
                -- A grounding word is measured against grounding words only: against «л» or
                -- «1» of a size every two-letter word is two edits away, inside the budget.
-               where not qw.grounds or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]')
+               where not qw.grounds
+                  or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]' and w not in ${UNIT_KEYS})
              ) as qd
       from candidates c
       cross join query_words qw
