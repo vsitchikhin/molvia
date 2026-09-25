@@ -17,6 +17,22 @@ export function purchaseDay(when: Date, locale: string, now = new Date()): strin
 }
 
 /**
+ * The same day, with the year when it is not this one (MOL-57, self-review С-5): a session lives
+ * for as long as it is used, so «вошли 12 сент.» may be a September of another year. Only where a
+ * date can be that old — a purchase card is never older than its trip.
+ */
+export function dayOfAnyYear(when: Date, locale: string, now = new Date()): string {
+  // «Вчера» beats the year: 31 December seen on 1 January is yesterday, whatever the calendar.
+  const days = Math.round((startOfDay(now) - startOfDay(when)) / DAY_MS)
+  if (when.getFullYear() === now.getFullYear() || days <= 1) return purchaseDay(when, locale, now)
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(when)
+}
+
+/**
  * The clock beside that day: «21:40» (MOL-32). The age of a remembered answer is named
  * exactly — «вчера в 21:40» is what a person judges by, while «данные могут быть неактуальны»
  * says nothing — and the two halves travel as separate placeholders because the word between

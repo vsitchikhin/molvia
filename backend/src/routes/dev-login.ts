@@ -11,6 +11,7 @@ import {
 } from '@/cookie'
 import { refuseAnyBody } from './empty-body'
 import type { SignedIn } from '@/usecases/sign-in'
+import { deviceName } from '@/device-name'
 
 /**
  * A login with no Telegram in it — the seam development and the end-to-end suite come in
@@ -98,7 +99,7 @@ function accountOf(request: FastifyRequest): TelegramUserId | null {
 
 export function devLoginRoute(
   app: FastifyInstance,
-  api: { signIn(id: TelegramUserId): Promise<SignedIn> },
+  api: { signIn(id: TelegramUserId, deviceName: string | null): Promise<SignedIn> },
 ): void {
   app.post(
     '/dev/login',
@@ -115,7 +116,12 @@ export function devLoginRoute(
       // otherwise hand out the same number and the second call would answer CONFLICT. Well
       // inside 2^40, so it can never be mistaken for the safe-integer ceiling the column checks.
       const telegramUserId = remembered ?? randomInt(1, 2 ** 40)
-      const { actor, token, expiresAt } = await api.signIn(telegramUserId)
+      // Named like a real login's device (MOL-57): without it every session of a working copy —
+      // and every one the end-to-end suite makes — reads «unknown device» in «Устройства».
+      const { actor, token, expiresAt } = await api.signIn(
+        telegramUserId,
+        deviceName(request.headers['user-agent']),
+      )
 
       // Written back even when it was read, so a year of development never runs the cookie out
       // from under a browser that keeps using it.

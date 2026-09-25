@@ -17,9 +17,19 @@
  * seven days, and with it whatever the trip queue had not sent. That is a property of MOL-24;
  * the session itself survives, because a cookie the server set is not what ITP caps.
  */
-import { forget, read, write } from '@/stores/storage'
+import { forget, forgetWhere, read, reshape, sharedHolds, write } from '@/stores/storage'
 
 const KEY = 'molvia.actor'
+
+/**
+ * Where the login screen keeps the request in progress and the owner this device approved
+ * (MOL-56). Named here rather than in the login store, because erasing an owner has to reach it and
+ * this module is the leaf both depend on.
+ */
+export const LOGIN_KEY = 'molvia.login'
+
+/** «Выйти» was pressed for this owner and has not been confirmed yet (MOL-57, adversarial Б2). */
+const LEAVING_KEY = 'molvia.leaving'
 
 /** What this browser is right now. `null` until `/actors/me` has answered once. */
 let current: string | null = null
@@ -35,9 +45,125 @@ export function isIdentifier(value: string | null): value is string {
 export function currentIdentity(): string | null {
   if (current === null) {
     const stored = read(KEY)
-    if (isIdentifier(stored)) current = stored
+    if (isIdentifier(stored)) {
+      if (erasedElsewhere(stored)) forgetOwner(stored)
+      else current = stored
+    }
   }
   return current
+}
+
+/**
+ * Asks again whether the drawer this tab knows was erased in another window — what a launch and a
+ * return to the tab do (`actor.start`). A tab the browser froze wakes with its memory intact and
+ * the event it slept through never delivered, so the answer cached above is not enough.
+ */
+export function erasedWhileAway(): boolean {
+  const owner = current ?? read(KEY)
+  if (!isIdentifier(owner) || !erasedElsewhere(owner)) return false
+  forgetOwner(owner)
+  return true
+}
+
+/**
+ * The drawer is on this tab's own shelf and on no other — «Выйти» in another window took it from
+ * the shared one while this tab did not hear it (MOL-57, round 2, Д2). The event reaches live
+ * documents only: a tab the browser unloaded to save memory, or one closed and reopened, gets its
+ * `sessionStorage` back without it, and `read` falling back there opened the app of the person who
+ * left.
+ *
+ * Every write of the app goes to both shelves, so a drawer only here, with **not one key of this
+ * owner** on a shared shelf that works, is a drawer erased there. A shelf that cannot be written
+ * says nothing (`null`): with it refusing, this tab's shelf is the only one, legitimately.
+ *
+ * **The premise, checked** (self-review Р3-1): Safari's seven-day cap on script-writable storage
+ * clears `SessionStorage` together with `LocalStorage` (WebKit, «Full Third-Party Cookie Blocking
+ * and More», 2020), so ITP does not produce a drawer on one shelf only. What still can is clearing
+ * the shared shelf by hand — the developer tools, an extension — and then this tab's copy goes too.
+ * A named limit: a marker naming who left would keep that owner's id on the device after they
+ * asked to be forgotten.
+ */
+function erasedElsewhere(owner: string): boolean {
+  // The drawer's name counts by its value, not by its presence (round 4, Ж2): after this owner left
+  // and somebody else signed in, the shared shelf names them, and this owner's drawer is gone.
+  const held = sharedHolds((key, value) =>
+    key === KEY ? value === owner : key.startsWith('molvia.') && key.endsWith(`.${owner}`),
+  )
+  return held === false
+}
+
+/**
+ * Everything this device keeps for one owner, and the name of the drawer itself (MOL-57, owner's
+ * decision Q1). What «Выйти» leaves behind.
+ *
+ * **By the suffix, not by a list.** Every store files its data as `molvia.<what>.<owner>` — the
+ * trip queue, the drafts, the remembered answers — so a store added next month is swept without
+ * anybody remembering to add it here; `identity.test.ts` pins which keys exist, so a new key that
+ * breaks the shape is a decision rather than a leak.
+ *
+ * **Every shelf this window can reach, and that is not every shelf there is** (adversarial А1).
+ * `sessionStorage` belongs to one tab, so the window where «Выйти» was pressed cannot clear its
+ * neighbours' — each neighbour calls this for itself when it hears the drawer go.
+ *
+ * The login record loses only the approval of this owner: a request in progress in it is another
+ * window's, and a window takes out only what it put in (MOL-56, adversarial А3).
+ *
+ * **Why this does not contradict «a 401 erases nothing» (MOL-56, MOL-58).** That rule exists
+ * because «no session» is also what an expired session looks like, and the queue may hold a
+ * purchase made at a shelf with no signal. Here the person said it themselves, and they said it
+ * after the server confirmed the session is gone. Without it the drawer would still open the app
+ * offline — MOL-56's rule for a launch with an owner on the device — and show the next person at
+ * that laptop the purchases of the last one.
+ */
+export function forgetOwner(owner: string): void {
+  current = null
+  forgetWhere((key) => key.startsWith('molvia.') && key.endsWith(`.${owner}`))
+  // The drawer's name and the intent go only when they are this owner's: once somebody else has
+  // signed in here, they name that person (self-review Р3-2).
+  reshape(KEY, (value) => (value === owner ? null : value))
+  reshape(LEAVING_KEY, (value) => (value === owner ? null : value))
+  reshape(LOGIN_KEY, (value) => withoutClaimOf(owner, value))
+}
+
+function withoutClaimOf(owner: string, value: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (typeof parsed !== 'object' || parsed === null) return null
+    const { claimed, ...rest } = parsed as Record<string, unknown>
+    if (claimed !== owner) return value
+    return Object.keys(rest).length > 0 ? JSON.stringify(rest) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Written **before** `POST /auth/logout` leaves, and taken away with the drawer (adversarial Б2).
+ * An answer can be lost after the server has already deleted the session; the first `401` after
+ * that closes the door, and the settings with «Выйти» on them are behind it — so the erasure the
+ * person asked for would never come. With this on the device, the server's «no session» finishes
+ * it instead.
+ */
+export function markLeaving(owner: string): void {
+  write(LEAVING_KEY, owner)
+}
+
+export function leavingOwner(): string | null {
+  const stored = read(LEAVING_KEY)
+  return isIdentifier(stored) ? stored : null
+}
+
+/** The person closed the sheet, or the server said the session is alive: nothing to finish. */
+export function clearLeaving(): void {
+  forget(LEAVING_KEY)
+}
+
+/**
+ * Forgets the owner this tab holds in memory, when another window has erased the drawer (MOL-57):
+ * storage is empty there already, and this cache would otherwise name the owner who left.
+ */
+export function dropIdentity(): void {
+  current = null
 }
 
 /** Returns whether the value outlived this tab: false means storage refused it. */

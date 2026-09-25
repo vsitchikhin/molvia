@@ -364,6 +364,44 @@
       "bad_day": "Choose the day of the exchange"
     }
   },
+  "devices": {
+    "title": "Devices",
+    "list_title": "Where you are signed in",
+    "this_device": "This device",
+    "unknown": "Unknown device",
+    "meta_current": "Signed in {signedIn}",
+    "meta": "Signed in {signedIn} · last seen {seen}",
+    "end": "End",
+    "end_label": "End the session on {device}",
+    "end_label_unknown": "End the session on an unknown device",
+    "end_sheet": {
+      "title": "End the session on {device}?",
+      "title_unknown": "End the session on an unknown device?",
+      "body": "Molvia will ask to sign in with Telegram again on that device. This cannot be undone from here.",
+      "confirm": "End session"
+    },
+    "end_failed": "Could not end that session. Check the connection and try again.",
+    "ended": "The session on {device} has ended",
+    "ended_unknown": "The session on an unknown device has ended",
+    "more": "Showing the latest {shown} of {total}",
+    "note": "A device whose session was ended asks to sign in again the next time it is opened. What is saved on the device itself is beyond the server's reach.",
+    "load_error": {
+      "title": "The list did not load",
+      "body": "The server did not answer. Try again."
+    },
+    "offline": {
+      "title": "No connection",
+      "body": "The list of devices will be here when the connection is back."
+    }
+  },
+  "sign_out": {
+    "title": "Sign out of Molvia on this device?",
+    "body": "Everything Molvia saved on this device will be erased. Nothing is lost on the server: sign in with Telegram and it all comes back.",
+    "unsent": "{n} entry has not been sent or was not accepted and will be lost | {n} entries have not been sent or were not accepted and will be lost",
+    "confirm": "Sign out and erase",
+    "offline": "Signing out needs a connection: without one the session on the server cannot be ended.",
+    "error": "Could not sign out: the server did not answer. Try again."
+  },
   "identity": {
     "error": {
       "title": "Could not check the sign-in",
@@ -513,11 +551,13 @@
       "title": "Connection lost while saving",
       "body": "We will check with the server when it returns. Your edits will stay here."
     },
-    "group_money": "Money"
+    "group_money": "Money",
+    "group_account": "Account",
+    "sign_out": "Sign out"
   },
   "privacy": {
     "title": "Data and privacy",
-    "revised": "Revised 24 September 2026",
+    "revised": "Revised 25 September 2026",
     "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
@@ -551,7 +591,7 @@
       },
       "devices": {
         "term": "Sign-in devices",
-        "text": "The name of the phone and browser you signed in from."
+        "text": "The name of the phone and browser you signed in from, and when you last used them. The list is in Settings, under Devices, where any sign-in can be ended. A sign-in unused for six months is deleted by itself."
       },
       "settings": {
         "term": "Your settings",
@@ -564,11 +604,11 @@
     },
     "storage": {
       "title": "Cookies and the phone's memory",
-      "text": "Two cookies: the sign-in, and one more for five minutes while you sign in. The phone keeps what you saw last and what has not reached the server yet. All of it is needed for the app to work, so there is no banner."
+      "text": "Two cookies: the sign-in, and one more for five minutes while you sign in. The phone keeps what you saw last and what has not reached the server yet. All of it is needed for the app to work, so there is no banner. Signing out in Settings erases all of it from the phone."
     },
     "erase": {
       "title": "Delete everything",
-      "text": "Send /delete to the bot you sign in with and confirm. Deletion is immediate and permanent: everything in the list above goes except the shops — they and the items you added to the shared catalogue stay, without your name. Saved copies may remain on your phone: to remove them, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account."
+      "text": "Send /delete to the bot you sign in with and confirm. Deletion is immediate and permanent: everything in the list above goes except the shops — they and the items you added to the shared catalogue stay, without your name. Saved copies may remain on your phone: to remove them, sign out in Settings, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account."
     }
   }
 }

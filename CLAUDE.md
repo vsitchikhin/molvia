@@ -1231,8 +1231,10 @@ the round trip through Telegram, and ask whose account this turned out to be.
   on a login into an account this device has not approved before, and one's own first account is
   indistinguishable from a stranger's fresh one — which is the case with nothing yet to take.
   Telling them apart needs the confirming Telegram's name on the wire, and that is a task of its
-  own. «Это не я» does not end the stranger's session — that handle is MOL-57's — but nothing is
-  claimed, so a reload or a relaunch asks again instead of walking in.
+  own. «Это не я» ends the stranger's session on the server first (MOL-57, `POST /auth/logout`) —
+  this browser's session only, the stranger's other devices are theirs — and nothing is claimed,
+  so a reload or a relaunch asks again instead of walking in. A way out that fails does not hold
+  the way in: the new login replaces the cookie anyway, and the row left behind has no key.
 - **Showing the app and writing into it are different rights** (adversarial Б1). The door may
   open on the drawer's name while the first `me()` is still in flight — that is what keeps a
   launch with a live session from flashing «Вход» — but a drawer says nothing about the cookie,
@@ -1265,7 +1267,8 @@ the round trip through Telegram, and ask whose account this turned out to be.
   every other screen said «что-то пошло не так» about an account that was simply not there.
   Telling `error.no_actor` from a bare `401` stays where it was, in `packages/client`: a proxy, a
   gateway and a shop's captive portal all answer `401` without knowing what an actor is.
-- **Nothing on the device is thrown away by any of this.** `molvia.actor` stays — it is the name
+- **Nothing on the device is thrown away by any of this** — by a `401`, that is; «Выйти» is the
+  one exception, below. `molvia.actor` stays — it is the name
   of a drawer, not a credential (MOL-53) — so the trip queue, the recent items and the verdict
   drafts wait where they are, and Telegram brings the same owner back. The task's own line about
   deleting it was written before MOL-53 and is answered by it (owner's decision, 24.09.2026).
@@ -1279,6 +1282,114 @@ the round trip through Telegram, and ask whose account this turned out to be.
   screen instead of opening the app with a notice. It shows no «whose account» step: that exists
   for a confirmation given elsewhere, and here the person signs themselves in with no Telegram
   in it at all.
+
+## The way out, and what it takes with it (MOL-57)
+
+The epic's last task: end this device's session, and end another one — the old phone, the laptop
+somebody else owns. **Revoking is deleting the row** (MOL-52), so ended, expired and never-issued
+stay one answer, and the device that was put out learns it on its next request: `401`, its cookie
+put out, the login screen through the seam of MOL-56. Nothing reaches it sooner, and nothing can.
+
+- **Three routes, and each keeps a rule it already had.** `GET /sessions` lists the owner's live
+  sessions, **the current one first by the `ORDER BY`** — past `SESSIONS_LIMIT` a caller sorting
+  what it was given would cut off the very row in the person's hand — and `total` beside them.
+  `DELETE /sessions/:id` puts ownership in the `WHERE`: someone else's, a missing one, an expired
+  one and a malformed id are one `404`. **The current session may be ended there too**, and then
+  the cookie goes with it — the last session leaves the same way as any. `POST /auth/logout` sits
+  with the login's routes, not in the guarded scope: a way out must work for a session already
+  gone, so a repeat after a lost answer is the same `204`, and it never says whether a session
+  was behind the token. The login's guards apply (`X-Molvia-Login`, fetch metadata, no body), and
+  two cookies of the name are refused with nothing cleared — MOL-53's rule, for MOL-53's reason.
+- **`withActor` hands the session's id to the request** (`request.sessionId`), from the same read
+  that found the owner. It is what «this device» is, and what `DELETE` compares with to know it
+  ended its own session — by the id as Postgres spells it, since a path is taken in either case.
+- **Expired sessions are deleted by the minute timer** (owner's decision Q4), `skip locked` as the
+  login's cleanup is: nothing read them, and a device name kept for good contradicted the privacy
+  page's «180 days from the last use».
+- **«Выйти» erases this device's drawer — after the server's `204`, never on the tap** (owner's
+  decision Q1). This is the exception to «a `401` erases nothing» above, and it is not a
+  contradiction: that rule exists because «no session» is also an expired one, with a purchase
+  from a shelf with no signal still in the queue. Here the person says it, and the server has
+  confirmed it. Without the erasure the drawer would open the app offline — MOL-56's rule for a
+  launch with an owner on the device — and show the next person at that laptop the last one's
+  trips. `forgetOwner` takes every `molvia.*.<owner>` key and `molvia.actor` from both shelves,
+  **by the suffix and not by a list**, so a store added later is swept without anyone remembering
+  to; `identity.test.ts` pins which keys exist, so a key that breaks the shape is a decision. The
+  login record loses only this owner's approval — a login another window has in progress stays.
+  **The owner is let go in this window first** (`release`: `id` to `null`, the revision moved), so
+  a rating answering after the erasure finds nobody to file itself under and a `me()` that left
+  before it cannot write the drawer's name back (adversarial Б1, self-review С-2); then the drawer
+  goes under the trip queue's lock, and the page is loaded afresh at `/`. **Offline there is no
+  way out at all** — the cookie is `HttpOnly`, the page cannot put it out, and a session left
+  alive is what the person came to end — and the sheet says so **before a tap**: the button is
+  inactive and nothing is sent or written down (round 3, Е1). A tap known to be offline used to
+  leave an intent behind, and a person who changed their mind at the shelf met the login screen
+  at the next launch.
+- **A lost `204` is settled by the server's next answer, and by nothing else** (adversarial Б2,
+  round 2 Д1, Д3). The intent, `molvia.leaving`, is written before the request leaves: if the
+  server deleted the session and the answer never came, the first `401` closed the door on the
+  settings and the erasure never happened. The server's «nobody» now finishes it; its «this very
+  owner» means the request did not land, and the intent goes. **The identity keeps the server's
+  word apart from its own state** (`heard`, `nobody`): a launch with no connection and the intent
+  on the device shows the login screen — the door's `signed-out` — but that is the device's
+  conclusion, and erasing on it threw away a purchase from the shelf while the session lived on.
+  Closing the sheet after a failure does not withdraw the intent — the outcome is unknown — it
+  asks the server; so does a return of the connection or of the app while the intent waits. The
+  listener is a store of its own (`stores/signOut`), created with the app. **An answer that came,
+  and not from our API, is not unknown** (round 4, Ж1): a captive portal's page or a stranger's
+  `4xx` (`answered === false`, anything but `error.internal`) means the request never reached the
+  server, and the intent goes at once — kept, a portal at the till locked the app further into the
+  shop. **The way out succeeds on `204` and on nothing else**: a portal answers a redirected
+  request with `200` and a page of its own, which read as «no body», and the phone erased a drawer
+  for a session the server never heard about. **Somebody else signing in settles the intent too**
+  (self-review Р3-2): the cookie of the owner who left is gone, so their drawer is erased there and
+  then and the person now signed in is left as they are — `forgetOwner` removes the drawer's name
+  and the intent only when they name the owner being erased. **The price, named:**
+  a connection lost while the request was on its way leaves the outcome unknown, and a launch with
+  no connection then shows the login screen until the server can be asked — the drawer of someone
+  who may have left is not opened on a guess.
+- **What would be lost is counted aloud** (owner's decision Q2) — everything the erasure takes
+  that the server does not hold: the trip queue and the purchases it refused, every rating draft,
+  saved or still being typed, and an unsaved settings form (adversarial Б3). The app is asked to
+  send first when the sheet opens. Both «Выйти» and «Завершить» ask before acting, because
+  neither can be undone — there is no «Вернуть» for a deleted key.
+- **Another window lets the owner go by the drawer's disappearing, and erases its own shelves**
+  (adversarial А1). `sessionStorage` belongs to one tab, so the window where «Выйти» was pressed
+  cannot clear its neighbours' — and `read` falls back to it, so a neighbour's reload opened the
+  app of the person who left. It asks no `me()`: the window that erased did so after the `204`.
+  **A tab that slept through the event checks at every start** (round 2, Д2): a drawer on its own
+  shelf with not one key of the owner on a shared shelf that works was erased elsewhere — a tab
+  the browser unloaded, or one closed and reopened, gets its `sessionStorage` back without the
+  event. The drawer's name counts **by its value** (round 4, Ж2): once somebody else signed in, the
+  shared shelf names them. A shared shelf that refuses a probe write says nothing: then this tab's
+  shelf is the only one, legitimately (Safari's private mode). The premise was checked (self-review
+  Р3-1): Safari's seven-day cap clears `SessionStorage` together with `LocalStorage`, so ITP does
+  not leave a drawer on one shelf; clearing the shared one by hand still does, and then the tab's
+  copy goes too — a named limit, because a marker naming who left would keep their id on the device. A tab that wakes with its memory — frozen by the
+  browser, or restored from the back-forward cache — checks on `visibilitychange` and `pageshow`
+  too, because `recover` starts nothing from `ready`.
+- **«Это не я» and the login's poll take turns** (adversarial Г1). The way out's `Max-Age=0` is
+  addressed to the cookie's name, not to a token, so a poll that collected this person's own
+  session and answered first had it put out of the jar. `refuse` waits for a poll already on its
+  way — and if that one brought the person's own session, there is nobody to put out and no
+  login to begin — and holds the next poll until the way out has answered. The server still
+  clears by name, as the task asks: the race is closed where the requests are made.
+- **«Устройства» keeps nothing on the phone and reads the list again on every return** — to the
+  tab, or `online` — not only after a failure (adversarial В2): a list kept in memory for hours is
+  the copy it refuses to keep on the disk. A device ended leaves the list at once, not with the
+  next read (В1), and a list that could not be read again is not shown at all — the screen says
+  «нет связи» or offers «Повторить» instead (round 2, Д4). There is no empty state: a live session is always in its own list. «Были» is a
+  day, never a time — `last_seen_at` moves once a day — the current row says none, and a date of
+  another year carries the year. An unknown device gets its own sentences rather than its label
+  put into somebody else's case.
+- **Where they live** (owner's decision Q3, brief of MOL-41): «Устройства ›» and «Выйти» are one
+  group, «Аккаунт», on the settings screen, outside the form's states — the way into the account
+  does not depend on whether its settings loaded. The current row in «Устройства» has no button:
+  one place for one action.
+- **Named limits.** A device that was put out keeps what it stored until someone clears it — the
+  server does not reach a phone (MOL-58), and the list says so. Without Web Locks the erasure is
+  not serialised with another window's send. The development seam now names its sessions by
+  `User-Agent`, so a working copy's list is not a column of «unknown device».
 
 ## Code rules
 
@@ -1545,7 +1656,11 @@ into a door instead of «что-то пошло не так». **And it closed w
 «Это не я» in the chat rescues a hijacked login only while the browser is not polling — with the
 screen open a stranger confirms and the session is collected in a cycle or two. So the screen
 names the account it landed in and waits to be told it is the right one. The rules are in «The
-way in, and what stands behind it» above; what remains of the epic is MOL-57, the way out.
+way in, and what stands behind it» above.
+MOL-57 closed the epic with the way out: «Устройства» under the settings, «Завершить» on any other
+device, «Выйти» that ends this session and erases this device's drawer after the server's `204`,
+and «Это не я» that now ends the stranger's session instead of only walking away from it. The
+rules are in «The way out, and what it takes with it» above.
 
 MOL-65 gave the person their four fields and a fourth tab: Armenia, Гюмри or Ереван, the currency
 purchases are written in and the one they are converted into. `PUT /actors/me/settings` compares

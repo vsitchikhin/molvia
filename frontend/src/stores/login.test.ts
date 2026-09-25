@@ -8,11 +8,13 @@ import { useLoginStore } from '@/stores/login'
 
 const startLogin = vi.fn<() => Promise<LoginStarted>>()
 const pollLogin = vi.fn<(id: string) => Promise<LoginPoll>>()
+const logout = vi.fn<() => Promise<void>>()
 const me = vi.fn<() => Promise<ActorView>>()
 vi.mock('@/api', () => ({
   api: {
     startLogin: () => startLogin(),
     pollLogin: (id: string) => pollLogin(id),
+    logout: () => logout(),
     me: () => me(),
   },
   onMissingActor: () => undefined,
@@ -71,6 +73,8 @@ beforeEach(() => {
   sessionStorage.clear()
   startLogin.mockReset()
   pollLogin.mockReset()
+  logout.mockReset()
+  logout.mockResolvedValue(undefined)
   me.mockReset()
   online(true)
 })
@@ -276,9 +280,9 @@ describe('в чей аккаунт вошли', () => {
     expect(login.closed).toBe(false)
   })
 
-  it('«Это не я» держит дверь закрытой и начинает новый вход', async () => {
-    // Погасить чужую сессию на сервере нечем до MOL-57, поэтому браузер просто перестаёт ею
-    // пользоваться — и помнит об этом после перезапуска, потому что признан никто.
+  it('«Это не я» гасит чужую сессию, держит дверь закрытой и начинает новый вход', async () => {
+    // С MOL-57 сессия постороннего гасится на сервере, а не только перестаёт использоваться; и
+    // помнит браузер об отказе после перезапуска, потому что признан никто.
     opened()
     const { login } = await signedOut()
     startLogin.mockResolvedValue(REQUEST)
@@ -287,11 +291,102 @@ describe('в чей аккаунт вошли', () => {
     await login.poll()
 
     const next = { ...REQUEST, id: '11111111-2222-4333-8444-555555555555' }
+    startLogin.mockReset()
+    startLogin.mockResolvedValue(next)
+    await login.refuse()
+
+    expect(logout).toHaveBeenCalledOnce()
+    // Сначала выход, потом новый вход: наоборот новая cookie сессии ушла бы под выход.
+    expect(logout.mock.invocationCallOrder[0]).toBeLessThan(
+      startLogin.mock.invocationCallOrder[0] ?? 0,
+    )
+    expect(login.closed).toBe(true)
+    expect(login.phase).toBe('waiting')
+    expect(kept()).toEqual({ request: { id: next.id, url: next.url } })
+  })
+
+  it('«Это не я» не спорит со своей сессией, пришедшей, пока выход в пути (adversarial Г1)', async () => {
+    // Случай А4 из MOL-56: вопрос о чужой сессии задан, пока своя попытка ещё ждёт. Опрос на
+    // время выхода придержан — иначе он забирал свою сессию, выход гасил её в банке cookie по
+    // имени, а `begin()` заводил третий вход поверх уже вошедшего аккаунта.
+    opened()
+    const { actor, login } = await signedOut()
+    const second = { ...REQUEST, id: '11111111-2222-4333-8444-555555555555' }
+    startLogin.mockResolvedValueOnce(REQUEST)
+    await login.begin()
+    startLogin.mockResolvedValueOnce(second)
+    await login.restart()
+    me.mockReset()
+    me.mockResolvedValue(STRANGER)
+    await actor.verify()
+    expect(login.phase).toBe('welcome')
+
+    let answered: () => void = () => undefined
+    logout.mockReturnValue(
+      new Promise<void>((resolve) => {
+        answered = resolve
+      }),
+    )
+    const refusing = login.refuse()
+    pollLogin.mockResolvedValue({ status: 'authenticated', actor: MINE })
+    await login.poll()
+    // Придержан: пока выход в пути, своя сессия в банку не кладётся.
+    expect(pollLogin).not.toHaveBeenCalled()
+
+    answered()
+    await refusing
+    // Вторая попытка жива — новый старт не нужен и не делается.
+    expect(startLogin).toHaveBeenCalledTimes(2)
+    expect(login.request?.id).toBe(second.id)
+
+    // После выхода опрос идёт как шёл и забирает свою сессию.
+    await login.poll()
+    expect(actor.actor?.id).toBe(MINE.id)
+  })
+
+  it('«Это не я» ждёт опрос, который уже в пути, — и если тот принёс свою сессию, не выходит', async () => {
+    opened()
+    const { actor, login } = await signedOut()
+    startLogin.mockResolvedValueOnce(REQUEST)
+    await login.begin()
+    pollLogin.mockResolvedValueOnce({ status: 'authenticated', actor: STRANGER })
+    await login.poll()
+    startLogin.mockResolvedValueOnce({ ...REQUEST, id: '11111111-2222-4333-8444-555555555555' })
+    await login.restart()
+
+    let collected: () => void = () => undefined
+    pollLogin.mockReturnValueOnce(
+      new Promise((resolve) => {
+        collected = () => {
+          resolve({ status: 'authenticated', actor: MINE })
+        }
+      }),
+    )
+    const polling = login.poll()
+    const refusing = login.refuse()
+    collected()
+    await polling
+    await refusing
+
+    expect(logout).not.toHaveBeenCalled()
+    expect(startLogin).toHaveBeenCalledTimes(2)
+    expect(actor.actor?.id).toBe(MINE.id)
+  })
+
+  it('«Это не я» начинает вход, даже если выйти не удалось', async () => {
+    opened()
+    const { login } = await signedOut()
+    startLogin.mockResolvedValue(REQUEST)
+    await login.begin()
+    pollLogin.mockResolvedValue({ status: 'authenticated', actor: STRANGER })
+    await login.poll()
+
+    logout.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const next = { ...REQUEST, id: '11111111-2222-4333-8444-555555555555' }
     startLogin.mockResolvedValue(next)
     await login.refuse()
 
     expect(login.closed).toBe(true)
-    expect(login.phase).toBe('waiting')
     expect(kept()).toEqual({ request: { id: next.id, url: next.url } })
   })
 

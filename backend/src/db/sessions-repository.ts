@@ -1,4 +1,4 @@
-import { and, eq, gt, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, sql } from 'drizzle-orm'
 import { actorSchema, deviceNameOrNull, newSessionSchema, sessionSchema } from '@molvia/model'
 import type { Actor, Session } from '@molvia/model'
 import { sha256Hex } from './digest'
@@ -12,6 +12,12 @@ import { actors, sessions } from './schema'
 export interface LiveSession {
   readonly session: Session
   readonly actor: Actor
+}
+
+/** A page of an owner's sessions and how many there are past it. */
+export interface SessionList {
+  readonly sessions: readonly Session[]
+  readonly total: number
 }
 
 export interface SessionRepository {
@@ -75,13 +81,41 @@ export interface SessionRepository {
   touch(id: string, afterHours: number, lifetimeDays: number): Promise<Date | null>
 
   /**
-   * **Two methods this table needs and does not have here: removing a session and listing an
-   * owner's.** Both are decisions of MOL-52 — «revoking is deleting the row», «the device list
-   * is what is left of the table», and `sessions_actor_idx` is in the schema for the second —
-   * but their callers are MOL-57, and a method with no caller is a method no test exercises
-   * for real. Said out loud rather than left to be noticed: the repository is delivered for
-   * the login of MOL-53 and MOL-54, not for the settings screen (adversarial А2).
+   * The owner's live sessions for «Устройства» (MOL-57), **the one this request came with
+   * first**, then by the last visit, and how many there are in all.
+   *
+   * The current one is put first by the `ORDER BY` rather than by the caller: past the limit a
+   * caller could only sort what it was given, and the row the person is holding in their hand
+   * would be the one cut off. Expired rows are not listed — for the person they no longer exist,
+   * and `removeFor` answers them the same way.
    */
+  listFor(actorId: string, currentId: string, limit: number): Promise<SessionList>
+
+  /**
+   * Deletes one of the owner's live sessions, and answers whether there was one (MOL-57).
+   *
+   * Ownership is in the `WHERE`, not in a read before it: another owner's session, one that does
+   * not exist, one that ran out and a malformed id all delete nothing and answer `false` — the
+   * difference between them is how a stranger would learn which ids exist (MOL-7). Revoking is
+   * deleting the row (MOL-52, Р-4), so «revoked», «expired» and «never existed» stay one answer.
+   */
+  removeFor(actorId: string, id: string): Promise<boolean>
+
+  /**
+   * Deletes the session behind a token — the way out of this very device (`POST /auth/logout`).
+   * Hashes the token itself, as `create` and `liveByToken` do, so no caller handles a digest; a
+   * value this server could not have minted matches nothing and answers `false` unasked.
+   */
+  removeByToken(token: string): Promise<boolean>
+
+  /**
+   * Deletes the sessions whose term has run out (MOL-57, owner's decision Q4). Nothing reads an
+   * expired row — `liveByToken` and `listFor` both skip it — but it kept a device name and three
+   * dates for good, while the privacy page says a session lives 180 days from its last use.
+   * Rows someone holds are skipped, as the login cleanup skips them (MOL-58, Р-3): an erasure
+   * locks the owner's sessions, and the minute timer has nothing to gain by waiting for it.
+   */
+  removeExpired(): Promise<void>
 }
 
 function toSession(row: typeof sessions.$inferSelect): Session {
@@ -163,6 +197,55 @@ export function createSessionRepository(db: Conn): SessionRepository {
         )
         .returning({ expiresAt: sessions.expiresAt })
       return row?.expiresAt ?? null
+    },
+
+    async listFor(actorId, currentId, limit) {
+      const rows = await db
+        .select({ session: sessions, total: sql<number>`count(*) over ()`.mapWith(Number) })
+        .from(sessions)
+        .where(and(eq(sessions.actorId, actorId), gt(sessions.expiresAt, sql`now()`)))
+        .orderBy(
+          sql`${sessions.id} = ${currentId}::uuid desc`,
+          desc(sessions.lastSeenAt),
+          desc(sessions.createdAt),
+          sessions.id,
+        )
+        .limit(limit)
+      return { sessions: rows.map((row) => toSession(row.session)), total: rows[0]?.total ?? 0 }
+    },
+
+    async removeFor(actorId, id) {
+      const own = idOrNull(id)
+      if (own === null) return false
+      const removed = await db
+        .delete(sessions)
+        .where(
+          and(
+            eq(sessions.id, own),
+            eq(sessions.actorId, actorId),
+            gt(sessions.expiresAt, sql`now()`),
+          ),
+        )
+        .returning({ id: sessions.id })
+      return removed.length > 0
+    },
+
+    async removeByToken(token) {
+      if (secretOrNull(token) === null) return false
+      const removed = await db
+        .delete(sessions)
+        .where(eq(sessions.tokenHash, sha256Hex(token)))
+        .returning({ id: sessions.id })
+      return removed.length > 0
+    },
+
+    async removeExpired() {
+      await db.delete(sessions).where(
+        sql`${sessions.id} in (
+          select ${sessions.id} from ${sessions}
+          where ${sessions.expiresAt} <= now()
+          for update skip locked)`,
+      )
     },
   }
 }
