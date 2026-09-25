@@ -77,8 +77,22 @@ export const useActorStore = defineStore('actor', () => {
   })
   /** True while `start` is in flight, so a retry button cannot queue a second one. */
   let running = false
+  /**
+   * How many questions about the identity are in flight. A refusal earned by one of them is the
+   * answer being waited for, not news — `sessionEnded` steps aside while it is non-zero, or a
+   * cold start with no session would ask twice and `verify` would ask itself forever.
+   */
+  let asking = 0
+  /**
+   * Bumped by every settled answer. A question about the identity that comes back after a newer
+   * one has already been answered is about a world that no longer exists — most sharply when
+   * the newer answer is a login and the older one is `error.no_actor` about the moment before
+   * it (adversarial А1).
+   */
+  let revision = 0
 
   function settle(loaded: ActorView): void {
+    revision += 1
     const was = currentIdentity()
     if (actor.value?.id === loaded.id && actor.value.updatedAt > loaded.updatedAt) return
     actor.value = loaded
@@ -122,26 +136,31 @@ export const useActorStore = defineStore('actor', () => {
    * It signed the app in automatically until now, which made the screen this epic exists for
    * invisible in every working copy and unreachable to the end-to-end suite.
    */
-  async function signIn(): Promise<boolean> {
+  async function signIn(): Promise<ActorView | null> {
     // The literal Vite folds, so the call to an address production does not carry is dropped
     // from that bundle together with this branch — the property MOL-52 (Р-14) wrote down and a
     // `v-if` in the template alone would not have kept.
-    if (!import.meta.env.DEV) return false
+    if (!import.meta.env.DEV) return null
     state.value = 'loading'
+    asking += 1
     try {
-      settle(await api.devLogin())
+      const view = await api.devLogin()
+      settle(view)
       state.value = 'ready'
-      return true
+      return view
     } catch (error) {
       // Провал входа дверь не открывает: `error` показывает приложение с плашкой, а здесь
       // приложения ещё нет. Что сказать человеку, решает экран входа — своим состоянием.
       console.error('[molvia] шов разработки не впустил', error)
       state.value = 'signed-out'
-      return false
+      return null
+    } finally {
+      asking -= 1
     }
   }
 
   async function load(): Promise<void> {
+    asking += 1
     try {
       settle(await api.me())
       state.value = 'ready'
@@ -155,20 +174,39 @@ export const useActorStore = defineStore('actor', () => {
       // when a person has to tap a button (MOL-53, Б3).
       if (isMissingActor(error)) state.value = 'signed-out'
       else fail(error)
+    } finally {
+      asking -= 1
     }
   }
 
   /**
-   * Asks again without disturbing what is on screen — for the login screen, which is shown for
-   * minutes at a time while another tab, or another device of the same person, may sign this
-   * browser in. A plain `start()` would flash its skeleton on every return to the tab.
+   * **Asks the server who this browser is, and changes nothing it was not told** (MOL-56,
+   * adversarial А1). It is the answer to every «the session may not be what I think it is»:
+   * a refusal from a request that left earlier, another window's login, a return to the tab.
+   *
+   * What it deliberately does not do is take a refusal at face value. `error.no_actor` is the
+   * truth about the moment a request **left**, and answers still in flight outlive a login: one
+   * of them used to wipe the question «is this your account?» and let the next `me()` walk into
+   * the account a stranger had confirmed. So the seam asks again instead of concluding, and only
+   * a `me()` of its own may say «nobody». A server that cannot be reached says nothing at all
+   * and leaves the screen as it is.
+   *
+   * Re-entrancy matters more than it looks: the `me()` below goes through the same seam, so
+   * without the guard a dead session would ask forever.
    */
-  async function recheck(): Promise<void> {
-    if (state.value !== 'signed-out') return
+  async function verify(): Promise<void> {
+    if (asking > 0) return
+    asking += 1
+    const at = revision
     try {
-      adopt(await api.me())
-    } catch {
-      // Still nobody, or nobody to ask. The screen keeps what it is showing.
+      const view = await api.me()
+      if (revision === at) adopt(view)
+    } catch (error) {
+      // A refusal earned before a login landed says nothing about after it: the session it was
+      // asking about is not the session this browser now holds (adversarial А1).
+      if (isMissingActor(error) && revision === at) state.value = 'signed-out'
+    } finally {
+      asking -= 1
     }
   }
 
@@ -233,7 +271,19 @@ export const useActorStore = defineStore('actor', () => {
     state.value = 'ready'
   }
 
-  return { actor, id, settings, state, start, apply, adopt, recheck, signIn, retry: start }
+  return {
+    actor,
+    id,
+    settings,
+    state,
+    start,
+    apply,
+    adopt,
+    verify,
+    signIn,
+    busy: () => asking > 0,
+    retry: start,
+  }
 })
 
 /**
@@ -243,5 +293,8 @@ export const useActorStore = defineStore('actor', () => {
  * composition root is where a wire between two modules belongs.
  */
 export function sessionEnded(): void {
-  useActorStore().state = 'signed-out'
+  const actor = useActorStore()
+  // A question already in flight is about to answer this better than the refusal can.
+  if (actor.busy()) return
+  void actor.verify()
 }

@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { ActorView, LoginPoll, LoginStarted } from '@molvia/model'
-import { useActorStore } from '@/stores/actor'
+import { sessionEnded, useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
 
 const startLogin = vi.fn<() => Promise<LoginStarted>>()
@@ -167,10 +167,10 @@ describe('круг «ушёл в Telegram и вернулся»', () => {
     expect(pollLogin).not.toHaveBeenCalled()
   })
 
-  it('ответ на брошенный запрос не считается', async () => {
-    // «Начать заново» отдаёт браузеру новый секрет, и ответ прежнего опроса — о чужой попытке.
+  it('«ещё ждём» на брошенный запрос ничего не трогает', async () => {
+    // Ответ со сбором сессии — другое дело, он берётся всегда: см. «А4» ниже.
     opened()
-    const { login, actor } = await signedOut()
+    const { login } = await signedOut()
     startLogin.mockResolvedValue(REQUEST)
     await login.begin()
     let answer: (poll: LoginPoll) => void = () => undefined
@@ -181,12 +181,13 @@ describe('круг «ушёл в Telegram и вернулся»', () => {
     )
 
     const flight = login.poll()
-    startLogin.mockResolvedValue({ ...REQUEST, id: '11111111-2222-4333-8444-555555555555' })
+    const next = { ...REQUEST, id: '11111111-2222-4333-8444-555555555555' }
+    startLogin.mockResolvedValue(next)
     await login.restart()
-    answer({ status: 'authenticated', actor: STRANGER })
+    answer({ status: 'pending', expiresAt: REQUEST.expiresAt })
     await flight
 
-    expect(actor.state).toBe('signed-out')
+    expect(login.request?.id).toBe(next.id)
     expect(login.phase).toBe('waiting')
   })
 })
@@ -204,15 +205,14 @@ describe('в чей аккаунт вошли', () => {
     await login.poll()
 
     expect(login.phase).toBe('welcome')
-    expect(login.blocked).toBe(true)
-    // Сессия у браузера уже есть — что держит приложение закрытым, это вопрос, а не личность.
+    expect(login.closed).toBe(true)
+    // Сессия у браузера уже есть — дверь держит не незаконченная личность, а сравнение.
     expect(actor.state).toBe('ready')
     expect(actor.actor?.id).toBe(STRANGER.id)
   })
 
   it('перезагрузка не проходит мимо вопроса', async () => {
     // Иначе перезагрузка и была бы способом его обойти.
-    localStorage.setItem(KEY, JSON.stringify({ unconfirmed: STRANGER.id }))
     localStorage.setItem(OWNER, STRANGER.id)
     setActivePinia(createPinia())
     const actor = useActorStore()
@@ -221,11 +221,11 @@ describe('в чей аккаунт вошли', () => {
     await actor.start()
 
     expect(actor.state).toBe('ready')
-    expect(login.blocked).toBe(true)
+    expect(login.closed).toBe(true)
     expect(login.phase).toBe('welcome')
   })
 
-  it('«Да, это я» открывает дверь и забывает вопрос', async () => {
+  it('«Да, это я» открывает дверь и записывает, кого признали', async () => {
     opened()
     const { login } = await signedOut()
     startLogin.mockResolvedValue(REQUEST)
@@ -235,13 +235,26 @@ describe('в чей аккаунт вошли', () => {
 
     login.confirm()
 
-    expect(login.blocked).toBe(false)
-    expect(kept()).toBeNull()
+    expect(login.closed).toBe(false)
+    expect(kept()).toEqual({ claimed: MINE.id })
+  })
+
+  it('свой аккаунт, признанный раньше, второй раз не спрашивают', async () => {
+    localStorage.setItem(KEY, JSON.stringify({ claimed: MINE.id }))
+    localStorage.setItem(OWNER, MINE.id)
+    setActivePinia(createPinia())
+    const actor = useActorStore()
+    me.mockResolvedValue(MINE)
+    const login = useLoginStore()
+
+    await actor.start()
+
+    expect(login.closed).toBe(false)
   })
 
   it('«Это не я» держит дверь закрытой и начинает новый вход', async () => {
     // Погасить чужую сессию на сервере нечем до MOL-57, поэтому браузер просто перестаёт ею
-    // пользоваться — и помнит об этом после перезапуска.
+    // пользоваться — и помнит об этом после перезапуска, потому что признан никто.
     opened()
     const { login } = await signedOut()
     startLogin.mockResolvedValue(REQUEST)
@@ -253,48 +266,120 @@ describe('в чей аккаунт вошли', () => {
     startLogin.mockResolvedValue(next)
     await login.refuse()
 
-    expect(login.blocked).toBe(true)
+    expect(login.closed).toBe(true)
     expect(login.phase).toBe('waiting')
-    expect(kept()).toEqual({
-      request: { id: next.id, url: next.url },
-      unconfirmed: STRANGER.id,
-    })
+    expect(kept()).toEqual({ request: { id: next.id, url: next.url } })
   })
 
-  it('вопрос закрывает дверь и во втором окне', async () => {
-    // Две вкладки делят банку cookie: сессия, забранная в одной, — это сессия и другой. Окно,
-    // которое уже было открыто, иначе вошло бы в аккаунт, которого никто не признавал.
-    const { login } = await signedOut()
-    expect(login.blocked).toBe(false)
+  it('чужой вход в соседнем окне закрывает дверь здесь — и показывает того, кто пришёл', async () => {
+    // Две вкладки делят банку cookie. Окно, которое сессию не забирало, иначе продолжало бы
+    // показывать приложение того владельца, в которого верило минуту назад (ревью Р2-1).
+    localStorage.setItem(KEY, JSON.stringify({ claimed: MINE.id }))
+    localStorage.setItem(OWNER, MINE.id)
+    setActivePinia(createPinia())
+    const actor = useActorStore()
+    me.mockResolvedValue(MINE)
+    const login = useLoginStore()
+    await actor.start()
+    expect(login.closed).toBe(false)
 
-    localStorage.setItem(KEY, JSON.stringify({ unconfirmed: STRANGER.id }))
+    // Соседнее окно собрало вход: в банке cookie теперь чужая сессия, а запрос с устройства ушёл.
+    me.mockResolvedValue(STRANGER)
     window.dispatchEvent(new StorageEvent('storage', { key: KEY }))
 
-    expect(login.blocked).toBe(true)
+    // Пока идёт переспрос, дверь уже закрыта, а вопрос ещё не показан: окно не знает, чью
+    // сессию держит, и рисовать карточку по прежнему владельцу было бы ложью (Р2-1).
+    expect(login.closed).toBe(true)
+    expect(login.phase).toBe('loading')
+
+    await vi.waitFor(() => {
+      expect(login.phase).toBe('welcome')
+    })
+    // Карточка вопроса рисуется по `actor.actor` — и это уже тот, кто пришёл, а не прежний.
+    expect(actor.actor?.id).toBe(STRANGER.id)
+    expect(login.closed).toBe(true)
   })
 
   it('и открывает её, когда в соседнем окне ответили «да, это я»', async () => {
-    localStorage.setItem(KEY, JSON.stringify({ unconfirmed: STRANGER.id }))
     localStorage.setItem(OWNER, STRANGER.id)
     setActivePinia(createPinia())
     const actor = useActorStore()
     me.mockResolvedValue(STRANGER)
     const login = useLoginStore()
     await actor.start()
-    expect(login.blocked).toBe(true)
+    expect(login.closed).toBe(true)
 
-    localStorage.removeItem(KEY)
+    localStorage.setItem(KEY, JSON.stringify({ claimed: STRANGER.id }))
     window.dispatchEvent(new StorageEvent('storage', { key: KEY }))
 
-    expect(login.blocked).toBe(false)
+    await vi.waitFor(() => {
+      expect(login.closed).toBe(false)
+    })
+  })
+})
+
+describe('вопрос нельзя обойти ни отказом, ни потерянным ответом', () => {
+  it('А1: запоздалый 401 не стирает вопрос', async () => {
+    // `error.no_actor` — правда про момент, когда запрос уходил. Ответ, застрявший в пути до
+    // входа, приходит уже после него, и раньше он снимал вопрос вместе с записью на устройстве.
+    opened()
+    const { login, actor } = await signedOut()
+    startLogin.mockResolvedValue(REQUEST)
+    await login.begin()
+    pollLogin.mockResolvedValue({ status: 'authenticated', actor: STRANGER })
+    await login.poll()
+    expect(login.closed).toBe(true)
+
+    me.mockResolvedValue(STRANGER)
+    sessionEnded()
+    await vi.waitFor(() => {
+      expect(me).toHaveBeenCalled()
+    })
+
+    expect(login.closed).toBe(true)
+    expect(actor.actor?.id).toBe(STRANGER.id)
+    expect(login.phase).toBe('welcome')
   })
 
-  it('и вопрос уходит вместе с сессией, которой не стало', async () => {
-    localStorage.setItem(KEY, JSON.stringify({ unconfirmed: STRANGER.id }))
-    const { login } = await signedOut()
+  it('А4: ответ опроса, пришедший после «Начать заново», всё равно берут', async () => {
+    // Сервер погасил запрос и ответил с `Set-Cookie`: сессия у браузера уже есть, что бы потом
+    // ни решил скрипт. Отбросить такой ответ значило пустить в аккаунт без вопроса.
+    opened()
+    const { login, actor } = await signedOut()
+    startLogin.mockResolvedValueOnce(REQUEST)
+    await login.begin()
+    let answer: (poll: LoginPoll) => void = () => undefined
+    pollLogin.mockReturnValueOnce(
+      new Promise<LoginPoll>((resolve) => {
+        answer = resolve
+      }),
+    )
+    const flight = login.poll()
 
-    expect(login.blocked).toBe(false)
-    expect(kept()).toBeNull()
+    startLogin.mockResolvedValueOnce({ ...REQUEST, id: '11111111-2222-4333-8444-555555555555' })
+    await login.restart()
+    answer({ status: 'authenticated', actor: STRANGER })
+    await flight
+
+    expect(actor.actor?.id).toBe(STRANGER.id)
+    expect(login.closed).toBe(true)
+    expect(login.phase).toBe('welcome')
+  })
+
+  it('А4: и перезапуск с неувиденным ответом тоже спрашивает', async () => {
+    // Человек вернулся из Telegram, опрос ушёл, приложение перезапустилось. Скрипт ответа не
+    // видел, а сессия у браузера есть — и на устройстве всё ещё висит запрос.
+    localStorage.setItem(KEY, JSON.stringify({ request: { id: REQUEST.id, url: REQUEST.url } }))
+    localStorage.setItem(OWNER, STRANGER.id)
+    setActivePinia(createPinia())
+    const actor = useActorStore()
+    me.mockResolvedValue(STRANGER)
+    const login = useLoginStore()
+
+    await actor.start()
+
+    expect(login.closed).toBe(true)
+    expect(login.phase).toBe('welcome')
   })
 })
 
@@ -378,6 +463,56 @@ describe('отказы', () => {
   })
 })
 
+describe('экран не застревает и не открывает дверь мимо владельца', () => {
+  it('А2: соседнее окно собрало вход — здесь вопрос, а не вечный скелет', async () => {
+    const { login } = await signedOut()
+    expect(login.phase).toBe('offer')
+
+    me.mockResolvedValue(STRANGER)
+    localStorage.setItem(KEY, JSON.stringify({ claimed: MINE.id }))
+    window.dispatchEvent(new StorageEvent('storage', { key: KEY }))
+
+    await vi.waitFor(() => {
+      expect(login.phase).toBe('welcome')
+    })
+  })
+
+  it('А2: перезапуск без сети при непризнанном владельце — «нет связи», а не загрузка', async () => {
+    // MOL-19: у каждого экрана есть состояние «нет связи». Бесконечная загрузка — не оно.
+    localStorage.setItem(OWNER, STRANGER.id)
+    online(false)
+    setActivePinia(createPinia())
+    const actor = useActorStore()
+    const login = useLoginStore()
+
+    await actor.start()
+
+    expect(actor.state).toBe('offline')
+    expect(login.closed).toBe(true)
+    expect(login.phase).toBe('offline')
+  })
+
+  it('А5: новый телефон, API не ответил — дверь закрыта, а не приложение без владельца', async () => {
+    // Портал магазина отвечает `onLine === true`, и правило «пустому устройству показывать
+    // нечего» мимо него проходило: приложение открывалось с плашкой, но без ящиков.
+    // Модули заново: `identity.ts` держит владельца в памяти модуля, а телефон — новый.
+    vi.resetModules()
+    const freshActor = await import('@/stores/actor')
+    const freshLogin = await import('@/stores/login')
+    setActivePinia(createPinia())
+    const actor = freshActor.useActorStore()
+    const login = freshLogin.useLoginStore()
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+
+    await actor.start()
+
+    expect(actor.state).toBe('error')
+    expect(actor.id).toBeNull()
+    expect(login.closed).toBe(true)
+    expect(login.phase).toBe('error')
+  })
+})
+
 describe('что лежит на устройстве, проверяется', () => {
   it('ссылка не на t.me не открывается', async () => {
     // Хранилище — единственный вход сюда, который никто не проверял на проводе.
@@ -388,6 +523,23 @@ describe('что лежит на устройстве, проверяется', 
     const { login } = await signedOut()
 
     expect(login.phase).toBe('offer')
+  })
+
+  it('А3: окно с мёртвой ссылкой не стирает запрос соседнего окна', async () => {
+    // Ключ общий, а запрос — личное дело окна: чужой `forget` уносил подтверждение, которому
+    // потом некуда приходить, если соседнюю вкладку iOS уже выгрузил.
+    opened()
+    const { login } = await signedOut()
+    startLogin.mockResolvedValue(REQUEST)
+    await login.begin()
+    const neighbour = { id: '11111111-2222-4333-8444-555555555555', url: REQUEST.url }
+    localStorage.setItem(KEY, JSON.stringify({ request: neighbour }))
+
+    pollLogin.mockRejectedValue(new ApiError(ERROR.LOGIN_UNAVAILABLE))
+    await login.poll()
+
+    expect(login.phase).toBe('unavailable')
+    expect(kept()).toEqual({ request: neighbour })
   })
 
   it('мусор вместо записи — как будто записи нет', async () => {

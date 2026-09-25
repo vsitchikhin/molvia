@@ -93,9 +93,12 @@ test('a session that is gone brings back the same owner, not a new person', asyn
 // Сервер, который не ответил, — это не «сессии нет»: сессия может быть жива за порталом кафе,
 // поэтому приложение показывается с плашкой, а не дверью (MOL-56).
 test('the same answer after «Try again» is said again', async ({ page }) => {
+  // Плашка — про телефон, который уже знает своего владельца: на пустом устройстве показывать
+  // нечего, и там это дверь, а не приложение с плашкой (MOL-56, адверсариальный А5).
+  await open(page)
   const said = await recordLiveRegion(page)
   await page.route('**/api/actors/me**', (route) => route.fulfill({ status: 500, body: '{}' }))
-  await page.goto('/')
+  await page.reload()
   const notice = 'Could not check the sign-in'
   await expect(page.getByRole('heading', { name: notice })).toBeVisible()
   await expect

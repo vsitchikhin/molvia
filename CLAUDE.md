@@ -1019,11 +1019,18 @@ the round trip through Telegram, and ask whose account this turned out to be.
   брать» the moment they are in. A `/login` entry would have to be written into the rules of
   «back» (MOL-17) and would need to remember, separately from the address bar, where the person
   was headed. The one price is the tab's title, which the screen sets and puts back.
-- **The door opens on a settled identity, not on the absence of a refusal.** `ready`, and also
-  `offline` and `error`, which show the app with a notice — a session may be perfectly alive
-  behind a captive portal. While the answer is still coming the login screen holds its own
-  loading state: rendering the app first and taking it away a moment later is a flash of
-  somebody's trip on a phone that is about to be asked to sign in.
+- **The door opens on a settled identity, not on the absence of a refusal**, and it has one
+  definition — `login.closed`, which `App.vue` only reads. `ready` opens it; so do `offline` and
+  `error` **when the device knows an owner**, because those show the app with a notice and a
+  session may be perfectly alive behind a captive portal. With no owner there is nothing to
+  show — no drawers, no cached answers — and that is the login screen whether the phone says it
+  is offline or the server simply did not answer: a shop's captive portal reports
+  `onLine === true`, so a rule written for `navigator.onLine` alone walked straight past it
+  (adversarial А5). While the answer is still coming the login screen holds its own loading
+  state: rendering the app first and taking it away a moment later is a flash of somebody's trip
+  on a phone that is about to be asked to sign in. **And the screen keeps all four of its own
+  states behind the door**: an unanswered question with no connection is «нет связи», not a
+  skeleton that loads nothing (А2).
 - **One tap is one request, and nothing starts a login by itself.** The quota is thirty starts a
   minute **across the whole database**, so an app that started one every time the screen appeared
   would close the door for everybody. «Открыть Telegram» reopens the same link; only «Начать
@@ -1034,6 +1041,11 @@ the round trip through Telegram, and ask whose account this turned out to be.
   would otherwise have nowhere to arrive. The secret stays in the `HttpOnly` cookie; putting it
   on the device would be MOL-8's mistake again. What comes back off the shelf is checked before
   it is opened — `https` and `t.me`, the same shape `loginStartedCodec` holds on the way in.
+  **The key is shared between windows and the request inside it is not**: a window removes or
+  rewrites only the request it started, because one whose link had died used to `forget` over a
+  neighbour's live one — and a neighbour iOS had unloaded came back to «Войти через Telegram»
+  with a confirmation on its way to nobody (adversarial А3). Starting a login still replaces what
+  is stored: a new start replaces the secret, so whatever was there is dead anyway.
 - **«Истекло» is the server's word** (`error.login_unavailable`), never `expiresAt` minus the
   device's clock: a phone whose clock has run away would otherwise be unable to sign in at all.
   There is no countdown on the screen; the text says the link lives five minutes.
@@ -1045,18 +1057,40 @@ the round trip through Telegram, and ask whose account this turned out to be.
   the link within its five minutes can confirm it with their own Telegram, and the browser that
   started the login collects _that_ session; the bot's «Это не я» rescues nobody once the screen
   is polling. So the screen stops: it names what the wire carries — the city, the currencies and
-  the day the account appeared, «сегодня» for a fresh one — and waits. **The question is kept on
-  the device**, or reloading would be the way past it. «Это не я» does not end the stranger's
-  session — that handle is MOL-57's — but this browser stops using it and a fresh login starts;
-  the question stays until a session someone has claimed replaces it. The price is named and
-  accepted (owner's decision, 24.09.2026): one extra tap on every login, and one's own first
-  account is indistinguishable from a stranger's fresh one — which is the case with nothing yet
-  to take. Telling them apart needs the confirming Telegram's name on the wire, and that is a
-  task of its own.
-- **Nothing is sent while the door is shut.** The trip queue and the verdict drafts are held by
-  `App.vue`, not by a screen, and the account behind an unanswered question may not be this
-  person's. A door that has just opened is the other moment worth sending: what the queue held on
-  a `401` has been waiting for exactly that.
+  the day the account appeared, «сегодня» for a fresh one — and waits.
+- **What the device writes down is the owner the person approved, never «somebody is
+  unconfirmed»**, and the difference is the whole of the second review (adversarial А1 и А4).
+  A flag saying «ask about this one» is set only when the script sees the answer that collected
+  a session — and the browser stores the cookie from that answer's _headers_ whether the script
+  lives to read it or not: a restart, or a «Начать заново» a moment earlier, left a session with
+  no flag beside it and the door opened on an account nobody had been asked about. The same flag
+  was cleared by anything that looked signed-out, and `error.no_actor` is the truth about the
+  moment a request **left**: one still in flight from before the login wiped the question, and
+  the next `me()` walked in. Written the other way round — `claimed` — the question cannot be
+  missed: whoever the server says we are is compared with whoever the person approved, and
+  anything else is a question, however the session arrived.
+- **A refusal is not a conclusion; the app asks again.** `error.no_actor` from any call sends the
+  identity to `verify()`, which asks `me()` once and believes only that: a refusal earned before
+  a login landed is discarded by a revision counter, and a server that cannot be reached says
+  nothing at all rather than signing anybody out. It steps aside while a question is already in
+  flight, or a cold start with no session would ask twice and `verify` would ask itself forever.
+- **Another window's login is this window's business.** Two windows share one cookie jar, so a
+  session collected in one is the session the other carries; a window that was already open
+  would otherwise keep showing the app — and, worse, the question itself — as the owner it
+  believed in a minute ago. A write to `molvia.login` shuts the door here and re-asks `me()`,
+  and the card is drawn only from the answer.
+- The price of the question is named and accepted (owner's decision, 24.09.2026): one extra tap
+  on a login into an account this device has not approved before, and one's own first account is
+  indistinguishable from a stranger's fresh one — which is the case with nothing yet to take.
+  Telling them apart needs the confirming Telegram's name on the wire, and that is a task of its
+  own. «Это не я» does not end the stranger's session — that handle is MOL-57's — but nothing is
+  claimed, so a reload or a relaunch asks again instead of walking in.
+- **Nothing is sent from behind the shut door by `App.vue`** — it holds the trip queue and the
+  verdict drafts, not a screen — and a door that has just opened is the other moment worth
+  sending: what the queue held on a `401` has been waiting for exactly that. The queue has a
+  second way out of its own, on a change of owner, and that one is deliberately not held: it
+  sends the drawer of whoever the server says we are, and on this device a stranger's drawer is
+  empty.
 - **A `401` anywhere is the login screen**, through one seam in `frontend/src/api.ts` wired in
   `main.ts`. Before it, `error.no_actor` was read by three callers out of a dozen and a half and
   every other screen said «что-то пошло не так» about an account that was simply not there.

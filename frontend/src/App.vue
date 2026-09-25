@@ -19,8 +19,6 @@ import TabBar from '@/components/TabBar.vue'
 import LoginView from '@/views/LoginView.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
-import { useActorStore } from '@/stores/actor'
-import type { IdentityState } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
@@ -31,27 +29,17 @@ export default defineComponent({
   name: 'AppRoot',
   components: { LoginView, TabBar },
   setup() {
-    const actor = useActorStore()
     const login = useLoginStore()
 
-    /**
-     * The door, and it opens only once the identity has settled one way or another: signed in,
-     * or offline and error, which show the app with a notice because a session may be perfectly
-     * alive behind a captive portal (MOL-19). While the answer is still coming the login screen
-     * holds its own loading state — rendering the app first and taking it away a moment later
-     * would be a flash of somebody's trip on a phone that is about to be asked to sign in.
-     *
-     * It is also shut while a session nobody has said is theirs is in hand. That is the whole of
-     * MOL-55's round 3: a stranger who saw the link can confirm it with their own Telegram, and
-     * this browser then holds *their* session.
-     */
-    const settled: IdentityState[] = ['ready', 'offline', 'error']
-    const closed = computed(() => login.blocked || !settled.includes(actor.state))
+    // Whether the app is shown at all, or the login screen instead. The rule lives in the login
+    // store, where it can be read and tested without mounting the app (MOL-56).
+    const closed = computed(() => login.closed)
 
     // The app, not a screen, sends what waits on the phone, whichever screen is open when the
     // connection is back: purchases written at the shelf (MOL-24) and saved ratings (MOL-28).
-    // **Never while the door is shut**: the account behind it may not be this person's, and
-    // their purchases would land in it.
+    // Not while the door is shut — though the queue has a second way out of its own, on a change
+    // of owner, and that one is not held here: it sends the drawer of whoever the server says we
+    // are, and a stranger's drawer on this device is empty.
     const queue = useTripQueueStore()
     const drafts = useVerdictDraftsStore()
     const send = () => {

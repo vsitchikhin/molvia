@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { ActorView } from '@molvia/model'
@@ -16,11 +16,25 @@ import { useActorStore } from '@/stores/actor'
  * identifier and the link — **never the secret**: that lives in `__Host-molvia_login`, where no
  * script can read it, and putting it here would be MOL-8's mistake all over again.
  *
- * **The owner nobody has confirmed yet**, because a session can arrive for an account that is
- * not this person's (MOL-55, round 3): whoever sees the link within its five minutes can
- * confirm it with their own Telegram, and the browser that started the login collects *that*
- * account. The screen asks before letting anyone in, and the question has to survive a reload —
- * otherwise reloading is the way past it.
+ * **The owner this person has said is theirs**, because a session can arrive for an account that
+ * is not (MOL-55, round 3): whoever sees the link within its five minutes can confirm it with
+ * their own Telegram, and the browser that started the login collects *that* account.
+ *
+ * **It is written down the right way round, and that is the whole of the second fix**
+ * (adversarial А1 и А4). The first version kept the opposite — «somebody is unconfirmed» — a
+ * flag set when the script happened to see the answer that collected a session, and cleared by
+ * anything that looked like a signed-out state. Both halves were wrong about the world:
+ *
+ * - The browser stores the cookie from the *headers* of the poll's answer. A script that never
+ *   saw that answer — the app was restarted, «Начать заново» was pressed a moment earlier —
+ *   left no flag behind, and the door opened on a session nobody had been asked about.
+ * - `error.no_actor` says there was no session **when that request left**, and nothing about
+ *   now. An answer still in flight from before the login cleared the flag, and the next
+ *   `me()` walked in.
+ *
+ * Kept as «claimed», the question cannot be missed: whoever the server says we are is compared
+ * with whoever the person approved, and anything else is a question — however the session got
+ * here.
  */
 const KEY = 'molvia.login'
 
@@ -38,7 +52,7 @@ interface Request {
 
 interface Kept {
   readonly request?: Request
-  readonly unconfirmed?: string
+  readonly claimed?: string
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -66,10 +80,10 @@ function recall(): Kept {
   try {
     const parsed: unknown = JSON.parse(raw)
     if (typeof parsed !== 'object' || parsed === null) return {}
-    const { request, unconfirmed } = parsed as Record<string, unknown>
+    const { request, claimed } = parsed as Record<string, unknown>
     return {
       ...(isRequest(request) ? { request } : {}),
-      ...(typeof unconfirmed === 'string' && UUID.test(unconfirmed) ? { unconfirmed } : {}),
+      ...(typeof claimed === 'string' && UUID.test(claimed) ? { claimed } : {}),
     }
   } catch {
     return {}
@@ -80,11 +94,19 @@ export const useLoginStore = defineStore('login', () => {
   const actor = useActorStore()
   const kept = recall()
   const request = ref<Request | null>(kept.request ?? null)
-  const unconfirmed = ref<string | null>(kept.unconfirmed ?? null)
+  const claimed = ref<string | null>(kept.claimed ?? null)
   const failure = ref<LoginFailure | null>(null)
   const connected = ref(navigator.onLine)
   /** True while `POST /auth/login` is in flight, so the tap has a visible consequence at once. */
   const starting = ref(false)
+  /** True while another window's login is being caught up with — see the `storage` listener. */
+  const rechecking = ref(false)
+  /**
+   * The owner the person has just said is not theirs. In memory only: it exists to keep the
+   * screen on the new attempt instead of asking the same question again, and a relaunch may
+   * ask again — the door is shut either way.
+   */
+  const refusedOwner = ref<string | null>(null)
   /** One request in flight at a time: the interval and a tap must not poll twice over. */
   let polling = false
 
@@ -95,69 +117,100 @@ export const useLoginStore = defineStore('login', () => {
     connected.value = false
   })
 
-  function keep(): void {
-    if (!request.value && !unconfirmed.value) {
+  /**
+   * **A window writes its own request and never another window's** (adversarial А3). The key is
+   * shared, so a window whose link died used to call `forget` over a live request its neighbour
+   * had just started — and a neighbour that iOS had unloaded then came back to «Войти через
+   * Telegram» with a confirmation on its way to nobody. Starting a login still replaces what is
+   * stored, because a new start replaces the secret and kills whatever was there; only removal
+   * and rewriting are checked against ownership.
+   */
+  function keep(previous?: Request | null): void {
+    const stored = recall()
+    const mine = previous === undefined || stored.request?.id === previous?.id
+    const held = mine ? request.value : (stored.request ?? null)
+    if (!held && !claimed.value) {
       forget(KEY)
       return
     }
     write(
       KEY,
       JSON.stringify({
-        ...(request.value ? { request: request.value } : {}),
-        ...(unconfirmed.value ? { unconfirmed: unconfirmed.value } : {}),
+        ...(held ? { request: held } : {}),
+        ...(claimed.value ? { claimed: claimed.value } : {}),
       }),
     )
   }
 
-  /**
-   * **The door stays shut while somebody's account is unconfirmed**, even though the server has
-   * already handed this browser a session. That is the whole of the protection: a person is
-   * shown which account they landed in before anything of theirs is written into it.
-   */
-  const blocked = computed(() => unconfirmed.value !== null)
+  /** Who the server last said this browser is, or — with nothing to ask — the drawer's name. */
+  const known = computed(() => actor.actor?.id ?? actor.id)
 
   /**
-   * The request comes before the unconfirmed owner on purpose: «Это не я» keeps the question
-   * shut *and* starts a new login, and what the person must see then is the new attempt, not
-   * the account they have just refused.
+   * **The door stays shut until the person has said the account is theirs** — and it is shut by
+   * comparing, not by remembering an event. A session this browser holds without an answer is a
+   * session somebody else may have confirmed (MOL-55, round 3), whether the app noticed it
+   * arrive or not.
    */
+  const blocked = computed(
+    () => rechecking.value || (known.value !== null && known.value !== claimed.value),
+  )
+
+  /**
+   * **Дверь**, и она одна на всё приложение: `App.vue` рисует либо экран входа, либо маршрут.
+   * Открывается она только на осевшей личности — вошли, либо офлайн/ошибка **и владелец на
+   * устройстве есть**: без владельца показывать нечего, ни очереди, ни запомненных ответов, и
+   * довод решения Q5 ничем не отличается от случая, когда сети нет вовсе (адверсариальный А5:
+   * портал магазина отвечает `onLine === true`, и правило мимо него проходило).
+   */
+  const closed = computed(() => {
+    if (blocked.value) return true
+    if (actor.state === 'ready') return false
+    if (actor.state === 'offline' || actor.state === 'error') return actor.id === null
+    return true
+  })
+
   const phase = computed<LoginPhase>(() => {
-    if (actor.state === 'idle' || actor.state === 'loading') return 'loading'
+    if (actor.state === 'idle' || actor.state === 'loading' || rechecking.value) return 'loading'
     if (failure.value) return failure.value
+    // The account in hand is asked about before the attempt that is still waiting: a session may
+    // well have arrived while the screen was showing «ждём» — that is what А4 is (the answer that
+    // carried it never reached the script). «Это не я» is the one case where the new attempt
+    // wins, and it says so by naming the owner it has just refused.
+    if (actor.state === 'ready' && blocked.value && known.value !== refusedOwner.value)
+      return 'welcome'
     if (starting.value || request.value) return 'waiting'
-    if (unconfirmed.value) return actor.state === 'ready' ? 'welcome' : 'loading'
-    return connected.value ? 'offer' : 'offline'
+    // Not a skeleton: an identity that could not be checked is «no connection» or «try again»,
+    // and a screen without all four of its states is what MOL-19 exists to prevent.
+    if (actor.state === 'offline' || !connected.value) return 'offline'
+    if (actor.state === 'error') return 'error'
+    return 'offer'
   })
 
   /**
-   * **The question belongs to the browser, not to the window that asked it** (self-review).
+   * **What another window did to the login is this window's business too** (self-review С-1,
+   * adversarial А2, review Р2-1). Two windows share one cookie jar, so a session collected in
+   * one is the session the other carries — and a window that was already open would otherwise
+   * keep showing the app, and the question, as the owner it believed in a minute ago.
    *
-   * Two windows share one cookie jar, so a session collected in one is the session the other
-   * carries — and a window that was already open, with the app on screen, would walk into an
-   * account nobody has claimed. The request itself is deliberately **not** shared: each window
-   * owns its own attempt, and two of them polling one identifier would make the second read
-   * «ссылка больше не действует» about a login that worked.
+   * So the record is re-read **and the identity is asked for again**: the door is shut for the
+   * length of that question, because until it is answered this window does not know whose
+   * session it is holding.
    */
   window.addEventListener('storage', (event) => {
     if (event.key !== KEY) return
-    const now = recall().unconfirmed ?? null
-    if (now !== unconfirmed.value) unconfirmed.value = now
+    const now = recall()
+    claimed.value = now.claimed ?? null
+    void catchUp()
   })
 
-  // A session that turned out to be gone takes the question with it: there is nobody left to
-  // ask about. Without this the screen would hold «is this your account?» over no account.
-  // `immediate`, because the store is created by the screen — that is, after the identity has
-  // usually already settled, and a watcher that only hears changes would hear nothing.
-  watch(
-    () => actor.state,
-    (state) => {
-      if (state === 'signed-out' && unconfirmed.value) {
-        unconfirmed.value = null
-        keep()
-      }
-    },
-    { immediate: true },
-  )
+  async function catchUp(): Promise<void> {
+    rechecking.value = true
+    try {
+      await actor.verify()
+    } finally {
+      rechecking.value = false
+    }
+  }
 
   /**
    * Telegram is opened by the tap, and the link stays on the screen regardless: a popup opened
@@ -203,10 +256,18 @@ export const useLoginStore = defineStore('login', () => {
   /**
    * Вход швом разработки: в прод-сборке его нет вовсе, а здесь он такой же исход, как и
    * настоящий вход, — и провал остаётся на этом экране, а не открывает приложение с плашкой.
+   *
+   * Вопроса «ваш ли это аккаунт» он не задаёт и задавать не должен: спрашивают ради чужого
+   * подтверждения по утёкшей ссылке, а здесь человек входит сам, и никакого Telegram в этом нет.
    */
   async function devSignIn(): Promise<void> {
     failure.value = null
-    if (!(await actor.signIn())) failure.value = navigator.onLine ? 'error' : 'offline'
+    const view = await actor.signIn()
+    if (!view) {
+      failure.value = navigator.onLine ? 'error' : 'offline'
+      return
+    }
+    claim(view.id)
   }
 
   /** «Открыть Telegram» again — the same link, never a second request (see `begin`). */
@@ -216,9 +277,15 @@ export const useLoginStore = defineStore('login', () => {
 
   /** «Начать заново»: the previous request is abandoned, and its secret is about to be replaced. */
   async function restart(): Promise<void> {
-    request.value = null
-    keep()
+    drop()
     return begin()
+  }
+
+  /** Takes this window's request off the device, leaving a neighbour's alone. */
+  function drop(): void {
+    const previous = request.value
+    request.value = null
+    keep(previous)
   }
 
   /**
@@ -236,20 +303,20 @@ export const useLoginStore = defineStore('login', () => {
     polling = true
     try {
       const answer = await api.pollLogin(current.id)
-      // Restarted while the answer was in flight: that request has a secret this browser no
-      // longer holds, and its answer is about somebody else's attempt.
-      if (request.value?.id !== current.id) return
-      if (answer.status === 'authenticated') collect(answer.actor)
-      else failure.value = null
+      if (answer.status === 'authenticated') {
+        // Taken even when this window has moved on to another attempt: the session it carries is
+        // **this browser's**, whatever the screen has since been asked to do (А4). What holds the
+        // app shut is the comparison in `blocked`, so nothing is lost by adopting it here.
+        collect(answer.actor)
+        return
+      }
+      if (request.value?.id === current.id) failure.value = null
     } catch (error) {
       if (request.value?.id !== current.id) return
       const kind = refused(error)
       // Everything but a dead link keeps the request: the next poll is three seconds away, and
       // a hiccup must not throw away a confirmation the person is about to give.
-      if (kind === 'unavailable') {
-        request.value = null
-        keep()
-      }
+      if (kind === 'unavailable') drop()
       failure.value = kind
     } finally {
       polling = false
@@ -257,29 +324,33 @@ export const useLoginStore = defineStore('login', () => {
   }
 
   function collect(view: ActorView): void {
-    request.value = null
-    unconfirmed.value = view.id
-    keep()
+    drop()
     failure.value = null
-    // The owner is adopted at once — it is this browser's session now, whosever it is — and
-    // what holds the app shut is `blocked`, not an unfinished identity.
+    refusedOwner.value = null
+    // The owner is adopted at once — it is this browser's session now, whosever it is — and what
+    // holds the app shut is `blocked`, not an unfinished identity.
     actor.adopt(view)
   }
 
   /** «Да, это я». */
   function confirm(): void {
-    unconfirmed.value = null
+    if (actor.actor) claim(actor.actor.id)
+  }
+
+  function claim(owner: string): void {
+    claimed.value = owner
+    refusedOwner.value = null
     keep()
   }
 
   /**
    * «Это не я». The session stays on the server — ending it is MOL-57's handle — but this
-   * browser stops using it: the question is kept, so a reload or a relaunch asks again instead
-   * of walking in, and a fresh login starts right away.
+   * browser stops using it: nothing is claimed, so a reload or a relaunch asks again instead of
+   * walking in, and a fresh login starts right away.
    */
   async function refuse(): Promise<void> {
-    request.value = null
-    keep()
+    refusedOwner.value = known.value
+    drop()
     return begin()
   }
 
@@ -289,16 +360,17 @@ export const useLoginStore = defineStore('login', () => {
     if (!connected.value) return
     if (failure.value === 'offline') failure.value = null
     if (request.value) return poll()
-    if (!unconfirmed.value) return actor.recheck()
+    return actor.verify()
   }
 
   return {
     phase,
     blocked,
+    closed,
     starting,
     failure,
     request,
-    unconfirmed,
+    claimed,
     begin,
     devSignIn,
     again,

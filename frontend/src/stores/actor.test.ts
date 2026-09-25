@@ -310,7 +310,7 @@ describe('a session the server does not know', () => {
 
     await store.start()
 
-    await expect(store.signIn()).resolves.toBe(false)
+    await expect(store.signIn()).resolves.toBeNull()
     expect(store.state).toBe('signed-out')
   })
 
@@ -385,7 +385,7 @@ describe('когда сессию открыли в другом месте', ()
     expect(store.state).toBe('signed-out')
 
     me.mockResolvedValue(FIRST)
-    await store.recheck()
+    await store.verify()
 
     expect(store.state).toBe('ready')
     expect(store.id).toBe(FIRST.id)
@@ -396,9 +396,22 @@ describe('когда сессию открыли в другом месте', ()
     me.mockRejectedValue(await refusal())
     await store.start()
 
-    await store.recheck()
+    await store.verify()
 
     expect(store.state).toBe('signed-out')
+  })
+
+  it('сервер, который не ответил, ничего не решает', async () => {
+    // Отказ без ответа — не «сессии нет». Экран остаётся тем, чем был (адверсариальный А1).
+    const { store } = await freshStore()
+    me.mockResolvedValue(FIRST)
+    await store.start()
+    expect(store.state).toBe('ready')
+
+    me.mockRejectedValue(new Error('fetch failed'))
+    await store.verify()
+
+    expect(store.state).toBe('ready')
   })
 
   it('берёт владельца, которого забрал опрос входа', async () => {
@@ -425,7 +438,7 @@ describe('шва разработки в прод-сборке нет', () => {
     me.mockRejectedValue(await refusal())
     await store.start()
 
-    await expect(store.signIn()).resolves.toBe(false)
+    await expect(store.signIn()).resolves.toBeNull()
 
     expect(devLogin).not.toHaveBeenCalled()
     expect(store.state).toBe('signed-out')
@@ -434,20 +447,51 @@ describe('шва разработки в прод-сборке нет', () => {
 })
 
 describe('401 посреди работы', () => {
-  it('поднимает экран входа, с какого бы запроса отказ ни пришёл', async () => {
-    // Шов живёт в `@/api`, а связывает их `main.ts`; проверка самого шва — в `api.test.ts`.
+  it('переспрашивает, а не верит отказу на слово', async () => {
+    // `error.no_actor` — правда про момент, когда запрос **уходил**, и ничего про сейчас.
+    // Ответ, застрявший в пути до входа, приходит уже после него (адверсариальный А1).
     localStorage.setItem(KEY, FIRST.id)
     const { store, sessionEnded } = await freshStore()
     me.mockResolvedValue(FIRST)
     await store.start()
     expect(store.state).toBe('ready')
+    me.mockClear()
 
     sessionEnded()
+    await vi.waitFor(() => {
+      expect(me).toHaveBeenCalledTimes(1)
+    })
 
-    expect(store.state).toBe('signed-out')
+    expect(store.state).toBe('ready')
+  })
+
+  it('и поднимает экран входа, когда переспросил и сессии правда нет', async () => {
+    localStorage.setItem(KEY, FIRST.id)
+    const { store, sessionEnded } = await freshStore()
+    me.mockResolvedValue(FIRST)
+    await store.start()
+    me.mockRejectedValue(await refusal())
+
+    sessionEnded()
+    await vi.waitFor(() => {
+      expect(store.state).toBe('signed-out')
+    })
+
     // Ящик на месте: сессия — не данные, и тот же аккаунт вернётся через Telegram.
     expect(store.id).toBe(FIRST.id)
     expect(localStorage.getItem(KEY)).toBe(FIRST.id)
+  })
+
+  it('и не спрашивает второй раз, когда вопрос уже в полёте', async () => {
+    // `me()` внутри `verify` идёт через тот же шов: без этого мёртвая сессия спрашивала бы
+    // сама себя бесконечно, а холодный старт без сессии — дважды.
+    const { store } = await freshStore()
+    me.mockRejectedValue(await refusal())
+
+    await store.start()
+
+    expect(store.state).toBe('signed-out')
+    expect(me).toHaveBeenCalledTimes(1)
   })
 })
 
