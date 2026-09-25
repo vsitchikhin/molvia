@@ -113,7 +113,6 @@
       :income="target"
       :amounts="target ? `${amountOf(target)} · ${lineOf(target)}` : ''"
       :busy="busy"
-      :in-base="!!target && !!overview && target.amount.currency === overview.base"
       @confirm="confirmRemove"
     />
   </AppScreen>

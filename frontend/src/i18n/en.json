@@ -312,9 +312,9 @@
     "cost_line_estimated": "{currency}: {rate} · {basis} · part at the Central Bank of Armenia rate",
     "no_wallet": "No {quote} has come in yet, by exchange or income — new trips count by the Central Bank of Armenia rate",
     "wallet_unknown": "Rate unknown: the {given} → {quote} exchange of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New trips count by the Central Bank of Armenia rate until you record an exchange of a known price or an income on a day with a fresh Central Bank of Armenia rate",
-    "wallet_old_reckoning": "Rate unknown: the {quote} bought on {date} with {given} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New trips count by the Central Bank of Armenia rate until you record an exchange paid in {base} or an income in {quote} after the change",
+    "wallet_old_reckoning": "Rate unknown: the {quote} bought on {date} with {given} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New trips count by the Central Bank of Armenia rate until you record an exchange paid in {base} or an income in {quote} after the change, on a day with a fresh Central Bank of Armenia rate",
     "wallet_unknown_income": "Rate unknown: the {quote} income of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New trips count by the Central Bank of Armenia rate until you record an exchange of a known price or an income on a day with a fresh Central Bank of Armenia rate",
-    "wallet_old_reckoning_income": "Rate unknown: the {quote} received on {date} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New trips count by the Central Bank of Armenia rate until you record an exchange paid in {base} or an income in {quote} after the change",
+    "wallet_old_reckoning_income": "Rate unknown: the {quote} received on {date} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New trips count by the Central Bank of Armenia rate until you record an exchange paid in {base} or an income in {quote} after the change, on a day with a fresh Central Bank of Armenia rate",
     "preference_legend": "New trips count",
     "preference_personal": "by my rate",
     "preference_official": "by the central bank rate",
@@ -398,8 +398,7 @@
     "remove": "Remove income {amount}",
     "remove_sheet": {
       "title": "Remove this income?",
-      "body": "A removed income no longer counts in the rate of new trips. Past trips do not change",
-      "body_base": "Past trips do not change, and neither does the rate of new ones: an income in the currency of conversion is not part of it",
+      "body": "Past trips do not change. If this income was part of your rate, new trips will work it out without it",
       "confirm": "Remove income"
     },
     "removed": "Income removed: {amount}",

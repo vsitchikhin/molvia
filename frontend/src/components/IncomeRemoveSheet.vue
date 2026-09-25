@@ -3,9 +3,7 @@
     <template #title>{{ t('income.remove_sheet.title') }}</template>
     <template v-if="income" #meta>{{ amounts }}</template>
 
-    <p class="words">
-      {{ t(inBase ? 'income.remove_sheet.body_base' : 'income.remove_sheet.body') }}
-    </p>
+    <p class="words">{{ t('income.remove_sheet.body') }}</p>
 
     <template #footer>
       <AppButton variant="danger-ghost" block :disabled="busy" @click="$emit('confirm')">
@@ -25,8 +23,11 @@ import BottomSheet from '@/components/BottomSheet.vue'
 
 /**
  * «Удалить доход?» (MOL-66, as В-5 of MOL-40): the amount, the source and the day, and what removing
- * does — the rate of new trips is worked out again when the income was part of it, past trips keep
- * theirs. After it the screen still offers «Вернуть» for ten minutes.
+ * does — past trips keep their rate, and new ones work it out without the income **if it was part
+ * of it**. Said as a condition, not a promise: whether it still is only the whole walk knows — an
+ * income in roubles never is, one in euros is not until exchanged, and an exchange with no
+ * remainder after it starts the rate afresh (self-review Ч-2, adversarial round 2, Е1). After it the
+ * screen still offers «Вернуть» for ten minutes.
  */
 export default defineComponent({
   name: 'IncomeRemoveSheet',
@@ -37,11 +38,6 @@ export default defineComponent({
     /** The income named as the list names it. */
     amounts: { type: String, default: '' },
     busy: { type: Boolean, default: false },
-    /**
-     * The income is in the currency of conversion: it never moved the rate (Р-5), so the sheet does
-     * not promise that removing it will (self-review Ч-2).
-     */
-    inBase: { type: Boolean, default: false },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
