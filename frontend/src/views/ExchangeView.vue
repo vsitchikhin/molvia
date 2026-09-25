@@ -70,6 +70,7 @@
             :model-value="overview.preference"
             :options="preferenceOptions"
             :legend="t('exchange.preference_legend')"
+            :disabled="!online || busy"
             @update:model-value="choose"
           />
           <p v-if="overview.pair" class="meta">{{ t('exchange.preference_hint') }}</p>
@@ -198,26 +199,25 @@ export default defineComponent({
 
     function comparisonOf(exchange: Row): string {
       const official = exchange.official
-      if (!official) return t('exchange.row_no_official')
+      if (!official) {
+        return t(exchange.officialDoubtful ? 'exchange.row_doubtful' : 'exchange.row_no_official')
+      }
       const minor = official.difference.minor
-      const amount = formatMoney(
-        { ...official.difference, minor: minor < 0n ? -minor : minor },
-        locale.value,
-      )
       const words = {
-        amount,
+        amount: formatMoney(
+          { ...official.difference, minor: minor < 0n ? -minor : minor },
+          locale.value,
+        ),
         rate: rateOf(official.rate),
         date: dayOf(official.rate.asOf),
+        source: t(`trip.rate.source_${official.provider}`),
       }
-      const said =
-        minor > 0n
-          ? t('exchange.row_more', words)
-          : minor < 0n
-            ? t('exchange.row_less', words)
-            : t('exchange.row_equal', words)
-      return official.provider === 'cba'
-        ? said
-        : `${said} · ${t('exchange.row_fallback', { source: t(`trip.rate.source_${official.provider}`) })}`
+      // An open source is named instead of the central bank, never beside it: «чем по ЦБ РА ·
+      // не ЦБ РА» said a thing and took it back in one line (review С-6).
+      const bank = official.provider === 'cba'
+      if (minor > 0n) return t(bank ? 'exchange.row_more' : 'exchange.row_more_other', words)
+      if (minor < 0n) return t(bank ? 'exchange.row_less' : 'exchange.row_less_other', words)
+      return t(bank ? 'exchange.row_equal' : 'exchange.row_equal_other', words)
     }
 
     function choose(value: string): void {

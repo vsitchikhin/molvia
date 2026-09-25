@@ -46,6 +46,7 @@ function row(patch: Partial<Row> = {}): Row {
       provider: 'cba',
       difference: { minor: 875_400n, currency: 'AMD' },
     },
+    officialDoubtful: false,
     ...patch,
   }
 }
@@ -166,6 +167,14 @@ describe('ExchangeView: the rate and the list', () => {
     expect(view.text()).not.toMatch(/commission/i)
   })
 
+  it('says the bank’s rate of that day is in doubt when it jumped with nothing before it (С-5)', async () => {
+    exchanges.mockResolvedValue(
+      overview({ exchanges: [row({ official: null, officialDoubtful: true })] }),
+    )
+    const view = await render()
+    expect(view.get('.row').text()).toContain(en.exchange.row_doubtful)
+  })
+
   it('names an open source when the bank of that day was not the central bank', async () => {
     exchanges.mockResolvedValue(
       overview({
@@ -181,7 +190,10 @@ describe('ExchangeView: the rate and the list', () => {
       }),
     )
     const view = await render()
-    expect(view.get('.row').text()).toContain(en.trip.rate.source_cbr)
+    const text = view.get('.row').text()
+    // Named instead of the central bank, never beside it (С-6).
+    expect(text).toContain(`than the ${en.trip.rate.source_cbr} rate`)
+    expect(text).not.toContain('central bank')
   })
 
   it('without a pair says there is nothing to convert, and offers no preference', async () => {
@@ -200,6 +212,27 @@ describe('ExchangeView: the rate and the list', () => {
     await flushPromises()
     expect(chooseRatePreference).toHaveBeenCalledWith('official')
     expect((view.get('input[value="official"]').element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('a refused preference goes back to what the server holds — for the radio too (Б3)', async () => {
+    exchanges.mockResolvedValue(overview())
+    chooseRatePreference.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+
+    await view.get('input[value="official"]').setValue(true)
+    await flushPromises()
+    expect((view.get('input[value="personal"]').element as HTMLInputElement).checked).toBe(true)
+    expect((view.get('input[value="official"]').element as HTMLInputElement).checked).toBe(false)
+    expect(view.get('.segment.on').text()).toBe(en.exchange.preference_personal)
+  })
+
+  it('the preference cannot be touched without a connection or while one is on its way', async () => {
+    exchanges.mockResolvedValue(overview())
+    chooseRatePreference.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    await view.get('input[value="official"]').setValue(true)
+    await flushPromises()
+    expect(view.get('fieldset').attributes('disabled')).toBeDefined()
   })
 
   it('deletes an exchange named by its amounts, and a failure is said once', async () => {

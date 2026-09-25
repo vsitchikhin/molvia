@@ -40,6 +40,8 @@ export function useExchanges(): Exchanges {
   const failed = ref(false)
   let latest = 0
 
+  const current = (): ExchangesResponse | null => overview.value
+
   function land(answer: ExchangesResponse): void {
     latest += 1
     overview.value = answer
@@ -106,7 +108,20 @@ export function useExchanges(): Exchanges {
       land(exchanges)
       return exchanges
     },
-    prefer: (preference) => write(() => api.chooseRatePreference(preference)),
+    // Shown at once, and taken back if the server refuses: the radio the browser already checked
+    // has to follow the answer, or a screen reader reads out a choice the server does not hold
+    // (review С-2, adversarial Б3).
+    async prefer(preference) {
+      const shown = overview.value
+      if (!shown || busy.value || shown.preference === preference) return
+      overview.value = { ...shown, preference }
+      await write(() => api.chooseRatePreference(preference))
+      // Read again after the wait: the owner may have changed meanwhile and taken the list away.
+      const after = current()
+      if (failed.value && after?.preference === preference) {
+        overview.value = { ...after, preference: shown.preference }
+      }
+    },
     remove: (id) => write(() => api.removeExchange(id)),
   }
 }

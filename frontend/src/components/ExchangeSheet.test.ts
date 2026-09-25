@@ -27,8 +27,19 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
       },
       basis: 'last',
     },
-    heldEstimate: { minor: 2_000_000n, currency: 'AMD' },
-    exchanges: [],
+    heldEstimate: { held: { minor: 2_000_000n, currency: 'AMD' }, whole: true },
+    exchanges: [
+      {
+        id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d',
+        exchangedOn: '2026-09-01',
+        given: { minor: 2_000_000n, currency: 'RUB' },
+        received: { minor: 10_000_000n, currency: 'AMD' },
+        heldBefore: null,
+        rate: null,
+        official: null,
+        officialDoubtful: false,
+      },
+    ],
     ...patch,
   }
 }
@@ -111,13 +122,52 @@ describe('ExchangeSheet', () => {
   })
 
   it('asks what was held only from the second exchange of the pair, and hints at it', async () => {
-    const first = await render(overview({ wallet: null, heldEstimate: null }))
+    const first = await render(overview({ wallet: null, heldEstimate: null, exchanges: [] }))
     expect(first.text()).not.toContain('held before the exchange')
 
     const second = await render()
     expect(second.text()).toContain('held before the exchange')
     expect(second.text()).toContain('By the recorded spending')
     expect(second.text()).toContain('20,000.00')
+  })
+
+  it('asks by days, not by the order of entry: a day before every exchange is the first link (С-3)', async () => {
+    const view = await render()
+    await field(view, en.exchange.sheet.day).get('input').setValue('2026-08-20')
+    expect(view.text()).not.toContain('held before the exchange')
+    await field(view, en.exchange.sheet.day).get('input').setValue('2026-09-01')
+    expect(view.text()).toContain('held before the exchange')
+  })
+
+  it('says the hint is about the last exchange alone when what was there before it is unknown', async () => {
+    const view = await render(
+      overview({ heldEstimate: { held: { minor: 7_000_000n, currency: 'AMD' }, whole: false } }),
+    )
+    expect(view.text()).toContain('Of the last exchange ≈')
+    expect(view.text()).toContain('70,000.00')
+  })
+
+  it('refuses a cleared day under the field, not as a lost connection (Б2)', async () => {
+    const view = await render()
+    await fill(view, '20000', '95000')
+    await field(view, en.exchange.sheet.day).get('input').setValue('')
+    await save(view)
+    expect(record).not.toHaveBeenCalled()
+    expect(field(view, en.exchange.sheet.day).text()).toContain(en.exchange.sheet.bad_day)
+    expect(view.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('refuses amounts no rate says under «Got», before sending and when the server does (А3)', async () => {
+    const view = await render()
+    await fill(view, '1', '5000000')
+    await save(view)
+    expect(record).not.toHaveBeenCalled()
+    expect(field(view, en.exchange.sheet.received).text()).toContain(en.error.invalid_rate)
+
+    record.mockRejectedValue(new ApiError(ERROR.INVALID_RATE))
+    await fill(view, '20000', '95000')
+    await save(view)
+    expect(field(view, en.exchange.sheet.received).text()).toContain(en.error.invalid_rate)
   })
 
   it('does not ask what was held for an exchange of another pair', async () => {

@@ -27,8 +27,10 @@
         v-model="day"
         :label="t('exchange.sheet.day')"
         kind="date"
+        min="2000-01-01"
         :max="today"
         :error="dayError"
+        :error-text="dayInvalid ? t('exchange.sheet.bad_day') : null"
       />
 
       <div v-if="asksHeld">
@@ -41,9 +43,7 @@
         />
         <p :id="`${id}-held`" class="hint">
           {{ t('exchange.sheet.held_hint') }}
-          <template v-if="estimate">
-            <br />{{ t('exchange.sheet.held_estimate', { amount: estimate }) }}
-          </template>
+          <template v-if="estimate"> <br />{{ estimate }} </template>
         </p>
       </div>
     </form>
@@ -67,6 +67,8 @@ import {
   currencySchema,
   currencySign,
   formatMoney,
+  isPlausibleExchange,
+  isRateDay,
   parseMoney,
   yerevanDate,
 } from '@molvia/model'
@@ -114,6 +116,7 @@ export default defineComponent({
     const day = ref(today.value)
     const held = ref('')
     const dayError = ref<ErrorCode | null>(null)
+    const dayInvalid = ref(false)
     const heldError = ref<ErrorCode | null>(null)
     const sending = ref(false)
     const failed = ref(false)
@@ -135,6 +138,7 @@ export default defineComponent({
         day.value = today.value
         held.value = ''
         dayError.value = null
+        dayInvalid.value = false
         heldError.value = null
         failed.value = false
         exchangeId = newId()
@@ -150,16 +154,41 @@ export default defineComponent({
     const sign = (currency: Currency) => currencySign(currency, locale.value)
     const sameCurrency = computed(() => currencies.given === currencies.received)
 
+    /** The exchanges of the pair this form is about, in the order the wallet walks them. */
+    const ofPair = computed(() =>
+      props.overview.exchanges.filter(
+        (exchange) =>
+          exchange.given.currency === currencies.given &&
+          exchange.received.currency === currencies.received,
+      ),
+    )
+
+    /**
+     * Asked only where it weighs anything: when the wallet already has an exchange of this pair on
+     * or before the chosen day — the chain is walked by days, not by the order of entry, and an
+     * earlier day entered second is the first link, whose remainder is ignored (review С-3). A
+     * choice of field, not a computation: the list is the server's.
+     */
     const asksHeld = computed(() => {
-      const { pair, wallet } = props.overview
+      const { pair } = props.overview
       return (
-        !!pair && !!wallet && currencies.given === pair.base && currencies.received === pair.quote
+        !!pair &&
+        currencies.given === pair.base &&
+        currencies.received === pair.quote &&
+        ofPair.value.some((exchange) => exchange.exchangedOn <= day.value)
       )
     })
 
-    const estimate = computed(() =>
-      props.overview.heldEstimate ? formatMoney(props.overview.heldEstimate, locale.value) : null,
-    )
+    /** The hint is about the latest exchange, so it fits only a day not before it. */
+    const estimate = computed(() => {
+      const hint = props.overview.heldEstimate
+      const latest = ofPair.value.at(0)?.exchangedOn
+      if (!hint || !asksHeld.value || (latest !== undefined && day.value < latest)) return null
+      const amount = formatMoney(hint.held, locale.value)
+      return hint.whole
+        ? t('exchange.sheet.held_estimate', { amount })
+        : t('exchange.sheet.held_estimate_last', { amount })
+    })
 
     /** UX only: the server reads the same codecs and has the last word (CLAUDE.md). */
     function money(text: string, currency: Currency): Money | null {
@@ -175,6 +204,9 @@ export default defineComponent({
       failed.value = false
       dayError.value = null
       heldError.value = null
+      // Cleared, or before the year the rates begin: said under the field, not as a lost
+      // connection (adversarial Б2).
+      dayInvalid.value = !isRateDay(day.value)
       const given = money(amounts.given, currencies.given)
       const received = money(amounts.received, currencies.received)
       amountErrors.given = given && given.minor > 0n ? null : ERROR.INVALID_AMOUNT
@@ -183,7 +215,13 @@ export default defineComponent({
         asksHeld.value && held.value.trim() ? money(held.value, currencies.received) : null
       if (asksHeld.value && held.value.trim() && !heldBefore) heldError.value = ERROR.INVALID_AMOUNT
       if (!given || !received || amountErrors.given || amountErrors.received) return
-      if (sameCurrency.value || heldError.value) return
+      // Amounts no rate in the band says — a zero too many — refused before the connection is
+      // asked; the server refuses the same (adversarial А3).
+      if (!isPlausibleExchange(given, received)) {
+        amountErrors.received = ERROR.INVALID_RATE
+        return
+      }
+      if (sameCurrency.value || heldError.value || dayInvalid.value) return
 
       sending.value = true
       try {
@@ -199,6 +237,8 @@ export default defineComponent({
         // The refusals a person can answer stay under their field; anything else is said once.
         if (caught instanceof ApiError && caught.code === ERROR.EXCHANGE_IN_FUTURE) {
           dayError.value = ERROR.EXCHANGE_IN_FUTURE
+        } else if (caught instanceof ApiError && caught.code === ERROR.INVALID_RATE) {
+          amountErrors.received = ERROR.INVALID_RATE
         } else {
           failed.value = true
         }
@@ -220,6 +260,7 @@ export default defineComponent({
       today,
       day,
       dayError,
+      dayInvalid,
       held,
       heldError,
       asksHeld,
