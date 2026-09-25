@@ -17,7 +17,7 @@
  * seven days, and with it whatever the trip queue had not sent. That is a property of MOL-24;
  * the session itself survives, because a cookie the server set is not what ITP caps.
  */
-import { forget, forgetWhere, read, reshape, write } from '@/stores/storage'
+import { forget, forgetWhere, read, reshape, sharedHolds, write } from '@/stores/storage'
 
 const KEY = 'molvia.actor'
 
@@ -45,9 +45,43 @@ export function isIdentifier(value: string | null): value is string {
 export function currentIdentity(): string | null {
   if (current === null) {
     const stored = read(KEY)
-    if (isIdentifier(stored)) current = stored
+    if (isIdentifier(stored)) {
+      if (erasedElsewhere(stored)) forgetOwner(stored)
+      else current = stored
+    }
   }
   return current
+}
+
+/**
+ * Asks again whether the drawer this tab knows was erased in another window — what a launch and a
+ * return to the tab do (`actor.start`). A tab the browser froze wakes with its memory intact and
+ * the event it slept through never delivered, so the answer cached above is not enough.
+ */
+export function erasedWhileAway(): boolean {
+  const owner = current ?? read(KEY)
+  if (!isIdentifier(owner) || !erasedElsewhere(owner)) return false
+  forgetOwner(owner)
+  return true
+}
+
+/**
+ * The drawer is on this tab's own shelf and on no other — «Выйти» in another window took it from
+ * the shared one while this tab did not hear it (MOL-57, round 2, Д2). The event reaches live
+ * documents only: a tab the browser unloaded to save memory, or one closed and reopened, gets its
+ * `sessionStorage` back without it, and `read` falling back there opened the app of the person who
+ * left.
+ *
+ * Every write of the app goes to both shelves, so a drawer only here, with **not one key of this
+ * owner** on a shared shelf that works, is a drawer erased there. A shelf that cannot be written
+ * says nothing (`null`): with it refusing, this tab's shelf is the only one, legitimately.
+ */
+function erasedElsewhere(owner: string): boolean {
+  return (
+    sharedHolds(
+      (key) => key === KEY || (key.startsWith('molvia.') && key.endsWith(`.${owner}`)),
+    ) === false
+  )
 }
 
 /**

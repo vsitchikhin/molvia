@@ -1307,13 +1307,17 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   goes under the trip queue's lock, and the page is loaded afresh at `/`. **Offline there is no
   way out at all** — the cookie is `HttpOnly`, the page cannot put it out, and a session left
   alive is what the person came to end — and the sheet says so.
-- **A lost `204` is finished by the server's «no session»** (adversarial Б2). The intent,
-  `molvia.leaving`, is written before the request leaves: if the server deleted the session and
-  the answer never came, the first `401` closed the door on the settings and the erasure never
-  happened. Now the identity settling as signed out finishes it; settling as the same owner means
-  the request did not land, and the intent goes; a launch with no connection and the intent on
-  the device shows the login screen, not the app. Closing the sheet withdraws it — the person
-  decided to stay. The listener is a store of its own (`stores/signOut`), created with the app.
+- **A lost `204` is settled by the server's next answer, and by nothing else** (adversarial Б2,
+  round 2 Д1, Д3). The intent, `molvia.leaving`, is written before the request leaves: if the
+  server deleted the session and the answer never came, the first `401` closed the door on the
+  settings and the erasure never happened. The server's «nobody» now finishes it; its «this very
+  owner» means the request did not land, and the intent goes. **The identity keeps the server's
+  word apart from its own state** (`heard`, `nobody`): a launch with no connection and the intent
+  on the device shows the login screen — the door's `signed-out` — but that is the device's
+  conclusion, and erasing on it threw away a purchase from the shelf while the session lived on.
+  Closing the sheet after a failure does not withdraw the intent — the outcome is unknown — it
+  asks the server; so does a return of the connection or of the app while the intent waits. The
+  listener is a store of its own (`stores/signOut`), created with the app.
 - **What would be lost is counted aloud** (owner's decision Q2) — everything the erasure takes
   that the server does not hold: the trip queue and the purchases it refused, every rating draft,
   saved or still being typed, and an unsaved settings form (adversarial Б3). The app is asked to
@@ -1323,6 +1327,11 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   (adversarial А1). `sessionStorage` belongs to one tab, so the window where «Выйти» was pressed
   cannot clear its neighbours' — and `read` falls back to it, so a neighbour's reload opened the
   app of the person who left. It asks no `me()`: the window that erased did so after the `204`.
+  **A tab that slept through the event checks at every start** (round 2, Д2): a drawer on its own
+  shelf with not one key of the owner on a shared shelf that works was erased elsewhere — a tab
+  the browser unloaded, or one closed and reopened, gets its `sessionStorage` back without the
+  event. A shared shelf that refuses a probe write says nothing: then this tab's shelf is the only
+  one, legitimately (Safari's private mode).
 - **«Это не я» and the login's poll take turns** (adversarial Г1). The way out's `Max-Age=0` is
   addressed to the cookie's name, not to a token, so a poll that collected this person's own
   session and answered first had it put out of the jar. `refuse` waits for a poll already on its
@@ -1332,7 +1341,8 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
 - **«Устройства» keeps nothing on the phone and reads the list again on every return** — to the
   tab, or `online` — not only after a failure (adversarial В2): a list kept in memory for hours is
   the copy it refuses to keep on the disk. A device ended leaves the list at once, not with the
-  next read (В1). There is no empty state: a live session is always in its own list. «Были» is a
+  next read (В1), and a list that could not be read again is not shown at all — the screen says
+  «нет связи» or offers «Повторить» instead (round 2, Д4). There is no empty state: a live session is always in its own list. «Были» is a
   day, never a time — `last_seen_at` moves once a day — the current row says none, and a date of
   another year carries the year. An unknown device gets its own sentences rather than its label
   put into somebody else's case.

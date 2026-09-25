@@ -144,6 +144,27 @@ export function forgetWhere(match: (key: string) => boolean): void {
 }
 
 /**
+ * Whether the shared shelf holds a key `match` accepts — or `null` when it cannot say: blocked,
+ * or refusing writes (Safari's private mode keeps `localStorage` readable and empty), which makes
+ * the tab's own shelf the only one there is (MOL-57, round 2, Д2).
+ */
+export function sharedHolds(match: (key: string) => boolean): boolean | null {
+  try {
+    const shared = window.localStorage
+    const probe = 'molvia.probe'
+    shared.setItem(probe, '1')
+    shared.removeItem(probe)
+    for (let index = 0; index < shared.length; index += 1) {
+      const key = shared.key(index)
+      if (key !== null && match(key)) return true
+    }
+    return false
+  } catch {
+    return null
+  }
+}
+
+/**
  * Rewrites one key on every shelf that holds it, each from its own value: `change` answers what
  * that shelf should keep, `null` for nothing. Each shelf separately, because two shelves may hold
  * different values under one key — the shared one and this window's own (MOL-57).

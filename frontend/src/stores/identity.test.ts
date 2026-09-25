@@ -1,6 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   currentIdentity,
+  dropIdentity,
+  erasedWhileAway,
   forgetOwner,
   forgetTheInviteDoor,
   rememberIdentity,
@@ -11,6 +13,11 @@ const INVITE_KEY = 'molvia.invite'
 function openedAt(path: string): void {
   window.history.replaceState({ back: '/', current: path, position: 1 }, '', path)
 }
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  dropIdentity()
+})
 
 beforeEach(() => {
   localStorage.clear()
@@ -115,6 +122,31 @@ describe('«Выйти» стирает ящик владельца (MOL-57)', (
     expect(JSON.parse(localStorage.getItem('molvia.login') ?? '{}')).toEqual({ claimed: OTHER })
   })
 
+  it('ящик только на своей полке, при рабочей общей — стёрт в другом окне (раунд 2, Д2)', () => {
+    sessionStorage.setItem('molvia.actor', OWNER)
+    sessionStorage.setItem(`molvia.trip-queue.${OWNER}`, '[]')
+
+    expect(erasedWhileAway()).toBe(true)
+    expect(sessionStorage.length).toBe(0)
+    expect(currentIdentity()).toBeNull()
+  })
+
+  it('контроль: хоть один ключ владельца на общей полке — ящик жив', () => {
+    sessionStorage.setItem('molvia.actor', OWNER)
+    localStorage.setItem(`molvia.settings.${OWNER}`, '{}')
+    expect(erasedWhileAway()).toBe(false)
+    expect(sessionStorage.getItem('molvia.actor')).toBe(OWNER)
+  })
+
+  it('контроль: общая полка не пишет — своя единственная, и ящик на ней законен', () => {
+    sessionStorage.setItem('molvia.actor', OWNER)
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError')
+    })
+    expect(erasedWhileAway()).toBe(false)
+    expect(sessionStorage.getItem('molvia.actor')).toBe(OWNER)
+  })
+
   it('после стирания устройство больше не знает владельца', () => {
     rememberIdentity(OWNER)
     forgetOwner(OWNER)
@@ -145,6 +177,8 @@ describe('какие ключи приложение пишет на устро�
       'molvia.invite',
       'molvia.leaving',
       'molvia.login',
+      // Пробная запись: пишется и тут же удаляется, чтобы узнать, работает ли общая полка.
+      'molvia.probe',
       'molvia.total-flipped',
     ]
     // По владельцу — `molvia.<что>.<владелец>`, всё это уходит с `forgetOwner`.

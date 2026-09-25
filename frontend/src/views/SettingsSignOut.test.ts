@@ -20,6 +20,7 @@ import { routes } from '@/router'
 import { sessionEnded, useActorStore } from '@/stores/actor'
 import { currentIdentity } from '@/stores/identity'
 import { useLoginStore } from '@/stores/login'
+import { useSignOutStore } from '@/stores/signOut'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 import SettingsView from './SettingsView.vue'
 
@@ -319,7 +320,7 @@ describe('ответ, который пришёл не вовремя', () => {
     expect(replaced).toEqual(['/'])
   })
 
-  it('контроль: шторку закрыли после сбоя — человек остался, и 401 потом ничего не стирает', async () => {
+  it('шторку закрыли после сбоя — сервер переспрошен, «сессия жива» снимает намерение', async () => {
     fillTheDrawer()
     const view = await render()
     await askToLeave(view)
@@ -335,6 +336,53 @@ describe('ответ, который пришёл не вовремя', () => {
     await flushPromises()
     expect(localStorage.getItem(`molvia.advice.${OWNER}`)).toBe('{}')
     expect(replaced).toEqual([])
+  })
+
+  it('шторку закрыли после сбоя, а сессии уже нет — стирание доделано (раунд 2, Д3)', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToLeave(view)
+    logout.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'timeout', false))
+    confirmButton().click()
+    await flushPromises()
+
+    me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    sheet().querySelector<HTMLButtonElement>('button[aria-label]')?.click()
+    await flushPromises()
+
+    expect(ownersKeys()).toEqual([])
+    expect(replaced).toEqual(['/'])
+  })
+
+  it('запуск без связи с незавершённым выходом не стирает ничего — стирает ответ сервера (раунд 2, Д1)', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToLeave(view)
+    logout.mockImplementation(() => {
+      online(false)
+      return Promise.reject(new ApiError(ERROR.INTERNAL, 'offline', false))
+    })
+    confirmButton().click()
+    await flushPromises()
+
+    // Приложение выгружено, открыто без связи — стор выхода создан раньше запуска, как в App.vue.
+    setActivePinia(createPinia())
+    const signOut = useSignOutStore()
+    const actor = useActorStore()
+    await actor.start()
+    await flushPromises()
+    expect(actor.state).toBe('signed-out')
+    expect(localStorage.getItem(`molvia.advice.${OWNER}`)).toBe('{}')
+    expect(replaced).toEqual([])
+
+    // Связь вернулась: сервер спрошен, сессии нет — теперь стирание.
+    online(true)
+    me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(signOut.leaving).toBe(false)
+    expect(ownersKeys()).toEqual([])
+    expect(replaced).toEqual(['/'])
   })
 
   it('незавершённый выход не открывает приложение без связи при следующем запуске', async () => {

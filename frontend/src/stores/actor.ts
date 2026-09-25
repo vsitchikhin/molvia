@@ -14,6 +14,7 @@ import {
   IDENTITY_KEY,
   currentIdentity,
   dropIdentity,
+  erasedWhileAway,
   forgetOwner,
   isIdentifier,
   leavingOwner,
@@ -45,6 +46,18 @@ export const useActorStore = defineStore('actor', () => {
   const actor = ref<ActorView | null>(null)
   const id = ref<string | null>(currentIdentity())
   const state = ref<IdentityState>('idle')
+  /**
+   * How many times the server has answered who this browser is, and whether its last answer was
+   * «nobody» (MOL-57, adversarial Д1). `signed-out` alone cannot say that: this device sets it too
+   * — a launch with no connection and a «Выйти» not yet confirmed — and erasing a drawer on the
+   * device's own guess threw away a purchase while the session lived on.
+   */
+  const heard = ref(0)
+  const nobody = ref(false)
+  function told(isNobody: boolean): void {
+    nobody.value = isNobody
+    heard.value += 1
+  }
   const cachedSettings = ref(recallSettings(id.value))
   const settings = computed(() =>
     actor.value?.id === id.value ? settingsOf(actor.value) : cachedSettings.value,
@@ -175,8 +188,7 @@ export const useActorStore = defineStore('actor', () => {
     try {
       const view = await api.me()
       if (revision !== at) return
-      settle(view)
-      state.value = 'ready'
+      adopt(view)
     } catch (error) {
       if (revision !== at) return
       // **«Nobody» is an answer, not a failure** (MOL-56). The app stops here and draws the
@@ -186,8 +198,10 @@ export const useActorStore = defineStore('actor', () => {
       // The lock and the second `me()` that used to stand here went with the automatic sign-in
       // they existed for: two tabs racing to create an account is not a thing that can happen
       // when a person has to tap a button (MOL-53, Б3).
-      if (isMissingActor(error)) state.value = 'signed-out'
-      else fail(error)
+      if (isMissingActor(error)) {
+        state.value = 'signed-out'
+        told(true)
+      } else fail(error)
     } finally {
       asking -= 1
     }
@@ -218,7 +232,10 @@ export const useActorStore = defineStore('actor', () => {
     } catch (error) {
       // A refusal earned before a login landed says nothing about after it: the session it was
       // asking about is not the session this browser now holds (adversarial А1).
-      if (isMissingActor(error) && revision === at) state.value = 'signed-out'
+      if (isMissingActor(error) && revision === at) {
+        state.value = 'signed-out'
+        told(true)
+      }
     } finally {
       asking -= 1
     }
@@ -228,6 +245,7 @@ export const useActorStore = defineStore('actor', () => {
   function adopt(loaded: ActorView): void {
     settle(loaded)
     state.value = 'ready'
+    told(false)
   }
 
   /** Called once after the app mounts, and again by the retry control. */
@@ -235,6 +253,13 @@ export const useActorStore = defineStore('actor', () => {
     if (running) return
     running = true
     state.value = 'loading'
+    // «Выйти» in another window that this tab slept through (round 2, Д2): its own shelf still
+    // holds the drawer. Let go here as the `storage` listener would have.
+    if (erasedWhileAway()) {
+      revision += 1
+      actor.value = null
+      id.value = null
+    }
     try {
       if (!navigator.onLine) {
         // The identifier already on the device is usable without a network — a PWA precached
@@ -326,6 +351,8 @@ export const useActorStore = defineStore('actor', () => {
     adopt,
     verify,
     release,
+    heard,
+    nobody,
     signIn,
     busy: () => asking > 0,
     retry: start,

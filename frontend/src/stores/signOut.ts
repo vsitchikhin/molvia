@@ -16,10 +16,14 @@ import { whileQueueIsStill } from '@/stores/tripQueue'
  *
  * **An answer can be lost after the server did its part** (adversarial Б2), and then the first
  * `401` of any request closes the door — the settings with «Выйти» on them are behind it, and the
- * erasure would never come. So the intent is written down before the request leaves, and the
- * server's own «no session» — the identity settling as signed out — finishes the job. The server
- * saying the session is alive means the request did not land: the intent goes, and «Выйти» is
- * there to press again. Closing the sheet withdraws it too: the person decided to stay.
+ * erasure would never come. So the intent is written down before the request leaves, and **only
+ * the server's answer settles it**: «nobody» finishes the erasure, «this very owner» means the
+ * request did not land and withdraws it. Nothing the device concludes by itself does either
+ * (round 2): a launch with no connection closes the door on the intent, and that `signed-out` is
+ * not the server's word — erasing on it threw away a purchase while the session lived on (Д1).
+ * Closing the sheet after a failure is not a decision to stay either — the outcome is unknown —
+ * so it asks the server rather than dropping the intent (Д3), and so does a return of the
+ * connection while the intent waits.
  *
  * A store rather than a composable for that reason: it has to hear the identity settle from the
  * moment the app starts, the screen with the button or not.
@@ -56,37 +60,50 @@ export const useSignOutStore = defineStore('signOut', () => {
     leaving.value = true
     failure.value = null
     markLeaving(owner)
+    const before = actor.heard
     try {
       await api.logout()
     } catch {
       // Decided after the failure (MOL-19, A1).
       failure.value = navigator.onLine ? 'error' : 'offline'
       leaving.value = false
-      // A `401` may have settled the identity while this was in flight — its settling was skipped
-      // then, and nothing will settle it again. Only that: a «ready» here is stale, not an answer,
-      // and reading it as «the session is alive» withdrew the intent this failure is kept for.
-      if (actor.state === 'signed-out') void finish(owner)
+      // The server may have said «nobody» while this was in flight — its settling was skipped
+      // then, and nothing will settle it again. Only that: an answer «this owner» given meanwhile
+      // may be about the moment before the way out landed.
+      if (actor.heard !== before && actor.nobody) void finish(owner)
       return
     }
     await finish(owner)
   }
 
-  /** The sheet was closed: whatever did not work is not to be finished behind the person's back. */
+  /**
+   * The sheet was closed. After a failure the outcome is unknown, so the intent stays and the
+   * server is asked instead (round 2, Д3): its answer withdraws the intent or finishes the job.
+   */
   function stay(): void {
     if (leaving.value || finishing) return
     failure.value = null
-    clearLeaving()
+    ask()
   }
 
-  /** The server has answered who we are, and a «Выйти» is waiting for that answer. */
+  function ask(): void {
+    if (leavingOwner() && !leaving.value && !finishing) void actor.verify()
+  }
+
+  /** The server has answered who this browser is, and a «Выйти» may be waiting for that answer. */
   function settle(): void {
     const owner = leavingOwner()
     if (!owner || leaving.value) return
-    if (actor.state === 'signed-out') void finish(owner)
-    else if (actor.state === 'ready' && actor.id === owner) clearLeaving()
+    if (actor.nobody) void finish(owner)
+    else if (actor.id === owner) clearLeaving()
   }
 
-  watch(() => actor.state, settle)
+  watch(() => actor.heard, settle)
+  // A return of the connection or of the app is when the waiting intent can be settled.
+  window.addEventListener('online', ask)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') ask()
+  })
 
   return { leaving, failure, leave, stay, settle }
 })

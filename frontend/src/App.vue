@@ -60,12 +60,9 @@ export default defineComponent({
     // Every settling of the identity is an occasion: «ready» is what the queue held on a `401`
     // has been waiting for (MOL-24, `HOLDS`), and «error» is what starts its doubling retry.
     watch(() => actor.state, send)
-    // A «Выйти» whose answer was lost is finished by the server's «no session», on this launch or
+    // A «Выйти» whose answer was lost is settled by the server's next answer, on this launch or
     // the next (MOL-57, adversarial Б2) — the store listens from the start, whatever screen is open.
-    const signOut = useSignOutStore()
-    onMounted(() => {
-      signOut.settle()
-    })
+    useSignOutStore()
 
     return { closed, route: useRoute(), announcements: provideAnnouncer() }
   },
