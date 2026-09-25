@@ -27,6 +27,10 @@ export interface Exchanges {
    * shows what is there, and the screen says to remove it and enter it again.
    */
   readonly conflicted: Ref<boolean>
+  /** «Вернуть» came after the removal became final: the screen says so instead of «no connection». */
+  readonly gone: Ref<boolean>
+  /** The last «Вернуть» brought the exchange back — said out loud, the button being gone. */
+  readonly restored: Ref<boolean>
   retry(): Promise<void>
   /** Resolves `null` when the server holds another exchange under this name (В-6). */
   record(body: ExchangeBody): Promise<ExchangesResponse | null>
@@ -54,6 +58,8 @@ export function useExchanges(): Exchanges {
   const failed = ref(false)
   const removed = ref<ExchangeView | null>(null)
   const conflicted = ref(false)
+  const gone = ref(false)
+  const restored = ref(false)
   let latest = 0
 
   const current = (): ExchangesResponse | null => overview.value
@@ -91,6 +97,8 @@ export function useExchanges(): Exchanges {
     busy.value = true
     failed.value = false
     conflicted.value = false
+    gone.value = false
+    restored.value = false
     try {
       land(await run())
       return true
@@ -112,6 +120,8 @@ export function useExchanges(): Exchanges {
       failure.value = null
       failed.value = false
       conflicted.value = false
+      gone.value = false
+      restored.value = false
       removed.value = null
       void load()
     },
@@ -128,10 +138,14 @@ export function useExchanges(): Exchanges {
     failed,
     removed,
     conflicted,
+    gone,
+    restored,
     retry: load,
     async record(body) {
       conflicted.value = false
       failed.value = false
+      gone.value = false
+      restored.value = false
       removed.value = null
       try {
         const { exchanges } = await api.recordExchange(body)
@@ -156,9 +170,9 @@ export function useExchanges(): Exchanges {
       const shown = overview.value
       if (!shown || busy.value || shown.preference === preference) return
       overview.value = { ...shown, preference }
-      // Any other request makes a removed exchange final on the server: nothing to offer back.
-      removed.value = null
-      await write(() => api.chooseRatePreference(preference))
+      // A request that reached the server makes a removed exchange final; one that did not leaves it
+      // there to bring back — so the offer goes with the answer, not with the tap (round 3, Д4).
+      if (await write(() => api.chooseRatePreference(preference))) removed.value = null
       // Read again after the wait: the owner may have changed meanwhile and taken the list away.
       const after = current()
       if (failed.value && after?.preference === preference) {
@@ -177,13 +191,21 @@ export function useExchanges(): Exchanges {
       if (!exchange || busy.value) return
       busy.value = true
       failed.value = false
+      gone.value = false
       try {
         land(await api.restoreExchange(exchange.id))
         removed.value = null
+        restored.value = true
       } catch (caught) {
-        failed.value = true
+        // The server's own «nothing to bring back»: it is final — another request, another window.
+        // Said as it is and the list read again, so what is on screen is what is there; «check the
+        // connection» here sent people to enter the exchange a second time (round 3, Д1).
         if (caught instanceof ApiError && caught.code === ERROR.NOT_FOUND && caught.answered) {
           removed.value = null
+          gone.value = true
+          await load()
+        } else {
+          failed.value = true
         }
       } finally {
         busy.value = false

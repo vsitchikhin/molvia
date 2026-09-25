@@ -330,6 +330,8 @@
     },
     "removed": "Exchange deleted: {amounts}",
     "restore": "Bring back",
+    "restored": "The exchange is back",
+    "restore_gone": "The exchange can no longer be brought back — the removal is final. If it was needed, record it again",
     "conflict": "This exchange was already recorded — with the earlier amounts. If they are wrong, delete it and record it again",
     "empty": {
       "title": "No exchanges yet",

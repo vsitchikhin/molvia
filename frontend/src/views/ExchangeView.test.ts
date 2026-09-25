@@ -330,7 +330,7 @@ describe('ExchangeView: the rate and the list', () => {
     expect(view.text()).not.toContain('Exchange deleted')
   })
 
-  it('«Bring back» that comes too late says so and stops offering it', async () => {
+  it('«Bring back» after the removal became final says so, and reads the list again (Д1)', async () => {
     exchanges.mockResolvedValue(overview())
     removeExchange.mockResolvedValue(overview({ exchanges: [], wallet: null }))
     restoreExchange.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
@@ -342,8 +342,38 @@ describe('ExchangeView: the rate and the list', () => {
     const restore = view.findAll('button').find((button) => button.text() === en.exchange.restore)
     await restore?.trigger('click')
     await flushPromises()
-    expect(view.get('[role="alert"]').text()).toBe(en.exchange.failed)
+    expect(view.text()).toContain(en.exchange.restore_gone)
+    expect(view.text()).not.toContain(en.exchange.failed)
     expect(view.text()).not.toContain(en.exchange.restore)
+    expect(exchanges).toHaveBeenCalledTimes(2)
+  })
+
+  it('once back, the focus goes to «Record an exchange» (Т-3)', async () => {
+    exchanges.mockResolvedValue(overview())
+    removeExchange.mockResolvedValue(overview({ exchanges: [], wallet: null }))
+    restoreExchange.mockResolvedValue(overview())
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    const restore = view.findAll('button').find((button) => button.text() === en.exchange.restore)
+    await restore?.trigger('click')
+    await flushPromises()
+    expect(document.activeElement?.textContent.trim()).toBe(en.exchange.record)
+  })
+
+  it('a preference that never reached the server keeps «Bring back» (Д4)', async () => {
+    exchanges.mockResolvedValue(overview())
+    removeExchange.mockResolvedValue(overview({ exchanges: [row()] }))
+    chooseRatePreference.mockRejectedValue(new TypeError('network'))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+
+    await view.get('input[value="official"]').setValue(true)
+    await flushPromises()
+    expect(view.text()).toContain(en.exchange.restore)
   })
 
   it('another owner gets none of the last one’s strips (Г1)', async () => {

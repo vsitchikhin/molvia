@@ -8,6 +8,7 @@
       </p>
       <p v-if="failed" class="strip failed" role="alert">{{ t('exchange.failed') }}</p>
       <p v-if="conflicted" class="strip" role="alert">{{ t('exchange.conflict') }}</p>
+      <p v-if="gone" class="strip" role="alert">{{ t('exchange.restore_gone') }}</p>
       <div v-if="removed" ref="removedStrip" class="strip removed">
         <span class="removed-text">{{
           t('exchange.removed', { amounts: amountsOf(removed) })
@@ -91,7 +92,7 @@
 
         <p class="frozen"><IconCheck aria-hidden="true" />{{ t('money.rate_frozen') }}</p>
 
-        <AppButton block :inactive="!online || busy" @click="sheetOpen = true">
+        <AppButton ref="recordButton" block :inactive="!online || busy" @click="sheetOpen = true">
           <template #icon><IconPlus /></template>
           {{ t('exchange.record') }}
         </AppButton>
@@ -201,6 +202,16 @@ export default defineComponent({
       await nextTick()
       removedStrip.value?.querySelector('button')?.focus()
     })
+    // «Вернуть» goes with its strip once it worked: the words say the exchange is back, and the
+    // focus goes to «Записать обмен», the one button that is always there (review Т-3).
+    const recordButton = ref<{ $el: HTMLElement } | null>(null)
+    watch(exchanges.restored, async (back) => {
+      if (!back) return
+      unsay?.()
+      unsay = announce?.(t('exchange.restored'))
+      await nextTick()
+      recordButton.value?.$el.focus()
+    })
     onUnmounted(() => unsay?.())
 
     function confirmRemove(): void {
@@ -283,6 +294,7 @@ export default defineComponent({
       sheetOpen,
       removeOpen,
       removedStrip,
+      recordButton,
       target,
       ask,
       confirmRemove,
