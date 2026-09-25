@@ -420,3 +420,66 @@ describe('the catalogue search as the screen types it', () => {
     expect(calls[0]?.signal?.aborted).toBe(true)
   })
 })
+
+describe('the query that found nothing (MOL-45)', () => {
+  /** Types, waits out the pause and answers the search that went out. */
+  async function ask(query: { value: string }, text: string, found: CatalogueEntry[]) {
+    await type(query, text)
+    await pause()
+    calls.at(-1)?.answer(found)
+    await settle()
+  }
+
+  it('holds the last query the server found nothing for, and keeps it past a later find', async () => {
+    const { query, search } = harness()
+    expect(search.missed.value).toBeNull()
+
+    await ask(query, 'бахчевые', [])
+    expect(search.missed.value).toBe('бахчевые')
+
+    await ask(query, 'арбуз', [milk])
+    expect(search.missed.value).toBe('бахчевые')
+  })
+
+  it('keeps it when erasing back through it: «бахч» found nothing too, and is not the word', async () => {
+    const { query, search } = harness()
+    await ask(query, 'бахчевые', [])
+    await ask(query, 'БАХЧ', [])
+    expect(search.missed.value).toBe('бахчевые')
+  })
+
+  it('takes the longer word while it is being typed, and another word outright', async () => {
+    const { query, search } = harness()
+    await ask(query, 'бах', [])
+    await ask(query, 'бахчевые', [])
+    expect(search.missed.value).toBe('бахчевые')
+
+    await ask(query, 'дыня', [])
+    expect(search.missed.value).toBe('дыня')
+  })
+
+  it('must not fire on a failure or offline — nothing was found to be missing', async () => {
+    const { query, search } = harness()
+    await type(query, 'бахчевые')
+    await pause()
+    calls.at(-1)?.fail()
+    await settle()
+    expect(search.missed.value).toBeNull()
+
+    online(false)
+    await type(query, 'дыня')
+    expect(search.missed.value).toBeNull()
+  })
+
+  it('must not fire on an answer the next one replaced', async () => {
+    const { query, search } = harness()
+    await type(query, 'бахчевые')
+    await pause()
+    const first = calls.at(-1)
+    await type(query, 'арбуз')
+    await pause()
+    first?.answer([])
+    await settle()
+    expect(search.missed.value).toBeNull()
+  })
+})

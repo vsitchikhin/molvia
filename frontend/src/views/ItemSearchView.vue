@@ -102,6 +102,7 @@
       :trip-context="selectedId ? selectedTrip : undefined"
       :trip-currency="selectedLocal?.currency ?? undefined"
       :query="picked.query"
+      :missed-query="picked.missedQuery ?? null"
       :close-steps="2"
       :on-closed="putAway"
       @added="added"
@@ -162,7 +163,7 @@ export default defineComponent({
         : null,
     )
     const query = ref('')
-    const { phase, results, stale, answered, retry } = useCatalogueSearch(query)
+    const { phase, results, stale, answered, missed, retry } = useCatalogueSearch(query)
     const recent = useRecentItemsStore()
     const entry = useItemEntryStore()
     const announce = useAnnouncer()
@@ -223,9 +224,16 @@ export default defineComponent({
     // screen, dimmed, while the next search is out, and a tap on «Кока-кола» found for «кола»
     // with «хлеб» already typed must not teach the search that «хлеб» means cola (Р-9, A3). The
     // recent items answer no query — they go with the field as it is.
+    //
+    // A pick from the server's answer takes along the query that found nothing before it
+    // (MOL-45): the person's own word for the item. Not a pick from the recent items or one just
+    // proposed — neither was found by another word.
     function pick(chosen: CatalogueEntry): void {
       opened.value += 1
-      entry.pick({ entry: chosen, query: phase.value === 'ready' ? answered.value : query.value })
+      const found = phase.value === 'ready'
+      const text = found ? answered.value : query.value
+      const word = found && missed.value !== null && missed.value !== text ? missed.value : null
+      entry.pick({ entry: chosen, query: text, ...(word === null ? {} : { missedQuery: word }) })
     }
 
     // Into the recent items only once it went into the trip, as the server's memory of picks

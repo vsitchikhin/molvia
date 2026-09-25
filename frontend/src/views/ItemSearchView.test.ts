@@ -390,6 +390,47 @@ describe('«What did you pick up?»', () => {
       expect(useItemEntryStore(pinia).picked).toEqual({ entry: marianna, query: ' Мол ' })
     })
 
+    it('takes along the query that found nothing before — the person’s own word for it (MOL-45)', async () => {
+      searchCatalogue.mockImplementation((query) =>
+        Promise.resolve(query === 'арбуз' ? [milk] : []),
+      )
+      const view = await render()
+      await field(view).setValue('бахчевые')
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledWith('бахчевые')
+      })
+      await field(view).setValue('арбуз')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([milk.name])
+      })
+
+      await view.get('[role="option"]').trigger('click')
+
+      expect(useItemEntryStore(pinia).picked).toEqual({
+        entry: milk,
+        query: 'арбуз',
+        missedQuery: 'бахчевые',
+      })
+    })
+
+    it('takes nothing along from the recent items — they were not found by another word', async () => {
+      searchCatalogue.mockResolvedValue([])
+      remembered(bread)
+      const view = await render()
+      await field(view).setValue('бахчевые')
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledWith('бахчевые')
+      })
+      await field(view).setValue('')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([bread.name])
+      })
+
+      await view.get('[role="option"]').trigger('click')
+
+      expect(useItemEntryStore(pinia).picked).toEqual({ entry: bread, query: '' })
+    })
+
     it('from a dimmed answer leaves with the query that answer is for, not the one being typed', async () => {
       let second!: (entries: CatalogueEntry[]) => void
       searchCatalogue

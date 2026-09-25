@@ -165,6 +165,15 @@ describe('useItemDetails', () => {
       })
     })
 
+    it('carries the query that found nothing before, when there was one (MOL-45)', () => {
+      const sheet = details()
+      expect(sheet.body('арбуз', 'бахчевые')).toMatchObject({
+        query: 'арбуз',
+        missedQuery: 'бахчевые',
+      })
+      expect(sheet.body('арбуз', null)).not.toHaveProperty('missedQuery')
+    })
+
     it('carries the quantity and the price in the currency chosen', () => {
       const sheet = details()
       sheet.quantity.value = '0,9'
