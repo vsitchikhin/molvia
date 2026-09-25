@@ -68,8 +68,14 @@ export function createErasureRepository(db: Db): ErasureRepository {
       const id = telegramUserIdSchema.parse(telegramUserId)
       try {
         return await db.transaction(async (tx) => {
-          const count = async (statement: ReturnType<typeof sql>): Promise<number> =>
-            (await tx.execute(statement)).length
+          // Counted in the database: `returning 1` alone brought every erased row over the wire
+          // just to take its length, and a long history made the dry run cost more than it said.
+          const count = async (statement: ReturnType<typeof sql>): Promise<number> => {
+            const [row] = await tx.execute<{ n: number }>(
+              sql`with erased as (${statement}) select count(*)::int as n from erased`,
+            )
+            return row?.n ?? 0
+          }
 
           // The login requests first, and not only to count them (adversarial О-3). `for update`
           // on an owner who does not exist yet locks nothing, and a confirmed login collected in
@@ -104,9 +110,10 @@ export function createErasureRepository(db: Db): ErasureRepository {
           let itemsReleased = 0
 
           if (actorId !== null) {
-            itemsReleased = (
-              await tx.execute(sql`select 1 from items where created_by = ${actorId}`)
-            ).length
+            const [released] = await tx.execute<{ n: number }>(
+              sql`select count(*)::int as n from items where created_by = ${actorId}`,
+            )
+            itemsReleased = released?.n ?? 0
             erased.sessions = await count(
               sql`delete from sessions where actor_id = ${actorId} returning 1`,
             )

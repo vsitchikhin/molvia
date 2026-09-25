@@ -32,6 +32,12 @@ describe('docker-compose.prod.yml', () => {
     for (const [, block] of found) expect(block).toMatch(/^ {4}logging: \*logging$/m)
   })
 
+  it('keeps DETAIL — the values of the row — out of the journal of Postgres itself', () => {
+    expect(services().get('postgres')).toContain(
+      `command: ['postgres', '-c', 'log_error_verbosity=terse']`,
+    )
+  })
+
   it('and the anchor is the journal unless a laptop says otherwise, never a size cap', () => {
     expect(compose).toMatch(/^x-logging: &logging\n {2}driver: \$\{LOG_DRIVER:-journald\}$/m)
   })

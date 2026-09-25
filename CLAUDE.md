@@ -843,7 +843,8 @@ database access. In a product about data integrity, two write paths will silentl
   privacy page says and is discussed before it lands.
 - **Logs live fourteen days and carry no address and no query** (MOL-58). The API logs a request
   as its method and path — the query of `/catalogue/search` is what a person looked for; Caddy
-  keeps no access log; every container writes to journald, and the term is the host's
+  keeps no access log; Postgres logs its errors `terse`, without the row values of `DETAIL`;
+  every container writes to journald, and the term is the host's
   (`MaxRetentionSec=14day`, `deploy/README.md`). **A failure is logged by its kind, on every
   path** (adversarial О-1): name, driver code and stack frames through `describeFailure`, never
   its message — a driver's message is the query with its parameters, and a failed search wrote
@@ -979,7 +980,10 @@ Rating reminders are 0.2.
   the message as a reply, and the buttons go only once something was said (П-4): a refusal may be
   silent because its buttons stay, and this one takes them. **A button too old to mean yes is
   answered the same way** (Р-2) — it too takes the buttons, and it was «Удалить навсегда» that
-  was pressed. The erase composer is installed **before** the login's, which
+  was pressed. **Under the message speaks only the press that took the buttons away** (С-1): the bot keeps no
+  state, but Telegram refuses to take away buttons already gone («message is not modified»), so
+  the second press of a double tap stays quiet; if nothing can be said at all, the buttons are put
+  back. The erase composer is installed **before** the login's, which
   ends in a catch-all that greets every text.
 
 - **The i18n rule of the frontend covers the bot too, and this is the line that says so.** Not a
