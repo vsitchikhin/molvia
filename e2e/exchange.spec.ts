@@ -102,3 +102,37 @@ test('roubles to dollars to drams: the chain is the rate of the next trip', asyn
     rate: { base: 'RUB', quote: 'AMD', rate: '4.060187', source: 'personal' },
   })
 })
+
+/**
+ * An amendment (MOL-42, В-3): a tap on the row opens it, the rate follows the new amounts, and the
+ * row says it was amended, with the version before it one tap away.
+ */
+test('an amended exchange changes the rate and keeps what it said before', async ({ page }) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Обмен денег' }).click()
+  await page.getByRole('button', { name: 'Записать обмен' }).click()
+
+  const sheet = page.locator('dialog[open]')
+  await page.waitForTimeout(400)
+  await sheet.getByLabel('Отдал').fill('20000')
+  await sheet.getByLabel('Получил').fill('100000')
+  await sheet.getByRole('button', { name: 'Сохранить обмен' }).click()
+  await expect(sheet).toBeHidden()
+  await expect(page.locator('.figure')).toHaveText('5,00 ֏/₽')
+
+  await page.getByRole('button', { name: /^Исправить обмен/ }).click()
+  await expect(sheet).toContainText('Правка обмена')
+  await page.waitForTimeout(400)
+  await sheet.getByLabel('Получил').fill('95000')
+  await sheet.getByLabel('Где и заметка').fill('ВТБ банкомат')
+  await sheet.getByRole('button', { name: 'Сохранить правку' }).click()
+  await expect(sheet).toBeHidden()
+
+  await expect(page.locator('.figure')).toHaveText('4,75 ֏/₽')
+  await expect(page.locator('.amended')).toContainText('исправлен')
+  await expect(page.locator('.note')).toHaveText('ВТБ банкомат')
+
+  await page.getByRole('button', { name: /^Исправить обмен/ }).click()
+  await expect(sheet.locator('.versions')).toContainText('100 000,00')
+})
