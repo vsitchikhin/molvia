@@ -1,6 +1,8 @@
 import { createExchangeRepository } from './exchanges-repository'
 import type { ExchangeRepository } from './exchanges-repository'
 import { createExpenseRepository } from './expenses-repository'
+import { createIncomeRepository } from './incomes-repository'
+import type { IncomeRepository } from './incomes-repository'
 import type { ExpenseRepository } from './expenses-repository'
 import type { Conn, Db } from './index'
 import { createItemRepository } from './items-repository'
@@ -28,6 +30,8 @@ export interface TripRepositories {
    * rate, and the screen of exchanges is built from these and the rates above.
    */
   readonly exchanges: ExchangeRepository
+  /** The person's incomes (MOL-66): money that came in moves their own rate too. */
+  readonly incomes: IncomeRepository
 }
 
 export function tripRepositories(conn: Conn): TripRepositories {
@@ -39,6 +43,7 @@ export function tripRepositories(conn: Conn): TripRepositories {
     searchPicks: createSearchPickRepository(conn),
     rates: createRateRepository(conn),
     exchanges: createExchangeRepository(conn),
+    incomes: createIncomeRepository(conn),
   }
 }
 
