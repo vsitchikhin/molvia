@@ -36,9 +36,9 @@ export const en: Dictionary = {
     'To delete all your data — /delete.',
   'erase.prompt':
     'Delete all your data in Molvia?\n\n' +
-    'Everything Molvia knows about you will go: purchases, ratings and reviews, search picks, ' +
-    'visit marks, settings and sign-ins on every device. Items and shops you added to the ' +
-    'shared catalogue will stay — without your name.\n\n' +
+    'Everything Molvia knows about you will go: purchases, money exchanges, ratings and ' +
+    'reviews, search picks, visit marks, settings and sign-ins on every device. Items and ' +
+    'shops you added to the shared catalogue will stay — without your name.\n\n' +
     'This cannot be undone.',
   'erase.confirm': 'Delete for good',
   'erase.cancel': 'Cancel',

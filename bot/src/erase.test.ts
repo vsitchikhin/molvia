@@ -377,6 +377,8 @@ describe('/delete — человек удаляет себя сам (MOL-58)', (
       expect(prompt).toMatch(
         language === 'ru' ? /выбор в поиске.*отметки о визитах/s : /search picks.*visit marks/s,
       )
+      // MOL-40: exchanges are the person's own money, and they go too.
+      expect(prompt).toMatch(language === 'ru' ? /обмены денег/ : /money exchanges/)
     }
   })
 

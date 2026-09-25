@@ -11,6 +11,7 @@ const REPORT: ErasureReport = {
     events: 4,
     expenses: 5,
     trips: 1,
+    exchanges: 2,
     login_requests: 1,
     actors: 1,
   },

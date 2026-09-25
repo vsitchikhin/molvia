@@ -10,6 +10,7 @@ import { lockTelegramAccount } from '@/db/telegram-lock'
 import {
   actors,
   events,
+  exchanges,
   expenses,
   items,
   loginRequests,
@@ -76,6 +77,19 @@ async function aLife(
   await db
     .insert(events)
     .values({ actorId, type: 'advice_viewed', payload: { subject: 'product' } })
+  // Their own money (MOL-40): one exchange live, one removed but still offered back.
+  const exchange = {
+    actorId,
+    givenMinor: 1_000_000n,
+    givenCurrency: 'RUB',
+    receivedMinor: 4_700_000n,
+    receivedCurrency: 'AMD',
+    exchangedOn: '2026-09-20',
+  } as const
+  await db.insert(exchanges).values([
+    { id: randomUUID(), ...exchange },
+    { id: randomUUID(), ...exchange, deletedAt: new Date() },
+  ])
   await insertSession(db, { actorId })
   await insertLoginRequest(db, { telegramUserId }) // confirmed, not yet collected
   await insertLoginRequest(db, { telegramUserId, consumedAt: new Date() })
@@ -108,6 +122,7 @@ async function snapshot(actorId: string) {
     expenses: await db.execute(sql`
       select e.* from expenses e join trips t on t.id = e.trip_id where t.actor_id = ${actorId}`),
     sessions: await db.execute(sql`select * from sessions where actor_id = ${actorId}`),
+    exchanges: await db.select().from(exchanges).where(eq(exchanges.actorId, actorId)),
   }
 }
 
@@ -141,6 +156,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
         events: 1,
         expenses: 2,
         trips: 1,
+        exchanges: 2,
         login_requests: 2,
         actors: 1,
       },
