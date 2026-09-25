@@ -517,14 +517,19 @@ device, private always. The rate is what the two amounts say and is not stored b
 - **A change of the currency of conversion works forwards** (В-2, the owner's comment over the
   option they ticked): «what I exchanged before is not re-counted». `actors.income_currency_since`
   is the day of the last change — the settings' own `UPDATE` sets it on every change, and a repeat
-  of the form does not move it — and **an exchange dated before it counts only when it was paid in
-  the new currency**: dollars to drams, for someone who now counts in dollars, needs no
-  re-counting at all, while roubles to drams belonged to the old reckoning and are not re-valued
-  into dollars. The rows cannot tell a chosen currency from the default `RUB` every account starts
-  with, and this rule does not need them to: two earlier attempts that cut by the day alone took the
-  whole dollar history of anyone who once changed leftover roubles (review Ж2, round 2 Л1). Earlier
-  exchanges stay in the list as they were; the drams held from the rouble ones have no cost in the
-  new currency and are not weighed. A trip started offline with the old currency in its `context`
+  of the form does not move it — and **before it no price is ever taken from the bank**: an
+  exchange counts when what was given already has a price in the new currency without one — the
+  new currency itself (dollars to drams, for someone who now counts in dollars), or a currency
+  priced by the links counted so far (euros → dollars → drams, for someone who chose euros later).
+  Roubles to drams belonged to the old reckoning and are not re-valued; the drams they brought have
+  no price in the new currency, so the link makes their cost unknown rather than vanishing — a
+  vanished link let the next dollar exchange weigh rouble drams at the price of dollar ones (review
+  round 3, М1). The rows cannot tell a chosen currency from the default `RUB` every account starts
+  with, and this rule does not need them to: attempts that cut by the day alone took the whole
+  dollar history of anyone who once changed leftover roubles (Ж2, Л1). Which exchanges gave their
+  currency a price only the whole walk knows, so the server says it per row (`priced`) and the
+  sheet asks «сколько было до обмена» by that, never re-deriving the rule. Earlier exchanges stay in
+  the list as they were. A trip started offline with the old currency in its `context`
   is not cut — the cut is about the current one.
 - **Exact to eighteen digits, rounded to six once.** `walletRate` keeps ratios of integers through
   the chain, each link brought to 10¹⁸ (the exception under «Money and quantity rules»), and rounds
@@ -544,7 +549,8 @@ device, private always. The rate is what the two amounts say and is not stored b
   was made over (`revision`): the exchange already as sent is a repeat, 200 and no new version; a
   version another device moved on from is 409, as the settings form is; removed or someone else's
   is 404, and a conflict keeps the sheet open with what was typed, over the version held now —
-  which the sheet itself shows, since the list that has it is under the sheet (round 2, Л4). A
+  which the sheet itself shows, remainder included, since the list that has it is under the sheet
+  (round 2, Л4; round 3, М2). A
   remainder the exchange has is shown in the sheet whatever a new exchange would ask: an amendment
   replaces the exchange whole, so a field not shown was a field cleared. The row is a button named
   by its words — an `aria-label` silenced the rate and the comparison. The row says «исправлен», the sheet shows the versions — which is what explains a trip
