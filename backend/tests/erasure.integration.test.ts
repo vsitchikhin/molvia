@@ -12,7 +12,7 @@ import {
   searchPicks,
   verdicts,
 } from '@/db/schema'
-import { connectDrizzle } from './db'
+import { connect, connectDrizzle } from './db'
 import {
   clearAll,
   insertActor,
@@ -219,6 +219,35 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
 
   it.each([0, -1, 1.5, 2 ** 53])('id %s не доходит до базы', async (id) => {
     await expect(erasure.erase(id, { dryRun: true })).rejects.toThrow()
+  })
+})
+
+describe('стирание и вход, который собирается в это же время (adversarial О-3)', () => {
+  it('владелец, созданный сборкой входа во время стирания, стирается, а не переживает его', async () => {
+    const tg = telegramId()
+    // Confirmed in the bot, not collected yet: there is no owner, and the browser's poll is on
+    // its way. The collection is played by hand on its own connection, in the order
+    // `completeLogin` takes: lock the request row, then create the owner, then commit.
+    const request = await insertLoginRequest(db, { telegramUserId: tg })
+    const collector = connect()
+    try {
+      let erasing: Promise<unknown> | undefined
+      await collector.begin(async (tx) => {
+        await tx`select id from login_requests where id = ${request} for update`
+        erasing = erasure.erase(tg, { dryRun: false })
+        // Long enough for the erasure to reach its first statement and wait there.
+        await new Promise((resolve) => setTimeout(resolve, 200))
+        await tx`insert into actors (id, telegram_user_id, country, city, spend_currency, income_currency)
+                 values (${randomUUID()}, ${tg}, 'AM', 'Гюмри', 'AMD', 'RUB')`
+      })
+      const report = (await erasing) as Awaited<ReturnType<typeof erasure.erase>>
+
+      expect(report.found).toBe(true)
+      expect(report.erased.actors).toBe(1)
+      expect(await db.select().from(actors).where(eq(actors.telegramUserId, tg))).toEqual([])
+    } finally {
+      await collector.end()
+    }
   })
 })
 

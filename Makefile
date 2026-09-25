@@ -68,9 +68,10 @@ migrate: ## Apply migrations
 	$(NEED_SCAFFOLD)
 	npm run migrate
 
+# TG is quoted, so a value cannot carry a flag of its own: TG="<id> --yes" is refused (MOL-58).
 forget: ## Erase a person by Telegram id: make forget TG=<id> [YES=1] (dry run without YES)
 	$(NEED_SCAFFOLD)
-	./bin/forget-actor.sh $(TG) $(if $(YES),--yes)
+	./bin/forget-actor.sh "$(TG)" $(if $(YES),--yes)
 
 dev: ## Run api, pwa and bot for this copy
 	$(NEED_SCAFFOLD)

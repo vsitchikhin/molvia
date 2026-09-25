@@ -70,7 +70,18 @@ export function createErasureRepository(db: Db): ErasureRepository {
           const count = async (statement: ReturnType<typeof sql>): Promise<number> =>
             (await tx.execute(statement)).length
 
-          // The lock makes a concurrent write by the same person wait and then fail on its
+          // The login requests first, and not only to count them (adversarial О-3). `for update`
+          // on an owner who does not exist yet locks nothing, and a confirmed login collected in
+          // the meantime created one this transaction had already decided was not there — it
+          // reported «nobody to erase» over a live account. Collection locks its request row
+          // before it creates the owner, so holding these rows makes the two take turns: a
+          // collection already under way finishes first and its owner is found below; one that
+          // comes after finds its request gone. A login confirmed *after* this line is a new
+          // sign-in, made after the person asked to be erased.
+          await tx.execute(
+            sql`select 1 from login_requests where telegram_user_id = ${id} for update`,
+          )
+          // The owner's row: a concurrent write by the same person waits and then fails on its
           // foreign key, rather than land a row beside an owner that is going away.
           const owner = await tx.execute<{ id: string }>(
             sql`select id from actors where telegram_user_id = ${id} for update`,
