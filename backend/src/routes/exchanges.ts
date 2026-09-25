@@ -18,6 +18,7 @@ export interface ExchangesApi {
     body: ExchangeBody,
   ): Promise<{ overview: ExchangesResponse; created: boolean }>
   remove(actor: Actor, id: string): Promise<ExchangesResponse>
+  restore(actor: Actor, id: string): Promise<ExchangesResponse>
   prefer(actor: Actor, preference: RatePreference): Promise<ExchangesResponse>
 }
 
@@ -56,6 +57,13 @@ export function exchangeRoutes(app: FastifyInstance, api: ExchangesApi): void {
    */
   app.delete<{ Params: { exchangeId: string } }>('/exchanges/:exchangeId', async (request, reply) =>
     answer(reply, await api.remove(ownerOf(request), request.params.exchangeId)),
+  )
+
+  /** «Вернуть» (В-5): 404 for anything that is not the owner's removed exchange. */
+  app.post<{ Params: { exchangeId: string } }>(
+    '/exchanges/:exchangeId/restore',
+    async (request, reply) =>
+      answer(reply, await api.restore(ownerOf(request), request.params.exchangeId)),
   )
 
   app.put('/actors/me/rate-preference', async (request, reply) => {

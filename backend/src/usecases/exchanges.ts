@@ -7,6 +7,7 @@ import {
   pickOfficialRate,
   walletRate,
   yerevanDate,
+  yerevanMidnight,
 } from '@molvia/model'
 import type {
   Actor,
@@ -81,6 +82,21 @@ async function viewsOf(
   })
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * From when the purchases count against the money of an exchange. From the moment it was written
+ * when that was on its own day: a purchase that morning was paid with the money held before, which
+ * `heldBefore` already names (А4). An exchange written later, under an earlier day, counts from the
+ * end of that day — what was bought between the exchange and its record was bought with its money,
+ * and counting only from the record lost all of it (round 2, В3). What was bought later on the day
+ * of such an exchange is lost instead: the day has no hours to tell before from after.
+ */
+function spentFrom(exchange: Exchange): Date {
+  const endOfDay = new Date(yerevanMidnight(exchange.exchangedOn).getTime() + DAY_MS)
+  return exchange.createdAt < endOfDay ? exchange.createdAt : endOfDay
+}
+
 /**
  * «Обмен денег» whole (MOL-40): the preference, the pair a trip started today would convert by,
  * the wallet of that pair as of today, the hint for its next exchange, and every exchange, newest
@@ -112,10 +128,8 @@ export async function exchangesOverview(
           exchange.exchangedOn <= today,
       )
     : undefined
-  // From the moment the exchange was written, not from the midnight of its day: a purchase that
-  // morning was paid with the money held before, which `heldBefore` already names (А4).
   const held = last
-    ? heldEstimate(last, await exchanges.spentSince(owner.id, quote, last.createdAt))
+    ? heldEstimate(last, await exchanges.spentSince(owner.id, quote, spentFrom(last)))
     : null
 
   return {
@@ -132,6 +146,19 @@ export async function exchangesOverview(
  * Yerevan: a rate from tomorrow would enter today's trips (the same line «not from the future»
  * draws for an official rate). 201 for a new exchange, and the screen whole either way.
  */
+/**
+ * The screen as it is on opening. A removed exchange is final from here: the screen that offered
+ * it back is gone (В-5).
+ */
+export async function readExchanges(
+  repositories: Repositories,
+  owner: Owner,
+  now: Date = new Date(),
+): Promise<ExchangesResponse> {
+  await repositories.exchanges.purgeRemoved(owner.id)
+  return exchangesOverview(repositories, owner, now)
+}
+
 export async function recordExchange(
   repositories: Repositories,
   owner: Owner,
@@ -139,6 +166,7 @@ export async function recordExchange(
   now: Date = new Date(),
 ): Promise<{ overview: ExchangesResponse; created: boolean }> {
   if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
+  await repositories.exchanges.purgeRemoved(owner.id)
   const { created } = await repositories.exchanges.add(owner.id, body)
   return { overview: await exchangesOverview(repositories, owner, now), created }
 }
@@ -146,6 +174,7 @@ export async function recordExchange(
 /**
  * «Удалить обмен» (Р-4): no amending, a wrong exchange is removed and entered again. Trips
  * already started keep the rate they took; only trips from now on see the wallet without it.
+ * Removed and not yet final: the one removed before it is, since only the latest is offered back.
  */
 export async function removeExchange(
   repositories: Repositories,
@@ -153,7 +182,24 @@ export async function removeExchange(
   id: string,
   now: Date = new Date(),
 ): Promise<ExchangesResponse> {
+  await repositories.exchanges.purgeRemoved(owner.id)
   await repositories.exchanges.remove(owner.id, id)
+  return exchangesOverview(repositories, owner, now)
+}
+
+/**
+ * «Вернуть» (В-5): the removed exchange as it was, `created_at` included. Nothing to bring back —
+ * already final, or someone else's — answers as a missing row does.
+ */
+export async function restoreExchange(
+  repositories: Repositories,
+  owner: Owner,
+  id: string,
+  now: Date = new Date(),
+): Promise<ExchangesResponse> {
+  if (!(await repositories.exchanges.restore(owner.id, id))) {
+    throw new DomainError(ERROR.NOT_FOUND)
+  }
   return exchangesOverview(repositories, owner, now)
 }
 
@@ -164,6 +210,7 @@ export async function chooseRatePreference(
   preference: RatePreference,
   now: Date = new Date(),
 ): Promise<ExchangesResponse> {
+  await repositories.exchanges.purgeRemoved(owner.id)
   await repositories.exchanges.setPreference(owner.id, preference)
   return exchangesOverview(repositories, owner, now)
 }

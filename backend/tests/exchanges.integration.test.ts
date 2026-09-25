@@ -443,6 +443,102 @@ describe('«Обмен денег»: правки ревью', () => {
   })
 })
 
+describe('«Обмен денег»: правки второго захода', () => {
+  it('В1: «Вернуть» возвращает обмен на его место в дне — и курс тоже', async () => {
+    const { cookie } = await owner()
+    const morning = payload({ exchangedOn: daysAgo(1) })
+    await app.inject({ method: 'POST', url: '/exchanges', headers: { cookie }, payload: morning })
+    await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload({
+        exchangedOn: daysAgo(1),
+        received: { amount: '95000', currency: 'AMD' },
+        heldBefore: { amount: '20000', currency: 'AMD' },
+      }),
+    })
+    await app.inject({ method: 'DELETE', url: `/exchanges/${morning.id}`, headers: { cookie } })
+    const back = await app.inject({
+      method: 'POST',
+      url: `/exchanges/${morning.id}/restore`,
+      headers: { cookie },
+    })
+    expect(back.statusCode).toBe(200)
+    expect(back.json()).toMatchObject({
+      wallet: { rate: { rate: '4.791667' }, basis: 'weighted' },
+    })
+  })
+
+  it('«Вернуть» после любого другого запроса — 404: удаление стало окончательным', async () => {
+    const { cookie } = await owner()
+    const one = payload()
+    await app.inject({ method: 'POST', url: '/exchanges', headers: { cookie }, payload: one })
+    await app.inject({ method: 'DELETE', url: `/exchanges/${one.id}`, headers: { cookie } })
+    await app.inject({ method: 'GET', url: '/exchanges', headers: { cookie } })
+    const late = await app.inject({
+      method: 'POST',
+      url: `/exchanges/${one.id}/restore`,
+      headers: { cookie },
+    })
+    expect(late.statusCode).toBe(404)
+    expect(await db.select().from(exchanges)).toEqual([])
+  })
+
+  it('чужой обмен «Вернуть» нельзя — 404, как отсутствующий', async () => {
+    const stranger = await owner()
+    const me = await owner()
+    const theirs = payload()
+    await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: stranger.cookie },
+      payload: theirs,
+    })
+    await app.inject({
+      method: 'DELETE',
+      url: `/exchanges/${theirs.id}`,
+      headers: { cookie: stranger.cookie },
+    })
+    const response = await app.inject({
+      method: 'POST',
+      url: `/exchanges/${theirs.id}/restore`,
+      headers: { cookie: me.cookie },
+    })
+    expect(response.statusCode).toBe(404)
+  })
+
+  it('В3: обмен, записанный задним числом, видит траты после своего дня', async () => {
+    const me = await owner()
+    const item = await insertItem(db)
+    const place = await insertPlace(db)
+    const trip = await insertTrip(db, {
+      actorId: me.id,
+      placeId: place,
+      startedAt: new Date(Date.now() - 60 * 60 * 1000),
+    })
+    // Bought this morning, and the exchange of three days ago written only after it.
+    await db.insert(expenses).values({
+      id: randomUUID(),
+      tripId: trip,
+      itemId: item,
+      amountMinor: 3_000_000n,
+      amountCurrency: 'AMD',
+      createdAt: new Date(Date.now() - 30 * 60 * 1000),
+    })
+    const response = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: payload({ exchangedOn: daysAgo(3) }),
+    })
+    expect(overviewOf(response.json()).heldEstimate?.held).toEqual({
+      minor: 7_000_000n,
+      currency: 'AMD',
+    })
+  })
+})
+
 describe('свой курс в походе (MOL-40)', () => {
   async function start(owner: { id: string; cookie: string }, id = randomUUID()) {
     const response = await app.inject({

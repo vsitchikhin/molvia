@@ -740,6 +740,11 @@ export const exchanges = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .default(sql`clock_timestamp()`),
+    // Removed, but still offered back (owner's decision В-5): «Вернуть» clears this and the row
+    // keeps its `created_at` — the order of a day and the hint both read it, and writing the
+    // exchange anew moved both (adversarial round 2, В1, В2). The owner's next request removes
+    // such rows for good: by then the screen no longer offers them back.
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (table) => [
     // The owner's exchanges in the order the wallet walks them.

@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNull, or, sum } from 'drizzle-orm'
+import { and, asc, eq, gt, isNotNull, isNull, or, sql, sum } from 'drizzle-orm'
 import { DomainError, ERROR, exchangeSchema } from '@molvia/model'
 import type { Currency, Exchange, ExchangeBody, RatePreference } from '@molvia/model'
 import { translateFailures } from './failure'
@@ -20,10 +20,24 @@ export interface ExchangeRepository {
   add(actorId: string, input: ExchangeBody): Promise<{ exchange: Exchange; created: boolean }>
 
   /**
-   * The owner's exchange, gone. Whether there was one is not said: a repeat after a lost answer,
+   * The owner's exchange, gone from every reader — marked, not yet deleted, so «Вернуть» can bring
+   * it back as it was (В-5). Whether there was one is not said: a repeat after a lost answer,
    * someone else's identifier and a missing one are one outcome, and nothing tells them apart.
    */
   remove(actorId: string, id: string): Promise<void>
+
+  /**
+   * «Вернуть»: the owner's removed exchange, back with its own `created_at` — written anew it
+   * would take the moment of the tap, and move both the order of its day and the hint (round 2,
+   * В1, В2). `false` when there is nothing to bring back: already final, or never removed.
+   */
+  restore(actorId: string, id: string): Promise<boolean>
+
+  /**
+   * Removed exchanges of the owner, deleted for good. Called by every request of the screen but
+   * «Вернуть»: once another request is made, the screen no longer offers them back.
+   */
+  purgeRemoved(actorId: string): Promise<void>
 
   /** Every exchange of the owner, in the order the wallet walks them: by day, then as written. */
   list(actorId: string): Promise<readonly Exchange[]>
@@ -87,6 +101,8 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
         const [same] = await db.select().from(exchanges).where(eq(exchanges.id, input.id)).limit(1)
         if (same?.actorId !== actorId) throw new DomainError(ERROR.CONFLICT)
         const held = theRow(same, 'exchanges')
+        // A removed exchange still holds its name until it is final; «Вернуть» brings it back.
+        if (held.deletedAt !== null) throw new DomainError(ERROR.CONFLICT)
         const repeated =
           held.givenMinor === input.given.minor &&
           held.givenCurrency === input.given.currency &&
@@ -102,14 +118,42 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
     async remove(actorId, id) {
       const own = idOrNull(id)
       if (own === null) return
-      await db.delete(exchanges).where(and(eq(exchanges.id, own), eq(exchanges.actorId, actorId)))
+      await db
+        .update(exchanges)
+        .set({ deletedAt: sql`clock_timestamp()` })
+        .where(
+          and(eq(exchanges.id, own), eq(exchanges.actorId, actorId), isNull(exchanges.deletedAt)),
+        )
+    },
+
+    async restore(actorId, id) {
+      const own = idOrNull(id)
+      if (own === null) return false
+      const restored = await db
+        .update(exchanges)
+        .set({ deletedAt: null })
+        .where(
+          and(
+            eq(exchanges.id, own),
+            eq(exchanges.actorId, actorId),
+            isNotNull(exchanges.deletedAt),
+          ),
+        )
+        .returning({ id: exchanges.id })
+      return restored.length > 0
+    },
+
+    async purgeRemoved(actorId) {
+      await db
+        .delete(exchanges)
+        .where(and(eq(exchanges.actorId, actorId), isNotNull(exchanges.deletedAt)))
     },
 
     async list(actorId) {
       const rows = await db
         .select()
         .from(exchanges)
-        .where(eq(exchanges.actorId, actorId))
+        .where(and(eq(exchanges.actorId, actorId), isNull(exchanges.deletedAt)))
         .orderBy(asc(exchanges.exchangedOn), asc(exchanges.createdAt), asc(exchanges.id))
       return rows.map(toExchange)
     },

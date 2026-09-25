@@ -983,5 +983,8 @@ describe('the exchanges', () => {
     expect(new URL(calls[0]?.url ?? '').pathname).toBe('/exchanges/..%2Factors%2Fme')
     expect(calls[1]).toMatchObject({ method: 'PUT', body: { preference: 'official' } })
     expect(new URL(calls[1]?.url ?? '').pathname).toBe('/actors/me/rate-preference')
+    await client.restoreExchange(EXCHANGE)
+    expect(calls[2]?.method).toBe('POST')
+    expect(new URL(calls[2]?.url ?? '').pathname).toBe(`/exchanges/${EXCHANGE}/restore`)
   })
 })

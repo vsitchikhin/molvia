@@ -133,6 +133,11 @@ export interface MolviaClient {
   recordExchange(body: ExchangeBody): Promise<{ exchanges: ExchangesResponse; created: boolean }>
   /** Gone, whether it was there or not — the answer is the screen as it is now. */
   removeExchange(id: string): Promise<ExchangesResponse>
+  /**
+   * «Вернуть»: the exchange just removed, back as it was. `error.not_found` once it is final —
+   * after any other request of the screen.
+   */
+  restoreExchange(id: string): Promise<ExchangesResponse>
   /** «Мой / Официальный» for trips from now on. */
   chooseRatePreference(preference: RatePreference): Promise<ExchangesResponse>
   /**
@@ -328,6 +333,9 @@ export function createClient(options: ClientOptions): MolviaClient {
 
     removeExchange: async (id) =>
       request(`/exchanges/${segment(id)}`, exchangesResponseCodec, { method: 'DELETE' }),
+
+    restoreExchange: async (id) =>
+      request(`/exchanges/${segment(id)}/restore`, exchangesResponseCodec, { method: 'POST' }),
 
     chooseRatePreference: async (preference) =>
       request('/actors/me/rate-preference', exchangesResponseCodec, {

@@ -34,9 +34,10 @@ import { signIn } from '@/usecases/sign-in'
 import { chooseTripRate } from '@/usecases/choose-trip-rate'
 import {
   chooseRatePreference,
-  exchangesOverview,
+  readExchanges,
   recordExchange,
   removeExchange,
+  restoreExchange,
 } from '@/usecases/exchanges'
 import { createSettingsRepository } from '@/db/settings-repository'
 import { saveSettings } from '@/usecases/save-settings'
@@ -306,9 +307,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
       })
       exchangeRoutes(guarded, {
-        overview: (actor) => exchangesOverview(tripData, actor),
+        overview: (actor) => readExchanges(tripData, actor),
         record: (actor, body) => recordExchange(tripData, actor, body),
         remove: (actor, id) => removeExchange(tripData, actor, id),
+        restore: (actor, id) => restoreExchange(tripData, actor, id),
         prefer: (actor, preference) => chooseRatePreference(tripData, actor, preference),
       })
       adviceRoutes(guarded, {

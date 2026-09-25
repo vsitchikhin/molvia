@@ -127,7 +127,7 @@ describe('exchanges: чтение и удаление', () => {
     ])
   })
 
-  it('удаляет свой; чужой, отсутствующий и кривой id — молча и без следа', async () => {
+  it('удаляет свой — из всех читателей; чужой, отсутствующий и кривой id — молча', async () => {
     const owner = await insertActor(db)
     const stranger = await insertActor(db)
     const own = await repository.add(owner, body())
@@ -138,7 +138,40 @@ describe('exchanges: чтение и удаление', () => {
     await repository.remove(owner, 'not-a-uuid')
     await repository.remove(owner, own.exchange.id.toUpperCase())
 
-    expect((await db.select().from(exchanges)).map((row) => row.id)).toEqual([theirs.exchange.id])
+    expect(await repository.list(owner)).toEqual([])
+    expect((await repository.list(stranger)).map((exchange) => exchange.id)).toEqual([
+      theirs.exchange.id,
+    ])
+  })
+
+  it('«Вернуть» возвращает ту же строку с прежним created_at, чужое — нет (В1, В2)', async () => {
+    const owner = await insertActor(db)
+    const stranger = await insertActor(db)
+    const own = await repository.add(owner, body())
+    await repository.remove(owner, own.exchange.id)
+
+    expect(await repository.restore(stranger, own.exchange.id)).toBe(false)
+    expect(await repository.restore(owner, own.exchange.id)).toBe(true)
+    const [back] = await repository.list(owner)
+    expect(back?.createdAt).toEqual(own.exchange.createdAt)
+    // Nothing removed any more: a second «Вернуть» has nothing to bring back.
+    expect(await repository.restore(owner, own.exchange.id)).toBe(false)
+  })
+
+  it('удалённое держит имя, пока не стёрто, и стирается окончательно только своё', async () => {
+    const owner = await insertActor(db)
+    const stranger = await insertActor(db)
+    const input = body()
+    await repository.add(owner, input)
+    await repository.remove(owner, input.id)
+    await expect(repository.add(owner, input)).rejects.toMatchObject({ code: ERROR.CONFLICT })
+
+    const theirs = await repository.add(stranger, body())
+    await repository.remove(stranger, theirs.exchange.id)
+    await repository.purgeRemoved(owner)
+    expect(await repository.restore(owner, input.id)).toBe(false)
+    expect(await repository.restore(stranger, theirs.exchange.id)).toBe(true)
+    expect(await db.select().from(exchanges)).toHaveLength(1)
   })
 
   it('уходит вместе с владельцем', async () => {

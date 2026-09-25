@@ -166,6 +166,8 @@ function fakeRepositories(
     exchanges: {
       add: unexpected('exchanges.add'),
       remove: unexpected('exchanges.remove'),
+      restore: unexpected('exchanges.restore'),
+      purgeRemoved: unexpected('exchanges.purgeRemoved'),
       list: () => Promise.resolve([]),
       spentSince: unexpected('exchanges.spentSince'),
       // No exchanges is where every person starts, and every trip test before MOL-40 is there.
