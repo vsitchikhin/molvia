@@ -165,6 +165,7 @@ describe('exchangesResponseCodec', () => {
           difference: money(875_400n, 'AMD'),
         },
         officialDoubtful: false,
+        priced: true,
       },
     ],
   }

@@ -233,22 +233,18 @@ export default defineComponent({
 
     /**
      * Asked only where it weighs anything (MOL-42, Р-2): not for the currency of conversion, which
-     * always costs one, and only when that currency already came in by an exchange on or before
-     * the chosen day that the wallet counts — before the day the currency of conversion changed,
-     * only one paid in the new currency (round 2, Л1). The chain is walked by days, not by the order of
-     * entry, so an earlier day entered second is the first link, whose remainder is ignored
-     * (review С-3). A choice of field, not a computation: the list is the server's.
+     * always costs one, and only when an exchange on or before the chosen day already gave the
+     * received currency a known cost — which only the server's walk knows (`priced`): a chain made
+     * before a change of the currency of conversion counts, a link of the old reckoning does not
+     * (round 3, П-1, М1). The chain is walked by days, not by the order of entry (review С-3). A
+     * choice of field, not a computation: the list is the server's.
      */
     const asksHeld = computed(() => {
-      const { pair, baseSince } = props.overview
+      const { pair } = props.overview
       return (
         !!pair &&
         currencies.received !== pair.base &&
-        intoReceived.value.some(
-          ({ exchangedOn, given }) =>
-            exchangedOn <= day.value &&
-            (baseSince === null || exchangedOn >= baseSince || given.currency === pair.base),
-        )
+        intoReceived.value.some(({ exchangedOn, priced }) => priced && exchangedOn <= day.value)
       )
     })
 
@@ -295,18 +291,28 @@ export default defineComponent({
         : t('exchange.sheet.version', words)
     }
 
-    /** «Сейчас записано: 21 000,00 ₽ → 99 000,00 ֏ · 16 сент. · ВТБ банкомат» */
+    /**
+     * «Сейчас записано: 21 000,00 ₽ → 99 000,00 ֏ · 16 сент. · было до обмена 30 000,00 ֏ · ВТБ»
+     * — every field an amendment replaces, the remainder too: it moves the rate, and a change of it
+     * alone made on the other phone read as «nothing changed» (round 3, М2).
+     */
     function currentOf(exchange: ExchangeView): string {
-      const words = {
-        amounts: t('exchange.row_amounts', {
+      const details = [
+        t('exchange.row_amounts', {
           given: formatMoney(exchange.given, locale.value),
           received: formatMoney(exchange.received, locale.value),
         }),
-        date: purchaseDay(yerevanMidnight(exchange.exchangedOn), locale.value),
-      }
-      return exchange.note
-        ? t('exchange.sheet.current_note', { ...words, note: exchange.note })
-        : t('exchange.sheet.current', words)
+        purchaseDay(yerevanMidnight(exchange.exchangedOn), locale.value),
+        ...(exchange.heldBefore
+          ? [
+              t('exchange.sheet.current_held', {
+                amount: formatMoney(exchange.heldBefore, locale.value),
+              }),
+            ]
+          : []),
+        ...(exchange.note ? [exchange.note] : []),
+      ]
+      return t('exchange.sheet.current', { details: details.join(' · ') })
     }
 
     /** UX only: the server reads the same codecs and has the last word (CLAUDE.md). */

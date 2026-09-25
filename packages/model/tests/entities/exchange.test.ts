@@ -336,6 +336,36 @@ describe('walletRate through other currencies (MOL-42)', () => {
         walletRate([roubles, dollarsBefore, later], 'USD', 'AMD', '2026-09-30', roubleRate, since),
       ).toMatchObject({ basis: 'weighted', rate: { scaled: parseRate('370.75') } })
     })
+
+    it('counts a chain made before it when every price in it is known without the bank (П-1)', () => {
+      // Euros to dollars to drams, for someone who chose euros only on the 25th.
+      const euros = exchange('1000 EUR', '1080 USD', '2026-09-01')
+      const drams = exchange('500 USD', '190000 AMD', '2026-09-02')
+      const wallet = walletRate([euros, drams], 'EUR', 'AMD', '2026-09-30', undefined, '2026-09-25')
+      expect(wallet?.rate.scaled).toBe(410_400_000n)
+      expect(wallet?.estimated).toBe(false)
+    })
+
+    it('does not weigh drams bought with roubles by the price of dollar ones (М1)', () => {
+      const early = exchange('100 USD', '38000 AMD', '2026-09-03')
+      const roubleDrams = exchange('20000 RUB', '100000 AMD', '2026-09-05', '38000 AMD')
+      // Everything held — the rouble drams too — named at the next dollar exchange.
+      const next = exchange('100 USD', '36150 AMD', since, '138000 AMD')
+      const rates = ownRates(
+        [early, roubleDrams, next],
+        'USD',
+        'AMD',
+        '2026-09-30',
+        roubleRate,
+        since,
+      )
+      expect(rates.wallet).toMatchObject({ basis: 'last', rate: { scaled: parseRate('361.5') } })
+      // The old reckoning is said by the day of the change, not as a price that was lost.
+      expect(
+        ownRates([early, roubleDrams], 'USD', 'AMD', '2026-09-30', roubleRate, since),
+      ).toMatchObject({ wallet: null, unknownAt: null })
+      expect([...rates.priced].sort()).toEqual([early.id, next.id].sort())
+    })
   })
 
   it('works in any currency of conversion, through any currency', () => {

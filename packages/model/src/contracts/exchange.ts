@@ -104,6 +104,12 @@ export const exchangeViewCodec = z.strictObject({
       replacedAt: isoDate,
     }),
   ),
+  /**
+   * Whether it gave the received currency a known cost — the sheet asks «сколько было до обмена»
+   * by it. Only the whole walk knows: a chain made before a change of the currency of conversion
+   * counts, a link of the old reckoning does not (round 3, П-1, М1). The phone does not re-derive it.
+   */
+  priced: z.boolean(),
   /** Null only for amounts so far apart that no rate within the band says them. */
   rate: rateCodec.nullable(),
   /**

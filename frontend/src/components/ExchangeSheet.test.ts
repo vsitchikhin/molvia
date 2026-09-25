@@ -53,6 +53,7 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
         rate: null,
         official: null,
         officialDoubtful: false,
+        priced: true,
       },
     ],
     ...patch,
@@ -178,16 +179,15 @@ describe('ExchangeSheet', () => {
     expect(view.text()).not.toContain('held before the exchange')
   })
 
-  it('after the currency changed, asks only by earlier exchanges paid in the new one (В-2, Л1)', async () => {
-    // Roubles, the currency now counted in, paid before the change: the wallet counts that one.
+  it('asks by the exchanges the server says gave the currency a price, and no others (П-1, М1)', async () => {
     const counted = await render(overview({ baseSince: '2026-09-10' }))
     expect(counted.text()).toContain('held before the exchange')
     counted.unmount()
 
     const [base] = overview().exchanges
     if (!base) throw new Error('the fixture has an exchange')
-    const dollars = { ...base, given: { minor: 10_000n, currency: 'USD' as const } }
-    const left = await render(overview({ baseSince: '2026-09-10', exchanges: [dollars] }))
+    // A link of the old reckoning: the wallet does not count it, so nothing held is weighed.
+    const left = await render(overview({ exchanges: [{ ...base, priced: false }] }))
     expect(left.text()).not.toContain('held before the exchange')
   })
 
@@ -376,5 +376,13 @@ describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
     expect(
       (field(view, en.exchange.sheet.received).get('input').element as HTMLInputElement).value,
     ).toBe('96000')
+  })
+
+  it('names the remainder in «now recorded» — a change of it alone is a change (М2)', async () => {
+    amend.mockResolvedValue('conflict')
+    const theirs: ExchangeView = { ...amended, heldBefore: { minor: 3_000_000n, currency: 'AMD' } }
+    const view = await render(overview({ exchanges: [theirs] }), theirs)
+    await saveAmendment(view)
+    expect(view.get('.current').text()).toContain('held before ֏30,000.00')
   })
 })

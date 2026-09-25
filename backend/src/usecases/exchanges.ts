@@ -95,6 +95,7 @@ function viewsOf(
   exchanges: readonly Exchange[],
   cached: ReadonlyMap<string, readonly CachedRate[]>,
   history: ReadonlyMap<string, readonly ExchangeRevision[]>,
+  priced: ReadonlySet<string>,
 ): ExchangeView[] {
   return [...exchanges].reverse().map((exchange): ExchangeView => {
     const { given, received, exchangedOn } = exchange
@@ -125,6 +126,7 @@ function viewsOf(
           replacedAt,
         }),
       ),
+      priced: priced.has(exchange.id),
       rate: exchangeRateOf(exchange),
       official:
         official && measure && difference
@@ -180,7 +182,7 @@ export async function exchangesOverview(
   const quote = owner.spendCurrency
   const pair = base === quote ? null : { base, quote }
   const baseSince = sinceDay(since)
-  const { wallet, costs, unknownAt } = ownRates(
+  const { wallet, costs, unknownAt, priced } = ownRates(
     list,
     base,
     quote,
@@ -214,7 +216,7 @@ export async function exchangesOverview(
       : null,
     heldEstimates: heldEstimates.filter((estimate) => estimate !== null),
     baseSince,
-    exchanges: viewsOf(list, cached, history),
+    exchanges: viewsOf(list, cached, history, priced),
   }
 }
 

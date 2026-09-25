@@ -215,12 +215,19 @@ export function exchangeRateOf(exchange: Exchange): ExchangeRate | null {
  * What every currency cost in `base`, from the exchanges dated no later than `day`.
  *
  * `since` is the day `base` became the currency of conversion, or null when it always was
- * (MOL-42, В-2: a change of it works forwards). An exchange dated before it counts only when it
- * was paid in `base` itself — dollars to drams, for someone who now counts in dollars, needs no
- * re-counting at all. What was paid in anything else belonged to the old reckoning, and is not
- * re-valued into the new one (review round 2, Л1): whether the old currency had been *chosen*
- * or was only the default every account starts with, the rows cannot tell, and this rule does
- * not need to know.
+ * (MOL-42, В-2: a change of it works forwards). Before it, **no price is ever taken from the
+ * bank**: an exchange counts when what was given already has a price in `base` without one —
+ * `base` itself, or a currency priced by the exchanges counted so far (dollars bought with euros,
+ * then drams bought with those dollars, for someone who now counts in euros; review round 3,
+ * П-1). Anything else belonged to the old reckoning and is not re-valued into the new one (round
+ * 2, Л1) — and the money it brought has no price in the new one, so it is not weighed by the price
+ * of other money either: the received currency's cost becomes unknown, the way it does after any
+ * link of no known price (round 3, М1). Unlike that link, this is not «lost» — the screen has
+ * the day of the change to say it with. Whether the old currency had been *chosen* or was only
+ * the default every account starts with, the rows cannot tell, and this rule does not need to.
+ *
+ * `priced` is the exchanges that gave their received currency a known cost — what the sheet asks
+ * «сколько было до обмена» by, since only the whole walk knows it.
  *
  * One rule covers the pair, chains and reversals alike. `base` costs one. **Giving money away
  * moves nothing** — it takes money and its cost away in one proportion, as spending does — so an
@@ -248,23 +255,25 @@ function costsOf(
   day: string,
   officialOf: OfficialRateOf,
   since: string | null,
-): { costs: Map<Currency, Cost | null>; lost: Map<Currency, Exchange> } {
-  const links = exchanges
-    .filter(
-      ({ exchangedOn, given }) =>
-        exchangedOn <= day && (since === null || exchangedOn >= since || given.currency === base),
-    )
-    .sort(chronological)
+): {
+  costs: Map<Currency, Cost | null>
+  lost: Map<Currency, Exchange>
+  priced: Set<string>
+} {
+  const links = exchanges.filter(({ exchangedOn }) => exchangedOn <= day).sort(chronological)
 
   const costs = new Map<Currency, Cost | null>()
   const lost = new Map<Currency, Exchange>()
+  const priced = new Set<string>()
   const paidWith = (
     currency: Currency,
     on: string,
+    bank: boolean,
   ): { ratio: Ratio; estimated: boolean } | null => {
     if (currency === base) return { ratio: ONE, estimated: false }
     const own = costs.get(currency)
     if (own) return own
+    if (!bank) return null
     const official = officialOf(currency, on)
     if (official?.base !== base || official.quote !== currency) return null
     const ratio = reduced(
@@ -278,13 +287,16 @@ function costsOf(
     const { given, received } = link
     if (received.currency === base) continue
 
-    const paid = paidWith(given.currency, link.exchangedOn)
+    const oldReckoning = since !== null && link.exchangedOn < since
+    const paid = paidWith(given.currency, link.exchangedOn, !oldReckoning)
     if (paid === null) {
       costs.set(received.currency, null)
-      lost.set(received.currency, link)
+      if (oldReckoning) lost.delete(received.currency)
+      else lost.set(received.currency, link)
       continue
     }
     lost.delete(received.currency)
+    priced.add(link.id)
     const previous = costs.get(received.currency) ?? null
     const held = link.heldBefore?.minor ?? null
     costs.set(
@@ -315,7 +327,7 @@ function costsOf(
           },
     )
   }
-  return { costs, lost }
+  return { costs, lost, priced }
 }
 
 function costOf(cost: Cost, base: Currency, currency: Currency): CurrencyCost | null {
@@ -373,6 +385,8 @@ export interface OwnRates {
   readonly wallet: WalletRate | null
   /** The price of every other currency held by exchange, `quote` and `base` left out. */
   readonly costs: readonly CurrencyCost[]
+  /** The exchanges that gave their received currency a known cost (see `costsOf`). */
+  readonly priced: ReadonlySet<string>
   /**
    * When `quote` has exchanges but no known cost: the exchange it was lost on — money of no known
    * price and no official rate of its day to value it by (review С-4). The screen says that,
@@ -393,9 +407,10 @@ export function ownRates(
   officialOf: OfficialRateOf = noOfficialRate,
   since: string | null = null,
 ): OwnRates {
-  const { costs, lost } = costsOf(exchanges, base, day, officialOf, since)
+  const { costs, lost, priced } = costsOf(exchanges, base, day, officialOf, since)
   const cost = base === quote ? null : costs.get(quote)
   return {
+    priced,
     wallet: cost ? costOf(cost, base, quote) : null,
     costs: pricesOf(costs, base).filter(({ rate }) => rate.base !== quote),
     unknownAt: base === quote || cost ? null : (lost.get(quote) ?? null),

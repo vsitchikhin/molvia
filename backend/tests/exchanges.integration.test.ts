@@ -828,6 +828,84 @@ describe('стоимость валют (MOL-42)', () => {
   })
 })
 
+describe('смена валюты пересчёта: старый счёт и цепочки (MOL-42, раунд 3)', () => {
+  async function record(me: { cookie: string }, patch: Record<string, unknown>) {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: payload(patch),
+    })
+    expect(response.statusCode).toBe(201)
+    return overviewOf(response.json())
+  }
+
+  async function choose(me: { id: string; cookie: string }, incomeCurrency: 'USD' | 'EUR') {
+    const before = await tripContext(db, me.id)
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/actors/me/settings',
+      headers: { cookie: me.cookie },
+      payload: { previous: before, settings: { ...before, incomeCurrency } },
+    })
+    expect(response.statusCode).toBe(200)
+  }
+
+  it('драмы за рубли до смены не взвешиваются по цене долларовых, и шторке сказано не спрашивать (М1)', async () => {
+    const me = await owner()
+    await record(me, {
+      given: { amount: '100', currency: 'USD' },
+      received: { amount: '38000', currency: 'AMD' },
+      exchangedOn: daysAgo(12),
+    })
+    await record(me, {
+      heldBefore: { amount: '38000', currency: 'AMD' },
+      exchangedOn: daysAgo(10),
+    })
+    await choose(me, 'USD')
+
+    // Everything held, the rouble drams too — what the sheet's hint says.
+    const overview = await record(me, {
+      given: { amount: '100', currency: 'USD' },
+      received: { amount: '36150', currency: 'AMD' },
+      heldBefore: { amount: '138000', currency: 'AMD' },
+      exchangedOn: today,
+    })
+    expect(overview.wallet).toMatchObject({ basis: 'last', rate: { scaled: parseRate('361.5') } })
+    const byDay = new Map(overview.exchanges.map((row) => [row.exchangedOn, row.priced]))
+    expect(byDay).toEqual(
+      new Map([
+        [today, true],
+        [daysAgo(10), false],
+        [daysAgo(12), true],
+      ]),
+    )
+  })
+
+  it('цепочка EUR → USD → AMD до смены входит целиком: пересчитывать в ней нечего (П-1)', async () => {
+    const me = await owner()
+    await record(me, {
+      given: { amount: '1000', currency: 'EUR' },
+      received: { amount: '1080', currency: 'USD' },
+      exchangedOn: daysAgo(20),
+    })
+    await record(me, {
+      given: { amount: '500', currency: 'USD' },
+      received: { amount: '190000', currency: 'AMD' },
+      exchangedOn: daysAgo(19),
+    })
+    await choose(me, 'EUR')
+    const read = await app.inject({
+      method: 'GET',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+    })
+    const overview = overviewOf(read.json())
+    expect(overview.wallet).toMatchObject({ estimated: false, rate: { scaled: 410_400_000n } })
+    expect(overview.exchanges.every((row) => row.priced)).toBe(true)
+  })
+})
+
 describe('правка обмена с историей (MOL-42)', () => {
   async function recorded(me: { cookie: string }, patch: Record<string, unknown> = {}) {
     const body = payload(patch)

@@ -64,6 +64,7 @@ function row(patch: Partial<Row> = {}): Row {
       difference: { minor: 875_400n, currency: 'AMD' },
     },
     officialDoubtful: false,
+    priced: true,
     ...patch,
   }
 }

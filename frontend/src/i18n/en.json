@@ -378,8 +378,8 @@
       "save": "Save the exchange",
       "save_amend": "Save the amendment",
       "amend_conflict": "While you were amending it, this exchange was amended on another device. It now stands as below; save again to write your amounts over it",
-      "current": "Now recorded: {amounts} · {date}",
-      "current_note": "Now recorded: {amounts} · {date} · {note}",
+      "current": "Now recorded: {details}",
+      "current_held": "held before {amount}",
       "saving": "Saving the exchange…",
       "bad_day": "Choose the day of the exchange"
     }
