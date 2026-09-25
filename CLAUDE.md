@@ -287,10 +287,12 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   «пакетиков», «таблеток», never «таблетки», which begins the goods' own name. A query word right
   after a number that starts a unit or is one edit from one is read as that unit — «батарейки 4
   шту» on its way to «штук», «кефир 500 мд» — or the item vanished on every keystroke until the
-  unit was typed whole. What it costs, named: «чай пакетики» misses the tea, its word measured
-  as a word (the owner's decision); a right unit no longer carries a typo through the mean —
-  «шакалат 100 гр» is lost where «шакалат голд» is found; and a real word that shares a unit's
-  key goes with it — «7 Up» is `7 up`, which «7 ап» no longer reaches.
+  unit was typed whole; but only while another word still grounds the query, because in «2 суп»
+  or «2 кап» the word is the goods. What it costs, named: «чай пакетики» misses the tea, its word
+  measured as a word (the owner's decision); a right unit no longer carries a typo through the
+  mean — «шакалат 100 гр» is lost where «шакалат голд» is found; a real word that shares a unit's
+  key goes with it — «7 Up» is `7 up`, which «7 ап» no longer reaches; and «тш» for «шт» is `цh`
+  in the key, two edits, past the slip.
   A grounding word is measured against the grounding words of the name only, never
   against «л» or «1», which every two-letter word is within two edits of. Grounding words fold by their **mean**,
   rounded up; short words by their **worst**, at most one edit, so each has to find its pair
