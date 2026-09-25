@@ -1,6 +1,6 @@
 import { onUnmounted, ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
-import { drawsNothing } from '@molvia/model'
+import { drawsNothing, toSearchKey } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
@@ -114,12 +114,13 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
   }
 
   /**
-   * Whether `text` is the start of `held`, as typed — case and spacing aside. Not by the search
-   * key: the key folds by position, and «дет» is not the start of `deцkoe`, the key of «детское»
-   * (review К).
+   * Whether `text` is the start of `held` — as typed or by the search key, either will do. The
+   * key alone folds by position, and «дет» is not the start of `deцkoe`, the key of «детское»
+   * (review К); the text alone does not see that «сгущенка» starts «сгущёнка варёная», «кока
+   * кола» starts «кока-кола лайт», «moloko» starts «молоко топлёное» (review П).
    */
   function startsHeld(held: string, text: string): boolean {
-    return typed(held).startsWith(typed(text))
+    return typed(held).startsWith(typed(text)) || toSearchKey(held).startsWith(toSearchKey(text))
   }
 
   function takeMissed(text: string): string | null {

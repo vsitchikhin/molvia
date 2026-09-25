@@ -478,6 +478,9 @@ describe('the query that found nothing (MOL-45)', () => {
     ['сыр косичка', 'сыр'],
     ['картошк', 'картошка'],
     ['Кефир', 'кефир '],
+    ['сгущёнка варёная', 'сгущенка'],
+    ['кока-кола лайт', 'кока кола'],
+    ['moloko toplenoe', 'молоко'],
   ])(
     'hands no miss «%s» to a pick by «%s» — one starts the other (review Р-1, Е)',
     async (miss, found) => {

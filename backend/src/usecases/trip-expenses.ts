@@ -22,6 +22,19 @@ async function lockedTrip(trips: TripRepository, tripId: string, actorId: string
 }
 
 /**
+ * Whether the query that missed is the found one, or one of them starts the other, by the key:
+ * «Кефир» is «кефир », «сгущёнка варёная» cut short is «сгущенка» — a pick, not a word of one's
+ * own, and learnt as well one purchase would count twice (adversarial Е, П). The screen holds
+ * the same rule; this keeps a stale or a foreign client to it.
+ */
+function sameQuery(missed: string, query: string | undefined): boolean {
+  if (query === undefined) return false
+  const a = toSearchKey(missed)
+  const b = toSearchKey(query)
+  return a.startsWith(b) || b.startsWith(a)
+}
+
+/**
  * «Добавить в поход». A finished trip takes it too (MOL-21, В-8): the soy sauce found in the bag
  * at home belongs to the trip it was bought on.
  *
@@ -44,13 +57,7 @@ export async function addExpense(
     if (created && query !== undefined) {
       await repositories.searchPicks.remember(actorId, query, body.itemId)
     }
-    // The same query by its key is a pick, not a word of one's own: learnt as well, one purchase
-    // would count twice (adversarial Е).
-    if (
-      created &&
-      missedQuery !== undefined &&
-      (query === undefined || toSearchKey(missedQuery) !== toSearchKey(query))
-    ) {
+    if (created && missedQuery !== undefined && !sameQuery(missedQuery, query)) {
       await repositories.searchPicks.learn(actorId, missedQuery, body.itemId)
     }
     return { trip: await tripViewFor(repositories, trip), created }

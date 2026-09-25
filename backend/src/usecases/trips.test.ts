@@ -672,11 +672,11 @@ describe('addExpense', () => {
     await addExpense(transactWith(adding(true, picks, learnt)), ACTOR, TRIP, {
       id: EXPENSE,
       itemId: milk.id,
-      query: 'мол',
+      query: 'кефир',
       missedQuery: 'молочка',
     })
 
-    expect(picks).toEqual([[ACTOR, 'мол', milk.id]])
+    expect(picks).toEqual([[ACTOR, 'кефир', milk.id]])
     expect(learnt).toEqual([[ACTOR, 'молочка', milk.id]])
   })
 
@@ -690,6 +690,17 @@ describe('addExpense', () => {
       missedQuery: 'Кефир',
     })
     expect(picks).toEqual([[ACTOR, 'кефир ', milk.id]])
+    expect(learnt).toEqual([])
+  })
+
+  it('must not fire: a missed query the found one starts, by the key — «сгущёнка варёная», «сгущенка»', async () => {
+    const learnt: unknown[][] = []
+    await addExpense(transactWith(adding(true, [], learnt)), ACTOR, TRIP, {
+      id: EXPENSE,
+      itemId: milk.id,
+      query: 'сгущенка',
+      missedQuery: 'сгущёнка варёная',
+    })
     expect(learnt).toEqual([])
   })
 
