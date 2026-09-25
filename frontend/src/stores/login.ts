@@ -375,12 +375,23 @@ export const useLoginStore = defineStore('login', () => {
   }
 
   /**
-   * «Это не я». The session stays on the server — ending it is MOL-57's handle — but this
-   * browser stops using it: nothing is claimed, so a reload or a relaunch asks again instead of
-   * walking in, and a fresh login starts right away.
+   * «Это не я». The stranger's session this browser collected is ended on the server first
+   * (MOL-57) — until then it stayed alive for its whole term and only this browser stopped using
+   * it. Only this session: the stranger's other devices are theirs. Nothing is claimed either
+   * way, so a reload or a relaunch asks again instead of walking in, and a fresh login starts
+   * right away.
+   *
+   * A way out that fails does not hold the way in: the person is waiting to sign in as
+   * themselves, and the new login replaces the cookie anyway. What is left behind then is a row
+   * nobody holds a key to, until its term runs out — named rather than retried.
    */
   async function refuse(): Promise<void> {
     refusedOwner.value = known.value
+    try {
+      await api.logout()
+    } catch {
+      // See above: the new login goes ahead regardless.
+    }
     // `begin` ничего не делает, если попытка уже идёт, — и это правильно: её не выбрасывают.
     return begin()
   }
