@@ -515,13 +515,17 @@ device, private always. The rate is what the two amounts say and is not stored b
   a list of exchanges says which exchange its cost was lost on (`walletUnknown`), never «no
   exchanges yet».
 - **A change of the currency of conversion works forwards** (В-2, the owner's comment over the
-  option they ticked): the wallet in the new currency is built from exchanges dated on or after
-  `actors.income_currency_since`, which the settings' own `UPDATE` sets when the currency changes
-  and a repeat of the form does not move — **and only when the old currency was in a live
-  exchange** (Ж2): the cut protects exchanges counted in it, and a first choice over the default
-  `RUB` by someone who never exchanged roubles has none; cutting there took their whole history. Earlier exchanges stay in the list as they were; the
-  drams held from them have no cost in the new currency and are not weighed. A trip started
-  offline with the old currency in its `context` is not cut — the cut is about the current one.
+  option they ticked): «what I exchanged before is not re-counted». `actors.income_currency_since`
+  is the day of the last change — the settings' own `UPDATE` sets it on every change, and a repeat
+  of the form does not move it — and **an exchange dated before it counts only when it was paid in
+  the new currency**: dollars to drams, for someone who now counts in dollars, needs no
+  re-counting at all, while roubles to drams belonged to the old reckoning and are not re-valued
+  into dollars. The rows cannot tell a chosen currency from the default `RUB` every account starts
+  with, and this rule does not need them to: two earlier attempts that cut by the day alone took the
+  whole dollar history of anyone who once changed leftover roubles (review Ж2, round 2 Л1). Earlier
+  exchanges stay in the list as they were; the drams held from the rouble ones have no cost in the
+  new currency and are not weighed. A trip started offline with the old currency in its `context`
+  is not cut — the cut is about the current one.
 - **Exact to eighteen digits, rounded to six once.** `walletRate` keeps ratios of integers through
   the chain, each link brought to 10¹⁸ (the exception under «Money and quantity rules»), and rounds
   to the snapshot's six digits at the end, the way a cross rate is rounded. The screen walks the
@@ -539,7 +543,8 @@ device, private always. The rate is what the two amounts say and is not stored b
   place, `created_at` untouched so the exchange keeps its place in its day. It names the version it
   was made over (`revision`): the exchange already as sent is a repeat, 200 and no new version; a
   version another device moved on from is 409, as the settings form is; removed or someone else's
-  is 404, and a conflict keeps the sheet open with what was typed, over the version held now. A
+  is 404, and a conflict keeps the sheet open with what was typed, over the version held now —
+  which the sheet itself shows, since the list that has it is under the sheet (round 2, Л4). A
   remainder the exchange has is shown in the sheet whatever a new exchange would ask: an amendment
   replaces the exchange whole, so a field not shown was a field cleared. The row is a button named
   by its words — an `aria-label` silenced the rate and the comparison. The row says «исправлен», the sheet shows the versions — which is what explains a trip
@@ -749,8 +754,10 @@ database access. In a product about data integrity, two write paths will silentl
 - Rounding happens on output only — never in storage or in intermediate results. **One written
   exception: the links of the wallet's chain** are brought to eighteen digits (MOL-42, Ж1, owner's
   decision 25.09.2026). Kept exact, the fraction grew by some ten digits an exchange and 800 of
-  them held the event loop — the whole API — for seconds; eighteen digits against the six a rate
-  is printed with never reach the sixth, not in ten thousand links.
+  them held the event loop — the whole API — for seconds. The error stays some twelve orders below
+  the sixth digit a rate is printed with — which can still turn on an exact half, where any error
+  decides the rounding: a chain may then print one unit of the sixth digit below the same price
+  made in one pair (round 2, Л3). A named price, not a hidden one.
 
 ## Data rules
 
