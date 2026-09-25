@@ -455,7 +455,7 @@
     },
     "erase": {
       "title": "Delete everything",
-      "text": "Send /delete to the bot you sign in with and confirm. Deletion is immediate and permanent: everything in the list above goes. Items and shops you added to the shared catalogue stay — without your name. Saved copies may remain on your phone: to remove them, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account."
+      "text": "Send /delete to the bot you sign in with and confirm. Deletion is immediate and permanent: everything in the list above goes except the shops — they and the items you added to the shared catalogue stay, without your name. Saved copies may remain on your phone: to remove them, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account."
     }
   }
 }

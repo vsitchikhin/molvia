@@ -187,6 +187,25 @@ describe('/delete — человек удаляет себя сам (MOL-58)', (
     expect(edits).toEqual([t('ru', 'erase.done')])
   })
 
+  // Adversarial П-4: an aged-out query takes no alert, and the buttons used to go in silence.
+  it('«Отмена» без алерта говорит в чат и только потом убирает кнопки', async () => {
+    const { bot, calls } = harness({}, NOW, ['answerCallbackQuery'])
+
+    await bot.handleUpdate(press(`erase:no:${String(NOW)}`))
+
+    expect(sent(calls, 'sendMessage')?.text).toBe(t('ru', 'erase.cancelled'))
+    expect(sent(calls, 'editMessageText')).toBeUndefined()
+    expect(sent(calls, 'editMessageReplyMarkup')).toBeDefined()
+  })
+
+  it('«Отмена», которую не удалось сказать никак, оставляет кнопки', async () => {
+    const { bot, calls } = harness({}, NOW, ['answerCallbackQuery', 'sendMessage'])
+
+    await bot.handleUpdate(press(`erase:no:${String(NOW)}`))
+
+    expect(sent(calls, 'editMessageReplyMarkup')).toBeUndefined()
+  })
+
   it('«Удалить навсегда» после «Отмены» — нажатие было, и «Готово» правда', async () => {
     const eraseMe = vi.fn(() => Promise.resolve())
     const { bot, calls } = harness({ eraseMe })

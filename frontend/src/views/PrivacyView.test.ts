@@ -50,7 +50,9 @@ it('promises nothing it does not keep: no «никто не видит», no cou
 
 it('names what stays after erasure in full — the items and the shops (adversarial О-5)', async () => {
   const text = (await render()).text()
-  expect(ru.privacy.erase.text).toMatch(/магазины/)
+  expect(ru.privacy.erase.text).toMatch(/магазин/)
+  // Selfreview 7: «Магазины» is in the list above, so «everything in it goes» names the exception.
+  expect(ru.privacy.erase.text).toMatch(/всё из списка выше, кроме магазинов/)
   expect(text).toContain(ru.privacy.stored.places.term)
   // Selfreview 3: copies on the phone are out of the server's reach, and the page says so.
   expect(ru.privacy.erase.text).toMatch(/телефоне/)

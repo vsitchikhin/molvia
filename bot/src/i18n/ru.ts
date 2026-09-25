@@ -99,18 +99,18 @@ export const ru = {
    * One sentence for «erased» and «there was nothing to erase», because a double tap produces
    * both — the second press finds nobody — and the second must not overwrite the first with
    * something that sounds different. This one is true either way.
-   */
-  /**
-   * The server's side only: the app keeps its last answers and unsent entries on the phone,
-   * and nothing on the server can reach them (selfreview 3) — so the person is told how.
+   *
+   * And it speaks for the server only: the app keeps its last answers and unsent entries on the
+   * phone, where nothing on the server can reach them (selfreview 3) — so the person is told how.
    */
   'erase.done':
     'Готово: ваших данных в Molvia нет. Войти снова можно — это будет новый пустой аккаунт.\n\n' +
     'На телефоне могли остаться сохранённые копии: чтобы убрать их, удалите приложение ' +
     'или очистите данные сайта в браузере.',
   /**
-   * Shown over the message, never written into it, and true whichever button came first: the
-   * bot cannot know whether «Удалить навсегда» was already pressed (adversarial О-2).
+   * Never written into the question: shown over it, or under it when Telegram will not take the
+   * alert (П-4). True whichever button came first — the bot cannot know whether «Удалить
+   * навсегда» was already pressed (adversarial О-2).
    */
   'erase.cancelled': 'Кнопки убраны. Если «Удалить навсегда» уже нажата, удаление не отменить.',
   /** A prompt answered long after it was sent is not the «yes» it was asking for. */

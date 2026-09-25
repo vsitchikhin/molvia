@@ -21,6 +21,28 @@ const buttonData = (action: 'ok' | 'no', issued: number): string =>
   `${PREFIX}${action}:${String(issued)}`
 const BUTTON_DATA = new RegExp(`^${PREFIX}(ok|no):([0-9]*)$`)
 
+/**
+ * «Отмена», said over the message — and **under** it when Telegram will not take the alert
+ * (adversarial П-4). A refusal may stay silent because its buttons stay for the next press;
+ * this one takes them away, and silence with no buttons left the question «Удалить все ваши
+ * данные?» standing unanswered. Its words are true whichever button came first, so unlike a
+ * refusal they may be written into the chat. The buttons go only once something was said.
+ */
+async function cancel(ctx: Context): Promise<void> {
+  const text = t(ctx.from?.language_code, 'erase.cancelled')
+  try {
+    await ctx.answerCallbackQuery({ text, show_alert: true })
+  } catch {
+    try {
+      await ctx.reply(text)
+    } catch {
+      // Nothing reached the person: the buttons stay, and the next press can try again.
+      return
+    }
+  }
+  await dropKeyboard(ctx)
+}
+
 export interface EraseDeps {
   readonly api: MolviaBotClient
   /** Seconds since the epoch — injectable so the age of a button is testable. */
@@ -62,11 +84,7 @@ export function eraseComposer({
     // was pressed, so the words are shown over the message, say what is true either way, and
     // the buttons go.
     if (action === 'no') {
-      try {
-        await refuse(ctx, 'erase.cancelled')
-      } finally {
-        await dropKeyboard(ctx)
-      }
+      await cancel(ctx)
       return
     }
 
