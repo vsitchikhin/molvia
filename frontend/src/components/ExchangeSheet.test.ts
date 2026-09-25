@@ -200,6 +200,34 @@ describe('ExchangeSheet', () => {
     expect(taken.text()).toContain('held before the exchange')
   })
 
+  it('asks only when this exchange will give a price: not for the old reckoning (О1)', async () => {
+    const [base] = overview().exchanges
+    if (!base) throw new Error('the fixture has an exchange')
+    // Dollars to drams on the 1st; counting in dollars since the 10th.
+    const dollars = { ...base, given: { minor: 10_000n, currency: 'USD' as const } }
+    const view = await render(
+      overview({
+        pair: { base: 'USD', quote: 'AMD' },
+        baseSince: '2026-09-10',
+        exchanges: [dollars],
+      }),
+    )
+    const [given] = view.findAll('select')
+    const day = field(view, en.exchange.sheet.day).get('input')
+
+    // Roubles for drams on the 5th: the old reckoning — what was held weighs nothing.
+    await given?.setValue('RUB')
+    await day.setValue('2026-09-05')
+    expect(view.text()).not.toContain('held before the exchange')
+    // The same on the 12th: the bank may price the roubles now.
+    await day.setValue('2026-09-12')
+    expect(view.text()).toContain('held before the exchange')
+    // Control: dollars on the 5th give the drams a price.
+    await given?.setValue('USD')
+    await day.setValue('2026-09-05')
+    expect(view.text()).toContain('held before the exchange')
+  })
+
   it('says the hint is about the last exchange alone when what was there before it is unknown', async () => {
     const view = await render(
       overview({

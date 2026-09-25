@@ -220,31 +220,58 @@ export default defineComponent({
     const sign = (currency: Currency) => currencySign(currency, locale.value)
     const sameCurrency = computed(() => currencies.given === currencies.received)
 
-    /**
-     * The exchanges into the currency this form receives, newest first — as the server lists them,
-     * whatever was given for it: dollars bought drams as roubles did (MOL-42).
-     */
-    const intoReceived = computed(() =>
+    /** The exchanges into `currency`, newest first — as the server lists them — this one aside. */
+    const into = (currency: Currency) =>
       props.overview.exchanges.filter(
-        (exchange) =>
-          exchange.received.currency === currencies.received && exchange.id !== props.editing?.id,
-      ),
-    )
+        (exchange) => exchange.received.currency === currency && exchange.id !== props.editing?.id,
+      )
+
+    /** Whether `currency` has a price on the chosen day: the latest exchange into it gave one. */
+    const hasPrice = (currency: Currency): boolean =>
+      !!into(currency).find(({ exchangedOn }) => exchangedOn <= day.value)?.priced
 
     /**
-     * Asked only where it weighs anything (MOL-42, Р-2): not for the currency of conversion, which
-     * always costs one, and only when the received currency *has* a known cost on the chosen day —
-     * that is, when the latest exchange into it on or before that day gave it one. Only the
-     * server's walk knows which did (`priced`): a chain made before a change of the currency of
-     * conversion does, a link of the old reckoning does not, and such a link after a priced one
-     * takes the cost away again (round 3, П-1, М1; round 4, Н2). The chain is walked by days, not
-     * by the order of entry (review С-3); the list comes newest first. A choice of field, not a
-     * computation: the list is the server's.
+     * Asked only where it weighs anything (MOL-42, Р-2), and that takes two things (round 5, О1):
+     *
+     * - the received currency *has* a price on the chosen day — the latest exchange into it on or
+     *   before that day gave it one (`priced`, from the server's walk: a chain made before a change
+     *   of the currency of conversion does, a link of the old reckoning does not; round 3, П-1, М1;
+     *   round 4, Н2) — and is not the currency of conversion, which always costs one;
+     * - this exchange will *give* it one: paid in the currency of conversion, or in a currency with a
+     *   price that day, or — on or after the day it was chosen — in anything the bank can price.
+     *   Before that day the bank is never asked, and a link paid otherwise makes the price unknown:
+     *   what was held then weighs nothing. Whether the bank has a fresh rate of that day the phone
+     *   cannot know; a week of its silence is the one case left asking in vain.
+     *
+     * The chain is walked by days, not by the order of entry (review С-3). A choice of field, not a
+     * computation: the flags are the server's.
      */
     const asksHeld = computed(() => {
-      const { pair } = props.overview
-      const latest = intoReceived.value.find(({ exchangedOn }) => exchangedOn <= day.value)
-      return !!pair && currencies.received !== pair.base && !!latest?.priced
+      const { pair, baseSince } = props.overview
+      if (!pair || currencies.received === pair.base || !hasPrice(currencies.received)) return false
+      return (
+        currencies.given === pair.base ||
+        hasPrice(currencies.given) ||
+        baseSince === null ||
+        day.value >= baseSince
+      )
+    })
+
+    /**
+     * The hint is about the latest exchange, so it fits only a day not before it — and never an
+     * amendment, whose exchange may be that latest one itself.
+     */
+    const estimate = computed(() => {
+      if (props.editing) return null
+      const hint = props.overview.heldEstimates.find(
+        ({ held }) => held.currency === currencies.received,
+      )
+      const latest = into(currencies.received).at(0)?.exchangedOn
+      if (!hint || !asksHeld.value || (latest !== undefined && day.value < latest)) return null
+      const amount = formatMoney(hint.held, locale.value)
+      return hint.whole
+        ? t('exchange.sheet.held_estimate', { amount })
+        : t('exchange.sheet.held_estimate_last', { amount })
     })
 
     /**
@@ -257,23 +284,6 @@ export default defineComponent({
         asksHeld.value ||
         (!!props.editing?.heldBefore && currencies.received === props.editing.received.currency),
     )
-
-    /**
-     * The hint is about the latest exchange, so it fits only a day not before it — and never an
-     * amendment, whose exchange may be that latest one itself.
-     */
-    const estimate = computed(() => {
-      if (props.editing) return null
-      const hint = props.overview.heldEstimates.find(
-        ({ held }) => held.currency === currencies.received,
-      )
-      const latest = intoReceived.value.at(0)?.exchangedOn
-      if (!hint || !asksHeld.value || (latest !== undefined && day.value < latest)) return null
-      const amount = formatMoney(hint.held, locale.value)
-      return hint.whole
-        ? t('exchange.sheet.held_estimate', { amount })
-        : t('exchange.sheet.held_estimate_last', { amount })
-    })
 
     /** «до 25 сент.: 20 000,00 ₽ → 100 000,00 ֏ · 16 сент. · ВТБ банкомат» */
     function versionOf(version: ExchangeView['history'][number]): string {
