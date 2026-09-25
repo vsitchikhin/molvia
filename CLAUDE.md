@@ -510,7 +510,9 @@ device, private always. The rate is what the two amounts say and is not stored b
   `created_at` — written anew it took the moment of the tap, which moved both the order of its day
   and the hint. **A removal is final after ten minutes** (`EXCHANGE_UNDO_MINUTES`, owner's decision
   В-7): the server's minute timer deletes older marks of everyone, and the owner's next request of
-  the screen deletes theirs sooner — the moment the screen stops offering them back. Both
+  the screen deletes theirs sooner — the moment the screen stops offering them back. The screen
+  withdraws the offer on an answer, never on a tap: a write lost on the way, or refused before it
+  reached that point, leaves the removal undoable, and «Вернуть» stays. Both
   «Вернуть» and a removal are safe to send again after a lost answer: an exchange already back
   answers 200, and a removal never makes final the row it is marking. A «Вернуть» that comes too
   late is told so, and the list is read again — not «check the connection», which sent people to
