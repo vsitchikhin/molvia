@@ -1,0 +1,126 @@
+/**
+ * The words people say for what a shelf writes otherwise: «картошка» for «Картофель», «орешки»
+ * for «Арахис» (MOL-45). No spelling rule reaches these and no threshold does either — MOL-14
+ * measured it — so the search is told, word by word, what else a word may stand for.
+ *
+ * Only the query is expanded, never a stored key, so unlike the alphabet of `search-key` this
+ * table is **not frozen**: a word added here is an ordinary commit, not a migration.
+ *
+ * What goes in, and what does not:
+ *
+ * - **A target is a kind of product, never a brand.** «бритва» finds «станок», not «Gillette»:
+ *   expanding into a brand would be a place in the results handed to one maker by hand — a paid
+ *   placement without the payment. The other way round is fine: «памперсы» finds «подгузники»
+ *   of every maker. «Белизна» is the common name of chlorine bleach from many makers, and is
+ *   let in as a kind.
+ * - **No categories.** «овощи», «фрукты», «специи», «сладости» name a shelf, not a purchase, and
+ *   an answer to them is a list of everything; reaching kefir from «молочка» is what embeddings
+ *   are for in 0.2.
+ * - **Every form is written out** — «картошка», «картошки», «картошку». A word is looked up by
+ *   its exact key: with an edit budget «белки» would be one edit from «булки» and find buns.
+ */
+
+import { toSearchKey } from './search-key'
+
+/** Words that mean one thing: each finds the names written with any other. */
+const SAME: readonly (readonly string[])[] = [
+  ['картошка', 'картошки', 'картошку', 'картофель', 'картофеля'],
+  ['булка', 'булки', 'булку', 'булочка', 'булочки', 'булочку'],
+  ['помидор', 'помидоры', 'помидоров', 'томат', 'томаты', 'томатов'],
+  ['огурец', 'огурцы', 'огурцов', 'огурчики'],
+  ['оливки', 'оливок', 'маслины', 'маслин'],
+  ['гречка', 'гречки', 'гречку', 'греча', 'гречу', 'гречневая', 'гречневой'],
+  ['мацун', 'мацони'],
+  ['бритва', 'бритвы', 'бритву', 'станок', 'станки', 'станка'],
+  ['отбеливатель', 'отбеливателя', 'белизна', 'белизну'],
+  ['курица', 'курицы', 'курицу', 'курятина', 'курятину'],
+  ['кабачки', 'кабачок', 'цукини'],
+  ['баклажаны', 'баклажан', 'синенькие'],
+  ['пакеты', 'пакет', 'мешки', 'мешок'],
+  ['овсянка', 'овсянки', 'овсянку', 'овсяные', 'овсяная', 'овсяных'],
+  ['сгущенка', 'сгущёнка', 'сгущенку', 'сгущенное', 'сгущённое'],
+  ['шоколадка', 'шоколадки', 'шоколад', 'шоколада'],
+  ['лампочка', 'лампочки', 'лампа', 'лампы'],
+  ['дезодорант', 'антиперспирант'],
+  ['селедка', 'селёдка', 'сельдь'],
+]
+
+/**
+ * A word that stands for narrower ones: «орешки» finds «Арахис», and «арахис» never finds
+ * «Фисташки» — a peanut is not a pistachio, however both are nuts.
+ */
+const NARROWER: readonly (readonly [readonly string[], readonly string[]])[] = [
+  [
+    ['орешки', 'орешков', 'орехи', 'орехов'],
+    ['орехи', 'орешки', 'арахис', 'фисташки', 'миндаль', 'кешью', 'фундук'],
+  ],
+  [
+    ['мясо', 'мяса'],
+    ['говядина', 'свинина', 'баранина', 'телятина', 'фарш'],
+  ],
+  [
+    ['минералка', 'минералки', 'минералку'],
+    ['вода', 'минеральная'],
+  ],
+  [
+    ['газировка', 'газировки', 'газировку'],
+    ['лимонад', 'газированная', 'газированный'],
+  ],
+  [['памперсы', 'памперс'], ['подгузники']],
+  [['зелень'], ['петрушка', 'укроп', 'кинза', 'киндза', 'базилик', 'тархун']],
+  [
+    ['макароны', 'макарошки'],
+    ['спагетти', 'вермишель', 'рожки'],
+  ],
+  [['сок', 'соки'], ['нектар']],
+  [['хлеб'], ['батон', 'лаваш', 'матнакаш', 'багет']],
+  [
+    ['колбаса', 'колбасу', 'колбаски'],
+    ['сервелат', 'салями'],
+  ],
+  [
+    ['сыр', 'сыра'],
+    ['чанах', 'лори', 'моцарелла', 'гауда', 'чечил', 'сулугуни'],
+  ],
+  [
+    ['рыба', 'рыбу', 'рыбы'],
+    ['лосось', 'семга', 'форель', 'скумбрия', 'треска', 'тунец', 'сельдь', 'селедка'],
+  ],
+]
+
+function keysOf(words: readonly string[]): string[] {
+  return [...new Set(words.map(toSearchKey))]
+}
+
+const EXPANSIONS: ReadonlyMap<string, readonly string[]> = (() => {
+  const map = new Map<string, Set<string>>()
+  const add = (from: string, to: readonly string[]) => {
+    const known = map.get(from) ?? new Set<string>()
+    for (const key of to) if (key !== from) known.add(key)
+    map.set(from, known)
+  }
+  for (const group of SAME) {
+    const keys = keysOf(group)
+    for (const key of keys) add(key, keys)
+  }
+  for (const [heads, tails] of NARROWER) {
+    const targets = keysOf(tails)
+    for (const key of keysOf(heads)) add(key, targets)
+  }
+  return new Map([...map].map(([key, targets]) => [key, [...targets]]))
+})()
+
+/**
+ * The search keys a word of a query also stands for; the word's own key is never among them.
+ * Takes one word of a key already made by `toSearchKey` — the query is folded once, by the
+ * same function the names were, and a word is looked up exactly.
+ */
+export function synonymKeys(wordKey: string): readonly string[] {
+  return EXPANSIONS.get(wordKey) ?? []
+}
+
+/**
+ * Exported for the test that holds the rules above — no brand as a target, one group per word —
+ * to walk the real table rather than a copy of it. Nothing in the applications reads this.
+ */
+export const SYNONYM_TABLES = Object.freeze({ same: SAME, narrower: NARROWER })
