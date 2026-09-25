@@ -530,7 +530,10 @@ device, private always. The rate is what the two amounts say and is not stored b
   currency a price only the whole walk knows, so the server says it per row (`priced`) and the
   sheet asks «сколько было до обмена» when the latest exchange into that currency on or before the
   chosen day is priced — the currency _has_ a price then, not merely had one once (round 4, Н2) —
-  never re-deriving the rule. A wallet lost to the old reckoning says so in its own words
+  and when this exchange will give one: paid in the currency of conversion, in a currency with a
+  price that day, or on or after the day of the change in anything the bank can price (round 5,
+  О1). The flags are the server's; the one case the phone cannot see is a week of the bank's
+  silence, when it still asks in vain. A wallet lost to the old reckoning says so in its own words
   (`walletUnknown.reason: 'oldReckoning'`), since «no bank rate that day» would be untrue (Н1). Earlier exchanges stay in
   the list as they were. A trip started offline with the old currency in its `context`
   is not cut — the cut is about the current one.
