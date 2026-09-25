@@ -211,6 +211,13 @@ export const actors = pgTable(
      * exchanges, and the form of MOL-65 compares its four fields and nothing else.
      */
     ratePreference: text('rate_preference').$type<RatePreference>().notNull().default('personal'),
+    /**
+     * When `income_currency` last changed (MOL-42, В-2): a change of the currency of conversion
+     * works forwards, so the person's own rate in the new one is built only from exchanges from
+     * that day on, and nothing before it is re-counted. Empty for whoever never changed it — then
+     * nothing is cut. Set by the settings' own `UPDATE`, in the same statement as the change.
+     */
+    incomeCurrencySince: timestamp('income_currency_since', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.
