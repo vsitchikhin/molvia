@@ -27,7 +27,16 @@ import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
 
 /** What is kept, in the order of how personal it is: the account, then what it did. */
-const STORED = ['telegram', 'purchases', 'ratings', 'search', 'visits', 'devices', 'settings']
+const STORED = [
+  'telegram',
+  'purchases',
+  'places',
+  'ratings',
+  'search',
+  'visits',
+  'devices',
+  'settings',
+]
 const PARTS = ['logs', 'storage', 'erase']
 
 /**

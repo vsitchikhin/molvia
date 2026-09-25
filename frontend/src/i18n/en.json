@@ -409,7 +409,7 @@
   "privacy": {
     "title": "Data and privacy",
     "revised": "Revised 24 September 2026",
-    "summary": "Your purchases are shown to nobody. Others see ratings only as an average, and only once three people stand behind it. No ads, no trackers, no analytics.",
+    "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
       "telegram": {
@@ -418,7 +418,11 @@
       },
       "purchases": {
         "term": "Purchases",
-        "text": "What, where, when and for how much. This is the most personal part: it shows where you go. In the app only you see them."
+        "text": "What, where, when and for how much. This is the most personal part: it shows where you go. Only you see your list of purchases. Others may see a price you paid, without your name and only in a shop where at least three people bought that item — then the lowest price may turn out to be yours."
+      },
+      "places": {
+        "term": "Shops",
+        "text": "The names of the shops you give on a trip — in the shared catalogue, without your name."
       },
       "ratings": {
         "term": "Ratings and reviews",
@@ -443,15 +447,15 @@
     },
     "logs": {
       "title": "Server logs",
-      "text": "Kept for no longer than 14 days. Your IP address and what you searched for are not written to them."
+      "text": "Kept for no longer than 14 days. Requests are written to them without your IP address and without what you searched for. An IP address can reach only the server's error log — and it too lives there no longer than 14 days."
     },
     "storage": {
       "title": "Cookies and the phone's memory",
-      "text": "Two cookies: the sign-in, and one more for five minutes while you sign in. The phone keeps purchases and ratings until they reach the server. All of it is needed for the app to work, so there is no banner."
+      "text": "Two cookies: the sign-in, and one more for five minutes while you sign in. The phone keeps what you saw last and what has not reached the server yet. All of it is needed for the app to work, so there is no banner."
     },
     "erase": {
       "title": "Delete everything",
-      "text": "Send /delete to the bot you sign in with and confirm. Deletion is immediate and permanent: purchases, ratings, reviews, settings and sign-ins go. Items you added to the shared catalogue stay — without your name. You can sign in again, but it will be a new, empty account."
+      "text": "Send /delete to the bot you sign in with and confirm. Deletion is immediate and permanent: everything in the list above goes. Items and shops you added to the shared catalogue stay — without your name. Saved copies may remain on your phone: to remove them, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account."
     }
   }
 }

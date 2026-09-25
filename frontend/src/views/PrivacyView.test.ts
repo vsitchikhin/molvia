@@ -40,4 +40,18 @@ it('asks nothing of the server: no skeleton and no state, whatever the connectio
 it('promises nothing it does not keep: no «никто не видит», no country of the server', async () => {
   const text = (await render()).text()
   expect(text).not.toMatch(/никто не видит|сервер находится|30 дней/i)
+  // Selfreview 1: the shared mode shows other people's prices, so «shown to nobody» is said of
+  // the list of purchases, and the prices are named with their threshold.
+  expect(text).not.toMatch(/покупки никому не показываются/i)
+  expect(text).toMatch(/хотя бы трое/)
+  // Selfreview 5: an address can reach Caddy's error log, so the promise is about requests.
+  expect(text).not.toMatch(/IP-адрес и то, что вы искали, в них не пишутся/)
+})
+
+it('names what stays after erasure in full — the items and the shops (adversarial О-5)', async () => {
+  const text = (await render()).text()
+  expect(ru.privacy.erase.text).toMatch(/магазины/)
+  expect(text).toContain(ru.privacy.stored.places.term)
+  // Selfreview 3: copies on the phone are out of the server's reach, and the page says so.
+  expect(ru.privacy.erase.text).toMatch(/телефоне/)
 })
