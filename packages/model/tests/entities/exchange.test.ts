@@ -360,10 +360,13 @@ describe('walletRate through other currencies (MOL-42)', () => {
         since,
       )
       expect(rates.wallet).toMatchObject({ basis: 'last', rate: { scaled: parseRate('361.5') } })
-      // The old reckoning is said by the day of the change, not as a price that was lost.
+      // Said with its own reason: «no rate of that day» would be untrue of it (Н1).
       expect(
         ownRates([early, roubleDrams], 'USD', 'AMD', '2026-09-30', roubleRate, since),
-      ).toMatchObject({ wallet: null, unknownAt: null })
+      ).toMatchObject({
+        wallet: null,
+        unknownAt: { exchange: roubleDrams, reason: 'oldReckoning' },
+      })
       expect([...rates.priced].sort()).toEqual([early.id, next.id].sort())
     })
   })
@@ -415,7 +418,7 @@ describe('ownRates', () => {
     const airport = exchange('600 USD', '217200 AMD', '2026-09-05')
     const rates = ownRates([first, airport], 'RUB', 'AMD', '2026-09-30')
     expect(rates.wallet).toBeNull()
-    expect(rates.unknownAt).toBe(airport)
+    expect(rates.unknownAt).toEqual({ exchange: airport, reason: 'noRate' })
     // An exchange that starts the cost afresh finds it again.
     const next = exchange('20000 RUB', '95000 AMD', '2026-09-15')
     expect(ownRates([first, airport, next], 'RUB', 'AMD', '2026-09-30').unknownAt).toBeNull()

@@ -189,6 +189,15 @@ describe('ExchangeSheet', () => {
     // A link of the old reckoning: the wallet does not count it, so nothing held is weighed.
     const left = await render(overview({ exchanges: [{ ...base, priced: false }] }))
     expect(left.text()).not.toContain('held before the exchange')
+    left.unmount()
+
+    // One that took the cost away after a priced one: it is the latest that decides (Н2).
+    const later = { ...base, id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5e', exchangedOn: '2026-09-05' }
+    const taken = await render(overview({ exchanges: [{ ...later, priced: false }, base] }))
+    expect(taken.text()).not.toContain('held before the exchange')
+    // Dated between them, the next exchange follows the priced one.
+    await field(taken, en.exchange.sheet.day).get('input').setValue('2026-09-03')
+    expect(taken.text()).toContain('held before the exchange')
   })
 
   it('says the hint is about the last exchange alone when what was there before it is unknown', async () => {

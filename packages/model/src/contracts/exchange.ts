@@ -4,6 +4,7 @@ import {
   exchangeDaySchema,
   exchangeNoteSchema,
   isPlausibleExchange,
+  lostCostReasonSchema,
   walletBasisSchema,
 } from '#model/entities/exchange'
 import { ERROR, ISSUE } from '#model/support/errors'
@@ -161,11 +162,17 @@ export const exchangesResponseCodec = z.strictObject({
   costs: z.array(currencyCostCodec),
   /**
    * Why there is no wallet although the spending currency came in by exchanges: the exchange its
-   * cost was lost on — money of no known price, with no official rate of that day to value it by.
-   * Null when there is a wallet, or nothing of the spending currency was ever received (С-4).
+   * cost was lost on, and why — money of no known price with no fresh official rate of that day
+   * (`noRate`), or money of the reckoning before the last change of the currency of conversion
+   * (`oldReckoning`). Null when there is a wallet, or nothing of the spending currency was ever
+   * received (С-4, round 4 Н1).
    */
   walletUnknown: z
-    .strictObject({ exchangedOn: exchangeDaySchema, given: currencySchema })
+    .strictObject({
+      exchangedOn: exchangeDaySchema,
+      given: currencySchema,
+      reason: lostCostReasonSchema,
+    })
     .nullable(),
   /**
    * The hints for the next exchange into each currency but the one of conversion: what is left

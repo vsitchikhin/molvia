@@ -233,19 +233,18 @@ export default defineComponent({
 
     /**
      * Asked only where it weighs anything (MOL-42, Р-2): not for the currency of conversion, which
-     * always costs one, and only when an exchange on or before the chosen day already gave the
-     * received currency a known cost — which only the server's walk knows (`priced`): a chain made
-     * before a change of the currency of conversion counts, a link of the old reckoning does not
-     * (round 3, П-1, М1). The chain is walked by days, not by the order of entry (review С-3). A
-     * choice of field, not a computation: the list is the server's.
+     * always costs one, and only when the received currency *has* a known cost on the chosen day —
+     * that is, when the latest exchange into it on or before that day gave it one. Only the
+     * server's walk knows which did (`priced`): a chain made before a change of the currency of
+     * conversion does, a link of the old reckoning does not, and such a link after a priced one
+     * takes the cost away again (round 3, П-1, М1; round 4, Н2). The chain is walked by days, not
+     * by the order of entry (review С-3); the list comes newest first. A choice of field, not a
+     * computation: the list is the server's.
      */
     const asksHeld = computed(() => {
       const { pair } = props.overview
-      return (
-        !!pair &&
-        currencies.received !== pair.base &&
-        intoReceived.value.some(({ exchangedOn, priced }) => priced && exchangedOn <= day.value)
-      )
+      const latest = intoReceived.value.find(({ exchangedOn }) => exchangedOn <= day.value)
+      return !!pair && currencies.received !== pair.base && !!latest?.priced
     })
 
     /**

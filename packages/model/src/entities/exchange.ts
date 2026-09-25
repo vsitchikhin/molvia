@@ -222,8 +222,8 @@ export function exchangeRateOf(exchange: Exchange): ExchangeRate | null {
  * П-1). Anything else belonged to the old reckoning and is not re-valued into the new one (round
  * 2, Л1) — and the money it brought has no price in the new one, so it is not weighed by the price
  * of other money either: the received currency's cost becomes unknown, the way it does after any
- * link of no known price (round 3, М1). Unlike that link, this is not «lost» — the screen has
- * the day of the change to say it with. Whether the old currency had been *chosen* or was only
+ * link of no known price (round 3, М1) — and is named with its own reason, `oldReckoning`, since
+ * «no rate of that day» would be untrue of it (round 4, Н1). Whether the old currency had been *chosen* or was only
  * the default every account starts with, the rows cannot tell, and this rule does not need to.
  *
  * `priced` is the exchanges that gave their received currency a known cost — what the sheet asks
@@ -247,7 +247,7 @@ export function exchangeRateOf(exchange: Exchange): ExchangeRate | null {
  *
  * Ratios of integers, each link brought to eighteen digits (`LINK_SCALE`, Ж1) and the rate rounded
  * to its six at the end. `lost` names, for a currency whose cost is unknown, the exchange it was
- * lost on — what the screen says instead of «no exchanges» (review С-4).
+ * lost on and why — what the screen says instead of «no exchanges» (review С-4, round 4 Н1).
  */
 function costsOf(
   exchanges: readonly Exchange[],
@@ -257,13 +257,13 @@ function costsOf(
   since: string | null,
 ): {
   costs: Map<Currency, Cost | null>
-  lost: Map<Currency, Exchange>
+  lost: Map<Currency, LostCost>
   priced: Set<string>
 } {
   const links = exchanges.filter(({ exchangedOn }) => exchangedOn <= day).sort(chronological)
 
   const costs = new Map<Currency, Cost | null>()
-  const lost = new Map<Currency, Exchange>()
+  const lost = new Map<Currency, LostCost>()
   const priced = new Set<string>()
   const paidWith = (
     currency: Currency,
@@ -291,8 +291,10 @@ function costsOf(
     const paid = paidWith(given.currency, link.exchangedOn, !oldReckoning)
     if (paid === null) {
       costs.set(received.currency, null)
-      if (oldReckoning) lost.delete(received.currency)
-      else lost.set(received.currency, link)
+      lost.set(received.currency, {
+        exchange: link,
+        reason: oldReckoning ? 'oldReckoning' : 'noRate',
+      })
       continue
     }
     lost.delete(received.currency)
@@ -379,6 +381,19 @@ export function walletRate(
   return cost ? costOf(cost, base, quote) : null
 }
 
+/**
+ * Why a currency has no known cost: the link that made it so, and whether that link paid with money
+ * of no price and no fresh official rate of its day (`noRate`), or belonged to the reckoning of the
+ * currency of conversion before the last change of it (`oldReckoning`).
+ */
+export const lostCostReasonSchema = z.enum(['noRate', 'oldReckoning'])
+export type LostCostReason = z.infer<typeof lostCostReasonSchema>
+
+export interface LostCost {
+  readonly exchange: Exchange
+  readonly reason: LostCostReason
+}
+
 /** What «Обмен денег» shows of the person's own rates, from one walk of the chain. */
 export interface OwnRates {
   /** The rate of `base` into `quote` a trip would take, or null. */
@@ -388,11 +403,10 @@ export interface OwnRates {
   /** The exchanges that gave their received currency a known cost (see `costsOf`). */
   readonly priced: ReadonlySet<string>
   /**
-   * When `quote` has exchanges but no known cost: the exchange it was lost on — money of no known
-   * price and no official rate of its day to value it by (review С-4). The screen says that,
-   * rather than «no exchanges yet» above a list of them.
+   * When `quote` has exchanges but no known cost: the exchange it was lost on, and why (review
+   * С-4, round 4 Н1). The screen says that, rather than «no exchanges yet» above a list of them.
    */
-  readonly unknownAt: Exchange | null
+  readonly unknownAt: LostCost | null
 }
 
 /**

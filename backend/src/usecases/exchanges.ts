@@ -212,7 +212,11 @@ export async function exchangesOverview(
     wallet,
     costs: [...costs],
     walletUnknown: unknownAt
-      ? { exchangedOn: unknownAt.exchangedOn, given: unknownAt.given.currency }
+      ? {
+          exchangedOn: unknownAt.exchange.exchangedOn,
+          given: unknownAt.exchange.given.currency,
+          reason: unknownAt.reason,
+        }
       : null,
     heldEstimates: heldEstimates.filter((estimate) => estimate !== null),
     baseSince,

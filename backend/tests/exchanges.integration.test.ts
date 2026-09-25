@@ -749,7 +749,11 @@ describe('стоимость валют (MOL-42)', () => {
     })
     expect(overview.wallet).toBeNull()
     // Said as it is, not «no exchanges yet» above the list (С-4).
-    expect(overview.walletUnknown).toEqual({ exchangedOn: daysAgo(5), given: 'USD' })
+    expect(overview.walletUnknown).toEqual({
+      exchangedOn: daysAgo(5),
+      given: 'USD',
+      reason: 'noRate',
+    })
     expect((await start(me)).rate?.source).toBe('official')
   })
 
@@ -863,6 +867,19 @@ describe('смена валюты пересчёта: старый счёт и �
       exchangedOn: daysAgo(10),
     })
     await choose(me, 'USD')
+
+    // The rouble drams have no price in dollars: said as the old reckoning, not «no exchanges»
+    // and not «no bank rate» (Н1). The dollar exchange before them does not make the sheet ask
+    // for what is held: the rouble one after it took the price away (Н2).
+    const read = await app.inject({
+      method: 'GET',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+    })
+    expect(overviewOf(read.json())).toMatchObject({
+      wallet: null,
+      walletUnknown: { exchangedOn: daysAgo(10), given: 'RUB', reason: 'oldReckoning' },
+    })
 
     // Everything held, the rouble drams too — what the sheet's hint says.
     const overview = await record(me, {

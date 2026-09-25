@@ -80,11 +80,16 @@
                «no exchanges yet» above a list of them (review С-4). -->
           <p v-else-if="overview.pair && overview.walletUnknown" class="meta">
             {{
-              t('exchange.wallet_unknown', {
-                given: currencySignOf(overview.walletUnknown.given),
-                quote: pairSigns(overview.pair).quote,
-                date: dayOf(midnightOf(overview.walletUnknown.exchangedOn)),
-              })
+              t(
+                overview.walletUnknown.reason === 'oldReckoning'
+                  ? 'exchange.wallet_old_reckoning'
+                  : 'exchange.wallet_unknown',
+                {
+                  given: currencySignOf(overview.walletUnknown.given),
+                  ...pairSigns(overview.pair),
+                  date: dayOf(midnightOf(overview.walletUnknown.exchangedOn)),
+                },
+              )
             }}
           </p>
           <p v-else-if="overview.pair" class="meta">

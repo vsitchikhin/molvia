@@ -243,11 +243,29 @@ describe('ExchangeView: the rate and the list', () => {
 
   it('says why the rate is unknown, not «no exchanges yet» above a list of them (С-4)', async () => {
     exchanges.mockResolvedValue(
-      overview({ wallet: null, walletUnknown: { exchangedOn: '2026-08-25', given: 'USD' } }),
+      overview({
+        wallet: null,
+        walletUnknown: { exchangedOn: '2026-08-25', given: 'USD', reason: 'noRate' },
+      }),
     )
     const view = await render()
     expect(view.text()).toContain('Rate unknown: the $ → ֏ exchange of')
     expect(view.text()).not.toContain('exchanges yet')
+  })
+
+  it('names the old reckoning as the reason, not a missing bank rate (Н1)', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        wallet: null,
+        baseSince: '2026-09-25',
+        walletUnknown: { exchangedOn: '2026-09-05', given: 'EUR', reason: 'oldReckoning' },
+      }),
+    )
+    const view = await render()
+    expect(view.text()).toContain('Rate unknown: the ֏ bought on')
+    expect(view.text()).toContain('with € have no price in ₽')
+    expect(view.text()).not.toContain('exchanges yet')
+    expect(view.text()).not.toContain('Central Bank of Armenia rate for that day')
   })
 
   it('names the day the currency of conversion changed, and says nothing when it never did', async () => {

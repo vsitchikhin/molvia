@@ -311,6 +311,7 @@
     "cost_line_estimated": "{currency}: {rate} · {basis} · part at the Central Bank of Armenia rate",
     "no_wallet": "No {base} → {quote} exchanges yet — new trips count by the Central Bank of Armenia rate",
     "wallet_unknown": "Rate unknown: the {given} → {quote} exchange of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New trips count by the Central Bank of Armenia rate until you record an exchange of a known price",
+    "wallet_old_reckoning": "Rate unknown: the {quote} bought on {date} with {given} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New trips count by the Central Bank of Armenia rate until you record an exchange paid in {base}",
     "preference_legend": "New trips count",
     "preference_personal": "by my rate",
     "preference_official": "by the central bank rate",
