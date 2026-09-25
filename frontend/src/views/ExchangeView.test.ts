@@ -362,6 +362,39 @@ describe('ExchangeView: the rate and the list', () => {
     expect(document.activeElement?.textContent.trim()).toBe(en.exchange.record)
   })
 
+  it('a new exchange that never reached the server keeps «Bring back» (Е1)', async () => {
+    exchanges.mockResolvedValue(overview())
+    removeExchange.mockResolvedValue(overview({ exchanges: [row()] }))
+    recordExchange.mockRejectedValue(new TypeError('network'))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+
+    await recordThroughSheet(view)
+    expect(recordExchange).toHaveBeenCalledTimes(1)
+    expect(view.text()).toContain(en.exchange.restore)
+  })
+
+  it('a second removal that never reached the server keeps the first one undoable (Е2)', async () => {
+    const other = row({ id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5e' })
+    exchanges.mockResolvedValue(overview({ exchanges: [row(), other] }))
+    removeExchange
+      .mockResolvedValueOnce(overview({ exchanges: [other] }))
+      .mockRejectedValueOnce(new TypeError('network'))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    expect(view.text()).toContain('Exchange deleted')
+
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    expect(view.text()).toContain(en.exchange.failed)
+    expect(view.text()).toContain(en.exchange.restore)
+  })
+
   it('a preference that never reached the server keeps «Bring back» (Д4)', async () => {
     exchanges.mockResolvedValue(overview())
     removeExchange.mockResolvedValue(overview({ exchanges: [row()] }))

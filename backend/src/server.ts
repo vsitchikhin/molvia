@@ -234,8 +234,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           instance.log.error('login request cleanup failed')
         },
       )
-      // The same minute timer: a removed exchange is final ten minutes on, whether or not its
-      // owner opens the screen again (MOL-40, В-7).
+      // The login timer's runner, reused — it owns only a minute timer and knows nothing of
+      // logins: a removed exchange is final ten minutes on, whether or not its owner opens the
+      // screen again (MOL-40, В-7).
       stopExchangeCleanup = startLoginCleanup(
         () => removedExchanges.purgeStale(),
         () => {

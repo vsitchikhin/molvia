@@ -146,16 +146,21 @@ export function useExchanges(): Exchanges {
       failed.value = false
       gone.value = false
       restored.value = false
-      removed.value = null
+      // The offer to bring a removed exchange back goes when the server made the removal final —
+      // with a write that reached it — never on the tap: a write lost on the way, or refused
+      // before it got that far (a day ahead of the server's clock), leaves it undoable (round 4, Е1).
       try {
         const { exchanges } = await api.recordExchange(body)
         land(exchanges)
+        removed.value = null
         return exchanges
       } catch (caught) {
         // Another exchange under this name — the first «Сохранить» landed with the amounts it had,
         // and its answer was lost. Not a failure of this form: the list is read again to show what
-        // is there, and the screen says what to do about it (В-6).
+        // is there, and the screen says what to do about it (В-6). This one did reach the point
+        // where the server makes removals final.
         if (caught instanceof ApiError && caught.code === ERROR.CONFLICT && caught.answered) {
+          removed.value = null
           conflicted.value = true
           await load()
           return null
@@ -179,8 +184,9 @@ export function useExchanges(): Exchanges {
         overview.value = { ...after, preference: shown.preference }
       }
     },
+    // Only a removal that reached the server replaces the one offered back: one lost on the way
+    // leaves the earlier removal undoable, as it still is (round 4, Е2).
     async remove(exchange) {
-      removed.value = null
       if (await write(() => api.removeExchange(exchange.id))) removed.value = exchange
     },
     // The same row back, marked no longer removed: written anew it would take the moment of the
