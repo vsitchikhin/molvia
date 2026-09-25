@@ -193,6 +193,21 @@ describe('свежесть списка', () => {
   })
 })
 
+describe('возвращение без связи (раунд 2, Д4)', () => {
+  it('прежний список уходит, экран говорит «нет связи»', async () => {
+    sessions.mockResolvedValueOnce(both)
+    const view = await render()
+    sessions.mockImplementation(() => {
+      online(false)
+      return Promise.reject(new ApiError(ERROR.INTERNAL))
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(view.findAll('li')).toHaveLength(0)
+    expect(view.text()).toContain(en.devices.offline.title)
+  })
+})
+
 describe('неизвестное устройство', () => {
   it('называется целой фразой, а не именем в чужом падеже (self-review С-4)', async () => {
     sessions.mockResolvedValue({
@@ -211,7 +226,7 @@ describe('неизвестное устройство', () => {
 })
 
 describe('«Завершить»', () => {
-  it('строка уходит сразу, даже если перечитать список не вышло (adversarial В1)', async () => {
+  it('завершённое устройство не остаётся на экране, даже если перечитать не вышло (adversarial В1)', async () => {
     sessions.mockResolvedValueOnce(both)
     const view = await render()
     await askToEnd(view)
@@ -221,9 +236,9 @@ describe('«Завершить»', () => {
     confirmButton().click()
     await flushPromises()
 
-    const rows = view.findAll('li')
-    expect(rows).toHaveLength(1)
-    expect(rows[0]?.text()).toContain(en.devices.this_device)
+    // Не прочитан — не показан (раунд 2, Д4): вместо списка ошибка с повтором.
+    expect(view.findAll('li')).toHaveLength(0)
+    expect(view.text()).toContain(en.devices.load_error.title)
   })
 
   it('сначала спрашивает, называя устройство, и только потом завершает', async () => {

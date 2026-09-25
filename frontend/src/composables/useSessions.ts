@@ -51,6 +51,9 @@ export function useSessions(): Sessions {
       failure.value = null
     } catch {
       if (mine !== latest) return
+      // A list that could not be read again is not shown as if it had been (round 2, Д4): it is
+      // the copy this composable refuses to keep, only in memory instead of on the disk.
+      list.value = null
       // Decided after the failure, never before the request (MOL-19, A1).
       failure.value = navigator.onLine ? 'error' : 'offline'
     }
