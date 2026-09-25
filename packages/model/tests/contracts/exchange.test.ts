@@ -42,6 +42,17 @@ describe('exchangeBodySchema', () => {
     )
   })
 
+  it('refuses amounts no rate in the band says, under «received» (А3)', () => {
+    const absurd = {
+      ...body,
+      given: { amount: '1', currency: 'RUB' },
+      received: { amount: '5000000', currency: 'AMD' },
+    }
+    const issue = exchangeBodySchema.safeParse(absurd).error?.issues[0]
+    expect(issue?.message).toBe(ERROR.INVALID_RATE)
+    expect(issue?.path).toEqual(['received'])
+  })
+
   it('refuses an identifier the device would not recognise in the answer, and extra fields', () => {
     expect(exchangeBodySchema.safeParse({ ...body, id: body.id.toUpperCase() }).success).toBe(false)
     expect(exchangeBodySchema.safeParse({ ...body, rate: '4.75' }).success).toBe(false)
@@ -84,7 +95,7 @@ describe('exchangesResponseCodec', () => {
     preference: 'personal',
     pair: { base: 'RUB', quote: 'AMD' },
     wallet: { rate, basis: 'weighted' },
-    heldEstimate: money(8_500_000n, 'AMD'),
+    heldEstimate: { held: money(8_500_000n, 'AMD'), whole: true },
     exchanges: [
       {
         id: body.id,
@@ -98,6 +109,7 @@ describe('exchangesResponseCodec', () => {
           provider: 'cba',
           difference: money(875_400n, 'AMD'),
         },
+        officialDoubtful: false,
       },
     ],
   }

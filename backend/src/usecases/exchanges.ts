@@ -7,7 +7,6 @@ import {
   pickOfficialRate,
   walletRate,
   yerevanDate,
-  yerevanMidnight,
 } from '@molvia/model'
 import type {
   Actor,
@@ -31,25 +30,42 @@ function foreign(...currencies: Currency[]): AmdRate['currency'][] {
 /**
  * One exchange as the list shows it, compared with the official rate of its own day — the rate a
  * trip started that day would have taken, by the same rule (`pickOfficialRate`). The cache is
- * asked once per day of the list, not once per exchange.
+ * asked once per day and pair of the list, all at once.
+ *
+ * A rate that jumped when it arrived is not a fact to measure an exchange by — it may be a comma
+ * in the wrong place at the bank (MOL-39, Р-19): the rate before the jump is used when there is
+ * one, and otherwise the comparison is withheld and the row says why (review С-5).
  */
 async function viewsOf(
   { rates }: Pick<Repositories, 'rates'>,
   exchanges: readonly Exchange[],
 ): Promise<ExchangeView[]> {
-  const cached = new Map<string, Awaited<ReturnType<typeof rates.latestOnOrBefore>>>()
-  const views: ExchangeView[] = []
-  for (const exchange of [...exchanges].reverse()) {
+  const keyOf = ({ given, received, exchangedOn }: Exchange) =>
+    `${exchangedOn}:${given.currency}:${received.currency}`
+  const distinct = new Map(exchanges.map((exchange) => [keyOf(exchange), exchange]))
+  const cached = new Map(
+    await Promise.all(
+      [...distinct].map(
+        async ([key, { given, received, exchangedOn }]) =>
+          [
+            key,
+            await rates.latestOnOrBefore(foreign(given.currency, received.currency), exchangedOn),
+          ] as const,
+      ),
+    ),
+  )
+
+  return [...exchanges].reverse().map((exchange): ExchangeView => {
     const { given, received, exchangedOn } = exchange
-    const key = `${exchangedOn}:${given.currency}:${received.currency}`
-    let rows = cached.get(key)
-    if (!rows) {
-      rows = await rates.latestOnOrBefore(foreign(given.currency, received.currency), exchangedOn)
-      cached.set(key, rows)
-    }
-    const official = pickOfficialRate(given.currency, received.currency, rows, exchangedOn)
-    const difference = official ? officialDifference(exchange, official.rate) : null
-    views.push({
+    const official = pickOfficialRate(
+      given.currency,
+      received.currency,
+      cached.get(keyOf(exchange)) ?? [],
+      exchangedOn,
+    )
+    const measure = official?.jumped ? official.previous : (official?.rate ?? null)
+    const difference = measure ? officialDifference(exchange, measure) : null
+    return {
       id: exchange.id,
       exchangedOn,
       given,
@@ -57,12 +73,12 @@ async function viewsOf(
       heldBefore: exchange.heldBefore,
       rate: exchangeRateOf(exchange),
       official:
-        official && difference
-          ? { rate: official.rate, provider: official.provider, difference }
+        official && measure && difference
+          ? { rate: measure, provider: official.provider, difference }
           : null,
-    })
-  }
-  return views
+      officialDoubtful: !!official?.jumped && !measure,
+    }
+  })
 }
 
 /**
@@ -96,11 +112,10 @@ export async function exchangesOverview(
           exchange.exchangedOn <= today,
       )
     : undefined
+  // From the moment the exchange was written, not from the midnight of its day: a purchase that
+  // morning was paid with the money held before, which `heldBefore` already names (А4).
   const held = last
-    ? heldEstimate(
-        last,
-        await exchanges.spentSince(owner.id, quote, yerevanMidnight(last.exchangedOn)),
-      )
+    ? heldEstimate(last, await exchanges.spentSince(owner.id, quote, last.createdAt))
     : null
 
   return {

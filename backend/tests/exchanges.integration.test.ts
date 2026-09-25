@@ -4,10 +4,18 @@ import { ERROR, exchangesResponseCodec, parseRate, tripViewCodec, yerevanDate } 
 import type { CachedRate, ExchangesResponse } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
-import { exchanges } from '@/db/schema'
+import { exchanges, expenses } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, signIn, tripContext } from './fixtures'
+import {
+  clearAll,
+  insertActor,
+  insertItem,
+  insertPlace,
+  insertTrip,
+  signIn,
+  tripContext,
+} from './fixtures'
 
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
@@ -100,7 +108,7 @@ describe('«Обмен денег» через API (MOL-40)', () => {
         basis: 'weighted',
       },
       // Nothing spent since: what the last exchange left, and nothing else is known.
-      heldEstimate: { amount: '115000.00', currency: 'AMD' },
+      heldEstimate: { held: { amount: '115000.00', currency: 'AMD' }, whole: true },
     })
     const list = overviewOf(second.json()).exchanges
     expect(list.map((exchange) => exchange.exchangedOn)).toEqual([daysAgo(2), daysAgo(10)])
@@ -295,6 +303,129 @@ describe('«Обмен денег» через API (MOL-40)', () => {
     })
     expect(response.json()).toMatchObject({ pair: null, wallet: null, heldEstimate: null })
     expect(overviewOf(response.json()).exchanges).toHaveLength(1)
+  })
+})
+
+describe('«Обмен денег»: правки ревью', () => {
+  it('А1: остаток у предела int8 — обмен записан, экран отвечает 200, подсказки нет', async () => {
+    const { cookie } = await owner()
+    await app.inject({ method: 'POST', url: '/exchanges', headers: { cookie }, payload: payload() })
+    const absurd = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload({
+        exchangedOn: daysAgo(2),
+        heldBefore: { amount: '92233720368547758.07', currency: 'AMD' },
+      }),
+    })
+    expect(absurd.statusCode).toBe(201)
+    expect(overviewOf(absurd.json()).heldEstimate).toBeNull()
+    const read = await app.inject({ method: 'GET', url: '/exchanges', headers: { cookie } })
+    expect(read.statusCode).toBe(200)
+  })
+
+  it('А3: обмен, чей курс вне полосы, отклоняется и не записывается', async () => {
+    const { cookie } = await owner()
+    const response = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload({
+        given: { amount: '1', currency: 'RUB' },
+        received: { amount: '5000000', currency: 'AMD' },
+      }),
+    })
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toMatchObject({ code: ERROR.INVALID_RATE, details: 'received' })
+    expect(await db.select().from(exchanges)).toEqual([])
+  })
+
+  it('А4: покупка, дописанная в поход, закрытый до обмена, остаток не уменьшает', async () => {
+    const me = await owner()
+    const item = await insertItem(db)
+    const place = await insertPlace(db)
+    const closed = await insertTrip(db, {
+      actorId: me.id,
+      placeId: place,
+      startedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+      finishedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    })
+    const open = await insertTrip(db, { actorId: me.id, placeId: place })
+    await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: payload({ exchangedOn: today, heldBefore: { amount: '20000', currency: 'AMD' } }),
+    })
+    const later = new Date(Date.now() + 1000)
+    await db.insert(expenses).values([
+      // The sauce found at home, written into last week's trip after the exchange.
+      {
+        id: randomUUID(),
+        tripId: closed,
+        itemId: item,
+        amountMinor: 3_000_000n,
+        amountCurrency: 'AMD',
+        createdAt: later,
+      },
+      // A purchase in the trip open across the exchange: paid from what is at hand.
+      {
+        id: randomUUID(),
+        tripId: open,
+        itemId: item,
+        amountMinor: 1_000_000n,
+        amountCurrency: 'AMD',
+        createdAt: later,
+      },
+    ])
+    const read = await app.inject({
+      method: 'GET',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+    })
+    expect(overviewOf(read.json()).heldEstimate?.held).toEqual({
+      minor: 11_000_000n,
+      currency: 'AMD',
+    })
+  })
+
+  it('С-5: курс ЦБ со скачком — сравнение с прежним, если он есть', async () => {
+    await rates.upsert([
+      rub('4.3000', daysAgo(15)),
+      rub('4.3100', daysAgo(14)),
+      rub('4.3200', daysAgo(13)),
+      { ...rub('431.23', daysAgo(11)), jump: true },
+    ])
+    const { cookie } = await owner()
+    const response = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload(),
+    })
+    const [row] = overviewOf(response.json()).exchanges
+    expect(row?.official?.rate.scaled).toBe(parseRate('4.32'))
+    expect(row?.officialDoubtful).toBe(false)
+  })
+
+  it('С-5: курс ЦБ со скачком и без прежнего — сравнения нет, «под сомнением»', async () => {
+    await rates.upsert([
+      rub('4.3000', daysAgo(22)),
+      rub('4.3100', daysAgo(21)),
+      rub('4.3200', daysAgo(20)),
+      { ...rub('431.23', daysAgo(11)), jump: true },
+    ])
+    const { cookie } = await owner()
+    const response = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload(),
+    })
+    const [row] = overviewOf(response.json()).exchanges
+    expect(row?.official).toBeNull()
+    expect(row?.officialDoubtful).toBe(true)
   })
 })
 

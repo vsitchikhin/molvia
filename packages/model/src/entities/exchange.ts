@@ -3,7 +3,14 @@ import { INT8_MAX, divideRounded } from '#model/support/decimal'
 import { ERROR, ISSUE } from '#model/support/errors'
 import { minorPerMajor, priceSchema } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
-import { RATE_SCALE, exchangeRateSchema, isRateDay, yerevanMidnight } from '#model/values/rates'
+import {
+  RATE_MAX,
+  RATE_MIN,
+  RATE_SCALE,
+  exchangeRateSchema,
+  isRateDay,
+  yerevanMidnight,
+} from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
 
 const positiveMoneySchema = priceSchema.refine((value) => value.minor > 0n, {
@@ -36,6 +43,9 @@ export const exchangeSchema = z
   })
   .refine(({ given, received }) => given.currency !== received.currency, {
     error: ISSUE.EXCHANGE_SAME_CURRENCY,
+  })
+  .refine(({ given, received }) => isPlausibleExchange(given, received), {
+    error: ERROR.INVALID_RATE,
   })
   .refine(
     ({ heldBefore, received }) => heldBefore === null || heldBefore.currency === received.currency,
@@ -78,11 +88,15 @@ function reduced(quote: bigint, base: bigint): Ratio {
  * the one rounding, done once, where the exact value becomes a rate (as `rateFromAmd` does for a
  * cross). `null` when the result is outside what `exchangeRateSchema` accepts.
  */
-function rateOf(ratio: Ratio, base: Currency, quote: Currency, day: string): ExchangeRate | null {
-  const scaled = divideRounded(
+function scaledOf(ratio: Ratio, base: Currency, quote: Currency): bigint {
+  return divideRounded(
     ratio.quote * minorPerMajor(base) * RATE_SCALE,
     ratio.base * minorPerMajor(quote),
   )
+}
+
+function rateOf(ratio: Ratio, base: Currency, quote: Currency, day: string): ExchangeRate | null {
+  const scaled = scaledOf(ratio, base, quote)
   const rate = { base, quote, scaled, source: 'personal' as const, asOf: yerevanMidnight(day) }
   return exchangeRateSchema.safeParse(rate).success ? rate : null
 }
@@ -92,6 +106,20 @@ function chronological(a: Exchange, b: Exchange): number {
   const time = a.createdAt.getTime() - b.createdAt.getTime()
   if (time !== 0) return time
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+}
+
+/**
+ * Whether the two amounts say a rate a trip could take (MOL-40, adversarial А3). An exchange
+ * outside the band was accepted once and then could not be counted: the wallet vanished, the trip
+ * took the bank's rate in silence and the screen said there were no exchanges above a list of two.
+ * So it is refused where it is written, and the wallet of exchanges inside the band stays inside.
+ */
+export function isPlausibleExchange(given: Money, received: Money): boolean {
+  if (given.minor <= 0n || received.minor <= 0n || given.currency === received.currency) {
+    return true // not this rule's question: the amounts and currencies are refused by their own
+  }
+  const scaled = scaledOf(reduced(received.minor, given.minor), given.currency, received.currency)
+  return scaled >= RATE_MIN && scaled <= RATE_MAX
 }
 
 /** The rate a single exchange was made at: what was received per one of what was given. */
@@ -180,12 +208,23 @@ export function officialDifference(exchange: Exchange, official: ExchangeRate): 
 }
 
 /**
- * A hint for «сколько было до обмена» (MOL-40, Р-7): what the last exchange left in the wallet
- * less what was spent in that currency since, never below zero. A hint and not a fact — purchases
- * without a price and money spent outside a trip are not in it, so the screen says «по записанным
- * тратам» — and absent when nothing is known of what came before.
+ * A hint for «сколько было до обмена» (MOL-40, Р-7, Р-13): what the last exchange left less what
+ * was spent in that currency since. A hint and not a fact — purchases without a price and money
+ * spent outside a trip are not in it, so the screen says «по записанным тратам».
+ *
+ * `whole` says whether it counts everything held: when the last exchange did not say what was
+ * there before it, the hint is about that exchange's money alone and the screen says so — the
+ * unknown remainder is not counted as zero (В-2). `null` when the figure is not money at all: an
+ * absurd remainder once took the whole screen down with a 500 (adversarial А1).
  */
-export function heldEstimate(last: Exchange, spent: bigint): Money {
+export function heldEstimate(
+  last: Exchange,
+  spent: bigint,
+): { readonly held: Money; readonly whole: boolean } | null {
   const held = last.received.minor + (last.heldBefore?.minor ?? 0n) - spent
-  return { minor: held > 0n ? held : 0n, currency: last.received.currency }
+  if (held > INT8_MAX) return null
+  return {
+    held: { minor: held > 0n ? held : 0n, currency: last.received.currency },
+    whole: last.heldBefore !== null,
+  }
 }

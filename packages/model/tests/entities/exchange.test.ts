@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { INT8_MAX } from '#model/support/decimal'
 import { ERROR, ISSUE } from '#model/support/errors'
 import {
   exchangeRateOf,
   exchangeSchema,
   heldEstimate,
+  isPlausibleExchange,
   officialDifference,
   walletRate,
 } from '#model/entities/exchange'
@@ -205,12 +207,37 @@ describe('officialDifference', () => {
 })
 
 describe('heldEstimate', () => {
-  it('is what the last exchange left, less what was spent since', () => {
-    expect(heldEstimate(second, 3_000_000n)).toEqual(money(8_500_000n, 'AMD'))
-    expect(heldEstimate(first, 3_000_000n)).toEqual(money(7_000_000n, 'AMD'))
+  it('is what the last exchange left, less what was spent since, and says whether it is all', () => {
+    expect(heldEstimate(second, 3_000_000n)).toEqual({
+      held: money(8_500_000n, 'AMD'),
+      whole: true,
+    })
+    // The first exchange never says what was there before: the hint is about its own money.
+    expect(heldEstimate(first, 3_000_000n)).toEqual({
+      held: money(7_000_000n, 'AMD'),
+      whole: false,
+    })
   })
 
   it('never goes below zero', () => {
-    expect(heldEstimate(first, 99_999_999n)).toEqual(money(0n, 'AMD'))
+    expect(heldEstimate(first, 99_999_999n)?.held).toEqual(money(0n, 'AMD'))
+  })
+
+  it('is none when the sum is not money at all — it took the screen down once (А1)', () => {
+    const absurd: Exchange = { ...second, heldBefore: money(INT8_MAX, 'AMD') }
+    expect(heldEstimate(absurd, 0n)).toBeNull()
+  })
+})
+
+describe('isPlausibleExchange', () => {
+  it('holds an ordinary exchange and refuses one no rate in the band says (А3)', () => {
+    expect(isPlausibleExchange(money(2_000_000n, 'RUB'), money(9_500_000n, 'AMD'))).toBe(true)
+    expect(isPlausibleExchange(money(100n, 'RUB'), money(500_000_000n, 'AMD'))).toBe(false)
+    expect(isPlausibleExchange(money(100_000_000_000n, 'AMD'), money(1n, 'RUB'))).toBe(false)
+  })
+
+  it('refuses the same in the entity itself', () => {
+    const absurd = { ...first, given: money(100n, 'RUB'), received: money(500_000_000n, 'AMD') }
+    expect(exchangeSchema.safeParse(absurd).error?.issues[0]?.message).toBe(ERROR.INVALID_RATE)
   })
 })

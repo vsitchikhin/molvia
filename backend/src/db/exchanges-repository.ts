@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, sum } from 'drizzle-orm'
+import { and, asc, eq, gt, isNull, or, sum } from 'drizzle-orm'
 import { DomainError, ERROR, exchangeSchema } from '@molvia/model'
 import type { Currency, Exchange, ExchangeBody, RatePreference } from '@molvia/model'
 import { translateFailures } from './failure'
@@ -24,9 +24,15 @@ export interface ExchangeRepository {
   list(actorId: string): Promise<readonly Exchange[]>
 
   /**
-   * What the owner spent in `currency` since `since`, in minor units: the priced expenses of
-   * their trips, whatever trip. The hint of «сколько было до обмена» (Р-7) — purchases without a
-   * price and money spent outside a trip are not in it, and the screen says so.
+   * What the owner spent in `currency` after `since`, in minor units: the priced expenses written
+   * after it, in trips that were still open at that moment. The hint of «сколько было до обмена»
+   * (Р-7) — purchases without a price and money spent outside a trip are not in it, and the screen
+   * says so.
+   *
+   * A purchase added to a trip finished before `since` — the sauce found at home, written into
+   * last week's trip — was paid with the money held before; counting it would take it away twice
+   * (adversarial А4). A purchase of the trip open across the exchange counts: it was made there
+   * and then, with whatever money was at hand.
    */
   spentSince(actorId: string, currency: Currency, since: Date): Promise<bigint>
 
@@ -103,7 +109,8 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
           and(
             eq(trips.actorId, actorId),
             eq(expenses.amountCurrency, currency),
-            gte(expenses.createdAt, since),
+            gt(expenses.createdAt, since),
+            or(isNull(trips.finishedAt), gt(trips.finishedAt, since)),
           ),
         )
       // `sum` of a bigint is a numeric, and the driver hands it back as text — or null for none.

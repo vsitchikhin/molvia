@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { deviceIdSchema } from './trip'
-import { exchangeDaySchema, walletBasisSchema } from '#model/entities/exchange'
+import { exchangeDaySchema, isPlausibleExchange, walletBasisSchema } from '#model/entities/exchange'
 import { ERROR, ISSUE } from '#model/support/errors'
 import { currencySchema, moneyCodec, signedMoneyCodec } from '#model/values/money'
 import { rateCodec, rateProviderSchema } from '#model/values/rates'
@@ -36,6 +36,10 @@ export const exchangeBodySchema = z
     error: ISSUE.EXCHANGE_SAME_CURRENCY,
     path: ['received'],
   })
+  .refine(({ given, received }) => isPlausibleExchange(given, received), {
+    error: ERROR.INVALID_RATE,
+    path: ['received'],
+  })
   .refine(
     ({ heldBefore, received }) =>
       heldBefore === undefined || heldBefore.currency === received.currency,
@@ -67,6 +71,11 @@ export const exchangeViewCodec = z.strictObject({
       difference: signedMoneyCodec,
     })
     .nullable(),
+  /**
+   * The official rate of that day jumped and there is nothing before it to measure by: no
+   * comparison, and the screen says the bank's number of that day is in doubt (review С-5).
+   */
+  officialDoubtful: z.boolean(),
 })
 export type ExchangeView = z.output<typeof exchangeViewCodec>
 
@@ -79,7 +88,12 @@ export const exchangesResponseCodec = z.strictObject({
   preference: ratePreferenceSchema,
   pair: z.strictObject({ base: currencySchema, quote: currencySchema }).nullable(),
   wallet: z.strictObject({ rate: rateCodec, basis: walletBasisSchema }).nullable(),
-  heldEstimate: moneyCodec.nullable(),
+  /**
+   * The hint for the next exchange of the pair: what is left by the recorded spending, and whether
+   * that is everything held (`whole`) or only the money of the last exchange, whose remainder
+   * before it was never said.
+   */
+  heldEstimate: z.strictObject({ held: moneyCodec, whole: z.boolean() }).nullable(),
   exchanges: z.array(exchangeViewCodec),
 })
 export type ExchangesResponse = z.output<typeof exchangesResponseCodec>
