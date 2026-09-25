@@ -4,6 +4,7 @@ import {
   ISSUE,
   botApiSecretSchema,
   confirmLoginSchema,
+  eraseMeSchema,
   loginCodeSchema,
   loginPreviewCodec,
 } from '@molvia/model'
@@ -18,6 +19,8 @@ export interface MolviaBotClient {
   previewLogin(code: string): Promise<LoginPreview>
   confirmLogin(code: string, telegramUserId: TelegramUserId): Promise<void>
   declineLogin(code: string): Promise<void>
+  /** Everything about this Telegram account, gone (MOL-58). Repeats answer the same. */
+  eraseMe(telegramUserId: TelegramUserId): Promise<void>
 }
 
 /** An internal client has no session and cannot attach its secret to an arbitrary API path. */
@@ -37,6 +40,11 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
     },
     declineLogin: async (code) => {
       await request(`${path(code)}/decline`, z.undefined(), { method: 'POST' })
+    },
+    eraseMe: async (telegramUserId) => {
+      const body = eraseMeSchema.safeParse({ telegramUserId })
+      if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'telegramUserId')
+      await request('/internal/actors/erase', z.undefined(), { method: 'POST', body: body.data })
     },
   }
 }

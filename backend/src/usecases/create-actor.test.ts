@@ -13,6 +13,7 @@ function fakeActors(overrides: Partial<ActorRepository> = {}): ActorRepository {
     byId: () => Promise.reject(new Error('byId was not expected')),
     byTelegramUserId: () => Promise.reject(new Error('byTelegramUserId was not expected')),
     update: () => Promise.reject(new Error('update was not expected')),
+    lockAccount: () => Promise.reject(new Error('lockAccount was not expected')),
     ...overrides,
   }
 }

@@ -73,6 +73,7 @@ function deps(world: World = {}) {
     byId: () => Promise.resolve(world.actor === undefined ? actor() : world.actor),
     byTelegramUserId: () => Promise.reject(new Error('byTelegramUserId was not expected')),
     update: () => Promise.reject(new Error('update was not expected')),
+    lockAccount: () => Promise.reject(new Error('lockAccount was not expected')),
   }
 
   const verdicts: VerdictRepository = {

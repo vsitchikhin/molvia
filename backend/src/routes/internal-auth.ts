@@ -1,6 +1,12 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
-import { DomainError, ERROR, confirmLoginSchema, loginPreviewCodec } from '@molvia/model'
+import {
+  DomainError,
+  ERROR,
+  confirmLoginSchema,
+  eraseMeSchema,
+  loginPreviewCodec,
+} from '@molvia/model'
 import type { LoginPreview, TelegramUserId } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { parseBody, parseQuery } from '@/parse'
@@ -13,6 +19,7 @@ export function internalAuthRoutes(
     preview(code: string): Promise<LoginPreview>
     confirm(code: string, telegramUserId: TelegramUserId): Promise<void>
     decline(code: string): Promise<void>
+    erase(telegramUserId: TelegramUserId): Promise<void>
   },
 ): void {
   const digest = (value: string): Buffer => createHash('sha256').update(value).digest()
@@ -51,6 +58,14 @@ export function internalAuthRoutes(
         return reply.code(204).send()
       },
     )
+    // Behind the same secret as the login, because it is the same caller asking for the same
+    // kind of thing: an act Telegram vouched for, which the API cannot check by itself (MOL-58).
+    scope.post('/internal/actors/erase', async (request, reply) => {
+      parseQuery(z.strictObject({}), request.query)
+      const body = parseBody(eraseMeSchema, request.body)
+      await api.erase(body.telegramUserId)
+      return reply.code(204).send()
+    })
     done()
   })
 }

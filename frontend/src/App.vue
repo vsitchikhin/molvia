@@ -5,7 +5,8 @@
   </div>
   <!-- Всё приложение — за входом (MOL-56). Экран входа не маршрут: адрес всё это время тот,
        куда человек шёл, и после входа он там и оказывается. -->
-  <LoginView v-if="closed" />
+  <!-- Кроме того, что читают до входа: «Данные и приватность» (MOL-58, `meta.public`). -->
+  <LoginView v-if="closed && !route.meta.public" />
   <template v-else>
     <RouterView />
     <TabBar v-if="route.meta.tab" />

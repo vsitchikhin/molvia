@@ -21,6 +21,7 @@ import { exchangeRoutes } from '@/routes/exchanges'
 import { advice } from '@/usecases/advice'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
+import { eraseMe } from '@/usecases/erase-me'
 import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
@@ -51,6 +52,8 @@ import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
+import { createErasureRepository } from '@/db/erasure-repository'
+import { describeFailure } from '@/db/failure'
 import { authTransactOn } from '@/db/auth-unit-of-work'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
@@ -96,17 +99,6 @@ function isBodyFault(error: FastifyError): boolean {
 }
 
 /**
- * The driver's code behind a failure — a SQLSTATE such as `23505`, or `CONNECTION_ENDED` — and
- * nothing else of it: without this every 500 of a login reads as the one word `Error`, and the
- * message beside it is exactly what carries the query's parameters.
- */
-function failureCode(error: Error): string | undefined {
-  const cause: unknown = error.cause
-  const code = typeof cause === 'object' && cause !== null && 'code' in cause ? cause.code : null
-  return typeof code === 'string' && /^[\dA-Z_]{1,64}$/.test(code) ? code : undefined
-}
-
-/**
  * Where every reply is `no-store` and an error is logged by name only.
  *
  * Judged by the route that matched, not by how the URL was spelt: the router decodes static
@@ -116,7 +108,7 @@ function failureCode(error: Error): string | undefined {
  */
 function isAuthRequest(request: FastifyRequest): boolean {
   const path = request.routeOptions.url ?? decodedPath(request.url)
-  return path.startsWith('/auth/') || path.startsWith('/internal/auth/')
+  return path.startsWith('/auth/') || path.startsWith('/internal/')
 }
 
 function decodedPath(url: string): string {
@@ -148,6 +140,18 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       // is here for the day a serializer is widened. What keeps credentials out of the log now
       // is the error handler below, and a test holds that, not this line.
       redact: ['req.headers.cookie', 'req.headers.authorization', 'res.headers'],
+      // A request is logged as its method and its path, and nothing else (MOL-58). Fastify's own
+      // serializer adds the address, the port and the host, and keeps the query string — which
+      // for `/catalogue/search?q=…` is what a person was looking for, the very behaviour the
+      // privacy page promises is not kept. The address today is Caddy's rather than a person's
+      // (no `trustProxy`), and this keeps it out on the day that changes.
+      serializers: {
+        req: (request: FastifyRequest) => ({
+          id: request.id,
+          method: request.method,
+          path: request.url.split('?', 1)[0],
+        }),
+      },
       ...(options.logStream ? { stream: options.logStream } : {}),
     },
     // No limit of the router's own: every parameter is judged by the schema of its route, which
@@ -166,7 +170,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           .send({ code: ISSUE.PATH_INVALID })
         return
       }
-      app.log.error({ errorName: error.name }, 'request refused by the framework')
+      app.log.error(describeFailure(error), 'request refused by the framework')
       void reply.status(500).send({ code: ERROR.INTERNAL })
     },
   })
@@ -178,6 +182,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   app.addHook('onRequest', (request, reply, next) => {
     if (isAuthRequest(request)) void reply.header('cache-control', 'no-store')
     next()
+  })
+
+  // Fastify's own 404 writes `Route GET:/path?q=… not found` into the log and into the body,
+  // past the request serializer: an old client or a mistyped path would log the query the
+  // serializer keeps out (MOL-58). The body keeps Fastify's shape — a code the client does not
+  // know is how it reads «the API has no such address» — but no longer carries the address.
+  app.setNotFoundHandler((_request, reply) => {
+    void reply.status(404).send({ message: 'Route not found', error: 'Not Found', statusCode: 404 })
   })
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
@@ -209,12 +221,15 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       return reply.status(400).send(answer({ code, ...(details ? { details } : {}) }))
     }
 
-    // Driver errors can carry SQL parameters; an auth failure must never log credentials.
-    if (isAuthRequest(request)) {
-      app.log.error({ errorName: error.name, code: failureCode(error) }, 'authentication failed')
-    } else {
-      app.log.error(error)
-    }
+    // By its kind and never by its content, on every path (MOL-58). This was the rule for the
+    // login's paths alone, and everything else logged the error whole: a driver's message is
+    // the query with its parameters, so a failed search wrote what was searched for and who
+    // asked, and a dropped connection wrote the hash of every session token in flight — into a
+    // log the privacy page promises holds neither.
+    app.log.error(
+      describeFailure(error),
+      isAuthRequest(request) ? 'authentication failed' : 'request failed',
+    )
     return reply.status(error.statusCode ?? 500).send({ code: ERROR.INTERNAL })
   })
 
@@ -271,6 +286,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       preview: (code) => previewLogin(loginRequests, code),
       confirm: (code, telegramId) => confirmLogin(loginRequests, code, telegramId),
       decline: (code) => declineLogin(loginRequests, code),
+      erase: (telegramUserId) => eraseMe(createErasureRepository(db), telegramUserId),
     })
 
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).

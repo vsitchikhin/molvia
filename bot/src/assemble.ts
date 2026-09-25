@@ -2,6 +2,8 @@ import { Bot } from 'grammy'
 import type { BotConfig, Context } from 'grammy'
 import { run, sequentialize } from '@grammyjs/runner'
 import type { RunnerHandle } from '@grammyjs/runner'
+import { eraseComposer } from './erase'
+import type { EraseDeps } from './erase'
 import { loginComposer } from './login'
 import type { LoginDeps } from './login'
 
@@ -12,7 +14,11 @@ import type { LoginDeps } from './login'
  * what it promises — one person at a time, everybody at once — is a property of the order these
  * two middlewares are installed in, and nothing else would notice if that order changed.
  */
-export function assembleBot(token: string, deps: LoginDeps, config?: BotConfig<Context>): Bot {
+export function assembleBot(
+  token: string,
+  deps: LoginDeps & EraseDeps,
+  config?: BotConfig<Context>,
+): Bot {
   const bot = new Bot<Context>(token, config)
 
   /**
@@ -35,6 +41,9 @@ export function assembleBot(token: string, deps: LoginDeps, config?: BotConfig<C
    * (adversarial Е1).
    */
   bot.use(sequentialize((ctx) => ctx.chat?.id.toString()))
+  // Before the login, which ends in a catch-all: every text is greeted and every unknown press
+  // is refused there, so `/delete` and its buttons would never get past it.
+  bot.use(eraseComposer(deps))
   bot.use(loginComposer(deps))
 
   // The last resort: a handler that throws must not take the process with it. The update itself

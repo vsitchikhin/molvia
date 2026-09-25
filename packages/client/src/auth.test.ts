@@ -26,7 +26,7 @@ describe('login clients', () => {
     }
   })
 
-  it('bot credentials only travel to its three internal methods and never follow a redirect', async () => {
+  it('bot credentials only travel to its four internal methods and never follow a redirect', async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(
@@ -36,15 +36,19 @@ describe('login clients', () => {
       )
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
     const bot = createBotClient({ baseUrl: 'http://backend', fetch, secret })
     await bot.previewLogin('code')
     await bot.confirmLogin('code', 123)
     await bot.declineLogin('code')
+    await bot.eraseMe(123)
     expect(fetch.mock.calls.map(([url]) => url)).toEqual([
       'http://backend/internal/auth/login/code',
       'http://backend/internal/auth/login/code/confirm',
       'http://backend/internal/auth/login/code/decline',
+      'http://backend/internal/actors/erase',
     ])
+    expect(fetch.mock.calls[3]?.[1]?.body).toBe(JSON.stringify({ telegramUserId: 123 }))
     for (const [, options] of fetch.mock.calls) {
       expect(new Headers(options?.headers).get('authorization')).toBe(`Bearer ${secret}`)
       expect(options?.credentials).toBe('omit')
@@ -57,6 +61,8 @@ describe('login clients', () => {
     const bot = createBotClient({ baseUrl: 'http://backend', fetch, secret })
     await expect(bot.previewLogin('../health')).rejects.toMatchObject({ code: ISSUE.PATH_INVALID })
     await expect(bot.confirmLogin('code', 0)).rejects.toMatchObject({ code: ISSUE.BODY_INVALID })
+    await expect(bot.eraseMe(0)).rejects.toMatchObject({ code: ISSUE.BODY_INVALID })
+    await expect(bot.eraseMe(1.5)).rejects.toMatchObject({ code: ISSUE.BODY_INVALID })
     expect(fetch).not.toHaveBeenCalled()
     expect(() => createBotClient({ baseUrl: 'http://backend', secret: '' })).toThrow()
   })

@@ -6,6 +6,10 @@
 //
 //   node bin/bundle.mjs backend
 //   node bin/bundle.mjs bot
+//
+// The API ships a second file beside its server: `dist/forget.js`, the owner's fallback for
+// erasing a person by hand (MOL-58). The production machine has neither the source nor a
+// published database port, so the image it already runs is the only place such a tool can live.
 
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -19,9 +23,16 @@ if (!['backend', 'bot'].includes(app)) {
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 
+const entries = {
+  backend: { index: 'src/index.ts', forget: 'src/forget-cli.ts' },
+  bot: { index: 'src/index.ts' },
+}
+
 await build({
-  entryPoints: [`${root}${app}/src/index.ts`],
-  outfile: `${root}${app}/dist/index.js`,
+  entryPoints: Object.fromEntries(
+    Object.entries(entries[app]).map(([name, path]) => [name, `${root}${app}/${path}`]),
+  ),
+  outdir: `${root}${app}/dist`,
   bundle: true,
   platform: 'node',
   target: 'node22',
@@ -58,4 +69,8 @@ await build({
   },
 })
 
-console.log(`bundled ${app}/dist/index.js`)
+console.log(
+  `bundled ${Object.keys(entries[app])
+    .map((name) => `${app}/dist/${name}.js`)
+    .join(', ')}`,
+)

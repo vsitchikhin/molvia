@@ -7,6 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "migrate": "tsx src/db/migrate-cli.ts",
+    "forget": "tsx src/forget-cli.ts",
     "bundle": "node ../bin/bundle.mjs backend",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

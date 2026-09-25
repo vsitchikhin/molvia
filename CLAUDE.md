@@ -57,8 +57,9 @@ the gates are decorative and the project loses the ability to fail on time.
 The `events` table is that groundwork, and it holds only what no domain table can answer:
 whether someone came back, and to look at what. The 0.2 threshold is a query over
 verdicts, not an event — anything a domain table already knows must never be duplicated
-into the log. Nothing updates or deletes from it, the gate queries are its only readers,
-and each is pinned by an integration test, boundary days included.
+into the log. Nothing updates or deletes from it — with one written exception, erasing a person
+(MOL-58, below) — the gate queries are its only readers, and each is pinned by an integration
+test, boundary days included.
 
 **The one writer is «Что брать», once a day per owner (MOL-31).** MOL-8 was going to record
 `session_started` on the first visit, and the promise was withdrawn when it was examined:
@@ -104,11 +105,12 @@ anything at all** — with the gate gone, `catalogue_viewed` had no reader, and 
 enters purchases is what `expenses` and `verdicts` answer. The rows already written stay where
 they are: the log is append-only, and they were true when they were made.
 
-One consequence of MOL-6 is open and worth knowing before it is met: the log points at
-`actors` with a real foreign key, so an actor that has events cannot be deleted. When
-«delete my account» arrives, either the log outlives the actor (`actor_id` becomes nullable,
-and the gate queries lose the half they measure by) or that deletion becomes the single
-written exception to append-only. It is a product decision, not a schema detail.
+**The question MOL-6 left open is answered: the log does not outlive the person** (MOL-58,
+owner's decision 20.09.2026). The log points at `actors` with a real foreign key, so an owner
+with events could not be deleted; erasing a person on request is now the single written
+exception to append-only, and their rows go with them. The right to be erased outweighs a gate,
+and a lost row there is the lesser harm. Whether the log could instead be anonymised to keep the
+gates is 0.2's question, and an anonymisation that can be reversed is still personal data.
 
 **The 0.2 gate is `VerdictRepository.reachedRatings` (MOL-49):** of those who appeared in a
 window, how many have `GATE_RATINGS` rows in `verdicts` within `GATE_RATINGS_WINDOW_HOURS` of
@@ -857,6 +859,58 @@ database access. In a product about data integrity, two write paths will silentl
   to whoever looked twice, and the same holds for prices. Closing that needs noise or delayed
   publication, neither of which 0.1 has — a known limit, not an oversight.
 - Country and city are part of the key from the start, not "we'll add it later".
+- **A person can be erased, and erasure is one function** (MOL-58): `ErasureRepository.erase` in
+  `backend/src/db`, one transaction under a lock on the owner's row. It removes sessions, search
+  picks, verdicts with the withdrawn ones, events, expenses, trips, exchanges (MOL-40 — the
+  person's own money), login requests by Telegram id
+  — they carry no foreign key, so no cascade reaches them — and the owner. Catalogue items the
+  person added stay with `created_by` nulled, and **every place stays** (owner's decision
+  24.09.2026). People erase themselves with `/delete` in the bot; the owner's fallback is
+  `dist/forget.js` in the API image (`make forget` in a copy — `TG` reaches the script through the
+  environment, never pasted into the recipe, where a value could close a quote and bring its own
+  `--yes`, П-3), a dry run unless `--yes`, and
+  **a dry run is the real run, rolled back**, so its count cannot disagree with what erasure does.
+  **A new table that points at `actors` must join erasure** — a test compares every foreign key
+  on `actors` with `ACTOR_REFERENCES`, and another scans every table for the erased person's uuid
+  and Telegram id. **Its first lock is the account's, then the person's login requests, and only
+  then the owner** (adversarial О-3, П-2): `for update` on an owner who does not exist yet locks
+  nothing, and a login collected meanwhile created an owner the transaction had already decided
+  was not there — «nobody to erase» over a live account. Collection locks its request row before
+  creating the owner, so the two take turns; and a request not yet confirmed has no Telegram id to
+  be locked by, so confirmation and erasure share `lockTelegramAccount`, an advisory lock on the
+  account taken first by both — and so does **whatever makes an owner**: `create` and `createIfMissing` take
+  it themselves (Р-1), so no path — the login, the development seam, whatever comes next — makes an
+  owner inside an erasure. Collection takes the account's lock before its request row (read, lock,
+  read again), because taken after it, a collection and an erasure could each wait on the other.
+  One order everywhere: the account, then request rows, then the owner. The bot's `sequentialize`
+  happens to order one chat's presses too, but that is another module's promise and the two API
+  routes have no order of their own. **Cleaning expired requests skips locked rows** (Р-3): it runs
+  under the one quota lock every login start takes, and waiting there for an erasure — or a dry
+  run of one — holding a person's expired request closed the door to everybody. A dry run still
+  holds that one account's lock for as long as it runs. **The page and the bot name what stays in full** — the items and the shops —
+  and say that copies on the phone are out of the server's reach: nothing clears a device's
+  storage for an owner the server no longer knows, since a 401 there is also an expired session.
+- **No third-party trackers or analytics, and so no cookie banner** (MOL-58). There are two
+  cookies, both strictly necessary: the session and the five-minute one of a login in progress
+  (MOL-54); what the phone keeps in its storage is the queue and the drafts the app needs to work.
+  **Any third-party script that sees data is a decision, not a dependency** — it changes what the
+  privacy page says and is discussed before it lands.
+- **Logs live fourteen days and carry no address and no query** (MOL-58). The API logs a request
+  as its method and path — the query of `/catalogue/search` is what a person looked for; Caddy
+  keeps no access log; Postgres logs its errors `terse`, without the row values of `DETAIL`;
+  every container writes to journald, and the term is the host's
+  (`MaxRetentionSec=14day`, `deploy/README.md`). **A failure is logged by its kind, on every
+  path** (adversarial О-1): name, driver code and stack frames through `describeFailure`, never
+  its message — a driver's message is the query with its parameters, and a failed search wrote
+  what was searched for and who asked, a dropped connection the hash of every session token in
+  flight. **The frames are what follows the stack's own header, cut off whole** (П-1): picked by
+  their shape, a line of a multi-line review written as `    at …` passed as a frame, with the
+  rest of the parameters behind it. `forget` prints the same. An unknown address answers without echoing it and is not
+  logged with its query. What the privacy page (`/privacy`) says about data is a promise these
+  rules keep, and it is read before signing in — the one route with `meta.public`, which
+  `App.vue` draws past the login screen (MOL-56), linked from that screen and from the settings: a change to either is a change to both — and it says only what they keep: other
+  people's prices are shown in the shared mode (MOL-31), so «shown to nobody» is said of the list
+  of purchases, and an address can reach Caddy's error log, so «no address» is said of requests.
 
 ## Frontend and styling rules
 
@@ -961,11 +1015,31 @@ database access. In a product about data integrity, two write paths will silentl
   page scrolls»**: a panel over the screen has no window of its own, so it scrolls itself and
   the page under it is held still.
 
-## The bot, and what it is allowed to know (MOL-55)
+## The bot, and what it is allowed to know (MOL-55, MOL-58)
 
-The bot is the second half of the login and nothing else in 0.1: the one place a person is
-shown **which device** they are letting in and says «yes» to it by hand. Rating reminders are
-0.2.
+The bot does two things in 0.1. It is the second half of the login: the one place a person is
+shown **which device** they are letting in and says «yes» to it by hand. And it is where a person
+**erases themselves** (MOL-58): `/delete`, one question naming what goes and what stays, one
+press — the only channel people are given, because there Telegram already says who is asking.
+Rating reminders are 0.2.
+
+- **Whose data goes is `ctx.from.id`, never anything in the button.** The button carries the
+  action and the second it was issued, and it means yes for ten minutes
+  (`ERASE_BUTTON_SECONDS`); older, without a time or from the future, it is refused over the
+  message and taken away. The API answers `204` whether there was anyone to erase or not, and the
+  bot writes one sentence for both — «ваших данных в Molvia нет» — so the second press of a double
+  tap cannot overwrite the first with something that sounds different. **«Отмена» is not an
+  outcome** (adversarial О-2): it is shown over the message and takes the buttons away, and its
+  words are true whichever button came first — written in, «Ничего не удалено» overwrote «Готово»
+  over an account already gone. When Telegram will not take the alert, the same words go under
+  the message as a reply, and the buttons go only once something was said (П-4): a refusal may be
+  silent because its buttons stay, and this one takes them. **A button too old to mean yes is
+  answered the same way** (Р-2) — it too takes the buttons, and it was «Удалить навсегда» that
+  was pressed. **Under the message speaks only the press that took the buttons away** (С-1): the bot keeps no
+  state, but Telegram refuses to take away buttons already gone («message is not modified»), so
+  the second press of a double tap stays quiet; if nothing can be said at all, the buttons are put
+  back. The erase composer is installed **before** the login's, which
+  ends in a catch-all that greets every text.
 
 - **The i18n rule of the frontend covers the bot too, and this is the line that says so.** Not a
   string of text in the code — every message is a key, Russian first, English mirroring it. The
@@ -1056,7 +1130,8 @@ shown **which device** they are letting in and says «yes» to it by hand. Ratin
   and the person's explicit consent.
 - **Telegram updates are never logged whole** (the privacy page, п. 4.3): an update carries a
   name, a username and a language we deliberately do not store. What goes to the log is the code
-  of the error and the operation that failed.
+  of the error and the operation that failed. How a press is answered — `settle`, `refuse`, the
+  spinner, the keyboard — lives in `answer.ts`, shared by the login and erasure.
 - **A copy without `TELEGRAM_BOT_TOKEN` or without `BOT_API_SECRET` does not start**, says so in
   one line and exits 0 — «this copy has no bot» must not become a restart loop under compose.
   Such a copy signs in through `POST /dev/login` and cannot use Telegram at all.
@@ -1491,6 +1566,12 @@ exchanges, the wallet worked out from them, the preference «мой / ЦБ РА�
 beside the central bank of its day. The trip total says «мой курс» for it. Incomes and the rest
 of the money model are still their own tasks.
 
+MOL-58 gave the people whose data this is the minimum 0.1 owes them: a page that says what is
+kept and for how long (`/privacy`, open without a session), `/delete` in the bot, which erases a
+person in one transaction — the event log included, the one exception to append-only — and logs
+that keep no address and no query and live fourteen days. Export, a delete button in the
+settings, versioned policy and consent are 0.2 (Confluence, «Персональные данные», section 5).
+
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 **What the database guarantees and what it leaves to the domain** is a line, not a habit:
@@ -1513,7 +1594,11 @@ The shape worth knowing here:
 - **`api` and `bot` ship as a single bundled file each** (`bin/bundle.mjs`, esbuild). The
   runtime image carries no `node_modules` at all: nothing to audit and nothing that can
   drift from the lockfile it was built with. It also sidesteps the fact that the workspace
-  packages export TypeScript source, which a runtime image could not read.
+  packages export TypeScript source, which a runtime image could not read. The API's image
+  carries a second file, `dist/forget.js` — the owner's fallback for erasure (MOL-58), since the
+  machine has neither the source nor a published database port.
+- **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
+  exists only for trying the stack on a laptop, where Docker Desktop has no journald.
 - **Migrations run when the API starts.** There is one instance, and a schema that lags
   the code deployed against it is the worse of the two failures. `make migrate`, the test
   setup and the boot path all go through the same code, so a migration cannot behave one

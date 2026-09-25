@@ -79,7 +79,43 @@ export const ru = {
   'login.failed': 'Не дождался ответа. Попробуйте ещё раз через минуту.',
   'start.greeting':
     'Molvia — что стоит покупать и где.\n\n' +
-    'Вход начинается в приложении: {url} — а я пришлю сюда подтверждение.',
+    'Вход начинается в приложении: {url} — а я пришлю сюда подтверждение.\n\n' +
+    'Удалить все свои данные — /delete.',
+  /**
+   * The person erasing themselves (MOL-58). What stays is named as plainly as what goes: the
+   * catalogue keeps the items they added and every shop they named (adversarial О-5), and
+   * hearing that afterwards would feel like a lie. What goes is «everything», not a list: a
+   * list of four left out the search picks and the visit marks the privacy page names.
+   */
+  'erase.prompt':
+    'Удалить все ваши данные в Molvia?\n\n' +
+    'Уйдёт всё, что Molvia о вас знает: покупки, обмены денег, оценки и отзывы, выбор в ' +
+    'поиске, отметки о визитах, настройки и входы на всех устройствах. Товары и магазины, ' +
+    'которые вы добавили в общий справочник, останутся — без вашего имени.\n\n' +
+    'Отменить это нельзя.',
+  'erase.confirm': 'Удалить навсегда',
+  'erase.cancel': 'Отмена',
+  /**
+   * One sentence for «erased» and «there was nothing to erase», because a double tap produces
+   * both — the second press finds nobody — and the second must not overwrite the first with
+   * something that sounds different. This one is true either way.
+   *
+   * And it speaks for the server only: the app keeps its last answers and unsent entries on the
+   * phone, where nothing on the server can reach them (selfreview 3) — so the person is told how.
+   */
+  'erase.done':
+    'Готово: ваших данных в Molvia нет. Войти снова можно — это будет новый пустой аккаунт.\n\n' +
+    'На телефоне могли остаться сохранённые копии: чтобы убрать их, удалите приложение ' +
+    'или очистите данные сайта в браузере.',
+  /**
+   * Never written into the question: shown over it, or under it when Telegram will not take the
+   * alert (П-4). True whichever button came first — the bot cannot know whether «Удалить
+   * навсегда» was already pressed (adversarial О-2).
+   */
+  'erase.cancelled': 'Кнопки убраны. Если «Удалить навсегда» уже нажата, удаление не отменить.',
+  /** A prompt answered long after it was sent is not the «yes» it was asking for. */
+  'erase.expired': 'Эта кнопка устарела. Отправьте /delete ещё раз.',
+  'erase.failed': 'Не дождался ответа. Попробуйте ещё раз через минуту.',
 } as const
 
 /**

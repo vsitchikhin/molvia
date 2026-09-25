@@ -5,6 +5,7 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
 import { actors } from './schema'
+import { lockTelegramAccount } from './telegram-lock'
 
 export interface ActorRepository {
   /**
@@ -29,6 +30,13 @@ export interface ActorRepository {
    */
   byTelegramUserId(telegramUserId: TelegramUserId): Promise<Actor | null>
   update(id: string, patch: ActorPatch): Promise<Actor | null>
+
+  /**
+   * The lock erasure holds on this account for its whole transaction (`telegram-lock.ts`),
+   * taken for the rest of the caller's. Meaningful only inside a transaction: outside one it is
+   * released as soon as it is taken. `create` and `createIfMissing` take it themselves.
+   */
+  lockAccount(telegramUserId: TelegramUserId): Promise<void>
 }
 
 /**
@@ -61,32 +69,47 @@ export function createActorRepository(db: Conn): ActorRepository {
       // exactly what that constraint exists to refuse (MOL-52). Both arrive as `23505`, which
       // the wrapper turns into CONFLICT — unwrapped it went up untouched and a refused write
       // looked like a broken server.
-      return translateFailures(async () => {
-        const [row] = await db
-          .insert(actors)
-          .values({ id, telegramUserId, ...input })
-          .returning()
-        return toActor(theRow(row, 'actors'))
-      })
+      return translateFailures(() =>
+        db.transaction(async (tx) => {
+          await tx.execute(lockTelegramAccount(telegramUserId))
+          const [row] = await tx
+            .insert(actors)
+            .values({ id, telegramUserId, ...input })
+            .returning()
+          return toActor(theRow(row, 'actors'))
+        }),
+      )
     },
 
     async createIfMissing(id, telegramUserId, input) {
       telegramUserIdSchema.parse(telegramUserId)
-      return translateFailures(async () => {
-        // A uniqueness error aborts an enclosing login transaction. DO NOTHING keeps it
-        // usable; a separate statement then sees the other transaction's committed owner.
-        const [created] = await db
-          .insert(actors)
-          .values({ id, telegramUserId, ...input })
-          .onConflictDoNothing({ target: actors.telegramUserId })
-          .returning()
-        if (created) return toActor(created)
-        const [found] = await db
-          .select()
-          .from(actors)
-          .where(eq(actors.telegramUserId, telegramUserId))
-        return toActor(theRow(found, 'actors'))
-      })
+      return translateFailures(() =>
+        db.transaction(async (tx) => {
+          // **Whoever makes an owner takes the account's lock** (adversarial Р-1): an erasure in
+          // progress holds it, so no path — the login, the development seam, whatever comes next
+          // — can make an owner inside one. It was held by `confirm` alone, and the seam went
+          // round it. Here rather than in each caller, because this is the one place that inserts.
+          await tx.execute(lockTelegramAccount(telegramUserId))
+          // A uniqueness error aborts an enclosing login transaction. DO NOTHING keeps it
+          // usable; a separate statement then sees the other transaction's committed owner.
+          const [created] = await tx
+            .insert(actors)
+            .values({ id, telegramUserId, ...input })
+            .onConflictDoNothing({ target: actors.telegramUserId })
+            .returning()
+          if (created) return toActor(created)
+          const [found] = await tx
+            .select()
+            .from(actors)
+            .where(eq(actors.telegramUserId, telegramUserId))
+          return toActor(theRow(found, 'actors'))
+        }),
+      )
+    },
+
+    async lockAccount(telegramUserId) {
+      telegramUserIdSchema.parse(telegramUserId)
+      await db.execute(lockTelegramAccount(telegramUserId))
     },
 
     async byTelegramUserId(telegramUserId) {

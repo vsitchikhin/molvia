@@ -27,7 +27,7 @@ const initial = actorCodec.parse({
   updatedAt: '2026-09-01T00:00:00Z',
 })
 const views: VueWrapper[] = []
-async function render(cached = true) {
+async function render(cached = true, online?: boolean) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const actor = useActorStore()
@@ -35,10 +35,11 @@ async function render(cached = true) {
   if (cached) actor.apply(initial)
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/settings')
+  if (online !== undefined) vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(online)
   const view = mount(SettingsView, { global: { plugins: [pinia, router, createAppI18n('en')] } })
   views.push(view)
   await flushPromises()
-  return view
+  return Object.assign(view, { router })
 }
 beforeEach(() => {
   vi.restoreAllMocks()
@@ -159,6 +160,19 @@ it('replaces a previous write error with the offline notice when the connection 
   expect(view.find('[role="alert"]').exists()).toBe(false)
   expect(view.get('.actions button').text()).toBe(en.settings.save)
   expect(view.get('.actions button').attributes('aria-disabled')).toBe('true')
+})
+
+it.each([
+  ['with the form', true, true],
+  ['offline and without a form to show', false, false],
+])('leads to «Data and privacy» %s (MOL-58)', async (_name, cached, online) => {
+  if (!online) me.mockRejectedValue(new TypeError('network'))
+  const view = await render(cached, online)
+  const link = view.findAll('button').find((button) => button.text() === en.privacy.title)
+  expect(link).toBeDefined()
+  await link?.trigger('click')
+  await flushPromises()
+  expect(view.router.currentRoute.value.name).toBe('privacy')
 })
 
 it('leads to «Обмен денег» from the money group, and hides «Доходы» until it exists', async () => {

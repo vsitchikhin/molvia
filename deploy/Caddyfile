@@ -2,6 +2,9 @@
 # resolves to this machine; use `localhost` to try the production stack locally, and
 # Caddy will issue an internal certificate instead.
 {$DOMAIN:localhost} {
+	# No `log` directive, on purpose: an access log is every visitor's address, and the privacy
+	# page promises none is kept (MOL-58). What Caddy still writes — its errors, which can carry
+	# an address — goes to the journal and lives there fourteen days.
 	encode zstd gzip
 
 	# The PWA calls /api/... so that the origin is never hardcoded in the client — the
