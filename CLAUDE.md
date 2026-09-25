@@ -299,8 +299,10 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   it slipped from, beside the number typed — «кефир 500 мд» loses «Кефир 1 л», which «кефир 500 мл»
   finds, and «кефир 1 мд» loses «Кефир 1000 мл»; a small count that matches the label passes for a
   slip — «1 суп доширак» brings «Doshirak лапша … 1 уп» in at the soup's distance, since only the
-  meaning tells the goods from a mistyped unit; and «тш» for «шт» is `цh` in the key, no
-  transposition of `sht`, and two edits from it.
+  meaning tells the goods from a mistyped unit; the start of a brand after a number is taken for a
+  unit being typed — on «сыр 125 ка» (`ka` starts `kapsul`) every cheese comes one edit behind the
+  Camembert, for one keystroke; and «тш» for «шт» is `цh` in the key, no transposition of `sht`, and
+  two edits from it.
   A grounding word is measured against the grounding words of the name only, never
   against «л» or «1», which every two-letter word is within two edits of. Grounding words fold by their **mean**,
   rounded up; short words by their **worst**, at most one edit, so each has to find its pair

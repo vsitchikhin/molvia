@@ -424,6 +424,19 @@ describe('search — a unit is a size, not a word (MOL-48)', () => {
     expect(await names('2 суп доширак')).toEqual(['Doshirak суп курица'])
   })
 
+  it('reads the start of a brand after a number as a unit being typed — the price, pinned', async () => {
+    // `ka` starts `kapsul`: on «сыр 125 ка» every cheese comes one edit behind the Camembert.
+    // One keystroke, the right item first — and without it a name blinked out of the list on
+    // the way to «штук».
+    await named('Сыр Камамбер 125 г')
+    await named('Сыр Лори 250 г')
+    await named('Сыр Чанах 300 г')
+    const found = await names('сыр 125 ка')
+    expect(found[0]).toBe('Сыр Камамбер 125 г')
+    expect(found.slice(1).sort()).toEqual(['Сыр Лори 250 г', 'Сыр Чанах 300 г'])
+    expect(await names('сыр 125 кам')).toEqual(['Сыр Камамбер 125 г'])
+  })
+
   it('keeps a name without a unit on every keystroke of one after the number', async () => {
     // A unit still being typed is a size against every name — «Батарейки Duracell AA» carries
     // none, and must not blink out between «4 ш» and «4 штук».
