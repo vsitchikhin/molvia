@@ -10,7 +10,13 @@ import {
   settingsKey,
 } from '@/stores/settingsMemory'
 import { api } from '@/api'
-import { currentIdentity, isIdentifier, rememberIdentity } from '@/stores/identity'
+import {
+  IDENTITY_KEY,
+  currentIdentity,
+  dropIdentity,
+  isIdentifier,
+  rememberIdentity,
+} from '@/stores/identity'
 
 /**
  * What the identity is doing, so a screen can show the right one of its states.
@@ -259,6 +265,21 @@ export const useActorStore = defineStore('actor', () => {
   window.addEventListener('online', recover)
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') recover()
+  })
+
+  /**
+   * «Выйти» in another window (MOL-57): the drawer is gone from storage, and the session with it —
+   * that window erased nothing before the server's `204`. So this is not a guess that needs
+   * `me()`: the owner is let go here too, and every store that follows `id` reads its drawer
+   * again and finds it empty. Without it a window with no connection kept the app open, and the
+   * purchases of the person who left, until it was closed.
+   */
+  window.addEventListener('storage', (event) => {
+    if (event.key !== IDENTITY_KEY || event.newValue !== null || id.value === null) return
+    dropIdentity()
+    actor.value = null
+    id.value = null
+    state.value = 'signed-out'
   })
 
   function apply(loaded: ActorView): void {

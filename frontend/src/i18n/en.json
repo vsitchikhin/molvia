@@ -371,17 +371,17 @@
     "unknown": "Unknown device",
     "meta_current": "Signed in {signedIn}",
     "meta": "Signed in {signedIn} · last seen {seen}",
-    "end": "Sign out",
-    "end_label": "Sign out {device}",
+    "end": "End",
+    "end_label": "End the session on {device}",
     "end_sheet": {
-      "title": "Sign out {device}?",
+      "title": "End the session on {device}?",
       "body": "Molvia will ask to sign in with Telegram again on that device. This cannot be undone from here.",
-      "confirm": "Sign out device"
+      "confirm": "End session"
     },
-    "end_failed": "Could not sign that device out. Check the connection and try again.",
-    "ended": "{device} is signed out",
+    "end_failed": "Could not end that session. Check the connection and try again.",
+    "ended": "The session on {device} has ended",
     "more": "Showing the latest {shown} of {total}",
-    "note": "A signed-out device asks to sign in again the next time it is opened. What is saved on the device itself is beyond the server's reach.",
+    "note": "A device whose session was ended asks to sign in again the next time it is opened. What is saved on the device itself is beyond the server's reach.",
     "load_error": {
       "title": "The list did not load",
       "body": "The server did not answer. Try again."
@@ -390,6 +390,14 @@
       "title": "No connection",
       "body": "The list of devices will be here when the connection is back."
     }
+  },
+  "sign_out": {
+    "title": "Sign out of Molvia on this device?",
+    "body": "Everything Molvia saved on this device will be erased. Nothing is lost on the server: sign in with Telegram and it all comes back.",
+    "unsent": "{n} entry has not been sent yet and will be lost | {n} entries have not been sent yet and will be lost",
+    "confirm": "Sign out and erase",
+    "offline": "Signing out needs a connection: without one the session on the server cannot be ended.",
+    "error": "Could not sign out: the server did not answer. Try again."
   },
   "identity": {
     "error": {
@@ -541,7 +549,8 @@
       "body": "We will check with the server when it returns. Your edits will stay here."
     },
     "group_money": "Money",
-    "group_account": "Account"
+    "group_account": "Account",
+    "sign_out": "Sign out"
   },
   "privacy": {
     "title": "Data and privacy",

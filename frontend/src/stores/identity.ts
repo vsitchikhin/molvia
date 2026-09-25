@@ -17,7 +17,7 @@
  * seven days, and with it whatever the trip queue had not sent. That is a property of MOL-24;
  * the session itself survives, because a cookie the server set is not what ITP caps.
  */
-import { forget, read, write } from '@/stores/storage'
+import { forget, forgetWhere, read, write } from '@/stores/storage'
 
 const KEY = 'molvia.actor'
 
@@ -38,6 +38,35 @@ export function currentIdentity(): string | null {
     if (isIdentifier(stored)) current = stored
   }
   return current
+}
+
+/**
+ * Everything this device keeps for one owner, and the name of the drawer itself (MOL-57, owner's
+ * decision Q1). What «Выйти» leaves behind.
+ *
+ * **By the suffix, not by a list.** Every store files its data as `molvia.<what>.<owner>` — the
+ * trip queue, the drafts, the remembered answers — so a store added next month is swept without
+ * anybody remembering to add it here; `identity.test.ts` pins which keys exist, so a new key that
+ * breaks the shape is a decision rather than a leak.
+ *
+ * **Why this does not contradict «a 401 erases nothing» (MOL-56, MOL-58).** That rule exists
+ * because «no session» is also what an expired session looks like, and the queue may hold a
+ * purchase made at a shelf with no signal. Here the person said it themselves, and they said it
+ * after the server confirmed the session is gone. Without it the drawer would still open the app
+ * offline — MOL-56's rule for a launch with an owner on the device — and show the next person at
+ * that laptop the purchases of the last one.
+ */
+export function forgetOwner(owner: string): void {
+  current = null
+  forgetWhere((key) => key === KEY || (key.startsWith('molvia.') && key.endsWith(`.${owner}`)))
+}
+
+/**
+ * Forgets the owner this tab holds in memory, when another window has erased the drawer (MOL-57):
+ * storage is empty there already, and this cache would otherwise name the owner who left.
+ */
+export function dropIdentity(): void {
+  current = null
 }
 
 /** Returns whether the value outlived this tab: false means storage refused it. */

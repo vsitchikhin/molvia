@@ -38,6 +38,9 @@ import { useActorStore } from '@/stores/actor'
  */
 const KEY = 'molvia.login'
 
+/** What «Выйти» removes with the owner's drawer: the owner this device approved lives here. */
+export const LOGIN_KEY = KEY
+
 /** How often a login that is waiting asks whether it has been confirmed. */
 export const POLL_INTERVAL_MS = 3000
 

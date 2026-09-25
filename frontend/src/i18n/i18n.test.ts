@@ -182,6 +182,7 @@ describe('словарь: плюральные формы', () => {
       'item.results_announced',
       'advice.ratings_count',
       'verdict.pending_count',
+      'sign_out.unsent',
     ])
   })
 })

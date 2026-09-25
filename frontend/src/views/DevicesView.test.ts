@@ -77,7 +77,7 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-/** «Sign out» on the laptop's row, and the sheet given time to rise — until then it takes no tap. */
+/** «End» on the laptop's row, and the sheet given time to rise — until then it takes no tap. */
 async function askToEnd(view: VueWrapper): Promise<void> {
   const button = view.findAll('button').find((found) => found.text() === en.devices.end)
   await button?.trigger('click')
@@ -90,7 +90,7 @@ function confirmButton(): HTMLButtonElement {
   const found = [...document.querySelectorAll('dialog[open] button')].find(
     (button) => button.textContent.trim() === en.devices.end_sheet.confirm,
   )
-  if (!(found instanceof HTMLButtonElement)) throw new Error('no «Sign out» in the sheet')
+  if (!(found instanceof HTMLButtonElement)) throw new Error('no «End session» in the sheet')
   return found
 }
 
@@ -108,7 +108,9 @@ describe('«Устройства»', () => {
     expect(rows[0]?.text()).not.toContain('last seen')
     expect(rows[1]?.text()).toContain('Windows · Chrome')
     expect(rows[1]?.text()).toContain('last seen')
-    expect(rows[1]?.find('button').attributes('aria-label')).toBe('Sign out Windows · Chrome')
+    expect(rows[1]?.find('button').attributes('aria-label')).toBe(
+      'End the session on Windows · Chrome',
+    )
   })
 
   it('безымянное устройство называется «неизвестным», а не пустой строкой', async () => {
@@ -177,7 +179,7 @@ describe('«Завершить»', () => {
     await askToEnd(view)
 
     expect(document.querySelector('dialog[open]')?.textContent).toContain(
-      'Sign out Windows · Chrome?',
+      'End the session on Windows · Chrome?',
     )
     expect(endSession).not.toHaveBeenCalled()
 

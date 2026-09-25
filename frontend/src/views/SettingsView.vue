@@ -84,11 +84,26 @@
             <IconChevron class="entry-chevron" aria-hidden="true" />
           </RouterLink>
         </li>
+        <!-- Here and not beside «Это устройство» in the list: leaving a laptop that is not yours
+             is «quickly, then go», and it is looked for on this screen (owner's decision Q3). -->
+        <li>
+          <button class="entry leave" type="button" @click="askToLeave">
+            <IconLogout class="entry-icon" aria-hidden="true" />
+            <span class="entry-label">{{ t('settings.sign_out') }}</span>
+          </button>
+        </li>
       </AppCard>
     </section>
     <AppButton class="privacy" variant="ghost" block @click="privacy">{{
       t('privacy.title')
     }}</AppButton>
+    <SignOutSheet
+      v-model:open="leaveOpen"
+      :unsent="unsent"
+      :busy="leaving"
+      :failure="leaveFailure"
+      @confirm="leave"
+    />
     <template #docked>
       <div class="actions">
         <div
@@ -135,7 +150,7 @@
   </AppScreen>
 </template>
 <script lang="ts">
-import { defineComponent, useId } from 'vue'
+import { computed, defineComponent, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { ActorSettings } from '@molvia/model'
@@ -147,13 +162,18 @@ import IconRefresh from '~icons/mdi/refresh'
 import IconSwap from '~icons/mdi/swap-horizontal'
 import IconChevron from '~icons/mdi/chevron-right'
 import IconDevices from '~icons/mdi/devices'
+import IconLogout from '~icons/mdi/logout'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import SettingsFields from '@/components/SettingsFields.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SignOutSheet from '@/components/SignOutSheet.vue'
 import { useSettings } from '@/composables/useSettings'
+import { useSignOut } from '@/composables/useSignOut'
+import { useTripQueueStore } from '@/stores/tripQueue'
+import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 export default defineComponent({
   name: 'SettingsView',
   components: {
@@ -163,6 +183,7 @@ export default defineComponent({
     SettingsFields,
     ScreenSkeleton,
     ScreenState,
+    SignOutSheet,
     IconCloud,
     IconPencil,
     IconCheck,
@@ -171,6 +192,7 @@ export default defineComponent({
     IconSwap,
     IconChevron,
     IconDevices,
+    IconLogout,
   },
   setup() {
     const { t } = useI18n()
@@ -185,12 +207,36 @@ export default defineComponent({
       spendCurrency: t(`settings.currencies.${value.spendCurrency}`),
       incomeCurrency: t(`settings.currencies.${value.incomeCurrency}`),
     })
+    const settings = useSettings()
+
+    // «Выйти» (MOL-57): what would be lost is counted while the sheet is open, and the app is
+    // asked to send it first — with a connection that is usually everything.
+    const queue = useTripQueueStore()
+    const drafts = useVerdictDraftsStore()
+    const { leaving, failure: leaveFailure, leave } = useSignOut()
+    const leaveOpen = ref(false)
+    const unsent = computed(
+      () => queue.pending.length + drafts.waiting.length + (settings.form.dirty ? 1 : 0),
+    )
+    function askToLeave(): void {
+      leaveFailure.value = null
+      leaveOpen.value = true
+      void queue.flush()
+      void drafts.flush()
+    }
+
     return {
       t,
       saidIn,
       id: useId(),
       privacy: () => void router.push({ name: 'privacy' }),
-      ...useSettings(),
+      ...settings,
+      leaveOpen,
+      leaving,
+      leaveFailure,
+      unsent,
+      askToLeave,
+      leave,
     }
   },
 })
@@ -321,6 +367,22 @@ export default defineComponent({
 
 .entry-label {
   flex: 1;
+}
+
+// A button dressed as the link beside it: the same row, the colour of an action that ends
+// something (MOL-57).
+.leave {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &,
+  .entry-icon {
+    color: var(--bad-ink);
+  }
 }
 
 .skeleton-card {

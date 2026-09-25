@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { forgetTheInviteDoor } from '@/stores/identity'
+import {
+  currentIdentity,
+  forgetOwner,
+  forgetTheInviteDoor,
+  rememberIdentity,
+} from '@/stores/identity'
 
 const INVITE_KEY = 'molvia.invite'
 
@@ -9,6 +14,7 @@ function openedAt(path: string): void {
 
 beforeEach(() => {
   localStorage.clear()
+  sessionStorage.clear()
   openedAt('/')
 })
 
@@ -55,5 +61,82 @@ describe('what the invite door left behind', () => {
 
     expect(window.location.search).toBe('?utm_source=telegram')
     expect(window.location.hash).toBe('#top')
+  })
+})
+
+describe('«Выйти» стирает ящик владельца (MOL-57)', () => {
+  const OWNER = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+  const OTHER = '0b6f6c1e-3f7a-4c2b-9a53-5b8a5d1e2f00'
+
+  it('уходит всё с суффиксом владельца и сам ящик, на обеих полках', () => {
+    for (const shelf of [localStorage, sessionStorage]) {
+      shelf.setItem('molvia.actor', OWNER)
+      shelf.setItem(`molvia.trip-queue.${OWNER}`, '[]')
+      shelf.setItem(`molvia.advice.${OWNER}`, '{}')
+      shelf.setItem(`molvia.settings-draft.${OWNER}`, '{}')
+    }
+
+    forgetOwner(OWNER)
+
+    for (const shelf of [localStorage, sessionStorage]) expect(shelf.length).toBe(0)
+  })
+
+  it('чужой ящик и настройки вида не трогает', () => {
+    localStorage.setItem('molvia.actor', OWNER)
+    localStorage.setItem(`molvia.trip-queue.${OWNER}`, '[]')
+    localStorage.setItem(`molvia.trip-queue.${OTHER}`, '[]')
+    localStorage.setItem('molvia.total-flipped', '1')
+    // Чужое приложение на том же адресе — не наше, чтобы стирать.
+    localStorage.setItem(`someone-else.${OWNER}`, 'x')
+
+    forgetOwner(OWNER)
+
+    expect(Object.keys(localStorage).sort()).toEqual(
+      [`molvia.trip-queue.${OTHER}`, 'molvia.total-flipped', `someone-else.${OWNER}`].sort(),
+    )
+  })
+
+  it('после стирания устройство больше не знает владельца', () => {
+    rememberIdentity(OWNER)
+    forgetOwner(OWNER)
+    expect(currentIdentity()).toBeNull()
+  })
+})
+
+describe('какие ключи приложение пишет на устройство', () => {
+  // Снимок, а не список «что стирать»: `forgetOwner` берёт всё с суффиксом владельца, и новый
+  // ключ попадает под стирание сам — если он устроен как `molvia.<что>.<владелец>`. Этот тест
+  // делает новый ключ решением: добавивший его видит, в какой он группе, и если ключ хранит
+  // что-то о человеке без суффикса, выход его не сотрёт (MOL-57).
+  it('каждый ключ либо принадлежит владельцу, либо назван здесь как общий', () => {
+    const sources = import.meta.glob(['/src/**/*.{ts,vue}', '!/src/**/*.test.ts'], {
+      query: '?raw',
+      import: 'default',
+      eager: true,
+    })
+    const keys = new Set<string>()
+    for (const text of Object.values(sources)) {
+      for (const [, key] of text.matchAll(/['`](molvia\.[a-z-]+)[.'`$]/g)) if (key) keys.add(key)
+    }
+    // Без владельца: имя ящика и одобренный на устройстве вход — оба стирает выход; след снятой
+    // двери приглашения; выбор вида итога — он ничего не говорит о человеке.
+    const ownerless = ['molvia.actor', 'molvia.invite', 'molvia.login', 'molvia.total-flipped']
+    // По владельцу — `molvia.<что>.<владелец>`, всё это уходит с `forgetOwner`.
+    const perOwner = [
+      'molvia.advice',
+      'molvia.places',
+      'molvia.recent',
+      'molvia.settings',
+      'molvia.settings-draft',
+      'molvia.trip',
+      'molvia.trip-history',
+      'molvia.trip-queue',
+      'molvia.trip-rejected',
+      'molvia.verdict-confirmed',
+      'molvia.verdict-drafts',
+      'molvia.verdict-queue',
+      'molvia.verdict-skips',
+    ]
+    expect([...keys].sort()).toEqual([...ownerless, ...perOwner].sort())
   })
 })
