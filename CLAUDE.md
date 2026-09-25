@@ -313,7 +313,8 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   smarter would later need. Four rules hold it (MOL-11). **Personal:** only the asker's own
   picks count; a sum across people would be popularity in the results, indistinguishable from
   the paid placement forbidden below. **Above distance, but only among what was found:** a
-  pick outranks a closer spelling and never lets in what the search did not accept.
+  pick outranks a closer spelling and never lets in what the search did not accept — with one
+  written exception, the person's own word, below.
   **The same query** means every word but the last equal, one last word the start of the
   other from three characters, and the word being typed still the start of a word of the item
   taken — the screen searches while typing, so the pick was made on «мол» and the next search
@@ -323,6 +324,35 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   found and taken by its own name («марианна») does not move «молоко» at all. It is written when the item is
   added to a trip, not on a tap — a tap the sheet cancels is a changed mind. It never forgets;
   if a stale pick starts to hurt, decay is a task with a number, not a guess.
+- **What people call a thing the shelf writes otherwise is a dictionary (MOL-45).** «картошка»
+  for «Картофель», «орешки» for «Арахис»: no spelling rule and no threshold reaches them.
+  `synonymKeys` in `packages/model` expands a word of the query, looked up by its **exact** key,
+  into the words it also stands for — a group of the same thing both ways, a wider word into
+  narrower ones one way («арахис» never finds «Фисташки»). Only the query is expanded and
+  nothing is stored, so **the dictionary is not frozen**: a word added is a commit, not a
+  migration. **A synonym counts only as a whole word of a name, at no cost**, and its candidates
+  come from `like '%word%'` on the same GIN index, not from `%>`: at 0.15 each of the eight
+  fish of «рыба» brought in half of 20 000 names and the query took six seconds. **The typed
+  word's edit budget applies only to the names it found itself** — brought in by «лори», «Рис»
+  passed as two edits from `sir`. **A target is a kind of product, never a brand**: expanding
+  into a maker would be a place in the results handed out by hand; the other way round is fine
+  («памперсы» → «подгузники» of every maker), and «белизна» is let in as the common name of a
+  kind. **No categories** — «овощи», «специи», «сладости» name a shelf, and reaching kefir from
+  «молочка» is what embeddings are for in 0.2. Measured on MOL-14's corpus: the six misses
+  found, «макароны» finds the spaghetti the shelf carries, nothing else moved; the words come
+  from the owner's expense log plus the usual pairs of a grocery. The prices, named: a typo in
+  the synonym itself is not expanded, and a name with no word of its kind («Coca-Cola 1 л» for
+  «газировка») stays out of reach.
+- **And the person's own word (MOL-45).** A query the server found nothing for, followed on
+  the same screen by a pick found by another word, is learnt with the purchase —
+  `search_picks.admits` — and from then on **exactly that query** lets the item in: the one
+  written exception to «never lets in what the search did not accept», and personal for the
+  reason memory is. Only the exact key, never its start or a word more; erasing back through
+  the word keeps it («бахч» on the way back from «бахчевые» is not the word); a pick from the
+  recent items or from «Предложить товар» learns nothing. It is not checked against the search:
+  «бахчевые» and then bread costs its owner one row on that exact query, and the next real pick
+  stands above it. A dictionary grown from everyone's words is 0.2's, and would need three
+  people, as any aggregate does.
 
 **The thresholds — `word_similarity` > 0.15, edit distance <= 2 — were measured and kept
 (MOL-14).** The set: the owner's own words from the expense log («кола», «дошик», «туалетка», 73
@@ -337,13 +367,15 @@ too and loses five typos and «собачий корм»; a budget of 3 wins one
 hits. The slack on an unfinished word (MOL-10) moves five or six whole answers either way but
 never a first row, so the grid could not tell its three settings apart — kept as it is, not
 chosen. What no threshold reaches went to tasks with numbers: **synonyms** — «картошка» against
-«Картофель», 6 of 73, one of them («мясо») found by letters only — MOL-45; **the absolute
+«Картофель», 6 of 73, one of them («мясо») found by letters only — MOL-45 closed them with the
+dictionary above, which puts 67 of 73 first and alone; **the absolute
 budget** — «овощи» finds «Мука … высший сорт», «специи» «Соевый соус», «пельмени» «Чай зелёный»,
 3 of 25 — MOL-46; **a unit word grounding a match** — «сыр» is two edits from `sht` of «4 шт» —
 MOL-48. Weighting vowel edits below consonant ones was tried against the budget and refuted:
 `ovoshi`/`vishi` share every consonant, while the right `canah`/«Чанах» and `grecka`/«Гречка»
 differ by two. **The owner's absent words flatter the search:** of fifty everyday purchases the
-shelf does not carry, 24 find something, and they are two outcomes. In 12 the first row carries
+shelf does not carry, 25 find something since MOL-45 — «макароны» finds the spaghetti through
+the dictionary, the shelf carrying it under another name — and the other 24 are two outcomes. In 12 the first row carries
 the word's root — a taste or a property printed on another item. Six of those are found exactly
 or by the start of a word («сметана» is in the chips' name), which no threshold can remove; with
 «Предложить товар» shown only on an empty answer, that is a question for the screen (MOL-23),
