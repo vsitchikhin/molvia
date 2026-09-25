@@ -18,8 +18,10 @@ import type {
   CachedRate,
   Currency,
   Exchange,
+  ExchangeAmendBody,
   ExchangeBody,
   ExchangeRate,
+  ExchangeRevision,
   ExchangeView,
   ExchangesResponse,
   OfficialRate,
@@ -82,6 +84,7 @@ export function sinceDay(since: Date | null): string | null {
 function viewsOf(
   exchanges: readonly Exchange[],
   cached: ReadonlyMap<string, readonly CachedRate[]>,
+  history: ReadonlyMap<string, readonly ExchangeRevision[]>,
 ): ExchangeView[] {
   return [...exchanges].reverse().map((exchange): ExchangeView => {
     const { given, received, exchangedOn } = exchange
@@ -99,6 +102,19 @@ function viewsOf(
       given,
       received,
       heldBefore: exchange.heldBefore,
+      note: exchange.note,
+      revision: exchange.revision,
+      amendedAt: exchange.amendedAt,
+      history: (history.get(exchange.id) ?? []).map(
+        ({ given, received, exchangedOn, heldBefore, note, replacedAt }) => ({
+          given,
+          received,
+          exchangedOn,
+          heldBefore,
+          note,
+          replacedAt,
+        }),
+      ),
       rate: exchangeRateOf(exchange),
       official:
         official && measure && difference
@@ -140,9 +156,10 @@ export async function exchangesOverview(
 ): Promise<ExchangesResponse> {
   const { exchanges } = repositories
   const today = yerevanDate(now)
-  const [{ preference, since }, list] = await Promise.all([
+  const [{ preference, since }, list, history] = await Promise.all([
     exchanges.rateSettings(owner.id),
     exchanges.list(owner.id),
+    exchanges.history(owner.id),
   ])
   const cached = await officialRatesOn(
     repositories,
@@ -181,7 +198,7 @@ export async function exchangesOverview(
     costs,
     heldEstimates: heldEstimates.filter((estimate) => estimate !== null),
     baseSince,
-    exchanges: viewsOf(list, cached),
+    exchanges: viewsOf(list, cached, history),
   }
 }
 
@@ -213,6 +230,24 @@ export async function recordExchange(
   await repositories.exchanges.purgeRemoved(owner.id)
   const { created } = await repositories.exchanges.add(owner.id, body)
   return { overview: await exchangesOverview(repositories, owner, now), created }
+}
+
+/**
+ * «Сохранить правку» (MOL-42, В-3): the exchange as it should now be, the version before it kept.
+ * The same «not after today» as a new exchange. Trips already started keep the rate they took;
+ * trips from now on count by the amended exchange — and its history says why the two differ.
+ */
+export async function amendExchange(
+  repositories: Repositories,
+  owner: Owner,
+  id: string,
+  body: ExchangeAmendBody,
+  now: Date = new Date(),
+): Promise<ExchangesResponse> {
+  if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
+  await repositories.exchanges.purgeRemoved(owner.id)
+  await repositories.exchanges.amend(owner.id, id, body)
+  return exchangesOverview(repositories, owner, now)
 }
 
 /**

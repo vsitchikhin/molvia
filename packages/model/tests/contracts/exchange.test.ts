@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { ERROR, ISSUE } from '#model/support/errors'
 import {
+  exchangeAmendBodySchema,
   exchangeBodySchema,
   exchangesResponseCodec,
   ratePreferenceBodySchema,
@@ -83,6 +84,32 @@ describe('signedMoneyCodec', () => {
   })
 })
 
+describe('exchangeAmendBodySchema (MOL-42, В-3)', () => {
+  const fields = { given: body.given, received: body.received, exchangedOn: body.exchangedOn }
+  const amend = { ...fields, revision: 1 }
+
+  it('reads the exchange whole as it should now be, with the version it was made over', () => {
+    const read = exchangeAmendBodySchema.parse({ ...amend, note: '  аэропорт, по памяти ' })
+    expect(read).toMatchObject({ revision: 1, note: 'аэропорт, по памяти' })
+    expect(read.received).toEqual(money(9_500_000n, 'AMD'))
+  })
+
+  it('holds the rules of a new exchange, and refuses an identifier or a version below one', () => {
+    const same = { ...amend, received: { amount: '5', currency: 'RUB' } }
+    expect(exchangeAmendBodySchema.safeParse(same).error?.issues[0]?.message).toBe(
+      ISSUE.EXCHANGE_SAME_CURRENCY,
+    )
+    expect(exchangeAmendBodySchema.safeParse({ ...amend, id: body.id }).success).toBe(false)
+    expect(exchangeAmendBodySchema.safeParse({ ...amend, revision: 0 }).success).toBe(false)
+    expect(exchangeAmendBodySchema.safeParse(fields).success).toBe(false)
+  })
+
+  it('refuses a note that draws nothing — in a new exchange too', () => {
+    expect(exchangeAmendBodySchema.safeParse({ ...amend, note: '   ' }).success).toBe(false)
+    expect(issueOf({ ...body, note: '\u2060' })).toBe(ISSUE.TEXT_NOT_VISIBLE)
+  })
+})
+
 describe('exchangesResponseCodec', () => {
   const rate = {
     base: 'RUB' as const,
@@ -117,6 +144,19 @@ describe('exchangesResponseCodec', () => {
         given: money(2_000_000n, 'RUB'),
         received: money(9_500_000n, 'AMD'),
         heldBefore: money(2_000_000n, 'AMD'),
+        note: 'ВТБ банкомат',
+        revision: 2,
+        amendedAt: new Date('2026-09-25T10:00:00.000Z'),
+        history: [
+          {
+            given: money(2_000_000n, 'RUB'),
+            received: money(9_000_000n, 'AMD'),
+            exchangedOn: '2026-09-14',
+            heldBefore: null,
+            note: null,
+            replacedAt: new Date('2026-09-25T10:00:00.000Z'),
+          },
+        ],
         rate: { ...rate, scaled: 4_750_000n },
         official: {
           rate: { ...rate, scaled: 4_312_300n, source: 'official' },

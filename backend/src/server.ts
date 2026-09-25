@@ -34,6 +34,7 @@ import { searchCatalogue } from '@/usecases/search-catalogue'
 import { signIn } from '@/usecases/sign-in'
 import { chooseTripRate } from '@/usecases/choose-trip-rate'
 import {
+  amendExchange,
   chooseRatePreference,
   readExchanges,
   recordExchange,
@@ -338,6 +339,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       exchangeRoutes(guarded, {
         overview: (actor) => readExchanges(tripData, actor),
         record: (actor, body) => recordExchange(tripData, actor, body),
+        amend: (actor, id, body) => amendExchange(tripData, actor, id, body),
         remove: (actor, id) => removeExchange(tripData, actor, id),
         restore: (actor, id) => restoreExchange(tripData, actor, id),
         prefer: (actor, preference) => chooseRatePreference(tripData, actor, preference),

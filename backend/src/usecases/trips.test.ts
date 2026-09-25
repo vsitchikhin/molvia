@@ -165,6 +165,8 @@ function fakeRepositories(
     },
     exchanges: {
       add: unexpected('exchanges.add'),
+      amend: unexpected('exchanges.amend'),
+      history: unexpected('exchanges.history'),
       remove: unexpected('exchanges.remove'),
       restore: unexpected('exchanges.restore'),
       purgeRemoved: unexpected('exchanges.purgeRemoved'),
@@ -439,7 +441,10 @@ describe('startTrip: the person’s own rate (MOL-40)', () => {
     received: { minor: received, currency: currencies[1] },
     exchangedOn,
     heldBefore: held === null ? null : { minor: held, currency: currencies[1] },
+    note: null,
+    revision: 1,
     createdAt: new Date(`${exchangedOn}T09:00:00.000Z`),
+    amendedAt: null,
   })
   const owners = [
     exchange('2026-09-01', 2_000_000n, 10_000_000n),

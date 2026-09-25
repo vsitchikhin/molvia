@@ -141,7 +141,9 @@ export function createErasureRepository(db: Db): ErasureRepository {
               sql`delete from trips where actor_id = ${actorId} returning 1`,
             )
             // The cascade from `actors` would take these too (MOL-40); deleted here so they are
-            // counted — they are the person's own money, and the dry run has to say so.
+            // counted — they are the person's own money, and the dry run has to say so. Their
+            // earlier versions go by the cascade from `exchanges` (MOL-42): part of an exchange,
+            // counted with it.
             erased.exchanges = await count(
               sql`delete from exchanges where actor_id = ${actorId} returning 1`,
             )

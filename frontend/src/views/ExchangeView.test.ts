@@ -50,6 +50,10 @@ function row(patch: Partial<Row> = {}): Row {
     given: { minor: 2_000_000n, currency: 'RUB' },
     received: { minor: 9_500_000n, currency: 'AMD' },
     heldBefore: null,
+    note: null,
+    revision: 1,
+    amendedAt: null,
+    history: [],
     rate: rate('4.75', '2026-09-15'),
     official: {
       rate: rate('4.3123', '2026-09-15', 'official'),

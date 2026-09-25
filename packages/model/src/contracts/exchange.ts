@@ -1,8 +1,14 @@
 import { z } from 'zod'
-import { deviceIdSchema } from './trip'
-import { exchangeDaySchema, isPlausibleExchange, walletBasisSchema } from '#model/entities/exchange'
+import { deviceIdSchema, isoDate } from './trip'
+import {
+  exchangeDaySchema,
+  exchangeNoteSchema,
+  isPlausibleExchange,
+  walletBasisSchema,
+} from '#model/entities/exchange'
 import { ERROR, ISSUE } from '#model/support/errors'
 import { currencySchema, moneyCodec, signedMoneyCodec } from '#model/values/money'
+import type { Money } from '#model/values/money'
 import { rateCodec, rateProviderSchema } from '#model/values/rates'
 
 /**
@@ -20,32 +26,57 @@ const positiveMoneyCodec = moneyCodec.refine((value) => value.minor > 0n, {
   error: ERROR.INVALID_AMOUNT,
 })
 
+/** What an exchange says, as the screen sends it — the same whether it is recorded or amended. */
+const exchangeFields = {
+  given: positiveMoneyCodec,
+  received: positiveMoneyCodec,
+  exchangedOn: exchangeDaySchema,
+  heldBefore: moneyCodec.optional(),
+  note: exchangeNoteSchema.optional(),
+}
+
+interface ExchangeFields {
+  readonly given: Money
+  readonly received: Money
+  readonly heldBefore?: Money | undefined
+}
+
+/** The rules of one exchange, held by both bodies and said under the field they are about. */
+function withExchangeRules<Schema extends z.ZodType<ExchangeFields>>(schema: Schema) {
+  return schema
+    .refine(({ given, received }) => given.currency !== received.currency, {
+      error: ISSUE.EXCHANGE_SAME_CURRENCY,
+      path: ['received'],
+    })
+    .refine(({ given, received }) => isPlausibleExchange(given, received), {
+      error: ERROR.INVALID_RATE,
+      path: ['received'],
+    })
+    .refine(
+      ({ heldBefore, received }) =>
+        heldBefore === undefined || heldBefore.currency === received.currency,
+      { error: ISSUE.EXCHANGE_HELD_NOT_RECEIVED, path: ['heldBefore'] },
+    )
+}
+
 /**
  * «Записать обмен». Named by the device, as a trip is, so a tap sent twice is one exchange. The
  * day is the person's; «not after today» is the use case's, which has the clock.
  */
-export const exchangeBodySchema = z
-  .strictObject({
-    id: deviceIdSchema,
-    given: positiveMoneyCodec,
-    received: positiveMoneyCodec,
-    exchangedOn: exchangeDaySchema,
-    heldBefore: moneyCodec.optional(),
-  })
-  .refine(({ given, received }) => given.currency !== received.currency, {
-    error: ISSUE.EXCHANGE_SAME_CURRENCY,
-    path: ['received'],
-  })
-  .refine(({ given, received }) => isPlausibleExchange(given, received), {
-    error: ERROR.INVALID_RATE,
-    path: ['received'],
-  })
-  .refine(
-    ({ heldBefore, received }) =>
-      heldBefore === undefined || heldBefore.currency === received.currency,
-    { error: ISSUE.EXCHANGE_HELD_NOT_RECEIVED, path: ['heldBefore'] },
-  )
+export const exchangeBodySchema = withExchangeRules(
+  z.strictObject({ id: deviceIdSchema, ...exchangeFields }),
+)
 export type ExchangeBody = z.infer<typeof exchangeBodySchema>
+
+/**
+ * «Сохранить правку» (MOL-42, В-3): the exchange whole as it should now be, and the version it was
+ * amended over — so an amendment made on another phone in between is a conflict rather than lost,
+ * as the settings form of MOL-65 is. Whatever is left out is cleared, as in a new exchange.
+ */
+export const exchangeAmendBodySchema = withExchangeRules(
+  z.strictObject({ revision: z.int().min(1), ...exchangeFields }),
+)
+export type ExchangeAmendBody = z.infer<typeof exchangeAmendBodySchema>
 
 /**
  * One exchange as the screen lists it. Its own rate and the comparison with the central bank are
@@ -57,6 +88,22 @@ export const exchangeViewCodec = z.strictObject({
   given: moneyCodec,
   received: moneyCodec,
   heldBefore: moneyCodec.nullable(),
+  note: z.string().nullable(),
+  /** The version an amendment names, so one made elsewhere in between is a conflict. */
+  revision: z.int().min(1),
+  /** When it was last amended, or null — «исправлен 25 сент.» on the row. */
+  amendedAt: isoDate.nullable(),
+  /** The versions before, newest first: what the sheet of an amendment shows (MOL-42, В-3). */
+  history: z.array(
+    z.strictObject({
+      given: moneyCodec,
+      received: moneyCodec,
+      exchangedOn: exchangeDaySchema,
+      heldBefore: moneyCodec.nullable(),
+      note: z.string().nullable(),
+      replacedAt: isoDate,
+    }),
+  ),
   /** Null only for amounts so far apart that no rate within the band says them. */
   rate: rateCodec.nullable(),
   /**

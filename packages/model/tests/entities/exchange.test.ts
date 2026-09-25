@@ -42,7 +42,10 @@ function exchange(
     received: toMoney(received),
     exchangedOn,
     heldBefore: heldBefore === null ? null : toMoney(heldBefore),
+    note: null,
+    revision: 1,
     createdAt: new Date(`${exchangedOn}T12:00:00Z`),
+    amendedAt: null,
   }
 }
 
@@ -78,6 +81,14 @@ describe('exchangeSchema', () => {
 
   it('refuses a day that is not one', () => {
     expect(exchangeSchema.safeParse({ ...first, exchangedOn: '2026-02-31' }).success).toBe(false)
+  })
+
+  it('keeps a note of one visible line, and refuses one that draws nothing (MOL-42, В-4)', () => {
+    expect(exchangeSchema.safeParse({ ...first, note: 'ВТБ банкомат (озон)' }).success).toBe(true)
+    expect(exchangeSchema.safeParse({ ...first, note: '\u200b' }).error?.issues[0]?.message).toBe(
+      ISSUE.TEXT_NOT_VISIBLE,
+    )
+    expect(exchangeSchema.safeParse({ ...first, note: 'x'.repeat(201) }).success).toBe(false)
   })
 })
 

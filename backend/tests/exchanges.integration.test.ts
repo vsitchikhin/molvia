@@ -4,7 +4,7 @@ import { ERROR, exchangesResponseCodec, parseRate, tripViewCodec, yerevanDate } 
 import type { CachedRate, ExchangesResponse } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
-import { exchanges, expenses } from '@/db/schema'
+import { exchangeRevisions, exchanges, expenses } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import {
@@ -796,5 +796,145 @@ describe('стоимость валют (MOL-42)', () => {
     expect(after.wallet).toMatchObject({ basis: 'last', estimated: false })
     expect(after.wallet?.rate.scaled).toBe(parseRate('361.5'))
     expect((await start(me)).rate).toMatchObject({ source: 'personal', base: 'USD' })
+  })
+})
+
+describe('правка обмена с историей (MOL-42)', () => {
+  async function recorded(me: { cookie: string }, patch: Record<string, unknown> = {}) {
+    const body = payload(patch)
+    const response = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: body,
+    })
+    expect(response.statusCode).toBe(201)
+    return body
+  }
+
+  function amend(cookie: string, id: string, patch: Record<string, unknown>) {
+    return app.inject({
+      method: 'PUT',
+      url: `/exchanges/${id}`,
+      headers: { cookie },
+      payload: {
+        given: { amount: '20000', currency: 'RUB' },
+        received: { amount: '100000', currency: 'AMD' },
+        exchangedOn: daysAgo(10),
+        revision: 1,
+        ...patch,
+      },
+    })
+  }
+
+  it('правит на месте, прежняя версия — в истории, место в дне и курс — по новой', async () => {
+    const me = await owner()
+    const { id } = await recorded(me, { note: 'ВТБ банкомат' })
+    const [before] = await db.select().from(exchanges)
+
+    const response = await amend(me.cookie, id, {
+      received: { amount: '95000', currency: 'AMD' },
+      note: 'ВТБ банкомат (озон)',
+    })
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['cache-control']).toBe('no-store')
+    const overview = overviewOf(response.json())
+    const [row] = overview.exchanges
+    expect(row).toMatchObject({
+      received: { minor: 9_500_000n, currency: 'AMD' },
+      note: 'ВТБ банкомат (озон)',
+      revision: 2,
+    })
+    expect(row?.amendedAt).toBeInstanceOf(Date)
+    expect(row?.history).toEqual([
+      {
+        given: { minor: 2_000_000n, currency: 'RUB' },
+        received: { minor: 10_000_000n, currency: 'AMD' },
+        exchangedOn: daysAgo(10),
+        heldBefore: null,
+        note: 'ВТБ банкомат',
+        replacedAt: row?.amendedAt,
+      },
+    ])
+    expect(overview.wallet?.rate.scaled).toBe(parseRate('4.75'))
+    const [after] = await db.select().from(exchanges)
+    expect(after?.createdAt).toEqual(before?.createdAt)
+  })
+
+  it('повтор той же правки после потерянного ответа — 200 и ни одной лишней версии', async () => {
+    const me = await owner()
+    const { id } = await recorded(me)
+    const patch = { received: { amount: '95000', currency: 'AMD' } }
+    expect((await amend(me.cookie, id, patch)).statusCode).toBe(200)
+    const again = await amend(me.cookie, id, patch)
+    expect(again.statusCode).toBe(200)
+    expect(overviewOf(again.json()).exchanges[0]).toMatchObject({ revision: 2 })
+    expect(overviewOf(again.json()).exchanges[0]?.history).toHaveLength(1)
+    // Nothing changed at all: no version is kept for it either.
+    const same = await amend(me.cookie, id, { ...patch, revision: 2 })
+    expect(overviewOf(same.json()).exchanges[0]?.history).toHaveLength(1)
+  })
+
+  it('два телефона правят одну версию — второй получает 409, а не молча затирает', async () => {
+    const me = await owner()
+    const second = await signIn(db, me.id)
+    const { id } = await recorded(me)
+    const replies = await Promise.all([
+      amend(me.cookie, id, { received: { amount: '95000', currency: 'AMD' } }),
+      amend(second, id, { received: { amount: '96000', currency: 'AMD' } }),
+    ])
+    expect(replies.map((reply) => reply.statusCode).sort()).toEqual([200, 409])
+    expect(replies.find((reply) => reply.statusCode === 409)?.json()).toMatchObject({
+      code: ERROR.CONFLICT,
+    })
+  })
+
+  it('чужой, удалённый, несуществующий и кривой адрес — один ответ, 404', async () => {
+    const me = await owner()
+    const other = await owner()
+    const { id } = await recorded(me)
+    expect((await amend(other.cookie, id, {})).statusCode).toBe(404)
+    expect((await amend(me.cookie, randomUUID(), {})).statusCode).toBe(404)
+    expect((await amend(me.cookie, 'not-a-uuid', {})).statusCode).toBe(404)
+    await app.inject({ method: 'DELETE', url: `/exchanges/${id}`, headers: { cookie: me.cookie } })
+    expect((await amend(me.cookie, id, { note: 'x' })).statusCode).toBe(404)
+  })
+
+  it('правит и день: цепочка перестраивается, и день из будущего не проходит', async () => {
+    const me = await owner()
+    const first = await recorded(me, { exchangedOn: daysAgo(10) })
+    await recorded(me, {
+      received: { amount: '95000', currency: 'AMD' },
+      heldBefore: { amount: '20000', currency: 'AMD' },
+      exchangedOn: daysAgo(5),
+    })
+    // Moved after the second, the first is now the last link: taken alone.
+    const moved = await amend(me.cookie, first.id, { exchangedOn: daysAgo(2) })
+    expect(overviewOf(moved.json()).wallet).toMatchObject({ basis: 'last' })
+    expect(overviewOf(moved.json()).wallet?.rate.scaled).toBe(parseRate('5'))
+
+    const future = await amend(me.cookie, first.id, { exchangedOn: '2999-01-01', revision: 2 })
+    expect(future.statusCode).toBe(400)
+  })
+
+  it('окончательное удаление уносит историю', async () => {
+    const me = await owner()
+    const { id } = await recorded(me)
+    await amend(me.cookie, id, { received: { amount: '95000', currency: 'AMD' } })
+    await app.inject({ method: 'DELETE', url: `/exchanges/${id}`, headers: { cookie: me.cookie } })
+    await app.inject({ method: 'GET', url: '/exchanges', headers: { cookie: me.cookie } })
+    expect(await db.select().from(exchangeRevisions)).toEqual([])
+  })
+
+  it('заметка — часть повтора: тот же id с другой заметкой — 409 (В-6)', async () => {
+    const me = await owner()
+    const body = await recorded(me, { note: 'аэропорт' })
+    const other = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: { ...body, note: 'обменник' },
+    })
+    expect(other.statusCode).toBe(409)
   })
 })

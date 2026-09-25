@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { INT8_MAX, divideRounded } from '#model/support/decimal'
 import { ERROR, ISSUE } from '#model/support/errors'
+import { visibleLine } from '#model/support/text'
 import { minorPerMajor, priceSchema } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
 import {
@@ -17,6 +18,12 @@ const positiveMoneySchema = priceSchema.refine((value) => value.minor > 0n, {
   error: ERROR.INVALID_AMOUNT,
 })
 
+/** The longest «Где и заметка»: «ВТБ банкомат (озон), по памяти» and then some (MOL-42, В-4). */
+export const EXCHANGE_NOTE_MAX = 200
+
+/** «Где и заметка»: one line of what the person wants to remember — private as the exchange. */
+export const exchangeNoteSchema = visibleLine(EXCHANGE_NOTE_MAX)
+
 /** The day of an exchange as the person names it — a day in Yerevan, the one rates are dated by. */
 export const exchangeDaySchema = z
   .string()
@@ -30,6 +37,9 @@ export const exchangeDaySchema = z
  * `heldBefore` is how much of the received currency the person still had just before this
  * exchange. Optional, because nobody is made to count their wallet — and it is the one number the
  * average cost of what is left needs beyond the exchanges themselves (see `walletRate`).
+ *
+ * `revision` counts the versions: an amendment keeps the one before it (MOL-42, В-3), because
+ * the rate of a past exchange is a fact and is not rewritten in silence.
  */
 export const exchangeSchema = z
   .object({
@@ -39,7 +49,10 @@ export const exchangeSchema = z
     received: positiveMoneySchema,
     exchangedOn: exchangeDaySchema,
     heldBefore: priceSchema.nullable(),
+    note: exchangeNoteSchema.nullable(),
+    revision: z.int().min(1),
     createdAt: z.date(),
+    amendedAt: z.date().nullable(),
   })
   .refine(({ given, received }) => given.currency !== received.currency, {
     error: ISSUE.EXCHANGE_SAME_CURRENCY,
@@ -52,6 +65,17 @@ export const exchangeSchema = z
     { error: ISSUE.EXCHANGE_HELD_NOT_RECEIVED },
   )
 export type Exchange = z.infer<typeof exchangeSchema>
+
+/** A version an exchange had before it was amended, and when it stopped being the exchange. */
+export interface ExchangeRevision {
+  readonly revision: number
+  readonly given: Money
+  readonly received: Money
+  readonly exchangedOn: string
+  readonly heldBefore: Money | null
+  readonly note: string | null
+  readonly replacedAt: Date
+}
 
 /**
  * How long a removed exchange can be brought back (owner's decision В-7, 25.09.2026). After that it

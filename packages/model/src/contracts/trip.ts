@@ -67,7 +67,8 @@ export const addExpenseBodySchema = newExpenseSchema.omit({ tripId: true }).exte
 })
 export type AddExpenseBody = z.infer<typeof addExpenseBodySchema>
 
-const isoDate = z.codec(z.iso.datetime(), z.date(), {
+/** A moment on the wire: an ISO string there, a `Date` in the domain. */
+export const isoDate = z.codec(z.iso.datetime(), z.date(), {
   decode: (wire) => new Date(wire),
   encode: (date) => date.toISOString(),
 })
