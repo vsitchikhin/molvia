@@ -1019,16 +1019,17 @@ the round trip through Telegram, and ask whose account this turned out to be.
   брать» the moment they are in. A `/login` entry would have to be written into the rules of
   «back» (MOL-17) and would need to remember, separately from the address bar, where the person
   was headed. The one price is the tab's title, which the screen sets and puts back.
-- **The door opens on a settled identity, not on the absence of a refusal**, and it has one
-  definition — `login.closed`, which `App.vue` only reads. `ready` opens it; so do `offline` and
-  `error` **when the device knows an owner**, because those show the app with a notice and a
-  session may be perfectly alive behind a captive portal. With no owner there is nothing to
-  show — no drawers, no cached answers — and that is the login screen whether the phone says it
-  is offline or the server simply did not answer: a shop's captive portal reports
-  `onLine === true`, so a rule written for `navigator.onLine` alone walked straight past it
-  (adversarial А5). While the answer is still coming the login screen holds its own loading
-  state: rendering the app first and taking it away a moment later is a flash of somebody's trip
-  on a phone that is about to be asked to sign in. **And the screen keeps all four of its own
+- **The door has one definition** — `login.closed`, which `App.vue` only reads — and it turns on
+  what is actually known. A session the server named and the person claimed opens it; «no
+  session» is an answer too and shuts it, whatever the device remembers. **Where nothing has
+  been answered yet** — the launch, offline, a server that did not reply — **the drawer decides**:
+  with an owner on the device the app is shown, drawing its own skeletons the way it did before
+  this screen existed, and without one there is nothing to show at all, no drawers and no cached
+  answers. That last part is the same argument as Q5's, and it is deliberately not written in
+  terms of `navigator.onLine`: a shop's captive portal reports `true`, and the rule walked
+  straight past it (adversarial А5). Holding the door shut for the whole of the loading was
+  tried and is worse than it looks — every launch with a live session flashed «Вход», and what
+  caught it was an end-to-end test rather than an eye. **The screen keeps all four of its own
   states behind the door**: an unanswered question with no connection is «нет связи», not a
   skeleton that loads nothing (А2).
 - **One tap is one request, and nothing starts a login by itself.** The quota is thirty starts a

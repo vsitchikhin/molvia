@@ -269,6 +269,8 @@ test('the skeleton breathes, and stops for someone who asked for less motion', a
   const animation = () => bars.evaluate((element) => getComputedStyle(element).animationName)
 
   await page.goto('/advice')
+  // Скелет именно этого экрана: пока личность не осела, свой скелет рисует и экран входа.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What to buy')
   await expect(bars).toBeVisible()
   expect(await animation()).not.toBe('none')
 
