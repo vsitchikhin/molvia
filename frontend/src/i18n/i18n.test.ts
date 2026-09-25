@@ -111,13 +111,34 @@ describe('словарь: повторяющиеся тексты', () => {
       Сохранить: ['item.save_edit', 'settings.save'],
       // Цена Р-2: одно состояние, написанное для трёх экранов.
       'Сервер не ответил': ['advice.error.title', 'item.error.title', 'trip.error.title'],
-      // Та же цена у офлайна: у настроек, у обменов и у устройств своё состояние (MOL-40, MOL-57).
-      'Нет связи': ['devices.offline.title', 'exchange.offline.title', 'settings.offline.title'],
+      // Та же цена у офлайна: у настроек, у обменов, у доходов и у устройств своё состояние
+      // (MOL-40, MOL-57, MOL-66).
+      'Нет связи': [
+        'devices.offline.title',
+        'exchange.offline.title',
+        'income.offline.title',
+        'settings.offline.title',
+      ],
       // Один глагол, два предмета: поход и вход на устройстве. Предмет называет контекст —
       // шторка похода и строка устройства (MOL-57).
       Завершить: ['devices.end', 'trip.finish_confirm.ok'],
       // Одно правило часов у обмена и у дохода, два кода — у каждого своя шторка (MOL-66).
       'Этот день ещё не наступил': ['error.exchange_in_future', 'error.income_in_future'],
+      // Цена Р-2 у двух экранов одной денежной модели: доходы пишутся, правятся, удаляются и
+      // возвращаются по правилам обменов (MOL-66, Р-2), и слова о тех же действиях — те же.
+      'исправлен {date}': ['exchange.amended', 'income.amended'],
+      Вернуть: ['exchange.restore', 'income.restore'],
+      'Сервер не ответил как надо. Попробуйте ещё раз': [
+        'exchange.load_error.body',
+        'income.load_error.body',
+      ],
+      'Не получилось. Проверьте связь и попробуйте ещё раз': ['exchange.failed', 'income.failed'],
+      Валюта: ['exchange.sheet.currency', 'income.sheet.currency'],
+      'Прежние версии': ['exchange.sheet.history', 'income.sheet.history'],
+      'Сохранить правку': ['exchange.sheet.save_amend', 'income.sheet.save_amend'],
+      'Сейчас записано: {details}': ['exchange.sheet.current', 'income.sheet.current'],
+      // Название экрана и пункт страницы приватности о том же (MOL-58, MOL-66).
+      Доходы: ['income.title', 'privacy.stored.incomes.term'],
     })
   })
 
@@ -135,12 +156,28 @@ describe('словарь: повторяющиеся тексты', () => {
       'No connection': [
         'devices.offline.title',
         'exchange.offline.title',
+        'income.offline.title',
         'item.offline.title',
         'settings.offline.title',
       ],
       'The server did not answer': ['advice.error.title', 'item.error.title', 'trip.error.title'],
       // Английский не различает отмену диалога и отмену ввода; русский различает.
       Cancel: ['item.cancel', 'trip.finish_confirm.cancel'],
+      'amended {date}': ['exchange.amended', 'income.amended'],
+      'Bring back': ['exchange.restore', 'income.restore'],
+      'The server did not answer properly. Try again': [
+        'exchange.load_error.body',
+        'income.load_error.body',
+      ],
+      'That did not work. Check the connection and try again': ['exchange.failed', 'income.failed'],
+      Currency: ['exchange.sheet.currency', 'income.sheet.currency'],
+      'Earlier versions': ['exchange.sheet.history', 'income.sheet.history'],
+      'Save the amendment': ['exchange.sheet.save_amend', 'income.sheet.save_amend'],
+      'Now recorded: {details}': ['exchange.sheet.current', 'income.sheet.current'],
+      // English has one word where Russian says «было до обмена» and «было до поступления».
+      'held before {amount}': ['exchange.sheet.current_held', 'income.sheet.current_held'],
+      // One English word for the screen, its sheet and the privacy entry; Russian has «Доход».
+      Income: ['income.sheet.title', 'income.title', 'privacy.stored.incomes.term'],
     })
   })
 })

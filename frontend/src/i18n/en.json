@@ -389,6 +389,78 @@
       "bad_day": "Choose the day of the exchange"
     }
   },
+  "income": {
+    "title": "Income",
+    "record": "Record income",
+    "edit": "Amend income:",
+    "row_line": "{source} · {date}",
+    "amended": "amended {date}",
+    "remove": "Remove income {amount}",
+    "remove_sheet": {
+      "title": "Remove this income?",
+      "body": "A removed income no longer counts in the rate of new trips. Past trips do not change",
+      "confirm": "Remove income"
+    },
+    "removed": "Income removed: {amount}",
+    "restore": "Bring back",
+    "restored": "Income restored",
+    "restore_gone": "This income can no longer be restored — the removal is final. If you needed it, record it again",
+    "conflict": "This income is already recorded — here it is as it stands. If something is wrong, tap it in the list and amend it",
+    "amend_conflict": "This income was amended on another device — here it is as it stands now. Amend it again if you need to",
+    "vanished": "This income is gone — it was removed. The list is up to date",
+    "empty": {
+      "title": "No income yet",
+      "body": "Record how much came in and when — we will add up each month. Income is optional: trips and ratings work without it"
+    },
+    "offline": {
+      "title": "No connection",
+      "body": "We will show your income once the connection is back",
+      "strip": "No connection — you can record income once it is back"
+    },
+    "load_error": {
+      "title": "Could not load your income",
+      "body": "The server did not answer properly. Try again"
+    },
+    "failed": "That did not work. Check the connection and try again",
+    "source": {
+      "salary": "Salary",
+      "bonus": "Bonus",
+      "freelance": "Freelance / side job",
+      "debt_return": "Debt repaid",
+      "sale": "Sold something",
+      "gift": "Gift / help",
+      "interest": "Deposit interest",
+      "brought": "Money brought along",
+      "other": "Other"
+    },
+    "sheet": {
+      "title": "Income",
+      "title_amend": "Amend income",
+      "meta": "How much came in and when — in any of the four currencies",
+      "amount": "Amount",
+      "currency": "Currency",
+      "bought_hint": "Bought this money with {base}? Record it as an exchange — the rate will count your price",
+      "source": "From",
+      "source_placeholder": "Choose",
+      "no_source": "Choose where the money came from",
+      "day": "Day received",
+      "bad_day": "Choose the day it came in",
+      "held": "{currency} held before it came in",
+      "held_hint": "Optional. With it the rate counts what the money already held cost; without it we take the Central Bank of Armenia rate of that day",
+      "note": "Note",
+      "note_placeholder": "For example, «for September»",
+      "bad_note": "There is nothing to save in the note — write a word or leave it empty",
+      "history": "Earlier versions",
+      "version": "until {until}: {amount} · {source} · {date}",
+      "version_note": "until {until}: {amount} · {source} · {date} · {note}",
+      "save": "Save income",
+      "save_amend": "Save the amendment",
+      "saving": "Saving income…",
+      "amend_conflict": "While you were editing, this income was amended on another device. It now stands as below; save again to write yours over it",
+      "current": "Now recorded: {details}",
+      "current_held": "held before {amount}"
+    }
+  },
   "devices": {
     "title": "Devices",
     "list_title": "Where you are signed in",
@@ -598,6 +670,10 @@
       "exchanges": {
         "term": "Money exchanges",
         "text": "How much you changed, of which currency and when, and the note of where, if you write one — your own rate is worked out from them. When you amend an exchange, the version before it is kept beside it for as long as the exchange itself. Only you see them."
+      },
+      "incomes": {
+        "term": "Income",
+        "text": "How much came in, in which currency, when and from where, and the note if you write one — your rate is worked out from these too. When you amend an income, the earlier version is kept beside it for as long as the income exists. Only you see it."
       },
       "places": {
         "term": "Shops",

@@ -175,13 +175,16 @@ it.each([
   expect(view.router.currentRoute.value.name).toBe('privacy')
 })
 
-it('leads to «Обмен денег» from the money group, and hides «Доходы» until it exists', async () => {
+it('leads to «Обмен денег» and «Доходы» from the money group (MOL-66)', async () => {
   const view = await render()
-  const entry = view.get('a.entry')
-  expect(entry.text()).toBe(en.exchange.title)
-  expect(entry.attributes('href')).toBe('/settings/exchange')
+  const entries = view
+    .findAll('.money a.entry')
+    .map((entry) => [entry.text(), entry.attributes('href')])
+  expect(entries).toEqual([
+    [en.exchange.title, '/settings/exchange'],
+    [en.income.title, '/settings/incomes'],
+  ])
   expect(view.text()).toContain(en.settings.group_money)
-  expect(view.text()).not.toMatch(/Income/)
 })
 
 it.each([
