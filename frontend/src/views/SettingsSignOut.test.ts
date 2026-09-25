@@ -4,18 +4,34 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
-import { ERROR, actorCodec } from '@molvia/model'
-import type { ActorView } from '@molvia/model'
+import {
+  ERROR,
+  actorCodec,
+  addExpenseBodySchema,
+  catalogueEntryCodec,
+  parseMoney,
+  parseQuantity,
+  pendingVerdictCodec,
+} from '@molvia/model'
+import type { ActorView, CatalogueEntry, PendingVerdict, Rating } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
-import { useActorStore } from '@/stores/actor'
+import { sessionEnded, useActorStore } from '@/stores/actor'
+import { currentIdentity } from '@/stores/identity'
+import { useLoginStore } from '@/stores/login'
+import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 import SettingsView from './SettingsView.vue'
 
 const me = vi.fn<() => Promise<ActorView>>()
 const logout = vi.fn<() => Promise<void>>()
+const rateItem = vi.fn<(itemId: string, rating: Rating) => Promise<unknown>>()
 vi.mock('@/api', () => ({
-  api: { me: () => me(), logout: () => logout() },
+  api: {
+    me: () => me(),
+    logout: () => logout(),
+    rateItem: (itemId: string, rating: Rating) => rateItem(itemId, rating),
+  },
 }))
 
 const OWNER = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
@@ -76,6 +92,29 @@ function confirmButton(): HTMLButtonElement {
   return found
 }
 
+const card: PendingVerdict = {
+  itemId: 'dddddddd-0000-4000-8000-000000000001',
+  name: 'Сыр «Лори»',
+  placeName: 'Ереван Сити',
+  boughtAt: new Date('2026-09-24T10:00:00Z'),
+}
+
+const milk: CatalogueEntry = {
+  id: 'dddddddd-0000-4000-8000-000000000002',
+  kind: 'product',
+  name: 'Молоко «Ашхар»',
+  note: null,
+  defaultUnit: 'l',
+  typicalQuantity: parseQuantity('1', 'l'),
+}
+
+/** The owner's keys on both shelves. */
+function ownersKeys(): string[] {
+  return [localStorage, sessionStorage].flatMap((shelf) =>
+    Object.keys(shelf).filter((key) => key === 'molvia.actor' || key.endsWith(`.${OWNER}`)),
+  )
+}
+
 /** Everything this device holds for the owner — what «Выйти» has to leave nothing of. */
 function fillTheDrawer(): void {
   localStorage.setItem('molvia.actor', OWNER)
@@ -88,6 +127,7 @@ beforeEach(() => {
   vi.restoreAllMocks()
   me.mockReset()
   logout.mockReset()
+  rateItem.mockReset()
   localStorage.clear()
   sessionStorage.clear()
   online(true)
@@ -127,7 +167,9 @@ describe('«Выйти» на этом устройстве', () => {
     await city?.setValue('Ереван')
     await askToLeave(view)
 
-    expect(sheet().textContent).toContain('1 entry has not been sent yet and will be lost')
+    expect(sheet().textContent).toContain(
+      '1 entry has not been sent or was not accepted and will be lost',
+    )
   })
 
   it('стирает ящик только после ответа сервера и открывает приложение заново', async () => {
@@ -191,7 +233,176 @@ describe('«Выйти» на этом устройстве', () => {
   })
 })
 
+describe('что «Выйти» считает пропадающим (adversarial Б3)', () => {
+  it('отклонённую покупку и начатую, но не сохранённую оценку — тоже', async () => {
+    localStorage.setItem('molvia.actor', OWNER)
+    localStorage.setItem(
+      `molvia.trip-rejected.${OWNER}`,
+      JSON.stringify([
+        {
+          key: 'k1',
+          code: ERROR.INVALID_AMOUNT,
+          write: {
+            kind: 'add',
+            tripId: 'bbbbbbbb-0000-4000-8000-000000000001',
+            entry: catalogueEntryCodec.encode(milk),
+            body: addExpenseBodySchema.encode({
+              id: 'cccccccc-0000-4000-8000-000000000001',
+              itemId: milk.id,
+              quantity: parseQuantity('0.9', 'l'),
+              amount: parseMoney('520', 'AMD'),
+            }),
+          },
+        },
+      ]),
+    )
+    localStorage.setItem(
+      `molvia.verdict-drafts.${OWNER}`,
+      JSON.stringify([
+        {
+          card: pendingVerdictCodec.encode(card),
+          score: 2,
+          review: 'горчит',
+          state: 'typing',
+          error: null,
+        },
+      ]),
+    )
+    const view = await render()
+    await askToLeave(view)
+    expect(sheet().textContent).toContain('2 entries have not been sent or were not accepted')
+  })
+})
+
+describe('ответ, который пришёл не вовремя', () => {
+  it('оценка, отвечающая после выхода, ничего не пишет обратно (adversarial Б1)', async () => {
+    localStorage.setItem('molvia.actor', OWNER)
+    const view = await render()
+    let answer: () => void = () => undefined
+    rateItem.mockReturnValue(
+      new Promise((resolve) => {
+        answer = () => {
+          resolve({ verdict: {}, created: true })
+        }
+      }),
+    )
+    useVerdictDraftsStore().save(card, 4, 'кисловат')
+    expect(rateItem).toHaveBeenCalledOnce()
+
+    await askToLeave(view)
+    logout.mockResolvedValue(undefined)
+    confirmButton().click()
+    await flushPromises()
+    expect(ownersKeys()).toEqual([])
+
+    answer()
+    await flushPromises()
+    expect(ownersKeys()).toEqual([])
+  })
+
+  it('потерянный ответ на «Выйти»: стирание доделывает первый же «сессии нет» (adversarial Б2)', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToLeave(view)
+    logout.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'timeout', false))
+    confirmButton().click()
+    await flushPromises()
+    expect(sheet().textContent).toContain(en.sign_out.error)
+    expect(localStorage.getItem(`molvia.advice.${OWNER}`)).toBe('{}')
+
+    // Сервер сессию удалил, ответ потерялся: следующий запрос приложения — `401`.
+    me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    sessionEnded()
+    await flushPromises()
+
+    expect(ownersKeys()).toEqual([])
+    expect(replaced).toEqual(['/'])
+  })
+
+  it('контроль: шторку закрыли после сбоя — человек остался, и 401 потом ничего не стирает', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToLeave(view)
+    logout.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    confirmButton().click()
+    await flushPromises()
+    sheet().querySelector<HTMLButtonElement>('button[aria-label]')?.click()
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+
+    me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    sessionEnded()
+    await flushPromises()
+    expect(localStorage.getItem(`molvia.advice.${OWNER}`)).toBe('{}')
+    expect(replaced).toEqual([])
+  })
+
+  it('незавершённый выход не открывает приложение без связи при следующем запуске', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToLeave(view)
+    logout.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'timeout', false))
+    confirmButton().click()
+    await flushPromises()
+
+    // Приложение закрыли, не дождавшись ответа, и открыли без связи.
+    setActivePinia(createPinia())
+    online(false)
+    const actor = useActorStore()
+    await actor.start()
+    expect(actor.state).toBe('signed-out')
+    expect(useLoginStore().closed).toBe(true)
+  })
+})
+
 describe('выход в соседнем окне', () => {
+  it('стирает и собственную полку этого окна (adversarial А1)', async () => {
+    online(false)
+    localStorage.setItem('molvia.actor', OWNER)
+    // Всё, что пишет приложение, лежит на обеих полках — и sessionStorage у вкладки свой.
+    sessionStorage.setItem('molvia.actor', OWNER)
+    sessionStorage.setItem(`molvia.trip-queue.${OWNER}`, '[]')
+    sessionStorage.setItem('molvia.login', JSON.stringify({ claimed: OWNER }))
+    await render()
+
+    localStorage.removeItem('molvia.actor')
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: 'molvia.actor', oldValue: OWNER, newValue: null }),
+    )
+    await flushPromises()
+
+    expect(ownersKeys()).toEqual([])
+    expect(sessionStorage.getItem('molvia.login')).toBeNull()
+    expect(currentIdentity()).toBeNull()
+  })
+
+  it('«кто я», ушедший до выхода, не возвращает ящик (self-review С-2)', async () => {
+    localStorage.setItem('molvia.actor', OWNER)
+    await render()
+    const actor = useActorStore()
+    let answer: () => void = () => undefined
+    me.mockReturnValue(
+      new Promise((resolve) => {
+        answer = () => {
+          resolve(initial)
+        }
+      }),
+    )
+    actor.state = 'error'
+    void actor.start()
+
+    localStorage.removeItem('molvia.actor')
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: 'molvia.actor', oldValue: OWNER, newValue: null }),
+    )
+    answer()
+    await flushPromises()
+
+    expect(localStorage.getItem('molvia.actor')).toBeNull()
+    expect(actor.state).toBe('signed-out')
+    expect(actor.id).toBeNull()
+  })
+
   it('отпускает владельца и здесь — даже без связи, без вопроса серверу', async () => {
     online(false)
     localStorage.setItem('molvia.actor', OWNER)

@@ -373,13 +373,16 @@
     "meta": "Signed in {signedIn} · last seen {seen}",
     "end": "End",
     "end_label": "End the session on {device}",
+    "end_label_unknown": "End the session on an unknown device",
     "end_sheet": {
       "title": "End the session on {device}?",
+      "title_unknown": "End the session on an unknown device?",
       "body": "Molvia will ask to sign in with Telegram again on that device. This cannot be undone from here.",
       "confirm": "End session"
     },
     "end_failed": "Could not end that session. Check the connection and try again.",
     "ended": "The session on {device} has ended",
+    "ended_unknown": "The session on an unknown device has ended",
     "more": "Showing the latest {shown} of {total}",
     "note": "A device whose session was ended asks to sign in again the next time it is opened. What is saved on the device itself is beyond the server's reach.",
     "load_error": {
@@ -394,7 +397,7 @@
   "sign_out": {
     "title": "Sign out of Molvia on this device?",
     "body": "Everything Molvia saved on this device will be erased. Nothing is lost on the server: sign in with Telegram and it all comes back.",
-    "unsent": "{n} entry has not been sent yet and will be lost | {n} entries have not been sent yet and will be lost",
+    "unsent": "{n} entry has not been sent or was not accepted and will be lost | {n} entries have not been sent or were not accepted and will be lost",
     "confirm": "Sign out and erase",
     "offline": "Signing out needs a connection: without one the session on the server cannot be ended.",
     "error": "Could not sign out: the server did not answer. Try again."

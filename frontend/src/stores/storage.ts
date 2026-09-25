@@ -143,6 +143,25 @@ export function forgetWhere(match: (key: string) => boolean): void {
   }
 }
 
+/**
+ * Rewrites one key on every shelf that holds it, each from its own value: `change` answers what
+ * that shelf should keep, `null` for nothing. Each shelf separately, because two shelves may hold
+ * different values under one key — the shared one and this window's own (MOL-57).
+ */
+export function reshape(key: string, change: (value: string) => string | null): void {
+  for (const shelf of shelves()) {
+    try {
+      const value = shelf.getItem(key)
+      if (value === null) continue
+      const kept = change(value)
+      if (kept === null) shelf.removeItem(key)
+      else if (kept !== value) shelf.setItem(key, kept)
+    } catch {
+      // Nothing to do: this shelf refuses to be read or written.
+    }
+  }
+}
+
 /** A list, kept as JSON, for the one thing there can be more than one of: lost identities. */
 export function readList(key: string): string[] {
   const raw = read(key)

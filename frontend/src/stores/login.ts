@@ -5,6 +5,7 @@ import { ERROR } from '@molvia/model'
 import type { ActorView } from '@molvia/model'
 import { api } from '@/api'
 import { forget, read, write } from '@/stores/storage'
+import { LOGIN_KEY } from '@/stores/identity'
 import { useActorStore } from '@/stores/actor'
 
 /**
@@ -36,10 +37,7 @@ import { useActorStore } from '@/stores/actor'
  * with whoever the person approved, and anything else is a question — however the session got
  * here.
  */
-const KEY = 'molvia.login'
-
-/** What «Выйти» removes with the owner's drawer: the owner this device approved lives here. */
-export const LOGIN_KEY = KEY
+const KEY = LOGIN_KEY
 
 /** How often a login that is waiting asks whether it has been confirmed. */
 export const POLL_INTERVAL_MS = 3000
@@ -118,6 +116,15 @@ export const useLoginStore = defineStore('login', () => {
   const refusedOwner = ref<string | null>(null)
   /** One request in flight at a time: the interval and a tap must not poll twice over. */
   let polling = false
+  /** The poll in flight, so «Это не я» can wait for its answer before it decides anything. */
+  let polled: Promise<void> | null = null
+  /**
+   * True while «Это не я» ends the stranger's session (MOL-57, adversarial Г1). A poll that went
+   * out meanwhile could collect this person's own session, and if its answer arrived before the
+   * way out's, the way out's `Max-Age=0` — addressed to the cookie's name, not to a token — would
+   * put the fresh session out of the jar. Held, the poll leaves after the way out has answered.
+   */
+  let holding = false
 
   window.addEventListener('online', () => {
     connected.value = true
@@ -326,10 +333,18 @@ export const useLoginStore = defineStore('login', () => {
    * subtraction of `expiresAt` from the device's clock: a phone whose clock has run away would
    * otherwise be unable to sign in at all.
    */
-  async function poll(): Promise<void> {
+  function poll(): Promise<void> {
     const current = request.value
-    if (!current || polling) return
+    if (!current || polling || holding) return Promise.resolve()
     polling = true
+    polled = ask(current).finally(() => {
+      polling = false
+      polled = null
+    })
+    return polled
+  }
+
+  async function ask(current: Request): Promise<void> {
     try {
       const answer = await api.pollLogin(current.id)
       if (answer.status === 'authenticated') {
@@ -347,8 +362,6 @@ export const useLoginStore = defineStore('login', () => {
       // a hiccup must not throw away a confirmation the person is about to give.
       if (kind === 'unavailable') drop()
       failure.value = kind
-    } finally {
-      polling = false
     }
   }
 
@@ -389,12 +402,24 @@ export const useLoginStore = defineStore('login', () => {
    * nobody holds a key to, until its term runs out — named rather than retried.
    */
   async function refuse(): Promise<void> {
-    refusedOwner.value = known.value
+    const refused = known.value
+    refusedOwner.value = refused
+    // A poll already on its way may be bringing this person's own session (MOL-56, А4): what the
+    // screen asks about then is that account, and there is neither a stranger to put out nor a
+    // login to begin (adversarial Г1).
+    // Awaited only when there is one: an empty `await` yields a tick, and a poll starting in it
+    // would go out unheld.
+    if (polled) await polled
+    if (known.value !== refused) return
+    holding = true
     try {
       await api.logout()
     } catch {
       // See above: the new login goes ahead regardless.
+    } finally {
+      holding = false
     }
+    if (known.value !== refused) return
     // `begin` ничего не делает, если попытка уже идёт, — и это правильно: её не выбрасывают.
     return begin()
   }

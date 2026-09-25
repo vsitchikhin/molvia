@@ -100,9 +100,9 @@
     <SignOutSheet
       v-model:open="leaveOpen"
       :unsent="unsent"
-      :busy="leaving"
-      :failure="leaveFailure"
-      @confirm="leave"
+      :busy="signOut.leaving"
+      :failure="signOut.failure"
+      @confirm="signOut.leave"
     />
     <template #docked>
       <div class="actions">
@@ -150,7 +150,7 @@
   </AppScreen>
 </template>
 <script lang="ts">
-import { computed, defineComponent, ref, useId } from 'vue'
+import { computed, defineComponent, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { ActorSettings } from '@molvia/model'
@@ -171,7 +171,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SignOutSheet from '@/components/SignOutSheet.vue'
 import { useSettings } from '@/composables/useSettings'
-import { useSignOut } from '@/composables/useSignOut'
+import { useSignOutStore } from '@/stores/signOut'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 export default defineComponent({
@@ -210,20 +210,29 @@ export default defineComponent({
     const settings = useSettings()
 
     // «Выйти» (MOL-57): what would be lost is counted while the sheet is open, and the app is
-    // asked to send it first — with a connection that is usually everything.
+    // asked to send it first — with a connection that is usually everything. Counted is all the
+    // erasure takes that the server does not hold (adversarial Б3): the queue, the purchases it
+    // refused, every rating draft — a score picked and a review typed, «Сохранить» or not — and an
+    // unsaved settings form.
     const queue = useTripQueueStore()
     const drafts = useVerdictDraftsStore()
-    const { leaving, failure: leaveFailure, leave } = useSignOut()
+    const signOut = useSignOutStore()
     const leaveOpen = ref(false)
     const unsent = computed(
-      () => queue.pending.length + drafts.waiting.length + (settings.form.dirty ? 1 : 0),
+      () =>
+        queue.pending.length +
+        queue.rejected.length +
+        Object.keys(drafts.drafts).length +
+        (settings.form.dirty ? 1 : 0),
     )
     function askToLeave(): void {
-      leaveFailure.value = null
       leaveOpen.value = true
       void queue.flush()
       void drafts.flush()
     }
+    watch(leaveOpen, (open) => {
+      if (!open) signOut.stay()
+    })
 
     return {
       t,
@@ -232,11 +241,9 @@ export default defineComponent({
       privacy: () => void router.push({ name: 'privacy' }),
       ...settings,
       leaveOpen,
-      leaving,
-      leaveFailure,
+      signOut,
       unsent,
       askToLeave,
-      leave,
     }
   },
 })

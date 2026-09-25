@@ -14,7 +14,9 @@ import {
   IDENTITY_KEY,
   currentIdentity,
   dropIdentity,
+  forgetOwner,
   isIdentifier,
+  leavingOwner,
   rememberIdentity,
 } from '@/stores/identity'
 
@@ -167,10 +169,16 @@ export const useActorStore = defineStore('actor', () => {
 
   async function load(): Promise<void> {
     asking += 1
+    // The same check `verify` makes: an answer to a question asked before the owner was let go
+    // is about a session that no longer exists (self-review С-2).
+    const at = revision
     try {
-      settle(await api.me())
+      const view = await api.me()
+      if (revision !== at) return
+      settle(view)
       state.value = 'ready'
     } catch (error) {
+      if (revision !== at) return
       // **«Nobody» is an answer, not a failure** (MOL-56). The app stops here and draws the
       // login screen; nothing on the device is touched, because the drawers are filed under the
       // owner and Telegram brings the same one back.
@@ -238,7 +246,9 @@ export const useActorStore = defineStore('actor', () => {
         // cached answers, and a person who has never signed in on this phone cannot start. That
         // is the login screen's offline state and not a notice over an empty app.
         const known = currentIdentity()
-        if (!isIdentifier(known)) {
+        // An owner who pressed «Выйти» and was not confirmed yet is not somebody to open the
+        // app as (adversarial Б2): the drawer waits for the server's word to be erased.
+        if (!isIdentifier(known) || leavingOwner() === known) {
           state.value = 'signed-out'
           return
         }
@@ -268,18 +278,32 @@ export const useActorStore = defineStore('actor', () => {
   })
 
   /**
-   * «Выйти» in another window (MOL-57): the drawer is gone from storage, and the session with it —
-   * that window erased nothing before the server's `204`. So this is not a guess that needs
-   * `me()`: the owner is let go here too, and every store that follows `id` reads its drawer
-   * again and finds it empty. Without it a window with no connection kept the app open, and the
-   * purchases of the person who left, until it was closed.
+   * Lets the owner go in this window (MOL-57): nobody is signed in here any more, and nothing may
+   * be written under their name. Every write of the stores asks `actor.id` first, so with it
+   * `null` a rating answering after the erasure finds nobody to file it under (adversarial Б1);
+   * and the revision moves, so a `me()` that left before this — from a return to the tab, from
+   * `online` — cannot bring the owner back and write the drawer's name again (self-review С-2).
    */
-  window.addEventListener('storage', (event) => {
-    if (event.key !== IDENTITY_KEY || event.newValue !== null || id.value === null) return
+  function release(): void {
+    revision += 1
     dropIdentity()
     actor.value = null
     id.value = null
     state.value = 'signed-out'
+  }
+
+  /**
+   * «Выйти» in another window: the drawer is gone from storage, and the session with it — that
+   * window erased nothing before the server's `204`. So this is not a guess that needs `me()`: the
+   * owner is let go here too. **And this window erases its own shelves** (adversarial А1): the
+   * one where «Выйти» was pressed cannot reach this tab's `sessionStorage`, where the same drawer
+   * lies — `read` falls back to it, and a reload opened the app of the person who left.
+   */
+  window.addEventListener('storage', (event) => {
+    if (event.key !== IDENTITY_KEY || event.newValue !== null || id.value === null) return
+    const owner = id.value
+    release()
+    forgetOwner(owner)
   })
 
   function apply(loaded: ActorView): void {
@@ -301,6 +325,7 @@ export const useActorStore = defineStore('actor', () => {
     apply,
     adopt,
     verify,
+    release,
     signIn,
     busy: () => asking > 0,
     retry: start,

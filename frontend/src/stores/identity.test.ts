@@ -96,6 +96,25 @@ describe('«Выйти» стирает ящик владельца (MOL-57)', (
     )
   })
 
+  it('с входом уходит одобрение этого владельца, а попытка входа соседнего окна остаётся', () => {
+    const request = { id: '11111111-2222-4333-8444-555555555555', url: 'https://t.me/bot?start=x' }
+    localStorage.setItem('molvia.login', JSON.stringify({ request, claimed: OWNER }))
+    sessionStorage.setItem('molvia.login', JSON.stringify({ claimed: OWNER }))
+    localStorage.setItem('molvia.leaving', OWNER)
+
+    forgetOwner(OWNER)
+
+    expect(JSON.parse(localStorage.getItem('molvia.login') ?? '{}')).toEqual({ request })
+    expect(sessionStorage.getItem('molvia.login')).toBeNull()
+    expect(localStorage.getItem('molvia.leaving')).toBeNull()
+  })
+
+  it('чужое одобрение не трогает', () => {
+    localStorage.setItem('molvia.login', JSON.stringify({ claimed: OTHER }))
+    forgetOwner(OWNER)
+    expect(JSON.parse(localStorage.getItem('molvia.login') ?? '{}')).toEqual({ claimed: OTHER })
+  })
+
   it('после стирания устройство больше не знает владельца', () => {
     rememberIdentity(OWNER)
     forgetOwner(OWNER)
@@ -118,9 +137,16 @@ describe('какие ключи приложение пишет на устро�
     for (const text of Object.values(sources)) {
       for (const [, key] of text.matchAll(/['`](molvia\.[a-z-]+)[.'`$]/g)) if (key) keys.add(key)
     }
-    // Без владельца: имя ящика и одобренный на устройстве вход — оба стирает выход; след снятой
-    // двери приглашения; выбор вида итога — он ничего не говорит о человеке.
-    const ownerless = ['molvia.actor', 'molvia.invite', 'molvia.login', 'molvia.total-flipped']
+    // Без владельца: имя ящика, одобренный на устройстве вход и незавершённый выход — все три
+    // стирает выход; след снятой двери приглашения; выбор вида итога — он ничего не говорит о
+    // человеке.
+    const ownerless = [
+      'molvia.actor',
+      'molvia.invite',
+      'molvia.leaving',
+      'molvia.login',
+      'molvia.total-flipped',
+    ]
     // По владельцу — `molvia.<что>.<владелец>`, всё это уходит с `forgetOwner`.
     const perOwner = [
       'molvia.advice',
