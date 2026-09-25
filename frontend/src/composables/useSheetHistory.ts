@@ -8,9 +8,10 @@ import { stepBack } from '@/navigation'
  * the iOS edge swipe — closes the sheet instead of leaving the screen under it.
  *
  * The entry is laid at the very same address, through the router's own history rather than a
- * bare `pushState`: the router keeps `position`, `back`, `current` and the scroll in
- * `history.state`, and the rules of «back» read them (`entryBelow` in navigation.ts). A foreign
- * state without them would make the next step count from `undefined` and drop the list to the top.
+ * bare `pushState`: the router keeps `position`, `back` and `current` in `history.state`, and the
+ * rules of «back» read them (`entryBelow` in navigation.ts). A foreign state without them would
+ * make the next step count from `undefined`. The scroll is not among the reasons: putting a sheet
+ * away does not scroll at all (`scrollBehavior` in router.ts, MOL-63).
  *
  * Every close goes through the history. The ×, the scrim and Esc step back; only the pop that
  * follows actually closes it. So exactly one entry is ever taken away, and the «back» after a

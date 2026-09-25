@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
-import { routes } from '@/router'
+import { routes, scrollBehavior } from '@/router'
 
 function lookup(dictionary: unknown, key: string): unknown {
   return key.split('.').reduce<unknown>((node, part) => {
@@ -105,5 +105,27 @@ describe('the kit page', () => {
     await router.push('/_kit')
     expect(router.currentRoute.value.fullPath).toBe('/')
     expect(production.routes.some((route) => route.path === '/_kit')).toBe(false)
+  })
+})
+
+describe('scrollBehavior', () => {
+  const saved = { left: 0, top: 2127 }
+
+  // The same address is a sheet put away: the page under it never moved (MOL-63).
+  it('does not scroll on a move to the same address, whatever was saved', async () => {
+    const search = await resolveAt('/trip/add')
+    const advice = await resolveAt('/advice')
+    expect(scrollBehavior(search, search, saved)).toBe(false)
+    expect(scrollBehavior(advice, advice, null)).toBe(false)
+  })
+
+  it('returns to where the person was on back and forward between screens', async () => {
+    expect(scrollBehavior(await resolveAt('/'), await resolveAt('/trip/add'), saved)).toEqual(saved)
+  })
+
+  it('starts any other move at the top', async () => {
+    expect(scrollBehavior(await resolveAt('/trip/add'), await resolveAt('/'), null)).toEqual({
+      top: 0,
+    })
   })
 })

@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import type { RouteRecordRaw } from 'vue-router'
+import type { RouteRecordRaw, RouterScrollBehavior } from 'vue-router'
 import SettingsView from '@/views/SettingsView.vue'
 import PrivacyView from '@/views/PrivacyView.vue'
 import AdviceView from '@/views/AdviceView.vue'
@@ -127,15 +127,21 @@ export const routes = [
 // `watchBrowserAnimatedBack`.
 watchBrowserAnimatedBack()
 
+/**
+ * Back and forward return to where the person was; any other move starts at the top. The
+ * sections keep no scroll of their own — their state lives in stores, not in components.
+ *
+ * A move to the same address is a sheet put away — a push or a replace to where the router
+ * already is, it refuses as a duplicate — and it does not scroll at all. The page under a sheet
+ * never moved, and whatever changed above the screen meanwhile — a list reread, a queued row
+ * sent, a notice come or gone — the browser has already kept out of sight. Scrolling back to the
+ * number saved when the sheet opened moved the list by exactly that change (MOL-63).
+ */
+export const scrollBehavior: RouterScrollBehavior = (to, from, saved) =>
+  to.fullPath === from.fullPath ? false : (saved ?? { top: 0 })
+
 export const router = createRouter({
   history: createWebHistory(),
   routes,
-  // Back and forward return to where the person was; any other move starts at the top. The
-  // sections keep no scroll of their own — their state lives in stores, not in components.
-  //
-  // A sheet closed by «back» is a move to the same address, and it lands where the list was:
-  // the router's own `history.push` stores the position in the entry the sheet leaves, and
-  // `saved` comes from there. That is why the sheet lays its entry through the router and never
-  // with a bare `pushState` — which would leave nothing saved and drop the list to the top.
-  scrollBehavior: (_to, _from, saved) => saved ?? { top: 0 },
+  scrollBehavior,
 })
