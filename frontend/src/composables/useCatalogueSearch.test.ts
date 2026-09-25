@@ -458,6 +458,36 @@ describe('the query that found nothing (MOL-45)', () => {
     expect(search.missed.value).toBe('дыня')
   })
 
+  it('keeps it when the key would not start with what is left: «дет» of «детское» (review К)', async () => {
+    // `deцkoe` does not start with `det` — the key folds «тс» by position, the text does not.
+    const { query, search } = harness()
+    await ask(query, 'детское питание', [])
+    await ask(query, 'дет', [])
+    expect(search.missed.value).toBe('детское питание')
+  })
+
+  it('hands the miss to a pick by another word, once, and forgets it (review И)', async () => {
+    const { query, search } = harness()
+    await ask(query, 'кефир', [])
+    expect(search.takeMissed('молоко')).toBe('кефир')
+    expect(search.takeMissed('хлеб')).toBeNull()
+    expect(search.missed.value).toBeNull()
+  })
+
+  it.each([
+    ['сыр косичка', 'сыр'],
+    ['картошк', 'картошка'],
+    ['Кефир', 'кефир '],
+  ])(
+    'hands no miss «%s» to a pick by «%s» — one starts the other (review Р-1, Е)',
+    async (miss, found) => {
+      const { query, search } = harness()
+      await ask(query, miss, [])
+      expect(search.takeMissed(found)).toBeNull()
+      expect(search.missed.value).toBeNull()
+    },
+  )
+
   it('must not fire on a failure or offline — nothing was found to be missing', async () => {
     const { query, search } = harness()
     await type(query, 'бахчевые')

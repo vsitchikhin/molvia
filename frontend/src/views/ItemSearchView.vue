@@ -163,7 +163,7 @@ export default defineComponent({
         : null,
     )
     const query = ref('')
-    const { phase, results, stale, answered, missed, retry } = useCatalogueSearch(query)
+    const { phase, results, stale, answered, takeMissed, retry } = useCatalogueSearch(query)
     const recent = useRecentItemsStore()
     const entry = useItemEntryStore()
     const announce = useAnnouncer()
@@ -227,12 +227,13 @@ export default defineComponent({
     //
     // A pick from the server's answer takes along the query that found nothing before it
     // (MOL-45): the person's own word for the item. Not a pick from the recent items or one just
-    // proposed — neither was found by another word.
-    function pick(chosen: CatalogueEntry): void {
+    // proposed — neither was found by another word — and every pick uses the miss up.
+    function pick(chosen: CatalogueEntry, learns = true): void {
       opened.value += 1
       const found = phase.value === 'ready'
       const text = found ? answered.value : query.value
-      const word = found && missed.value !== null && missed.value !== text ? missed.value : null
+      const missed = takeMissed(text)
+      const word = learns && found ? missed : null
       entry.pick({ entry: chosen, query: text, ...(word === null ? {} : { missedQuery: word }) })
     }
 
@@ -261,7 +262,7 @@ export default defineComponent({
     }
 
     function afterProposing(): void {
-      if (proposedItem) pick(proposedItem)
+      if (proposedItem) pick(proposedItem, false)
       proposedItem = null
     }
 
