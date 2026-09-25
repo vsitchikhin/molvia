@@ -69,6 +69,96 @@ const ACCEPTED_DISTANCE = 2
 const SHORT_WORD = 2
 
 /**
+ * A unit grounds nothing either, whatever its length — it is the size too, only spelled with
+ * letters. The length alone stopped «л» and let «шт» through: `sht` is two edits from `sir`,
+ * so «сыр» found every item sold by the piece, six of them on MOL-14's shelf (MOL-48). The
+ * same on both sides, or «кефир 500 мл» would ask for a grounding pair of `ml` and lose
+ * «Кефир 500 мл».
+ *
+ * Words as a label prints them, keyed by the function the name goes through, so the list
+ * follows the alphabet by itself and nothing stored depends on it. Only what the length rule
+ * misses, and only the forms written after a number: «таблетки» and «капсулы» begin the names
+ * of the very goods, and as units «табл» lost «Таблетки для посудомоечной машины» on the way
+ * there. The price, accepted: a counting word in another form — «чай пакетики», «бумага
+ * рулоны» — is measured as a word and misses (owner's decision, 25.09.2026). So does a real
+ * word that shares a unit's key, and not only when typed alone: `up` of «уп» is the «Up» of
+ * «7 Up», which «7 ап» no longer reaches, and `hat` of «հատ» is the Latin «hat». Kept anyway —
+ * without «уп» «суп» finds «Яйца 10 уп» at one edit, which is the defect itself.
+ */
+export const UNIT_WORDS = [
+  'шт',
+  'штук',
+  'штуки',
+  'мл',
+  'кг',
+  'гр',
+  'мг',
+  'см',
+  'Вт',
+  'уп',
+  'упак',
+  'пак',
+  'рулон',
+  'рулона',
+  'рулонов',
+  'пакетик',
+  'пакетика',
+  'пакетиков',
+  'таблеток',
+  'капсул',
+  'հատ',
+  'կգ',
+  'գր',
+  'մլ',
+  'սմ',
+  'տուփ',
+  'pcs',
+  'pc',
+  'ml',
+  'kg',
+  'gr',
+  'mg',
+  'cm',
+  'pack',
+  'pk',
+] as const
+
+const UNIT_KEYS = [...new Set(UNIT_WORDS.map(toSearchKey))]
+const UNIT_ARRAY = sql`array[${sql.join(
+  UNIT_KEYS.map((unit) => sql`${unit}`),
+  sql`, `,
+)}]::text[]`
+
+/**
+ * How far a query word right after a number may stray from a unit and still be read as one.
+ * The screen searches while the person types, so «батарейки 4 шту» is on its way to «штук», and
+ * a finger slips to the key next door — «кефир 500 мд». Read as grounding, either looked for a
+ * grounding pair the name no longer offers and lost the item on every keystroke up to the full
+ * unit. Only after a number, where a size stands: «пакеты» alone still does not find the tea.
+ * And only while another word still grounds the query — «2 суп», «2 кап» on the way to «2
+ * капусты» are the goods themselves, and read as units they left nothing to find by.
+ *
+ * A transposition is two edits, and «тш» for «шт» is not even that in the key: the alphabet
+ * folds `ts` into `ц`, so it is `цh`, two from `sht`. Not caught — the price, named.
+ */
+const UNIT_SLIP = 1
+
+/**
+ * Whether a query word may be that unit by a slip of the finger: one edit from it, or two letters
+ * swapped — the commonest typo, and two edits to Levenshtein, so «кефир 500 лм» lost «мл». One
+ * predicate for the query's own reading and for the name's unit it is set against.
+ */
+function slipsFromUnit(word: SQL, unit: SQL): SQL {
+  return sql`(levenshtein(${word}, ${unit}) <= ${UNIT_SLIP}
+          or exists (
+            select 1
+            from generate_series(1, length(${word}) - 1) as i
+            where overlay(${word} placing substr(${word}, i + 1, 1) || substr(${word}, i, 1)
+                          from i for 2) = ${unit}
+          ))`
+}
+
+/**
  * How many words of a query are looked at. Every query word is compared with every word of
  * every candidate, so the cost grows with the query — 42 KB of it held a connection for
  * three seconds. No name on a shelf needs more words than this to be found.
@@ -212,12 +302,40 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     with query_words as (
       -- Cut to 255 here, once: levenshtein refuses longer arguments, and the prefix arm below
       -- cuts the name to the length of the query word, not to 255.
-      select n, left(word, 255) as q,
-             length(word) >= ${SHORT_WORD} and word !~ '[0-9]' as grounds,
+      select n, left(word, 255) as q, number,
+             -- A word is read as a unit by its place only while another word still grounds the
+             -- query: in «2 суп» the soup is all there is, not two of «տուփ». A unit still being
+             -- typed is a size against every name — the item must not blink out of the list on
+             -- the way to «штук»; a slip only against the names in \`slipped\`.
+             plain and not (anchored and unit_start) as grounds,
+             plain and anchored and unit_like and not unit_start as slips,
              word ~ '[^0-9]' as lettered,
-             n = max(n) over () as last,
+             last,
              n::int = any(string_to_array(${expanded}, ' ')::int[]) as expanded
-      from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
+      from (
+        select *, bool_or(plain and not unit_like) over () as anchored
+        from (
+          select n, word, last, number,
+                 length(word) >= ${SHORT_WORD} and word !~ '[0-9]' and word not in ${UNIT_KEYS}
+                   as plain,
+                 after_number and exists (
+                   select 1
+                   from unnest(${UNIT_ARRAY}) as u(unit)
+                   where ${slipsFromUnit(sql`left(word, 255)`, sql`unit`)}
+                      or (last and starts_with(unit, word))
+                 ) as unit_like,
+                 after_number and last and exists (
+                   select 1 from unnest(${UNIT_ARRAY}) as u(unit) where starts_with(unit, word)
+                 ) as unit_start
+          from (
+            select word, n,
+                   n = max(n) over () as last,
+                   lag(word) over (order by n) as number,
+                   coalesce(lag(word) over (order by n) ~ '[0-9]', false) as after_number
+            from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
+          ) w
+        ) u
+      ) a
     ),
     synonyms as (
       select s.word, s.n, s.anywhere, s.before_kind
@@ -271,8 +389,42 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       from ${items}
       join admitted a on a.id = ${items.id}
     ),
-    per_word as (
-      select c.id, qw.grounds, qw.lettered,
+    slipped as (
+      -- A slip is a size only against a name that prints the unit it slipped from, after the
+      -- very number the query has; elsewhere the word is what it spells. In «2 сом замороженный»
+      -- the catfish is not «см»: read as a size everywhere it let «Котлеты … замороженные» in
+      -- beside the fish, and against any «см» it let in «Пицца замороженная 30 см». The number
+      -- is what gives a slip away — «кефир 500 мд» and «Кефир 500 мл» share «500». The price:
+      -- «кефир 1 мд» does not reach «Кефир 1000 мл». Apart and joined, not a subquery per row:
+      -- a slip after a number is rare, so this is nearly always empty.
+      select c.id, qw.n
+      from query_words qw
+      cross join candidates c
+      where qw.slips
+        and (exists (
+               select 1
+               from (
+                 select unit, lag(unit) over (order by i) as number
+                 from unnest(string_to_array(c.search_key, ' ')) with ordinality as t(unit, i)
+               ) nw
+               where nw.unit in ${UNIT_KEYS}
+                 and nw.number = qw.number
+                 and ${slipsFromUnit(sql`qw.q`, sql`nw.unit`)}
+             )
+             -- A size written together, «Ряженка 500мл», is one word of the key: \`500ml\`.
+             or exists (
+               select 1
+               from unnest(string_to_array(c.search_key, ' ')) as nw(word)
+               cross join unnest(${UNIT_ARRAY}) as u(unit)
+               where nw.word = qw.number || u.unit
+                 and ${slipsFromUnit(sql`qw.q`, sql`u.unit`)}
+             ))
+    ),
+    -- Materialized, so each word distance is taken once per row: inlined, the planner copied the
+    -- subquery into the select list, the filter and the order by — and with \`slipped\` joined
+    -- in, 20 000 names answered half as fast again as before it. Kept, it beats both.
+    per_word as materialized (
+      select c.id, qw.grounds and s.id is null as grounds, qw.lettered,
              -- The typed spelling is measured unless the row came by a synonym of this very word:
              -- «сыр» is not measured against «Рис» that «лори» brought, but «хаггис» of
              -- «памперсы хаггис» is still measured against the «Huggies» that «подгузники» did.
@@ -293,19 +445,21 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                from unnest(string_to_array(c.search_key, ' ')) as w
                -- A grounding word is measured against grounding words only: against «л» or
                -- «1» of a size every two-letter word is two edits away, inside the budget.
-               where not qw.grounds or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]')
+               where not (qw.grounds and s.id is null)
+                  or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]' and w not in ${UNIT_KEYS})
              ) end as qd_typed,
-             -- A synonym is a word, not a typo: it counts only as the whole first word of the
-             -- name, and then costs nothing. With the edit budget on top, «мясо» expanded into five
+             -- A synonym is a word, not a typo: it counts only as the whole word of the kind,
+             -- and then costs nothing. With the edit budget on top, «мясо» expanded into five
              -- words would have five chances of the absolute budget's false hits (MOL-46).
              ${bySynonymWord} as qd_synonym
       from candidates c
       cross join query_words qw
+      left join slipped s on s.id = c.id and s.n = qw.n
     ),
-    per_word_best as materialized (
-      -- \`least\` skips a null, so a word found only by its synonym is still found.
-      -- Materialized, or the planner folds it into every aggregate below and into the filter on
-      -- the distance, and each of them runs the levenshtein subquery again for the same row.
+    per_word_best as (
+      -- \`least\` skips a null, so a word found only by its synonym is still found. Not
+      -- materialized: \`per_word\` is, so folding this into the aggregates below repeats a
+      -- \`least\`, not the levenshtein subquery.
       select id, grounds, lettered, least(qd_typed, qd_synonym) as qd,
              coalesce(qd_synonym = 0 and coalesce(qd_typed, 255) > 0, false) as by_synonym
       from per_word

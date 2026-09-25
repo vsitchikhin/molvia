@@ -49,6 +49,8 @@ export const ERROR = {
    * it rather than the schema — the same line `exchangeRateSchema` draws for «not from the future».
    */
   EXCHANGE_IN_FUTURE: 'error.exchange_in_future',
+  /** An income dated after today in Yerevan (MOL-66): the same rule of the clock as an exchange. */
+  INCOME_IN_FUTURE: 'error.income_in_future',
 } as const
 
 export type ErrorCode = (typeof ERROR)[keyof typeof ERROR]
@@ -102,6 +104,8 @@ export const ISSUE = {
   EXCHANGE_SAME_CURRENCY: 'issue.exchange_same_currency',
   /** What was held before an exchange, named in a currency other than the one received. */
   EXCHANGE_HELD_NOT_RECEIVED: 'issue.exchange_held_not_received',
+  /** What was held before an income, named in a currency other than the one that came in. */
+  INCOME_HELD_NOT_RECEIVED: 'issue.income_held_not_received',
 } as const
 
 export type IssueCode = (typeof ISSUE)[keyof typeof ISSUE]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dayOfAnyYear, purchaseDay, timeOfDay } from '@/days'
+import { dayOfAnyYear, monthOf, purchaseDay, timeOfDay } from '@/days'
 
 // Built from local parts: the phone's calendar is what counts, whatever zone the test runs in.
 const at = (day: number, hour: number, minute = 0) => new Date(2026, 8, day, hour, minute)
@@ -55,5 +55,15 @@ describe('dayOfAnyYear (MOL-57, self-review С-5)', () => {
 
   it('across New Year yesterday is still «вчера», not a date with a year', () => {
     expect(dayOfAnyYear(new Date(2025, 11, 31, 20), 'ru', new Date(2026, 0, 1, 9))).toBe('вчера')
+  })
+})
+
+describe('monthOf (MOL-66)', () => {
+  it('names the month and the year, without the «г.» Russian adds', () => {
+    expect(monthOf('2026-09', 'ru')).toBe('сентябрь 2026')
+    expect(monthOf('2026-09', 'en')).toBe('September 2026')
+    // The first and the last month: the number is a month, not an index.
+    expect(monthOf('2027-01', 'ru')).toBe('январь 2027')
+    expect(monthOf('2026-12', 'en')).toBe('December 2026')
   })
 })

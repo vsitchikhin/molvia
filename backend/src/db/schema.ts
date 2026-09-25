@@ -29,6 +29,7 @@ import {
   catalogueSubjectSchema,
   currencySchema,
   eventTypeSchema,
+  incomeSourceSchema,
   itemKindSchema,
   placeKindSchema,
   rateChoiceSchema,
@@ -40,6 +41,7 @@ import type {
   BaseUnit,
   Currency,
   EventPayload,
+  IncomeSource,
   ItemKind,
   PlaceKind,
   AmdRate,
@@ -822,6 +824,75 @@ export const exchangeRevisions = pgTable(
       'exchange_revisions_received_currency_known',
       oneOf(table.receivedCurrency, currencySchema.options),
     ),
+  ],
+)
+
+/**
+ * Money that came in with nothing given for it (MOL-66): the day, the amount and its currency, and
+ * where it came from. Only what arrived — nothing expected is ever written. Private as an exchange:
+ * no aggregate reads it, the log of events does not either, and it goes with its owner.
+ */
+export const incomes = pgTable(
+  'incomes',
+  {
+    // Named by the device, as an exchange is: a tap sent twice is one income.
+    id: uuid('id').primaryKey(),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+    currency: char('currency', { length: 3 }).$type<Currency>().notNull(),
+    // A day in Yerevan, as the rates are dated: the official rate of that day values it (В-1).
+    receivedOn: date('received_on').notNull(),
+    // How much of that currency was held just before; null is «not said», which is not zero.
+    heldBeforeMinor: bigint('held_before_minor', { mode: 'bigint' }),
+    source: text('source').$type<IncomeSource>().notNull(),
+    note: text('note'),
+    revision: integer('revision').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    amendedAt: timestamp('amended_at', { withTimezone: true }),
+    // Removed and still offered back for ten minutes, as an exchange is (MOL-40, В-5, В-7).
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (table) => [
+    // The owner's incomes in the order the wallet walks them.
+    index('incomes_actor_day_idx').on(table.actorId, table.receivedOn, table.createdAt),
+    check('incomes_amount_positive', sql`${table.amountMinor} > 0`),
+    check(
+      'incomes_held_not_negative',
+      sql`${table.heldBeforeMinor} is null or ${table.heldBeforeMinor} >= 0`,
+    ),
+    check('incomes_currency_known', oneOf(table.currency, currencySchema.options)),
+    check('incomes_source_known', oneOf(table.source, incomeSourceSchema.options)),
+    check('incomes_revision_positive', sql`${table.revision} > 0`),
+  ],
+)
+
+/** The versions an income had before it was amended — the same trace an exchange keeps (В-3). */
+export const incomeRevisions = pgTable(
+  'income_revisions',
+  {
+    incomeId: uuid('income_id')
+      .notNull()
+      .references(() => incomes.id, { onDelete: 'cascade' }),
+    revision: integer('revision').notNull(),
+    amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+    currency: char('currency', { length: 3 }).$type<Currency>().notNull(),
+    receivedOn: date('received_on').notNull(),
+    heldBeforeMinor: bigint('held_before_minor', { mode: 'bigint' }),
+    source: text('source').$type<IncomeSource>().notNull(),
+    note: text('note'),
+    replacedAt: timestamp('replaced_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.incomeId, table.revision] }),
+    check('income_revisions_amount_positive', sql`${table.amountMinor} > 0`),
+    check('income_revisions_currency_known', oneOf(table.currency, currencySchema.options)),
+    check('income_revisions_source_known', oneOf(table.source, incomeSourceSchema.options)),
   ],
 )
 

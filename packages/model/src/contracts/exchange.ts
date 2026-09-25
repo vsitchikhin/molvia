@@ -23,7 +23,7 @@ export type RatePreference = z.infer<typeof ratePreferenceSchema>
 export const ratePreferenceBodySchema = z.strictObject({ preference: ratePreferenceSchema })
 export type RatePreferenceBody = z.infer<typeof ratePreferenceBodySchema>
 
-const positiveMoneyCodec = moneyCodec.refine((value) => value.minor > 0n, {
+export const positiveMoneyCodec = moneyCodec.refine((value) => value.minor > 0n, {
   error: ERROR.INVALID_AMOUNT,
 })
 
@@ -105,12 +105,6 @@ export const exchangeViewCodec = z.strictObject({
       replacedAt: isoDate,
     }),
   ),
-  /**
-   * Whether it gave the received currency a known cost — the sheet asks «сколько было до обмена»
-   * by it. Only the whole walk knows: a chain made before a change of the currency of conversion
-   * counts, a link of the old reckoning does not (round 3, П-1, М1). The phone does not re-derive it.
-   */
-  priced: z.boolean(),
   /** Null only for amounts so far apart that no rate within the band says them. */
   rate: rateCodec.nullable(),
   /**
@@ -132,6 +126,33 @@ export const exchangeViewCodec = z.strictObject({
   officialDoubtful: z.boolean(),
 })
 export type ExchangeView = z.output<typeof exchangeViewCodec>
+
+/**
+ * Money that came in — an exchange or an income (MOL-66) — as the sheets need it to decide whether
+ * to ask «сколько было до»: into which currency, on which day, and whether it gave that currency a
+ * known cost. Only the whole walk knows the last: a chain made before a change of the currency of
+ * conversion counts, a link of the old reckoning does not (MOL-42, round 3, П-1, М1). The phone does
+ * not re-derive it. Newest first, as the walk would meet them last.
+ */
+export const receiptCodec = z.strictObject({
+  id: z.uuid(),
+  currency: currencySchema,
+  on: exchangeDaySchema,
+  priced: z.boolean(),
+})
+export type ReceiptView = z.output<typeof receiptCodec>
+
+/**
+ * A hint for «сколько было до»: what is left of a currency by the recorded spending and exchanges,
+ * whether that is everything held (`whole`) or only the money of the last receipt, whose remainder
+ * before it was never said — and whether that receipt was an exchange or an income (MOL-66), so the
+ * sheet names the right one.
+ */
+export const heldEstimateCodec = z.strictObject({
+  held: moneyCodec,
+  whole: z.boolean(),
+  from: z.enum(['exchange', 'income']),
+})
 
 const currencyCostCodec = z.strictObject({
   rate: rateCodec,
@@ -161,16 +182,16 @@ export const exchangesResponseCodec = z.strictObject({
    */
   costs: z.array(currencyCostCodec),
   /**
-   * Why there is no wallet although the spending currency came in by exchanges: the exchange its
-   * cost was lost on, and why — money of no known price with no fresh official rate of that day
-   * (`noRate`), or money of the reckoning before the last change of the currency of conversion
-   * (`oldReckoning`). Null when there is a wallet, or nothing of the spending currency was ever
-   * received (С-4, round 4 Н1).
+   * Why there is no wallet although the spending currency came in: the exchange or income its
+   * cost was lost on — `given` is null for an income (MOL-66) — and why: money of no known price
+   * with no fresh official rate of that day (`noRate`), or money of the reckoning before the last
+   * change of the currency of conversion (`oldReckoning`). Null when there is a wallet, or nothing
+   * of the spending currency was ever received (С-4, round 4 Н1).
    */
   walletUnknown: z
     .strictObject({
-      exchangedOn: exchangeDaySchema,
-      given: currencySchema,
+      on: exchangeDaySchema,
+      given: currencySchema.nullable(),
       reason: lostCostReasonSchema,
     })
     .nullable(),
@@ -179,12 +200,14 @@ export const exchangesResponseCodec = z.strictObject({
    * by the recorded spending and exchanges, and whether that is everything held (`whole`) or only
    * the money of the last exchange, whose remainder before it was never said.
    */
-  heldEstimates: z.array(z.strictObject({ held: moneyCodec, whole: z.boolean() })),
+  heldEstimates: z.array(heldEstimateCodec),
   /**
    * The day the currency of conversion last changed, or null if it never did: the wallet counts
    * exchanges from that day on, and the ones before it stand in the list as they were (В-2).
    */
   baseSince: exchangeDaySchema.nullable(),
   exchanges: z.array(exchangeViewCodec),
+  /** Every exchange and income, for the sheet's «сколько было до обмена» (see `receiptCodec`). */
+  receipts: z.array(receiptCodec),
 })
 export type ExchangesResponse = z.output<typeof exchangesResponseCodec>

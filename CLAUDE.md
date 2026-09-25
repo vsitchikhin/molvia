@@ -279,8 +279,31 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   makes «Молоко 1 л» and «Молоко 2 л» identical for ranking while «Молоко 1л» written
   without the space stays distinct, so two shops' labels for one product rank by different
   rules. MOL-10 took **the third way**, and its review made it hold on both sides. A word
-  **grounds** a match only if it has two characters and no digit — «32», «1л», «500г» are
-  sizes, not grounds — and it is measured against the grounding words of the name only, never
+  **grounds** a match only if it has two characters, no digit and is not a unit — «32», «1л»,
+  «500г» are sizes, not grounds, and so are «шт», «мл», «см», «հատ», «pcs» (MOL-48): the length
+  alone let `sht` through, two edits from «сыр», and every item sold by the piece answered it.
+  The units are a list in natural spelling keyed by `toSearchKey` itself, so nothing stored
+  depends on it and a missing unit is a line; only the forms written after a number — «рулона»,
+  «пакетиков», «таблеток», never «таблетки», which begins the goods' own name. A query word right
+  after a number that starts a unit is read as that unit against every name — «батарейки 4 шту»
+  on its way to «штук», or the item vanished on every keystroke until the unit was typed whole.
+  One that is a slip from a unit — an edit, or two letters swapped: «кефир 500 мд», «500 лм» — is
+  that unit only against a name that prints it after the same number — apart or together, «500 мл»
+  or «500мл» — and elsewhere the word it spells: read as a size everywhere, «2 сом замороженный» let
+  «Котлеты … замороженные» in beside the fish, and against any «см» it let in «Пицца … 30 см» — the
+  number gives a slip away. Either way only while another word still grounds the query, because in
+  «2 суп» or «2 кап» the word is the goods. What it costs, named: «чай пакетики» misses the tea, its
+  word measured as a word (the owner's decision); a right unit no longer carries a typo through the
+  mean — «шакалат 100 гр» is lost where «шакалат голд» is found; a real word that shares a unit's
+  key goes with it — «7 Up» is `7 up`, which «7 ап» no longer reaches; a slip reaches only the unit
+  it slipped from, beside the number typed — «кефир 500 мд» loses «Кефир 1 л», which «кефир 500 мл»
+  finds, and «кефир 1 мд» loses «Кефир 1000 мл»; a small count that matches the label passes for a
+  slip — «1 суп доширак» brings «Doshirak лапша … 1 уп» in at the soup's distance, since only the
+  meaning tells the goods from a mistyped unit; the start of a brand after a number is taken for a
+  unit being typed — on «сыр 125 ка» (`ka` starts `kapsul`) every cheese comes one edit behind the
+  Camembert, for one keystroke; and «тш» for «шт» is `цh` in the key, no transposition of `sht`, and
+  two edits from it.
+  A grounding word is measured against the grounding words of the name only, never
   against «л» or «1», which every two-letter word is within two edits of. Grounding words fold by their **mean**,
   rounded up; short words by their **worst**, at most one edit, so each has to find its pair
   and «1 л» against «2 л» costs one. A query with no grounding word but with letters — «M&M's» is
@@ -410,7 +433,8 @@ chosen. What no threshold reaches went to tasks with numbers: **synonyms** — �
 dictionary above, which puts 67 of 73 first and alone; **the absolute
 budget** — «овощи» finds «Мука … высший сорт», «специи» «Соевый соус», «пельмени» «Чай зелёный»,
 3 of 25 — MOL-46; **a unit word grounding a match** — «сыр» is two edits from `sht` of «4 шт» —
-MOL-48. Weighting vowel edits below consonant ones was tried against the budget and refuted:
+closed by MOL-48 for the units it lists, which took six of the ten items «сыр» found. Weighting
+vowel edits below consonant ones was tried against the budget and refuted:
 `ovoshi`/`vishi` share every consonant, while the right `canah`/«Чанах» and `grecka`/«Гречка»
 differ by two. **The owner's absent words flatter the search:** of fifty everyday purchases the
 shelf does not carry, 25 find something since MOL-45 — «макароны» finds the spaghetti through
@@ -420,7 +444,8 @@ or by the start of a word («сметана» is in the chips' name), which no t
 «Предложить товар» shown only on an empty answer, that is a question for the screen (MOL-23),
 not the search. The other six are an edit of the ending inside the budget («яблоки» →
 «яблочный», gone at a budget of 1). The remaining 12 share nothing but letters — the absolute
-budget («водка» → «Вода») and the unit word («сыр» → «4 шт»), MOL-46 and MOL-48.
+budget («водка» → «Вода», «сыр» → «Сок»), MOL-46; the unit word that added to them is gone
+(MOL-48).
 `REMEMBERED_PREFIX` was measured by typing letter by letter: a pick lifts its item on the next
 letter 18 times at 2, 9 at 3, 5 at 4. It harms 5 times at 2 — where two of the owner's words
 share two letters, a pick for Coca-Cola on «ко» puts it above «Колбаса» on «кол», one for
@@ -613,10 +638,12 @@ device, private always. The rate is what the two amounts say and is not stored b
   to the snapshot's six digits at the end, the way a cross rate is rounded. The screen walks the
   chain once (`ownRates`) for the wallet, the prices and the reason a wallet is missing.
 - **A trip takes it at the start, like the official one, and never again** (В-4): with
-  `actors.rate_preference = 'personal'` — the default — and an exchange of the pair dated no later
-  than today in Yerevan, the snapshot is `source: 'personal'` with no provider and no jump;
-  otherwise MOL-39's branch as it was. Nothing is required of the person: without exchanges the
-  two preferences are the same answer. An exchange made while a trip is open moves the next one.
+  `actors.rate_preference = 'personal'` — the default — and a known cost of the spending currency
+  dated no later than today in Yerevan — by an exchange of the pair, a chain, or an income alone
+  (MOL-66) — the snapshot is `source: 'personal'` with no provider and no jump; otherwise MOL-39's
+  branch as it was. Nothing is required of the person: without exchanges and incomes the two
+  preferences are the same answer. An exchange or an income made while a trip is open moves the
+  next one.
 - **Every exchange is set beside the central bank of its own day**, by the same `pickOfficialRate`
   a trip started that day would use — «на 8 754 ֏ больше» or «меньше», never «комиссия»: a good
   exchanger beats the bank, and the difference says nothing about why.
@@ -660,6 +687,38 @@ device, private always. The rate is what the two amounts say and is not stored b
   from the record threw away everything bought between the exchange and its entry. Without a remainder named
   at the last exchange it speaks of that exchange's money only. A day's official rate that jumped
   is never an exchange's measure: the rate before the jump is, or no comparison at all.
+
+**An income is money that came in with nothing given for it (MOL-66)** — the actual day, amount,
+currency and a source from the owner's own closed list (`incomes`, В-3); nothing expected is ever
+written. Private exactly as an exchange is, and written by an exchange's rules: a name from the
+device, a repeat is 200 and anything else under that name 409; an amendment in place with its
+version kept in `income_revisions`; a removal offered back for ten minutes. One money model, one
+set of rules — the task's own «as for exchanges in MOL-40» predates MOL-42's history.
+
+- **It is a link of the same walk** (В-1). In the currency of conversion it moves nothing — that
+  currency costs one. In any other its price in the currency of conversion was never named, so by
+  the rule of every unknown cost it is **the official rate of its own day**, fresh and judged for a
+  jump as money of no known cost is, and the wallet says «часть — по курсу ЦБ РА». It is never
+  valued at what the money already held cost — that is a price of other money. What was held
+  before it weighs it as for an exchange (`heldBefore`, asked where it will count); unknown, the
+  wallet takes the income alone and says «по последнему поступлению» (`basis: 'income'`). No fresh
+  rate, or a day before the currency of conversion changed, and the cost is unknown with the income
+  named as the reason (`walletUnknown.given: null`). **Incomes alone make a wallet**, so «Обмен
+  денег» is empty only when its card has nothing to say — no exchange, no wallet, no reason for one
+  missing, no price of another currency: drawn empty over drams that came in, it said «trips take the
+  central bank» while they took the income's rate, and hid the switch back (adversarial Д1).
+- **Money bought with the currency of conversion is an exchange, not an income** (Р-6): dollars
+  brought from home with their rouble price on the owner's sheet are «251 000 ₽ → 2 900 $», and
+  written so they carry that price instead of the bank's. The sheet says it under any other
+  currency.
+- **Both screens are one walk** (`ownMoney`): «Обмен денег» and «Доходы» read the exchanges, the
+  incomes and the cache once, and the sheets ask «сколько было до» by one list, `receipts`, of every
+  exchange and income with whether it gave its currency a price. The hint starts from the latest
+  money in, whichever kind, and says which (`from`).
+- **«Доходы» is a journal by month with what came in per currency, never converted** (В-2). The
+  sum is the model's (`incomeMonths`); one no money can hold is left out rather than thrown — the
+  screen failing whole would take away the one way to remove the income that made it. «Пришло /
+  потрачено» is not in 0.1: a purchase need not have a price, so «потрачено» would always be short.
 
 ## Tracker and documentation
 
@@ -995,8 +1054,8 @@ database access. In a product about data integrity, two write paths will silentl
 - Country and city are part of the key from the start, not "we'll add it later".
 - **A person can be erased, and erasure is one function** (MOL-58): `ErasureRepository.erase` in
   `backend/src/db`, one transaction under a lock on the owner's row. It removes sessions, search
-  picks, verdicts with the withdrawn ones, events, expenses, trips, exchanges (MOL-40 — the
-  person's own money), login requests by Telegram id
+  picks, verdicts with the withdrawn ones, events, expenses, trips, exchanges and incomes (MOL-40,
+  MOL-66 — the person's own money), login requests by Telegram id
   — they carry no foreign key, so no cascade reaches them — and the owner. Catalogue items the
   person added stay with `created_by` nulled, and **every place stays** (owner's decision
   24.09.2026). People erase themselves with `/delete` in the bot; the owner's fallback is
@@ -1830,8 +1889,10 @@ exchanges, the wallet worked out from them, the preference «мой / ЦБ РА�
 beside the central bank of its day. The trip total says «мой курс» for it. MOL-42 made it every
 currency's cost rather than one pair's — chains, reversals, money of no known cost valued at the
 bank's rate of its day, a change of the currency of conversion that works forwards — and gave an
-exchange amendments with their history and a note. Incomes and the rest
-of the money model are still their own tasks.
+exchange amendments with their history and a note. MOL-66 put incomes beside them — «Доходы», the
+second row of the money group: a journal by month, and an income in any currency but the one of
+conversion is a link of the same walk at the bank's rate of its day. Accounts and balances are
+MOL-43's question.
 
 MOL-58 gave the people whose data this is the minimum 0.1 owes them: a page that says what is
 kept and for how long (`/privacy`, open without a session), `/delete` in the bot, which erases a

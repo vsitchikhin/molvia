@@ -244,11 +244,6 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
         'Кофе Jacobs Monarch молотый 230 г',
         "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
       ],
-      [
-        'Мука пшеничная высший сорт 2 кг',
-        'Соевый соус Kikkoman 150 мл',
-        'Стиральный порошок Ariel 3 кг',
-      ],
     ],
     фанта: ['Fanta апельсин 1 л'],
     фан: ['Fanta апельсин 1 л'],
@@ -258,17 +253,12 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     ],
     мол: [
       ['Кофе Jacobs Monarch молотый 230 г', 'Молоко Марианна 3,2% 1 л', 'Молоко Ашхар 2,5% 1 л'],
-      ['Соевый соус Kikkoman 150 мл', 'Сливки Марианна 20% 200 мл'],
       'Средство для мытья пола Mr. Proper 1 л',
     ],
     моло: [
       ['Кофе Jacobs Monarch молотый 230 г', 'Молоко Марианна 3,2% 1 л', 'Молоко Ашхар 2,5% 1 л'],
       'Полотенце кухонное',
-      [
-        'Соевый соус Kikkoman 150 мл',
-        'Средство для мытья пола Mr. Proper 1 л',
-        'Сливки Марианна 20% 200 мл',
-      ],
+      'Средство для мытья пола Mr. Proper 1 л',
     ],
     несквик: ['Nesquik какао-напиток 250 г'],
     неск: ['Nesquik какао-напиток 250 г', 'Хлопья Nestlé Fitness 300 г'],
@@ -303,15 +293,7 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
         'Соевый соус Kikkoman 150 мл',
         'Соус чесночный Махеевъ 200 г',
       ],
-      [
-        "Чипсы Lay's сметана и лук 150 г",
-        'Батарейки Duracell AA 4 шт',
-        'Салфетки бумажные Zewa 100 шт',
-        'Салфетки влажные Huggies 56 шт',
-        'Станки Gillette Blue II 5 шт',
-        'Таблетки для посудомоечной машины Finish 40 шт',
-        'Булочки с кунжутом 4 шт',
-      ],
+      "Чипсы Lay's сметана и лук 150 г",
     ],
     чипсы: ["Чипсы Lay's сметана и лук 150 г"],
     чип: ["Чипсы Lay's сметана и лук 150 г"],
@@ -382,13 +364,7 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
         'Doshirak лапша курица 90 г',
       ],
       ["Хлопья кукурузные Kellogg's Corn Flakes 375 г", 'Колбаса сервелат Макур'],
-      [
-        'Корм для кошек Whiskas 85 г',
-        'Корм для собак Pedigree 400 г',
-        'Мука пшеничная высший сорт 2 кг',
-        'Стиральный порошок Ariel 3 кг',
-        'Крекеры TUC 100 г',
-      ],
+      ['Корм для кошек Whiskas 85 г', 'Корм для собак Pedigree 400 г', 'Крекеры TUC 100 г'],
     ],
     'средство для полов': ['Средство для мытья пола Mr. Proper 1 л'],
     'собачий корм': ['Корм для собак Pedigree 400 г'],
@@ -491,10 +467,10 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
    *   chips', «печень» in «печёночный») — no threshold removes those, a question for the
    *   screen (MOL-23), not the search. Six more by an edit of the ending, inside the budget
    *   («томаты» → «томатный», «яблоки» → «яблочный», two edits, gone at a budget of 1).
-   *   «соль» and «суп» drag a tail of «шт» behind the first row — MOL-48.
    * - `UNRELATED` — nothing in common but letters: the absolute budget («водка» → «Вода»,
-   *   «мыло» → «Молоко», «торт», «плов» — MOL-46) and a unit word grounding a match («сыр» is
-   *   two edits from `sht` of «4 шт» — MOL-48).
+   *   «мыло» → «Молоко», «торт», «плов», «сыр» → «Сок» and «сорт» — MOL-46). A unit grounded
+   *   matches too until MOL-48 — «сыр» is two edits from `sht` of «4 шт» — and six of the
+   *   ten «сыр» found went with it.
    * - `BY_SYNONYM` — the shelf does carry it, under another name: «макароны» are the spaghetti.
    *   Absent from the list by its word, found by the dictionary (MOL-45).
    *
@@ -529,29 +505,14 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
         'Соус чесночный Махеевъ 200 г',
         'Соевый соус Kikkoman 150 мл',
       ],
-      [
-        'Салфетки бумажные Zewa 100 шт',
-        'Станки Gillette Blue II 5 шт',
-        'Таблетки для посудомоечной машины Finish 40 шт',
-        'Булочки с кунжутом 4 шт',
-        'Средство для мытья пола Mr. Proper 1 л',
-        'Салфетки влажные Huggies 56 шт',
-        'Батарейки Duracell AA 4 шт',
-        'Сливки Марианна 20% 200 мл',
-      ],
+      'Средство для мытья пола Mr. Proper 1 л',
     ],
     масло: [],
     чай: ["Чипсы Lay's сметана и лук 150 г"],
     сыр: [
       [
-        'Салфетки бумажные Zewa 100 шт',
         'Мука пшеничная высший сорт 2 кг',
-        'Станки Gillette Blue II 5 шт',
-        'Таблетки для посудомоечной машины Finish 40 шт',
-        'Булочки с кунжутом 4 шт',
         'Средство для мытья пола Mr. Proper 1 л',
-        'Салфетки влажные Huggies 56 шт',
-        'Батарейки Duracell AA 4 шт',
         'Сок Rich апельсин 1 л',
         'Сок Noy яблочный 1 л',
       ],
@@ -583,12 +544,6 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
       'Тарелка суповая',
       [
         "Чипсы Lay's сметана и лук 150 г",
-        'Салфетки бумажные Zewa 100 шт',
-        'Станки Gillette Blue II 5 шт',
-        'Таблетки для посудомоечной машины Finish 40 шт',
-        'Булочки с кунжутом 4 шт',
-        'Салфетки влажные Huggies 56 шт',
-        'Батарейки Duracell AA 4 шт',
         'Соус чесночный Махеевъ 200 г',
         'Сок Rich апельсин 1 л',
         'Сок Noy яблочный 1 л',
@@ -602,7 +557,6 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     шампунь: [],
     мыло: [
       ['Молоко Ашхар 2,5% 1 л', 'Кофе Jacobs Monarch молотый 230 г', 'Молоко Марианна 3,2% 1 л'],
-      ['Соевый соус Kikkoman 150 мл', 'Сливки Марианна 20% 200 мл'],
     ],
     губка: ['Мука пшеничная высший сорт 2 кг'],
     пакеты: ['Спагетти Barilla №5 500 г'],

@@ -912,10 +912,13 @@ describe('the exchanges', () => {
       estimated: false,
     },
     costs: [],
-    heldEstimates: [{ held: { amount: '85000.00', currency: 'AMD' }, whole: true }],
+    heldEstimates: [
+      { held: { amount: '85000.00', currency: 'AMD' }, whole: true, from: 'exchange' },
+    ],
     baseSince: null,
     walletUnknown: null,
     exchanges: [],
+    receipts: [],
   }
 
   function clientReplying(status: number, body: unknown) {
@@ -1011,5 +1014,103 @@ describe('the exchanges', () => {
     await client.restoreExchange(EXCHANGE)
     expect(calls[2]?.method).toBe('POST')
     expect(new URL(calls[2]?.url ?? '').pathname).toBe(`/exchanges/${EXCHANGE}/restore`)
+  })
+})
+
+describe('the incomes (MOL-66)', () => {
+  const INCOME = '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c2d'
+  const overviewWire = {
+    base: 'RUB',
+    baseSince: null,
+    months: [
+      {
+        month: '2026-09',
+        sums: [{ amount: '99615.00', currency: 'RUB' }],
+        incomes: [
+          {
+            id: INCOME,
+            receivedOn: '2026-09-15',
+            amount: { amount: '99615.00', currency: 'RUB' },
+            heldBefore: null,
+            source: 'salary',
+            note: null,
+            revision: 1,
+            amendedAt: null,
+            history: [],
+          },
+        ],
+      },
+    ],
+    receipts: [{ id: INCOME, currency: 'RUB', on: '2026-09-15', priced: false }],
+    heldEstimates: [],
+  }
+
+  function clientReplying(status: number, body: unknown) {
+    const calls: { url: string; method: string; body: unknown }[] = []
+    const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      calls.push({
+        url: input instanceof URL ? input.href : typeof input === 'string' ? input : input.url,
+        method: init?.method ?? 'GET',
+        body: typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined,
+      })
+      return Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    }
+    return { client: createClient({ baseUrl: 'http://api', fetch }), calls }
+  }
+
+  const body = {
+    id: INCOME,
+    amount: { minor: 9_961_500n, currency: 'RUB' as const },
+    receivedOn: '2026-09-15',
+    source: 'salary' as const,
+  }
+
+  it('reads the screen whole, with the sums decoded to money', async () => {
+    const { client, calls } = clientReplying(200, overviewWire)
+    const overview = await client.incomes()
+    expect(overview.months[0]?.sums).toEqual([{ minor: 9_961_500n, currency: 'RUB' }])
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe('/incomes')
+  })
+
+  it('records an income and tells a new one from a repeat', async () => {
+    const fresh = clientReplying(201, overviewWire)
+    expect((await fresh.client.recordIncome(body)).created).toBe(true)
+    expect(fresh.calls[0]).toMatchObject({
+      method: 'POST',
+      body: {
+        id: INCOME,
+        amount: { amount: '99615.00', currency: 'RUB' },
+        receivedOn: '2026-09-15',
+        source: 'salary',
+      },
+    })
+    const repeat = clientReplying(200, overviewWire)
+    expect((await repeat.client.recordIncome(body)).created).toBe(false)
+  })
+
+  it('refuses a remainder in another currency before sending it', async () => {
+    const { client, calls } = clientReplying(201, overviewWire)
+    const held = { ...body, heldBefore: { minor: 100n, currency: 'AMD' as const } }
+    expect(await codeOf(client.recordIncome(held))).toBe(ISSUE.INCOME_HELD_NOT_RECEIVED)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('amends, removes and brings back inside its own path segment', async () => {
+    const { client, calls } = clientReplying(200, overviewWire)
+    const { amount, receivedOn, source } = body
+    await client.amendIncome(INCOME, { amount, receivedOn, source, revision: 1, note: 'Викаса' })
+    await client.removeIncome('../actors/me')
+    await client.restoreIncome(INCOME)
+    expect(calls[0]).toMatchObject({ method: 'PUT', body: { revision: 1, note: 'Викаса' } })
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/incomes/${INCOME}`)
+    expect(calls[1]?.method).toBe('DELETE')
+    expect(new URL(calls[1]?.url ?? '').pathname).toBe('/incomes/..%2Factors%2Fme')
+    expect(calls[2]?.method).toBe('POST')
+    expect(new URL(calls[2]?.url ?? '').pathname).toBe(`/incomes/${INCOME}/restore`)
   })
 })

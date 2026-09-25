@@ -31,6 +31,7 @@ const STORED = [
   'telegram',
   'purchases',
   'exchanges',
+  'incomes',
   'places',
   'ratings',
   'search',

@@ -1,6 +1,6 @@
 {
-  "id": "c119bdf4-9605-4f95-803d-fe00628c4190",
-  "prevId": "a06e9ed0-7191-42fb-b95c-06db448a383a",
+  "id": "0f4855a4-2960-4ec7-b32e-70ea708c4149",
+  "prevId": "c119bdf4-9605-4f95-803d-fe00628c4190",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1366,6 +1366,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "admits": {
+          "name": "admits",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         }
       },
       "indexes": {},

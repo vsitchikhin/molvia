@@ -305,17 +305,20 @@
     "my_rate": "My rate",
     "basis_weighted": "average of what is left · since {date}",
     "basis_last": "by the last exchange · since {date}",
-    "estimated": "part of it at the Central Bank of Armenia rate of the exchange days: what that money cost was never recorded",
+    "basis_income": "by the last income · since {date}",
+    "estimated": "part of it at the Central Bank of Armenia rate of the days of exchanges and incomes: what that money cost was never recorded",
     "base_since": "Counting in {base} since {date} — earlier exchanges in another currency are not in the rate and stay as they were",
     "cost_line": "{currency}: {rate} · {basis}",
     "cost_line_estimated": "{currency}: {rate} · {basis} · part at the Central Bank of Armenia rate",
-    "no_wallet": "No {base} → {quote} exchanges yet — new trips count by the Central Bank of Armenia rate",
-    "wallet_unknown": "Rate unknown: the {given} → {quote} exchange of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New trips count by the Central Bank of Armenia rate until you record an exchange of a known price",
-    "wallet_old_reckoning": "Rate unknown: the {quote} bought on {date} with {given} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New trips count by the Central Bank of Armenia rate until you record an exchange paid in {base}",
+    "no_wallet": "No {quote} has come in yet, by exchange or income — new trips count by the Central Bank of Armenia rate",
+    "wallet_unknown": "Rate unknown: the {given} → {quote} exchange of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New trips count by the Central Bank of Armenia rate until you record an exchange of a known price or an income on a day with a fresh Central Bank of Armenia rate",
+    "wallet_old_reckoning": "Rate unknown: the {quote} bought on {date} with {given} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New trips count by the Central Bank of Armenia rate until you record an exchange paid in {base} or an income in {quote} after the change, on a day with a fresh Central Bank of Armenia rate",
+    "wallet_unknown_income": "Rate unknown: the {quote} income of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New trips count by the Central Bank of Armenia rate until you record an exchange of a known price or an income on a day with a fresh Central Bank of Armenia rate",
+    "wallet_old_reckoning_income": "Rate unknown: the {quote} received on {date} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New trips count by the Central Bank of Armenia rate until you record an exchange paid in {base} or an income in {quote} after the change, on a day with a fresh Central Bank of Armenia rate",
     "preference_legend": "New trips count",
     "preference_personal": "by my rate",
     "preference_official": "by the central bank rate",
-    "preference_hint": "My rate when there is an exchange; without one a trip takes the central bank rate anyway",
+    "preference_hint": "My rate comes from exchanges and incomes; until there is one, a trip takes the central bank rate anyway",
     "record": "Record an exchange",
     "list_title": "Exchanges",
     "row_amounts": "{given} → {received}",
@@ -345,7 +348,7 @@
     "conflict": "This exchange is already recorded — the list shows it as it stands now. If the amounts are wrong, tap it in the list and amend it",
     "empty": {
       "title": "No exchanges yet",
-      "body": "Record what you gave and what you got — the rate is worked out for you. Until then trips count by the central bank rate"
+      "body": "Record what you gave and what you got — the rate is worked out for you. Until you have a rate of your own, trips count by the central bank rate"
     },
     "offline": {
       "title": "No connection",
@@ -370,6 +373,7 @@
       "held_hint": "Optional. With it the rate accounts for what the money left over cost; without it the rate of this exchange is taken",
       "held_estimate": "By the recorded spending ≈ {amount}",
       "held_estimate_last": "Of the last exchange ≈ {amount} is left by the recorded spending",
+      "held_estimate_last_income": "Of the last income ≈ {amount} is left by the recorded spending",
       "note": "Where, and a note",
       "note_placeholder": "Say, «VTB cash machine» or «from memory»",
       "bad_note": "There is nothing here to keep — write at least a word or leave the field empty",
@@ -383,6 +387,78 @@
       "current_held": "held before {amount}",
       "saving": "Saving the exchange…",
       "bad_day": "Choose the day of the exchange"
+    }
+  },
+  "income": {
+    "title": "Income",
+    "record": "Record income",
+    "edit": "Amend income:",
+    "row_line": "{source} · {date}",
+    "amended": "amended {date}",
+    "remove": "Remove income {amount}",
+    "remove_sheet": {
+      "title": "Remove this income?",
+      "body": "Past trips do not change. If this income was part of your rate, new trips will work it out without it",
+      "confirm": "Remove income"
+    },
+    "removed": "Income removed: {amount}",
+    "restore": "Bring back",
+    "restored": "Income restored",
+    "restore_gone": "This income can no longer be restored — the removal is final. If you needed it, record it again",
+    "conflict": "This income is already recorded — here it is as it stands. If something is wrong, tap it in the list and amend it",
+    "amend_conflict": "This income was amended on another device — here it is as it stands now. Amend it again if you need to",
+    "vanished": "This income is gone — it was removed. The list is up to date",
+    "empty": {
+      "title": "No income yet",
+      "body": "Record how much came in and when — we will add up each month. Income is optional: trips and ratings work without it"
+    },
+    "offline": {
+      "title": "No connection",
+      "body": "We will show your income once the connection is back",
+      "strip": "No connection — you can record income once it is back"
+    },
+    "load_error": {
+      "title": "Could not load your income",
+      "body": "The server did not answer properly. Try again"
+    },
+    "failed": "That did not work. Check the connection and try again",
+    "source": {
+      "salary": "Salary",
+      "bonus": "Bonus",
+      "freelance": "Freelance / side job",
+      "debt_return": "Debt repaid",
+      "sale": "Sold something",
+      "gift": "Gift / help",
+      "interest": "Deposit interest",
+      "brought": "Money brought along",
+      "other": "Other"
+    },
+    "sheet": {
+      "title": "Income",
+      "title_amend": "Amend income",
+      "meta": "How much came in and when — in any of the four currencies",
+      "amount": "Amount",
+      "currency": "Currency",
+      "bought_hint": "Bought this money with {base}? Record it as an exchange — the rate will count your price",
+      "source": "From",
+      "source_placeholder": "Choose",
+      "no_source": "Choose where the money came from",
+      "day": "Day received",
+      "bad_day": "Choose the day it came in",
+      "held": "{currency} held before it came in",
+      "held_hint": "Optional. With it the rate counts what the money already held cost; without it we take the Central Bank of Armenia rate of that day",
+      "note": "Note",
+      "note_placeholder": "For example, «for September» or «from a client»",
+      "bad_note": "There is nothing to save in the note — write a word or leave it empty",
+      "history": "Earlier versions",
+      "version": "until {until}: {amount} · {source} · {date}",
+      "version_note": "until {until}: {amount} · {source} · {date} · {note}",
+      "save": "Save income",
+      "save_amend": "Save the amendment",
+      "saving": "Saving income…",
+      "amend_conflict": "While you were editing, this income was amended on another device. It now stands as below; save again to write yours over it",
+      "current": "Now recorded: {details}",
+      "current_held": "held before {amount}"
     }
   },
   "devices": {
@@ -507,7 +583,8 @@
     "login_rate_limited": "Too many login requests. Try again in a minute",
     "login_disabled": "Telegram sign-in is not configured yet",
     "bot_unauthorized": "The bot could not authenticate",
-    "exchange_in_future": "An exchange cannot be dated in the future"
+    "exchange_in_future": "An exchange cannot be dated in the future",
+    "income_in_future": "An income cannot be dated in the future"
   },
   "settings": {
     "title": "Settings",
@@ -593,6 +670,10 @@
       "exchanges": {
         "term": "Money exchanges",
         "text": "How much you changed, of which currency and when, and the note of where, if you write one — your own rate is worked out from them. When you amend an exchange, the version before it is kept beside it for as long as the exchange itself. Only you see them."
+      },
+      "incomes": {
+        "term": "Income",
+        "text": "How much came in, in which currency, when and from where, and the note if you write one — your rate is worked out from these too. When you amend an income, the earlier version is kept beside it for as long as the income exists. Only you see it."
       },
       "places": {
         "term": "Shops",
