@@ -44,6 +44,8 @@ function harness(
 ): { bot: Bot; calls: Call[] } {
   const calls: Call[] = []
   let shown: unknown
+  // Telegram's own memory of the message: whether it still carries its buttons.
+  let buttons = true
   const bot = assembleBot(
     '42:TEST',
     { api: api as MolviaBotClient, appUrl: 'https://molvia.test', now: () => now },
@@ -65,6 +67,19 @@ function harness(
         }) as never
       }
       shown = body.text
+      buttons = false
+    }
+    // Taking away buttons that are already gone is refused, exactly like a text edit.
+    if (method === 'editMessageReplyMarkup') {
+      const restoring = (payload as { readonly reply_markup?: unknown }).reply_markup !== undefined
+      if (!restoring && !buttons) {
+        return Promise.resolve({
+          ok: false,
+          error_code: 400,
+          description: 'Bad Request: message is not modified',
+        }) as never
+      }
+      buttons = restoring
     }
     return Promise.resolve({ ok: true, result: { message_id: 1 } }) as never
   }
@@ -86,6 +101,16 @@ function command(text: string, chat: Record<string, unknown> = CHAT): Update {
   }
 }
 
+/** The prompt's own buttons, as Telegram hands them back with every press. */
+const KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: 'Удалить навсегда', callback_data: `erase:ok:${String(NOW)}` },
+      { text: 'Отмена', callback_data: `erase:no:${String(NOW)}` },
+    ],
+  ],
+}
+
 function press(data: string, from: Record<string, unknown> = FROM): Update {
   return {
     update_id: 2,
@@ -94,7 +119,13 @@ function press(data: string, from: Record<string, unknown> = FROM): Update {
       from: from as never,
       chat_instance: 'ci',
       data,
-      message: { message_id: 10, date: 0, chat: CHAT, from: { ...FROM, id: 42, is_bot: true } },
+      message: {
+        message_id: 10,
+        date: 0,
+        chat: CHAT,
+        from: { ...FROM, id: 42, is_bot: true },
+        reply_markup: KEYBOARD,
+      },
     },
   }
 }
@@ -203,7 +234,43 @@ describe('/delete — человек удаляет себя сам (MOL-58)', (
 
     await bot.handleUpdate(press(`erase:no:${String(NOW)}`))
 
-    expect(sent(calls, 'editMessageReplyMarkup')).toBeUndefined()
+    // Taken away to claim the right to speak, then put back when nothing could be said.
+    const restores = calls.filter((call) => call.method === 'editMessageReplyMarkup')
+    expect(restores.at(-1)?.payload.reply_markup).toEqual(KEYBOARD)
+  })
+
+  // Adversarial С-1: with the alert refused, a double tap put the same words in the chat twice.
+  it.each([
+    ['«Отмена»', `erase:no:${String(NOW)}`],
+    ['устаревшая кнопка', `erase:ok:${String(NOW - ERASE_BUTTON_SECONDS - 1)}`],
+  ])('%s дважды без алерта — слова в чате один раз', async (_name, data) => {
+    const { bot, calls } = harness({}, NOW, ['answerCallbackQuery'])
+
+    await bot.handleUpdate(press(data))
+    await bot.handleUpdate(press(data))
+
+    expect(calls.filter((call) => call.method === 'sendMessage')).toHaveLength(1)
+  })
+
+  it('второе нажатие молчит и тогда, когда первое сказало поверх сообщения', async () => {
+    const { bot, calls } = harness()
+    await bot.handleUpdate(press(`erase:no:${String(NOW)}`))
+    // The second press finds the alert refused — its query aged out while the first was handled.
+    bot.api.config.use((prev, method, payload, signal) =>
+      method === 'answerCallbackQuery'
+        ? (Promise.resolve({
+            ok: false,
+            error_code: 400,
+            description: 'query is too old',
+          }) as never)
+        : prev(method, payload, signal),
+    )
+
+    await bot.handleUpdate(press(`erase:no:${String(NOW)}`))
+
+    // The refusal really happened: the second alert never reached the recording transformer.
+    expect(calls.filter((call) => call.method === 'answerCallbackQuery')).toHaveLength(1)
+    expect(calls.filter((call) => call.method === 'sendMessage')).toEqual([])
   })
 
   it('«Удалить навсегда» после «Отмены» — нажатие было, и «Готово» правда', async () => {
@@ -252,7 +319,9 @@ describe('/delete — человек удаляет себя сам (MOL-58)', (
 
     await bot.handleUpdate(press(`erase:ok:${String(NOW - ERASE_BUTTON_SECONDS - 1)}`))
 
-    expect(sent(calls, 'editMessageReplyMarkup')).toBeUndefined()
+    // Taken away to claim the right to speak, then put back when nothing could be said.
+    const restores = calls.filter((call) => call.method === 'editMessageReplyMarkup')
+    expect(restores.at(-1)?.payload.reply_markup).toEqual(KEYBOARD)
   })
 
   it('кнопка без времени — устаревшая, не «вечная»', async () => {

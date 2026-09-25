@@ -1,4 +1,4 @@
-import { Composer, InlineKeyboard } from 'grammy'
+import { Composer, GrammyError, InlineKeyboard } from 'grammy'
 import type { Context } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
@@ -27,22 +27,52 @@ const BUTTON_DATA = new RegExp(`^${PREFIX}(ok|no):([0-9]*)$`)
  * П-4, Р-2). A refusal may stay silent because its buttons stay for the next press; these take
  * them away, and silence with no buttons left the question «Удалить все ваши данные?» standing
  * unanswered — after «Удалить навсегда» was pressed. Both are true whatever happened before, so
- * unlike a refusal they may be written into the chat. The buttons go only once something was
- * said.
+ * unlike a refusal they may be written into the chat.
+ *
+ * **Under the message speaks only the press that took the buttons away** (adversarial С-1). The
+ * bot remembers nothing between presses, so a double tap said it twice; but Telegram remembers
+ * for us — taking away buttons that are already gone is refused as «message is not modified»,
+ * and that press stays quiet: the one before it has spoken. If nothing can be said at all, the
+ * buttons are put back for the next press.
  */
 async function sayAndClose(ctx: Context, key: 'erase.cancelled' | 'erase.expired'): Promise<void> {
   const text = t(ctx.from?.language_code, key)
   try {
     await ctx.answerCallbackQuery({ text, show_alert: true })
+    await dropKeyboard(ctx)
+    return
   } catch {
+    // The alert was refused — a query that aged out. Said under the message instead.
+  }
+
+  try {
+    await ctx.editMessageReplyMarkup()
+  } catch (error) {
+    if (error instanceof GrammyError && error.description.includes('message is not modified')) {
+      return
+    }
+    // The buttons could not be taken — the message is too old to edit. They stay, and the words
+    // still have to arrive.
     try {
       await ctx.reply(text)
     } catch {
-      // Nothing reached the person: the buttons stay, and the next press can try again.
-      return
+      // Nothing more to try; the buttons are still there for the next press.
+    }
+    return
+  }
+
+  try {
+    await ctx.reply(text)
+  } catch {
+    const buttons = ctx.callbackQuery?.message?.reply_markup
+    if (buttons) {
+      try {
+        await ctx.editMessageReplyMarkup({ reply_markup: buttons })
+      } catch {
+        // Neither words nor buttons — nothing left that Telegram will take.
+      }
     }
   }
-  await dropKeyboard(ctx)
 }
 
 export interface EraseDeps {
