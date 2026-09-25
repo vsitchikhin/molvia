@@ -16,6 +16,8 @@ declare module 'fastify' {
      */
     actorId: string
     actor: Actor | null
+    /** The session the request proved itself with (MOL-57): «this device» in the device list. */
+    sessionId: string
   }
 }
 
@@ -38,6 +40,7 @@ declare module 'fastify' {
 export function withActor(app: FastifyInstance, lookup: SessionLookup): void {
   app.decorateRequest('actorId', '')
   app.decorateRequest('actor', null)
+  app.decorateRequest('sessionId', '')
 
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
     const sent = readCookieValues(request.headers.cookie, SESSION_COOKIE)
@@ -80,6 +83,7 @@ export function withActor(app: FastifyInstance, lookup: SessionLookup): void {
 
     request.actor = authenticated.actor
     request.actorId = authenticated.actor.id
+    request.sessionId = authenticated.sessionId
 
     // The sliding term, and it is set here rather than by the use case because a use case knows
     // nothing about HTTP. `setSessionCookie` sends `no-store` with it, so whichever handle this

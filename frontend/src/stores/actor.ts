@@ -10,7 +10,16 @@ import {
   settingsKey,
 } from '@/stores/settingsMemory'
 import { api } from '@/api'
-import { currentIdentity, isIdentifier, rememberIdentity } from '@/stores/identity'
+import {
+  IDENTITY_KEY,
+  currentIdentity,
+  dropIdentity,
+  erasedWhileAway,
+  forgetOwner,
+  isIdentifier,
+  leavingOwner,
+  rememberIdentity,
+} from '@/stores/identity'
 
 /**
  * What the identity is doing, so a screen can show the right one of its states.
@@ -37,6 +46,18 @@ export const useActorStore = defineStore('actor', () => {
   const actor = ref<ActorView | null>(null)
   const id = ref<string | null>(currentIdentity())
   const state = ref<IdentityState>('idle')
+  /**
+   * How many times the server has answered who this browser is, and whether its last answer was
+   * «nobody» (MOL-57, adversarial Д1). `signed-out` alone cannot say that: this device sets it too
+   * — a launch with no connection and a «Выйти» not yet confirmed — and erasing a drawer on the
+   * device's own guess threw away a purchase while the session lived on.
+   */
+  const heard = ref(0)
+  const nobody = ref(false)
+  function told(isNobody: boolean): void {
+    nobody.value = isNobody
+    heard.value += 1
+  }
   const cachedSettings = ref(recallSettings(id.value))
   const settings = computed(() =>
     actor.value?.id === id.value ? settingsOf(actor.value) : cachedSettings.value,
@@ -161,10 +182,15 @@ export const useActorStore = defineStore('actor', () => {
 
   async function load(): Promise<void> {
     asking += 1
+    // The same check `verify` makes: an answer to a question asked before the owner was let go
+    // is about a session that no longer exists (self-review С-2).
+    const at = revision
     try {
-      settle(await api.me())
-      state.value = 'ready'
+      const view = await api.me()
+      if (revision !== at) return
+      adopt(view)
     } catch (error) {
+      if (revision !== at) return
       // **«Nobody» is an answer, not a failure** (MOL-56). The app stops here and draws the
       // login screen; nothing on the device is touched, because the drawers are filed under the
       // owner and Telegram brings the same one back.
@@ -172,8 +198,10 @@ export const useActorStore = defineStore('actor', () => {
       // The lock and the second `me()` that used to stand here went with the automatic sign-in
       // they existed for: two tabs racing to create an account is not a thing that can happen
       // when a person has to tap a button (MOL-53, Б3).
-      if (isMissingActor(error)) state.value = 'signed-out'
-      else fail(error)
+      if (isMissingActor(error)) {
+        state.value = 'signed-out'
+        told(true)
+      } else fail(error)
     } finally {
       asking -= 1
     }
@@ -204,7 +232,10 @@ export const useActorStore = defineStore('actor', () => {
     } catch (error) {
       // A refusal earned before a login landed says nothing about after it: the session it was
       // asking about is not the session this browser now holds (adversarial А1).
-      if (isMissingActor(error) && revision === at) state.value = 'signed-out'
+      if (isMissingActor(error) && revision === at) {
+        state.value = 'signed-out'
+        told(true)
+      }
     } finally {
       asking -= 1
     }
@@ -214,6 +245,7 @@ export const useActorStore = defineStore('actor', () => {
   function adopt(loaded: ActorView): void {
     settle(loaded)
     state.value = 'ready'
+    told(false)
   }
 
   /** Called once after the app mounts, and again by the retry control. */
@@ -221,6 +253,13 @@ export const useActorStore = defineStore('actor', () => {
     if (running) return
     running = true
     state.value = 'loading'
+    // «Выйти» in another window that this tab slept through (round 2, Д2): its own shelf still
+    // holds the drawer. Let go here as the `storage` listener would have.
+    if (erasedWhileAway()) {
+      revision += 1
+      actor.value = null
+      id.value = null
+    }
     try {
       if (!navigator.onLine) {
         // The identifier already on the device is usable without a network — a PWA precached
@@ -232,7 +271,9 @@ export const useActorStore = defineStore('actor', () => {
         // cached answers, and a person who has never signed in on this phone cannot start. That
         // is the login screen's offline state and not a notice over an empty app.
         const known = currentIdentity()
-        if (!isIdentifier(known)) {
+        // An owner who pressed «Выйти» and was not confirmed yet is not somebody to open the
+        // app as (adversarial Б2): the drawer waits for the server's word to be erased.
+        if (!isIdentifier(known) || leavingOwner() === known) {
           state.value = 'signed-out'
           return
         }
@@ -258,7 +299,53 @@ export const useActorStore = defineStore('actor', () => {
   }
   window.addEventListener('online', recover)
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') recover()
+    if (document.visibilityState === 'visible') {
+      awake()
+      recover()
+    }
+  })
+  // A page restored from the back-forward cache comes back with its memory and without the events
+  // it missed, `storage` among them.
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) awake()
+  })
+
+  /**
+   * A tab the browser froze, or kept in the back-forward cache, wakes with its memory and without
+   * the `storage` event of a «Выйти» in another window — and `recover` starts nothing from
+   * `ready`. So the check of a launch is made here too (round 3, «не проверял»).
+   */
+  function awake(): void {
+    if (id.value !== null && erasedWhileAway()) release()
+  }
+
+  /**
+   * Lets the owner go in this window (MOL-57): nobody is signed in here any more, and nothing may
+   * be written under their name. Every write of the stores asks `actor.id` first, so with it
+   * `null` a rating answering after the erasure finds nobody to file it under (adversarial Б1);
+   * and the revision moves, so a `me()` that left before this — from a return to the tab, from
+   * `online` — cannot bring the owner back and write the drawer's name again (self-review С-2).
+   */
+  function release(): void {
+    revision += 1
+    dropIdentity()
+    actor.value = null
+    id.value = null
+    state.value = 'signed-out'
+  }
+
+  /**
+   * «Выйти» in another window: the drawer is gone from storage, and the session with it — that
+   * window erased nothing before the server's `204`. So this is not a guess that needs `me()`: the
+   * owner is let go here too. **And this window erases its own shelves** (adversarial А1): the
+   * one where «Выйти» was pressed cannot reach this tab's `sessionStorage`, where the same drawer
+   * lies — `read` falls back to it, and a reload opened the app of the person who left.
+   */
+  window.addEventListener('storage', (event) => {
+    if (event.key !== IDENTITY_KEY || event.newValue !== null || id.value === null) return
+    const owner = id.value
+    release()
+    forgetOwner(owner)
   })
 
   function apply(loaded: ActorView): void {
@@ -280,6 +367,9 @@ export const useActorStore = defineStore('actor', () => {
     apply,
     adopt,
     verify,
+    release,
+    heard,
+    nobody,
     signIn,
     busy: () => asking > 0,
     retry: start,

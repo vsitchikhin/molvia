@@ -6,6 +6,7 @@ import type { Router } from 'vue-router'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import BottomSheet from '@/components/BottomSheet.vue'
+import { pageAnchor } from '@/composables/useSheetHistory'
 import { routes } from '@/router'
 
 /**
@@ -587,5 +588,166 @@ describe('BottomSheet', () => {
     await vi.waitFor(() => {
       expect(router.currentRoute.value.fullPath).toBe('/')
     })
+  })
+})
+
+/**
+ * The page under a sheet, put back where it stood (MOL-63, adversarial В2–В4). happy-dom lays
+ * nothing out, so where the opener stands on the screen, and the window's scroll, are the test's to
+ * say.
+ */
+describe('the page under the sheet', () => {
+  function scrolledTo(top: number): void {
+    Object.defineProperty(window, 'scrollY', { value: top, configurable: true })
+  }
+
+  afterEach(() => {
+    scrolledTo(0)
+  })
+
+  function opener(top: { value: number }): HTMLButtonElement {
+    const button = document.createElement('button')
+    document.body.append(button)
+    vi.spyOn(button, 'getBoundingClientRect').mockImplementation(
+      () => ({ top: top.value }) as DOMRect,
+    )
+    return button
+  }
+
+  /** The screen opens the sheet from the button's click, as a screen does. */
+  async function sheetOn(button: HTMLElement, options: { at?: string } = {}) {
+    const rendered = await render(options)
+    button.addEventListener('click', () => {
+      rendered.open.value = true
+    })
+    const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined)
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
+    return { ...rendered, scrollBy, scrollTo }
+  }
+
+  async function openFrom(button: HTMLElement, options: { at?: string } = {}) {
+    const rendered = await sheetOn(button, options)
+    button.click()
+    await nextTick()
+    return rendered
+  }
+
+  // The iOS keyboard for a field in the sheet may move the window; nothing else moves it back.
+  it('is put back when the window moved under the sheet', async () => {
+    scrolledTo(900)
+    const top = { value: 400 }
+    const { router, scrollBy } = await openFrom(opener(top))
+    top.value = 1000
+    router.back()
+    expect(scrollBy).toHaveBeenCalledExactlyOnceWith({ top: 600, behavior: 'auto' })
+  })
+
+  // iOS does not focus a tapped button: what was activated says what opened the sheet.
+  it('is measured by what was activated, whatever holds the focus', async () => {
+    scrolledTo(900)
+    const top = { value: 400 }
+    const button = opener(top)
+    const field = document.createElement('input')
+    document.body.append(field)
+    field.focus()
+    const { router, scrollBy } = await openFrom(button)
+    top.value = 100
+    router.back()
+    expect(scrollBy).toHaveBeenCalledExactlyOnceWith({ top: -300, behavior: 'auto' })
+  })
+
+  // Enter on a focused button is a click with no press; a press elsewhere before it measured the
+  // sheet by the wrong element and brought the jump of MOL-63 back (review С-4, adversarial В3).
+  it('is measured by the button activated from the keyboard, not by an older press', async () => {
+    scrolledTo(900)
+    const elsewhere = { value: 50 }
+    const other = opener(elsewhere)
+    other.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    other.click()
+    await realTime()
+    const top = { value: 400 }
+    const button = opener(top)
+    button.focus()
+    const { router, scrollBy } = await openFrom(button)
+    elsewhere.value = -70
+    router.back()
+    expect(scrollBy).not.toHaveBeenCalled()
+  })
+
+  // A sheet opened later, with no click of its own — after an answer from the API — is measured by
+  // the focus, never by what was clicked before (review С-4).
+  it('forgets a click once its task is over', async () => {
+    scrolledTo(900)
+    const elsewhere = { value: 50 }
+    const other = opener(elsewhere)
+    const { router, open, scrollBy } = await sheetOn(document.createElement('span'))
+    other.click()
+    await realTime()
+    const top = { value: 400 }
+    const button = opener(top)
+    button.focus()
+    open.value = true
+    await nextTick()
+    elsewhere.value = -70
+    top.value = 700
+    router.back()
+    expect(scrollBy).toHaveBeenCalledExactlyOnceWith({ top: 300, behavior: 'auto' })
+  })
+
+  // The list changed height above it and the browser kept the opener still: nothing to put back.
+  it('must not fire: the opener stands where it stood', async () => {
+    scrolledTo(900)
+    const { router, scrollBy } = await openFrom(opener({ value: 400 }))
+    router.back()
+    expect(scrollBy).not.toHaveBeenCalled()
+  })
+
+  it('must not fire: the opener is gone — the row the sheet deleted', async () => {
+    scrolledTo(900)
+    const top = { value: 400 }
+    const button = opener(top)
+    const { router, scrollBy } = await openFrom(button)
+    button.remove()
+    top.value = 1000
+    router.back()
+    expect(scrollBy).not.toHaveBeenCalled()
+  })
+
+  // The screen goes with the sheet, and the router puts the one under it where it was.
+  it('must not fire: close(2) leaves the screen', async () => {
+    scrolledTo(900)
+    const top = { value: 400 }
+    const { sheet, scrollBy } = await openFrom(opener(top), { at: '/trip/add' })
+    top.value = 1000
+    ;(sheet().vm as unknown as { close: (steps: number) => void }).close(2)
+    expect(scrollBy).not.toHaveBeenCalled()
+  })
+
+  // At the very top the browser keeps nothing still: a notice arrived above the list pushes it
+  // down and stays in sight. Measured by the opener, it was scrolled under the bar (adversarial В4).
+  it('must not fire: at the top of the page, what arrived above the list stays in sight', async () => {
+    const top = { value: 400 }
+    const { router, scrollBy, scrollTo } = await openFrom(opener(top))
+    top.value = 520
+    router.back()
+    expect(scrollBy).not.toHaveBeenCalled()
+    expect(scrollTo).not.toHaveBeenCalled()
+  })
+
+  it('takes the page back to the top when the window moved off it under the sheet', async () => {
+    const { router, scrollTo } = await openFrom(opener({ value: 400 }))
+    scrolledTo(300)
+    router.back()
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 0, behavior: 'auto' })
+  })
+
+  // A sheet over a sheet is opened from inside a dialog, which the page's scroll does not move.
+  it('takes no measure from inside a dialog', () => {
+    const dialog = document.createElement('dialog')
+    const button = document.createElement('button')
+    dialog.append(button)
+    document.body.append(dialog)
+    button.click()
+    expect(pageAnchor()).toBeNull()
   })
 })

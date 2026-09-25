@@ -123,6 +123,66 @@ export function forget(key: string): void {
   }
 }
 
+/**
+ * Removes every key that `match` accepts, from every shelf — the one sweep that does not name
+ * its keys one by one (MOL-57). Keys are collected before any is removed: `Storage.key(i)` shifts
+ * under a removal, and walking it while deleting skips every other key.
+ */
+export function forgetWhere(match: (key: string) => boolean): void {
+  for (const shelf of shelves()) {
+    try {
+      const keys: string[] = []
+      for (let index = 0; index < shelf.length; index += 1) {
+        const key = shelf.key(index)
+        if (key !== null && match(key)) keys.push(key)
+      }
+      for (const key of keys) shelf.removeItem(key)
+    } catch {
+      // A shelf that refuses to be read holds nothing this app could have written.
+    }
+  }
+}
+
+/**
+ * Whether the shared shelf holds a key `match` accepts — or `null` when it cannot say: blocked,
+ * or refusing writes (Safari's private mode keeps `localStorage` readable and empty), which makes
+ * the tab's own shelf the only one there is (MOL-57, round 2, Д2).
+ */
+export function sharedHolds(match: (key: string, value: string | null) => boolean): boolean | null {
+  try {
+    const shared = window.localStorage
+    const probe = 'molvia.probe'
+    shared.setItem(probe, '1')
+    shared.removeItem(probe)
+    for (let index = 0; index < shared.length; index += 1) {
+      const key = shared.key(index)
+      if (key !== null && match(key, shared.getItem(key))) return true
+    }
+    return false
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Rewrites one key on every shelf that holds it, each from its own value: `change` answers what
+ * that shelf should keep, `null` for nothing. Each shelf separately, because two shelves may hold
+ * different values under one key — the shared one and this window's own (MOL-57).
+ */
+export function reshape(key: string, change: (value: string) => string | null): void {
+  for (const shelf of shelves()) {
+    try {
+      const value = shelf.getItem(key)
+      if (value === null) continue
+      const kept = change(value)
+      if (kept === null) shelf.removeItem(key)
+      else if (kept !== value) shelf.setItem(key, kept)
+    } catch {
+      // Nothing to do: this shelf refuses to be read or written.
+    }
+  }
+}
+
 /** A list, kept as JSON, for the one thing there can be more than one of: lost identities. */
 export function readList(key: string): string[] {
   const raw = read(key)

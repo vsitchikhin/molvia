@@ -111,8 +111,11 @@ describe('словарь: повторяющиеся тексты', () => {
       Сохранить: ['item.save_edit', 'settings.save'],
       // Цена Р-2: одно состояние, написанное для трёх экранов.
       'Сервер не ответил': ['advice.error.title', 'item.error.title', 'trip.error.title'],
-      // Та же цена у офлайна: у настроек и у обменов своё состояние (MOL-40).
-      'Нет связи': ['exchange.offline.title', 'settings.offline.title'],
+      // Та же цена у офлайна: у настроек, у обменов и у устройств своё состояние (MOL-40, MOL-57).
+      'Нет связи': ['devices.offline.title', 'exchange.offline.title', 'settings.offline.title'],
+      // Один глагол, два предмета: поход и вход на устройстве. Предмет называет контекст —
+      // шторка похода и строка устройства (MOL-57).
+      Завершить: ['devices.end', 'trip.finish_confirm.ok'],
     })
   })
 
@@ -127,7 +130,12 @@ describe('словарь: повторяющиеся тексты', () => {
       Ratings: ['nav.verdicts', 'verdict.title'],
       Settings: ['nav.settings', 'settings.title'],
       Save: ['item.save_edit', 'settings.save'],
-      'No connection': ['exchange.offline.title', 'item.offline.title', 'settings.offline.title'],
+      'No connection': [
+        'devices.offline.title',
+        'exchange.offline.title',
+        'item.offline.title',
+        'settings.offline.title',
+      ],
       'The server did not answer': ['advice.error.title', 'item.error.title', 'trip.error.title'],
       // Английский не различает отмену диалога и отмену ввода; русский различает.
       Cancel: ['item.cancel', 'trip.finish_confirm.cancel'],
@@ -174,6 +182,7 @@ describe('словарь: плюральные формы', () => {
       'item.results_announced',
       'advice.ratings_count',
       'verdict.pending_count',
+      'sign_out.unsent',
     ])
   })
 })

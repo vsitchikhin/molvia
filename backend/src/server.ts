@@ -17,6 +17,7 @@ import { catalogueRoutes } from '@/routes/catalogue'
 import { placeRoutes } from '@/routes/places'
 import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
+import { sessionRoutes } from '@/routes/sessions'
 import { exchangeRoutes } from '@/routes/exchanges'
 import { advice } from '@/usecases/advice'
 import { authenticate } from '@/usecases/authenticate'
@@ -32,6 +33,7 @@ import { withdrawVerdict } from '@/usecases/withdraw-verdict'
 import { pendingVerdicts } from '@/usecases/pending-verdicts'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { signIn } from '@/usecases/sign-in'
+import { endSession, listSessions, logout } from '@/usecases/sessions'
 import { chooseTripRate } from '@/usecases/choose-trip-rate'
 import {
   amendExchange,
@@ -243,6 +245,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const removedExchanges = createExchangeRepository(db)
     let stopCleanup: (() => Promise<void>) | undefined
     let stopExchangeCleanup: (() => Promise<void>) | undefined
+    let stopSessionCleanup: (() => Promise<void>) | undefined
     instance.addHook('onReady', (ready) => {
       stopCleanup = startLoginCleanup(
         () => loginRequests.removeExpired(),
@@ -259,11 +262,20 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           instance.log.error('removed exchange cleanup failed')
         },
       )
+      // An expired session has no reader, and it kept a device name for good while the privacy
+      // page promises 180 days from the last use (MOL-57, owner's decision Q4).
+      stopSessionCleanup = startLoginCleanup(
+        () => sessions.removeExpired(),
+        () => {
+          instance.log.error('expired session cleanup failed')
+        },
+      )
       ready()
     })
     instance.addHook('onClose', async () => {
       await stopCleanup?.()
       await stopExchangeCleanup?.()
+      await stopSessionCleanup?.()
     })
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
@@ -281,6 +293,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         return startLogin(loginRequests, login.username, name)
       },
       poll: (id, secret) => completeLogin(authTransactOn(db), id, secret),
+      logout: (token) => logout(sessions, token),
     })
     internalAuthRoutes(instance, {
       secret: login?.botSecret ?? null,
@@ -302,7 +315,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     // file.
     if (process.env.NODE_ENV !== 'production') {
       devLoginRoute(instance, {
-        signIn: (telegramUserId) => signIn(actors, sessions, telegramUserId),
+        signIn: (telegramUserId, name) => signIn(actors, sessions, telegramUserId, name),
       })
     }
 
@@ -313,6 +326,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     void instance.register((guarded, _guardedOptions, guardedDone) => {
       withActor(guarded, (token) => authenticate(sessions, token))
       actorMeRoute(guarded)
+      sessionRoutes(guarded, {
+        list: (actorId, currentId) => listSessions(sessions, actorId, currentId),
+        end: (actorId, currentId, id) => endSession(sessions, actorId, currentId, id),
+      })
       settingsRoute(guarded, (owner, input) =>
         saveSettings(createSettingsRepository(db), owner, input),
       )

@@ -22,6 +22,7 @@ import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
+import { useSignOutStore } from '@/stores/signOut'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 
@@ -59,6 +60,9 @@ export default defineComponent({
     // Every settling of the identity is an occasion: «ready» is what the queue held on a `401`
     // has been waiting for (MOL-24, `HOLDS`), and «error» is what starts its doubling retry.
     watch(() => actor.state, send)
+    // A «Выйти» whose answer was lost is settled by the server's next answer, on this launch or
+    // the next (MOL-57, adversarial Б2) — the store listens from the start, whatever screen is open.
+    useSignOutStore()
 
     return { closed, route: useRoute(), announcements: provideAnnouncer() }
   },

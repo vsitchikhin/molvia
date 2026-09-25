@@ -183,3 +183,15 @@ it('leads to «Обмен денег» from the money group, and hides «Дох�
   expect(view.text()).toContain(en.settings.group_money)
   expect(view.text()).not.toMatch(/Income/)
 })
+
+it.each([
+  ['with the form', true, true],
+  ['offline and without a form to show', false, false],
+])('leads to «Устройства» from the account group %s (MOL-57)', async (_name, cached, online) => {
+  // The way into the account does not depend on whether its settings loaded.
+  if (!online) me.mockRejectedValue(new TypeError('network'))
+  const view = await render(cached, online)
+  const entry = view.findAll('a.entry').find((link) => link.text() === en.devices.title)
+  expect(entry?.attributes('href')).toBe('/settings/devices')
+  expect(view.text()).toContain(en.settings.group_account)
+})

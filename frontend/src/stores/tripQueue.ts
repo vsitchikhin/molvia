@@ -373,6 +373,15 @@ function sameWrite(a: QueuedWrite, b: QueuedWrite): boolean {
   return a.kind === b.kind && a.tripId === b.tripId && subject(a) === subject(b)
 }
 
+/**
+ * Runs `work` while no window is sending this owner's queue (MOL-57). «Выйти» erases the queue
+ * under it: a window mid-send takes out the write it sent and writes the rest back, and done
+ * during the erasure that put a purchase of the owner who left back on the disk.
+ */
+export function whileQueueIsStill(owner: string, work: () => Promise<void>): Promise<void> {
+  return exclusively(`${QUEUE_KEY}.${owner}`, work)
+}
+
 /** Runs `work` alone across every window of the app where the browser can say so. */
 function exclusively(name: string, work: () => Promise<void>): Promise<void> {
   // The DOM types promise `navigator.locks`; older WebViews do not have it (see stores/actor.ts).

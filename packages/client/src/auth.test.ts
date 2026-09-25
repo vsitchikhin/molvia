@@ -78,3 +78,66 @@ describe('login clients', () => {
     await expect(client.pollLogin(id)).rejects.toMatchObject({ code: ERROR.LOGIN_UNAVAILABLE })
   })
 })
+
+describe('устройства и выход (MOL-57)', () => {
+  it('выход несёт заголовок входа, список и завершение идут по своим адресам', async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            sessions: [
+              { id, deviceName: null, createdAt: expiresAt, lastSeenAt: expiresAt, current: true },
+            ],
+            total: 1,
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    const client = createClient({ baseUrl: '/api', fetch })
+
+    await client.logout()
+    const list = await client.sessions()
+    await client.endSession(id.toUpperCase())
+
+    expect(list.sessions[0]?.lastSeenAt).toEqual(new Date(expiresAt))
+    const [logout, sessions, end] = fetch.mock.calls
+    expect(logout?.[0]).toBe('/api/auth/logout')
+    expect(logout?.[1]?.method).toBe('POST')
+    expect(new Headers(logout?.[1]?.headers).get(LOGIN_HEADER)).toBe('1')
+    expect(sessions?.[0]).toBe('/api/sessions')
+    expect(end?.[0]).toBe(`/api/sessions/${id.toUpperCase()}`)
+    expect(end?.[1]?.method).toBe('DELETE')
+  })
+
+  it('завершение уже ушедшей сессии приходит кодом not_found', async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: ERROR.NOT_FOUND }), { status: 404 }),
+      )
+    const client = createClient({ baseUrl: '/api', fetch })
+    await expect(client.endSession(id)).rejects.toMatchObject({ code: ERROR.NOT_FOUND })
+  })
+
+  it('портал, ответивший 200 своей страницей, — не выход и не завершение (round 4)', async () => {
+    const portal = () =>
+      Promise.resolve(
+        new Response('<html>Wi-Fi</html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        }),
+      )
+    const client = createClient({ baseUrl: '/api', fetch: vi.fn<typeof globalThis.fetch>(portal) })
+
+    await expect(client.logout()).rejects.toMatchObject({
+      code: ISSUE.RESPONSE_INVALID,
+      answered: false,
+    })
+    await expect(client.endSession(id)).rejects.toMatchObject({
+      code: ISSUE.RESPONSE_INVALID,
+      answered: false,
+    })
+  })
+})

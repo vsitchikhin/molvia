@@ -1,5 +1,5 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import type { RouteRecordRaw } from 'vue-router'
+import { START_LOCATION, createRouter, createWebHistory } from 'vue-router'
+import type { RouteRecordRaw, RouterScrollBehavior } from 'vue-router'
 import SettingsView from '@/views/SettingsView.vue'
 import PrivacyView from '@/views/PrivacyView.vue'
 import AdviceView from '@/views/AdviceView.vue'
@@ -8,6 +8,7 @@ import TripHistoryView from '@/views/TripHistoryView.vue'
 import FinishedTripView from '@/views/FinishedTripView.vue'
 import TripView from '@/views/TripView.vue'
 import ExchangeView from '@/views/ExchangeView.vue'
+import DevicesView from '@/views/DevicesView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
 import { watchBrowserAnimatedBack } from '@/transitions'
 
@@ -20,6 +21,7 @@ export type RouteName =
   | 'verdicts'
   | 'settings'
   | 'exchange'
+  | 'devices'
   | 'item-search'
   | 'trip-history'
   | 'finished-trip'
@@ -61,6 +63,12 @@ export const routes = [
     name: 'exchange',
     component: ExchangeView,
     meta: { titleKey: 'exchange.title', parent: 'settings' },
+  },
+  {
+    path: '/settings/devices',
+    name: 'devices',
+    component: DevicesView,
+    meta: { titleKey: 'devices.title', parent: 'settings' },
   },
   { path: '/', name: 'trip', component: TripView, meta: { titleKey: 'trip.title', tab: 'trip' } },
   {
@@ -127,15 +135,27 @@ export const routes = [
 // `watchBrowserAnimatedBack`.
 watchBrowserAnimatedBack()
 
+/**
+ * Back and forward return to where the person was; any other move starts at the top. The
+ * sections keep no scroll of their own — their state lives in stores, not in components.
+ *
+ * A move to the same address is not the router's to scroll. It is one of two things. A sheet put
+ * away: the sheet puts the page back itself, by the element it was opened from (`putBack` in
+ * useSheetHistory.ts); scrolling back to the number saved when it opened moved the list by
+ * whatever changed above the screen meanwhile — a list reread, a queued row sent, a notice come or
+ * gone — which the browser had already kept out of sight (MOL-63). Or a push to where the router
+ * already is: it refuses the duplicate and still asks this function, from the screen to itself.
+ *
+ * The first navigation is not one of them, though it comes «from» `START_LOCATION`, whose address
+ * is «/»: that is the page loaded again — «back» into the app from another site — and the number
+ * the router saved on `pagehide` is where the person was. Read as the same address, the trip, and
+ * only the trip, forgot it (adversarial В1).
+ */
+export const scrollBehavior: RouterScrollBehavior = (to, from, saved) =>
+  from !== START_LOCATION && to.fullPath === from.fullPath ? false : (saved ?? { top: 0 })
+
 export const router = createRouter({
   history: createWebHistory(),
   routes,
-  // Back and forward return to where the person was; any other move starts at the top. The
-  // sections keep no scroll of their own — their state lives in stores, not in components.
-  //
-  // A sheet closed by «back» is a move to the same address, and it lands where the list was:
-  // the router's own `history.push` stores the position in the entry the sheet leaves, and
-  // `saved` comes from there. That is why the sheet lays its entry through the router and never
-  // with a bare `pushState` — which would leave nothing saved and drop the list to the top.
-  scrollBehavior: (_to, _from, saved) => saved ?? { top: 0 },
+  scrollBehavior,
 })

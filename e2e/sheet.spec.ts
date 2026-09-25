@@ -28,28 +28,71 @@ async function scrollY(page: Page): Promise<number> {
   return page.evaluate(() => Math.round(window.scrollY))
 }
 
+/** Where the opener stands on the screen — what the person sees, whatever `scrollY` says. */
+async function openerTop(page: Page): Promise<number> {
+  return opener(page).evaluate((element) => Math.round(element.getBoundingClientRect().top))
+}
+
+/** Two frames: the router's move has landed, so a late scroll cannot slip past the check. */
+async function settled(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            done()
+          })
+        })
+      }),
+  )
+}
+
+/** 120 px more above the list, as a list reread or a notice come would add. */
+async function grow(page: Page, where: '.content' | '.notice-slot'): Promise<void> {
+  const grown = await page.evaluate((selector) => {
+    const container = document.querySelector(selector)
+    const above = document.createElement('div')
+    above.style.height = '120px'
+    container?.prepend(above)
+    return container !== null
+  }, where)
+  expect(grown).toBe(true)
+}
+
 /** Opens the kit scrolled down to the opener — the list above it is long on purpose. */
-async function openSheet(page: Page): Promise<{ scrolled: number; length: number }> {
+async function openSheet(page: Page): Promise<{ top: number; length: number }> {
   await open(page, '/_kit')
   await expect(heading(page)).toHaveText('Kit')
+  // The scene is set before the measure: a face arriving later rewraps the lines between the
+  // browser's anchor and the opener, and moves the opener by a pixel for no fault of the sheet.
+  await page.evaluate(async () => {
+    await document.fonts.ready
+  })
   await opener(page).scrollIntoViewIfNeeded()
-  const scrolled = await scrollY(page)
-  expect(scrolled).toBeGreaterThan(200)
+  expect(await scrollY(page)).toBeGreaterThan(200)
+  const top = await openerTop(page)
   const length = await historyLength(page)
   await opener(page).click()
   await expect(sheet(page)).toBeVisible()
   // Until it has come up the sheet takes no tap — the second of a double tap (Б-5).
   await page.waitForTimeout(400)
-  return { scrolled, length }
+  return { top, length }
 }
 
-/** Closed, on the same screen, at the same scroll, with focus back on what opened it. */
-async function expectPutAway(page: Page, scrolled: number): Promise<void> {
+/**
+ * Closed, on the same screen, with the list where it stood and focus back on what opened it.
+ *
+ * Where it stood is where the opener is on the screen, not `scrollY`: the browser moves `scrollY`
+ * to keep the list still when something above it changes height, and the router scrolling back
+ * to the number taken at the opening passed this check while the list jumped (MOL-63).
+ */
+async function expectPutAway(page: Page, top: number): Promise<void> {
   await expect(sheet(page)).toBeHidden()
   await expect(page).toHaveURL('/_kit')
   await expect(heading(page)).toHaveText('Kit')
   await expect(opener(page)).toBeFocused()
-  expect(await scrollY(page)).toBe(scrolled)
+  await settled(page)
+  expect(await openerTop(page)).toBe(top)
 }
 
 test.describe('the sheet', () => {
@@ -67,30 +110,30 @@ test.describe('the sheet', () => {
   })
 
   test('Esc closes it and takes its entry away', async ({ page }) => {
-    const { scrolled } = await openSheet(page)
+    const { top } = await openSheet(page)
     await page.keyboard.press('Escape')
-    await expectPutAway(page, scrolled)
+    await expectPutAway(page, top)
   })
 
   // The browser's «back» and the iOS edge swipe are a pop: the sheet goes, the screen stays.
   test('«back» closes the sheet, not the screen, and the list stays where it was', async ({
     page,
   }) => {
-    const { scrolled } = await openSheet(page)
+    const { top } = await openSheet(page)
     await page.goBack()
-    await expectPutAway(page, scrolled)
+    await expectPutAway(page, top)
   })
 
   test('× closes it', async ({ page }) => {
-    const { scrolled } = await openSheet(page)
+    const { top } = await openSheet(page)
     await sheet(page).getByRole('button', { name: 'Close' }).click()
-    await expectPutAway(page, scrolled)
+    await expectPutAway(page, top)
   })
 
   test('a tap on the scrim closes it', async ({ page }) => {
-    const { scrolled } = await openSheet(page)
+    const { top } = await openSheet(page)
     await page.mouse.click(12, 12)
-    await expectPutAway(page, scrolled)
+    await expectPutAway(page, top)
   })
 
   test('a tap inside the sheet does not', async ({ page }) => {
@@ -100,9 +143,81 @@ test.describe('the sheet', () => {
   })
 
   test('its main action closes it through the same step', async ({ page }) => {
-    const { scrolled } = await openSheet(page)
+    const { top } = await openSheet(page)
     await sheet(page).getByRole('button', { name: 'Add to the trip' }).click()
-    await expectPutAway(page, scrolled)
+    await expectPutAway(page, top)
+  })
+
+  // Under an open sheet the list may change height above the screen — reread, a queued row
+  // sent, a notice come or gone. The browser keeps what is on screen in place; scrolling back to
+  // the number taken when the sheet opened moved the list by exactly that change (MOL-63).
+  test('the list does not jump when what is above it changed under the sheet', async ({ page }) => {
+    await openSheet(page)
+    await grow(page, '.content')
+    const underSheet = await openerTop(page)
+    await page.goBack()
+    await expect(sheet(page)).toBeHidden()
+    await settled(page)
+    expect(await openerTop(page)).toBe(underSheet)
+  })
+
+  // `overflow: hidden` stops a finger, not the platform: the iOS keyboard for a field in the sheet
+  // may move the window. Once the router no longer scrolled on the way out, nothing moved it back
+  // (adversarial В2). Moved here by hand — Chromium has no such keyboard.
+  test('the list is put back when the window moved under the sheet', async ({ page }) => {
+    const { top } = await openSheet(page)
+    const before = await scrollY(page)
+    await page.evaluate(() => {
+      window.scrollBy(0, -600)
+    })
+    expect(await scrollY(page)).toBe(before - 600)
+    await page.goBack()
+    await expectPutAway(page, top)
+  })
+
+  // Enter is a click with no press. Measured by the last press — the title — the sheet put back
+  // the title and moved the list by the change, the jump of MOL-63 (review С-4, adversarial В3).
+  test('opened from the keyboard after a press elsewhere, the list does not jump', async ({
+    page,
+  }) => {
+    const { top } = await openSheet(page)
+    await page.keyboard.press('Escape')
+    await expectPutAway(page, top)
+    await heading(page).click()
+    await opener(page).scrollIntoViewIfNeeded()
+    await opener(page).focus()
+    await page.keyboard.press('Enter')
+    await expect(sheet(page)).toBeVisible()
+    await page.waitForTimeout(400)
+    await grow(page, '.content')
+    await page.goBack()
+    await expectPutAway(page, top)
+  })
+
+  // At the very top the browser keeps nothing still: a notice come above the list pushes it down
+  // and stays in sight. Measured by the opener, it went under the bar with the title (adversarial
+  // В4). The top stays the top.
+  test('opened at the top of the page, what came above the list stays in sight', async ({
+    page,
+  }) => {
+    await open(page, '/_kit')
+    await expect(heading(page)).toHaveText('Kit')
+    await page.evaluate(async () => {
+      await document.fonts.ready
+    })
+    expect(await scrollY(page)).toBe(0)
+    await opener(page).evaluate((element) => {
+      ;(element as HTMLElement).focus({ preventScroll: true })
+    })
+    await page.keyboard.press('Enter')
+    await expect(sheet(page)).toBeVisible()
+    await page.waitForTimeout(400)
+    await grow(page, '.notice-slot')
+    await page.goBack()
+    await expect(sheet(page)).toBeHidden()
+    await settled(page)
+    expect(await scrollY(page)).toBe(0)
+    await expect(heading(page)).toBeInViewport()
   })
 
   // One entry laid, one taken: the «back» after a closed sheet leaves the screen for the trip

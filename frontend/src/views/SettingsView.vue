@@ -72,9 +72,39 @@
         </AppCard>
       </section>
     </template>
+    <!-- Outside the form's states: the way into the account does not depend on whether its
+         settings loaded (MOL-57). -->
+    <section class="group">
+      <h2 class="caption">{{ t('settings.group_account') }}</h2>
+      <AppCard as="ul" list>
+        <li>
+          <RouterLink class="entry" :to="{ name: 'devices' }">
+            <IconDevices class="entry-icon" aria-hidden="true" />
+            <span class="entry-label">{{ t('devices.title') }}</span>
+            <IconChevron class="entry-chevron" aria-hidden="true" />
+          </RouterLink>
+        </li>
+        <!-- Here and not beside «Это устройство» in the list: leaving a laptop that is not yours
+             is «quickly, then go», and it is looked for on this screen (owner's decision Q3). -->
+        <li>
+          <button class="entry leave" type="button" @click="askToLeave">
+            <IconLogout class="entry-icon" aria-hidden="true" />
+            <span class="entry-label">{{ t('settings.sign_out') }}</span>
+          </button>
+        </li>
+      </AppCard>
+    </section>
     <AppButton class="privacy" variant="ghost" block @click="privacy">{{
       t('privacy.title')
     }}</AppButton>
+    <SignOutSheet
+      v-model:open="leaveOpen"
+      :unsent="unsent"
+      :busy="signOut.leaving"
+      :offline="!online"
+      :failure="signOut.failure"
+      @confirm="signOut.leave"
+    />
     <template #docked>
       <div class="actions">
         <div
@@ -121,7 +151,7 @@
   </AppScreen>
 </template>
 <script lang="ts">
-import { defineComponent, useId } from 'vue'
+import { computed, defineComponent, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { ActorSettings } from '@molvia/model'
@@ -132,13 +162,19 @@ import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconRefresh from '~icons/mdi/refresh'
 import IconSwap from '~icons/mdi/swap-horizontal'
 import IconChevron from '~icons/mdi/chevron-right'
+import IconDevices from '~icons/mdi/devices'
+import IconLogout from '~icons/mdi/logout'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import SettingsFields from '@/components/SettingsFields.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SignOutSheet from '@/components/SignOutSheet.vue'
 import { useSettings } from '@/composables/useSettings'
+import { useSignOutStore } from '@/stores/signOut'
+import { useTripQueueStore } from '@/stores/tripQueue'
+import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 export default defineComponent({
   name: 'SettingsView',
   components: {
@@ -148,6 +184,7 @@ export default defineComponent({
     SettingsFields,
     ScreenSkeleton,
     ScreenState,
+    SignOutSheet,
     IconCloud,
     IconPencil,
     IconCheck,
@@ -155,6 +192,8 @@ export default defineComponent({
     IconRefresh,
     IconSwap,
     IconChevron,
+    IconDevices,
+    IconLogout,
   },
   setup() {
     const { t } = useI18n()
@@ -169,12 +208,43 @@ export default defineComponent({
       spendCurrency: t(`settings.currencies.${value.spendCurrency}`),
       incomeCurrency: t(`settings.currencies.${value.incomeCurrency}`),
     })
+    const settings = useSettings()
+
+    // «Выйти» (MOL-57): what would be lost is counted while the sheet is open, and the app is
+    // asked to send it first — with a connection that is usually everything. Counted is all the
+    // erasure takes that the server does not hold (adversarial Б3): the queue, the purchases it
+    // refused, every rating draft — a score picked and a review typed, «Сохранить» or not — and an
+    // unsaved settings form.
+    const queue = useTripQueueStore()
+    const drafts = useVerdictDraftsStore()
+    const signOut = useSignOutStore()
+    const leaveOpen = ref(false)
+    const unsent = computed(
+      () =>
+        queue.pending.length +
+        queue.rejected.length +
+        Object.keys(drafts.drafts).length +
+        (settings.form.dirty ? 1 : 0),
+    )
+    function askToLeave(): void {
+      leaveOpen.value = true
+      void queue.flush()
+      void drafts.flush()
+    }
+    watch(leaveOpen, (open) => {
+      if (!open) signOut.stay()
+    })
+
     return {
       t,
       saidIn,
       id: useId(),
       privacy: () => void router.push({ name: 'privacy' }),
-      ...useSettings(),
+      ...settings,
+      leaveOpen,
+      signOut,
+      unsent,
+      askToLeave,
     }
   },
 })
@@ -267,7 +337,8 @@ export default defineComponent({
   color: var(--bad-ink);
 }
 
-.money {
+.money,
+.group {
   margin-top: var(--space-6);
 }
 
@@ -304,6 +375,22 @@ export default defineComponent({
 
 .entry-label {
   flex: 1;
+}
+
+// A button dressed as the link beside it: the same row, the colour of an action that ends
+// something (MOL-57).
+.leave {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &,
+  .entry-icon {
+    color: var(--bad-ink);
+  }
 }
 
 .skeleton-card {
