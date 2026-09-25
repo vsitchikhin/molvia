@@ -399,6 +399,7 @@
     "remove_sheet": {
       "title": "Remove this income?",
       "body": "A removed income no longer counts in the rate of new trips. Past trips do not change",
+      "body_base": "Past trips do not change, and neither does the rate of new ones: an income in the currency of conversion is not part of it",
       "confirm": "Remove income"
     },
     "removed": "Income removed: {amount}",
@@ -448,7 +449,7 @@
       "held": "{currency} held before it came in",
       "held_hint": "Optional. With it the rate counts what the money already held cost; without it we take the Central Bank of Armenia rate of that day",
       "note": "Note",
-      "note_placeholder": "For example, «for September»",
+      "note_placeholder": "For example, «for September» or «from a client»",
       "bad_note": "There is nothing to save in the note — write a word or leave it empty",
       "history": "Earlier versions",
       "version": "until {until}: {amount} · {source} · {date}",

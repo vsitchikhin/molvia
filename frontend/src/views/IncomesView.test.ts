@@ -322,6 +322,22 @@ describe('IncomesView: recording, amending and removing', () => {
     expect(document.activeElement?.textContent.trim()).toBe(en.income.record)
   })
 
+  it.each([
+    ['in the currency of conversion promises nothing about the rate (Ч-2)', 'RUB', 'body_base'],
+    ['in another currency says the rate of new trips changes', 'AMD', 'body'],
+  ] as const)('removing an income %s', async (_name, currency, body) => {
+    const amount = { minor: 20_000_000n, currency }
+    incomes.mockResolvedValue(
+      overview({ months: [{ month: '2026-09', sums: [], incomes: [row({ amount })] }] }),
+    )
+    const view = await render()
+    await view.get('button.remove').trigger('click')
+    await risen()
+    expect(document.querySelector('dialog[open]')?.textContent).toContain(
+      en.income.remove_sheet[body],
+    )
+  })
+
   it('«Bring back» after the removal became final says so and reads the list again', async () => {
     incomes.mockResolvedValue(overview())
     removeIncome.mockResolvedValue(overview({ months: [] }))

@@ -152,7 +152,9 @@ export function receiptsOf(
     .sort((a, b) => {
       const [dayA, dayB] = [receiptDay(a), receiptDay(b)]
       if (dayA !== dayB) return dayA < dayB ? 1 : -1
-      return b.createdAt.getTime() - a.createdAt.getTime()
+      const time = b.createdAt.getTime() - a.createdAt.getTime()
+      // The walk breaks a tie by the name, and this is its order turned round (self-review).
+      return time !== 0 ? time : a.id < b.id ? 1 : a.id > b.id ? -1 : 0
     })
     .map((receipt) => ({
       id: receipt.id,
