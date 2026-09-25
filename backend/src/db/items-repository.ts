@@ -151,6 +151,14 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       from unnest(string_to_array(${synonymWords}, ' '),
                   string_to_array(${synonymOf}, ' ')::int[]) as s(word, n)
     ),
+    admitted as (
+      -- The person's own synonyms for exactly this query (MOL-45): it found nothing, and they
+      -- took the item by another word. The one exception to «memory never lets in what the
+      -- search did not find» — and a personal one, so it never becomes a second search.
+      select sp.item_id as id
+      from ${searchPicks} sp
+      where sp.actor_id = ${actorId} and sp.query_key = ${key} and sp.admits
+    ),
     candidates as (
       -- The column goes first, and that is not style: \`search_key %> $1\` is the only form
       -- the GIN index serves. \`$1 %> search_key\`, \`search_key <% $1\` and
@@ -173,6 +181,14 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       -- very ones «Предложить товар» just added. \`order by id\` is worse still: the planner
       -- walks the primary key and filters every row. The cost is bounded by the catalogue and
       -- by MAX_QUERY_WORDS; measured in MOL-10, under 260 ms at every threshold in MOL-14.
+      -- A branch of its own rather than an \`or\` above: \`id in (…)\` beside the trigram
+      -- conditions is not something the GIN index can serve, and the whole scan would fall back.
+      union
+      select ${items.id}, ${items.searchKey},
+             word_similarity(${key}, ${items.searchKey}),
+             (${items.searchKey} %> ${key} or ${items.searchKey} = ${key})
+      from ${items}
+      join admitted a on a.id = ${items.id}
     ),
     per_word as (
       select c.id, qw.grounds, qw.lettered,
@@ -215,6 +231,7 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     ranked as (
       select c.id, c.ws,
              case when c.search_key = ${key} then 0
+                  when c.id in (select id from admitted) then 0
                   -- Grounding words by their mean, rounded up: a correct extra word printed
                   -- on the package («пастеризованное») would cost 11 by the worst, 4 by the
                   -- mean. A name with no grounding word leaves qd null and never passes.

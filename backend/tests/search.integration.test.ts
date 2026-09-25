@@ -605,9 +605,87 @@ describe('search — a word the shelf writes otherwise (MOL-45)', () => {
   it('reaches the index for every synonym, with no Seq Scan over the items', async () => {
     await named('Арахис солёный 150 г')
     const plan = await db.transaction(async (tx) => {
+      // Both off, so the one way left to the items is a bitmap over an index: on a single row
+      // walking the primary key and filtering is cheaper, and would hide a condition the GIN
+      // index cannot serve. Served, it plans; not served, it falls back to a Seq Scan.
       await tx.execute(raw`set local enable_seqscan = off`)
+      await tx.execute(raw`set local enable_indexscan = off`)
       return tx.execute<{ 'QUERY PLAN': string }>(
         raw`explain ${rankedCandidates(toSearchKey('орешки'), 10, nobody)}`,
+      )
+    })
+    const text = plan.map((row) => row['QUERY PLAN']).join('\n')
+    expect(text).toContain('items_search_key_trgm_idx')
+    expect(text).not.toMatch(/Seq Scan on items/)
+  })
+})
+
+describe("search — a word of the person's own (MOL-45)", () => {
+  const picks = createSearchPickRepository(db)
+
+  async function namesFor(actorId: string, query: string): Promise<string[]> {
+    return (await repo.search(query, 20, actorId)).map((item) => item.name)
+  }
+
+  it('finds by a query that found nothing, once the item was taken by another word', async () => {
+    const actorId = await insertActor(db)
+    const melon = await named('Арбуз')
+    expect(await namesFor(actorId, 'бахчевые')).toEqual([])
+
+    await picks.learn(actorId, 'бахчевые', melon)
+
+    expect(await namesFor(actorId, 'бахчевые')).toEqual(['Арбуз'])
+  })
+
+  it("must not fire for anyone else: the word is the person's alone", async () => {
+    const actorId = await insertActor(db)
+    const stranger = await insertActor(db)
+    await picks.learn(stranger, 'бахчевые', await named('Арбуз'))
+
+    expect(await namesFor(actorId, 'бахчевые')).toEqual([])
+    expect(await names('бахчевые')).toEqual([])
+  })
+
+  it('lets in on exactly that query — not on its start, not with a word more', async () => {
+    const actorId = await insertActor(db)
+    await picks.learn(actorId, 'бахчевые', await named('Арбуз'))
+
+    expect(await namesFor(actorId, 'бахч')).toEqual([])
+    expect(await namesFor(actorId, 'бахчевые спелые')).toEqual([])
+    // The key, not the spelling: the same word in another case or script is the same query.
+    expect(await namesFor(actorId, 'БАХЧЕВЫЕ')).toEqual(['Арбуз'])
+  })
+
+  it('puts the learnt item above what the search found, as memory puts a pick', async () => {
+    const actorId = await insertActor(db)
+    await named('Молоко Ашхар')
+    const matsun = await named('Мацун')
+
+    await picks.learn(actorId, 'молоко', matsun)
+
+    expect(await namesFor(actorId, 'молоко')).toEqual(['Мацун', 'Молоко Ашхар'])
+  })
+
+  it('stays learnt when an ordinary pick lands under the same key', async () => {
+    const actorId = await insertActor(db)
+    const melon = await named('Арбуз')
+    await picks.learn(actorId, 'бахчевые', melon)
+    await picks.remember(actorId, 'бахчевые', melon)
+
+    expect(await namesFor(actorId, 'бахчевые')).toEqual(['Арбуз'])
+  })
+
+  it('reaches the index with a learnt word in the query', async () => {
+    const actorId = await insertActor(db)
+    await named('Молоко «Ашхар»')
+    await picks.learn(actorId, 'malako', await named('Мацун'))
+
+    const plan = await db.transaction(async (tx) => {
+      // As for the synonyms: only a bitmap is left, so a branch the index cannot serve shows.
+      await tx.execute(raw`set local enable_seqscan = off`)
+      await tx.execute(raw`set local enable_indexscan = off`)
+      return tx.execute<{ 'QUERY PLAN': string }>(
+        raw`explain ${rankedCandidates('malako', 10, actorId)}`,
       )
     })
     const text = plan.map((row) => row['QUERY PLAN']).join('\n')
