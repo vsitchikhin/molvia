@@ -68,6 +68,15 @@ const MAX_QUERY_WORDS = 12
 const HAS_CONTENT = /[\p{L}\p{N}]/u
 
 /**
+ * How many words the dictionary may add to one query, taken in the order the query names them.
+ * Each is one more condition on the index and one more set of candidates to rank: twelve wide
+ * words — «мясо рыба сыр хлеб…» — expand into fifty and held a connection for a second and a
+ * half (MOL-45, adversarial Ж). A shelf query is one or two words, and «рыба», the widest, is
+ * eight; sixteen leaves both untouched.
+ */
+const MAX_SYNONYMS = 16
+
+/**
  * A remembered query counts as the one being typed when every word but the last is equal and
  * one last word is the start of the other — the screen searches while the person types, so
  * the pick was made on «мол» and the next search may fire on «моло» — and the word being
@@ -125,8 +134,10 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
   const synonyms = key
     .split(' ')
     .flatMap((word, index) => synonymKeys(word).map((synonym) => [synonym, index + 1] as const))
+    .slice(0, MAX_SYNONYMS)
   const synonymWords = synonyms.map(([synonym]) => synonym).join(' ')
   const synonymOf = synonyms.map(([, n]) => n).join(' ')
+  const expanded = [...new Set(synonyms.map(([, n]) => n))].join(' ')
   // Without a synonym every candidate of the index was found by what was typed, and asking the
   // operator again per row is what «мо» over 20 000 names paid for.
   const typedHere =
@@ -141,16 +152,16 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       : sql`case when exists (
                     select 1
                     from synonyms s
-                    join unnest(string_to_array(c.search_key, ' ')) as w(word) on w.word = s.word
-                    where s.n = qw.n
+                    where s.n = qw.n and s.word = split_part(c.search_key, ' ', 1)
                   ) then 0 end`
-  // A synonym counts only as a whole word of a name, so its candidates are the names that
-  // contain it, not those that merely resemble it: `%>` at 0.15 brought in half of 20 000
-  // names for each of the eight fish of «рыба» and took six seconds. `like` is served by the
-  // same trigram index, one condition per word. The words are letters only (the dictionary's
-  // test), so nothing in them is a wildcard.
+  // A synonym counts only as the first word of a name — where a shelf writes the kind (owner's
+  // decision on review, MOL-45 А): «Вода Джермук», not «Мицеллярная вода», not the tuna of a
+  // cat food. So its candidates are the names that begin with it, not those that resemble it:
+  // `%>` at 0.15 brought in half of 20 000 names for each of the eight fish of «рыба» and took
+  // six seconds. `like` is served by the same trigram index, one condition per word. The words
+  // are letters only (the dictionary's test), so nothing in them is a wildcard.
   const bySynonym = [...new Set(synonyms.map(([synonym]) => synonym))].map(
-    (synonym) => sql` or ${items.searchKey} like ${`%${synonym}%`}`,
+    (synonym) => sql` or ${items.searchKey} like ${`${synonym}%`}`,
   )
 
   return sql`
@@ -160,7 +171,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       select n, left(word, 255) as q,
              length(word) >= ${SHORT_WORD} and word !~ '[0-9]' as grounds,
              word ~ '[^0-9]' as lettered,
-             n = max(n) over () as last
+             n = max(n) over () as last,
+             n::int = any(string_to_array(${expanded}, ' ')::int[]) as expanded
       from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
     ),
     synonyms as (
@@ -212,7 +224,10 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     ),
     per_word as (
       select c.id, qw.grounds, qw.lettered,
-             case when c.typed then (
+             -- The typed spelling is measured unless the row came by a synonym of this very word:
+             -- «сыр» is not measured against «Рис» that «лори» brought, but «хаггис» of
+             -- «памперсы хаггис» is still measured against the «Huggies» that «подгузники» did.
+             case when c.typed or not qw.expanded then (
                select min(
                  -- The screen searches while the person types, so the last word is usually
                  -- unfinished: it may also match the start of a name word. Exactly at two or
@@ -231,8 +246,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                -- «1» of a size every two-letter word is two edits away, inside the budget.
                where not qw.grounds or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]')
              ) end as qd_typed,
-             -- A synonym is a word, not a typo: it counts only as a whole word of the name, and
-             -- then costs nothing. With the edit budget on top, «мясо» expanded into five
+             -- A synonym is a word, not a typo: it counts only as the whole first word of the
+             -- name, and then costs nothing. With the edit budget on top, «мясо» expanded into five
              -- words would have five chances of the absolute budget's false hits (MOL-46).
              ${bySynonymWord} as qd_synonym
       from candidates c
@@ -242,17 +257,24 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       -- \`least\` skips a null, so a word found only by its synonym is still found.
       -- Materialized, or the planner folds it into every aggregate below and into the filter on
       -- the distance, and each of them runs the levenshtein subquery again for the same row.
-      select id, grounds, lettered, least(qd_typed, qd_synonym) as qd from per_word
+      select id, grounds, lettered, least(qd_typed, qd_synonym) as qd,
+             coalesce(qd_synonym = 0 and coalesce(qd_typed, 255) > 0, false) as by_synonym
+      from per_word
     ),
     ranked as (
       select c.id, c.ws,
+             c.id in (select id from admitted) as admitted,
              case when c.search_key = ${key} then 0
-                  when c.id in (select id from admitted) then 0
                   -- Grounding words by their mean, rounded up: a correct extra word printed
                   -- on the package («пастеризованное») would cost 11 by the worst, 4 by the
                   -- mean. A name with no grounding word leaves qd null and never passes.
+                  --
+                  -- A word found only by its synonym stays out of the mean: free, it would lend
+                  -- its budget to the next word, and «хлеб барадинский» found «Лаваш армянский»
+                  -- by \`baradinskii\` four edits from \`armianskii\`. The others stand on their own.
                   when bool_or(pw.grounds)
-                  then ceil(avg(coalesce(pw.qd, 255)) filter (where pw.grounds))
+                  then coalesce(ceil(avg(coalesce(pw.qd, 255))
+                                       filter (where pw.grounds and not pw.by_synonym)), 0)
                        -- Short words by their worst, at most one edit: each has to find its
                        -- pair, so «1 л» against «2 л» costs one where «л» alone would hide it.
                        + least(coalesce(max(pw.qd) filter (where not pw.grounds), 0), 1)
@@ -300,15 +322,19 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     select r.id
     from ranked r
     left join remembered m on m.item_id = r.id
-    -- The filter stays on the distance alone: a pick lifts what the search found and never
-    -- lets in what it did not, or memory would become a second search with rules of its own.
-    where r.distance <= ${ACCEPTED_DISTANCE}
-    -- What the person took before comes first, above a closer spelling — their own choice
-    -- says more than a typo metric does. Among several, the latest wins: after switching
-    -- brands the new one is on top from the first trip. Then the order of MOL-10, where ties
-    -- stay ties («moloko» names «Ашхар» and «Марианна» alike) and \`id\` only keeps two loads
-    -- of one screen in one order.
-    order by m.item_id is null,
+    -- The filter stays on the distance: a pick lifts what the search found and never lets in
+    -- what it did not, or memory would become a second search with rules of its own. The one
+    -- exception is the person's own word (MOL-45), and it is let in, not lifted.
+    where r.distance <= ${ACCEPTED_DISTANCE} or r.admitted
+    -- What the search found comes before what only a learnt word let in (owner's decision on
+    -- review, MOL-45 И): «кефир» learnt as the milk taken in its place stops standing above
+    -- the kefir the day the catalogue has one. Then what the person took before, above a
+    -- closer spelling — their own choice says more than a typo metric does. Among several, the
+    -- latest wins: after switching brands the new one is on top from the first trip. Then the
+    -- order of MOL-10, where ties stay ties («moloko» names «Ашхар» and «Марианна» alike) and
+    -- \`id\` only keeps two loads of one screen in one order.
+    order by coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) desc,
+             m.item_id is null,
              m.last_picked_at desc nulls last,
              m.picks desc nulls last,
              r.distance, r.ws desc, r.id

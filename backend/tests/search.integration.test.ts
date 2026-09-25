@@ -602,6 +602,27 @@ describe('search — a word the shelf writes otherwise (MOL-45)', () => {
     expect(found).toEqual(['Картофель молодой', 'Картофель'])
   })
 
+  it('counts a synonym only as the first word of a name — where the shelf writes the kind (review, А)', async () => {
+    await named('Вода Джермук 0,5 л')
+    await named('Мицеллярная вода Garnier 400 мл')
+    await named('Корм для кошек Whiskas тунец 85 г')
+    expect(await names('минералка')).toEqual(['Вода Джермук 0,5 л'])
+    expect(await names('рыба')).toEqual([])
+  })
+
+  it('still measures a word with no synonym on a name a synonym brought: «памперсы хаггис» (review, Б)', async () => {
+    await named('Подгузники Huggies 5')
+    expect(await names('памперсы хаггис')).toEqual(['Подгузники Huggies 5'])
+  })
+
+  it('keeps a synonym out of the mean, so it lends no budget to the next word (review, В)', async () => {
+    // `baradinskii` is four edits from `armianskii`: with a free «хлеб» → «лаваш» beside it, the
+    // mean of 0 and 4 was 2 and let the lavash in.
+    await named('Хлеб Бородинский')
+    await named('Лаваш армянский')
+    expect(await names('хлеб барадинский')).toEqual(['Хлеб Бородинский'])
+  })
+
   it('reaches the index for every synonym, with no Seq Scan over the items', async () => {
     await named('Арахис солёный 150 г')
     const plan = await db.transaction(async (tx) => {
@@ -656,14 +677,16 @@ describe("search — a word of the person's own (MOL-45)", () => {
     expect(await namesFor(actorId, 'БАХЧЕВЫЕ')).toEqual(['Арбуз'])
   })
 
-  it('puts the learnt item above what the search found, as memory puts a pick', async () => {
+  it('puts what the search found above what only the learnt word let in (review, И)', async () => {
+    // «кефир» learnt as the milk taken in its place: once there is kefir, kefir comes first.
     const actorId = await insertActor(db)
-    await named('Молоко Ашхар')
-    const matsun = await named('Мацун')
+    const milk = await named('Молоко Ашхар')
+    await picks.learn(actorId, 'кефир', milk)
+    expect(await namesFor(actorId, 'кефир')).toEqual(['Молоко Ашхар'])
 
-    await picks.learn(actorId, 'молоко', matsun)
+    await named('Кефир Ашхар')
 
-    expect(await namesFor(actorId, 'молоко')).toEqual(['Мацун', 'Молоко Ашхар'])
+    expect(await namesFor(actorId, 'кефир')).toEqual(['Кефир Ашхар', 'Молоко Ашхар'])
   })
 
   it('stays learnt when an ordinary pick lands under the same key', async () => {
