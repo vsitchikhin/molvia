@@ -142,6 +142,29 @@ describe('ExchangeSheet', () => {
     expect(view.text()).toContain('held before the exchange')
   })
 
+  it('asks what was held of drams bought with dollars too, and never of the currency of conversion (MOL-42)', async () => {
+    const view = await render()
+    const [given, received] = view.findAll('select')
+    await given?.setValue('USD')
+    expect(view.text()).toContain('held before the exchange')
+    expect(view.text()).toContain('20,000.00')
+
+    // Roubles back for drams: the currency of conversion always costs one, nothing to weigh.
+    await given?.setValue('AMD')
+    await received?.setValue('RUB')
+    expect(view.text()).not.toContain('held before the exchange')
+
+    // Dollars nobody received by an exchange yet: their first link.
+    await given?.setValue('RUB')
+    await received?.setValue('USD')
+    expect(view.text()).not.toContain('held before the exchange')
+  })
+
+  it('does not ask for exchanges the wallet no longer counts after the currency changed (В-2)', async () => {
+    const view = await render(overview({ baseSince: '2026-09-10' }))
+    expect(view.text()).not.toContain('held before the exchange')
+  })
+
   it('says the hint is about the last exchange alone when what was there before it is unknown', async () => {
     const view = await render(
       overview({
@@ -173,12 +196,6 @@ describe('ExchangeSheet', () => {
     await fill(view, '20000', '95000')
     await save(view)
     expect(field(view, en.exchange.sheet.received).text()).toContain(en.error.invalid_rate)
-  })
-
-  it('does not ask what was held for an exchange of another pair', async () => {
-    const view = await render()
-    await view.findAll('select')[0]?.setValue('USD')
-    expect(view.text()).not.toContain('held before the exchange')
   })
 
   it('leaves the held amount out when it is left empty — unknown, not zero', async () => {

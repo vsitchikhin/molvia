@@ -100,9 +100,10 @@ export const exchangesResponseCodec = z.strictObject({
    */
   wallet: currencyCostCodec.nullable(),
   /**
-   * What every other currency held by exchange cost in the currency of conversion — the dollars a
-   * chain of roubles to dollars to drams went through — so the chain can be checked by eye
-   * (MOL-42, Р-4). Neither the currency of conversion nor the spending one is here.
+   * What one unit of every other currency held by exchange cost in the currency of conversion —
+   * the dollars a chain of roubles to dollars to drams went through, as «89,04 ₽/$» — so the chain
+   * can be checked by eye (MOL-42, Р-4). Neither the currency of conversion nor the spending one
+   * is here.
    */
   costs: z.array(currencyCostCodec),
   /**

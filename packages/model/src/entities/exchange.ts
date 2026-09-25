@@ -268,7 +268,9 @@ function costOf(cost: Cost, base: Currency, currency: Currency): CurrencyCost | 
 
 /**
  * The cost of every currency the person holds by exchange, other than `base` itself: what the
- * screen shows under the wallet, so a chain can be checked by eye (MOL-42, Р-4).
+ * screen shows under the wallet, so a chain can be checked by eye (MOL-42, Р-4). Each is the price
+ * of one unit of it in `base` — «доллар — 89,04 ₽» — the way a price is read, where the wallet is
+ * the rate a trip converts by.
  */
 export function currencyCosts(
   exchanges: readonly Exchange[],
@@ -278,8 +280,10 @@ export function currencyCosts(
   since: string | null = null,
 ): CurrencyCost[] {
   return [...costsOf(exchanges, base, day, officialOf, since)].flatMap(([currency, cost]) => {
-    const known = cost ? costOf(cost, base, currency) : null
-    return known ? [known] : []
+    if (!cost) return []
+    const price = { quote: cost.ratio.base, base: cost.ratio.quote }
+    const rate = rateOf(price, currency, base, cost.day)
+    return rate ? [{ rate, basis: cost.basis, estimated: cost.estimated }] : []
   })
 }
 

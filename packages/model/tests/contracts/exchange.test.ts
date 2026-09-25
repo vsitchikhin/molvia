@@ -97,7 +97,13 @@ describe('exchangesResponseCodec', () => {
     wallet: { rate, basis: 'weighted', estimated: false },
     costs: [
       {
-        rate: { ...rate, quote: 'USD', scaled: 11_232n, asOf: yerevanMidnight('2026-08-31') },
+        rate: {
+          ...rate,
+          base: 'USD',
+          quote: 'RUB',
+          scaled: 89_035_302n,
+          asOf: yerevanMidnight('2026-08-31'),
+        },
         basis: 'last',
         estimated: true,
       },

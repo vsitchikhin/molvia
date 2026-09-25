@@ -705,7 +705,10 @@ describe('стоимость валют (MOL-42)', () => {
 
     expect(overview.wallet).toMatchObject({ basis: 'last', estimated: false })
     expect(overview.wallet?.rate.scaled).toBe(4_060_187n)
-    expect(overview.costs.map(({ rate }) => [rate.quote, rate.scaled])).toEqual([['USD', 11_232n]])
+    // One dollar cost 20000 / 224.63 roubles.
+    expect(overview.costs.map(({ rate }) => [rate.base, rate.quote, rate.scaled])).toEqual([
+      ['USD', 'RUB', 89_035_302n],
+    ])
     // Handing 100 $ over for drams leaves 124.63 $; the drams are all still held.
     expect(overview.heldEstimates.map(({ held }) => held)).toEqual(
       expect.arrayContaining([

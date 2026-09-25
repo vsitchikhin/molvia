@@ -156,7 +156,7 @@ export async function exchangesOverview(
   const officialOf = officialRateOf(cached, base)
   const wallet = pair ? walletRate(list, base, quote, today, officialOf, baseSince) : null
   const costs = currencyCosts(list, base, today, officialOf, baseSince).filter(
-    ({ rate }) => rate.quote !== quote,
+    ({ rate }) => rate.base !== quote,
   )
 
   const received = [...new Set(list.map((exchange) => exchange.received.currency))].filter(

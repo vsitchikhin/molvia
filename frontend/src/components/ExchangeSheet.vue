@@ -154,28 +154,33 @@ export default defineComponent({
     const sign = (currency: Currency) => currencySign(currency, locale.value)
     const sameCurrency = computed(() => currencies.given === currencies.received)
 
-    /** The exchanges of the pair this form is about, newest first — as the server lists them. */
-    const ofPair = computed(() =>
+    /**
+     * The exchanges into the currency this form receives, newest first — as the server lists them,
+     * whatever was given for it: dollars bought drams as roubles did (MOL-42).
+     */
+    const intoReceived = computed(() =>
       props.overview.exchanges.filter(
-        (exchange) =>
-          exchange.given.currency === currencies.given &&
-          exchange.received.currency === currencies.received,
+        (exchange) => exchange.received.currency === currencies.received,
       ),
     )
 
     /**
-     * Asked only where it weighs anything: when the wallet already has an exchange of this pair on
-     * or before the chosen day — the chain is walked by days, not by the order of entry, and an
-     * earlier day entered second is the first link, whose remainder is ignored (review С-3). A
-     * choice of field, not a computation: the list is the server's.
+     * Asked only where it weighs anything (MOL-42, Р-2): not for the currency of conversion, which
+     * always costs one, and only when that currency already came in by an exchange on or before
+     * the chosen day — and not before the day the currency of conversion changed, whose earlier
+     * exchanges the wallet no longer counts. The chain is walked by days, not by the order of
+     * entry, so an earlier day entered second is the first link, whose remainder is ignored
+     * (review С-3). A choice of field, not a computation: the list is the server's.
      */
     const asksHeld = computed(() => {
-      const { pair } = props.overview
+      const { pair, baseSince } = props.overview
       return (
         !!pair &&
-        currencies.given === pair.base &&
-        currencies.received === pair.quote &&
-        ofPair.value.some((exchange) => exchange.exchangedOn <= day.value)
+        currencies.received !== pair.base &&
+        intoReceived.value.some(
+          ({ exchangedOn }) =>
+            exchangedOn <= day.value && (baseSince === null || exchangedOn >= baseSince),
+        )
       )
     })
 
@@ -184,7 +189,7 @@ export default defineComponent({
       const hint = props.overview.heldEstimates.find(
         ({ held }) => held.currency === currencies.received,
       )
-      const latest = ofPair.value.at(0)?.exchangedOn
+      const latest = intoReceived.value.at(0)?.exchangedOn
       if (!hint || !asksHeld.value || (latest !== undefined && day.value < latest)) return null
       const amount = formatMoney(hint.held, locale.value)
       return hint.whole

@@ -315,9 +315,14 @@ describe('currencyCosts', () => {
   it('lists what every currency held by exchange cost, and never the base itself', () => {
     const back = exchange('50 USD', '4500 RUB', '2026-09-14')
     const costs = currencyCosts([dollars, drams, back], 'RUB', '2026-09-30')
-    expect(costs.map(({ rate }) => rate.quote).sort()).toEqual(['AMD', 'USD'])
-    // Handing dollars over — for drams or back for roubles — leaves their price where it was.
-    expect(costs.find(({ rate }) => rate.quote === 'USD')?.rate.scaled).toBe(11_232n)
+    expect(costs.map(({ rate }) => rate.base).sort()).toEqual(['AMD', 'USD'])
+    // The price of one dollar in roubles, 20000 / 224.63 — and handing dollars over, for drams or
+    // back for roubles, leaves it where it was.
+    expect(costs.find(({ rate }) => rate.base === 'USD')?.rate).toMatchObject({
+      quote: 'RUB',
+      scaled: 89_035_302n,
+      source: 'personal',
+    })
   })
 })
 

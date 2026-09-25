@@ -204,6 +204,45 @@ describe('ExchangeView: the rate and the list', () => {
     expect(view.text()).toContain('by the last exchange')
   })
 
+  it('says when part of the rate was priced by the bank, and prints each currency of a chain (MOL-42)', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        wallet: { rate: rate('4.060187', '2026-09-13'), basis: 'last', estimated: true },
+        costs: [
+          {
+            rate: {
+              base: 'USD',
+              quote: 'RUB',
+              scaled: parseRate('89.035302'),
+              source: 'personal',
+              asOf: yerevanMidnight('2026-08-31'),
+            },
+            basis: 'last',
+            estimated: false,
+          },
+        ],
+      }),
+    )
+    const view = await render()
+    expect(view.text()).toContain(en.exchange.estimated)
+    const [line] = view.findAll('.costs li')
+    expect(line?.text()).toContain('$: 89.04 ₽/$')
+    expect(line?.text()).toContain('by the last exchange')
+    expect(line?.text()).not.toContain('Central Bank')
+  })
+
+  it('names the day the currency of conversion changed, and says nothing when it never did', async () => {
+    exchanges.mockResolvedValue(overview({ wallet: null, baseSince: '2026-09-18' }))
+    const view = await render()
+    expect(view.text()).toContain('Counting in ₽ since')
+    expect(view.find('.costs').exists()).toBe(false)
+
+    exchanges.mockResolvedValue(overview())
+    const plain = await render()
+    expect(plain.text()).not.toContain('Counting in')
+    expect(plain.text()).not.toContain(en.exchange.estimated)
+  })
+
   it('compares with the bank in words — more, less, or nothing to compare with', async () => {
     exchanges.mockResolvedValue(
       overview({

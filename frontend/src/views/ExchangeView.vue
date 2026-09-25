@@ -72,11 +72,28 @@
                 )
               }}
             </p>
+            <p v-if="overview.wallet.estimated" class="meta">{{ t('exchange.estimated') }}</p>
           </template>
           <p v-else-if="overview.pair" class="meta">
             {{ t('exchange.no_wallet', pairSigns(overview.pair)) }}
           </p>
           <p v-else class="meta">{{ t('settings.same_currencies') }}</p>
+          <p v-if="overview.pair && overview.baseSince" class="meta">
+            {{
+              t('exchange.base_since', {
+                base: pairSigns(overview.pair).base,
+                date: dayOf(midnightOf(overview.baseSince)),
+              })
+            }}
+          </p>
+
+          <!-- The currencies a chain went through, each at its own price: the drams' rate above
+               is only as believable as the dollars' under it (MOL-42, Р-4). -->
+          <ul v-if="overview.costs.length > 0" class="costs">
+            <li v-for="cost in overview.costs" :key="cost.rate.base" class="meta">
+              {{ costLineOf(cost) }}
+            </li>
+          </ul>
 
           <SegmentedControl
             v-if="overview.pair"
@@ -136,7 +153,13 @@
 import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { currencySign, formatMoney, formatRate, yerevanMidnight } from '@molvia/model'
-import type { Currency, ExchangeRate, ExchangeView as Row, RatePreference } from '@molvia/model'
+import type {
+  Currency,
+  CurrencyCost,
+  ExchangeRate,
+  ExchangeView as Row,
+  RatePreference,
+} from '@molvia/model'
 import IconCheck from '~icons/mdi/check-bold'
 import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconDelete from '~icons/mdi/trash-can-outline'
@@ -282,6 +305,18 @@ export default defineComponent({
       return t(bank ? 'exchange.row_equal' : 'exchange.row_equal_other', words)
     }
 
+    /** «$: 89,04 ₽/$ · по последнему обмену · с 31 авг.» — and whether the bank priced part of it. */
+    function costLineOf(cost: CurrencyCost): string {
+      const words = {
+        currency: currencySign(cost.rate.base, locale.value),
+        rate: rateOf(cost.rate),
+        basis: t(cost.basis === 'weighted' ? 'exchange.basis_weighted' : 'exchange.basis_last', {
+          date: dayOf(cost.rate.asOf),
+        }),
+      }
+      return t(cost.estimated ? 'exchange.cost_line_estimated' : 'exchange.cost_line', words)
+    }
+
     function choose(value: string): void {
       if (value === 'personal' || value === 'official') {
         void exchanges.prefer(value satisfies RatePreference)
@@ -302,7 +337,9 @@ export default defineComponent({
       preferenceOptions,
       rateOf,
       dayOf,
+      midnightOf,
       pairSigns,
+      costLineOf,
       rateLineOf,
       amountsOf,
       comparisonOf,
@@ -344,6 +381,13 @@ export default defineComponent({
 
 .preference {
   margin-top: var(--space-4);
+}
+
+.costs {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) 0 0;
+  border-top: var(--hairline) solid var(--border);
+  list-style: none;
 }
 
 .frozen,
