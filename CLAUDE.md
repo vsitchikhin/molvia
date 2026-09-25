@@ -279,8 +279,13 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   makes «Молоко 1 л» and «Молоко 2 л» identical for ranking while «Молоко 1л» written
   without the space stays distinct, so two shops' labels for one product rank by different
   rules. MOL-10 took **the third way**, and its review made it hold on both sides. A word
-  **grounds** a match only if it has two characters and no digit — «32», «1л», «500г» are
-  sizes, not grounds — and it is measured against the grounding words of the name only, never
+  **grounds** a match only if it has two characters, no digit and is not a unit — «32», «1л»,
+  «500г» are sizes, not grounds, and so are «шт», «мл», «հատ», «pcs» (MOL-48): the length alone
+  let `sht` through, two edits from «сыр», and every item sold by the piece answered it. The
+  units are a list in natural spelling keyed by `toSearchKey` itself, so nothing stored depends on
+  it; only the forms written after a number — «рулона», «пакетиков», «таблеток», never «таблетки»,
+  which begins the goods' own name — and «чай пакетики» missing the tea is the price, the owner's.
+  A grounding word is measured against the grounding words of the name only, never
   against «л» or «1», which every two-letter word is within two edits of. Grounding words fold by their **mean**,
   rounded up; short words by their **worst**, at most one edit, so each has to find its pair
   and «1 л» against «2 л» costs one. A query with no grounding word but with letters — «M&M's» is
@@ -340,7 +345,7 @@ chosen. What no threshold reaches went to tasks with numbers: **synonyms** — �
 «Картофель», 6 of 73, one of them («мясо») found by letters only — MOL-45; **the absolute
 budget** — «овощи» finds «Мука … высший сорт», «специи» «Соевый соус», «пельмени» «Чай зелёный»,
 3 of 25 — MOL-46; **a unit word grounding a match** — «сыр» is two edits from `sht` of «4 шт» —
-MOL-48. Weighting vowel edits below consonant ones was tried against the budget and refuted:
+closed by MOL-48, which took six of the ten items «сыр» found. Weighting vowel edits below consonant ones was tried against the budget and refuted:
 `ovoshi`/`vishi` share every consonant, while the right `canah`/«Чанах» and `grecka`/«Гречка»
 differ by two. **The owner's absent words flatter the search:** of fifty everyday purchases the
 shelf does not carry, 24 find something, and they are two outcomes. In 12 the first row carries
@@ -349,7 +354,7 @@ or by the start of a word («сметана» is in the chips' name), which no t
 «Предложить товар» shown only on an empty answer, that is a question for the screen (MOL-23),
 not the search. The other six are an edit of the ending inside the budget («яблоки» →
 «яблочный», gone at a budget of 1). The remaining 12 share nothing but letters — the absolute
-budget («водка» → «Вода») and the unit word («сыр» → «4 шт»), MOL-46 and MOL-48.
+budget («водка» → «Вода», «сыр» → «Сок»), MOL-46; the unit word that added to them is gone (MOL-48).
 `REMEMBERED_PREFIX` was measured by typing letter by letter: a pick lifts its item on the next
 letter 18 times at 2, 9 at 3, 5 at 4. It harms 5 times at 2 — where two of the owner's words
 share two letters, a pick for Coca-Cola on «ко» puts it above «Колбаса» on «кол», one for
