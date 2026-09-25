@@ -333,7 +333,7 @@ describe('search — a unit is a size, not a word (MOL-48)', () => {
     ])
   })
 
-  it('finds by a unit alone what carries it, and not by distance: «шт» is not two edits from «сок»', async () => {
+  it('finds by a unit alone what carries it, and not by distance: «шт» is two edits from «сок» and does not find it', async () => {
     await named('Булочки с кунжутом 4 шт')
     await named('Сок Noy яблочный 1 л')
     expect(await names('шт')).toEqual(['Булочки с кунжутом 4 шт'])
@@ -389,6 +389,30 @@ describe('search — a unit is a size, not a word (MOL-48)', () => {
     await named('Сахар 1 кг')
     expect(await names('кефир 500 мд')).toEqual(['Кефир 500 мл'])
     expect(await names('сахар 1 кн')).toEqual(['Сахар 1 кг'])
+  })
+
+  it('reads a word as a unit by its place only while another word grounds the query: «2 суп»', async () => {
+    // `sup` is one edit from `tup` of «տուփ», `kap` starts «капсул» — after a number both look
+    // like units. With nothing else to ground by they are the goods: «2 кап» is on its way to
+    // «2 капусты».
+    await named('Суп Магги курица')
+    await named('Капуста белокочанная')
+    await named('Рулет с маком')
+    expect(await names('2 суп')).toEqual(['Суп Магги курица'])
+    expect(await names('2 кап')).toEqual(['Капуста белокочанная'])
+    expect(await names('2 рул')).toEqual(['Рулет с маком'])
+  })
+
+  it('grounds nothing on «пак» and «pack» of a label', async () => {
+    await named('Чай Ахмад 25 пак.')
+    await named('Coca-Cola 0,33 л 6 pack')
+    expect(await names('мак')).toEqual([])
+  })
+
+  it('misses «тш» typed for «шт» — two edits in the key, the price, pinned', async () => {
+    // The alphabet folds `ts` into `ц`: «тш» is `цh`, two edits from `sht`, past the slip.
+    await named('Булочки с кунжутом 4 шт')
+    expect(await names('булочки 4 тш')).toEqual([])
   })
 
   it('reads a word as a unit by its place only after a number: «чай пакет» is still a word', async () => {

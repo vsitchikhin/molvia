@@ -87,6 +87,7 @@ export const UNIT_WORDS = [
   'Вт',
   'уп',
   'упак',
+  'пак',
   'рулон',
   'рулона',
   'рулонов',
@@ -108,6 +109,7 @@ export const UNIT_WORDS = [
   'gr',
   'mg',
   'cm',
+  'pack',
   'pk',
 ] as const
 
@@ -119,6 +121,11 @@ const UNIT_KEYS = [...new Set(UNIT_WORDS.map(toSearchKey))]
  * a finger slips to the key next door — «кефир 500 мд». Read as grounding, either looked for a
  * grounding pair the name no longer offers and lost the item on every keystroke up to the full
  * unit. Only after a number, where a size stands: «пакеты» alone still does not find the tea.
+ * And only while another word still grounds the query — «2 суп», «2 кап» on the way to «2
+ * капусты» are the goods themselves, and read as units they left nothing to find by.
+ *
+ * A transposition is two edits, and «тш» for «шт» is not even that in the key: the alphabet
+ * folds `ts` into `ц`, so it is `цh`, two from `sht`. Not caught — the price, named.
  */
 const UNIT_SLIP = 1
 
@@ -189,8 +196,16 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       -- Cut to 255 here, once: levenshtein refuses longer arguments, and the prefix arm below
       -- cuts the name to the length of the query word, not to 255.
       select left(word, 255) as q,
-             length(word) >= ${SHORT_WORD} and word !~ '[0-9]' and word not in ${UNIT_KEYS}
-               and not (after_number and exists (
+             -- A word is read as a unit by its place only while another word still grounds the
+             -- query: in «2 суп» the soup is all there is, not two of «տուփ».
+             plain and not (unit_like and bool_or(plain and not unit_like) over ()) as grounds,
+             word ~ '[^0-9]' as lettered,
+             last
+      from (
+        select word, last,
+               length(word) >= ${SHORT_WORD} and word !~ '[0-9]' and word not in ${UNIT_KEYS}
+                 as plain,
+               after_number and exists (
                  select 1
                  from unnest(array[${sql.join(
                    UNIT_KEYS.map((unit) => sql`${unit}`),
@@ -198,16 +213,14 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                  )}]::text[]) as u(unit)
                  where levenshtein(left(word, 255), unit) <= ${UNIT_SLIP}
                     or (last and starts_with(unit, word))
-               ))
-               as grounds,
-             word ~ '[^0-9]' as lettered,
-             last
-      from (
-        select word,
-               n = max(n) over () as last,
-               coalesce(lag(word) over (order by n) ~ '[0-9]', false) as after_number
-        from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
-      ) w
+               ) as unit_like
+        from (
+          select word,
+                 n = max(n) over () as last,
+                 coalesce(lag(word) over (order by n) ~ '[0-9]', false) as after_number
+          from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
+        ) w
+      ) u
     ),
     candidates as (
       -- The column goes first, and that is not style: \`search_key %> $1\` is the only form
