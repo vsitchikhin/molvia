@@ -8,9 +8,14 @@ import { actors, exchanges, expenses, trips } from './schema'
 
 export interface ExchangeRepository {
   /**
-   * «Записать обмен». The same identifier again is a repeat — a tap sent twice, an answer lost —
-   * and returns the exchange already there with `created: false`, whatever the second body said.
-   * The same identifier under someone else is `CONFLICT`.
+   * «Записать обмен». The same identifier with the same exchange again is a repeat — a tap sent
+   * twice, an answer lost — and returns the row already there with `created: false`.
+   *
+   * The same identifier with **other** amounts, day or remainder is `CONFLICT` (owner's decision
+   * В-6, 25.09.2026): that is not a repeat but a correction sent under the old name after an answer
+   * that never arrived, and answering it «saved» left the typo in the wallet with the screen
+   * saying all was well (adversarial А2, Б1). There is no amending an exchange — the screen says
+   * to remove it and enter it again. The same identifier under someone else is `CONFLICT` too.
    */
   add(actorId: string, input: ExchangeBody): Promise<{ exchange: Exchange; created: boolean }>
 
@@ -81,7 +86,16 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
 
         const [same] = await db.select().from(exchanges).where(eq(exchanges.id, input.id)).limit(1)
         if (same?.actorId !== actorId) throw new DomainError(ERROR.CONFLICT)
-        return { exchange: toExchange(theRow(same, 'exchanges')), created: false }
+        const held = theRow(same, 'exchanges')
+        const repeated =
+          held.givenMinor === input.given.minor &&
+          held.givenCurrency === input.given.currency &&
+          held.receivedMinor === input.received.minor &&
+          held.receivedCurrency === input.received.currency &&
+          held.exchangedOn === input.exchangedOn &&
+          held.heldBeforeMinor === (input.heldBefore?.minor ?? null)
+        if (!repeated) throw new DomainError(ERROR.CONFLICT)
+        return { exchange: toExchange(held), created: false }
       })
     },
 

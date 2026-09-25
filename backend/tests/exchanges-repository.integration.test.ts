@@ -54,15 +54,30 @@ describe('exchanges: запись', () => {
     expect(empty.exchange.heldBefore).toEqual(money(0n, 'AMD'))
   })
 
-  it('повтор тем же id — тот же обмен, даже с другими числами', async () => {
+  it('повтор тем же id и тем же телом — тот же обмен', async () => {
+    const owner = await insertActor(db)
+    const input = body({ heldBefore: money(2_000_000n, 'AMD') })
+    await repository.add(owner, input)
+    const again = await repository.add(owner, { ...input })
+
+    expect(again.created).toBe(false)
+    expect(await db.select().from(exchanges)).toHaveLength(1)
+  })
+
+  it('тот же id с другими суммами, днём или остатком — CONFLICT, записанное не тронуто (В-6)', async () => {
     const owner = await insertActor(db)
     const input = body()
     await repository.add(owner, input)
-    const again = await repository.add(owner, { ...input, received: money(1n, 'AMD') })
-
-    expect(again.created).toBe(false)
-    expect(again.exchange.received).toEqual(money(9_500_000n, 'AMD'))
-    expect(await db.select().from(exchanges)).toHaveLength(1)
+    for (const other of [
+      { ...input, received: money(1n, 'AMD') },
+      { ...input, given: money(1n, 'RUB') },
+      { ...input, exchangedOn: '2026-09-16' },
+      { ...input, heldBefore: money(0n, 'AMD') },
+    ]) {
+      await expect(repository.add(owner, other)).rejects.toMatchObject({ code: ERROR.CONFLICT })
+    }
+    const [row] = await db.select().from(exchanges)
+    expect(row?.receivedMinor).toBe(9_500_000n)
   })
 
   it('чужой id — CONFLICT, и чужой обмен не тронут', async () => {

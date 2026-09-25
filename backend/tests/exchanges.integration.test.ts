@@ -163,6 +163,20 @@ describe('«Обмен денег» через API (MOL-40)', () => {
     expect(await db.select().from(exchanges)).toHaveLength(1)
   })
 
+  it('тот же id с исправленной суммой — 409, а не «сохранено» с прежней (В-6, А2)', async () => {
+    const { cookie } = await owner()
+    const typo = payload({ received: { amount: '1000000', currency: 'AMD' } })
+    await app.inject({ method: 'POST', url: '/exchanges', headers: { cookie }, payload: typo })
+    const corrected = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: { ...typo, received: { amount: '100000', currency: 'AMD' } },
+    })
+    expect(corrected.statusCode).toBe(409)
+    expect(corrected.json()).toEqual({ code: ERROR.CONFLICT })
+  })
+
   it('завтрашний день — отказ; сегодняшний — можно', async () => {
     const { cookie } = await owner()
     const tomorrow = yerevanDate(new Date(Date.now() + 24 * 60 * 60 * 1000))
