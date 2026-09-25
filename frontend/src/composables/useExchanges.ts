@@ -1,6 +1,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
-import type { ExchangeBody, ExchangesResponse, RatePreference } from '@molvia/model'
+import { ApiError } from '@molvia/client'
+import { ERROR } from '@molvia/model'
+import type { ExchangeBody, ExchangeView, ExchangesResponse, RatePreference } from '@molvia/model'
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
@@ -15,10 +17,22 @@ export interface Exchanges {
   readonly busy: Ref<boolean>
   /** A write that failed — said once, above the list, and cleared by the next one. */
   readonly failed: Ref<boolean>
+  /**
+   * The exchange just removed, kept on the phone so «Вернуть» can write it back (В-5) — until the
+   * next write or until the screen is left.
+   */
+  readonly removed: Ref<ExchangeView | null>
+  /**
+   * The last «Сохранить» named an exchange already written with other amounts (В-6): the list
+   * shows what is there, and the screen says to remove it and enter it again.
+   */
+  readonly conflicted: Ref<boolean>
   retry(): Promise<void>
-  record(body: ExchangeBody): Promise<ExchangesResponse>
+  /** Resolves `null` when the server holds another exchange under this name (В-6). */
+  record(body: ExchangeBody): Promise<ExchangesResponse | null>
   prefer(preference: RatePreference): Promise<void>
-  remove(id: string): Promise<void>
+  remove(exchange: ExchangeView): Promise<void>
+  restore(): Promise<void>
 }
 
 /**
@@ -38,6 +52,8 @@ export function useExchanges(): Exchanges {
   const failure = ref<'offline' | 'error' | null>(null)
   const busy = ref(false)
   const failed = ref(false)
+  const removed = ref<ExchangeView | null>(null)
+  const conflicted = ref(false)
   let latest = 0
 
   const current = (): ExchangesResponse | null => overview.value
@@ -70,16 +86,30 @@ export function useExchanges(): Exchanges {
     return failure.value ?? 'loading'
   })
 
-  async function write(run: () => Promise<ExchangesResponse>): Promise<void> {
-    if (busy.value) return
+  async function write(run: () => Promise<ExchangesResponse>): Promise<boolean> {
+    if (busy.value) return false
     busy.value = true
     failed.value = false
+    conflicted.value = false
     try {
       land(await run())
+      return true
     } catch {
       failed.value = true
+      return false
     } finally {
       busy.value = false
+    }
+  }
+
+  /** What the server needs to write the exchange again: the same name, the same amounts. */
+  function bodyOf(exchange: ExchangeView): ExchangeBody {
+    return {
+      id: exchange.id,
+      given: exchange.given,
+      received: exchange.received,
+      exchangedOn: exchange.exchangedOn,
+      ...(exchange.heldBefore ? { heldBefore: exchange.heldBefore } : {}),
     }
   }
 
@@ -102,11 +132,27 @@ export function useExchanges(): Exchanges {
     overview,
     busy,
     failed,
+    removed,
+    conflicted,
     retry: load,
     async record(body) {
-      const { exchanges } = await api.recordExchange(body)
-      land(exchanges)
-      return exchanges
+      conflicted.value = false
+      removed.value = null
+      try {
+        const { exchanges } = await api.recordExchange(body)
+        land(exchanges)
+        return exchanges
+      } catch (caught) {
+        // Another exchange under this name — the first «Сохранить» landed with the amounts it had,
+        // and its answer was lost. Not a failure of this form: the list is read again to show what
+        // is there, and the screen says what to do about it (В-6).
+        if (caught instanceof ApiError && caught.code === ERROR.CONFLICT && caught.answered) {
+          conflicted.value = true
+          await load()
+          return null
+        }
+        throw caught
+      }
     },
     // Shown at once, and taken back if the server refuses: the radio the browser already checked
     // has to follow the answer, or a screen reader reads out a choice the server does not hold
@@ -122,6 +168,20 @@ export function useExchanges(): Exchanges {
         overview.value = { ...after, preference: shown.preference }
       }
     },
-    remove: (id) => write(() => api.removeExchange(id)),
+    async remove(exchange) {
+      removed.value = null
+      if (await write(() => api.removeExchange(exchange.id))) removed.value = exchange
+    },
+    // The same name and the same amounts: the row is gone, so it is written anew — and a repeat
+    // of this after a lost answer is the ordinary repeat the server answers 200 to.
+    async restore() {
+      const exchange = removed.value
+      if (!exchange) return
+      if (
+        await write(() => api.recordExchange(bodyOf(exchange)).then((answer) => answer.exchanges))
+      ) {
+        removed.value = null
+      }
+    },
   }
 }

@@ -1,5 +1,23 @@
 <template>
   <AppScreen :title="t('exchange.title')">
+    <template v-if="overview && phase !== 'loading'">
+      <!-- Above every branch: removing the last exchange leaves the empty state, and «Вернуть»
+           must still be there (В-5). -->
+      <p v-if="!online" class="strip">
+        <IconCloud aria-hidden="true" />{{ t('exchange.offline.strip') }}
+      </p>
+      <p v-if="failed" class="strip failed" role="alert">{{ t('exchange.failed') }}</p>
+      <p v-if="conflicted" class="strip" role="alert">{{ t('exchange.conflict') }}</p>
+      <div v-if="removed" class="strip removed">
+        <span class="removed-text">{{
+          t('exchange.removed', { amounts: amountsOf(removed) })
+        }}</span>
+        <AppButton variant="ghost" :inactive="!online || busy" @click="restore">
+          {{ t('exchange.restore') }}
+        </AppButton>
+      </div>
+    </template>
+
     <ScreenSkeleton v-if="phase === 'loading'" :groups="[32, 64, 64]" />
 
     <template v-else-if="phase !== 'idle'">
@@ -39,11 +57,6 @@
       </ScreenState>
 
       <template v-else-if="overview">
-        <p v-if="!online" class="strip">
-          <IconCloud aria-hidden="true" />{{ t('exchange.offline.strip') }}
-        </p>
-        <p v-if="failed" class="strip failed" role="alert">{{ t('exchange.failed') }}</p>
-
         <AppCard class="rate">
           <p class="caption">{{ t('exchange.my_rate') }}</p>
           <template v-if="overview.wallet">
@@ -97,18 +110,24 @@
                 type="button"
                 :disabled="!online || busy"
                 :aria-label="t('exchange.remove', { amounts: amountsOf(exchange) })"
-                @click="remove(exchange.id)"
+                @click="ask(exchange)"
               >
                 <IconDelete aria-hidden="true" />
               </button>
             </li>
           </AppCard>
-          <p class="meta">{{ t('exchange.remove_note') }}</p>
         </section>
       </template>
     </template>
 
     <ExchangeSheet v-if="overview" v-model:open="sheetOpen" :overview="overview" :record="record" />
+    <ExchangeRemoveSheet
+      v-model:open="removeOpen"
+      :exchange="target"
+      :amounts="target ? `${amountsOf(target)} · ${rateLineOf(target)}` : ''"
+      :busy="busy"
+      @confirm="confirmRemove"
+    />
   </AppScreen>
 </template>
 
@@ -125,6 +144,7 @@ import IconSwap from '~icons/mdi/swap-horizontal'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import ExchangeRemoveSheet from '@/components/ExchangeRemoveSheet.vue'
 import ExchangeSheet from '@/components/ExchangeSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
@@ -144,6 +164,7 @@ export default defineComponent({
     AppButton,
     AppCard,
     AppScreen,
+    ExchangeRemoveSheet,
     ExchangeSheet,
     ScreenSkeleton,
     ScreenState,
@@ -157,6 +178,18 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const exchanges = useExchanges()
     const sheetOpen = ref(false)
+    // «Удалить обмен?» first, then «Вернуть» after (В-5): the bin never removes on its own.
+    const removeOpen = ref(false)
+    const target = ref<Row | null>(null)
+    function ask(exchange: Row): void {
+      target.value = exchange
+      removeOpen.value = true
+    }
+    function confirmRemove(): void {
+      const exchange = target.value
+      removeOpen.value = false
+      if (exchange) void exchanges.remove(exchange)
+    }
 
     const online = ref(navigator.onLine)
     const follow = (): void => {
@@ -230,6 +263,10 @@ export default defineComponent({
       t,
       ...exchanges,
       sheetOpen,
+      removeOpen,
+      target,
+      ask,
+      confirmRemove,
       online,
       preferenceOptions,
       rateOf,
@@ -302,6 +339,17 @@ export default defineComponent({
 .strip {
   background: var(--warn-tint);
   color: var(--warn-ink);
+}
+
+.removed {
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.removed-text {
+  min-width: 0;
 }
 
 .failed {

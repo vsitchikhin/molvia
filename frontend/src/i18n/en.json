@@ -323,7 +323,14 @@
     "row_no_official": "no central bank rate for this day — nothing to compare with",
     "row_doubtful": "the central bank rate of that day is in doubt — no comparison",
     "remove": "Delete the exchange {amounts}",
-    "remove_note": "A deleted exchange no longer counts in the rate of new trips. Past trips do not change",
+    "remove_sheet": {
+      "title": "Delete the exchange?",
+      "body": "A deleted exchange no longer counts in the rate of new trips. Past trips do not change",
+      "confirm": "Delete"
+    },
+    "removed": "Exchange deleted: {amounts}",
+    "restore": "Bring back",
+    "conflict": "This exchange was already recorded — with the earlier amounts. If they are wrong, delete it and record it again",
     "empty": {
       "title": "No exchanges yet",
       "body": "Record what you gave and what you got — the rate is worked out for you. Until then trips count by the central bank rate"
