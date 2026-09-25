@@ -8,6 +8,8 @@
       </p>
       <p v-if="failed" class="strip failed" role="alert">{{ t('exchange.failed') }}</p>
       <p v-if="conflicted" class="strip" role="alert">{{ t('exchange.conflict') }}</p>
+      <p v-if="amendConflicted" class="strip" role="alert">{{ t('exchange.amend_conflict') }}</p>
+      <p v-if="vanished" class="strip" role="alert">{{ t('exchange.vanished') }}</p>
       <p v-if="gone" class="strip" role="alert">{{ t('exchange.restore_gone') }}</p>
       <div v-if="removed" ref="removedStrip" class="strip removed">
         <span class="removed-text">{{
@@ -51,7 +53,7 @@
         :body="t('exchange.empty.body')"
       >
         <template #action>
-          <AppButton block :inactive="!online" @click="sheetOpen = true">
+          <AppButton block :inactive="!online" @click="compose">
             {{ t('exchange.record') }}
           </AppButton>
         </template>
@@ -109,7 +111,7 @@
 
         <p class="frozen"><IconCheck aria-hidden="true" />{{ t('money.rate_frozen') }}</p>
 
-        <AppButton ref="recordButton" block :inactive="!online || busy" @click="sheetOpen = true">
+        <AppButton ref="recordButton" block :inactive="!online || busy" @click="compose">
           <template #icon><IconPlus /></template>
           {{ t('exchange.record') }}
         </AppButton>
@@ -118,11 +120,25 @@
           <h2 class="caption">{{ t('exchange.list_title') }}</h2>
           <AppCard as="ul" list>
             <li v-for="exchange in overview.exchanges" :key="exchange.id" class="row">
-              <div class="body">
-                <p class="amounts">{{ amountsOf(exchange) }}</p>
-                <p class="meta">{{ rateLineOf(exchange) }}</p>
-                <p class="meta">{{ comparisonOf(exchange) }}</p>
-              </div>
+              <!-- The row is the way into its amendment (MOL-42, В-3), as a verdict is amended
+                   where it is met. -->
+              <button
+                class="body"
+                type="button"
+                :disabled="!online || busy"
+                :aria-label="t('exchange.edit', { amounts: amountsOf(exchange) })"
+                @click="edit(exchange)"
+              >
+                <span class="amounts">
+                  {{ amountsOf(exchange) }}
+                  <span v-if="exchange.amendedAt" class="amended">{{
+                    t('exchange.amended', { date: dayOf(exchange.amendedAt) })
+                  }}</span>
+                </span>
+                <span class="meta">{{ rateLineOf(exchange) }}</span>
+                <span class="meta">{{ comparisonOf(exchange) }}</span>
+                <span v-if="exchange.note" class="meta note">{{ exchange.note }}</span>
+              </button>
               <button
                 class="remove"
                 type="button"
@@ -138,7 +154,14 @@
       </template>
     </template>
 
-    <ExchangeSheet v-if="overview" v-model:open="sheetOpen" :overview="overview" :record="record" />
+    <ExchangeSheet
+      v-if="overview"
+      v-model:open="sheetOpen"
+      :overview="overview"
+      :editing="editing"
+      :record="record"
+      :amend="amend"
+    />
     <ExchangeRemoveSheet
       v-model:open="removeOpen"
       :exchange="target"
@@ -203,6 +226,16 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const exchanges = useExchanges()
     const sheetOpen = ref(false)
+    // The exchange the sheet amends, or null when it records a new one.
+    const editing = ref<Row | null>(null)
+    function compose(): void {
+      editing.value = null
+      sheetOpen.value = true
+    }
+    function edit(exchange: Row): void {
+      editing.value = exchange
+      sheetOpen.value = true
+    }
     // «Удалить обмен?» first, then «Вернуть» after (В-5): the bin never removes on its own.
     const removeOpen = ref(false)
     const target = ref<Row | null>(null)
@@ -327,6 +360,9 @@ export default defineComponent({
       t,
       ...exchanges,
       sheetOpen,
+      editing,
+      compose,
+      edit,
       removeOpen,
       removedStrip,
       recordButton,
@@ -444,8 +480,26 @@ export default defineComponent({
 }
 
 .body {
+  display: grid;
   flex: 1;
   min-width: 0;
+  min-height: var(--touch-target);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:disabled {
+    cursor: default;
+  }
 }
 
 .amounts {
@@ -453,6 +507,20 @@ export default defineComponent({
   font-size: var(--text-callout);
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
+}
+
+.amended {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+  font-weight: var(--weight-regular);
+}
+
+.note {
+  overflow-wrap: anywhere;
 }
 
 .remove {

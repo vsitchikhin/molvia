@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { ERROR, parseRate, yerevanMidnight } from '@molvia/model'
 import type {
+  ExchangeAmendBody,
   ExchangeBody,
   ExchangeView as Row,
   ExchangesResponse,
@@ -23,6 +24,7 @@ const removeExchange = vi.fn<(id: string) => Promise<ExchangesResponse>>()
 const recordExchange =
   vi.fn<(body: ExchangeBody) => Promise<{ exchanges: ExchangesResponse; created: boolean }>>()
 const restoreExchange = vi.fn<(id: string) => Promise<ExchangesResponse>>()
+const amendExchange = vi.fn<(id: string, body: ExchangeAmendBody) => Promise<ExchangesResponse>>()
 vi.mock('@/api', () => ({
   api: {
     exchanges: () => exchanges(),
@@ -30,6 +32,7 @@ vi.mock('@/api', () => ({
     removeExchange: (id: string) => removeExchange(id),
     recordExchange: (body: ExchangeBody) => recordExchange(body),
     restoreExchange: (id: string) => restoreExchange(id),
+    amendExchange: (id: string, body: ExchangeAmendBody) => amendExchange(id, body),
   },
 }))
 
@@ -107,6 +110,7 @@ beforeEach(() => {
   removeExchange.mockReset()
   recordExchange.mockReset()
   restoreExchange.mockReset()
+  amendExchange.mockReset()
   online(true)
   clock = 0
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -517,5 +521,67 @@ describe('ExchangeView: the rate and the list', () => {
 
     expect(view.text()).toContain(en.exchange.offline.strip)
     expect(view.get('button.remove').attributes('disabled')).toBeDefined()
+  })
+})
+
+describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
+  /** A tap on the row, and the sheet risen — until then it takes no tap. */
+  async function openRow(view: VueWrapper): Promise<void> {
+    await view.get('button.body').trigger('click')
+    await flushPromises()
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+
+  async function saveAmendment(): Promise<void> {
+    const save = [...document.querySelectorAll('dialog[open] button')].find(
+      (button) => button.textContent.trim() === en.exchange.sheet.save_amend,
+    )
+    if (!(save instanceof HTMLButtonElement)) throw new Error('no «Save the amendment»')
+    save.click()
+    await flushPromises()
+  }
+
+  it('marks an amended row and shows its note', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [row({ amendedAt: new Date('2026-09-25T09:00:00.000Z'), note: 'airport' })],
+      }),
+    )
+    const view = await render()
+    expect(view.get('.amended').text()).toContain('amended')
+    expect(view.get('.note').text()).toBe('airport')
+  })
+
+  it('opens the row in the sheet for an amendment, and lands the answer', async () => {
+    exchanges.mockResolvedValue(overview())
+    amendExchange.mockResolvedValue(overview({ exchanges: [row({ revision: 2 })] }))
+    const view = await render()
+    await openRow(view)
+    expect(document.querySelector('dialog[open]')?.textContent).toContain(
+      en.exchange.sheet.title_amend,
+    )
+    await saveAmendment()
+    expect(amendExchange).toHaveBeenCalledWith(row().id, expect.objectContaining({ revision: 1 }))
+  })
+
+  it('an amendment made over a version that moved on says so and reads the list again', async () => {
+    exchanges.mockResolvedValue(overview())
+    amendExchange.mockRejectedValue(new ApiError(ERROR.CONFLICT))
+    const view = await render()
+    await openRow(view)
+    await saveAmendment()
+    expect(view.text()).toContain(en.exchange.amend_conflict)
+    expect(exchanges).toHaveBeenCalledTimes(2)
+  })
+
+  it('an exchange removed elsewhere is said to be gone, not «check the connection»', async () => {
+    exchanges.mockResolvedValue(overview())
+    amendExchange.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
+    const view = await render()
+    await openRow(view)
+    await saveAmendment()
+    expect(view.text()).toContain(en.exchange.vanished)
+    expect(view.text()).not.toContain(en.exchange.failed)
   })
 })

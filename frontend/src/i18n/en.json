@@ -327,6 +327,10 @@
     "row_no_official": "no central bank rate for this day — nothing to compare with",
     "row_doubtful": "the central bank rate of that day is in doubt — no comparison",
     "remove": "Delete the exchange {amounts}",
+    "edit": "Amend the exchange {amounts}",
+    "amended": "amended {date}",
+    "amend_conflict": "This exchange was already amended on another device — here it is as it stands now. Amend it again if you need to",
+    "vanished": "This exchange is gone — it was removed. The list is up to date",
     "remove_sheet": {
       "title": "Delete the exchange?",
       "body": "A deleted exchange no longer counts in the rate of new trips. Past trips do not change",
@@ -336,7 +340,7 @@
     "restore": "Bring back",
     "restored": "The exchange is back",
     "restore_gone": "The exchange can no longer be brought back — the removal is final. If it was needed, record it again",
-    "conflict": "This exchange was already recorded — with the earlier amounts. If they are wrong, delete it and record it again",
+    "conflict": "This exchange was already recorded — with the earlier amounts. If they are wrong, tap it in the list and amend it",
     "empty": {
       "title": "No exchanges yet",
       "body": "Record what you gave and what you got — the rate is worked out for you. Until then trips count by the central bank rate"
@@ -353,6 +357,7 @@
     "failed": "That did not work. Check the connection and try again",
     "sheet": {
       "title": "Exchange",
+      "title_amend": "Amend the exchange",
       "meta": "What you gave and what you got — the rate is worked out for you",
       "given": "Gave",
       "received": "Got",
@@ -363,7 +368,14 @@
       "held_hint": "Optional. With it the rate accounts for what the money left over cost; without it the rate of this exchange is taken",
       "held_estimate": "By the recorded spending ≈ {amount}",
       "held_estimate_last": "Of the last exchange ≈ {amount} is left by the recorded spending",
+      "note": "Where, and a note",
+      "note_placeholder": "Say, «VTB cash machine» or «from memory»",
+      "bad_note": "There is nothing here to keep — write at least a word or leave the field empty",
+      "history": "Earlier versions",
+      "version": "until {until}: {amounts} · {date}",
+      "version_note": "until {until}: {amounts} · {date} · {note}",
       "save": "Save the exchange",
+      "save_amend": "Save the amendment",
       "saving": "Saving the exchange…",
       "bad_day": "Choose the day of the exchange"
     }

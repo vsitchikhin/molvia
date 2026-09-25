@@ -2,7 +2,13 @@ import { computed, onMounted, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
-import type { ExchangeBody, ExchangeView, ExchangesResponse, RatePreference } from '@molvia/model'
+import type {
+  ExchangeAmendBody,
+  ExchangeBody,
+  ExchangeView,
+  ExchangesResponse,
+  RatePreference,
+} from '@molvia/model'
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
@@ -27,6 +33,13 @@ export interface Exchanges {
    * shows what is there, and the screen says to remove it and enter it again.
    */
   readonly conflicted: Ref<boolean>
+  /**
+   * The last amendment was made over a version another device had already moved on from
+   * (MOL-42): the list shows the exchange as it is now, and the screen says so.
+   */
+  readonly amendConflicted: Ref<boolean>
+  /** The exchange being amended is gone — removed elsewhere: the list is read again. */
+  readonly vanished: Ref<boolean>
   /** «Вернуть» came after the removal became final: the screen says so instead of «no connection». */
   readonly gone: Ref<boolean>
   /** The last «Вернуть» brought the exchange back — said out loud, the button being gone. */
@@ -34,6 +47,8 @@ export interface Exchanges {
   retry(): Promise<void>
   /** Resolves `null` when the server holds another exchange under this name (В-6). */
   record(body: ExchangeBody): Promise<ExchangesResponse | null>
+  /** Resolves `null` when the exchange moved on elsewhere or is gone — said above the list. */
+  amend(id: string, body: ExchangeAmendBody): Promise<ExchangesResponse | null>
   prefer(preference: RatePreference): Promise<void>
   remove(exchange: ExchangeView): Promise<void>
   restore(): Promise<void>
@@ -58,6 +73,8 @@ export function useExchanges(): Exchanges {
   const failed = ref(false)
   const removed = ref<ExchangeView | null>(null)
   const conflicted = ref(false)
+  const amendConflicted = ref(false)
+  const vanished = ref(false)
   const gone = ref(false)
   const restored = ref(false)
   let latest = 0
@@ -92,13 +109,20 @@ export function useExchanges(): Exchanges {
     return failure.value ?? 'loading'
   })
 
+  /** Every word above the list is about the last write; a new one takes them all away. */
+  function hush(): void {
+    failed.value = false
+    conflicted.value = false
+    amendConflicted.value = false
+    vanished.value = false
+    gone.value = false
+    restored.value = false
+  }
+
   async function write(run: () => Promise<ExchangesResponse>): Promise<boolean> {
     if (busy.value) return false
     busy.value = true
-    failed.value = false
-    conflicted.value = false
-    gone.value = false
-    restored.value = false
+    hush()
     try {
       land(await run())
       return true
@@ -118,10 +142,7 @@ export function useExchanges(): Exchanges {
       // them into the next account (round 2, Г1).
       overview.value = null
       failure.value = null
-      failed.value = false
-      conflicted.value = false
-      gone.value = false
-      restored.value = false
+      hush()
       removed.value = null
       void load()
     },
@@ -138,14 +159,13 @@ export function useExchanges(): Exchanges {
     failed,
     removed,
     conflicted,
+    amendConflicted,
+    vanished,
     gone,
     restored,
     retry: load,
     async record(body) {
-      conflicted.value = false
-      failed.value = false
-      gone.value = false
-      restored.value = false
+      hush()
       // The offer to bring a removed exchange back goes when the server made the removal final —
       // with a write that reached it — never on the tap: a write lost on the way, or refused
       // before it got that far (a day ahead of the server's clock), leaves it undoable (round 4, Е1).
@@ -162,6 +182,33 @@ export function useExchanges(): Exchanges {
         if (caught instanceof ApiError && caught.code === ERROR.CONFLICT && caught.answered) {
           removed.value = null
           conflicted.value = true
+          await load()
+          return null
+        }
+        throw caught
+      }
+    },
+    // An amendment reaches the point where the server makes removals final on every answer it
+    // gives — a success, a conflict, a missing exchange — so each of those takes «Вернуть» away,
+    // and a write lost on the way leaves it (as `record` does, round 4, Е1).
+    async amend(id, body) {
+      hush()
+      try {
+        const answer = await api.amendExchange(id, body)
+        land(answer)
+        removed.value = null
+        return answer
+      } catch (caught) {
+        const answered = caught instanceof ApiError && caught.answered
+        if (answered && caught.code === ERROR.CONFLICT) {
+          removed.value = null
+          amendConflicted.value = true
+          await load()
+          return null
+        }
+        if (answered && caught.code === ERROR.NOT_FOUND) {
+          removed.value = null
+          vanished.value = true
           await load()
           return null
         }
