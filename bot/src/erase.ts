@@ -55,11 +55,17 @@ export function eraseComposer({
 
   privately.callbackQuery(BUTTON_DATA, async (ctx) => {
     const [, action, issued = ''] = ctx.match
+    // «Отмена» is not an outcome, so it is not written into the message (adversarial О-2).
+    // Both presses of a hesitant double tap leave before the first edit lands, and written in,
+    // «Ничего не удалено» overwrote «Готово» over an account already gone — the one lie this
+    // screen cannot afford. The bot keeps no state and cannot know whether the other button
+    // was pressed, so the words are shown over the message, say what is true either way, and
+    // the buttons go.
     if (action === 'no') {
       try {
-        await settle(ctx, 'erase.cancelled')
+        await refuse(ctx, 'erase.cancelled')
       } finally {
-        await stopSpinner(ctx)
+        await dropKeyboard(ctx)
       }
       return
     }

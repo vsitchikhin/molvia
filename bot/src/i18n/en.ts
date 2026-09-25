@@ -36,14 +36,18 @@ export const en: Dictionary = {
     'To delete all your data — /delete.',
   'erase.prompt':
     'Delete all your data in Molvia?\n\n' +
-    'Your purchases, ratings and reviews, settings and sign-ins on every device will go. ' +
-    'Items you added to the shared catalogue will stay — without your name.\n\n' +
+    'Everything Molvia knows about you will go: purchases, ratings and reviews, search picks, ' +
+    'visit marks, settings and sign-ins on every device. Items and shops you added to the ' +
+    'shared catalogue will stay — without your name.\n\n' +
     'This cannot be undone.',
   'erase.confirm': 'Delete for good',
   'erase.cancel': 'Cancel',
   'erase.done':
-    'Done: Molvia holds no data of yours. You can sign in again — it will be a new, empty account.',
-  'erase.cancelled': 'Nothing was deleted.',
+    'Done: Molvia holds no data of yours. You can sign in again — it will be a new, empty account.\n\n' +
+    'Saved copies may remain on your phone: to remove them, delete the app or clear the ' +
+    "site's data in your browser.",
+  'erase.cancelled':
+    'The buttons are gone. If “Delete for good” was already pressed, it cannot be undone.',
   'erase.expired': 'This button has expired. Send /delete again.',
   'erase.failed': 'No answer came back. Please try again in a minute.',
 }

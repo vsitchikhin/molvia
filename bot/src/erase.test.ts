@@ -157,14 +157,45 @@ describe('/delete — человек удаляет себя сам (MOL-58)', (
     expect(calls.filter((call) => call.method === 'sendMessage')).toEqual([])
   })
 
-  it('«Отмена» ничего не стирает', async () => {
+  it('«Отмена» ничего не стирает и ничего не пишет в сообщение — только поверх, и кнопки уходят', async () => {
     const eraseMe = vi.fn()
     const { bot, calls } = harness({ eraseMe })
 
     await bot.handleUpdate(press(`erase:no:${String(NOW)}`))
 
     expect(eraseMe).not.toHaveBeenCalled()
-    expect(sent(calls, 'editMessageText')?.text).toBe(t('ru', 'erase.cancelled'))
+    expect(sent(calls, 'editMessageText')).toBeUndefined()
+    expect(sent(calls, 'answerCallbackQuery')).toMatchObject({
+      text: t('ru', 'erase.cancelled'),
+      show_alert: true,
+    })
+    expect(sent(calls, 'editMessageReplyMarkup')).toBeDefined()
+  })
+
+  // Adversarial О-2: both presses leave before the first edit lands, and «Отмена» used to
+  // rewrite «Готово» into «Ничего не удалено» over an account already gone.
+  it('«Отмена» после «Удалить навсегда» оставляет «Готово» последним словом в сообщении', async () => {
+    const eraseMe = vi.fn(() => Promise.resolve())
+    const { bot, calls } = harness({ eraseMe })
+
+    await bot.handleUpdate(press(`erase:ok:${String(NOW)}`))
+    await bot.handleUpdate(press(`erase:no:${String(NOW)}`))
+
+    const edits = calls
+      .filter((call) => call.method === 'editMessageText')
+      .map((call) => call.payload.text)
+    expect(edits).toEqual([t('ru', 'erase.done')])
+  })
+
+  it('«Удалить навсегда» после «Отмены» — нажатие было, и «Готово» правда', async () => {
+    const eraseMe = vi.fn(() => Promise.resolve())
+    const { bot, calls } = harness({ eraseMe })
+
+    await bot.handleUpdate(press(`erase:no:${String(NOW)}`))
+    await bot.handleUpdate(press(`erase:ok:${String(NOW)}`))
+
+    expect(eraseMe).toHaveBeenCalledTimes(1)
+    expect(sent(calls, 'editMessageText')?.text).toBe(t('ru', 'erase.done'))
   })
 
   it.each([
@@ -228,6 +259,17 @@ describe('/delete — человек удаляет себя сам (MOL-58)', (
 
     expect(log).toHaveBeenCalledTimes(1)
     expect(JSON.stringify(log.mock.calls)).not.toMatch(/Аня|anya_gyumri|"hy"|777/)
+  })
+
+  // Adversarial О-5 and selfreview 6: what goes is everything, what stays is named in full.
+  it('вопрос называет, что остаются и товары, и магазины, а уходит всё', () => {
+    for (const language of ['ru', 'en']) {
+      const prompt = t(language, 'erase.prompt')
+      expect(prompt).toMatch(language === 'ru' ? /магазин/ : /shops/)
+      expect(prompt).toMatch(
+        language === 'ru' ? /выбор в поиске.*отметки о визитах/s : /search picks.*visit marks/s,
+      )
+    }
   })
 
   it('приветствие называет /delete', () => {
