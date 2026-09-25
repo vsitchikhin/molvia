@@ -1,8 +1,11 @@
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { ACTOR_REFERENCES, createErasureRepository } from '@/db/erasure-repository'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
+import { createActorRepository } from '@/db/actors-repository'
+import { authTransactOn } from '@/db/auth-unit-of-work'
+import { completeLogin } from '@/usecases/complete-login'
 import { lockTelegramAccount } from '@/db/telegram-lock'
 import {
   actors,
@@ -16,6 +19,7 @@ import {
 } from '@/db/schema'
 import { connect, connectDrizzle } from './db'
 import {
+  anHourFromNow,
   clearAll,
   insertActor,
   insertItem,
@@ -105,6 +109,18 @@ async function snapshot(actorId: string) {
       select e.* from expenses e join trips t on t.id = e.trip_id where t.actor_id = ${actorId}`),
     sessions: await db.execute(sql`select * from sessions where actor_id = ${actorId}`),
   }
+}
+
+/** Whether a promise settles within `ms`: the lock either holds it back or it does not. */
+async function settlesWithin(promise: Promise<unknown>, ms: number): Promise<boolean> {
+  return Promise.race([
+    promise.then(() => true),
+    new Promise<boolean>((resolve) =>
+      setTimeout(() => {
+        resolve(false)
+      }, ms),
+    ),
+  ])
 }
 
 describe('стирание владельца по Telegram-id (MOL-58)', () => {
@@ -254,18 +270,6 @@ describe('стирание и вход, который собирается в �
 })
 
 describe('подтверждение входа и стирание одного аккаунта идут по очереди (adversarial П-2)', () => {
-  /** Whether a promise settles within `ms`: the lock either holds it back or it does not. */
-  async function settlesWithin(promise: Promise<unknown>, ms: number): Promise<boolean> {
-    return Promise.race([
-      promise.then(() => true),
-      new Promise<boolean>((resolve) =>
-        setTimeout(() => {
-          resolve(false)
-        }, ms),
-      ),
-    ])
-  }
-
   it('подтверждение ждёт, пока идёт стирание этого аккаунта', async () => {
     const tg = telegramId()
     // Started in the browser, not confirmed yet: the row has no Telegram id for erasure to lock.
@@ -311,6 +315,92 @@ describe('подтверждение входа и стирание одного
         await tx.execute(lockTelegramAccount(telegramId()))
         expect(await settlesWithin(erasure.erase(tg, { dryRun: false }), 2000)).toBe(true)
       })
+    } finally {
+      await holder.close()
+    }
+  })
+})
+
+describe('владельца, пока идёт стирание, не создаёт никто (adversarial Р-1)', () => {
+  const settings = {
+    country: 'AM',
+    city: 'Гюмри',
+    spendCurrency: 'AMD',
+    incomeCurrency: 'RUB',
+  } as const
+
+  it('создание владельца ждёт замка аккаунта — каким бы путём оно ни шло', async () => {
+    const tg = telegramId()
+    const holder = connectDrizzle()
+    try {
+      let creating: Promise<unknown> | undefined
+      await holder.db.transaction(async (tx) => {
+        await tx.execute(lockTelegramAccount(tg))
+        // What `signIn` does for the development seam, and for any sign-in that comes later.
+        creating = createActorRepository(db).createIfMissing(randomUUID(), tg, settings)
+        expect(await settlesWithin(creating, 300)).toBe(false)
+      })
+      await creating
+    } finally {
+      await holder.close()
+    }
+  })
+
+  it('сборка входа тоже ждёт — и ждёт до строки запроса, так что стиранию ждать нечего', async () => {
+    const tg = telegramId()
+    const id = randomUUID()
+    const code = randomBytes(32).toString('base64url')
+    const secret = randomBytes(32).toString('base64url')
+    const requests = createLoginRequestRepository(db)
+    await requests.create(id, code, secret, null, anHourFromNow())
+    await requests.confirm(code, tg)
+    const holder = connectDrizzle()
+    try {
+      let collecting: Promise<unknown> | undefined
+      await holder.db.transaction(async (tx) => {
+        await tx.execute(lockTelegramAccount(tg))
+        collecting = completeLogin(authTransactOn(db), id, secret)
+        expect(await settlesWithin(collecting, 300)).toBe(false)
+        // The row is still free: erasure, holding the account, can take it without a deadlock.
+        await tx.execute(sql`select 1 from login_requests where id = ${id} for update nowait`)
+      })
+      expect(await collecting).toMatchObject({ status: 'authenticated' })
+    } finally {
+      await holder.close()
+    }
+  })
+})
+
+describe('стирание не закрывает вход остальным (adversarial Р-3)', () => {
+  it('пока идёт стирание человека с истёкшим запросом входа, чужой вход начинается сразу', async () => {
+    const tg = telegramId()
+    const actorId = await insertActor(db, { telegramUserId: tg })
+    const expired = await insertLoginRequest(db, { telegramUserId: tg })
+    await db.execute(sql`
+      update login_requests
+      set created_at = now() - interval '10 minutes', expires_at = now() - interval '5 minutes'
+      where id = ${expired}`)
+    const holder = connectDrizzle()
+    try {
+      await holder.db.transaction(async (tx) => {
+        // What erasure holds for its whole transaction: the account, every request, the owner.
+        await tx.execute(lockTelegramAccount(tg))
+        await tx.execute(
+          sql`select 1 from login_requests where telegram_user_id = ${tg} for update`,
+        )
+        await tx.execute(sql`select 1 from actors where id = ${actorId} for update`)
+
+        const started = createLoginRequestRepository(db).createLimited(
+          randomUUID(),
+          randomUUID().replaceAll('-', ''),
+          randomBytes(32).toString('base64url'),
+          null,
+        )
+        expect(await settlesWithin(started, 2000)).toBe(true)
+      })
+      // Skipped, not lost: the next pass takes the expired row.
+      await createLoginRequestRepository(db).removeExpired()
+      expect(await db.select().from(loginRequests).where(eq(loginRequests.id, expired))).toEqual([])
     } finally {
       await holder.close()
     }

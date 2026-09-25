@@ -153,7 +153,16 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
 
   return {
     async removeExpired() {
-      await db.delete(loginRequests).where(sql`${loginRequests.expiresAt} <= clock_timestamp()`)
+      // `skip locked`: a row somebody holds is left for the next pass (MOL-58, adversarial Р-3).
+      // Erasure holds every request of the person it erases, expired ones too, and this runs
+      // under the one quota lock every start of a login takes — waiting here closed the door to
+      // everybody for as long as one erasure, or one dry run of it, took.
+      await db.delete(loginRequests).where(
+        sql`${loginRequests.id} in (
+          select ${loginRequests.id} from ${loginRequests}
+          where ${loginRequests.expiresAt} <= clock_timestamp()
+          for update skip locked)`,
+      )
     },
 
     async createLimited(id, code, secret, deviceName) {
