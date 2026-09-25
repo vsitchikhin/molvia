@@ -6,6 +6,7 @@ import type { Router } from 'vue-router'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import BottomSheet from '@/components/BottomSheet.vue'
+import { pageAnchor } from '@/composables/useSheetHistory'
 import { routes } from '@/router'
 
 /**
@@ -587,5 +588,87 @@ describe('BottomSheet', () => {
     await vi.waitFor(() => {
       expect(router.currentRoute.value.fullPath).toBe('/')
     })
+  })
+})
+
+/**
+ * The page under a sheet, put back where it stood (MOL-63, adversarial В2). happy-dom lays nothing
+ * out, so where the opener stands on the screen is the test's to say.
+ */
+describe('the page under the sheet', () => {
+  function opener(top: { value: number }): HTMLButtonElement {
+    const button = document.createElement('button')
+    document.body.append(button)
+    vi.spyOn(button, 'getBoundingClientRect').mockImplementation(
+      () => ({ top: top.value }) as DOMRect,
+    )
+    return button
+  }
+
+  async function openFrom(button: HTMLElement, options: { at?: string } = {}) {
+    button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    const rendered = await render(options)
+    rendered.open.value = true
+    await nextTick()
+    const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined)
+    return { ...rendered, scrollBy }
+  }
+
+  // The iOS keyboard for a field in the sheet may move the window; nothing else moves it back.
+  it('is put back when the window moved under the sheet', async () => {
+    const top = { value: 400 }
+    const { router, scrollBy } = await openFrom(opener(top))
+    top.value = 1000
+    router.back()
+    expect(scrollBy).toHaveBeenCalledExactlyOnceWith({ top: 600, behavior: 'instant' })
+  })
+
+  // iOS does not focus a tapped button: the press says what opened the sheet, not the focus.
+  it('is measured by what was pressed, whatever holds the focus', async () => {
+    const top = { value: 400 }
+    const button = opener(top)
+    const field = document.createElement('input')
+    document.body.append(field)
+    field.focus()
+    const { router, scrollBy } = await openFrom(button)
+    top.value = 100
+    router.back()
+    expect(scrollBy).toHaveBeenCalledExactlyOnceWith({ top: -300, behavior: 'instant' })
+  })
+
+  // The list changed height above it and the browser kept the opener still: nothing to put back.
+  it('must not fire: the opener stands where it stood', async () => {
+    const { router, scrollBy } = await openFrom(opener({ value: 400 }))
+    router.back()
+    expect(scrollBy).not.toHaveBeenCalled()
+  })
+
+  it('must not fire: the opener is gone — the row the sheet deleted', async () => {
+    const top = { value: 400 }
+    const button = opener(top)
+    const { router, scrollBy } = await openFrom(button)
+    button.remove()
+    top.value = 1000
+    router.back()
+    expect(scrollBy).not.toHaveBeenCalled()
+  })
+
+  // The screen goes with the sheet, and the router puts the one under it where it was.
+  it('must not fire: close(2) leaves the screen', async () => {
+    const top = { value: 400 }
+    const { sheet, scrollBy } = await openFrom(opener(top), { at: '/trip/add' })
+    top.value = 1000
+    ;(sheet().vm as unknown as { close: (steps: number) => void }).close(2)
+    expect(scrollBy).not.toHaveBeenCalled()
+  })
+
+  // A sheet over a sheet is opened from inside a dialog, which the page's scroll does not move.
+  it('takes no measure from inside a dialog', () => {
+    const dialog = document.createElement('dialog')
+    const button = document.createElement('button')
+    dialog.append(button)
+    document.body.append(dialog)
+    button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    expect(pageAnchor()).toBeNull()
   })
 })

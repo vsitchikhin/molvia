@@ -131,12 +131,12 @@ watchBrowserAnimatedBack()
  * Back and forward return to where the person was; any other move starts at the top. The
  * sections keep no scroll of their own — their state lives in stores, not in components.
  *
- * A move to the same address does not scroll at all. It is one of two things, and neither should
- * move the page. A sheet put away: the page under it never moved, and whatever changed above the
- * screen meanwhile — a list reread, a queued row sent, a notice come or gone — the browser has
- * already kept out of sight; scrolling back to the number saved when the sheet opened moved the
- * list by exactly that change (MOL-63). Or a push to where the router already is: it refuses the
- * duplicate and still asks this function, from the screen to itself.
+ * A move to the same address is not the router's to scroll. It is one of two things. A sheet put
+ * away: the sheet puts the page back itself, by the element it was opened from (`putBack` in
+ * useSheetHistory.ts); scrolling back to the number saved when it opened moved the list by
+ * whatever changed above the screen meanwhile — a list reread, a queued row sent, a notice come or
+ * gone — which the browser had already kept out of sight (MOL-63). Or a push to where the router
+ * already is: it refuses the duplicate and still asks this function, from the screen to itself.
  *
  * The first navigation is not one of them, though it comes «from» `START_LOCATION`, whose address
  * is «/»: that is the page loaded again — «back» into the app from another site — and the number

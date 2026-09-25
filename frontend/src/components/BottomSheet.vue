@@ -36,7 +36,7 @@ import { useI18n } from 'vue-i18n'
 import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
-import { useSheetHistory } from '@/composables/useSheetHistory'
+import { pageAnchor, useSheetHistory } from '@/composables/useSheetHistory'
 
 /** A double tap lands within this — a platform convention, not a design token. */
 const DOUBLE_TAP = 300
@@ -141,10 +141,12 @@ export default defineComponent({
       if (import.meta.env.DEV && activation && !activation.isActive) {
         console.warn('[BottomSheet] opened without a tap: «back» may skip its entry')
       }
+      // Measured before the sheet is up, with the page as the person left it.
+      const anchor = pageAnchor()
       shown.value = true
       element.showModal()
       settledAt = performance.now() + settleTime(element)
-      history.lay()
+      history.lay(anchor)
     }
 
     /** Closes the sheet — and `steps - 1` screens under it — by stepping back through history. */
