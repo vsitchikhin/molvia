@@ -3,16 +3,24 @@
   <div class="announcer" role="status">
     <p v-for="announcement in announcements" :key="announcement.id">{{ announcement.text }}</p>
   </div>
-  <RouterView />
-  <TabBar v-if="route.meta.tab" />
+  <!-- Всё приложение — за входом (MOL-56). Экран входа не маршрут: адрес всё это время тот,
+       куда человек шёл, и после входа он там и оказывается. -->
+  <LoginView v-if="closed" />
+  <template v-else>
+    <RouterView />
+    <TabBar v-if="route.meta.tab" />
+  </template>
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted } from 'vue'
+import { computed, defineComponent, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import TabBar from '@/components/TabBar.vue'
+import LoginView from '@/views/LoginView.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
+import { useActorStore } from '@/stores/actor'
+import { useLoginStore } from '@/stores/login'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 
@@ -20,10 +28,25 @@ import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 // and the frame around each screen is AppScreen's.
 export default defineComponent({
   name: 'AppRoot',
-  components: { TabBar },
+  components: { LoginView, TabBar },
   setup() {
+    const actor = useActorStore()
+    const login = useLoginStore()
+
+    // Whether the app is shown at all, or the login screen instead. The rule lives in the login
+    // store, where it can be read and tested without mounting the app (MOL-56).
+    const closed = computed(() => login.closed)
+
     // The app, not a screen, sends what waits on the phone, whichever screen is open when the
     // connection is back: purchases written at the shelf (MOL-24) and saved ratings (MOL-28).
+    //
+    // **Whether it may actually go out is each queue's own to decide**, and it is decided in
+    // their `flush()`: only once the server has said who we are, because until then the app is
+    // drawn from the drawer's name and a drawer says nothing about the cookie — that is how a
+    // rating held back on a `401` went out into a stranger's account (adversarial Б1). Here is
+    // only the occasion, and a gate here as well would be a second place that decides: it took
+    // away the queue's own «the server is silent, try again later», because that timer is set by
+    // `flush` and `flush` was never reached (adversarial Г1).
     const queue = useTripQueueStore()
     const drafts = useVerdictDraftsStore()
     const send = () => {
@@ -32,8 +55,11 @@ export default defineComponent({
     }
     onMounted(send)
     useReconnect(send)
+    // Every settling of the identity is an occasion: «ready» is what the queue held on a `401`
+    // has been waiting for (MOL-24, `HOLDS`), and «error» is what starts its doubling retry.
+    watch(() => actor.state, send)
 
-    return { route: useRoute(), announcements: provideAnnouncer() }
+    return { closed, route: useRoute(), announcements: provideAnnouncer() }
   },
 })
 </script>

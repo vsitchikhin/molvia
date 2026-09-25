@@ -57,6 +57,20 @@
         />
         <p class="note">{{ t('settings.scope') }}</p>
       </form>
+      <!-- Entrances to the money screens (handoff MOL-41, кадр 8a): only the ones that exist —
+           «Доходы» joins when its screen does. -->
+      <section class="money">
+        <h2 class="caption">{{ t('settings.group_money') }}</h2>
+        <AppCard as="ul" list>
+          <li>
+            <RouterLink class="entry" :to="{ name: 'exchange' }">
+              <IconSwap class="entry-icon" aria-hidden="true" />
+              <span class="entry-label">{{ t('exchange.title') }}</span>
+              <IconChevron class="entry-chevron" aria-hidden="true" />
+            </RouterLink>
+          </li>
+        </AppCard>
+      </section>
     </template>
     <AppButton class="privacy" variant="ghost" block @click="privacy">{{
       t('privacy.title')
@@ -116,6 +130,8 @@ import IconPencil from '~icons/mdi/pencil-outline'
 import IconCheck from '~icons/mdi/check'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconRefresh from '~icons/mdi/refresh'
+import IconSwap from '~icons/mdi/swap-horizontal'
+import IconChevron from '~icons/mdi/chevron-right'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
@@ -137,6 +153,8 @@ export default defineComponent({
     IconCheck,
     IconAlert,
     IconRefresh,
+    IconSwap,
+    IconChevron,
   },
   setup() {
     const { t } = useI18n()
@@ -247,6 +265,45 @@ export default defineComponent({
 .error {
   background: var(--bad-tint);
   color: var(--bad-ink);
+}
+
+.money {
+  margin-top: var(--space-6);
+}
+
+.caption {
+  margin: 0 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target-lg);
+  padding: 0 var(--space-4);
+  color: inherit;
+  text-decoration: none;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.entry-icon,
+.entry-chevron {
+  flex: none;
+  width: var(--space-6);
+  height: var(--space-6);
+  color: var(--text-muted);
+}
+
+.entry-label {
+  flex: 1;
 }
 
 .skeleton-card {

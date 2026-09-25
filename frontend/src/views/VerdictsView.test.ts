@@ -56,6 +56,8 @@ async function render({ identity = true } = {}) {
   localStorage.setItem('molvia.actor', ME)
   const pinia = createPinia()
   setActivePinia(pinia)
+  // Приложение с осевшей личностью: очередь отправляет только по ответу сервера (MOL-56).
+  useActorStore().state = 'ready'
   if (!identity) useActorStore().id = null
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/verdicts')

@@ -73,6 +73,8 @@ async function mounted(): Promise<VerdictQueue> {
 function freshPinia(): void {
   localStorage.setItem('molvia.actor', ME)
   setActivePinia(createPinia())
+  // Приложение с осевшей личностью: очередь отправляет только по ответу сервера (MOL-56).
+  useActorStore().state = 'ready'
 }
 
 const names = (queue: VerdictQueue) => queue.cards.value.map((item) => item.name)

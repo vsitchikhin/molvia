@@ -120,6 +120,20 @@
       "when": 1790104022082,
       "tag": "0016_trip_device_completion",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790266107833,
+      "tag": "0017_exchanges",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790323634860,
+      "tag": "0018_exchange_undo",
+      "breakpoints": true
     }
   ]
 }

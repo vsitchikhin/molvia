@@ -21,6 +21,7 @@ import type {
 } from '@molvia/model'
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
+import { useLoginStore } from '@/stores/login'
 import { isIdentifier } from '@/stores/identity'
 import { read, writeEverywhere } from '@/stores/storage'
 import { useTripHistoryStore } from '@/stores/tripHistory'
@@ -403,6 +404,7 @@ function exclusively(name: string, work: () => Promise<void>): Promise<void> {
  */
 export const useTripQueueStore = defineStore('tripQueue', () => {
   const actor = useActorStore()
+  const login = useLoginStore()
   const trips = useTripStore()
 
   let kept: Kept[] = []
@@ -515,8 +517,21 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function retryLater(): void {
     if (!navigator.onLine) return
     clearTimeout(retry)
-    retry = setTimeout(() => void flush(), retryDelay)
+    retry = setTimeout(() => void attempt(), retryDelay)
     retryDelay = Math.min(retryDelay * 2, RETRY_LAST_MS)
+  }
+
+  /**
+   * Один заход повтора: сперва спросить о личности, если сервер молчал, и только потом пробовать
+   * отправку — без ответа `me()` она всё равно не пойдёт (MOL-56, Б1).
+   *
+   * **`await` здесь держит цепочку** (адверсариальный Г1): `start()` синхронно ставит
+   * `loading`, и `flush()` в том же тике видел уже не `error`, а значит не заводил следующего
+   * таймера. Повтор случался ровно один раз, без обещанного удвоения.
+   */
+  async function attempt(): Promise<void> {
+    if (actor.state === 'error') await actor.retry()
+    await flush()
   }
 
   let running: Promise<void> | null = null
@@ -527,6 +542,16 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
    * otherwise have been handed the old run's promise and waited for the next `online`.
    */
   function flush(): Promise<void> {
+    // **Ничего не уходит, пока сервер не сказал, кто мы** (MOL-56, адверсариальный Б1): до
+    // ответа «кто мы» — это имя ящика на устройстве, а оно ничего не знает про cookie.
+    //
+    // Молчащий сервер при живой связи по-прежнему пробуется сам, с удваивающейся паузой: без
+    // этого покупка, застрявшая за порталом магазина, ждала бы возвращения во вкладку, а
+    // `online` за порталом не приходит вовсе — `onLine` там всё время `true` (MOL-24, Р-5).
+    if (actor.state !== 'ready' || login.rechecking) {
+      if (actor.state === 'error') retryLater()
+      return Promise.resolve()
+    }
     if (!running) {
       const owner = actor.id
       clearTimeout(retry)

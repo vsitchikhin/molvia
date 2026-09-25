@@ -111,6 +111,8 @@ describe('словарь: повторяющиеся тексты', () => {
       Сохранить: ['item.save_edit', 'settings.save'],
       // Цена Р-2: одно состояние, написанное для трёх экранов.
       'Сервер не ответил': ['advice.error.title', 'item.error.title', 'trip.error.title'],
+      // Та же цена у офлайна: у настроек и у обменов своё состояние (MOL-40).
+      'Нет связи': ['exchange.offline.title', 'settings.offline.title'],
     })
   })
 
@@ -125,7 +127,7 @@ describe('словарь: повторяющиеся тексты', () => {
       Ratings: ['nav.verdicts', 'verdict.title'],
       Settings: ['nav.settings', 'settings.title'],
       Save: ['item.save_edit', 'settings.save'],
-      'No connection': ['item.offline.title', 'settings.offline.title'],
+      'No connection': ['exchange.offline.title', 'item.offline.title', 'settings.offline.title'],
       'The server did not answer': ['advice.error.title', 'item.error.title', 'trip.error.title'],
       // Английский не различает отмену диалога и отмену ввода; русский различает.
       Cancel: ['item.cancel', 'trip.finish_confirm.cancel'],

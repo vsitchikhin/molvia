@@ -7,6 +7,7 @@ import ItemSearchView from '@/views/ItemSearchView.vue'
 import TripHistoryView from '@/views/TripHistoryView.vue'
 import FinishedTripView from '@/views/FinishedTripView.vue'
 import TripView from '@/views/TripView.vue'
+import ExchangeView from '@/views/ExchangeView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
 import { watchBrowserAnimatedBack } from '@/transitions'
 
@@ -18,6 +19,7 @@ export type RouteName =
   | 'advice'
   | 'verdicts'
   | 'settings'
+  | 'exchange'
   | 'item-search'
   | 'trip-history'
   | 'finished-trip'
@@ -39,7 +41,7 @@ declare module 'vue-router' {
   }
 }
 
-// Not lazy: eight small screens, and a chunk per route would turn the first tap on a tab into
+// Not lazy: nine small screens, and a chunk per route would turn the first tap on a tab into
 // a network request exactly where the connection drops.
 export const routes = [
   {
@@ -47,6 +49,12 @@ export const routes = [
     name: 'settings',
     component: SettingsView,
     meta: { titleKey: 'settings.title', tab: 'settings' },
+  },
+  {
+    path: '/settings/exchange',
+    name: 'exchange',
+    component: ExchangeView,
+    meta: { titleKey: 'exchange.title', parent: 'settings' },
   },
   { path: '/', name: 'trip', component: TripView, meta: { titleKey: 'trip.title', tab: 'trip' } },
   {

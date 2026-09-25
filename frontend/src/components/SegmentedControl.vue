@@ -1,5 +1,5 @@
 <template>
-  <fieldset class="segmented">
+  <fieldset class="segmented" :disabled="disabled">
     <legend class="legend" :class="{ hidden: hideLegend }">{{ legend }}</legend>
     <div class="track">
       <label
@@ -50,6 +50,11 @@ export default defineComponent({
     legend: { type: String, required: true },
     /** Where a label above would repeat what the screen already says; still read out. */
     hideLegend: { type: Boolean, default: false },
+    /**
+     * The choice cannot be made right now — no connection, or the last one still on its way
+     * (MOL-40, review С-2). On the fieldset, so every radio and the arrows go quiet at once.
+     */
+    disabled: { type: Boolean, default: false },
   },
   emits: {
     'update:modelValue': (value: string) => typeof value === 'string',

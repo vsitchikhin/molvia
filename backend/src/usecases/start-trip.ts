@@ -1,5 +1,13 @@
-import { DomainError, ERROR, geographyAllowed, pickOfficialRate, yerevanDate } from '@molvia/model'
+import {
+  DomainError,
+  ERROR,
+  geographyAllowed,
+  pickOfficialRate,
+  walletRate,
+  yerevanDate,
+} from '@molvia/model'
 import type { Actor, AmdRate, OfficialRate, StartTripBody, TripView } from '@molvia/model'
+import type { TripSnapshot } from '@/db/trips-repository'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
 import { tripViewFor } from './trip-view'
 
@@ -17,10 +25,10 @@ export interface Started {
  * row — and `places.ensure` meets «ЕРЕВАН СИТИ» and «ереван сити» at the one shop. «Yerevan City» is a
  * second shop, accepted for 0.1 — merging places is 0.2's, as merging items is (MOL-21, В-11).
  *
- * The currency is a snapshot of the person's setting, and so is the rate: the official one, read
- * from the cache and never from the network — a trip at the shelf does not wait for a central
- * bank (MOL-39, Р-3). One transaction, so a trip refused because another is open leaves no new
- * place behind either.
+ * The currency is a snapshot of the person's setting, and so is the rate: their own, from their
+ * exchanges, or the official one read from the cache and never from the network — a trip at the
+ * shelf does not wait for a central bank (MOL-39, Р-3; MOL-40). One transaction, so a trip refused
+ * because another is open leaves no new place behind either.
  */
 export async function startTrip(
   transact: Transact,
@@ -54,15 +62,39 @@ export async function startTrip(
       country: context.country,
       city: context.city,
     })
-    const official = await officialRateFor(repositories, context, now)
+    const snapshot =
+      (await personalRateFor(repositories, actor.id, context, now)) ??
+      (await officialRateFor(repositories, context, now))
     const { trip, created } = await repositories.trips.start(
       actor.id,
       { id: body.id, placeId: place.id },
       context.spendCurrency,
-      official,
+      snapshot,
     )
     return { trip: await tripViewFor(repositories, trip), created }
   })
+}
+
+/**
+ * The person's own rate of the trip's pair (MOL-40, В-3, В-4): the average cost of what they hold,
+ * from their exchanges dated no later than today in Yerevan — or none, and the official rate goes
+ * in instead: when they asked for the official one, when the two currencies are one, and when
+ * they have no exchange of this pair. Never jumped, never with a provider: it is nobody's
+ * publication, and nothing to measure a jump against.
+ */
+async function personalRateFor(
+  { exchanges }: Pick<TripRepositories, 'exchanges'>,
+  owner: string,
+  pair: Pick<Actor, 'incomeCurrency' | 'spendCurrency'>,
+  now: Date,
+): Promise<TripSnapshot | null> {
+  const base = pair.incomeCurrency
+  const quote = pair.spendCurrency
+  if (base === quote) return null
+  if ((await exchanges.preference(owner)) !== 'personal') return null
+
+  const wallet = walletRate(await exchanges.list(owner), base, quote, yerevanDate(now))
+  return wallet ? { rate: wallet.rate, provider: null, jumped: false, previous: null } : null
 }
 
 /**

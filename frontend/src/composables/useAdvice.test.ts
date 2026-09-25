@@ -404,7 +404,12 @@ describe('useAdvice', () => {
     await flushPromises()
 
     expect(held.groups.value.take[0]?.rating).toBe('4.7')
-    expect(localStorage.getItem(`molvia.advice.${ME}`)).not.toContain('2.0')
+    // Разбором, а не поиском подстроки: «2.0» попадается в метке времени самого снимка
+    // («…T17:21:42.071Z»), и тест краснел раз в сотню прогонов по часам машины.
+    const kept: unknown = JSON.parse(localStorage.getItem(`molvia.advice.${ME}`) ?? 'null')
+    expect((kept as { answer: AdviceResponse }).answer.rows.map((one) => one.rating)).toEqual([
+      '4.7',
+    ])
   })
 
   it('А3: an answer about another city is taken when the settings do not move', async () => {

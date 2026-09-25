@@ -91,6 +91,29 @@ export const moneyCodec = z.codec(moneyWireSchema, priceSchema, {
   encode: (value) => ({ amount: decimalFromMinor(value), currency: value.currency }),
 })
 
+/**
+ * Money that may be below zero, for the one answer that is a difference rather than a price:
+ * how much more or less an exchange gave than the central bank would have (MOL-40). A price is
+ * never negative, so `moneyCodec` keeps refusing the sign — this is a second codec, not a looser
+ * first one.
+ */
+export const signedMoneyCodec = z.codec(moneyWireSchema, moneySchema, {
+  decode: ({ amount, currency }, payload) => {
+    const minor = scaledFromDecimal(amount, MINOR_EXPONENT[currency])
+    if (minor === null || minor > INT8_MAX || minor < -INT8_MAX) {
+      payload.issues.push({
+        code: 'custom',
+        input: amount,
+        path: ['amount'],
+        message: ERROR.INVALID_AMOUNT,
+      })
+      return { minor: 0n, currency }
+    }
+    return { minor, currency }
+  },
+  encode: (value) => ({ amount: decimalFromMinor(value), currency: value.currency }),
+})
+
 function sameCurrency(a: Money, b: Money): void {
   if (a.currency !== b.currency) {
     throw new DomainError(ERROR.CURRENCY_MISMATCH, `${a.currency} vs ${b.currency}`)

@@ -55,6 +55,8 @@ function fresh() {
   sessionStorage.clear()
   localStorage.setItem('molvia.actor', ME)
   setActivePinia(createPinia())
+  // Приложение с осевшей личностью: очередь отправляет только по ответу сервера (MOL-56).
+  useActorStore().state = 'ready'
   return { trips: useTripStore(), queue: useTripQueueStore(), current: useCurrentTrip() }
 }
 

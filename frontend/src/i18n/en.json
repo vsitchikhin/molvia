@@ -65,6 +65,7 @@
       "drop_trip": "Drop the trip and its purchases"
     },
     "rate_line": "rate {rate} · {date}",
+    "rate_line_mine": "my rate {rate} · {date}",
     "flip": "Show in the other currency",
     "caveat": {
       "pending": "+ {n} item not sent yet | + {n} items not sent yet",
@@ -293,21 +294,125 @@
     "converted_package": "≈ {amount} per pack",
     "converted_note": "the conversion is approximate, we always compare by the price on the tag",
     "rate_official": "rate {rate} · CBA",
-    "rate_mine": "my rate {rate}",
     "rate_frozen": "The rate is saved with the trip. Last month does not change with today's rate",
     "rate_label": "1 {currency} =",
     "source_mine": "mine",
     "source_official": "official",
     "home_currency": "My currency"
   },
-  "identity": {
-    "error": {
-      "title": "Could not sign in",
-      "body": "Until that works, the app cannot save anything — there is nowhere to put it."
+  "exchange": {
+    "title": "Money exchange",
+    "my_rate": "My rate",
+    "basis_weighted": "average of what is left · since {date}",
+    "basis_last": "by the last exchange · since {date}",
+    "no_wallet": "No {base} → {quote} exchanges yet — new trips count by the Central Bank of Armenia rate",
+    "preference_legend": "New trips count",
+    "preference_personal": "by my rate",
+    "preference_official": "by the central bank rate",
+    "preference_hint": "My rate when there is an exchange; without one a trip takes the central bank rate anyway",
+    "record": "Record an exchange",
+    "list_title": "Exchanges",
+    "row_amounts": "{given} → {received}",
+    "row_rate": "{date} · {rate}",
+    "row_more": "{amount} more than the central bank ({rate}, {date})",
+    "row_less": "{amount} less than the central bank ({rate}, {date})",
+    "row_equal": "exactly the central bank rate ({rate}, {date})",
+    "row_more_other": "{amount} more than the {source} rate ({rate}, {date})",
+    "row_less_other": "{amount} less than the {source} rate ({rate}, {date})",
+    "row_equal_other": "exactly the {source} rate ({rate}, {date})",
+    "row_no_official": "no central bank rate for this day — nothing to compare with",
+    "row_doubtful": "the central bank rate of that day is in doubt — no comparison",
+    "remove": "Delete the exchange {amounts}",
+    "remove_sheet": {
+      "title": "Delete the exchange?",
+      "body": "A deleted exchange no longer counts in the rate of new trips. Past trips do not change",
+      "confirm": "Delete"
+    },
+    "removed": "Exchange deleted: {amounts}",
+    "restore": "Bring back",
+    "restored": "The exchange is back",
+    "restore_gone": "The exchange can no longer be brought back — the removal is final. If it was needed, record it again",
+    "conflict": "This exchange was already recorded — with the earlier amounts. If they are wrong, delete it and record it again",
+    "empty": {
+      "title": "No exchanges yet",
+      "body": "Record what you gave and what you got — the rate is worked out for you. Until then trips count by the central bank rate"
     },
     "offline": {
-      "title": "Not signed in yet",
-      "body": "We will sign in as soon as you are back online. Until then nothing new can be saved."
+      "title": "No connection",
+      "body": "The exchanges will be shown when the connection is back",
+      "strip": "No connection — an exchange or the rate can be changed when it is back"
+    },
+    "load_error": {
+      "title": "Could not load the exchanges",
+      "body": "The server did not answer properly. Try again"
+    },
+    "failed": "That did not work. Check the connection and try again",
+    "sheet": {
+      "title": "Exchange",
+      "meta": "What you gave and what you got — the rate is worked out for you",
+      "given": "Gave",
+      "received": "Got",
+      "currency": "Currency",
+      "same_currency": "The same currency on both sides is not an exchange",
+      "day": "Day of the exchange",
+      "held": "{currency} held before the exchange",
+      "held_hint": "Optional. With it the rate accounts for what the money left over cost; without it the rate of this exchange is taken",
+      "held_estimate": "By the recorded spending ≈ {amount}",
+      "held_estimate_last": "Of the last exchange ≈ {amount} is left by the recorded spending",
+      "save": "Save the exchange",
+      "saving": "Saving the exchange…",
+      "bad_day": "Choose the day of the exchange"
+    }
+  },
+  "identity": {
+    "error": {
+      "title": "Could not check the sign-in",
+      "body": "The app is open, but nothing is sent until the server answers."
+    },
+    "offline": {
+      "title": "Working without a connection",
+      "body": "Purchases are kept on the phone and sent once the internet is back."
+    }
+  },
+  "login": {
+    "title": "Sign in",
+    "offer": {
+      "title": "Sign in with your Telegram",
+      "body": "Your trips and ratings then survive a change of phone. We store neither your name nor your phone number."
+    },
+    "start": "Sign in with Telegram",
+    "waiting": {
+      "title": "Open Telegram and tap «Sign in»",
+      "body": "The link lives five minutes. Come back here — the app will recognise you by itself."
+    },
+    "open": "Open Telegram",
+    "restart": "Start again",
+    "welcome": {
+      "title": "Signed in. Is this your account?",
+      "body": "Everything you write from here lands in it.",
+      "created": "Account created: {day}"
+    },
+    "confirm": "Yes, that is me",
+    "refuse": "That is not me",
+    "unavailable": {
+      "title": "This link no longer works",
+      "body": "Five minutes may have passed, or the login has been collected. Start again."
+    },
+    "rate_limited": {
+      "title": "Too many sign-in attempts",
+      "body": "That is everybody's requests together. Try in a minute."
+    },
+    "disabled": {
+      "title": "Signing in with Telegram is not set up",
+      "body": "This copy has no bot. That happens in development only."
+    },
+    "error": {
+      "title": "Could not sign in",
+      "body": "Something got in the way. Try again."
+    },
+    "offline": {
+      "title": "No internet, no sign-in",
+      "body": "We will try by ourselves once the connection is back."
     }
   },
   "dev": {
@@ -321,7 +426,9 @@
       "sample_milk": "Milk «Ashkhar»",
       "sample_meta": "UHT, 2.5%",
       "date": "Date"
-    }
+    },
+    "login_seam": "Sign in for development",
+    "login_insecure": "Signing in needs https: run make certs"
   },
   "error": {
     "invalid_amount": "That does not look like an amount",
@@ -340,7 +447,8 @@
     "login_forbidden": "Open sign-in from the app",
     "login_rate_limited": "Too many login requests. Try again in a minute",
     "login_disabled": "Telegram sign-in is not configured yet",
-    "bot_unauthorized": "The bot could not authenticate"
+    "bot_unauthorized": "The bot could not authenticate",
+    "exchange_in_future": "An exchange cannot be dated in the future"
   },
   "settings": {
     "title": "Settings",
@@ -404,7 +512,8 @@
     "save_unknown": {
       "title": "Connection lost while saving",
       "body": "We will check with the server when it returns. Your edits will stay here."
-    }
+    },
+    "group_money": "Money"
   },
   "privacy": {
     "title": "Data and privacy",
@@ -419,6 +528,10 @@
       "purchases": {
         "term": "Purchases",
         "text": "What, where, when and for how much. This is the most personal part: it shows where you go. Only you see your list of purchases. Others may see a price you paid, without your name and only in a shop where at least three people bought that item — then the lowest price may turn out to be yours."
+      },
+      "exchanges": {
+        "term": "Money exchanges",
+        "text": "How much you changed, of which currency and when — your own rate is worked out from them. Only you see them."
       },
       "places": {
         "term": "Shops",

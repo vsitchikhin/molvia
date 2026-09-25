@@ -8,6 +8,7 @@ import type { PriceQuery } from '@/db/expenses-repository'
 import {
   actors,
   events,
+  exchanges,
   expenses,
   itemBarcodes,
   items,
@@ -168,6 +169,7 @@ export async function clearAll(db: Db): Promise<void> {
   await db.delete(sessions)
   await db.delete(events)
   await db.delete(officialRates)
+  await db.delete(exchanges)
   await db.delete(searchPicks)
   await db.delete(verdicts)
   await db.delete(expenses)

@@ -480,6 +480,59 @@ snapshot, and an inverse or a cross is rounded there to the snapshot's six digit
 - **An empty cache gives a trip no rate, for good** — the snapshot is written once and never
   filled in later (owner's decision, 19.09.2026).
 
+**The person's own rate comes from exchanges, never from a number typed in (MOL-40).** The plan's
+decisions of MOL-41 (22.09.2026) replaced «enter your rate once and edit it» with the operation a
+person actually performs: «gave 20 000 ₽, got 95 000 ֏, on this day» — `exchanges`, named by the
+device, private always. The rate is what the two amounts say and is not stored beside them.
+
+- **The wallet is the average cost of what is held, and spending does not move it** — it takes
+  money and its cost away in one proportion. Only a new exchange does, and the weight of the old
+  money in it is exactly how much was left at that moment: `heldBefore`, optional, asked from the
+  second exchange of the pair. Unknown, the wallet takes that exchange's rate and says so
+  (`basis: 'last'`) rather than counting the remainder as zero in silence; before the first there
+  is money of no known cost, so the first exchange never asks. Not derived from purchases: a price
+  is optional and spending outside a trip is not written, so a sum of expenses would be a wrong
+  weight presented as a right one — it is offered only as a hint, «по записанным тратам».
+- **Exact to the end.** `walletRate` keeps a ratio of integers through the whole chain and rounds
+  once, to the snapshot's six digits, the way a cross rate is rounded. Only exchanges of «currency
+  of conversion → currency of spending» count; another pair, the reverse one included, is the
+  money model's (chains, reversals, a change of base) and not guessed at here.
+- **A trip takes it at the start, like the official one, and never again** (В-4): with
+  `actors.rate_preference = 'personal'` — the default — and an exchange of the pair dated no later
+  than today in Yerevan, the snapshot is `source: 'personal'` with no provider and no jump;
+  otherwise MOL-39's branch as it was. Nothing is required of the person: without exchanges the
+  two preferences are the same answer. An exchange made while a trip is open moves the next one.
+- **Every exchange is set beside the central bank of its own day**, by the same `pickOfficialRate`
+  a trip started that day would use — «на 8 754 ֏ больше» or «меньше», never «комиссия»: a good
+  exchanger beats the bank, and the difference says nothing about why.
+- **No amending — delete and enter again** (plan, Р-4). Trips already started keep what they
+  took. **The bin asks first, with the amounts and the day, and «Вернуть» stays offered after**
+  (owner's decision В-5). A removal marks the row (`deleted_at`) and hides it from every reader;
+  «Вернуть» (`POST /exchanges/:id/restore`) clears the mark, so the exchange keeps its
+  `created_at` — written anew it took the moment of the tap, which moved both the order of its day
+  and the hint. **A removal is final after ten minutes** (`EXCHANGE_UNDO_MINUTES`, owner's decision
+  В-7): the server's minute timer deletes older marks of everyone, and the owner's next request of
+  the screen deletes theirs sooner — the moment the screen stops offering them back. The screen
+  withdraws the offer on an answer, never on a tap: a write lost on the way, or refused before it
+  reached that point, leaves the removal undoable, and «Вернуть» stays. Both
+  «Вернуть» and a removal are safe to send again after a lost answer: an exchange already back
+  answers 200, and a removal never makes final the row it is marking. A «Вернуть» that comes too
+  late is told so, and the list is read again — not «check the connection», which sent people to
+  enter the exchange a second time.
+- **A repeat is the same exchange, or it is a conflict** (В-6). The same name with the same
+  amounts, day and remainder answers 200; with anything else, 409 — that is a correction sent
+  after an answer that never came, and answering it «saved» left the typo in the wallet. The
+  screen then shows what was written and says to remove it and enter it again.
+- **An exchange no rate in the band says is refused where it is written** (`error.invalid_rate`),
+  never accepted and dropped from the wallet later: a zero too many once made the wallet vanish, the
+  trip take the bank in silence and the screen say there were no exchanges above a list of two.
+- **The hint counts what was spent after the exchange, in trips still open then** — a purchase
+  added to a finished trip was paid with the money held before. «After» is the moment the exchange
+  was written when that was on its own day, and the end of its day for one written later: counting
+  from the record threw away everything bought between the exchange and its entry. Without a remainder named
+  at the last exchange it speaks of that exchange's money only. A day's official rate that jumped
+  is never an exchange's measure: the rate before the jump is, or no comparison at all.
+
 ## Tracker and documentation
 
 They live outside the repository, on the same Atlassian site, reachable through the
@@ -808,7 +861,8 @@ database access. In a product about data integrity, two write paths will silentl
 - Country and city are part of the key from the start, not "we'll add it later".
 - **A person can be erased, and erasure is one function** (MOL-58): `ErasureRepository.erase` in
   `backend/src/db`, one transaction under a lock on the owner's row. It removes sessions, search
-  picks, verdicts with the withdrawn ones, events, expenses, trips, login requests by Telegram id
+  picks, verdicts with the withdrawn ones, events, expenses, trips, exchanges (MOL-40 — the
+  person's own money), login requests by Telegram id
   — they carry no foreign key, so no cascade reaches them — and the owner. Catalogue items the
   person added stay with `created_by` nulled, and **every place stays** (owner's decision
   24.09.2026). People erase themselves with `/delete` in the bot; the owner's fallback is
@@ -853,7 +907,8 @@ database access. In a product about data integrity, two write paths will silentl
   their shape, a line of a multi-line review written as `    at …` passed as a frame, with the
   rest of the parameters behind it. `forget` prints the same. An unknown address answers without echoing it and is not
   logged with its query. What the privacy page (`/privacy`) says about data is a promise these
-  rules keep: a change to either is a change to both — and it says only what they keep: other
+  rules keep, and it is read before signing in — the one route with `meta.public`, which
+  `App.vue` draws past the login screen (MOL-56), linked from that screen and from the settings: a change to either is a change to both — and it says only what they keep: other
   people's prices are shown in the shared mode (MOL-31), so «shown to nobody» is said of the list
   of purchases, and an address can reach Caddy's error log, so «no address» is said of requests.
 
@@ -1080,6 +1135,135 @@ Rating reminders are 0.2.
 - **A copy without `TELEGRAM_BOT_TOKEN` or without `BOT_API_SECRET` does not start**, says so in
   one line and exits 0 — «this copy has no bot» must not become a restart loop under compose.
   Such a copy signs in through `POST /dev/login` and cannot use Telegram at all.
+
+## The way in, and what stands behind it (MOL-56)
+
+The login is the first screen a person without a session sees, and every other screen is behind
+it. The whole of it is three things the API and the bot cannot do: start the request, survive
+the round trip through Telegram, and ask whose account this turned out to be.
+
+- **It is a gate, not a route.** `App.vue` draws it instead of the router's view, so the address
+  is all along the one the person was going to: a link from the bot to `/advice` opens «Что
+  брать» the moment they are in. A `/login` entry would have to be written into the rules of
+  «back» (MOL-17) and would need to remember, separately from the address bar, where the person
+  was headed. The one price is the tab's title, which the screen sets and puts back.
+- **The door has one definition** — `login.closed`, which `App.vue` only reads — and it turns on
+  what is actually known. A session the server named and the person claimed opens it; «no
+  session» is an answer too and shuts it, whatever the device remembers. **Where nothing has
+  been answered yet** — the launch, offline, a server that did not reply — **the drawer decides**:
+  with an owner on the device the app is shown, drawing its own skeletons the way it did before
+  this screen existed, and without one there is nothing to show at all, no drawers and no cached
+  answers. That last part is the same argument as Q5's, and it is deliberately not written in
+  terms of `navigator.onLine`: a shop's captive portal reports `true`, and the rule walked
+  straight past it (adversarial А5). Holding the door shut for the whole of the loading was
+  tried and is worse than it looks — every launch with a live session flashed «Вход», and what
+  caught it was an end-to-end test rather than an eye. **The screen keeps all four of its own
+  states behind the door**: an unanswered question with no connection is «нет связи», not a
+  skeleton that loads nothing (А2).
+- **One tap is one request, and nothing starts a login by itself.** The quota is thirty starts a
+  minute **across the whole database**, so an app that started one every time the screen appeared
+  would close the door for everybody. «Открыть Telegram» reopens the same link; only «Начать
+  заново» asks for another, because a new start replaces the secret in `__Host-molvia_login` and
+  makes the previous request uncollectable.
+- **The device remembers the request and never the secret.** `{id, url}` under `molvia.login`,
+  because iOS unloads the PWA while the person is in Telegram and the confirmation they gave
+  would otherwise have nowhere to arrive. The secret stays in the `HttpOnly` cookie; putting it
+  on the device would be MOL-8's mistake again. What comes back off the shelf is checked before
+  it is opened — `https` and `t.me`, the same shape `loginStartedCodec` holds on the way in.
+  **The key is shared between windows and the request inside it is not**: a window removes or
+  rewrites only the request it started, because one whose link had died used to `forget` over a
+  neighbour's live one — and a neighbour iOS had unloaded came back to «Войти через Telegram»
+  with a confirmation on its way to nobody (adversarial А3). Starting a login still replaces what
+  is stored: a new start replaces the secret, so whatever was there is dead anyway.
+- **«Истекло» is the server's word** (`error.login_unavailable`), never `expiresAt` minus the
+  device's clock: a phone whose clock has run away would otherwise be unable to sign in at all.
+  There is no countdown on the screen; the text says the link lives five minutes.
+- **«Повторить» repeats whatever did not work.** The screen's error state covers two failures at
+  once — the login would not start, and the server would not say who we are — and a button that
+  always began a login took a person who needed only an answer into Telegram instead, with a
+  fresh request against a quota shared by everybody (adversarial Б2).
+- **The poll fires on the three ways a person comes back**: a three-second timer, the app
+  returning into view — on iOS a frozen PWA gets nothing else — and `online`. A hidden tab polls
+  nothing. Every refusal but a dead link keeps the request: the next poll is seconds away, and a
+  hiccup must not throw away a confirmation the person is about to give.
+- **Whose account this is, is asked before anyone is let in** (MOL-55's round 3). Whoever sees
+  the link within its five minutes can confirm it with their own Telegram, and the browser that
+  started the login collects _that_ session; the bot's «Это не я» rescues nobody once the screen
+  is polling. So the screen stops: it names what the wire carries — the city, the currencies and
+  the day the account appeared, «сегодня» for a fresh one — and waits.
+- **What the device writes down is the owner the person approved, never «somebody is
+  unconfirmed»**, and the difference is the whole of the second review (adversarial А1 и А4).
+  A flag saying «ask about this one» is set only when the script sees the answer that collected
+  a session — and the browser stores the cookie from that answer's _headers_ whether the script
+  lives to read it or not: a restart, or a «Начать заново» a moment earlier, left a session with
+  no flag beside it and the door opened on an account nobody had been asked about. The same flag
+  was cleared by anything that looked signed-out, and `error.no_actor` is the truth about the
+  moment a request **left**: one still in flight from before the login wiped the question, and
+  the next `me()` walked in. Written the other way round — `claimed` — the question cannot be
+  missed: whoever the server says we are is compared with whoever the person approved, and
+  anything else is a question, however the session arrived.
+- **A refusal is not a conclusion; the app asks again.** `error.no_actor` from any call sends the
+  identity to `verify()`, which asks `me()` once and believes only that: a refusal earned before
+  a login landed is discarded by a revision counter, and a server that cannot be reached says
+  nothing at all rather than signing anybody out. It steps aside while a question is already in
+  flight, or a cold start with no session would ask twice and `verify` would ask itself forever.
+- **Another window's login is this window's business.** Two windows share one cookie jar, so a
+  session collected in one is the session the other carries; a window that was already open
+  would otherwise keep showing the app — and, worse, the question itself — as the owner it
+  believed in a minute ago. A write to `molvia.login` shuts the door here and re-asks `me()`,
+  and the card is drawn only from the answer.
+- The price of the question is named and accepted (owner's decision, 24.09.2026): one extra tap
+  on a login into an account this device has not approved before, and one's own first account is
+  indistinguishable from a stranger's fresh one — which is the case with nothing yet to take.
+  Telling them apart needs the confirming Telegram's name on the wire, and that is a task of its
+  own. «Это не я» does not end the stranger's session — that handle is MOL-57's — but nothing is
+  claimed, so a reload or a relaunch asks again instead of walking in.
+- **Showing the app and writing into it are different rights** (adversarial Б1). The door may
+  open on the drawer's name while the first `me()` is still in flight — that is what keeps a
+  launch with a live session from flashing «Вход» — but a drawer says nothing about the cookie,
+  and in the one case where the two disagree (a session that arrived without the script seeing
+  it) a rating held back on a `401` went out into a stranger's account at the first
+  `onMounted(send)`. So **the queue and the drafts send only once the server has said who we
+  are**, and while another window's login is still being caught up with: the rule sits in
+  `flush()` of both, and **only** there — `App.vue` gives the occasion and no second opinion. A gate there as well looked harmless and took away the queue's own
+  «the server is silent, try again later»: that timer is set by `flush`, and `flush` was never
+  reached (adversarial Г1). The occasion is every settling of the identity, «error» included,
+  which is what starts the doubling retry — and the retry asks about the identity first, waiting
+  for that answer, because `start()` sets «loading» synchronously and a `flush` in the same tick
+  saw no error left to schedule the next attempt from. Nothing is lost by waiting — a queue waits for
+  the network anyway, and the answer is one round trip — **but the screen is told**, in the same
+  words a failed attempt would have used: silence there left «Отправляем оценку…» standing
+  forever at a shelf with no signal, which is the product's main scenario (adversarial В1).
+  What is **not** held is everything else: a screen's first fetch goes out in parallel with
+  `me()` on purpose, and so does a write a person makes with their own hands in a sheet — the
+  rating, the amendment, «Предложить товар». In that same rare window those may reach a session
+  the person has not claimed, or draw its figures for a moment before the door shuts. Holding
+  them would mean serialising every screen behind the identity and paying a round trip on every
+  ordinary launch, to close a case that needs a session to have arrived unseen.
+- **What the screen says while it waits is «нет связи», and that is an exception to MOL-19's
+  rule rather than its new edition.** There, offline or error is decided by `navigator.onLine`
+  read after the failure; here nothing was even attempted, and behind a shop's captive portal
+  `onLine` is `true` while «Повторить» would call the same held-back send and change nothing.
+  Silence was worse: it left «Отправляем оценку…» standing forever at a shelf (adversarial В1).
+- **A `401` anywhere is the login screen**, through one seam in `frontend/src/api.ts` wired in
+  `main.ts`. Before it, `error.no_actor` was read by three callers out of a dozen and a half and
+  every other screen said «что-то пошло не так» about an account that was simply not there.
+  Telling `error.no_actor` from a bare `401` stays where it was, in `packages/client`: a proxy, a
+  gateway and a shop's captive portal all answer `401` without knowing what an actor is.
+- **Nothing on the device is thrown away by any of this.** `molvia.actor` stays — it is the name
+  of a drawer, not a credential (MOL-53) — so the trip queue, the recent items and the verdict
+  drafts wait where they are, and Telegram brings the same owner back. The task's own line about
+  deleting it was written before MOL-53 and is answered by it (owner's decision, 24.09.2026).
+- **Offline with nobody on the device is the screen's own offline state**, not a notice over an
+  empty app: there are no drawers to open and no cached answers to show. Offline **with** an
+  owner opens the app, because a PWA at a shelf with no signal is the main scenario there is.
+- **The development seam is a button, and only in a development build.** It signed the app in by
+  itself until now, which made the screen this epic exists for invisible in every working copy
+  and unreachable to the end-to-end suite; `signedIn()` in `e2e/session.ts` now presses it, in
+  either language, and waits for the door rather than for the tap. Its failure stays on the login
+  screen instead of opening the app with a notice. It shows no «whose account» step: that exists
+  for a confirmation given elsewhere, and here the person signs themselves in with no Telegram
+  in it at all.
 
 ## Code rules
 
@@ -1339,12 +1523,14 @@ contracts and separate clients. Production requires `TELEGRAM_BOT_USERNAME` and 
 MOL-55 gave the bot its half: `/start <code>` names the device and the age of the request and
 offers «Войти» and «Это не я», the answer replaces the question so its buttons go with it, and
 five kinds of dead code get one reply. With it the bot got a dictionary of its own and
-`pickLocale` moved into `packages/model`, where the PWA now reads it from too. The user-facing
-flow still needs the PWA screen (MOL-56). **And that screen inherits one thing from the bot's
-review:** the «Это не я» above rescues a hijacked login only while the browser is not polling.
-With the login screen open and polling, a stranger confirms and the session is collected in a
-cycle or two — before the person can even open Telegram. Only the screen can close that, by
-showing **whose** account was entered before letting anyone further in.
+`pickLocale` moved into `packages/model`, where the PWA now reads it from too.
+MOL-56 closed the epic's user-facing half: the login screen, the gate in front of every route,
+the request that survives the round trip through Telegram, and the one seam that turns any `401`
+into a door instead of «что-то пошло не так». **And it closed what the bot's review left open:**
+«Это не я» in the chat rescues a hijacked login only while the browser is not polling — with the
+screen open a stranger confirms and the session is collected in a cycle or two. So the screen
+names the account it landed in and waits to be told it is the right one. The rules are in «The
+way in, and what stands behind it» above; what remains of the epic is MOL-57, the way out.
 
 MOL-65 gave the person their four fields and a fourth tab: Armenia, Гюмри or Ереван, the currency
 purchases are written in and the one they are converted into. `PUT /actors/me/settings` compares
@@ -1374,6 +1560,11 @@ a new launch takes the last draft written while two windows open at once keep th
 are typing into. «Что брать» answers with the geography it counted by, and
 the phone compares it with its own: a different city is a list to load again, and an answer the
 settings will not move to is taken as it is — the screen used to stay on a skeleton for good.
+
+MOL-40 put the person's own rate under the trip — «Обмен денег», nested under «Настройки»: the
+exchanges, the wallet worked out from them, the preference «мой / ЦБ РА», and every exchange
+beside the central bank of its day. The trip total says «мой курс» for it. Incomes and the rest
+of the money model are still their own tasks.
 
 MOL-58 gave the people whose data this is the minimum 0.1 owes them: a page that says what is
 kept and for how long (`/privacy`, open without a session), `/delete` in the bot, which erases a
@@ -1512,11 +1703,17 @@ by hand.
 - **Each copy gets its own database.** A shared database plus parallel migrations kill each
   other, and silently: the second copy sees a foreign schema and assumes the migration is
   already applied.
-- **Each copy gets its own bot.** Two processes on one token steal each other's updates via
-  long polling — silently and unreproducibly. Register a separate bot in BotFather. **A copy
-  without a token cannot sign in through Telegram at all** — its only door is `POST /dev/login`,
-  and the same holds without `TELEGRAM_BOT_USERNAME`, which is what the API builds the link
-  from: starting a real login there answers `503 error.login_disabled`.
+- **One bot for development and one for production, and the development token lives in the one
+  copy that is testing the login** (owner's decision, 24.09.2026; MOL-56 asked again). Two
+  processes on one token do not each get a copy of an update — Telegram hands every update to
+  exactly one of them, at random. So with the token in two copies at once, the tap on «Войти»
+  reaches the bot of the _other_ copy, that bot asks _its_ API, which holds no such request, the
+  person reads «ссылка больше не действует», and the screen under test waits out its five
+  minutes. Nothing errors, and the next attempt may work. **A copy without a token cannot sign in
+  through Telegram at all** — it says one line, exits 0, and its only door is `POST /dev/login`;
+  the same holds without `TELEGRAM_BOT_USERNAME`, which is what the API builds the link from:
+  starting a real login there answers `503 error.login_disabled`. That is why moving the token
+  costs nothing: a copy without it is not broken, it is simply not the one being tested.
 
 **Plans and requirements live in `.scratch/tasks/`, not in the working copy and not on the
 Jira issue.** A copy is temporary and a task is not; `.scratch` is the shared directory, so
