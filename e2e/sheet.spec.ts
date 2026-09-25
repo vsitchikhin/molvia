@@ -47,6 +47,18 @@ async function settled(page: Page): Promise<void> {
   )
 }
 
+/** 120 px more above the list, as a list reread or a notice come would add. */
+async function grow(page: Page, where: '.content' | '.notice-slot'): Promise<void> {
+  const grown = await page.evaluate((selector) => {
+    const container = document.querySelector(selector)
+    const above = document.createElement('div')
+    above.style.height = '120px'
+    container?.prepend(above)
+    return container !== null
+  }, where)
+  expect(grown).toBe(true)
+}
+
 /** Opens the kit scrolled down to the opener — the list above it is long on purpose. */
 async function openSheet(page: Page): Promise<{ top: number; length: number }> {
   await open(page, '/_kit')
@@ -141,14 +153,7 @@ test.describe('the sheet', () => {
   // the number taken when the sheet opened moved the list by exactly that change (MOL-63).
   test('the list does not jump when what is above it changed under the sheet', async ({ page }) => {
     await openSheet(page)
-    const grown = await page.evaluate(() => {
-      const content = document.querySelector('.content')
-      const above = document.createElement('div')
-      above.style.height = '120px'
-      content?.prepend(above)
-      return content !== null
-    })
-    expect(grown).toBe(true)
+    await grow(page, '.content')
     const underSheet = await openerTop(page)
     await page.goBack()
     await expect(sheet(page)).toBeHidden()
@@ -168,6 +173,51 @@ test.describe('the sheet', () => {
     expect(await scrollY(page)).toBe(before - 600)
     await page.goBack()
     await expectPutAway(page, top)
+  })
+
+  // Enter is a click with no press. Measured by the last press — the title — the sheet put back
+  // the title and moved the list by the change, the jump of MOL-63 (review С-4, adversarial В3).
+  test('opened from the keyboard after a press elsewhere, the list does not jump', async ({
+    page,
+  }) => {
+    const { top } = await openSheet(page)
+    await page.keyboard.press('Escape')
+    await expectPutAway(page, top)
+    await heading(page).click()
+    await opener(page).scrollIntoViewIfNeeded()
+    await opener(page).focus()
+    await page.keyboard.press('Enter')
+    await expect(sheet(page)).toBeVisible()
+    await page.waitForTimeout(400)
+    await grow(page, '.content')
+    await page.goBack()
+    await expectPutAway(page, top)
+  })
+
+  // At the very top the browser keeps nothing still: a notice come above the list pushes it down
+  // and stays in sight. Measured by the opener, it went under the bar with the title (adversarial
+  // В4). The top stays the top.
+  test('opened at the top of the page, what came above the list stays in sight', async ({
+    page,
+  }) => {
+    await open(page, '/_kit')
+    await expect(heading(page)).toHaveText('Kit')
+    await page.evaluate(async () => {
+      await document.fonts.ready
+    })
+    expect(await scrollY(page)).toBe(0)
+    await opener(page).evaluate((element) => {
+      ;(element as HTMLElement).focus({ preventScroll: true })
+    })
+    await page.keyboard.press('Enter')
+    await expect(sheet(page)).toBeVisible()
+    await page.waitForTimeout(400)
+    await grow(page, '.notice-slot')
+    await page.goBack()
+    await expect(sheet(page)).toBeHidden()
+    await settled(page)
+    expect(await scrollY(page)).toBe(0)
+    await expect(heading(page)).toBeInViewport()
   })
 
   // One entry laid, one taken: the «back» after a closed sheet leaves the screen for the trip
