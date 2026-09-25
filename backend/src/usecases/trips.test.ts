@@ -172,7 +172,7 @@ function fakeRepositories(
       list: () => Promise.resolve([]),
       spentSince: unexpected('exchanges.spentSince'),
       // No exchanges is where every person starts, and every trip test before MOL-40 is there.
-      preference: () => Promise.resolve('personal'),
+      rateSettings: () => Promise.resolve({ preference: 'personal', since: null }),
       setPreference: unexpected('exchanges.setPreference'),
       ...overrides.exchanges,
     },
@@ -451,6 +451,8 @@ describe('startTrip: the person’s own rate (MOL-40)', () => {
     preference: RatePreference = 'personal',
     person: Actor = actor,
     now: Date = sunday,
+    since: Date | null = null,
+    context = settingsOf(person),
   ): Promise<{ snapshot: TripSnapshot | null; askedOfficial: boolean }> {
     let snapshot: TripSnapshot | null = null
     let askedOfficial = false
@@ -479,14 +481,14 @@ describe('startTrip: the person’s own rate (MOL-40)', () => {
         },
       },
       exchanges: {
-        preference: () => Promise.resolve(preference),
+        rateSettings: () => Promise.resolve({ preference, since }),
         list: () => Promise.resolve(exchanges),
       },
     })
     await startTrip(
       transactWith(repositories),
       person,
-      { id: TRIP, context: settingsOf(person), place: { kind: 'store', name: 'Ереван Сити' } },
+      { id: TRIP, context, place: { kind: 'store', name: 'Ереван Сити' } },
       now,
     )
     return { snapshot, askedOfficial }
@@ -527,6 +529,25 @@ describe('startTrip: the person’s own rate (MOL-40)', () => {
     const tomorrow = [exchange('2026-09-21', 2_000_000n, 9_000_000n)]
     expect((await startedWith(today)).snapshot?.rate.scaled).toBe(parseRate('4.5'))
     expect((await startedWith(tomorrow)).snapshot?.rate.source).toBe('official')
+  })
+
+  it('counts only exchanges from the day the currency of conversion changed (MOL-42, В-2)', async () => {
+    // Changed on the 10th in Yerevan: the exchange of the 1st is the old reckoning's.
+    const since = new Date('2026-09-10T06:00:00.000Z')
+    const { snapshot } = await startedWith(owners, 'personal', actor, sunday, since)
+    expect(snapshot?.rate.scaled).toBe(parseRate('4.75'))
+    const later = new Date('2026-09-16T06:00:00.000Z')
+    expect(
+      (await startedWith(owners, 'personal', actor, sunday, later)).snapshot?.rate.source,
+    ).toBe('official')
+  })
+
+  it('does not cut a trip started with the currency of conversion before the change (Р-8)', async () => {
+    const dollars = [exchange('2026-09-05', 10_000n, 3_800_000n, null, ['USD', 'AMD'])]
+    const since = new Date('2026-09-18T06:00:00.000Z')
+    const old = { ...settingsOf(actor), incomeCurrency: 'USD' as const }
+    const { snapshot } = await startedWith(dollars, 'personal', actor, sunday, since, old)
+    expect(snapshot?.rate).toMatchObject({ base: 'USD', scaled: parseRate('380') })
   })
 
   it('asks nothing of the wallet when the two currencies are one', async () => {

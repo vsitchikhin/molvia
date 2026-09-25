@@ -65,8 +65,11 @@ export interface ExchangeRepository {
    */
   spentSince(actorId: string, currency: Currency, since: Date): Promise<bigint>
 
-  /** Which rate a new trip takes (В-3). The row always has one: the column has a default. */
-  preference(actorId: string): Promise<RatePreference>
+  /**
+   * Which rate a new trip takes (В-3) — the row always has one, the column has a default — and
+   * when the currency of conversion last changed, or null if it never did (MOL-42, В-2).
+   */
+  rateSettings(actorId: string): Promise<{ preference: RatePreference; since: Date | null }>
 
   setPreference(actorId: string, preference: RatePreference): Promise<void>
 }
@@ -204,14 +207,14 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
       return BigInt(row?.spent ?? '0')
     },
 
-    async preference(actorId) {
+    async rateSettings(actorId) {
       const [row] = await db
-        .select({ preference: actors.ratePreference })
+        .select({ preference: actors.ratePreference, since: actors.incomeCurrencySince })
         .from(actors)
         .where(eq(actors.id, actorId))
         .limit(1)
       if (!row) throw new DomainError(ERROR.NO_ACTOR)
-      return row.preference
+      return row
     },
 
     async setPreference(actorId, preference) {

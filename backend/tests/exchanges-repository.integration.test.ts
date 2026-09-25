@@ -244,9 +244,9 @@ describe('exchanges: подсказка остатка и источник ку�
 
   it('источник по умолчанию — свой, и переключается', async () => {
     const owner = await insertActor(db)
-    expect(await repository.preference(owner)).toBe('personal')
+    expect(await repository.rateSettings(owner)).toEqual({ preference: 'personal', since: null })
     await repository.setPreference(owner, 'official')
-    expect(await repository.preference(owner)).toBe('official')
+    expect((await repository.rateSettings(owner)).preference).toBe('official')
   })
 
   it('база не пускает неизвестный источник', async () => {

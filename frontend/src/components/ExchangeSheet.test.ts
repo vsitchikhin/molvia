@@ -28,7 +28,9 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
       basis: 'last',
       estimated: false,
     },
-    heldEstimate: { held: { minor: 2_000_000n, currency: 'AMD' }, whole: true },
+    costs: [],
+    heldEstimates: [{ held: { minor: 2_000_000n, currency: 'AMD' }, whole: true }],
+    baseSince: null,
     exchanges: [
       {
         id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d',
@@ -123,7 +125,7 @@ describe('ExchangeSheet', () => {
   })
 
   it('asks what was held only from the second exchange of the pair, and hints at it', async () => {
-    const first = await render(overview({ wallet: null, heldEstimate: null, exchanges: [] }))
+    const first = await render(overview({ wallet: null, heldEstimates: [], exchanges: [] }))
     expect(first.text()).not.toContain('held before the exchange')
 
     const second = await render()
@@ -142,7 +144,9 @@ describe('ExchangeSheet', () => {
 
   it('says the hint is about the last exchange alone when what was there before it is unknown', async () => {
     const view = await render(
-      overview({ heldEstimate: { held: { minor: 7_000_000n, currency: 'AMD' }, whole: false } }),
+      overview({
+        heldEstimates: [{ held: { minor: 7_000_000n, currency: 'AMD' }, whole: false }],
+      }),
     )
     expect(view.text()).toContain('Of the last exchange ≈')
     expect(view.text()).toContain('70,000.00')

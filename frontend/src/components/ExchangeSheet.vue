@@ -181,7 +181,9 @@ export default defineComponent({
 
     /** The hint is about the latest exchange, so it fits only a day not before it. */
     const estimate = computed(() => {
-      const hint = props.overview.heldEstimate
+      const hint = props.overview.heldEstimates.find(
+        ({ held }) => held.currency === currencies.received,
+      )
       const latest = ofPair.value.at(0)?.exchangedOn
       if (!hint || !asksHeld.value || (latest !== undefined && day.value < latest)) return null
       const amount = formatMoney(hint.held, locale.value)

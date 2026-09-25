@@ -79,10 +79,17 @@ export const exchangeViewCodec = z.strictObject({
 })
 export type ExchangeView = z.output<typeof exchangeViewCodec>
 
+const currencyCostCodec = z.strictObject({
+  rate: rateCodec,
+  basis: walletBasisSchema,
+  estimated: z.boolean(),
+})
+
 /**
  * «Обмен денег» whole: the preference, the pair a trip would convert by today — the currency of
- * conversion into the spending one, or null when the two are one — the wallet of that pair, the
- * hint for the next exchange of it, and the exchanges, newest first.
+ * conversion into the spending one, or null when the two are one — the wallet of that pair, what
+ * the other currencies held by exchange cost, the hints for the next exchange into each, and the
+ * exchanges, newest first.
  */
 export const exchangesResponseCodec = z.strictObject({
   preference: ratePreferenceSchema,
@@ -91,15 +98,24 @@ export const exchangesResponseCodec = z.strictObject({
    * `estimated`: part of the cost was never named by the person and was taken from the official
    * rate of an exchange's day — dollars brought from home, say (MOL-42, В-1).
    */
-  wallet: z
-    .strictObject({ rate: rateCodec, basis: walletBasisSchema, estimated: z.boolean() })
-    .nullable(),
+  wallet: currencyCostCodec.nullable(),
   /**
-   * The hint for the next exchange of the pair: what is left by the recorded spending, and whether
-   * that is everything held (`whole`) or only the money of the last exchange, whose remainder
-   * before it was never said.
+   * What every other currency held by exchange cost in the currency of conversion — the dollars a
+   * chain of roubles to dollars to drams went through — so the chain can be checked by eye
+   * (MOL-42, Р-4). Neither the currency of conversion nor the spending one is here.
    */
-  heldEstimate: z.strictObject({ held: moneyCodec, whole: z.boolean() }).nullable(),
+  costs: z.array(currencyCostCodec),
+  /**
+   * The hints for the next exchange into each currency but the one of conversion: what is left
+   * by the recorded spending and exchanges, and whether that is everything held (`whole`) or only
+   * the money of the last exchange, whose remainder before it was never said.
+   */
+  heldEstimates: z.array(z.strictObject({ held: moneyCodec, whole: z.boolean() })),
+  /**
+   * The day the currency of conversion last changed, or null if it never did: the wallet counts
+   * exchanges from that day on, and the ones before it stand in the list as they were (В-2).
+   */
+  baseSince: exchangeDaySchema.nullable(),
   exchanges: z.array(exchangeViewCodec),
 })
 export type ExchangesResponse = z.output<typeof exchangesResponseCodec>

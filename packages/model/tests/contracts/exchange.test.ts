@@ -95,7 +95,15 @@ describe('exchangesResponseCodec', () => {
     preference: 'personal',
     pair: { base: 'RUB', quote: 'AMD' },
     wallet: { rate, basis: 'weighted', estimated: false },
-    heldEstimate: { held: money(8_500_000n, 'AMD'), whole: true },
+    costs: [
+      {
+        rate: { ...rate, quote: 'USD', scaled: 11_232n, asOf: yerevanMidnight('2026-08-31') },
+        basis: 'last',
+        estimated: true,
+      },
+    ],
+    heldEstimates: [{ held: money(8_500_000n, 'AMD'), whole: true }],
+    baseSince: '2026-09-01',
     exchanges: [
       {
         id: body.id,

@@ -75,7 +75,9 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       preference: 'personal',
       pair: { base: 'RUB', quote: 'AMD' },
       wallet: null,
-      heldEstimate: null,
+      costs: [],
+      heldEstimates: [],
+      baseSince: null,
       exchanges: [],
     })
   })
@@ -106,9 +108,11 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       wallet: {
         rate: { base: 'RUB', quote: 'AMD', rate: '4.791667', source: 'personal' },
         basis: 'weighted',
+        estimated: false,
       },
+      costs: [],
       // Nothing spent since: what the last exchange left, and nothing else is known.
-      heldEstimate: { held: { amount: '115000.00', currency: 'AMD' }, whole: true },
+      heldEstimates: [{ held: { amount: '115000.00', currency: 'AMD' }, whole: true }],
     })
     const list = overviewOf(second.json()).exchanges
     expect(list.map((exchange) => exchange.exchangedOn)).toEqual([daysAgo(2), daysAgo(10)])
@@ -315,7 +319,7 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       headers: { cookie },
       payload: payload(),
     })
-    expect(response.json()).toMatchObject({ pair: null, wallet: null, heldEstimate: null })
+    expect(response.json()).toMatchObject({ pair: null, wallet: null, costs: [] })
     expect(overviewOf(response.json()).exchanges).toHaveLength(1)
   })
 })
@@ -334,7 +338,7 @@ describe('«Обмен денег»: правки ревью', () => {
       }),
     })
     expect(absurd.statusCode).toBe(201)
-    expect(overviewOf(absurd.json()).heldEstimate).toBeNull()
+    expect(overviewOf(absurd.json()).heldEstimates).toEqual([])
     const read = await app.inject({ method: 'GET', url: '/exchanges', headers: { cookie } })
     expect(read.statusCode).toBe(200)
   })
@@ -398,7 +402,7 @@ describe('«Обмен денег»: правки ревью', () => {
       url: '/exchanges',
       headers: { cookie: me.cookie },
     })
-    expect(overviewOf(read.json()).heldEstimate?.held).toEqual({
+    expect(overviewOf(read.json()).heldEstimates[0]?.held).toEqual({
       minor: 11_000_000n,
       currency: 'AMD',
     })
@@ -532,7 +536,7 @@ describe('«Обмен денег»: правки второго захода', 
       headers: { cookie: me.cookie },
       payload: payload({ exchangedOn: daysAgo(3) }),
     })
-    expect(overviewOf(response.json()).heldEstimate?.held).toEqual({
+    expect(overviewOf(response.json()).heldEstimates[0]?.held).toEqual({
       minor: 7_000_000n,
       currency: 'AMD',
     })
@@ -652,5 +656,142 @@ describe('свой курс в походе (MOL-40)', () => {
     expect(current.json()).toMatchObject({
       trip: { rate: { rate: '5.000000', source: 'personal' } },
     })
+  })
+})
+
+describe('стоимость валют (MOL-42)', () => {
+  const usd = (value: string, date: string): CachedRate => ({
+    ...rub(value, date),
+    currency: 'USD',
+  })
+
+  async function record(me: { cookie: string }, patch: Record<string, unknown>) {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
+      payload: payload(patch),
+    })
+    expect(response.statusCode).toBe(201)
+    return overviewOf(response.json())
+  }
+
+  async function start(me: { id: string; cookie: string }) {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/trips',
+      headers: { cookie: me.cookie },
+      payload: {
+        id: randomUUID(),
+        context: await tripContext(db, me.id),
+        place: { kind: 'store', name: 'Ереван Сити' },
+      },
+    })
+    expect(response.statusCode).toBe(201)
+    return tripViewCodec.parse(response.json())
+  }
+
+  it('цепочка RUB → USD → AMD: цена долларов переходит в драмы, и поход её берёт', async () => {
+    const me = await owner()
+    await record(me, {
+      received: { amount: '224.63', currency: 'USD' },
+      exchangedOn: daysAgo(10),
+    })
+    const overview = await record(me, {
+      given: { amount: '100', currency: 'USD' },
+      received: { amount: '36150', currency: 'AMD' },
+      exchangedOn: daysAgo(5),
+    })
+
+    expect(overview.wallet).toMatchObject({ basis: 'last', estimated: false })
+    expect(overview.wallet?.rate.scaled).toBe(4_060_187n)
+    expect(overview.costs.map(({ rate }) => [rate.quote, rate.scaled])).toEqual([['USD', 11_232n]])
+    // Handing 100 $ over for drams leaves 124.63 $; the drams are all still held.
+    expect(overview.heldEstimates.map(({ held }) => held)).toEqual(
+      expect.arrayContaining([
+        { minor: 12_463n, currency: 'USD' },
+        { minor: 3_615_000n, currency: 'AMD' },
+      ]),
+    )
+
+    const trip = await start(me)
+    expect(trip.rate).toMatchObject({ source: 'personal', scaled: 4_060_187n })
+  })
+
+  it('привезённые доллары — по ЦБ РА на день обмена, с пометкой; поход берёт то же число', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(6)), usd('363.44', daysAgo(6))])
+    const me = await owner()
+    const overview = await record(me, {
+      given: { amount: '600', currency: 'USD' },
+      received: { amount: '217200', currency: 'AMD' },
+      exchangedOn: daysAgo(5),
+    })
+    expect(overview.wallet).toMatchObject({ basis: 'last', estimated: true })
+    expect(overview.wallet?.rate.scaled).toBe(4_295_130n)
+    // The dollars themselves were never bought: they have no cost of their own to list.
+    expect(overview.costs).toEqual([])
+
+    const trip = await start(me)
+    expect(trip.rate).toMatchObject({ source: 'personal', scaled: 4_295_130n })
+  })
+
+  it('без курса ЦБ на тот день стоимость неизвестна, и поход берёт официальный', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(1))])
+    const me = await owner()
+    const overview = await record(me, {
+      given: { amount: '600', currency: 'USD' },
+      received: { amount: '217200', currency: 'AMD' },
+      exchangedOn: daysAgo(5),
+    })
+    expect(overview.wallet).toBeNull()
+    expect((await start(me)).rate?.source).toBe('official')
+  })
+
+  it('обратный обмен курс не двигает и уменьшает подсказку остатка', async () => {
+    const me = await owner()
+    await record(me, {})
+    const overview = await record(me, {
+      given: { amount: '10000', currency: 'AMD' },
+      received: { amount: '2250', currency: 'RUB' },
+      exchangedOn: daysAgo(3),
+    })
+    expect(overview.wallet?.rate.scaled).toBe(parseRate('5'))
+    expect(overview.heldEstimates).toEqual([
+      { held: { minor: 9_000_000n, currency: 'AMD' }, whole: false },
+    ])
+  })
+
+  it('смена валюты пересчёта действует вперёд: прошлые обмены в новый курс не входят (В-2)', async () => {
+    const me = await owner()
+    await record(me, {})
+    const before = await tripContext(db, me.id)
+    const settings = await app.inject({
+      method: 'PUT',
+      url: '/actors/me/settings',
+      headers: { cookie: me.cookie },
+      payload: { previous: before, settings: { ...before, incomeCurrency: 'USD' } },
+    })
+    expect(settings.statusCode).toBe(200)
+
+    // A dollar exchange dated before the change belongs to the old reckoning too.
+    const earlier = await record(me, {
+      given: { amount: '100', currency: 'USD' },
+      received: { amount: '38000', currency: 'AMD' },
+      exchangedOn: daysAgo(3),
+    })
+    expect(earlier).toMatchObject({ pair: { base: 'USD', quote: 'AMD' }, baseSince: today })
+    expect(earlier.wallet).toBeNull()
+    expect(earlier.exchanges).toHaveLength(2)
+
+    const after = await record(me, {
+      given: { amount: '100', currency: 'USD' },
+      received: { amount: '36150', currency: 'AMD' },
+      heldBefore: { amount: '100000', currency: 'AMD' },
+      exchangedOn: today,
+    })
+    // The drams held were bought with roubles: no cost in dollars to weigh them by.
+    expect(after.wallet).toMatchObject({ basis: 'last', estimated: false })
+    expect(after.wallet?.rate.scaled).toBe(parseRate('361.5'))
+    expect((await start(me)).rate).toMatchObject({ source: 'personal', base: 'USD' })
   })
 })

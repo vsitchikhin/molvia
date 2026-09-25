@@ -66,7 +66,9 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
     preference: 'personal',
     pair: { base: 'RUB', quote: 'AMD' },
     wallet: { rate: rate('4.791667', '2026-09-15'), basis: 'weighted', estimated: false },
-    heldEstimate: null,
+    costs: [],
+    heldEstimates: [],
+    baseSince: null,
     exchanges: [row()],
     ...patch,
   }
