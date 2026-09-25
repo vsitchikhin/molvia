@@ -216,7 +216,7 @@ export default defineComponent({
         login.confirm()
       },
       refuse: () => void login.refuse(),
-      retry: () => void (login.request ? login.poll() : login.begin()),
+      retry: () => void login.retry(),
       devSignIn: () => void login.devSignIn(),
     }
   },

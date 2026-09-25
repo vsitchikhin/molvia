@@ -143,7 +143,16 @@ const here: ActorSettings = {
 function fresh(identity = ME) {
   localStorage.setItem('molvia.actor', identity)
   setActivePinia(createPinia())
+  // Приложение с осевшей личностью: очередь отправляет только по ответу сервера (MOL-56).
+  useActorStore().state = 'ready'
   return useTripQueueStore()
+}
+
+/** Соседнее окно того же браузера: своя pinia, та же осевшая личность. */
+function otherWindow() {
+  const pinia = createPinia()
+  useActorStore(pinia).state = 'ready'
+  return useTripQueueStore(pinia)
 }
 
 /** Resolves when every promise already queued has run: the queue sends in the background. */
@@ -486,22 +495,22 @@ describe('trip queue', () => {
     it('keep each other’s purchases: storage is the queue, not a copy', async () => {
       addExpense.mockRejectedValue(offline())
       fresh()
-      const pwa = useTripQueueStore(createPinia())
-      const tab = useTripQueueStore(createPinia())
+      const pwa = otherWindow()
+      const tab = otherWindow()
       pwa.enqueue(add(MILK))
       tab.enqueue(add(BREAD))
       await settled()
 
-      expect(idsOf(useTripQueueStore(createPinia()).pending)).toEqual([MILK, BREAD])
+      expect(idsOf(otherWindow().pending)).toEqual([MILK, BREAD])
     })
 
     it('do not bring back a purchase one of them sent and then removed', async () => {
       addExpense.mockRejectedValueOnce(offline())
       fresh()
-      const pwa = useTripQueueStore(createPinia())
+      const pwa = otherWindow()
       pwa.enqueue(add(MILK))
       await settled()
-      const tab = useTripQueueStore(createPinia())
+      const tab = otherWindow()
       expect(idsOf(tab.pending)).toEqual([MILK])
 
       addExpense.mockResolvedValue({ trip: answer('520.00'), created: true })
@@ -531,10 +540,10 @@ describe('trip queue', () => {
       try {
         addExpense.mockRejectedValueOnce(offline())
         fresh()
-        const pwa = useTripQueueStore(createPinia())
+        const pwa = otherWindow()
         pwa.enqueue(add(MILK))
         await settled()
-        const tab = useTripQueueStore(createPinia())
+        const tab = otherWindow()
 
         let release: (answered: { trip: TripView; created: boolean }) => void = () => undefined
         addExpense.mockImplementationOnce(

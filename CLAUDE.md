@@ -1050,6 +1050,10 @@ the round trip through Telegram, and ask whose account this turned out to be.
 - **«Истекло» is the server's word** (`error.login_unavailable`), never `expiresAt` minus the
   device's clock: a phone whose clock has run away would otherwise be unable to sign in at all.
   There is no countdown on the screen; the text says the link lives five minutes.
+- **«Повторить» repeats whatever did not work.** The screen's error state covers two failures at
+  once — the login would not start, and the server would not say who we are — and a button that
+  always began a login took a person who needed only an answer into Telegram instead, with a
+  fresh request against a quota shared by everybody (adversarial Б2).
 - **The poll fires on the three ways a person comes back**: a three-second timer, the app
   returning into view — on iOS a frozen PWA gets nothing else — and `online`. A hidden tab polls
   nothing. Every refusal but a dead link keeps the request: the next poll is seconds away, and a
@@ -1086,12 +1090,19 @@ the round trip through Telegram, and ask whose account this turned out to be.
   Telling them apart needs the confirming Telegram's name on the wire, and that is a task of its
   own. «Это не я» does not end the stranger's session — that handle is MOL-57's — but nothing is
   claimed, so a reload or a relaunch asks again instead of walking in.
-- **Nothing is sent from behind the shut door by `App.vue`** — it holds the trip queue and the
-  verdict drafts, not a screen — and a door that has just opened is the other moment worth
-  sending: what the queue held on a `401` has been waiting for exactly that. The queue has a
-  second way out of its own, on a change of owner, and that one is deliberately not held: it
-  sends the drawer of whoever the server says we are, and on this device a stranger's drawer is
-  empty.
+- **Showing the app and writing into it are different rights** (adversarial Б1). The door may
+  open on the drawer's name while the first `me()` is still in flight — that is what keeps a
+  launch with a live session from flashing «Вход» — but a drawer says nothing about the cookie,
+  and in the one case where the two disagree (a session that arrived without the script seeing
+  it) a rating held back on a `401` went out into a stranger's account at the first
+  `onMounted(send)`. So **the queue and the drafts send only once the server has said who we
+  are**: the rule sits in `flush()` of both, where neither `App.vue` nor the queue's own
+  «the owner changed» path can walk around it. Nothing is lost by waiting — a queue waits for
+  the network anyway, and the answer is one round trip. What is **not** held is reading: a
+  screen's first fetch goes out in parallel with `me()` on purpose, so in that same rare window
+  it may draw a stranger's own figures for a moment before the door shuts. Serialising every
+  screen behind the identity would cost every ordinary launch a round trip to close a case that
+  needs a session to have arrived unseen.
 - **A `401` anywhere is the login screen**, through one seam in `frontend/src/api.ts` wired in
   `main.ts`. Before it, `error.no_actor` was read by three callers out of a dozen and a half and
   every other screen said «что-то пошло не так» about an account that was simply not there.

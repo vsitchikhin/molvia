@@ -177,6 +177,16 @@ export const useLoginStore = defineStore('login', () => {
     return actor.id === null
   })
 
+  /**
+   * **Можно ли что-то отправлять.** Показывать приложение и писать в него — разные права
+   * (адверсариальный Б1). Пока сервер не ответил, «кто мы» берётся из имени ящика на
+   * устройстве, а оно ничего не знает про cookie: в случае, когда сессия пришла мимо скрипта,
+   * ящик — прежнего владельца, а cookie — постороннего, и отложенные на `401` записи уходили
+   * в чужой аккаунт при первом же `onMounted(send)`. Ждать здесь ничего не стоит: очереди и
+   * так ждут сети, а ответ про личность — один заход.
+   */
+  const trusted = computed(() => actor.state === 'ready' && !blocked.value)
+
   const phase = computed<LoginPhase>(() => {
     if (actor.state === 'idle' || actor.state === 'loading' || rechecking.value) return 'loading'
     if (failure.value) return failure.value
@@ -315,7 +325,7 @@ export const useLoginStore = defineStore('login', () => {
         // Taken even when this window has moved on to another attempt: the session it carries is
         // **this browser's**, whatever the screen has since been asked to do (А4). What holds the
         // app shut is the comparison in `blocked`, so nothing is lost by adopting it here.
-        collect(answer.actor)
+        collect(answer.actor, current)
         return
       }
       if (request.value?.id === current.id) failure.value = null
@@ -331,8 +341,11 @@ export const useLoginStore = defineStore('login', () => {
     }
   }
 
-  function collect(view: ActorView): void {
-    drop()
+  function collect(view: ActorView, from: Request): void {
+    // Снимается тот запрос, который это и принёс. Тот, что человек успел начать после него,
+    // живёт дальше: он мог быть уже подтверждён, и выбросить его значило бы просить подтвердить
+    // заново (замечание раунда 2, без атаки).
+    if (request.value?.id === from.id) drop()
     failure.value = null
     refusedOwner.value = null
     // The owner is adopted at once — it is this browser's session now, whosever it is — and what
@@ -358,7 +371,19 @@ export const useLoginStore = defineStore('login', () => {
    */
   async function refuse(): Promise<void> {
     refusedOwner.value = known.value
-    drop()
+    // `begin` ничего не делает, если попытка уже идёт, — и это правильно: её не выбрасывают.
+    return begin()
+  }
+
+  /**
+   * «Повторить» повторяет то, что не вышло (адверсариальный Б2). С тех пор как экран получил
+   * собственное состояние ошибки для «сервер не подтвердил личность», кнопка, всегда начинавшая
+   * вход, уводила человека в Telegram — с новым запросом против общей квоты — там, где ему нужен
+   * был только ответ сервера.
+   */
+  async function retry(): Promise<void> {
+    if (!failure.value && actor.state === 'error') return actor.retry()
+    if (request.value) return poll()
     return begin()
   }
 
@@ -375,6 +400,7 @@ export const useLoginStore = defineStore('login', () => {
     phase,
     blocked,
     closed,
+    trusted,
     starting,
     failure,
     request,
@@ -384,6 +410,7 @@ export const useLoginStore = defineStore('login', () => {
     again,
     restart,
     poll,
+    retry,
     confirm,
     refuse,
     reconnected,

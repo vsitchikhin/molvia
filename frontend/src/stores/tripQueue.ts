@@ -527,6 +527,9 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
    * otherwise have been handed the old run's promise and waited for the next `online`.
    */
   function flush(): Promise<void> {
+    // **Ничего не уходит, пока сервер не сказал, кто мы** (MOL-56, адверсариальный Б1): до
+    // ответа «кто мы» — это имя ящика на устройстве, а оно ничего не знает про cookie.
+    if (actor.state !== 'ready') return Promise.resolve()
     if (!running) {
       const owner = actor.id
       clearTimeout(retry)

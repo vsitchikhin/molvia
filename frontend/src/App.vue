@@ -37,23 +37,29 @@ export default defineComponent({
 
     // The app, not a screen, sends what waits on the phone, whichever screen is open when the
     // connection is back: purchases written at the shelf (MOL-24) and saved ratings (MOL-28).
-    // Not while the door is shut — though the queue has a second way out of its own, on a change
-    // of owner, and that one is not held here: it sends the drawer of whoever the server says we
-    // are, and a stranger's drawer on this device is empty.
+    //
+    // **Only once the server has said who we are and the person has said it is them.** An open
+    // door is not enough: while the first `me()` is still in flight the app is drawn from the
+    // drawer's name, and a drawer says nothing about the cookie — that is how a rating held back
+    // on a `401` went out into a stranger's account (adversarial Б1). Nothing is lost by
+    // waiting: a queue waits for the network anyway, and the answer is one round trip.
     const queue = useTripQueueStore()
     const drafts = useVerdictDraftsStore()
     const send = () => {
-      if (closed.value) return
+      if (!login.trusted) return
       void queue.flush()
       void drafts.flush()
     }
     onMounted(send)
     useReconnect(send)
-    // A door that has just opened is the other moment worth sending: what the queue held on a
-    // `401` has been waiting for exactly this (MOL-24, `HOLDS`).
-    watch(closed, (shut) => {
-      if (!shut) send()
-    })
+    // The other moment worth sending: what the queue held on a `401` has been waiting for
+    // exactly this (MOL-24, `HOLDS`).
+    watch(
+      () => login.trusted,
+      (may) => {
+        if (may) send()
+      },
+    )
 
     return { closed, route: useRoute(), announcements: provideAnnouncer() }
   },

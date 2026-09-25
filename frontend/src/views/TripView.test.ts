@@ -152,6 +152,8 @@ async function render({ memory = null as TripViewModel | null, settings = true }
     )
   const pinia = createPinia()
   setActivePinia(pinia)
+  // Приложение с осевшей личностью: очередь отправляет только по ответу сервера (MOL-56).
+  useActorStore().state = 'ready'
   const trips = useTripStore()
   const queue = useTripQueueStore()
   if (memory) trips.apply(memory)

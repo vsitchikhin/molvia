@@ -39,6 +39,8 @@ function answered(itemId: string, score: number): { verdict: VerdictCard; create
 function fresh() {
   localStorage.setItem('molvia.actor', ME)
   setActivePinia(createPinia())
+  // Приложение с осевшей личностью: очередь отправляет только по ответу сервера (MOL-56).
+  useActorStore().state = 'ready'
   return useVerdictDraftsStore()
 }
 
@@ -55,6 +57,23 @@ describe('verdict drafts', () => {
     sessionStorage.clear()
     rateItem.mockReset()
     vi.restoreAllMocks()
+  })
+
+  it('Б1: не отправляет ничего, пока сервер не сказал, кто мы', async () => {
+    // До ответа «кто мы» — это имя ящика на устройстве, а оно ничего не знает про cookie:
+    // сессия могла прийти мимо скрипта, и тогда отложенная оценка ушла бы в чужой аккаунт.
+    const drafts = fresh()
+    useActorStore().state = 'idle'
+    drafts.save(milk, 4, '')
+    await settled()
+
+    expect(rateItem).not.toHaveBeenCalled()
+    expect(drafts.waiting).toHaveLength(1)
+
+    useActorStore().state = 'ready'
+    await drafts.flush()
+
+    expect(rateItem).toHaveBeenCalledTimes(1)
   })
 
   it('saves on the phone first, sends after, and forgets once the server has it', async () => {

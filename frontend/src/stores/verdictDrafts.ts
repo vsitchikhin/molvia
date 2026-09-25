@@ -199,6 +199,9 @@ export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
    * identity is followed by one for the new identity.
    */
   function flush(): Promise<void> {
+    // **Ничего не уходит, пока сервер не сказал, кто мы** (MOL-56, адверсариальный Б1): до
+    // ответа «кто мы» — это имя ящика на устройстве, а оно ничего не знает про cookie.
+    if (actor.state !== 'ready') return Promise.resolve()
     if (!running) {
       const owner = actor.id
       running = drain(owner).finally(() => {

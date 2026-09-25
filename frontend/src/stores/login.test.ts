@@ -225,6 +225,30 @@ describe('в чей аккаунт вошли', () => {
     expect(login.phase).toBe('welcome')
   })
 
+  it('сбор снимает свой запрос и не трогает начатый после него', async () => {
+    // Иначе «Начать заново» с уже подтверждённым R2 заставляло бы подтверждать заново.
+    opened()
+    const { login } = await signedOut()
+    startLogin.mockResolvedValueOnce(REQUEST)
+    await login.begin()
+    let answer: (poll: LoginPoll) => void = () => undefined
+    pollLogin.mockReturnValueOnce(
+      new Promise<LoginPoll>((resolve) => {
+        answer = resolve
+      }),
+    )
+    const flight = login.poll()
+    const next = { ...REQUEST, id: '11111111-2222-4333-8444-555555555555' }
+    startLogin.mockResolvedValueOnce(next)
+    await login.restart()
+
+    answer({ status: 'authenticated', actor: STRANGER })
+    await flight
+
+    expect(login.request?.id).toBe(next.id)
+    expect(login.closed).toBe(true)
+  })
+
   it('«Да, это я» открывает дверь и записывает, кого признали', async () => {
     opened()
     const { login } = await signedOut()
@@ -460,6 +484,38 @@ describe('отказы', () => {
     window.dispatchEvent(new Event('offline'))
 
     expect(login.phase).toBe('offline')
+  })
+})
+
+describe('«Повторить» повторяет то, что не вышло', () => {
+  it('Б2: ошибка проверки личности переспрашивает сервер, а не ведёт в Telegram', async () => {
+    // Человеку нужен был ответ сервера, чтобы увидеть свой вопрос, — а кнопка заводила новый
+    // вход: лишний старт против общей квоты и Telegram поверх экрана.
+    localStorage.setItem(OWNER, STRANGER.id)
+    setActivePinia(createPinia())
+    const actor = useActorStore()
+    const login = useLoginStore()
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    await actor.start()
+    expect(login.phase).toBe('error')
+
+    await login.retry()
+
+    expect(startLogin).not.toHaveBeenCalled()
+    expect(me).toHaveBeenCalledTimes(2)
+  })
+
+  it('а ошибка самого входа — начинает его заново', async () => {
+    opened()
+    const { login } = await signedOut()
+    startLogin.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+    await login.begin()
+    expect(login.phase).toBe('error')
+
+    startLogin.mockResolvedValue(REQUEST)
+    await login.retry()
+
+    expect(login.phase).toBe('waiting')
   })
 })
 
