@@ -87,7 +87,13 @@ export type ExchangeView = z.output<typeof exchangeViewCodec>
 export const exchangesResponseCodec = z.strictObject({
   preference: ratePreferenceSchema,
   pair: z.strictObject({ base: currencySchema, quote: currencySchema }).nullable(),
-  wallet: z.strictObject({ rate: rateCodec, basis: walletBasisSchema }).nullable(),
+  /**
+   * `estimated`: part of the cost was never named by the person and was taken from the official
+   * rate of an exchange's day — dollars brought from home, say (MOL-42, В-1).
+   */
+  wallet: z
+    .strictObject({ rate: rateCodec, basis: walletBasisSchema, estimated: z.boolean() })
+    .nullable(),
   /**
    * The hint for the next exchange of the pair: what is left by the recorded spending, and whether
    * that is everything held (`whole`) or only the money of the last exchange, whose remainder

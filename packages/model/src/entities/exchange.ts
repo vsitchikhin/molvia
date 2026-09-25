@@ -69,16 +69,47 @@ export const EXCHANGE_UNDO_MINUTES = 10
 export const walletBasisSchema = z.enum(['weighted', 'last'])
 export type WalletBasis = z.infer<typeof walletBasisSchema>
 
-export interface WalletRate {
+/**
+ * What one unit of a currency cost in the currency of conversion, as a rate of the latter into
+ * the former (MOL-42). `estimated` says that part of that cost was never named by the person and
+ * was taken from the official rate of an exchange's day instead (В-1).
+ */
+export interface CurrencyCost {
   readonly rate: ExchangeRate
   readonly basis: WalletBasis
+  readonly estimated: boolean
 }
 
-/** A ratio of minor units — the received currency's per one of the given one — kept exact. */
+/** The person's own rate of the currency of conversion into the spending one. */
+export type WalletRate = CurrencyCost
+
+/**
+ * The official rate of the currency of conversion into `currency` on `day`, already judged the way
+ * a comparison judges it (a jumped rate gives way to the one before it) — or null when there is
+ * none. The model reads no cache: the use case hands the answer in.
+ */
+export type OfficialRateOf = (currency: Currency, day: string) => ExchangeRate | null
+
+const noOfficialRate: OfficialRateOf = () => null
+
+/**
+ * A ratio of minor units, kept exact: `quote` of a currency per `base` of the currency of
+ * conversion — for an exchange alone, what was received per what was given.
+ */
 interface Ratio {
   readonly quote: bigint
   readonly base: bigint
 }
+
+interface Cost {
+  readonly ratio: Ratio
+  readonly basis: WalletBasis
+  readonly estimated: boolean
+  /** The day of the exchange that last moved it. */
+  readonly day: string
+}
+
+const ONE: Ratio = { quote: 1n, base: 1n }
 
 function gcd(a: bigint, b: bigint): bigint {
   let [x, y] = [a, b]
@@ -109,6 +140,7 @@ function rateOf(ratio: Ratio, base: Currency, quote: Currency, day: string): Exc
   return exchangeRateSchema.safeParse(rate).success ? rate : null
 }
 
+/** The order the wallet walks exchanges in: by day, then as written. */
 function chronological(a: Exchange, b: Exchange): number {
   if (a.exchangedOn !== b.exchangedOn) return a.exchangedOn < b.exchangedOn ? -1 : 1
   const time = a.createdAt.getTime() - b.createdAt.getTime()
@@ -141,59 +173,133 @@ export function exchangeRateOf(exchange: Exchange): ExchangeRate | null {
 }
 
 /**
+ * What every currency cost in `base`, from the exchanges dated no later than `day` and no earlier
+ * than `since` — the day `base` became the currency of conversion, or null when it always was
+ * (MOL-42, В-2: a change of it works forwards, and nothing before it is re-counted in the new one).
+ *
+ * One rule covers the pair, chains and reversals alike. `base` costs one. **Giving money away
+ * moves nothing** — it takes money and its cost away in one proportion, as spending does — so an
+ * exchange back into `base` leaves every cost where it was. **Receiving money** costs what was
+ * given for it, at the cost of that: roubles to dollars to drams carries the price of the dollars
+ * into the drams. Then, as for the pair alone (MOL-40):
+ *
+ * - the first receipt of a currency, one whose `heldBefore` is unknown, or one after its cost
+ *   became unknown: the cost of this exchange alone, `basis: 'last'`;
+ * - otherwise weighted by what was held: `(received + held) / (paid + held / previous)`.
+ *
+ * What was given may have no known cost at all — dollars brought from home, whose price in roubles
+ * nobody wrote down. Then it is valued at the official rate of the exchange's day and the cost
+ * says so (`estimated`, В-1): what the person named is counted as named, and what they did not is
+ * taken from a source, never as zero. With no official rate either, the received currency's cost
+ * is unknown until an exchange starts it afresh.
+ *
+ * Exact throughout — ratios of integers, reduced at every link — and rounded once, at the end.
+ */
+function costsOf(
+  exchanges: readonly Exchange[],
+  base: Currency,
+  day: string,
+  officialOf: OfficialRateOf,
+  since: string | null,
+): Map<Currency, Cost | null> {
+  const links = exchanges
+    .filter(({ exchangedOn }) => exchangedOn <= day && (since === null || exchangedOn >= since))
+    .sort(chronological)
+
+  const costs = new Map<Currency, Cost | null>()
+  const paidWith = (
+    currency: Currency,
+    on: string,
+  ): { ratio: Ratio; estimated: boolean } | null => {
+    if (currency === base) return { ratio: ONE, estimated: false }
+    const own = costs.get(currency)
+    if (own) return own
+    const official = officialOf(currency, on)
+    if (official?.base !== base || official.quote !== currency) return null
+    const ratio = reduced(
+      official.scaled * minorPerMajor(currency),
+      RATE_SCALE * minorPerMajor(base),
+    )
+    return { ratio, estimated: true }
+  }
+
+  for (const link of links) {
+    const { given, received } = link
+    if (received.currency === base) continue
+
+    const paid = paidWith(given.currency, link.exchangedOn)
+    if (paid === null) {
+      costs.set(received.currency, null)
+      continue
+    }
+    const previous = costs.get(received.currency) ?? null
+    const held = link.heldBefore?.minor ?? null
+    costs.set(
+      received.currency,
+      previous === null || held === null
+        ? {
+            ratio: reduced(received.minor * paid.ratio.quote, given.minor * paid.ratio.base),
+            basis: 'last',
+            estimated: paid.estimated,
+            day: link.exchangedOn,
+          }
+        : {
+            // What was given is worth `given · paid.base / paid.quote` of the base, and the money
+            // held `held · previous.base / previous.quote`: together, the cost of everything now
+            // held. Both fractions are brought to one denominator so nothing is rounded.
+            ratio: reduced(
+              (received.minor + held) * paid.ratio.quote * previous.ratio.quote,
+              given.minor * paid.ratio.base * previous.ratio.quote +
+                held * previous.ratio.base * paid.ratio.quote,
+            ),
+            basis: 'weighted',
+            estimated: paid.estimated || previous.estimated,
+            day: link.exchangedOn,
+          },
+    )
+  }
+  return costs
+}
+
+function costOf(cost: Cost, base: Currency, currency: Currency): CurrencyCost | null {
+  const rate = rateOf(cost.ratio, base, currency, cost.day)
+  return rate ? { rate, basis: cost.basis, estimated: cost.estimated } : null
+}
+
+/**
+ * The cost of every currency the person holds by exchange, other than `base` itself: what the
+ * screen shows under the wallet, so a chain can be checked by eye (MOL-42, Р-4).
+ */
+export function currencyCosts(
+  exchanges: readonly Exchange[],
+  base: Currency,
+  day: string,
+  officialOf: OfficialRateOf = noOfficialRate,
+  since: string | null = null,
+): CurrencyCost[] {
+  return [...costsOf(exchanges, base, day, officialOf, since)].flatMap(([currency, cost]) => {
+    const known = cost ? costOf(cost, base, currency) : null
+    return known ? [known] : []
+  })
+}
+
+/**
  * The person's own rate of `base` into `quote` on `day`: the average cost of the `quote` money
- * they hold, from their exchanges of `base` into `quote` dated no later than `day` (MOL-40, Т-2).
- *
- * Spending does not move it — it takes money and its cost away in one proportion — so purchases
- * are not an input. A new exchange does, and the weight of the money already held is exactly how
- * much of it was left at that moment:
- *
- * - the first exchange, or one whose `heldBefore` is unknown: the rate of that exchange alone,
- *   `basis: 'last'`. Before the first there is money of no known cost, and weighing it by nothing
- *   is the honest answer rather than weighing it by a guess;
- * - otherwise `(received + held) / (given + held / previous)`, `basis: 'weighted'`.
- *
- * Exact throughout — a ratio of integers — and rounded once at the end, so a chain of exchanges
- * carries no rounding from one link to the next. Exchanges of any other pair, the reverse one
- * included, are not part of this wallet: chains and reversals are the money model's, not this.
+ * they hold (MOL-40, Т-2), through whatever currencies it was bought with (MOL-42). Spending does
+ * not move it, so purchases are not an input; see `costsOf` for the rule. Null when the cost of
+ * `quote` is not known — the trip then takes the official rate.
  */
 export function walletRate(
   exchanges: readonly Exchange[],
   base: Currency,
   quote: Currency,
   day: string,
+  officialOf: OfficialRateOf = noOfficialRate,
+  since: string | null = null,
 ): WalletRate | null {
-  const links = exchanges
-    .filter(
-      (exchange) =>
-        exchange.given.currency === base &&
-        exchange.received.currency === quote &&
-        exchange.exchangedOn <= day,
-    )
-    .sort(chronological)
-
-  let wallet: { ratio: Ratio; basis: WalletBasis; day: string } | null = null
-  for (const link of links) {
-    const held = link.heldBefore?.minor ?? null
-    const ratio: Ratio =
-      wallet === null || held === null
-        ? reduced(link.received.minor, link.given.minor)
-        : // The money held is worth `held / previous` of the base: added to what was given, it
-          // is the cost of everything now in the wallet.
-          reduced(
-            (link.received.minor + held) * wallet.ratio.quote,
-            link.given.minor * wallet.ratio.quote + held * wallet.ratio.base,
-          )
-    wallet = {
-      ratio,
-      basis: wallet === null || held === null ? 'last' : 'weighted',
-      day: link.exchangedOn,
-    }
-  }
-  if (wallet === null) return null
-
-  const rate = rateOf(wallet.ratio, base, quote, wallet.day)
-  return rate ? { rate, basis: wallet.basis } : null
+  if (base === quote) return null
+  const cost = costsOf(exchanges, base, day, officialOf, since).get(quote)
+  return cost ? costOf(cost, base, quote) : null
 }
 
 /**
@@ -216,9 +322,26 @@ export function officialDifference(exchange: Exchange, official: ExchangeRate): 
 }
 
 /**
- * A hint for «сколько было до обмена» (MOL-40, Р-7, Р-13): what the last exchange left less what
- * was spent in that currency since. A hint and not a fact — purchases without a price and money
- * spent outside a trip are not in it, so the screen says «по записанным тратам».
+ * The latest exchange into `currency` dated no later than `day` — the one a hint of what is still
+ * held starts from.
+ */
+export function lastReceipt(
+  exchanges: readonly Exchange[],
+  currency: Currency,
+  day: string,
+): Exchange | undefined {
+  return exchanges
+    .filter(({ received, exchangedOn }) => received.currency === currency && exchangedOn <= day)
+    .sort(chronological)
+    .at(-1)
+}
+
+/**
+ * A hint for «сколько было до обмена» (MOL-40, Р-7, Р-13; MOL-42, Р-3): what the last exchange
+ * into a currency left, less what was spent in it since and less what later exchanges gave of it —
+ * a reversal and dollars handed over for drams take money away as a purchase does. A hint and not
+ * a fact — purchases without a price and money spent outside a trip are not in it, so the screen
+ * says «по записанным тратам».
  *
  * `whole` says whether it counts everything held: when the last exchange did not say what was
  * there before it, the hint is about that exchange's money alone and the screen says so — the
@@ -226,13 +349,18 @@ export function officialDifference(exchange: Exchange, official: ExchangeRate): 
  * absurd remainder once took the whole screen down with a 500 (adversarial А1).
  */
 export function heldEstimate(
+  exchanges: readonly Exchange[],
   last: Exchange,
   spent: bigint,
 ): { readonly held: Money; readonly whole: boolean } | null {
-  const held = last.received.minor + (last.heldBefore?.minor ?? 0n) - spent
+  const currency = last.received.currency
+  const givenAfter = exchanges
+    .filter((exchange) => exchange.given.currency === currency && chronological(exchange, last) > 0)
+    .reduce((sum, exchange) => sum + exchange.given.minor, 0n)
+  const held = last.received.minor + (last.heldBefore?.minor ?? 0n) - spent - givenAfter
   if (held > INT8_MAX) return null
   return {
-    held: { minor: held > 0n ? held : 0n, currency: last.received.currency },
+    held: { minor: held > 0n ? held : 0n, currency },
     whole: last.heldBefore !== null,
   }
 }

@@ -129,7 +129,7 @@ export async function exchangesOverview(
       )
     : undefined
   const held = last
-    ? heldEstimate(last, await exchanges.spentSince(owner.id, quote, spentFrom(last)))
+    ? heldEstimate(list, last, await exchanges.spentSince(owner.id, quote, spentFrom(last)))
     : null
 
   return {

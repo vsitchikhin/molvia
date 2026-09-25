@@ -94,7 +94,7 @@ describe('exchangesResponseCodec', () => {
   const response: ExchangesResponse = {
     preference: 'personal',
     pair: { base: 'RUB', quote: 'AMD' },
-    wallet: { rate, basis: 'weighted' },
+    wallet: { rate, basis: 'weighted', estimated: false },
     heldEstimate: { held: money(8_500_000n, 'AMD'), whole: true },
     exchanges: [
       {

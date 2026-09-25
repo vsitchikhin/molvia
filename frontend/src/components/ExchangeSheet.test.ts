@@ -26,6 +26,7 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
         asOf: yerevanMidnight('2026-09-01'),
       },
       basis: 'last',
+      estimated: false,
     },
     heldEstimate: { held: { minor: 2_000_000n, currency: 'AMD' }, whole: true },
     exchanges: [

@@ -65,7 +65,7 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
   return {
     preference: 'personal',
     pair: { base: 'RUB', quote: 'AMD' },
-    wallet: { rate: rate('4.791667', '2026-09-15'), basis: 'weighted' },
+    wallet: { rate: rate('4.791667', '2026-09-15'), basis: 'weighted', estimated: false },
     heldEstimate: null,
     exchanges: [row()],
     ...patch,
@@ -196,7 +196,7 @@ describe('ExchangeView: the rate and the list', () => {
 
   it('says «by the last exchange» when what was held is unknown', async () => {
     exchanges.mockResolvedValue(
-      overview({ wallet: { rate: rate('4.75', '2026-09-15'), basis: 'last' } }),
+      overview({ wallet: { rate: rate('4.75', '2026-09-15'), basis: 'last', estimated: false } }),
     )
     const view = await render()
     expect(view.text()).toContain('by the last exchange')
