@@ -69,11 +69,15 @@ describe('verdict drafts', () => {
 
     expect(rateItem).not.toHaveBeenCalled()
     expect(drafts.waiting).toHaveLength(1)
+    // В1: и говорит об этом теми же словами, что и провал отправки, — «сохранено, уйдёт со
+    // связью». Молчание оставляло на экране «Отправляем оценку…» навсегда.
+    expect(drafts.held).toBe('offline')
 
     useActorStore().state = 'ready'
     await drafts.flush()
 
     expect(rateItem).toHaveBeenCalledTimes(1)
+    expect(drafts.held).toBeNull()
   })
 
   it('saves on the phone first, sends after, and forgets once the server has it', async () => {

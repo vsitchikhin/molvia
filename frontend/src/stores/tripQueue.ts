@@ -515,7 +515,12 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function retryLater(): void {
     if (!navigator.onLine) return
     clearTimeout(retry)
-    retry = setTimeout(() => void flush(), retryDelay)
+    retry = setTimeout(() => {
+      // Сервер молчал — спрашиваем и о личности: без её ответа отправка всё равно не пойдёт,
+      // а осевшая личность сама позовёт отправку из `App.vue` (MOL-56, В1).
+      if (actor.state === 'error') void actor.retry()
+      void flush()
+    }, retryDelay)
     retryDelay = Math.min(retryDelay * 2, RETRY_LAST_MS)
   }
 
@@ -529,7 +534,14 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function flush(): Promise<void> {
     // **Ничего не уходит, пока сервер не сказал, кто мы** (MOL-56, адверсариальный Б1): до
     // ответа «кто мы» — это имя ящика на устройстве, а оно ничего не знает про cookie.
-    if (actor.state !== 'ready') return Promise.resolve()
+    //
+    // Молчащий сервер при живой связи по-прежнему пробуется сам, с удваивающейся паузой: без
+    // этого покупка, застрявшая за порталом магазина, ждала бы возвращения во вкладку, а
+    // `online` за порталом не приходит вовсе — `onLine` там всё время `true` (MOL-24, Р-5).
+    if (actor.state !== 'ready') {
+      if (actor.state === 'error') retryLater()
+      return Promise.resolve()
+    }
     if (!running) {
       const owner = actor.id
       clearTimeout(retry)

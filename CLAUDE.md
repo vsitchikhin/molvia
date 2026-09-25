@@ -1098,11 +1098,15 @@ the round trip through Telegram, and ask whose account this turned out to be.
   `onMounted(send)`. So **the queue and the drafts send only once the server has said who we
   are**: the rule sits in `flush()` of both, where neither `App.vue` nor the queue's own
   «the owner changed» path can walk around it. Nothing is lost by waiting — a queue waits for
-  the network anyway, and the answer is one round trip. What is **not** held is reading: a
-  screen's first fetch goes out in parallel with `me()` on purpose, so in that same rare window
-  it may draw a stranger's own figures for a moment before the door shuts. Serialising every
-  screen behind the identity would cost every ordinary launch a round trip to close a case that
-  needs a session to have arrived unseen.
+  the network anyway, and the answer is one round trip — **but the screen is told**, in the same
+  words a failed attempt would have used: silence there left «Отправляем оценку…» standing
+  forever at a shelf with no signal, which is the product's main scenario (adversarial В1).
+  What is **not** held is everything else: a screen's first fetch goes out in parallel with
+  `me()` on purpose, and so does a write a person makes with their own hands in a sheet — the
+  rating, the amendment, «Предложить товар». In that same rare window those may reach a session
+  the person has not claimed, or draw its figures for a moment before the door shuts. Holding
+  them would mean serialising every screen behind the identity and paying a round trip on every
+  ordinary launch, to close a case that needs a session to have arrived unseen.
 - **A `401` anywhere is the login screen**, through one seam in `frontend/src/api.ts` wired in
   `main.ts`. Before it, `error.no_actor` was read by three callers out of a dozen and a half and
   every other screen said «что-то пошло не так» about an account that was simply not there.
