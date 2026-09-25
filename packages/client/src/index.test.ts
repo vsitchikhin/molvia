@@ -910,7 +910,7 @@ describe('the exchanges', () => {
       },
       basis: 'weighted',
     },
-    heldEstimate: { amount: '85000.00', currency: 'AMD' },
+    heldEstimate: { held: { amount: '85000.00', currency: 'AMD' }, whole: true },
     exchanges: [],
   }
 
