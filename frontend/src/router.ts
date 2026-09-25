@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { START_LOCATION, createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw, RouterScrollBehavior } from 'vue-router'
 import SettingsView from '@/views/SettingsView.vue'
 import PrivacyView from '@/views/PrivacyView.vue'
@@ -131,14 +131,20 @@ watchBrowserAnimatedBack()
  * Back and forward return to where the person was; any other move starts at the top. The
  * sections keep no scroll of their own — their state lives in stores, not in components.
  *
- * A move to the same address is a sheet put away — a push or a replace to where the router
- * already is, it refuses as a duplicate — and it does not scroll at all. The page under a sheet
- * never moved, and whatever changed above the screen meanwhile — a list reread, a queued row
- * sent, a notice come or gone — the browser has already kept out of sight. Scrolling back to the
- * number saved when the sheet opened moved the list by exactly that change (MOL-63).
+ * A move to the same address does not scroll at all. It is one of two things, and neither should
+ * move the page. A sheet put away: the page under it never moved, and whatever changed above the
+ * screen meanwhile — a list reread, a queued row sent, a notice come or gone — the browser has
+ * already kept out of sight; scrolling back to the number saved when the sheet opened moved the
+ * list by exactly that change (MOL-63). Or a push to where the router already is: it refuses the
+ * duplicate and still asks this function, from the screen to itself.
+ *
+ * The first navigation is not one of them, though it comes «from» `START_LOCATION`, whose address
+ * is «/»: that is the page loaded again — «back» into the app from another site — and the number
+ * the router saved on `pagehide` is where the person was. Read as the same address, the trip, and
+ * only the trip, forgot it (adversarial В1).
  */
 export const scrollBehavior: RouterScrollBehavior = (to, from, saved) =>
-  to.fullPath === from.fullPath ? false : (saved ?? { top: 0 })
+  from !== START_LOCATION && to.fullPath === from.fullPath ? false : (saved ?? { top: 0 })
 
 export const router = createRouter({
   history: createWebHistory(),

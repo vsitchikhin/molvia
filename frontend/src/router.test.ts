@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { START_LOCATION, createMemoryHistory, createRouter } from 'vue-router'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { routes, scrollBehavior } from '@/router'
@@ -127,5 +127,36 @@ describe('scrollBehavior', () => {
     expect(scrollBehavior(await resolveAt('/trip/add'), await resolveAt('/'), null)).toEqual({
       top: 0,
     })
+  })
+
+  // `START_LOCATION` is at «/» too, and the trip is at «/»: read as the same address, a trip loaded
+  // again threw away where the person was — and it alone of the screens (adversarial В1).
+  it('returns the first navigation to where the person was, on the trip as elsewhere', async () => {
+    const trip = await resolveAt('/')
+    expect(scrollBehavior(trip, START_LOCATION, saved)).toEqual(saved)
+    expect(scrollBehavior(trip, trip, saved)).toBe(false)
+  })
+
+  // Asked by the router itself: its first navigation, and a duplicate it refuses (adversarial Д1).
+  it('is asked by the router for a duplicate too, and does not scroll it', async () => {
+    const asked: { to: string; from: string; answer: unknown }[] = []
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes,
+      scrollBehavior: (to, from, position) => {
+        const answer = scrollBehavior(to, from, position)
+        asked.push({ to: to.fullPath, from: from.fullPath, answer })
+        return answer
+      },
+    })
+    await router.push('/')
+    expect(await router.push('/')).toBeDefined()
+    await vi.waitFor(() => {
+      expect(asked).toHaveLength(2)
+    })
+    expect(asked).toEqual([
+      { to: '/', from: '/', answer: { top: 0 } },
+      { to: '/', from: '/', answer: false },
+    ])
   })
 })
