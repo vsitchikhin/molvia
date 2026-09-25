@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { telegramUserIdSchema } from '@molvia/model'
 import type { TelegramUserId } from '@molvia/model'
 import type { Db } from './index'
+import { lockTelegramAccount } from './telegram-lock'
 
 /**
  * Every column in the schema that points at `actors`, as `table.column`. Erasure has to know
@@ -76,8 +77,10 @@ export function createErasureRepository(db: Db): ErasureRepository {
           // reported «nobody to erase» over a live account. Collection locks its request row
           // before it creates the owner, so holding these rows makes the two take turns: a
           // collection already under way finishes first and its owner is found below; one that
-          // comes after finds its request gone. A login confirmed *after* this line is a new
-          // sign-in, made after the person asked to be erased.
+          // comes after finds its request gone. A request not yet confirmed has no Telegram id to
+          // be found by, and that is what the account lock above is for.
+          // A confirmation in this person's name waits until this commits (П-2, see the lock).
+          await tx.execute(lockTelegramAccount(id))
           await tx.execute(
             sql`select 1 from login_requests where telegram_user_id = ${id} for update`,
           )

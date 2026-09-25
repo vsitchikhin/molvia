@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { ACTOR_REFERENCES, createErasureRepository } from '@/db/erasure-repository'
+import { createLoginRequestRepository } from '@/db/login-requests-repository'
+import { lockTelegramAccount } from '@/db/telegram-lock'
 import {
   actors,
   events,
@@ -247,6 +249,70 @@ describe('стирание и вход, который собирается в �
       expect(await db.select().from(actors).where(eq(actors.telegramUserId, tg))).toEqual([])
     } finally {
       await collector.end()
+    }
+  })
+})
+
+describe('подтверждение входа и стирание одного аккаунта идут по очереди (adversarial П-2)', () => {
+  /** Whether a promise settles within `ms`: the lock either holds it back or it does not. */
+  async function settlesWithin(promise: Promise<unknown>, ms: number): Promise<boolean> {
+    return Promise.race([
+      promise.then(() => true),
+      new Promise<boolean>((resolve) =>
+        setTimeout(() => {
+          resolve(false)
+        }, ms),
+      ),
+    ])
+  }
+
+  it('подтверждение ждёт, пока идёт стирание этого аккаунта', async () => {
+    const tg = telegramId()
+    // Started in the browser, not confirmed yet: the row has no Telegram id for erasure to lock.
+    const requestId = await insertLoginRequest(db)
+    const [request] = await db.select().from(loginRequests).where(eq(loginRequests.id, requestId))
+    const holder = connectDrizzle()
+    try {
+      let confirming: Promise<unknown> | undefined
+      await holder.db.transaction(async (tx) => {
+        await tx.execute(lockTelegramAccount(tg))
+        confirming = createLoginRequestRepository(db).confirm(request?.code ?? '', tg)
+        expect(await settlesWithin(confirming, 300)).toBe(false)
+      })
+      expect(await confirming).not.toBeNull()
+    } finally {
+      await holder.close()
+    }
+  })
+
+  it('и стирание ждёт того же замка — первым, до любой строки', async () => {
+    const tg = telegramId()
+    await insertActor(db, { telegramUserId: tg })
+    const holder = connectDrizzle()
+    try {
+      let erasing: Promise<unknown> | undefined
+      await holder.db.transaction(async (tx) => {
+        await tx.execute(lockTelegramAccount(tg))
+        erasing = erasure.erase(tg, { dryRun: false })
+        expect(await settlesWithin(erasing, 300)).toBe(false)
+      })
+      expect(await erasing).toMatchObject({ found: true })
+    } finally {
+      await holder.close()
+    }
+  })
+
+  it('а другой аккаунт этот замок не держит', async () => {
+    const tg = telegramId()
+    await insertActor(db, { telegramUserId: tg })
+    const holder = connectDrizzle()
+    try {
+      await holder.db.transaction(async (tx) => {
+        await tx.execute(lockTelegramAccount(telegramId()))
+        expect(await settlesWithin(erasure.erase(tg, { dryRun: false }), 2000)).toBe(true)
+      })
+    } finally {
+      await holder.close()
     }
   })
 })

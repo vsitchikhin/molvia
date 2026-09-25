@@ -18,6 +18,7 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
 import { loginRequests } from './schema'
+import { lockTelegramAccount } from './telegram-lock'
 
 export interface LoginRequestRepository {
   /** Lock before checking time: waiting for another write must not extend a login. */
@@ -222,20 +223,25 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
       // move the account a request names — and it cannot: the second press matches a row that
       // already holds this id and writes the same value over it. Another account matches
       // nothing, which is the refusal the button exists for.
-      const [row] = await db
-        .update(loginRequests)
-        .set({ telegramUserId })
-        .where(
-          and(
-            eq(loginRequests.code, code),
-            live,
-            or(
-              isNull(loginRequests.telegramUserId),
-              eq(loginRequests.telegramUserId, telegramUserId),
+      // Never inside an erasure of the same account: an erasure in progress holds this lock, and
+      // the confirmation comes after it rather than making an owner it has already looked for.
+      const [row] = await db.transaction(async (tx) => {
+        await tx.execute(lockTelegramAccount(telegramUserId))
+        return tx
+          .update(loginRequests)
+          .set({ telegramUserId })
+          .where(
+            and(
+              eq(loginRequests.code, code),
+              live,
+              or(
+                isNull(loginRequests.telegramUserId),
+                eq(loginRequests.telegramUserId, telegramUserId),
+              ),
             ),
-          ),
-        )
-        .returning()
+          )
+          .returning()
+      })
       return row ? toLoginRequest(row) : null
     },
 

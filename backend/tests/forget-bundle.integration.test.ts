@@ -44,3 +44,20 @@ describe('dist/forget.js', () => {
     expect(wrong.stdout).toContain('usage: forget')
   })
 })
+
+// Adversarial О-6 and П-3: the value of TG must not be able to bring its own `--yes`, quoted or
+// not. Every value here is refused before the database — none of them is a Telegram id alone.
+describe('make forget', () => {
+  it.each(['184467331 --yes', '184467331" --yes "--yes', '1" ; echo PWNED "'])(
+    'TG=%s is one argument, and so a refusal',
+    (value) => {
+      const run = spawnSync('make', ['--no-print-directory', 'forget', `TG=${value}`], {
+        cwd: root,
+        encoding: 'utf8',
+      })
+      expect(run.status).not.toBe(0)
+      expect(run.stdout).toContain('usage: forget')
+      expect(run.stdout).not.toContain('PWNED')
+    },
+  )
+})

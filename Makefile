@@ -68,10 +68,11 @@ migrate: ## Apply migrations
 	$(NEED_SCAFFOLD)
 	npm run migrate
 
-# TG is quoted, so a value cannot carry a flag of its own: TG="<id> --yes" is refused (MOL-58).
+# TG reaches the script through the environment, never pasted into the recipe: pasted in, even
+# quoted, a value could close the quote and bring its own `--yes` (MOL-58, П-3). It is one argument.
 forget: ## Erase a person by Telegram id: make forget TG=<id> [YES=1] (dry run without YES)
 	$(NEED_SCAFFOLD)
-	./bin/forget-actor.sh "$(TG)" $(if $(YES),--yes)
+	./bin/forget-actor.sh "$$TG" $(if $(YES),--yes)
 
 dev: ## Run api, pwa and bot for this copy
 	$(NEED_SCAFFOLD)
