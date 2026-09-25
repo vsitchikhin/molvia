@@ -64,7 +64,6 @@ function row(patch: Partial<Row> = {}): Row {
       difference: { minor: 875_400n, currency: 'AMD' },
     },
     officialDoubtful: false,
-    priced: true,
     ...patch,
   }
 }
@@ -79,6 +78,7 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
     baseSince: null,
     walletUnknown: null,
     exchanges: [row()],
+    receipts: [],
     ...patch,
   }
 }
@@ -189,6 +189,53 @@ describe('ExchangeView: the four states', () => {
     expect(view.text()).not.toContain(en.state.retry)
   })
 
+  it('incomes alone make a rate: the card is drawn — the figure, why, the switch — and no list (Д1)', async () => {
+    // Drams that came in with no exchange: the wallet a trip takes (MOL-66, adversarial Д1).
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [],
+        wallet: { rate: rate('4.3', '2026-09-05'), basis: 'income', estimated: true },
+      }),
+    )
+    const view = await render()
+    expect(view.text()).not.toContain(en.exchange.empty.title)
+    expect(view.get('.figure').text()).toContain('4.3')
+    expect(view.text()).toContain('by the last income')
+    expect(view.text()).toContain(en.exchange.preference_legend)
+    expect(view.text()).toContain(en.exchange.record)
+    expect(view.text()).not.toContain(en.exchange.list_title)
+  })
+
+  it('incomes that lost the rate, or priced another currency, draw the card too', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [],
+        wallet: null,
+        walletUnknown: { on: '2026-09-20', given: null, reason: 'noRate' },
+      }),
+    )
+    const lost = await render()
+    expect(lost.text()).toContain('Rate unknown: the ֏ income of')
+    lost.unmount()
+
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [],
+        wallet: null,
+        costs: [
+          {
+            rate: { ...rate('80', '2026-09-20'), base: 'USD', quote: 'RUB' },
+            basis: 'income',
+            estimated: true,
+          },
+        ],
+      }),
+    )
+    const dollars = await render()
+    expect(dollars.text()).not.toContain(en.exchange.empty.title)
+    expect(dollars.get('.costs').text()).toContain('by the last income')
+  })
+
   it('without exchanges offers to record one, and says the trips keep the central bank', async () => {
     exchanges.mockResolvedValue(overview({ wallet: null, exchanges: [] }))
     const view = await render()
@@ -245,7 +292,7 @@ describe('ExchangeView: the rate and the list', () => {
     exchanges.mockResolvedValue(
       overview({
         wallet: null,
-        walletUnknown: { exchangedOn: '2026-08-25', given: 'USD', reason: 'noRate' },
+        walletUnknown: { on: '2026-08-25', given: 'USD', reason: 'noRate' },
       }),
     )
     const view = await render()
@@ -253,12 +300,31 @@ describe('ExchangeView: the rate and the list', () => {
     expect(view.text()).not.toContain('exchanges yet')
   })
 
+  it('names an income the rate was lost on, and the income a rate was taken from (MOL-66)', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        wallet: null,
+        walletUnknown: { on: '2026-09-20', given: null, reason: 'noRate' },
+      }),
+    )
+    const lost = await render()
+    expect(lost.text()).toContain('Rate unknown: the ֏ income of')
+    lost.unmount()
+
+    exchanges.mockResolvedValue(
+      overview({ wallet: { rate: rate('4.3', '2026-09-20'), basis: 'income', estimated: true } }),
+    )
+    const taken = await render()
+    expect(taken.text()).toContain('by the last income')
+    expect(taken.text()).toContain('days of exchanges and incomes')
+  })
+
   it('names the old reckoning as the reason, not a missing bank rate (Н1)', async () => {
     exchanges.mockResolvedValue(
       overview({
         wallet: null,
         baseSince: '2026-09-25',
-        walletUnknown: { exchangedOn: '2026-09-05', given: 'EUR', reason: 'oldReckoning' },
+        walletUnknown: { on: '2026-09-05', given: 'EUR', reason: 'oldReckoning' },
       }),
     )
     const view = await render()

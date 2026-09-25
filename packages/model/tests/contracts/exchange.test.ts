@@ -135,7 +135,7 @@ describe('exchangesResponseCodec', () => {
         estimated: true,
       },
     ],
-    heldEstimates: [{ held: money(8_500_000n, 'AMD'), whole: true }],
+    heldEstimates: [{ held: money(8_500_000n, 'AMD'), whole: true, from: 'exchange' }],
     baseSince: '2026-09-01',
     walletUnknown: null,
     exchanges: [
@@ -165,9 +165,9 @@ describe('exchangesResponseCodec', () => {
           difference: money(875_400n, 'AMD'),
         },
         officialDoubtful: false,
-        priced: true,
       },
     ],
+    receipts: [{ id: body.id, currency: 'AMD', on: '2026-09-15', priced: true }],
   }
 
   it('crosses the wire and comes back the same', () => {

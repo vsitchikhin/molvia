@@ -542,10 +542,12 @@ device, private always. The rate is what the two amounts say and is not stored b
   to the snapshot's six digits at the end, the way a cross rate is rounded. The screen walks the
   chain once (`ownRates`) for the wallet, the prices and the reason a wallet is missing.
 - **A trip takes it at the start, like the official one, and never again** (В-4): with
-  `actors.rate_preference = 'personal'` — the default — and an exchange of the pair dated no later
-  than today in Yerevan, the snapshot is `source: 'personal'` with no provider and no jump;
-  otherwise MOL-39's branch as it was. Nothing is required of the person: without exchanges the
-  two preferences are the same answer. An exchange made while a trip is open moves the next one.
+  `actors.rate_preference = 'personal'` — the default — and a known cost of the spending currency
+  dated no later than today in Yerevan — by an exchange of the pair, a chain, or an income alone
+  (MOL-66) — the snapshot is `source: 'personal'` with no provider and no jump; otherwise MOL-39's
+  branch as it was. Nothing is required of the person: without exchanges and incomes the two
+  preferences are the same answer. An exchange or an income made while a trip is open moves the
+  next one.
 - **Every exchange is set beside the central bank of its own day**, by the same `pickOfficialRate`
   a trip started that day would use — «на 8 754 ֏ больше» or «меньше», never «комиссия»: a good
   exchanger beats the bank, and the difference says nothing about why.
@@ -589,6 +591,38 @@ device, private always. The rate is what the two amounts say and is not stored b
   from the record threw away everything bought between the exchange and its entry. Without a remainder named
   at the last exchange it speaks of that exchange's money only. A day's official rate that jumped
   is never an exchange's measure: the rate before the jump is, or no comparison at all.
+
+**An income is money that came in with nothing given for it (MOL-66)** — the actual day, amount,
+currency and a source from the owner's own closed list (`incomes`, В-3); nothing expected is ever
+written. Private exactly as an exchange is, and written by an exchange's rules: a name from the
+device, a repeat is 200 and anything else under that name 409; an amendment in place with its
+version kept in `income_revisions`; a removal offered back for ten minutes. One money model, one
+set of rules — the task's own «as for exchanges in MOL-40» predates MOL-42's history.
+
+- **It is a link of the same walk** (В-1). In the currency of conversion it moves nothing — that
+  currency costs one. In any other its price in the currency of conversion was never named, so by
+  the rule of every unknown cost it is **the official rate of its own day**, fresh and judged for a
+  jump as money of no known cost is, and the wallet says «часть — по курсу ЦБ РА». It is never
+  valued at what the money already held cost — that is a price of other money. What was held
+  before it weighs it as for an exchange (`heldBefore`, asked where it will count); unknown, the
+  wallet takes the income alone and says «по последнему поступлению» (`basis: 'income'`). No fresh
+  rate, or a day before the currency of conversion changed, and the cost is unknown with the income
+  named as the reason (`walletUnknown.given: null`). **Incomes alone make a wallet**, so «Обмен
+  денег» is empty only when its card has nothing to say — no exchange, no wallet, no reason for one
+  missing, no price of another currency: drawn empty over drams that came in, it said «trips take the
+  central bank» while they took the income's rate, and hid the switch back (adversarial Д1).
+- **Money bought with the currency of conversion is an exchange, not an income** (Р-6): dollars
+  brought from home with their rouble price on the owner's sheet are «251 000 ₽ → 2 900 $», and
+  written so they carry that price instead of the bank's. The sheet says it under any other
+  currency.
+- **Both screens are one walk** (`ownMoney`): «Обмен денег» and «Доходы» read the exchanges, the
+  incomes and the cache once, and the sheets ask «сколько было до» by one list, `receipts`, of every
+  exchange and income with whether it gave its currency a price. The hint starts from the latest
+  money in, whichever kind, and says which (`from`).
+- **«Доходы» is a journal by month with what came in per currency, never converted** (В-2). The
+  sum is the model's (`incomeMonths`); one no money can hold is left out rather than thrown — the
+  screen failing whole would take away the one way to remove the income that made it. «Пришло /
+  потрачено» is not in 0.1: a purchase need not have a price, so «потрачено» would always be short.
 
 ## Tracker and documentation
 
@@ -924,8 +958,8 @@ database access. In a product about data integrity, two write paths will silentl
 - Country and city are part of the key from the start, not "we'll add it later".
 - **A person can be erased, and erasure is one function** (MOL-58): `ErasureRepository.erase` in
   `backend/src/db`, one transaction under a lock on the owner's row. It removes sessions, search
-  picks, verdicts with the withdrawn ones, events, expenses, trips, exchanges (MOL-40 — the
-  person's own money), login requests by Telegram id
+  picks, verdicts with the withdrawn ones, events, expenses, trips, exchanges and incomes (MOL-40,
+  MOL-66 — the person's own money), login requests by Telegram id
   — they carry no foreign key, so no cascade reaches them — and the owner. Catalogue items the
   person added stay with `created_by` nulled, and **every place stays** (owner's decision
   24.09.2026). People erase themselves with `/delete` in the bot; the owner's fallback is
@@ -1759,8 +1793,10 @@ exchanges, the wallet worked out from them, the preference «мой / ЦБ РА�
 beside the central bank of its day. The trip total says «мой курс» for it. MOL-42 made it every
 currency's cost rather than one pair's — chains, reversals, money of no known cost valued at the
 bank's rate of its day, a change of the currency of conversion that works forwards — and gave an
-exchange amendments with their history and a note. Incomes and the rest
-of the money model are still their own tasks.
+exchange amendments with their history and a note. MOL-66 put incomes beside them — «Доходы», the
+second row of the money group: a journal by month, and an income in any currency but the one of
+conversion is a link of the same walk at the bank's rate of its day. Accounts and balances are
+MOL-43's question.
 
 MOL-58 gave the people whose data this is the minimum 0.1 owes them: a page that says what is
 kept and for how long (`/privacy`, open without a session), `/delete` in the bot, which erases a

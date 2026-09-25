@@ -25,6 +25,7 @@ import type { ItemRepository } from '@/db/items-repository'
 import type { PlaceRepository } from '@/db/places-repository'
 import type { RateRepository } from '@/db/rates-repository'
 import type { ExchangeRepository } from '@/db/exchanges-repository'
+import type { IncomeRepository } from '@/db/incomes-repository'
 import type { SearchPickRepository } from '@/db/search-picks-repository'
 import type { TripRepository, TripSnapshot } from '@/db/trips-repository'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
@@ -112,6 +113,7 @@ function fakeRepositories(
     searchPicks?: Partial<SearchPickRepository>
     rates?: Partial<RateRepository>
     exchanges?: Partial<ExchangeRepository>
+    incomes?: Partial<IncomeRepository>
   } = {},
 ): TripRepositories {
   return {
@@ -177,6 +179,18 @@ function fakeRepositories(
       rateSettings: () => Promise.resolve({ preference: 'personal', since: null }),
       setPreference: unexpected('exchanges.setPreference'),
       ...overrides.exchanges,
+    },
+    incomes: {
+      add: unexpected('incomes.add'),
+      amend: unexpected('incomes.amend'),
+      history: unexpected('incomes.history'),
+      remove: unexpected('incomes.remove'),
+      restore: unexpected('incomes.restore'),
+      purgeRemoved: unexpected('incomes.purgeRemoved'),
+      purgeStale: unexpected('incomes.purgeStale'),
+      // No incomes is where every person starts (MOL-66).
+      list: () => Promise.resolve([]),
+      ...overrides.incomes,
     },
   }
 }

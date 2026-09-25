@@ -58,6 +58,21 @@ export interface Exchanges {
 }
 
 /**
+ * Whether the card of the rate has anything to say: an exchange, or a rate — or the reason there is
+ * none — that incomes alone made (MOL-66, adversarial Д1). Drams that came in with no exchange are
+ * a wallet a trip takes, and «no exchanges, trips take the central bank» above it was untrue, with
+ * the switch back to the bank hidden in the card that was not drawn.
+ */
+function hasOwnMoney(overview: ExchangesResponse): boolean {
+  return (
+    overview.exchanges.length > 0 ||
+    overview.wallet !== null ||
+    overview.walletUnknown !== null ||
+    overview.costs.length > 0
+  )
+}
+
+/**
  * «Обмен денег» as this phone sees it (MOL-40): the server's answer and nothing worked out here —
  * the wallet, the rate of each exchange and its difference from the central bank are all the
  * server's (CLAUDE.md, «No business logic on the frontend»).
@@ -108,7 +123,7 @@ export function useExchanges(): Exchanges {
 
   const phase = computed<ExchangesPhase>(() => {
     if (!actor.id) return 'idle'
-    if (overview.value) return overview.value.exchanges.length > 0 ? 'ready' : 'empty'
+    if (overview.value) return hasOwnMoney(overview.value) ? 'ready' : 'empty'
     return failure.value ?? 'loading'
   })
 

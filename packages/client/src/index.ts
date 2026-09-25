@@ -17,6 +17,9 @@ import {
   exchangeAmendBodySchema,
   exchangeBodySchema,
   exchangesResponseCodec,
+  incomeAmendBodySchema,
+  incomeBodySchema,
+  incomesResponseCodec,
   expensePatchSchema,
   finishTripBodySchema,
   tripHistoryCodec,
@@ -47,6 +50,9 @@ import type {
   ExchangeAmendBody,
   ExchangeBody,
   ExchangesResponse,
+  IncomeAmendBody,
+  IncomeBody,
+  IncomesResponse,
   ExpensePatch,
   TripHistory,
   TripHistoryCursor,
@@ -162,6 +168,26 @@ export interface MolviaClient {
   restoreExchange(id: string): Promise<ExchangesResponse>
   /** «Мой / Официальный» for trips from now on. */
   chooseRatePreference(preference: RatePreference): Promise<ExchangesResponse>
+  /**
+   * «Доходы» whole (MOL-66): the months with what came in per currency, and every income with its
+   * earlier versions — all the server's, so the screen adds up nothing.
+   */
+  incomes(): Promise<IncomesResponse>
+  /**
+   * «Записать доход». Named by the device, so safe to repeat: `created` is `false` for the same
+   * identifier again, `error.conflict` for it with anything else. A day after today in Yerevan
+   * rejects with `error.income_in_future`.
+   */
+  recordIncome(body: IncomeBody): Promise<{ incomes: IncomesResponse; created: boolean }>
+  /**
+   * «Сохранить правку»: safe to repeat; `error.conflict` when it was amended elsewhere in between,
+   * `error.not_found` when it is gone.
+   */
+  amendIncome(id: string, body: IncomeAmendBody): Promise<IncomesResponse>
+  /** Gone, whether it was there or not — the answer is the screen as it is now. */
+  removeIncome(id: string): Promise<IncomesResponse>
+  /** «Вернуть»: `error.not_found` once the removal is final. */
+  restoreIncome(id: string): Promise<IncomesResponse>
   /**
    * «Поставить оценку», or give it again — safe to repeat, which is what a draft sent when the
    * network is back needs. `created` is `true` for a first verdict, or one given after it was
@@ -393,6 +419,28 @@ export function createClient(options: ClientOptions): MolviaClient {
         method: 'PUT',
         body: encode(ratePreferenceBodySchema, { preference }),
       }),
+
+    incomes: () => request('/incomes', incomesResponseCodec),
+
+    recordIncome: async (body) => {
+      const { status, data } = await exchange('/incomes', incomesResponseCodec, {
+        method: 'POST',
+        body: encode(incomeBodySchema, body),
+      })
+      return { incomes: data, created: status === 201 }
+    },
+
+    amendIncome: async (id, body) =>
+      request(`/incomes/${segment(id)}`, incomesResponseCodec, {
+        method: 'PUT',
+        body: encode(incomeAmendBodySchema, body),
+      }),
+
+    removeIncome: async (id) =>
+      request(`/incomes/${segment(id)}`, incomesResponseCodec, { method: 'DELETE' }),
+
+    restoreIncome: async (id) =>
+      request(`/incomes/${segment(id)}/restore`, incomesResponseCodec, { method: 'POST' }),
 
     // 204 has no body, and nothing else is a success here.
     finishTrip: async (tripId, finishedOnDeviceAt) => {
