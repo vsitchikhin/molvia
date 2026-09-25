@@ -914,6 +914,7 @@ describe('the exchanges', () => {
     costs: [],
     heldEstimates: [{ held: { amount: '85000.00', currency: 'AMD' }, whole: true }],
     baseSince: null,
+    walletUnknown: null,
     exchanges: [],
   }
 

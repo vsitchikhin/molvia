@@ -137,6 +137,7 @@ describe('exchangesResponseCodec', () => {
     ],
     heldEstimates: [{ held: money(8_500_000n, 'AMD'), whole: true }],
     baseSince: '2026-09-01',
+    walletUnknown: null,
     exchanges: [
       {
         id: body.id,

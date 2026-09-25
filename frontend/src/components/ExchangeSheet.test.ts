@@ -37,6 +37,7 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
     costs: [],
     heldEstimates: [{ held: { minor: 2_000_000n, currency: 'AMD' }, whole: true }],
     baseSince: null,
+    walletUnknown: null,
     exchanges: [
       {
         id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d',

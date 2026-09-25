@@ -2,13 +2,13 @@ import {
   DomainError,
   ERROR,
   currencySchema,
-  currencyCosts,
   exchangeRateOf,
   heldEstimate,
+  isRateFresh,
   lastReceipt,
   officialDifference,
+  ownRates,
   pickOfficialRate,
-  walletRate,
   yerevanDate,
   yerevanMidnight,
 } from '@molvia/model'
@@ -37,18 +37,22 @@ const FOREIGN = currencySchema.options.filter(
   (currency): currency is AmdRate['currency'] => currency !== 'AMD',
 )
 
-/** The official rates cached on or before each of `days`, one query a day, all at once. */
+/** How many days of the cache are read at once: a long list must not take the whole pool (Ч-3). */
+const RATE_READS_AT_ONCE = 8
+
+/** The official rates cached on or before each of `days`, one query a day, a few at a time. */
 export async function officialRatesOn(
   { rates }: Pick<Repositories, 'rates'>,
   days: Iterable<string>,
 ): Promise<ReadonlyMap<string, readonly CachedRate[]>> {
-  return new Map(
-    await Promise.all(
-      [...new Set(days)].map(
-        async (day) => [day, await rates.latestOnOrBefore(FOREIGN, day)] as const,
-      ),
-    ),
-  )
+  const distinct = [...new Set(days)]
+  const cached = new Map<string, readonly CachedRate[]>()
+  for (let start = 0; start < distinct.length; start += RATE_READS_AT_ONCE) {
+    const batch = distinct.slice(start, start + RATE_READS_AT_ONCE)
+    const read = await Promise.all(batch.map((day) => rates.latestOnOrBefore(FOREIGN, day)))
+    batch.forEach((day, index) => cached.set(day, read[index] ?? []))
+  }
+  return cached
 }
 
 /**
@@ -62,13 +66,19 @@ function steadyOf(official: OfficialRate | null): ExchangeRate | null {
 
 /**
  * The official rate of `base` into a currency on an exchange's day, by the rule a trip started
- * that day would have used — what money of no known cost is valued at (MOL-42, В-1).
+ * that day would have used — what money of no known cost is valued at (MOL-42, В-1). Only a rate
+ * fresh for that day, as a trip's is (a Friday rate on Sunday): the rule for a trip falls back to
+ * the freshest it has and says `rateStale`, and here nothing would say it — an old number would
+ * turn an honest «unknown» into a confident «valued» (adversarial Ж3).
  */
 export function officialRateOf(
   cached: ReadonlyMap<string, readonly CachedRate[]>,
   base: Currency,
 ): OfficialRateOf {
-  return (currency, day) => steadyOf(pickOfficialRate(base, currency, cached.get(day) ?? [], day))
+  return (currency, day) => {
+    const rate = steadyOf(pickOfficialRate(base, currency, cached.get(day) ?? [], day))
+    return rate && isRateFresh(yerevanDate(rate.asOf), day) ? rate : null
+  }
 }
 
 /** The Yerevan day the currency of conversion changed on, or null when it never did. */
@@ -170,10 +180,13 @@ export async function exchangesOverview(
   const quote = owner.spendCurrency
   const pair = base === quote ? null : { base, quote }
   const baseSince = sinceDay(since)
-  const officialOf = officialRateOf(cached, base)
-  const wallet = pair ? walletRate(list, base, quote, today, officialOf, baseSince) : null
-  const costs = currencyCosts(list, base, today, officialOf, baseSince).filter(
-    ({ rate }) => rate.base !== quote,
+  const { wallet, costs, unknownAt } = ownRates(
+    list,
+    base,
+    quote,
+    today,
+    officialRateOf(cached, base),
+    baseSince,
   )
 
   const received = [...new Set(list.map((exchange) => exchange.received.currency))].filter(
@@ -195,7 +208,10 @@ export async function exchangesOverview(
     preference,
     pair,
     wallet,
-    costs,
+    costs: [...costs],
+    walletUnknown: unknownAt
+      ? { exchangedOn: unknownAt.exchangedOn, given: unknownAt.given.currency }
+      : null,
     heldEstimates: heldEstimates.filter((estimate) => estimate !== null),
     baseSince,
     exchanges: viewsOf(list, cached, history),

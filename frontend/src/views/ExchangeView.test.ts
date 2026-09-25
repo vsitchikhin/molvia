@@ -76,6 +76,7 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
     costs: [],
     heldEstimates: [],
     baseSince: null,
+    walletUnknown: null,
     exchanges: [row()],
     ...patch,
   }

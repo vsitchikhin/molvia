@@ -154,6 +154,14 @@ export const exchangesResponseCodec = z.strictObject({
    */
   costs: z.array(currencyCostCodec),
   /**
+   * Why there is no wallet although the spending currency came in by exchanges: the exchange its
+   * cost was lost on — money of no known price, with no official rate of that day to value it by.
+   * Null when there is a wallet, or nothing of the spending currency was ever received (С-4).
+   */
+  walletUnknown: z
+    .strictObject({ exchangedOn: exchangeDaySchema, given: currencySchema })
+    .nullable(),
+  /**
    * The hints for the next exchange into each currency but the one of conversion: what is left
    * by the recorded spending and exchanges, and whether that is everything held (`whole`) or only
    * the money of the last exchange, whose remainder before it was never said.

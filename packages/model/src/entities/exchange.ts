@@ -135,6 +135,15 @@ interface Cost {
 
 const ONE: Ratio = { quote: 1n, base: 1n }
 
+/**
+ * The denominator every link of the chain is brought to (MOL-42, Ж1, owner's decision 25.09.2026).
+ * Kept exact, the fraction grew by some ten digits a link — amounts like 20 000,00 and 95 000,00
+ * share almost no factors — and 800 exchanges held the event loop for seconds, the whole API with
+ * it. Eighteen digits against the six a rate is printed with: the error of a link never reaches
+ * the sixth digit, not in ten thousand links.
+ */
+const LINK_SCALE = 10n ** 18n
+
 function gcd(a: bigint, b: bigint): bigint {
   let [x, y] = [a, b]
   while (y !== 0n) [x, y] = [y, x % y]
@@ -144,6 +153,11 @@ function gcd(a: bigint, b: bigint): bigint {
 function reduced(quote: bigint, base: bigint): Ratio {
   const divisor = gcd(quote, base)
   return { quote: quote / divisor, base: base / divisor }
+}
+
+/** A link's ratio brought to `LINK_SCALE`, half-up — the one rounding inside the chain. */
+function bounded(ratio: Ratio): Ratio {
+  return reduced(divideRounded(ratio.quote * LINK_SCALE, ratio.base), LINK_SCALE)
 }
 
 /**
@@ -217,7 +231,9 @@ export function exchangeRateOf(exchange: Exchange): ExchangeRate | null {
  * taken from a source, never as zero. With no official rate either, the received currency's cost
  * is unknown until an exchange starts it afresh.
  *
- * Exact throughout — ratios of integers, reduced at every link — and rounded once, at the end.
+ * Ratios of integers, each link brought to eighteen digits (`LINK_SCALE`, Ж1) and the rate rounded
+ * to its six at the end. `lost` names, for a currency whose cost is unknown, the exchange it was
+ * lost on — what the screen says instead of «no exchanges» (review С-4).
  */
 function costsOf(
   exchanges: readonly Exchange[],
@@ -225,12 +241,13 @@ function costsOf(
   day: string,
   officialOf: OfficialRateOf,
   since: string | null,
-): Map<Currency, Cost | null> {
+): { costs: Map<Currency, Cost | null>; lost: Map<Currency, Exchange> } {
   const links = exchanges
     .filter(({ exchangedOn }) => exchangedOn <= day && (since === null || exchangedOn >= since))
     .sort(chronological)
 
   const costs = new Map<Currency, Cost | null>()
+  const lost = new Map<Currency, Exchange>()
   const paidWith = (
     currency: Currency,
     on: string,
@@ -254,15 +271,19 @@ function costsOf(
     const paid = paidWith(given.currency, link.exchangedOn)
     if (paid === null) {
       costs.set(received.currency, null)
+      lost.set(received.currency, link)
       continue
     }
+    lost.delete(received.currency)
     const previous = costs.get(received.currency) ?? null
     const held = link.heldBefore?.minor ?? null
     costs.set(
       received.currency,
       previous === null || held === null
         ? {
-            ratio: reduced(received.minor * paid.ratio.quote, given.minor * paid.ratio.base),
+            ratio: bounded(
+              reduced(received.minor * paid.ratio.quote, given.minor * paid.ratio.base),
+            ),
             basis: 'last',
             estimated: paid.estimated,
             day: link.exchangedOn,
@@ -270,11 +291,13 @@ function costsOf(
         : {
             // What was given is worth `given · paid.base / paid.quote` of the base, and the money
             // held `held · previous.base / previous.quote`: together, the cost of everything now
-            // held. Both fractions are brought to one denominator so nothing is rounded.
-            ratio: reduced(
-              (received.minor + held) * paid.ratio.quote * previous.ratio.quote,
-              given.minor * paid.ratio.base * previous.ratio.quote +
-                held * previous.ratio.base * paid.ratio.quote,
+            // held. Both fractions are brought to one denominator before the link is bounded.
+            ratio: bounded(
+              reduced(
+                (received.minor + held) * paid.ratio.quote * previous.ratio.quote,
+                given.minor * paid.ratio.base * previous.ratio.quote +
+                  held * previous.ratio.base * paid.ratio.quote,
+              ),
             ),
             basis: 'weighted',
             estimated: paid.estimated || previous.estimated,
@@ -282,7 +305,7 @@ function costsOf(
           },
     )
   }
-  return costs
+  return { costs, lost }
 }
 
 function costOf(cost: Cost, base: Currency, currency: Currency): CurrencyCost | null {
@@ -303,7 +326,11 @@ export function currencyCosts(
   officialOf: OfficialRateOf = noOfficialRate,
   since: string | null = null,
 ): CurrencyCost[] {
-  return [...costsOf(exchanges, base, day, officialOf, since)].flatMap(([currency, cost]) => {
+  return pricesOf(costsOf(exchanges, base, day, officialOf, since).costs, base)
+}
+
+function pricesOf(costs: ReadonlyMap<Currency, Cost | null>, base: Currency): CurrencyCost[] {
+  return [...costs].flatMap(([currency, cost]) => {
     if (!cost) return []
     const price = { quote: cost.ratio.base, base: cost.ratio.quote }
     const rate = rateOf(price, currency, base, cost.day)
@@ -326,8 +353,43 @@ export function walletRate(
   since: string | null = null,
 ): WalletRate | null {
   if (base === quote) return null
-  const cost = costsOf(exchanges, base, day, officialOf, since).get(quote)
+  const cost = costsOf(exchanges, base, day, officialOf, since).costs.get(quote)
   return cost ? costOf(cost, base, quote) : null
+}
+
+/** What «Обмен денег» shows of the person's own rates, from one walk of the chain. */
+export interface OwnRates {
+  /** The rate of `base` into `quote` a trip would take, or null. */
+  readonly wallet: WalletRate | null
+  /** The price of every other currency held by exchange, `quote` and `base` left out. */
+  readonly costs: readonly CurrencyCost[]
+  /**
+   * When `quote` has exchanges but no known cost: the exchange it was lost on — money of no known
+   * price and no official rate of its day to value it by (review С-4). The screen says that,
+   * rather than «no exchanges yet» above a list of them.
+   */
+  readonly unknownAt: Exchange | null
+}
+
+/**
+ * The wallet, the prices of the other currencies and why the wallet may be missing, walked once —
+ * the screen asked for the chain twice before (Ж1).
+ */
+export function ownRates(
+  exchanges: readonly Exchange[],
+  base: Currency,
+  quote: Currency,
+  day: string,
+  officialOf: OfficialRateOf = noOfficialRate,
+  since: string | null = null,
+): OwnRates {
+  const { costs, lost } = costsOf(exchanges, base, day, officialOf, since)
+  const cost = base === quote ? null : costs.get(quote)
+  return {
+    wallet: cost ? costOf(cost, base, quote) : null,
+    costs: pricesOf(costs, base).filter(({ rate }) => rate.base !== quote),
+    unknownAt: base === quote || cost ? null : (lost.get(quote) ?? null),
+  }
 }
 
 /**

@@ -9,6 +9,7 @@ import {
   isPlausibleExchange,
   lastReceipt,
   officialDifference,
+  ownRates,
   walletRate,
 } from '#model/entities/exchange'
 import type { Exchange, OfficialRateOf } from '#model/entities/exchange'
@@ -319,6 +320,52 @@ describe('walletRate through other currencies (MOL-42)', () => {
     expect(walletRate([euros, spent], 'EUR', 'AMD', '2026-09-30')?.rate.scaled).toBe(410_400_000n)
     expect(walletRate([spent], 'USD', 'AMD', '2026-09-30')?.rate.scaled).toBe(parseRate('380'))
     expect(walletRate([spent], 'AMD', 'AMD', '2026-09-30')).toBeNull()
+  })
+})
+
+describe('a long chain (Ж1)', () => {
+  it('stays fast however many links there are: each is bounded to eighteen digits', () => {
+    const chain = Array.from({ length: 2000 }, (_, index) => {
+      const day = new Date(Date.UTC(2020, 0, 2) + index * 86_400_000).toISOString().slice(0, 10)
+      return exchange(
+        `${String(20_000 + index)} RUB`,
+        `${String(95_000 + index * 7)} AMD`,
+        day,
+        '20000 AMD',
+      )
+    })
+    const started = performance.now()
+    const wallet = walletRate(chain, 'RUB', 'AMD', '2030-01-01')
+    expect(performance.now() - started).toBeLessThan(1000)
+    expect(wallet?.basis).toBe('weighted')
+  })
+
+  it('still gives the exact answers of short chains to the sixth digit', () => {
+    const third = exchange('10000 RUB', '47000 AMD', '2026-09-20', '30000 AMD')
+    expect(walletRate([first, second, third], 'RUB', 'AMD', '2026-09-30')?.rate.scaled).toBe(
+      4_735_294n,
+    )
+  })
+})
+
+describe('ownRates', () => {
+  it('walks once for the wallet and the prices, leaving the spending currency out of the prices', () => {
+    const rates = ownRates([dollars, drams], 'RUB', 'AMD', '2026-09-30')
+    expect(rates.wallet?.rate.scaled).toBe(4_060_187n)
+    expect(rates.costs.map(({ rate }) => rate.base)).toEqual(['USD'])
+    expect(rates.unknownAt).toBeNull()
+  })
+
+  it('names the exchange the cost was lost on, rather than «no exchanges» (С-4)', () => {
+    const airport = exchange('600 USD', '217200 AMD', '2026-09-05')
+    const rates = ownRates([first, airport], 'RUB', 'AMD', '2026-09-30')
+    expect(rates.wallet).toBeNull()
+    expect(rates.unknownAt).toBe(airport)
+    // An exchange that starts the cost afresh finds it again.
+    const next = exchange('20000 RUB', '95000 AMD', '2026-09-15')
+    expect(ownRates([first, airport, next], 'RUB', 'AMD', '2026-09-30').unknownAt).toBeNull()
+    // No exchange of the spending currency at all is not «lost».
+    expect(ownRates([dollars], 'RUB', 'AMD', '2026-09-30').unknownAt).toBeNull()
   })
 })
 

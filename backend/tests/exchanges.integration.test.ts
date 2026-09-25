@@ -78,6 +78,7 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       costs: [],
       heldEstimates: [],
       baseSince: null,
+      walletUnknown: null,
       exchanges: [],
     })
   })
@@ -747,7 +748,24 @@ describe('стоимость валют (MOL-42)', () => {
       exchangedOn: daysAgo(5),
     })
     expect(overview.wallet).toBeNull()
+    // Said as it is, not «no exchanges yet» above the list (С-4).
+    expect(overview.walletUnknown).toEqual({ exchangedOn: daysAgo(5), given: 'USD' })
     expect((await start(me)).rate?.source).toBe('official')
+  })
+
+  it('курс ЦБ давностью больше недели оценкой не служит: стоимость неизвестна (Ж3)', async () => {
+    await rates.upsert([rub('4.3123', daysAgo(70)), usd('363.44', daysAgo(70))])
+    const me = await owner()
+    const overview = await record(me, {
+      given: { amount: '600', currency: 'USD' },
+      received: { amount: '217200', currency: 'AMD' },
+      exchangedOn: daysAgo(5),
+    })
+    expect(overview.wallet).toBeNull()
+    expect(overview.walletUnknown).toMatchObject({ given: 'USD' })
+    const trip = await start(me)
+    expect(trip.rate?.source).toBe('official')
+    expect(trip.rateStale).toBe(true)
   })
 
   it('обратный обмен курс не двигает и уменьшает подсказку остатка', async () => {
