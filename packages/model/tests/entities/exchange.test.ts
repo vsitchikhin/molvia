@@ -300,17 +300,42 @@ describe('walletRate through other currencies (MOL-42)', () => {
     expect(walletRate([airport], 'RUB', 'AMD', '2026-09-30', foreign)).toBeNull()
   })
 
-  it('counts from the day the currency of conversion changed, and not a day before (В-2)', () => {
+  describe('after the currency of conversion changed (В-2)', () => {
+    // Counting in roubles until the 15th, in dollars since.
     const since = '2026-09-15'
-    // The rouble exchange of the 1st belongs to the old base and is not re-counted.
-    expect(walletRate([first], 'RUB', 'AMD', '2026-09-30', undefined, since)).toBeNull()
-    // The one of the day itself counts, and its remainder has no cost to weigh by.
-    expect(walletRate([first, second], 'RUB', 'AMD', '2026-09-30', undefined, since)).toMatchObject(
-      { basis: 'last', rate: { scaled: parseRate('4.75') } },
-    )
-    expect(walletRate([first, second], 'RUB', 'AMD', '2026-09-30', undefined, null)?.basis).toBe(
-      'weighted',
-    )
+    const roubles = exchange('20000 RUB', '100000 AMD', '2026-09-01')
+    const dollarsBefore = exchange('100 USD', '38000 AMD', '2026-09-05')
+    const roubleRate: OfficialRateOf = (currency, day) => ({
+      base: 'USD',
+      quote: currency,
+      scaled: parseRate('90'),
+      source: 'official',
+      asOf: yerevanMidnight(day),
+    })
+
+    it('leaves out what was paid in another currency before it, even with a rate to value it', () => {
+      expect(walletRate([roubles], 'USD', 'AMD', '2026-09-30', roubleRate, since)).toBeNull()
+      expect(walletRate([roubles], 'USD', 'AMD', '2026-09-30', roubleRate, null)).toMatchObject({
+        estimated: true,
+      })
+    })
+
+    it('counts what was paid in the new currency before it: nothing there needs re-counting (Л1)', () => {
+      const wallet = walletRate(
+        [roubles, dollarsBefore],
+        'USD',
+        'AMD',
+        '2026-09-30',
+        roubleRate,
+        since,
+      )
+      expect(wallet?.rate.scaled).toBe(parseRate('380'))
+      // And the next exchange weighs what was held by it: (36 150 + 38 000) / (100 + 100).
+      const later = exchange('100 USD', '36150 AMD', since, '38000 AMD')
+      expect(
+        walletRate([roubles, dollarsBefore, later], 'USD', 'AMD', '2026-09-30', roubleRate, since),
+      ).toMatchObject({ basis: 'weighted', rate: { scaled: parseRate('370.75') } })
+    })
   })
 
   it('works in any currency of conversion, through any currency', () => {

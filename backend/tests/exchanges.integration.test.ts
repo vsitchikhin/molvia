@@ -782,9 +782,18 @@ describe('стоимость валют (MOL-42)', () => {
     ])
   })
 
-  it('смена валюты пересчёта действует вперёд: прошлые обмены в новый курс не входят (В-2)', async () => {
+  it('смена валюты действует вперёд: прошлые рубли в долларовый курс не входят, прошлые доллары входят (В-2, Л1)', async () => {
+    // A rate to value the roubles by is there: they are left out by the change, not by its absence.
+    await rates.upsert([rub('4.3123', daysAgo(11)), usd('363.44', daysAgo(11))])
     const me = await owner()
-    await record(me, {})
+    // The default RUB, one exchange of roubles left over from home, then dollars.
+    await record(me, { exchangedOn: daysAgo(10) })
+    await record(me, {
+      given: { amount: '100', currency: 'USD' },
+      received: { amount: '38000', currency: 'AMD' },
+      heldBefore: { amount: '100000', currency: 'AMD' },
+      exchangedOn: daysAgo(3),
+    })
     const before = await tripContext(db, me.id)
     const settings = await app.inject({
       method: 'PUT',
@@ -794,25 +803,27 @@ describe('стоимость валют (MOL-42)', () => {
     })
     expect(settings.statusCode).toBe(200)
 
-    // A dollar exchange dated before the change belongs to the old reckoning too.
-    const earlier = await record(me, {
-      given: { amount: '100', currency: 'USD' },
-      received: { amount: '38000', currency: 'AMD' },
-      exchangedOn: daysAgo(3),
+    const read = await app.inject({
+      method: 'GET',
+      url: '/exchanges',
+      headers: { cookie: me.cookie },
     })
-    expect(earlier).toMatchObject({ pair: { base: 'USD', quote: 'AMD' }, baseSince: today })
-    expect(earlier.wallet).toBeNull()
-    expect(earlier.exchanges).toHaveLength(2)
+    const overview = overviewOf(read.json())
+    expect(overview).toMatchObject({ pair: { base: 'USD', quote: 'AMD' }, baseSince: today })
+    // The dollars count as they were paid; the roubles do not come back valued by the bank, so
+    // the drams held before the dollar exchange have no cost to weigh by.
+    expect(overview.wallet).toMatchObject({ basis: 'last', estimated: false })
+    expect(overview.wallet?.rate.scaled).toBe(parseRate('380'))
+    expect(overview.exchanges).toHaveLength(2)
 
     const after = await record(me, {
       given: { amount: '100', currency: 'USD' },
       received: { amount: '36150', currency: 'AMD' },
-      heldBefore: { amount: '100000', currency: 'AMD' },
+      heldBefore: { amount: '38000', currency: 'AMD' },
       exchangedOn: today,
     })
-    // The drams held were bought with roubles: no cost in dollars to weigh them by.
-    expect(after.wallet).toMatchObject({ basis: 'last', estimated: false })
-    expect(after.wallet?.rate.scaled).toBe(parseRate('361.5'))
+    expect(after.wallet).toMatchObject({ basis: 'weighted', estimated: false })
+    expect(after.wallet?.rate.scaled).toBe(parseRate('370.75'))
     expect((await start(me)).rate).toMatchObject({ source: 'personal', base: 'USD' })
   })
 })

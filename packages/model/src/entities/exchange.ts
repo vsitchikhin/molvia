@@ -139,8 +139,9 @@ const ONE: Ratio = { quote: 1n, base: 1n }
  * The denominator every link of the chain is brought to (MOL-42, Ж1, owner's decision 25.09.2026).
  * Kept exact, the fraction grew by some ten digits a link — amounts like 20 000,00 and 95 000,00
  * share almost no factors — and 800 exchanges held the event loop for seconds, the whole API with
- * it. Eighteen digits against the six a rate is printed with: the error of a link never reaches
- * the sixth digit, not in ten thousand links.
+ * it. Eighteen digits against the six a rate is printed with: the error stays some twelve orders
+ * below the sixth digit — which can still turn on an exact half, where any error decides the
+ * rounding (round 2, Л3): a chain may then print one unit of the sixth digit below the pair.
  */
 const LINK_SCALE = 10n ** 18n
 
@@ -211,9 +212,15 @@ export function exchangeRateOf(exchange: Exchange): ExchangeRate | null {
 }
 
 /**
- * What every currency cost in `base`, from the exchanges dated no later than `day` and no earlier
- * than `since` — the day `base` became the currency of conversion, or null when it always was
- * (MOL-42, В-2: a change of it works forwards, and nothing before it is re-counted in the new one).
+ * What every currency cost in `base`, from the exchanges dated no later than `day`.
+ *
+ * `since` is the day `base` became the currency of conversion, or null when it always was
+ * (MOL-42, В-2: a change of it works forwards). An exchange dated before it counts only when it
+ * was paid in `base` itself — dollars to drams, for someone who now counts in dollars, needs no
+ * re-counting at all. What was paid in anything else belonged to the old reckoning, and is not
+ * re-valued into the new one (review round 2, Л1): whether the old currency had been *chosen*
+ * or was only the default every account starts with, the rows cannot tell, and this rule does
+ * not need to know.
  *
  * One rule covers the pair, chains and reversals alike. `base` costs one. **Giving money away
  * moves nothing** — it takes money and its cost away in one proportion, as spending does — so an
@@ -243,7 +250,10 @@ function costsOf(
   since: string | null,
 ): { costs: Map<Currency, Cost | null>; lost: Map<Currency, Exchange> } {
   const links = exchanges
-    .filter(({ exchangedOn }) => exchangedOn <= day && (since === null || exchangedOn >= since))
+    .filter(
+      ({ exchangedOn, given }) =>
+        exchangedOn <= day && (since === null || exchangedOn >= since || given.currency === base),
+    )
     .sort(chronological)
 
   const costs = new Map<Currency, Cost | null>()

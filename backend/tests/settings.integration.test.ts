@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import { actorCodec, ERROR, settingsOf, tripViewCodec } from '@molvia/model'
 import type { ActorSettings } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { actors, exchanges, places } from '@/db/schema'
+import { actors, places } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
@@ -90,26 +90,12 @@ describe('settings and offline trip context', () => {
     expect((await save(first, settingsOf(winner), initial)).statusCode).toBe(200)
   })
 
-  async function exchanged(owner: string, given: 'RUB' | 'USD', deletedAt: Date | null = null) {
-    await db.insert(exchanges).values({
-      id: randomUUID(),
-      actorId: owner,
-      givenMinor: given === 'RUB' ? 2_000_000n : 10_000n,
-      givenCurrency: given,
-      receivedMinor: 3_800_000n,
-      receivedCurrency: 'AMD',
-      exchangedOn: '2026-09-01',
-      deletedAt,
-    })
-  }
-
   const sinceOf = async (owner: string) =>
     (await db.select().from(actors).where(eq(actors.id, owner)))[0]?.incomeCurrencySince ?? null
 
   it('remembers when the currency of conversion changed, and nothing else moves it (MOL-42, В-2)', async () => {
     const owner = await insertActor(db)
     const cookie = await signIn(db, owner)
-    await exchanged(owner, 'RUB')
     const since = () => sinceOf(owner)
 
     expect(await since()).toBeNull()
@@ -126,29 +112,11 @@ describe('settings and offline trip context', () => {
     expect((await save(cookie, moved, dollars)).statusCode).toBe(200)
     expect(await since()).toEqual(first)
 
-    // Back again with no dollar exchange in between: nothing was counted in dollars to protect.
-    expect((await save(cookie, dollars, moved)).statusCode).toBe(200)
-    expect(await since()).toEqual(first)
-
-    // Once dollars were exchanged, the latest change is the one that counts.
-    expect((await save(cookie, moved, dollars)).statusCode).toBe(200)
-    await exchanged(owner, 'USD')
+    // Back again: the latest change is the one that counts, exchanges or not — the screen names
+    // the day the current currency was chosen (round 2, Л2).
     expect((await save(cookie, dollars, moved)).statusCode).toBe(200)
     const second = await since()
     expect(second?.getTime()).toBeGreaterThan(first?.getTime() ?? Infinity)
-  })
-
-  it('a first choice over the default cuts nothing when the old currency was never exchanged (Ж2)', async () => {
-    const owner = await insertActor(db)
-    const cookie = await signIn(db, owner)
-    // Dollars to drams under the default RUB: roubles never came into it.
-    await exchanged(owner, 'USD')
-    // A removed rouble exchange is not one: it is going away.
-    await exchanged(owner, 'RUB', new Date())
-    expect((await save(cookie, initial, { ...initial, incomeCurrency: 'USD' })).statusCode).toBe(
-      200,
-    )
-    expect(await sinceOf(owner)).toBeNull()
   })
 
   it('requires a session and rejects unsupported new geography while preserving historical values', async () => {

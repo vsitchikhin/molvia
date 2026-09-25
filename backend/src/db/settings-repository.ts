@@ -2,7 +2,7 @@ import { and, eq, or, sql } from 'drizzle-orm'
 import { actorSchema } from '@molvia/model'
 import type { Actor, ActorSettings, SettingsUpdate } from '@molvia/model'
 import type { Conn } from './index'
-import { actors, exchanges } from './schema'
+import { actors } from './schema'
 
 export interface SettingsRepository {
   save(owner: string, input: SettingsUpdate): Promise<Actor | null>
@@ -27,22 +27,10 @@ export function createSettingsRepository(db: Conn): SettingsRepository {
         .set({
           ...settings,
           // The day the currency of conversion changed (MOL-42, В-2), decided by the row as it
-          // is: a retry of the same form finds the currency already there and moves nothing.
-          // And only when the old currency was ever in an exchange (review С-1, Ж2): the cut
-          // protects exchanges counted in it, and a first choice made over the default `RUB` by
-          // someone who never exchanged roubles has none — cutting there took their whole history.
-          incomeCurrencySince: sql`case
-            when ${actors.incomeCurrency} = ${settings.incomeCurrency}
-              then ${actors.incomeCurrencySince}
-            when exists (
-              select 1 from ${exchanges}
-              where ${exchanges.actorId} = ${actors.id}
-                and ${exchanges.deletedAt} is null
-                and ${actors.incomeCurrency} in (${exchanges.givenCurrency}, ${exchanges.receivedCurrency})
-            )
-              then clock_timestamp()
-            else ${actors.incomeCurrencySince}
-          end`,
+          // is: a retry of the same form finds the currency already there and moves nothing. Every
+          // change sets it — the wallet decides what the day cuts: only exchanges paid in another
+          // currency before it (round 2, Л1, Л2).
+          incomeCurrencySince: sql`case when ${actors.incomeCurrency} = ${settings.incomeCurrency} then ${actors.incomeCurrencySince} else clock_timestamp() end`,
         })
         .where(and(eq(actors.id, owner), or(matches(previous), matches(settings))))
         .returning()

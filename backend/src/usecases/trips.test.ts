@@ -536,15 +536,11 @@ describe('startTrip: the person’s own rate (MOL-40)', () => {
     expect((await startedWith(tomorrow)).snapshot?.rate.source).toBe('official')
   })
 
-  it('counts only exchanges from the day the currency of conversion changed (MOL-42, В-2)', async () => {
-    // Changed on the 10th in Yerevan: the exchange of the 1st is the old reckoning's.
+  it('after a change of the currency of conversion, counts exchanges paid in it from before (MOL-42, Л1)', async () => {
+    // Roubles were chosen on the 10th; the rouble exchange of the 1st needs no re-counting in them.
     const since = new Date('2026-09-10T06:00:00.000Z')
     const { snapshot } = await startedWith(owners, 'personal', actor, sunday, since)
-    expect(snapshot?.rate.scaled).toBe(parseRate('4.75'))
-    const later = new Date('2026-09-16T06:00:00.000Z')
-    expect(
-      (await startedWith(owners, 'personal', actor, sunday, later)).snapshot?.rate.source,
-    ).toBe('official')
+    expect(snapshot?.rate.scaled).toBe(4_791_667n)
   })
 
   it('does not cut a trip started with the currency of conversion before the change (Р-8)', async () => {
