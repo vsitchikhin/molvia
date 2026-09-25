@@ -177,16 +177,6 @@ export const useLoginStore = defineStore('login', () => {
     return actor.id === null
   })
 
-  /**
-   * **Можно ли что-то отправлять.** Показывать приложение и писать в него — разные права
-   * (адверсариальный Б1). Пока сервер не ответил, «кто мы» берётся из имени ящика на
-   * устройстве, а оно ничего не знает про cookie: в случае, когда сессия пришла мимо скрипта,
-   * ящик — прежнего владельца, а cookie — постороннего, и отложенные на `401` записи уходили
-   * в чужой аккаунт при первом же `onMounted(send)`. Ждать здесь ничего не стоит: очереди и
-   * так ждут сети, а ответ про личность — один заход.
-   */
-  const trusted = computed(() => actor.state === 'ready' && !blocked.value)
-
   const phase = computed<LoginPhase>(() => {
     if (actor.state === 'idle' || actor.state === 'loading' || rechecking.value) return 'loading'
     if (failure.value) return failure.value
@@ -400,7 +390,6 @@ export const useLoginStore = defineStore('login', () => {
     phase,
     blocked,
     closed,
-    trusted,
     starting,
     failure,
     request,

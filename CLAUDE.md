@@ -1096,8 +1096,13 @@ the round trip through Telegram, and ask whose account this turned out to be.
   and in the one case where the two disagree (a session that arrived without the script seeing
   it) a rating held back on a `401` went out into a stranger's account at the first
   `onMounted(send)`. So **the queue and the drafts send only once the server has said who we
-  are**: the rule sits in `flush()` of both, where neither `App.vue` nor the queue's own
-  «the owner changed» path can walk around it. Nothing is lost by waiting — a queue waits for
+  are**: the rule sits in `flush()` of both, and **only** there — `App.vue` gives the occasion
+  and no second opinion. A gate there as well looked harmless and took away the queue's own
+  «the server is silent, try again later»: that timer is set by `flush`, and `flush` was never
+  reached (adversarial Г1). The occasion is every settling of the identity, «error» included,
+  which is what starts the doubling retry — and the retry asks about the identity first, waiting
+  for that answer, because `start()` sets «loading» synchronously and a `flush` in the same tick
+  saw no error left to schedule the next attempt from. Nothing is lost by waiting — a queue waits for
   the network anyway, and the answer is one round trip — **but the screen is told**, in the same
   words a failed attempt would have used: silence there left «Отправляем оценку…» standing
   forever at a shelf with no signal, which is the product's main scenario (adversarial В1).

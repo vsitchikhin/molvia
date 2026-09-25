@@ -515,13 +515,21 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function retryLater(): void {
     if (!navigator.onLine) return
     clearTimeout(retry)
-    retry = setTimeout(() => {
-      // Сервер молчал — спрашиваем и о личности: без её ответа отправка всё равно не пойдёт,
-      // а осевшая личность сама позовёт отправку из `App.vue` (MOL-56, В1).
-      if (actor.state === 'error') void actor.retry()
-      void flush()
-    }, retryDelay)
+    retry = setTimeout(() => void attempt(), retryDelay)
     retryDelay = Math.min(retryDelay * 2, RETRY_LAST_MS)
+  }
+
+  /**
+   * Один заход повтора: сперва спросить о личности, если сервер молчал, и только потом пробовать
+   * отправку — без ответа `me()` она всё равно не пойдёт (MOL-56, Б1).
+   *
+   * **`await` здесь держит цепочку** (адверсариальный Г1): `start()` синхронно ставит
+   * `loading`, и `flush()` в том же тике видел уже не `error`, а значит не заводил следующего
+   * таймера. Повтор случался ровно один раз, без обещанного удвоения.
+   */
+  async function attempt(): Promise<void> {
+    if (actor.state === 'error') await actor.retry()
+    await flush()
   }
 
   let running: Promise<void> | null = null

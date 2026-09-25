@@ -19,6 +19,7 @@ import TabBar from '@/components/TabBar.vue'
 import LoginView from '@/views/LoginView.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
+import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
@@ -29,6 +30,7 @@ export default defineComponent({
   name: 'AppRoot',
   components: { LoginView, TabBar },
   setup() {
+    const actor = useActorStore()
     const login = useLoginStore()
 
     // Whether the app is shown at all, or the login screen instead. The rule lives in the login
@@ -38,28 +40,24 @@ export default defineComponent({
     // The app, not a screen, sends what waits on the phone, whichever screen is open when the
     // connection is back: purchases written at the shelf (MOL-24) and saved ratings (MOL-28).
     //
-    // **Only once the server has said who we are and the person has said it is them.** An open
-    // door is not enough: while the first `me()` is still in flight the app is drawn from the
-    // drawer's name, and a drawer says nothing about the cookie — that is how a rating held back
-    // on a `401` went out into a stranger's account (adversarial Б1). Nothing is lost by
-    // waiting: a queue waits for the network anyway, and the answer is one round trip.
+    // **Whether it may actually go out is each queue's own to decide**, and it is decided in
+    // their `flush()`: only once the server has said who we are, because until then the app is
+    // drawn from the drawer's name and a drawer says nothing about the cookie — that is how a
+    // rating held back on a `401` went out into a stranger's account (adversarial Б1). Here is
+    // only the occasion, and a gate here as well would be a second place that decides: it took
+    // away the queue's own «the server is silent, try again later», because that timer is set by
+    // `flush` and `flush` was never reached (adversarial Г1).
     const queue = useTripQueueStore()
     const drafts = useVerdictDraftsStore()
     const send = () => {
-      if (!login.trusted) return
       void queue.flush()
       void drafts.flush()
     }
     onMounted(send)
     useReconnect(send)
-    // The other moment worth sending: what the queue held on a `401` has been waiting for
-    // exactly this (MOL-24, `HOLDS`).
-    watch(
-      () => login.trusted,
-      (may) => {
-        if (may) send()
-      },
-    )
+    // Every settling of the identity is an occasion: «ready» is what the queue held on a `401`
+    // has been waiting for (MOL-24, `HOLDS`), and «error» is what starts its doubling retry.
+    watch(() => actor.state, send)
 
     return { closed, route: useRoute(), announcements: provideAnnouncer() }
   },

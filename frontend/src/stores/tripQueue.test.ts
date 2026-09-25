@@ -32,8 +32,10 @@ const removeExpense = vi.fn<(tripId: string, expenseId: string) => Promise<TripV
 const startTrip = vi.fn<(body: StartTripBody) => Promise<{ trip: TripView; created: boolean }>>()
 const finishTrip = vi.fn<(tripId: string, at?: Date) => Promise<void>>()
 const currentTrip = vi.fn<() => Promise<TripView | null>>()
+const me = vi.fn<() => Promise<never>>()
 vi.mock('@/api', () => ({
   api: {
+    me: () => me(),
     addExpense: (tripId: string, body: AddExpenseBody) => addExpense(tripId, body),
     updateExpense: (tripId: string, expenseId: string, patch: ExpensePatch) =>
       updateExpense(tripId, expenseId, patch),
@@ -265,7 +267,33 @@ describe('trip queue', () => {
     startTrip.mockReset()
     finishTrip.mockReset()
     currentTrip.mockReset()
+    me.mockReset()
     vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  it('Г1: молчащий сервер пробуется снова и снова, с удвоением, и переспрашивает личность', async () => {
+    // Портал магазина: `onLine` всё время `true`, `online` не приходит вовсе, и без своего
+    // повтора покупка ждала бы возвращения во вкладку. Первая версия цепочки обрывалась на
+    // первом заходе: `start()` синхронно ставит `loading`, и `flush` уже не видел `error`.
+    vi.useFakeTimers()
+    const queue = fresh()
+    const actor = useActorStore()
+    actor.state = 'error'
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    queue.enqueue(add(MILK))
+
+    await queue.flush()
+    expect(addExpense).not.toHaveBeenCalled()
+
+    // Не один заход, а цепочка: пауза удваивается, поэтому считаем заходы, а не их часы.
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(me.mock.calls.length).toBeGreaterThanOrEqual(3)
+
+    // Портал отпустил: личность оседает, и покупка уходит сама.
+    actor.state = 'ready'
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(addExpense).toHaveBeenCalled()
   })
 
   it('sends a write and hands the answer to the trip', async () => {
