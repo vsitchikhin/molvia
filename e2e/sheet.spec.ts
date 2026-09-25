@@ -156,6 +156,20 @@ test.describe('the sheet', () => {
     expect(await openerTop(page)).toBe(underSheet)
   })
 
+  // `overflow: hidden` stops a finger, not the platform: the iOS keyboard for a field in the sheet
+  // may move the window. Once the router no longer scrolled on the way out, nothing moved it back
+  // (adversarial В2). Moved here by hand — Chromium has no such keyboard.
+  test('the list is put back when the window moved under the sheet', async ({ page }) => {
+    const { top } = await openSheet(page)
+    const before = await scrollY(page)
+    await page.evaluate(() => {
+      window.scrollBy(0, -600)
+    })
+    expect(await scrollY(page)).toBe(before - 600)
+    await page.goBack()
+    await expectPutAway(page, top)
+  })
+
   // One entry laid, one taken: the «back» after a closed sheet leaves the screen for the trip
   // laid under it, instead of «closing» a sheet that is already gone.
   test('«back» after it closed leaves the screen', async ({ page }) => {
