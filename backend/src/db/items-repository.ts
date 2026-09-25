@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
-import { itemSchema, nameIdentity, toSearchKey } from '@molvia/model'
+import { itemSchema, nameIdentity, synonymKeys, toSearchKey } from '@molvia/model'
 import type { Item, NewItem } from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
@@ -120,15 +120,36 @@ function toItem(row: ItemRow, barcodes: readonly string[]): Item {
  * statement and not a copy that could drift from it.
  */
 export function rankedCandidates(key: string, limit: number, actorId: string | null): SQL {
+  // What else each word of the query stands for (MOL-45): «картошка» is also «картофель». Two
+  // parallel lists rather than an array parameter — words of a key never hold a space.
+  const synonyms = key
+    .split(' ')
+    .flatMap((word, index) => synonymKeys(word).map((synonym) => [synonym, index + 1] as const))
+  const synonymWords = synonyms.map(([synonym]) => synonym).join(' ')
+  const synonymOf = synonyms.map(([, n]) => n).join(' ')
+  // A synonym counts only as a whole word of a name, so its candidates are the names that
+  // contain it, not those that merely resemble it: `%>` at 0.15 brought in half of 20 000
+  // names for each of the eight fish of «рыба» and took six seconds. `like` is served by the
+  // same trigram index, one condition per word. The words are letters only (the dictionary's
+  // test), so nothing in them is a wildcard.
+  const bySynonym = [...new Set(synonyms.map(([synonym]) => synonym))].map(
+    (synonym) => sql` or ${items.searchKey} like ${`%${synonym}%`}`,
+  )
+
   return sql`
     with query_words as (
       -- Cut to 255 here, once: levenshtein refuses longer arguments, and the prefix arm below
       -- cuts the name to the length of the query word, not to 255.
-      select left(word, 255) as q,
+      select n, left(word, 255) as q,
              length(word) >= ${SHORT_WORD} and word !~ '[0-9]' as grounds,
              word ~ '[^0-9]' as lettered,
              n = max(n) over () as last
       from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
+    ),
+    synonyms as (
+      select s.word, s.n
+      from unnest(string_to_array(${synonymWords}, ' '),
+                  string_to_array(${synonymOf}, ' ')::int[]) as s(word, n)
     ),
     candidates as (
       -- The column goes first, and that is not style: \`search_key %> $1\` is the only form
@@ -139,9 +160,13 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       -- \`m m s\`), which has no word to ground a match by distance.
       select ${items.id} as id,
              ${items.searchKey} as search_key,
-             word_similarity(${key}, ${items.searchKey}) as ws
+             word_similarity(${key}, ${items.searchKey}) as ws,
+             -- Found by what was typed, not only by a synonym. The typed word's edit budget
+             -- applies to these alone: a name brought in by «лори» for «сыр» is no candidate
+             -- of «сыр», and measured against it anyway, «Рис» passed as two edits from \`sir\`.
+             (${items.searchKey} %> ${key} or ${items.searchKey} = ${key}) as typed
       from ${items}
-      where ${items.searchKey} %> ${key} or ${items.searchKey} = ${key}
+      where ${items.searchKey} %> ${key} or ${items.searchKey} = ${key}${sql.join(bySynonym)}
       -- Every candidate is ranked, with no ceiling. Any cut here is wrong in one of two ways:
       -- ordered by similarity it drops the typo the low threshold exists for (two hundred
       -- «Малина» pushed out the milk), unordered it drops by row age — the newest items, the
@@ -168,10 +193,24 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                from unnest(string_to_array(c.search_key, ' ')) as w
                -- A grounding word is measured against grounding words only: against «л» or
                -- «1» of a size every two-letter word is two edits away, inside the budget.
-               where not qw.grounds or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]')
-             ) as qd
+               where c.typed
+                 and (not qw.grounds or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]'))
+             ) as qd_typed,
+             -- A synonym is a word, not a typo: it counts only as a whole word of the name, and
+             -- then costs nothing. With the edit budget on top, «мясо» expanded into five
+             -- words would have five chances of the absolute budget's false hits (MOL-46).
+             case when exists (
+                    select 1
+                    from synonyms s
+                    join unnest(string_to_array(c.search_key, ' ')) as w(word) on w.word = s.word
+                    where s.n = qw.n
+                  ) then 0 end as qd_synonym
       from candidates c
       cross join query_words qw
+    ),
+    per_word_best as (
+      -- \`least\` skips a null, so a word found only by its synonym is still found.
+      select id, grounds, lettered, least(qd_typed, qd_synonym) as qd from per_word
     ),
     ranked as (
       select c.id, c.ws,
@@ -190,7 +229,7 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                   when bool_or(pw.lettered) and max(coalesce(pw.qd, 255)) = 0 then 0
              end as distance
       from candidates c
-      join per_word pw on pw.id = c.id
+      join per_word_best pw on pw.id = c.id
       group by c.id, c.ws, c.search_key
     ),
     remembered as (

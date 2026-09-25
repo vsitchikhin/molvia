@@ -542,6 +542,80 @@ describe('search — the items it returns', () => {
   })
 })
 
+describe('search — a word the shelf writes otherwise (MOL-45)', () => {
+  it("finds the shelf's word by the person's: «картошка» → «Картофель»", async () => {
+    await named('Картофель')
+    await named('Картофельное пюре')
+    // Whole words only: the purée carries `kartofelnoe`, which no synonym is equal to.
+    expect(await names('картошка')).toEqual(['Картофель'])
+  })
+
+  it('expands a word typed in Latin as the Cyrillic one', async () => {
+    await named('Картофель')
+    expect(await names('kartoshka')).toEqual(['Картофель'])
+  })
+
+  it('expands one word of several, and the rest still count', async () => {
+    await named('Картофель молодой 1 кг')
+    await named('Картофель 2 кг')
+    expect(await names('картошка 1 кг')).toEqual(['Картофель молодой 1 кг', 'Картофель 2 кг'])
+  })
+
+  it('puts the word the person typed above its synonym at the same distance', async () => {
+    await named('Белизна 1 л')
+    await named('Отбеливатель Vanish 450 мл')
+    expect(await names('отбеливатель')).toEqual(['Отбеливатель Vanish 450 мл', 'Белизна 1 л'])
+  })
+
+  it('goes from the wider word to the narrower, never back', async () => {
+    await named('Арахис солёный 150 г')
+    await named('Фисташки жареные 100 г')
+    expect(await names('орешки')).toHaveLength(2)
+    expect(await names('арахис')).toEqual(['Арахис солёный 150 г'])
+  })
+
+  it('looks a word up exactly: «белки» is one edit from «булки» and finds no buns', async () => {
+    await named('Булочки с кунжутом 4 шт')
+    expect(await names('булки')).toEqual(['Булочки с кунжутом 4 шт'])
+    expect(await names('белки')).toEqual([])
+  })
+
+  it('does not expand a typo in the synonym itself — the price, named', async () => {
+    await named('Картофель')
+    expect(await names('картошак')).toEqual([])
+  })
+
+  it('does not lend the typed word its budget over a name only a synonym brought in', async () => {
+    // «лори» brings «Рис» in as a candidate; measured against the typed «сыр», `ris` is two
+    // edits from `sir` and used to pass. A candidate of the synonym is judged by the synonym.
+    await named('Рис длиннозёрный 900 г')
+    await named('Сыр лори')
+    expect(await names('сыр')).toEqual(['Сыр лори'])
+  })
+
+  it("lifts a pick made on the person's word: memory keeps working on top", async () => {
+    const actorId = await insertActor(db)
+    await named('Картофель')
+    const young = await named('Картофель молодой')
+    await createSearchPickRepository(db).remember(actorId, 'картошка', young)
+    const found = (await repo.search('картошка', 20, actorId)).map((item) => item.name)
+    expect(found).toEqual(['Картофель молодой', 'Картофель'])
+  })
+
+  it('reaches the index for every synonym, with no Seq Scan over the items', async () => {
+    await named('Арахис солёный 150 г')
+    const plan = await db.transaction(async (tx) => {
+      await tx.execute(raw`set local enable_seqscan = off`)
+      return tx.execute<{ 'QUERY PLAN': string }>(
+        raw`explain ${rankedCandidates(toSearchKey('орешки'), 10, nobody)}`,
+      )
+    })
+    const text = plan.map((row) => row['QUERY PLAN']).join('\n')
+    expect(text).toContain('items_search_key_trgm_idx')
+    expect(text).not.toMatch(/Seq Scan on items/)
+  })
+})
+
 describe('search — what the person took before (MOL-11)', () => {
   const picks = createSearchPickRepository(db)
 
