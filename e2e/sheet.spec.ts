@@ -51,6 +51,11 @@ async function settled(page: Page): Promise<void> {
 async function openSheet(page: Page): Promise<{ top: number; length: number }> {
   await open(page, '/_kit')
   await expect(heading(page)).toHaveText('Kit')
+  // The scene is set before the measure: a face arriving later rewraps the lines between the
+  // browser's anchor and the opener, and moves the opener by a pixel for no fault of the sheet.
+  await page.evaluate(async () => {
+    await document.fonts.ready
+  })
   await opener(page).scrollIntoViewIfNeeded()
   expect(await scrollY(page)).toBeGreaterThan(200)
   const top = await openerTop(page)
