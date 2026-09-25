@@ -373,6 +373,7 @@
       "held_hint": "Optional. With it the rate accounts for what the money left over cost; without it the rate of this exchange is taken",
       "held_estimate": "By the recorded spending ≈ {amount}",
       "held_estimate_last": "Of the last exchange ≈ {amount} is left by the recorded spending",
+      "held_estimate_last_income": "Of the last income ≈ {amount} is left by the recorded spending",
       "note": "Where, and a note",
       "note_placeholder": "Say, «VTB cash machine» or «from memory»",
       "bad_note": "There is nothing here to keep — write at least a word or leave the field empty",

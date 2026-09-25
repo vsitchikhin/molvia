@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { INT8_MAX } from '#model/support/decimal'
 import { ERROR, ISSUE } from '#model/support/errors'
 import { heldEstimate, lastReceipt, ownRates, walletRate } from '#model/entities/exchange'
 import type { Exchange, OfficialRateOf } from '#model/entities/exchange'
-import { incomeSchema } from '#model/entities/income'
+import { incomeMonths, incomeSchema } from '#model/entities/income'
 import type { Income, IncomeSource } from '#model/entities/income'
 import { money } from '#model/values/money'
 import type { Currency } from '#model/values/money'
@@ -195,13 +196,31 @@ describe('the hint with incomes (Р-8)', () => {
       whole: false,
     })
   })
+})
 
-  it('adds what came in after the last exchange', () => {
-    const salary = income('200000 AMD', '2026-09-20')
-    const dollars = income('500 USD', '2026-09-21')
-    // 95 000 + 20 000 held + 200 000 that came in − 30 000 spent; the dollars are no drams.
-    expect(heldEstimate([first, second, salary, dollars], second, 3_000_000n)?.held).toEqual(
-      money(28_500_000n, 'AMD'),
-    )
+describe('incomeMonths (В-2)', () => {
+  it('groups by the month of the day, newest first, and sums each currency apart', () => {
+    const brought = income('35195 RUB', '2026-08-25', null, 'brought')
+    const dollars = income('500 USD', '2026-08-25', null, 'freelance')
+    const august = income('102345 RUB', '2026-08-31')
+    const september = income('99615 RUB', '2026-09-15')
+    expect(incomeMonths([brought, september, august, dollars])).toEqual([
+      { month: '2026-09', sums: [money(9_961_500n, 'RUB')], incomes: [september] },
+      {
+        month: '2026-08',
+        sums: [money(13_754_000n, 'RUB'), money(50_000n, 'USD')],
+        // One day and one moment: the later name first, so the order never depends on the input.
+        incomes: [august, dollars, brought],
+      },
+    ])
+  })
+
+  it('is empty without incomes, and leaves out a sum no money can hold, not the rows', () => {
+    expect(incomeMonths([])).toEqual([])
+    const huge = { ...income('1 RUB', '2026-09-01'), amount: money(INT8_MAX, 'RUB') }
+    const more = income('1 RUB', '2026-09-02')
+    const [month] = incomeMonths([huge, more])
+    expect(month?.sums).toEqual([])
+    expect(month?.incomes).toHaveLength(2)
   })
 })

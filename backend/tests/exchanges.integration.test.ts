@@ -114,7 +114,9 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       },
       costs: [],
       // Nothing spent since: what the last exchange left, and nothing else is known.
-      heldEstimates: [{ held: { amount: '115000.00', currency: 'AMD' }, whole: true }],
+      heldEstimates: [
+        { held: { amount: '115000.00', currency: 'AMD' }, whole: true, from: 'exchange' },
+      ],
     })
     const list = overviewOf(second.json()).exchanges
     expect(list.map((exchange) => exchange.exchangedOn)).toEqual([daysAgo(2), daysAgo(10)])
@@ -783,7 +785,7 @@ describe('стоимость валют (MOL-42)', () => {
     })
     expect(overview.wallet?.rate.scaled).toBe(parseRate('5'))
     expect(overview.heldEstimates).toEqual([
-      { held: { minor: 9_000_000n, currency: 'AMD' }, whole: false },
+      { held: { minor: 9_000_000n, currency: 'AMD' }, whole: false, from: 'exchange' },
     ])
   })
 

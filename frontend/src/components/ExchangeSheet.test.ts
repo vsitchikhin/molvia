@@ -62,7 +62,9 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
       estimated: false,
     },
     costs: [],
-    heldEstimates: [{ held: { minor: 2_000_000n, currency: 'AMD' }, whole: true }],
+    heldEstimates: [
+      { held: { minor: 2_000_000n, currency: 'AMD' }, whole: true, from: 'exchange' },
+    ],
     baseSince: null,
     walletUnknown: null,
     receipts: receiptsOf(exchanges),
@@ -257,11 +259,24 @@ describe('ExchangeSheet', () => {
   it('says the hint is about the last exchange alone when what was there before it is unknown', async () => {
     const view = await render(
       overview({
-        heldEstimates: [{ held: { minor: 7_000_000n, currency: 'AMD' }, whole: false }],
+        heldEstimates: [
+          { held: { minor: 7_000_000n, currency: 'AMD' }, whole: false, from: 'exchange' },
+        ],
       }),
     )
     expect(view.text()).toContain('Of the last exchange ≈')
     expect(view.text()).toContain('70,000.00')
+  })
+
+  it('names an income when the hint starts from one (MOL-66, Р-8)', async () => {
+    const view = await render(
+      overview({
+        heldEstimates: [
+          { held: { minor: 7_000_000n, currency: 'AMD' }, whole: false, from: 'income' },
+        ],
+      }),
+    )
+    expect(view.text()).toContain('Of the last income ≈')
   })
 
   it('refuses a cleared day under the field, not as a lost connection (Б2)', async () => {

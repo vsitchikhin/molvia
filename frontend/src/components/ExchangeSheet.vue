@@ -272,9 +272,13 @@ export default defineComponent({
       const latest = into(currencies.received).at(0)?.on
       if (!hint || !asksHeld.value || (latest !== undefined && day.value < latest)) return null
       const amount = formatMoney(hint.held, locale.value)
-      return hint.whole
-        ? t('exchange.sheet.held_estimate', { amount })
-        : t('exchange.sheet.held_estimate_last', { amount })
+      if (hint.whole) return t('exchange.sheet.held_estimate', { amount })
+      return t(
+        hint.from === 'income'
+          ? 'exchange.sheet.held_estimate_last_income'
+          : 'exchange.sheet.held_estimate_last',
+        { amount },
+      )
     })
 
     /**

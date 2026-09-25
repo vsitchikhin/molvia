@@ -142,6 +142,18 @@ export const receiptCodec = z.strictObject({
 })
 export type ReceiptView = z.output<typeof receiptCodec>
 
+/**
+ * A hint for «сколько было до»: what is left of a currency by the recorded spending and exchanges,
+ * whether that is everything held (`whole`) or only the money of the last receipt, whose remainder
+ * before it was never said — and whether that receipt was an exchange or an income (MOL-66), so the
+ * sheet names the right one.
+ */
+export const heldEstimateCodec = z.strictObject({
+  held: moneyCodec,
+  whole: z.boolean(),
+  from: z.enum(['exchange', 'income']),
+})
+
 const currencyCostCodec = z.strictObject({
   rate: rateCodec,
   basis: walletBasisSchema,
@@ -188,7 +200,7 @@ export const exchangesResponseCodec = z.strictObject({
    * by the recorded spending and exchanges, and whether that is everything held (`whole`) or only
    * the money of the last exchange, whose remainder before it was never said.
    */
-  heldEstimates: z.array(z.strictObject({ held: moneyCodec, whole: z.boolean() })),
+  heldEstimates: z.array(heldEstimateCodec),
   /**
    * The day the currency of conversion last changed, or null if it never did: the wallet counts
    * exchanges from that day on, and the ones before it stand in the list as they were (В-2).

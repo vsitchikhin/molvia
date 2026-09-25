@@ -25,15 +25,17 @@ import type {
   ExchangeRevision,
   ExchangeView,
   ExchangesResponse,
+  Income,
   OfficialRate,
   OfficialRateOf,
+  OwnRates,
   RatePreference,
   Receipt,
   ReceiptView,
 } from '@molvia/model'
 import type { TripRepositories } from '@/db/unit-of-work'
 
-type Repositories = Pick<TripRepositories, 'exchanges' | 'rates'>
+type Repositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
 type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
 
 const FOREIGN = currencySchema.options.filter(
@@ -175,70 +177,113 @@ function spentFrom(receipt: Receipt): Date {
   return receipt.createdAt < endOfDay ? receipt.createdAt : endOfDay
 }
 
+/** What «Обмен денег» and «Доходы» are both built from — see `ownMoney`. */
+interface OwnMoney {
+  readonly preference: RatePreference
+  readonly base: Currency
+  readonly quote: Currency
+  readonly baseSince: string | null
+  readonly exchanges: readonly Exchange[]
+  readonly incomes: readonly Income[]
+  readonly cached: ReadonlyMap<string, readonly CachedRate[]>
+  readonly rates: OwnRates
+  readonly heldEstimates: ExchangesResponse['heldEstimates']
+  readonly receipts: readonly ReceiptView[]
+}
+
+/**
+ * The person's own money as of today, walked once for either screen (MOL-66): the exchanges and
+ * incomes, the official rates of their days, the rates they make, what each currency is likely
+ * still held at, and every exchange and income with whether it gave its currency a price.
+ *
+ * The cache of official rates is read once for every day of an exchange and of an income in a
+ * currency that needs valuing: the same rows compare each exchange with the bank and value money
+ * whose cost nobody named.
+ */
+export async function ownMoney(
+  repositories: Repositories,
+  owner: Owner,
+  now: Date = new Date(),
+): Promise<OwnMoney> {
+  const { exchanges, incomes } = repositories
+  const today = yerevanDate(now)
+  const base = owner.incomeCurrency
+  const quote = owner.spendCurrency
+  const [{ preference, since }, list, received] = await Promise.all([
+    exchanges.rateSettings(owner.id),
+    exchanges.list(owner.id),
+    incomes.list(owner.id),
+  ])
+  const cached = await officialRatesOn(repositories, [
+    ...list.map(({ exchangedOn }) => exchangedOn),
+    ...received
+      .filter(({ amount }) => amount.currency !== base)
+      .map(({ receivedOn }) => receivedOn),
+  ])
+
+  const receipts: Receipt[] = [...list, ...received]
+  const baseSince = sinceDay(since)
+  const rates = ownRates(receipts, base, quote, today, officialRateOf(cached, base), baseSince)
+
+  const currencies = [
+    ...new Set(
+      receipts.map((receipt) =>
+        'given' in receipt ? receipt.received.currency : receipt.amount.currency,
+      ),
+    ),
+  ].filter((currency) => currency !== base)
+  const heldEstimates = await Promise.all(
+    currencies.map(async (currency) => {
+      const last = lastReceipt(receipts, currency, today)
+      if (!last) return null
+      const spent = await exchanges.spentSince(owner.id, currency, spentFrom(last))
+      const estimate = heldEstimate(receipts, last, spent)
+      if (!estimate) return null
+      const from: 'exchange' | 'income' = 'given' in last ? 'exchange' : 'income'
+      return { ...estimate, from }
+    }),
+  )
+
+  return {
+    preference,
+    base,
+    quote,
+    baseSince,
+    exchanges: list,
+    incomes: received,
+    cached,
+    rates,
+    heldEstimates: heldEstimates.filter((estimate) => estimate !== null),
+    receipts: receiptsOf(receipts, rates.priced),
+  }
+}
+
 /**
  * «Обмен денег» whole (MOL-40, MOL-42): the preference, the pair a trip started today would convert
- * by, the wallet of that pair and the cost of every other currency held by exchange as of today,
- * the hints for the next exchange into each currency, and every exchange, newest first. Everything
- * a figure on the screen is comes from here — the phone divides nothing.
- *
- * The cache of official rates is read once for every day of the list: the same rows compare each
- * exchange with the bank and value money whose cost nobody named.
+ * by, the wallet of that pair and the cost of every other currency held as of today, the hints for
+ * the next exchange into each currency, and every exchange, newest first. Everything a figure on
+ * the screen is comes from here — the phone divides nothing.
  */
 export async function exchangesOverview(
   repositories: Repositories,
   owner: Owner,
   now: Date = new Date(),
 ): Promise<ExchangesResponse> {
-  const { exchanges } = repositories
-  const today = yerevanDate(now)
-  const [{ preference, since }, list, history] = await Promise.all([
-    exchanges.rateSettings(owner.id),
-    exchanges.list(owner.id),
-    exchanges.history(owner.id),
+  const [money, history] = await Promise.all([
+    ownMoney(repositories, owner, now),
+    repositories.exchanges.history(owner.id),
   ])
-  const cached = await officialRatesOn(
-    repositories,
-    list.map(({ exchangedOn }) => exchangedOn),
-  )
-
-  const base = owner.incomeCurrency
-  const quote = owner.spendCurrency
-  const pair = base === quote ? null : { base, quote }
-  const baseSince = sinceDay(since)
-  const { wallet, costs, unknownAt, priced } = ownRates(
-    list,
-    base,
-    quote,
-    today,
-    officialRateOf(cached, base),
-    baseSince,
-  )
-
-  const received = [...new Set(list.map((exchange) => exchange.received.currency))].filter(
-    (currency) => currency !== base,
-  )
-  const heldEstimates = await Promise.all(
-    received.map(async (currency) => {
-      const last = lastReceipt(list, currency, today)
-      if (!last) return null
-      return heldEstimate(
-        list,
-        last,
-        await exchanges.spentSince(owner.id, currency, spentFrom(last)),
-      )
-    }),
-  )
-
+  const { base, quote, rates } = money
   return {
-    preference,
-    pair,
-    wallet,
-    costs: [...costs],
-    walletUnknown: unknownAt,
-    heldEstimates: heldEstimates.filter((estimate) => estimate !== null),
-    baseSince,
-    exchanges: viewsOf(list, cached, history),
-    receipts: receiptsOf(list, priced),
+    preference: money.preference,
+    pair: base === quote ? null : { base, quote },
+    wallet: rates.wallet,
+    costs: [...rates.costs],
+    walletUnknown: rates.unknownAt,
+    heldEstimates: money.heldEstimates,
+    baseSince: money.baseSince,
+    exchanges: viewsOf(money.exchanges, money.cached, history),
+    receipts: [...money.receipts],
   }
 }
 

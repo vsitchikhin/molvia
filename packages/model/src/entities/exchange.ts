@@ -532,10 +532,10 @@ export function receiptDay(receipt: Receipt): string {
 
 /**
  * A hint for «сколько было до обмена» (MOL-40, Р-7, Р-13; MOL-42, Р-3): what the last money into a
- * currency left, less what was spent in it since and less what later exchanges gave of it — a
- * reversal and dollars handed over for drams take money away as a purchase does — and plus what
- * later incomes brought (MOL-66, Р-8). A hint and not a fact — purchases without a price and money
- * spent outside a trip are not in it, so the screen says «по записанным тратам».
+ * currency left — an exchange or an income (MOL-66, Р-8) — less what was spent in it since and less
+ * what later exchanges gave of it: a reversal and dollars handed over for drams take money away as
+ * a purchase does. A hint and not a fact — purchases without a price and money spent outside a trip
+ * are not in it, so the screen says «по записанным тратам».
  *
  * `whole` says whether it counts everything held: when the last money in did not say what was
  * there before it, the hint is about that money alone and the screen says so — the unknown
@@ -549,14 +549,11 @@ export function heldEstimate(
 ): { readonly held: Money; readonly whole: boolean } | null {
   const from = linkOf(last)
   const currency = from.received.currency
-  const later = receipts.map(linkOf).filter((link) => chronological(link, from) > 0)
-  const givenAfter = later
-    .filter(({ given }) => given?.currency === currency)
+  const givenAfter = receipts
+    .map(linkOf)
+    .filter((link) => link.given?.currency === currency && chronological(link, from) > 0)
     .reduce((sum, { given }) => sum + (given?.minor ?? 0n), 0n)
-  const cameAfter = later
-    .filter(({ given, received }) => given === null && received.currency === currency)
-    .reduce((sum, { received }) => sum + received.minor, 0n)
-  const held = from.received.minor + (from.heldBefore?.minor ?? 0n) + cameAfter - spent - givenAfter
+  const held = from.received.minor + (from.heldBefore?.minor ?? 0n) - spent - givenAfter
   if (held > INT8_MAX) return null
   return {
     held: { minor: held > 0n ? held : 0n, currency },

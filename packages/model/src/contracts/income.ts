@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { positiveMoneyCodec, receiptCodec } from './exchange'
+import { heldEstimateCodec, positiveMoneyCodec, receiptCodec } from './exchange'
 import { deviceIdSchema, isoDate } from './trip'
 import { exchangeDaySchema, exchangeNoteSchema } from '#model/entities/exchange'
 import { incomeSourceSchema } from '#model/entities/income'
@@ -90,6 +90,6 @@ export const incomesResponseCodec = z.strictObject({
     }),
   ),
   receipts: z.array(receiptCodec),
-  heldEstimates: z.array(z.strictObject({ held: moneyCodec, whole: z.boolean() })),
+  heldEstimates: z.array(heldEstimateCodec),
 })
 export type IncomesResponse = z.output<typeof incomesResponseCodec>

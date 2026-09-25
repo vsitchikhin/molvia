@@ -135,7 +135,7 @@ describe('exchangesResponseCodec', () => {
         estimated: true,
       },
     ],
-    heldEstimates: [{ held: money(8_500_000n, 'AMD'), whole: true }],
+    heldEstimates: [{ held: money(8_500_000n, 'AMD'), whole: true, from: 'exchange' }],
     baseSince: '2026-09-01',
     walletUnknown: null,
     exchanges: [
