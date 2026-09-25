@@ -64,7 +64,6 @@ function row(patch: Partial<Row> = {}): Row {
       difference: { minor: 875_400n, currency: 'AMD' },
     },
     officialDoubtful: false,
-    priced: true,
     ...patch,
   }
 }
@@ -79,6 +78,7 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
     baseSince: null,
     walletUnknown: null,
     exchanges: [row()],
+    receipts: [],
     ...patch,
   }
 }
@@ -245,7 +245,7 @@ describe('ExchangeView: the rate and the list', () => {
     exchanges.mockResolvedValue(
       overview({
         wallet: null,
-        walletUnknown: { exchangedOn: '2026-08-25', given: 'USD', reason: 'noRate' },
+        walletUnknown: { on: '2026-08-25', given: 'USD', reason: 'noRate' },
       }),
     )
     const view = await render()
@@ -253,12 +253,31 @@ describe('ExchangeView: the rate and the list', () => {
     expect(view.text()).not.toContain('exchanges yet')
   })
 
+  it('names an income the rate was lost on, and the income a rate was taken from (MOL-66)', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        wallet: null,
+        walletUnknown: { on: '2026-09-20', given: null, reason: 'noRate' },
+      }),
+    )
+    const lost = await render()
+    expect(lost.text()).toContain('Rate unknown: the ֏ income of')
+    lost.unmount()
+
+    exchanges.mockResolvedValue(
+      overview({ wallet: { rate: rate('4.3', '2026-09-20'), basis: 'income', estimated: true } }),
+    )
+    const taken = await render()
+    expect(taken.text()).toContain('by the last income')
+    expect(taken.text()).toContain('days of exchanges and incomes')
+  })
+
   it('names the old reckoning as the reason, not a missing bank rate (Н1)', async () => {
     exchanges.mockResolvedValue(
       overview({
         wallet: null,
         baseSince: '2026-09-25',
-        walletUnknown: { exchangedOn: '2026-09-05', given: 'EUR', reason: 'oldReckoning' },
+        walletUnknown: { on: '2026-09-05', given: 'EUR', reason: 'oldReckoning' },
       }),
     )
     const view = await render()

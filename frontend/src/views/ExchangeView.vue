@@ -65,32 +65,14 @@
           <template v-if="overview.wallet">
             <p class="figure">{{ rateOf(overview.wallet.rate) }}</p>
             <p class="meta">
-              {{
-                t(
-                  overview.wallet.basis === 'weighted'
-                    ? 'exchange.basis_weighted'
-                    : 'exchange.basis_last',
-                  { date: dayOf(overview.wallet.rate.asOf) },
-                )
-              }}
+              {{ t(basisKey(overview.wallet.basis), { date: dayOf(overview.wallet.rate.asOf) }) }}
             </p>
             <p v-if="overview.wallet.estimated" class="meta">{{ t('exchange.estimated') }}</p>
           </template>
           <!-- Exchanges of the spending currency are there, its cost is not: the words say why, not
                «no exchanges yet» above a list of them (review С-4). -->
           <p v-else-if="overview.pair && overview.walletUnknown" class="meta">
-            {{
-              t(
-                overview.walletUnknown.reason === 'oldReckoning'
-                  ? 'exchange.wallet_old_reckoning'
-                  : 'exchange.wallet_unknown',
-                {
-                  given: currencySignOf(overview.walletUnknown.given),
-                  ...pairSigns(overview.pair),
-                  date: dayOf(midnightOf(overview.walletUnknown.exchangedOn)),
-                },
-              )
-            }}
+            {{ unknownLineOf(overview.walletUnknown, overview.pair) }}
           </p>
           <p v-else-if="overview.pair" class="meta">
             {{ t('exchange.no_wallet', pairSigns(overview.pair)) }}
@@ -200,7 +182,9 @@ import type {
   ExchangeAmendBody,
   ExchangeRate,
   ExchangeView as Row,
+  ExchangesResponse,
   RatePreference,
+  WalletBasis,
 } from '@molvia/model'
 import IconCheck from '~icons/mdi/check-bold'
 import IconCloud from '~icons/mdi/cloud-off-outline'
@@ -369,14 +353,37 @@ export default defineComponent({
       return t(bank ? 'exchange.row_equal' : 'exchange.row_equal_other', words)
     }
 
+    /** Which money the rate was last taken from — an exchange or an income (MOL-66, Р-9). */
+    function basisKey(basis: WalletBasis): string {
+      if (basis === 'weighted') return 'exchange.basis_weighted'
+      return basis === 'income' ? 'exchange.basis_income' : 'exchange.basis_last'
+    }
+
+    /** Why there is no rate: the link it was lost on — an income gave nothing, so names no «given». */
+    function unknownLineOf(
+      unknown: NonNullable<ExchangesResponse['walletUnknown']>,
+      pair: NonNullable<ExchangesResponse['pair']>,
+    ): string {
+      const words = { ...pairSigns(pair), date: dayOf(midnightOf(unknown.on)) }
+      const old = unknown.reason === 'oldReckoning'
+      if (unknown.given === null) {
+        return t(
+          old ? 'exchange.wallet_old_reckoning_income' : 'exchange.wallet_unknown_income',
+          words,
+        )
+      }
+      return t(old ? 'exchange.wallet_old_reckoning' : 'exchange.wallet_unknown', {
+        ...words,
+        given: currencySign(unknown.given, locale.value),
+      })
+    }
+
     /** «$: 89,04 ₽/$ · по последнему обмену · с 31 авг.» — and whether the bank priced part of it. */
     function costLineOf(cost: CurrencyCost): string {
       const words = {
         currency: currencySign(cost.rate.base, locale.value),
         rate: rateOf(cost.rate),
-        basis: t(cost.basis === 'weighted' ? 'exchange.basis_weighted' : 'exchange.basis_last', {
-          date: dayOf(cost.rate.asOf),
-        }),
+        basis: t(basisKey(cost.basis), { date: dayOf(cost.rate.asOf) }),
       }
       return t(cost.estimated ? 'exchange.cost_line_estimated' : 'exchange.cost_line', words)
     }
@@ -409,6 +416,8 @@ export default defineComponent({
       currencySignOf: (currency: Currency) => currencySign(currency, locale.value),
       pairSigns,
       costLineOf,
+      basisKey,
+      unknownLineOf,
       rateLineOf,
       amountsOf,
       comparisonOf,

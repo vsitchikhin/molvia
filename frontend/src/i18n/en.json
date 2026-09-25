@@ -305,13 +305,16 @@
     "my_rate": "My rate",
     "basis_weighted": "average of what is left · since {date}",
     "basis_last": "by the last exchange · since {date}",
-    "estimated": "part of it at the Central Bank of Armenia rate of the exchange days: what that money cost was never recorded",
+    "basis_income": "by the last income · since {date}",
+    "estimated": "part of it at the Central Bank of Armenia rate of the days of exchanges and incomes: what that money cost was never recorded",
     "base_since": "Counting in {base} since {date} — earlier exchanges in another currency are not in the rate and stay as they were",
     "cost_line": "{currency}: {rate} · {basis}",
     "cost_line_estimated": "{currency}: {rate} · {basis} · part at the Central Bank of Armenia rate",
     "no_wallet": "No {base} → {quote} exchanges yet — new trips count by the Central Bank of Armenia rate",
     "wallet_unknown": "Rate unknown: the {given} → {quote} exchange of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New trips count by the Central Bank of Armenia rate until you record an exchange of a known price",
     "wallet_old_reckoning": "Rate unknown: the {quote} bought on {date} with {given} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New trips count by the Central Bank of Armenia rate until you record an exchange paid in {base}",
+    "wallet_unknown_income": "Rate unknown: the {quote} income of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New trips count by the Central Bank of Armenia rate until you record an exchange of a known price",
+    "wallet_old_reckoning_income": "Rate unknown: the {quote} received on {date} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New trips count by the Central Bank of Armenia rate until you record an exchange paid in {base}",
     "preference_legend": "New trips count",
     "preference_personal": "by my rate",
     "preference_official": "by the central bank rate",
@@ -507,7 +510,8 @@
     "login_rate_limited": "Too many login requests. Try again in a minute",
     "login_disabled": "Telegram sign-in is not configured yet",
     "bot_unauthorized": "The bot could not authenticate",
-    "exchange_in_future": "An exchange cannot be dated in the future"
+    "exchange_in_future": "An exchange cannot be dated in the future",
+    "income_in_future": "An income cannot be dated in the future"
   },
   "settings": {
     "title": "Settings",

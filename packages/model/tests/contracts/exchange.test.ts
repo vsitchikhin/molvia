@@ -165,9 +165,9 @@ describe('exchangesResponseCodec', () => {
           difference: money(875_400n, 'AMD'),
         },
         officialDoubtful: false,
-        priced: true,
       },
     ],
+    receipts: [{ id: body.id, currency: 'AMD', on: '2026-09-15', priced: true }],
   }
 
   it('crosses the wire and comes back the same', () => {

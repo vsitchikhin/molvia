@@ -20,7 +20,33 @@ const record = vi.fn<(body: ExchangeBody) => Promise<unknown>>()
 const amend =
   vi.fn<(id: string, body: ExchangeAmendBody) => Promise<'saved' | 'conflict' | 'gone'>>()
 
+/** The money into each currency as the server would list it: every exchange here gave a price. */
+function receiptsOf(exchanges: readonly ExchangeView[]): ExchangesResponse['receipts'] {
+  return exchanges.map(({ id, received, exchangedOn }) => ({
+    id,
+    currency: received.currency,
+    on: exchangedOn,
+    priced: true,
+  }))
+}
+
 function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
+  const exchanges: ExchangeView[] = patch.exchanges ?? [
+    {
+      id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d',
+      exchangedOn: '2026-09-01',
+      given: { minor: 2_000_000n, currency: 'RUB' },
+      received: { minor: 10_000_000n, currency: 'AMD' },
+      heldBefore: null,
+      note: null,
+      revision: 1,
+      amendedAt: null,
+      history: [],
+      rate: null,
+      official: null,
+      officialDoubtful: false,
+    },
+  ]
   return {
     preference: 'personal',
     pair: { base: 'RUB', quote: 'AMD' },
@@ -39,24 +65,9 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
     heldEstimates: [{ held: { minor: 2_000_000n, currency: 'AMD' }, whole: true }],
     baseSince: null,
     walletUnknown: null,
-    exchanges: [
-      {
-        id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d',
-        exchangedOn: '2026-09-01',
-        given: { minor: 2_000_000n, currency: 'RUB' },
-        received: { minor: 10_000_000n, currency: 'AMD' },
-        heldBefore: null,
-        note: null,
-        revision: 1,
-        amendedAt: null,
-        history: [],
-        rate: null,
-        official: null,
-        officialDoubtful: false,
-        priced: true,
-      },
-    ],
+    receipts: receiptsOf(exchanges),
     ...patch,
+    exchanges,
   }
 }
 
@@ -143,6 +154,14 @@ describe('ExchangeSheet', () => {
     expect(view.emitted('update:open')?.at(-1)).toEqual([false])
   })
 
+  it('asks by an income that gave the currency a price, as by an exchange (MOL-66)', async () => {
+    const income = { id: '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c2d', currency: 'AMD' as const }
+    const view = await render(
+      overview({ exchanges: [], receipts: [{ ...income, on: '2026-09-01', priced: true }] }),
+    )
+    expect(view.text()).toContain('held before the exchange')
+  })
+
   it('asks what was held only from the second exchange of the pair, and hints at it', async () => {
     const first = await render(overview({ wallet: null, heldEstimates: [], exchanges: [] }))
     expect(first.text()).not.toContain('held before the exchange')
@@ -187,13 +206,20 @@ describe('ExchangeSheet', () => {
     const [base] = overview().exchanges
     if (!base) throw new Error('the fixture has an exchange')
     // A link of the old reckoning: the wallet does not count it, so nothing held is weighed.
-    const left = await render(overview({ exchanges: [{ ...base, priced: false }] }))
+    const [receipt] = receiptsOf([base])
+    if (!receipt) throw new Error('the fixture has a receipt')
+    const left = await render(overview({ receipts: [{ ...receipt, priced: false }] }))
     expect(left.text()).not.toContain('held before the exchange')
     left.unmount()
 
     // One that took the cost away after a priced one: it is the latest that decides (Н2).
     const later = { ...base, id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5e', exchangedOn: '2026-09-05' }
-    const taken = await render(overview({ exchanges: [{ ...later, priced: false }, base] }))
+    const taken = await render(
+      overview({
+        exchanges: [later, base],
+        receipts: [{ ...receipt, id: later.id, on: later.exchangedOn, priced: false }, receipt],
+      }),
+    )
     expect(taken.text()).not.toContain('held before the exchange')
     // Dated between them, the next exchange follows the priced one.
     await field(taken, en.exchange.sheet.day).get('input').setValue('2026-09-03')

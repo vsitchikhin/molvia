@@ -80,6 +80,7 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       baseSince: null,
       walletUnknown: null,
       exchanges: [],
+      receipts: [],
     })
   })
 
@@ -750,7 +751,7 @@ describe('стоимость валют (MOL-42)', () => {
     expect(overview.wallet).toBeNull()
     // Said as it is, not «no exchanges yet» above the list (С-4).
     expect(overview.walletUnknown).toEqual({
-      exchangedOn: daysAgo(5),
+      on: daysAgo(5),
       given: 'USD',
       reason: 'noRate',
     })
@@ -878,7 +879,7 @@ describe('смена валюты пересчёта: старый счёт и �
     })
     expect(overviewOf(read.json())).toMatchObject({
       wallet: null,
-      walletUnknown: { exchangedOn: daysAgo(10), given: 'RUB', reason: 'oldReckoning' },
+      walletUnknown: { on: daysAgo(10), given: 'RUB', reason: 'oldReckoning' },
     })
 
     // Everything held, the rouble drams too — what the sheet's hint says.
@@ -889,7 +890,7 @@ describe('смена валюты пересчёта: старый счёт и �
       exchangedOn: today,
     })
     expect(overview.wallet).toMatchObject({ basis: 'last', rate: { scaled: parseRate('361.5') } })
-    const byDay = new Map(overview.exchanges.map((row) => [row.exchangedOn, row.priced]))
+    const byDay = new Map(overview.receipts.map((row) => [row.on, row.priced]))
     expect(byDay).toEqual(
       new Map([
         [today, true],
@@ -919,7 +920,7 @@ describe('смена валюты пересчёта: старый счёт и �
     })
     const overview = overviewOf(read.json())
     expect(overview.wallet).toMatchObject({ estimated: false, rate: { scaled: 410_400_000n } })
-    expect(overview.exchanges.every((row) => row.priced)).toBe(true)
+    expect(overview.receipts.every((row) => row.priced)).toBe(true)
   })
 })
 

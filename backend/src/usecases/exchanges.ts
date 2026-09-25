@@ -9,6 +9,7 @@ import {
   officialDifference,
   ownRates,
   pickOfficialRate,
+  receiptDay,
   yerevanDate,
   yerevanMidnight,
 } from '@molvia/model'
@@ -27,6 +28,8 @@ import type {
   OfficialRate,
   OfficialRateOf,
   RatePreference,
+  Receipt,
+  ReceiptView,
 } from '@molvia/model'
 import type { TripRepositories } from '@/db/unit-of-work'
 
@@ -95,7 +98,6 @@ function viewsOf(
   exchanges: readonly Exchange[],
   cached: ReadonlyMap<string, readonly CachedRate[]>,
   history: ReadonlyMap<string, readonly ExchangeRevision[]>,
-  priced: ReadonlySet<string>,
 ): ExchangeView[] {
   return [...exchanges].reverse().map((exchange): ExchangeView => {
     const { given, received, exchangedOn } = exchange
@@ -126,7 +128,6 @@ function viewsOf(
           replacedAt,
         }),
       ),
-      priced: priced.has(exchange.id),
       rate: exchangeRateOf(exchange),
       official:
         official && measure && difference
@@ -135,6 +136,28 @@ function viewsOf(
       officialDoubtful: !!official?.jumped && !measure,
     }
   })
+}
+
+/**
+ * Every exchange and income, newest first, with whether it gave its currency a price — what the
+ * sheets ask «сколько было до» by (MOL-66). The order is the walk's, turned round.
+ */
+export function receiptsOf(
+  receipts: readonly Receipt[],
+  priced: ReadonlySet<string>,
+): ReceiptView[] {
+  return [...receipts]
+    .sort((a, b) => {
+      const [dayA, dayB] = [receiptDay(a), receiptDay(b)]
+      if (dayA !== dayB) return dayA < dayB ? 1 : -1
+      return b.createdAt.getTime() - a.createdAt.getTime()
+    })
+    .map((receipt) => ({
+      id: receipt.id,
+      currency: 'given' in receipt ? receipt.received.currency : receipt.amount.currency,
+      on: receiptDay(receipt),
+      priced: priced.has(receipt.id),
+    }))
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -147,9 +170,9 @@ const DAY_MS = 24 * 60 * 60 * 1000
  * and counting only from the record lost all of it (round 2, В3). What was bought later on the day
  * of such an exchange is lost instead: the day has no hours to tell before from after.
  */
-function spentFrom(exchange: Exchange): Date {
-  const endOfDay = new Date(yerevanMidnight(exchange.exchangedOn).getTime() + DAY_MS)
-  return exchange.createdAt < endOfDay ? exchange.createdAt : endOfDay
+function spentFrom(receipt: Receipt): Date {
+  const endOfDay = new Date(yerevanMidnight(receiptDay(receipt)).getTime() + DAY_MS)
+  return receipt.createdAt < endOfDay ? receipt.createdAt : endOfDay
 }
 
 /**
@@ -211,16 +234,11 @@ export async function exchangesOverview(
     pair,
     wallet,
     costs: [...costs],
-    walletUnknown: unknownAt
-      ? {
-          exchangedOn: unknownAt.exchange.exchangedOn,
-          given: unknownAt.exchange.given.currency,
-          reason: unknownAt.reason,
-        }
-      : null,
+    walletUnknown: unknownAt,
     heldEstimates: heldEstimates.filter((estimate) => estimate !== null),
     baseSince,
-    exchanges: viewsOf(list, cached, history, priced),
+    exchanges: viewsOf(list, cached, history),
+    receipts: receiptsOf(list, priced),
   }
 }
 
