@@ -44,6 +44,7 @@ import { createItemRepository } from '@/db/items-repository'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
+import { describeFailure } from '@/db/failure'
 import { authTransactOn } from '@/db/auth-unit-of-work'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
@@ -86,17 +87,6 @@ function answer(response: ErrorResponse): ErrorResponse {
  */
 function isBodyFault(error: FastifyError): boolean {
   return typeof error.code === 'string' && error.code.startsWith('FST_ERR_CTP_')
-}
-
-/**
- * The driver's code behind a failure — a SQLSTATE such as `23505`, or `CONNECTION_ENDED` — and
- * nothing else of it: without this every 500 of a login reads as the one word `Error`, and the
- * message beside it is exactly what carries the query's parameters.
- */
-function failureCode(error: Error): string | undefined {
-  const cause: unknown = error.cause
-  const code = typeof cause === 'object' && cause !== null && 'code' in cause ? cause.code : null
-  return typeof code === 'string' && /^[\dA-Z_]{1,64}$/.test(code) ? code : undefined
 }
 
 /**
@@ -171,7 +161,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           .send({ code: ISSUE.PATH_INVALID })
         return
       }
-      app.log.error({ errorName: error.name }, 'request refused by the framework')
+      app.log.error(describeFailure(error), 'request refused by the framework')
       void reply.status(500).send({ code: ERROR.INTERNAL })
     },
   })
@@ -183,6 +173,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   app.addHook('onRequest', (request, reply, next) => {
     if (isAuthRequest(request)) void reply.header('cache-control', 'no-store')
     next()
+  })
+
+  // Fastify's own 404 writes `Route GET:/path?q=… not found` into the log and into the body,
+  // past the request serializer: an old client or a mistyped path would log the query the
+  // serializer keeps out (MOL-58). The body keeps Fastify's shape — a code the client does not
+  // know is how it reads «the API has no such address» — but no longer carries the address.
+  app.setNotFoundHandler((_request, reply) => {
+    void reply.status(404).send({ message: 'Route not found', error: 'Not Found', statusCode: 404 })
   })
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
@@ -214,12 +212,15 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       return reply.status(400).send(answer({ code, ...(details ? { details } : {}) }))
     }
 
-    // Driver errors can carry SQL parameters; an auth failure must never log credentials.
-    if (isAuthRequest(request)) {
-      app.log.error({ errorName: error.name, code: failureCode(error) }, 'authentication failed')
-    } else {
-      app.log.error(error)
-    }
+    // By its kind and never by its content, on every path (MOL-58). This was the rule for the
+    // login's paths alone, and everything else logged the error whole: a driver's message is
+    // the query with its parameters, so a failed search wrote what was searched for and who
+    // asked, and a dropped connection wrote the hash of every session token in flight — into a
+    // log the privacy page promises holds neither.
+    app.log.error(
+      describeFailure(error),
+      isAuthRequest(request) ? 'authentication failed' : 'request failed',
+    )
     return reply.status(error.statusCode ?? 500).send({ code: ERROR.INTERNAL })
   })
 

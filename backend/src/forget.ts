@@ -1,5 +1,6 @@
 import { telegramUserIdSchema } from '@molvia/model'
 import type { ErasureReport, ErasureRepository } from '@/db/erasure-repository'
+import { describeFailure } from '@/db/failure'
 import { ERASED_TABLES } from '@/db/erasure-repository'
 
 export const FORGET_USAGE = 'usage: forget <telegram-user-id> [--yes]'
@@ -36,7 +37,10 @@ export async function forget(
   try {
     report = await erasure.erase(id.data, { dryRun })
   } catch (error) {
-    write(`erasure failed, nothing changed: ${error instanceof Error ? error.message : 'unknown'}`)
+    // The kind of failure and never its message: a driver's message is the query with its
+    // parameters — the very uuid this output promises to keep out of the scrollback.
+    const failure = describeFailure(error)
+    write(`erasure failed, nothing changed: ${failure.code ?? failure.errorName}`)
     return 1
   }
 

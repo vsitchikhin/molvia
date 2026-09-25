@@ -1,6 +1,6 @@
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import { ERROR } from '@molvia/model'
+import { ERROR, SESSION_COOKIE } from '@molvia/model'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { telegramId } from './fixtures'
@@ -62,4 +62,26 @@ it('erasure through the bot logs no Telegram id when the database fails either (
   expect(response.statusCode).toBe(500)
   expect(lines.join('')).not.toContain(String(account))
   expect(lines.join('')).not.toMatch(/Failed query|telegram_user_id|params/i)
+})
+
+// Adversarial О-1: off the login's paths a failure used to be logged whole — the driver's
+// message is the query with its parameters, here the hash of the session token in flight.
+it('any other request that fails logs its kind and where, never the query or its parameters', async () => {
+  lines.length = 0
+  const token = randomBytes(32).toString('base64url')
+  const response = await app.inject({
+    method: 'GET',
+    url: '/trips/current',
+    headers: { cookie: `${SESSION_COOKIE}=${token}` },
+  })
+  expect(response.statusCode).toBe(500)
+
+  const log = lines.join('')
+  expect(log).not.toContain(createHash('sha256').update(token).digest('hex'))
+  expect(log).not.toMatch(/Failed query|token_hash|params/i)
+  const failure = lines
+    .map((line) => JSON.parse(line) as { msg?: string; errorName?: string; frames?: unknown })
+    .find((entry) => entry.msg === 'request failed')
+  expect(failure?.errorName).toBeTruthy()
+  expect(Array.isArray(failure?.frames)).toBe(true)
 })

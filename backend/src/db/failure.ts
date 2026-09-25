@@ -54,3 +54,41 @@ export async function translateFailures<T>(run: () => Promise<T>): Promise<T> {
     throw error
   }
 }
+
+/** What a failure may say about itself in a log or a terminal: its kind, never its content. */
+export interface FailureSummary {
+  readonly errorName: string
+  /** The driver's code — a SQLSTATE such as `23505`, or `CONNECTION_ENDED`. */
+  readonly code?: string
+  /** Where it was thrown: the stack's frames, without the message that heads it. */
+  readonly frames?: readonly string[]
+}
+
+/**
+ * A failure described without a word of what it failed on (MOL-58).
+ *
+ * The message is the dangerous part, and it is dangerous for more than the driver. A
+ * `DrizzleQueryError` carries the whole query and its parameters — what a person searched for,
+ * their uuid, the hash of their session token — and `postgres` adds `detail` with the values of
+ * the row; a `ZodError` quotes the input it refused. So nothing here reads a message: the name,
+ * the code from the chain `codeOf` walks, and the frames of the stack, taken line by line
+ * because a multi-line message sits at its head.
+ */
+export function describeFailure(error: unknown): FailureSummary {
+  const errorName = error instanceof Error ? error.name : typeof error
+  const raw = codeOf(error)
+  const code = raw !== undefined && /^[\dA-Z_]{1,64}$/.test(raw) ? raw : undefined
+  const frames =
+    error instanceof Error && typeof error.stack === 'string'
+      ? error.stack
+          .split('\n')
+          .filter((line) => line.startsWith('    at '))
+          .slice(0, 8)
+          .map((line) => line.trim())
+      : undefined
+  return {
+    errorName,
+    ...(code === undefined ? {} : { code }),
+    ...(frames?.length ? { frames } : {}),
+  }
+}

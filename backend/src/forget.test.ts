@@ -86,9 +86,21 @@ describe('forget — стирание вручную', () => {
     expect(lines[0]).toBe('no owner with this Telegram id')
   })
 
-  it('сбой базы — код 1 и слова о том, что ничего не изменилось', async () => {
-    const { exit, lines } = run(['184467331', '--yes'], new Error('connection refused'))
+  it('сбой базы — код 1, код сбоя и ни слова из его сообщения', async () => {
+    // What the driver really throws: drizzle's wrapper, the query and its parameters in the
+    // message, the SQLSTATE underneath (adversarial О-4).
+    const failure = new Error(
+      'Failed query: delete from events where actor_id = $1 returning 1\nparams: 1f0e2c4a-…',
+      { cause: Object.assign(new Error('relation "events" does not exist'), { code: '42P01' }) },
+    )
+    const { exit, lines } = run(['184467331', '--yes'], failure)
     expect(await exit).toBe(1)
-    expect(lines).toEqual(['erasure failed, nothing changed: connection refused'])
+    expect(lines).toEqual(['erasure failed, nothing changed: 42P01'])
+  })
+
+  it('сбой без кода называется своим видом', async () => {
+    const { exit, lines } = run(['184467331', '--yes'], new TypeError('secret detail'))
+    expect(await exit).toBe(1)
+    expect(lines).toEqual(['erasure failed, nothing changed: TypeError'])
   })
 })
