@@ -20,6 +20,14 @@ describe('synonymKeys', () => {
     expect(synonymKeys(key('мясо'))).toContain(key('фарш'))
   })
 
+  it('knows the forms people type, not only the dictionary one: «селёдку», «хлеба»', () => {
+    // A form left out misses where the target is far in letters — `seledku` against `seld`.
+    expect(synonymKeys(key('селёдку'))).toContain(key('сельдь'))
+    expect(synonymKeys(key('хлеба'))).toContain(key('лаваш'))
+    expect(synonymKeys(key('колбасы'))).toContain(key('сервелат'))
+    expect(synonymKeys(key('помидора'))).toContain(key('томаты'))
+  })
+
   it('works both ways inside a group of the same thing', () => {
     expect(synonymKeys(key('картофель'))).toContain(key('картошка'))
     expect(synonymKeys(key('белизна'))).toContain(key('отбеливатель'))
