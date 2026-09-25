@@ -331,3 +331,49 @@ describe('доход в «моём курсе» (MOL-66, В-1)', () => {
     expect((await exchanges(me)).heldEstimates).toEqual([hint])
   })
 })
+
+describe('доход без обменов (MOL-66, адверсариальный Д1)', () => {
+  async function start(me: Owner) {
+    const response = await call(me, 'POST', '/trips', {
+      id: randomUUID(),
+      context: await tripContext(db, me.id),
+      place: { kind: 'store', name: 'Ереван Сити' },
+    })
+    expect(response.statusCode).toBe(201)
+    return tripViewCodec.parse(response.json())
+  }
+
+  it('драмы дохода без единого обмена — кошелёк, и «Обмен денег» его отдаёт; поход берёт его', async () => {
+    // The bank: 4.3 on the day of the income, 4.0 today.
+    await rates.upsert([rub('4.3', daysAgo(20)), rub('4.0', today)])
+    const me = await owner()
+    await record(me, { amount: { amount: '150000', currency: 'AMD' }, receivedOn: daysAgo(20) })
+
+    const overview = exchangesResponseCodec.parse((await call(me, 'GET', '/exchanges')).json())
+    expect(overview.exchanges).toEqual([])
+    // What the screen draws its card from — the reason it is not «no exchanges» any more.
+    expect(overview.wallet).toMatchObject({
+      basis: 'income',
+      estimated: true,
+      rate: { scaled: parseRate('4.3') },
+    })
+    expect((await start(me)).rate).toMatchObject({ source: 'personal', scaled: parseRate('4.3') })
+  })
+
+  it('без доходов и обменов, и с доходом в рублях — поход по ЦБ РА сегодняшнего дня', async () => {
+    await rates.upsert([rub('4.3', daysAgo(20)), rub('4.0', today)])
+    const nothing = await owner()
+    expect((await start(nothing)).rate).toMatchObject({
+      source: 'official',
+      scaled: parseRate('4.0'),
+    })
+    const roubles = await owner()
+    await record(roubles, { receivedOn: daysAgo(20) })
+    const overview = exchangesResponseCodec.parse((await call(roubles, 'GET', '/exchanges')).json())
+    expect(overview).toMatchObject({ wallet: null, walletUnknown: null, costs: [] })
+    expect((await start(roubles)).rate).toMatchObject({
+      source: 'official',
+      scaled: parseRate('4.0'),
+    })
+  })
+})

@@ -114,7 +114,8 @@
           {{ t('exchange.record') }}
         </AppButton>
 
-        <section class="list">
+        <!-- Incomes alone can make the rate (MOL-66): then there is the card, and no list. -->
+        <section v-if="overview.exchanges.length > 0" class="list">
           <h2 class="caption">{{ t('exchange.list_title') }}</h2>
           <AppCard as="ul" list>
             <li v-for="exchange in overview.exchanges" :key="exchange.id" class="row">

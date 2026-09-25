@@ -542,10 +542,12 @@ device, private always. The rate is what the two amounts say and is not stored b
   to the snapshot's six digits at the end, the way a cross rate is rounded. The screen walks the
   chain once (`ownRates`) for the wallet, the prices and the reason a wallet is missing.
 - **A trip takes it at the start, like the official one, and never again** (В-4): with
-  `actors.rate_preference = 'personal'` — the default — and an exchange of the pair dated no later
-  than today in Yerevan, the snapshot is `source: 'personal'` with no provider and no jump;
-  otherwise MOL-39's branch as it was. Nothing is required of the person: without exchanges the
-  two preferences are the same answer. An exchange made while a trip is open moves the next one.
+  `actors.rate_preference = 'personal'` — the default — and a known cost of the spending currency
+  dated no later than today in Yerevan — by an exchange of the pair, a chain, or an income alone
+  (MOL-66) — the snapshot is `source: 'personal'` with no provider and no jump; otherwise MOL-39's
+  branch as it was. Nothing is required of the person: without exchanges and incomes the two
+  preferences are the same answer. An exchange or an income made while a trip is open moves the
+  next one.
 - **Every exchange is set beside the central bank of its own day**, by the same `pickOfficialRate`
   a trip started that day would use — «на 8 754 ֏ больше» or «меньше», never «комиссия»: a good
   exchanger beats the bank, and the difference says nothing about why.
@@ -605,7 +607,10 @@ set of rules — the task's own «as for exchanges in MOL-40» predates MOL-42's
   before it weighs it as for an exchange (`heldBefore`, asked where it will count); unknown, the
   wallet takes the income alone and says «по последнему поступлению» (`basis: 'income'`). No fresh
   rate, or a day before the currency of conversion changed, and the cost is unknown with the income
-  named as the reason (`walletUnknown.given: null`).
+  named as the reason (`walletUnknown.given: null`). **Incomes alone make a wallet**, so «Обмен
+  денег» is empty only when its card has nothing to say — no exchange, no wallet, no reason for one
+  missing, no price of another currency: drawn empty over drams that came in, it said «trips take the
+  central bank» while they took the income's rate, and hid the switch back (adversarial Д1).
 - **Money bought with the currency of conversion is an exchange, not an income** (Р-6): dollars
   brought from home with their rouble price on the owner's sheet are «251 000 ₽ → 2 900 $», and
   written so they carry that price instead of the bank's. The sheet says it under any other
