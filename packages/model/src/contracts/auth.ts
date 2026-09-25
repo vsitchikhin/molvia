@@ -65,3 +65,38 @@ export const confirmLoginSchema = z.strictObject({ telegramUserId: telegramUserI
  * naming one — and a repeat is as good as the first: whoever had nothing left gets the same 204.
  */
 export const eraseMeSchema = z.strictObject({ telegramUserId: telegramUserIdSchema })
+
+/**
+ * The most sessions `GET /sessions` lists (MOL-57). Every selection has a limit (MOL-7), and
+ * one login is one row, so a real account holds a handful; `total` beside the rows lets a list
+ * past the limit say that it is one rather than pass for whole.
+ */
+export const SESSIONS_LIMIT = 50
+
+/**
+ * One way into the account, as its owner sees it in «Устройства» (MOL-57).
+ *
+ * The token is not here and neither is its hash, and `expiresAt` is left out too: the list holds
+ * only live sessions, and the date the term would run out moves with every visit, so printing it
+ * would say something that stops being true tomorrow. `current` is the row this very request came
+ * with — the screen cannot work that out, because the id of its own session never reaches it.
+ */
+export const sessionViewCodec = z.strictObject({
+  id: z.uuid(),
+  deviceName: deviceNameSchema.nullable(),
+  createdAt: dateCodec,
+  lastSeenAt: dateCodec,
+  current: z.boolean(),
+})
+export type SessionView = z.infer<typeof sessionViewCodec>
+
+export const sessionsResponseCodec = z
+  .strictObject({
+    sessions: z.array(sessionViewCodec).max(SESSIONS_LIMIT),
+    total: z.number().int().nonnegative(),
+  })
+  // A request comes with one session, so at most one row can be it; and a list cut by the limit
+  // never holds more rows than there are.
+  .refine(({ sessions }) => sessions.filter((session) => session.current).length <= 1)
+  .refine(({ sessions, total }) => total >= sessions.length)
+export type SessionsResponse = z.infer<typeof sessionsResponseCodec>

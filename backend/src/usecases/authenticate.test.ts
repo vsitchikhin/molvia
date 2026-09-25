@@ -44,6 +44,10 @@ function fakeSessions(overrides: Partial<SessionRepository> = {}): SessionReposi
     create: () => Promise.reject(new Error('create was not expected')),
     liveByToken: () => Promise.reject(new Error('liveByToken was not expected')),
     touch: () => Promise.reject(new Error('touch was not expected')),
+    listFor: () => Promise.reject(new Error('listFor was not expected')),
+    removeFor: () => Promise.reject(new Error('removeFor was not expected')),
+    removeByToken: () => Promise.reject(new Error('removeByToken was not expected')),
+    removeExpired: () => Promise.reject(new Error('removeExpired was not expected')),
     ...overrides,
   }
 }
@@ -56,6 +60,7 @@ describe('чем запрос доказывает личность', () => {
 
     await expect(authenticate(sessions, TOKEN)).resolves.toEqual({
       actor,
+      sessionId: SESSION_ID,
       refreshedUntil: null,
     })
   })

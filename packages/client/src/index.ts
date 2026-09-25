@@ -4,6 +4,7 @@ import {
   ERROR,
   LOGIN_HEADER,
   loginStartedCodec,
+  sessionsResponseCodec,
   loginPollCodec,
   ISSUE,
   actorCodec,
@@ -34,6 +35,7 @@ import {
 } from '@molvia/model'
 import type {
   LoginStarted,
+  SessionsResponse,
   LoginPoll,
   ActorView,
   SettingsUpdate,
@@ -81,6 +83,18 @@ export interface MolviaClient {
   devLogin(): Promise<ActorView>
   /** Who this browser is, according to the session it is carrying — or `error.no_actor`. */
   me(): Promise<ActorView>
+  /** «Устройства» (MOL-57): the owner's live sessions, this one first and marked. */
+  sessions(): Promise<SessionsResponse>
+  /**
+   * Ends one of the owner's sessions. `error.not_found` is the answer for one that is already
+   * gone, someone else's and one that never was — a screen reads it as done.
+   */
+  endSession(id: string): Promise<void>
+  /**
+   * The way out of this device (MOL-57): the server deletes the session and puts the cookie out.
+   * Safe to send again after a lost answer — a session already gone answers the same 204.
+   */
+  logout(): Promise<void>
   saveSettings(input: SettingsUpdate): Promise<ActorView>
   /**
    * The catalogue lookup behind «что взяли?», ranked by the server — the query goes as typed.
@@ -236,6 +250,15 @@ export function createClient(options: ClientOptions): MolviaClient {
       request('/dev/login', actorCodec, { method: 'POST', timeout: null }),
 
     me: () => request('/actors/me', actorCodec),
+    sessions: async () => request('/sessions', sessionsResponseCodec),
+    endSession: async (id) =>
+      request(`/sessions/${segment(id)}`, z.undefined(), { method: 'DELETE' }),
+    // The login's header: the API refuses a way out that a page on another site could send.
+    logout: async () =>
+      request('/auth/logout', z.undefined(), {
+        method: 'POST',
+        headers: new Headers({ [LOGIN_HEADER]: '1' }),
+      }),
     saveSettings: async (input) =>
       request('/actors/me/settings', actorCodec, {
         method: 'PUT',

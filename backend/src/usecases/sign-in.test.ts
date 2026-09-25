@@ -53,6 +53,10 @@ function fakeSessions(overrides: Partial<SessionRepository> = {}): SessionReposi
       ),
     liveByToken: () => Promise.reject(new Error('liveByToken was not expected')),
     touch: () => Promise.reject(new Error('touch was not expected')),
+    listFor: () => Promise.reject(new Error('listFor was not expected')),
+    removeFor: () => Promise.reject(new Error('removeFor was not expected')),
+    removeByToken: () => Promise.reject(new Error('removeByToken was not expected')),
+    removeExpired: () => Promise.reject(new Error('removeExpired was not expected')),
     ...overrides,
   }
 }

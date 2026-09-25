@@ -5,6 +5,12 @@ import type { SessionRepository } from '@/db/sessions-repository'
 export interface Authenticated {
   readonly actor: Actor
   /**
+   * The session this request came with — what «Устройства» marks as «this device» and what
+   * `DELETE /sessions/:id` compares with to know it is ending the very session it arrived on
+   * (MOL-57). Already in hand from the same read, so it costs nothing.
+   */
+  readonly sessionId: string
+  /**
    * The new expiry, when the session was slid forward just now — and `null` when it was not.
    * The route re-sets the cookie on exactly this, so the browser and the row never disagree
    * about when the way in runs out.
@@ -42,5 +48,5 @@ export async function authenticate(
     ? await sessions.touch(live.session.id, SESSION_TOUCH_AFTER_HOURS, SESSION_LIFETIME_DAYS)
     : null
 
-  return { actor: live.actor, refreshedUntil }
+  return { actor: live.actor, sessionId: live.session.id, refreshedUntil }
 }
