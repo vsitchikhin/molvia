@@ -114,6 +114,10 @@ export const UNIT_WORDS = [
 ] as const
 
 const UNIT_KEYS = [...new Set(UNIT_WORDS.map(toSearchKey))]
+const UNIT_ARRAY = sql`array[${sql.join(
+  UNIT_KEYS.map((unit) => sql`${unit}`),
+  sql`, `,
+)}]::text[]`
 
 /**
  * How far a query word right after a number may stray from a unit and still be read as one.
@@ -128,6 +132,21 @@ const UNIT_KEYS = [...new Set(UNIT_WORDS.map(toSearchKey))]
  * folds `ts` into `ц`, so it is `цh`, two from `sht`. Not caught — the price, named.
  */
 const UNIT_SLIP = 1
+
+/**
+ * Whether a query word may be that unit by a slip of the finger: one edit from it, or two letters
+ * swapped — the commonest typo, and two edits to Levenshtein, so «кефир 500 лм» lost «мл». One
+ * predicate for the query's own reading and for the name's unit it is set against.
+ */
+function slipsFromUnit(word: SQL, unit: SQL): SQL {
+  return sql`(levenshtein(${word}, ${unit}) <= ${UNIT_SLIP}
+          or exists (
+            select 1
+            from generate_series(1, length(${word}) - 1) as i
+            where overlay(${word} placing substr(${word}, i + 1, 1) || substr(${word}, i, 1)
+                          from i for 2) = ${unit}
+          ))`
+}
 
 /**
  * How many words of a query are looked at. Every query word is compared with every word of
@@ -195,32 +214,38 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     with query_words as (
       -- Cut to 255 here, once: levenshtein refuses longer arguments, and the prefix arm below
       -- cuts the name to the length of the query word, not to 255.
-      select left(word, 255) as q,
+      select n, left(word, 255) as q,
              -- A word is read as a unit by its place only while another word still grounds the
-             -- query: in «2 суп» the soup is all there is, not two of «տուփ».
-             plain and not (unit_like and bool_or(plain and not unit_like) over ()) as grounds,
+             -- query: in «2 суп» the soup is all there is, not two of «տուփ». A unit still being
+             -- typed is a size against every name — the item must not blink out of the list on
+             -- the way to «штук»; a slip only against the names in \`slipped\`.
+             plain and not (anchored and unit_start) as grounds,
+             plain and anchored and unit_like and not unit_start as slips,
              word ~ '[^0-9]' as lettered,
              last
       from (
-        select word, last,
-               length(word) >= ${SHORT_WORD} and word !~ '[0-9]' and word not in ${UNIT_KEYS}
-                 as plain,
-               after_number and exists (
-                 select 1
-                 from unnest(array[${sql.join(
-                   UNIT_KEYS.map((unit) => sql`${unit}`),
-                   sql`, `,
-                 )}]::text[]) as u(unit)
-                 where levenshtein(left(word, 255), unit) <= ${UNIT_SLIP}
-                    or (last and starts_with(unit, word))
-               ) as unit_like
+        select *, bool_or(plain and not unit_like) over () as anchored
         from (
-          select word,
-                 n = max(n) over () as last,
-                 coalesce(lag(word) over (order by n) ~ '[0-9]', false) as after_number
-          from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
-        ) w
-      ) u
+          select n, word, last,
+                 length(word) >= ${SHORT_WORD} and word !~ '[0-9]' and word not in ${UNIT_KEYS}
+                   as plain,
+                 after_number and exists (
+                   select 1
+                   from unnest(${UNIT_ARRAY}) as u(unit)
+                   where ${slipsFromUnit(sql`left(word, 255)`, sql`unit`)}
+                      or (last and starts_with(unit, word))
+                 ) as unit_like,
+                 after_number and last and exists (
+                   select 1 from unnest(${UNIT_ARRAY}) as u(unit) where starts_with(unit, word)
+                 ) as unit_start
+          from (
+            select word, n,
+                   n = max(n) over () as last,
+                   coalesce(lag(word) over (order by n) ~ '[0-9]', false) as after_number
+            from unnest(string_to_array(${key}, ' ')) with ordinality as t(word, n)
+          ) w
+        ) u
+      ) a
     ),
     candidates as (
       -- The column goes first, and that is not style: \`search_key %> $1\` is the only form
@@ -241,8 +266,26 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       -- walks the primary key and filters every row. The cost is bounded by the catalogue and
       -- by MAX_QUERY_WORDS; measured in MOL-10, under 260 ms at every threshold in MOL-14.
     ),
-    per_word as (
-      select c.id, qw.grounds, qw.lettered,
+    slipped as (
+      -- A slip is a size only against a name that prints the unit it slipped from; elsewhere
+      -- the word is what it spells. In «2 сом замороженный» the catfish is not «см», and read as
+      -- a size everywhere it let «Котлеты … замороженные» in beside the fish. Apart and joined,
+      -- not a subquery per row: a slip after a number is rare, so this is nearly always empty.
+      select c.id, qw.n
+      from query_words qw
+      cross join candidates c
+      where qw.slips
+        and exists (
+          select 1
+          from unnest(string_to_array(c.search_key, ' ')) as nw(unit)
+          where nw.unit in ${UNIT_KEYS} and ${slipsFromUnit(sql`qw.q`, sql`nw.unit`)}
+        )
+    ),
+    -- Materialized, so each word distance is taken once per row: inlined, the planner copied the
+    -- subquery into the select list, the filter and the order by — and with \`slipped\` joined
+    -- in, 20 000 names answered half as fast again as before it. Kept, it beats both.
+    per_word as materialized (
+      select c.id, qw.grounds and s.id is null as grounds, qw.lettered,
              (
                select min(
                  -- The screen searches while the person types, so the last word is usually
@@ -260,11 +303,12 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                from unnest(string_to_array(c.search_key, ' ')) as w
                -- A grounding word is measured against grounding words only: against «л» or
                -- «1» of a size every two-letter word is two edits away, inside the budget.
-               where not qw.grounds
+               where not (qw.grounds and s.id is null)
                   or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]' and w not in ${UNIT_KEYS})
              ) as qd
       from candidates c
       cross join query_words qw
+      left join slipped s on s.id = c.id and s.n = qw.n
     ),
     ranked as (
       select c.id, c.ws,

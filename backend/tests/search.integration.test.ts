@@ -391,6 +391,48 @@ describe('search — a unit is a size, not a word (MOL-48)', () => {
     expect(await names('сахар 1 кн')).toEqual(['Сахар 1 кг'])
   })
 
+  it('reads two swapped letters of a unit as the unit: «лм», «гк»', async () => {
+    // A transposition is two edits to Levenshtein, past the slip, and was caught only by luck —
+    // `lm` is one edit from `km` of «cm».
+    await named('Кефир 500 мл')
+    await named('Сахар 1 кг')
+    expect(await names('кефир 500 лм')).toEqual(['Кефир 500 мл'])
+    expect(await names('сахар 1 гк')).toEqual(['Сахар 1 кг'])
+  })
+
+  it('reads a slip as a unit only against a name that prints it: «2 сом замороженный»', async () => {
+    // `som` is one edit from `sm` of «см», `sup` from `up` and `tup`. Read as a size against
+    // every name, the goods of the query ranked «Котлеты … замороженные» level with the fish.
+    await named('Сом замороженный')
+    await named('Котлеты куриные замороженные')
+    await named('Суп Магги курица')
+    await named('Приправа Магги 75 г')
+    await named('Doshirak лапша курица 90 г')
+    expect(await names('2 сом замороженный')).toEqual(['Сом замороженный'])
+    expect(await names('2 суп магги')).toEqual(['Суп Магги курица'])
+    expect(await names('2 суп доширак')).toEqual([])
+  })
+
+  it('keeps a name without a unit on every keystroke of one after the number', async () => {
+    // A unit still being typed is a size against every name — «Батарейки Duracell AA» carries
+    // none, and must not blink out between «4 ш» and «4 штук».
+    await named('Батарейки Duracell AA')
+    const query = 'батарейки 4 штук'
+    for (let end = query.indexOf('4') + 3; end <= query.length; end += 1) {
+      const prefix = query.slice(0, end)
+      expect(await names(prefix), prefix).toEqual(['Батарейки Duracell AA'])
+    }
+  })
+
+  it('reaches only the unit slipped from: «кефир 500 мд» loses «Кефир 1 л» — the price, pinned', async () => {
+    // Against a name that prints no «мл» the slip is read as the word it spells, and a word
+    // with no grounding pair is out of the budget. «кефир 500 мл», typed right, finds both.
+    await named('Кефир 500 мл')
+    await named('Кефир 1 л')
+    expect(await names('кефир 500 мд')).toEqual(['Кефир 500 мл'])
+    expect(await names('кефир 500 мл')).toEqual(['Кефир 500 мл', 'Кефир 1 л'])
+  })
+
   it('reads a word as a unit by its place only while another word grounds the query: «2 суп»', async () => {
     // `sup` is one edit from `tup` of «տուփ», `kap` starts «капсул» — after a number both look
     // like units. With nothing else to ground by they are the goods: «2 кап» is on its way to
@@ -410,7 +452,8 @@ describe('search — a unit is a size, not a word (MOL-48)', () => {
   })
 
   it('misses «тш» typed for «шт» — two edits in the key, the price, pinned', async () => {
-    // The alphabet folds `ts` into `ц`: «тш» is `цh`, two edits from `sht`, past the slip.
+    // Swapped letters are caught, but not these: the alphabet folds `ts` into `ц`, so «тш» is
+    // `цh` — no transposition of `sht`, and two edits from it, past the slip.
     await named('Булочки с кунжутом 4 шт')
     expect(await names('булочки 4 тш')).toEqual([])
   })
