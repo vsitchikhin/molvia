@@ -76,6 +76,17 @@
             </p>
             <p v-if="overview.wallet.estimated" class="meta">{{ t('exchange.estimated') }}</p>
           </template>
+          <!-- Exchanges of the spending currency are there, its cost is not: the words say why, not
+               «no exchanges yet» above a list of them (review С-4). -->
+          <p v-else-if="overview.pair && overview.walletUnknown" class="meta">
+            {{
+              t('exchange.wallet_unknown', {
+                given: currencySignOf(overview.walletUnknown.given),
+                quote: pairSigns(overview.pair).quote,
+                date: dayOf(midnightOf(overview.walletUnknown.exchangedOn)),
+              })
+            }}
+          </p>
           <p v-else-if="overview.pair" class="meta">
             {{ t('exchange.no_wallet', pairSigns(overview.pair)) }}
           </p>
@@ -122,13 +133,15 @@
             <li v-for="exchange in overview.exchanges" :key="exchange.id" class="row">
               <!-- The row is the way into its amendment (MOL-42, В-3), as a verdict is amended
                    where it is met. -->
+              <!-- No `aria-label`: it would replace the name whole, and the rate, the comparison
+                   and the note would go silent (review С-3). The verb is said first, unseen. -->
               <button
                 class="body"
                 type="button"
                 :disabled="!online || busy"
-                :aria-label="t('exchange.edit', { amounts: amountsOf(exchange) })"
                 @click="edit(exchange)"
               >
+                <span class="verb">{{ t('exchange.edit') }}</span>
                 <span class="amounts">
                   {{ amountsOf(exchange) }}
                   <span v-if="exchange.amendedAt" class="amended">{{
@@ -160,7 +173,7 @@
       :overview="overview"
       :editing="editing"
       :record="record"
-      :amend="amend"
+      :amend="amendEditing"
     />
     <ExchangeRemoveSheet
       v-model:open="removeOpen"
@@ -179,6 +192,7 @@ import { currencySign, formatMoney, formatRate, yerevanMidnight } from '@molvia/
 import type {
   Currency,
   CurrencyCost,
+  ExchangeAmendBody,
   ExchangeRate,
   ExchangeView as Row,
   RatePreference,
@@ -198,6 +212,7 @@ import ScreenState from '@/components/ScreenState.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExchanges } from '@/composables/useExchanges'
+import type { AmendOutcome } from '@/composables/useExchanges'
 import { purchaseDay } from '@/days'
 
 /**
@@ -235,6 +250,17 @@ export default defineComponent({
     function edit(exchange: Row): void {
       editing.value = exchange
       sheetOpen.value = true
+    }
+    // A conflict leaves the sheet open over the version the server holds now, so a second
+    // «Сохранить» goes over that one and nothing typed is lost (review Ч-2).
+    async function amendEditing(id: string, body: ExchangeAmendBody): Promise<AmendOutcome> {
+      const outcome = await exchanges.amend(id, body)
+      // Gone in the meantime: the sheet keeps the old one, and its next save is told so.
+      if (outcome === 'conflict') {
+        editing.value =
+          exchanges.overview.value?.exchanges.find((row) => row.id === id) ?? editing.value
+      }
+      return outcome
     }
     // «Удалить обмен?» first, then «Вернуть» after (В-5): the bin never removes on its own.
     const removeOpen = ref(false)
@@ -363,6 +389,7 @@ export default defineComponent({
       editing,
       compose,
       edit,
+      amendEditing,
       removeOpen,
       removedStrip,
       recordButton,
@@ -374,6 +401,7 @@ export default defineComponent({
       rateOf,
       dayOf,
       midnightOf,
+      currencySignOf: (currency: Currency) => currencySign(currency, locale.value),
       pairSigns,
       costLineOf,
       rateLineOf,
@@ -507,6 +535,10 @@ export default defineComponent({
   font-size: var(--text-callout);
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
+}
+
+.verb {
+  @include visually-hidden;
 }
 
 .amended {

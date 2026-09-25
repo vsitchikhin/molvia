@@ -17,7 +17,8 @@ import en from '@/i18n/en.json'
 import { routes } from '@/router'
 
 const record = vi.fn<(body: ExchangeBody) => Promise<unknown>>()
-const amend = vi.fn<(id: string, body: ExchangeAmendBody) => Promise<unknown>>()
+const amend =
+  vi.fn<(id: string, body: ExchangeAmendBody) => Promise<'saved' | 'conflict' | 'gone'>>()
 
 function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
   return {
@@ -309,7 +310,7 @@ describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
   })
 
   it('saves over the version it was opened on, and says so on the button', async () => {
-    amend.mockResolvedValue(undefined)
+    amend.mockResolvedValue('saved')
     const view = await render(overview({ exchanges: [amended] }), amended)
     await field(view, en.exchange.sheet.received).get('input').setValue('96000')
     const button = view.findAll('button').find((one) => one.text() === en.exchange.sheet.save_amend)
@@ -325,5 +326,44 @@ describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
       note: 'VTB',
     })
     expect(view.emitted('update:open')?.at(-1)).toEqual([false])
+  })
+
+  async function saveAmendment(view: VueWrapper): Promise<void> {
+    const button = view.findAll('button').find((one) => one.text() === en.exchange.sheet.save_amend)
+    await button?.trigger('click')
+    await flushPromises()
+  }
+
+  it('shows and keeps a remainder the exchange has, even where a new one would not ask (Ж4)', async () => {
+    amend.mockResolvedValue('saved')
+    const held: ExchangeView = { ...amended, heldBefore: { minor: 2_000_000n, currency: 'AMD' } }
+    for (const state of [
+      overview({ exchanges: [held], baseSince: '2026-09-10' }),
+      overview({ exchanges: [held], pair: null }),
+      overview({ exchanges: [held] }),
+    ]) {
+      amend.mockClear()
+      const view = await render(state, held)
+      expect(view.text()).toContain('held before the exchange')
+      await field(view, en.exchange.sheet.note).get('input').setValue('VTB cash machine')
+      await saveAmendment(view)
+      expect(amend.mock.calls[0]?.[1]).toMatchObject({
+        heldBefore: { minor: 2_000_000n, currency: 'AMD' },
+        note: 'VTB cash machine',
+      })
+      view.unmount()
+    }
+  })
+
+  it('a conflict keeps the sheet open with what was typed, and says so (Ч-2)', async () => {
+    amend.mockResolvedValue('conflict')
+    const view = await render(overview({ exchanges: [amended] }), amended)
+    await field(view, en.exchange.sheet.received).get('input').setValue('96000')
+    await saveAmendment(view)
+    expect(view.emitted('update:open')).toBeUndefined()
+    expect(view.text()).toContain(en.exchange.sheet.amend_conflict)
+    expect(
+      (field(view, en.exchange.sheet.received).get('input').element as HTMLInputElement).value,
+    ).toBe('96000')
   })
 })

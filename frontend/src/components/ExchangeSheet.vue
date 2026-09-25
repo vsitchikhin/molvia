@@ -35,7 +35,7 @@
         :error-text="dayInvalid ? t('exchange.sheet.bad_day') : null"
       />
 
-      <div v-if="asksHeld">
+      <div v-if="showsHeld">
         <AppField
           v-model="held"
           :label="t('exchange.sheet.held', { currency: sign(currencies.received) })"
@@ -72,6 +72,7 @@
 
     <template #footer>
       <p v-if="failed" class="failed" role="alert">{{ t('exchange.failed') }}</p>
+      <p v-if="conflict" class="failed" role="alert">{{ t('exchange.sheet.amend_conflict') }}</p>
       <AppButton size="large" block :busy="sending" :disabled="sending" @click="submit">
         {{
           sending
@@ -142,8 +143,11 @@ export default defineComponent({
       type: Function as PropType<(body: ExchangeBody) => Promise<unknown>>,
       required: true,
     },
+    /** Resolves how it ended: a conflict keeps the sheet open, over the version held now. */
     amend: {
-      type: Function as PropType<(id: string, body: ExchangeAmendBody) => Promise<unknown>>,
+      type: Function as PropType<
+        (id: string, body: ExchangeAmendBody) => Promise<'saved' | 'conflict' | 'gone'>
+      >,
       required: true,
     },
     /** The exchange being amended, or null for a new one. */
@@ -170,6 +174,7 @@ export default defineComponent({
     const heldError = ref<ErrorCode | null>(null)
     const sending = ref(false)
     const failed = ref(false)
+    const conflict = ref(false)
     let exchangeId = newId()
 
     // Made afresh at every opening: the last exchange's numbers, or its error, are not this one's.
@@ -196,6 +201,7 @@ export default defineComponent({
         dayInvalid.value = false
         heldError.value = null
         failed.value = false
+        conflict.value = false
         exchangeId = newId()
       },
       { immediate: true },
@@ -239,6 +245,17 @@ export default defineComponent({
         )
       )
     })
+
+    /**
+     * An amendment replaces the exchange whole, and a field not sent is cleared: so a remainder
+     * the exchange already has is shown, whatever `asksHeld` says, for as long as the received
+     * currency is the one it was said in. What is sent is what is seen (review С-2, Ж4).
+     */
+    const showsHeld = computed(
+      () =>
+        asksHeld.value ||
+        (!!props.editing?.heldBefore && currencies.received === props.editing.received.currency),
+    )
 
     /**
      * The hint is about the latest exchange, so it fits only a day not before it — and never an
@@ -294,8 +311,10 @@ export default defineComponent({
       amountErrors.given = given && given.minor > 0n ? null : ERROR.INVALID_AMOUNT
       amountErrors.received = received && received.minor > 0n ? null : ERROR.INVALID_AMOUNT
       const heldBefore =
-        asksHeld.value && held.value.trim() ? money(held.value, currencies.received) : null
-      if (asksHeld.value && held.value.trim() && !heldBefore) heldError.value = ERROR.INVALID_AMOUNT
+        showsHeld.value && held.value.trim() ? money(held.value, currencies.received) : null
+      if (showsHeld.value && held.value.trim() && !heldBefore) {
+        heldError.value = ERROR.INVALID_AMOUNT
+      }
       // Empty is «no note»; anything typed must be a line the server keeps (MOL-42, В-4).
       const typedNote = note.value.trim() ? exchangeNoteSchema.safeParse(note.value) : null
       noteInvalid.value = typedNote !== null && !typedNote.success
@@ -316,11 +335,20 @@ export default defineComponent({
         ...(typedNote?.success ? { note: typedNote.data } : {}),
       }
       sending.value = true
+      conflict.value = false
       try {
         const editing = props.editing
-        await (editing
-          ? props.amend(editing.id, { revision: editing.revision, ...fields })
-          : props.record({ id: exchangeId, ...fields }))
+        if (editing) {
+          const outcome = await props.amend(editing.id, { revision: editing.revision, ...fields })
+          // Made over a version that moved on: what was typed stays, and the next «Сохранить»
+          // goes over the version the screen now holds (review Ч-2).
+          if (outcome === 'conflict') {
+            conflict.value = true
+            return
+          }
+        } else {
+          await props.record({ id: exchangeId, ...fields })
+        }
         emit('update:open', false)
       } catch (caught) {
         // The refusals a person can answer stay under their field; anything else is said once.
@@ -357,7 +385,9 @@ export default defineComponent({
       noteMax: EXCHANGE_NOTE_MAX,
       versionOf,
       asksHeld,
+      showsHeld,
       estimate,
+      conflict,
       sending,
       failed,
       submit,

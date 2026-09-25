@@ -310,6 +310,7 @@
     "cost_line": "{currency}: {rate} · {basis}",
     "cost_line_estimated": "{currency}: {rate} · {basis} · part at the Central Bank of Armenia rate",
     "no_wallet": "No {base} → {quote} exchanges yet — new trips count by the Central Bank of Armenia rate",
+    "wallet_unknown": "Rate unknown: the {given} → {quote} exchange of {date} has nothing to be valued by — there is no Central Bank of Armenia rate for that day. New trips count by the Central Bank of Armenia rate until you record an exchange of a known price",
     "preference_legend": "New trips count",
     "preference_personal": "by my rate",
     "preference_official": "by the central bank rate",
@@ -327,7 +328,7 @@
     "row_no_official": "no central bank rate for this day — nothing to compare with",
     "row_doubtful": "the central bank rate of that day is in doubt — no comparison",
     "remove": "Delete the exchange {amounts}",
-    "edit": "Amend the exchange {amounts}",
+    "edit": "Amend the exchange:",
     "amended": "amended {date}",
     "amend_conflict": "This exchange was already amended on another device — here it is as it stands now. Amend it again if you need to",
     "vanished": "This exchange is gone — it was removed. The list is up to date",
@@ -340,7 +341,7 @@
     "restore": "Bring back",
     "restored": "The exchange is back",
     "restore_gone": "The exchange can no longer be brought back — the removal is final. If it was needed, record it again",
-    "conflict": "This exchange was already recorded — with the earlier amounts. If they are wrong, tap it in the list and amend it",
+    "conflict": "This exchange is already recorded — the list shows it as it stands now. If the amounts are wrong, tap it in the list and amend it",
     "empty": {
       "title": "No exchanges yet",
       "body": "Record what you gave and what you got — the rate is worked out for you. Until then trips count by the central bank rate"
@@ -376,6 +377,7 @@
       "version_note": "until {until}: {amounts} · {date} · {note}",
       "save": "Save the exchange",
       "save_amend": "Save the amendment",
+      "amend_conflict": "While you were amending it, this exchange was amended on another device — its new version is now in the history below. Save again to write your amounts over it",
       "saving": "Saving the exchange…",
       "bad_day": "Choose the day of the exchange"
     }
@@ -533,7 +535,7 @@
   },
   "privacy": {
     "title": "Data and privacy",
-    "revised": "Revised 24 September 2026",
+    "revised": "Revised 25 September 2026",
     "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
@@ -547,7 +549,7 @@
       },
       "exchanges": {
         "term": "Money exchanges",
-        "text": "How much you changed, of which currency and when — your own rate is worked out from them. Only you see them."
+        "text": "How much you changed, of which currency and when, and the note of where, if you write one — your own rate is worked out from them. When you amend an exchange, the version before it is kept beside it for as long as the exchange itself. Only you see them."
       },
       "places": {
         "term": "Shops",
@@ -571,7 +573,7 @@
       },
       "settings": {
         "term": "Your settings",
-        "text": "Country, city and currencies."
+        "text": "Country, city, currencies, and the day you changed the currency of conversion."
       }
     },
     "logs": {

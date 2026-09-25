@@ -240,6 +240,15 @@ describe('ExchangeView: the rate and the list', () => {
     expect(line?.text()).not.toContain('Central Bank')
   })
 
+  it('says why the rate is unknown, not «no exchanges yet» above a list of them (С-4)', async () => {
+    exchanges.mockResolvedValue(
+      overview({ wallet: null, walletUnknown: { exchangedOn: '2026-08-25', given: 'USD' } }),
+    )
+    const view = await render()
+    expect(view.text()).toContain('Rate unknown: the $ → ֏ exchange of')
+    expect(view.text()).not.toContain('exchanges yet')
+  })
+
   it('names the day the currency of conversion changed, and says nothing when it never did', async () => {
     exchanges.mockResolvedValue(overview({ wallet: null, baseSince: '2026-09-18' }))
     const view = await render()
@@ -566,14 +575,32 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     expect(amendExchange).toHaveBeenCalledWith(row().id, expect.objectContaining({ revision: 1 }))
   })
 
-  it('an amendment made over a version that moved on says so and reads the list again', async () => {
-    exchanges.mockResolvedValue(overview())
-    amendExchange.mockRejectedValue(new ApiError(ERROR.CONFLICT))
+  it('an amendment made over a version that moved on says so, reads the list again and keeps the sheet', async () => {
+    exchanges
+      .mockResolvedValueOnce(overview())
+      .mockResolvedValue(overview({ exchanges: [row({ revision: 2 })] }))
+    amendExchange.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT))
     const view = await render()
     await openRow(view)
     await saveAmendment()
     expect(view.text()).toContain(en.exchange.amend_conflict)
     expect(exchanges).toHaveBeenCalledTimes(2)
+    expect(document.querySelector('dialog[open]')?.textContent).toContain(
+      en.exchange.sheet.amend_conflict,
+    )
+    // The second «Save» goes over the version the server holds now.
+    amendExchange.mockResolvedValue(overview())
+    await saveAmendment()
+    expect(amendExchange.mock.calls.at(-1)?.[1]).toMatchObject({ revision: 2 })
+  })
+
+  it('the row is named by its words, the rate and the comparison included (С-3)', async () => {
+    exchanges.mockResolvedValue(overview())
+    const view = await render()
+    const button = view.get('button.body')
+    expect(button.attributes('aria-label')).toBeUndefined()
+    expect(button.text()).toContain(en.exchange.edit)
+    expect(button.text()).toContain('more than the central bank')
   })
 
   it('an exchange removed elsewhere is said to be gone, not «check the connection»', async () => {

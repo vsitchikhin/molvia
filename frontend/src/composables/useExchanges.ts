@@ -13,6 +13,9 @@ import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 
+/** How an amendment ended: written, made over a version that moved on, or the exchange is gone. */
+export type AmendOutcome = 'saved' | 'conflict' | 'gone'
+
 /** `idle` — no identity yet, so there is nobody whose exchanges to ask for. */
 export type ExchangesPhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'offline'
 
@@ -47,8 +50,8 @@ export interface Exchanges {
   retry(): Promise<void>
   /** Resolves `null` when the server holds another exchange under this name (В-6). */
   record(body: ExchangeBody): Promise<ExchangesResponse | null>
-  /** Resolves `null` when the exchange moved on elsewhere or is gone — said above the list. */
-  amend(id: string, body: ExchangeAmendBody): Promise<ExchangesResponse | null>
+  /** A conflict and a missing exchange are said above the list, and the list is read again. */
+  amend(id: string, body: ExchangeAmendBody): Promise<AmendOutcome>
   prefer(preference: RatePreference): Promise<void>
   remove(exchange: ExchangeView): Promise<void>
   restore(): Promise<void>
@@ -194,23 +197,22 @@ export function useExchanges(): Exchanges {
     async amend(id, body) {
       hush()
       try {
-        const answer = await api.amendExchange(id, body)
-        land(answer)
+        land(await api.amendExchange(id, body))
         removed.value = null
-        return answer
+        return 'saved'
       } catch (caught) {
         const answered = caught instanceof ApiError && caught.answered
         if (answered && caught.code === ERROR.CONFLICT) {
           removed.value = null
           amendConflicted.value = true
           await load()
-          return null
+          return 'conflict'
         }
         if (answered && caught.code === ERROR.NOT_FOUND) {
           removed.value = null
           vanished.value = true
           await load()
-          return null
+          return 'gone'
         }
         throw caught
       }
