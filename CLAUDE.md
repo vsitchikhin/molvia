@@ -1006,11 +1006,15 @@ database access. In a product about data integrity, two write paths will silentl
   rules of «back» read. Every close — ×, the scrim, Esc, Android «back» — steps back
   off that entry, and only the pop closes it, so exactly one entry is ever taken. **The sheet puts
   the page back by what it was opened from, never by a number** (MOL-63): it notes the element
-  pressed — iOS does not focus a tapped button — and where it stood on the screen, and after the
-  pop that lands on the same screen scrolls by the difference. A list that changed height above it
-  meanwhile — reread, a queued row sent, a notice come or gone — the browser has already kept still,
-  and the difference is nothing; a window the platform moved under the sheet — the iOS keyboard for
-  a field in it — comes back, since `overflow: hidden` stops a finger and not the platform. The
+  the opening click landed on — a tap, Enter, a screen reader alike, since iOS does not focus a
+  tapped button; the click is forgotten once its task is over, and a sheet opened later is measured
+  by the focus — and where it stood on the screen, and after the pop that lands on the same screen
+  scrolls by the difference. A list that changed height above it meanwhile — reread, a queued row
+  sent, a notice come or gone — Chrome and Firefox have already kept still, and the difference is
+  nothing (Safari keeps nothing still, and gets it put back); a window the platform moved under the
+  sheet — the iOS keyboard for a field in it — comes back, since `overflow: hidden` stops a finger
+  and not the platform. At the very top of the page the browser keeps nothing still on purpose —
+  what came above the list stays in sight — and there the top stays the top. The
   router's number did the second and broke the first, moving the list by the change. So the router
   does not scroll a move to the same address, which is a sheet's or a refused duplicate push; the
   first navigation comes «from» `START_LOCATION`, whose address is «/», and is not one — read as
