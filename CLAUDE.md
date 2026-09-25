@@ -285,14 +285,18 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   The units are a list in natural spelling keyed by `toSearchKey` itself, so nothing stored
   depends on it and a missing unit is a line; only the forms written after a number — «рулона»,
   «пакетиков», «таблеток», never «таблетки», which begins the goods' own name. A query word right
-  after a number that starts a unit or is one edit from one is read as that unit — «батарейки 4
-  шту» on its way to «штук», «кефир 500 мд» — or the item vanished on every keystroke until the
-  unit was typed whole; but only while another word still grounds the query, because in «2 суп»
-  or «2 кап» the word is the goods. What it costs, named: «чай пакетики» misses the tea, its word
-  measured as a word (the owner's decision); a right unit no longer carries a typo through the
-  mean — «шакалат 100 гр» is lost where «шакалат голд» is found; a real word that shares a unit's
-  key goes with it — «7 Up» is `7 up`, which «7 ап» no longer reaches; and «тш» for «шт» is `цh`
-  in the key, two edits, past the slip.
+  after a number that starts a unit is read as that unit against every name — «батарейки 4 шту»
+  on its way to «штук», or the item vanished on every keystroke until the unit was typed whole.
+  One that is a slip from a unit — an edit, or two letters swapped: «кефир 500 мд», «500 лм» —
+  is that unit only against a name that prints it, and elsewhere the word it spells: read as a
+  size everywhere, «2 сом замороженный» let «Котлеты … замороженные» in beside the fish. Either
+  way only while another word still grounds the query, because in «2 суп» or «2 кап» the word is
+  the goods. What it costs, named: «чай пакетики» misses the tea, its word measured as a word (the
+  owner's decision); a right unit no longer carries a typo through the mean — «шакалат 100 гр» is
+  lost where «шакалат голд» is found; a real word that shares a unit's key goes with it — «7 Up»
+  is `7 up`, which «7 ап» no longer reaches; a slip reaches only the unit it slipped from —
+  «кефир 500 мд» loses «Кефир 1 л», which «кефир 500 мл» finds; and «тш» for «шт» is `цh` in the
+  key, no transposition of `sht`, and two edits from it.
   A grounding word is measured against the grounding words of the name only, never
   against «л» or «1», which every two-letter word is within two edits of. Grounding words fold by their **mean**,
   rounded up; short words by their **worst**, at most one edit, so each has to find its pair
