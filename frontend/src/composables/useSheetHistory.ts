@@ -8,9 +8,10 @@ import { stepBack } from '@/navigation'
  * the iOS edge swipe — closes the sheet instead of leaving the screen under it.
  *
  * The entry is laid at the very same address, through the router's own history rather than a
- * bare `pushState`: the router keeps `position`, `back`, `current` and the scroll in
- * `history.state`, and the rules of «back» read them (`entryBelow` in navigation.ts). A foreign
- * state without them would make the next step count from `undefined` and drop the list to the top.
+ * bare `pushState`: the router keeps `position`, `back` and `current` in `history.state`, and the
+ * rules of «back» read them (`entryBelow` in navigation.ts). A foreign state without them would
+ * make the next step count from `undefined`. The scroll is not among the reasons: the router does
+ * not scroll a sheet put away, the sheet puts the page back itself (`putBack` below, MOL-63).
  *
  * Every close goes through the history. The ×, the scrim and Esc step back; only the pop that
  * follows actually closes it. So exactly one entry is ever taken away, and the «back» after a
@@ -22,8 +23,93 @@ import { stepBack } from '@/navigation'
  * «back» reaches it.
  */
 
+/** How the page stood when a sheet was opened over it — see `putBack`. */
+export interface SheetAnchor {
+  /** The window's scroll at the opening. */
+  scrolled: number
+  /** The element the sheet was opened from, and where it stood on the screen. */
+  element: Element | null
+  top: number
+}
+
 interface Holder {
   left: () => void
+  /** The address the sheet was laid at, as the history spells it. */
+  at: string
+  anchor: SheetAnchor | null
+}
+
+// The element activated in the task now running. A click reaches it however it was activated — a
+// tap (iOS does not focus a tapped button), a mouse, Enter or Space, a screen reader — and it is
+// forgotten once the task is over: a sheet opened later, with no click of its own, must not be
+// measured by whatever was clicked before (review С-4, adversarial В3).
+let activated: Element | null = null
+let watching = false
+
+function watchActivations(): void {
+  if (watching) return
+  watching = true
+  document.addEventListener(
+    'click',
+    (event) => {
+      activated = event.target instanceof Element ? event.target : null
+      setTimeout(() => {
+        activated = null
+      })
+    },
+    { capture: true, passive: true },
+  )
+}
+
+function inPage(candidate: Element | null): candidate is Element {
+  return (
+    candidate !== null &&
+    candidate !== document.body &&
+    candidate !== document.documentElement &&
+    candidate.isConnected
+  )
+}
+
+/**
+ * How the page stands as the sheet opens: its scroll, and the element the sheet is opened from —
+ * activated just now, or else focused — with where it stands on the screen. Taken before the sheet
+ * is shown. A sheet over a sheet is opened from inside a dialog, which the page's scroll does not
+ * move, and takes none.
+ */
+export function pageAnchor(): SheetAnchor | null {
+  const element = [activated, document.activeElement].find(inPage) ?? null
+  if (element?.closest('dialog')) return null
+  return {
+    scrolled: window.scrollY,
+    element,
+    top: element ? element.getBoundingClientRect().top : 0,
+  }
+}
+
+/**
+ * Puts the page back where it stood when the sheet opened. `overflow: hidden` stops a finger, not
+ * the platform — the iOS keyboard for a field in the sheet may move the window — and nothing else
+ * moves it back (adversarial В2).
+ *
+ * Measured by the element the sheet was opened from, never by a saved `scrollY`: when the list
+ * changed height above it, Chrome and Firefox have already kept that element still and there is
+ * nothing to put back, while a saved number moved the list by exactly the change (MOL-63); Safari,
+ * which keeps nothing still, gets the difference put back. An element gone meanwhile — the row the
+ * sheet deleted — puts back nothing.
+ *
+ * At the very top of the page the browser keeps nothing still on purpose: what arrived above the
+ * list — a notice — pushes it down and stays in sight. Measured by the element, it was scrolled
+ * out from under the bar (adversarial В4). There the top stays the top.
+ */
+function putBack(anchor: SheetAnchor | null): void {
+  if (!anchor) return
+  if (anchor.scrolled < 1) {
+    if (window.scrollY !== 0) window.scrollTo({ top: 0, behavior: 'auto' })
+    return
+  }
+  if (!anchor.element?.isConnected) return
+  const shift = Math.round(anchor.element.getBoundingClientRect().top - anchor.top)
+  if (shift !== 0) window.scrollBy({ top: shift, behavior: 'auto' })
 }
 
 /**
@@ -39,13 +125,17 @@ function stackOf(router: Router): Holder[] {
   if (!stack) {
     const created: Holder[] = []
     stacks.set(router, created)
-    router.options.history.listen((_to, _from, { delta }) => {
+    router.options.history.listen((to, _from, { delta }) => {
       // Back by `delta` entries; an unknown distance is one. Forward past an open sheet cannot
       // happen: laying its entry cut the forward history away.
       const count = Math.min(delta < 0 ? -delta : delta === 0 ? 1 : 0, created.length)
-      for (const holder of created.splice(created.length - count, count).reverse()) {
-        holder.left()
-      }
+      const gone = created.splice(created.length - count, count).reverse()
+      for (const holder of gone) holder.left()
+      // Landed on the screen the lowest of them was opened over: that screen stays, and stands
+      // where it stood. Here and not in the router's `scrollBehavior`, which comes a tick later —
+      // after a sheet opened again at once («save and next») has taken its measure.
+      const lowest = gone.at(-1)
+      if (to === lowest?.at) putBack(lowest.anchor)
     })
     stack = created
   }
@@ -53,13 +143,14 @@ function stackOf(router: Router): Holder[] {
 }
 
 export function useSheetHistory(onLeft: () => void): {
-  lay: () => void
+  lay: (anchor?: SheetAnchor | null) => void
   leave: (steps?: number) => void
   laid: () => boolean
 } {
   const router = useRouter()
   const history = router.options.history
   const stack = stackOf(router)
+  watchActivations()
   let holder: Holder | undefined
   let stopMoves: (() => void) | undefined
   // Whether the screen under the sheet has an entry of the app beneath it: `null` for a section
@@ -83,9 +174,10 @@ export function useSheetHistory(onLeft: () => void): {
     if (history.state.sheet === true) history.replace(history.location, { sheet: false })
   }
 
-  function lay(): void {
+  function lay(anchor: SheetAnchor | null = null): void {
     if (holder) return
     const at = router.currentRoute.value.fullPath
+    const where = history.location
     screenBelow = history.state.back
     history.push(at, { sheet: true })
     const own: Holder = {
@@ -93,6 +185,8 @@ export function useSheetHistory(onLeft: () => void): {
         forget()
         onLeft()
       },
+      at: where,
+      anchor,
     }
     holder = own
     stack.push(own)
