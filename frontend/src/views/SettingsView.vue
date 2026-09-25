@@ -101,6 +101,7 @@
       v-model:open="leaveOpen"
       :unsent="unsent"
       :busy="signOut.leaving"
+      :offline="!online"
       :failure="signOut.failure"
       @confirm="signOut.leave"
     />

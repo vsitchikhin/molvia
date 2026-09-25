@@ -4,10 +4,17 @@
 
     <p class="words">{{ t('sign_out.body') }}</p>
     <p v-if="unsent > 0" class="warn">{{ t('sign_out.unsent', { n: unsent }, unsent) }}</p>
-    <p v-if="failure" class="failed" role="alert">{{ t(`sign_out.${failure}`) }}</p>
+    <p v-if="offline" class="warn">{{ t('sign_out.offline') }}</p>
+    <p v-else-if="failure" class="failed" role="alert">{{ t(`sign_out.${failure}`) }}</p>
 
     <template #footer>
-      <AppButton variant="danger-ghost" block :disabled="busy" @click="$emit('confirm')">
+      <AppButton
+        variant="danger-ghost"
+        block
+        :disabled="busy"
+        :inactive="offline"
+        @click="$emit('confirm')"
+      >
         {{ t('sign_out.confirm') }}
       </AppButton>
     </template>
@@ -38,6 +45,8 @@ export default defineComponent({
     /** Writes this device holds that the server does not have yet. */
     unsent: { type: Number, default: 0 },
     busy: { type: Boolean, default: false },
+    /** No connection now: the way out cannot be taken, and the sheet says so before a tap. */
+    offline: { type: Boolean, default: false },
     failure: { type: String as PropType<'offline' | 'error' | null>, default: null },
   },
   emits: {

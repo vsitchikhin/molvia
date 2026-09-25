@@ -234,6 +234,41 @@ describe('«Выйти» на этом устройстве', () => {
   })
 })
 
+describe('без связи «Выйти» не начинается (round 3, Е1)', () => {
+  it('кнопка неактивна и сказано почему; ничего не уходит и не записывается', async () => {
+    fillTheDrawer()
+    online(false)
+    const view = await render()
+    await askToLeave(view)
+
+    expect(sheet().textContent).toContain(en.sign_out.offline)
+    expect(confirmButton().getAttribute('aria-disabled')).toBe('true')
+    confirmButton().click()
+    await useSignOutStore().leave()
+    await flushPromises()
+
+    expect(logout).not.toHaveBeenCalled()
+    expect(localStorage.getItem('molvia.leaving')).toBeNull()
+  })
+
+  it('передумал у полки — следующий запуск без связи открывает приложение, а не вход', async () => {
+    fillTheDrawer()
+    online(false)
+    const view = await render()
+    await askToLeave(view)
+    await useSignOutStore().leave()
+    sheet().querySelector<HTMLButtonElement>('button[aria-label]')?.click()
+    await flushPromises()
+
+    setActivePinia(createPinia())
+    useSignOutStore()
+    const actor = useActorStore()
+    await actor.start()
+    expect(actor.state).toBe('offline')
+    expect(useLoginStore().closed).toBe(false)
+  })
+})
+
 describe('что «Выйти» считает пропадающим (adversarial Б3)', () => {
   it('отклонённую покупку и начатую, но не сохранённую оценку — тоже', async () => {
     localStorage.setItem('molvia.actor', OWNER)
@@ -385,6 +420,33 @@ describe('ответ, который пришёл не вовремя', () => {
     expect(replaced).toEqual(['/'])
   })
 
+  it('связь вернулась, сервер сказал «сессия жива» — намерение снято, ящик цел (self-review Р2-1)', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToLeave(view)
+    logout.mockImplementation(() => {
+      online(false)
+      return Promise.reject(new ApiError(ERROR.INTERNAL, 'offline', false))
+    })
+    confirmButton().click()
+    await flushPromises()
+
+    setActivePinia(createPinia())
+    useSignOutStore()
+    const actor = useActorStore()
+    await actor.start()
+    expect(actor.state).toBe('signed-out')
+
+    online(true)
+    me.mockResolvedValue(initial)
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(actor.state).toBe('ready')
+    expect(localStorage.getItem('molvia.leaving')).toBeNull()
+    expect(localStorage.getItem(`molvia.advice.${OWNER}`)).toBe('{}')
+    expect(replaced).toEqual([])
+  })
+
   it('незавершённый выход не открывает приложение без связи при следующем запуске', async () => {
     fillTheDrawer()
     const view = await render()
@@ -468,6 +530,26 @@ describe('выход в соседнем окне', () => {
     expect(actor.actor).toBeNull()
     expect(actor.state).toBe('signed-out')
     expect(me).not.toHaveBeenCalled()
+  })
+
+  it('вкладка, проснувшаяся после выхода в другом окне, отпускает владельца (round 3)', async () => {
+    // Заморожена браузером: событие `storage` проспала, память цела, состояние — `ready`.
+    localStorage.setItem('molvia.actor', OWNER)
+    sessionStorage.setItem('molvia.actor', OWNER)
+    await render()
+    const actor = useActorStore()
+    expect(actor.state).toBe('ready')
+
+    // Выход в другом окне стёр общую полку целиком — как `forgetOwner` там.
+    for (const key of Object.keys(localStorage)) {
+      if (key === 'molvia.actor' || key.endsWith(`.${OWNER}`)) localStorage.removeItem(key)
+    }
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+
+    expect(actor.id).toBeNull()
+    expect(actor.state).toBe('signed-out')
+    expect(sessionStorage.getItem('molvia.actor')).toBeNull()
   })
 
   it('контроль: запись ящика, а не его исчезновение, владельца не отпускает', async () => {

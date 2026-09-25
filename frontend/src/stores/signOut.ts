@@ -28,6 +28,11 @@ import { whileQueueIsStill } from '@/stores/tripQueue'
  * A store rather than a composable for that reason: it has to hear the identity settle from the
  * moment the app starts, the screen with the button or not.
  */
+/** Read afresh each time: the connection read before an `await` says nothing about after it. */
+function connected(): boolean {
+  return navigator.onLine
+}
+
 export const useSignOutStore = defineStore('signOut', () => {
   const actor = useActorStore()
   /** The request is on its way — the sheet holds its button. */
@@ -57,6 +62,13 @@ export const useSignOutStore = defineStore('signOut', () => {
   async function leave(): Promise<void> {
     const owner = actor.id
     if (leaving.value || !owner) return
+    // Known offline before anything is sent — the approved plan's «only with a connection» — so
+    // nothing leaves and nothing is left behind (round 3, Е1). A cancelled tap at the shelf with no
+    // signal used to leave an intent that locked the app at the next launch until a signal came.
+    if (!connected()) {
+      failure.value = 'offline'
+      return
+    }
     leaving.value = true
     failure.value = null
     markLeaving(owner)
@@ -65,7 +77,7 @@ export const useSignOutStore = defineStore('signOut', () => {
       await api.logout()
     } catch {
       // Decided after the failure (MOL-19, A1).
-      failure.value = navigator.onLine ? 'error' : 'offline'
+      failure.value = connected() ? 'error' : 'offline'
       leaving.value = false
       // The server may have said «nobody» while this was in flight — its settling was skipped
       // then, and nothing will settle it again. Only that: an answer «this owner» given meanwhile

@@ -299,8 +299,25 @@ export const useActorStore = defineStore('actor', () => {
   }
   window.addEventListener('online', recover)
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') recover()
+    if (document.visibilityState === 'visible') {
+      awake()
+      recover()
+    }
   })
+  // A page restored from the back-forward cache comes back with its memory and without the events
+  // it missed, `storage` among them.
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) awake()
+  })
+
+  /**
+   * A tab the browser froze, or kept in the back-forward cache, wakes with its memory and without
+   * the `storage` event of a «Выйти» in another window — and `recover` starts nothing from
+   * `ready`. So the check of a launch is made here too (round 3, «не проверял»).
+   */
+  function awake(): void {
+    if (id.value !== null && erasedWhileAway()) release()
+  }
 
   /**
    * Lets the owner go in this window (MOL-57): nobody is signed in here any more, and nothing may

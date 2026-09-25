@@ -1306,7 +1306,10 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   before it cannot write the drawer's name back (adversarial Б1, self-review С-2); then the drawer
   goes under the trip queue's lock, and the page is loaded afresh at `/`. **Offline there is no
   way out at all** — the cookie is `HttpOnly`, the page cannot put it out, and a session left
-  alive is what the person came to end — and the sheet says so.
+  alive is what the person came to end — and the sheet says so **before a tap**: the button is
+  inactive and nothing is sent or written down (round 3, Е1). A tap known to be offline used to
+  leave an intent behind, and a person who changed their mind at the shelf met the login screen
+  at the next launch.
 - **A lost `204` is settled by the server's next answer, and by nothing else** (adversarial Б2,
   round 2 Д1, Д3). The intent, `molvia.leaving`, is written before the request leaves: if the
   server deleted the session and the answer never came, the first `401` closed the door on the
@@ -1317,7 +1320,10 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   conclusion, and erasing on it threw away a purchase from the shelf while the session lived on.
   Closing the sheet after a failure does not withdraw the intent — the outcome is unknown — it
   asks the server; so does a return of the connection or of the app while the intent waits. The
-  listener is a store of its own (`stores/signOut`), created with the app.
+  listener is a store of its own (`stores/signOut`), created with the app. **The price, named:**
+  a connection lost while the request was on its way leaves the outcome unknown, and a launch with
+  no connection then shows the login screen until the server can be asked — the drawer of someone
+  who may have left is not opened on a guess.
 - **What would be lost is counted aloud** (owner's decision Q2) — everything the erasure takes
   that the server does not hold: the trip queue and the purchases it refused, every rating draft,
   saved or still being typed, and an unsaved settings form (adversarial Б3). The app is asked to
@@ -1331,7 +1337,9 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   shelf with not one key of the owner on a shared shelf that works was erased elsewhere — a tab
   the browser unloaded, or one closed and reopened, gets its `sessionStorage` back without the
   event. A shared shelf that refuses a probe write says nothing: then this tab's shelf is the only
-  one, legitimately (Safari's private mode).
+  one, legitimately (Safari's private mode). A tab that wakes with its memory — frozen by the
+  browser, or restored from the back-forward cache — checks on `visibilitychange` and `pageshow`
+  too, because `recover` starts nothing from `ready`.
 - **«Это не я» and the login's poll take turns** (adversarial Г1). The way out's `Max-Age=0` is
   addressed to the cookie's name, not to a token, so a poll that collected this person's own
   session and answered first had it put out of the jar. `refuse` waits for a poll already on its
