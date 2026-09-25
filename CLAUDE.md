@@ -331,13 +331,20 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   into the words it also stands for — a group of the same thing both ways, a wider word into
   narrower ones one way («арахис» never finds «Фисташки»). Only the query is expanded and
   nothing is stored, so **the dictionary is not frozen**: a word added is a commit, not a
-  migration. **A synonym counts only as the first word of a name, at no cost** (owner's
-  decision on review): the kind stands first on a shelf — «Вода Джермук», «Скумбрия х/к» — and
-  anywhere in the name it found «Мицеллярная вода» for «минералка», the tuna of a cat food for
-  «рыба», a pizza for «сыр»; the price is a name with its brand first («Barilla спагетти»), which
-  only its own word finds. Its candidates come from `like 'word%'` on the same GIN index, not
-  from `%>`: at 0.15 each of the eight fish of «рыба» brought in half of 20 000 names and the
-  query took six seconds. **The typed spelling is not measured only for a word whose synonym
+  migration. **A synonym counts only as the word of the kind, at no cost** — the first word of
+  a name that is not an adjective, `kindKey` (owner's decisions on review): «Вода Джермук»,
+  «Скумбрия х/к», «Молодой картофель», «Армянский лаваш». Anywhere in the name it found
+  «Мицеллярная вода» for «минералка», the tuna of a cat food for «рыба», a pizza for «сыр»; the
+  first word alone missed every name with an adjective in front, which is how people write it.
+  An adjective is read off the name by its ending (`ADJECTIVE_WORD`, one pattern for the domain
+  and for Postgres), not off the key, which collapses «солёный» to `soleni`, the ending of
+  «огурцы». A synonym that is itself an adjective — «минеральная», «гречневая» — is never the
+  kind, and counts as any word of the name. «вода» is no longer a target of «минералка»: the
+  water is in «Вода туалетная» first word and all. The prices: «Вода Джермук» without the word is
+  not a «минералка», a name with its brand first («Barilla спагетти») is found only by its own
+  word, and «Фарш рыбный» is meat to «мясо». Its candidates come from `like '%word%'` on the
+  same GIN index, not from `%>`: at 0.15 each of the eight fish of «рыба» brought in half of
+  20 000 names and the query took six seconds. **The typed spelling is not measured only for a word whose synonym
   brought the name in** — «лори» brings «Рис», and `sir` is two edits from `ris`; but «хаггис»
   of «памперсы хаггис» is still measured against the «Huggies» that «подгузники» brought. **A
   word found by its synonym stays out of the mean** of MOL-10: free, it lent its budget to the
@@ -354,19 +361,22 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   nothing else moved; the words come from the owner's expense log plus the usual pairs of a
   grocery. The prices, named: a typo in the synonym itself is not expanded, and a name with no
   word of its kind («Coca-Cola 1 л» for «газировка») stays out of reach. Offline, «Часто берёте»
-  reads the dictionary by the same rules — the kind first, a pair for every word.
+  reads the dictionary by the same rules — the word of the kind, a pair for every word.
 - **And the person's own word (MOL-45).** A query the server found nothing for, followed on
   the same screen by a pick found by another word, is learnt with the purchase —
   `search_picks.admits` — and from then on **exactly that query** lets the item in: the one
   written exception to «never lets in what the search did not accept», and personal for the
-  reason memory is. **It is let in, not lifted**: what the search finds by itself comes first
-  (owner's decision on review) — «кефир» learnt as the milk taken in its place stops standing
-  above the kefir the day there is one. **Only the first sheet opened after a miss may take it
+  reason memory is. **It stands below an exact match and a pick, above a typo** (owner's
+  decisions on review): «кефир» learnt as the milk taken in its place stops standing above the
+  kefir the day there is one, and the potato learnt for «овощи» stays above the flour the absolute
+  budget finds there (MOL-46) — the words a person teaches are the ones the search misses. **Only the first sheet opened after a miss may take it
   along**, and every pick uses it up: a milk looked at and put back does not make the bread
   taken next the meaning of «кефир». Not when one query starts the other — «сыр» after «сыр
-  косичка» is the same query cut short, and «Кефир» is «кефир »; the server skips a missed query
-  with the key of the found one too. Erasing back keeps the word, compared as typed rather than by
-  key («дет» is not the start of `deцkoe`); a pick from the recent items or from «Предложить
+  косичка» is the same query cut short, and «Кефир» is «кефир » — compared as typed _or_ by the
+  key, since each alone misses: «дет» is not the start of `deцkoe`, and «сгущенка» is not the
+  start of «сгущёнка варёная» as typed. The server skips a missed query whose key starts the found
+  one or the other way round too. Erasing back keeps the word by the same rule; a pick from the
+  recent items or from «Предложить
   товар» learns nothing. It is not checked against the search: a real substitution — no kefir,
   milk taken — is learnt as it is, and costs its owner one row on that exact query. A dictionary
   grown from everyone's words is 0.2's, and would need three people, as any aggregate does.
