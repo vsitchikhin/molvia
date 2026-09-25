@@ -1,6 +1,10 @@
 <template>
   <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
-    <template #title>{{ t('devices.end_sheet.title', { device }) }}</template>
+    <template #title>{{
+      device === null
+        ? t('devices.end_sheet.title_unknown')
+        : t('devices.end_sheet.title', { device })
+    }}</template>
 
     <p class="words">{{ t('devices.end_sheet.body') }}</p>
     <p v-if="failed" class="failed" role="alert">{{ t('devices.end_failed') }}</p>
@@ -15,6 +19,7 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -32,8 +37,8 @@ export default defineComponent({
   components: { AppButton, BottomSheet },
   props: {
     open: { type: Boolean, required: true },
-    /** The device as the list names it — «Неизвестное устройство» included. */
-    device: { type: String, default: '' },
+    /** The device's name, or `null` for one that has none — its sentence is a different one. */
+    device: { type: String as PropType<string | null>, default: null },
     busy: { type: Boolean, default: false },
     failed: { type: Boolean, default: false },
   },

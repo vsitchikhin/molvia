@@ -73,8 +73,11 @@ export function useSessions(): Sessions {
       void load()
     },
   )
+  // Every return, not only one after a failure (adversarial В2): an installed app comes back to
+  // this screen hours later, and a list kept in memory that long is the copy this composable
+  // refuses to keep on the disk — a stranger's login meanwhile would not be in it.
   useReconnect(() => {
-    if (failure.value) void load()
+    void load()
   })
 
   return {
@@ -102,6 +105,16 @@ export function useSessions(): Sessions {
         }
       }
       ending.value = null
+      // Gone from the screen at once, not when the list is read again (adversarial В1): with that
+      // read failing, the device just ended stayed in the list with its button under the words
+      // «ended», and nothing said the list was stale.
+      const shown = list.value
+      if (shown?.sessions.some((row) => row.id === session.id)) {
+        list.value = {
+          sessions: shown.sessions.filter((row) => row.id !== session.id),
+          total: Math.max(0, shown.total - 1),
+        }
+      }
       await load()
       return true
     },

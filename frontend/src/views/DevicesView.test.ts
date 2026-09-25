@@ -172,7 +172,60 @@ describe('«Устройства»', () => {
   })
 })
 
+describe('свежесть списка', () => {
+  it('перечитывается при возвращении в приложение, а не только после сбоя (adversarial В2)', async () => {
+    sessions.mockResolvedValueOnce(both)
+    const view = await render()
+    sessions.mockResolvedValue({
+      sessions: [
+        ...both.sessions,
+        session({
+          id: 'd3d3d3d3-3333-4333-8333-333333333333',
+          deviceName: 'Linux · Firefox',
+          current: false,
+        }),
+      ],
+      total: 3,
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(view.text()).toContain('Linux · Firefox')
+  })
+})
+
+describe('неизвестное устройство', () => {
+  it('называется целой фразой, а не именем в чужом падеже (self-review С-4)', async () => {
+    sessions.mockResolvedValue({
+      sessions: [session({}), session({ id: LAPTOP, deviceName: null, current: false })],
+      total: 2,
+    })
+    const view = await render()
+    expect(view.findAll('li')[1]?.find('button').attributes('aria-label')).toBe(
+      en.devices.end_label_unknown,
+    )
+    await askToEnd(view)
+    expect(document.querySelector('dialog[open]')?.textContent).toContain(
+      en.devices.end_sheet.title_unknown,
+    )
+  })
+})
+
 describe('«Завершить»', () => {
+  it('строка уходит сразу, даже если перечитать список не вышло (adversarial В1)', async () => {
+    sessions.mockResolvedValueOnce(both)
+    const view = await render()
+    await askToEnd(view)
+
+    endSession.mockResolvedValue(undefined)
+    sessions.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+    confirmButton().click()
+    await flushPromises()
+
+    const rows = view.findAll('li')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.text()).toContain(en.devices.this_device)
+  })
+
   it('сначала спрашивает, называя устройство, и только потом завершает', async () => {
     sessions.mockResolvedValueOnce(both)
     const view = await render()

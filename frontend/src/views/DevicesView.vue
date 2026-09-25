@@ -35,7 +35,7 @@
           <AppButton
             v-if="!session.current"
             variant="danger-ghost"
-            :aria-label="t('devices.end_label', { device: nameOf(session) })"
+            :aria-label="said('devices.end_label', session.deviceName)"
             @click="ask(session)"
           >
             {{ t('devices.end') }}
@@ -50,7 +50,7 @@
 
     <SessionEndSheet
       v-model:open="sheetOpen"
-      :device="target ? nameOf(target) : ''"
+      :device="target?.deviceName ?? null"
       :busy="ending !== null"
       :failed="endFailed"
       @confirm="confirm"
@@ -75,7 +75,7 @@ import ScreenState from '@/components/ScreenState.vue'
 import SessionEndSheet from '@/components/SessionEndSheet.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useSessions } from '@/composables/useSessions'
-import { purchaseDay } from '@/days'
+import { dayOfAnyYear } from '@/days'
 
 /**
  * «Устройства» (MOL-57), under «Настройки»: every live way into the account, this one first and
@@ -111,11 +111,11 @@ export default defineComponent({
     async function confirm(): Promise<void> {
       const session = target.value
       if (!session) return
-      const device = nameOf(session)
+      const device = session.deviceName
       if (!(await sessions.end(session))) return
       sheetOpen.value = false
       unsay?.()
-      unsay = announce?.(t('devices.ended', { device }))
+      unsay = announce?.(said('devices.ended', device))
       await nextTick()
       caption.value?.focus()
     }
@@ -124,8 +124,12 @@ export default defineComponent({
       if (!open) sessions.endFailed.value = false
     })
 
-    const dayOf = (when: Date): string => purchaseDay(when, locale.value)
+    const dayOf = (when: Date): string => dayOfAnyYear(when, locale.value)
     const nameOf = (session: SessionView): string => session.deviceName ?? t('devices.unknown')
+    // «на Неизвестное устройство» is the name put into a sentence as it is; an unknown device gets
+    // a sentence of its own, with the words in their case (self-review С-4).
+    const said = (key: string, device: string | null): string =>
+      device === null ? t(`${key}_unknown`) : t(key, { device })
     const metaOf = (session: SessionView): string =>
       session.current
         ? t('devices.meta_current', { signedIn: dayOf(session.createdAt) })
@@ -149,6 +153,7 @@ export default defineComponent({
       ask,
       confirm,
       nameOf,
+      said,
       metaOf,
       iconOf,
     }
