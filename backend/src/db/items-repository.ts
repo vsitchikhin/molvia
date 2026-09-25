@@ -127,6 +127,23 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     .flatMap((word, index) => synonymKeys(word).map((synonym) => [synonym, index + 1] as const))
   const synonymWords = synonyms.map(([synonym]) => synonym).join(' ')
   const synonymOf = synonyms.map(([, n]) => n).join(' ')
+  // Without a synonym every candidate of the index was found by what was typed, and asking the
+  // operator again per row is what «мо» over 20 000 names paid for.
+  const typedHere =
+    synonyms.length === 0
+      ? sql`true`
+      : sql`(${items.searchKey} %> ${key} or ${items.searchKey} = ${key})`
+  // Measured only when there is a synonym at all: the query words of most searches have none,
+  // and a subquery per candidate and word to find that out doubled the time of «малако».
+  const bySynonymWord =
+    synonyms.length === 0
+      ? sql`null::int`
+      : sql`case when exists (
+                    select 1
+                    from synonyms s
+                    join unnest(string_to_array(c.search_key, ' ')) as w(word) on w.word = s.word
+                    where s.n = qw.n
+                  ) then 0 end`
   // A synonym counts only as a whole word of a name, so its candidates are the names that
   // contain it, not those that merely resemble it: `%>` at 0.15 brought in half of 20 000
   // names for each of the eight fish of «рыба» and took six seconds. `like` is served by the
@@ -172,7 +189,7 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              -- Found by what was typed, not only by a synonym. The typed word's edit budget
              -- applies to these alone: a name brought in by «лори» for «сыр» is no candidate
              -- of «сыр», and measured against it anyway, «Рис» passed as two edits from \`sir\`.
-             (${items.searchKey} %> ${key} or ${items.searchKey} = ${key}) as typed
+             ${typedHere} as typed
       from ${items}
       where ${items.searchKey} %> ${key} or ${items.searchKey} = ${key}${sql.join(bySynonym)}
       -- Every candidate is ranked, with no ceiling. Any cut here is wrong in one of two ways:
@@ -183,7 +200,10 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       -- by MAX_QUERY_WORDS; measured in MOL-10, under 260 ms at every threshold in MOL-14.
       -- A branch of its own rather than an \`or\` above: \`id in (…)\` beside the trigram
       -- conditions is not something the GIN index can serve, and the whole scan would fall back.
-      union
+      -- \`union all\`: an item both found and learnt comes twice, and the ranking does not mind —
+      -- a repeated row changes neither a mean nor a worst — while \`union\` sorted thousands of
+      -- candidates to find it, and doubled «малако» on 20 000 names.
+      union all
       select ${items.id}, ${items.searchKey},
              word_similarity(${key}, ${items.searchKey}),
              (${items.searchKey} %> ${key} or ${items.searchKey} = ${key})
@@ -192,7 +212,7 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     ),
     per_word as (
       select c.id, qw.grounds, qw.lettered,
-             (
+             case when c.typed then (
                select min(
                  -- The screen searches while the person types, so the last word is usually
                  -- unfinished: it may also match the start of a name word. Exactly at two or
@@ -209,23 +229,19 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                from unnest(string_to_array(c.search_key, ' ')) as w
                -- A grounding word is measured against grounding words only: against «л» or
                -- «1» of a size every two-letter word is two edits away, inside the budget.
-               where c.typed
-                 and (not qw.grounds or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]'))
-             ) as qd_typed,
+               where not qw.grounds or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]')
+             ) end as qd_typed,
              -- A synonym is a word, not a typo: it counts only as a whole word of the name, and
              -- then costs nothing. With the edit budget on top, «мясо» expanded into five
              -- words would have five chances of the absolute budget's false hits (MOL-46).
-             case when exists (
-                    select 1
-                    from synonyms s
-                    join unnest(string_to_array(c.search_key, ' ')) as w(word) on w.word = s.word
-                    where s.n = qw.n
-                  ) then 0 end as qd_synonym
+             ${bySynonymWord} as qd_synonym
       from candidates c
       cross join query_words qw
     ),
-    per_word_best as (
+    per_word_best as materialized (
       -- \`least\` skips a null, so a word found only by its synonym is still found.
+      -- Materialized, or the planner folds it into every aggregate below and into the filter on
+      -- the distance, and each of them runs the levenshtein subquery again for the same row.
       select id, grounds, lettered, least(qd_typed, qd_synonym) as qd from per_word
     ),
     ranked as (
