@@ -235,6 +235,26 @@ describe('/delete — человек удаляет себя сам (MOL-58)', (
     }
   })
 
+  // Adversarial Р-2: the expired branch took the buttons away in silence, like «Отмена» did.
+  it('устаревшая кнопка без алерта говорит в чат и только потом убирает кнопки', async () => {
+    const eraseMe = vi.fn()
+    const { bot, calls } = harness({ eraseMe }, NOW, ['answerCallbackQuery'])
+
+    await bot.handleUpdate(press(`erase:ok:${String(NOW - ERASE_BUTTON_SECONDS - 1)}`))
+
+    expect(eraseMe).not.toHaveBeenCalled()
+    expect(sent(calls, 'sendMessage')?.text).toBe(t('ru', 'erase.expired'))
+    expect(sent(calls, 'editMessageReplyMarkup')).toBeDefined()
+  })
+
+  it('устаревшая кнопка, которую не удалось объяснить никак, остаётся', async () => {
+    const { bot, calls } = harness({}, NOW, ['answerCallbackQuery', 'sendMessage'])
+
+    await bot.handleUpdate(press(`erase:ok:${String(NOW - ERASE_BUTTON_SECONDS - 1)}`))
+
+    expect(sent(calls, 'editMessageReplyMarkup')).toBeUndefined()
+  })
+
   it('кнопка без времени — устаревшая, не «вечная»', async () => {
     const eraseMe = vi.fn()
     const { bot } = harness({ eraseMe })

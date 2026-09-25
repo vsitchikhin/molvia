@@ -824,8 +824,16 @@ database access. In a product about data integrity, two write paths will silentl
   was not there — «nobody to erase» over a live account. Collection locks its request row before
   creating the owner, so the two take turns; and a request not yet confirmed has no Telegram id to
   be locked by, so confirmation and erasure share `lockTelegramAccount`, an advisory lock on the
-  account taken first by both. The bot's `sequentialize` happens to order one chat's presses too,
-  but that is another module's promise and the two API routes have no order of their own. **The page and the bot name what stays in full** — the items and the shops —
+  account taken first by both — and so does **whatever makes an owner**: `create` and `createIfMissing` take
+  it themselves (Р-1), so no path — the login, the development seam, whatever comes next — makes an
+  owner inside an erasure. Collection takes the account's lock before its request row (read, lock,
+  read again), because taken after it, a collection and an erasure could each wait on the other.
+  One order everywhere: the account, then request rows, then the owner. The bot's `sequentialize`
+  happens to order one chat's presses too, but that is another module's promise and the two API
+  routes have no order of their own. **Cleaning expired requests skips locked rows** (Р-3): it runs
+  under the one quota lock every login start takes, and waiting there for an erasure — or a dry
+  run of one — holding a person's expired request closed the door to everybody. A dry run still
+  holds that one account's lock for as long as it runs. **The page and the bot name what stays in full** — the items and the shops —
   and say that copies on the phone are out of the server's reach: nothing clears a device's
   storage for an owner the server no longer knows, since a 401 there is also an expired session.
 - **No third-party trackers or analytics, and so no cookie banner** (MOL-58). There are two
@@ -969,7 +977,9 @@ Rating reminders are 0.2.
   words are true whichever button came first — written in, «Ничего не удалено» overwrote «Готово»
   over an account already gone. When Telegram will not take the alert, the same words go under
   the message as a reply, and the buttons go only once something was said (П-4): a refusal may be
-  silent because its buttons stay, and this one takes them. The erase composer is installed **before** the login's, which
+  silent because its buttons stay, and this one takes them. **A button too old to mean yes is
+  answered the same way** (Р-2) — it too takes the buttons, and it was «Удалить навсегда» that
+  was pressed. The erase composer is installed **before** the login's, which
   ends in a catch-all that greets every text.
 
 - **The i18n rule of the frontend covers the bot too, and this is the line that says so.** Not a
