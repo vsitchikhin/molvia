@@ -338,8 +338,15 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   first word alone missed every name with an adjective in front, which is how people write it.
   An adjective is read off the name by its ending (`ADJECTIVE_WORD`, one pattern for the domain
   and for Postgres), not off the key, which collapses «солёный» to `soleni`, the ending of
-  «огурцы». A synonym that is itself an adjective — «минеральная», «гречневая» — is never the
-  kind, and counts as any word of the name. «вода» is no longer a target of «минералка»: the
+  «огурцы»; nouns with that ending — «Пирожное», «Мороженое», «Жаркое» — are listed apart
+  (`NOUN_WORD`), or «Пирожное Картошка» was a potato. The words of a name are split by one
+  written-out class, `WORD_BREAK` — every Unicode `White_Space` — in both places: `\s` of
+  JavaScript takes the no-break space and `\s` of Postgres does not, and a name pasted with one
+  was found offline and missed online; a test walks every code point, as for `INVISIBLE`. A
+  narrower target that is itself an adjective — «минеральная», «газированная» — is never the
+  kind, and counts as any word of the name; an adjective of a group of the same thing —
+  «гречневая», «овсяная» — counts only as the kind, since it describes «Лапша гречневая» as
+  often as the groats (owner's decision on review). «вода» is no longer a target of «минералка»: the
   water is in «Вода туалетная» first word and all. The prices: «Вода Джермук» without the word is
   not a «минералка», a name with its brand first («Barilla спагетти») is found only by its own
   word, and «Фарш рыбный» is meat to «мясо». Its candidates come from `like '%word%'` on the
@@ -366,10 +373,12 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   the same screen by a pick found by another word, is learnt with the purchase —
   `search_picks.admits` — and from then on **exactly that query** lets the item in: the one
   written exception to «never lets in what the search did not accept», and personal for the
-  reason memory is. **It stands below an exact match and a pick, above a typo** (owner's
-  decisions on review): «кефир» learnt as the milk taken in its place stops standing above the
-  kefir the day there is one, and the potato learnt for «овощи» stays above the flour the absolute
-  budget finds there (MOL-46) — the words a person teaches are the ones the search misses. **Only the first sheet opened after a miss may take it
+  reason memory is. **It stands below a find of the very words and a pick, above a typo in a
+  word** (owner's decisions on review): «кефир» learnt as the milk taken in its place stops
+  standing above the kefir the day there is one, in any size — «кефир 1 л» against «0,5 л» is the
+  same words — and the potato learnt for «овощи» stays above the flour the absolute budget finds
+  there (MOL-46): the words a person teaches are the ones the search misses. The price, named: a
+  kefir found only through a typo of the query («кефра») stays below the learnt milk. **Only the first sheet opened after a miss may take it
   along**, and every pick uses it up: a milk looked at and put back does not make the bread
   taken next the meaning of «кефир». Not when one query starts the other — «сыр» after «сыр
   косичка» is the same query cut short, and «Кефир» is «кефир » — compared as typed _or_ by the
