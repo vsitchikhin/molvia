@@ -1,5 +1,5 @@
-import { and, eq, sql } from 'drizzle-orm'
-import { exchangeRateSchema } from '@molvia/model'
+import { and, eq, gte, or, sql } from 'drizzle-orm'
+import { exchangeRateSchema, monthOf } from '@molvia/model'
 import type { Currency, ExchangeRate, TripLine } from '@molvia/model'
 import type { Conn } from './index'
 import { moneyMonthRates } from './schema'
@@ -16,7 +16,7 @@ export interface MoneyRepository {
    */
   tripLines(actorId: string, from: string, to: string): Promise<readonly TripLine[]>
 
-  /** The rate `month` was frozen at, of this pair, or null when it has not been frozen yet. */
+  /** The rate `month` was frozen at, of this pair on either side, or null when it is not frozen. */
   frozenRate(
     actorId: string,
     month: string,
@@ -26,6 +26,14 @@ export interface MoneyRepository {
 
   /** Freezes `month` at `rate` — once: a rate already there stays, and is what comes back. */
   freeze(actorId: string, month: string, rate: ExchangeRate): Promise<ExchangeRate>
+
+  /**
+   * Lets go of the months frozen from `day` on (owner's decision В-6): an exchange or an income of
+   * that day was written, amended, removed or brought back, and every month whose last day is not
+   * before it was counted without that. The running month is never frozen, so today's exchange
+   * lets go of nothing — which is what «a new exchange today does not move August» means.
+   */
+  thaw(actorId: string, day: string): Promise<void>
 }
 
 interface TripLineRow extends Record<string, unknown> {
@@ -47,8 +55,10 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
         and(
           eq(moneyMonthRates.actorId, actorId),
           eq(moneyMonthRates.month, month),
-          eq(moneyMonthRates.base, base),
-          eq(moneyMonthRates.quote, quote),
+          or(
+            and(eq(moneyMonthRates.base, base), eq(moneyMonthRates.quote, quote)),
+            and(eq(moneyMonthRates.base, quote), eq(moneyMonthRates.quote, base)),
+          ),
         ),
       )
     return row
@@ -78,7 +88,7 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
         select f.id as trip_id, f.place_name, f.finished_at,
                to_char(f.finished_at at time zone 'Asia/Yerevan', 'YYYY-MM-DD') as finished_on,
                e.amount_currency as currency, sum(e.amount_minor) as amount_minor,
-               (select count(*) from expenses all_e where all_e.trip_id = f.id) as items
+               count(*) as items
           from finished f
           join expenses e on e.trip_id = f.id and e.amount_minor is not null
          group by f.id, f.place_name, f.finished_at, e.amount_currency
@@ -109,6 +119,12 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
         })
         .onConflictDoNothing()
       return (await frozenRate(actorId, month, rate.base, rate.quote)) ?? rate
+    },
+
+    async thaw(actorId, day) {
+      await db
+        .delete(moneyMonthRates)
+        .where(and(eq(moneyMonthRates.actorId, actorId), gte(moneyMonthRates.month, monthOf(day))))
     },
   }
 }
