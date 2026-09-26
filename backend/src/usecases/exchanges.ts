@@ -10,6 +10,7 @@ import {
   ownRates,
   pickOfficialRate,
   receiptDay,
+  resourceIdOf,
   yerevanDate,
   yerevanMidnight,
 } from '@molvia/model'
@@ -36,6 +37,8 @@ import type {
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
+/** A write also lets go of the months frozen without it (MOL-73, В-6). */
+type Writing = Repositories & Pick<TripRepositories, 'money'>
 type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
 
 const FOREIGN = currencySchema.options.filter(
@@ -80,10 +83,18 @@ export function officialRateOf(
   cached: ReadonlyMap<string, readonly CachedRate[]>,
   base: Currency,
 ): OfficialRateOf {
-  return (currency, day) => {
-    const rate = steadyOf(pickOfficialRate(base, currency, cached.get(day) ?? [], day))
-    return rate && isRateFresh(yerevanDate(rate.asOf), day) ? rate : null
-  }
+  return (currency, day) => freshOfficialRate(base, currency, cached.get(day) ?? [], day)
+}
+
+/** The official rate of the pair on `day`, judged as above and fresh for that day — or null. */
+export function freshOfficialRate(
+  base: Currency,
+  quote: Currency,
+  rows: readonly CachedRate[],
+  day: string,
+): ExchangeRate | null {
+  const rate = steadyOf(pickOfficialRate(base, quote, rows, day))
+  return rate && isRateFresh(yerevanDate(rate.asOf), day) ? rate : null
 }
 
 /** The Yerevan day the currency of conversion changed on, or null when it never did. */
@@ -307,8 +318,24 @@ export async function readExchanges(
   return exchangesOverview(repositories, owner, now)
 }
 
+/** The day of the owner's live exchange, or null — what a write lets the frozen months go from. */
+async function dayOfExchange(
+  repositories: Pick<Repositories, 'exchanges'>,
+  owner: Pick<Owner, 'id'>,
+  id: string,
+): Promise<string | null> {
+  const own = resourceIdOf(id)
+  const exchanges = await repositories.exchanges.list(owner.id)
+  return exchanges.find((exchange) => exchange.id === own)?.exchangedOn ?? null
+}
+
+/** The earlier of two days, the known one when only one is. */
+export function earlier(one: string | null, other: string): string {
+  return one !== null && one < other ? one : other
+}
+
 export async function recordExchange(
-  repositories: Repositories,
+  repositories: Writing,
   owner: Owner,
   body: ExchangeBody,
   now: Date = new Date(),
@@ -316,6 +343,7 @@ export async function recordExchange(
   if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
   await repositories.exchanges.purgeRemoved(owner.id)
   const { created } = await repositories.exchanges.add(owner.id, body)
+  await repositories.money.thaw(owner.id, body.exchangedOn)
   return { overview: await exchangesOverview(repositories, owner, now), created }
 }
 
@@ -325,7 +353,7 @@ export async function recordExchange(
  * trips from now on count by the amended exchange — and its history says why the two differ.
  */
 export async function amendExchange(
-  repositories: Repositories,
+  repositories: Writing,
   owner: Owner,
   id: string,
   body: ExchangeAmendBody,
@@ -333,7 +361,9 @@ export async function amendExchange(
 ): Promise<ExchangesResponse> {
   if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
   await repositories.exchanges.purgeRemoved(owner.id)
+  const before = await dayOfExchange(repositories, owner, id)
   await repositories.exchanges.amend(owner.id, id, body)
+  await repositories.money.thaw(owner.id, earlier(before, body.exchangedOn))
   return exchangesOverview(repositories, owner, now)
 }
 
@@ -344,13 +374,15 @@ export async function amendExchange(
  * — but never this one, when the removal is sent again after a lost answer (round 3, Д2).
  */
 export async function removeExchange(
-  repositories: Repositories,
+  repositories: Writing,
   owner: Owner,
   id: string,
   now: Date = new Date(),
 ): Promise<ExchangesResponse> {
   await repositories.exchanges.purgeRemoved(owner.id, id)
+  const day = await dayOfExchange(repositories, owner, id)
   await repositories.exchanges.remove(owner.id, id)
+  if (day !== null) await repositories.money.thaw(owner.id, day)
   return exchangesOverview(repositories, owner, now)
 }
 
@@ -360,7 +392,7 @@ export async function removeExchange(
  * missing row does.
  */
 export async function restoreExchange(
-  repositories: Repositories,
+  repositories: Writing,
   owner: Owner,
   id: string,
   now: Date = new Date(),
@@ -368,17 +400,25 @@ export async function restoreExchange(
   if (!(await repositories.exchanges.restore(owner.id, id))) {
     throw new DomainError(ERROR.NOT_FOUND)
   }
+  const day = await dayOfExchange(repositories, owner, id)
+  if (day !== null) await repositories.money.thaw(owner.id, day)
   return exchangesOverview(repositories, owner, now)
 }
 
-/** «Мой / Официальный» (В-3): for trips from now on. */
+/**
+ * «Мой / Официальный» (В-3): for trips from now on — a trip keeps the rate it took. The months of
+ * «Деньги» are counted by it, not snapshotted by it, so every frozen one is let go and counted by the
+ * new rule when next read (MOL-73, owner's decision В-8): two past months by two rules, decided by
+ * which was opened first, was the alternative.
+ */
 export async function chooseRatePreference(
-  repositories: Repositories,
+  repositories: Writing,
   owner: Owner,
   preference: RatePreference,
   now: Date = new Date(),
 ): Promise<ExchangesResponse> {
   await repositories.exchanges.purgeRemoved(owner.id)
   await repositories.exchanges.setPreference(owner.id, preference)
+  await repositories.money.thaw(owner.id)
   return exchangesOverview(repositories, owner, now)
 }

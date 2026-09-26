@@ -36,6 +36,8 @@ import {
   rateProviderSchema,
   ratePreferenceSchema,
   rateSourceSchema,
+  SPENDING_CATEGORY_COLOURS,
+  spendingPresetSchema,
 } from '@molvia/model'
 import type {
   BaseUnit,
@@ -49,6 +51,7 @@ import type {
   RateProvider,
   RatePreference,
   RateSource,
+  SpendingPreset,
 } from '@molvia/model'
 
 /**
@@ -893,6 +896,145 @@ export const incomeRevisions = pgTable(
     check('income_revisions_amount_positive', sql`${table.amountMinor} > 0`),
     check('income_revisions_currency_known', oneOf(table.currency, currencySchema.options)),
     check('income_revisions_source_known', oneOf(table.source, incomeSourceSchema.options)),
+  ],
+)
+
+/**
+ * A person's spending categories (MOL-73, В-3): the presets every account is given and the ones they
+ * made. Each account has its own list, because people's categories differ. Removing one is
+ * `archived_at`, never a delete: the spendings in it keep it, and past months keep their sums.
+ */
+export const spendingCategories = pgTable(
+  'spending_categories',
+  {
+    // A preset's row is named by the server; one's own by the device, as everything written
+    // offline is — a category made at a shelf with no signal is one category when it arrives.
+    id: uuid('id').primaryKey(),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    preset: text('preset').$type<SpendingPreset>(),
+    name: text('name'),
+    colour: smallint('colour'),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    // The pair a spending points at: its category is the same owner's, held by the database.
+    unique('spending_categories_id_actor_unique').on(table.id, table.actorId),
+    // Each preset once per owner, so giving them twice — two tabs asking at once — is one list.
+    uniqueIndex('spending_categories_actor_preset_unique')
+      .on(table.actorId, table.preset)
+      .where(sql`${table.preset} is not null`),
+    check(
+      'spending_categories_preset_or_own',
+      sql`(${table.preset} is not null and ${table.name} is null and ${table.colour} is null)
+        or (${table.preset} is null and ${table.name} is not null and ${table.colour} is not null)`,
+    ),
+    check(
+      'spending_categories_preset_known',
+      sql`${table.preset} is null or ${oneOf(table.preset, spendingPresetSchema.options)}`,
+    ),
+    check(
+      'spending_categories_colour_in_palette',
+      sql`${table.colour} is null or ${table.colour} between 0 and ${sql.raw(String(SPENDING_CATEGORY_COLOURS - 1))}`,
+    ),
+  ],
+)
+
+/**
+ * Money spent outside a trip (MOL-73): a day, an amount in its currency, one of the owner's
+ * categories and two lines of their own words. Private as an income: no aggregate reads it, the
+ * log of events does not either, and it goes with its owner. A spending in another currency than
+ * the spending one carries the rate of its own day — all five columns or none, as a trip's.
+ */
+export const spendings = pgTable(
+  'spendings',
+  {
+    // Named by the device: a spending sent twice from the queue is one spending.
+    id: uuid('id').primaryKey(),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    spentOn: date('spent_on').notNull(),
+    amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+    currency: char('currency', { length: 3 }).$type<Currency>().notNull(),
+    categoryId: uuid('category_id').notNull(),
+    note: text('note'),
+    place: text('place'),
+    rateBase: char('rate_base', { length: 3 }).$type<Currency>(),
+    rateQuote: char('rate_quote', { length: 3 }).$type<Currency>(),
+    rateScaled: bigint('rate_scaled', { mode: 'bigint' }),
+    rateSource: text('rate_source').$type<RateSource>(),
+    rateAsOf: timestamp('rate_as_of', { withTimezone: true }),
+    revision: integer('revision').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    amendedAt: timestamp('amended_at', { withTimezone: true }),
+    // Removed and offered back for ten minutes, as an exchange is (MOL-73, В-4).
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (table) => [
+    // A month of the journal is one index scan.
+    index('spendings_actor_day_idx').on(table.actorId, table.spentOn, table.createdAt),
+    // The category is the owner's own: the pair, not the id alone.
+    foreignKey({
+      name: 'spendings_category_is_owners',
+      columns: [table.categoryId, table.actorId],
+      foreignColumns: [spendingCategories.id, spendingCategories.actorId],
+    }),
+    check('spendings_amount_positive', sql`${table.amountMinor} > 0`),
+    check('spendings_currency_known', oneOf(table.currency, currencySchema.options)),
+    check('spendings_revision_positive', sql`${table.revision} > 0`),
+    check(
+      'spendings_rate_all_or_none',
+      sql`num_nonnulls(${table.rateBase}, ${table.rateQuote}, ${table.rateScaled}, ${table.rateSource}, ${table.rateAsOf}) in (0, 5)`,
+    ),
+    // «390 ֏ за $»: the spending's own currency on whichever side keeps the number's digits.
+    check(
+      'spendings_rate_of_spending_currency',
+      sql`${table.rateBase} is null or ${table.currency} in (${table.rateBase}, ${table.rateQuote})`,
+    ),
+    check(
+      'spendings_rate_two_currencies',
+      sql`${table.rateBase} is null or ${table.rateBase} <> ${table.rateQuote}`,
+    ),
+    check('spendings_rate_quote_known', currencyKnownOrNull(table.rateQuote)),
+    check(
+      'spendings_rate_source_known',
+      sql`${table.rateSource} is null or ${oneOf(table.rateSource, rateSourceSchema.options)}`,
+    ),
+  ],
+)
+
+/**
+ * The rate a closed month is counted by in the income currency (MOL-73, handoff 06): the person's
+ * rate — or the official one — on its last day, written the first time the month is read after it
+ * closed and never again. A new exchange today does not move August.
+ */
+export const moneyMonthRates = pgTable(
+  'money_month_rates',
+  {
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    month: char('month', { length: 7 }).notNull(),
+    base: char('base', { length: 3 }).$type<Currency>().notNull(),
+    quote: char('quote', { length: 3 }).$type<Currency>().notNull(),
+    scaled: bigint('scaled', { mode: 'bigint' }).notNull(),
+    source: text('source').$type<RateSource>().notNull(),
+    asOf: timestamp('as_of', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.actorId, table.month, table.base, table.quote] }),
+    check('money_month_rates_two_currencies', sql`${table.base} <> ${table.quote}`),
+    check('money_month_rates_base_known', oneOf(table.base, currencySchema.options)),
+    check('money_month_rates_quote_known', oneOf(table.quote, currencySchema.options)),
+    check('money_month_rates_source_known', oneOf(table.source, rateSourceSchema.options)),
+    check('money_month_rates_month_shape', sql`${table.month} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
   ],
 )
 

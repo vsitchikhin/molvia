@@ -1,11 +1,12 @@
 import { z } from 'zod'
-import { INT8_MAX, convertScaled } from '#model/support/decimal'
+import { INT8_MAX, convertScaled, divideRounded } from '#model/support/decimal'
 import { DomainError, ERROR, ISSUE } from '#model/support/errors'
 import type { Expense } from './expense'
 import { MINOR_EXPONENT, currencySchema } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
 import {
   RATE_DIGITS,
+  RATE_SCALE,
   exchangeRateSchema,
   isRateFresh,
   parseRate,
@@ -165,6 +166,27 @@ export function convertedMinor(amount: Money, rate: ExchangeRate): bigint {
     MINOR_EXPONENT[amount.currency],
     MINOR_EXPONENT[rate.base],
   )
+}
+
+/**
+ * An amount on either side of `rate` into the other side. The rates of «Деньги» are kept in the
+ * orientation whose number is at least one — «390 ֏ за $», never «0,002564 $ за ֏» — because six
+ * digits of a small number are four significant ones (MOL-73, С-1), so a dram can stand on either
+ * side: a snapshot «֏ за $» converts a dollar spending, «֏ за ₽» a dram income into roubles. Null when
+ * the amount is of neither currency, or when what it comes to is more than money holds: a month
+ * counts such a line «не посчитано» rather than failing whole (adversarial Д5).
+ */
+export function convertAcross(amount: Money, rate: ExchangeRate): Money | null {
+  if (amount.currency !== rate.base && amount.currency !== rate.quote) return null
+  const minor =
+    amount.currency === rate.base
+      ? divideRounded(
+          amount.minor * rate.scaled * 10n ** BigInt(MINOR_EXPONENT[rate.quote]),
+          RATE_SCALE * 10n ** BigInt(MINOR_EXPONENT[amount.currency]),
+        )
+      : convertedMinor(amount, rate)
+  if (minor > INT8_MAX) return null
+  return { minor, currency: amount.currency === rate.base ? rate.quote : rate.base }
 }
 
 /** Display only. The rate lives in the trip as a snapshot; last month must not move. */

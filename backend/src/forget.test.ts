@@ -13,6 +13,9 @@ const REPORT: ErasureReport = {
     trips: 1,
     exchanges: 2,
     incomes: 1,
+    spendings: 7,
+    spending_categories: 13,
+    money_month_rates: 1,
     login_requests: 1,
     actors: 1,
   },
@@ -77,8 +80,8 @@ describe('forget — стирание вручную', () => {
   it('печатает счёт по каждой таблице и ничего о человеке', async () => {
     const { exit, lines } = run(['184467331'])
     await exit
-    expect(lines).toContain('  verdicts        3')
-    expect(lines).toContain('  items kept      1 (author removed)')
+    expect(lines).toContain('  verdicts            3')
+    expect(lines).toContain('  items kept          1 (author removed)')
     expect(lines.join('\n')).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/)
   })
 

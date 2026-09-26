@@ -1,4 +1,4 @@
-import { DomainError, ERROR, incomeMonths, yerevanDate } from '@molvia/model'
+import { DomainError, ERROR, incomeMonths, resourceIdOf, yerevanDate } from '@molvia/model'
 import type {
   Actor,
   Income,
@@ -8,10 +8,12 @@ import type {
   IncomeView,
   IncomesResponse,
 } from '@molvia/model'
-import { ownMoney } from './exchanges'
+import { earlier, ownMoney } from './exchanges'
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
+/** A write also lets go of the months frozen without it (MOL-73, В-6). */
+type Writing = Repositories & Pick<TripRepositories, 'money'>
 type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
 
 function viewOf(income: Income, history: readonly IncomeRevision[]): IncomeView {
@@ -72,12 +74,23 @@ export async function readIncomes(
   return incomesOverview(repositories, owner, now)
 }
 
+/** The day of the owner's live income, or null — what a write lets the frozen months go from. */
+async function dayOfIncome(
+  repositories: Pick<Repositories, 'incomes'>,
+  owner: Pick<Owner, 'id'>,
+  id: string,
+): Promise<string | null> {
+  const own = resourceIdOf(id)
+  const incomes = await repositories.incomes.list(owner.id)
+  return incomes.find((income) => income.id === own)?.receivedOn ?? null
+}
+
 /**
  * «Записать доход». Not a day that has not come yet in Yerevan: money from tomorrow would enter
  * today's trips. 201 for a new income, and the screen whole either way.
  */
 export async function recordIncome(
-  repositories: Repositories,
+  repositories: Writing,
   owner: Owner,
   body: IncomeBody,
   now: Date = new Date(),
@@ -85,6 +98,7 @@ export async function recordIncome(
   if (body.receivedOn > yerevanDate(now)) throw new DomainError(ERROR.INCOME_IN_FUTURE)
   await repositories.incomes.purgeRemoved(owner.id)
   const { created } = await repositories.incomes.add(owner.id, body)
+  await repositories.money.thaw(owner.id, body.receivedOn)
   return { overview: await incomesOverview(repositories, owner, now), created }
 }
 
@@ -93,7 +107,7 @@ export async function recordIncome(
  * started keep the rate they took; trips from now on count by the amended income.
  */
 export async function amendIncome(
-  repositories: Repositories,
+  repositories: Writing,
   owner: Owner,
   id: string,
   body: IncomeAmendBody,
@@ -101,7 +115,9 @@ export async function amendIncome(
 ): Promise<IncomesResponse> {
   if (body.receivedOn > yerevanDate(now)) throw new DomainError(ERROR.INCOME_IN_FUTURE)
   await repositories.incomes.purgeRemoved(owner.id)
+  const before = await dayOfIncome(repositories, owner, id)
   await repositories.incomes.amend(owner.id, id, body)
+  await repositories.money.thaw(owner.id, earlier(before, body.receivedOn))
   return incomesOverview(repositories, owner, now)
 }
 
@@ -110,19 +126,21 @@ export async function amendIncome(
  * but never this one, when the removal is sent again after a lost answer.
  */
 export async function removeIncome(
-  repositories: Repositories,
+  repositories: Writing,
   owner: Owner,
   id: string,
   now: Date = new Date(),
 ): Promise<IncomesResponse> {
   await repositories.incomes.purgeRemoved(owner.id, id)
+  const day = await dayOfIncome(repositories, owner, id)
   await repositories.incomes.remove(owner.id, id)
+  if (day !== null) await repositories.money.thaw(owner.id, day)
   return incomesOverview(repositories, owner, now)
 }
 
 /** «Вернуть»: the removed income as it was; nothing to bring back answers as a missing row does. */
 export async function restoreIncome(
-  repositories: Repositories,
+  repositories: Writing,
   owner: Owner,
   id: string,
   now: Date = new Date(),
@@ -130,5 +148,7 @@ export async function restoreIncome(
   if (!(await repositories.incomes.restore(owner.id, id))) {
     throw new DomainError(ERROR.NOT_FOUND)
   }
+  const day = await dayOfIncome(repositories, owner, id)
+  if (day !== null) await repositories.money.thaw(owner.id, day)
   return incomesOverview(repositories, owner, now)
 }
