@@ -344,13 +344,30 @@ test.describe('the sheet', () => {
     await expect(sheet(page)).toBeVisible()
   })
 
+  // The rise is held still, so the second tap lands while the sheet comes up however slow the
+  // machine is: a pause of 80 ms between the taps became 330 under load, the clock the sheet
+  // was held by ran out while it was still sliding, and the tap closed it (MOL-69).
   test('two quick taps of a finger on the opener leave the sheet open', async ({ page }) => {
     const { x, y } = await centreOpener(page)
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send('Animation.enable')
+    await cdp.send('Animation.setPlaybackRate', { playbackRate: 0 })
     await page.touchscreen.tap(x, y)
-    await page.waitForTimeout(80)
+    // A lower bound: past a double tap, with the sheet still at the bottom edge.
+    await page.waitForTimeout(400)
     await page.touchscreen.tap(x, y)
-    await page.waitForTimeout(600)
+    await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 })
+    // Asked once the rise is over: closed by the tap, the rise is cut short and the sheet is shut.
+    const openWhenUp = await page.locator('dialog').evaluate(async (dialog: HTMLDialogElement) => {
+      await Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished))
+      return dialog.open
+    })
+    expect(openWhenUp, 'the second tap closed the sheet while it was coming up').toBe(true)
     await expect(sheet(page)).toBeVisible()
+
+    // Up, it takes a tap on the scrim again: what held it was the rise, not a delay.
+    await page.touchscreen.tap(x, 40)
+    await expect(sheet(page)).toBeHidden()
   })
 
   // A selection that began in a field and overshot onto the scrim is clicked on the dialog, their

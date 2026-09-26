@@ -196,6 +196,111 @@ describe('BottomSheet', () => {
     expect(tapped).toHaveBeenCalledOnce()
   })
 
+  /** The sheet's own rise, held until the test lets it finish or cuts it short. */
+  function rise(): { finish: () => Promise<void>; cut: () => Promise<void> } {
+    let finish = (): void => undefined
+    let cut = (): void => undefined
+    const finished = new Promise<void>((resolve, reject) => {
+      finish = resolve
+      cut = () => {
+        reject(new DOMException('The rise was cut short', 'AbortError'))
+      }
+    })
+    const animation = { finished } as unknown as Animation
+    vi.spyOn(HTMLDialogElement.prototype, 'getAnimations').mockReturnValueOnce([animation])
+    const settles = async (): Promise<void> => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+    return {
+      finish: async () => {
+        finish()
+        await settles()
+      },
+      cut: async () => {
+        cut()
+        await settles()
+      },
+    }
+  }
+
+  // Up is the end of the rise, not a clock: under load the first frame came late, the rise
+  // outlasted a double tap and the second tap closed the sheet while it slid (MOL-69).
+  it('must not fire: a tap on the scrim while the rise outlasts a double tap', async () => {
+    const rising = rise()
+    const { go, dialog } = await render({ open: true, rising: true })
+    wait(400)
+    await tapScrim(dialog())
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().open).toBe(true)
+
+    await rising.finish()
+    wait(10)
+    await tapScrim(dialog())
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+  })
+
+  // Boundary: a rise shorter than a double tap still holds the double tap.
+  it('must not fire: a tap within a double tap after a quick rise', async () => {
+    const rising = rise()
+    const { go, dialog } = await render({ open: true, rising: true })
+    wait(100)
+    await rising.finish()
+    wait(150)
+    await tapScrim(dialog())
+    expect(go).not.toHaveBeenCalled()
+
+    wait(50)
+    await tapScrim(dialog())
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+  })
+
+  // A rise cut short settles the sheet too, or it would take no tap ever again.
+  it('takes a tap after a rise that was cut short', async () => {
+    const rising = rise()
+    const { go, dialog } = await render({ open: true, rising: true })
+    await rising.cut()
+    wait(300)
+    await tapScrim(dialog())
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+  })
+
+  // A busy main thread hands a tap over late; it counts from when the finger touched (MOL-69).
+  it('must not fire: a tap made while the sheet rose and handled once it was up', async () => {
+    const rising = rise()
+    const { go, dialog } = await render({ open: true, rising: true })
+    wait(100)
+    const down = new PointerEvent('pointerdown', { bubbles: true })
+    const click = new MouseEvent('click', { bubbles: true })
+    wait(400)
+    await rising.finish()
+    dialog().dispatchEvent(down)
+    dialog().dispatchEvent(click)
+    await nextTick()
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().open).toBe(true)
+  })
+
+  // «Save and next»: the rise of the sheet that was put away must not settle the next one.
+  it('must not fire: the rise of a closed sheet does not settle the one opened after it', async () => {
+    const first = rise()
+    const { open, go, dialog } = await render({ open: true, rising: true })
+    open.value = false
+    await nextTick()
+    landed()
+    const second = rise()
+    open.value = true
+    await nextTick()
+    await first.finish()
+    wait(1000)
+    await tapScrim(dialog())
+    expect(go).toHaveBeenCalledOnce()
+    expect(dialog().open).toBe(true)
+
+    await second.finish()
+    await tapScrim(dialog())
+    expect(go).toHaveBeenCalledTimes(2)
+  })
+
   it('must not fire: a tap inside the sheet does not close it', async () => {
     const { host, go, dialog } = await render({ open: true })
     await host.get('.content').trigger('click')

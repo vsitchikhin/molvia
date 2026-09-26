@@ -1277,7 +1277,12 @@ database access. In a product about data integrity, two write paths will silentl
   `close(2)` closes it together with the screen under it, the sheets above and below included,
   and never steps out of the app. Sheets may stack: a pop closes as many from the top as
   entries it went back. Until it has come up the sheet takes
-  no tap, so the second tap of a double tap cannot close it or press its main action. Open a
+  no tap, so the second tap of a double tap cannot close it or press its main action. **«Up» is
+  the end of its own rise, not a clock** (MOL-69): a rise starts with the first frame that draws
+  it, and on a busy phone that frame comes late — a clock started at `showModal` ran out while
+  the sheet still slid, and the second tap closed it. Never sooner than a double tap, for a sheet
+  with no rise; no ceiling, since a rise either finishes or is cut short; and a tap counts from
+  when the finger touched (`event.timeStamp`), not from when a busy thread handled it. Open a
   sheet from a tap only: Chrome skips on «back» an entry laid without a gesture. **The sheet is the one exception to «only the
   page scrolls»**: a panel over the screen has no window of its own, so it scrolls itself and
   the page under it is held still.

@@ -42,24 +42,6 @@ import { pageAnchor, useSheetHistory } from '@/composables/useSheetHistory'
 const DOUBLE_TAP = 300
 
 /**
- * How long the sheet takes to come up — its own transition, so reduced motion (none) and the
- * token (`--dur`) are both honoured — and never less than a double tap.
- */
-function settleTime(element: HTMLElement): number {
-  const longest = Math.max(
-    0,
-    ...getComputedStyle(element)
-      .transitionDuration.split(',')
-      .map((part) => {
-        const value = Number.parseFloat(part)
-        if (Number.isNaN(value)) return 0
-        return part.trim().endsWith('ms') ? value : value * 1000
-      }),
-  )
-  return Math.max(longest, DOUBLE_TAP)
-}
-
-/**
  * The sheet of 0.1: it rises from the bottom over the screen, which stays visible behind the
  * scrim. A native modal `<dialog>` — the focus trap, the inert page, the backdrop and Esc come
  * from the platform, and focus goes back to whatever opened it when it closes.
@@ -111,6 +93,8 @@ export default defineComponent({
     // A tap on the scrim counts only if it began there, and no tap counts until the sheet is up.
     let downOnScrim = false
     let settledAt = 0
+    // Which showing the sheet is on: the rise of one that was closed must not settle the next.
+    let showing = 0
 
     const history = useSheetHistory(() => {
       if (!shown.value) return
@@ -145,8 +129,24 @@ export default defineComponent({
       const anchor = pageAnchor()
       shown.value = true
       element.showModal()
-      settledAt = performance.now() + settleTime(element)
+      settle(element)
       history.lay(anchor)
+    }
+
+    // «Up» is the end of the sheet's own rise, not a clock started at `showModal`: a rise starts
+    // with the first frame that draws it, and on a busy phone that frame comes late — the clock
+    // ran out while the sheet was still sliding, and the second tap of a double tap closed it
+    // (MOL-69). Never sooner than a double tap, for a sheet with no rise (reduced motion). No
+    // ceiling: a transition either finishes or is cancelled, and both settle it.
+    function settle(element: HTMLDialogElement): void {
+      const current = ++showing
+      const floor = performance.now() + DOUBLE_TAP
+      settledAt = Number.POSITIVE_INFINITY
+      // Not every engine has it (Safari before 13.1), whatever the DOM types say.
+      const rising = typeof element.getAnimations === 'function' ? element.getAnimations() : []
+      void Promise.allSettled(rising.map((animation) => animation.finished)).then(() => {
+        if (current === showing) settledAt = Math.max(performance.now(), floor)
+      })
     }
 
     /** Closes the sheet — and `steps - 1` screens under it — by stepping back through history. */
@@ -162,9 +162,10 @@ export default defineComponent({
     // The second tap of a double tap on the opener lands wherever the sheet is while it rises —
     // the scrim, the ×, the main action sliding under the finger — and closed the sheet before it
     // was seen, or added an empty item to the trip (adversarial Б-5). Until the sheet is up it
-    // takes no click at all: stopped here, on the way down, before any button hears it.
+    // takes no click at all: stopped here, on the way down, before any button hears it. Judged by
+    // when the finger touched, not by when a busy main thread got round to the tap (MOL-69).
     function holdWhileRising(event: MouseEvent): void {
-      if (performance.now() >= settledAt) return
+      if (event.timeStamp >= settledAt) return
       event.stopPropagation()
       event.preventDefault()
     }
