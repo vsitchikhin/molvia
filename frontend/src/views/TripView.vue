@@ -104,11 +104,11 @@
     <template v-else-if="phase === 'going'">
       <TripRateNotes v-if="trip" :trip="trip" />
 
+      <!-- No circle: over «Найти товар» it read as a button of its own, and was tapped (MOL-77). -->
       <ScreenState
         v-if="rows.length === 0"
         kind="empty"
         tone="accent"
-        :icon="IconPlus"
         :title="t('trip.empty.title')"
         :body="t('trip.empty.body')"
       >

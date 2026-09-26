@@ -202,6 +202,8 @@ describe('TripView', () => {
     const { view } = await render()
     expect(view.text()).toContain(ru.trip.empty.title)
     expect(button(view, ru.trip.empty.action).exists()).toBe(true)
+    // Круг над «Найти товар» читался кнопкой и не нажимался (MOL-77).
+    expect(view.find('.circle').exists()).toBe(false)
   })
 
   it('пока сервера не спросили и памяти нет — скелетон, а не «Новый поход»', async () => {

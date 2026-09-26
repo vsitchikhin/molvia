@@ -41,6 +41,13 @@ describe('ScreenState', () => {
       expect(view.classes()).toContain('accent')
     })
 
+    // Over an action a circle reads as a button whatever its glyph (MOL-77).
+    it('empty without an icon draws no circle at all', () => {
+      const view = render({ kind: 'empty', tone: 'accent' })
+      expect(view.find('.circle').exists()).toBe(false)
+      expect(refused({ kind: 'empty', tone: 'accent' })).toBe(false)
+    })
+
     it('empty that is a success is green', () => {
       const view = render({ kind: 'empty', tone: 'good', icon: IconPlus })
       expect(view.classes()).toContain('good')
@@ -79,7 +86,6 @@ describe('ScreenState', () => {
       ['offline in red', { kind: 'offline', tone: 'bad' }],
       ['offline with no tone', { kind: 'offline' }],
       ['offline in accent', { kind: 'offline', tone: 'accent' }],
-      ['empty with no icon', { kind: 'empty', tone: 'accent' }],
       ['empty with no tone', { kind: 'empty', icon: IconPlus }],
       ['empty in yellow', { kind: 'empty', tone: 'warn', icon: IconPlus }],
       ['error with a tone', { kind: 'error', tone: 'good' }],
