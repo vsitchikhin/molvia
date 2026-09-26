@@ -222,8 +222,9 @@ export default defineComponent({
      * from two (round 2, З1). And by names, not a count: a card carries the place's name without
      * its city, and «Ереван Сити» of Gyumri and of Yerevan are two places under one name — a
      * number would claim what the phone does not know (round 3, И2). Names are newest first. When
-     * the server holds more than the page, one name is not claimed for all (adversarial В2), and
-     * two are followed by «and others».
+     * the server holds more than the page, one or two names are not claimed for all — whether
+     * there are others the phone cannot tell, and says nothing (adversarial В2, round 4, Л2); three
+     * already are «and others», page or no page.
      */
     const pendingFrom = computed(() => {
       const cards = [...queue.cards.value].sort(
@@ -242,9 +243,8 @@ export default defineComponent({
               when: purchaseDay(latest.boughtAt, locale.value),
             })
       }
-      return names.length > 2 || partial
-        ? t('trip.home.pending.more_places', { a, b })
-        : t('trip.home.pending.two_places', { a, b })
+      if (names.length > 2) return t('trip.home.pending.more_places', { a, b })
+      return partial ? null : t('trip.home.pending.two_places', { a, b })
     })
 
     return {
@@ -377,14 +377,21 @@ export default defineComponent({
   min-width: 0;
 }
 
-.title {
+.title,
+.sub {
   display: block;
+
+  // A shop's name has no spaces to break at — the same reason `TripHistoryRow` wraps its own; cut
+  // by the card's edge it ran under the chevron (round 4, Л1).
+  overflow-wrap: anywhere;
+}
+
+.title {
   font-size: var(--text-headline);
   font-weight: var(--weight-medium);
 }
 
 .sub {
-  display: block;
   color: var(--text-muted);
   font-size: var(--text-footnote);
 }

@@ -205,24 +205,45 @@ describe('TripHome', () => {
   })
 
   describe('ответ, под которым сдвинулся список (адверсариальное А)', () => {
-    it('запись другого окна в полёте — ответ спрошен заново, а не вечный скелет', async () => {
-      const first = deferred<TripHistory>()
-      tripHistory.mockReturnValueOnce(first.promise)
-      tripHistory.mockResolvedValue({ trips: [trip(1), trip(2)], nextCursor: null })
-      const { view } = await render()
+    // The pauses before asking again run on a fake clock: the whole ladder is checked, and no
+    // test waits for real seconds (review Р-11). `flushPromises` goes through `setImmediate`.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] })
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
 
-      const key = `molvia.trip-history.${ME}`
+    const key = `molvia.trip-history.${ME}`
+    /** Another window writes the history cache, as every answer to its purchases does. */
+    const neighbourWrites = () => {
       localStorage.setItem(
         key,
         JSON.stringify({ page: { trips: [], nextCursor: null }, selected: null, local: [] }),
       )
       window.dispatchEvent(new StorageEvent('storage', { key }))
-      first.resolve({ trips: [trip(1), trip(2)], nextCursor: null })
+    }
+    /** Lets every pause of the ladder run out: 400 + 800 + 1600 ms. */
+    const pausesPass = async () => {
+      await vi.advanceTimersByTimeAsync(3000)
+      await flushPromises()
+    }
 
-      await vi.waitFor(() => {
-        expect(view.findAll('.history-row')).toHaveLength(2)
-      })
+    it('запись другого окна в полёте — ответ спрошен заново после паузы, а не вечный скелет', async () => {
+      const first = deferred<TripHistory>()
+      tripHistory.mockReturnValueOnce(first.promise)
+      tripHistory.mockResolvedValue({ trips: [trip(1), trip(2)], nextCursor: null })
+      const { view } = await render()
+
+      neighbourWrites()
+      first.resolve({ trips: [trip(1), trip(2)], nextCursor: null })
+      await flushPromises()
+      // Not at once: the first pause is still running.
+      expect(tripHistory).toHaveBeenCalledTimes(1)
+
+      await pausesPass()
       expect(tripHistory).toHaveBeenCalledTimes(2)
+      expect(view.findAll('.history-row')).toHaveLength(2)
       expect(view.find('.skeleton').exists()).toBe(false)
     })
 
@@ -242,81 +263,57 @@ describe('TripHome', () => {
       )
       useTripHistoryStore().forgetLocal('bbbbbbbb-0000-4000-8000-0000000000fe')
       first.resolve({ trips: [trip(1)], nextCursor: null })
+      await pausesPass()
 
-      await vi.waitFor(() => {
-        expect(view.findAll('.history-row')).toHaveLength(1)
-      })
+      expect(view.findAll('.history-row')).toHaveLength(1)
     })
 
     // Another window sends its queue one purchase at a time once the connection is back: every
     // answer of the first two lands on a list it has just written. The pause lets it finish, and
     // the third answer is taken (round 2, Ж2).
     it('поток записей соседнего окна — пауза перед повтором, и ответ принят', async () => {
-      const key = `molvia.trip-history.${ME}`
       tripHistory.mockImplementation(() => {
-        const calls = tripHistory.mock.calls.length
-        if (calls <= 2) {
-          localStorage.setItem(
-            key,
-            JSON.stringify({ page: { trips: [], nextCursor: null }, selected: null, local: [] }),
-          )
-          window.dispatchEvent(new StorageEvent('storage', { key }))
-        }
+        if (tripHistory.mock.calls.length <= 2) neighbourWrites()
         return Promise.resolve({ trips: [trip(1), trip(2)], nextCursor: null })
       })
       const { view } = await render()
-      await vi.waitFor(
-        () => {
-          expect(view.findAll('.history-row')).toHaveLength(2)
-        },
-        { timeout: 3000 },
-      )
+      await pausesPass()
+
       expect(tripHistory).toHaveBeenCalledTimes(3)
+      expect(view.findAll('.history-row')).toHaveLength(2)
       expect(view.text()).not.toContain(ru.trip.home.error.title)
     })
 
     it('список сдвигается под каждым ответом — в конце тихая ошибка, никого не винящая', async () => {
-      const key = `molvia.trip-history.${ME}`
       tripHistory.mockImplementation(() => {
-        localStorage.setItem(
-          key,
-          JSON.stringify({ page: { trips: [], nextCursor: null }, selected: null, local: [] }),
-        )
-        window.dispatchEvent(new StorageEvent('storage', { key }))
+        neighbourWrites()
         return Promise.resolve({ trips: [trip(1)], nextCursor: null })
       })
       const { view } = await render()
-      await vi.waitFor(
-        () => {
-          expect(view.text()).toContain(ru.trip.home.error.title)
-        },
-        { timeout: 5000 },
-      )
+      await pausesPass()
+
       expect(tripHistory).toHaveBeenCalledTimes(4)
+      expect(view.text()).toContain(ru.trip.home.error.title)
       expect(view.find('.skeleton').exists()).toBe(false)
       // The server answered every time: nothing on screen says it did not.
       expect(view.text()).not.toContain('Сервер не ответил')
     })
-  })
 
-  // A retry asleep in its pause when the screen goes — «Начать поход», a tab — must not wake and
-  // ask again for nobody (round 3, И1).
-  it('экран снят во время паузы повтора — больше ничего не спрашивается', async () => {
-    const key = `molvia.trip-history.${ME}`
-    tripHistory.mockImplementation(() => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ page: { trips: [], nextCursor: null }, selected: null, local: [] }),
-      )
-      window.dispatchEvent(new StorageEvent('storage', { key }))
-      return Promise.resolve({ trips: [trip(1)], nextCursor: null })
+    // A retry asleep in its pause when the screen goes — «Начать поход», a tab — must not wake
+    // and ask again for nobody (round 3, И1).
+    it('экран снят во время паузы повтора — больше ничего не спрашивается', async () => {
+      tripHistory.mockImplementation(() => {
+        neighbourWrites()
+        return Promise.resolve({ trips: [trip(1)], nextCursor: null })
+      })
+      const { view } = await render()
+      expect(tripHistory).toHaveBeenCalledTimes(1)
+      view.unmount()
+      mounted.splice(mounted.indexOf(view), 1)
+
+      await pausesPass()
+      expect(tripHistory).toHaveBeenCalledTimes(1)
     })
-    const { view } = await render()
-    expect(tripHistory).toHaveBeenCalledTimes(1)
-    view.unmount()
-    mounted.splice(mounted.indexOf(view), 1)
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    expect(tripHistory).toHaveBeenCalledTimes(1)
   })
 
   describe('вчерашний пустой ответ не сильнее сегодняшнего (адверсариальное Г)', () => {
@@ -487,7 +484,21 @@ describe('TripHome', () => {
       expect(view.get('.pending .sub').text()).toBe('Из «SAS» и «Ереван Сити»')
     })
 
-    it('больше двух мест или неполная страница — «и других мест», без числа (И2, В2)', async () => {
+    it('неполная страница из двух мест — подписи нет: есть ли другие, телефон не знает (Л2)', async () => {
+      tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+      pendingVerdicts.mockResolvedValue({
+        items: Array.from({ length: 50 }, (_, i) => ({
+          ...card(1, i % 2 === 0 ? 'SAS' : 'Ереван Сити', yesterday()),
+          itemId: `cccccccc-0000-4000-8000-${String(i).padStart(12, '0')}`,
+        })),
+        total: 60,
+      })
+      const { view } = await render()
+      expect(view.text()).toContain('60 покупок ждут оценки')
+      expect(view.find('.pending .sub').exists()).toBe(false)
+    })
+
+    it('больше двух мест — «и других мест», без числа (И2)', async () => {
       tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
       pendingVerdicts.mockResolvedValue({
         items: [

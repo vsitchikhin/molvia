@@ -1,6 +1,8 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { actorCodec, settingsOf } from '@molvia/model'
 import { asBrowser, signedIn } from './session'
 import type { Page } from '@playwright/test'
 
@@ -225,5 +227,53 @@ test.describe('the home screen with no trip (MOL-77)', () => {
     const step = await page.getByRole('button', { name: /What to buy”?\s/ }).boundingBox()
     const strip = await page.locator('.dock').boundingBox()
     expect(step && strip && step.y + step.height <= strip.y).toBe(true)
+  })
+
+  // A shop's full name has no spaces to break at: in «ждут оценки» it was cut by the card's edge
+  // and ran under the chevron, while the same name wraps in the trip's row (round 4, Л1).
+  test('a long shop name in «waiting to be rated» wraps inside the card', async ({ page }) => {
+    const shop = `ЕреванСитиТЦКомитасаМоллВторойЭтажОтделБытовойХимии${randomUUID().slice(0, 8)}`
+    await page.setViewportSize({ width: 375, height: 667 })
+    await signedIn(page)
+
+    const headers = await asBrowser(page)
+    const context = settingsOf(
+      actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+    )
+    const id = randomUUID()
+    const started = await page.request.post('/api/trips', {
+      headers,
+      data: { context, id, place: { name: shop, kind: 'store' } },
+    })
+    expect(started.status()).toBe(201)
+    const item = await page.request.post('/api/catalogue/items', {
+      headers,
+      data: { kind: 'product', name: `Порошок ${randomUUID()}`, defaultUnit: 'piece' },
+    })
+    const { id: itemId } = (await item.json()) as { id: string }
+    const added = await page.request.post(`/api/trips/${id}/expenses`, {
+      headers,
+      data: { id: randomUUID(), itemId },
+    })
+    expect(added.status()).toBe(201)
+    const finished = await page.request.post(`/api/trips/${id}/finish`, {
+      headers,
+      data: { finishedOnDeviceAt: new Date().toISOString() },
+    })
+    expect(finished.status()).toBe(204)
+    await page.reload()
+
+    const sub = page.locator('.pending .sub')
+    await expect(sub).toContainText(shop)
+    expect(await sub.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
+    const inside = await page.evaluate(() => {
+      const card = document.querySelector('.pending')?.getBoundingClientRect()
+      const text = document.querySelector('.pending .sub')
+      if (!card || !text) return false
+      const range = document.createRange()
+      range.selectNodeContents(text)
+      return range.getBoundingClientRect().right <= card.right
+    })
+    expect(inside).toBe(true)
   })
 })
