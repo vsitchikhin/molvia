@@ -22,10 +22,14 @@ request="${SSH_ORIGINAL_COMMAND:-${1:-}}"
 cd "$molvia"
 compose=(docker compose -f docker-compose.prod.yml --env-file .env.prod)
 
+# A line of .env.prod that sets $1, in any shape compose accepts: `export` in front, spaces
+# around `=`, an indent.
+assigns() { printf '^[[:space:]]*(export[[:space:]]+)?%s[[:space:]]*=[[:space:]]*' "$1"; }
+
 # A value as compose reads it: the quotes around it and a trailing ` # comment` are not part of it.
 setting() {
   local value
-  value="$(sed -n "s/^$1=//p" .env.prod | tail -n 1)"
+  value="$(sed -nE "s/$(assigns "$1")//p" .env.prod | tail -n 1)"
   case "$value" in
     \"*) value="${value#\"}" && value="${value%%\"*}" ;;
     \'*) value="${value#\'}" && value="${value%%\'*}" ;;
@@ -47,21 +51,30 @@ if [[ ! "$request" =~ ^(sha-[0-9a-f]{7}|v[0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
 fi
 tag="$request"
 
-# Everything from here goes to deploy.log, and a separate tail carries it to the client. A client
-# that goes away — a job cancelled, a runner off the network — takes the tail with it and nothing
-# else: the rollout, or its rollback, runs to the end.
-log="$molvia/deploy.log"
-: >"$log"
-tail -n +1 --pid=$$ -f "$log" 2>/dev/null &
-exec >>"$log" 2>&1
-
-# One deploy at a time on this machine too, whatever Actions believes about concurrency.
+# One deploy at a time on this machine too, whatever Actions believes about concurrency. Nothing
+# has changed yet, so a client that goes away while this waits costs nothing.
 exec 9>"$molvia/.deploy.lock"
-flock -w 600 9
+if ! flock -n 9; then
+  echo "waiting for a rollout in progress"
+  flock -w 600 9 || { echo "refused: a rollout still holds the lock after 600 s" >&2; exit 4; }
+fi
 if [[ -e "$molvia/deploy.hold" ]]; then
   echo "refused: $molvia/deploy.hold exists — a restore or maintenance is in progress; re-run once it is gone" >&2
   exit 3
 fi
+
+# Everything from here goes to deploy.log, and a separate tail carries this rollout's part of it to
+# the client. A client that goes away — a job cancelled, a runner off the network — takes the tail
+# with it and nothing else: the rollout, or its rollback, runs to the end. The log keeps every
+# rollout that went ahead, the latest last, and its oldest half goes past a megabyte.
+log="$molvia/deploy.log"
+touch "$log"
+if (($(stat -c %s "$log") > 1000000)); then
+  tail -c 500000 "$log" >"$log.next" && mv "$log.next" "$log"
+fi
+tail -c +"$(($(stat -c %s "$log") + 1))" --pid=$$ -f "$log" 2>/dev/null 9>&- &
+exec >>"$log" 2>&1
+echo "── $(date -u +%FT%TZ) $tag"
 
 domain="$(setting DOMAIN)"
 port="$(setting HTTPS_PORT)"
@@ -87,10 +100,23 @@ running_tag() {
 }
 
 # The bot restarts on failure, so «running» alone can be a crash loop caught between two starts.
-bot_steady() {
+# Its restarts are counted from where they stood before `up -d`: a new container starts at 0, and
+# one `up -d` left in place — the same tag rolled out again — keeps the count it already had.
+bot_state() {
   local id
-  id="$("${compose[@]}" ps -q bot)"
-  [[ -n "$id" && "$(docker inspect --format '{{.State.Running}} {{.RestartCount}}' "$id")" == 'true 0' ]]
+  id="$("${compose[@]}" ps -q bot)" || return 1
+  [[ -n "$id" ]] || return 1
+  echo "$id $(docker inspect --format '{{.State.Running}} {{.RestartCount}}' "$id")"
+}
+bot_steady() {
+  local id running count
+  read -r id running count <<<"$(bot_state)" || return 1
+  [[ "$running" == true ]] || return 1
+  if [[ "$id" == "${bot_before%% *}" ]]; then
+    [[ "$count" == "${bot_before##* }" ]]
+  else
+    [[ "$count" == 0 ]]
+  fi
 }
 
 wait_healthy() {
@@ -112,7 +138,7 @@ wait_healthy() {
 set_tag() {
   local next
   next="$(mktemp .env.prod.XXXXXX)"
-  { grep -v '^IMAGE_TAG=' .env.prod || true; echo "IMAGE_TAG=$1"; } >"$next"
+  { grep -vE "$(assigns IMAGE_TAG)" .env.prod || true; echo "IMAGE_TAG=$1"; } >"$next"
   chmod 600 "$next"
   mv "$next" .env.prod
 }
@@ -123,6 +149,7 @@ echo "deploying $tag over ${previous:-nothing}"
 # Pulled before anything changes: a tag the registry does not have leaves the machine as it was.
 IMAGE_TAG="$tag" "${compose[@]}" pull -q backend bot frontend
 
+bot_before="$(bot_state || true)"
 set_tag "$tag"
 if "${compose[@]}" up -d && wait_healthy "$tag"; then
   # Unused images older than a week: a deploy a day leaves three behind each time.
@@ -136,6 +163,7 @@ if [[ -z "$previous" ]]; then
   exit 1
 fi
 echo "rolling back to $previous — a migration $tag applied stays applied" >&2
+bot_before="$(bot_state || true)"
 set_tag "$previous"
 "${compose[@]}" up -d || true
 wait_healthy "$previous" || echo "$previous is not healthy either — the machine needs hands" >&2
