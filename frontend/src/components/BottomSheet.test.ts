@@ -149,7 +149,7 @@ describe('BottomSheet', () => {
   /** A tap on the scrim: pressed and let go on the dialog itself. */
   async function tapScrim(dialog: HTMLDialogElement): Promise<void> {
     dialog.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    dialog.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    dialog.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
     await nextTick()
   }
 
@@ -264,20 +264,59 @@ describe('BottomSheet', () => {
     expect(go).toHaveBeenCalledExactlyOnceWith(-1)
   })
 
-  // A busy main thread hands a tap over late; it counts from when the finger touched (MOL-69).
-  it('must not fire: a tap made while the sheet rose and handled once it was up', async () => {
+  // A click is born when the finger lifts: one put down on the scrim while the sheet rose and
+  // lifted once it was up counts from the touch, not the lift (MOL-69, adversarial А1). So does
+  // a tap a busy main thread hands over late.
+  it('must not fire: a finger put down on the scrim while it rose and lifted once it was up', async () => {
     const rising = rise()
     const { go, dialog } = await render({ open: true, rising: true })
     wait(100)
-    const down = new PointerEvent('pointerdown', { bubbles: true })
-    const click = new MouseEvent('click', { bubbles: true })
+    dialog().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     wait(400)
     await rising.finish()
-    dialog().dispatchEvent(down)
-    dialog().dispatchEvent(click)
+    wait(100)
+    dialog().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
     await nextTick()
     expect(go).not.toHaveBeenCalled()
     expect(dialog().open).toBe(true)
+  })
+
+  // …or on the main action, which slid under it meanwhile (adversarial А2).
+  it('must not fire: the main action under a finger put down while it rose', async () => {
+    const rising = rise()
+    const { host, dialog } = await render({ open: true, rising: true })
+    const tapped = vi.fn()
+    const content = host.get('.content').element
+    content.addEventListener('click', tapped)
+    wait(100)
+    content.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    wait(400)
+    await rising.finish()
+    content.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    expect(tapped).not.toHaveBeenCalled()
+    expect(dialog().open).toBe(true)
+
+    // The next finger, put down once it is up, is taken.
+    wait(10)
+    content.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    content.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    expect(tapped).toHaveBeenCalledOnce()
+  })
+
+  // A click from the keyboard has no finger: a touch left over from the rise does not date it.
+  it('takes a click from the keyboard once up, whatever finger touched while it rose', async () => {
+    const rising = rise()
+    const { host } = await render({ open: true, rising: true })
+    const tapped = vi.fn()
+    const content = host.get('.content').element
+    content.addEventListener('click', tapped)
+    wait(100)
+    content.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    wait(400)
+    await rising.finish()
+    wait(10)
+    content.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }))
+    expect(tapped).toHaveBeenCalledOnce()
   })
 
   // «Save and next»: the rise of the sheet that was put away must not settle the next one.

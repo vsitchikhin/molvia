@@ -93,6 +93,9 @@ export default defineComponent({
     // A tap on the scrim counts only if it began there, and no tap counts until the sheet is up.
     let downOnScrim = false
     let settledAt = 0
+    // When the finger of the tap now under way touched the glass — its click carries the moment
+    // it lifted (MOL-69, adversarial А1).
+    let touchedAt: number | null = null
     // Which showing the sheet is on: the rise of one that was closed must not settle the next.
     let showing = 0
 
@@ -137,13 +140,15 @@ export default defineComponent({
     // with the first frame that draws it, and on a busy phone that frame comes late — the clock
     // ran out while the sheet was still sliding, and the second tap of a double tap closed it
     // (MOL-69). Never sooner than a double tap, for a sheet with no rise (reduced motion). No
-    // ceiling: a transition either finishes or is cancelled, and both settle it.
+    // ceiling: a transition either finishes or is cancelled, and both settle it — an endless
+    // animation never would, so one is not waited for, or the sheet would take no tap for good.
     function settle(element: HTMLDialogElement): void {
       const current = ++showing
       const floor = performance.now() + DOUBLE_TAP
       settledAt = Number.POSITIVE_INFINITY
-      // Not every engine has it (Safari before 13.1), whatever the DOM types say.
-      const rising = typeof element.getAnimations === 'function' ? element.getAnimations() : []
+      const rising = element
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
       void Promise.allSettled(rising.map((animation) => animation.finished)).then(() => {
         if (current === showing) settledAt = Math.max(performance.now(), floor)
       })
@@ -157,15 +162,23 @@ export default defineComponent({
 
     function pressed(event: PointerEvent): void {
       downOnScrim = event.target === dialog.value
+      touchedAt = event.timeStamp
     }
 
     // The second tap of a double tap on the opener lands wherever the sheet is while it rises —
     // the scrim, the ×, the main action sliding under the finger — and closed the sheet before it
     // was seen, or added an empty item to the trip (adversarial Б-5). Until the sheet is up it
-    // takes no click at all: stopped here, on the way down, before any button hears it. Judged by
-    // when the finger touched, not by when a busy main thread got round to the tap (MOL-69).
+    // takes no click at all: stopped here, on the way down, before any button hears it.
+    //
+    // Judged by when the finger touched, not by when a busy main thread got round to the tap
+    // (MOL-69) — and not by the click's own time either: a click is born when the finger lifts,
+    // so one put down on the scrim while the sheet rose and lifted once it was up closed the
+    // sheet, or pressed the main action that had slid under it (adversarial А1, А2). A click
+    // from the keyboard has no finger (`detail` 0) and is judged by its own time.
     function holdWhileRising(event: MouseEvent): void {
-      if (event.timeStamp >= settledAt) return
+      const touched = event.detail > 0 && touchedAt !== null ? touchedAt : event.timeStamp
+      touchedAt = null
+      if (touched >= settledAt) return
       event.stopPropagation()
       event.preventDefault()
     }
