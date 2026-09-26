@@ -48,28 +48,34 @@ function isSeam(request: Request): boolean {
 /**
  * Ответ шва — или его обрыв, который называется сразу (MOL-67, ревью Р-4). Ответа у оборванного
  * запроса нет вовсе: экран входа уже сказал «не вышло», а ожидание одного ответа длилось бы до
- * таймаута теста и читалось бы как медленный стенд. Не отклоняется, если страница закрылась: это
- * таймаут теста, и его называет шаг, внутри которого ждут.
+ * таймаута теста и читалось бы как медленный стенд.
+ *
+ * **Ответ ждёт вызов Playwright, а не своё обещание на `page.on`** (ревью В2). Таймаут теста
+ * называет вызов, который был в полёте, и его строку; у своего обещания вызова нет, и зависший шов
+ * читался голым «Test timeout» без места. `requestfailed` при закрытии страницы не приходит, так
+ * что медленный стенд не выдаёт себя за обрыв.
  */
-function seamAnswer(page: Page): Promise<Response> {
-  return new Promise((resolve, reject) => {
-    const stop = () => {
-      page.off('response', answered)
-      page.off('requestfailed', failed)
-    }
-    const answered = (response: Response) => {
-      if (!isSeam(response.request())) return
-      stop()
-      resolve(response)
-    }
+async function seamAnswer(page: Page): Promise<Response> {
+  let stop: () => void = () => undefined
+  const cutOff = new Promise<never>((_resolve, reject) => {
     const failed = (request: Request) => {
       if (!isSeam(request)) return
-      stop()
       reject(new Error(`запрос шва оборвался без ответа: ${request.failure()?.errorText ?? '?'}`))
     }
-    page.on('response', answered)
     page.on('requestfailed', failed)
+    stop = () => {
+      page.off('requestfailed', failed)
+    }
   })
+  try {
+    return await Promise.race([
+      // Таймаут здесь — стенд не ответил на вход швом за всё время теста (MOL-67): не спека.
+      page.waitForEvent('response', { predicate: (one) => isSeam(one.request()), timeout: 0 }),
+      cutOff,
+    ])
+  } finally {
+    stop()
+  }
 }
 
 export async function open(page: Page, path = '/'): Promise<void> {
@@ -81,9 +87,8 @@ export async function open(page: Page, path = '/'): Promise<void> {
   // **Ответ — без своего предела.** Так его ждёт само приложение: `devLogin` в `@molvia/client` —
   // единственный запрос без таймаута. На перегруженном стенде он и есть медленная часть: 8
   // воркеров с замедленным CPU — до 23 с, большая часть — в самом API, а на свободной машине —
-  // меньше секунды. Это правда про стенд, а не про продукт: в прод-сборке шва нет. Ждут внутри
-  // шага, чтобы таймаут здесь назывался входом, а не `waitForResponse`. `Promise.all`, а не
-  // ожидание, заведённое до нажатия: оно подписывается и на отказ, если упадёт само нажатие.
+  // меньше секунды. Это правда про стенд, а не про продукт: в прод-сборке шва нет. `Promise.all`,
+  // а не ожидание, заведённое до нажатия: оно подписывается и на отказ, если упадёт само нажатие.
   const info = test.info()
   const started = Date.now()
   const answer = await test.step('вход швом: ответ сервера', async () => {
@@ -96,12 +101,19 @@ export async function open(page: Page, path = '/'): Promise<void> {
   // **Сколько стенд думал над входом, столько тест и получает обратно** (ревью Р-1, Р-2). Без
   // этого «без предела» значило «из бюджета спеки»: вход за 27 с проходил, а тело падало через три
   // секунды на своём шаге, и сообщение о входе молчало. Возвращается ровно выжданное, а не
-  // подобранное число; и вложение в отчёте говорит об этом при любом падении дальше.
+  // подобранное число — и только конечному бюджету: таймаут 0 значит «без предела» (`--timeout 0`,
+  // `--debug`, `PWDEBUG=1`), и `0 + waited` сделал бы из него предел длиной во вход (ревью Т-1).
+  //
+  // **Цена названа** (ревью Т-2): вход, замедленный самим продуктом — шов идёт через тот же
+  // `signIn`, что и настоящий вход, — тоже больше не падает на двери. На свободной машине шов
+  // отвечает меньше чем за секунду, поэтому вложение ниже там — находка о продукте, а не стенд.
   const waited = Date.now() - started
-  info.setTimeout(info.timeout + waited)
+  const finite = info.timeout > 0
+  if (finite) info.setTimeout(info.timeout + waited)
   if (waited > SLOW_ANSWER_MS) {
+    const seconds = (waited / 1000).toFixed(1).replace('.', ',')
     await info.attach('вход швом', {
-      body: `ответ через ${(waited / 1000).toFixed(1).replace('.', ',')} с — стенд перегружен; столько же добавлено к таймауту теста`,
+      body: `нажатие и ответ — ${seconds} с: стенд перегружен${finite ? '; столько же добавлено к таймауту теста' : ''}`,
       contentType: 'text/plain',
     })
   }
