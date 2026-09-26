@@ -1990,6 +1990,20 @@ person in one transaction — the event log included, the one exception to appen
 that keep no address and no query and live fourteen days. Export, a delete button in the
 settings, versioned policy and consent are 0.2 (Confluence, «Персональные данные», section 5).
 
+MOL-77 gave «Поход» without a trip a face — the first screen a new person meets. **No circle
+over an action anywhere on it**: the empty state's «+» read as a button and was the thing the
+owner tapped, so `ScreenState` draws an empty state without a circle when it is given no icon,
+and «Поход начат» has none. **«Начать поход» stands in the strip above the tab bar** in every
+state without a trip, loading included — a start goes through the queue, and an open trip the
+server then names is asked about as before. A newcomer gets «Что брать и где» and the cycle «у
+двери → у полки → дома «Оценки» → «Что брать»», whose last two steps change tab; a person with a
+history gets «N покупок ждут оценки» and their last three trips (`TripHistoryRow`, shared with
+the history). **The introduction is only for a history known to be empty**: every write to a
+trip persists the history cache, so an empty stored page proves nothing, and the store keeps
+whether the server answered (`answered`). An error or no connection with nothing remembered is a
+quiet card of its own, never «newcomer» — MOL-56's «no answer is not the answer „no“». A trip in
+«ждут оценки» is told by the place and the day of a purchase, since a card carries no trip.
+
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 **What the database guarantees and what it leaves to the domain** is a line, not a habit:
