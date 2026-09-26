@@ -45,7 +45,9 @@ export default defineConfig({
   forbidOnly: ci,
   retries: ci ? 2 : 0,
   reporter: ci ? 'github' : 'list',
-  use: { baseURL, trace: 'on-first-retry', locale: 'en-US' },
+  // A trace of every failure outside CI (MOL-67): there are no retries here, so `on-first-retry`
+  // never wrote one, and a flake met on pre-push left nothing behind but its message.
+  use: { baseURL, trace: ci ? 'on-first-retry' : 'retain-on-failure', locale: 'en-US' },
 
   // One project, and it is a phone: that is the device the product is designed for,
   // so a desktop-only pass would prove nothing about the screen that matters.
