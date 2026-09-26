@@ -127,11 +127,13 @@ key never comes to this machine — a compromised server cannot read old copies.
    read -rs -p 'Access key id: ' AK; echo; read -rs -p 'Secret access key: ' SK; echo
    read -r -p 'Endpoint (https://<account>.eu.r2.cloudflarestorage.com): ' EP
    rclone config create r2 s3 provider=Cloudflare access_key_id="$AK" \
-     secret_access_key="$SK" endpoint="$EP" acl=private no_check_bucket=true
+     secret_access_key="$SK" endpoint="$EP" no_check_bucket=true no_head=true
    unset AK SK EP
    ```
 
-   The token is «Object Read & Write» on `molvia-backups` only.
+   The token is «Object Read & Write» on `molvia-backups` only. `no_head` is not optional: after
+   an upload rclone asks for the object by `?versionId=`, which R2 answers `501 Not Implemented` —
+   the copy is there, and the run still fails. Nor is an `acl`: R2 has none to set.
 
 3. `backup.env` next to `.env.prod`, mode 600, from `backup/backup.env.example`.
 4. The scripts and units:

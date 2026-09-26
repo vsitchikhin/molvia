@@ -16,7 +16,14 @@ molvia="${MOLVIA_DIR:-$HOME/molvia}"
 : "${HC_URL:?set in backup.env}" "${DELETE_AFTER_DAYS:?set in backup.env}"
 
 report() { curl -fsS -m 10 --retry 3 -o /dev/null "$HC_URL/$1" || true; }
-trap 'report "$?"' EXIT
+partial=""
+finish() {
+  local code=$?
+  # A run that failed leaves nothing behind: an upload cut short is not a copy.
+  if ((code != 0)) && [[ -n "$partial" ]]; then rclone deletefile "$partial" 2>/dev/null || true; fi
+  report "$code"
+}
+trap finish EXIT
 report start
 
 cd "$molvia"
@@ -34,10 +41,10 @@ size="$(rclone lsjson "$partial" | sed -n 's/.*"Size":\([0-9]*\).*/\1/p')"
 header="$(rclone cat --count 21 "$partial")"
 if [[ "${size:-0}" -le 0 || "$header" != "age-encryption.org/v1" ]]; then
   echo "refused: $name is ${size:-0} bytes and does not start as an age file" >&2
-  rclone deletefile "$partial" || true
   exit 1
 fi
 rclone moveto "$partial" "$RCLONE_REMOTE/$name"
+partial=""
 
 # The bucket's lifecycle rule is what enforces the term; this only keeps a broken rule from
 # holding erased people longer than the privacy page says.

@@ -36,11 +36,11 @@ fetch() {
 
 # Row counts of every table in public and drizzle, one «schema.table count» per line.
 counts() {
-  local sql="select format('select %L || '' '' || count(*) from %I.%I', n.nspname || '.' || c.relname, n.nspname, c.relname)
+  local sql="select format('select %L || '' '' || count(*) from %I.%I;', n.nspname || '.' || c.relname, n.nspname, c.relname)
                from pg_class c join pg_namespace n on n.oid = c.relnamespace
               where c.relkind = 'r' and n.nspname in ('public', 'drizzle') order by 1"
-  printf '%s' "$sql" | ssh -o BatchMode=yes "$host" "$1 psql -U molvia -d molvia -At" \
-    | ssh -o BatchMode=yes "$host" "$1 psql -U molvia -d molvia -At"
+  printf '%s' "$sql" | ssh -o BatchMode=yes "$host" "$1 psql -U molvia -d molvia -At -v ON_ERROR_STOP=1" \
+    | ssh -o BatchMode=yes "$host" "$1 psql -U molvia -d molvia -At -v ON_ERROR_STOP=1"
 }
 
 case "$mode" in
@@ -61,6 +61,11 @@ case "$mode" in
       "docker exec -i $drill pg_restore -U molvia -d molvia --no-owner --exit-on-error"
     live="$(counts "cd ~/molvia && $compose exec -T postgres")"
     restored="$(counts "docker exec -i $drill")"
+    # An empty list would «match» too: a drill that compared nothing has proved nothing.
+    if [[ -z "$live" || -z "$restored" ]]; then
+      echo "drill: no row counts came back — nothing was compared" >&2
+      exit 1
+    fi
     echo "table · live · restored"
     join -a1 -a2 -e '—' -o '0,1.2,2.2' <(sort <<<"$live") <(sort <<<"$restored") \
       | awk '{ mark = ($2 == $3) ? "" : "   ≠"; print $1 " · " $2 " · " $3 mark; bad += ($2 != $3) }
