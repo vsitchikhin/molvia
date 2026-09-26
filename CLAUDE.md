@@ -1238,7 +1238,10 @@ database access. In a product about data integrity, two write paths will silentl
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and
-  gets the chevron, labelled with the parent's title, never the word «Back». Tabs and the
+  gets the chevron, labelled with the title of where it leads, never the word «Back». **It
+  leads to the screen underneath when that screen is any ancestor** — the step the system
+  button takes — and otherwise replaces onto the parent (`backTarget`, MOL-77): a finished trip
+  opened from the home screen says «‹ Поход» and both «back»s go home. Tabs and the
   chevron move through `useNavigation`: «Trip» is home — leaving it pushes, moving between
   the other sections replaces, returning is a step back — so the system «back» never walks
   through tab taps, and a nested screen opened cold gets its parent laid underneath. A
@@ -2000,9 +2003,19 @@ server then names is asked about as before. A newcomer gets «Что брать 
 history gets «N покупок ждут оценки» and their last three trips (`TripHistoryRow`, shared with
 the history). **The introduction is only for a history known to be empty**: every write to a
 trip persists the history cache, so an empty stored page proves nothing, and the store keeps
-whether the server answered (`answered`). An error or no connection with nothing remembered is a
-quiet card of its own, never «newcomer» — MOL-56's «no answer is not the answer „no“». A trip in
-«ждут оценки» is told by the place and the day of a purchase, since a card carries no trip.
+whether the server answered (`answered`) — **under a key of its own, never as a field of the
+cache**: the cache codec is strict, and a window still on the previous version read an unknown
+field as no cache and wrote its empty one over a finish made with no signal (adversarial Е). A
+change to a phone-side cache is read by both versions, as a field added to the contract is. An
+answer the list moved under — another window wrote the cache, a finish was taken back — is asked
+for again rather than taken for a success (А). Today's error, and purchases waiting for a verdict,
+outweigh an empty answer remembered from an earlier launch (Г); an error or no connection with
+nothing remembered is a quiet card of its own, never «newcomer» — MOL-56's «no answer is not the
+answer „no“». With the server down there is one «Повторить», the red block's, and it asks for the
+history too (Д). The price, named: offline with an empty answer remembered, the introduction
+stands — Safari and the installed app keep separate shelves. A trip in «ждут оценки» is told by
+the place and a gap of six hours between purchases, since a card carries no trip: two trips to
+one shop closer than that are one.
 
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
