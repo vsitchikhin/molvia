@@ -1,6 +1,5 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { registerSW } from 'virtual:pwa-register'
 import App from '@/App.vue'
 import { applyDocumentLang, i18n } from '@/i18n'
 import { settleColdStart } from '@/navigation'
@@ -17,8 +16,19 @@ import '@/styles/main.scss'
 // on devices that used it — a dead code in storage and a `?c=` that nothing scrubs any more.
 forgetTheInviteDoor()
 
-// A new version waits for the app to be put away, and is looked for when it comes back (MOL-46).
-installPwaUpdate(registerSW)
+// A new version waits for the app to be put away with no sheet up, and is looked for when it
+// comes back (MOL-46). Production only: the dev server builds no worker.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  installPwaUpdate({
+    serviceWorker: navigator.serviceWorker,
+    script: `${import.meta.env.BASE_URL}sw.js`,
+    scope: import.meta.env.BASE_URL,
+    sheetOpen: () => document.querySelector('dialog[open]') !== null,
+    reload: () => {
+      window.location.reload()
+    },
+  })
+}
 
 const app = createApp(App)
 

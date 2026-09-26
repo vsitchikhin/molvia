@@ -1,100 +1,215 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { RegisterSWOptions } from 'vite-plugin-pwa/types'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { installPwaUpdate } from '@/pwaUpdate'
 
-function visibility(state: DocumentVisibilityState): void {
-  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(state)
+type Handler = () => void
+
+/** Just enough of an event target: listeners by type, fired by hand. */
+class Target {
+  private readonly handlers = new Map<string, Handler[]>()
+  addEventListener(type: string, handler: Handler): void {
+    this.handlers.set(type, [...(this.handlers.get(type) ?? []), handler])
+  }
+  emit(type: string): void {
+    for (const handler of this.handlers.get(type) ?? []) handler()
+  }
+}
+
+class Worker extends Target {
+  readonly postMessage = vi.fn()
+}
+
+class Registration extends Target {
+  waiting: Worker | null = null
+  installing: Worker | null = null
+  readonly update = vi.fn(() => Promise.resolve())
+
+  /** A new version found and installed: it waits, as `registerType: 'prompt'` builds it. */
+  arrive(): Worker {
+    const worker = new Worker()
+    this.installing = worker
+    this.emit('updatefound')
+    this.installing = null
+    this.waiting = worker
+    worker.emit('statechange')
+    return worker
+  }
+}
+
+class Container extends Target {
+  constructor(readonly controller: object | null) {
+    super()
+  }
+  readonly registration = new Registration()
+  readonly register = vi.fn(() => Promise.resolve(this.registration))
+}
+
+let hidden = false
+let sheet = false
+
+function show(state: 'visible' | 'hidden'): void {
+  hidden = state === 'hidden'
   document.dispatchEvent(new Event('visibilitychange'))
 }
 
-/** The plugin's `registerSW`, driven by hand: what it was given, and a worker to report. */
-function installed() {
-  let options: RegisterSWOptions = {}
-  const update = vi.fn(() => Promise.resolve())
-  const check = vi.fn(() => Promise.resolve(undefined as never))
-  installPwaUpdate((given) => {
-    options = given
-    return update
+async function installed(options: { controlled?: boolean } = {}) {
+  const container = new Container(options.controlled === false ? null : {})
+  const reload = vi.fn()
+  installPwaUpdate({
+    serviceWorker: container as unknown as ServiceWorkerContainer,
+    script: '/sw.js',
+    scope: '/',
+    sheetOpen: () => sheet,
+    reload,
   })
-  const registration = { update: check } as unknown as ServiceWorkerRegistration
-  options.onRegisteredSW?.('/sw.js', registration)
-  return { options, update, check }
+  await vi.waitFor(() => {
+    expect(container.register).toHaveBeenCalled()
+  })
+  await Promise.resolve()
+  return { container, registration: container.registration, reload }
 }
+
+beforeEach(() => {
+  hidden = false
+  sheet = false
+  vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() =>
+    hidden ? 'hidden' : 'visible',
+  )
+})
 
 afterEach(() => {
   vi.restoreAllMocks()
 })
 
 describe('an installed app taking a new version (MOL-46)', () => {
-  it('registers at once, not on the load event', () => {
-    const { options } = installed()
-    expect(options.immediate).toBe(true)
+  it('registers the worker the build emits, at its scope', async () => {
+    const { container } = await installed()
+    expect(container.register).toHaveBeenCalledWith('/sw.js', { scope: '/' })
   })
 
-  it('does not reload while the app is looked at: what is being typed stays', () => {
-    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
-    const { options, update } = installed()
-
-    options.onNeedRefresh?.()
-
-    expect(update).not.toHaveBeenCalled()
+  it('does not let a new version in while the app is looked at', async () => {
+    const { registration } = await installed()
+    const worker = registration.arrive()
+    expect(worker.postMessage).not.toHaveBeenCalled()
   })
 
-  it('takes the new version the moment the app is put away', () => {
-    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
-    const { options, update } = installed()
-    options.onNeedRefresh?.()
+  it('lets it in the moment the app is put away', async () => {
+    const { registration } = await installed()
+    const worker = registration.arrive()
 
-    visibility('hidden')
+    show('hidden')
 
-    expect(update).toHaveBeenCalledExactlyOnceWith(true)
+    expect(worker.postMessage).toHaveBeenCalledExactlyOnceWith({ type: 'SKIP_WAITING' })
   })
 
-  it('takes it at once when it is found with the app already hidden', () => {
-    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
-    const { options, update } = installed()
+  it('lets it in at once when it arrives with the app already hidden', async () => {
+    const { registration } = await installed()
+    show('hidden')
 
-    options.onNeedRefresh?.()
+    const worker = registration.arrive()
 
-    expect(update).toHaveBeenCalledExactlyOnceWith(true)
+    expect(worker.postMessage).toHaveBeenCalledExactlyOnceWith({ type: 'SKIP_WAITING' })
   })
 
-  it('must not reload on being put away when there is nothing new', () => {
-    const { update } = installed()
+  it('reloads once the new worker has taken over, while still hidden', async () => {
+    const { container, registration, reload } = await installed()
+    registration.arrive()
+    show('hidden')
 
-    visibility('hidden')
+    container.emit('controllerchange')
 
-    expect(update).not.toHaveBeenCalled()
+    expect(reload).toHaveBeenCalledOnce()
   })
 
-  it('takes one version once: a second hide reloads nothing more', () => {
-    const { options, update } = installed()
-    visibility('visible')
-    options.onNeedRefresh?.()
+  describe('never under the finger (adversarial review Г)', () => {
+    it('must not reload a visible page another window let the new worker into', async () => {
+      // An installed app and a tab from the bot share one worker: the other one was put away.
+      const { container, reload } = await installed()
 
-    visibility('hidden')
-    visibility('visible')
-    visibility('hidden')
+      container.emit('controllerchange')
+      expect(reload).not.toHaveBeenCalled()
 
-    expect(update).toHaveBeenCalledTimes(1)
+      show('hidden')
+      expect(reload).toHaveBeenCalledOnce()
+    })
+
+    it('must not reload when the app came back before the worker took over', async () => {
+      const { container, registration, reload } = await installed()
+      registration.arrive()
+      show('hidden')
+      show('visible')
+
+      container.emit('controllerchange')
+      expect(reload).not.toHaveBeenCalled()
+
+      show('hidden')
+      expect(reload).toHaveBeenCalledOnce()
+    })
+
+    it('must not let a version in, nor reload, with a sheet up — what is typed there lives in memory', async () => {
+      const { container, registration, reload } = await installed()
+      const worker = registration.arrive()
+      sheet = true
+
+      show('hidden')
+      expect(worker.postMessage).not.toHaveBeenCalled()
+
+      container.emit('controllerchange')
+      expect(reload).not.toHaveBeenCalled()
+
+      // Back, the purchase added, the sheet put away — and the app away again.
+      show('visible')
+      sheet = false
+      show('hidden')
+      expect(reload).toHaveBeenCalledOnce()
+    })
   })
 
-  it('looks for a new version when the app is looked at again and when the network is back', () => {
-    const { check } = installed()
+  it('must not reload on being put away when there is nothing new', async () => {
+    const { reload, registration } = await installed()
 
-    visibility('visible')
+    show('hidden')
+
+    expect(reload).not.toHaveBeenCalled()
+    expect(registration.waiting).toBeNull()
+  })
+
+  it('must not reload for the first install: it replaces nothing', async () => {
+    const { container, reload } = await installed({ controlled: false })
+    show('hidden')
+
+    container.emit('controllerchange')
+
+    expect(reload).not.toHaveBeenCalled()
+  })
+
+  it('reloads once for one version', async () => {
+    const { container, registration, reload } = await installed()
+    registration.arrive()
+    show('hidden')
+    container.emit('controllerchange')
+
+    show('visible')
+    show('hidden')
+
+    expect(reload).toHaveBeenCalledOnce()
+  })
+
+  it('looks for a new version when the app is looked at again and when the network is back', async () => {
+    const { registration } = await installed()
+
+    show('visible')
     window.dispatchEvent(new Event('online'))
 
-    expect(check).toHaveBeenCalledTimes(2)
+    expect(registration.update).toHaveBeenCalledTimes(2)
   })
 
   it('says nothing when a look for a new version fails offline', async () => {
-    const { check } = installed()
-    check.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const { registration } = await installed()
+    registration.update.mockRejectedValueOnce(new TypeError('Failed to fetch'))
 
-    visibility('visible')
+    show('visible')
+    await Promise.resolve()
 
-    await expect(Promise.resolve()).resolves.toBeUndefined()
-    expect(check).toHaveBeenCalledOnce()
+    expect(registration.update).toHaveBeenCalledOnce()
   })
 })
