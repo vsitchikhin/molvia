@@ -122,8 +122,15 @@ test.describe('the trip', () => {
     await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
 
     // Over on the phone at once, and over on the server as soon as the queue has been out.
-    await expect(page.getByRole('heading', { name: 'A new trip', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Start a trip' })).toBeVisible()
     await expect.poll(setting.current).toBeNull()
+
+    // The home screen lists the trip just finished, and opens it (MOL-77).
+    const recent = page.locator('.history-row').filter({ hasText: 'Ереван Сити' })
+    await expect(recent).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'What to buy, and where' })).toHaveCount(0)
+    await recent.click()
+    await expect(page).toHaveURL(/\/trip\/history\/[0-9a-f-]+$/)
   })
 
   test('is started with no connection, and catches up when it comes back', async ({
@@ -142,7 +149,8 @@ test.describe('the trip', () => {
     await page.waitForTimeout(400)
     await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
     // The trip is over on the phone at once, though nothing has reached the server.
-    await expect(page.getByRole('heading', { name: 'A new trip', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Start a trip' })).toBeVisible()
+    await expect(page.locator('.history-row').filter({ hasText: 'Рынок' })).toBeVisible()
     expect(await setting.current()).not.toBeNull()
 
     await startTrip(page, 'Ереван Сити')
@@ -157,5 +165,36 @@ test.describe('the trip', () => {
         timeout: 15_000,
       })
       .toBe('Ереван Сити')
+  })
+})
+
+test.describe('the home screen with no trip (MOL-77)', () => {
+  for (const size of [
+    { width: 390, height: 844 },
+    { width: 375, height: 667 },
+  ]) {
+    test(`greets a newcomer, and «Start a trip» is in view at ${String(size.width)}×${String(size.height)}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(size)
+      await signedIn(page)
+
+      await expect(page.getByRole('heading', { name: 'What to buy, and where' })).toBeVisible()
+      // Not a circle over the button any more: the only action is the button with words.
+      await expect(page.locator('.circle')).toHaveCount(0)
+      const start = page.getByRole('button', { name: 'Start a trip' })
+      await expect(start).toBeInViewport({ ratio: 1 })
+
+      // The cycle's third step leads to «Ratings» as a change of tab.
+      await page.getByRole('button', { name: /At home/ }).click()
+      await expect(page).toHaveURL(/\/verdicts$/)
+    })
+  }
+
+  test('keeps «Start a trip» in view with large text', async ({ page }) => {
+    await signedIn(page)
+    await page.addStyleTag({ content: 'html { font-size: 130% }' })
+    await expect(page.getByRole('heading', { name: 'What to buy, and where' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Start a trip' })).toBeInViewport({ ratio: 1 })
   })
 })
