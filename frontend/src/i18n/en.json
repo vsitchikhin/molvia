@@ -586,7 +586,10 @@
     "login_disabled": "Telegram sign-in is not configured yet",
     "bot_unauthorized": "The bot could not authenticate",
     "exchange_in_future": "An exchange cannot be dated in the future",
-    "income_in_future": "An income cannot be dated in the future"
+    "income_in_future": "An income cannot be dated in the future",
+    "spending_in_future": "A spending cannot be dated in the future",
+    "spending_category_unknown": "There is no such category — choose another",
+    "spending_category_taken": "A category with this name already exists"
   },
   "settings": {
     "title": "Settings",
@@ -676,6 +679,10 @@
       "incomes": {
         "term": "Income",
         "text": "How much came in, in which currency, when and from where, and the note if you write one — your rate is worked out from these too. When you amend an income, the earlier version is kept beside it for as long as the income exists. Only you see it."
+      },
+      "spendings": {
+        "term": "Spending outside trips",
+        "text": "How much, in what, when, in which category, and «what» and «where» if you write them — and your own categories. Spending in another currency keeps the rate of its day, and a past month the rate of its last day, worked out from your exchanges. Only you see it."
       },
       "places": {
         "term": "Shops",

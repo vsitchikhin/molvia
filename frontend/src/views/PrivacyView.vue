@@ -32,6 +32,7 @@ const STORED = [
   'purchases',
   'exchanges',
   'incomes',
+  'spendings',
   'places',
   'ratings',
   'search',

@@ -439,6 +439,42 @@ export function walletRate(
 }
 
 /**
+ * The person's own rate between two currencies on `day`, both priced in `base` by one walk of the
+ * chain and rounded once (MOL-73, review Р-1). Dividing two wallet rates, each already rounded to
+ * six digits as «so much of it per rouble», lost the digits of the small one — a dollar is 0,011235
+ * per rouble, five significant — and 1 500 $ of rent came out 24 ֏ short. On whichever side its
+ * number is at least one, as every rate of «Деньги» is, and dated by the later of the two costs.
+ * Null when the cost of either is unknown.
+ */
+export function walletCross(
+  receipts: readonly Receipt[],
+  base: Currency,
+  one: Currency,
+  other: Currency,
+  day: string,
+  officialOf: OfficialRateOf = noOfficialRate,
+  since: string | null = null,
+): ExchangeRate | null {
+  if (one === other) return null
+  const { costs } = costsOf(receipts, base, day, officialOf, since)
+  const costOfCurrency = (currency: Currency) =>
+    currency === base ? { ratio: ONE, day: null } : (costs.get(currency) ?? null)
+  const ofOne = costOfCurrency(one)
+  const ofOther = costOfCurrency(other)
+  if (!ofOne || !ofOther) return null
+  const dated = [ofOne.day, ofOther.day].flatMap((on) => (on === null ? [] : [on])).sort()
+  const asOf = dated.at(-1) ?? day
+  // `other` per `one`: what `other` costs per unit of `base`, over what `one` does.
+  const ratio = reduced(
+    ofOther.ratio.quote * ofOne.ratio.base,
+    ofOther.ratio.base * ofOne.ratio.quote,
+  )
+  const forward = rateOf(ratio, one, other, asOf)
+  if (forward && forward.scaled >= RATE_SCALE) return forward
+  return rateOf({ quote: ratio.base, base: ratio.quote }, other, one, asOf) ?? forward
+}
+
+/**
  * Why a currency has no known cost: the link that made it so, and whether that link paid with money
  * of no price and no fresh official rate of its day (`noRate`), or belonged to the reckoning of the
  * currency of conversion before the last change of it (`oldReckoning`).

@@ -162,6 +162,13 @@
       "when": 1790371845582,
       "tag": "0022_search_pick_admits",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790440969570,
+      "tag": "0023_spendings",
+      "breakpoints": true
     }
   ]
 }

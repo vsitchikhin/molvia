@@ -14,8 +14,11 @@ export const ACTOR_REFERENCES = [
   'exchanges.actor_id',
   'incomes.actor_id',
   'items.created_by',
+  'money_month_rates.actor_id',
   'search_picks.actor_id',
   'sessions.actor_id',
+  'spending_categories.actor_id',
+  'spendings.actor_id',
   'trips.actor_id',
   'verdicts.actor_id',
 ] as const
@@ -30,6 +33,9 @@ export const ERASED_TABLES = [
   'trips',
   'exchanges',
   'incomes',
+  'spendings',
+  'spending_categories',
+  'money_month_rates',
   'login_requests',
   'actors',
 ] as const
@@ -110,6 +116,9 @@ export function createErasureRepository(db: Db): ErasureRepository {
             trips: 0,
             exchanges: 0,
             incomes: 0,
+            spendings: 0,
+            spending_categories: 0,
+            money_month_rates: 0,
             login_requests: 0,
             actors: 0,
           }
@@ -153,6 +162,17 @@ export function createErasureRepository(db: Db): ErasureRepository {
             // The same for incomes (MOL-66), their versions going by the cascade from `incomes`.
             erased.incomes = await count(
               sql`delete from incomes where actor_id = ${actorId} returning 1`,
+            )
+            // Spendings outside trips (MOL-73), removed ones too — then the categories they
+            // pointed at, and the rates the person's closed months were frozen at.
+            erased.spendings = await count(
+              sql`delete from spendings where actor_id = ${actorId} returning 1`,
+            )
+            erased.spending_categories = await count(
+              sql`delete from spending_categories where actor_id = ${actorId} returning 1`,
+            )
+            erased.money_month_rates = await count(
+              sql`delete from money_month_rates where actor_id = ${actorId} returning 1`,
             )
           }
           // No foreign key reaches these — on a first login the owner does not exist yet — so
