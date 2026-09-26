@@ -1,10 +1,11 @@
 import {
-  convertFromBase,
+  convertAcross,
   lastDayOf,
   monthOf,
   moneyMonth,
   moneyMonthViewOf,
   previousMonth,
+  spendingIn,
   yerevanDate,
 } from '@molvia/model'
 import type {
@@ -12,6 +13,7 @@ import type {
   ConvertOn,
   Currency,
   ExchangeRate,
+  JournalKey,
   Money,
   MoneyMonth,
   MoneyMonthView,
@@ -29,23 +31,23 @@ type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
 
 /**
  * The rates a month needs, read before it is counted: the pure function asks synchronously, so every
- * day a trip in a third currency or an income in another currency falls on is looked up first.
+ * day an amount in another currency falls on is looked up first — by `rateOf`, which is the trip's
+ * rule for what was spent and the central bank's alone for what came in.
  */
 async function converter(
-  rates: DayRates,
-  base: Currency,
+  rateOf: DayRates['between'],
+  into: Currency,
   needs: readonly { amount: Money; day: string }[],
 ): Promise<ConvertOn> {
   const known = new Map<string, ExchangeRate | null>()
   for (const { amount, day } of needs) {
     const key = `${amount.currency}:${day}`
-    if (known.has(key) || amount.currency === base) continue
-    // «86 ₽ за $», not «0,0116 $ за ₽»: the orientation whose number keeps its digits.
-    known.set(key, await rates.on(amount.currency, base, day))
+    if (known.has(key) || amount.currency === into) continue
+    known.set(key, await rateOf(amount.currency, into, day))
   }
   return (amount, day) => {
     const rate = known.get(`${amount.currency}:${day}`)
-    return rate ? convertFromBase(amount, rate) : null
+    return rate ? convertAcross(amount, rate) : null
   }
 }
 
@@ -66,14 +68,17 @@ async function count(
     repositories.incomes.list(owner.id),
   ])
   const ofMonth = incomes.filter((income) => monthOf(income.receivedOn) === month)
-  const [tripInSpend, incomeInIncome] = await Promise.all([
+  const [inSpend, incomeInIncome] = await Promise.all([
+    converter((one, other, day) => rates.between(one, other, day), owner.spendCurrency, [
+      ...trips.map((trip) => ({ amount: trip.amount, day: trip.finishedOn })),
+      // A spending whose snapshot is not of the spending currency now — none was known that day,
+      // or it was written before a move — is counted as a trip line is (review Р-5).
+      ...spendings
+        .filter((spending) => spendingIn(spending, owner.spendCurrency) === null)
+        .map((spending) => ({ amount: spending.amount, day: spending.spentOn })),
+    ]),
     converter(
-      rates,
-      owner.spendCurrency,
-      trips.map((trip) => ({ amount: trip.amount, day: trip.finishedOn })),
-    ),
-    converter(
-      rates,
+      (one, other, day) => rates.official(one, other, day),
       owner.incomeCurrency,
       ofMonth.map((income) => ({ amount: income.amount, day: income.receivedOn })),
     ),
@@ -88,16 +93,18 @@ async function count(
     categories,
     rate,
     rateKind,
-    tripInSpend,
+    inSpend,
     incomeInIncome,
   })
 }
 
 /**
- * The month's rate from the spending currency into the income one: today's for the running month,
- * and for a closed one the rate of its last day, frozen the first time it is read and never moved
- * again — a new exchange today does not rewrite August (handoff 06). Nothing known that day, and
- * nothing is frozen: the next read tries again rather than locking an empty answer in.
+ * The month's rate between the spending currency and the income one: today's for the running month,
+ * and for a closed one the rate of its last day, frozen the first time it is read — a new exchange
+ * today does not rewrite August (handoff 06). A fact of August amended later does: writing, amending,
+ * removing or bringing back an exchange or an income of a day lets go of the months from that day on
+ * (owner's decision В-6). Nothing known that day, and nothing is frozen: the next read tries again
+ * rather than locking an empty answer in.
  */
 async function monthRate(
   repositories: Pick<Repositories, 'money'>,
@@ -109,21 +116,22 @@ async function monthRate(
   const base = owner.incomeCurrency
   const quote = owner.spendCurrency
   if (base === quote) return { rate: null, kind: 'live' }
-  if (month >= monthOf(today)) return { rate: await rates.on(base, quote, today), kind: 'live' }
+  if (month >= monthOf(today))
+    return { rate: await rates.between(base, quote, today), kind: 'live' }
 
   const frozen = await repositories.money.frozenRate(owner.id, month, base, quote)
   if (frozen) return { rate: frozen, kind: 'frozen' }
-  const closing = await rates.on(base, quote, lastDayOf(month))
+  const closing = await rates.between(base, quote, lastDayOf(month))
   if (!closing) return { rate: null, kind: 'frozen' }
   return { rate: await repositories.money.freeze(owner.id, month, closing), kind: 'frozen' }
 }
 
-/** `GET /money/months/:month` (MOL-73): the month counted, a page of its journal from `cursor`. */
+/** `GET /money/months/:month` (MOL-73): the month counted, a page of its journal after `cursor`. */
 export async function moneyMonthOf(
   repositories: Repositories,
   owner: Owner,
   month: string,
-  cursor = 0,
+  cursor?: JournalKey,
   now: Date = new Date(),
 ): Promise<MoneyMonthView> {
   const today = yerevanDate(now)

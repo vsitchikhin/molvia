@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, gte, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, gte, isNotNull, isNull, lte, or, sql } from 'drizzle-orm'
 import { DomainError, ERROR, SPENDING_UNDO_MINUTES, spendingSchema } from '@molvia/model'
 import type { ExchangeRate, Spending, SpendingAmendBody, SpendingBody } from '@molvia/model'
 import { translateFailures } from './failure'
@@ -10,7 +10,8 @@ import { spendings } from './schema'
  * The owner's spendings outside trips (MOL-73). Every rule of writing is an income's, so one money
  * model keeps one set: the same identifier with the same spending is a repeat, with another is
  * `CONFLICT`; an amendment names the version it was made over; a removal is a mark offered back for
- * ten minutes (В-4). The rate of the spending's day is decided by the use case and written beside it.
+ * ten minutes whatever is written meanwhile (В-4), then made final by the minute timer. The rate of
+ * the spending's day is decided by the use case and written beside it.
  */
 export interface SpendingRepository {
   add(
@@ -35,7 +36,6 @@ export interface SpendingRepository {
 
   remove(actorId: string, id: string): Promise<void>
   restore(actorId: string, id: string): Promise<boolean>
-  purgeRemoved(actorId: string, except?: string): Promise<void>
   purgeStale(): Promise<void>
 
   /** The owner's live spendings with a day from `from` to `to`, both included. */
@@ -205,19 +205,6 @@ export function createSpendingRepository(db: Conn): SpendingRepository {
       await db
         .delete(spendings)
         .where(and(isNotNull(spendings.deletedAt), lte(spendings.deletedAt, undoFrom())))
-    },
-
-    async purgeRemoved(actorId, except) {
-      const kept = except === undefined ? null : idOrNull(except)
-      await db
-        .delete(spendings)
-        .where(
-          and(
-            eq(spendings.actorId, actorId),
-            isNotNull(spendings.deletedAt),
-            kept === null ? undefined : ne(spendings.id, kept),
-          ),
-        )
     },
 
     async between(actorId, from, to) {

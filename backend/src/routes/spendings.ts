@@ -13,6 +13,7 @@ import {
 } from '@molvia/model'
 import type {
   Actor,
+  JournalKey,
   MoneyMonthView,
   SpendingAmendBody,
   SpendingBody,
@@ -35,7 +36,7 @@ export interface SpendingsApi {
     body: SpendingCategoryBody,
   ): Promise<{ list: SpendingCategoriesResponse; created: boolean }>
   archiveCategory(actor: Actor, id: string, archived: boolean): Promise<SpendingCategoriesResponse>
-  month(actor: Actor, month: string, cursor: number): Promise<MoneyMonthView>
+  month(actor: Actor, month: string, cursor?: JournalKey): Promise<MoneyMonthView>
 }
 
 /** Spendings are the person's own money: private always, never in a shared cache. */
@@ -133,7 +134,7 @@ export function spendingRoutes(app: FastifyInstance, api: SpendingsApi): void {
       const month = monthSchema.safeParse(request.params.month)
       if (!month.success) throw new DomainError(ERROR.NOT_FOUND)
       const { cursor } = parseQuery(moneyMonthQuerySchema, request.query)
-      const view = await api.month(ownerOf(request), month.data, cursor ?? 0)
+      const view = await api.month(ownerOf(request), month.data, cursor)
       return privately(reply).send(z.encode(moneyMonthCodec, view))
     },
   )

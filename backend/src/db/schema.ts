@@ -993,10 +993,10 @@ export const spendings = pgTable(
       'spendings_rate_all_or_none',
       sql`num_nonnulls(${table.rateBase}, ${table.rateQuote}, ${table.rateScaled}, ${table.rateSource}, ${table.rateAsOf}) in (0, 5)`,
     ),
-    // «390 ֏ за $»: the spending's own currency is the base, so the number keeps its digits.
+    // «390 ֏ за $»: the spending's own currency on whichever side keeps the number's digits.
     check(
-      'spendings_rate_base_is_spending_currency',
-      sql`${table.rateBase} is null or ${table.rateBase} = ${table.currency}`,
+      'spendings_rate_of_spending_currency',
+      sql`${table.rateBase} is null or ${table.currency} in (${table.rateBase}, ${table.rateQuote})`,
     ),
     check(
       'spendings_rate_two_currencies',

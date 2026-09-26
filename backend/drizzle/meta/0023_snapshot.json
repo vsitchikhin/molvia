@@ -1891,9 +1891,9 @@
           "name": "spendings_rate_all_or_none",
           "value": "num_nonnulls(\"spendings\".\"rate_base\", \"spendings\".\"rate_quote\", \"spendings\".\"rate_scaled\", \"spendings\".\"rate_source\", \"spendings\".\"rate_as_of\") in (0, 5)"
         },
-        "spendings_rate_base_is_spending_currency": {
-          "name": "spendings_rate_base_is_spending_currency",
-          "value": "\"spendings\".\"rate_base\" is null or \"spendings\".\"rate_base\" = \"spendings\".\"currency\""
+        "spendings_rate_of_spending_currency": {
+          "name": "spendings_rate_of_spending_currency",
+          "value": "\"spendings\".\"rate_base\" is null or \"spendings\".\"currency\" in (\"spendings\".\"rate_base\", \"spendings\".\"rate_quote\")"
         },
         "spendings_rate_two_currencies": {
           "name": "spendings_rate_two_currencies",

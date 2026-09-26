@@ -41,13 +41,21 @@ export interface SpendingCategoryRepository {
 
 type Row = typeof spendingCategories.$inferSelect
 
+/** One owner's names are decided one at a time: a check and its write are one step. */
+function lockOwner(actorId: string) {
+  return sql`select pg_advisory_xact_lock(hashtext('spending_categories'), hashtext(${actorId}))`
+}
+
 function toCategory(row: Row): SpendingCategory {
   return spendingCategorySchema.parse(row)
 }
 
 export function createSpendingCategoryRepository(db: Conn): SpendingCategoryRepository {
-  async function all(actorId: string): Promise<SpendingCategory[]> {
-    const rows = await db
+  async function all(
+    actorId: string,
+    conn: Pick<Conn, 'select'> = db,
+  ): Promise<SpendingCategory[]> {
+    const rows = await conn
       .select()
       .from(spendingCategories)
       .where(eq(spendingCategories.actorId, actorId))
@@ -86,29 +94,35 @@ export function createSpendingCategoryRepository(db: Conn): SpendingCategoryRepo
     list: given,
 
     async add(actorId, input) {
-      return translateFailures(async () => {
-        const owned = await given(actorId)
-        const same = owned.find((category) => category.id === input.id)
-        if (same) {
-          if (same.name !== input.name) throw new DomainError(ERROR.CONFLICT)
-          return { category: same, created: false }
-        }
-        if (nameTaken(owned, input.name)) throw new DomainError(ERROR.SPENDING_CATEGORY_TAKEN)
+      await given(actorId)
+      return translateFailures(() =>
+        db.transaction(async (tx) => {
+          // The name is checked and written under the owner's lock: two phones adding «Такси» at
+          // once each saw no «Такси» and both wrote one (adversarial Д7).
+          await tx.execute(lockOwner(actorId))
+          const owned = await all(actorId, tx)
+          const same = owned.find((category) => category.id === input.id)
+          if (same) {
+            if (same.name !== input.name) throw new DomainError(ERROR.CONFLICT)
+            return { category: same, created: false }
+          }
+          if (nameTaken(owned, input.name)) throw new DomainError(ERROR.SPENDING_CATEGORY_TAKEN)
 
-        const [inserted] = await db
-          .insert(spendingCategories)
-          .values({
-            id: input.id,
-            actorId,
-            name: input.name,
-            colour: nextCategoryColour(owned),
-          })
-          .onConflictDoNothing({ target: spendingCategories.id })
-          .returning()
-        // Taken by an identifier of someone else's: a device does not choose another's name.
-        if (!inserted) throw new DomainError(ERROR.CONFLICT)
-        return { category: toCategory(inserted), created: true }
-      })
+          const [inserted] = await tx
+            .insert(spendingCategories)
+            .values({
+              id: input.id,
+              actorId,
+              name: input.name,
+              colour: nextCategoryColour(owned),
+            })
+            .onConflictDoNothing({ target: spendingCategories.id })
+            .returning()
+          // Taken by an identifier of someone else's: a device does not choose another's name.
+          if (!inserted) throw new DomainError(ERROR.CONFLICT)
+          return { category: toCategory(inserted), created: true }
+        }),
+      )
     },
 
     async archive(actorId, id) {
@@ -135,24 +149,27 @@ export function createSpendingCategoryRepository(db: Conn): SpendingCategoryRepo
     async restore(actorId, id) {
       const own = idOrNull(id)
       if (own === null) return false
-      const owned = await all(actorId)
-      const category = owned.find((candidate) => candidate.id === own)
-      if (!category) return false
-      // Brought back beside a live one of the same name, the chips would hold two «Такси».
-      if (category.name !== null && nameTaken(owned, category.name, own)) {
-        throw new DomainError(ERROR.SPENDING_CATEGORY_TAKEN)
-      }
-      await db
-        .update(spendingCategories)
-        .set({ archivedAt: null })
-        .where(
-          and(
-            eq(spendingCategories.id, own),
-            eq(spendingCategories.actorId, actorId),
-            isNotNull(spendingCategories.archivedAt),
-          ),
-        )
-      return true
+      return db.transaction(async (tx) => {
+        await tx.execute(lockOwner(actorId))
+        const owned = await all(actorId, tx)
+        const category = owned.find((candidate) => candidate.id === own)
+        if (!category) return false
+        // Brought back beside a live one of the same name, the chips would hold two «Такси».
+        if (category.name !== null && nameTaken(owned, category.name, own)) {
+          throw new DomainError(ERROR.SPENDING_CATEGORY_TAKEN)
+        }
+        await tx
+          .update(spendingCategories)
+          .set({ archivedAt: null })
+          .where(
+            and(
+              eq(spendingCategories.id, own),
+              eq(spendingCategories.actorId, actorId),
+              isNotNull(spendingCategories.archivedAt),
+            ),
+          )
+        return true
+      })
     },
   }
 }

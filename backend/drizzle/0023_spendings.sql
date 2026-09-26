@@ -51,7 +51,7 @@ CREATE TABLE "spendings" (
 	CONSTRAINT "spendings_currency_known" CHECK ("spendings"."currency" in ('AMD', 'RUB', 'USD', 'EUR')),
 	CONSTRAINT "spendings_revision_positive" CHECK ("spendings"."revision" > 0),
 	CONSTRAINT "spendings_rate_all_or_none" CHECK (num_nonnulls("spendings"."rate_base", "spendings"."rate_quote", "spendings"."rate_scaled", "spendings"."rate_source", "spendings"."rate_as_of") in (0, 5)),
-	CONSTRAINT "spendings_rate_base_is_spending_currency" CHECK ("spendings"."rate_base" is null or "spendings"."rate_base" = "spendings"."currency"),
+	CONSTRAINT "spendings_rate_of_spending_currency" CHECK ("spendings"."rate_base" is null or "spendings"."currency" in ("spendings"."rate_base", "spendings"."rate_quote")),
 	CONSTRAINT "spendings_rate_two_currencies" CHECK ("spendings"."rate_base" is null or "spendings"."rate_base" <> "spendings"."rate_quote"),
 	CONSTRAINT "spendings_rate_quote_known" CHECK ("spendings"."rate_quote" is null or "spendings"."rate_quote" in ('AMD', 'RUB', 'USD', 'EUR')),
 	CONSTRAINT "spendings_rate_source_known" CHECK ("spendings"."rate_source" is null or "spendings"."rate_source" in ('personal', 'official', 'fallback'))
