@@ -1,0 +1,11 @@
+# 04:00 in Yerevan, whatever zone the machine is set to. Persistent: a night the machine was
+# off is copied as soon as it is back, instead of waiting for the next one.
+[Unit]
+Description=Molvia: nightly copy of the production database
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 Asia/Yerevan
+Persistent=true
+
+[Install]
+WantedBy=timers.target

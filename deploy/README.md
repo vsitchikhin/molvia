@@ -92,12 +92,79 @@ is the fallback for when the bot is down — not a channel people are told about
      exec backend node dist/forget.js <telegram-id>
    ```
 
-3. The same command with `--yes` at the end erases. It cannot be undone and there are no backups.
+3. The same command with `--yes` at the end erases. It cannot be undone — and the person stays in
+   the nightly copies for up to fourteen days, until the bucket deletes them (Backups, below).
 
 In a working copy the same thing is `make forget TG=<id>` and `make forget TG=<id> YES=1`.
 What goes: purchases and trips, ratings including withdrawn ones, search picks, the event log,
 sessions, login requests and the owner. What stays: catalogue items the person added, with no
 author, and every place.
+
+## Backups (MOL-70)
+
+Every night at 04:00 in Yerevan `molvia-backup.timer` runs `backup/backup.sh`: `pg_dump` inside the
+postgres container, encrypted on the spot with `age` to the owner's public key, streamed to a
+Cloudflare R2 bucket in the EU jurisdiction. No unencrypted dump touches a disk, and the private
+key never comes to this machine — a compromised server cannot read old copies.
+
+- **Fourteen days.** The bucket's lifecycle rule deletes a copy at 13 days and R2 removes it within
+  a day of that, so the privacy page's «fourteen days» holds; `backup.sh` deletes by the same number
+  as a fallback. Longer is not a setting to raise quietly: an erased person lives in the copies
+  exactly that long, and the page says so.
+- **A missing copy is an alarm.** Each run pings healthchecks.io with its exit code; no ping for 25
+  hours, or a failed one, reaches the owner in Telegram. The service sees when the server pinged and
+  from where — no data.
+- **A copy is written under `partial/` and moved into place only when the whole pipe succeeded**, and
+  only if it is non-empty and starts as an age file: `rclone rcat` completes an upload whether or not
+  `pg_dump` did.
+
+### Once, on a new machine
+
+1. `sudo apt install age rclone`.
+2. The R2 remote — the owner types the token, it never lands in shell history:
+
+   ```bash
+   read -rs -p 'Access key id: ' AK; echo; read -rs -p 'Secret access key: ' SK; echo
+   read -r -p 'Endpoint (https://<account>.eu.r2.cloudflarestorage.com): ' EP
+   rclone config create r2 s3 provider=Cloudflare access_key_id="$AK" \
+     secret_access_key="$SK" endpoint="$EP" no_check_bucket=true no_head=true
+   unset AK SK EP
+   ```
+
+   The token is «Object Read & Write» on `molvia-backups` only. `no_head` is not optional: after
+   an upload rclone asks for the object by `?versionId=`, which R2 answers `501 Not Implemented` —
+   the copy is there, and the run still fails. Nor is an `acl`: R2 has none to set.
+
+3. `backup.env` next to `.env.prod`, mode 600, from `backup/backup.env.example`.
+4. The scripts and units:
+
+   ```bash
+   mkdir -p ~/molvia/backup  # then copy deploy/backup/{backup.sh,restore.sh} there
+   sudo cp molvia-backup.service molvia-backup.timer /etc/systemd/system/
+   sudo systemctl daemon-reload && sudo systemctl enable --now molvia-backup.timer
+   sudo systemctl start molvia-backup.service && journalctl -u molvia-backup -n 5
+   ```
+
+### Restoring — from the owner's machine
+
+`restore.sh` runs where the private key is (`~/.config/molvia/backup.key`, and a copy in the
+password manager — lose both and every copy is noise). The encrypted bytes come from the server,
+are decrypted in memory and go back over ssh:
+
+```bash
+deploy/backup/restore.sh --list
+deploy/backup/restore.sh --drill                  # latest copy into a throwaway Postgres, row counts vs live
+deploy/backup/restore.sh --into-prod <copy>       # asks for the copy's name, stops api and bot, replaces
+```
+
+**After `--into-prod`, erasures made after the copy have to be repeated**: a copy is a snapshot, and
+someone who wrote `/delete` after it is back. The window is at most a day — accepted for 0.1 and named
+on the privacy page (owner's decision, 26.09.2026); a record of erasures that survives the database
+is 0.2's question, with the lawyer («Персональные данные», section 5).
+
+**What is not copied, on purpose:** `.env.prod`. Nothing in it is lost with the machine — the
+database password and `BOT_API_SECRET` are generated anew, BotFather shows the bot's token
+(`/mybots` → API Token), the GHCR token is issued anew. Images are in GHCR, code in git.
 
 ## What is deliberately not automated
 
