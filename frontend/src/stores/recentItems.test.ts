@@ -238,19 +238,21 @@ describe('recent items', () => {
       expect(store.filter('картошка').map((item) => item.id)).toEqual([young.id])
     })
 
-    it('takes an adjective of a group right before the kind only: «Лапша гречневая» is no «гречка» (review С, Ф)', () => {
+    it('takes an adjective of a group beside a kind of its own only: «Лапша гречневая» is no «гречка» (review С, Ц)', () => {
       const store = relaunched()
       const noodles = entry(10, { name: 'Лапша гречневая Sen Soy' })
       const buckwheat = entry(11, { name: 'Гречневая крупа' })
-      for (const item of [noodles, buckwheat]) store.remember(item)
-      // After the kind it is a property of the noodles; right before it, the groats (review Ф).
-      expect(store.filter('гречка').map((item) => item.id)).toEqual([buckwheat.id])
+      const groats = entry(12, { name: 'Крупа гречневая ядрица' })
+      const soba = entry(13, { name: 'Гречневая лапша' })
+      for (const item of [noodles, buckwheat, groats, soba]) store.remember(item)
+      // Beside the groats it is the groats, in either order; beside the noodles, the noodles.
       expect(
         store
-          .filter('гречневая')
+          .filter('гречка')
           .map((item) => item.id)
           .sort(),
-      ).toEqual([noodles.id, buckwheat.id].sort())
+      ).toEqual([buckwheat.id, groats.id].sort())
+      expect(store.filter('гречневая')).toHaveLength(4)
     })
 
     it('not at all under an empty or blank query', () => {

@@ -194,7 +194,7 @@ export function kindKey(name: string): string {
 
 // Narrower targets only. An adjective of a group of the same thing — «гречневая», «овсяная» —
 // describes somebody else's product as often as its own («Лапша гречневая», «Мука овсяная»), and
-// counts only as the kind, like any word of the group (owner's decision on review, MOL-45 С).
+// counts only beside a kind of its own, `PAIRED` (owner's decisions on review, MOL-45 С and Ц).
 const DESCRIBING: ReadonlySet<string> = new Set(
   NARROWER.flatMap(([, tails]) => tails)
     .filter(describes)
@@ -210,29 +210,44 @@ export function synonymDescribes(key: string): boolean {
   return DESCRIBING.has(key)
 }
 
-// Adjectives of a group of the same thing — «гречневая», «сгущённое», «овсяные». Never the kind,
-// which skips adjectives, and not anywhere, where «Лапша гречневая» carries them (review С): they
-// count right before the kind, where a shelf writes «Гречневая крупа», «Сгущённое молоко»
-// (owner's decision on review, MOL-45 Ф). The price: «Гречневая лапша» is found by them too.
-const BEFORE_KIND: ReadonlySet<string> = new Set(SAME.flat().filter(describes).map(toSearchKey))
+/**
+ * The adjectives of a group of the same thing, each with the kinds it names that thing beside:
+ * «гречневая» is «гречка» on «Крупа гречневая» and «Гречневая крупа» alike, and on «Лапша
+ * гречневая» it is somebody else's product (review С). Never the kind, which skips adjectives, and
+ * not by its place beside it, since a shelf writes both orders — «Молоко цельное сгущённое с
+ * сахаром», by the standard (owner's decisions on review, MOL-45 Ф and Ц). The kinds are written
+ * as a shelf writes them, in the nominative. The price: a kind left out — «Ядрица гречневая» —
+ * is found by letters only, until it is written here.
+ */
+const PAIRED: readonly (readonly [readonly string[], readonly string[]])[] = [
+  [
+    ['гречневая', 'гречневой', 'гречневую'],
+    ['крупа', 'крупы'],
+  ],
+  [
+    ['овсяная', 'овсяную', 'овсяные', 'овсяных'],
+    ['хлопья', 'каша'],
+  ],
+  [['сгущенное', 'сгущённое', 'сгущенного', 'сгущённого'], ['молоко']],
+]
 
-/** Whether a synonym counts as the word right before the kind — see `BEFORE_KIND`. */
-export function synonymBeforeKind(key: string): boolean {
-  return BEFORE_KIND.has(key)
-}
+const PAIRED_KINDS: ReadonlyMap<string, readonly string[]> = new Map(
+  PAIRED.flatMap(([adjectives, kinds]) => {
+    const keys = keysOf(kinds)
+    return keysOf(adjectives).map((adjective) => [adjective, keys] as const)
+  }),
+)
 
 /**
- * The word right before the kind, as a search key — the adjective a shelf puts there («Гречневая
- * крупа») — or empty when the kind stands first. Split and counted as `kindKey` does.
+ * The kinds beside which a synonym counts — an adjective of a group anywhere in a name whose
+ * kind is one of them (see `PAIRED`). Empty for every other word.
  */
-export function beforeKindKey(name: string): string {
-  const words = name.split(BREAK).filter((word) => word !== '')
-  const at = words.findIndex((word) => !describes(word))
-  return at > 0 ? (toSearchKey(name).split(' ')[at - 1] ?? '') : ''
+export function synonymPairedKinds(key: string): readonly string[] {
+  return PAIRED_KINDS.get(key) ?? []
 }
 
 /**
  * Exported for the test that holds the rules above — no brand as a target, one group per word —
  * to walk the real table rather than a copy of it. Nothing in the applications reads this.
  */
-export const SYNONYM_TABLES = Object.freeze({ same: SAME, narrower: NARROWER })
+export const SYNONYM_TABLES = Object.freeze({ same: SAME, narrower: NARROWER, paired: PAIRED })

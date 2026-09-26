@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { toSearchKey } from '#model/support/search-key'
 import {
+  ADJECTIVE_WORD,
   SYNONYM_TABLES,
   WORD_BREAK,
-  beforeKindKey,
   kindKey,
-  synonymBeforeKind,
   synonymDescribes,
   synonymKeys,
+  synonymPairedKinds,
 } from '#model/support/synonyms'
 
 const key = toSearchKey
-const { same, narrower } = SYNONYM_TABLES
+const { same, narrower, paired } = SYNONYM_TABLES
 const heads = narrower.flatMap(([from]) => from)
 const tails = narrower.flatMap(([, to]) => to)
 const every = [...same.flat(), ...heads, ...tails]
@@ -166,17 +166,37 @@ describe('WORD_BREAK', () => {
   })
 })
 
-describe('an adjective of a group, right before the kind (review Ф)', () => {
-  it('is the word before the kind, or nothing when the kind stands first', () => {
-    expect(beforeKindKey('Гречневая крупа ядрица')).toBe(key('гречневая'))
-    expect(beforeKindKey('Сгущённое цельное молоко')).toBe(key('цельное'))
-    expect(beforeKindKey('Лапша гречневая')).toBe('')
+describe('an adjective of a group, beside a kind of its own (review Ф, Ц)', () => {
+  it('names the kinds it counts beside, and none for any other word', () => {
+    expect(synonymPairedKinds(key('гречневая'))).toEqual([key('крупа'), key('крупы')])
+    expect(synonymPairedKinds(key('сгущённое'))).toEqual([key('молоко')])
+    expect(synonymPairedKinds(key('овсяные'))).toContain(key('хлопья'))
+    expect(synonymPairedKinds(key('минеральная'))).toEqual([])
+    expect(synonymPairedKinds(key('гречка'))).toEqual([])
   })
 
-  it('counts for the adjectives of the groups, not the narrower targets or nouns', () => {
-    expect(synonymBeforeKind(key('гречневая'))).toBe(true)
-    expect(synonymBeforeKind(key('сгущённое'))).toBe(true)
-    expect(synonymBeforeKind(key('минеральная'))).toBe(false)
-    expect(synonymBeforeKind(key('гречка'))).toBe(false)
+  it('pairs every adjective of a group, and nothing outside one — an unpaired one is a dead target', () => {
+    const adjective = new RegExp(ADJECTIVE_WORD, 'u')
+    // Said, never printed: «синенькие» is a query word for the aubergines, not a target.
+    const spoken = new Set([key('синенькие')])
+    const inGroups = new Set(
+      same
+        .flat()
+        .filter((word) => adjective.test(word))
+        .map(key)
+        .filter((word) => !spoken.has(word)),
+    )
+    const pairedAdjectives = new Set(paired.flatMap(([adjectives]) => adjectives).map(key))
+    const grouped = new Set(same.flat().map(key))
+    for (const word of inGroups) expect(pairedAdjectives.has(word), word).toBe(true)
+    for (const word of pairedAdjectives) expect(grouped.has(word), word).toBe(true)
+  })
+
+  it('pairs with kinds, never with an adjective — the kind skips adjectives', () => {
+    const adjective = new RegExp(ADJECTIVE_WORD, 'u')
+    for (const kind of paired.flatMap(([, kinds]) => kinds)) {
+      expect(adjective.test(kind), kind).toBe(false)
+      expect(kindKey(kind), kind).toBe(key(kind))
+    }
   })
 })

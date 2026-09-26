@@ -978,17 +978,43 @@ describe("search — a word of the person's own (MOL-45)", () => {
     expect(await namesFor(actorId, 'кефир 1 л')).toEqual(['Кефир Ашхар 0,5 л', 'Молоко Ашхар 1 л'])
   })
 
-  it("finds «Гречневая крупа» by the group's adjective right before the kind, above a learnt rice (review, Ф)", async () => {
+  it("finds the groats by the group's adjective beside a kind of its own, in either order, above a learnt rice (review, Ф, Ц)", async () => {
     const actorId = await insertActor(db)
     const rice = await named('Рис длиннозёрный')
     await picks.learn(actorId, 'гречка', rice)
     await named('Гречневая крупа ядрица')
+    await named('Крупа гречневая 900 г')
     await named('Лапша гречневая Sen Soy')
+    await named('Гречневая лапша')
 
     const found = await namesFor(actorId, 'гречка')
-    expect(found.slice(0, 2)).toEqual(['Гречневая крупа ядрица', 'Рис длиннозёрный'])
-    // After the kind the adjective is a property of somebody else's product: a typo at most.
-    expect(found.at(-1)).toBe('Лапша гречневая Sen Soy')
+    expect(found.slice(0, 2).sort()).toEqual(
+      ['Гречневая крупа ядрица', 'Крупа гречневая 900 г'].sort(),
+    )
+    expect(found[2]).toBe('Рис длиннозёрный')
+    // Beside another kind the adjective is a property of somebody else's product, in either
+    // order: a typo at most.
+    expect(found.slice(3).sort()).toEqual(['Гречневая лапша', 'Лапша гречневая Sen Soy'].sort())
+  })
+
+  it('finds the condensed milk and the oat flakes as a shelf writes them, the kind first (review, Ц)', async () => {
+    const actorId = await insertActor(db)
+    const milk = await named('Молоко Ашхар 1 л')
+    const rice = await named('Рис длиннозёрный')
+    await picks.learn(actorId, 'сгущенка', milk)
+    await picks.learn(actorId, 'овсянка', rice)
+    await named('Молоко цельное сгущённое с сахаром Рогачёв')
+    await named('Хлопья овсяные Геркулес')
+    await named('Мука овсяная')
+
+    expect(await namesFor(actorId, 'сгущенка')).toEqual([
+      'Молоко цельное сгущённое с сахаром Рогачёв',
+      'Молоко Ашхар 1 л',
+    ])
+    expect((await namesFor(actorId, 'овсянка')).slice(0, 2)).toEqual([
+      'Хлопья овсяные Геркулес',
+      'Рис длиннозёрный',
+    ])
   })
 
   it('puts what the search found above what only the learnt word let in (review, И)', async () => {

@@ -3,12 +3,11 @@ import { ref } from 'vue'
 import {
   INVISIBLE,
   catalogueEntryCodec,
-  beforeKindKey,
   drawsNothing,
   kindKey,
-  synonymBeforeKind,
   synonymDescribes,
   synonymKeys,
+  synonymPairedKinds,
   toSearchKey,
 } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
@@ -136,7 +135,6 @@ export const useRecentItemsStore = defineStore('recentItems', () => {
       // every other word a pair of its own: «сок яблочный» is not the peach nectar, though «сок»
       // alone is (adversarial Д).
       const kind = kindKey(entry.name)
-      const before = beforeKindKey(entry.name)
       const keyWords = toSearchKey(entry.name).split(' ')
       return words.every(
         ({ word, synonyms }) =>
@@ -144,8 +142,8 @@ export const useRecentItemsStore = defineStore('recentItems', () => {
           synonyms.some(
             (synonym) =>
               synonym === kind ||
-              (synonymDescribes(synonym) && keyWords.includes(synonym)) ||
-              (synonymBeforeKind(synonym) && synonym === before),
+              ((synonymDescribes(synonym) || synonymPairedKinds(synonym).includes(kind)) &&
+                keyWords.includes(synonym)),
           ),
       )
     })

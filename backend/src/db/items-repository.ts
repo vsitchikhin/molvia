@@ -7,9 +7,9 @@ import {
   WORD_BREAK,
   itemSchema,
   nameIdentity,
-  synonymBeforeKind,
   synonymDescribes,
   synonymKeys,
+  synonymPairedKinds,
   toSearchKey,
 } from '@molvia/model'
 import type { Item, NewItem } from '@molvia/model'
@@ -240,8 +240,11 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
   const synonymOf = synonyms.map(([, n]) => n).join(' ')
   // A synonym that describes — «минеральная» — is never the kind, and counts as any word.
   const synonymAnywhere = synonyms.map(([synonym]) => String(synonymDescribes(synonym))).join(' ')
-  // An adjective of a group — «гречневая» — counts right before the kind: «Гречневая крупа».
-  const synonymBefore = synonyms.map(([synonym]) => String(synonymBeforeKind(synonym))).join(' ')
+  // An adjective of a group — «гречневая» — counts anywhere beside its own kinds: «Крупа
+  // гречневая», «Гречневая крупа», never «Лапша гречневая». A list per synonym, `-` for none.
+  const synonymKinds = synonyms
+    .map(([synonym]) => synonymPairedKinds(synonym).join(',') || '-')
+    .join(' ')
   const expanded = [...new Set(synonyms.map(([, n]) => n))].join(' ')
   // Without a synonym every candidate of the index was found by what was typed, and asking the
   // operator again per row is what «мо» over 20 000 names paid for.
@@ -263,8 +266,9 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                       and (s.word = split_part(c.search_key, ' ', c.kind_at)
                            or s.anywhere
                               and s.word = any(string_to_array(c.search_key, ' '))
-                           or s.before_kind and c.kind_at > 1
-                              and s.word = split_part(c.search_key, ' ', c.kind_at - 1))
+                           or split_part(c.search_key, ' ', c.kind_at)
+                                = any(string_to_array(nullif(s.kinds, '-'), ','))
+                              and s.word = any(string_to_array(c.search_key, ' ')))
                   ) then 0 end`
   // A synonym counts only as the word of the kind — the first word of a name that is not an
   // adjective, `kindKey` of the domain (owner's decisions on review, MOL-45 А and Н): «Вода
@@ -366,12 +370,12 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       ) a
     ),
     synonyms as (
-      select s.word, s.n, s.anywhere, s.before_kind
+      select s.word, s.n, s.anywhere, s.kinds
       from unnest(string_to_array(${synonymWords}, ' '),
                   string_to_array(${synonymOf}, ' ')::int[],
                   string_to_array(${synonymAnywhere}, ' ')::boolean[],
-                  string_to_array(${synonymBefore}, ' ')::boolean[])
-           as s(word, n, anywhere, before_kind)
+                  string_to_array(${synonymKinds}, ' '))
+           as s(word, n, anywhere, kinds)
     ),
     admitted as (
       -- The person's own synonyms for exactly this query (MOL-45): it found nothing, and they
