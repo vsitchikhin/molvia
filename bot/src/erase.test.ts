@@ -378,7 +378,13 @@ describe('/delete — человек удаляет себя сам (MOL-58)', (
         language === 'ru' ? /выбор в поиске.*отметки о визитах/s : /search picks.*visit marks/s,
       )
       // MOL-40, MOL-66: exchanges and incomes are the person's own money, and they go too.
-      expect(prompt).toMatch(language === 'ru' ? /обмены денег, доходы/ : /money exchanges, income/)
+      expect(prompt).toMatch(
+        language === 'ru' ? /обмены денег, доходы/ : /money\s+exchanges, income/,
+      )
+      // MOL-73: spending outside trips and the categories it is counted by go as well.
+      expect(prompt).toMatch(
+        language === 'ru' ? /траты и их категории/ : /spending and its categories/,
+      )
     }
   })
 
