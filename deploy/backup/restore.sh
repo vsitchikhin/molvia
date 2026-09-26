@@ -98,7 +98,11 @@ case "$mode" in
           ;;
         dropped)
           echo "the restore failed after the database was dropped — its state is unknown, api and bot are stopped." >&2
-          echo "Rollouts stay held (~/molvia/deploy.hold). Restore again; once it succeeds the hold comes off." >&2
+          echo "Rollouts stay held (~/molvia/deploy.hold). Restore again; $(lifted 'the one that succeeds takes the hold off.')" >&2
+          ;;
+        poured)
+          echo "the copy is in, but api and bot did not start." >&2
+          echo "Rollouts stay held. Start them: ssh $host 'cd ~/molvia && $compose up -d backend bot'; $(lifted "then take the hold off: ssh $host 'rm ~/molvia/deploy.hold'.")" >&2
           ;;
         restored)
           if [[ "$held_before" == manual ]]; then
@@ -109,12 +113,21 @@ case "$mode" in
           ;;
       esac
     }
+    # What becomes of the hold: a hold set by hand is never this script's, whatever happened.
+    lifted() {
+      if [[ "$held_before" == manual ]]; then
+        echo "the hold was set by hand before the restore and stays — take it off when the maintenance is over."
+      else
+        echo "$1"
+      fi
+    }
     trap finish EXIT
     remote "{ [ -e deploy.hold ] || echo restore >deploy.hold; } && flock -w 900 .deploy.lock true"
     remote "$compose stop backend bot"
     stage=dropped
     remote "$compose exec -T postgres sh -c 'dropdb -U \"\$POSTGRES_USER\" --force \"\$POSTGRES_DB\" && createdb -U \"\$POSTGRES_USER\" \"\$POSTGRES_DB\"'"
     fetch "$copy" | remote "$compose exec -T postgres sh -c 'pg_restore -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" --no-owner --exit-on-error'"
+    stage=poured
     remote "$compose up -d backend bot"
     stage=restored
     echo "restored $copy. Erasures made after it have to be repeated — see deploy/README.md, Backups."
