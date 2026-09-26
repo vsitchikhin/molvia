@@ -80,16 +80,43 @@ case "$mode" in
     echo "Everything written after that copy is lost, and people erased after it come back."
     read -r -p "Type the copy's name to go on: " answer
     [[ "$answer" == "$copy" ]] || { echo "not confirmed, nothing changed"; exit 1; }
+    # Before anything stops: a key that is not there would otherwise be found after the drop.
+    [[ -r "$key" ]] || { echo "no private key at $key (AGE_KEY), nothing changed" >&2; exit 1; }
     # A merge rolls out on its own (MOL-90), and its `up -d` would start an API that migrates the
     # empty database before the copy is in. deploy.hold makes every rollout refuse; the lock waits
-    # out one already running. Taken off however this ends.
-    trap 'ssh -o BatchMode=yes "$host" "rm -f ~/molvia/deploy.hold" \
-      && echo "rollouts are back on; a merge made meanwhile needs its Release job re-run"' EXIT
-    remote "touch deploy.hold && flock -w 900 .deploy.lock true"
+    # out one already running. It comes off only once the copy is in: a pour that failed leaves a
+    # database with no rows, or rows with no keys, and an API started on that answers ok. A hold
+    # that was there before — maintenance by hand — is not this script's to take off; one a failed
+    # restore left says `restore`, and a restore that succeeds takes it off.
+    held_before="$(remote 'if [ ! -e deploy.hold ]; then echo none; elif grep -qx restore deploy.hold; then echo restore; else echo manual; fi')"
+    stage=held
+    finish() {
+      case "$stage" in
+        held)
+          # Nothing was touched: the hold goes only if this run put it there.
+          [[ "$held_before" != none ]] || remote "rm -f deploy.hold" || true
+          ;;
+        dropped)
+          echo "the restore failed after the database was dropped — its state is unknown, api and bot are stopped." >&2
+          echo "Rollouts stay held (~/molvia/deploy.hold). Restore again; once it succeeds the hold comes off." >&2
+          ;;
+        restored)
+          if [[ "$held_before" == manual ]]; then
+            echo "deploy.hold was there before the restore and stays: take it off when the maintenance is over."
+          elif remote "rm -f deploy.hold"; then
+            echo "rollouts are back on; a merge made meanwhile rolls out with the next one, or re-run its Release job"
+          fi
+          ;;
+      esac
+    }
+    trap finish EXIT
+    remote "{ [ -e deploy.hold ] || echo restore >deploy.hold; } && flock -w 900 .deploy.lock true"
     remote "$compose stop backend bot"
+    stage=dropped
     remote "$compose exec -T postgres sh -c 'dropdb -U \"\$POSTGRES_USER\" --force \"\$POSTGRES_DB\" && createdb -U \"\$POSTGRES_USER\" \"\$POSTGRES_DB\"'"
     fetch "$copy" | remote "$compose exec -T postgres sh -c 'pg_restore -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" --no-owner --exit-on-error'"
     remote "$compose up -d backend bot"
+    stage=restored
     echo "restored $copy. Erasures made after it have to be repeated — see deploy/README.md, Backups."
     ;;
 
