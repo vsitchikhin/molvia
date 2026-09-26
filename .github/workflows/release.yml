@@ -111,34 +111,36 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # A tag is usually set right after a merge, while its commit is still in CI and being built:
-      # the job waits for all three images, up to fifteen minutes, and names none until all three
-      # are there. A commit whose master build never came — a red CI, a build that failed on one
-      # image — is refused whole rather than tagged in part.
+      # A tag names the build production runs (owner's decision В-4), so it waits until
+      # production's /health names its commit — up to twenty minutes, CI, build and rollout of a
+      # fresh merge. A rollout that failed, was held or stood aside never gets there, and the tag
+      # is refused rather than put on a build nobody ran. Names are put on all three images or on
+      # none.
       - env:
           OWNER: ${{ github.repository_owner }}
         run: |
           sha="$(git rev-parse HEAD)"
-          source="sha-${sha:0:7}"
-          missing() {
-            local name
-            for name in backend bot frontend; do
-              docker buildx imagetools inspect "ghcr.io/$OWNER/molvia-$name:$source" >/dev/null 2>&1 || printf '%s ' "$name"
-            done
-          }
-          for _ in $(seq 60); do
-            gone="$(missing)"
-            [[ -z "$gone" ]] && break
-            echo "waiting for the master build of ${sha:0:7}: $gone"
+          short="${sha:0:7}"
+          version=""
+          for _ in $(seq 80); do
+            version="$(curl -fsS -m 10 https://molvia.net/api/health | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')" || version=""
+            [[ "$version" == *"-g$short"* ]] && break
+            echo "waiting for production to run $short: it runs ${version:-nothing}"
             sleep 15
           done
-          if [[ -n "$gone" ]]; then
-            echo "::error::after 15 minutes $source is still missing for: $gone— the master build of ${sha:0:7} failed or never ran; re-run this job once it is built"
+          if [[ "$version" != *"-g$short"* ]]; then
+            echo "::error::production runs ${version:-nothing}, not $short — a tag names the build that runs: set it on that commit, or re-run this job once $short rolls out"
             exit 1
           fi
           for name in backend bot frontend; do
+            if ! docker buildx imagetools inspect "ghcr.io/$OWNER/molvia-$name:sha-$short" >/dev/null; then
+              echo "::error::ghcr.io/$OWNER/molvia-$name:sha-$short is missing although production runs $short"
+              exit 1
+            fi
+          done
+          for name in backend bot frontend; do
             image="ghcr.io/$OWNER/molvia-$name"
-            docker buildx imagetools create --tag "$image:$GITHUB_REF_NAME" "$image:$source"
+            docker buildx imagetools create --tag "$image:$GITHUB_REF_NAME" "$image:sha-$short"
           done
 
   deploy:
