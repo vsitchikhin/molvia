@@ -25,6 +25,9 @@ interface TripHistoryScreen {
   open(tripId: string): void
   home(): void
 }
+/** How many times one load asks, when every answer came back to a list that had moved. */
+const ATTEMPTS = 3
+
 export function useTripHistory(): TripHistoryScreen {
   const history = useTripHistoryStore()
   const queue = useTripQueueStore()
@@ -86,8 +89,12 @@ export function useTripHistory(): TripHistoryScreen {
     busy.value = true
     history.stale = true
     try {
-      await history.load(more)
-      if (token === run) trouble.value = null
+      // An answer the list moved under is asked for again, a few times: the move is a burst — a
+      // write of another window, a finish taken back — not a stream (adversarial А).
+      let taken = await history.load(more)
+      for (let again = 1; !taken && again < ATTEMPTS && token === run; again += 1)
+        taken = await history.load(more)
+      if (token === run) trouble.value = taken ? null : 'error'
     } catch {
       if (token === run) trouble.value = navigator.onLine ? 'error' : 'offline'
     } finally {

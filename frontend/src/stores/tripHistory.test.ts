@@ -80,12 +80,22 @@ describe('whether the server has answered (MOL-77)', () => {
     expect(store.answered).toBe(false)
   })
 
-  it('a cache from before the flag reads as not answered', () => {
-    localStorage.setItem(
-      `molvia.trip-history.${OWNER}`,
-      JSON.stringify({ page: { trips: [], nextCursor: null }, selected: null, local: [] }),
+  it('the cache keeps the previous version’s shape, so a window still on it can read it', () => {
+    // A field the old strict codec did not know made it read the cache as none, and write its own
+    // empty one over a finish made with no signal (adversarial Е).
+    const store = useTripHistoryStore()
+    store.capture(
+      A,
+      'Рынок',
+      new Date('2026-09-01T10:00:00Z'),
+      new Date('2026-09-01T10:30:00Z'),
+      'AMD',
+      null,
     )
-    expect(restart().answered).toBe(false)
+    const cached = JSON.parse(
+      localStorage.getItem(`molvia.trip-history.${OWNER}`) ?? '{}',
+    ) as object
+    expect(Object.keys(cached).sort()).toEqual(['local', 'page', 'selected'])
   })
 
   it('another owner’s answer is not this owner’s', async () => {

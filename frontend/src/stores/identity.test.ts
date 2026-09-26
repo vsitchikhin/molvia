@@ -213,6 +213,8 @@ describe('какие ключи приложение пишет на устро�
       'molvia.settings-draft',
       'molvia.trip',
       'molvia.trip-history',
+      // Ответил ли сервер историей — своим ключом, чтобы кэш читался прежней версией (MOL-77).
+      'molvia.trip-history-answered',
       'molvia.trip-queue',
       'molvia.trip-rejected',
       'molvia.verdict-confirmed',
