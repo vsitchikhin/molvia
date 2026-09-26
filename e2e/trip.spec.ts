@@ -1,6 +1,8 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { actorCodec, settingsOf } from '@molvia/model'
 import { asBrowser, signedIn } from './session'
 import type { Page } from '@playwright/test'
 
@@ -122,8 +124,22 @@ test.describe('the trip', () => {
     await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
 
     // Over on the phone at once, and over on the server as soon as the queue has been out.
-    await expect(page.getByRole('heading', { name: 'A new trip', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Start a trip' })).toBeVisible()
     await expect.poll(setting.current).toBeNull()
+
+    // The home screen lists the trip just finished, and opens it (MOL-77).
+    const recent = page.locator('.history-row').filter({ hasText: 'Ереван Сити' })
+    await expect(recent).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'What to buy, and where' })).toHaveCount(0)
+    await recent.click()
+    await expect(page).toHaveURL(/\/trip\/history\/[0-9a-f-]+$/)
+    // Opened from the home screen, both «back»s lead home, and the chevron says so (MOL-77).
+    await page.getByRole('button', { name: 'Back Trip' }).click()
+    await expect(page).toHaveURL(/\/$/)
+    await recent.click()
+    await expect(page).toHaveURL(/\/trip\/history\/[0-9a-f-]+$/)
+    await page.goBack()
+    await expect(page).toHaveURL(/\/$/)
   })
 
   test('is started with no connection, and catches up when it comes back', async ({
@@ -142,7 +158,8 @@ test.describe('the trip', () => {
     await page.waitForTimeout(400)
     await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
     // The trip is over on the phone at once, though nothing has reached the server.
-    await expect(page.getByRole('heading', { name: 'A new trip', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Start a trip' })).toBeVisible()
+    await expect(page.locator('.history-row').filter({ hasText: 'Рынок' })).toBeVisible()
     expect(await setting.current()).not.toBeNull()
 
     await startTrip(page, 'Ереван Сити')
@@ -157,5 +174,106 @@ test.describe('the trip', () => {
         timeout: 15_000,
       })
       .toBe('Ереван Сити')
+  })
+})
+
+test.describe('the home screen with no trip (MOL-77)', () => {
+  for (const size of [
+    { width: 390, height: 844 },
+    { width: 375, height: 667 },
+  ]) {
+    test(`greets a newcomer, and «Start a trip» is in view at ${String(size.width)}×${String(size.height)}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(size)
+      await signedIn(page)
+
+      await expect(page.getByRole('heading', { name: 'What to buy, and where' })).toBeVisible()
+      // Not a circle over the button any more: the only action is the button with words.
+      await expect(page.locator('.circle')).toHaveCount(0)
+      const start = page.getByRole('button', { name: 'Start a trip' })
+      await expect(start).toBeInViewport({ ratio: 1 })
+
+      // The cycle's third step leads to «Ratings» as a change of tab.
+      await page.getByRole('button', { name: /At home/ }).click()
+      await expect(page).toHaveURL(/\/verdicts$/)
+    })
+  }
+
+  test('keeps «Start a trip» in view with large text', async ({ page }) => {
+    await signedIn(page)
+    await page.addStyleTag({ content: 'html { font-size: 130% }' })
+    await expect(page.getByRole('heading', { name: 'What to buy, and where' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Start a trip' })).toBeInViewport({ ratio: 1 })
+  })
+
+  // Large text on a small phone: the home screen is taller than the window for real — no filler
+  // — so the title collapses, and the last step scrolls out from under the strip (review Р-6, С-8).
+  test('on a small phone with large text the title collapses and the last step is reachable', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 667 })
+    await signedIn(page)
+    await page.addStyleTag({ content: 'html { font-size: 130% }' })
+    await expect(page.getByRole('heading', { name: 'What to buy, and where' })).toBeVisible()
+    const start = page.getByRole('button', { name: 'Start a trip' })
+
+    await page.evaluate(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })
+    })
+    await expect(page.locator('.screen')).toHaveClass(/collapsed/)
+    await expect(start).toBeInViewport({ ratio: 1 })
+    // The last step stands above the strip, not under it.
+    const step = await page.getByRole('button', { name: /What to buy”?\s/ }).boundingBox()
+    const strip = await page.locator('.dock').boundingBox()
+    expect(step && strip && step.y + step.height <= strip.y).toBe(true)
+  })
+
+  // A shop's full name has no spaces to break at: in «ждут оценки» it was cut by the card's edge
+  // and ran under the chevron, while the same name wraps in the trip's row (round 4, Л1).
+  test('a long shop name in «waiting to be rated» wraps inside the card', async ({ page }) => {
+    const shop = `ЕреванСитиТЦКомитасаМоллВторойЭтажОтделБытовойХимии${randomUUID().slice(0, 8)}`
+    await page.setViewportSize({ width: 375, height: 667 })
+    await signedIn(page)
+
+    const headers = await asBrowser(page)
+    const context = settingsOf(
+      actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+    )
+    const id = randomUUID()
+    const started = await page.request.post('/api/trips', {
+      headers,
+      data: { context, id, place: { name: shop, kind: 'store' } },
+    })
+    expect(started.status()).toBe(201)
+    const item = await page.request.post('/api/catalogue/items', {
+      headers,
+      data: { kind: 'product', name: `Порошок ${randomUUID()}`, defaultUnit: 'piece' },
+    })
+    const { id: itemId } = (await item.json()) as { id: string }
+    const added = await page.request.post(`/api/trips/${id}/expenses`, {
+      headers,
+      data: { id: randomUUID(), itemId },
+    })
+    expect(added.status()).toBe(201)
+    const finished = await page.request.post(`/api/trips/${id}/finish`, {
+      headers,
+      data: { finishedOnDeviceAt: new Date().toISOString() },
+    })
+    expect(finished.status()).toBe(204)
+    await page.reload()
+
+    const sub = page.locator('.pending .sub')
+    await expect(sub).toContainText(shop)
+    expect(await sub.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
+    const inside = await page.evaluate(() => {
+      const card = document.querySelector('.pending')?.getBoundingClientRect()
+      const text = document.querySelector('.pending .sub')
+      if (!card || !text) return false
+      const range = document.createRange()
+      range.selectNodeContents(text)
+      return range.getBoundingClientRect().right <= card.right
+    })
+    expect(inside).toBe(true)
   })
 })

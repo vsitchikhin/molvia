@@ -5,7 +5,7 @@ import { currencySchema, tripHistoryCodec, tripViewCodec } from '@molvia/model'
 import type { Currency, TripHistory, TripHistoryEntry, TripView } from '@molvia/model'
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
-import { read, writeEverywhere } from '@/stores/storage'
+import { forget, read, write, writeEverywhere } from '@/stores/storage'
 
 const date = z.codec(z.iso.datetime(), z.date(), {
   decode: (s) => new Date(s),
@@ -28,6 +28,21 @@ const cacheCodec = z.strictObject({
   local: z.array(localCodec),
 })
 const KEY = 'molvia.trip-history'
+/**
+ * Whether the server's last first page for this owner was empty — now or on an earlier launch.
+ * Every write to a trip persists the cache, so a stored empty page may be one nobody asked for,
+ * and the home screen must not greet a person with a history as a newcomer (MOL-77).
+ *
+ * A key of its own, not a field of the cache: the cache codec is strict, and a window still on
+ * the previous version read a cache with an unknown field as no cache at all, then wrote its
+ * empty one over it — a finish made with no signal went with it (adversarial Е).
+ *
+ * «Empty», not «answered»: the flag and the page now live apart and can outlive each other — a
+ * shelf that refused the new page keeps an old empty one — and «answered» beside a stale empty
+ * page said «newcomer» to a person the server had just named two trips for (round 2, Ж1). An
+ * answer with trips removes the flag from every shelf, which needs no room.
+ */
+const EMPTY_KEY = 'molvia.trip-history-empty'
 const empty = (): TripHistory => ({ trips: [], nextCursor: null })
 
 /**
@@ -43,6 +58,8 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   const selected = ref<TripView | null>(null)
   const local = ref<LocalFinishedTrip[]>([])
   const stale = ref(true)
+  /** The server's last first page for this owner was empty (`EMPTY_KEY`). */
+  const answeredEmpty = ref(false)
   let firstPage: TripHistory = empty()
   // What «Показать ещё» brought, and the cursor standing after it. Only the first page is
   // remembered on the phone; these live for as long as the screen does.
@@ -99,6 +116,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     page.value = spread()
     selected.value = held?.selected ?? null
     local.value = held?.local ?? []
+    answeredEmpty.value = actor.id !== null && read(`${EMPTY_KEY}.${actor.id}`) === '1'
     stale.value = true
   }
   restore()
@@ -225,11 +243,17 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     persist()
   }
 
-  async function load(more = false): Promise<void> {
+  /**
+   * Whether the answer was taken. A false one is not a failure: the list changed under the
+   * request — another window wrote the cache, a finish was taken back — and the answer may no
+   * longer be true. The caller asks again rather than wait for a reconnect that may never come:
+   * treated as a success, it left the home screen on a skeleton for good (adversarial А).
+   */
+  async function load(more = false): Promise<boolean> {
     const owner = actor.id
     const version = generation
     const cursor = more ? page.value.nextCursor : null
-    if (more && !cursor) return
+    if (more && !cursor) return true
     const answer = await api.tripHistory(cursor ?? undefined)
     // A next page cannot be cancelled by a change somewhere else: it lies deeper than anything
     // held, and it is merged by id. Under the shared guard a correction sent to a trip finished
@@ -239,8 +263,8 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     // completion landing in the first page pushes its last row out, and the page that comes back
     // starts below where that row now is. Appended, it left the row in no page at all and the
     // list called itself complete — the hole `sameCursor` closes below, reached by a race (Д2).
-    if (owner !== actor.id || (!more && version !== generation)) return
-    if (more && !sameCursor(cursor, page.value.nextCursor)) return
+    if (owner !== actor.id || (!more && version !== generation)) return false
+    if (more && !sameCursor(cursor, page.value.nextCursor)) return false
     syncLocal()
     local.value = local.value.filter((held) => !answer.trips.some((row) => row.id === held.id))
     if (more) {
@@ -267,9 +291,13 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
         deeper = deeper.filter((row) => beyond(answer.trips, row))
       }
       page.value = spread()
+      answeredEmpty.value = answer.trips.length === 0
+      if (owner && answeredEmpty.value) write(`${EMPTY_KEY}.${owner}`, '1')
+      else if (owner) forget(`${EMPTY_KEY}.${owner}`)
     }
     stale.value = false
     persist()
+    return true
   }
 
   function known(id: string): TripView | null {
@@ -309,5 +337,18 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     }
   }
 
-  return { page, selected, local, stale, capture, apply, forgetLocal, load, known, open, completed }
+  return {
+    page,
+    selected,
+    local,
+    stale,
+    answeredEmpty,
+    capture,
+    apply,
+    forgetLocal,
+    load,
+    known,
+    open,
+    completed,
+  }
 })

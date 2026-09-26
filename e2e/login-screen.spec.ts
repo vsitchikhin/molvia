@@ -113,8 +113,17 @@ test('сессия, которой не стало, поднимает экра�
   // Шов на `error.no_actor` живёт в одном месте, и проверить его можно только так: у экрана
   // «Что брать» своего разбора отказа нет, и до MOL-56 он показывал «что-то пошло не так».
   await page.goto('/')
+  // The home screen without a trip asks for the history and the verdict queue by itself
+  // (MOL-77). Answered after the session is gone, either one raises the door before «What to
+  // buy» is pressed — right, but not the path this test is about — so both are let in first.
+  const home = Promise.all(
+    ['/api/trips/history', '/api/verdicts/pending'].map((path) =>
+      page.waitForResponse((response) => response.url().includes(path)),
+    ),
+  )
   await page.getByRole('button', { name: 'Sign in for development' }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trip')
+  await home
 
   // Ждём, пока cookie сессии окажется в банке: под нагрузкой чтение банки успевает опередить
   // её запись, и тогда «убрать сессию» убирает пустоту, а приложение остаётся вошедшим.

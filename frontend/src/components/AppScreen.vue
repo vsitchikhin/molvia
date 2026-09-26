@@ -59,7 +59,7 @@ import { useRoute, useRouter } from 'vue-router'
 import IconChevronLeft from '~icons/mdi/chevron-left'
 import IdentityNotice from '@/components/IdentityNotice.vue'
 import { useCollapsed, useHeight } from '@/composables/useCollapsed'
-import { useNavigation } from '@/navigation'
+import { backTarget, useNavigation } from '@/navigation'
 
 /**
  * The frame every screen of 0.1 sits in: a pinned row, the large title, the room under the tab
@@ -91,10 +91,9 @@ export default defineComponent({
     const dock = ref<HTMLElement | null>(null)
     const sentinel = ref<HTMLElement | null>(null)
 
-    const parentTitleKey = computed(() => {
-      const parent = route.meta.parent
-      return parent ? router.resolve({ name: parent }).meta.titleKey : undefined
-    })
+    // Named by where it leads (`backTarget`): a finished trip opened from the home screen goes
+    // back there, and says «Поход» (MOL-77).
+    const parentTitleKey = computed(() => backTarget(router, route)?.location.meta.titleKey)
     // Slots are not reactive, so a computed would keep whatever it saw on mount — and the trip's
     // place and «Finish» arrive with the trip, from the API, after it. Read again before every
     // render instead: a row filled late is pinned and alive, not drawn inside an invisible one.

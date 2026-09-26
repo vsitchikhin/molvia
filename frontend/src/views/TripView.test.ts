@@ -4,7 +4,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE, parseMoney, parseQuantity, tripViewCodec } from '@molvia/model'
-import type { CatalogueEntry, TripView as TripViewModel, WireCode } from '@molvia/model'
+import type {
+  CatalogueEntry,
+  PendingVerdicts,
+  TripHistory,
+  TripView as TripViewModel,
+  WireCode,
+} from '@molvia/model'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
@@ -17,9 +23,13 @@ const currentTrip = vi.fn<() => Promise<TripViewModel | null>>()
 const recentPlaces = vi.fn<() => Promise<{ id: string; kind: 'store'; name: string }[]>>()
 const startTrip = vi.fn()
 const addExpense = vi.fn()
+const tripHistory = vi.fn<() => Promise<TripHistory>>()
+const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
 vi.mock('@/api', () => ({
   api: {
     currentTrip: () => currentTrip(),
+    tripHistory: () => tripHistory(),
+    pendingVerdicts: () => pendingVerdicts(),
     recentPlaces: () => recentPlaces(),
     addExpense: (...args: unknown[]) => addExpense(...args),
     updateExpense: () => new Promise(() => undefined),
@@ -180,6 +190,10 @@ describe('TripView', () => {
     startTrip.mockReturnValue(new Promise(() => undefined))
     addExpense.mockReset()
     addExpense.mockReturnValue(new Promise(() => undefined))
+    tripHistory.mockReset()
+    tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
+    pendingVerdicts.mockReset()
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     clock = 0
     vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -193,8 +207,62 @@ describe('TripView', () => {
 
   it('без похода предлагает начать, а не показывает пустой список', async () => {
     const { view } = await render()
-    expect(view.text()).toContain(ru.trip.none.title)
-    expect(button(view, ru.trip.none.action).exists()).toBe(true)
+    expect(view.text()).toContain(ru.trip.home.intro.title)
+    expect(view.get('.dock').text()).toContain(ru.trip.none.action)
+  })
+
+  describe('главная без похода (MOL-77)', () => {
+    it('«Начать поход» — в полосе над таб-баром, и кругов с «+» на экране нет', async () => {
+      const { view } = await render()
+      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
+      expect(view.find('.circle').exists()).toBe(false)
+      // Призрачную «Историю походов» заменяет «Вся история» главной.
+      expect(view.findAll('button').some((b) => b.text() === ru.trip.history.title)).toBe(false)
+    })
+
+    it('в загрузке без похода полоса уже держит «Начать поход», а не пустой итог', async () => {
+      currentTrip.mockReturnValue(new Promise(() => undefined))
+      const { view } = await render()
+      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
+    })
+
+    it('«Начать поход» открывает шторку и при ошибке похода, и при ошибке истории', async () => {
+      currentTrip.mockRejectedValue(new Error('HTTP 500'))
+      tripHistory.mockRejectedValue(new Error('HTTP 500'))
+      const { view } = await render()
+      expect(view.text()).toContain(ru.trip.error.title)
+      expect(view.text()).toContain(ru.trip.home.error.title)
+      await view.get('.dock button').trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('dialog[open]')?.textContent).toContain(
+        ru.trip.start.title,
+      )
+    })
+
+    it('сервер лежит — одна «Повторить», и она перечитывает и поход, и историю (Д)', async () => {
+      currentTrip.mockRejectedValue(new Error('HTTP 500'))
+      tripHistory.mockRejectedValue(new Error('HTTP 500'))
+      const { view } = await render()
+      expect(view.findAll('button').filter((b) => b.text() === ru.state.retry)).toHaveLength(1)
+      // Похода нет — и «позиции остались на телефоне» было бы неправдой.
+      expect(view.text()).toContain(ru.trip.error.body_none)
+      expect(view.text()).not.toContain(ru.trip.error.body)
+
+      currentTrip.mockResolvedValue(null)
+      tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
+      await button(view, ru.state.retry).trigger('click')
+      await flushPromises()
+      expect(view.text()).not.toContain(ru.trip.error.title)
+      expect(view.text()).not.toContain(ru.trip.home.error.title)
+      expect(view.text()).toContain(ru.trip.home.intro.title)
+    })
+
+    it('при открытом походе в полосе — итог, а «Начать поход» нет', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      const { view } = await render()
+      expect(view.get('.dock').text()).not.toContain(ru.trip.none.action)
+      expect(button(view, ru.trip.history.title).exists()).toBe(true)
+    })
   })
 
   it('поход без позиций зовёт добавить первую', async () => {
@@ -202,6 +270,8 @@ describe('TripView', () => {
     const { view } = await render()
     expect(view.text()).toContain(ru.trip.empty.title)
     expect(button(view, ru.trip.empty.action).exists()).toBe(true)
+    // Круг над «Найти товар» читался кнопкой и не нажимался (MOL-77).
+    expect(view.find('.circle').exists()).toBe(false)
   })
 
   it('пока сервера не спросили и памяти нет — скелетон, а не «Новый поход»', async () => {
@@ -222,7 +292,7 @@ describe('TripView', () => {
     mounted.push(view)
 
     expect(view.findAll('.bar')).not.toHaveLength(0)
-    expect(view.text()).not.toContain(ru.trip.none.title)
+    expect(view.text()).not.toContain(ru.trip.home.intro.title)
   })
 
   it('весь смысл продукта в двух числах: 520 ֏ за 0,9 л дороже 570 ֏ за литр', async () => {
@@ -424,7 +494,7 @@ describe('TripView', () => {
       inside(document.body.querySelector('dialog[open]'), ru.trip.finish_confirm.ok).click()
       await flushPromises()
 
-      expect(view.text()).toContain(ru.trip.none.title)
+      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
       // На iOS фонового обмена нет: молчание здесь — это покупка, о которой никто не узнает.
       expect(view.text()).toContain('1 покупка ещё не отправлена')
     })
@@ -703,7 +773,7 @@ describe('TripView', () => {
       await flushPromises()
 
       // Поход закончился, а покупка так и не записана — спрятать её значит потерять.
-      expect(view.text()).toContain(ru.trip.none.title)
+      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
       expect(view.text()).toContain(ru.trip.rejected.drop)
       expect(queue.rejected).toHaveLength(1)
     })
@@ -755,14 +825,17 @@ describe('TripView', () => {
       expect(view.findAll('.row')).toHaveLength(2)
     })
 
-    it('похода нет и спросить не удалось — «Новый поход» не молчит об этом', async () => {
+    it('похода нет и спросить не удалось — главная не молчит об этом', async () => {
       currentTrip.mockRejectedValue(new Error('Failed to fetch'))
+      tripHistory.mockRejectedValue(new Error('Failed to fetch'))
       vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
       const { view } = await render()
 
-      expect(view.text()).toContain(ru.trip.none.title)
+      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
       // Иначе поход, который сервер держит, но о котором не спросили, читается как «похода нет».
-      expect(view.text()).toContain(ru.trip.offline.title)
+      // Своими словами главной: начать можно и без сети — и одно уведомление, а не два.
+      expect(view.text()).toContain(ru.trip.home.offline.title)
+      expect(view.text()).not.toContain(ru.trip.offline.title)
     })
 
     it('сеть есть, а сервер молчит — ошибка, тоже поверх похода, и «Повторить»', async () => {
@@ -783,7 +856,7 @@ describe('TripView', () => {
     it('«Начать поход» пишет поход в очередь и рисует его сразу — сеть не ждём', async () => {
       recentPlaces.mockRejectedValue(new Error('Failed to fetch'))
       const { view, queue } = await render()
-      await button(view, ru.trip.none.action).trigger('click')
+      await view.get('.dock button').trigger('click')
       await flushPromises()
       clock += 1000
 
@@ -808,7 +881,7 @@ describe('TripView', () => {
         { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: 'Ереван Сити' },
       ])
       const { view, queue } = await render()
-      await button(view, ru.trip.none.action).trigger('click')
+      await view.get('.dock button').trigger('click')
       await flushPromises()
       clock += 1000
 
@@ -841,7 +914,7 @@ describe('TripView', () => {
       await flushPromises()
 
       expect(queue.pending.some((write) => write.kind === 'finish')).toBe(true)
-      expect(view.text()).toContain(ru.trip.none.title)
+      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
       expect(view.findAll('.row')).toHaveLength(0)
     })
   })
