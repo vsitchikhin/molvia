@@ -760,6 +760,34 @@ set of rules — the task's own «as for exchanges in MOL-40» predates MOL-42's
   screen failing whole would take away the one way to remove the income that made it. «Пришло /
   потрачено» is not in 0.1: a purchase need not have a price, so «потрачено» would always be short.
 
+**A spending is money spent outside a trip (MOL-73)** — the barber, the rent, the domain: a day, an
+amount in its currency, one of the owner's categories, «что это» and «где» as free text
+(`spendings`). The personal accounting layer of MOL-72, private as an income. It makes no item,
+feeds no price and no verdict: a purchase at a shop is still entered in «Поход», and the sheet says
+so (В-2) — the boundary is held by the hint, not by a ban, because the owner's own sheet is full of
+«кола, молоко, несквик… · ереван сити».
+
+- **Categories are the owner's own** (В-3): every account is given thirteen presets the first time
+  it asks — the handoff's ten and «Дом и быт», «Животные», «Документы» — and may make its own.
+  **Removing one takes it out of the choice and erases nothing** (`archived_at`): the spendings in
+  it keep it and past months keep their sums; otherwise removing «Продукты» would rewrite every
+  month. A spending's category is the same owner's, held by a composite key, and a removed one of
+  theirs still takes spendings — one queued offline must not be lost to a chip taken away elsewhere.
+- **A spending in another currency keeps the rate of its own day** — the person's, else the central
+  bank's — written with it and never recomputed. **Kept as «390 ֏ за $», never «0,002564 $ за ֏»**:
+  six digits of a small number are four significant ones, and 11 $ came out 4 290,17 ֏
+  (`convertFromBase`). The same orientation for a trip's purchase in a third currency and an income
+  in another one, converted on the fly by the official rate of their day.
+- **The month is counted by the server** (`GET /money/months/:month`): spendings and **finished**
+  trips — one line per currency, on the device's day of finishing, in «Продукты», read from the
+  purchases every time so an amendment, MOL-78's receipt sum or MOL-76's removal moves it by
+  itself — what came in, the rest, the categories and every day's total; the journal comes forty
+  rows a page, and a day cut by the page keeps its whole total. **A closed month is counted in the
+  income currency by the rate of its last day, frozen the first time it is read** (`money_month_rates`):
+  a new exchange today does not move August.
+- **Removal is the money rule**: a mark, «Вернуть», final after ten minutes on the server (В-4) —
+  whatever the screen's strip shows. Erasure takes spendings, categories and frozen rates.
+
 ## Tracker and documentation
 
 They live outside the repository, on the same Atlassian site, reachable through the
