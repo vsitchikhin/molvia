@@ -111,19 +111,34 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # A commit with no master build never passed CI on master and never ran on production;
-      # a tag there is refused rather than built.
+      # A tag is usually set right after a merge, while its commit is still in CI and being built:
+      # the job waits for all three images, up to fifteen minutes, and names none until all three
+      # are there. A commit whose master build never came — a red CI, a build that failed on one
+      # image — is refused whole rather than tagged in part.
       - env:
           OWNER: ${{ github.repository_owner }}
         run: |
           sha="$(git rev-parse HEAD)"
+          source="sha-${sha:0:7}"
+          missing() {
+            local name
+            for name in backend bot frontend; do
+              docker buildx imagetools inspect "ghcr.io/$OWNER/molvia-$name:$source" >/dev/null 2>&1 || printf '%s ' "$name"
+            done
+          }
+          for _ in $(seq 60); do
+            gone="$(missing)"
+            [[ -z "$gone" ]] && break
+            echo "waiting for the master build of ${sha:0:7}: $gone"
+            sleep 15
+          done
+          if [[ -n "$gone" ]]; then
+            echo "::error::after 15 minutes $source is still missing for: $gone— the master build of ${sha:0:7} failed or never ran; re-run this job once it is built"
+            exit 1
+          fi
           for name in backend bot frontend; do
             image="ghcr.io/$OWNER/molvia-$name"
-            if ! docker buildx imagetools inspect "$image:sha-${sha:0:7}" >/dev/null; then
-              echo "::error::$image:sha-${sha:0:7} does not exist — $GITHUB_REF_NAME is on a commit that was never built from master"
-              exit 1
-            fi
-            docker buildx imagetools create --tag "$image:$GITHUB_REF_NAME" "$image:sha-${sha:0:7}"
+            docker buildx imagetools create --tag "$image:$GITHUB_REF_NAME" "$image:$source"
           done
 
   deploy:
