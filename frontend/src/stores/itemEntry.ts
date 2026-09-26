@@ -15,6 +15,8 @@ import type { CatalogueEntry } from '@molvia/model'
 export interface Pick {
   readonly entry: CatalogueEntry
   readonly query: string
+  /** The query that found nothing before this one found the item, if any (MOL-45). */
+  readonly missedQuery?: string | null
 }
 
 export const useItemEntryStore = defineStore('itemEntry', () => {

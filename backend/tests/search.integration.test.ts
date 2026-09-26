@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { toSearchKey } from '@molvia/model'
+import { newItemSchema, toSearchKey } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { sql as raw } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
@@ -154,20 +154,27 @@ describe('search — the shape of the query', () => {
     expect(row?.threshold).toBe('0.6')
   })
 
-  it("hands a caller's transaction back its own threshold", async () => {
+  it("hands a caller's transaction back its own threshold and its JIT", async () => {
     // Inside a caller's transaction `search` runs in a savepoint, and a local setting would
-    // outlive it — the caller's own `%>` would then answer by 0.15.
+    // outlive it — the caller's own `%>` would then answer by 0.15, and run without JIT.
     await named('Молоко Ашхар')
     const seen = await db.transaction(async (tx) => {
+      await tx.execute(raw`set local jit = on`)
       const before = await tx.execute(raw`select 1 from items where search_key %> 'malako'`)
       await createItemRepository(tx).search('малако', 10, nobody)
       const after = await tx.execute(raw`select 1 from items where search_key %> 'malako'`)
-      const [row] = await tx.execute<{ threshold: string }>(
-        raw`select current_setting('pg_trgm.word_similarity_threshold') as threshold`,
+      const [row] = await tx.execute<{ threshold: string; jit: string }>(
+        raw`select current_setting('pg_trgm.word_similarity_threshold') as threshold,
+                   current_setting('jit') as jit`,
       )
-      return { before: before.length, after: after.length, threshold: row?.threshold }
+      return {
+        before: before.length,
+        after: after.length,
+        threshold: row?.threshold,
+        jit: row?.jit,
+      }
     })
-    expect(seen).toEqual({ before: 0, after: 0, threshold: '0.6' })
+    expect(seen).toEqual({ before: 0, after: 0, threshold: '0.6', jit: 'on' })
   })
 
   it('answers on a fresh connection, where pg_trgm is not loaded yet, by its own threshold', async () => {
@@ -785,6 +792,275 @@ describe('search — the items it returns', () => {
     // log line, not garbage on the screen (Р-3 of MOL-7).
     await insertItem(db, { name: 'Мацун', searchKey: toSearchKey('Мацун'), note: '   ' })
     await expect(repo.search('мацун', 10, nobody)).rejects.toThrow()
+  })
+})
+
+describe('search — a word the shelf writes otherwise (MOL-45)', () => {
+  it("finds the shelf's word by the person's: «картошка» → «Картофель»", async () => {
+    await named('Картофель')
+    await named('Картофельное пюре')
+    // Whole words only: the purée carries `kartofelnoe`, which no synonym is equal to.
+    expect(await names('картошка')).toEqual(['Картофель'])
+  })
+
+  it('expands a word typed in Latin as the Cyrillic one', async () => {
+    await named('Картофель')
+    expect(await names('kartoshka')).toEqual(['Картофель'])
+  })
+
+  it('expands one word of several, and the rest still count', async () => {
+    await named('Картофель молодой 1 кг')
+    await named('Картофель 2 кг')
+    expect(await names('картошка 1 кг')).toEqual(['Картофель молодой 1 кг', 'Картофель 2 кг'])
+  })
+
+  it('puts the word the person typed above its synonym at the same distance', async () => {
+    await named('Белизна 1 л')
+    await named('Отбеливатель Vanish 450 мл')
+    expect(await names('отбеливатель')).toEqual(['Отбеливатель Vanish 450 мл', 'Белизна 1 л'])
+  })
+
+  it('goes from the wider word to the narrower, never back', async () => {
+    await named('Арахис солёный 150 г')
+    await named('Фисташки жареные 100 г')
+    expect(await names('орешки')).toHaveLength(2)
+    expect(await names('арахис')).toEqual(['Арахис солёный 150 г'])
+  })
+
+  it('looks a word up exactly: «белки» is one edit from «булки» and finds no buns', async () => {
+    await named('Булочки с кунжутом 4 шт')
+    expect(await names('булки')).toEqual(['Булочки с кунжутом 4 шт'])
+    expect(await names('белки')).toEqual([])
+  })
+
+  it('does not expand a typo in the synonym itself — the price, named', async () => {
+    await named('Картофель')
+    expect(await names('картошак')).toEqual([])
+  })
+
+  it('does not lend the typed word its budget over a name only a synonym brought in', async () => {
+    // «лори» brings «Рис» in as a candidate; measured against the typed «сыр», `ris` is two
+    // edits from `sir` and used to pass. A candidate of the synonym is judged by the synonym.
+    await named('Рис длиннозёрный 900 г')
+    await named('Сыр лори')
+    expect(await names('сыр')).toEqual(['Сыр лори'])
+  })
+
+  it("lifts a pick made on the person's word: memory keeps working on top", async () => {
+    const actorId = await insertActor(db)
+    await named('Картофель')
+    const young = await named('Картофель молодой')
+    await createSearchPickRepository(db).remember(actorId, 'картошка', young)
+    const found = (await repo.search('картошка', 20, actorId)).map((item) => item.name)
+    expect(found).toEqual(['Картофель молодой', 'Картофель'])
+  })
+
+  it('counts a synonym only as the word of the kind, not a taste or a purpose (review, А и М)', async () => {
+    await named('Вода минеральная Джермук 0,5 л')
+    await named('Вода Джермук 0,5 л')
+    await named('Вода туалетная Hugo Boss')
+    await named('Мицеллярная вода Garnier 400 мл')
+    await named('Корм для кошек Whiskas тунец 85 г')
+    // «вода» is no target of «минералка»: the price, named — the Jermuk without the word is missed.
+    expect(await names('минералка')).toEqual(['Вода минеральная Джермук 0,5 л'])
+    expect(await names('рыба')).toEqual([])
+  })
+
+  it('skips the adjectives before the kind: «Молодой картофель», «Армянский лаваш» (review, Н)', async () => {
+    await named('Молодой картофель')
+    await named('Копчёная скумбрия')
+    await named('Армянский лаваш')
+    expect(await names('картошка')).toEqual(['Молодой картофель'])
+    expect(await names('рыба')).toEqual(['Копчёная скумбрия'])
+    expect(await names('хлеб')).toEqual(['Армянский лаваш'])
+  })
+
+  it('still measures a word with no synonym on a name a synonym brought: «памперсы хаггис» (review, Б)', async () => {
+    await named('Подгузники Huggies 5')
+    expect(await names('памперсы хаггис')).toEqual(['Подгузники Huggies 5'])
+  })
+
+  it('keeps a synonym out of the mean, so it lends no budget to the next word (review, В)', async () => {
+    // `baradinskii` is four edits from `armianskii`: with a free «хлеб» → «лаваш» beside it, the
+    // mean of 0 and 4 was 2 and let the lavash in.
+    await named('Хлеб Бородинский')
+    await named('Лаваш армянский')
+    expect(await names('хлеб барадинский')).toEqual(['Хлеб Бородинский'])
+  })
+
+  it('splits a name at every White_Space as the domain does — a no-break space too (review У)', async () => {
+    // The domain and Postgres split by one written-out class; `\\s` of each differs on U+00A0.
+    for (let code = 0; code <= 0x3000; code += 1) {
+      const space = String.fromCodePoint(code)
+      const name = `Молодой${space}картофель`
+      // Only what a name may carry: a tab or a line break is refused before it is ever stored.
+      if (!/^\p{White_Space}$/u.test(space) || !newItemSchema.shape.name.safeParse(name).success) {
+        continue
+      }
+      await clearAll(db)
+      await named(name)
+      expect(await names('картошка'), code.toString(16)).toEqual([name])
+    }
+  })
+
+  it('takes a noun with an adjective ending for the kind: «Пирожное Картошка» is no potato (review Р)', async () => {
+    await named('Пирожное Картошка')
+    await named('Молодой картофель')
+    expect(await names('картофель')).toEqual(['Молодой картофель'])
+  })
+
+  it('reaches the index for every synonym, with no Seq Scan over the items', async () => {
+    await named('Арахис солёный 150 г')
+    const plan = await db.transaction(async (tx) => {
+      // Both off, so the one way left to the items is a bitmap over an index: on a single row
+      // walking the primary key and filtering is cheaper, and would hide a condition the GIN
+      // index cannot serve. Served, it plans; not served, it falls back to a Seq Scan.
+      await tx.execute(raw`set local enable_seqscan = off`)
+      await tx.execute(raw`set local enable_indexscan = off`)
+      return tx.execute<{ 'QUERY PLAN': string }>(
+        raw`explain ${rankedCandidates(toSearchKey('орешки'), 10, nobody)}`,
+      )
+    })
+    const text = plan.map((row) => row['QUERY PLAN']).join('\n')
+    expect(text).toContain('items_search_key_trgm_idx')
+    expect(text).not.toMatch(/Seq Scan on items/)
+  })
+})
+
+describe("search — a word of the person's own (MOL-45)", () => {
+  const picks = createSearchPickRepository(db)
+
+  async function namesFor(actorId: string, query: string): Promise<string[]> {
+    return (await repo.search(query, 20, actorId)).map((item) => item.name)
+  }
+
+  it('finds by a query that found nothing, once the item was taken by another word', async () => {
+    const actorId = await insertActor(db)
+    const melon = await named('Арбуз')
+    expect(await namesFor(actorId, 'бахчевые')).toEqual([])
+
+    await picks.learn(actorId, 'бахчевые', melon)
+
+    expect(await namesFor(actorId, 'бахчевые')).toEqual(['Арбуз'])
+  })
+
+  it("must not fire for anyone else: the word is the person's alone", async () => {
+    const actorId = await insertActor(db)
+    const stranger = await insertActor(db)
+    await picks.learn(stranger, 'бахчевые', await named('Арбуз'))
+
+    expect(await namesFor(actorId, 'бахчевые')).toEqual([])
+    expect(await names('бахчевые')).toEqual([])
+  })
+
+  it('lets in on exactly that query — not on its start, not with a word more', async () => {
+    const actorId = await insertActor(db)
+    await picks.learn(actorId, 'бахчевые', await named('Арбуз'))
+
+    expect(await namesFor(actorId, 'бахч')).toEqual([])
+    expect(await namesFor(actorId, 'бахчевые спелые')).toEqual([])
+    // The key, not the spelling: the same word in another case or script is the same query.
+    expect(await namesFor(actorId, 'БАХЧЕВЫЕ')).toEqual(['Арбуз'])
+  })
+
+  it('puts the learnt item above what the search found only by a typo (review, О)', async () => {
+    // «овощи» finds the flour by two edits (MOL-46); the potato learnt for it stays first.
+    const actorId = await insertActor(db)
+    const potato = await named('Картофель')
+    await picks.learn(actorId, 'овощи', potato)
+    await named('Мука пшеничная высший сорт 2 кг')
+
+    expect(await namesFor(actorId, 'овощи')).toEqual([
+      'Картофель',
+      'Мука пшеничная высший сорт 2 кг',
+    ])
+  })
+
+  it('puts a find of the very words in another size above the learnt item (review, Т)', async () => {
+    const actorId = await insertActor(db)
+    const milk = await named('Молоко Ашхар 1 л')
+    await picks.learn(actorId, 'кефир 1 л', milk)
+    await named('Кефир Ашхар 0,5 л')
+
+    expect(await namesFor(actorId, 'кефир 1 л')).toEqual(['Кефир Ашхар 0,5 л', 'Молоко Ашхар 1 л'])
+  })
+
+  it("finds the groats by the group's adjective beside a kind of its own, in either order, above a learnt rice (review, Ф, Ц)", async () => {
+    const actorId = await insertActor(db)
+    const rice = await named('Рис длиннозёрный')
+    await picks.learn(actorId, 'гречка', rice)
+    await named('Гречневая крупа ядрица')
+    await named('Крупа гречневая 900 г')
+    await named('Лапша гречневая Sen Soy')
+    await named('Гречневая лапша')
+
+    const found = await namesFor(actorId, 'гречка')
+    expect(found.slice(0, 2).sort()).toEqual(
+      ['Гречневая крупа ядрица', 'Крупа гречневая 900 г'].sort(),
+    )
+    expect(found[2]).toBe('Рис длиннозёрный')
+    // Beside another kind the adjective is a property of somebody else's product, in either
+    // order: a typo at most.
+    expect(found.slice(3).sort()).toEqual(['Гречневая лапша', 'Лапша гречневая Sen Soy'].sort())
+  })
+
+  it('finds the condensed milk and the oat flakes as a shelf writes them, the kind first (review, Ц)', async () => {
+    const actorId = await insertActor(db)
+    const milk = await named('Молоко Ашхар 1 л')
+    const rice = await named('Рис длиннозёрный')
+    await picks.learn(actorId, 'сгущенка', milk)
+    await picks.learn(actorId, 'овсянка', rice)
+    await named('Молоко цельное сгущённое с сахаром Рогачёв')
+    await named('Хлопья овсяные Геркулес')
+    await named('Мука овсяная')
+
+    expect(await namesFor(actorId, 'сгущенка')).toEqual([
+      'Молоко цельное сгущённое с сахаром Рогачёв',
+      'Молоко Ашхар 1 л',
+    ])
+    expect((await namesFor(actorId, 'овсянка')).slice(0, 2)).toEqual([
+      'Хлопья овсяные Геркулес',
+      'Рис длиннозёрный',
+    ])
+  })
+
+  it('puts what the search found above what only the learnt word let in (review, И)', async () => {
+    // «кефир» learnt as the milk taken in its place: once there is kefir, kefir comes first.
+    const actorId = await insertActor(db)
+    const milk = await named('Молоко Ашхар')
+    await picks.learn(actorId, 'кефир', milk)
+    expect(await namesFor(actorId, 'кефир')).toEqual(['Молоко Ашхар'])
+
+    await named('Кефир Ашхар')
+
+    expect(await namesFor(actorId, 'кефир')).toEqual(['Кефир Ашхар', 'Молоко Ашхар'])
+  })
+
+  it('stays learnt when an ordinary pick lands under the same key', async () => {
+    const actorId = await insertActor(db)
+    const melon = await named('Арбуз')
+    await picks.learn(actorId, 'бахчевые', melon)
+    await picks.remember(actorId, 'бахчевые', melon)
+
+    expect(await namesFor(actorId, 'бахчевые')).toEqual(['Арбуз'])
+  })
+
+  it('reaches the index with a learnt word in the query', async () => {
+    const actorId = await insertActor(db)
+    await named('Молоко «Ашхар»')
+    await picks.learn(actorId, 'malako', await named('Мацун'))
+
+    const plan = await db.transaction(async (tx) => {
+      // As for the synonyms: only a bitmap is left, so a branch the index cannot serve shows.
+      await tx.execute(raw`set local enable_seqscan = off`)
+      await tx.execute(raw`set local enable_indexscan = off`)
+      return tx.execute<{ 'QUERY PLAN': string }>(
+        raw`explain ${rankedCandidates('malako', 10, actorId)}`,
+      )
+    })
+    const text = plan.map((row) => row['QUERY PLAN']).join('\n')
+    expect(text).toContain('items_search_key_trgm_idx')
+    expect(text).not.toMatch(/Seq Scan on items/)
   })
 })
 

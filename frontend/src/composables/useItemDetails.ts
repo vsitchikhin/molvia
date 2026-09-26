@@ -82,6 +82,8 @@ export interface RetryPurchase {
   readonly amount: Money | null
   /** What was typed when the item was picked: it travels with the purchase (MOL-11, В2-4). */
   readonly query?: string | null
+  /** The query that found nothing before it, travelling the same way (MOL-45). */
+  readonly missedQuery?: string | null
 }
 
 export interface ItemDetailsInput {
@@ -121,7 +123,7 @@ export interface ItemDetails {
   readonly errors: ComputedRef<Record<DetailsField, ErrorCode | null>>
   leave: (field: DetailsField) => void
   validate: () => DetailsField | null
-  body: (query: string | null) => AddExpenseBody
+  body: (query: string | null, missedQuery?: string | null) => AddExpenseBody
   patch: () => ExpensePatch | null
 }
 
@@ -279,7 +281,7 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
   }
 
   /** The body of «Добавить в поход»: the item always, the rest only when it is there. */
-  function body(query: string | null): AddExpenseBody {
+  function body(query: string | null, missedQuery: string | null = null): AddExpenseBody {
     const q = valueOf(parsedQuantity.value)
     const a = valueOf(parsedAmount.value)
     return {
@@ -288,6 +290,7 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
       ...(q ? { quantity: q } : {}),
       ...(a ? { amount: a } : {}),
       ...(query ? { query } : {}),
+      ...(missedQuery ? { missedQuery } : {}),
     }
   }
 

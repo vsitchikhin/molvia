@@ -1,6 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { INVISIBLE, catalogueEntryCodec, drawsNothing } from '@molvia/model'
+import {
+  INVISIBLE,
+  catalogueEntryCodec,
+  drawsNothing,
+  kindKey,
+  synonymDescribes,
+  synonymKeys,
+  synonymPairedKinds,
+  toSearchKey,
+} from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import { currentIdentity } from '@/stores/identity'
 import { read, write } from '@/stores/storage'
@@ -103,18 +112,41 @@ export const useRecentItemsStore = defineStore('recentItems', () => {
 
   /**
    * Narrowing twenty rows while offline, not a catalogue search: no transliteration and no
-   * typos, which is what the offline text says («только среди недавних»).
+   * typos, which is what the offline text says («только среди недавних»). The one thing taken
+   * from the search is its dictionary (MOL-45): at a shelf with no signal «картошка» has to find
+   * the «Картофель» bought last week, or one word gives two answers depending on the network.
    */
   function filter(query: string): CatalogueEntry[] {
     // Empty by the measure the search uses, and what draws nothing is not looked for on either
     // side: a pasted U+200B left the phase at «nothing typed» and the list empty (Р-14, B1).
     if (drawsNothing(query)) return items.value
     const needle = comparable(query).trim()
-    return items.value.filter(
-      (entry) =>
-        comparable(entry.name).includes(needle) ||
-        (entry.note !== null && comparable(entry.note).includes(needle)),
-    )
+    const words = needle.split(/\s+/u).map((word) => ({
+      word,
+      synonyms: toSearchKey(word).split(' ').flatMap(synonymKeys),
+    }))
+    const expands = words.some(({ synonyms }) => synonyms.length > 0)
+    return items.value.filter((entry) => {
+      const name = comparable(entry.name)
+      if (name.includes(needle)) return true
+      if (entry.note !== null && comparable(entry.note).includes(needle)) return true
+      if (!expands) return false
+      // As the search counts a synonym — the word of the kind, `kindKey` — and as it demands of
+      // every other word a pair of its own: «сок яблочный» is not the peach nectar, though «сок»
+      // alone is (adversarial Д).
+      const kind = kindKey(entry.name)
+      const keyWords = toSearchKey(entry.name).split(' ')
+      return words.every(
+        ({ word, synonyms }) =>
+          name.includes(word) ||
+          synonyms.some(
+            (synonym) =>
+              synonym === kind ||
+              ((synonymDescribes(synonym) || synonymPairedKinds(synonym).includes(kind)) &&
+                keyWords.includes(synonym)),
+          ),
+      )
+    })
   }
 
   return { items, sync, remember, filter }

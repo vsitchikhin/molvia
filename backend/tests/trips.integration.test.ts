@@ -561,6 +561,50 @@ describe('запомненный выбор (MOL-11) пишется добавл
   })
 })
 
+describe('личное слово (MOL-45) пишется добавлением в поход', () => {
+  async function found(actor: string, query: string): Promise<string[]> {
+    const reply = await call('GET', `/catalogue/search?q=${encodeURIComponent(query)}`, actor)
+    return catalogueSearchResponseSchema.parse(reply.body).items.map((entry) => entry.name)
+  }
+
+  it('запрос, который ничего не нашёл, находит взятое после него — только у этого человека', async () => {
+    const actor = await insertActor(db)
+    const stranger = await insertActor(db)
+    const melon = await item('Арбуз')
+    const tripId = trip(await start(actor)).id
+    expect(await found(actor, 'бахчевые')).toEqual([])
+
+    await add(actor, tripId, { itemId: melon, query: 'арбуз', missedQuery: 'бахчевые' })
+
+    expect(await found(actor, 'бахчевые')).toEqual(['Арбуз'])
+    expect(await found(stranger, 'бахчевые')).toEqual([])
+  })
+
+  it('не должно сработать: повтор очереди учит один раз', async () => {
+    const actor = await insertActor(db)
+    const melon = await item('Арбуз')
+    const tripId = trip(await start(actor)).id
+    const body = { id: randomUUID(), itemId: melon, query: 'арбуз', missedQuery: 'бахчевые' }
+
+    await call('POST', `/trips/${tripId}/expenses`, actor, body)
+    await call('POST', `/trips/${tripId}/expenses`, actor, body)
+
+    const rows = await db.select().from(searchPicks)
+    expect(rows.map((row) => [row.picks, row.admits]).sort()).toEqual([
+      [1, false],
+      [1, true],
+    ])
+  })
+
+  it('не должно сработать: трата не записалась — слова нет', async () => {
+    const actor = await insertActor(db)
+    const tripId = trip(await start(actor)).id
+
+    await add(actor, tripId, { itemId: randomUUID(), query: 'арбуз', missedQuery: 'бахчевые' })
+    expect(await db.select().from(searchPicks)).toEqual([])
+  })
+})
+
 describe('курс в походе (MOL-39)', () => {
   // Dated by the real clock: the route snapshots as of now, in Yerevan.
   const today = yerevanDate(new Date())

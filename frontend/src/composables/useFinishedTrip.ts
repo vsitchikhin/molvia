@@ -77,6 +77,7 @@ export function useFinishedTrip(): FinishedTrip {
               quantity: write.body.quantity ?? null,
               amount: write.body.amount ?? null,
               query: write.body.query ?? null,
+              missedQuery: write.body.missedQuery ?? null,
             }
           : null,
     }

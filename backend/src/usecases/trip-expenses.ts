@@ -1,4 +1,4 @@
-import { DomainError, ERROR, isDeviceTime } from '@molvia/model'
+import { DomainError, ERROR, isDeviceTime, toSearchKey } from '@molvia/model'
 import type { AddExpenseBody, ExpensePatch, Trip, TripView } from '@molvia/model'
 import type { TripRepository } from '@/db/trips-repository'
 import type { Transact } from '@/db/unit-of-work'
@@ -22,12 +22,27 @@ async function lockedTrip(trips: TripRepository, tripId: string, actorId: string
 }
 
 /**
+ * Whether the query that missed is the found one, or one of them starts the other, by the key:
+ * «Кефир» is «кефир », «сгущёнка варёная» cut short is «сгущенка» — a pick, not a word of one's
+ * own, and learnt as well one purchase would count twice (adversarial Е, П). The screen holds
+ * the same rule; this keeps a stale or a foreign client to it.
+ */
+function sameQuery(missed: string, query: string | undefined): boolean {
+  if (query === undefined) return false
+  const a = toSearchKey(missed)
+  const b = toSearchKey(query)
+  return a.startsWith(b) || b.startsWith(a)
+}
+
+/**
  * «Добавить в поход». A finished trip takes it too (MOL-21, В-8): the soy sauce found in the bag
  * at home belongs to the trip it was bought on.
  *
  * The pick is remembered in the same transaction as the purchase (MOL-11), and only for a
  * purchase written now: a repeat from the queue is one purchase and one pick, and a purchase
- * refused leaves no pick lifting an item nobody took.
+ * refused leaves no pick lifting an item nobody took. The query that found nothing before it is
+ * learnt the same way (MOL-45) — and not checked against the search: the row is the person's
+ * alone, and checking would be a second search on every purchase.
  */
 export async function addExpense(
   transact: Transact,
@@ -37,10 +52,13 @@ export async function addExpense(
 ): Promise<Added> {
   return transact(async (repositories) => {
     const trip = await lockedTrip(repositories.trips, tripId, actorId)
-    const { query, ...fields } = body
+    const { query, missedQuery, ...fields } = body
     const { created } = await repositories.expenses.add(actorId, { ...fields, tripId: trip.id })
     if (created && query !== undefined) {
       await repositories.searchPicks.remember(actorId, query, body.itemId)
+    }
+    if (created && missedQuery !== undefined && !sameQuery(missedQuery, query)) {
+      await repositories.searchPicks.learn(actorId, missedQuery, body.itemId)
     }
     return { trip: await tripViewFor(repositories, trip), created }
   })

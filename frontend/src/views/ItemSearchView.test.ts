@@ -114,6 +114,10 @@ beforeEach(() => {
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount()
   vi.restoreAllMocks()
+  // A sheet's close holds «a step in flight» until the pop lands, and a memory history sends no
+  // `popstate`: held into the next test, it swallowed that test's step back, and a sheet there
+  // never closed. The pop a browser would send, sent here.
+  window.dispatchEvent(new PopStateEvent('popstate'))
 })
 
 describe('«What did you pick up?»', () => {
@@ -390,6 +394,64 @@ describe('«What did you pick up?»', () => {
       expect(useItemEntryStore(pinia).picked).toEqual({ entry: marianna, query: ' Мол ' })
     })
 
+    it('takes along the query that found nothing before — the person’s own word for it (MOL-45)', async () => {
+      searchCatalogue.mockImplementation((query) =>
+        Promise.resolve(query === 'арбуз' ? [milk] : []),
+      )
+      const view = await render()
+      await field(view).setValue('бахчевые')
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledWith('бахчевые')
+      })
+      await field(view).setValue('арбуз')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([milk.name])
+      })
+
+      await view.get('[role="option"]').trigger('click')
+
+      expect(useItemEntryStore(pinia).picked).toEqual({
+        entry: milk,
+        query: 'арбуз',
+        missedQuery: 'бахчевые',
+      })
+    })
+
+    it('takes nothing along when the pick is the same query cut short: «сыр косичка», then «сыр» (review Р-1)', async () => {
+      searchCatalogue.mockImplementation((query) => Promise.resolve(query === 'сыр' ? [milk] : []))
+      const view = await render()
+      await field(view).setValue('сыр косичка')
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledWith('сыр косичка')
+      })
+      await field(view).setValue('сыр')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([milk.name])
+      })
+
+      await view.get('[role="option"]').trigger('click')
+
+      expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: 'сыр' })
+    })
+
+    it('takes nothing along from the recent items — they were not found by another word', async () => {
+      searchCatalogue.mockResolvedValue([])
+      remembered(bread)
+      const view = await render()
+      await field(view).setValue('бахчевые')
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledWith('бахчевые')
+      })
+      await field(view).setValue('')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([bread.name])
+      })
+
+      await view.get('[role="option"]').trigger('click')
+
+      expect(useItemEntryStore(pinia).picked).toEqual({ entry: bread, query: '' })
+    })
+
     it('from a dimmed answer leaves with the query that answer is for, not the one being typed', async () => {
       let second!: (entries: CatalogueEntry[]) => void
       searchCatalogue
@@ -499,6 +561,35 @@ describe('«What did you pick up?»', () => {
       expect(line.classes().join(' ')).toContain('ghost')
     })
 
+    it('learns nothing from a miss before it — what is proposed was not found by another word (review З)', async () => {
+      const tan = entry(9, 'Тан')
+      searchCatalogue.mockImplementation((query) => Promise.resolve(query === 'тан' ? [milk] : []))
+      proposeItem.mockResolvedValue({ entry: tan, created: true })
+      vi.spyOn(performance, 'now').mockReturnValue(0)
+      const view = await render()
+      await field(view).setValue('кефир')
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledWith('кефир')
+      })
+      await field(view).setValue('тан')
+      await vi.waitFor(() => {
+        expect(names(view)).toHaveLength(1)
+      })
+
+      await button(view, en.item.not_listed).trigger('click')
+      await sheetRisen()
+      const litre = view
+        .findAll('dialog label')
+        .find((label) => label.text() === en.item.unit_l)
+        ?.find('input')
+      await litre?.setValue(true)
+      await button(view, en.item.propose.submit).trigger('click')
+
+      await vi.waitFor(() => {
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: tan, query: 'тан' })
+      })
+    })
+
     it('is not offered under the recent items: they are not an answer to anything', async () => {
       remembered(bread)
       const view = await render()
@@ -575,6 +666,32 @@ describe('«What did you pick up?»', () => {
       expect(write).toMatchObject({ kind: 'add', tripId: TRIP, entry: milk })
       if (write?.kind === 'add') expect(write.body.query).toBe('мол')
       expect(useRecentItemsStore(pinia).items).toEqual([milk])
+    })
+
+    it('lets only the first sheet after a miss take it along: put back, the miss is gone (review И)', async () => {
+      searchCatalogue.mockImplementation((query) =>
+        Promise.resolve(query === 'кефир' ? [] : [milk, marianna]),
+      )
+      const view = await render()
+      await field(view).setValue('кефир')
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledWith('кефир')
+      })
+      await field(view).setValue('молоко')
+      await vi.waitFor(() => {
+        expect(names(view)).toHaveLength(2)
+      })
+      const store = useItemEntryStore(pinia)
+
+      await picked(view)
+      expect(store.picked?.missedQuery).toBe('кефир')
+      await view.get(`dialog[open] button[aria-label="${en.sheet.close}"]`).trigger('click')
+      await vi.waitFor(() => {
+        expect(store.picked).toBeNull()
+      })
+      await view.findAll('[role="option"]')[1]?.trigger('click')
+
+      expect(store.picked?.missedQuery).toBeUndefined()
     })
 
     it('writes nothing, not even the recent items, when closed with ×', async () => {
