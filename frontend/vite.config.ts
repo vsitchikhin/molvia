@@ -38,7 +38,11 @@ export default defineConfig(({ mode }) => {
       // currentColor — which means they obey the tokens like any other element.
       Icons({ compiler: 'vue3' }),
       VitePWA({
-        registerType: 'autoUpdate',
+        // Not `autoUpdate`: that takes control and reloads the page the moment a version is found,
+        // under whatever is being typed. The worker waits, and `pwaUpdate.ts` registers it and lets
+        // it in — not the plugin's script, whose `prompt` mode reloads on any takeover (MOL-46).
+        registerType: 'prompt',
+        injectRegister: false,
         workbox: {
           // woff2 is not in the default pattern, so without this the first offline open
           // falls back to a system font. Offline is a state this app is designed for, not

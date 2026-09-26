@@ -213,10 +213,24 @@ describe('GET /catalogue/search — the answer', () => {
     await add({ name: 'Молочный шоколад' })
 
     const reply = await search(actor, q('молоко'))
-    const direct = await repository.search('молоко', SEARCH_LIMIT, actor)
+    const direct = (await repository.search('молоко', SEARCH_LIMIT, actor)).items
 
     expect(ids(found(reply))).toEqual(ids(direct))
     expect(found(reply).length).toBeGreaterThan(0)
+  })
+
+  it('says how near the answer is — far for a word the budget only grazes (MOL-46)', async () => {
+    const actor = await insertActor(db)
+    await add({ name: 'Чай зелёный' })
+
+    const far = await search(actor, q('пельмени'))
+    const near = await search(actor, q('чай'))
+    const none = await search(actor, q('бастурма'))
+
+    expect(catalogueSearchResponseSchema.parse(far.body)).toMatchObject({ near: false })
+    expect(found(far).map((entry) => entry.name)).toEqual(['Чай зелёный'])
+    expect(catalogueSearchResponseSchema.parse(near.body)).toMatchObject({ near: true })
+    expect(catalogueSearchResponseSchema.parse(none.body)).toEqual({ items: [], near: false })
   })
 
   it('finds a Cyrillic name typed in Latin, and an Armenian one sent percent-encoded', async () => {

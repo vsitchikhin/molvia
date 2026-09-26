@@ -259,6 +259,43 @@ test.describe('nothing found', () => {
   })
 })
 
+test.describe('nothing close found (MOL-46)', () => {
+  test('says «nothing found» above a row two edits away, and offers «Suggest an item» first', async ({
+    page,
+  }) => {
+    await arrive(page)
+    const name = nonsense()
+    await propose(page, { name, defaultUnit: 'piece' })
+    await page.goto('/trip/add')
+    // Two vowels swapped for another, inside the word: two edits, the budget and only just. Vowels,
+    // because each is one letter of the key — a consonant may be two (`ch`, `sh`).
+    const other = (vowel: string) => (vowel === 'у' ? 'а' : 'у')
+    const typo =
+      name.slice(0, 3) +
+      other(name.charAt(3)) +
+      name.slice(4, 7) +
+      other(name.charAt(7)) +
+      name.slice(8)
+
+    await field(page).fill(typo)
+
+    // The block on the screen, not the live region, which says the same words (Р-10).
+    await expect(page.locator('.not-found-text')).toContainText(`Nothing found for «${typo}»`)
+    await expect(options(page).first()).toContainText(name)
+    // The list is named by its heading; the live region says «…with a similar spelling» too, and
+    // `getByText` would hold only while `exact` happened to tell them apart (MOL-64).
+    await expect(page.getByRole('listbox', { name: 'Similar spelling' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Suggest an item' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Not here? Suggest an item' })).toHaveCount(0)
+
+    // The word itself is a find: everything goes back to how a find looks.
+    await field(page).fill(name)
+    await expect(options(page).first()).toContainText(name)
+    await expect(page.locator('.not-found')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Not here? Suggest an item' })).toBeVisible()
+  })
+})
+
 // A state is taken by its heading: `ScreenState` hands «title. body» to the app's live region
 // as well, so `getByText` matches the announcement too and strict mode rightly refuses (MOL-64).
 test.describe('without the server', () => {

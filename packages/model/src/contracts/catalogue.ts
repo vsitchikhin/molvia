@@ -58,9 +58,23 @@ export const catalogueEntryCodec = z.strictObject({
   typicalQuantity: quantityCodec.nullable(),
 })
 
-/** An object rather than a bare list, so a field beside the items does not break a client. */
+/**
+ * An object rather than a bare list, so a field can stand beside the items without reshaping
+ * the answer. Strict all the same, as the entry is: a client that has not caught up refuses a field
+ * it does not know rather than reading past it. So the two halves are kept from meeting across
+ * versions from both ends (MOL-46, owner's decision): an installed PWA takes the new code the
+ * moment it is put away (`pwaUpdate.ts`), and a field is added so the old server's answer still
+ * reads — `near` missing is near, what every answer was before it existed.
+ *
+ * `near` says whether some row has every word close to what was typed (MOL-46): the budget of
+ * two edits lets a word wrong from end to end through — `pelmeni` is two from `zeleni` of «Чай
+ * зелёный», exactly as `malako` is from `moloko` — and no rule on the letters tells the two apart
+ * without losing typos. So nothing is dropped; the screen is told the answer only grazes the
+ * budget and says «не нашли» above it. Decided by the server, which alone has the distances.
+ */
 export const catalogueSearchResponseSchema = z.strictObject({
   items: z.array(catalogueEntryCodec),
+  near: z.boolean().default(true),
 })
 export type CatalogueSearchResponse = z.infer<typeof catalogueSearchResponseSchema>
 

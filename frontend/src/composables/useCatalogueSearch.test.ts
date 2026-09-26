@@ -3,14 +3,19 @@ import { defineComponent, h, nextTick, ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
-import type { CatalogueEntry } from '@molvia/model'
+import type { CatalogueEntry, CatalogueSearchResponse } from '@molvia/model'
 import { SEARCH_DEBOUNCE_MS, useCatalogueSearch } from '@/composables/useCatalogueSearch'
 
 /** One search the test answers by hand, with the signal the composable passed. */
 interface Call {
   readonly query: string
   readonly signal: AbortSignal | undefined
+  /** A close answer — or an empty one, which is never close. */
   answer(entries: CatalogueEntry[]): void
+  /** Rows, none of them close to the query (MOL-46). */
+  answerFar(entries: CatalogueEntry[]): void
+  /** An answer of an API before MOL-46, as the client reads it: `near` defaults to true. */
+  answerOld(entries: CatalogueEntry[]): void
   fail(error?: Error): void
 }
 
@@ -18,11 +23,20 @@ const calls: Call[] = []
 vi.mock('@/api', () => ({
   api: {
     searchCatalogue: (query: string, options?: { signal?: AbortSignal }) =>
-      new Promise<CatalogueEntry[]>((resolve, reject) => {
+      new Promise<CatalogueSearchResponse>((resolve, reject) => {
         calls.push({
           query,
           signal: options?.signal,
-          answer: resolve,
+          answer: (items) => {
+            resolve({ items, near: items.length > 0 })
+          },
+          answerFar: (items) => {
+            resolve({ items, near: false })
+          },
+          // What the client makes of an answer with no `near`: the contract's default.
+          answerOld: (items) => {
+            resolve({ items, near: true })
+          },
           fail: (error: Error = new ApiError(ERROR.INTERNAL, 'transport')) => {
             reject(error)
           },
@@ -171,6 +185,27 @@ describe('the catalogue search as the screen types it', () => {
     await type(query, 'танн')
     expect(search.phase.value).toBe('empty')
     expect(search.stale.value).toBe(true)
+  })
+
+  it('calls an answer with rows and nothing close far, and keeps its rows (MOL-46)', async () => {
+    const { query, search } = harness()
+    await type(query, 'пельмени')
+    await pause()
+    calls[0]?.answerFar([cream])
+    await settle()
+    expect(search.phase.value).toBe('far')
+    expect(search.results.value).toEqual([cream])
+    expect(search.answered.value).toBe('пельмени')
+
+    // Stale over it as over any answer, not back to the skeleton.
+    await type(query, 'пельмен')
+    expect(search.phase.value).toBe('far')
+    expect(search.stale.value).toBe(true)
+
+    await pause()
+    calls[1]?.answer([milk])
+    await settle()
+    expect(search.phase.value).toBe('ready')
   })
 
   it('aborts the search still out when the next one goes', async () => {
@@ -490,6 +525,35 @@ describe('the query that found nothing (MOL-45)', () => {
       expect(search.missed.value).toBeNull()
     },
   )
+
+  it('holds a far answer as a miss: the screen says «не нашли» there too (MOL-46)', async () => {
+    const { query, search } = harness()
+    await type(query, 'пельмени')
+    await pause()
+    calls.at(-1)?.answerFar([cream])
+    await settle()
+    expect(search.missed.value).toBe('пельмени')
+
+    // Taken from that very answer, the item was found by the word itself — nothing to learn.
+    expect(search.takeMissed('пельмени')).toBeNull()
+  })
+
+  it('holds an empty answer of an API older than `near` as a miss — it reads as near (review Р-5)', async () => {
+    const { query, search } = harness()
+    await type(query, 'бахчевые')
+    await pause()
+    calls.at(-1)?.answerOld([])
+    await settle()
+
+    expect(search.phase.value).toBe('empty')
+    expect(search.missed.value).toBe('бахчевые')
+  })
+
+  it('must not fire on a near answer', async () => {
+    const { query, search } = harness()
+    await ask(query, 'молоко', [milk])
+    expect(search.missed.value).toBeNull()
+  })
 
   it('must not fire on a failure or offline — nothing was found to be missing', async () => {
     const { query, search } = harness()

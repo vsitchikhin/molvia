@@ -96,7 +96,7 @@ describe('catalogueEntryCodec', () => {
 
 describe('catalogueSearchResponseSchema', () => {
   it('keeps the order it was given', () => {
-    const response = { items: [milk, carbonara].map(catalogueEntryOf) }
+    const response = { items: [milk, carbonara].map(catalogueEntryOf), near: true }
     const wire = z.encode(catalogueSearchResponseSchema, response)
 
     expect(catalogueSearchResponseSchema.parse(wire).items.map((item) => item.id)).toEqual([
@@ -106,7 +106,15 @@ describe('catalogueSearchResponseSchema', () => {
   })
 
   it('accepts nothing found', () => {
-    expect(catalogueSearchResponseSchema.parse({ items: [] })).toEqual({ items: [] })
+    expect(catalogueSearchResponseSchema.parse({ items: [], near: false })).toEqual({
+      items: [],
+      near: false,
+    })
+  })
+
+  it('reads an answer without `near` as near — the API before MOL-46, drawn as it always was', () => {
+    expect(catalogueSearchResponseSchema.parse({ items: [] })).toEqual({ items: [], near: true })
+    expect(catalogueSearchResponseSchema.safeParse({ items: [], near: 'no' }).success).toBe(false)
   })
 })
 

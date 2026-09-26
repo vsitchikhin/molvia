@@ -8,11 +8,12 @@ import { useReconnect } from '@/composables/useReconnect'
 /**
  * `idle` — nothing typed, the screen shows the recent items and nothing is asked. `loading` —
  * the first answer is on its way and there is none to show meanwhile. `ready` and `empty` — the
- * last answer, with rows or without. `error` and `offline` — the last search failed, told apart
- * by the connection rather than by the code: a dropped connection and a 500 arrive as the same
- * error from the client.
+ * last answer, with rows or without. `far` — rows, and none of them close to what was typed: the
+ * server's word (MOL-46), since only it has the distances; «пельмени» two edits from «Чай
+ * зелёный». `error` and `offline` — the last search failed, told apart by the connection rather
+ * than by the code: a dropped connection and a 500 arrive as the same error from the client.
  */
-export type SearchPhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'offline'
+export type SearchPhase = 'idle' | 'loading' | 'ready' | 'far' | 'empty' | 'error' | 'offline'
 
 /** The pause in typing that sends a search (handoff `02`). */
 export const SEARCH_DEBOUNCE_MS = 250
@@ -36,7 +37,9 @@ export interface CatalogueSearch {
   /** The query the answer on screen belongs to — «Не нашли „{query}“» names that one. */
   readonly answered: Ref<string>
   /**
-   * The last query the server found nothing for, on this screen (MOL-45). A pick made later by
+   * The last query the server found nothing for, on this screen (MOL-45) — nothing close either:
+   * a far answer is «не нашли» on the screen, and what the person takes next by another word is
+   * as much their word for it as after an empty one (MOL-46). A pick made later by
    * another word takes it along, and the person's word learns the item. Erasing back through it
    * keeps it: «бахч» on the way back from «бахчевые» found nothing too, and is not the word.
    */
@@ -93,12 +96,16 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
     const controller = new AbortController()
     inFlight = controller
     try {
-      const found = await api.searchCatalogue(text, { signal: controller.signal })
+      const { items: found, near } = await api.searchCatalogue(text, {
+        signal: controller.signal,
+      })
       if (mine !== latest) return
       results.value = found
       answered.value = text
-      phase.value = found.length > 0 ? 'ready' : 'empty'
-      if (found.length === 0 && !(missed.value !== null && startsHeld(missed.value, text))) {
+      phase.value = found.length === 0 ? 'empty' : near ? 'ready' : 'far'
+      // By the length too: an empty answer of an API older than `near` reads as near (MOL-46).
+      const miss = found.length === 0 || !near
+      if (miss && !(missed.value !== null && startsHeld(missed.value, text))) {
         missed.value = text
       }
       // Still dimmed while a newer search waits for its pause.
@@ -143,8 +150,11 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
     // (Р-13). Its answer, when it lands in the pause, is shown but stays dimmed: it answers the
     // text before (A2), and a pick from it leaves with that text (`answered`).
     clearTimeout(pending)
-    if (phase.value === 'ready' || phase.value === 'empty') stale.value = true
-    else phase.value = 'loading'
+    if (phase.value === 'ready' || phase.value === 'far' || phase.value === 'empty') {
+      stale.value = true
+    } else {
+      phase.value = 'loading'
+    }
     pending = setTimeout(() => {
       pending = undefined
       void run(text)

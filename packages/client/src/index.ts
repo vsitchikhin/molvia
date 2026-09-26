@@ -47,6 +47,7 @@ import type {
   AdviceResponse,
   AddExpenseBody,
   CatalogueEntry,
+  CatalogueSearchResponse,
   ExchangeAmendBody,
   ExchangeBody,
   ExchangesResponse,
@@ -108,11 +109,12 @@ export interface MolviaClient {
    * The catalogue lookup behind «что взяли?», ranked by the server — the query goes as typed.
    * The screen searches while the person types, so a search the next keystroke made stale is
    * cancelled through `signal`; the cancellation arrives as an ApiError like everything else.
+   * `near` is whether anything found is close to the query rather than two edits away (MOL-46).
    */
   searchCatalogue(
     query: string,
     options?: { readonly signal?: AbortSignal },
-  ): Promise<CatalogueEntry[]>
+  ): Promise<CatalogueSearchResponse>
   /**
    * «Предложить товар». `created` is `false` when the catalogue already held an item of this
    * kind by the same name — the entry is then that item, and the fields sent were not applied.
@@ -317,12 +319,11 @@ export function createClient(options: ClientOptions): MolviaClient {
       // URLSearchParams, not a template: «&», «#», «+» and «%» in a query would otherwise
       // cut it short or change its meaning on the way.
       const search = new URLSearchParams({ q: query })
-      const { items } = await request(
+      return request(
         `/catalogue/search?${search.toString()}`,
         catalogueSearchResponseSchema,
         options.signal === undefined ? {} : { signal: options.signal },
       )
-      return items
     },
 
     // `async` so that an input the schema refuses arrives as a rejection, like everything else.

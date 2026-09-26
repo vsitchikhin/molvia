@@ -36,7 +36,7 @@ const repo = createItemRepository(db)
 const nobody = randomUUID()
 
 async function names(query: string): Promise<string[]> {
-  return (await repo.search(query, 20, nobody)).map((item) => item.name)
+  return (await repo.search(query, 20, nobody)).items.map((item) => item.name)
 }
 
 /**
@@ -435,8 +435,8 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
   /**
    * Two of the owner's words for what the shelf does not carry still find something: `ovoshi`
    * is two edits from `vishi` of «высший сорт», `speцi` two from `soevi`. The absolute budget
-   * of MOL-10 — the class of «пельмени» — and with the one button «Предложить товар» shown
-   * only on an empty answer, such an item cannot be added. Pinned as it is.
+   * of MOL-10 — the class of «пельмени». Pinned as it is; the answer says it is far, and the
+   * screen draws it as «не нашли» with «Предложить товар» above the row (MOL-46).
    */
   const FALSE_HITS: Readonly<Record<string, Answer>> = {
     овощи: ['Мука пшеничная высший сорт 2 кг'],
@@ -672,6 +672,47 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
 
   it.each(SHELF_TYPED_OTHERWISE)('typed otherwise «%s»', async (query) => {
     await answers(query, OTHERWISE[query] ?? [])
+  })
+
+  /**
+   * Which answers only graze the budget, whole (MOL-46): no row has every word within one edit.
+   * Every false hit of MOL-14 that shares nothing with the word but letters two edits apart, with
+   * «яблоки» → «яблочный» of the edits of the ending; and five things meant — a spelling two edits
+   * off («хаггис», «лейс»), and a word of the query in another form than the label's («собачий
+   * корм», «средство для полов», «таблетки для посудомойки»), each still first in its answer.
+   */
+  it('calls far exactly the answers whose best row only grazes the budget', async () => {
+    const queries = [
+      ...SHELF_QUERIES.map(([query]) => query),
+      ...SHELF_TYPED_OTHERWISE.map(([query]) => query),
+      ...SHELF_ABSENT,
+      ...SHELF_EVERYDAY_ABSENT,
+    ]
+    const far: string[] = []
+    for (const query of queries) {
+      const { items: found, near } = await repo.search(query, 20, nobody)
+      if (found.length > 0 && !near) far.push(query)
+    }
+    expect(far.sort()).toEqual(
+      [
+        'собачий корм',
+        'средство для полов',
+        'таблетки для посудомойки',
+        'хаггис',
+        'лейс',
+        'овощи',
+        'специи',
+        'сахар',
+        'чай',
+        'сыр',
+        'яблоки',
+        'ложка',
+        'губка',
+        'пакеты',
+        'плов',
+        'конфеты',
+      ].sort(),
+    )
   })
 })
 

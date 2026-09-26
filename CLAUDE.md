@@ -317,12 +317,42 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   knowingly, and pinned by a test. The distance is exact `levenshtein` on words cut to 255
   characters: past that it raises an error, and `levenshtein_less_equal` is no substitute,
   because its capped answer distorts the mean. Limits MOL-14 measured and left in place: the
-  budget is absolute (MOL-46), so a short wrong word passes where a long right one does not —
+  budget is absolute, so a short wrong word passes where a long right one does not —
   «молоко ашхар кефир» finds the milk, and «кока кола 0,5 л» even finds «Вода Джермук 0.5 л»,
   every word wrong by two; the two thresholds disagree — «ыср» is two edits from «сыр» yet
   shares no trigram with it, so it never becomes a candidate; and a name of punctuation only
   («???») has a key but no query reaches it (both MOL-47). A name without a size ranks level
   with a wrong size — unknown is not worse than wrong, which is likely right.
+- **The answer says how near it is (MOL-46), and nothing is dropped for it.** The budget is
+  absolute: `pelmeni` is two edits from `zeleni` of «Чай зелёный» exactly as `malako` is from
+  `moloko`. Six rules on the letters were measured against the whole corpus and 241 two-edit
+  typos, and each bought false hits with typos: vowels by sound lost 38 of 40 slips of the
+  finger, the first letter every typo touching it, keyboard neighbours explained «овощи» as
+  well, and the best of them emptied ten answers for 28 typos — the trade this search refuses.
+  So `GET /catalogue/search` answers `near` beside the items: **true when some row has every
+  word within one edit (`ACCEPTED_DISTANCE - 1`, not a number of its own), or the person took it
+  on this query before, or it is their own word for it** — their choice says more than a typo
+  metric, as in the lift. **Every word, and the words alone** (adversarial review А, Б): by the
+  mean one exact word beside a wrong one made the row near — «мыло детское» over «Масло
+  детское», even three edits over two exact words — and a size in another number made a one-edit
+  typo far, «кефр 1 л» over «Кефир 0,5 л», which the ranking already calls the kefir in another
+  size. A word found by a synonym counts as exact. **The answer is near by the rows it hands out**
+  (owner's decision on review): the order is by the mean and the size, nearness by the worst word,
+  so a near row can rank below twenty far ones — and then the screen says «не нашли» over what it
+  shows rather than «нашли» over a list with nothing near in it. An empty answer is not near. A far answer is drawn as rows headed «Похоже по написанию» with «не нашли» and
+  «Предложить товар» **under them**, in place of the quiet «Нет нужного?» — above them, the block
+  moved every row under the finger as the answer flipped near and far while a word was typed
+  (owner's decision on review). It is read out as «не нашли» too, and it is a miss for the
+  person's own word as an empty one is. **An answer from a server older than the field is read as
+  near**, what every answer was before it existed — so «an empty answer is not near» is said of
+  this server, and the phone tells a miss by the rows as well (review Р-5). On MOL-14's shelf it is exactly the class: «овощи», «специи», eight of
+  twelve everyday words that share only letters, «яблоки» → «яблочный» of the edits of the
+  ending, and five things meant, still first — two brands spelt two edits off («хаггис», «лейс»)
+  and three queries with a word in another form than the label's («собачий корм», «средство для
+  полов», «таблетки для посудомойки»). The price, named: a word two edits from its label's —
+  a typo, «малако», or another form, «полов» for «пола» — reads «не нашли» under the item it
+  found, first in the list; and a wrong word within one edit — «водка» → «Вода» — stays a find, since nothing
+  tells it from a typo.
 - **Every candidate is ranked; there is no ceiling.** Any cut before ranking is wrong one
   way or another. By similarity it drops the typo the low threshold exists for — «малако»
   scores 0.429 against any «Малина» and 0.167 against the milk, and two hundred raspberries
@@ -403,7 +433,8 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   prices, named: a typo in the synonym itself is not expanded, and a name with no word of its kind
   («Coca-Cola 1 л» for «газировка») stays out of reach. Offline, «Часто берёте» reads the
   dictionary by the same rules — the word of the kind, a pair for every word.
-- **And the person's own word (MOL-45).** A query the server found nothing for, followed on
+- **And the person's own word (MOL-45).** A query the server found nothing for — or nothing near
+  (MOL-46) — followed on
   the same screen by a pick found by another word, is learnt with the purchase —
   `search_picks.admits` — and from then on **exactly that query** lets the item in: the one
   written exception to «never lets in what the search did not accept», and personal for the
@@ -440,7 +471,7 @@ chosen. What no threshold reaches went to tasks with numbers: **synonyms** — �
 «Картофель», 6 of 73, one of them («мясо») found by letters only — MOL-45 closed them with the
 dictionary above, which puts 67 of 73 first and alone; **the absolute
 budget** — «овощи» finds «Мука … высший сорт», «специи» «Соевый соус», «пельмени» «Чай зелёный»,
-3 of 25 — MOL-46; **a unit word grounding a match** — «сыр» is two edits from `sht` of «4 шт» —
+3 of 25 — MOL-46 made them a far answer rather than a find; **a unit word grounding a match** — «сыр» is two edits from `sht` of «4 шт» —
 closed by MOL-48 for the units it lists, which took six of the ten items «сыр» found. Weighting
 vowel edits below consonant ones was tried against the budget and refuted:
 `ovoshi`/`vishi` share every consonant, while the right `canah`/«Чанах» and `grecka`/«Гречка»
@@ -448,12 +479,13 @@ differ by two. **The owner's absent words flatter the search:** of fifty everyda
 shelf does not carry, 25 find something since MOL-45 — «макароны» finds the spaghetti through
 the dictionary, the shelf carrying it under another name — and the other 24 are two outcomes. In 12 the first row carries
 the word's root — a taste or a property printed on another item. Six of those are found exactly
-or by the start of a word («сметана» is in the chips' name), which no threshold can remove; with
-«Предложить товар» shown only on an empty answer, that is a question for the screen (MOL-23),
-not the search. The other six are an edit of the ending inside the budget («яблоки» →
-«яблочный», gone at a budget of 1). The remaining 12 share nothing but letters — the absolute
-budget («водка» → «Вода», «сыр» → «Сок»), MOL-46; the unit word that added to them is gone
-(MOL-48).
+or by the start of a word («сметана» is in the chips' name), which no threshold can remove — a
+question for the screen, which MOL-23 answered: «Нет нужного? Предложить товар» stands under every
+answer. The other six are an edit of the ending inside the budget («яблоки» →
+«яблочный», gone at a budget of 1); the one two edits away, «яблоки», is a far answer since
+MOL-46. The remaining 12 share nothing but letters — the absolute
+budget («водка» → «Вода», «сыр» → «Сок»); eight of them are a far answer since MOL-46, the four
+within one edit are not; the unit word that added to them is gone (MOL-48).
 `REMEMBERED_PREFIX` was measured by typing letter by letter: a pick lifts its item on the next
 letter 18 times at 2, 9 at 3, 5 at 4. It harms 5 times at 2 — where two of the owner's words
 share two letters, a pick for Coca-Cola on «ко» puts it above «Колбаса» on «кол», one for
@@ -1184,6 +1216,25 @@ database access. In a product about data integrity, two write paths will silentl
   total, not even for rows still in the queue.
 - Split components so they are not overloaded, but without five wrappers around one tag.
   One well-scoped component beats five trivial ones.
+- **An installed app takes a new version only when nobody can lose anything to it: hidden, and
+  holding no typing** (`pwaUpdate.ts`, MOL-46). The client reads every answer strictly, so an old page
+  against a new API breaks — and nothing reloaded it: an iOS app frozen in the background came back
+  on the old code until a cold start. Hidden is not enough by itself: a sheet keeps what is typed
+  in memory until its main action — the price of a purchase, a proposed item, an exchange — and at
+  the shelf the phone is put away mid-sheet for the calculator or the bank. `holdsTyping` is a
+  `dialog[open]`, and nothing else: everything else typed keeps a draft on the device and comes
+  back — the settings, the ratings, and **the search on «Что взяли?» with its miss**
+  (`searchDraft.ts`, this window's shelf, put away with the screen). Held against the update
+  instead, a typed query kept out the very version that fixes a search the old code could no
+  longer read, and an erased field let the miss be lost (adversarial review Е, Ж). So
+  the new worker is let in, and the page reloaded after it took over, only then; a takeover that came another way —
+  another window of the app let it in, or this one came back before it activated — waits for the
+  same moment. **The worker is registered by our code, not by the plugin's script**
+  (`injectRegister: false`): in `prompt` mode that script reloads the page on any takeover, visible
+  or not (adversarial review Г). The worker waits (`registerType: 'prompt'`) — taking control at
+  once leaves the old page on a precache that is no longer its own — and a new version is looked
+  for whenever the app is looked at again or the network comes back. The other half is the
+  contract's: a field is added so the old server's answer still reads.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and

@@ -83,6 +83,20 @@
           {{ t('item.not_listed') }}
         </AppButton>
       </template>
+
+      <!-- A far answer (MOL-46): what «пельмени» finds in «Чай зелёный» is a likeness, not a find,
+           so «не нашли» stands here with the button that adds the item. Under the rows, in place
+           of the quiet line: the answer flips near and far while a word is typed, and a block
+           above would move every row under the finger as it came and went (owner's decision). -->
+      <template v-else-if="phase === 'far'" #after>
+        <div class="not-found" :class="{ stale }">
+          <p class="not-found-text">{{ t('item.empty.body', { query: answered }) }}</p>
+          <AppButton @click="proposing = true">
+            <template #icon><IconPlus /></template>
+            {{ t('item.empty.action') }}
+          </AppButton>
+        </div>
+      </template>
     </CatalogueCombobox>
 
     <ProposeItemSheet
@@ -127,8 +141,10 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useCatalogueSearch } from '@/composables/useCatalogueSearch'
+import { currentIdentity } from '@/stores/identity'
 import { useItemEntryStore } from '@/stores/itemEntry'
 import { useRecentItemsStore } from '@/stores/recentItems'
+import { dropSearchDraft, keepSearchDraft, recallSearchDraft } from '@/stores/searchDraft'
 
 /**
  * «Что взяли?» — entering an item is a lookup in the catalogue, not a text field: free text
@@ -163,7 +179,19 @@ export default defineComponent({
         : null,
     )
     const query = ref('')
-    const { phase, results, stale, answered, takeMissed, retry } = useCatalogueSearch(query)
+    const { phase, results, stale, answered, missed, takeMissed, retry } = useCatalogueSearch(query)
+
+    // What was typed comes back after a reload — a new version of the app lands while the phone
+    // is away mid-search — and is put away with the screen, as it always was (MOL-46).
+    const owner = currentIdentity()
+    const draft = recallSearchDraft(owner)
+    if (draft) {
+      query.value = draft.query
+      missed.value = draft.missed
+    }
+    watch([query, missed], ([text, miss]) => {
+      keepSearchDraft(owner, { query: text, missed: miss })
+    })
     const recent = useRecentItemsStore()
     const entry = useItemEntryStore()
     const announce = useAnnouncer()
@@ -184,7 +212,7 @@ export default defineComponent({
     // Under an error as offline: the server does not answer either way, and «хлеб» typed before
     // it fell should not show twenty rows instead of one (Р-12).
     const rows = computed<CatalogueEntry[]>(() => {
-      if (phase.value === 'ready') return results.value
+      if (phase.value === 'ready' || phase.value === 'far') return results.value
       if (showsRecent.value) return recent.filter(query.value)
       return []
     })
@@ -193,9 +221,10 @@ export default defineComponent({
     // they are narrowed by the query, and a button leading to none of them is a dead end (B2).
     const hasRecent = computed(() => recent.filter(query.value).length > 0)
 
-    const heading = computed(() =>
-      showsRecent.value ? t('item.group_recent') : t('item.group_found'),
-    )
+    const heading = computed(() => {
+      if (showsRecent.value) return t('item.group_recent')
+      return phase.value === 'far' ? t('item.group_similar') : t('item.group_found')
+    })
 
     // Read out once per answer, not on every letter: the answer is what changed. An empty answer
     // too — the block that replaces the list is not a ScreenState and says nothing of itself, and
@@ -208,11 +237,15 @@ export default defineComponent({
     watch([phase, results, stale], ([next, found, dimmed]) => {
       withdraw?.()
       withdraw = undefined
-      if ((next !== 'ready' && next !== 'empty') || dimmed) return
+      if ((next !== 'ready' && next !== 'far' && next !== 'empty') || dimmed) return
+      // A far answer is «не нашли» out loud too: «found one» for «Чай зелёный» on «пельмени»
+      // would be the very claim the screen stopped making (MOL-46).
       withdraw = announce?.(
         next === 'ready'
           ? t('item.results_announced', { n: found.length }, found.length)
-          : t('item.empty.body', { query: answered.value }),
+          : next === 'far'
+            ? t('item.far_announced', { query: answered.value, n: found.length }, found.length)
+            : t('item.empty.body', { query: answered.value }),
       )
     })
 
@@ -230,7 +263,7 @@ export default defineComponent({
     // proposed — neither was found by another word — and every pick uses the miss up.
     function pick(chosen: CatalogueEntry, learns = true): void {
       opened.value += 1
-      const found = phase.value === 'ready'
+      const found = phase.value === 'ready' || phase.value === 'far'
       const text = found ? answered.value : query.value
       const missed = takeMissed(text)
       const word = learns && found ? missed : null
@@ -271,6 +304,7 @@ export default defineComponent({
     })
     onUnmounted(() => {
       withdraw?.()
+      dropSearchDraft(owner)
     })
 
     return {

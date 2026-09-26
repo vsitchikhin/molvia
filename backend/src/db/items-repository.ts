@@ -41,7 +41,16 @@ export interface ItemRepository {
    * Required rather than optional — a forgotten argument would switch the lift off silently,
    * and no test of the results would notice.
    */
-  search(query: string, limit: number, actorId: string): Promise<Item[]>
+  search(query: string, limit: number, actorId: string): Promise<SearchAnswer>
+}
+
+/**
+ * The items found, in their order, and whether any of them is close to what was typed (MOL-46).
+ * An empty answer is not near.
+ */
+export interface SearchAnswer {
+  readonly items: Item[]
+  readonly near: boolean
 }
 
 /**
@@ -56,9 +65,26 @@ const CANDIDATE_THRESHOLD = 0.15
 /**
  * The edit distance at which a name still counts as the one asked for. Kept by MOL-14: 1 loses
  * five typos of the MOL-5 corpus and «собачий корм», 3 wins one query of the owner's and finds
- * six more wrong items. A word wrong from end to end still fits in two — MOL-46.
+ * six more wrong items. A word wrong from end to end still fits in two, and the answer then
+ * says it is not near rather than dropping it (MOL-46, `NEAR_DISTANCE`).
  */
 const ACCEPTED_DISTANCE = 2
+
+/**
+ * How far a word of the query may be from its word in a name and the row still be close to what
+ * was typed rather than merely inside the budget (MOL-46). Not a threshold of its own: «far» is
+ * exactly what only grazed the budget. The budget cannot tell `malako` → `moloko` from `pelmeni` →
+ * `zeleni` — both two edits — and every rule on the letters that was measured against it lost
+ * typos to win false hits: vowels by sound lost 38 of 40 slips of the finger, the first letter
+ * every typo that touched it, keyboard neighbours explained «овощи» too. So nothing is dropped,
+ * and the answer says how sure it is.
+ *
+ * Measured per word, by the worst, and the size aside (adversarial review А, Б). By the mean one
+ * exact word beside a wrong one made the row close — «мыло детское» over «Масло детское», three
+ * edits over two exact words; and a size in another number made a one-edit typo far — «кефр 1 л»
+ * over «Кефир 0,5 л» — where MOL-45 already calls that the kefir asked for in another size.
+ */
+const NEAR_DISTANCE = ACCEPTED_DISTANCE - 1
 
 /**
  * A word grounds a match only if it has this many characters and no digit. Short words and
@@ -502,7 +528,10 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              -- The words alone, the size aside: «Кефир Ашхар 0,5 л» for «кефир 1 л» is the kefir
              -- asked for in another size, not a typo (review Т).
              coalesce(ceil(avg(coalesce(pw.qd, 255))
-                             filter (where pw.grounds and not pw.by_synonym)), 0) as words_distance
+                             filter (where pw.grounds and not pw.by_synonym)), 0) as words_distance,
+             -- The furthest of those words, for how near the row is (MOL-46).
+             coalesce(max(coalesce(pw.qd, 255))
+                        filter (where pw.grounds and not pw.by_synonym), 0) as words_worst
       from candidates c
       join per_word_best pw on pw.id = c.id
       group by c.id, c.ws, c.search_key
@@ -539,7 +568,15 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                 ))
       group by sp.item_id
     )
-    select r.id
+    -- Near: every word of the row within one edit, the size aside — or the person's own, taken
+    -- before on this query or their own word for the item: their choice says more than a typo
+    -- metric, the same reason it is lifted. Per row, and the answer is near by the rows it hands
+    -- out (owner's decision on review, В-4): the order is by the mean and the size, nearness by the
+    -- worst word, so a near row can rank below twenty far ones — and then the screen says «не
+    -- нашли» over what it shows, rather than «нашли» over a list with nothing near in it.
+    select r.id,
+           coalesce(r.words_worst <= ${NEAR_DISTANCE} or r.admitted or m.item_id is not null, false)
+             as near
     from ranked r
     left join remembered m on m.item_id = r.id
     -- The filter stays on the distance: a pick lifts what the search found and never lets in
@@ -691,9 +728,9 @@ export function createItemRepository(db: Conn): ItemRepository {
 
     async search(query, limit, actorId) {
       const key = searchQueryKey(query)
-      if (key === null) return []
+      if (key === null) return { items: [], near: false }
 
-      const ids = await db.transaction(async (tx) => {
+      const rows = await db.transaction(async (tx) => {
         /*
          * The threshold of `%>` is a setting of the connection, not a value in the query —
          * `set_limit()` governs `%` and leaves this one at its default of 0.6. Connections
@@ -725,7 +762,7 @@ export function createItemRepository(db: Conn): ItemRepository {
                      set_config('jit', 'off', true)`,
         )
 
-        const rows = await tx.execute<{ id: string }>(
+        const ranked = await tx.execute<{ id: string; near: boolean }>(
           rankedCandidates(key, rowLimit(limit), idOrNull(actorId)),
         )
 
@@ -733,12 +770,16 @@ export function createItemRepository(db: Conn): ItemRepository {
           sql`select set_config('pg_trgm.word_similarity_threshold', ${previous?.threshold ?? '0.6'}, true),
                      set_config('jit', ${previous?.jit ?? 'on'}, true)`,
         )
-        return rows.map((row) => row.id)
+        return ranked
       })
 
       // `load` answers in id order; the ranking is this query's, so it is restored here.
-      const found = new Map((await load(ids)).map((item) => [item.id, item]))
-      return ids.flatMap((id) => found.get(id) ?? [])
+      const found = new Map((await load(rows.map((row) => row.id))).map((item) => [item.id, item]))
+      const kept = rows.filter((row) => found.has(row.id))
+      return {
+        items: kept.flatMap((row) => found.get(row.id) ?? []),
+        near: kept.some((row) => row.near),
+      }
     },
   }
 }
