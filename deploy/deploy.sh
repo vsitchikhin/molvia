@@ -22,21 +22,13 @@ request="${SSH_ORIGINAL_COMMAND:-${1:-}}"
 cd "$molvia"
 compose=(docker compose -f docker-compose.prod.yml --env-file .env.prod)
 
-# A line of .env.prod that sets $1, in any shape compose accepts: `export` in front, spaces
-# around `=`, an indent.
-assigns() { printf '^[[:space:]]*(export[[:space:]]+)?%s[[:space:]]*=[[:space:]]*' "$1"; }
+# A line of .env.prod that sets $1, in any shape compose accepts — `export` in front, spaces or a
+# colon instead of `=`, an indent — for set_tag to replace it.
+assigns() { printf '^[[:space:]]*(export[[:space:]]+)?%s[[:space:]]*[=:]' "$1"; }
 
-# A value as compose reads it: the quotes around it and a trailing ` # comment` are not part of it.
-setting() {
-  local value
-  value="$(sed -nE "s/$(assigns "$1")//p" .env.prod | tail -n 1)"
-  case "$value" in
-    \"*) value="${value#\"}" && value="${value%%\"*}" ;;
-    \'*) value="${value#\'}" && value="${value%%\'*}" ;;
-    *) value="${value%%[[:space:]]#*}" && value="${value%"${value##*[![:space:]]}"}" ;;
-  esac
-  printf '%s\n' "$value"
-}
+# A value as compose reads it, asked of compose itself: quotes, comments, `${VAR:-default}` and the
+# rest of its grammar are its own, and a copy of that grammar here drifted form by form.
+setting() { "${compose[@]}" config --environment | sed -n "s/^$1=//p" | tail -n 1; }
 
 if [[ "$request" == status ]]; then
   echo "image_tag=$(setting IMAGE_TAG)"
