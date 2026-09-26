@@ -49,7 +49,8 @@ of exactly that commit as `sha-<7 hex>` and rolls them out:
 
 The script writes to `~/molvia/deploy.log`, and a `tail` carries it to the job: a job cancelled or
 a runner off the network takes the `tail` with it, and the rollout — or its rollback — still runs
-to the end. The log of the last rollout stays there.
+to the end. The log keeps every rollout that went ahead, each under a line with its time and tag,
+the latest last; one waiting for the lock or refused by a hold writes nothing there.
 
 **Every rollout is a few seconds of refusals.** `up -d` recreates all three containers, Caddy
 included. The PWA's queue holds a write through a 5xx and a dropped connection, so nothing is
@@ -65,9 +66,12 @@ waiting. So press a rollback when nothing is queued, and check that it ran.
 **Holding rollouts.** While `~/molvia/deploy.hold` exists every rollout is refused and the job goes
 red. `restore.sh --into-prod` sets it for as long as it replaces the database — an API started in
 the middle would migrate the empty database and the copy would no longer go in — and takes it off
-however it ends. Set it by hand (`ssh molvia 'touch ~/molvia/deploy.hold'`) for any maintenance
-that must not meet a merge, and remove it afterwards; a merge made meanwhile rolls out with the
-next one, or re-run its Release job.
+**only once the copy is in**. A restore that failed after the drop leaves a database with no rows,
+or rows with no keys, on which an API still answers ok: the hold stays, and the next restore that
+succeeds takes it off. Set it by hand (`ssh molvia 'touch ~/molvia/deploy.hold'`) for any
+maintenance that must not meet a merge, and remove it afterwards — a restore in the middle of that
+leaves it where it is. A merge made meanwhile rolls out with the next one, or re-run its Release
+job.
 
 **The version.** `/api/health` names the build by `git describe`: `v0.1.1-3-g1a2b3c4` is three
 commits after `v0.1.1`, at `1a2b3c4` — the long form always, `v0.1.2-0-g…` even on a tagged
@@ -80,11 +84,15 @@ git tag v0.1.2 && git push origin v0.1.2   # names the images of that commit v0.
 ```
 
 The tag builds nothing: it puts its name on the `sha-…` images already built from its commit —
-byte for byte what ran on production — and a commit that was never built from master is refused.
+byte for byte what ran on production. Set right after a merge, it waits up to fifteen minutes for
+that build, and names nothing until all three images are there; a commit whose master build never
+came is refused whole.
 Only `vN.N.N` sets it off. `v0.2.0` marks the start of the 0.2 cohort.
 
 **Rolling back by hand:** Actions → Release → «Run workflow» on master, with a tag — `v0.1.2`,
 `sha-1a2b3c4`, or any image built before MOL-90 (`v0.1.1`). It only deploys; nothing is built.
+**It holds until the next merge**, which rolls out over it — a merge is a deploy. If the fix is not
+ready, set `deploy.hold` after the rollback.
 
 **A failed deploy puts the previous image back, not the schema.** The API migrates when it
 starts, all pending migrations in one transaction: a migration that fails leaves the schema as it

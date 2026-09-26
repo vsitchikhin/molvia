@@ -2061,7 +2061,9 @@ The shape worth knowing here:
   may never pass CI. A compose file or a deploy script on the machine that differs from the
   commit stops the job before anything moves — the key cannot replace them, and a copy is made by
   hand. `~/molvia/deploy.hold` refuses every rollout, and `restore.sh --into-prod` sets it: an API
-  started mid-restore migrates the empty database. A tag `v0.1.N` is set by hand every 10–15
+  started mid-restore migrates the empty database. It comes off only once the copy is in — a pour
+  cut short leaves tables without keys that an API still calls healthy — and a hold set by hand
+  is never the restore's to take off. A tag `v0.1.N` is set by hand every 10–15
   tasks as a mark and a point to roll back to; it builds nothing and deploys nothing, but names
   the `sha-…` images of its commit — byte for byte what ran (owner's decision В-4). `v0.2.0`
   starts the 0.2 cohort. **`/api/health` names the build** — `git describe --long`,
