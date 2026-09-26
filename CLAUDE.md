@@ -1693,6 +1693,29 @@ shelf, so a desktop-only pass would prove nothing about the screen that matters.
   in this copy's band). A database alone would not have closed it: `reuseExistingServer`
   handed the suite the dev API whenever `make dev` was up, so no `DATABASE_URL` of ours
   reached a process — and `pre-push` runs e2e exactly then. Now the two stacks coexist.
+- **Every spec comes in through `open()` in `e2e/session.ts`, and it waits for two things
+  apart** (MOL-67). The seam's answer has no limit of its own, as the app itself waits for it
+  (`devLogin` has no timeout): on an overloaded machine that answer is what is slow — up to 23 s
+  with eight workers on a throttled CPU, most of it inside the API, under a second otherwise. **And
+  the spec does not pay for it**: whatever was waited is added back to a finite test timeout, so a
+  slow stand no longer lets the login pass and the body die three seconds later on a step of its
+  own with no word about the login. A timeout of `0` (`--timeout 0`, `--debug`, `PWDEBUG=1`) is
+  left unlimited — `0 + waited` would have turned it into a budget as long as the login. A login
+  slower than five seconds leaves a «вход швом» attachment with its seconds in the report of any
+  later failure; a seam that never answers times out on `page.waitForEvent` at the line in
+  `session.ts` that says so, and a request cut off without an answer fails at once with its own
+  error. **The price, named:** a login made slow by the product — the seam goes through the same
+  `signIn` as the real one — no longer fails at the door either; on a quiet machine the seam
+  answers in under a second, so an attachment there is a finding about the product, not the
+  stand. The door after the answer keeps the default five seconds and must not be raised: from the
+  answer to the door is one synchronous chain and one render, so a failure there is the login
+  (`verify()`, `claimed`, MOL-56), not the machine, and its message says so. Measured over 284
+  logins under load: late, never «not at all».
+- **Outside CI a failed test keeps its trace** (`retain-on-failure`, MOL-67), since there are no
+  retries to write one. It is recorded for every test and dropped when it passes, which costs
+  12–22 % of a full local run (measured in four pairs); and under an overload that times a test
+  out, the trace may still be lost: it is saved while the context is torn down, and that teardown
+  shares the test's timeout.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **six things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
