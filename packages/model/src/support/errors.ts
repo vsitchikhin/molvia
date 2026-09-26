@@ -51,6 +51,16 @@ export const ERROR = {
   EXCHANGE_IN_FUTURE: 'error.exchange_in_future',
   /** An income dated after today in Yerevan (MOL-66): the same rule of the clock as an exchange. */
   INCOME_IN_FUTURE: 'error.income_in_future',
+  /** A spending dated after today in Yerevan (MOL-73): the same rule of the clock again. */
+  SPENDING_IN_FUTURE: 'error.spending_in_future',
+  /**
+   * A spending names a category that is not among the person's own (MOL-73). A removed one is still
+   * theirs and still takes spendings — a spending queued offline must not be lost to a category
+   * taken out of the choice on another phone in between.
+   */
+  SPENDING_CATEGORY_UNKNOWN: 'error.spending_category_unknown',
+  /** One's own category under a name another live one of theirs already has (MOL-73, В-3). */
+  SPENDING_CATEGORY_TAKEN: 'error.spending_category_taken',
 } as const
 
 export type ErrorCode = (typeof ERROR)[keyof typeof ERROR]
@@ -106,6 +116,8 @@ export const ISSUE = {
   EXCHANGE_HELD_NOT_RECEIVED: 'issue.exchange_held_not_received',
   /** What was held before an income, named in a currency other than the one that came in. */
   INCOME_HELD_NOT_RECEIVED: 'issue.income_held_not_received',
+  /** A spending's rate snapshot is of another currency than the spending itself (MOL-73). */
+  RATE_NOT_OF_SPENDING_CURRENCY: 'issue.rate_not_of_spending_currency',
 } as const
 
 export type IssueCode = (typeof ISSUE)[keyof typeof ISSUE]
