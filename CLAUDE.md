@@ -367,9 +367,11 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   does not, and a name pasted with one was found offline and missed online; a test walks every
   code point, as for `INVISIBLE`. A narrower target that is itself an adjective — «минеральная»,
   «газированная» — is never the kind, and counts as any word of the name; an adjective of a group
-  of the same thing — «гречневая», «сгущённое» — counts right before the kind, where a shelf
-  writes «Гречневая крупа», «Сгущённое молоко», and not after it, where «Лапша гречневая» carries
-  it (owner's decisions on review; the price: «Гречневая лапша»). «вода» is no longer a target of
+  of the same thing — «гречневая», «сгущённое» — counts anywhere in a name whose kind is one of its
+  own, written beside it in the dictionary (`PAIRED`): «Крупа гречневая» and «Гречневая крупа»,
+  «Молоко цельное сгущённое» and «Сгущённое молоко» — a shelf writes both orders — and never
+  «Лапша гречневая» or «Гречневая лапша» (owner's decisions on review; the price: a kind not
+  written there, «Ядрица гречневая», is found by letters only). «вода» is no longer a target of
   «минералка»: the water is in «Вода туалетная» first word and all. The prices: «Вода Джермук»
   without the word is not a «минералка», a name with its brand first («Barilla спагетти») is found
   only by its own word, and «Фарш рыбный» is meat to «мясо». Its candidates come from
@@ -382,9 +384,12 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   барадинский» found «Лаваш армянский». **At most sixteen words** of the dictionary per query
   (`MAX_SYNONYMS`): twelve wide words expanded into fifty and held a connection for a second and a
   half. **The price, measured:** over 20 000 names built of the very words the dictionary expands
-  into, twelve wide words take about 0.5 s against 0.27 s on master, and a shelf query of one or
-  two words 30–60 ms more than master; the cost is ranking the names that carry the synonyms, not
-  finding them, so a smaller cap wins little. **A target is a kind of product, never a brand**:
+  into, twelve wide words take about 0.47 s against 0.28 s on master, one word with synonyms
+  («мясо», «сыр») 0.2–0.3 s against 0.19, and the same word after a number («мясо 1 кг») 0.3 s
+  against 0.1; the cost is ranking the names that carry the synonyms, not finding them, so a
+  smaller cap wins little. **The check for a slipped unit (MOL-48) runs only after a number, and
+  once** (review Ш): joined to the thousands of names a synonym brings, it took «мясо» to 1.4 s
+  while having nothing to look for — and without it «мо» answers in 0.11 s where master takes 0.17. **A target is a kind of product, never a brand**:
   expanding into a maker would be a place in the results handed out by hand; the other way round
   is fine («памперсы» → «подгузники» of every maker), and «белизна» is let in as the common name
   of a kind. **No categories** — «овощи», «специи», «сладости» name a shelf, and reaching kefir
