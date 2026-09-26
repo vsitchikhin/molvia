@@ -200,7 +200,6 @@ function fakeRepositories(
       byId: unexpected('spendings.byId'),
       remove: unexpected('spendings.remove'),
       restore: unexpected('spendings.restore'),
-      purgeRemoved: unexpected('spendings.purgeRemoved'),
       purgeStale: unexpected('spendings.purgeStale'),
       between: unexpected('spendings.between'),
     },
@@ -214,6 +213,7 @@ function fakeRepositories(
       tripLines: unexpected('money.tripLines'),
       frozenRate: unexpected('money.frozenRate'),
       freeze: unexpected('money.freeze'),
+      thaw: unexpected('money.thaw'),
     },
   }
 }

@@ -1,19 +1,26 @@
 import { randomUUID } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import {
   ERROR,
   SPENDING_PRESETS,
+  journalCursorCodec,
   moneyMonthCodec,
   parseRate,
   spendingCategoriesResponseCodec,
   spendingViewCodec,
   yerevanDate,
 } from '@molvia/model'
-import type { CachedRate, MoneyMonthView, SpendingCategoriesResponse } from '@molvia/model'
+import type {
+  CachedRate,
+  JournalKey,
+  MoneyMonthView,
+  SpendingCategoriesResponse,
+} from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
-import { expenses, moneyMonthRates, spendings } from '@/db/schema'
+import { actors, expenses, moneyMonthRates, spendings } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
@@ -93,8 +100,11 @@ async function spend(me: Owner, patch: Record<string, unknown> = {}) {
   })
 }
 
-async function month(me: Owner, value: string, cursor?: number): Promise<MoneyMonthView> {
-  const query = cursor === undefined ? '' : `?cursor=${String(cursor)}`
+async function month(me: Owner, value: string, cursor?: JournalKey): Promise<MoneyMonthView> {
+  const query =
+    cursor === undefined
+      ? ''
+      : `?cursor=${encodeURIComponent(z.encode(journalCursorCodec, cursor))}`
   const response = await call(me, 'GET', `/money/months/${value}${query}`)
   expect(response.statusCode).toBe(200)
   expect(response.headers['cache-control']).toBe('no-store')
@@ -292,7 +302,8 @@ describe('месяц «Денег» (MOL-73)', () => {
     const counted = await month(me, daysAgo(2).slice(0, 7))
     const lines = counted.days.flatMap((day) => day.entries)
     expect(lines).toHaveLength(2)
-    expect(lines.every((line) => line.kind === 'trip' && line.items === 3)).toBe(true)
+    // Each line counts the purchases behind its own sum (В-7): the unpriced one is in neither.
+    expect(lines.map((line) => (line.kind === 'trip' ? line.items : -1))).toEqual([1, 1])
     expect(counted.byCategory).toEqual([
       { categoryId: await presetId(me, 'groceries'), amount: counted.spent },
     ])
@@ -343,7 +354,8 @@ describe('месяц «Денег» (MOL-73)', () => {
 
   it('пришло — доходы месяца, остаток — со знаком; прошлый месяц для сравнения', async () => {
     const me = await owner()
-    await rates.upsert([official('RUB', '5', '2026-09-01')])
+    // The running month counts by today's rate, and only a fresh one counts (review Р-4).
+    await rates.upsert([official('RUB', '5', today)])
     await spend(me, { spentOn: '2026-08-10', amount: { amount: '1000', currency: 'AMD' } })
     await spend(me, { spentOn: '2026-09-06', amount: { amount: '600000', currency: 'AMD' } })
     await call(me, 'POST', '/incomes', {
@@ -382,8 +394,290 @@ describe('месяц «Денег» (MOL-73)', () => {
     expect(first.days[0]?.entries).toHaveLength(40)
     expect(first.days[0]?.total).toEqual({ minor: 450000n, currency: 'AMD' })
     expect(first.remaining).toBe(5)
-    const next = await month(me, today.slice(0, 7), first.cursor ?? 0)
+    const next = await month(me, today.slice(0, 7), first.cursor ?? undefined)
     expect(next.days[0]?.entries).toHaveLength(5)
     expect(next.cursor).toBeNull()
+  })
+})
+
+async function exchange(me: Owner, given: string, received: string, on: string): Promise<string> {
+  const [givenAmount = '', gave = ''] = given.split(' ')
+  const [receivedAmount = '', got = ''] = received.split(' ')
+  const id = randomUUID()
+  const response = await call(me, 'POST', '/exchanges', {
+    id,
+    given: { amount: givenAmount, currency: gave },
+    received: { amount: receivedAmount, currency: got },
+    exchangedOn: on,
+  })
+  expect(response.statusCode).toBe(201)
+  return id
+}
+
+async function finishedTrip(me: Owner, on: string, minor: bigint, currency: 'AMD' | 'USD') {
+  const trip = await insertTrip(db, {
+    actorId: me.id,
+    placeId: await insertPlace(db),
+    startedAt: new Date(`${on}T08:00:00Z`),
+    finishedAt: new Date(`${on}T09:00:00Z`),
+  })
+  await db.insert(expenses).values({
+    id: randomUUID(),
+    tripId: trip,
+    itemId: await insertItem(db),
+    amountMinor: minor,
+    amountCurrency: currency,
+  })
+}
+
+function idsOf(view: MoneyMonthView): string[] {
+  return view.days.flatMap((day) =>
+    day.entries.map((entry) => (entry.kind === 'manual' ? entry.spending.id : entry.tripId)),
+  )
+}
+
+describe('курсы «Денег» (ревью MOL-73: Р-1…Р-5, адверсариальный Д1, Д2, Д8)', () => {
+  it('пришло — доход в ֏ по ЦБ своего дня, а не по цене кошелька, и без потери знаков (Р-2, Д1, Д2б)', async () => {
+    const me = await owner()
+    await rates.upsert([
+      official('RUB', '4.10', '2026-08-05'),
+      official('RUB', '4.30', '2026-08-20'),
+    ])
+    await exchange(me, '100000 RUB', '410000 AMD', '2026-08-05')
+    const income = await call(me, 'POST', '/incomes', {
+      id: randomUUID(),
+      amount: { amount: '150000', currency: 'AMD' },
+      receivedOn: '2026-08-20',
+      source: 'freelance',
+      heldBefore: { amount: '410000', currency: 'AMD' },
+    })
+    expect(income.statusCode).toBe(201)
+    // 150 000 / 4,3 = 34 883,7209…: «₽ за ֏» (0,232558) gave 34 883,70.
+    expect((await month(me, '2026-08')).income).toEqual({ minor: 3488372n, currency: 'RUB' })
+  })
+
+  it('трата в $ при цепочке ₽ → $ → ֏ — кросс из одной цепочки, округлённый раз (Р-1, Д2)', async () => {
+    const me = await owner()
+    await exchange(me, '89011.50 RUB', '1000 USD', '2026-08-05')
+    await exchange(me, '100000 RUB', '410000 AMD', '2026-08-05')
+    const response = await spend(me, {
+      spentOn: '2026-08-10',
+      amount: { amount: '1500', currency: 'USD' },
+      categoryId: await presetId(me, 'rent'),
+    })
+    expect(response.statusCode).toBe(201)
+    expect(spendingViewCodec.parse(response.json()).rate).toMatchObject({
+      base: 'USD',
+      quote: 'AMD',
+      source: 'personal',
+      scaled: parseRate('364.94715'),
+    })
+    // 1 500 × 364,94715 = 547 420,73 ֏, not the 547 396,53 two rounded wallets gave.
+    expect((await month(me, '2026-08')).foreign[0]?.counted).toEqual({
+      minor: 54742073n,
+      currency: 'AMD',
+    })
+  })
+
+  it('покупка похода в $ — тем же правилом, что трата в $ того же дня (Р-3, Д1)', async () => {
+    const me = await owner()
+    await rates.upsert([official('USD', '390', '2026-08-20')])
+    await exchange(me, '89040 RUB', '1000 USD', '2026-08-05')
+    await exchange(me, '100000 RUB', '410000 AMD', '2026-08-05')
+    await finishedTrip(me, '2026-08-20', 1000n, 'USD')
+    await spend(me, { spentOn: '2026-08-20', amount: { amount: '10', currency: 'USD' } })
+    const august = await month(me, '2026-08')
+    // 89,04 × 4,1 = 365,064 ֏ за $ — the person's own dollars, not the bank's 390.
+    expect(august.days[0]?.entries.map((entry) => entry.counted)).toEqual([
+      { minor: 365064n, currency: 'AMD' },
+      { minor: 365064n, currency: 'AMD' },
+    ])
+  })
+
+  it('официальный курс — только свежий: трата в $ с курсом трёхнедельной давности не посчитана (Р-4)', async () => {
+    const me = await owner()
+    await rates.upsert([official('USD', '390', daysAgo(25))])
+    const response = await spend(me, {
+      spentOn: daysAgo(3),
+      amount: { amount: '11', currency: 'USD' },
+    })
+    expect(response.statusCode).toBe(201)
+    expect(spendingViewCodec.parse(response.json()).rate).toBeNull()
+    expect((await month(me, daysAgo(3).slice(0, 7))).uncounted).toEqual([
+      { minor: 1100n, currency: 'USD' },
+    ])
+  })
+
+  it('правка заметки у траты без курса берёт курс заново, если он появился (Р-5)', async () => {
+    const me = await owner()
+    const day = daysAgo(3)
+    const view = spendingViewCodec.parse(
+      (await spend(me, { spentOn: day, amount: { amount: '11', currency: 'USD' } })).json(),
+    )
+    expect(view.rate).toBeNull()
+    await rates.upsert([official('USD', '390', day)])
+    const amended = await call(me, 'PUT', `/spendings/${view.id}`, {
+      revision: view.revision,
+      spentOn: day,
+      amount: { amount: '11', currency: 'USD' },
+      categoryId: view.categoryId,
+      note: 'домен',
+    })
+    expect(amended.statusCode).toBe(200)
+    expect(spendingViewCodec.parse(amended.json()).rate?.scaled).toBe(parseRate('390'))
+  })
+
+  it('правка заметки у траты с курсом его сохраняет, даже если курс дня с тех пор другой', async () => {
+    const me = await owner()
+    const day = daysAgo(3)
+    await rates.upsert([official('USD', '390', day)])
+    const view = spendingViewCodec.parse(
+      (await spend(me, { spentOn: day, amount: { amount: '11', currency: 'USD' } })).json(),
+    )
+    // The bank corrected the day since: a corrected note is the same fact at the same rate.
+    await rates.upsert([official('USD', '395', day)])
+    const amended = await call(me, 'PUT', `/spendings/${view.id}`, {
+      revision: view.revision,
+      spentOn: day,
+      amount: { amount: '11', currency: 'USD' },
+      categoryId: view.categoryId,
+      note: 'домен',
+    })
+    expect(spendingViewCodec.parse(amended.json()).rate?.scaled).toBe(parseRate('390'))
+  })
+
+  it('после смены валюты трат ֏ похода и те же ֏ ручной траты считаются одинаково (Р-5, Д8)', async () => {
+    const me = await owner()
+    await rates.upsert([official('USD', '400', '2026-08-10')])
+    await spend(me, { spentOn: '2026-08-10', amount: { amount: '4000', currency: 'AMD' } })
+    await finishedTrip(me, '2026-08-10', 400000n, 'AMD')
+    await db.update(actors).set({ spendCurrency: 'USD' }).where(eq(actors.id, me.id))
+    const august = await month(me, '2026-08')
+    expect(august.spent).toEqual({ minor: 2000n, currency: 'USD' })
+    expect(august.uncounted).toEqual([])
+  })
+})
+
+describe('месяц «Денег» — края (адверсариальный Д3–Д7, В-6)', () => {
+  async function fortyFive(me: Owner): Promise<void> {
+    const beauty = await presetId(me, 'beauty')
+    for (let index = 0; index < 45; index += 1) {
+      const response = await call(me, 'POST', '/spendings', {
+        id: randomUUID(),
+        spentOn: today,
+        amount: { amount: '100', currency: 'AMD' },
+        categoryId: beauty,
+      })
+      expect(response.statusCode).toBe(201)
+    }
+  }
+
+  it('трата, записанная между страницами, не повторяется; удалённая не прячет соседнюю (Д3)', async () => {
+    const me = await owner()
+    await fortyFive(me)
+    const first = await month(me, today.slice(0, 7))
+    await spend(me)
+    const second = await month(me, today.slice(0, 7), first.cursor ?? undefined)
+    expect(idsOf(second).filter((id) => idsOf(first).includes(id))).toEqual([])
+    expect(idsOf(second)).toHaveLength(5)
+
+    expect((await call(me, 'DELETE', `/spendings/${idsOf(first)[3] ?? ''}`)).statusCode).toBe(204)
+    const again = await month(me, today.slice(0, 7), first.cursor ?? undefined)
+    expect(idsOf(again)).toEqual(idsOf(second))
+  })
+
+  it('курсор, который не ключ строки, — отказ, а не первая страница', async () => {
+    const me = await owner()
+    const response = await call(me, 'GET', `/money/months/${today.slice(0, 7)}?cursor=40`)
+    expect(response.statusCode).toBe(400)
+  })
+
+  it('0000-01 и 0001-01 — 404, как любой не месяц, а не 500 из Postgres (Д4)', async () => {
+    const me = await owner()
+    expect((await call(me, 'GET', '/money/months/0000-01')).statusCode).toBe(404)
+    expect((await call(me, 'GET', '/money/months/0001-01')).statusCode).toBe(404)
+    expect((await call(me, 'GET', '/money/months/2000-01')).statusCode).toBe(200)
+  })
+
+  it('сумма, которую не держат деньги, уходит в «не посчитано», а месяц читается (Д5)', async () => {
+    const me = await owner()
+    for (let index = 0; index < 2; index += 1) {
+      expect(
+        (await spend(me, { amount: { amount: '50000000000000000', currency: 'AMD' } })).statusCode,
+      ).toBe(201)
+    }
+    await rates.upsert([official('USD', '390', today)])
+    expect(
+      (await spend(me, { amount: { amount: '90000000000000000', currency: 'USD' } })).statusCode,
+    ).toBe(201)
+    const counted = await month(me, today.slice(0, 7))
+    expect(counted.spent).toEqual({ minor: 5_000_000_000_000_000_000n, currency: 'AMD' })
+    // Newest first: the later of the two drams is counted, the earlier would carry the sum past.
+    expect(counted.uncounted).toEqual([
+      { minor: 5_000_000_000_000_000_000n, currency: 'AMD' },
+      { minor: 9_000_000_000_000_000_000n, currency: 'USD' },
+    ])
+    expect(idsOf(counted)).toHaveLength(3)
+  })
+
+  it('удалённая трата: повтор POST — 409, «Вернуть» живёт десять минут, что бы ни писалось (Д6)', async () => {
+    const me = await owner()
+    const body = {
+      id: randomUUID(),
+      spentOn: today,
+      amount: { amount: '5000', currency: 'AMD' },
+      categoryId: await presetId(me, 'beauty'),
+    }
+    expect((await call(me, 'POST', '/spendings', body)).statusCode).toBe(201)
+    expect((await call(me, 'DELETE', `/spendings/${body.id}`)).statusCode).toBe(204)
+    expect((await call(me, 'POST', '/spendings', body)).statusCode).toBe(409)
+    expect((await month(me, today.slice(0, 7))).days).toEqual([])
+
+    const b = spendingViewCodec.parse((await spend(me)).json())
+    expect((await call(me, 'DELETE', `/spendings/${b.id}`)).statusCode).toBe(204)
+    expect((await spend(me, { amount: { amount: '700', currency: 'AMD' } })).statusCode).toBe(201)
+    expect((await call(me, 'POST', `/spendings/${body.id}/restore`)).statusCode).toBe(200)
+    expect((await call(me, 'POST', `/spendings/${b.id}/restore`)).statusCode).toBe(200)
+  })
+
+  it('два «Такси» с двух телефонов разом — одна категория (Д7)', async () => {
+    const me = await owner()
+    await categories(me)
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const name = `Такси ${String(attempt)}`
+      const answers = await Promise.all([
+        call(me, 'POST', '/spending-categories', { id: randomUUID(), name }),
+        call(me, 'POST', '/spending-categories', { id: randomUUID(), name }),
+      ])
+      expect(answers.map((answer) => answer.statusCode).sort()).toEqual([201, 409])
+    }
+  })
+
+  it('своя категория, названная в верхнем регистре, — своя (по коду)', async () => {
+    const me = await owner()
+    const beauty = await presetId(me, 'beauty')
+    const response = await spend(me, { categoryId: beauty.toUpperCase() })
+    expect(response.statusCode).toBe(201)
+    expect(spendingViewCodec.parse(response.json()).categoryId).toBe(beauty)
+  })
+
+  it('обмен задним числом размораживает месяцы от своего дня; сегодняшний — нет (В-6)', async () => {
+    const me = await owner()
+    await rates.upsert([official('RUB', '4.10', '2026-08-31')])
+    await spend(me, { spentOn: '2026-08-20', amount: { amount: '41000', currency: 'AMD' } })
+    expect((await month(me, '2026-08')).spentIncome).toEqual({ minor: 1000000n, currency: 'RUB' })
+
+    // Remembered on the 3rd of September: an exchange of the 28th of August at 5 ֏ за ₽.
+    const late = await exchange(me, '10000 RUB', '50000 AMD', '2026-08-28')
+    const amended = await month(me, '2026-08')
+    expect(amended.rate).toMatchObject({ source: 'personal', scaled: parseRate('5') })
+    expect(amended.spentIncome).toEqual({ minor: 820000n, currency: 'RUB' })
+
+    await exchange(me, '10000 RUB', '60000 AMD', today)
+    expect((await month(me, '2026-08')).spentIncome).toEqual(amended.spentIncome)
+
+    // Removing the late one lets August go again.
+    expect((await call(me, 'DELETE', `/exchanges/${late}`)).statusCode).toBe(200)
+    expect((await month(me, '2026-08')).spentIncome).toEqual({ minor: 1000000n, currency: 'RUB' })
   })
 })
