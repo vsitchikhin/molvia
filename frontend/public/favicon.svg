@@ -1,13 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Molvia">
-  <!-- Placeholder mark until there is real branding. The check is the verdict: the one
-       thing the product exists to give. Colours are the tokens --surface and --good. -->
-  <rect width="512" height="512" rx="112" fill="#1b1b1f" />
-  <path
-    d="M140 268 L212 340 L372 180"
-    fill="none"
-    stroke="#1baf7a"
-    stroke-width="56"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  />
+  <!-- The M in a speech bubble: molva, what people tell each other about things. The
+       manifest PNGs are drawn from these same shapes by bin/make-icons.py (make icons). -->
+  <rect width="512" height="512" rx="112" fill="#b2622d"></rect>
+  <path d="M127.1 307.5 A150 150 0 1 1 262 392 L122.2 392 A12 12 0 0 1 111.4 374.8 L127.1 342.5 A40 40 0 0 0 127.1 307.5 Z" fill="#fffaf2" stroke="#fffaf2" stroke-width="20" stroke-linejoin="round"></path>
+  <path d="M184 310 V178 L262 268 L340 178 V310" fill="none" stroke="#b2622d" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"></path>
 </svg>
