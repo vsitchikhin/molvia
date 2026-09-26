@@ -45,7 +45,12 @@ export default defineConfig({
   forbidOnly: ci,
   retries: ci ? 2 : 0,
   reporter: ci ? 'github' : 'list',
-  use: { baseURL, trace: 'on-first-retry', locale: 'en-US' },
+  // A trace of every failure outside CI (MOL-67): there are no retries here, so `on-first-retry`
+  // never wrote one, and a flake met on pre-push left nothing behind but its message. The price:
+  // it is recorded for every test and dropped when it passes — measured at 12–22 % of a full run
+  // (four pairs, 26.09.2026, ~66 s against ~59 s). And an overload that times a test out can
+  // still lose it: it is saved while the context is torn down, which shares the test's timeout.
+  use: { baseURL, trace: ci ? 'on-first-retry' : 'retain-on-failure', locale: 'en-US' },
 
   // One project, and it is a phone: that is the device the product is designed for,
   // so a desktop-only pass would prove nothing about the screen that matters.
