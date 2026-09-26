@@ -344,12 +344,104 @@ test.describe('the sheet', () => {
     await expect(sheet(page)).toBeVisible()
   })
 
+  // The rise is held still, so the second tap lands while the sheet comes up however slow the
+  // machine is: a pause of 80 ms between the taps became 330 under load, the clock the sheet
+  // was held by ran out while it was still sliding, and the tap closed it (MOL-69).
   test('two quick taps of a finger on the opener leave the sheet open', async ({ page }) => {
     const { x, y } = await centreOpener(page)
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send('Animation.enable')
+    await cdp.send('Animation.setPlaybackRate', { playbackRate: 0 })
     await page.touchscreen.tap(x, y)
-    await page.waitForTimeout(80)
+    // A lower bound: past a double tap, with the sheet still at the bottom edge.
+    await page.waitForTimeout(400)
     await page.touchscreen.tap(x, y)
-    await page.waitForTimeout(600)
+    await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 })
+    // Asked once the rise is over: closed by the tap, the rise is cut short and the sheet is shut.
+    const openWhenUp = await page.locator('dialog').evaluate(async (dialog: HTMLDialogElement) => {
+      await Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished))
+      return dialog.open
+    })
+    expect(openWhenUp, 'the second tap closed the sheet while it was coming up').toBe(true)
+    await expect(sheet(page)).toBeVisible()
+
+    // Up, it takes a tap on the scrim again: what held it was the rise, not a delay.
+    await page.touchscreen.tap(x, 40)
+    await expect(sheet(page)).toBeHidden()
+  })
+
+  /**
+   * A finger that rests: put down while the rise is held still at the bottom edge, lifted once
+   * the sheet is up. `touchscreen.tap` touches and lifts at once, and so never shows that a click
+   * carries the moment the finger lifted (adversarial А1). Answers whether the click it made got
+   * past the sheet — asked once the click has come, since a held click goes nowhere to wait for.
+   */
+  async function restingFinger(
+    page: Page,
+    at: (page: Page) => Promise<{ x: number; y: number }>,
+  ): Promise<boolean> {
+    const { x, y } = await centreOpener(page)
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send('Animation.enable')
+    await cdp.send('Animation.setPlaybackRate', { playbackRate: 0 })
+    await page.touchscreen.tap(x, y)
+    await expect(page.locator('dialog[open]')).toHaveCount(1)
+    await page.evaluate(() => {
+      const clicks = window as unknown as { came: number; through: number }
+      clicks.came = 0
+      clicks.through = 0
+      // Every click is seen on the way down; one the sheet held never comes back up.
+      window.addEventListener('click', () => (clicks.came += 1), { capture: true })
+      window.addEventListener('click', () => (clicks.through += 1))
+    })
+    // A lower bound: past a double tap, with the sheet still at the bottom edge.
+    await page.waitForTimeout(400)
+    const finger = await at(page)
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger] })
+    await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 })
+    // The rise is finished at once rather than waited out: a finger resting past a long press
+    // makes no click, and a slow machine stretched the wait towards it (review Р-4).
+    await page.locator('dialog').evaluate(async (dialog: HTMLDialogElement) => {
+      const rising = dialog.getAnimations()
+      for (const animation of rising) animation.finish()
+      await Promise.allSettled(rising.map((animation) => animation.finished))
+      // A frame more, so the sheet has heard the rise end too.
+      await new Promise((done) => requestAnimationFrame(done))
+    })
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    const clicks = () =>
+      page.evaluate(() => {
+        const { came, through } = window as unknown as { came: number; through: number }
+        return { came, through }
+      })
+    await expect.poll(async () => (await clicks()).came).toBe(1)
+    return (await clicks()).through > 0
+  }
+
+  test('a finger put down on the scrim while the sheet rose and lifted once it is up keeps it', async ({
+    page,
+  }) => {
+    const through = await restingFinger(page, (current) =>
+      Promise.resolve({ x: (current.viewportSize()?.width ?? 0) / 2, y: 40 }),
+    )
+    expect(through, 'the finger put down on the scrim while it rose closed the sheet').toBe(false)
+    await expect(sheet(page)).toBeVisible()
+  })
+
+  // The main action slid under the finger while it rested: in a real sheet an empty purchase
+  // went into the trip (adversarial А2, Б-5).
+  test('a finger put down while the sheet rose does not press the action that slid under it', async ({
+    page,
+  }) => {
+    const through = await restingFinger(page, (current) =>
+      current.locator('dialog').evaluate((dialog: HTMLDialogElement) => {
+        const below = new DOMMatrix(getComputedStyle(dialog).transform).m42
+        const box = dialog.querySelector('.footer button')!.getBoundingClientRect()
+        // Where the action will stand once the sheet is up; with the rise held, the scrim.
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2 - below }
+      }),
+    )
+    expect(through, 'the action that slid under a resting finger was pressed').toBe(false)
     await expect(sheet(page)).toBeVisible()
   })
 

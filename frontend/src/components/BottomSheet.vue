@@ -6,6 +6,7 @@
     @cancel.prevent="close()"
     @close="closedNatively"
     @pointerdown="pressed"
+    @pointercancel="takenBack"
     @click.capture="holdWhileRising"
     @click="closeOnScrim"
   >
@@ -40,24 +41,6 @@ import { pageAnchor, useSheetHistory } from '@/composables/useSheetHistory'
 
 /** A double tap lands within this — a platform convention, not a design token. */
 const DOUBLE_TAP = 300
-
-/**
- * How long the sheet takes to come up — its own transition, so reduced motion (none) and the
- * token (`--dur`) are both honoured — and never less than a double tap.
- */
-function settleTime(element: HTMLElement): number {
-  const longest = Math.max(
-    0,
-    ...getComputedStyle(element)
-      .transitionDuration.split(',')
-      .map((part) => {
-        const value = Number.parseFloat(part)
-        if (Number.isNaN(value)) return 0
-        return part.trim().endsWith('ms') ? value : value * 1000
-      }),
-  )
-  return Math.max(longest, DOUBLE_TAP)
-}
 
 /**
  * The sheet of 0.1: it rises from the bottom over the screen, which stays visible behind the
@@ -111,6 +94,13 @@ export default defineComponent({
     // A tap on the scrim counts only if it began there, and no tap counts until the sheet is up.
     let downOnScrim = false
     let settledAt = 0
+    // When the finger of the last touch on the sheet came down — its click carries the moment it
+    // lifted (MOL-69, adversarial А1). Kept for every click of that touch — a label and the radio
+    // it clicks for it — until the next touch, a touch the platform took back, or the next showing
+    // (adversarial Б1, review Р-3).
+    let touchedAt: number | null = null
+    // Which showing the sheet is on: the rise of one that was closed must not settle the next.
+    let showing = 0
 
     const history = useSheetHistory(() => {
       if (!shown.value) return
@@ -145,8 +135,27 @@ export default defineComponent({
       const anchor = pageAnchor()
       shown.value = true
       element.showModal()
-      settledAt = performance.now() + settleTime(element)
+      settle(element)
       history.lay(anchor)
+    }
+
+    // «Up» is the end of the sheet's own rise, not a clock started at `showModal`: a rise starts
+    // with the first frame that draws it, and on a busy phone that frame comes late — the clock
+    // ran out while the sheet was still sliding, and the second tap of a double tap closed it
+    // (MOL-69). Never sooner than a double tap, for a sheet with no rise (reduced motion). No
+    // ceiling: a transition either finishes or is cancelled, and both settle it — an endless
+    // animation never would, so one is not waited for, or the sheet would take no tap for good.
+    function settle(element: HTMLDialogElement): void {
+      const current = ++showing
+      const floor = performance.now() + DOUBLE_TAP
+      settledAt = Number.POSITIVE_INFINITY
+      touchedAt = null
+      const rising = element
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+      void Promise.allSettled(rising.map((animation) => animation.finished)).then(() => {
+        if (current === showing) settledAt = Math.max(performance.now(), floor)
+      })
     }
 
     /** Closes the sheet — and `steps - 1` screens under it — by stepping back through history. */
@@ -157,14 +166,28 @@ export default defineComponent({
 
     function pressed(event: PointerEvent): void {
       downOnScrim = event.target === dialog.value
+      touchedAt = event.timeStamp
+    }
+
+    // A touch the platform took back — a scroll, a long press — makes no click.
+    function takenBack(): void {
+      touchedAt = null
     }
 
     // The second tap of a double tap on the opener lands wherever the sheet is while it rises —
     // the scrim, the ×, the main action sliding under the finger — and closed the sheet before it
     // was seen, or added an empty item to the trip (adversarial Б-5). Until the sheet is up it
     // takes no click at all: stopped here, on the way down, before any button hears it.
+    //
+    // Judged by when the finger touched, not by when a busy main thread got round to the tap
+    // (MOL-69) — and not by the click's own time either: a click is born when the finger lifts,
+    // so one put down on the scrim while the sheet rose and lifted once it was up closed the
+    // sheet, or pressed the main action that had slid under it (adversarial А1, А2). A click
+    // from the keyboard has no finger (`detail` 0): it is judged by its own time and leaves the
+    // touch alone — spending it let the finger still resting be judged by its lift (Б1).
     function holdWhileRising(event: MouseEvent): void {
-      if (performance.now() >= settledAt) return
+      const finger = event.detail > 0 ? touchedAt : null
+      if ((finger ?? event.timeStamp) >= settledAt) return
       event.stopPropagation()
       event.preventDefault()
     }
@@ -209,7 +232,17 @@ export default defineComponent({
     })
 
     expose({ close })
-    return { t, dialog, titleId, close, pressed, holdWhileRising, closeOnScrim, closedNatively }
+    return {
+      t,
+      dialog,
+      titleId,
+      close,
+      pressed,
+      takenBack,
+      holdWhileRising,
+      closeOnScrim,
+      closedNatively,
+    }
   },
 })
 </script>
