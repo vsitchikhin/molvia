@@ -58,9 +58,18 @@ export const catalogueEntryCodec = z.strictObject({
   typicalQuantity: quantityCodec.nullable(),
 })
 
-/** An object rather than a bare list, so a field beside the items does not break a client. */
+/**
+ * An object rather than a bare list, so a field beside the items does not break a client.
+ *
+ * `near` says whether anything in the answer is close to what was typed (MOL-46): the budget of
+ * two edits lets a word wrong from end to end through — `pelmeni` is two from `zeleni` of «Чай
+ * зелёный», exactly as `malako` is from `moloko` — and no rule on the letters tells the two apart
+ * without losing typos. So nothing is dropped; the screen is told the answer only grazes the
+ * budget and says «не нашли» above it. Decided by the server, which alone has the distances.
+ */
 export const catalogueSearchResponseSchema = z.strictObject({
   items: z.array(catalogueEntryCodec),
+  near: z.boolean(),
 })
 export type CatalogueSearchResponse = z.infer<typeof catalogueSearchResponseSchema>
 

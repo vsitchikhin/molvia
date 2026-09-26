@@ -43,7 +43,7 @@ describe('searchCatalogue', () => {
     const items = fakeItems({
       search: (...args) => {
         calls.push(args)
-        return Promise.resolve([])
+        return Promise.resolve({ items: [], near: false })
       },
     })
     await searchCatalogue({ items }, ACTOR, '  Молоко ')
@@ -53,17 +53,34 @@ describe('searchCatalogue', () => {
   })
 
   it('answers in the order the repository ranked, without reshuffling', async () => {
-    const items = fakeItems({ search: () => Promise.resolve([first, second]) })
+    const items = fakeItems({
+      search: () => Promise.resolve({ items: [first, second], near: true }),
+    })
 
-    await expect(searchCatalogue({ items }, ACTOR, 'молоко')).resolves.toEqual([first, second])
+    await expect(searchCatalogue({ items }, ACTOR, 'молоко')).resolves.toEqual({
+      items: [first, second],
+      near: true,
+    })
+  })
+
+  it('hands on a far answer as far: the screen, not the use case, decides how to draw it', async () => {
+    const items = fakeItems({ search: () => Promise.resolve({ items: [first], near: false }) })
+
+    await expect(searchCatalogue({ items }, ACTOR, 'малако')).resolves.toEqual({
+      items: [first],
+      near: false,
+    })
   })
 
   it('writes nothing to the log: the visit that answers the gate is «Что брать» now', async () => {
     // The search used to record `catalogue_viewed` here (MOL-12). It stopped with MOL-31
     // (Р-18): `advice_viewed` answers the 0.3 gate, and an event nothing reads must not be
     // written into an append-only log.
-    const items = fakeItems({ search: () => Promise.resolve([first]) })
+    const items = fakeItems({ search: () => Promise.resolve({ items: [first], near: true }) })
 
-    await expect(searchCatalogue({ items }, ACTOR, 'молоко')).resolves.toEqual([first])
+    await expect(searchCatalogue({ items }, ACTOR, 'молоко')).resolves.toEqual({
+      items: [first],
+      near: true,
+    })
   })
 })

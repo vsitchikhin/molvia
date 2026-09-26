@@ -1,5 +1,4 @@
-import type { Item } from '@molvia/model'
-import type { ItemRepository } from '@/db/items-repository'
+import type { ItemRepository, SearchAnswer } from '@/db/items-repository'
 
 /**
  * How many rows a search answers with. A product decision rather than a parameter: a phone
@@ -31,6 +30,6 @@ export async function searchCatalogue(
   { items }: CatalogueSearchDeps,
   actorId: string,
   query: string,
-): Promise<Item[]> {
+): Promise<SearchAnswer> {
   return items.search(query, SEARCH_LIMIT, actorId)
 }

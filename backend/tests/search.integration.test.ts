@@ -23,7 +23,7 @@ async function named(name: string): Promise<string> {
 }
 
 async function names(query: string, limit = 20): Promise<string[]> {
-  return (await repo.search(query, limit, nobody)).map((item) => item.name)
+  return (await repo.search(query, limit, nobody)).items.map((item) => item.name)
 }
 
 /** A candidate by trigrams, so a missing answer below is the distance speaking. */
@@ -177,7 +177,7 @@ describe('search — the shape of the query', () => {
     await named('Молоко «Ашхар»')
     const fresh = connectDrizzle()
     try {
-      const found = await createItemRepository(fresh.db).search('малако', 10, nobody)
+      const found = (await createItemRepository(fresh.db).search('малако', 10, nobody)).items
       const [row] = await fresh.db.execute<{ threshold: string }>(
         raw`select current_setting('pg_trgm.word_similarity_threshold') as threshold`,
       )
@@ -688,8 +688,8 @@ describe('search — edges', () => {
     // one word of up to 600 characters, and levenshtein refuses anything past 255.
     const word = 'a'.repeat(300)
     await insertItem(db, { name: 'Длинное', searchKey: word })
-    await expect(repo.search(word, 10, nobody)).resolves.toBeInstanceOf(Array)
-    await expect(repo.search('щ'.repeat(150), 10, nobody)).resolves.toBeInstanceOf(Array)
+    expect((await repo.search(word, 10, nobody)).items).toBeInstanceOf(Array)
+    expect((await repo.search('щ'.repeat(150), 10, nobody)).items).toBeInstanceOf(Array)
   })
 
   it('does not lose the newest item: two thousand older candidates do not push it out', async () => {
@@ -740,8 +740,8 @@ describe('search — edges', () => {
     // reach levenshtein whole and answer a 500 to everyone, once such an item existed.
     await named('щ'.repeat(200))
     await named('Сыр Лори')
-    await expect(repo.search('щ'.repeat(130), 10, nobody)).resolves.toBeInstanceOf(Array)
-    await expect(repo.search(`сыр ${'щ'.repeat(150)}`, 10, nobody)).resolves.toBeInstanceOf(Array)
+    expect((await repo.search('щ'.repeat(130), 10, nobody)).items).toBeInstanceOf(Array)
+    expect((await repo.search(`сыр ${'щ'.repeat(150)}`, 10, nobody)).items).toBeInstanceOf(Array)
   })
 
   it('returns exactly as many as asked: 0, 1, N, N+1', async () => {
@@ -768,7 +768,7 @@ describe('search — edges', () => {
 describe('search — the items it returns', () => {
   it('carries an item without barcodes as an empty list', async () => {
     await named('Лаваш')
-    const [item] = await repo.search('lavash', 10, nobody)
+    const [item] = (await repo.search('lavash', 10, nobody)).items
     expect(item?.barcodes).toEqual([])
   })
 
@@ -776,7 +776,7 @@ describe('search — the items it returns', () => {
     const id = await named('Джермук')
     const codes = Array.from({ length: 20 }, (_, index) => String(4850000000000 + index))
     await db.insert(itemBarcodes).values([...codes].reverse().map((code) => ({ code, itemId: id })))
-    const [item] = await repo.search('джермук', 10, nobody)
+    const [item] = (await repo.search('джермук', 10, nobody)).items
     expect(item?.barcodes).toEqual(codes)
   })
 
@@ -844,7 +844,7 @@ describe('search — a word the shelf writes otherwise (MOL-45)', () => {
     await named('Картофель')
     const young = await named('Картофель молодой')
     await createSearchPickRepository(db).remember(actorId, 'картошка', young)
-    const found = (await repo.search('картошка', 20, actorId)).map((item) => item.name)
+    const found = (await repo.search('картошка', 20, actorId)).items.map((item) => item.name)
     expect(found).toEqual(['Картофель молодой', 'Картофель'])
   })
 
@@ -924,7 +924,7 @@ describe("search — a word of the person's own (MOL-45)", () => {
   const picks = createSearchPickRepository(db)
 
   async function namesFor(actorId: string, query: string): Promise<string[]> {
-    return (await repo.search(query, 20, actorId)).map((item) => item.name)
+    return (await repo.search(query, 20, actorId)).items.map((item) => item.name)
   }
 
   it('finds by a query that found nothing, once the item was taken by another word', async () => {
@@ -1066,7 +1066,7 @@ describe('search — what the person took before (MOL-11)', () => {
   }
 
   async function namesFor(actorId: string, query: string): Promise<string[]> {
-    return (await repo.search(query, 20, actorId)).map((item) => item.name)
+    return (await repo.search(query, 20, actorId)).items.map((item) => item.name)
   }
 
   /** Two milks that tie on «молоко»; `second` is the one the id puts below. */
@@ -1221,7 +1221,7 @@ describe('search — what the person took before (MOL-11)', () => {
     const actorId = await insertActor(db)
     const { first, second, secondId } = await twoMilks()
     const firstId =
-      (await repo.search('молоко', 20, actorId)).find((item) => item.name === first)?.id ?? ''
+      (await repo.search('молоко', 20, actorId)).items.find((item) => item.name === first)?.id ?? ''
 
     await db.transaction(async (tx) => {
       const inTx = createSearchPickRepository(tx)
@@ -1293,5 +1293,89 @@ describe('search — what the person took before (MOL-11)', () => {
     // The lift is personal memory, and the query says so in its own words.
     const text = new PgDialect().sqlToQuery(rankedCandidates('moloko', 10, nobody)).sql
     expect(text).not.toMatch(/boost|promot|sponsor/i)
+  })
+})
+
+describe('search — how near the answer is (MOL-46)', () => {
+  const picks = createSearchPickRepository(db)
+
+  async function answer(query: string, actorId: string = nobody): Promise<[string[], boolean]> {
+    const { items: found, near } = await repo.search(query, 20, actorId)
+    return [found.map((item) => item.name), near]
+  }
+
+  it('calls a word wrong from end to end far, and still lists what it found', async () => {
+    // `pelmeni` is two edits from `zeleni`, inside the budget like any typo. Nothing is dropped:
+    // the screen is told, and says «не нашли» above the row.
+    await named('Чай зелёный')
+    expect(await answer('пельмени')).toEqual([['Чай зелёный'], false])
+  })
+
+  it.each([
+    ['овощи', 'Мука пшеничная высший сорт 2 кг'],
+    ['специи', 'Соевый соус Kikkoman 150 мл'],
+    ['сыр', 'Сок Rich апельсин 1 л'],
+  ])('calls «%s» → «%s» far — the false hits of MOL-14', async (query, name) => {
+    await named(name)
+    expect(await answer(query)).toEqual([[name], false])
+  })
+
+  it('calls a typo of two edits far too, and keeps the item first — the price, named', async () => {
+    // No rule on the letters tells `malako` from `pelmeni`; the milk is on the screen, a tap away.
+    await named('Молоко Ашхар')
+    await named('Чай зелёный')
+    expect(await answer('малако')).toEqual([['Молоко Ашхар'], false])
+  })
+
+  it('calls an answer near from one edit down: exact, a typo of one, a word still being typed', async () => {
+    await named('Молоко Ашхар')
+    for (const query of ['молоко', 'малоко', 'моло', 'moloko']) {
+      expect(await answer(query), query).toEqual([['Молоко Ашхар'], true])
+    }
+  })
+
+  it('calls an answer near when any row is, with far rows behind it', async () => {
+    // «кола» finds the cola exactly and the dog food by two edits; the answer is a find.
+    await named('Coca-Cola 1 л')
+    await named('Корм для собак Pedigree 400 г')
+    expect(await answer('кола')).toEqual([['Coca-Cola 1 л', 'Корм для собак Pedigree 400 г'], true])
+  })
+
+  it('counts a size in another number as near: the word is right, the size refines', async () => {
+    await named('Кефир 1 л')
+    expect(await answer('кефир 500 мл')).toEqual([['Кефир 1 л'], true])
+  })
+
+  it('calls nothing found far, and a query with no key too', async () => {
+    await named('Молоко Ашхар')
+    expect(await answer('бастурма')).toEqual([[], false])
+    expect(await answer('!!!')).toEqual([[], false])
+  })
+
+  it('must not call far what the person took on this very query — their choice, not a typo', async () => {
+    const actorId = await insertActor(db)
+    const tea = await named('Чай зелёный')
+    await picks.remember(actorId, 'пельмени', tea)
+
+    expect(await answer('пельмени', actorId)).toEqual([['Чай зелёный'], true])
+    // Nobody else's pick: for them the same answer is still far.
+    expect(await answer('пельмени')).toEqual([['Чай зелёный'], false])
+  })
+
+  it("must not call far the person's own word for an item", async () => {
+    const actorId = await insertActor(db)
+    const potato = await named('Картофель')
+    await named('Мука пшеничная высший сорт 2 кг')
+    await picks.learn(actorId, 'овощи', potato)
+
+    expect(await answer('овощи', actorId)).toEqual([
+      ['Картофель', 'Мука пшеничная высший сорт 2 кг'],
+      true,
+    ])
+  })
+
+  it('must not call far what a synonym found: a word is not a typo', async () => {
+    await named('Картофель')
+    expect(await answer('картошка')).toEqual([['Картофель'], true])
   })
 })

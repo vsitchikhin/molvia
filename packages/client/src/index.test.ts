@@ -312,7 +312,7 @@ describe('the catalogue', () => {
 
   it('sends the query exactly as typed, whatever it holds', async () => {
     for (const text of ['молоко', 'Հաց', 'M&M’s', 'соль #2', 'a+b', '100%', '  с пробелами ']) {
-      const { client, calls } = clientReplying(200, { items: [] })
+      const { client, calls } = clientReplying(200, { items: [], near: false })
       await client.searchCatalogue(text)
 
       expect(new URL(calls[0]?.url ?? '').searchParams.get('q'), text).toBe(text)
@@ -321,16 +321,23 @@ describe('the catalogue', () => {
   })
 
   it('hands back entries with the quantity decoded', async () => {
+    const { client } = clientReplying(200, { items: [entryWire], near: true })
+
+    const { items, near } = await client.searchCatalogue('молоко')
+
+    expect(items[0]?.typicalQuantity).toEqual({ milli: 900n, unit: 'l' })
+    expect(near).toBe(true)
+  })
+
+  it('refuses an answer that does not say how near it is (MOL-46)', async () => {
     const { client } = clientReplying(200, { items: [entryWire] })
 
-    const [entry] = await client.searchCatalogue('молоко')
-
-    expect(entry?.typicalQuantity).toEqual({ milli: 900n, unit: 'l' })
+    expect(await codeOf(client.searchCatalogue('молоко'))).toBe(ISSUE.RESPONSE_INVALID)
   })
 
   it('refuses an answer that carries more than the contract — a leak must not pass unread', async () => {
     const leaking = { ...entryWire, createdBy: actorWire.id }
-    const { client } = clientReplying(200, { items: [leaking] })
+    const { client } = clientReplying(200, { items: [leaking], near: true })
 
     expect(await codeOf(client.searchCatalogue('молоко'))).toBe(ISSUE.RESPONSE_INVALID)
   })
@@ -355,7 +362,9 @@ describe('the catalogue', () => {
           if (init?.signal?.aborted) abort()
           init?.signal?.addEventListener('abort', abort)
           answer = () => {
-            resolve(new Response(JSON.stringify({ items: [entryWire] }), { status: 200 }))
+            resolve(
+              new Response(JSON.stringify({ items: [entryWire], near: true }), { status: 200 }),
+            )
           }
         })
       const client = createClient({ baseUrl: 'http://api', fetch, ...options })
@@ -389,7 +398,7 @@ describe('the catalogue', () => {
 
       const search = client.searchCatalogue('молоко', { signal: controller.signal })
       answer()
-      const entries = await search
+      const { items: entries } = await search
       controller.abort()
 
       expect(entries.map((entry) => entry.name)).toEqual([entryWire.name])
