@@ -22,14 +22,32 @@ export function tabMove(from: Tab | undefined, to: Tab, below: RouteName | undef
 }
 
 /**
- * Where the back chevron leads: one step back when the entry underneath is the parent — the
- * very step the system button takes, so the two never disagree — and otherwise a replace onto
- * the parent, so the chevron never leads out of the app.
+ * Where the back chevron leads, and so what it is called: one step back onto the entry
+ * underneath when that entry is one of this screen's ancestors — the very step the system button
+ * takes, so the two never disagree — and otherwise a replace onto the parent, so the chevron
+ * never leads out of the app.
+ *
+ * Any ancestor, not only the parent (MOL-77, owner's decision): a finished trip is opened from
+ * the history and from the home screen as well, and from there «back» is the home screen it was
+ * opened from — «‹ Поход», not «‹ История походов» over a system button that goes home anyway.
+ * Opened cold, the chain is laid underneath (`settleColdStart`) and the parent is below it.
  */
-export type BackMove = 'back' | { replace: RouteName }
+export interface BackTarget {
+  readonly location: ReturnType<Router['resolve']>
+  readonly step: boolean
+}
 
-export function backMove(parent: RouteName, below: RouteName | undefined): BackMove {
-  return below === parent ? 'back' : { replace: parent }
+export function backTarget(
+  router: Router,
+  route: { meta: { parent?: RouteName }; params: RouteParams },
+): BackTarget | null {
+  const parent = parentOf(router, route)
+  if (!parent) return null
+  const below: unknown = router.options.history.state.back
+  const path = typeof below === 'string' ? router.resolve(below).path : null
+  for (let ancestor: typeof parent | null = parent; ancestor; ancestor = parentOf(router, ancestor))
+    if (ancestor.path === path) return { location: ancestor, step: true }
+  return { location: parent, step: false }
 }
 
 /**
@@ -141,15 +159,11 @@ export function useNavigation(): {
   }
 
   async function goBack(): Promise<void> {
-    const parent = route.meta.parent
-    if (!parent || stepping) return
-    const destination = parentOf(router, route)
-    if (!destination) return
-    const below: unknown = router.options.history.state.back
-    const matches = typeof below === 'string' && router.resolve(below).path === destination.path
-    const move = backMove(parent, matches ? parent : undefined)
-    if (move === 'back') stepBack(router)
-    else await router.replace(destination.fullPath)
+    if (stepping) return
+    const target = backTarget(router, route)
+    if (!target) return
+    if (target.step) stepBack(router)
+    else await router.replace(target.location.fullPath)
   }
 
   return { goTab, goBack }

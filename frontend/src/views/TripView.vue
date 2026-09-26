@@ -11,10 +11,13 @@
     <template v-else>
       <!-- Over whatever the screen shows, never instead of it: at a shelf the list the phone
            remembers is worth more than a red square, and the purchases are all still there
-           (MOL-19). Above «Новый поход» too — otherwise a trip the server holds but could not be
-           asked for reads as «no trip at all». -->
+           (MOL-19). Without a trip the home screen says it in its own words — the trip can still
+           start (MOL-77). The price, named: offline with nothing remembered, a trip left open on
+           another device reads as «no trip» until the connection comes back; a start made then
+           goes through the queue, and `trip.elsewhere` asks about the open one. The error below
+           stays in both phases, in words that fit each. -->
       <ScreenState
-        v-if="trouble === 'offline'"
+        v-if="trouble === 'offline' && phase !== 'none'"
         class="notice"
         kind="offline"
         tone="good"
@@ -28,8 +31,8 @@
         kind="error"
         inline
         :title="t('trip.error.title')"
-        :body="t('trip.error.body')"
-        @retry="load"
+        :body="phase === 'none' ? t('trip.error.body_none') : t('trip.error.body')"
+        @retry="retry"
       />
     </template>
 
@@ -85,30 +88,21 @@
       :body="t('trip.unsent.body')"
     />
 
-    <template v-if="phase === 'none'">
-      <ScreenState
-        kind="empty"
-        tone="accent"
-        :icon="IconPlus"
-        :title="t('trip.none.title')"
-        :body="t('trip.none.body')"
-      >
-        <template #action>
-          <AppButton size="large" block @click="starting = true">
-            {{ t('trip.none.action') }}
-          </AppButton>
-        </template>
-      </ScreenState>
-    </template>
+    <TripHome
+      v-if="phase === 'none'"
+      :offline="trouble === 'offline'"
+      :trip-failed="trouble === 'error'"
+      :retries="retries"
+    />
 
     <template v-else-if="phase === 'going'">
       <TripRateNotes v-if="trip" :trip="trip" />
 
+      <!-- No circle: over «Найти товар» it read as a button of its own, and was tapped (MOL-77). -->
       <ScreenState
         v-if="rows.length === 0"
         kind="empty"
         tone="accent"
-        :icon="IconPlus"
         :title="t('trip.empty.title')"
         :body="t('trip.empty.body')"
       >
@@ -130,16 +124,24 @@
     </template>
 
     <!-- Under the list, and only once there is a screen to put it under: over the skeleton it
-         was the one thing drawn while everything else was still loading (З-9). -->
-    <AppButton v-if="phase !== 'loading'" class="history" variant="ghost" block @click="history">{{
+         was the one thing drawn while everything else was still loading (З-9). Without a trip the
+         home screen has «Вся история» of its own (MOL-77). -->
+    <AppButton v-if="phase === 'going'" class="history" variant="ghost" block @click="history">{{
       t('trip.history.title')
     }}</AppButton>
 
     <!-- The one permanent place money is converted, and it stays put while the list scrolls. -->
-    <!-- On the skeleton too, with a dash for the sum: the strip is part of the frame, and a screen
-         that grows it after the answer jumps under the thumb (требования §5, В2-7). -->
-    <template v-if="phase !== 'none'" #docked>
-      <TripTotal :trip="trip" :pending="waiting" :local="local !== null" />
+    <!-- Without a trip the strip holds «Начать поход» instead — under the thumb, above whatever
+         the home screen says, however long (MOL-77). Loading with no trip remembered is almost
+         always «no trip», and a start there goes through the queue like any other: an open trip
+         the server then names is asked about by `trip.elsewhere`. -->
+    <template #docked>
+      <TripTotal v-if="phase === 'going'" :trip="trip" :pending="waiting" :local="local !== null" />
+      <div v-else class="start">
+        <AppButton size="large" block @click="starting = true">{{
+          t('trip.none.action')
+        }}</AppButton>
+      </div>
     </template>
 
     <ScreenState
@@ -216,6 +218,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import TripContextSheet from '@/components/TripContextSheet.vue'
+import TripHome from '@/components/TripHome.vue'
 import StartTripSheet from '@/components/StartTripSheet.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import TripRateNotes from '@/components/TripRateNotes.vue'
@@ -271,6 +274,7 @@ export default defineComponent({
     ScreenState,
     StartTripSheet,
     TripContextSheet,
+    TripHome,
     TripRateNotes,
     TripRow,
     TripTotal,
@@ -317,6 +321,8 @@ export default defineComponent({
     const starting = ref(false)
     const clarifying = ref(false)
     const finishing = ref(false)
+    /** The red block's «Повторить» without a trip asks for the history too (adversarial Д). */
+    const retries = ref(0)
 
     async function load(): Promise<void> {
       // No identity yet — the first launch is still making one, and there is nothing to ask for
@@ -530,7 +536,6 @@ export default defineComponent({
       joinTrip,
       finishOtherTrip,
       t,
-      IconPlus,
       queue,
       trip,
       local,
@@ -546,7 +551,11 @@ export default defineComponent({
       clarifying,
       finishing,
       finish,
-      load: () => void load(),
+      retries,
+      retry: () => {
+        retries.value += 1
+        void load()
+      },
       refusalKey,
       refusalTitle,
       heldBack,
@@ -629,6 +638,10 @@ export default defineComponent({
 
 .history {
   margin-top: var(--space-6);
+}
+
+.start {
+  padding: var(--space-3) 0;
 }
 
 .footnote {

@@ -1238,7 +1238,10 @@ database access. In a product about data integrity, two write paths will silentl
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and
-  gets the chevron, labelled with the parent's title, never the word «Back». Tabs and the
+  gets the chevron, labelled with the title of where it leads, never the word «Back». **It
+  leads to the screen underneath when that screen is any ancestor** — the step the system
+  button takes — and otherwise replaces onto the parent (`backTarget`, MOL-77): a finished trip
+  opened from the home screen says «‹ Поход» and both «back»s go home. Tabs and the
   chevron move through `useNavigation`: «Trip» is home — leaving it pushes, moving between
   the other sections replaces, returning is a step back — so the system «back» never walks
   through tab taps, and a nested screen opened cold gets its parent laid underneath. A
@@ -1989,6 +1992,36 @@ kept and for how long (`/privacy`, open without a session), `/delete` in the bot
 person in one transaction — the event log included, the one exception to append-only — and logs
 that keep no address and no query and live fourteen days. Export, a delete button in the
 settings, versioned policy and consent are 0.2 (Confluence, «Персональные данные», section 5).
+
+MOL-77 gave «Поход» without a trip a face — the first screen a new person meets. **No circle over an
+action anywhere on it**: the empty state's «+» read as a button and was the thing the owner tapped,
+so `ScreenState` draws an empty state without a circle when it is given no icon, and «Поход начат»
+has none. **«Начать поход» stands in the strip above the tab bar** in every state without a trip,
+loading included — a start goes through the queue, and an open trip the server then names is asked
+about as before. A newcomer gets «Что брать и где» and the cycle «у двери → у полки → дома «Оценки»
+→ «Что брать»», whose last two steps change tab; a person with a history gets «N покупок ждут
+оценки» and their last three trips (`TripHistoryRow`, shared with the history). **The introduction
+is only for a history known to be empty**: every write to a trip persists the history cache, so an
+empty stored page proves nothing, and the store keeps whether the server's last answer was empty
+(`answeredEmpty`) — «empty», not «answered», since the flag and a page a full shelf kept can outlive
+each other, and an answer with trips takes it off every shelf (round 2, Ж1) — **under a key of its
+own, never as a field of the cache**: the cache codec is strict, and a window still on the previous
+version read an unknown field as no cache and wrote its empty one over a finish made with no signal
+(adversarial Е). A change to a phone-side cache is read by both versions, as a field added to the
+contract is. An answer the list moved under — another window wrote the cache, a finish was taken
+back — is asked for again after a doubling pause, since another window may be sending its whole
+queue, rather than taken for a success (А, Ж2). Today's error, and purchases waiting for a verdict,
+outweigh an empty answer remembered from an earlier launch (Г); an error or no connection with
+nothing remembered is a quiet card of its own, never «newcomer» — MOL-56's «no answer is not the
+answer „no“». With the server down there is one «Повторить», the red block's, and it asks for the
+history too (Д). The price, named: offline with an empty answer remembered, the introduction stands
+— Safari and the installed app keep separate shelves. «Ждут оценки» names places, not trips: a card
+carries the place and the moment the server took the purchase, and a purchase made with no signal
+arrives with the queue hours later, so no gap tells one trip from two (round 2, З1). **And it names
+them, never counts them**: a card carries the name without the city, so «Ереван Сити» of Gyumri and
+of Yerevan are one name — a number would claim what the phone does not know (round 3, И2). The name
+alone is what every card and row already shows. A retry of the history ends with the screen that
+asked (И1).
 
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 

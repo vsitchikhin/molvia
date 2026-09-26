@@ -31,17 +31,7 @@
     />
     <p v-if="history.stale && rows.length > 0" class="memory">{{ t('trip.history.cached') }}</p>
     <AppCard v-if="rows.length > 0" list>
-      <button
-        v-for="row in rows"
-        :key="row.id"
-        class="history-row"
-        type="button"
-        @click="open(row.id)"
-      >
-        <span class="place">{{ row.name }}</span>
-        <span class="when">{{ when(row.at) }}</span>
-        <span v-if="row.pending" class="pending">{{ t('trip.history.local_finish') }}</span>
-      </button>
+      <TripHistoryRow v-for="row in rows" :key="row.id" :row="row" @open="open" />
     </AppCard>
     <AppButton
       v-if="history.page.nextCursor && trouble !== 'offline'"
@@ -62,57 +52,20 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import TripHistoryRow from '@/components/TripHistoryRow.vue'
 import { useTripHistory } from '@/composables/useTripHistory'
 export default defineComponent({
   name: 'TripHistoryView',
-  components: { AppScreen, AppButton, AppCard, ScreenSkeleton, ScreenState },
+  components: { AppScreen, AppButton, AppCard, ScreenSkeleton, ScreenState, TripHistoryRow },
   setup: () => ({ ...useTripHistory(), IconHistory }),
 })
 </script>
 
 <style scoped lang="scss">
-.history-row {
-  @include touch-target;
-
-  display: block;
-  width: 100%;
-  padding: var(--space-4);
-  border: 0;
-  border-bottom: var(--hairline) solid var(--border);
-  color: var(--text);
-  background: var(--surface);
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-
-  &:last-child {
-    border-bottom: 0;
-  }
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
-.place {
-  display: block;
-  font-weight: var(--weight-medium);
-
-  // A shop's full name has no spaces to break at — the same reason `TripRow` wraps its own.
-  overflow-wrap: anywhere;
-}
-
-.when,
-.pending,
 .memory {
   display: block;
   color: var(--text-muted);
   font-size: var(--text-footnote);
-}
-
-.pending {
-  color: var(--warn-ink);
-  margin-top: var(--space-1);
 }
 
 .more,
