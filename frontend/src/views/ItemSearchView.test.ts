@@ -7,7 +7,12 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import { tripViewCodec } from '@molvia/model'
-import type { AddExpenseBody, CatalogueEntry, ProposedItem } from '@molvia/model'
+import type {
+  AddExpenseBody,
+  CatalogueEntry,
+  CatalogueSearchResponse,
+  ProposedItem,
+} from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
@@ -18,14 +23,19 @@ import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 
-const searchCatalogue = vi.fn<(query: string) => Promise<CatalogueEntry[]>>()
+/** Rows alone are a near answer — or an empty one; a far answer is given whole (MOL-46). */
+const searchCatalogue =
+  vi.fn<(query: string) => Promise<CatalogueEntry[] | CatalogueSearchResponse>>()
 const proposeItem =
   vi.fn<(input: ProposedItem) => Promise<{ entry: CatalogueEntry; created: boolean }>>()
 const addExpense = vi.fn<(tripId: string, body: AddExpenseBody) => Promise<unknown>>()
 const currentTrip = vi.fn<() => Promise<unknown>>(() => Promise.resolve(null))
 vi.mock('@/api', () => ({
   api: {
-    searchCatalogue: (query: string) => searchCatalogue(query),
+    searchCatalogue: async (query: string) => {
+      const answer = await searchCatalogue(query)
+      return Array.isArray(answer) ? { items: answer, near: answer.length > 0 } : answer
+    },
     proposeItem: (input: ProposedItem) => proposeItem(input),
     addExpense: (tripId: string, body: AddExpenseBody) => addExpense(tripId, body),
     currentTrip: () => currentTrip(),
@@ -264,6 +274,98 @@ describe('«What did you pick up?»', () => {
       expect(view.get('.not-found-text').text()).toBe(en.item.empty.body.replace('{query}', 'тан'))
     })
     expect(view.find('[role="listbox"]').exists()).toBe(false)
+  })
+
+  describe('a far answer — rows, none of them close (MOL-46)', () => {
+    const tea = entry(7, 'Чай зелёный')
+
+    async function farFor(query: string) {
+      searchCatalogue.mockResolvedValue({ items: [tea], near: false })
+      const view = await render()
+      await field(view).setValue(query)
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([tea.name])
+      })
+      return view
+    }
+
+    it('says «not found» above the rows, with the button to suggest the item', async () => {
+      const view = await farFor('пельмени')
+
+      expect(view.get('.not-found-text').text()).toBe(
+        en.item.empty.body.replace('{query}', 'пельмени'),
+      )
+      const html = view.html()
+      expect(html.indexOf(en.item.empty.action)).toBeLessThan(html.indexOf('role="listbox"'))
+      expect(button(view, en.item.empty.action).exists()).toBe(true)
+    })
+
+    it('heads the rows as a likeness in spelling, not as a find', async () => {
+      const view = await farFor('пельмени')
+
+      expect(view.text()).toContain(en.item.group_similar)
+      expect(view.text()).not.toContain(en.item.group_found)
+    })
+
+    it('does not add the quiet «not here?» under them — the button is already above', async () => {
+      const view = await farFor('пельмени')
+
+      expect(view.text()).not.toContain(en.item.not_listed)
+    })
+
+    it('reads out «not found» and how many look alike, not «found»', async () => {
+      const view = await farFor('пельмени')
+
+      await vi.waitFor(() => {
+        expect(view.get('.live').text()).toBe(
+          'Nothing found for «пельмени». 1 item with a similar spelling',
+        )
+      })
+    })
+
+    it('still lets a row be picked, with the query it answered', async () => {
+      const view = await farFor('малако')
+
+      await view.get('[role="option"]').trigger('click')
+
+      expect(useItemEntryStore(pinia).picked).toEqual({ entry: tea, query: 'малако' })
+    })
+
+    it('hands its query to a pick by another word, as a miss would (MOL-45)', async () => {
+      searchCatalogue.mockImplementation((query) =>
+        Promise.resolve(query === 'картофель' ? [milk] : { items: [tea], near: false }),
+      )
+      const view = await render()
+      await field(view).setValue('овощи')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([tea.name])
+      })
+      await field(view).setValue('картофель')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([milk.name])
+      })
+
+      await view.get('[role="option"]').trigger('click')
+
+      expect(useItemEntryStore(pinia).picked).toEqual({
+        entry: milk,
+        query: 'картофель',
+        missedQuery: 'овощи',
+      })
+    })
+
+    it('must not fire on a near answer: rows under «Found», the quiet line under them', async () => {
+      searchCatalogue.mockResolvedValue([milk])
+      const view = await render()
+      await field(view).setValue('молоко')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([milk.name])
+      })
+
+      expect(view.find('.not-found').exists()).toBe(false)
+      expect(view.text()).toContain(en.item.group_found)
+      expect(view.text()).toContain(en.item.not_listed)
+    })
   })
 
   it('goes back to the recent items when the field is cleared', async () => {

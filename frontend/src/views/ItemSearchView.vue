@@ -40,7 +40,9 @@
           <ScreenSkeleton :groups="[62, 62, 62]" />
         </div>
 
-        <div v-else-if="phase === 'empty'" class="not-found" :class="{ stale }">
+        <!-- A far answer too (MOL-46): rows two edits away are what «пельмени» finds in «Чай
+             зелёный», so the screen says «не нашли» and puts the rows below as a likeness. -->
+        <div v-else-if="phase === 'empty' || phase === 'far'" class="not-found" :class="{ stale }">
           <p class="not-found-text">{{ t('item.empty.body', { query: answered }) }}</p>
           <AppButton @click="proposing = true">
             <template #icon><IconPlus /></template>
@@ -184,7 +186,7 @@ export default defineComponent({
     // Under an error as offline: the server does not answer either way, and «хлеб» typed before
     // it fell should not show twenty rows instead of one (Р-12).
     const rows = computed<CatalogueEntry[]>(() => {
-      if (phase.value === 'ready') return results.value
+      if (phase.value === 'ready' || phase.value === 'far') return results.value
       if (showsRecent.value) return recent.filter(query.value)
       return []
     })
@@ -193,9 +195,10 @@ export default defineComponent({
     // they are narrowed by the query, and a button leading to none of them is a dead end (B2).
     const hasRecent = computed(() => recent.filter(query.value).length > 0)
 
-    const heading = computed(() =>
-      showsRecent.value ? t('item.group_recent') : t('item.group_found'),
-    )
+    const heading = computed(() => {
+      if (showsRecent.value) return t('item.group_recent')
+      return phase.value === 'far' ? t('item.group_similar') : t('item.group_found')
+    })
 
     // Read out once per answer, not on every letter: the answer is what changed. An empty answer
     // too — the block that replaces the list is not a ScreenState and says nothing of itself, and
@@ -208,11 +211,15 @@ export default defineComponent({
     watch([phase, results, stale], ([next, found, dimmed]) => {
       withdraw?.()
       withdraw = undefined
-      if ((next !== 'ready' && next !== 'empty') || dimmed) return
+      if ((next !== 'ready' && next !== 'far' && next !== 'empty') || dimmed) return
+      // A far answer is «не нашли» out loud too: «found one» for «Чай зелёный» on «пельмени»
+      // would be the very claim the screen stopped making (MOL-46).
       withdraw = announce?.(
         next === 'ready'
           ? t('item.results_announced', { n: found.length }, found.length)
-          : t('item.empty.body', { query: answered.value }),
+          : next === 'far'
+            ? t('item.far_announced', { query: answered.value, n: found.length }, found.length)
+            : t('item.empty.body', { query: answered.value }),
       )
     })
 
@@ -230,7 +237,7 @@ export default defineComponent({
     // proposed — neither was found by another word — and every pick uses the miss up.
     function pick(chosen: CatalogueEntry, learns = true): void {
       opened.value += 1
-      const found = phase.value === 'ready'
+      const found = phase.value === 'ready' || phase.value === 'far'
       const text = found ? answered.value : query.value
       const missed = takeMissed(text)
       const word = learns && found ? missed : null

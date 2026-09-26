@@ -219,6 +219,7 @@ describe('словарь: плюральные формы', () => {
       'trip.caveat.pending',
       'trip.unsent.title',
       'item.results_announced',
+      'item.far_announced',
       'advice.ratings_count',
       'verdict.pending_count',
       'sign_out.unsent',
