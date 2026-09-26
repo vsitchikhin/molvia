@@ -9,21 +9,21 @@ import { installSheetEntryGuard } from '@/composables/useSheetHistory'
 import { sessionEnded, useActorStore } from '@/stores/actor'
 import { forgetTheInviteDoor } from '@/stores/identity'
 import { onMissingActor } from '@/api'
-import { installPwaUpdate } from '@/pwaUpdate'
+import { holdsTyping, installPwaUpdate } from '@/pwaUpdate'
 import '@/styles/main.scss'
 
 // Before the router reads the address: the door of MOL-8 is gone, and this clears what it left
 // on devices that used it — a dead code in storage and a `?c=` that nothing scrubs any more.
 forgetTheInviteDoor()
 
-// A new version waits for the app to be put away with no sheet up, and is looked for when it
+// A new version waits for the app to be put away holding no typing, and is looked for when it
 // comes back (MOL-46). Production only: the dev server builds no worker.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   installPwaUpdate({
     serviceWorker: navigator.serviceWorker,
     script: `${import.meta.env.BASE_URL}sw.js`,
     scope: import.meta.env.BASE_URL,
-    sheetOpen: () => document.querySelector('dialog[open]') !== null,
+    holdsTyping: () => holdsTyping(document),
     reload: () => {
       window.location.reload()
     },

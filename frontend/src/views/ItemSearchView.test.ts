@@ -22,6 +22,7 @@ import { useRecentItemsStore } from '@/stores/recentItems'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
+import { holdsTyping } from '@/pwaUpdate'
 
 /** Rows alone are a near answer — or an empty one; a far answer is given whole (MOL-46). */
 const searchCatalogue =
@@ -373,6 +374,18 @@ describe('«What did you pick up?»', () => {
       expect(view.text()).toContain(en.item.group_found)
       expect(view.text()).toContain(en.item.not_listed)
     })
+  })
+
+  it('holds a new version of the app off while a search is typed (MOL-46, review Е)', async () => {
+    // The query and the miss live in memory only: the phone put away to ask what a thing is called
+    // here must come back to them.
+    searchCatalogue.mockResolvedValue([])
+    const view = await render()
+    expect(holdsTyping(document)).toBe(false)
+
+    await field(view).setValue('кефир')
+
+    expect(holdsTyping(document)).toBe(true)
   })
 
   it('goes back to the recent items when the field is cleared', async () => {

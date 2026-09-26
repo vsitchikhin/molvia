@@ -1215,13 +1215,16 @@ database access. In a product about data integrity, two write paths will silentl
   total, not even for rows still in the queue.
 - Split components so they are not overloaded, but without five wrappers around one tag.
   One well-scoped component beats five trivial ones.
-- **An installed app takes a new version only when nobody can lose anything to it: hidden, with
-  no sheet up** (`pwaUpdate.ts`, MOL-46). The client reads every answer strictly, so an old page
+- **An installed app takes a new version only when nobody can lose anything to it: hidden, and
+  holding no typing** (`pwaUpdate.ts`, MOL-46). The client reads every answer strictly, so an old page
   against a new API breaks — and nothing reloaded it: an iOS app frozen in the background came back
   on the old code until a cold start. Hidden is not enough by itself: a sheet keeps what is typed
-  in memory until its main action — the price of a purchase, a proposed item, an exchange — and at
-  the shelf the phone is put away mid-sheet for the calculator or the bank. So the new worker is
-  let in, and the page reloaded after it took over, only then; a takeover that came another way —
+  in memory until its main action — the price of a purchase, a proposed item, an exchange — and so
+  does a search typed on «Что взяли?», the query and the miss that teaches the person's own word
+  (adversarial review Е); at the shelf the phone is put away mid-sheet for the calculator or the
+  bank, and mid-search to ask what a thing is called here. `holdsTyping` is that list — a
+  `dialog[open]`, a combobox with a value — and forms with a draft on the device are not on it. So
+  the new worker is let in, and the page reloaded after it took over, only then; a takeover that came another way —
   another window of the app let it in, or this one came back before it activated — waits for the
   same moment. **The worker is registered by our code, not by the plugin's script**
   (`injectRegister: false`): in `prompt` mode that script reloads the page on any takeover, visible

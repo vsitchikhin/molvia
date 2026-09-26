@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { installPwaUpdate } from '@/pwaUpdate'
+import { holdsTyping, installPwaUpdate } from '@/pwaUpdate'
 
 type Handler = () => void
 
@@ -58,7 +58,7 @@ async function installed(options: { controlled?: boolean } = {}) {
     serviceWorker: container as unknown as ServiceWorkerContainer,
     script: '/sw.js',
     scope: '/',
-    sheetOpen: () => sheet,
+    holdsTyping: () => sheet,
     reload,
   })
   await vi.waitFor(() => {
@@ -211,5 +211,37 @@ describe('an installed app taking a new version (MOL-46)', () => {
     await Promise.resolve()
 
     expect(registration.update).toHaveBeenCalledOnce()
+  })
+})
+
+describe('what a reload would take away (MOL-46, adversarial review Г, Е)', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('holds nothing on a page with no sheet and no search typed', () => {
+    document.body.innerHTML = '<input role="combobox" value=""><input name="city" value="Гюмри">'
+    expect(holdsTyping(document)).toBe(false)
+  })
+
+  it('holds a sheet that is up, and not one that is closed', () => {
+    document.body.innerHTML = '<dialog></dialog>'
+    expect(holdsTyping(document)).toBe(false)
+    document.body.innerHTML = '<dialog open></dialog>'
+    expect(holdsTyping(document)).toBe(true)
+  })
+
+  it('holds a search typed: the query and the miss that teaches the person’s word live in memory', () => {
+    document.body.innerHTML = '<input role="combobox">'
+    const field = document.querySelector('input')
+    if (field) field.value = 'кефир'
+    expect(holdsTyping(document)).toBe(true)
+  })
+
+  it('must not hold a form that keeps a draft on the device', () => {
+    // The settings and the ratings write what is typed to a shelf; a reload gives it back.
+    document.body.innerHTML =
+      '<form><input name="city" value="Ереван"></form><textarea>хорош</textarea>'
+    expect(holdsTyping(document)).toBe(false)
   })
 })
