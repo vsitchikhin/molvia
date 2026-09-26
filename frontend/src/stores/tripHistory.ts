@@ -5,7 +5,7 @@ import { currencySchema, tripHistoryCodec, tripViewCodec } from '@molvia/model'
 import type { Currency, TripHistory, TripHistoryEntry, TripView } from '@molvia/model'
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
-import { read, write, writeEverywhere } from '@/stores/storage'
+import { forget, read, write, writeEverywhere } from '@/stores/storage'
 
 const date = z.codec(z.iso.datetime(), z.date(), {
   decode: (s) => new Date(s),
@@ -29,15 +29,20 @@ const cacheCodec = z.strictObject({
 })
 const KEY = 'molvia.trip-history'
 /**
- * Whether the server has answered the first page for this owner, now or on an earlier launch.
- * Every write to a trip persists the cache, so a stored empty page may be one nobody asked for —
+ * Whether the server's last first page for this owner was empty — now or on an earlier launch.
+ * Every write to a trip persists the cache, so a stored empty page may be one nobody asked for,
  * and the home screen must not greet a person with a history as a newcomer (MOL-77).
  *
  * A key of its own, not a field of the cache: the cache codec is strict, and a window still on
  * the previous version read a cache with an unknown field as no cache at all, then wrote its
  * empty one over it — a finish made with no signal went with it (adversarial Е).
+ *
+ * «Empty», not «answered»: the flag and the page now live apart and can outlive each other — a
+ * shelf that refused the new page keeps an old empty one — and «answered» beside a stale empty
+ * page said «newcomer» to a person the server had just named two trips for (round 2, Ж1). An
+ * answer with trips removes the flag from every shelf, which needs no room.
  */
-const ANSWERED_KEY = 'molvia.trip-history-answered'
+const EMPTY_KEY = 'molvia.trip-history-empty'
 const empty = (): TripHistory => ({ trips: [], nextCursor: null })
 
 /**
@@ -53,8 +58,8 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   const selected = ref<TripView | null>(null)
   const local = ref<LocalFinishedTrip[]>([])
   const stale = ref(true)
-  /** The server has answered the first page for this owner (`ANSWERED_KEY`). */
-  const answered = ref(false)
+  /** The server's last first page for this owner was empty (`EMPTY_KEY`). */
+  const answeredEmpty = ref(false)
   let firstPage: TripHistory = empty()
   // What «Показать ещё» brought, and the cursor standing after it. Only the first page is
   // remembered on the phone; these live for as long as the screen does.
@@ -111,7 +116,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     page.value = spread()
     selected.value = held?.selected ?? null
     local.value = held?.local ?? []
-    answered.value = actor.id !== null && read(`${ANSWERED_KEY}.${actor.id}`) === '1'
+    answeredEmpty.value = actor.id !== null && read(`${EMPTY_KEY}.${actor.id}`) === '1'
     stale.value = true
   }
   restore()
@@ -286,8 +291,9 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
         deeper = deeper.filter((row) => beyond(answer.trips, row))
       }
       page.value = spread()
-      answered.value = true
-      if (owner) write(`${ANSWERED_KEY}.${owner}`, '1')
+      answeredEmpty.value = answer.trips.length === 0
+      if (owner && answeredEmpty.value) write(`${EMPTY_KEY}.${owner}`, '1')
+      else if (owner) forget(`${EMPTY_KEY}.${owner}`)
     }
     stale.value = false
     persist()
@@ -336,7 +342,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     selected,
     local,
     stale,
-    answered,
+    answeredEmpty,
     capture,
     apply,
     forgetLocal,

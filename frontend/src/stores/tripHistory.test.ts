@@ -55,14 +55,14 @@ beforeEach(() => {
   setActivePinia(createPinia())
 })
 
-describe('whether the server has answered (MOL-77)', () => {
+describe('whether the server has answered an empty history (MOL-77)', () => {
   it('an empty answer is known, and stays known after a restart', async () => {
     const store = useTripHistoryStore()
-    expect(store.answered).toBe(false)
+    expect(store.answeredEmpty).toBe(false)
     tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
     await store.load()
-    expect(store.answered).toBe(true)
-    expect(restart().answered).toBe(true)
+    expect(store.answeredEmpty).toBe(true)
+    expect(restart().answeredEmpty).toBe(true)
   })
 
   it('a cache written by a trip write alone is not an answer', () => {
@@ -70,14 +70,35 @@ describe('whether the server has answered (MOL-77)', () => {
     useTripHistoryStore().apply(view(A, false))
     const again = restart()
     expect(again.page.trips).toEqual([])
-    expect(again.answered).toBe(false)
+    expect(again.answeredEmpty).toBe(false)
   })
 
   it('a failed load answers nothing', async () => {
     const store = useTripHistoryStore()
     tripHistory.mockRejectedValue(new Error('Failed to fetch'))
     await expect(store.load()).rejects.toThrow()
-    expect(store.answered).toBe(false)
+    expect(store.answeredEmpty).toBe(false)
+  })
+
+  it('an answer with trips takes the flag back — from every shelf, a full one too (round 2, Ж1)', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({ trips: [], nextCursor: null })
+    await store.load()
+    expect(localStorage.getItem(`molvia.trip-history-empty.${OWNER}`)).toBe('1')
+
+    // The shared shelf refuses every write now; removing needs no room.
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError')
+    })
+    tripHistory.mockResolvedValueOnce({ trips: [entry(A), entry(B)], nextCursor: null })
+    await store.load()
+    setItem.mockRestore()
+
+    expect(store.answeredEmpty).toBe(false)
+    expect(localStorage.getItem(`molvia.trip-history-empty.${OWNER}`)).toBeNull()
+    expect(sessionStorage.getItem(`molvia.trip-history-empty.${OWNER}`)).toBeNull()
+    // Whatever stale page a refusing shelf kept, a restart finds no «empty» beside it.
+    expect(restart().answeredEmpty).toBe(false)
   })
 
   it('the cache keeps the previous version’s shape, so a window still on it can read it', () => {
@@ -104,7 +125,7 @@ describe('whether the server has answered (MOL-77)', () => {
     await store.load()
     useActorStore().id = A
     await nextTick()
-    expect(store.answered).toBe(false)
+    expect(store.answeredEmpty).toBe(false)
   })
 })
 

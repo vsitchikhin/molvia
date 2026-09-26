@@ -26,7 +26,9 @@ interface TripHistoryScreen {
   home(): void
 }
 /** How many times one load asks, when every answer came back to a list that had moved. */
-const ATTEMPTS = 3
+const ATTEMPTS = 4
+/** The pause before the first ask again; each next one is twice as long. */
+const RETRY_PAUSE_MS = 400
 
 export function useTripHistory(): TripHistoryScreen {
   const history = useTripHistoryStore()
@@ -89,11 +91,15 @@ export function useTripHistory(): TripHistoryScreen {
     busy.value = true
     history.stale = true
     try {
-      // An answer the list moved under is asked for again, a few times: the move is a burst — a
-      // write of another window, a finish taken back — not a stream (adversarial А).
+      // An answer the list moved under is asked for again (adversarial А), after a pause that
+      // doubles: the move may be a stream — another window sending its queue one purchase at a
+      // time once the connection is back — and asking at once only met the next write (round 2,
+      // Ж2). What is left after that is a quiet «did not load», worded so it is true either way.
       let taken = await history.load(more)
-      for (let again = 1; !taken && again < ATTEMPTS && token === run; again += 1)
-        taken = await history.load(more)
+      for (let again = 1; !taken && again < ATTEMPTS && token === run; again += 1) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_PAUSE_MS * 2 ** (again - 1)))
+        if (token === run) taken = await history.load(more)
+      }
       if (token === run) trouble.value = taken ? null : 'error'
     } catch {
       if (token === run) trouble.value = navigator.onLine ? 'error' : 'offline'
