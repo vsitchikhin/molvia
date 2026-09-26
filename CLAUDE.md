@@ -317,12 +317,28 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   knowingly, and pinned by a test. The distance is exact `levenshtein` on words cut to 255
   characters: past that it raises an error, and `levenshtein_less_equal` is no substitute,
   because its capped answer distorts the mean. Limits MOL-14 measured and left in place: the
-  budget is absolute (MOL-46), so a short wrong word passes where a long right one does not —
+  budget is absolute, so a short wrong word passes where a long right one does not —
   «молоко ашхар кефир» finds the milk, and «кока кола 0,5 л» even finds «Вода Джермук 0.5 л»,
   every word wrong by two; the two thresholds disagree — «ыср» is two edits from «сыр» yet
   shares no trigram with it, so it never becomes a candidate; and a name of punctuation only
   («???») has a key but no query reaches it (both MOL-47). A name without a size ranks level
   with a wrong size — unknown is not worse than wrong, which is likely right.
+- **The answer says how near it is (MOL-46), and nothing is dropped for it.** The budget is
+  absolute: `pelmeni` is two edits from `zeleni` of «Чай зелёный» exactly as `malako` is from
+  `moloko`. Six rules on the letters were measured against the whole corpus and 241 two-edit
+  typos, and each bought false hits with typos: vowels by sound lost 38 of 40 slips of the
+  finger, the first letter every typo touching it, keyboard neighbours explained «овощи» as
+  well, and the best of them emptied ten answers for 28 typos — the trade this search refuses.
+  So `GET /catalogue/search` answers `near` beside the items: **true when a row is within one
+  edit (`ACCEPTED_DISTANCE - 1`, not a number of its own), or the person took it on this query
+  before, or it is their own word for it** — their choice says more than a typo metric, as in
+  the lift. An empty answer is not near. A far answer is drawn as «не нашли» with «Предложить
+  товар» above the rows, headed «Похоже по написанию», and read out as «не нашли» too; it is a
+  miss for the person's own word as an empty one is. On MOL-14's shelf it is exactly the class:
+  «овощи», «специи», eight of twelve everyday words that share only letters, plus three things
+  meant, found by a spelling two edits off. The price, named: a typo of two edits — «малако» —
+  reads «не нашли» above the milk it found, first; and a wrong word within one edit — «водка» →
+  «Вода» — stays a find, since nothing tells it from a typo.
 - **Every candidate is ranked; there is no ceiling.** Any cut before ranking is wrong one
   way or another. By similarity it drops the typo the low threshold exists for — «малако»
   scores 0.429 against any «Малина» and 0.167 against the milk, and two hundred raspberries
@@ -400,7 +416,8 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   prices, named: a typo in the synonym itself is not expanded, and a name with no word of its kind
   («Coca-Cola 1 л» for «газировка») stays out of reach. Offline, «Часто берёте» reads the
   dictionary by the same rules — the word of the kind, a pair for every word.
-- **And the person's own word (MOL-45).** A query the server found nothing for, followed on
+- **And the person's own word (MOL-45).** A query the server found nothing for — or nothing near
+  (MOL-46) — followed on
   the same screen by a pick found by another word, is learnt with the purchase —
   `search_picks.admits` — and from then on **exactly that query** lets the item in: the one
   written exception to «never lets in what the search did not accept», and personal for the
@@ -437,7 +454,7 @@ chosen. What no threshold reaches went to tasks with numbers: **synonyms** — �
 «Картофель», 6 of 73, one of them («мясо») found by letters only — MOL-45 closed them with the
 dictionary above, which puts 67 of 73 first and alone; **the absolute
 budget** — «овощи» finds «Мука … высший сорт», «специи» «Соевый соус», «пельмени» «Чай зелёный»,
-3 of 25 — MOL-46; **a unit word grounding a match** — «сыр» is two edits from `sht` of «4 шт» —
+3 of 25 — MOL-46 made them a far answer rather than a find; **a unit word grounding a match** — «сыр» is two edits from `sht` of «4 шт» —
 closed by MOL-48 for the units it lists, which took six of the ten items «сыр» found. Weighting
 vowel edits below consonant ones was tried against the budget and refuted:
 `ovoshi`/`vishi` share every consonant, while the right `canah`/«Чанах» and `grecka`/«Гречка»
@@ -445,12 +462,12 @@ differ by two. **The owner's absent words flatter the search:** of fifty everyda
 shelf does not carry, 25 find something since MOL-45 — «макароны» finds the spaghetti through
 the dictionary, the shelf carrying it under another name — and the other 24 are two outcomes. In 12 the first row carries
 the word's root — a taste or a property printed on another item. Six of those are found exactly
-or by the start of a word («сметана» is in the chips' name), which no threshold can remove; with
-«Предложить товар» shown only on an empty answer, that is a question for the screen (MOL-23),
-not the search. The other six are an edit of the ending inside the budget («яблоки» →
+or by the start of a word («сметана» is in the chips' name), which no threshold can remove — a
+question for the screen, which MOL-23 answered: «Нет нужного? Предложить товар» stands under every
+answer. The other six are an edit of the ending inside the budget («яблоки» →
 «яблочный», gone at a budget of 1). The remaining 12 share nothing but letters — the absolute
-budget («водка» → «Вода», «сыр» → «Сок»), MOL-46; the unit word that added to them is gone
-(MOL-48).
+budget («водка» → «Вода», «сыр» → «Сок»); eight of them are a far answer since MOL-46, the four
+within one edit are not; the unit word that added to them is gone (MOL-48).
 `REMEMBERED_PREFIX` was measured by typing letter by letter: a pick lifts its item on the next
 letter 18 times at 2, 9 at 3, 5 at 4. It harms 5 times at 2 — where two of the owner's words
 share two letters, a pick for Coca-Cola on «ко» puts it above «Колбаса» on «кол», one for
