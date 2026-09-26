@@ -1305,7 +1305,10 @@ database access. In a product about data integrity, two write paths will silentl
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and
-  gets the chevron, labelled with the parent's title, never the word «Back». Tabs and the
+  gets the chevron, labelled with the title of where it leads, never the word «Back». **It
+  leads to the screen underneath when that screen is any ancestor** — the step the system
+  button takes — and otherwise replaces onto the parent (`backTarget`, MOL-77): a finished trip
+  opened from the home screen says «‹ Поход» and both «back»s go home. Tabs and the
   chevron move through `useNavigation`: «Trip» is home — leaving it pushes, moving between
   the other sections replaces, returning is a step back — so the system «back» never walks
   through tab taps, and a nested screen opened cold gets its parent laid underneath. A
@@ -2057,6 +2060,36 @@ person in one transaction — the event log included, the one exception to appen
 that keep no address and no query and live fourteen days. Export, a delete button in the
 settings, versioned policy and consent are 0.2 (Confluence, «Персональные данные», section 5).
 
+MOL-77 gave «Поход» without a trip a face — the first screen a new person meets. **No circle over an
+action anywhere on it**: the empty state's «+» read as a button and was the thing the owner tapped,
+so `ScreenState` draws an empty state without a circle when it is given no icon, and «Поход начат»
+has none. **«Начать поход» stands in the strip above the tab bar** in every state without a trip,
+loading included — a start goes through the queue, and an open trip the server then names is asked
+about as before. A newcomer gets «Что брать и где» and the cycle «у двери → у полки → дома «Оценки»
+→ «Что брать»», whose last two steps change tab; a person with a history gets «N покупок ждут
+оценки» and their last three trips (`TripHistoryRow`, shared with the history). **The introduction
+is only for a history known to be empty**: every write to a trip persists the history cache, so an
+empty stored page proves nothing, and the store keeps whether the server's last answer was empty
+(`answeredEmpty`) — «empty», not «answered», since the flag and a page a full shelf kept can outlive
+each other, and an answer with trips takes it off every shelf (round 2, Ж1) — **under a key of its
+own, never as a field of the cache**: the cache codec is strict, and a window still on the previous
+version read an unknown field as no cache and wrote its empty one over a finish made with no signal
+(adversarial Е). A change to a phone-side cache is read by both versions, as a field added to the
+contract is. An answer the list moved under — another window wrote the cache, a finish was taken
+back — is asked for again after a doubling pause, since another window may be sending its whole
+queue, rather than taken for a success (А, Ж2). Today's error, and purchases waiting for a verdict,
+outweigh an empty answer remembered from an earlier launch (Г); an error or no connection with
+nothing remembered is a quiet card of its own, never «newcomer» — MOL-56's «no answer is not the
+answer „no“». With the server down there is one «Повторить», the red block's, and it asks for the
+history too (Д). The price, named: offline with an empty answer remembered, the introduction stands
+— Safari and the installed app keep separate shelves. «Ждут оценки» names places, not trips: a card
+carries the place and the moment the server took the purchase, and a purchase made with no signal
+arrives with the queue hours later, so no gap tells one trip from two (round 2, З1). **And it names
+them, never counts them**: a card carries the name without the city, so «Ереван Сити» of Gyumri and
+of Yerevan are one name — a number would claim what the phone does not know (round 3, И2). The name
+alone is what every card and row already shows. A retry of the history ends with the screen that
+asked (И1).
+
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
 **What the database guarantees and what it leaves to the domain** is a line, not a habit:
@@ -2115,9 +2148,35 @@ The shape worth knowing here:
 - **Postgres publishes no port.** It is reachable only over the compose network.
 - **The PWA calls `/api/...`** and Caddy strips the prefix — the same shape the Vite dev
   proxy has, so nothing about the origin differs between development and production.
-- **No deploy workflow.** Images are published to GHCR on a tag; the deploy itself is two
-  commands on the machine. A deploy job with no machine to deploy to would look like a
-  safety net without being one.
+- **A merge is a deploy (MOL-90, owner's decisions В-7 and В-11).** `release.yml` runs when CI
+  passes on master, builds the three images of exactly that commit as `sha-<7 hex>` and rolls
+  them out over ssh — about seven minutes from the merge. The key can do one thing: its forced
+  command, `deploy/deploy.sh`, takes a published tag and nothing else, so a stolen key re-deploys
+  what is already in the registry. **A rollout is told by the image its containers run, never by
+  the version `/health` names** — every image before MOL-90 calls itself `0.0.0`, and those are
+  the rollback targets. Any failure, `up -d` included, puts the previous tag back; the script
+  writes to a log rather than to ssh, so a client going away cannot cut a rollback short. One
+  rollout at a time, and never older over newer: a build stands aside only if the machine already
+  runs its commit or a descendant — not because master moved on, since the commit that moved it
+  may never pass CI. A compose file or a deploy script on the machine that differs from the
+  commit stops the job before anything moves — the key cannot replace them, and a copy is made by
+  hand. `~/molvia/deploy.hold` refuses every rollout, and `restore.sh --into-prod` sets it: an API
+  started mid-restore migrates the empty database. It comes off only once the copy is in — a pour
+  cut short leaves tables without keys that an API still calls healthy — and a hold set by hand
+  is never the restore's to take off. A tag `v0.1.N` is set by hand every 10–15
+  tasks as a mark and a point to roll back to; it builds nothing and deploys nothing, but names
+  the `sha-…` images of its commit, and only once production's `/health` names that commit — a
+  tag is the build that runs, never one that rolled back (owner's decision В-4). **`.env.prod` is
+  read by asking compose** (`config --environment`), never by parsing it: two rounds of review found
+  a form the copied grammar missed each time. `v0.2.0`
+  starts the 0.2 cohort. **`/api/health` names the build** — `git describe --long`,
+  `v0.1.1-3-g1a2b3c4`.
+- **A failed deploy puts the previous image back, not the schema.** Pending migrations run in
+  one transaction, so a migration that fails leaves the schema as it was and the old image
+  finds what it knew. One that succeeded while something else failed stays applied, and the
+  previous image then runs on the new schema: an added column costs it nothing, a dropped or
+  renamed one breaks it. **So a migration that drops or renames goes out in two merges** — the
+  code stops reading the thing first, the schema loses it after.
 
 ## Camera on a real phone
 

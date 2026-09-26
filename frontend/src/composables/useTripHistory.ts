@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -7,7 +7,8 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 import { useActorStore } from '@/stores/actor'
 import { useReconnect } from './useReconnect'
 
-interface HistoryRow {
+/** A row of the history, as both the history and the home screen draw it (MOL-77). */
+export interface HistoryRow {
   id: string
   name: string
   at: Date
@@ -19,18 +20,22 @@ interface TripHistoryScreen {
   rows: ComputedRef<HistoryRow[]>
   loading: ComputedRef<boolean>
   trouble: Ref<'error' | 'offline' | null>
-  when(date: Date): string
   load(): void
   more(): void
   open(tripId: string): void
   home(): void
 }
+/** How many times one load asks, when every answer came back to a list that had moved. */
+const ATTEMPTS = 4
+/** The pause before the first ask again; each next one is twice as long. */
+const RETRY_PAUSE_MS = 400
+
 export function useTripHistory(): TripHistoryScreen {
   const history = useTripHistoryStore()
   const queue = useTripQueueStore()
   const actor = useActorStore()
   const router = useRouter()
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const busy = ref(false)
   /**
    * Loading covers «the owner is not known yet»: the first launch is still making an identity,
@@ -86,8 +91,16 @@ export function useTripHistory(): TripHistoryScreen {
     busy.value = true
     history.stale = true
     try {
-      await history.load(more)
-      if (token === run) trouble.value = null
+      // An answer the list moved under is asked for again (adversarial А), after a pause that
+      // doubles: the move may be a stream — another window sending its queue one purchase at a
+      // time once the connection is back — and asking at once only met the next write (round 2,
+      // Ж2). What is left after that is a quiet «did not load», worded so it is true either way.
+      let taken = await history.load(more)
+      for (let again = 1; !taken && again < ATTEMPTS && token === run; again += 1) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_PAUSE_MS * 2 ** (again - 1)))
+        if (token === run) taken = await history.load(more)
+      }
+      if (token === run) trouble.value = taken ? null : 'error'
     } catch {
       if (token === run) trouble.value = navigator.onLine ? 'error' : 'offline'
     } finally {
@@ -105,15 +118,17 @@ export function useTripHistory(): TripHistoryScreen {
   useReconnect(() => {
     if (!loading.value) void load()
   })
-  const when = (date: Date) =>
-    new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+  // A screen taken away ends its asking: a retry asleep in its pause would otherwise wake and go
+  // for the history again with nobody to show it to (round 3, И1).
+  onScopeDispose(() => {
+    run += 1
+  })
   return {
     t,
     history,
     rows,
     loading,
     trouble,
-    when,
     load: () => void load(),
     more: () => void load(true),
     open: (tripId: string) => void router.push({ name: 'finished-trip', params: { tripId } }),

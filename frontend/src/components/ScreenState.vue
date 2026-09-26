@@ -1,6 +1,6 @@
 <template>
   <section ref="root" class="state" :class="[toneClass, { inline }]">
-    <span class="circle" aria-hidden="true">
+    <span v-if="glyph" class="circle" aria-hidden="true">
       <component :is="glyph" class="glyph" />
     </span>
     <!-- An alert holds the words only: a card read out with its buttons would say «Try again»
@@ -68,8 +68,11 @@ function isKind(value: unknown): value is StateKind {
 
 /**
  * What the types cannot say, since a prop's type does not depend on another prop's value:
- * an empty state brings its own icon, the others are drawn with theirs; a tone is given
- * exactly when the kind has a choice, and it is one of that kind's.
+ * an empty state may bring its own icon or none, the others are drawn with theirs; a tone is
+ * given exactly when the kind has a choice, and it is one of that kind's.
+ *
+ * An empty state without an icon draws no circle at all (MOL-77): over an action, a circle reads
+ * as a button whatever its glyph, and the person taps it.
  */
 function fits(kind: unknown, props: Record<string, unknown>): boolean {
   if (!isKind(kind)) return false
@@ -77,7 +80,7 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
   const tone = props.tone as StateTone | undefined
   const toneFits =
     allowed.length === 0 ? tone === undefined : tone !== undefined && allowed.includes(tone)
-  const iconFits = kind === 'empty' ? props.icon !== undefined : props.icon === undefined
+  const iconFits = kind === 'empty' || props.icon === undefined
   return toneFits && iconFits
 }
 

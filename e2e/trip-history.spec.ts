@@ -144,7 +144,8 @@ test('keeps an offline finish and its purchases across reload, then sends the or
     return queue.find((row) => row.write.kind === 'finish')?.write.finishedOnDeviceAt
   })
   expect(at).toBeTruthy()
-  await page.getByRole('button', { name: 'Trip history', exact: true }).click()
+  // With no trip going on, the way into the history is the home screen's own row (MOL-77).
+  await page.getByRole('button', { name: 'All trips' }).click()
   await expect(page).toHaveURL(/\/trip\/history$/)
   await page.reload()
   await page.locator('.history-row').filter({ hasText: 'Offline shop' }).click()
