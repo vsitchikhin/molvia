@@ -799,7 +799,9 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   in, the rest, the categories and every day's total; the journal comes forty rows a page, and a
   day cut by the page keeps its whole total. **The next page starts after the key of the last row
   shown** — day, moment, name (`journalCursorCodec`) — never an offset, which moved under the page
-  with every write above it (Д3). A row no money can hold is «не посчитано», never a failed month
+  with every write above it (Д3). The key is the row's own, so an amendment that moves a spending
+  to another day moves it across the cursor: it comes twice, or not at all, until the journal is
+  read from the start — which the screen does after its own amendment of a day (round 2, Е3). A row no money can hold is «не посчитано», never a failed month
   (Д5, MOL-66's rule). A month is one of the days a rate may be dated by — `0000-01` is 404, not a
   500 from Postgres (Д4).
 - **A closed month is counted in the income currency by the rate of its last day, frozen the first
@@ -807,11 +809,19 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   August amended later does** (owner's decision В-6): writing, amending, removing or bringing back
   an exchange or an income of a day lets go of the months frozen from that day on (`thaw`), and the
   next read freezes them again. The running month is never frozen, so today's exchange lets go of
-  nothing. The price, named: a month read while the write is on its way may freeze without it.
+  nothing. **A change of the rule lets go of every month** (owner's decision В-8): «мой курс / ЦБ РА»
+  switched, or the income or spending currency changed — otherwise two past months stood on two
+  rules, decided by which was opened first. A trip keeps its snapshot either way. The prices, named:
+  a month read while the write is on its way may freeze without it; `thaw` runs after the write,
+  not inside it, so a database failing between the two leaves the write done and the answer 500 —
+  a repeat of a write or an amendment lets go again, a repeat of a removal does not, since the day
+  is read off a live row; an official rate reaching the cache for a past day moves the wallet of
+  that month and lets nothing go.
 - **Removal is the money rule, held by the server**: a mark, «Вернуть», final after ten minutes by
   the minute timer and nothing else (В-4) — no other write makes it final sooner, unlike an
   exchange's, and a spending sent again while it is marked is 409, not a new one (Д6). After the ten
-  minutes a spending sent again is written anew, as a trip's row is. Erasure takes spendings,
+  minutes a spending sent again is written anew, as a trip's row is — at once, not when the timer
+  comes round (round 2, Е2). Erasure takes spendings,
   categories and frozen rates.
 - **The names of one's own categories are checked under the owner's lock** (Д7): two phones adding
   «Такси» at once wrote two. A name equal to a preset's («Продукты» beside `groceries`) is the
