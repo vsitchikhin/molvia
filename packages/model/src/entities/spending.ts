@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { EXCHANGE_UNDO_MINUTES, exchangeDaySchema } from '#model/entities/exchange'
-import { convertMoney } from '#model/entities/trip'
+import { convertFromBase } from '#model/entities/trip'
 import { ERROR, ISSUE } from '#model/support/errors'
 import { visibleLine } from '#model/support/text'
 import { priceSchema } from '#model/values/money'
@@ -26,9 +26,10 @@ const positiveMoneySchema = priceSchema.refine((value) => value.minor > 0n, {
  *
  * `rate` is the snapshot a spending in another currency than the spending one is counted by — the
  * rate of **its own day**, taken when it was written and never recomputed (CLAUDE.md, «Money»):
- * `base` is the spending currency of that moment, `quote` the spending's own. Null when the two are
- * one currency, and when nothing was known that day — then the month counts it by nothing and says
- * so, rather than by a rate from another day.
+ * `base` is the spending's own currency and `quote` the spending currency of that moment — «390 ֏ за
+ * $», the orientation whose number keeps its digits. Null when the two are one currency, and when
+ * nothing was known that day — then the month counts it by nothing and says so, rather than by a
+ * rate from another day.
  */
 export const spendingSchema = z
   .object({
@@ -44,7 +45,7 @@ export const spendingSchema = z
     createdAt: z.date(),
     amendedAt: z.date().nullable(),
   })
-  .refine(({ rate, amount }) => rate === null || rate.quote === amount.currency, {
+  .refine(({ rate, amount }) => rate === null || rate.base === amount.currency, {
     error: ISSUE.RATE_NOT_OF_SPENDING_CURRENCY,
   })
 export type Spending = z.infer<typeof spendingSchema>
@@ -56,6 +57,6 @@ export type Spending = z.infer<typeof spendingSchema>
  */
 export function spendingIn(spending: Spending, currency: Currency): Money | null {
   if (spending.amount.currency === currency) return spending.amount
-  if (spending.rate?.base !== currency) return null
-  return convertMoney(spending.amount, spending.rate)
+  if (spending.rate?.quote !== currency) return null
+  return convertFromBase(spending.amount, spending.rate)
 }

@@ -45,8 +45,8 @@ export async function forget(
   }
 
   write(report.found ? 'owner found' : 'no owner with this Telegram id')
-  for (const table of ERASED_TABLES) write(`  ${table.padEnd(16)}${String(report.erased[table])}`)
-  write(`  ${'items kept'.padEnd(16)}${String(report.itemsReleased)} (author removed)`)
+  for (const table of ERASED_TABLES) write(`  ${table.padEnd(20)}${String(report.erased[table])}`)
+  write(`  ${'items kept'.padEnd(20)}${String(report.itemsReleased)} (author removed)`)
   write(dryRun ? 'dry run: nothing changed. Run again with --yes to erase.' : 'erased.')
   return 0
 }

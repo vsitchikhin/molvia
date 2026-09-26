@@ -1,0 +1,114 @@
+import { and, eq, sql } from 'drizzle-orm'
+import { exchangeRateSchema } from '@molvia/model'
+import type { Currency, ExchangeRate, TripLine } from '@molvia/model'
+import type { Conn } from './index'
+import { moneyMonthRates } from './schema'
+
+/**
+ * What «Деньги» reads beside the spendings (MOL-73): the finished trips of a month, as lines of the
+ * journal, and the rate a closed month was frozen at.
+ */
+export interface MoneyRepository {
+  /**
+   * The owner's trips finished on a day from `from` to `to` in Yerevan — the device's moment of
+   * finishing, the server's for old rows (MOL-25) — one line per currency their purchases were paid
+   * in. Summed from the purchases each time: nothing is copied, so amending one moves the month.
+   */
+  tripLines(actorId: string, from: string, to: string): Promise<readonly TripLine[]>
+
+  /** The rate `month` was frozen at, of this pair, or null when it has not been frozen yet. */
+  frozenRate(
+    actorId: string,
+    month: string,
+    base: Currency,
+    quote: Currency,
+  ): Promise<ExchangeRate | null>
+
+  /** Freezes `month` at `rate` — once: a rate already there stays, and is what comes back. */
+  freeze(actorId: string, month: string, rate: ExchangeRate): Promise<ExchangeRate>
+}
+
+interface TripLineRow extends Record<string, unknown> {
+  trip_id: string
+  place_name: string
+  items: string | number
+  finished_at: Date | string
+  finished_on: string
+  currency: Currency
+  amount_minor: string | bigint
+}
+
+export function createMoneyRepository(db: Conn): MoneyRepository {
+  async function frozenRate(actorId: string, month: string, base: Currency, quote: Currency) {
+    const [row] = await db
+      .select()
+      .from(moneyMonthRates)
+      .where(
+        and(
+          eq(moneyMonthRates.actorId, actorId),
+          eq(moneyMonthRates.month, month),
+          eq(moneyMonthRates.base, base),
+          eq(moneyMonthRates.quote, quote),
+        ),
+      )
+    return row
+      ? exchangeRateSchema.parse({
+          base: row.base,
+          quote: row.quote,
+          scaled: row.scaled,
+          source: row.source,
+          asOf: row.asOf,
+        })
+      : null
+  }
+
+  return {
+    async tripLines(actorId, from, to) {
+      const rows = await db.execute<TripLineRow>(sql`
+        with finished as (
+          select t.id, p.name as place_name,
+                 coalesce(t.finished_on_device_at, t.finished_at) as finished_at
+            from trips t
+            join places p on p.id = t.place_id
+           where t.actor_id = ${actorId}
+             and t.finished_at is not null
+             and (coalesce(t.finished_on_device_at, t.finished_at) at time zone 'Asia/Yerevan')::date
+                 between ${from}::date and ${to}::date
+        )
+        select f.id as trip_id, f.place_name, f.finished_at,
+               to_char(f.finished_at at time zone 'Asia/Yerevan', 'YYYY-MM-DD') as finished_on,
+               e.amount_currency as currency, sum(e.amount_minor) as amount_minor,
+               (select count(*) from expenses all_e where all_e.trip_id = f.id) as items
+          from finished f
+          join expenses e on e.trip_id = f.id and e.amount_minor is not null
+         group by f.id, f.place_name, f.finished_at, e.amount_currency
+      `)
+      return rows.map((row) => ({
+        tripId: row.trip_id,
+        placeName: row.place_name,
+        items: Number(row.items),
+        finishedOn: row.finished_on,
+        finishedAt: new Date(row.finished_at),
+        amount: { minor: BigInt(row.amount_minor), currency: row.currency },
+      }))
+    },
+
+    frozenRate,
+
+    async freeze(actorId, month, rate) {
+      await db
+        .insert(moneyMonthRates)
+        .values({
+          actorId,
+          month,
+          base: rate.base,
+          quote: rate.quote,
+          scaled: rate.scaled,
+          source: rate.source,
+          asOf: rate.asOf,
+        })
+        .onConflictDoNothing()
+      return (await frozenRate(actorId, month, rate.base, rate.quote)) ?? rate
+    },
+  }
+}

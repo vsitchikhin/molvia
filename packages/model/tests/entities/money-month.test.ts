@@ -33,7 +33,7 @@ function toMoney(text: string) {
 }
 
 /**
- * `rate('AMD', 'USD', '0.0025')`: how much of the quote one of the base is — 0,0025 $ for a dram,
+ * `rate('USD', 'AMD', '400')`: how much of the quote one of the base is — 0,0025 $ for a dram,
  * 400 ֏ for a dollar. Converts the quote into the base.
  */
 function rate(base: Currency, quote: Currency, value: string, day = '2026-09-01'): ExchangeRate {
@@ -138,7 +138,7 @@ describe('the month of «Деньги»', () => {
   it('counts a spending in dollars by the rate of its own day, and lists it under «Включая»', () => {
     const result = month({
       spendings: [
-        spending('11 USD', '2026-09-18', 'telecom', rate('AMD', 'USD', '0.0025')),
+        spending('11 USD', '2026-09-18', 'telecom', rate('USD', 'AMD', '400')),
         spending('1000 AMD', '2026-09-18'),
       ],
     })
@@ -252,13 +252,13 @@ describe('months and their days', () => {
 
 describe('a spending', () => {
   it('refuses a rate snapshot of another currency than its own', () => {
-    const wrong = { ...spending('11 USD', '2026-09-18'), rate: rate('AMD', 'EUR', '0.0023') }
+    const wrong = { ...spending('11 USD', '2026-09-18'), rate: rate('EUR', 'AMD', '430') }
     const parsed = spendingSchema.safeParse(wrong)
     expect(parsed.error?.issues[0]?.message).toBe(ISSUE.RATE_NOT_OF_SPENDING_CURRENCY)
   })
 
   it('is not guessed into a currency its snapshot is not of — a move is not a rate', () => {
-    const dollars = spending('11 USD', '2026-09-18', 'other', rate('AMD', 'USD', '0.0025'))
+    const dollars = spending('11 USD', '2026-09-18', 'other', rate('USD', 'AMD', '400'))
     expect(spendingIn(dollars, 'AMD')).toEqual(toMoney('4400 AMD'))
     expect(spendingIn(dollars, 'RUB')).toBeNull()
   })

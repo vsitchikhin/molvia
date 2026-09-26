@@ -6,12 +6,18 @@ import type { IncomeRepository } from './incomes-repository'
 import type { ExpenseRepository } from './expenses-repository'
 import type { Conn, Db } from './index'
 import { createItemRepository } from './items-repository'
+import { createMoneyRepository } from './money-repository'
+import type { MoneyRepository } from './money-repository'
 import type { ItemRepository } from './items-repository'
 import { createPlaceRepository } from './places-repository'
 import type { PlaceRepository } from './places-repository'
 import { createRateRepository } from './rates-repository'
 import type { RateRepository } from './rates-repository'
 import { createSearchPickRepository } from './search-picks-repository'
+import { createSpendingCategoryRepository } from './spending-categories-repository'
+import type { SpendingCategoryRepository } from './spending-categories-repository'
+import { createSpendingRepository } from './spendings-repository'
+import type { SpendingRepository } from './spendings-repository'
 import type { SearchPickRepository } from './search-picks-repository'
 import { createTripRepository } from './trips-repository'
 import type { TripRepository } from './trips-repository'
@@ -32,6 +38,11 @@ export interface TripRepositories {
   readonly exchanges: ExchangeRepository
   /** The person's incomes (MOL-66): money that came in moves their own rate too. */
   readonly incomes: IncomeRepository
+  /** Money spent outside a trip (MOL-73), and the categories the person counts it by. */
+  readonly spendings: SpendingRepository
+  readonly spendingCategories: SpendingCategoryRepository
+  /** What «Деньги» reads beside them: the month's finished trips and its frozen rate. */
+  readonly money: MoneyRepository
 }
 
 export function tripRepositories(conn: Conn): TripRepositories {
@@ -44,6 +55,9 @@ export function tripRepositories(conn: Conn): TripRepositories {
     rates: createRateRepository(conn),
     exchanges: createExchangeRepository(conn),
     incomes: createIncomeRepository(conn),
+    spendings: createSpendingRepository(conn),
+    spendingCategories: createSpendingCategoryRepository(conn),
+    money: createMoneyRepository(conn),
   }
 }
 

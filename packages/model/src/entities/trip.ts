@@ -1,11 +1,12 @@
 import { z } from 'zod'
-import { INT8_MAX, convertScaled } from '#model/support/decimal'
+import { INT8_MAX, convertScaled, divideRounded } from '#model/support/decimal'
 import { DomainError, ERROR, ISSUE } from '#model/support/errors'
 import type { Expense } from './expense'
 import { MINOR_EXPONENT, currencySchema } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
 import {
   RATE_DIGITS,
+  RATE_SCALE,
   exchangeRateSchema,
   isRateFresh,
   parseRate,
@@ -165,6 +166,24 @@ export function convertedMinor(amount: Money, rate: ExchangeRate): bigint {
     MINOR_EXPONENT[amount.currency],
     MINOR_EXPONENT[rate.base],
   )
+}
+
+/**
+ * The other way: an amount in the rate's `base` into its `quote`. A rate is kept in the orientation
+ * whose number is at least one — «390 ֏ за $», never «0,002564 $ за ֏» — because six digits of a
+ * small number are four significant ones (MOL-73; the trap MOL-81 names for the screen): a
+ * spending's snapshot is «spending currency per its own», and converts from its base.
+ */
+export function convertFromBase(amount: Money, rate: ExchangeRate): Money {
+  if (amount.currency !== rate.base) {
+    throw new DomainError(ERROR.CURRENCY_MISMATCH, `${amount.currency} vs ${rate.base}`)
+  }
+  const minor = divideRounded(
+    amount.minor * rate.scaled * 10n ** BigInt(MINOR_EXPONENT[rate.quote]),
+    RATE_SCALE * 10n ** BigInt(MINOR_EXPONENT[amount.currency]),
+  )
+  if (minor > INT8_MAX) throw new DomainError(ERROR.INVALID_AMOUNT, String(minor))
+  return { minor, currency: rate.quote }
 }
 
 /** Display only. The rate lives in the trip as a snapshot; last month must not move. */

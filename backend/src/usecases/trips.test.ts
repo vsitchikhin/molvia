@@ -193,6 +193,28 @@ function fakeRepositories(
       list: () => Promise.resolve([]),
       ...overrides.incomes,
     },
+    // «Деньги» (MOL-73) is not a trip's business: reaching for it here is a mistake to see.
+    spendings: {
+      add: unexpected('spendings.add'),
+      amend: unexpected('spendings.amend'),
+      byId: unexpected('spendings.byId'),
+      remove: unexpected('spendings.remove'),
+      restore: unexpected('spendings.restore'),
+      purgeRemoved: unexpected('spendings.purgeRemoved'),
+      purgeStale: unexpected('spendings.purgeStale'),
+      between: unexpected('spendings.between'),
+    },
+    spendingCategories: {
+      list: unexpected('spendingCategories.list'),
+      add: unexpected('spendingCategories.add'),
+      archive: unexpected('spendingCategories.archive'),
+      restore: unexpected('spendingCategories.restore'),
+    },
+    money: {
+      tripLines: unexpected('money.tripLines'),
+      frozenRate: unexpected('money.frozenRate'),
+      freeze: unexpected('money.freeze'),
+    },
   }
 }
 

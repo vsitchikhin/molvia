@@ -69,7 +69,10 @@ export const spendingCategorySchema = z
   )
 export type SpendingCategory = z.infer<typeof spendingCategorySchema>
 
-/** The chips in their order: the presets as listed, then one's own as made; the removed are left out. */
+/**
+ * The categories in the order of the chips: the presets as listed, then one's own as made. The
+ * removed ones stay in the list — the spendings in them still need their names — marked by the view.
+ */
 export function categoryOrder(categories: readonly SpendingCategory[]): SpendingCategory[] {
   const rank = (category: SpendingCategory) =>
     category.preset === null ? SPENDING_PRESETS.length : SPENDING_PRESETS.indexOf(category.preset)

@@ -52,6 +52,18 @@ import {
 } from '@/usecases/incomes'
 import { incomeRoutes } from '@/routes/incomes'
 import { createIncomeRepository } from '@/db/incomes-repository'
+import {
+  addSpendingCategory,
+  amendSpending,
+  archiveSpendingCategory,
+  recordSpending,
+  removeSpending,
+  restoreSpending,
+  spendingCategoriesOf,
+} from '@/usecases/spendings'
+import { moneyMonthOf } from '@/usecases/money-month'
+import { spendingRoutes } from '@/routes/spendings'
+import { createSpendingRepository } from '@/db/spendings-repository'
 import { createSettingsRepository } from '@/db/settings-repository'
 import { saveSettings } from '@/usecases/save-settings'
 import { settingsRoute } from '@/routes/settings'
@@ -84,6 +96,8 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   // The request is well formed; another row already holds what it claims — a barcode that
   // belongs to another item. Not 400: nothing about the request itself is wrong.
   [ERROR.CONFLICT]: 409,
+  // A name one of the owner's live categories already has: the same kind of answer as a conflict.
+  [ERROR.SPENDING_CATEGORY_TAKEN]: 409,
   // Also well formed: another trip of the same person is still open, and which of the two goes
   // on is the person's choice (MOL-21). The screen reads the code, the status only groups it.
   [ERROR.TRIP_OPEN]: 409,
@@ -253,9 +267,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const loginRequests = createLoginRequestRepository(db)
     const removedExchanges = createExchangeRepository(db)
     const removedIncomes = createIncomeRepository(db)
+    const removedSpendings = createSpendingRepository(db)
     let stopCleanup: (() => Promise<void>) | undefined
     let stopExchangeCleanup: (() => Promise<void>) | undefined
     let stopIncomeCleanup: (() => Promise<void>) | undefined
+    let stopSpendingCleanup: (() => Promise<void>) | undefined
     let stopSessionCleanup: (() => Promise<void>) | undefined
     instance.addHook('onReady', (ready) => {
       stopCleanup = startLoginCleanup(
@@ -280,6 +296,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           instance.log.error('removed income cleanup failed')
         },
       )
+      // And for spendings (MOL-73, В-4): the ten minutes are the server's, whatever the strip says.
+      stopSpendingCleanup = startLoginCleanup(
+        () => removedSpendings.purgeStale(),
+        () => {
+          instance.log.error('removed spending cleanup failed')
+        },
+      )
       // An expired session has no reader, and it kept a device name for good while the privacy
       // page promises 180 days from the last use (MOL-57, owner's decision Q4).
       stopSessionCleanup = startLoginCleanup(
@@ -294,6 +317,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopCleanup?.()
       await stopExchangeCleanup?.()
       await stopIncomeCleanup?.()
+      await stopSpendingCleanup?.()
       await stopSessionCleanup?.()
     })
     const actors = createActorRepository(db)
@@ -386,6 +410,17 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         amend: (actor, id, body) => amendIncome(tripData, actor, id, body),
         remove: (actor, id) => removeIncome(tripData, actor, id),
         restore: (actor, id) => restoreIncome(tripData, actor, id),
+      })
+      spendingRoutes(guarded, {
+        record: (actor, body) => recordSpending(tripData, actor, body),
+        amend: (actor, id, body) => amendSpending(tripData, actor, id, body),
+        remove: (actor, id) => removeSpending(tripData, actor, id),
+        restore: (actor, id) => restoreSpending(tripData, actor, id),
+        categories: (actor) => spendingCategoriesOf(tripData, actor),
+        addCategory: (actor, body) => addSpendingCategory(tripData, actor, body),
+        archiveCategory: (actor, id, archived) =>
+          archiveSpendingCategory(tripData, actor, id, archived),
+        month: (actor, month, cursor) => moneyMonthOf(tripData, actor, month, cursor),
       })
       adviceRoutes(guarded, {
         advice: (actorId) =>
