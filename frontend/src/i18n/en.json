@@ -682,7 +682,7 @@
       },
       "spendings": {
         "term": "Spending outside trips",
-        "text": "How much, in what, when, in which category, and «what» and «where» if you write them — and your own categories. Spending in another currency keeps the rate of its day. Only you see it."
+        "text": "How much, in what, when, in which category, and «what» and «where» if you write them — and your own categories. Spending in another currency keeps the rate of its day, and a past month the rate of its last day, worked out from your exchanges. Only you see it."
       },
       "places": {
         "term": "Shops",

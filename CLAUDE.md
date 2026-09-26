@@ -774,19 +774,48 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   month. A spending's category is the same owner's, held by a composite key, and a removed one of
   theirs still takes spendings — one queued offline must not be lost to a chip taken away elsewhere.
 - **A spending in another currency keeps the rate of its own day** — the person's, else the central
-  bank's — written with it and never recomputed. **Kept as «390 ֏ за $», never «0,002564 $ за ֏»**:
-  six digits of a small number are four significant ones, and 11 $ came out 4 290,17 ֏
-  (`convertFromBase`). The same orientation for a trip's purchase in a third currency and an income
-  in another one, converted on the fly by the official rate of their day.
+  bank's, by the rule a trip started that day uses — written with it and never recomputed. The
+  person's is **the pair priced by one walk of the chain and rounded once** (`walletCross`, review
+  Р-1): two wallet rates divided after rounding lost 24 ֏ on 1 500 $. The bank's is **only a fresh
+  one** (`isRateFresh`, Р-4): the cache's latest may be weeks old, and a snapshot kept for good has
+  nowhere to say so — without one the spending is «не посчитано».
+- **Every rate of «Деньги» is kept on the side whose number is at least one** — «390 ֏ за $», never
+  «0,002564 $ за ֏» — the snapshot, a day's rate and the month's (`convertAcross` converts from
+  either side): six digits of a small number are four significant ones, and 11 $ came out
+  4 290,17 ֏ (С-1, adversarial Д2б).
+- **What was spent is counted by the trip's rule, what came in by the bank's alone** (review Р-2,
+  Р-3). A trip's line in another currency and a spending whose snapshot is not into the spending
+  currency of now — none was known that day, or it was written before a move — are converted on
+  the fly by the rule a spending's snapshot is taken by: ten dollars at the shop and ten at the
+  barber's on one day come to the same, and drams of August stay counted after a move to dollars
+  (Р-5, Д8). An income in another currency is the official rate of its day (MOL-66, В-1), never
+  what the money already held cost. An amendment keeps the snapshot only while the day, the
+  currency and the snapshot's use stay; otherwise it is taken anew. The price, named: on-the-fly
+  lines move when an exchange of their period is amended (С-3).
 - **The month is counted by the server** (`GET /money/months/:month`): spendings and **finished**
   trips — one line per currency, on the device's day of finishing, in «Продукты», read from the
   purchases every time so an amendment, MOL-78's receipt sum or MOL-76's removal moves it by
-  itself — what came in, the rest, the categories and every day's total; the journal comes forty
-  rows a page, and a day cut by the page keeps its whole total. **A closed month is counted in the
-  income currency by the rate of its last day, frozen the first time it is read** (`money_month_rates`):
-  a new exchange today does not move August.
-- **Removal is the money rule**: a mark, «Вернуть», final after ten minutes on the server (В-4) —
-  whatever the screen's strip shows. Erasure takes spendings, categories and frozen rates.
+  itself, **each line counting the purchases behind its own sum** (owner's decision В-7) — what came
+  in, the rest, the categories and every day's total; the journal comes forty rows a page, and a
+  day cut by the page keeps its whole total. **The next page starts after the key of the last row
+  shown** — day, moment, name (`journalCursorCodec`) — never an offset, which moved under the page
+  with every write above it (Д3). A row no money can hold is «не посчитано», never a failed month
+  (Д5, MOL-66's rule). A month is one of the days a rate may be dated by — `0000-01` is 404, not a
+  500 from Postgres (Д4).
+- **A closed month is counted in the income currency by the rate of its last day, frozen the first
+  time it is read** (`money_month_rates`): a new exchange today does not move August. **A fact of
+  August amended later does** (owner's decision В-6): writing, amending, removing or bringing back
+  an exchange or an income of a day lets go of the months frozen from that day on (`thaw`), and the
+  next read freezes them again. The running month is never frozen, so today's exchange lets go of
+  nothing. The price, named: a month read while the write is on its way may freeze without it.
+- **Removal is the money rule, held by the server**: a mark, «Вернуть», final after ten minutes by
+  the minute timer and nothing else (В-4) — no other write makes it final sooner, unlike an
+  exchange's, and a spending sent again while it is marked is 409, not a new one (Д6). After the ten
+  minutes a spending sent again is written anew, as a trip's row is. Erasure takes spendings,
+  categories and frozen rates.
+- **The names of one's own categories are checked under the owner's lock** (Д7): two phones adding
+  «Такси» at once wrote two. A name equal to a preset's («Продукты» beside `groceries`) is the
+  screen's to refuse — the server does not know the language of the chips (MOL-82).
 
 ## Tracker and documentation
 
