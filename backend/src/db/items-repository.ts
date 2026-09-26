@@ -71,12 +71,18 @@ const CANDIDATE_THRESHOLD = 0.15
 const ACCEPTED_DISTANCE = 2
 
 /**
- * The distance at which a row is close to what was typed rather than merely inside the budget
- * (MOL-46). Not a threshold of its own: «far» is exactly what only grazed the budget. The budget
- * cannot tell `malako` → `moloko` from `pelmeni` → `zeleni` — both two edits — and every rule on
- * the letters that was measured against it lost typos to win false hits: vowels by sound lost 38
- * of 40 slips of the finger, the first letter every typo that touched it, keyboard neighbours
- * explained «овощи» too. So nothing is dropped, and the answer says how sure it is.
+ * How far a word of the query may be from its word in a name and the row still be close to what
+ * was typed rather than merely inside the budget (MOL-46). Not a threshold of its own: «far» is
+ * exactly what only grazed the budget. The budget cannot tell `malako` → `moloko` from `pelmeni` →
+ * `zeleni` — both two edits — and every rule on the letters that was measured against it lost
+ * typos to win false hits: vowels by sound lost 38 of 40 slips of the finger, the first letter
+ * every typo that touched it, keyboard neighbours explained «овощи» too. So nothing is dropped,
+ * and the answer says how sure it is.
+ *
+ * Measured per word, by the worst, and the size aside (adversarial review А, Б). By the mean one
+ * exact word beside a wrong one made the row close — «мыло детское» over «Масло детское», three
+ * edits over two exact words; and a size in another number made a one-edit typo far — «кефр 1 л»
+ * over «Кефир 0,5 л» — where MOL-45 already calls that the kefir asked for in another size.
  */
 const NEAR_DISTANCE = ACCEPTED_DISTANCE - 1
 
@@ -522,7 +528,10 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              -- The words alone, the size aside: «Кефир Ашхар 0,5 л» for «кефир 1 л» is the kefir
              -- asked for in another size, not a typo (review Т).
              coalesce(ceil(avg(coalesce(pw.qd, 255))
-                             filter (where pw.grounds and not pw.by_synonym)), 0) as words_distance
+                             filter (where pw.grounds and not pw.by_synonym)), 0) as words_distance,
+             -- The furthest of those words, for how near the row is (MOL-46).
+             coalesce(max(coalesce(pw.qd, 255))
+                        filter (where pw.grounds and not pw.by_synonym), 0) as words_worst
       from candidates c
       join per_word_best pw on pw.id = c.id
       group by c.id, c.ws, c.search_key
@@ -559,11 +568,14 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                 ))
       group by sp.item_id
     )
-    -- Near: within one edit, or the person's own — taken before on this query, or their own word
-    -- for the item. Their choice says more than a typo metric, the same reason it is lifted.
+    -- Near: some row has every word within one edit, the size aside — or is the person's own,
+    -- taken before on this query or their own word for the item: their choice says more than a
+    -- typo metric, the same reason it is lifted. Over every row the filter accepts, before the
+    -- limit: a near row with a size penalty ranks level with a far one, and twenty of those would
+    -- cut it off.
     select r.id,
-           coalesce(r.distance <= ${NEAR_DISTANCE} or r.admitted or m.item_id is not null, false)
-             as near
+           bool_or(coalesce(r.words_worst <= ${NEAR_DISTANCE} or r.admitted
+                            or m.item_id is not null, false)) over () as near
     from ranked r
     left join remembered m on m.item_id = r.id
     -- The filter stays on the distance: a pick lifts what the search found and never lets in
@@ -757,7 +769,7 @@ export function createItemRepository(db: Conn): ItemRepository {
       const kept = rows.filter((row) => found.has(row.id))
       return {
         items: kept.flatMap((row) => found.get(row.id) ?? []),
-        near: kept.some((row) => row.near),
+        near: kept.length > 0 && rows.some((row) => row.near),
       }
     },
   }

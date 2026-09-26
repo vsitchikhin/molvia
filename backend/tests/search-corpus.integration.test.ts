@@ -675,9 +675,11 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
   })
 
   /**
-   * Which answers only graze the budget, whole (MOL-46): the best row two edits away. Measured
-   * before it was built — every false hit of MOL-14 that shares nothing with the word but letters
-   * two edits apart, and three things meant, found by a typo or a spelling of two.
+   * Which answers only graze the budget, whole (MOL-46): no row has every word within one edit.
+   * Every false hit of MOL-14 that shares nothing with the word but letters two edits apart, with
+   * «яблоки» → «яблочный» of the edits of the ending; and five things meant — a spelling two edits
+   * off («хаггис», «лейс»), and a word of the query in another form than the label's («собачий
+   * корм», «средство для полов», «таблетки для посудомойки»), each still first in its answer.
    */
   it('calls far exactly the answers whose best row only grazes the budget', async () => {
     const queries = [
@@ -694,6 +696,8 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     expect(far.sort()).toEqual(
       [
         'собачий корм',
+        'средство для полов',
+        'таблетки для посудомойки',
         'хаггис',
         'лейс',
         'овощи',

@@ -1374,6 +1374,54 @@ describe('search — how near the answer is (MOL-46)', () => {
     ])
   })
 
+  it.each([
+    ['мыло детское', 'Масло детское Johnson 200 мл'],
+    ['масло оливковое', 'Мыло оливковое 100 г'],
+    ['соус томатный', 'Сок томатный 1 л'],
+    ['овощи высший сорт', 'Мука пшеничная высший сорт 2 кг'],
+    ['сыр апельсин', 'Сок Rich апельсин 1 л'],
+    ['мука оливковое aleppo', 'Мыло оливковое Aleppo'],
+  ])(
+    'must not call «%s» → «%s» near: an exact word beside does not make the other one right (review А)',
+    async (query, name) => {
+      // By the mean, one exact word halved the wrong one's two edits — and three over two exact
+      // words came to one. Every word of the row has to be close.
+      await named(name)
+      expect(await answer(query)).toEqual([[name], false])
+    },
+  )
+
+  it('measures the words, not the size: a one-edit typo in another size is near (review Р-1, Б)', async () => {
+    await named('Кефир Ашхар 0,5 л')
+    expect(await answer('кефир 1 л')).toEqual([['Кефир Ашхар 0,5 л'], true])
+    expect(await answer('кефр 1 л')).toEqual([['Кефир Ашхар 0,5 л'], true])
+
+    await named('Молоко Ашхар 1 л')
+    // Apart or together, the size is not what decides.
+    expect((await answer('молако 1 л'))[1]).toBe(true)
+    expect((await answer('молако 1л'))[1]).toBe(true)
+  })
+
+  it('must not call a wrong word near because its size matches (review Б)', async () => {
+    await named('Мыло оливковое 100 г')
+    expect(await answer('масло оливковое 100 г')).toEqual([['Мыло оливковое 100 г'], false])
+    expect(await answer('масло оливковое 1 л')).toEqual([['Мыло оливковое 100 г'], false])
+
+    await named('Чай зелёный 1 л')
+    expect(await answer('пельмени 1 л')).toEqual([['Чай зелёный 1 л'], false])
+  })
+
+  it('calls the answer near by every row accepted, not only those under the limit (review Р-1)', async () => {
+    // «Кекс Ашхар 1 л» is one away by the mean and the size matches, so it ranks first; the
+    // kefir is the near one, with a size penalty behind it. A limit of one returns the cake alone.
+    await named('Кефир Ашхар 0,5 л')
+    await named('Кекс Ашхар 1 л')
+    expect(await names('кефр ашхар 1 л')).toEqual(['Кекс Ашхар 1 л', 'Кефир Ашхар 0,5 л'])
+
+    const { items: found, near } = await repo.search('кефр ашхар 1 л', 1, nobody)
+    expect([found.map((item) => item.name), near]).toEqual([['Кекс Ашхар 1 л'], true])
+  })
+
   it('must not call far what a synonym found: a word is not a typo', async () => {
     await named('Картофель')
     expect(await answer('картошка')).toEqual([['Картофель'], true])
