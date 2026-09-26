@@ -207,6 +207,8 @@ describe('какие ключи приложение пишет на устро�
       'molvia.advice',
       'molvia.places',
       'molvia.recent',
+      // Набранный поиск и промах — пережить перезагрузку этого окна (MOL-46).
+      'molvia.search-draft',
       'molvia.settings',
       'molvia.settings-draft',
       'molvia.trip',

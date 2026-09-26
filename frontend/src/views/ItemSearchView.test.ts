@@ -376,16 +376,70 @@ describe('«What did you pick up?»', () => {
     })
   })
 
-  it('holds a new version of the app off while a search is typed (MOL-46, review Е)', async () => {
-    // The query and the miss live in memory only: the phone put away to ask what a thing is called
-    // here must come back to them.
-    searchCatalogue.mockResolvedValue([])
-    const view = await render()
-    expect(holdsTyping(document)).toBe(false)
+  describe('a reload in the middle of a search (MOL-46, review Ж)', () => {
+    /** The page torn down without unmounting — what `location.reload()` does — and opened anew. */
+    async function reloaded(): Promise<VueWrapper> {
+      const kept = Array.from({ length: sessionStorage.length }, (_, index) => {
+        const key = sessionStorage.key(index) ?? ''
+        return [key, sessionStorage.getItem(key) ?? ''] as const
+      })
+      for (const wrapper of mounted.splice(0)) wrapper.unmount()
+      for (const [key, value] of kept) sessionStorage.setItem(key, value)
+      pinia = createPinia()
+      setActivePinia(pinia)
+      return render()
+    }
 
-    await field(view).setValue('кефир')
+    it('comes back to the query typed, and does not hold the update off for it', async () => {
+      searchCatalogue.mockResolvedValue([])
+      const view = await render()
+      await field(view).setValue('кефир')
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledWith('кефир')
+      })
+      expect(holdsTyping(document)).toBe(false)
 
-    expect(holdsTyping(document)).toBe(true)
+      const again = await reloaded()
+
+      expect(field(again).element.value).toBe('кефир')
+    })
+
+    it('keeps the miss through an erased field, so the next pick still teaches the word (Ж1)', async () => {
+      searchCatalogue.mockImplementation((query) =>
+        Promise.resolve(query === 'мацони' ? [milk] : []),
+      )
+      const view = await render()
+      await field(view).setValue('кефир')
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledWith('кефир')
+      })
+      await field(view).setValue('')
+
+      const again = await reloaded()
+      await field(again).setValue('мацони')
+      await vi.waitFor(() => {
+        expect(names(again)).toEqual([milk.name])
+      })
+      await again.get('[role="option"]').trigger('click')
+
+      expect(useItemEntryStore(pinia).picked).toEqual({
+        entry: milk,
+        query: 'мацони',
+        missedQuery: 'кефир',
+      })
+    })
+
+    it('forgets the search when the screen is left, as it always did', async () => {
+      searchCatalogue.mockResolvedValue([])
+      const view = await render()
+      await field(view).setValue('кефир')
+      view.unmount()
+      mounted.splice(0)
+
+      const next = await render()
+
+      expect(field(next).element.value).toBe('')
+    })
   })
 
   it('goes back to the recent items when the field is cleared', async () => {

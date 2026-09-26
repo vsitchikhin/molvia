@@ -13,18 +13,15 @@ export interface PwaEnvironment {
 }
 
 /**
- * Whether the page holds typing that lives in memory only, which a reload would take away. A sheet
- * up: what is typed there is written nowhere until its main action — the price of a purchase, a
- * proposed item, an exchange. And a search typed on «Что взяли?»: the query and the miss that
- * teaches the person's own word (MOL-45) — the phone is put away right there to ask someone what
- * the thing is called here (adversarial review Е). Forms that keep a draft on the device — the
- * settings, the ratings — hold nothing a reload loses.
+ * Whether the page holds typing that lives in memory only, which a reload would take away: a sheet
+ * up — what is typed there is written nowhere until its main action, the price of a purchase, a
+ * proposed item, an exchange. Everything else typed keeps a draft on the device and comes back:
+ * the settings, the ratings, and the search on «Что взяли?» with its miss (`searchDraft.ts`). Not
+ * held against the update, the search: a typed query kept out the version that fixes a search the
+ * old code could no longer read (adversarial review Ж2).
  */
 export function holdsTyping(page: Document): boolean {
-  if (page.querySelector('dialog[open]') !== null) return true
-  return [...page.querySelectorAll<HTMLInputElement>('input[role="combobox"]')].some(
-    (field) => field.value !== '',
-  )
+  return page.querySelector('dialog[open]') !== null
 }
 
 /**
@@ -40,7 +37,7 @@ export function holdsTyping(page: Document): boolean {
  * new worker takes control, whoever let it: another window of the app put away, or this one
  * brought back before the worker activated — a visible page reloaded under the finger (adversarial
  * review Г). And hidden is not enough by itself: at the shelf the phone is put away mid-sheet for
- * the calculator or the bank, and mid-search to ask what a thing is called here (`holdsTyping`).
+ * the calculator or the bank (`holdsTyping`).
  * So the new worker is let in, and the page reloaded after it took over, only while the app is
  * hidden and holds no typing; a takeover that came some other way waits for that moment. The worker waits too (`registerType: 'prompt'`):
  * taking control at once, as `autoUpdate` does, leaves the old page on a precache that is no

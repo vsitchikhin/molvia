@@ -214,7 +214,7 @@ describe('an installed app taking a new version (MOL-46)', () => {
   })
 })
 
-describe('what a reload would take away (MOL-46, adversarial review Г, Е)', () => {
+describe('what a reload would take away (MOL-46, adversarial review Г, Ж)', () => {
   afterEach(() => {
     document.body.innerHTML = ''
   })
@@ -231,17 +231,13 @@ describe('what a reload would take away (MOL-46, adversarial review Г, Е)', ()
     expect(holdsTyping(document)).toBe(true)
   })
 
-  it('holds a search typed: the query and the miss that teaches the person’s word live in memory', () => {
-    document.body.innerHTML = '<input role="combobox">'
-    const field = document.querySelector('input')
-    if (field) field.value = 'кефир'
-    expect(holdsTyping(document)).toBe(true)
-  })
-
-  it('must not hold a form that keeps a draft on the device', () => {
-    // The settings and the ratings write what is typed to a shelf; a reload gives it back.
+  it('must not hold what keeps a draft on the device — a typed search included (review Ж2)', () => {
+    // The settings, the ratings and the search write what is typed to a shelf, and a reload gives
+    // it back; held, a typed query kept out the version that fixes a broken search.
     document.body.innerHTML =
-      '<form><input name="city" value="Ереван"></form><textarea>хорош</textarea>'
+      '<form><input name="city" value="Ереван"></form><textarea>хорош</textarea><input role="combobox">'
+    const field = document.querySelector<HTMLInputElement>('input[role="combobox"]')
+    if (field) field.value = 'кефир'
     expect(holdsTyping(document)).toBe(false)
   })
 })

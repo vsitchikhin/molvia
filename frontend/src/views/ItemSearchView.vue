@@ -141,8 +141,10 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useCatalogueSearch } from '@/composables/useCatalogueSearch'
+import { currentIdentity } from '@/stores/identity'
 import { useItemEntryStore } from '@/stores/itemEntry'
 import { useRecentItemsStore } from '@/stores/recentItems'
+import { dropSearchDraft, keepSearchDraft, recallSearchDraft } from '@/stores/searchDraft'
 
 /**
  * «Что взяли?» — entering an item is a lookup in the catalogue, not a text field: free text
@@ -177,7 +179,19 @@ export default defineComponent({
         : null,
     )
     const query = ref('')
-    const { phase, results, stale, answered, takeMissed, retry } = useCatalogueSearch(query)
+    const { phase, results, stale, answered, missed, takeMissed, retry } = useCatalogueSearch(query)
+
+    // What was typed comes back after a reload — a new version of the app lands while the phone
+    // is away mid-search — and is put away with the screen, as it always was (MOL-46).
+    const owner = currentIdentity()
+    const draft = recallSearchDraft(owner)
+    if (draft) {
+      query.value = draft.query
+      missed.value = draft.missed
+    }
+    watch([query, missed], ([text, miss]) => {
+      keepSearchDraft(owner, { query: text, missed: miss })
+    })
     const recent = useRecentItemsStore()
     const entry = useItemEntryStore()
     const announce = useAnnouncer()
@@ -290,6 +304,7 @@ export default defineComponent({
     })
     onUnmounted(() => {
       withdraw?.()
+      dropSearchDraft(owner)
     })
 
     return {
