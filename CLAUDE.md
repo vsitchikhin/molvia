@@ -2003,19 +2003,22 @@ server then names is asked about as before. A newcomer gets «Что брать 
 history gets «N покупок ждут оценки» and their last three trips (`TripHistoryRow`, shared with
 the history). **The introduction is only for a history known to be empty**: every write to a
 trip persists the history cache, so an empty stored page proves nothing, and the store keeps
-whether the server answered (`answered`) — **under a key of its own, never as a field of the
-cache**: the cache codec is strict, and a window still on the previous version read an unknown
+whether the server's last answer was empty (`answeredEmpty`) — «empty», not «answered», since
+the flag and a page a full shelf kept can outlive each other, and an answer with trips takes it
+off every shelf (round 2, Ж1) — **under a key of its own, never as a field of the cache**: the cache codec is strict, and a window still on the previous version read an unknown
 field as no cache and wrote its empty one over a finish made with no signal (adversarial Е). A
 change to a phone-side cache is read by both versions, as a field added to the contract is. An
 answer the list moved under — another window wrote the cache, a finish was taken back — is asked
-for again rather than taken for a success (А). Today's error, and purchases waiting for a verdict,
+for again after a doubling pause, since another window may be sending its whole queue, rather
+than taken for a success (А, Ж2). Today's error, and purchases waiting for a verdict,
 outweigh an empty answer remembered from an earlier launch (Г); an error or no connection with
 nothing remembered is a quiet card of its own, never «newcomer» — MOL-56's «no answer is not the
 answer „no“». With the server down there is one «Повторить», the red block's, and it asks for the
 history too (Д). The price, named: offline with an empty answer remembered, the introduction
-stands — Safari and the installed app keep separate shelves. A trip in «ждут оценки» is told by
-the place and a gap of six hours between purchases, since a card carries no trip: two trips to
-one shop closer than that are one.
+stands — Safari and the installed app keep separate shelves. «Ждут оценки» names places, not
+trips: a card carries the place and the moment the server took the purchase, and a purchase made
+with no signal arrives with the queue hours later, so no gap tells one trip from two (round 2,
+З1).
 
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
