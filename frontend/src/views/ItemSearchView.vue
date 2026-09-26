@@ -40,9 +40,7 @@
           <ScreenSkeleton :groups="[62, 62, 62]" />
         </div>
 
-        <!-- A far answer too (MOL-46): rows two edits away are what «пельмени» finds in «Чай
-             зелёный», so the screen says «не нашли» and puts the rows below as a likeness. -->
-        <div v-else-if="phase === 'empty' || phase === 'far'" class="not-found" :class="{ stale }">
+        <div v-else-if="phase === 'empty'" class="not-found" :class="{ stale }">
           <p class="not-found-text">{{ t('item.empty.body', { query: answered }) }}</p>
           <AppButton @click="proposing = true">
             <template #icon><IconPlus /></template>
@@ -84,6 +82,20 @@
         <AppButton variant="ghost" block @click="proposing = true">
           {{ t('item.not_listed') }}
         </AppButton>
+      </template>
+
+      <!-- A far answer (MOL-46): what «пельмени» finds in «Чай зелёный» is a likeness, not a find,
+           so «не нашли» stands here with the button that adds the item. Under the rows, in place
+           of the quiet line: the answer flips near and far while a word is typed, and a block
+           above would move every row under the finger as it came and went (owner's decision). -->
+      <template v-else-if="phase === 'far'" #after>
+        <div class="not-found" :class="{ stale }">
+          <p class="not-found-text">{{ t('item.empty.body', { query: answered }) }}</p>
+          <AppButton @click="proposing = true">
+            <template #icon><IconPlus /></template>
+            {{ t('item.empty.action') }}
+          </AppButton>
+        </div>
       </template>
     </CatalogueCombobox>
 

@@ -289,15 +289,22 @@ describe('«What did you pick up?»', () => {
       return view
     }
 
-    it('says «not found» above the rows, with the button to suggest the item', async () => {
+    it('says «not found» under the rows, with the button to suggest the item', async () => {
       const view = await farFor('пельмени')
 
       expect(view.get('.not-found-text').text()).toBe(
         en.item.empty.body.replace('{query}', 'пельмени'),
       )
-      const html = view.html()
-      expect(html.indexOf(en.item.empty.action)).toBeLessThan(html.indexOf('role="listbox"'))
       expect(button(view, en.item.empty.action).exists()).toBe(true)
+    })
+
+    it('puts nothing above the rows: they stay where they were as the answer flips near and far', async () => {
+      // A block above the list moved every row under the finger while a word was typed — «ореш»
+      // far, «орешки» near (owner's decision on review, В-2).
+      const view = await farFor('пельмени')
+
+      const html = view.html()
+      expect(html.indexOf('class="not-found')).toBeGreaterThan(html.indexOf('role="listbox"'))
     })
 
     it('heads the rows as a likeness in spelling, not as a find', async () => {
