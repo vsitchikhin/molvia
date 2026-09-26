@@ -298,6 +298,34 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
           where u.w !~ ${ADJECTIVE_WORD} or u.w ~ ${NOUN_WORD}
         ), 1000)`
 
+  // No word after a number, no slip — and then not even the empty scan of every candidate: on
+  // «мо», which has no synonym, that alone was half the time.
+  const words = key.split(' ')
+  const slipped = words.some((_, index) => index > 0 && /[0-9]/u.test(words[index - 1] ?? ''))
+    ? sql`select c.id, qw.n
+      from query_words qw
+      cross join candidates c
+      where qw.slips
+        and (exists (
+               select 1
+               from (
+                 select unit, lag(unit) over (order by i) as number
+                 from unnest(string_to_array(c.search_key, ' ')) with ordinality as t(unit, i)
+               ) nw
+               where nw.unit in ${UNIT_KEYS}
+                 and nw.number = qw.number
+                 and ${slipsFromUnit(sql`qw.q`, sql`nw.unit`)}
+             )
+             -- A size written together, «Ряженка 500мл», is one word of the key: \`500ml\`.
+             or exists (
+               select 1
+               from unnest(string_to_array(c.search_key, ' ')) as nw(word)
+               cross join unnest(${UNIT_ARRAY}) as u(unit)
+               where nw.word = qw.number || u.unit
+                 and ${slipsFromUnit(sql`qw.q`, sql`u.unit`)}
+             ))`
+    : sql`select null::uuid as id, null::int as n where false`
+
   return sql`
     with query_words as (
       -- Cut to 255 here, once: levenshtein refuses longer arguments, and the prefix arm below
@@ -389,36 +417,17 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       from ${items}
       join admitted a on a.id = ${items.id}
     ),
-    slipped as (
+    slipped as materialized (
       -- A slip is a size only against a name that prints the unit it slipped from, after the
       -- very number the query has; elsewhere the word is what it spells. In «2 сом замороженный»
       -- the catfish is not «см»: read as a size everywhere it let «Котлеты … замороженные» in
       -- beside the fish, and against any «см» it let in «Пицца замороженная 30 см». The number
       -- is what gives a slip away — «кефир 500 мд» and «Кефир 500 мл» share «500». The price:
       -- «кефир 1 мд» does not reach «Кефир 1000 мл». Apart and joined, not a subquery per row:
-      -- a slip after a number is rare, so this is nearly always empty.
-      select c.id, qw.n
-      from query_words qw
-      cross join candidates c
-      where qw.slips
-        and (exists (
-               select 1
-               from (
-                 select unit, lag(unit) over (order by i) as number
-                 from unnest(string_to_array(c.search_key, ' ')) with ordinality as t(unit, i)
-               ) nw
-               where nw.unit in ${UNIT_KEYS}
-                 and nw.number = qw.number
-                 and ${slipsFromUnit(sql`qw.q`, sql`nw.unit`)}
-             )
-             -- A size written together, «Ряженка 500мл», is one word of the key: \`500ml\`.
-             or exists (
-               select 1
-               from unnest(string_to_array(c.search_key, ' ')) as nw(word)
-               cross join unnest(${UNIT_ARRAY}) as u(unit)
-               where nw.word = qw.number || u.unit
-                 and ${slipsFromUnit(sql`qw.q`, sql`u.unit`)}
-             ))
+      -- a slip after a number is rare, so this is nearly always empty — and materialized, taken
+      -- once: inlined into \`per_word\` beside the thousands of candidates a synonym brings,
+      -- «мясо» over 20 000 names took 1.4 s where it takes 0.2 without (MOL-45, review Ш).
+      ${slipped}
     ),
     -- Materialized, so each word distance is taken once per row: inlined, the planner copied the
     -- subquery into the select list, the filter and the order by — and with \`slipped\` joined
