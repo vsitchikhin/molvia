@@ -2065,7 +2065,10 @@ The shape worth knowing here:
   cut short leaves tables without keys that an API still calls healthy — and a hold set by hand
   is never the restore's to take off. A tag `v0.1.N` is set by hand every 10–15
   tasks as a mark and a point to roll back to; it builds nothing and deploys nothing, but names
-  the `sha-…` images of its commit — byte for byte what ran (owner's decision В-4). `v0.2.0`
+  the `sha-…` images of its commit, and only once production's `/health` names that commit — a
+  tag is the build that runs, never one that rolled back (owner's decision В-4). **`.env.prod` is
+  read by asking compose** (`config --environment`), never by parsing it: two rounds of review found
+  a form the copied grammar missed each time. `v0.2.0`
   starts the 0.2 cohort. **`/api/health` names the build** — `git describe --long`,
   `v0.1.1-3-g1a2b3c4`.
 - **A failed deploy puts the previous image back, not the schema.** Pending migrations run in

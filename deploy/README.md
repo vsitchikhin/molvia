@@ -68,7 +68,8 @@ red. `restore.sh --into-prod` sets it for as long as it replaces the database �
 the middle would migrate the empty database and the copy would no longer go in — and takes it off
 **only once the copy is in**. A restore that failed after the drop leaves a database with no rows,
 or rows with no keys, on which an API still answers ok: the hold stays, and the next restore that
-succeeds takes it off. Set it by hand (`ssh molvia 'touch ~/molvia/deploy.hold'`) for any
+succeeds takes it off. One that poured the copy and only failed to start api and bot says so, with
+the `up -d` that finishes it. Set it by hand (`ssh molvia 'touch ~/molvia/deploy.hold'`) for any
 maintenance that must not meet a merge, and remove it afterwards — a restore in the middle of that
 leaves it where it is. A merge made meanwhile rolls out with the next one, or re-run its Release
 job.
@@ -83,10 +84,11 @@ commit, so the commit is always in it.
 git tag v0.1.2 && git push origin v0.1.2   # names the images of that commit v0.1.2, deploys nothing
 ```
 
-The tag builds nothing: it puts its name on the `sha-…` images already built from its commit —
-byte for byte what ran on production. Set right after a merge, it waits up to fifteen minutes for
-that build, and names nothing until all three images are there; a commit whose master build never
-came is refused whole.
+The tag builds nothing: it names the build production runs — the `sha-…` images of its commit, byte
+for byte. So it waits, up to twenty minutes, until `https://molvia.net/api/health` names that commit:
+set right after a merge, that is CI, the build and the rollout. A commit production does not run — a
+rollout that rolled back, was held or stood aside for a newer one — is refused, and so is one whose
+three images are not all there; names go on all three or on none. Set it on the commit that runs.
 Only `vN.N.N` sets it off. `v0.2.0` marks the start of the 0.2 cohort.
 
 **Rolling back by hand:** Actions → Release → «Run workflow» on master, with a tag — `v0.1.2`,
