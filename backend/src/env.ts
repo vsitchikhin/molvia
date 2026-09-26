@@ -22,9 +22,15 @@ const envSchema = z.object({
    * depends on a foreign server answering is a test that fails for someone else's reasons.
    */
   RATES_REFRESH: z.enum(['on', 'off']).default('on'),
+  /**
+   * The build `/health` names (MOL-90): `git describe` of the commit the image was built from —
+   * `v0.1.1-3-g1a2b3c4`, or the tag alone on a tagged commit. The image carries it; outside one it
+   * is `dev`. What the deploy compares with to know the new containers are the ones answering.
+   */
+  APP_VERSION: z.string().min(1).default('dev'),
 })
 
 export const env = envSchema.parse(process.env)
-export const VERSION = '0.0.0'
+export const VERSION = env.APP_VERSION
 
 export const loginConfig = loginConfiguration(process.env)
