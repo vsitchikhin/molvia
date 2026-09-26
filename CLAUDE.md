@@ -413,11 +413,14 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   (`MAX_SYNONYMS`): twelve wide words expanded into fifty and held a connection for a second and a
   half. **The price, measured:** over 20 000 names built of the very words the dictionary expands
   into, twelve wide words take about 0.47 s against 0.28 s on master, one word with synonyms
-  («мясо», «сыр») 0.2–0.3 s against 0.19, and the same word after a number («мясо 1 кг») 0.3 s
-  against 0.1; the cost is ranking the names that carry the synonyms, not finding them, so a
+  («мясо», «сыр») 0.2–0.3 s against 0.19, and the same word after a number («мясо 1 кг») 0.2 s
+  against 0.11; the cost is ranking the names that carry the synonyms, not finding them, so a
   smaller cap wins little. **The check for a slipped unit (MOL-48) runs only after a number, and
   once** (review Ш): joined to the thousands of names a synonym brings, it took «мясо» to 1.4 s
-  while having nothing to look for — and without it «мо» answers in 0.11 s where master takes 0.17. **A target is a kind of product, never a brand**:
+  while having nothing to look for — and without it «мо» answers in 0.11 s where master takes 0.17.
+  **And the search runs without JIT**, set locally beside the threshold (review Щ): twelve words
+  with sizes — a shopping list pasted in — are estimated at a million, and Postgres spent 2.2 s
+  compiling a statement that answers in 0.4 s. **A target is a kind of product, never a brand**:
   expanding into a maker would be a place in the results handed out by hand; the other way round
   is fine («памперсы» → «подгузники» of every maker), and «белизна» is let in as the common name
   of a kind. **No categories** — «овощи», «специи», «сладости» name a shelf, and reaching kefir

@@ -154,20 +154,27 @@ describe('search — the shape of the query', () => {
     expect(row?.threshold).toBe('0.6')
   })
 
-  it("hands a caller's transaction back its own threshold", async () => {
+  it("hands a caller's transaction back its own threshold and its JIT", async () => {
     // Inside a caller's transaction `search` runs in a savepoint, and a local setting would
-    // outlive it — the caller's own `%>` would then answer by 0.15.
+    // outlive it — the caller's own `%>` would then answer by 0.15, and run without JIT.
     await named('Молоко Ашхар')
     const seen = await db.transaction(async (tx) => {
+      await tx.execute(raw`set local jit = on`)
       const before = await tx.execute(raw`select 1 from items where search_key %> 'malako'`)
       await createItemRepository(tx).search('малако', 10, nobody)
       const after = await tx.execute(raw`select 1 from items where search_key %> 'malako'`)
-      const [row] = await tx.execute<{ threshold: string }>(
-        raw`select current_setting('pg_trgm.word_similarity_threshold') as threshold`,
+      const [row] = await tx.execute<{ threshold: string; jit: string }>(
+        raw`select current_setting('pg_trgm.word_similarity_threshold') as threshold,
+                   current_setting('jit') as jit`,
       )
-      return { before: before.length, after: after.length, threshold: row?.threshold }
+      return {
+        before: before.length,
+        after: after.length,
+        threshold: row?.threshold,
+        jit: row?.jit,
+      }
     })
-    expect(seen).toEqual({ before: 0, after: 0, threshold: '0.6' })
+    expect(seen).toEqual({ before: 0, after: 0, threshold: '0.6', jit: 'on' })
   })
 
   it('answers on a fresh connection, where pg_trgm is not loaded yet, by its own threshold', async () => {

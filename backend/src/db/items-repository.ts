@@ -746,12 +746,19 @@ export function createItemRepository(db: Conn): ItemRepository {
          * search answered 500 until an insert happened to touch the index (MOL-12). A value
          * set before the library loads is a placeholder the library adopts, so the local
          * threshold still holds for the query below, and 0.6 — its default — is put back.
+         *
+         * JIT is switched off the same way (review Щ). The estimate of this statement is no
+         * measure of its work: a query with sizes, «мясо 1 кг рыба 2 кг…», is estimated at a
+         * million and answers in 0.45 s — and past `jit_above_cost` Postgres spent 2.2 s
+         * compiling it first. A search typed at a shelf never runs long enough to pay that back.
          */
-        const [previous] = await tx.execute<{ threshold: string | null }>(
-          sql`select current_setting('pg_trgm.word_similarity_threshold', true) as threshold`,
+        const [previous] = await tx.execute<{ threshold: string | null; jit: string }>(
+          sql`select current_setting('pg_trgm.word_similarity_threshold', true) as threshold,
+                     current_setting('jit') as jit`,
         )
         await tx.execute(
-          sql`select set_config('pg_trgm.word_similarity_threshold', ${String(CANDIDATE_THRESHOLD)}, true)`,
+          sql`select set_config('pg_trgm.word_similarity_threshold', ${String(CANDIDATE_THRESHOLD)}, true),
+                     set_config('jit', 'off', true)`,
         )
 
         const ranked = await tx.execute<{ id: string; near: boolean }>(
@@ -759,7 +766,8 @@ export function createItemRepository(db: Conn): ItemRepository {
         )
 
         await tx.execute(
-          sql`select set_config('pg_trgm.word_similarity_threshold', ${previous?.threshold ?? '0.6'}, true)`,
+          sql`select set_config('pg_trgm.word_similarity_threshold', ${previous?.threshold ?? '0.6'}, true),
+                     set_config('jit', ${previous?.jit ?? 'on'}, true)`,
         )
         return ranked
       })
