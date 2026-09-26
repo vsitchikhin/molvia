@@ -1,6 +1,6 @@
-import { expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { SESSION_COOKIE } from '@molvia/model'
-import type { Page } from '@playwright/test'
+import type { Page, Request, Response } from '@playwright/test'
 
 /**
  * Как тест ходит в API от лица той же личности, что и страница (MOL-53).
@@ -35,6 +35,42 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  */
 export const DEV_SEAM = /^(Sign in for development|Войти для разработки)$/
 const LOGIN_TITLE = /^(Sign in|Вход)$/
+/**
+ * Где старый `open()` уже упал бы — пять секунд `expect` по умолчанию. Не новый порог: дольше него
+ * вход оставляет след в отчёте, короче — нет, потому что это обычная машина.
+ */
+const SLOW_ANSWER_MS = 5_000
+
+function isSeam(request: Request): boolean {
+  return request.method() === 'POST' && new URL(request.url()).pathname === '/api/dev/login'
+}
+
+/**
+ * Ответ шва — или его обрыв, который называется сразу (MOL-67, ревью Р-4). Ответа у оборванного
+ * запроса нет вовсе: экран входа уже сказал «не вышло», а ожидание одного ответа длилось бы до
+ * таймаута теста и читалось бы как медленный стенд. Не отклоняется, если страница закрылась: это
+ * таймаут теста, и его называет шаг, внутри которого ждут.
+ */
+function seamAnswer(page: Page): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const stop = () => {
+      page.off('response', answered)
+      page.off('requestfailed', failed)
+    }
+    const answered = (response: Response) => {
+      if (!isSeam(response.request())) return
+      stop()
+      resolve(response)
+    }
+    const failed = (request: Request) => {
+      if (!isSeam(request)) return
+      stop()
+      reject(new Error(`запрос шва оборвался без ответа: ${request.failure()?.errorText ?? '?'}`))
+    }
+    page.on('response', answered)
+    page.on('requestfailed', failed)
+  })
+}
 
 export async function open(page: Page, path = '/'): Promise<void> {
   const first = !(await page.context().cookies()).some((one) => one.name === SESSION_COOKIE)
@@ -42,21 +78,33 @@ export async function open(page: Page, path = '/'): Promise<void> {
   if (!first) return
   // Ответ шва и дверь ждутся порознь, потому что медленным бывает только первое (MOL-67).
   //
-  // **Ответ — без своего предела, до таймаута теста.** Так его ждёт само приложение: `devLogin`
-  // в `@molvia/client` — единственный запрос без таймаута. На перегруженном стенде он и есть
-  // медленная часть: 8 воркеров с замедленным CPU — до 23 с, большая часть — в самом API, а на
-  // свободной машине — меньше секунды. Это правда про стенд, а не про продукт: в прод-сборке шва
-  // нет. `Promise.all`, а не ожидание, заведённое до нажатия: упади нажатие, брошенный
-  // `waitForResponse` отклонился бы при закрытии страницы без обработчика.
-  const [answer] = await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        response.request().method() === 'POST' &&
-        new URL(response.url()).pathname === '/api/dev/login',
-      { timeout: 0 },
-    ),
-    page.getByRole('button', { name: DEV_SEAM }).click(),
-  ])
+  // **Ответ — без своего предела.** Так его ждёт само приложение: `devLogin` в `@molvia/client` —
+  // единственный запрос без таймаута. На перегруженном стенде он и есть медленная часть: 8
+  // воркеров с замедленным CPU — до 23 с, большая часть — в самом API, а на свободной машине —
+  // меньше секунды. Это правда про стенд, а не про продукт: в прод-сборке шва нет. Ждут внутри
+  // шага, чтобы таймаут здесь назывался входом, а не `waitForResponse`. `Promise.all`, а не
+  // ожидание, заведённое до нажатия: оно подписывается и на отказ, если упадёт само нажатие.
+  const info = test.info()
+  const started = Date.now()
+  const answer = await test.step('вход швом: ответ сервера', async () => {
+    const [response] = await Promise.all([
+      seamAnswer(page),
+      page.getByRole('button', { name: DEV_SEAM }).click(),
+    ])
+    return response
+  })
+  // **Сколько стенд думал над входом, столько тест и получает обратно** (ревью Р-1, Р-2). Без
+  // этого «без предела» значило «из бюджета спеки»: вход за 27 с проходил, а тело падало через три
+  // секунды на своём шаге, и сообщение о входе молчало. Возвращается ровно выжданное, а не
+  // подобранное число; и вложение в отчёте говорит об этом при любом падении дальше.
+  const waited = Date.now() - started
+  info.setTimeout(info.timeout + waited)
+  if (waited > SLOW_ANSWER_MS) {
+    await info.attach('вход швом', {
+      body: `ответ через ${(waited / 1000).toFixed(1).replace('.', ',')} с — стенд перегружен; столько же добавлено к таймауту теста`,
+      contentType: 'text/plain',
+    })
+  }
   expect(answer.status(), 'шов разработки не впустил').toBe(201)
   // **Дверь — прежние пять секунд, и поднимать их нельзя.** От ответа до неё — синхронная
   // цепочка (`settle`, `claim`) и одна отрисовка, ждать тут нечего; упала эта проверка — это
