@@ -29,17 +29,80 @@ same machine and the same network; only Caddy is reachable from outside.
    address and no query string, and Caddy keeps no access log, but Caddy's errors can carry an
    address — this is what bounds them.
 
-## Every release
+## Deploys (MOL-90)
+
+A merge into master is a deploy. When CI passes on master, `release.yml` builds the three images
+of exactly that commit as `sha-<7 hex>` and rolls them out:
+
+1. **The machine's own files are checked first.** `deploy.sh status` answers with the tag running
+   and the sha256 of `docker-compose.prod.yml` and of `deploy.sh` itself; if either differs from
+   the commit, the job stops red and nothing moves. The key cannot replace them — copy them over
+   (`scp docker-compose.prod.yml deploy/deploy.sh molvia:molvia/`) and re-run the failed job.
+2. **`deploy.sh <tag>`** pulls the images — a tag the registry does not have leaves everything as
+   it was — writes `IMAGE_TAG` into `.env.prod`, runs `up -d` and waits up to 90 s for
+   `/api/health` through Caddy to answer `ok` **as the build it asked for**, with the bot running.
+   Otherwise it writes the previous tag back, runs `up -d` again and fails the job.
+3. The job then asks `https://molvia.net/api/health` from outside.
+
+**One at a time, newest last.** The deploy job waits for the one in progress rather than
+cancelling it, and rolls out master's head only: a slower build of an older commit is skipped,
+since the newer one brings it along. On the machine the script also holds a lock.
+
+**The version.** `/api/health` names the build by `git describe`: `v0.1.1-3-g1a2b3c4` is three
+commits after `v0.1.1`, at `1a2b3c4`. A tag build names itself: `v0.1.2`.
+
+**A tag is a mark, not a deploy.** Every 10–15 tasks, by hand:
 
 ```bash
-git tag v0.1.0 && git push --tags        # CI builds and publishes three images
-# then on the server:
-docker compose -f docker-compose.prod.yml --env-file .env.prod pull
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+git tag v0.1.2 && git push origin v0.1.2   # builds images named v0.1.2, deploys nothing
 ```
 
-Migrations run when the API starts, so there is no separate step to remember and no
-window where the schema lags the code deployed against it.
+`v0.2.0` marks the start of the 0.2 cohort.
+
+**Rolling back by hand:** Actions → Release → «Run workflow» on master, with a tag — `v0.1.2` or
+`sha-1a2b3c4`. It only deploys; nothing is built.
+
+**A failed deploy puts the previous image back, not the schema.** The API migrates when it
+starts, all pending migrations in one transaction: a migration that fails leaves the schema as it
+was. One that succeeded while something else failed stays — and the previous image runs on the
+new schema. An added column costs it nothing; a dropped or renamed one breaks it, so such a
+migration goes out in two merges: the code stops reading the thing first, the schema loses it
+after.
+
+### Once: the deploy key
+
+The key lives in the GitHub environment `production`, which admits the `master` branch only — a
+run from any other branch, or from a fork's pull request, gets no secret.
+
+1. A key pair for Actions, no passphrase: `ssh-keygen -t ed25519 -N '' -C github-actions-deploy@molvia -f deploy_key`.
+2. On the machine, the script and the key, restricted to it:
+
+   ```bash
+   scp deploy/deploy.sh molvia:molvia/deploy.sh
+   ssh molvia 'chmod 755 ~/molvia/deploy.sh'
+   # append to ~/.ssh/authorized_keys on the machine, one line:
+   restrict,command="/home/deploy/molvia/deploy.sh" ssh-ed25519 AAAA… github-actions-deploy@molvia
+   ```
+
+   `restrict` takes away the terminal, forwarding and the agent; whatever the client asks for
+   arrives in `$SSH_ORIGINAL_COMMAND`, and the script refuses anything but `status`, `sha-<7 hex>`
+   and `v<N>.<N>.<N>`.
+
+3. The environment and its two secrets — the host key taken from the machine itself, not scanned:
+
+   ```bash
+   gh api -X PUT repos/vsitchikhin/molvia/environments/production \
+     -F 'deployment_branch_policy[protected_branches]=false' \
+     -F 'deployment_branch_policy[custom_branch_policies]=true'
+   gh api -X POST repos/vsitchikhin/molvia/environments/production/deployment-branch-policies \
+     -f name=master -f type=branch
+   gh secret set DEPLOY_SSH_KEY --env production < deploy_key
+   printf '[molvia.net]:2222 %s\n' "$(ssh molvia 'cut -d" " -f1,2 /etc/ssh/ssh_host_ed25519_key.pub')" \
+     | gh secret set DEPLOY_KNOWN_HOSTS --env production
+   ```
+
+   Then delete `deploy_key`: GitHub holds the only copy it needs, and a new pair is cheaper than
+   guarding an old one.
 
 ## Login configuration (MOL-54, MOL-55)
 
@@ -165,12 +228,6 @@ is 0.2's question, with the lawyer («Персональные данные», s
 **What is not copied, on purpose:** `.env.prod`. Nothing in it is lost with the machine — the
 database password and `BOT_API_SECRET` are generated anew, BotFather shows the bot's token
 (`/mybots` → API Token), the GHCR token is issued anew. Images are in GHCR, code in git.
-
-## What is deliberately not automated
-
-There is no workflow that SSHs into the machine and deploys. Until a machine exists there
-are no secrets to configure, and a deploy job that cannot run is worse than none: it looks
-like a safety net and is not one. The two commands above are the whole deploy.
 
 ## The Postgres image has to carry ICU
 

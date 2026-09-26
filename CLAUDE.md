@@ -2048,9 +2048,22 @@ The shape worth knowing here:
 - **Postgres publishes no port.** It is reachable only over the compose network.
 - **The PWA calls `/api/...`** and Caddy strips the prefix — the same shape the Vite dev
   proxy has, so nothing about the origin differs between development and production.
-- **No deploy workflow.** Images are published to GHCR on a tag; the deploy itself is two
-  commands on the machine. A deploy job with no machine to deploy to would look like a
-  safety net without being one.
+- **A merge is a deploy (MOL-90, owner's decisions В-7 and В-11).** `release.yml` runs when CI
+  passes on master, builds the three images of exactly that commit as `sha-<7 hex>` and rolls
+  them out over ssh — about seven minutes from the merge. The key can do one thing: its forced
+  command, `deploy/deploy.sh`, takes a published tag and nothing else, so a stolen key re-deploys
+  what is already in the registry. One rollout at a time; only master's head goes out, so a
+  slower build of an older commit never lands over a newer one. A compose file or a deploy
+  script on the machine that differs from the commit stops the job before anything moves — the
+  key cannot replace them, and a copy is made by hand. A tag `v0.1.N` is set by hand every
+  10–15 tasks as a mark and a point to roll back to; it builds and does not deploy. `v0.2.0`
+  starts the 0.2 cohort. **`/api/health` names the build** — `git describe`, `v0.1.1-3-g1a2b3c4`.
+- **A failed deploy puts the previous image back, not the schema.** Pending migrations run in
+  one transaction, so a migration that fails leaves the schema as it was and the old image
+  finds what it knew. One that succeeded while something else failed stays applied, and the
+  previous image then runs on the new schema: an added column costs it nothing, a dropped or
+  renamed one breaks it. **So a migration that drops or renames goes out in two merges** — the
+  code stops reading the thing first, the schema loses it after.
 
 ## Camera on a real phone
 
