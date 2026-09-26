@@ -26,6 +26,10 @@ const cacheCodec = z.strictObject({
   page: tripHistoryCodec,
   selected: tripViewCodec.nullable(),
   local: z.array(localCodec),
+  // Whether `page` is the server's answer. Every write to a trip persists the cache, so a stored
+  // empty page may be one nobody asked for — and the home screen must not greet a person with a
+  // history as a newcomer (MOL-77). Optional: a cache written before it reads as «not asked».
+  answered: z.boolean().optional(),
 })
 const KEY = 'molvia.trip-history'
 const empty = (): TripHistory => ({ trips: [], nextCursor: null })
@@ -43,6 +47,8 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   const selected = ref<TripView | null>(null)
   const local = ref<LocalFinishedTrip[]>([])
   const stale = ref(true)
+  /** The server has answered the first page for this owner, now or on an earlier launch. */
+  const answered = ref(false)
   let firstPage: TripHistory = empty()
   // What «Показать ещё» brought, and the cursor standing after it. Only the first page is
   // remembered on the phone; these live for as long as the screen does.
@@ -99,6 +105,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     page.value = spread()
     selected.value = held?.selected ?? null
     local.value = held?.local ?? []
+    answered.value = held?.answered ?? false
     stale.value = true
   }
   restore()
@@ -127,6 +134,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
           page: firstPage,
           selected: selected.value,
           local: local.value,
+          answered: answered.value,
         }),
       ),
       (past) => {
@@ -267,6 +275,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
         deeper = deeper.filter((row) => beyond(answer.trips, row))
       }
       page.value = spread()
+      answered.value = true
     }
     stale.value = false
     persist()
@@ -309,5 +318,18 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     }
   }
 
-  return { page, selected, local, stale, capture, apply, forgetLocal, load, known, open, completed }
+  return {
+    page,
+    selected,
+    local,
+    stale,
+    answered,
+    capture,
+    apply,
+    forgetLocal,
+    load,
+    known,
+    open,
+    completed,
+  }
 })

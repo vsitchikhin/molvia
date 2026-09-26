@@ -13,8 +13,9 @@
            remembers is worth more than a red square, and the purchases are all still there
            (MOL-19). Above «Новый поход» too — otherwise a trip the server holds but could not be
            asked for reads as «no trip at all». -->
+      <!-- Without a trip the home screen says it in its own words: the trip can still start. -->
       <ScreenState
-        v-if="trouble === 'offline'"
+        v-if="trouble === 'offline' && phase !== 'none'"
         class="notice"
         kind="offline"
         tone="good"
@@ -85,21 +86,7 @@
       :body="t('trip.unsent.body')"
     />
 
-    <template v-if="phase === 'none'">
-      <ScreenState
-        kind="empty"
-        tone="accent"
-        :icon="IconPlus"
-        :title="t('trip.none.title')"
-        :body="t('trip.none.body')"
-      >
-        <template #action>
-          <AppButton size="large" block @click="starting = true">
-            {{ t('trip.none.action') }}
-          </AppButton>
-        </template>
-      </ScreenState>
-    </template>
+    <TripHome v-if="phase === 'none'" :offline="trouble === 'offline'" />
 
     <template v-else-if="phase === 'going'">
       <TripRateNotes v-if="trip" :trip="trip" />
@@ -130,16 +117,24 @@
     </template>
 
     <!-- Under the list, and only once there is a screen to put it under: over the skeleton it
-         was the one thing drawn while everything else was still loading (З-9). -->
-    <AppButton v-if="phase !== 'loading'" class="history" variant="ghost" block @click="history">{{
+         was the one thing drawn while everything else was still loading (З-9). Without a trip the
+         home screen has «Вся история» of its own (MOL-77). -->
+    <AppButton v-if="phase === 'going'" class="history" variant="ghost" block @click="history">{{
       t('trip.history.title')
     }}</AppButton>
 
     <!-- The one permanent place money is converted, and it stays put while the list scrolls. -->
-    <!-- On the skeleton too, with a dash for the sum: the strip is part of the frame, and a screen
-         that grows it after the answer jumps under the thumb (требования §5, В2-7). -->
-    <template v-if="phase !== 'none'" #docked>
-      <TripTotal :trip="trip" :pending="waiting" :local="local !== null" />
+    <!-- Without a trip the strip holds «Начать поход» instead — under the thumb, above whatever
+         the home screen says, however long (MOL-77). Loading with no trip remembered is almost
+         always «no trip», and a start there goes through the queue like any other: an open trip
+         the server then names is asked about by `trip.elsewhere`. -->
+    <template #docked>
+      <TripTotal v-if="phase === 'going'" :trip="trip" :pending="waiting" :local="local !== null" />
+      <div v-else class="start">
+        <AppButton size="large" block @click="starting = true">{{
+          t('trip.none.action')
+        }}</AppButton>
+      </div>
     </template>
 
     <ScreenState
@@ -216,6 +211,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import TripContextSheet from '@/components/TripContextSheet.vue'
+import TripHome from '@/components/TripHome.vue'
 import StartTripSheet from '@/components/StartTripSheet.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import TripRateNotes from '@/components/TripRateNotes.vue'
@@ -271,6 +267,7 @@ export default defineComponent({
     ScreenState,
     StartTripSheet,
     TripContextSheet,
+    TripHome,
     TripRateNotes,
     TripRow,
     TripTotal,
@@ -530,7 +527,6 @@ export default defineComponent({
       joinTrip,
       finishOtherTrip,
       t,
-      IconPlus,
       queue,
       trip,
       local,
@@ -629,6 +625,10 @@ export default defineComponent({
 
 .history {
   margin-top: var(--space-6);
+}
+
+.start {
+  padding: var(--space-3) 0;
 }
 
 .footnote {

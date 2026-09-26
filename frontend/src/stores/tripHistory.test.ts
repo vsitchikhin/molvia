@@ -1,9 +1,11 @@
+import { nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { tripViewCodec } from '@molvia/model'
 import type { TripHistory, TripHistoryEntry, TripView } from '@molvia/model'
 import { useTripHistoryStore } from './tripHistory'
 import { useTripStore } from './trip'
+import { useActorStore } from './actor'
 
 const trip = vi.fn<(id: string) => Promise<TripView>>()
 const tripHistory = vi.fn<() => Promise<TripHistory>>()
@@ -51,6 +53,49 @@ beforeEach(() => {
   localStorage.setItem('molvia.actor', OWNER)
   vi.resetAllMocks()
   setActivePinia(createPinia())
+})
+
+describe('whether the server has answered (MOL-77)', () => {
+  it('an empty answer is known, and stays known after a restart', async () => {
+    const store = useTripHistoryStore()
+    expect(store.answered).toBe(false)
+    tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
+    await store.load()
+    expect(store.answered).toBe(true)
+    expect(restart().answered).toBe(true)
+  })
+
+  it('a cache written by a trip write alone is not an answer', () => {
+    // Every write persists the cache, first page empty or not: that page nobody asked for.
+    useTripHistoryStore().apply(view(A, false))
+    const again = restart()
+    expect(again.page.trips).toEqual([])
+    expect(again.answered).toBe(false)
+  })
+
+  it('a failed load answers nothing', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockRejectedValue(new Error('Failed to fetch'))
+    await expect(store.load()).rejects.toThrow()
+    expect(store.answered).toBe(false)
+  })
+
+  it('a cache from before the flag reads as not answered', () => {
+    localStorage.setItem(
+      `molvia.trip-history.${OWNER}`,
+      JSON.stringify({ page: { trips: [], nextCursor: null }, selected: null, local: [] }),
+    )
+    expect(restart().answered).toBe(false)
+  })
+
+  it('another owner’s answer is not this owner’s', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
+    await store.load()
+    useActorStore().id = A
+    await nextTick()
+    expect(store.answered).toBe(false)
+  })
 })
 
 describe('history memory', () => {
