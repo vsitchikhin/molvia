@@ -657,7 +657,7 @@
   },
   "privacy": {
     "title": "Data and privacy",
-    "revised": "Revised 25 September 2026",
+    "revised": "Revised 26 September 2026",
     "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
@@ -706,13 +706,17 @@
       "title": "Server logs",
       "text": "Kept for no longer than 14 days. Requests are written to them without your IP address and without what you searched for. An IP address can reach only the server's error log — and it too lives there no longer than 14 days."
     },
+    "backups": {
+      "title": "Where the data and its copies are",
+      "text": "The server is in Germany, with the host Contabo. Once a day the database is copied, encrypted, to Cloudflare storage in the EU; only the owner of Molvia can decrypt a copy. Copies live 14 days — fourteen days after erasure your data is gone from them too. If the server ever has to be restored from a copy, an erasure made less than a day before the failure may need repeating."
+    },
     "storage": {
       "title": "Cookies and the phone's memory",
       "text": "Two cookies: the sign-in, and one more for five minutes while you sign in. The phone keeps what you saw last and what has not reached the server yet. All of it is needed for the app to work, so there is no banner. Signing out in Settings erases all of it from the phone."
     },
     "erase": {
       "title": "Delete everything",
-      "text": "Send /delete to the bot you sign in with and confirm. Deletion is immediate and permanent: everything in the list above goes except the shops — they and the items you added to the shared catalogue stay, without your name. Saved copies may remain on your phone: to remove them, sign out in Settings, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account."
+      "text": "Send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they and the items you added to the shared catalogue stay, without your name. Saved copies may remain on your phone: to remove them, sign out in Settings, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account."
     }
   }
 }
