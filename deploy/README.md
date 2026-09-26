@@ -106,7 +106,8 @@ after.
 ### Once: the deploy key
 
 The key lives in the GitHub environment `production`, which admits the `master` branch only:
-«Run workflow» from any other branch gets no secret. It does not keep out a pull request — a
+«Run workflow» from any other branch gets no secret — and the deploy job does not even start there,
+because one that did would wait in the queue first and push out a master rollout waiting in it. It does not keep out a pull request — a
 `workflow_run` always runs on master, whatever set it off. That is the `if` of the build job:
 only a successful CI of a push to master of this repository builds, and only a build deploys.
 

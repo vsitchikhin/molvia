@@ -146,9 +146,11 @@ jobs:
   deploy:
     name: roll out to production
     needs: images
-    # Not `always()`: that one survives cancelling the run.
+    # Not `always()`: that one survives cancelling the run. Master only, here and not just in the
+    # environment: a run from a branch that the environment would refuse still took its place in
+    # the queue below first, and pushed out the master rollout waiting there (seen on 26.09.2026).
     if: >-
-      !cancelled() &&
+      !cancelled() && github.ref == 'refs/heads/master' &&
       ((github.event_name == 'workflow_run' && needs.images.result == 'success') ||
        github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
