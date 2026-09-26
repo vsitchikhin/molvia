@@ -40,11 +40,32 @@ export async function open(page: Page, path = '/'): Promise<void> {
   const first = !(await page.context().cookies()).some((one) => one.name === SESSION_COOKIE)
   await page.goto(path)
   if (!first) return
-  await page.getByRole('button', { name: DEV_SEAM }).click()
-  // Дождаться, пока дверь откроется, а не просто нажать: тест, который пойдёт дальше сразу,
-  // успевает перезагрузить страницу раньше, чем браузер запишет cookie сессии. Заголовок
-  // экрана входа — единственное, что есть у него и чего нет ни у одного экрана приложения.
-  await expect(page.getByRole('heading', { level: 1 })).not.toHaveText(LOGIN_TITLE)
+  // Ответ шва и дверь ждутся порознь, потому что медленным бывает только первое (MOL-67).
+  //
+  // **Ответ — без своего предела, до таймаута теста.** Так его ждёт само приложение: `devLogin`
+  // в `@molvia/client` — единственный запрос без таймаута. На перегруженном стенде он и есть
+  // медленная часть: 8 воркеров с замедленным CPU — до 23 с, большая часть — в самом API, а на
+  // свободной машине — меньше секунды. Это правда про стенд, а не про продукт: в прод-сборке шва
+  // нет. `Promise.all`, а не ожидание, заведённое до нажатия: упади нажатие, брошенный
+  // `waitForResponse` отклонился бы при закрытии страницы без обработчика.
+  const [answer] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === '/api/dev/login',
+      { timeout: 0 },
+    ),
+    page.getByRole('button', { name: DEV_SEAM }).click(),
+  ])
+  expect(answer.status(), 'шов разработки не впустил').toBe(201)
+  // **Дверь — прежние пять секунд, и поднимать их нельзя.** От ответа до неё — синхронная
+  // цепочка (`settle`, `claim`) и одна отрисовка, ждать тут нечего; упала эта проверка — это
+  // дефект входа (`verify()`, `claimed`, MOL-56), а не медленная машина. Заголовок экрана входа —
+  // единственное, что есть у него и нет ни у одного экрана приложения.
+  await expect(
+    page.getByRole('heading', { level: 1 }),
+    'ответ шва пришёл, а дверь не открылась — это вход, а не стенд',
+  ).not.toHaveText(LOGIN_TITLE)
 }
 
 /** Открывает приложение, входит и отдаёт id владельца. */
