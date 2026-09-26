@@ -1563,6 +1563,15 @@ shelf, so a desktop-only pass would prove nothing about the screen that matters.
   in this copy's band). A database alone would not have closed it: `reuseExistingServer`
   handed the suite the dev API whenever `make dev` was up, so no `DATABASE_URL` of ours
   reached a process — and `pre-push` runs e2e exactly then. Now the two stacks coexist.
+- **Every spec comes in through `open()` in `e2e/session.ts`, and it waits for two things
+  apart** (MOL-67). The seam's answer is waited for as long as the test runs, as the app itself
+  waits for it (`devLogin` has no timeout): on an overloaded machine that answer is what is slow
+  — up to 23 s with eight workers on a throttled CPU, most of it inside the API, under a second
+  otherwise. The door after the answer keeps the default five seconds and must not be
+  raised: from the answer to the door is one synchronous chain and one render, so a failure
+  there is the login (`verify()`, `claimed`, MOL-56), not the machine, and its message says so.
+  Measured over 284 logins under load: late, never «not at all». Outside CI a failed test keeps
+  its trace (`retain-on-failure`), since there are no retries to write one.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **six things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
