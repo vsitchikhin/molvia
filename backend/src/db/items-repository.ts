@@ -568,14 +568,15 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                 ))
       group by sp.item_id
     )
-    -- Near: some row has every word within one edit, the size aside — or is the person's own,
-    -- taken before on this query or their own word for the item: their choice says more than a
-    -- typo metric, the same reason it is lifted. Over every row the filter accepts, before the
-    -- limit: a near row with a size penalty ranks level with a far one, and twenty of those would
-    -- cut it off.
+    -- Near: every word of the row within one edit, the size aside — or the person's own, taken
+    -- before on this query or their own word for the item: their choice says more than a typo
+    -- metric, the same reason it is lifted. Per row, and the answer is near by the rows it hands
+    -- out (owner's decision on review, В-4): the order is by the mean and the size, nearness by the
+    -- worst word, so a near row can rank below twenty far ones — and then the screen says «не
+    -- нашли» over what it shows, rather than «нашли» over a list with nothing near in it.
     select r.id,
-           bool_or(coalesce(r.words_worst <= ${NEAR_DISTANCE} or r.admitted
-                            or m.item_id is not null, false)) over () as near
+           coalesce(r.words_worst <= ${NEAR_DISTANCE} or r.admitted or m.item_id is not null, false)
+             as near
     from ranked r
     left join remembered m on m.item_id = r.id
     -- The filter stays on the distance: a pick lifts what the search found and never lets in
@@ -777,7 +778,7 @@ export function createItemRepository(db: Conn): ItemRepository {
       const kept = rows.filter((row) => found.has(row.id))
       return {
         items: kept.flatMap((row) => found.get(row.id) ?? []),
-        near: kept.length > 0 && rows.some((row) => row.near),
+        near: kept.some((row) => row.near),
       }
     },
   }

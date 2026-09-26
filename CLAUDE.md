@@ -336,9 +336,10 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   mean one exact word beside a wrong one made the row near — «мыло детское» over «Масло
   детское», even three edits over two exact words — and a size in another number made a one-edit
   typo far, «кефр 1 л» over «Кефир 0,5 л», which the ranking already calls the kefir in another
-  size. A word found by a synonym counts as exact. Taken over every row the filter accepts,
-  before the limit: a near row with a size penalty ranks level with a far one. An empty answer is
-  not near. A far answer is drawn as rows headed «Похоже по написанию» with «не нашли» and
+  size. A word found by a synonym counts as exact. **The answer is near by the rows it hands out**
+  (owner's decision on review): the order is by the mean and the size, nearness by the worst word,
+  so a near row can rank below twenty far ones — and then the screen says «не нашли» over what it
+  shows rather than «нашли» over a list with nothing near in it. An empty answer is not near. A far answer is drawn as rows headed «Похоже по написанию» with «не нашли» and
   «Предложить товар» **under them**, in place of the quiet «Нет нужного?» — above them, the block
   moved every row under the finger as the answer flipped near and far while a word was typed
   (owner's decision on review). It is read out as «не нашли» too, and it is a miss for the
@@ -1214,14 +1215,19 @@ database access. In a product about data integrity, two write paths will silentl
   total, not even for rows still in the queue.
 - Split components so they are not overloaded, but without five wrappers around one tag.
   One well-scoped component beats five trivial ones.
-- **An installed app takes a new version the moment it is put away** (`pwaUpdate.ts`, MOL-46).
-  The client reads every answer strictly, so an old page against a new API breaks — and nothing
-  reloaded it: an iOS app frozen in the background came back on the old code until a cold start.
-  Not the moment a version is found, which reloads under whatever is being typed; when the app is
-  hidden, which is when iOS may unload it anyway and everything that must survive is already
-  written down. The worker waits until then (`registerType: 'prompt'`) — taking control at once
-  left the old page asking for chunks the new precache no longer held — and a new version is
-  looked for whenever the app is looked at again or the network comes back. The other half is the
+- **An installed app takes a new version only when nobody can lose anything to it: hidden, with
+  no sheet up** (`pwaUpdate.ts`, MOL-46). The client reads every answer strictly, so an old page
+  against a new API breaks — and nothing reloaded it: an iOS app frozen in the background came back
+  on the old code until a cold start. Hidden is not enough by itself: a sheet keeps what is typed
+  in memory until its main action — the price of a purchase, a proposed item, an exchange — and at
+  the shelf the phone is put away mid-sheet for the calculator or the bank. So the new worker is
+  let in, and the page reloaded after it took over, only then; a takeover that came another way —
+  another window of the app let it in, or this one came back before it activated — waits for the
+  same moment. **The worker is registered by our code, not by the plugin's script**
+  (`injectRegister: false`): in `prompt` mode that script reloads the page on any takeover, visible
+  or not (adversarial review Г). The worker waits (`registerType: 'prompt'`) — taking control at
+  once leaves the old page on a precache that is no longer its own — and a new version is looked
+  for whenever the app is looked at again or the network comes back. The other half is the
   contract's: a field is added so the old server's answer still reads.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab

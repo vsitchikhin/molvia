@@ -1418,15 +1418,16 @@ describe('search — how near the answer is (MOL-46)', () => {
     expect(await answer('пельмени 1 л')).toEqual([['Чай зелёный 1 л'], false])
   })
 
-  it('calls the answer near by every row accepted, not only those under the limit (review Р-1)', async () => {
+  it('calls the answer near by the rows it hands out, not by one past the limit (review В-4)', async () => {
     // «Кекс Ашхар 1 л» is one away by the mean and the size matches, so it ranks first; the
-    // kefir is the near one, with a size penalty behind it. A limit of one returns the cake alone.
+    // kefir is the near one, with a size penalty behind it. A limit of one returns the cake alone,
+    // and the screen describes what it shows.
     await named('Кефир Ашхар 0,5 л')
     await named('Кекс Ашхар 1 л')
-    expect(await names('кефр ашхар 1 л')).toEqual(['Кекс Ашхар 1 л', 'Кефир Ашхар 0,5 л'])
+    expect(await answer('кефр ашхар 1 л')).toEqual([['Кекс Ашхар 1 л', 'Кефир Ашхар 0,5 л'], true])
 
     const { items: found, near } = await repo.search('кефр ашхар 1 л', 1, nobody)
-    expect([found.map((item) => item.name), near]).toEqual([['Кекс Ашхар 1 л'], true])
+    expect([found.map((item) => item.name), near]).toEqual([['Кекс Ашхар 1 л'], false])
   })
 
   it('must not call far what a synonym found: a word is not a typo', async () => {
