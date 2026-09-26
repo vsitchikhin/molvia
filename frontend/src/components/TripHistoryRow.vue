@@ -14,12 +14,14 @@ import { computed, defineComponent, type PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconChevronRight from '~icons/mdi/chevron-right'
 import type { HistoryRow } from '@/composables/useTripHistory'
-import { purchaseDay, timeOfDay } from '@/days'
+import { dayOfAnyYear, timeOfDay } from '@/days'
 
 /**
  * One finished trip: where, when it was finished, and whether the phone is still holding the
  * finish back. On two screens — the history and the home screen without a trip (MOL-77) — so it
  * is one component, and the day is said the way every other day in the app is: «вчера, 19:40».
+ * With the year when it is not this one: the history goes back without end, and a September of
+ * last year must not read as this one (review Р-1).
  */
 export default defineComponent({
   name: 'TripHistoryRow',
@@ -32,7 +34,7 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const when = computed(() =>
       t('trip.history.when', {
-        day: purchaseDay(props.row.at, locale.value),
+        day: dayOfAnyYear(props.row.at, locale.value),
         time: timeOfDay(props.row.at, locale.value),
       }),
     )

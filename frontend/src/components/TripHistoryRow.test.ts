@@ -32,6 +32,14 @@ describe('TripHistoryRow', () => {
     expect(view.text()).toContain('Завершён · вчера, 19:40')
   })
 
+  it('поход прошлого года — с годом, этого — без (Р-1)', () => {
+    const lastYear = new Date()
+    lastYear.setFullYear(lastYear.getFullYear() - 1, 8, 12)
+    lastYear.setHours(19, 40, 0, 0)
+    expect(render({ at: lastYear }).text()).toContain(String(lastYear.getFullYear()))
+    expect(render().text()).not.toContain(String(new Date().getFullYear()))
+  })
+
   it('поход, завершённый без сети, помечен', () => {
     expect(render().text()).not.toContain(ru.trip.history.local_finish)
     expect(render({ pending: true }).text()).toContain(ru.trip.history.local_finish)
