@@ -1,11 +1,22 @@
 name: Release
 
-# Only on a tag or by hand: images are a release artifact, not something every commit
-# needs to produce.
+# Every commit that reaches master and passes CI is built and rolled out to production (MOL-90).
+# A tag `vX.Y.Z` builds nothing: it puts its name on the images already built from its commit —
+# byte for byte what ran on production — as a mark and a point to roll back to (owner's decision
+# В-4). «Run workflow» with a tag rolls that tag out without building, which is how a rollback is
+# done by hand.
 on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [master]
   push:
-    tags: ['v*']
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag to roll out: sha-<7 hex> or v<N>.<N>.<N>'
+        required: true
 
 permissions:
   contents: read
@@ -14,7 +25,18 @@ permissions:
 jobs:
   images:
     name: build and publish
+    # A red or cancelled CI builds nothing, and neither does CI of a pull request — a fork's
+    # branch called master included. The environment below does not stand here: a workflow_run
+    # runs on master whatever set it off.
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.commit.outputs.tag }}
     strategy:
       matrix:
         include:
@@ -24,6 +46,25 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The commit CI passed. `github.sha` of a workflow_run is whatever master points at by
+          # the time this starts, which may already be the next merge.
+          ref: ${{ github.event.workflow_run.head_sha }}
+          # Tags, for `git describe`.
+          fetch-depth: 0
+
+      # What the image is called and what /health says it is: the long form, `v0.1.1-3-g1a2b3c4`,
+      # which names the commit even when a tag sits on it. A failed describe fails the build
+      # rather than publishing an image whose API refuses an empty version.
+      - id: commit
+        run: |
+          sha="$(git rev-parse HEAD)"
+          version="$(git describe --tags --match 'v[0-9]*' --long)"
+          {
+            echo "tag=sha-${sha:0:7}"
+            echo "version=$version"
+            echo "revision=$sha"
+          } >>"$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v4
 
@@ -37,10 +78,11 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository_owner }}/molvia-${{ matrix.name }}
-          tags: |
-            type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=short
+          # Named by hand rather than by the event: a workflow_run carries master's head, not the
+          # commit being built. No `latest`: builds run side by side, so it could name an older
+          # commit than the last one built.
+          tags: type=raw,value=${{ steps.commit.outputs.tag }}
+          labels: org.opencontainers.image.revision=${{ steps.commit.outputs.revision }}
 
       - uses: docker/build-push-action@v7
         with:
@@ -49,5 +91,159 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          build-args: ${{ matrix.name == 'backend' && format('APP_VERSION={0}', steps.commit.outputs.version) || '' }}
+          # A cache per image: shared, the three overwrote each other's layers.
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  tag:
+    name: name the images of a release tag
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A tag names the build production runs (owner's decision В-4), so it waits until
+      # production's /health names its commit — up to twenty minutes, CI, build and rollout of a
+      # fresh merge. A rollout that failed, was held or stood aside never gets there, and the tag
+      # is refused rather than put on a build nobody ran. Names are put on all three images or on
+      # none.
+      - env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          short="${sha:0:7}"
+          version=""
+          for _ in $(seq 80); do
+            version="$(curl -fsS -m 10 https://molvia.net/api/health | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')" || version=""
+            [[ "$version" == *"-g$short"* ]] && break
+            echo "waiting for production to run $short: it runs ${version:-nothing}"
+            sleep 15
+          done
+          if [[ "$version" != *"-g$short"* ]]; then
+            echo "::error::production runs ${version:-nothing}, not $short — a tag names the build that runs: set it on that commit, or re-run this job once $short rolls out"
+            exit 1
+          fi
+          for name in backend bot frontend; do
+            if ! docker buildx imagetools inspect "ghcr.io/$OWNER/molvia-$name:sha-$short" >/dev/null; then
+              echo "::error::ghcr.io/$OWNER/molvia-$name:sha-$short is missing although production runs $short"
+              exit 1
+            fi
+          done
+          for name in backend bot frontend; do
+            image="ghcr.io/$OWNER/molvia-$name"
+            docker buildx imagetools create --tag "$image:$GITHUB_REF_NAME" "$image:sha-$short"
+          done
+
+  deploy:
+    name: roll out to production
+    needs: images
+    # Not `always()`: that one survives cancelling the run.
+    if: >-
+      !cancelled() &&
+      ((github.event_name == 'workflow_run' && needs.images.result == 'success') ||
+       github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    # The job holding the deploy key gets no right to write to the registry.
+    permissions:
+      contents: read
+    # The environment holds the deploy key and admits master alone: «Run workflow» from any other
+    # branch gets no secret. What keeps a pull request out is the `if` of `images` above.
+    environment:
+      name: production
+      url: https://molvia.net
+    # One rollout at a time, and the one in progress is never cancelled halfway. A pending one is
+    # replaced by the next to arrive — GitHub keeps one waiting, not a queue.
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    env:
+      TAG: ${{ needs.images.outputs.tag || inputs.tag }}
+      BUILT: ${{ github.event.workflow_run.head_sha }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # History and tags, to tell whether what runs on the machine is newer than this build.
+          fetch-depth: 0
+
+      - name: ssh
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" >~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          # Pinned: scanning the host here would trust whoever answers first.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >~/.ssh/known_hosts
+          cat >~/.ssh/config <<'EOF'
+          Host production
+            HostName molvia.net
+            Port 2222
+            User deploy
+            IdentityFile ~/.ssh/deploy
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ConnectTimeout 20
+            ServerAliveInterval 15
+          EOF
+
+      # The machine keeps its own copies of the compose file and of the deploy script, and the
+      # key cannot replace them. A commit that changed either stops here, before anything moves.
+      - name: the machine runs this commit's files
+        id: machine
+        run: |
+          status="$(ssh production status)"
+          echo "$status"
+          drift=0
+          for pair in compose:docker-compose.prod.yml deploy:deploy/deploy.sh; do
+            name="${pair%%:*}" file="${pair#*:}"
+            want="$(sha256sum "$file" | cut -d' ' -f1)"
+            if ! grep -qx "$name=$want" <<<"$status"; then
+              echo "::error file=$file::$file on the machine differs from this commit — copy it over (deploy/README.md, «Deploys») and re-run this job"
+              drift=1
+            fi
+          done
+          echo "deployed=$(sed -n 's/^image_tag=//p' <<<"$status")" >>"$GITHUB_OUTPUT"
+          exit "$drift"
+
+      # Builds run side by side, so this one may finish after a newer commit went out. It stands
+      # aside only if the machine already runs this commit or a later one — not merely because
+      # master moved on: the commit that moved it may never pass CI.
+      - name: not older than what runs
+        id: order
+        if: github.event_name == 'workflow_run'
+        env:
+          DEPLOYED: ${{ steps.machine.outputs.deployed }}
+        run: |
+          ref="${DEPLOYED#sha-}"
+          if running="$(git rev-parse -q --verify "$ref^{commit}")" &&
+            git merge-base --is-ancestor "$BUILT" "$running"; then
+            echo "::notice::production already runs $DEPLOYED, which contains ${BUILT:0:7}"
+            echo "skip=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: roll out
+        if: steps.order.outputs.skip != 'true'
+        run: ssh production "$TAG"
+
+      - name: seen from outside
+        if: steps.order.outputs.skip != 'true'
+        run: |
+          health="$(curl -fsS -m 10 https://molvia.net/api/health)"
+          echo "$health"
+          grep -q '"status":"ok"' <<<"$health"
+          # An automatic rollout names its commit; a rollback by hand may go to an image that
+          # predates the version and calls itself 0.0.0.
+          if [[ -n "$BUILT" ]]; then grep -q "\"version\":\"v[^\"]*-g${BUILT:0:7}" <<<"$health"; fi

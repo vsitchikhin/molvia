@@ -23,6 +23,11 @@ ENV NODE_ENV=production
 COPY --from=build /repo/backend/dist ./dist
 COPY --from=build /repo/backend/drizzle ./drizzle
 
+# What `/health` names as the version (MOL-90): `git describe` of the commit, handed in by
+# `release.yml`. Last, so a new version does not throw away the layers above it.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+
 USER node
 EXPOSE 3300
 CMD ["node", "dist/index.js"]
