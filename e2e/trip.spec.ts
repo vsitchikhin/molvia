@@ -131,6 +131,13 @@ test.describe('the trip', () => {
     await expect(page.getByRole('heading', { name: 'What to buy, and where' })).toHaveCount(0)
     await recent.click()
     await expect(page).toHaveURL(/\/trip\/history\/[0-9a-f-]+$/)
+    // Opened from the home screen, both «back»s lead home, and the chevron says so (MOL-77).
+    await page.getByRole('button', { name: 'Back Trip' }).click()
+    await expect(page).toHaveURL(/\/$/)
+    await recent.click()
+    await expect(page).toHaveURL(/\/trip\/history\/[0-9a-f-]+$/)
+    await page.goBack()
+    await expect(page).toHaveURL(/\/$/)
   })
 
   test('is started with no connection, and catches up when it comes back', async ({
@@ -196,5 +203,27 @@ test.describe('the home screen with no trip (MOL-77)', () => {
     await page.addStyleTag({ content: 'html { font-size: 130% }' })
     await expect(page.getByRole('heading', { name: 'What to buy, and where' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Start a trip' })).toBeInViewport({ ratio: 1 })
+  })
+
+  // Large text on a small phone: the home screen is taller than the window for real — no filler
+  // — so the title collapses, and the last step scrolls out from under the strip (review Р-6, С-8).
+  test('on a small phone with large text the title collapses and the last step is reachable', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 667 })
+    await signedIn(page)
+    await page.addStyleTag({ content: 'html { font-size: 130% }' })
+    await expect(page.getByRole('heading', { name: 'What to buy, and where' })).toBeVisible()
+    const start = page.getByRole('button', { name: 'Start a trip' })
+
+    await page.evaluate(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })
+    })
+    await expect(page.locator('.screen')).toHaveClass(/collapsed/)
+    await expect(start).toBeInViewport({ ratio: 1 })
+    // The last step stands above the strip, not under it.
+    const step = await page.getByRole('button', { name: /What to buy”?\s/ }).boundingBox()
+    const strip = await page.locator('.dock').boundingBox()
+    expect(step && strip && step.y + step.height <= strip.y).toBe(true)
   })
 })

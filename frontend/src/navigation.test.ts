@@ -5,7 +5,7 @@ import { defineComponent, h } from 'vue'
 import { createRouter, createWebHistory, RouterView } from 'vue-router'
 import type { Router } from 'vue-router'
 import { createAppI18n } from '@/i18n'
-import { backMove, settleColdStart, tabMove } from '@/navigation'
+import { backTarget, settleColdStart, tabMove } from '@/navigation'
 import type { TabMove } from '@/navigation'
 import type { RouteName, Tab } from '@/router'
 import { routes } from '@/router'
@@ -37,19 +37,6 @@ describe('tabMove — «Trip» is home', () => {
   })
 })
 
-describe('backMove — the chevron agrees with the system button', () => {
-  it('steps back when the parent is underneath', () => {
-    expect(backMove('trip', 'trip')).toBe('back')
-  })
-
-  it.each<RouteName | undefined>([undefined, 'advice', 'verdicts'])(
-    'replaces onto the parent when %s is underneath, never leaving the app',
-    (below) => {
-      expect(backMove('trip', below)).toEqual({ replace: 'trip' })
-    },
-  )
-})
-
 /**
  * A web history, not a memory one: the entry underneath is what `history.state.back` says, and
  * only the web history writes it. The document's own state is cleared first — the history of
@@ -77,6 +64,50 @@ async function stepBack(router: Router): Promise<string> {
   })
   return router.currentRoute.value.fullPath
 }
+
+describe('backTarget — the chevron agrees with the system button', () => {
+  const TRIP = 'aaaaaaaa-0000-4000-8000-000000000012'
+  const target = (router: Router) => {
+    const found = backTarget(router, router.currentRoute.value)
+    return found && { path: found.location.path, step: found.step }
+  }
+
+  it('steps back when the parent is underneath', async () => {
+    const router = await fresh('/')
+    await router.push('/trip/add')
+    expect(target(router)).toEqual({ path: '/', step: true })
+  })
+
+  it('replaces onto the parent when nothing of ours is underneath, never leaving the app', async () => {
+    const router = await fresh('/trip/add')
+    expect(target(router)).toEqual({ path: '/', step: false })
+  })
+
+  it('replaces onto the parent over a screen that is not an ancestor', async () => {
+    const router = await fresh('/advice')
+    await router.push(`/trip/history/${TRIP}`)
+    expect(target(router)).toEqual({ path: '/trip/history', step: false })
+  })
+
+  // A finished trip opened from the home screen goes back there — both «back»s (MOL-77).
+  it('steps back onto an ancestor further up: the home screen under a finished trip', async () => {
+    const router = await fresh('/')
+    await router.push(`/trip/history/${TRIP}`)
+    expect(target(router)).toEqual({ path: '/', step: true })
+    expect(backTarget(router, router.currentRoute.value)?.location.meta.titleKey).toBe('trip.title')
+  })
+
+  it('opened from the history, a finished trip still goes back to the history', async () => {
+    const router = await fresh('/trip/history')
+    await router.push(`/trip/history/${TRIP}`)
+    expect(target(router)).toEqual({ path: '/trip/history', step: true })
+  })
+
+  it('a section has no chevron at all', async () => {
+    const router = await fresh('/')
+    expect(backTarget(router, router.currentRoute.value)).toBeNull()
+  })
+})
 
 describe('settleColdStart', () => {
   it('lays the parent underneath a nested screen opened cold', async () => {
