@@ -285,11 +285,15 @@ export default defineComponent({
   width: 100%;
   min-height: calc(var(--touch-target-lg) + var(--space-3));
   padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
-  border: 0;
   color: var(--text);
   background: var(--surface);
   text-align: left;
   font: inherit;
+}
+
+/* At no weight, so the rule between rows stays `AppCard list`'s (see `TripHistoryRow`). */
+:where(.line) {
+  border: 0;
 }
 
 .link {

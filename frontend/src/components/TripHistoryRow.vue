@@ -49,7 +49,6 @@ export default defineComponent({
   width: 100%;
   min-height: calc(var(--touch-target-lg) + var(--space-3));
   padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
-  border: 0;
   color: var(--text);
   background: var(--surface);
   text-align: left;
@@ -63,6 +62,12 @@ export default defineComponent({
   &:focus-visible {
     @include focus-ring;
   }
+}
+
+/* Without a border of its own, and at no weight: the rule between rows is `AppCard list`'s, and a
+   plain `border: 0` here outweighed it — the rows ran together. */
+:where(.history-row) {
+  border: 0;
 }
 
 .text {
