@@ -7,6 +7,7 @@ import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
+import { useTripHistoryStore } from '@/stores/tripHistory'
 import TripHome from '@/components/TripHome.vue'
 
 const tripHistory = vi.fn<() => Promise<TripHistory>>()
@@ -44,6 +45,15 @@ const card = (n: number, placeName: string, boughtAt: Date) => ({
   placeName,
   boughtAt,
 })
+
+/** An answer held in flight until the test says so. */
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
 
 const mounted: VueWrapper[] = []
 
@@ -84,9 +94,9 @@ function remember(trips: TripHistoryEntry[] = [], local: unknown[] = []) {
       },
       selected: null,
       local,
-      answered: true,
     }),
   )
+  localStorage.setItem(`molvia.trip-history-answered.${ME}`, '1')
 }
 
 describe('TripHome', () => {
@@ -194,6 +204,96 @@ describe('TripHome', () => {
     })
   })
 
+  describe('ответ, под которым сдвинулся список (адверсариальное А)', () => {
+    it('запись другого окна в полёте — ответ спрошен заново, а не вечный скелет', async () => {
+      const first = deferred<TripHistory>()
+      tripHistory.mockReturnValueOnce(first.promise)
+      tripHistory.mockResolvedValue({ trips: [trip(1), trip(2)], nextCursor: null })
+      const { view } = await render()
+
+      const key = `molvia.trip-history.${ME}`
+      localStorage.setItem(
+        key,
+        JSON.stringify({ page: { trips: [], nextCursor: null }, selected: null, local: [] }),
+      )
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+      first.resolve({ trips: [trip(1), trip(2)], nextCursor: null })
+      await flushPromises()
+
+      expect(tripHistory).toHaveBeenCalledTimes(2)
+      expect(view.findAll('.history-row')).toHaveLength(2)
+      expect(view.find('.skeleton').exists()).toBe(false)
+    })
+
+    it('завершение, взятое назад в полёте (forgetLocal), — тоже спрошено заново', async () => {
+      const first = deferred<TripHistory>()
+      tripHistory.mockReturnValueOnce(first.promise)
+      tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+      const { view } = await render()
+
+      useTripHistoryStore().capture(
+        'bbbbbbbb-0000-4000-8000-0000000000fe',
+        'SAS',
+        new Date(),
+        new Date(),
+        'AMD',
+        null,
+      )
+      useTripHistoryStore().forgetLocal('bbbbbbbb-0000-4000-8000-0000000000fe')
+      first.resolve({ trips: [trip(1)], nextCursor: null })
+      await flushPromises()
+
+      expect(view.findAll('.history-row')).toHaveLength(1)
+    })
+
+    it('список сдвигается под каждым ответом — через три раза тихая ошибка, а не скелет', async () => {
+      tripHistory.mockImplementation(() => {
+        // Every answer lands on a list another window has just written.
+        useTripHistoryStore().capture(
+          `bbbbbbbb-0000-4000-8000-0000000000${String(tripHistory.mock.calls.length).padStart(2, '0')}`,
+          'SAS',
+          new Date(),
+          new Date(),
+          'AMD',
+          null,
+        )
+        return Promise.resolve({ trips: [], nextCursor: null })
+      })
+      const { view } = await render()
+      expect(tripHistory).toHaveBeenCalledTimes(3)
+      expect(view.find('.skeleton').exists()).toBe(false)
+    })
+  })
+
+  describe('вчерашний пустой ответ не сильнее сегодняшнего (адверсариальное Г)', () => {
+    it('сервер отвечает ошибкой — видна ошибка с «Повторить», а не вступление', async () => {
+      tripHistory.mockRejectedValue(new Error('HTTP 500'))
+      const { view } = await render({
+        before: () => {
+          remember()
+        },
+      })
+      expect(view.text()).toContain(ru.trip.home.error.title)
+      expect(view.text()).not.toContain(ru.trip.home.intro.title)
+      expect(view.find('.retry').exists()).toBe(true)
+    })
+
+    it('покупки ждут оценки — значит, не новичок: карточка есть, вступления нет', async () => {
+      tripHistory.mockReturnValue(new Promise(() => undefined))
+      pendingVerdicts.mockResolvedValue({
+        items: [card(1, 'Ереван Сити', yesterday()), card(2, 'Ереван Сити', yesterday())],
+        total: 2,
+      })
+      const { view } = await render({
+        before: () => {
+          remember()
+        },
+      })
+      expect(view.text()).toContain('2 покупки ждут оценки')
+      expect(view.text()).not.toContain(ru.trip.home.intro.title)
+    })
+  })
+
   describe('человек с историей', () => {
     it.each([
       [1, 1],
@@ -287,7 +387,35 @@ describe('TripHome', () => {
       expect(router.currentRoute.value.name).toBe('verdicts')
     })
 
-    it('несколько: «Из 2 походов» — поход узнаётся по месту и дню', async () => {
+    it('один поход через полночь — всё ещё один поход (В1)', async () => {
+      const late = yesterday()
+      late.setHours(23, 50, 0, 0)
+      const after = new Date(late.getTime() + 20 * 60_000)
+      tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+      pendingVerdicts.mockResolvedValue({
+        items: [card(1, 'Ереван Сити', late), card(2, 'Ереван Сити', after)],
+        total: 2,
+      })
+      const { view } = await render()
+      expect(view.text()).toContain('Из похода в «Ереван Сити»')
+      expect(view.text()).not.toContain('Из 2 походов')
+    })
+
+    it('неполная страница из одного похода — поход не называется за всех (В2)', async () => {
+      tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+      pendingVerdicts.mockResolvedValue({
+        items: Array.from({ length: 50 }, (_, i) => ({
+          ...card(1, 'Ереван Сити', yesterday()),
+          itemId: `cccccccc-0000-4000-8000-${String(i).padStart(12, '0')}`,
+        })),
+        total: 60,
+      })
+      const { view } = await render()
+      expect(view.text()).toContain('60 покупок ждут оценки')
+      expect(view.text()).not.toContain('Из похода')
+    })
+
+    it('несколько: «Из 2 походов» — поход узнаётся по месту и промежутку', async () => {
       tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
       pendingVerdicts.mockResolvedValue({
         items: [card(1, 'Ереван Сити', yesterday()), card(2, 'SAS', yesterday())],

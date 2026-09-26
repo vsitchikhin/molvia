@@ -69,7 +69,7 @@
         </button>
       </AppCard>
 
-      <p class="caption">{{ t('trip.home.recent.caption') }}</p>
+      <p v-if="shown !== 'pending-only'" class="caption">{{ t('trip.home.recent.caption') }}</p>
 
       <ScreenSkeleton v-if="shown === 'loading'" :groups="[30, 62, 48, 70]" />
 
@@ -95,16 +95,18 @@
       </AppCard>
 
       <!-- Quiet on purpose: a red block's «Повторить» is a main button, and a second one beside
-           «Начать поход» would compete for the thumb. The trip starts without the history. -->
-      <AppCard v-else list>
+           «Начать поход» would compete for the thumb. The trip starts without the history. When
+           the trip could not be asked for either, the red block above is already there and its
+           «Повторить» asks for both — this card then only names what is missing (adversarial Д). -->
+      <AppCard v-else-if="shown === 'error'" list>
         <div class="line">
           <IconAlert class="icon bad" aria-hidden="true" />
           <span class="text">
             <span class="title">{{ t('trip.home.error.title') }}</span>
-            <span class="sub">{{ t('trip.home.error.body') }}</span>
+            <span v-if="!tripFailed" class="sub">{{ t('trip.home.error.body') }}</span>
           </span>
         </div>
-        <button class="line link retry" type="button" @click="load">
+        <button v-if="!tripFailed" class="line link retry" type="button" @click="load">
           <IconRefresh class="icon" aria-hidden="true" />
           <span class="text">{{ t('state.retry') }}</span>
         </button>
@@ -114,9 +116,10 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent } from 'vue'
+import { computed, defineComponent, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import type { PendingVerdict } from '@molvia/model'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconBasketPlus from '~icons/mdi/basket-plus-outline'
 import IconCart from '~icons/mdi/cart-outline'
@@ -136,6 +139,29 @@ import { useNavigation } from '@/navigation'
 
 /** How many finished trips the home screen lists: three fit above «Начать поход» on 390×844. */
 const RECENT = 3
+
+/** Purchases in one shop further apart than this are two trips: a trip at a shelf takes less. */
+const TRIP_GAP_HOURS = 6
+
+/** Cards grouped into trips by place and by the gap between purchases, newest purchase kept. */
+function tripsOf(cards: readonly PendingVerdict[]): { place: string; latest: Date }[] {
+  const byPlace = new Map<string, number[]>()
+  for (const card of cards) {
+    const times = byPlace.get(card.placeName) ?? []
+    times.push(card.boughtAt.getTime())
+    byPlace.set(card.placeName, times)
+  }
+  const trips: { place: string; latest: Date }[] = []
+  for (const [place, times] of byPlace) {
+    times.sort((a, b) => a - b)
+    times.forEach((at, index) => {
+      const next = times[index + 1]
+      if (next === undefined || next - at > TRIP_GAP_HOURS * 3_600_000)
+        trips.push({ place, latest: new Date(at) })
+    })
+  }
+  return trips
+}
 
 /**
  * «Поход» with no trip going on — the first screen a new person meets (MOL-77). A newcomer is
@@ -170,6 +196,10 @@ export default defineComponent({
   props: {
     /** The trip itself could not be asked for, and there was no connection. */
     offline: { type: Boolean, default: false },
+    /** The trip itself could not be asked for, with a connection: the red block above says so. */
+    tripFailed: { type: Boolean, default: false },
+    /** Raised by that block's «Повторить», which asks for the history as well (adversarial Д). */
+    retries: { type: Number, default: 0 },
   },
   setup(props) {
     const router = useRouter()
@@ -181,31 +211,52 @@ export default defineComponent({
 
     const isOffline = computed(() => props.offline || trouble.value === 'offline')
 
-    const shown = computed<'new' | 'recent' | 'loading' | 'no-memory' | 'error'>(() => {
-      if (rows.value.length > 0) return 'recent'
-      if (history.answered) return 'new'
-      if (trouble.value === null) return 'loading'
-      return trouble.value === 'offline' ? 'no-memory' : 'error'
-    })
-
-    const recent = computed(() => rows.value.slice(0, RECENT))
-
     const pending = computed(() => queue.count.value)
 
     /**
-     * «Из похода в «Ереван Сити» вчера», or «Из 3 походов». A card carries the place and the day
-     * of its latest purchase, not the trip (MOL-28), so a trip is told by that pair — the best the
-     * phone knows. Counted over the page the queue holds: past fifty items the count is of them.
+     * An empty answer remembered from an earlier launch is not stronger than today's failure: the
+     * error stays in sight (adversarial Г). Nor than purchases waiting for a verdict — a purchase
+     * is made in a trip, so they alone say this is no newcomer, whatever the cache holds. What is
+     * left is offline with an empty answer remembered: the introduction, as for a newcomer — a
+     * named limit, since Safari and the installed app keep separate shelves.
+     */
+    const shown = computed<'new' | 'recent' | 'pending-only' | 'loading' | 'no-memory' | 'error'>(
+      () => {
+        if (rows.value.length > 0) return 'recent'
+        if (trouble.value === 'error') return 'error'
+        if (history.answered) return pending.value > 0 ? 'pending-only' : 'new'
+        return trouble.value === 'offline' ? 'no-memory' : 'loading'
+      },
+    )
+
+    const recent = computed(() => rows.value.slice(0, RECENT))
+
+    watch(
+      () => props.retries,
+      () => {
+        screen.load()
+      },
+    )
+
+    /**
+     * «Из похода в «Ереван Сити» вчера», or «Из 3 походов». A card carries the place and the moment
+     * of its latest purchase, not the trip (MOL-28), so trips are told apart by place and by a gap
+     * of `TRIP_GAP_HOURS` between purchases — not by the calendar day, which split a trip over
+     * midnight into two (adversarial В1). Named limit: two trips to one shop closer than that are
+     * one. Counted over the page the queue holds; when the server holds more, one trip on the page
+     * is not claimed for all of them (adversarial В2) and the line is left out.
      */
     const pendingFrom = computed(() => {
-      const trips = new Map<string, { place: string; when: string }>()
-      for (const card of queue.cards.value) {
-        const when = purchaseDay(card.boughtAt, locale.value)
-        trips.set(`${card.placeName}\u0000${when}`, { place: card.placeName, when })
-      }
-      const [only] = trips.values()
-      if (trips.size === 1 && only) return t('trip.home.pending.one_trip', only)
-      if (trips.size > 1) return t('trip.home.pending.many_trips', { n: trips.size }, trips.size)
+      const trips = tripsOf(queue.cards.value)
+      const [only] = trips
+      const partial = pending.value > queue.cards.value.length
+      if (trips.length === 1 && only && !partial)
+        return t('trip.home.pending.one_trip', {
+          place: only.place,
+          when: purchaseDay(only.latest, locale.value),
+        })
+      if (trips.length > 1)
+        return t('trip.home.pending.many_trips', { n: trips.length }, trips.length)
       return null
     })
 

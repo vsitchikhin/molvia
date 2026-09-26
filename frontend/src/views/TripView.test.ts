@@ -239,6 +239,24 @@ describe('TripView', () => {
       )
     })
 
+    it('сервер лежит — одна «Повторить», и она перечитывает и поход, и историю (Д)', async () => {
+      currentTrip.mockRejectedValue(new Error('HTTP 500'))
+      tripHistory.mockRejectedValue(new Error('HTTP 500'))
+      const { view } = await render()
+      expect(view.findAll('button').filter((b) => b.text() === ru.state.retry)).toHaveLength(1)
+      // Похода нет — и «позиции остались на телефоне» было бы неправдой.
+      expect(view.text()).toContain(ru.trip.error.body_none)
+      expect(view.text()).not.toContain(ru.trip.error.body)
+
+      currentTrip.mockResolvedValue(null)
+      tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
+      await button(view, ru.state.retry).trigger('click')
+      await flushPromises()
+      expect(view.text()).not.toContain(ru.trip.error.title)
+      expect(view.text()).not.toContain(ru.trip.home.error.title)
+      expect(view.text()).toContain(ru.trip.home.intro.title)
+    })
+
     it('при открытом походе в полосе — итог, а «Начать поход» нет', async () => {
       currentTrip.mockResolvedValue(trip(handoff()))
       const { view } = await render()

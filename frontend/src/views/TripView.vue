@@ -11,9 +11,11 @@
     <template v-else>
       <!-- Over whatever the screen shows, never instead of it: at a shelf the list the phone
            remembers is worth more than a red square, and the purchases are all still there
-           (MOL-19). Above «Новый поход» too — otherwise a trip the server holds but could not be
-           asked for reads as «no trip at all». -->
-      <!-- Without a trip the home screen says it in its own words: the trip can still start. -->
+           (MOL-19). Without a trip the home screen says it in its own words — the trip can still
+           start (MOL-77). The price, named: offline with nothing remembered, a trip left open on
+           another device reads as «no trip» until the connection comes back; a start made then
+           goes through the queue, and `trip.elsewhere` asks about the open one. The error below
+           stays in both phases, in words that fit each. -->
       <ScreenState
         v-if="trouble === 'offline' && phase !== 'none'"
         class="notice"
@@ -29,8 +31,8 @@
         kind="error"
         inline
         :title="t('trip.error.title')"
-        :body="t('trip.error.body')"
-        @retry="load"
+        :body="phase === 'none' ? t('trip.error.body_none') : t('trip.error.body')"
+        @retry="retry"
       />
     </template>
 
@@ -86,7 +88,12 @@
       :body="t('trip.unsent.body')"
     />
 
-    <TripHome v-if="phase === 'none'" :offline="trouble === 'offline'" />
+    <TripHome
+      v-if="phase === 'none'"
+      :offline="trouble === 'offline'"
+      :trip-failed="trouble === 'error'"
+      :retries="retries"
+    />
 
     <template v-else-if="phase === 'going'">
       <TripRateNotes v-if="trip" :trip="trip" />
@@ -314,6 +321,8 @@ export default defineComponent({
     const starting = ref(false)
     const clarifying = ref(false)
     const finishing = ref(false)
+    /** The red block's «Повторить» without a trip asks for the history too (adversarial Д). */
+    const retries = ref(0)
 
     async function load(): Promise<void> {
       // No identity yet — the first launch is still making one, and there is nothing to ask for
@@ -542,7 +551,11 @@ export default defineComponent({
       clarifying,
       finishing,
       finish,
-      load: () => void load(),
+      retries,
+      retry: () => {
+        retries.value += 1
+        void load()
+      },
       refusalKey,
       refusalTitle,
       heldBack,

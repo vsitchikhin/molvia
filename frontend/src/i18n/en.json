@@ -37,7 +37,8 @@
     },
     "error": {
       "title": "The server did not answer",
-      "body": "Your items are still on the phone, nothing is lost"
+      "body": "Your items are still on the phone, nothing is lost",
+      "body_none": "Could not check whether a trip is going on. You can start a new one anyway"
     },
     "offline": {
       "title": "No connection — no matter",
