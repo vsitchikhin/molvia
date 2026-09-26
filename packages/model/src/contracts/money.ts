@@ -1,23 +1,45 @@
 import { z } from 'zod'
 import { spendingCategoryViewCodec, spendingCategoryViewOf, spendingViewCodec } from './spending'
 import { exchangeDaySchema } from '#model/entities/exchange'
-import type { MoneyMonth, MonthEntry } from '#model/entities/money-month'
+import { journalKeyOf, journalOrder, lastDayOf } from '#model/entities/money-month'
+import type { JournalKey, MoneyMonth, MonthEntry } from '#model/entities/money-month'
 import type { Spending } from '#model/entities/spending'
 import { categoryOrder } from '#model/entities/spending-category'
 import type { SpendingCategory } from '#model/entities/spending-category'
 import { currencySchema, moneyCodec, signedMoneyCodec } from '#model/values/money'
-import { rateCodec } from '#model/values/rates'
+import { isRateDay, rateCodec } from '#model/values/rates'
 
-/** A calendar month as `YYYY-MM`. */
-export const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+/**
+ * A calendar month as `YYYY-MM`, of the days a rate may be dated by: nothing of one's money is
+ * older, and `0000-01` reached Postgres, which has no year zero, as a 500 (adversarial Д4).
+ */
+export const monthSchema = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+  .refine((month) => isRateDay(lastDayOf(month)))
 
 /** How many rows of the journal one answer carries (handoff 01, «Догрузка»). */
 export const MONEY_JOURNAL_PAGE = 40
 
-/** The rows already shown, as the cursor of the next page: an offset in the month's order. */
-export const moneyMonthQuerySchema = z.strictObject({
-  cursor: z.coerce.number().int().min(0).optional(),
-})
+/**
+ * The cursor of the next page: the key of the last row shown — day, moment, name — never an offset,
+ * which moved under the page whenever something was written above it (adversarial Д3).
+ */
+const JOURNAL_CURSOR = /^(\d{4}-\d{2}-\d{2})~(\d{1,16})~([\da-f-]{36}(?::[A-Z]{3})?)$/
+
+export const journalCursorCodec = z.codec(
+  z.string().regex(JOURNAL_CURSOR),
+  z.custom<JournalKey>(),
+  {
+    decode: (text) => {
+      const [, day = '', moment = '', id = ''] = JOURNAL_CURSOR.exec(text) ?? []
+      return { day, moment: Number(moment), id }
+    },
+    encode: (key) => `${key.day}~${String(key.moment)}~${key.id}`,
+  },
+)
+
+export const moneyMonthQuerySchema = z.strictObject({ cursor: journalCursorCodec.optional() })
 
 const entryCodec = z.discriminatedUnion('kind', [
   z.strictObject({
@@ -67,7 +89,7 @@ export const moneyMonthCodec = z.strictObject({
     }),
   ),
   /** The cursor of the next page, or null when the journal is whole. */
-  cursor: z.int().min(0).nullable(),
+  cursor: journalCursorCodec.nullable(),
   /** Rows not yet sent, for «И ещё N трат» — and the days they span. */
   remaining: z.int().min(0),
   remainingFrom: exchangeDaySchema.nullable(),
@@ -103,16 +125,18 @@ function entryViewOf(entry: MonthEntry) {
       }
 }
 
-/** The month as it goes on the wire: one page of the journal from `cursor`, and everything else whole. */
+/** The month as it goes on the wire: one page of the journal after `after`, and everything else whole. */
 export function moneyMonthViewOf(
   month: MoneyMonth,
   previousSpent: MoneyMonth['spent'] | null,
   categories: readonly SpendingCategory[],
-  cursor = 0,
+  after?: JournalKey,
 ): MoneyMonthView {
-  const rows = month.days.flatMap((day) => day.entries.map((entry) => ({ day, entry })))
-  const page = rows.slice(cursor, cursor + MONEY_JOURNAL_PAGE)
-  const rest = rows.slice(cursor + MONEY_JOURNAL_PAGE)
+  const rows = month.days
+    .flatMap((day) => day.entries.map((entry) => ({ day, entry, key: journalKeyOf(entry) })))
+    .filter(({ key }) => after === undefined || journalOrder(after, key) < 0)
+  const page = rows.slice(0, MONEY_JOURNAL_PAGE)
+  const rest = rows.slice(MONEY_JOURNAL_PAGE)
 
   const days: MoneyMonthView['days'] = []
   for (const { day, entry } of page) {
@@ -138,7 +162,7 @@ export function moneyMonthViewOf(
     previousSpent,
     categories: categoryOrder(categories).map(spendingCategoryViewOf),
     days,
-    cursor: rest.length > 0 ? cursor + MONEY_JOURNAL_PAGE : null,
+    cursor: rest.length > 0 ? (page.at(-1)?.key ?? null) : null,
     remaining: rest.length,
     remainingFrom: rest.at(-1)?.day.day ?? null,
     remainingTo: rest[0]?.day.day ?? null,

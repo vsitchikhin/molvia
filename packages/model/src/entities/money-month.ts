@@ -2,7 +2,7 @@ import { spendingIn } from '#model/entities/spending'
 import type { Spending } from '#model/entities/spending'
 import { TRIP_CATEGORY } from '#model/entities/spending-category'
 import type { SpendingCategory } from '#model/entities/spending-category'
-import { convertMoney } from '#model/entities/trip'
+import { convertAcross } from '#model/entities/trip'
 import type { Income } from '#model/entities/income'
 import { INT8_MAX } from '#model/support/decimal'
 import type { Currency, Money } from '#model/values/money'
@@ -39,6 +39,11 @@ export function lastDayOf(month: Month): string {
 export interface TripLine {
   readonly tripId: string
   readonly placeName: string
+  /**
+   * The purchases behind this line's sum — of its currency, with a price (owner's decision В-7):
+   * with the trip's count on each, a trip of one purchase in drams and one in dollars read «2
+   * покупки» twice. A purchase with no price is in no line, as it is in no sum.
+   */
   readonly items: number
   readonly finishedOn: string
   readonly finishedAt: Date
@@ -70,7 +75,7 @@ export interface MoneyMonth {
   readonly foreign: readonly { readonly amount: Money; readonly counted: Money }[]
   /** `spent` in the income currency by the month's rate — null when there is none. */
   readonly spentIncome: Money | null
-  /** What came in, in the income currency, each income by the official rate of its own day. */
+  /** What came in, in the income currency, each income by the official rate of its own day (MOL-66). */
   readonly income: Money
   readonly incomeUncounted: readonly Money[]
   /** What came in less what was spent, in the income currency; signed. Null without a rate. */
@@ -94,12 +99,20 @@ export interface MoneyMonthInput {
   readonly trips: readonly TripLine[]
   readonly incomes: readonly Income[]
   readonly categories: readonly SpendingCategory[]
-  /** The month's rate from the spending currency into the income one; `base` is the income one. */
+  /** The month's rate between the spending currency and the income one, on either side. */
   readonly rate: ExchangeRate | null
   readonly rateKind: 'live' | 'frozen'
-  /** A trip's purchase in a third currency, into the spending one — the official rate of its day. */
-  readonly tripInSpend: ConvertOn
-  /** An income in another currency, into the income one — the official rate of its day (MOL-66). */
+  /**
+   * Into the spending currency, by the rule of the day a spending's snapshot is taken by — the
+   * person's own rate, else the central bank's: a trip's line in another currency, and a spending
+   * with no snapshot into the spending currency of now (review Р-3, Р-5). Ten dollars at the shop and
+   * ten at the barber's on one day come to the same.
+   */
+  readonly inSpend: ConvertOn
+  /**
+   * An income in another currency, into the income one — the official rate of its day only (MOL-66,
+   * В-1): never what the money already held cost, which is a price of other money.
+   */
   readonly incomeInIncome: ConvertOn
 }
 
@@ -114,19 +127,46 @@ function listOf(sums: Map<Currency, bigint>): Money[] {
     .sort((a, b) => (a.currency < b.currency ? -1 : a.currency > b.currency ? 1 : 0))
 }
 
+/**
+ * Where a row of the journal stands: its day, its moment — when the spending was written, when the
+ * trip was finished — and its name. The journal is newest first by these three, and the next page
+ * starts after the key of the last row shown (adversarial Д3): an offset moved under a page every
+ * time something was written above it, and a spending saved while the month was being read came
+ * twice, one removed made another come never.
+ */
+export interface JournalKey {
+  readonly day: string
+  readonly moment: number
+  readonly id: string
+}
+
+export function journalKeyOf(entry: MonthEntry): JournalKey {
+  return entry.kind === 'manual'
+    ? {
+        day: entry.spending.spentOn,
+        moment: entry.spending.createdAt.getTime(),
+        id: entry.spending.id,
+      }
+    : {
+        day: entry.trip.finishedOn,
+        moment: entry.trip.finishedAt.getTime(),
+        id: `${entry.trip.tripId}:${entry.trip.amount.currency}`,
+      }
+}
+
+/** Below zero when `a` comes first in the journal — the newer — and above when `b` does. */
+export function journalOrder(a: JournalKey, b: JournalKey): number {
+  if (a.day !== b.day) return a.day < b.day ? 1 : -1
+  if (a.moment !== b.moment) return b.moment - a.moment
+  return a.id === b.id ? 0 : a.id < b.id ? 1 : -1
+}
+
 function newestFirst(a: MonthEntry, b: MonthEntry): number {
-  const dayOf = (entry: MonthEntry) =>
-    entry.kind === 'manual' ? entry.spending.spentOn : entry.trip.finishedOn
-  const momentOf = (entry: MonthEntry) =>
-    entry.kind === 'manual' ? entry.spending.createdAt.getTime() : entry.trip.finishedAt.getTime()
-  const idOf = (entry: MonthEntry) =>
-    entry.kind === 'manual'
-      ? entry.spending.id
-      : `${entry.trip.tripId}:${entry.trip.amount.currency}`
-  const dayA = dayOf(a)
-  const dayB = dayOf(b)
-  if (dayA !== dayB) return dayA < dayB ? 1 : -1
-  return momentOf(b) - momentOf(a) || (idOf(a) < idOf(b) ? 1 : -1)
+  return journalOrder(journalKeyOf(a), journalKeyOf(b))
+}
+
+function amountOf(entry: MonthEntry): Money {
+  return entry.kind === 'manual' ? entry.spending.amount : entry.trip.amount
 }
 
 /**
@@ -140,45 +180,53 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
   const { spendCurrency: spend, incomeCurrency: incomeCurrency } = input
   const groceries = input.categories.find((category) => category.preset === TRIP_CATEGORY)
 
-  const entries: MonthEntry[] = [
+  const inSpend = (amount: Money, day: string) =>
+    amount.currency === spend ? amount : input.inSpend(amount, day)
+  const counted: MonthEntry[] = [
     ...input.spendings.map((spending): MonthEntry => ({
       kind: 'manual',
       spending,
-      counted: spendingIn(spending, spend),
+      counted: spendingIn(spending, spend) ?? inSpend(spending.amount, spending.spentOn),
     })),
     ...input.trips.map((trip): MonthEntry => ({
       kind: 'trip',
       trip,
-      counted:
-        trip.amount.currency === spend
-          ? trip.amount
-          : input.tripInSpend(trip.amount, trip.finishedOn),
+      counted: inSpend(trip.amount, trip.finishedOn),
     })),
   ].sort(newestFirst)
 
+  // Every sum below is at most `spent`, and `spent` is held within what money holds: a row that
+  // would carry it past is «не посчитано», so the month is read and the row can be found and
+  // removed — the rule MOL-66 set for an income no money can hold (adversarial Д5).
   let spentMinor = 0n
   const uncounted = new Map<Currency, bigint>()
   const foreign = new Map<Currency, { amount: bigint; counted: bigint }>()
   const byCategory = new Map<string, bigint>()
-  for (const entry of entries) {
-    const amount = entry.kind === 'manual' ? entry.spending.amount : entry.trip.amount
-    if (entry.counted === null) {
+  const entries = counted.map((entry): MonthEntry => {
+    const amount = amountOf(entry)
+    const value = entry.counted
+    const held = foreign.get(amount.currency) ?? { amount: 0n, counted: 0n }
+    if (
+      value === null ||
+      spentMinor + value.minor > INT8_MAX ||
+      (amount.currency !== spend && held.amount + amount.minor > INT8_MAX)
+    ) {
       add(uncounted, amount)
-      continue
+      return { ...entry, counted: null }
     }
-    spentMinor += entry.counted.minor
+    spentMinor += value.minor
     if (amount.currency !== spend) {
-      const held = foreign.get(amount.currency) ?? { amount: 0n, counted: 0n }
       foreign.set(amount.currency, {
         amount: held.amount + amount.minor,
-        counted: held.counted + entry.counted.minor,
+        counted: held.counted + value.minor,
       })
     }
     const categoryId = entry.kind === 'manual' ? entry.spending.categoryId : groceries?.id
     if (categoryId !== undefined) {
-      byCategory.set(categoryId, (byCategory.get(categoryId) ?? 0n) + entry.counted.minor)
+      byCategory.set(categoryId, (byCategory.get(categoryId) ?? 0n) + value.minor)
     }
-  }
+    return entry
+  })
 
   const days = new Map<string, MonthEntry[]>()
   for (const entry of entries) {
@@ -193,7 +241,8 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
       income.amount.currency === incomeCurrency
         ? income.amount
         : input.incomeInIncome(income.amount, income.receivedOn)
-    if (counted === null) add(incomeUncounted, income.amount)
+    if (counted === null || incomeMinor + counted.minor > INT8_MAX)
+      add(incomeUncounted, income.amount)
     else incomeMinor += counted.minor
   }
 
@@ -203,7 +252,7 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
       ? { minor: spentMinor, currency: incomeCurrency }
       : input.rate === null
         ? null
-        : convertMoney(spent, input.rate)
+        : convertAcross(spent, input.rate)
   const income: Money = { minor: incomeMinor, currency: incomeCurrency }
 
   return {
@@ -244,10 +293,7 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
         minor: list.reduce((sum, entry) => sum + (entry.counted?.minor ?? 0n), 0n),
         currency: spend,
       },
-      estimated: list.some((entry) => {
-        const amount = entry.kind === 'manual' ? entry.spending.amount : entry.trip.amount
-        return amount.currency !== spend
-      }),
+      estimated: list.some((entry) => amountOf(entry).currency !== spend),
       entries: list,
     })),
   }

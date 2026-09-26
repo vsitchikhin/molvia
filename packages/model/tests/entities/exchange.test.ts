@@ -10,10 +10,11 @@ import {
   lastReceipt,
   officialDifference,
   ownRates,
+  walletCross,
   walletRate,
 } from '#model/entities/exchange'
 import type { Exchange, OfficialRateOf } from '#model/entities/exchange'
-import { convertMoney } from '#model/entities/trip'
+import { convertAcross, convertMoney } from '#model/entities/trip'
 import { formatEstimate, money } from '#model/values/money'
 import type { Currency } from '#model/values/money'
 import { RATE_MAX, parseRate, yerevanMidnight } from '#model/values/rates'
@@ -531,5 +532,58 @@ describe('isPlausibleExchange', () => {
   it('refuses the same in the entity itself', () => {
     const absurd = { ...first, given: money(100n, 'RUB'), received: money(500_000_000n, 'AMD') }
     expect(exchangeSchema.safeParse(absurd).error?.issues[0]?.message).toBe(ERROR.INVALID_RATE)
+  })
+})
+
+describe('walletCross (MOL-73)', () => {
+  // A dollar is 89,0115 ₽ and a dram 1/4,1 ₽, so a dollar is 364,94715 ֏ — exactly.
+  const chain = [
+    exchange('89011.50 RUB', '1000 USD', '2026-08-05'),
+    exchange('100000 RUB', '410000 AMD', '2026-08-06'),
+  ]
+
+  it('prices the pair by one walk and rounds once — two rounded wallets lost 24 ֏ on 1 500 $ (Р-1)', () => {
+    const rate = walletCross(chain, 'RUB', 'USD', 'AMD', '2026-08-10')
+    expect(rate).toMatchObject({ base: 'USD', quote: 'AMD', scaled: parseRate('364.94715') })
+    expect(rate?.asOf).toEqual(yerevanMidnight('2026-08-06'))
+    expect(convertAcross(money(150000n, 'USD'), rate!)).toEqual(money(54742073n, 'AMD'))
+  })
+
+  it('stands on the side whose number is at least one, whichever way it is asked', () => {
+    expect(walletCross(chain, 'RUB', 'AMD', 'USD', '2026-08-10')).toMatchObject({
+      base: 'USD',
+      quote: 'AMD',
+    })
+    expect(walletCross(chain, 'RUB', 'AMD', 'RUB', '2026-08-10')).toMatchObject({
+      base: 'RUB',
+      quote: 'AMD',
+      scaled: parseRate('4.1'),
+    })
+  })
+
+  it('knows nothing of a currency with no cost, nor of a day before the exchanges', () => {
+    expect(walletCross(chain, 'RUB', 'EUR', 'AMD', '2026-08-10')).toBeNull()
+    expect(walletCross(chain, 'RUB', 'USD', 'AMD', '2026-08-05')).toBeNull()
+    expect(walletCross(chain, 'RUB', 'AMD', 'AMD', '2026-08-10')).toBeNull()
+  })
+})
+
+describe('convertAcross', () => {
+  const rate = {
+    base: 'USD' as const,
+    quote: 'AMD' as const,
+    scaled: parseRate('390'),
+    source: 'official' as const,
+    asOf: yerevanMidnight('2026-08-10'),
+  }
+
+  it('converts from either side of the rate', () => {
+    expect(convertAcross(money(1100n, 'USD'), rate)).toEqual(money(429000n, 'AMD'))
+    expect(convertAcross(money(429000n, 'AMD'), rate)).toEqual(money(1100n, 'USD'))
+  })
+
+  it('says it cannot, rather than throwing: another currency, or more than money holds (Д5)', () => {
+    expect(convertAcross(money(100n, 'EUR'), rate)).toBeNull()
+    expect(convertAcross(money(INT8_MAX, 'USD'), rate)).toBeNull()
   })
 })

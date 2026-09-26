@@ -113,7 +113,7 @@ function month(input: Partial<MoneyMonthInput>) {
     // 5 AMD for a rouble.
     rate: rate('RUB', 'AMD', '5'),
     rateKind: 'live',
-    tripInSpend: never,
+    inSpend: never,
     incomeInIncome: never,
     ...input,
   })
@@ -147,6 +147,30 @@ describe('the month of «Деньги»', () => {
     expect(result.days[0]).toMatchObject({ total: toMoney('5400 AMD'), estimated: true })
   })
 
+  it('counts a spending with no snapshot into the spending currency as a trip line: by its day (Р-5)', () => {
+    // Drams of August after a move to dollars — the trip beside them is 10 $ and so are they (Д8).
+    const byDay: ConvertOn = (amount, day) =>
+      amount.currency === 'AMD' && day === '2026-09-10' ? toMoney('10 USD') : null
+    const result = month({
+      spendCurrency: 'USD',
+      rate: null,
+      spendings: [spending('4000 AMD', '2026-09-10')],
+      trips: [trip('4000 AMD', '2026-09-10')],
+      inSpend: byDay,
+    })
+    expect(result.spent).toEqual(toMoney('20 USD'))
+    expect(result.uncounted).toEqual([])
+  })
+
+  it('keeps a snapshot of the pair on either side: drams for someone who counts in dollars', () => {
+    const result = month({
+      spendCurrency: 'USD',
+      rate: null,
+      spendings: [spending('3900 AMD', '2026-09-10', 'other', rate('USD', 'AMD', '390'))],
+    })
+    expect(result.spent).toEqual(toMoney('10 USD'))
+  })
+
   it('never guesses a spending with no rate of its day: it stays out of the sum and is said apart', () => {
     const result = month({
       spendings: [spending('5.50 EUR', '2026-09-26'), spending('900 AMD', '2026-09-26')],
@@ -162,14 +186,14 @@ describe('the month of «Деньги»', () => {
   it('takes a finished trip into the groceries, one line per currency', () => {
     const result = month({
       trips: [trip('8940 AMD', '2026-09-24')],
-      tripInSpend: (amount) => (amount.currency === 'USD' ? toMoney('3900 AMD') : null),
+      inSpend: (amount) => (amount.currency === 'USD' ? toMoney('3900 AMD') : null),
     })
     expect(result.byCategory).toEqual([
       { categoryId: categoryId('groceries'), amount: toMoney('8940 AMD') },
     ])
     const two = month({
       trips: [trip('8940 AMD', '2026-09-24'), trip('10 USD', '2026-09-24')],
-      tripInSpend: (amount) => (amount.currency === 'USD' ? toMoney('3900 AMD') : null),
+      inSpend: (amount) => (amount.currency === 'USD' ? toMoney('3900 AMD') : null),
     })
     expect(two.days[0]?.entries).toHaveLength(2)
     expect(two.spent).toEqual(toMoney('12840 AMD'))
@@ -231,6 +255,36 @@ describe('the month of «Деньги»', () => {
     expect(result.rate).toBeNull()
   })
 
+  it('leaves out what money cannot hold rather than failing the month (Д5)', () => {
+    const huge = (on: string) => ({
+      ...spending('1 AMD', on),
+      amount: money(5n * 10n ** 18n, 'AMD'),
+    })
+    const result = month({
+      spendings: [huge('2026-09-02'), huge('2026-09-01'), spending('100 AMD', '2026-09-03')],
+      incomes: [
+        { ...income('1 RUB', '2026-09-02'), amount: money(5n * 10n ** 18n, 'RUB') },
+        { ...income('1 RUB', '2026-09-03'), amount: money(5n * 10n ** 18n, 'RUB') },
+      ],
+      rate: null,
+    })
+    // Newest first: the spending of the 2nd is counted, the 1st would carry the sum past int8.
+    expect(result.spent).toEqual(money(5n * 10n ** 18n + 10000n, 'AMD'))
+    expect(result.uncounted).toEqual([money(5n * 10n ** 18n, 'AMD')])
+    expect(result.days.find((day) => day.day === '2026-09-01')?.entries[0]?.counted).toBeNull()
+    expect(result.income).toEqual(money(5n * 10n ** 18n, 'RUB'))
+    expect(result.incomeUncounted).toEqual([money(5n * 10n ** 18n, 'RUB')])
+  })
+
+  it('has no figure in the income currency when the month comes to more than money holds', () => {
+    const result = month({
+      spendings: [{ ...spending('1 AMD', '2026-09-02'), amount: money(9n * 10n ** 18n, 'AMD') }],
+      rate: rate('AMD', 'RUB', '10'),
+    })
+    expect(result.spentIncome).toBeNull()
+    expect(result.rest).toBeNull()
+  })
+
   it('is an empty month, not a failure, with nothing in it', () => {
     const result = month({})
     expect(result.spent).toEqual(toMoney('0 AMD'))
@@ -257,10 +311,16 @@ describe('a spending', () => {
     expect(parsed.error?.issues[0]?.message).toBe(ISSUE.RATE_NOT_OF_SPENDING_CURRENCY)
   })
 
-  it('is not guessed into a currency its snapshot is not of — a move is not a rate', () => {
+  it('is counted by its snapshot only into the pair it is of — a move is not a rate', () => {
     const dollars = spending('11 USD', '2026-09-18', 'other', rate('USD', 'AMD', '400'))
     expect(spendingIn(dollars, 'AMD')).toEqual(toMoney('4400 AMD'))
     expect(spendingIn(dollars, 'RUB')).toBeNull()
+  })
+
+  it('takes a snapshot on either side of the pair, and converts from either', () => {
+    const drams = spending('3900 AMD', '2026-09-18', 'other', rate('USD', 'AMD', '390'))
+    expect(spendingSchema.safeParse(drams).success).toBe(true)
+    expect(spendingIn(drams, 'USD')).toEqual(toMoney('10 USD'))
   })
 })
 

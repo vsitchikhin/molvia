@@ -16,7 +16,9 @@ import { rateCodec } from '#model/values/rates'
 const spendingFields = {
   spentOn: exchangeDaySchema,
   amount: positiveMoneyCodec,
-  categoryId: z.uuid(),
+  // A reference, not a name the device gives: read in either case, as an address is (MOL-25, Р-3),
+  // or `AB12…` of one's own category is «unknown» against the `ab12…` the server answered with.
+  categoryId: z.uuid().overwrite((id) => id.toLowerCase()),
   note: spendingTextSchema.optional(),
   place: spendingTextSchema.optional(),
 }

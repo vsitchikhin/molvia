@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { MONEY_JOURNAL_PAGE, moneyMonthCodec, moneyMonthViewOf } from '#model/contracts/money'
+import {
+  MONEY_JOURNAL_PAGE,
+  moneyMonthCodec,
+  moneyMonthQuerySchema,
+  moneyMonthViewOf,
+  monthSchema,
+} from '#model/contracts/money'
+import type { MoneyMonthView } from '#model/contracts/money'
 import { moneyMonth } from '#model/entities/money-month'
 import type { Spending } from '#model/entities/spending'
 import { SPENDING_PRESETS } from '#model/entities/spending-category'
@@ -34,6 +41,14 @@ function spendings(count: number, day: (index: number) => string): Spending[] {
   }))
 }
 
+const OTHER = '00000000-0000-4000-8000-999999999999'
+
+function idsOf(view: MoneyMonthView): string[] {
+  return view.days.flatMap((day) =>
+    day.entries.map((entry) => (entry.kind === 'manual' ? entry.spending.id : entry.tripId)),
+  )
+}
+
 function monthOf(list: Spending[]) {
   return moneyMonth({
     month: '2026-09',
@@ -45,7 +60,7 @@ function monthOf(list: Spending[]) {
     categories,
     rate: null,
     rateKind: 'live',
-    tripInSpend: () => null,
+    inSpend: () => null,
     incomeInIncome: () => null,
   })
 }
@@ -57,11 +72,56 @@ describe('a month on the wire', () => {
     expect(view.days).toHaveLength(1)
     expect(view.days[0]?.entries).toHaveLength(MONEY_JOURNAL_PAGE)
     expect(view.days[0]?.total).toEqual(money(5000n, 'AMD'))
-    expect(view).toMatchObject({ cursor: MONEY_JOURNAL_PAGE, remaining: 10 })
+    expect(view.remaining).toBe(10)
 
-    const next = moneyMonthViewOf(monthOf(spendings(50, () => '2026-09-20')), null, categories, 40)
+    const next = moneyMonthViewOf(
+      monthOf(spendings(50, () => '2026-09-20')),
+      null,
+      categories,
+      view.cursor ?? undefined,
+    )
     expect(next.days[0]?.entries).toHaveLength(10)
     expect(next).toMatchObject({ cursor: null, remaining: 0, remainingFrom: null })
+  })
+
+  it('starts the next page after the last row shown, whatever was written or removed above (Д3)', () => {
+    const list = spendings(45, () => '2026-09-20')
+    const first = moneyMonthViewOf(monthOf(list), null, categories)
+    const shown = idsOf(first)
+    const newer = spendings(1, () => '2026-09-21').map((row) => ({ ...row, id: OTHER }))
+    const withNew = moneyMonthViewOf(
+      monthOf([...newer, ...list]),
+      null,
+      categories,
+      first.cursor ?? undefined,
+    )
+    expect(idsOf(withNew).filter((id) => shown.includes(id))).toEqual([])
+    expect(idsOf(withNew)).toHaveLength(5)
+
+    const withoutFirst = list.filter((row) => row.id !== shown[0])
+    const after = moneyMonthViewOf(
+      monthOf(withoutFirst),
+      null,
+      categories,
+      first.cursor ?? undefined,
+    )
+    expect(new Set([...shown, ...idsOf(after)]).size).toBe(45)
+  })
+
+  it('crosses the wire as the key of the row, and reads back as one', () => {
+    const view = moneyMonthViewOf(monthOf(spendings(41, () => '2026-09-20')), null, categories)
+    const wire = z.encode(moneyMonthCodec, view)
+    expect(wire.cursor).toMatch(/^2026-09-20~\d+~[\da-f-]{36}$/)
+    expect(moneyMonthQuerySchema.parse({ cursor: wire.cursor }).cursor).toEqual(view.cursor)
+    expect(moneyMonthQuerySchema.safeParse({ cursor: '40' }).success).toBe(false)
+  })
+
+  it('is a month of days a rate may be dated by — not year zero (Д4)', () => {
+    expect(monthSchema.safeParse('2026-09').success).toBe(true)
+    expect(monthSchema.safeParse('2000-01').success).toBe(true)
+    expect(monthSchema.safeParse('1999-12').success).toBe(false)
+    expect(monthSchema.safeParse('0000-01').success).toBe(false)
+    expect(monthSchema.safeParse('2026-13').success).toBe(false)
   })
 
   it('names the days still to come for «И ещё N трат за …»', () => {

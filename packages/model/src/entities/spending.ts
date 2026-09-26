@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { EXCHANGE_UNDO_MINUTES, exchangeDaySchema } from '#model/entities/exchange'
-import { convertFromBase } from '#model/entities/trip'
+import { convertAcross } from '#model/entities/trip'
 import { ERROR, ISSUE } from '#model/support/errors'
 import { visibleLine } from '#model/support/text'
 import { priceSchema } from '#model/values/money'
@@ -26,10 +26,11 @@ const positiveMoneySchema = priceSchema.refine((value) => value.minor > 0n, {
  *
  * `rate` is the snapshot a spending in another currency than the spending one is counted by — the
  * rate of **its own day**, taken when it was written and never recomputed (CLAUDE.md, «Money»):
- * `base` is the spending's own currency and `quote` the spending currency of that moment — «390 ֏ за
- * $», the orientation whose number keeps its digits. Null when the two are one currency, and when
- * nothing was known that day — then the month counts it by nothing and says so, rather than by a
- * rate from another day.
+ * between the spending's own currency and the spending currency of that moment, on whichever side
+ * its number is at least one — «390 ֏ за $» for a dollar spending, «4,1 ֏ за ₽» for a rouble one,
+ * and for someone who counts in dollars a dram spending too is «390 ֏ за $». Null when the two are
+ * one currency, and when nothing was known that day — then the month counts it the way it counts a
+ * trip, by the rule of its day as known now (review Р-5).
  */
 export const spendingSchema = z
   .object({
@@ -45,18 +46,24 @@ export const spendingSchema = z
     createdAt: z.date(),
     amendedAt: z.date().nullable(),
   })
-  .refine(({ rate, amount }) => rate === null || rate.base === amount.currency, {
-    error: ISSUE.RATE_NOT_OF_SPENDING_CURRENCY,
-  })
+  .refine(
+    ({ rate, amount }) =>
+      rate === null || rate.base === amount.currency || rate.quote === amount.currency,
+    {
+      error: ISSUE.RATE_NOT_OF_SPENDING_CURRENCY,
+    },
+  )
 export type Spending = z.infer<typeof spendingSchema>
 
 /**
  * The spending in `currency` — the month's spending currency: as it is when it is already in it, by
- * its own day's snapshot when that snapshot is into it, and null when neither: a spending in dollars
- * written while the person counted in drams is not guessed into roubles after a move.
+ * its own day's snapshot when that snapshot is of this pair, and null when neither — a snapshot into
+ * drams says nothing of dollars after a move, and the month then counts the spending as it counts a
+ * trip line (review Р-5, adversarial Д8). Null too when it comes to more than money holds.
  */
 export function spendingIn(spending: Spending, currency: Currency): Money | null {
-  if (spending.amount.currency === currency) return spending.amount
-  if (spending.rate?.quote !== currency) return null
-  return convertFromBase(spending.amount, spending.rate)
+  const { amount, rate } = spending
+  if (amount.currency === currency) return amount
+  if (rate === null || (rate.base !== currency && rate.quote !== currency)) return null
+  return convertAcross(amount, rate)
 }
