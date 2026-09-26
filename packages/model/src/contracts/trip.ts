@@ -60,10 +60,15 @@ export type StartTripBody = z.infer<typeof startTripBodySchema>
  * `query` is what was typed before the item was picked. It is remembered in the same
  * transaction as the expense (MOL-11), so a pick exists only when the purchase does. Bounded
  * as the search bounds it: nothing longer could have been the query that found the item.
+ *
+ * `missedQuery` is the query that found nothing on the same screen before this one found the
+ * item (MOL-45): the person's own word for it, learnt so that next time it finds the item too.
+ * Optional both ways — a queue written before it existed is read as it was.
  */
 export const addExpenseBodySchema = newExpenseSchema.omit({ tripId: true }).extend({
   id: deviceIdSchema,
   query: z.string().max(CATALOGUE_QUERY_MAX).optional(),
+  missedQuery: z.string().max(CATALOGUE_QUERY_MAX).optional(),
 })
 export type AddExpenseBody = z.infer<typeof addExpenseBodySchema>
 

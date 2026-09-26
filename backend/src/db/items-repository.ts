@@ -1,7 +1,17 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
-import { itemSchema, nameIdentity, toSearchKey } from '@molvia/model'
+import {
+  ADJECTIVE_WORD,
+  NOUN_WORD,
+  WORD_BREAK,
+  itemSchema,
+  nameIdentity,
+  synonymDescribes,
+  synonymKeys,
+  synonymPairedKinds,
+  toSearchKey,
+} from '@molvia/model'
 import type { Item, NewItem } from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
@@ -158,6 +168,16 @@ const MAX_QUERY_WORDS = 12
 const HAS_CONTENT = /[\p{L}\p{N}]/u
 
 /**
+ * How many words the dictionary may add to one query, taken in the order the query names them.
+ * Each is one more condition on the index and one more set of candidates to rank: twelve wide
+ * words — «мясо рыба сыр хлеб…» — expand into fifty and held a connection for a second and a
+ * half (MOL-45, adversarial Ж). A shelf query is one or two words, and «рыба», the widest, is
+ * eight; sixteen leaves both untouched. Eight was measured too and wins little: what twelve wide
+ * words cost now is ranking the names that carry the synonyms, not finding them (review Х).
+ */
+const MAX_SYNONYMS = 16
+
+/**
  * A remembered query counts as the one being typed when every word but the last is equal and
  * one last word is the start of the other — the screen searches while the person types, so
  * the pick was made on «мол» and the next search may fire on «моло» — and the word being
@@ -210,6 +230,106 @@ function toItem(row: ItemRow, barcodes: readonly string[]): Item {
  * statement and not a copy that could drift from it.
  */
 export function rankedCandidates(key: string, limit: number, actorId: string | null): SQL {
+  // What else each word of the query stands for (MOL-45): «картошка» is also «картофель». Two
+  // parallel lists rather than an array parameter — words of a key never hold a space.
+  const synonyms = key
+    .split(' ')
+    .flatMap((word, index) => synonymKeys(word).map((synonym) => [synonym, index + 1] as const))
+    .slice(0, MAX_SYNONYMS)
+  const synonymWords = synonyms.map(([synonym]) => synonym).join(' ')
+  const synonymOf = synonyms.map(([, n]) => n).join(' ')
+  // A synonym that describes — «минеральная» — is never the kind, and counts as any word.
+  const synonymAnywhere = synonyms.map(([synonym]) => String(synonymDescribes(synonym))).join(' ')
+  // An adjective of a group — «гречневая» — counts anywhere beside its own kinds: «Крупа
+  // гречневая», «Гречневая крупа», never «Лапша гречневая». A list per synonym, `-` for none.
+  const synonymKinds = synonyms
+    .map(([synonym]) => synonymPairedKinds(synonym).join(',') || '-')
+    .join(' ')
+  const expanded = [...new Set(synonyms.map(([, n]) => n))].join(' ')
+  // Without a synonym every candidate of the index was found by what was typed, and asking the
+  // operator again per row is what «мо» over 20 000 names paid for.
+  const typedHere =
+    synonyms.length === 0
+      ? sql`true`
+      : sql`(${items.searchKey} %> ${key} or ${items.searchKey} = ${key})`
+  // Measured only when there is a synonym at all, and only for a word that has one: the query
+  // words of most searches have none, and a subquery per candidate and word to find that out
+  // doubled the time of «малако» — and of twelve wide words, which the cap leaves two or three
+  // words' worth of synonyms (review Х).
+  const bySynonymWord =
+    synonyms.length === 0
+      ? sql`null::int`
+      : sql`case when qw.expanded and exists (
+                    select 1
+                    from synonyms s
+                    where s.n = qw.n
+                      and (s.word = split_part(c.search_key, ' ', c.kind_at)
+                           or s.anywhere
+                              and s.word = any(string_to_array(c.search_key, ' '))
+                           or split_part(c.search_key, ' ', c.kind_at)
+                                = any(string_to_array(nullif(s.kinds, '-'), ','))
+                              and s.word = any(string_to_array(c.search_key, ' ')))
+                  ) then 0 end`
+  // A synonym counts only as the word of the kind — the first word of a name that is not an
+  // adjective, `kindKey` of the domain (owner's decisions on review, MOL-45 А and Н): «Вода
+  // Джермук», «Молодой картофель», and not the tuna of a cat food. So its candidates are the
+  // names that contain it, not those that resemble it: `%>` at 0.15 brought in half of 20 000
+  // names for each of the eight fish of «рыба» and took six seconds. And from the start of a
+  // word, not anywhere in one: `%lori%` brings every `kalorii` (review Х). `like` is served by the
+  // same trigram index, two conditions per word — one regular expression for all of them was
+  // measured slower still. The words are letters only (the dictionary's test), so nothing in them
+  // is a wildcard.
+  const bySynonym = [...new Set(synonyms.map(([synonym]) => synonym))].map(
+    (synonym) =>
+      sql` or ${items.searchKey} like ${`${synonym}%`} or ${items.searchKey} like ${`% ${synonym}%`}`,
+  )
+  // Where the kind stands: the first word of the name that is not an adjective, by the domain's
+  // own pattern. The adjectives are plain words, so the n-th word of the name is the n-th of
+  // the key. Past the end when every word describes — `split_part` then answers ''.
+  const kindAt =
+    synonyms.length === 0
+      ? sql`1`
+      : sql`coalesce((
+          select min(u.n)::int
+          from (
+            -- Split by the domain's own class and counted over the words alone, as \`kindKey\`
+            -- does: a no-break space is a break there, and \`\\s\` of Postgres does not see it.
+            select w, row_number() over (order by at) as n
+            from unnest(regexp_split_to_array(${items.name}, ${WORD_BREAK}))
+                 with ordinality as s(w, at)
+            where w <> ''
+          ) u
+          where u.w !~ ${ADJECTIVE_WORD} or u.w ~ ${NOUN_WORD}
+        ), 1000)`
+
+  // No word after a number, no slip — and then not even the empty scan of every candidate: on
+  // «мо», which has no synonym, that alone was half the time.
+  const words = key.split(' ')
+  const slipped = words.some((_, index) => index > 0 && /[0-9]/u.test(words[index - 1] ?? ''))
+    ? sql`select c.id, qw.n
+      from query_words qw
+      cross join candidates c
+      where qw.slips
+        and (exists (
+               select 1
+               from (
+                 select unit, lag(unit) over (order by i) as number
+                 from unnest(string_to_array(c.search_key, ' ')) with ordinality as t(unit, i)
+               ) nw
+               where nw.unit in ${UNIT_KEYS}
+                 and nw.number = qw.number
+                 and ${slipsFromUnit(sql`qw.q`, sql`nw.unit`)}
+             )
+             -- A size written together, «Ряженка 500мл», is one word of the key: \`500ml\`.
+             or exists (
+               select 1
+               from unnest(string_to_array(c.search_key, ' ')) as nw(word)
+               cross join unnest(${UNIT_ARRAY}) as u(unit)
+               where nw.word = qw.number || u.unit
+                 and ${slipsFromUnit(sql`qw.q`, sql`u.unit`)}
+             ))`
+    : sql`select null::uuid as id, null::int as n where false`
+
   return sql`
     with query_words as (
       -- Cut to 255 here, once: levenshtein refuses longer arguments, and the prefix arm below
@@ -222,7 +342,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              plain and not (anchored and unit_start) as grounds,
              plain and anchored and unit_like and not unit_start as slips,
              word ~ '[^0-9]' as lettered,
-             last
+             last,
+             n::int = any(string_to_array(${expanded}, ' ')::int[]) as expanded
       from (
         select *, bool_or(plain and not unit_like) over () as anchored
         from (
@@ -248,6 +369,22 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
         ) u
       ) a
     ),
+    synonyms as (
+      select s.word, s.n, s.anywhere, s.kinds
+      from unnest(string_to_array(${synonymWords}, ' '),
+                  string_to_array(${synonymOf}, ' ')::int[],
+                  string_to_array(${synonymAnywhere}, ' ')::boolean[],
+                  string_to_array(${synonymKinds}, ' '))
+           as s(word, n, anywhere, kinds)
+    ),
+    admitted as (
+      -- The person's own synonyms for exactly this query (MOL-45): it found nothing, and they
+      -- took the item by another word. The one exception to «memory never lets in what the
+      -- search did not find» — and a personal one, so it never becomes a second search.
+      select sp.item_id as id
+      from ${searchPicks} sp
+      where sp.actor_id = ${actorId} and sp.query_key = ${key} and sp.admits
+    ),
     candidates as (
       -- The column goes first, and that is not style: \`search_key %> $1\` is the only form
       -- the GIN index serves. \`$1 %> search_key\`, \`search_key <% $1\` and
@@ -257,53 +394,54 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       -- \`m m s\`), which has no word to ground a match by distance.
       select ${items.id} as id,
              ${items.searchKey} as search_key,
-             word_similarity(${key}, ${items.searchKey}) as ws
+             word_similarity(${key}, ${items.searchKey}) as ws,
+             -- Found by what was typed, not only by a synonym. The typed word's edit budget
+             -- applies to these alone: a name brought in by «лори» for «сыр» is no candidate
+             -- of «сыр», and measured against it anyway, «Рис» passed as two edits from \`sir\`.
+             ${typedHere} as typed,
+             ${kindAt} as kind_at
       from ${items}
-      where ${items.searchKey} %> ${key} or ${items.searchKey} = ${key}
+      where ${items.searchKey} %> ${key} or ${items.searchKey} = ${key}${sql.join(bySynonym)}
       -- Every candidate is ranked, with no ceiling. Any cut here is wrong in one of two ways:
       -- ordered by similarity it drops the typo the low threshold exists for (two hundred
       -- «Малина» pushed out the milk), unordered it drops by row age — the newest items, the
       -- very ones «Предложить товар» just added. \`order by id\` is worse still: the planner
       -- walks the primary key and filters every row. The cost is bounded by the catalogue and
       -- by MAX_QUERY_WORDS; measured in MOL-10, under 260 ms at every threshold in MOL-14.
+      -- A branch of its own rather than an \`or\` above: \`id in (…)\` beside the trigram
+      -- conditions is not something the GIN index can serve, and the whole scan would fall back.
+      -- \`union all\`: an item both found and learnt comes twice, and the ranking does not mind —
+      -- a repeated row changes neither a mean nor a worst — while \`union\` sorted thousands of
+      -- candidates to find it, and doubled «малако» on 20 000 names.
+      union all
+      select ${items.id}, ${items.searchKey},
+             word_similarity(${key}, ${items.searchKey}),
+             (${items.searchKey} %> ${key} or ${items.searchKey} = ${key}),
+             ${kindAt}
+      from ${items}
+      join admitted a on a.id = ${items.id}
     ),
-    slipped as (
+    slipped as materialized (
       -- A slip is a size only against a name that prints the unit it slipped from, after the
       -- very number the query has; elsewhere the word is what it spells. In «2 сом замороженный»
       -- the catfish is not «см»: read as a size everywhere it let «Котлеты … замороженные» in
       -- beside the fish, and against any «см» it let in «Пицца замороженная 30 см». The number
       -- is what gives a slip away — «кефир 500 мд» and «Кефир 500 мл» share «500». The price:
       -- «кефир 1 мд» does not reach «Кефир 1000 мл». Apart and joined, not a subquery per row:
-      -- a slip after a number is rare, so this is nearly always empty.
-      select c.id, qw.n
-      from query_words qw
-      cross join candidates c
-      where qw.slips
-        and (exists (
-               select 1
-               from (
-                 select unit, lag(unit) over (order by i) as number
-                 from unnest(string_to_array(c.search_key, ' ')) with ordinality as t(unit, i)
-               ) nw
-               where nw.unit in ${UNIT_KEYS}
-                 and nw.number = qw.number
-                 and ${slipsFromUnit(sql`qw.q`, sql`nw.unit`)}
-             )
-             -- A size written together, «Ряженка 500мл», is one word of the key: \`500ml\`.
-             or exists (
-               select 1
-               from unnest(string_to_array(c.search_key, ' ')) as nw(word)
-               cross join unnest(${UNIT_ARRAY}) as u(unit)
-               where nw.word = qw.number || u.unit
-                 and ${slipsFromUnit(sql`qw.q`, sql`u.unit`)}
-             ))
+      -- a slip after a number is rare, so this is nearly always empty — and materialized, taken
+      -- once: inlined into \`per_word\` beside the thousands of candidates a synonym brings,
+      -- «мясо» over 20 000 names took 1.4 s where it takes 0.2 without (MOL-45, review Ш).
+      ${slipped}
     ),
     -- Materialized, so each word distance is taken once per row: inlined, the planner copied the
     -- subquery into the select list, the filter and the order by — and with \`slipped\` joined
     -- in, 20 000 names answered half as fast again as before it. Kept, it beats both.
     per_word as materialized (
       select c.id, qw.grounds and s.id is null as grounds, qw.lettered,
-             (
+             -- The typed spelling is measured unless the row came by a synonym of this very word:
+             -- «сыр» is not measured against «Рис» that «лори» brought, but «хаггис» of
+             -- «памперсы хаггис» is still measured against the «Huggies» that «подгузники» did.
+             case when c.typed or not qw.expanded then (
                select min(
                  -- The screen searches while the person types, so the last word is usually
                  -- unfinished: it may also match the start of a name word. Exactly at two or
@@ -322,19 +460,37 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                -- «1» of a size every two-letter word is two edits away, inside the budget.
                where not (qw.grounds and s.id is null)
                   or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]' and w not in ${UNIT_KEYS})
-             ) as qd
+             ) end as qd_typed,
+             -- A synonym is a word, not a typo: it counts only as the whole word of the kind,
+             -- and then costs nothing. With the edit budget on top, «мясо» expanded into five
+             -- words would have five chances of the absolute budget's false hits (MOL-46).
+             ${bySynonymWord} as qd_synonym
       from candidates c
       cross join query_words qw
       left join slipped s on s.id = c.id and s.n = qw.n
     ),
+    per_word_best as (
+      -- \`least\` skips a null, so a word found only by its synonym is still found. Not
+      -- materialized: \`per_word\` is, so folding this into the aggregates below repeats a
+      -- \`least\`, not the levenshtein subquery.
+      select id, grounds, lettered, least(qd_typed, qd_synonym) as qd,
+             coalesce(qd_synonym = 0 and coalesce(qd_typed, 255) > 0, false) as by_synonym
+      from per_word
+    ),
     ranked as (
       select c.id, c.ws,
+             c.id in (select id from admitted) as admitted,
              case when c.search_key = ${key} then 0
                   -- Grounding words by their mean, rounded up: a correct extra word printed
                   -- on the package («пастеризованное») would cost 11 by the worst, 4 by the
                   -- mean. A name with no grounding word leaves qd null and never passes.
+                  --
+                  -- A word found only by its synonym stays out of the mean: free, it would lend
+                  -- its budget to the next word, and «хлеб барадинский» found «Лаваш армянский»
+                  -- by \`baradinskii\` four edits from \`armianskii\`. The others stand on their own.
                   when bool_or(pw.grounds)
-                  then ceil(avg(coalesce(pw.qd, 255)) filter (where pw.grounds))
+                  then coalesce(ceil(avg(coalesce(pw.qd, 255))
+                                       filter (where pw.grounds and not pw.by_synonym)), 0)
                        -- Short words by their worst, at most one edit: each has to find its
                        -- pair, so «1 л» against «2 л» costs one where «л» alone would hide it.
                        + least(coalesce(max(pw.qd) filter (where not pw.grounds), 0), 1)
@@ -342,9 +498,13 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                   -- screen sends halfway through typing it. Every word has to be found
                   -- exactly (the last one by its start). Digits alone never get here.
                   when bool_or(pw.lettered) and max(coalesce(pw.qd, 255)) = 0 then 0
-             end as distance
+             end as distance,
+             -- The words alone, the size aside: «Кефир Ашхар 0,5 л» for «кефир 1 л» is the kefir
+             -- asked for in another size, not a typo (review Т).
+             coalesce(ceil(avg(coalesce(pw.qd, 255))
+                             filter (where pw.grounds and not pw.by_synonym)), 0) as words_distance
       from candidates c
-      join per_word pw on pw.id = c.id
+      join per_word_best pw on pw.id = c.id
       group by c.id, c.ws, c.search_key
     ),
     remembered as (
@@ -382,15 +542,26 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     select r.id
     from ranked r
     left join remembered m on m.item_id = r.id
-    -- The filter stays on the distance alone: a pick lifts what the search found and never
-    -- lets in what it did not, or memory would become a second search with rules of its own.
-    where r.distance <= ${ACCEPTED_DISTANCE}
-    -- What the person took before comes first, above a closer spelling — their own choice
-    -- says more than a typo metric does. Among several, the latest wins: after switching
-    -- brands the new one is on top from the first trip. Then the order of MOL-10, where ties
-    -- stay ties («moloko» names «Ашхар» and «Марианна» alike) and \`id\` only keeps two loads
-    -- of one screen in one order.
-    order by m.item_id is null,
+    -- The filter stays on the distance: a pick lifts what the search found and never lets in
+    -- what it did not, or memory would become a second search with rules of its own. The one
+    -- exception is the person's own word (MOL-45), and it is let in, not lifted.
+    where r.distance <= ${ACCEPTED_DISTANCE} or r.admitted
+    -- What only a learnt word let in stands below what the search found by its words or the
+    -- person took before, and above what it found by a typo (owner's decisions on review,
+    -- MOL-45 И, О and Т): «кефир» learnt as the milk taken in its place stops standing above the
+    -- kefir the day the catalogue has one — in any size, «кефир 1 л» against «0,5 л» — and the
+    -- potato learnt for «овощи» stays above the flour the absolute budget finds there (MOL-46).
+    -- Among what the search found, the words matched exactly now go before a typo in a word at
+    -- the same distance; nothing else moves. Then what the person took before,
+    -- above a closer spelling — their own choice says more than a typo metric does. Among
+    -- several, the latest wins: after switching brands the new one is on top from the first
+    -- trip. Then the order of MOL-10, where ties stay ties («moloko» names «Ашхар» and
+    -- «Марианна» alike) and \`id\` only keeps two loads of one screen in one order.
+    order by case when not coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) then 1
+                  when m.item_id is not null or r.words_distance = 0 then 0
+                  else 2
+             end,
+             m.item_id is null,
              m.last_picked_at desc nulls last,
              m.picks desc nulls last,
              r.distance, r.ws desc, r.id
@@ -539,12 +710,19 @@ export function createItemRepository(db: Conn): ItemRepository {
          * search answered 500 until an insert happened to touch the index (MOL-12). A value
          * set before the library loads is a placeholder the library adopts, so the local
          * threshold still holds for the query below, and 0.6 — its default — is put back.
+         *
+         * JIT is switched off the same way (review Щ). The estimate of this statement is no
+         * measure of its work: a query with sizes, «мясо 1 кг рыба 2 кг…», is estimated at a
+         * million and answers in 0.45 s — and past `jit_above_cost` Postgres spent 2.2 s
+         * compiling it first. A search typed at a shelf never runs long enough to pay that back.
          */
-        const [previous] = await tx.execute<{ threshold: string | null }>(
-          sql`select current_setting('pg_trgm.word_similarity_threshold', true) as threshold`,
+        const [previous] = await tx.execute<{ threshold: string | null; jit: string }>(
+          sql`select current_setting('pg_trgm.word_similarity_threshold', true) as threshold,
+                     current_setting('jit') as jit`,
         )
         await tx.execute(
-          sql`select set_config('pg_trgm.word_similarity_threshold', ${String(CANDIDATE_THRESHOLD)}, true)`,
+          sql`select set_config('pg_trgm.word_similarity_threshold', ${String(CANDIDATE_THRESHOLD)}, true),
+                     set_config('jit', 'off', true)`,
         )
 
         const rows = await tx.execute<{ id: string }>(
@@ -552,7 +730,8 @@ export function createItemRepository(db: Conn): ItemRepository {
         )
 
         await tx.execute(
-          sql`select set_config('pg_trgm.word_similarity_threshold', ${previous?.threshold ?? '0.6'}, true)`,
+          sql`select set_config('pg_trgm.word_similarity_threshold', ${previous?.threshold ?? '0.6'}, true),
+                     set_config('jit', ${previous?.jit ?? 'on'}, true)`,
         )
         return rows.map((row) => row.id)
       })

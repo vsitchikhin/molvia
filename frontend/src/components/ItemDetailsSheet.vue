@@ -116,6 +116,8 @@ export default defineComponent({
     entry: { type: Object as PropType<CatalogueEntry>, required: true },
     /** What was typed before the item was picked; it goes with the purchase (MOL-11). */
     query: { type: String as PropType<string | null>, default: null },
+    /** The query that found nothing on the search screen before this pick (MOL-45). */
+    missedQuery: { type: String as PropType<string | null>, default: null },
     /** The row being amended; none when a purchase is being added. */
     expense: { type: Object as PropType<TripExpenseView | null>, default: null },
     /** A purchase the server refused, opened to be corrected and sent again (MOL-22, В-3). */
@@ -316,7 +318,10 @@ export default defineComponent({
       queue.enqueue({
         kind: 'add',
         tripId: writeInto.value,
-        body: details.body(props.retry?.query ?? props.query),
+        body: details.body(
+          props.retry?.query ?? props.query,
+          props.retry?.missedQuery ?? props.missedQuery,
+        ),
         entry: props.entry,
       })
       emit('added', props.entry)

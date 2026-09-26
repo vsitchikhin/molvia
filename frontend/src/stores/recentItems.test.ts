@@ -214,6 +214,47 @@ describe('recent items', () => {
       expect(store.filter('мацун')).toEqual([])
     })
 
+    it('by the search’s dictionary: «картошка» finds «Картофель», a whole word and nothing less', () => {
+      const store = relaunched()
+      const potato = entry(4, { name: 'Картофель молодой' })
+      const puree = entry(5, { name: 'Картофельное пюре' })
+      for (const item of [potato, puree]) store.remember(item)
+      expect(store.filter('картошка').map((item) => item.id)).toEqual([potato.id])
+      // An unfinished word is not looked up, as the search does not look it up.
+      expect(store.filter('картош')).toEqual([])
+    })
+
+    it('by the dictionary as the server reads it: the kind first, and a pair for every word (review Д)', () => {
+      const store = relaunched()
+      const nectar = entry(6, { name: 'Нектар персиковый 1 л' })
+      const toilet = entry(7, { name: 'Туалетная вода Hugo Boss' })
+      const water = entry(8, { name: 'Вода минеральная Джермук' })
+      const young = entry(9, { name: 'Молодой картофель' })
+      for (const item of [nectar, toilet, water, young]) store.remember(item)
+      expect(store.filter('сок').map((item) => item.id)).toEqual([nectar.id])
+      expect(store.filter('сок персиковый').map((item) => item.id)).toEqual([nectar.id])
+      expect(store.filter('сок яблочный')).toEqual([])
+      expect(store.filter('минералка').map((item) => item.id)).toEqual([water.id])
+      expect(store.filter('картошка').map((item) => item.id)).toEqual([young.id])
+    })
+
+    it('takes an adjective of a group beside a kind of its own only: «Лапша гречневая» is no «гречка» (review С, Ц)', () => {
+      const store = relaunched()
+      const noodles = entry(10, { name: 'Лапша гречневая Sen Soy' })
+      const buckwheat = entry(11, { name: 'Гречневая крупа' })
+      const groats = entry(12, { name: 'Крупа гречневая ядрица' })
+      const soba = entry(13, { name: 'Гречневая лапша' })
+      for (const item of [noodles, buckwheat, groats, soba]) store.remember(item)
+      // Beside the groats it is the groats, in either order; beside the noodles, the noodles.
+      expect(
+        store
+          .filter('гречка')
+          .map((item) => item.id)
+          .sort(),
+      ).toEqual([buckwheat.id, groats.id].sort())
+      expect(store.filter('гречневая')).toHaveLength(4)
+    })
+
     it('not at all under an empty or blank query', () => {
       const store = withThree()
       expect(store.filter('')).toHaveLength(3)

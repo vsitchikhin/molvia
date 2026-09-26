@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { toSearchKey } from '@molvia/model'
+import { synonymKeys, toSearchKey } from '@molvia/model'
 import {
   ITEMS,
   QUERIES,
@@ -283,7 +283,7 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     нут: ['Nutella 350 г', 'Сок Noy яблочный 1 л'],
     пиво: [['Пиво Gyumri 0,5 л', 'Пиво Kilikia 0,5 л'], 'Пирожное Наполеон'],
     говядина: ['Говядина мякоть'],
-    мясо: ['Говядина мякоть'],
+    мясо: ['Говядина мякоть', 'Фарш говяжий'],
     говя: [['Фарш говяжий', 'Говядина мякоть']],
     сок: [
       ['Сок Rich апельсин 1 л', 'Сок Noy яблочный 1 л'],
@@ -316,17 +316,17 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     спаг: ['Спагетти Barilla №5 500 г'],
     кетчуп: ['Кетчуп Heinz томатный 570 г'],
     соусы: [['Соевый соус Kikkoman 150 мл', 'Соус чесночный Махеевъ 200 г']],
-    орешки: [],
+    орешки: ['Фисташки жареные 100 г', 'Арахис солёный 150 г'],
     салфетки: [['Салфетки бумажные Zewa 100 шт', 'Салфетки влажные Huggies 56 шт']],
     салф: [['Салфетки бумажные Zewa 100 шт', 'Салфетки влажные Huggies 56 шт']],
     'влажные салфетки': ['Салфетки влажные Huggies 56 шт', 'Салфетки бумажные Zewa 100 шт'],
-    картошка: [],
+    картошка: ['Картофель'],
     виноград: ['Виноград Арарат'],
     нектарины: ['Нектарины'],
     перчатки: ['Перчатки хозяйственные Vileda'],
     батарейки: ['Батарейки Duracell AA 4 шт'],
     белизна: ['Белизна 1 л'],
-    отбеливатель: [],
+    отбеливатель: ['Белизна 1 л'],
     кофе: [
       'Кофе Jacobs Monarch молотый 230 г',
       [
@@ -341,7 +341,7 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     сливки: ['Сливки Марианна 20% 200 мл'],
     крекеры: ['Крекеры TUC 100 г'],
     булочки: ['Булочки с кунжутом 4 шт', 'Cheetos кукурузные палочки 55 г'],
-    булки: [],
+    булки: ['Булочки с кунжутом 4 шт'],
     пирожные: ['Пирожное Наполеон'],
     вода: [['Вода Бжни 1,5 л', 'Вода Джермук 0,5 л']],
     дошик: ['Doshirak лапша курица 90 г'],
@@ -351,7 +351,7 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     твор: ['Творог Ашхар 9% 400 г'],
     мука: ['Мука пшеничная высший сорт 2 кг', ['Coca-Cola 1 л', 'Coca-Cola 0,5 л']],
     туалетка: [['Туалетная бумага Zewa Plus 4 рулона', 'Наполнитель для кошачьего туалета 5 л']],
-    бритва: [],
+    бритва: ['Станки Gillette Blue II 5 шт'],
     'соевый соус': ['Соевый соус Kikkoman 150 мл', 'Соус чесночный Махеевъ 200 г'],
     рис: ['Рис длиннозёрный Мистраль 900 г', 'Сок Rich апельсин 1 л'],
     'таблетки для посудомойки': ['Таблетки для посудомоечной машины Finish 40 шт'],
@@ -384,9 +384,17 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
 
   /**
    * The owner's word is not the shelf's: «картошка» for «Картофель», «орешки» for «Арахис».
-   * No spelling rule reaches a synonym, and no threshold does either — pinned as misses.
+   * No spelling rule reaches a synonym and no threshold does either — MOL-14 pinned these as
+   * misses, and the dictionary of MOL-45 is what finds them now. «мясо» was counted a hit by
+   * luck before it: `miaso` is one edit from the start of `miakot`, and «Фарш говяжий», meat
+   * just as much, was not found at all.
    */
-  const SYNONYMS = new Set(['орешки', 'картошка', 'отбеливатель', 'булки', 'бритва'])
+  const SYNONYMS = ['орешки', 'картошка', 'отбеливатель', 'булки', 'бритва', 'мясо']
+
+  it.each(SYNONYMS)('finds «%s» through the dictionary, which is what reaches it', (query) => {
+    // Taken out of the dictionary, the word goes back to missing — the answer above is pinned.
+    expect(synonymKeys(toSearchKey(query))).not.toEqual([])
+  })
 
   it('pins an answer for every query of the shelf, and no other', () => {
     expect(Object.keys(ANSWERS).sort()).toEqual(SHELF_QUERIES.map(([query]) => query).sort())
@@ -398,17 +406,9 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
    * «моло» tie the milks with «Кофе … молотый», «кол» the colas with the sausages, «кур» and
    * «курица» the chicken with «Котлеты куриные» and «Doshirak лапша курица», «туалетка» the
    * paper with the litter's «туалета». Memory (MOL-11) settles it from the second trip, not the
-   * first. Counted apart from a hit: 62 queries have what they meant first alone, not 68.
+   * first. Counted apart from a hit: 67 queries have what they meant first alone, not 73.
    */
   const TIED_WITH_FOREIGN = new Set(['кол', 'мол', 'моло', 'кур', 'курица', 'туалетка'])
-
-  /**
-   * Found by the letters, not by the meaning: `miaso` is one edit from the start of `miakot`
-   * («мякоть»), inside the slack of an unfinished word. A synonym like «картошка», counted a
-   * hit by luck. «Фарш говяжий» is meat just as much and has no such start, so it is not
-   * found — which is what shows the letters, not the meaning, at work (MOL-45).
-   */
-  const BY_LETTERS: ReadonlyMap<string, string> = new Map([['мясо', 'Фарш говяжий']])
 
   const meantFirst = (
     answer: Answer | undefined,
@@ -420,24 +420,13 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     return head.every((name) => meant.includes(name)) ? 'alone' : 'tied'
   }
 
-  it('puts what the query meant first alone — apart from the ties and synonyms named above', () => {
+  it('puts what the query meant first alone — apart from the ties named above', () => {
     // The pinned answers replace nothing in the shared list, so they must still agree with it.
     for (const [query, meant] of SHELF_QUERIES) {
-      const expected = SYNONYMS.has(query)
-        ? 'empty'
-        : TIED_WITH_FOREIGN.has(query)
-          ? 'tied'
-          : 'alone'
+      const expected = TIED_WITH_FOREIGN.has(query) ? 'tied' : 'alone'
       expect(meantFirst(ANSWERS[query], meant), query).toBe(expected)
     }
   })
-
-  it.each([...BY_LETTERS])(
-    'finds by letters only: «%s» does not reach «%s», meant just as much',
-    (query, missed) => {
-      expect([ANSWERS[query] ?? []].flat(2)).not.toContain(missed)
-    },
-  )
 
   it.each(SHELF_QUERIES)('«%s»', async (query) => {
     await answers(query, ANSWERS[query] ?? [])
@@ -470,8 +459,8 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
 
   /**
    * Fifty everyday purchases the shelf does not carry — the adversarial pass's words, not the
-   * owner's. Twenty-four find something, and every one that does hides «Предложить товар»,
-   * shown only on an empty answer. They are two outcomes, not one:
+   * owner's. Twenty-five find something, and every one that does hides «Предложить товар»,
+   * shown only on an empty answer. They are three outcomes, not one:
    *
    * - `RELATED` — the first row carries the word's root: a taste or a property printed on
    *   another item. Six are found exactly or by the start of a word («сметана», «лук» in the
@@ -482,12 +471,15 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
    *   «мыло» → «Молоко», «торт», «плов», «сыр» → «Сок» and «сорт» — MOL-46). A unit grounded
    *   matches too until MOL-48 — «сыр» is two edits from `sht` of «4 шт» — and six of the
    *   ten «сыр» found went with it.
+   * - `BY_SYNONYM` — the shelf does carry it, under another name: «макароны» are the spaghetti.
+   *   Absent from the list by its word, found by the dictionary (MOL-45).
    *
    * Pinned whole, as they are.
    */
   const RELATED_EXACT = new Set(['соль', 'печень', 'лук', 'сметана', 'суп', 'вино'])
   const RELATED_BY_EDIT = new Set(['яблоки', 'апельсины', 'томаты', 'чеснок', 'кукуруза', 'пирог'])
   const RELATED = new Set([...RELATED_EXACT, ...RELATED_BY_EDIT])
+  const BY_SYNONYM = new Set(['макароны'])
   const UNRELATED = new Set([
     'сахар',
     'чай',
@@ -544,7 +536,7 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     ],
     сметана: ["Чипсы Lay's сметана и лук 150 г"],
     сосиски: [],
-    макароны: [],
+    макароны: ['Спагетти Barilla №5 500 г'],
     гречка: [],
     огурцы: [],
     зелень: [],
@@ -595,11 +587,12 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     expect(Object.keys(EVERYDAY).sort()).toEqual([...SHELF_EVERYDAY_ABSENT].sort())
   })
 
-  it('files every everyday word that finds something: 12 related, 12 unrelated', () => {
+  it('files every everyday word that finds something: 12 related, 12 unrelated, 1 by synonym', () => {
     const found = SHELF_EVERYDAY_ABSENT.filter((query) => (EVERYDAY[query] ?? []).length > 0)
-    expect(found.filter((query) => !RELATED.has(query) && !UNRELATED.has(query))).toEqual([])
-    expect([...RELATED, ...UNRELATED].filter((query) => !found.includes(query))).toEqual([])
-    expect([RELATED.size, UNRELATED.size]).toEqual([12, 12])
+    const filed = new Set([...RELATED, ...UNRELATED, ...BY_SYNONYM])
+    expect(found.filter((query) => !filed.has(query))).toEqual([])
+    expect([...filed].filter((query) => !found.includes(query))).toEqual([])
+    expect([RELATED.size, UNRELATED.size, BY_SYNONYM.size]).toEqual([12, 12, 1])
   })
 
   it.each(SHELF_EVERYDAY_ABSENT)('everyday «%s», which the shelf does not carry', async (query) => {

@@ -685,7 +685,7 @@
       },
       "search": {
         "term": "Search picks",
-        "text": "What you took for which query, so that next time it comes first."
+        "text": "What you took for which query, so that next time it comes first. And a query that found nothing, if you then found the item by another word — so that next time your word finds it. Only you see this."
       },
       "visits": {
         "term": "Visit marks",

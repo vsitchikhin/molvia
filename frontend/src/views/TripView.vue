@@ -455,6 +455,7 @@ export default defineComponent({
         quantity: write.body.quantity ?? null,
         amount: write.body.amount ?? null,
         query: write.body.query ?? null,
+        missedQuery: write.body.missedQuery ?? null,
       }
     }
 
@@ -474,6 +475,7 @@ export default defineComponent({
           quantity: write.body.quantity ?? null,
           amount: write.body.amount ?? null,
           query: write.body.query ?? null,
+          missedQuery: write.body.missedQuery ?? null,
         },
         refusal: item,
       }

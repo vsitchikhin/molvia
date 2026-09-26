@@ -1,6 +1,6 @@
 import { onUnmounted, ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
-import { drawsNothing } from '@molvia/model'
+import { drawsNothing, toSearchKey } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
@@ -23,6 +23,11 @@ function connected(): boolean {
   return navigator.onLine
 }
 
+/** A query as it was typed, with case and spacing set aside. */
+function typed(text: string): string {
+  return text.toLocaleLowerCase().trim().replace(/\s+/gu, ' ')
+}
+
 export interface CatalogueSearch {
   readonly phase: Ref<SearchPhase>
   readonly results: Ref<CatalogueEntry[]>
@@ -30,6 +35,20 @@ export interface CatalogueSearch {
   readonly stale: Ref<boolean>
   /** The query the answer on screen belongs to — «Не нашли „{query}“» names that one. */
   readonly answered: Ref<string>
+  /**
+   * The last query the server found nothing for, on this screen (MOL-45). A pick made later by
+   * another word takes it along, and the person's word learns the item. Erasing back through it
+   * keeps it: «бахч» on the way back from «бахчевые» found nothing too, and is not the word.
+   */
+  readonly missed: Ref<string | null>
+  /**
+   * The missed query for a pick found by `text`, or none — and forgotten either way: only the
+   * first sheet opened after a miss may carry it (owner's decision on review, MOL-45 И), so a
+   * milk looked at and put back does not make the bread taken next the meaning of «кефир».
+   * None when one of the two queries starts the other: «сыр» after «сыр косичка» is the same
+   * query cut short, not another word for it (review Р-1), and «Кефир» is «кефир » (Е).
+   */
+  readonly takeMissed: (text: string) => string | null
   readonly retry: () => void
 }
 
@@ -49,6 +68,7 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
   const results = shallowRef<CatalogueEntry[]>([])
   const stale = ref(false)
   const answered = ref('')
+  const missed = ref<string | null>(null)
 
   let latest = 0
   let pending: ReturnType<typeof setTimeout> | undefined
@@ -78,6 +98,9 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
       results.value = found
       answered.value = text
       phase.value = found.length > 0 ? 'ready' : 'empty'
+      if (found.length === 0 && !(missed.value !== null && startsHeld(missed.value, text))) {
+        missed.value = text
+      }
       // Still dimmed while a newer search waits for its pause.
       stale.value = pending !== undefined
     } catch {
@@ -88,6 +111,23 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
     } finally {
       if (inFlight === controller) inFlight = undefined
     }
+  }
+
+  /**
+   * Whether `text` is the start of `held` — as typed or by the search key, either will do. The
+   * key alone folds by position, and «дет» is not the start of `deцkoe`, the key of «детское»
+   * (review К); the text alone does not see that «сгущенка» starts «сгущёнка варёная», «кока
+   * кола» starts «кока-кола лайт», «moloko» starts «молоко топлёное» (review П).
+   */
+  function startsHeld(held: string, text: string): boolean {
+    return typed(held).startsWith(typed(text)) || toSearchKey(held).startsWith(toSearchKey(text))
+  }
+
+  function takeMissed(text: string): string | null {
+    const held = missed.value
+    missed.value = null
+    if (held === null || startsHeld(held, text) || startsHeld(text, held)) return null
+    return held
   }
 
   function settleFailed(): void {
@@ -154,5 +194,5 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
     cancel()
   })
 
-  return { phase, results, stale, answered, retry }
+  return { phase, results, stale, answered, missed, takeMissed, retry }
 }
