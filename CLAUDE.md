@@ -2017,6 +2017,15 @@ The shape worth knowing here:
   machine has neither the source nor a published database port.
 - **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
   exists only for trying the stack on a laptop, where Docker Desktop has no journald.
+- **The database is copied every night, encrypted, off the machine** (MOL-70): `pg_dump` inside the
+  container, `age` to the owner's public key, a Cloudflare R2 bucket in the EU — one pipe, so no
+  unencrypted dump touches a disk, and the private key lives only with the owner, so a compromised
+  server cannot read old copies. **Fourteen days**, enforced by the bucket's own lifecycle rule and
+  written on the privacy page: an erased person lives in the copies exactly that long, so the term is
+  a promise, not a setting. A restore brings back whoever was erased after the copy — a window of
+  at most a day, accepted for 0.1 and named on the page (owner's decision, 26.09.2026); a record of
+  erasures that outlives the database is 0.2's, with the lawyer. A missing copy is an alarm
+  (healthchecks.io), not a log line. `deploy/README.md`, «Backups».
 - **Migrations run when the API starts.** There is one instance, and a schema that lags
   the code deployed against it is the worse of the two failures. `make migrate`, the test
   setup and the boot path all go through the same code, so a migration cannot behave one
