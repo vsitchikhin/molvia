@@ -65,7 +65,8 @@
       },
       "pending": {
         "one_place": "Из «{place}», последняя — {when}",
-        "many_places": "Из {n} места | Из {n} мест | Из {n} мест"
+        "two_places": "Из «{a}» и «{b}»",
+        "more_places": "Из «{a}», «{b}» и других мест"
       },
       "recent": {
         "caption": "Последние походы",

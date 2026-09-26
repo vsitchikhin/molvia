@@ -216,27 +216,35 @@ export default defineComponent({
     )
 
     /**
-     * «Из «Ереван Сити», последняя — вчера», or «Из 3 мест». By places, not trips: a card carries
-     * the place and the moment the server took its latest purchase, not the trip (MOL-28), and a
-     * trip cannot be told by that moment — a purchase made with no signal arrives with the queue,
-     * hours later, and one trip read as two however the gap was drawn (round 2, З1). The place is
-     * exact. Counted over the page the queue holds; when the server holds more, one place on the
-     * page is not claimed for all of them (adversarial В2) and the line is left out.
+     * «Из «Ереван Сити», последняя — вчера», «Из «A» и «B»», or «Из «A», «B» и других мест». By
+     * places, not trips: a card carries the moment the server took its latest purchase, and a
+     * purchase made with no signal arrives with the queue hours later, so no gap tells one trip
+     * from two (round 2, З1). And by names, not a count: a card carries the place's name without
+     * its city, and «Ереван Сити» of Gyumri and of Yerevan are two places under one name — a
+     * number would claim what the phone does not know (round 3, И2). Names are newest first. When
+     * the server holds more than the page, one name is not claimed for all (adversarial В2), and
+     * two are followed by «and others».
      */
     const pendingFrom = computed(() => {
-      const cards = queue.cards.value
-      const places = new Set(cards.map((card) => card.placeName))
-      const [only] = places
-      if (places.size === 1 && only !== undefined && pending.value <= cards.length) {
-        const latest = Math.max(...cards.map((card) => card.boughtAt.getTime()))
-        return t('trip.home.pending.one_place', {
-          place: only,
-          when: purchaseDay(new Date(latest), locale.value),
-        })
+      const cards = [...queue.cards.value].sort(
+        (a, b) => b.boughtAt.getTime() - a.boughtAt.getTime(),
+      )
+      const names = [...new Set(cards.map((card) => card.placeName))]
+      const [a, b] = names
+      const partial = pending.value > cards.length
+      if (a === undefined) return null
+      if (b === undefined) {
+        const [latest] = cards
+        return partial || !latest
+          ? null
+          : t('trip.home.pending.one_place', {
+              place: a,
+              when: purchaseDay(latest.boughtAt, locale.value),
+            })
       }
-      if (places.size > 1)
-        return t('trip.home.pending.many_places', { n: places.size }, places.size)
-      return null
+      return names.length > 2 || partial
+        ? t('trip.home.pending.more_places', { a, b })
+        : t('trip.home.pending.two_places', { a, b })
     })
 
     return {

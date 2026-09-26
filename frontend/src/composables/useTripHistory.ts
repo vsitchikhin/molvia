@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -117,6 +117,11 @@ export function useTripHistory(): TripHistoryScreen {
   )
   useReconnect(() => {
     if (!loading.value) void load()
+  })
+  // A screen taken away ends its asking: a retry asleep in its pause would otherwise wake and go
+  // for the history again with nobody to show it to (round 3, И1).
+  onScopeDispose(() => {
+    run += 1
   })
   return {
     t,

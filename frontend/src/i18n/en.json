@@ -65,7 +65,8 @@
       },
       "pending": {
         "one_place": "From {place}, the latest {when}",
-        "many_places": "From {n} place | From {n} places"
+        "two_places": "From {a} and {b}",
+        "more_places": "From {a}, {b} and other places"
       },
       "recent": {
         "caption": "Recent trips",

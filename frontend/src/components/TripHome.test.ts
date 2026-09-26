@@ -299,6 +299,26 @@ describe('TripHome', () => {
     })
   })
 
+  // A retry asleep in its pause when the screen goes — «Начать поход», a tab — must not wake and
+  // ask again for nobody (round 3, И1).
+  it('экран снят во время паузы повтора — больше ничего не спрашивается', async () => {
+    const key = `molvia.trip-history.${ME}`
+    tripHistory.mockImplementation(() => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({ page: { trips: [], nextCursor: null }, selected: null, local: [] }),
+      )
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+      return Promise.resolve({ trips: [trip(1)], nextCursor: null })
+    })
+    const { view } = await render()
+    expect(tripHistory).toHaveBeenCalledTimes(1)
+    view.unmount()
+    mounted.splice(mounted.indexOf(view), 1)
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(tripHistory).toHaveBeenCalledTimes(1)
+  })
+
   describe('вчерашний пустой ответ не сильнее сегодняшнего (адверсариальное Г)', () => {
     it('сервер отвечает ошибкой — видна ошибка с «Повторить», а не вступление', async () => {
       tripHistory.mockRejectedValue(new Error('HTTP 500'))
@@ -455,14 +475,31 @@ describe('TripHome', () => {
       expect(view.find('.pending .sub').exists()).toBe(false)
     })
 
-    it('несколько мест: «Из 2 мест»', async () => {
+    it('два места — оба по имени, новое первым, без счёта (И2)', async () => {
+      const earlier = yesterday()
+      earlier.setHours(earlier.getHours() - 2)
       tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
       pendingVerdicts.mockResolvedValue({
-        items: [card(1, 'Ереван Сити', yesterday()), card(2, 'SAS', yesterday())],
+        items: [card(1, 'Ереван Сити', earlier), card(2, 'SAS', yesterday())],
         total: 2,
       })
       const { view } = await render()
-      expect(view.get('.pending .sub').text()).toBe('Из 2 мест')
+      expect(view.get('.pending .sub').text()).toBe('Из «SAS» и «Ереван Сити»')
+    })
+
+    it('больше двух мест или неполная страница — «и других мест», без числа (И2, В2)', async () => {
+      tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+      pendingVerdicts.mockResolvedValue({
+        items: [
+          card(1, 'Ереван Сити', yesterday()),
+          card(2, 'SAS', yesterday()),
+          card(3, 'Рынок', yesterday()),
+        ],
+        total: 3,
+      })
+      const { view } = await render()
+      expect(view.get('.pending .sub').text()).toMatch(/и других мест$/)
+      expect(view.get('.pending .sub').text()).not.toMatch(/\d/)
     })
   })
 })
