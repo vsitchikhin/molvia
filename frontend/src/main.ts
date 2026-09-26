@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import { registerSW } from 'virtual:pwa-register'
 import App from '@/App.vue'
 import { applyDocumentLang, i18n } from '@/i18n'
 import { settleColdStart } from '@/navigation'
@@ -9,11 +10,15 @@ import { installSheetEntryGuard } from '@/composables/useSheetHistory'
 import { sessionEnded, useActorStore } from '@/stores/actor'
 import { forgetTheInviteDoor } from '@/stores/identity'
 import { onMissingActor } from '@/api'
+import { installPwaUpdate } from '@/pwaUpdate'
 import '@/styles/main.scss'
 
 // Before the router reads the address: the door of MOL-8 is gone, and this clears what it left
 // on devices that used it — a dead code in storage and a `?c=` that nothing scrubs any more.
 forgetTheInviteDoor()
+
+// A new version waits for the app to be put away, and is looked for when it comes back (MOL-46).
+installPwaUpdate(registerSW)
 
 const app = createApp(App)
 

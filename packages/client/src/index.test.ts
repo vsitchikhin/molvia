@@ -329,10 +329,10 @@ describe('the catalogue', () => {
     expect(near).toBe(true)
   })
 
-  it('refuses an answer that does not say how near it is (MOL-46)', async () => {
+  it('reads an answer that does not say how near it is as near — an API before MOL-46', async () => {
     const { client } = clientReplying(200, { items: [entryWire] })
 
-    expect(await codeOf(client.searchCatalogue('молоко'))).toBe(ISSUE.RESPONSE_INVALID)
+    expect((await client.searchCatalogue('молоко')).near).toBe(true)
   })
 
   it('refuses an answer that carries more than the contract — a leak must not pass unread', async () => {

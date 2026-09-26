@@ -112,8 +112,8 @@ describe('catalogueSearchResponseSchema', () => {
     })
   })
 
-  it('requires `near`: an answer that does not say how close it is cannot be drawn', () => {
-    expect(catalogueSearchResponseSchema.safeParse({ items: [] }).success).toBe(false)
+  it('reads an answer without `near` as near — the API before MOL-46, drawn as it always was', () => {
+    expect(catalogueSearchResponseSchema.parse({ items: [] })).toEqual({ items: [], near: true })
     expect(catalogueSearchResponseSchema.safeParse({ items: [], near: 'no' }).success).toBe(false)
   })
 })
