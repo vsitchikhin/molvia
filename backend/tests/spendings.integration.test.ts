@@ -739,4 +739,19 @@ describe('второй раунд (адверсариальный Е1, Е2)', ()
     expect((await put({ ...moved, incomeCurrency: 'USD' }, moved)).statusCode).toBe(200)
     expect(await db.select().from(moneyMonthRates)).toEqual([])
   })
+
+  it('смена валюты трат тоже размораживает прошлые месяцы (В-8)', async () => {
+    const me = await owner()
+    await rates.upsert([official('RUB', '4.10', '2026-08-31')])
+    await spend(me, { spentOn: '2026-08-20', amount: { amount: '41000', currency: 'AMD' } })
+    await month(me, '2026-08')
+    expect(await db.select().from(moneyMonthRates)).toHaveLength(1)
+    const before = await tripContext(db, me.id)
+    const put = await call(me, 'PUT', '/actors/me/settings', {
+      previous: before,
+      settings: { ...before, spendCurrency: 'USD' },
+    })
+    expect(put.statusCode).toBe(200)
+    expect(await db.select().from(moneyMonthRates)).toEqual([])
+  })
 })
