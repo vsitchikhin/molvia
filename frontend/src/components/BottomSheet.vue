@@ -6,6 +6,7 @@
     @cancel.prevent="close()"
     @close="closedNatively"
     @pointerdown="pressed"
+    @pointercancel="takenBack"
     @click.capture="holdWhileRising"
     @click="closeOnScrim"
   >
@@ -93,8 +94,10 @@ export default defineComponent({
     // A tap on the scrim counts only if it began there, and no tap counts until the sheet is up.
     let downOnScrim = false
     let settledAt = 0
-    // When the finger of the tap now under way touched the glass — its click carries the moment
-    // it lifted (MOL-69, adversarial А1).
+    // When the finger of the last touch on the sheet came down — its click carries the moment it
+    // lifted (MOL-69, adversarial А1). Kept for every click of that touch — a label and the radio
+    // it clicks for it — until the next touch, a touch the platform took back, or the next showing
+    // (adversarial Б1, review Р-3).
     let touchedAt: number | null = null
     // Which showing the sheet is on: the rise of one that was closed must not settle the next.
     let showing = 0
@@ -146,6 +149,7 @@ export default defineComponent({
       const current = ++showing
       const floor = performance.now() + DOUBLE_TAP
       settledAt = Number.POSITIVE_INFINITY
+      touchedAt = null
       const rising = element
         .getAnimations()
         .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
@@ -165,6 +169,11 @@ export default defineComponent({
       touchedAt = event.timeStamp
     }
 
+    // A touch the platform took back — a scroll, a long press — makes no click.
+    function takenBack(): void {
+      touchedAt = null
+    }
+
     // The second tap of a double tap on the opener lands wherever the sheet is while it rises —
     // the scrim, the ×, the main action sliding under the finger — and closed the sheet before it
     // was seen, or added an empty item to the trip (adversarial Б-5). Until the sheet is up it
@@ -174,11 +183,11 @@ export default defineComponent({
     // (MOL-69) — and not by the click's own time either: a click is born when the finger lifts,
     // so one put down on the scrim while the sheet rose and lifted once it was up closed the
     // sheet, or pressed the main action that had slid under it (adversarial А1, А2). A click
-    // from the keyboard has no finger (`detail` 0) and is judged by its own time.
+    // from the keyboard has no finger (`detail` 0): it is judged by its own time and leaves the
+    // touch alone — spending it let the finger still resting be judged by its lift (Б1).
     function holdWhileRising(event: MouseEvent): void {
-      const touched = event.detail > 0 && touchedAt !== null ? touchedAt : event.timeStamp
-      touchedAt = null
-      if (touched >= settledAt) return
+      const finger = event.detail > 0 ? touchedAt : null
+      if ((finger ?? event.timeStamp) >= settledAt) return
       event.stopPropagation()
       event.preventDefault()
     }
@@ -223,7 +232,17 @@ export default defineComponent({
     })
 
     expose({ close })
-    return { t, dialog, titleId, close, pressed, holdWhileRising, closeOnScrim, closedNatively }
+    return {
+      t,
+      dialog,
+      titleId,
+      close,
+      pressed,
+      takenBack,
+      holdWhileRising,
+      closeOnScrim,
+      closedNatively,
+    }
   },
 })
 </script>

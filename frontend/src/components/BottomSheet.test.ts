@@ -319,6 +319,83 @@ describe('BottomSheet', () => {
     expect(tapped).toHaveBeenCalledOnce()
   })
 
+  // A click with no finger in between — a hardware key, switch access — did spend the touch of
+  // the finger still resting, and that finger was then judged by its lift (adversarial Б1).
+  it('must not fire: a click from the keyboard between a touch and its lift', async () => {
+    const rising = rise()
+    const { host } = await render({ open: true, rising: true })
+    const tapped = vi.fn()
+    const content = host.get('.content').element
+    content.addEventListener('click', tapped)
+    wait(100)
+    content.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    wait(400)
+    await rising.finish()
+    wait(10)
+    content.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }))
+    expect(tapped).toHaveBeenCalledOnce()
+    wait(100)
+    content.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    expect(tapped).toHaveBeenCalledOnce()
+  })
+
+  // A label and the radio it clicks for it are one touch, judged by it alike (adversarial З1).
+  it('must not fire: the second click of one touch made while it rose', async () => {
+    const rising = rise()
+    const { host } = await render({ open: true, rising: true })
+    const tapped = vi.fn()
+    const content = host.get('.content').element
+    content.addEventListener('click', tapped)
+    wait(100)
+    content.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    wait(400)
+    await rising.finish()
+    content.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    content.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    expect(tapped).not.toHaveBeenCalled()
+  })
+
+  // A touch the platform took back makes no click, and dates none after it (review Р-3).
+  it('takes a click with no touch of its own after a touch that was taken back', async () => {
+    const rising = rise()
+    const { host } = await render({ open: true, rising: true })
+    const tapped = vi.fn()
+    const content = host.get('.content').element
+    content.addEventListener('click', tapped)
+    wait(100)
+    content.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    content.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true }))
+    wait(400)
+    await rising.finish()
+    wait(10)
+    content.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    expect(tapped).toHaveBeenCalledOnce()
+  })
+
+  // Nor does a touch of the sheet's last showing (review Р-3).
+  it('takes a click with no touch of its own after a touch of the last showing', async () => {
+    const first = rise()
+    const { host, open, dialog } = await render({ open: true, rising: true })
+    wait(100)
+    dialog().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    await first.finish()
+    open.value = false
+    await nextTick()
+    landed()
+    const second = rise()
+    open.value = true
+    await nextTick()
+    wait(400)
+    await second.finish()
+    wait(10)
+    const tapped = vi.fn()
+    host.get('.content').element.addEventListener('click', tapped)
+    host
+      .get('.content')
+      .element.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    expect(tapped).toHaveBeenCalledOnce()
+  })
+
   // «Save and next»: the rise of the sheet that was put away must not settle the next one.
   it('must not fire: the rise of a closed sheet does not settle the one opened after it', async () => {
     const first = rise()

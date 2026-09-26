@@ -399,8 +399,12 @@ test.describe('the sheet', () => {
     const finger = await at(page)
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger] })
     await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 })
+    // The rise is finished at once rather than waited out: a finger resting past a long press
+    // makes no click, and a slow machine stretched the wait towards it (review Р-4).
     await page.locator('dialog').evaluate(async (dialog: HTMLDialogElement) => {
-      await Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished))
+      const rising = dialog.getAnimations()
+      for (const animation of rising) animation.finish()
+      await Promise.allSettled(rising.map((animation) => animation.finished))
       // A frame more, so the sheet has heard the rise end too.
       await new Promise((done) => requestAnimationFrame(done))
     })

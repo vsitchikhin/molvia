@@ -1284,7 +1284,8 @@ database access. In a product about data integrity, two write paths will silentl
   with no rise; no ceiling, since a rise either finishes or is cut short (an endless animation is
   not waited for); and a tap counts from when the finger touched — its `pointerdown`, since a click
   carries the moment the finger lifted and one resting across the end of the rise closed the sheet
-  or pressed the action that slid under it (adversarial А1). Open a
+  or pressed the action that slid under it (adversarial А1); a click from the keyboard, by its
+  own time, and it leaves the touch alone (Б1). Open a
   sheet from a tap only: Chrome skips on «back» an entry laid without a gesture. **The sheet is the one exception to «only the
   page scrolls»**: a panel over the screen has no window of its own, so it scrolls itself and
   the page under it is held still.
