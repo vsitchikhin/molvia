@@ -64,8 +64,8 @@
         "advice_body": "Sorts what you rated: buy, only if cheap, never — and shows where it costs less"
       },
       "pending": {
-        "one_trip": "From the trip to {place} {when}",
-        "many_trips": "From {n} trip | From {n} trips"
+        "one_place": "From {place}, the latest {when}",
+        "many_places": "From {n} place | From {n} places"
       },
       "recent": {
         "caption": "Recent trips",
@@ -82,7 +82,7 @@
       },
       "error": {
         "title": "Trips didn't load",
-        "body": "The server didn't answer. You can start a trip anyway"
+        "body": "You can start a trip anyway"
       }
     },
     "quantity": "{amount} {unit}",

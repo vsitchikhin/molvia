@@ -215,7 +215,7 @@ describe('словарь: плюральные формы', () => {
     // разделитель, поставленный по недосмотру.
     expect(pluralised(RU).map(([key]) => key)).toEqual([
       'trip.items_count',
-      'trip.home.pending.many_trips',
+      'trip.home.pending.many_places',
       'trip.rejected.orphaned',
       'trip.caveat.pending',
       'trip.unsent.title',

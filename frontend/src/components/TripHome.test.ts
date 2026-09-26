@@ -96,7 +96,7 @@ function remember(trips: TripHistoryEntry[] = [], local: unknown[] = []) {
       local,
     }),
   )
-  localStorage.setItem(`molvia.trip-history-answered.${ME}`, '1')
+  if (trips.length === 0) localStorage.setItem(`molvia.trip-history-empty.${ME}`, '1')
 }
 
 describe('TripHome', () => {
@@ -218,10 +218,11 @@ describe('TripHome', () => {
       )
       window.dispatchEvent(new StorageEvent('storage', { key }))
       first.resolve({ trips: [trip(1), trip(2)], nextCursor: null })
-      await flushPromises()
 
+      await vi.waitFor(() => {
+        expect(view.findAll('.history-row')).toHaveLength(2)
+      })
       expect(tripHistory).toHaveBeenCalledTimes(2)
-      expect(view.findAll('.history-row')).toHaveLength(2)
       expect(view.find('.skeleton').exists()).toBe(false)
     })
 
@@ -241,27 +242,60 @@ describe('TripHome', () => {
       )
       useTripHistoryStore().forgetLocal('bbbbbbbb-0000-4000-8000-0000000000fe')
       first.resolve({ trips: [trip(1)], nextCursor: null })
-      await flushPromises()
 
-      expect(view.findAll('.history-row')).toHaveLength(1)
+      await vi.waitFor(() => {
+        expect(view.findAll('.history-row')).toHaveLength(1)
+      })
     })
 
-    it('список сдвигается под каждым ответом — через три раза тихая ошибка, а не скелет', async () => {
+    // Another window sends its queue one purchase at a time once the connection is back: every
+    // answer of the first two lands on a list it has just written. The pause lets it finish, and
+    // the third answer is taken (round 2, Ж2).
+    it('поток записей соседнего окна — пауза перед повтором, и ответ принят', async () => {
+      const key = `molvia.trip-history.${ME}`
       tripHistory.mockImplementation(() => {
-        // Every answer lands on a list another window has just written.
-        useTripHistoryStore().capture(
-          `bbbbbbbb-0000-4000-8000-0000000000${String(tripHistory.mock.calls.length).padStart(2, '0')}`,
-          'SAS',
-          new Date(),
-          new Date(),
-          'AMD',
-          null,
-        )
-        return Promise.resolve({ trips: [], nextCursor: null })
+        const calls = tripHistory.mock.calls.length
+        if (calls <= 2) {
+          localStorage.setItem(
+            key,
+            JSON.stringify({ page: { trips: [], nextCursor: null }, selected: null, local: [] }),
+          )
+          window.dispatchEvent(new StorageEvent('storage', { key }))
+        }
+        return Promise.resolve({ trips: [trip(1), trip(2)], nextCursor: null })
       })
       const { view } = await render()
+      await vi.waitFor(
+        () => {
+          expect(view.findAll('.history-row')).toHaveLength(2)
+        },
+        { timeout: 3000 },
+      )
       expect(tripHistory).toHaveBeenCalledTimes(3)
+      expect(view.text()).not.toContain(ru.trip.home.error.title)
+    })
+
+    it('список сдвигается под каждым ответом — в конце тихая ошибка, никого не винящая', async () => {
+      const key = `molvia.trip-history.${ME}`
+      tripHistory.mockImplementation(() => {
+        localStorage.setItem(
+          key,
+          JSON.stringify({ page: { trips: [], nextCursor: null }, selected: null, local: [] }),
+        )
+        window.dispatchEvent(new StorageEvent('storage', { key }))
+        return Promise.resolve({ trips: [trip(1)], nextCursor: null })
+      })
+      const { view } = await render()
+      await vi.waitFor(
+        () => {
+          expect(view.text()).toContain(ru.trip.home.error.title)
+        },
+        { timeout: 5000 },
+      )
+      expect(tripHistory).toHaveBeenCalledTimes(4)
       expect(view.find('.skeleton').exists()).toBe(false)
+      // The server answered every time: nothing on screen says it did not.
+      expect(view.text()).not.toContain('Сервер не ответил')
     })
   })
 
@@ -372,36 +406,42 @@ describe('TripHome', () => {
       expect(view.text()).not.toContain('ждёт оценки')
     })
 
-    it('один поход: «Из похода в «Ереван Сити» вчера», тап ведёт в «Оценки»', async () => {
+    it('одно место: «Из «Ереван Сити», последняя — вчера», тап ведёт в «Оценки»', async () => {
       tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+      const earlier = yesterday()
+      earlier.setDate(earlier.getDate() - 3)
       pendingVerdicts.mockResolvedValue({
-        items: [card(1, 'Ереван Сити', yesterday()), card(2, 'Ереван Сити', yesterday())],
+        items: [card(1, 'Ереван Сити', earlier), card(2, 'Ереван Сити', yesterday())],
         total: 2,
       })
       const { view, router } = await render()
       expect(view.text()).toContain('2 покупки ждут оценки')
-      expect(view.text()).toContain('Из похода в «Ереван Сити» вчера')
+      expect(view.get('.pending .sub').text()).toBe('Из «Ереван Сити», последняя — вчера')
 
       await view.get('.pending button').trigger('click')
       await flushPromises()
       expect(router.currentRoute.value.name).toBe('verdicts')
     })
 
-    it('один поход через полночь — всё ещё один поход (В1)', async () => {
-      const late = yesterday()
-      late.setHours(23, 50, 0, 0)
-      const after = new Date(late.getTime() + 20 * 60_000)
+    // Покупка без связи уходит с очередью через часы: по времени один поход читался двумя
+    // (раунд 2, З1). Место — точное, поэтому подпись о местах, а не о походах.
+    it('одно место, покупки получены сервером с разрывом в часы — всё ещё одно место (З1, В1)', async () => {
+      const first = new Date(Date.now() - 8 * 3_600_000)
+      const rest = new Date(Date.now() - 60_000)
       tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
       pendingVerdicts.mockResolvedValue({
-        items: [card(1, 'Ереван Сити', late), card(2, 'Ереван Сити', after)],
-        total: 2,
+        items: [
+          card(1, 'Ереван Сити', first),
+          card(2, 'Ереван Сити', rest),
+          card(3, 'Ереван Сити', rest),
+        ],
+        total: 3,
       })
       const { view } = await render()
-      expect(view.text()).toContain('Из похода в «Ереван Сити»')
-      expect(view.text()).not.toContain('Из 2 походов')
+      expect(view.get('.pending .sub').text()).toMatch(/^Из «Ереван Сити»/)
     })
 
-    it('неполная страница из одного похода — поход не называется за всех (В2)', async () => {
+    it('неполная страница из одного места — место не называется за всех (В2)', async () => {
       tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
       pendingVerdicts.mockResolvedValue({
         items: Array.from({ length: 50 }, (_, i) => ({
@@ -412,17 +452,17 @@ describe('TripHome', () => {
       })
       const { view } = await render()
       expect(view.text()).toContain('60 покупок ждут оценки')
-      expect(view.text()).not.toContain('Из похода')
+      expect(view.find('.pending .sub').exists()).toBe(false)
     })
 
-    it('несколько: «Из 2 походов» — поход узнаётся по месту и промежутку', async () => {
+    it('несколько мест: «Из 2 мест»', async () => {
       tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
       pendingVerdicts.mockResolvedValue({
         items: [card(1, 'Ереван Сити', yesterday()), card(2, 'SAS', yesterday())],
         total: 2,
       })
       const { view } = await render()
-      expect(view.text()).toContain('Из 2 походов')
+      expect(view.get('.pending .sub').text()).toBe('Из 2 мест')
     })
   })
 })

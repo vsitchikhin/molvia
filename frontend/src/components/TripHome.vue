@@ -97,7 +97,8 @@
       <!-- Quiet on purpose: a red block's «Повторить» is a main button, and a second one beside
            «Начать поход» would compete for the thumb. The trip starts without the history. When
            the trip could not be asked for either, the red block above is already there and its
-           «Повторить» asks for both — this card then only names what is missing (adversarial Д). -->
+           «Повторить» asks for both — this card then only names what is missing (adversarial Д).
+           Its words blame nobody: it also stands after answers the list moved under (Ж2). -->
       <AppCard v-else-if="shown === 'error'" list>
         <div class="line">
           <IconAlert class="icon bad" aria-hidden="true" />
@@ -119,7 +120,6 @@
 import { computed, defineComponent, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import type { PendingVerdict } from '@molvia/model'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconBasketPlus from '~icons/mdi/basket-plus-outline'
 import IconCart from '~icons/mdi/cart-outline'
@@ -140,37 +140,14 @@ import { useNavigation } from '@/navigation'
 /** How many finished trips the home screen lists: three fit above «Начать поход» on 390×844. */
 const RECENT = 3
 
-/** Purchases in one shop further apart than this are two trips: a trip at a shelf takes less. */
-const TRIP_GAP_HOURS = 6
-
-/** Cards grouped into trips by place and by the gap between purchases, newest purchase kept. */
-function tripsOf(cards: readonly PendingVerdict[]): { place: string; latest: Date }[] {
-  const byPlace = new Map<string, number[]>()
-  for (const card of cards) {
-    const times = byPlace.get(card.placeName) ?? []
-    times.push(card.boughtAt.getTime())
-    byPlace.set(card.placeName, times)
-  }
-  const trips: { place: string; latest: Date }[] = []
-  for (const [place, times] of byPlace) {
-    times.sort((a, b) => a - b)
-    times.forEach((at, index) => {
-      const next = times[index + 1]
-      if (next === undefined || next - at > TRIP_GAP_HOURS * 3_600_000)
-        trips.push({ place, latest: new Date(at) })
-    })
-  }
-  return trips
-}
-
 /**
  * «Поход» with no trip going on — the first screen a new person meets (MOL-77). A newcomer is
  * told what the product is and how its cycle goes; a person with a history gets their last trips
  * and the purchases waiting for a verdict. «Начать поход» is not here: it stands in the strip
  * above the tab bar, in every state, and belongs to the trip screen.
  *
- * **The introduction is only for a history known to be empty** — the server answered, now or on
- * an earlier launch (`answered`), and the phone holds no finish of its own. No answer and no
+ * **The introduction is only for a history known to be empty** — the server answered so, now or on
+ * an earlier launch (`answeredEmpty`), and the phone holds no finish of its own. No answer and no
  * memory is not «nobody»: greeting a person with twenty trips as a newcomer, because the network
  * dropped, is the one thing this screen must not do (MOL-56's rule, applied here).
  *
@@ -224,7 +201,7 @@ export default defineComponent({
       () => {
         if (rows.value.length > 0) return 'recent'
         if (trouble.value === 'error') return 'error'
-        if (history.answered) return pending.value > 0 ? 'pending-only' : 'new'
+        if (history.answeredEmpty) return pending.value > 0 ? 'pending-only' : 'new'
         return trouble.value === 'offline' ? 'no-memory' : 'loading'
       },
     )
@@ -239,24 +216,26 @@ export default defineComponent({
     )
 
     /**
-     * «Из похода в «Ереван Сити» вчера», or «Из 3 походов». A card carries the place and the moment
-     * of its latest purchase, not the trip (MOL-28), so trips are told apart by place and by a gap
-     * of `TRIP_GAP_HOURS` between purchases — not by the calendar day, which split a trip over
-     * midnight into two (adversarial В1). Named limit: two trips to one shop closer than that are
-     * one. Counted over the page the queue holds; when the server holds more, one trip on the page
-     * is not claimed for all of them (adversarial В2) and the line is left out.
+     * «Из «Ереван Сити», последняя — вчера», or «Из 3 мест». By places, not trips: a card carries
+     * the place and the moment the server took its latest purchase, not the trip (MOL-28), and a
+     * trip cannot be told by that moment — a purchase made with no signal arrives with the queue,
+     * hours later, and one trip read as two however the gap was drawn (round 2, З1). The place is
+     * exact. Counted over the page the queue holds; when the server holds more, one place on the
+     * page is not claimed for all of them (adversarial В2) and the line is left out.
      */
     const pendingFrom = computed(() => {
-      const trips = tripsOf(queue.cards.value)
-      const [only] = trips
-      const partial = pending.value > queue.cards.value.length
-      if (trips.length === 1 && only && !partial)
-        return t('trip.home.pending.one_trip', {
-          place: only.place,
-          when: purchaseDay(only.latest, locale.value),
+      const cards = queue.cards.value
+      const places = new Set(cards.map((card) => card.placeName))
+      const [only] = places
+      if (places.size === 1 && only !== undefined && pending.value <= cards.length) {
+        const latest = Math.max(...cards.map((card) => card.boughtAt.getTime()))
+        return t('trip.home.pending.one_place', {
+          place: only,
+          when: purchaseDay(new Date(latest), locale.value),
         })
-      if (trips.length > 1)
-        return t('trip.home.pending.many_trips', { n: trips.length }, trips.length)
+      }
+      if (places.size > 1)
+        return t('trip.home.pending.many_places', { n: places.size }, places.size)
       return null
     })
 
