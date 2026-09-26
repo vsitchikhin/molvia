@@ -39,28 +39,52 @@ of exactly that commit as `sha-<7 hex>` and rolls them out:
    the commit, the job stops red and nothing moves. The key cannot replace them — copy them over
    (`scp docker-compose.prod.yml deploy/deploy.sh molvia:molvia/`) and re-run the failed job.
 2. **`deploy.sh <tag>`** pulls the images — a tag the registry does not have leaves everything as
-   it was — writes `IMAGE_TAG` into `.env.prod`, runs `up -d` and waits up to 90 s for
-   `/api/health` through Caddy to answer `ok` **as the build it asked for**, with the bot running.
-   Otherwise it writes the previous tag back, runs `up -d` again and fails the job.
-3. The job then asks `https://molvia.net/api/health` from outside.
+   it was — writes `IMAGE_TAG` into `.env.prod`, runs `up -d` and waits up to 90 s until every
+   service runs a container of **that tag's image**, `/api/health` through Caddy answers `ok` and
+   the bot has not restarted. Anything else — `up -d` itself failing included — writes the
+   previous tag back, runs `up -d` again and fails the job. It is told by the image, not by the
+   version `/health` names: images built before MOL-90 all call themselves `0.0.0`.
+3. The job then asks `https://molvia.net/api/health` from outside, and for an automatic rollout
+   checks that the version names its commit.
 
-**One at a time, newest last.** The deploy job waits for the one in progress rather than
-cancelling it, and rolls out master's head only: a slower build of an older commit is skipped,
-since the newer one brings it along. On the machine the script also holds a lock.
+The script writes to `~/molvia/deploy.log`, and a `tail` carries it to the job: a job cancelled or
+a runner off the network takes the `tail` with it, and the rollout — or its rollback — still runs
+to the end. The log of the last rollout stays there.
+
+**Every rollout is a few seconds of refusals.** `up -d` recreates all three containers, Caddy
+included. The PWA's queue holds a write through a 5xx and a dropped connection, so nothing is
+lost; a screen loading at that moment shows its error state and tries again.
+
+**One at a time, never older over newer.** The deploy job waits for the one in progress rather
+than cancelling it; on the machine the script also holds a lock. Builds run side by side, so a
+build may finish after a newer commit went out: it stands aside only if the machine already runs
+its commit or a later one — not because master moved on, since the commit that moved it may never
+pass CI. **GitHub keeps one job waiting, not a queue:** a third one to arrive replaces the one
+waiting. So press a rollback when nothing is queued, and check that it ran.
+
+**Holding rollouts.** While `~/molvia/deploy.hold` exists every rollout is refused and the job goes
+red. `restore.sh --into-prod` sets it for as long as it replaces the database — an API started in
+the middle would migrate the empty database and the copy would no longer go in — and takes it off
+however it ends. Set it by hand (`ssh molvia 'touch ~/molvia/deploy.hold'`) for any maintenance
+that must not meet a merge, and remove it afterwards; a merge made meanwhile rolls out with the
+next one, or re-run its Release job.
 
 **The version.** `/api/health` names the build by `git describe`: `v0.1.1-3-g1a2b3c4` is three
-commits after `v0.1.1`, at `1a2b3c4`. A tag build names itself: `v0.1.2`.
+commits after `v0.1.1`, at `1a2b3c4` — the long form always, `v0.1.2-0-g…` even on a tagged
+commit, so the commit is always in it.
 
-**A tag is a mark, not a deploy.** Every 10–15 tasks, by hand:
+**A tag is a mark, not a deploy** (owner's decision В-4). Every 10–15 tasks, by hand:
 
 ```bash
-git tag v0.1.2 && git push origin v0.1.2   # builds images named v0.1.2, deploys nothing
+git tag v0.1.2 && git push origin v0.1.2   # names the images of that commit v0.1.2, deploys nothing
 ```
 
-`v0.2.0` marks the start of the 0.2 cohort.
+The tag builds nothing: it puts its name on the `sha-…` images already built from its commit —
+byte for byte what ran on production — and a commit that was never built from master is refused.
+Only `vN.N.N` sets it off. `v0.2.0` marks the start of the 0.2 cohort.
 
-**Rolling back by hand:** Actions → Release → «Run workflow» on master, with a tag — `v0.1.2` or
-`sha-1a2b3c4`. It only deploys; nothing is built.
+**Rolling back by hand:** Actions → Release → «Run workflow» on master, with a tag — `v0.1.2`,
+`sha-1a2b3c4`, or any image built before MOL-90 (`v0.1.1`). It only deploys; nothing is built.
 
 **A failed deploy puts the previous image back, not the schema.** The API migrates when it
 starts, all pending migrations in one transaction: a migration that fails leaves the schema as it
@@ -71,8 +95,10 @@ after.
 
 ### Once: the deploy key
 
-The key lives in the GitHub environment `production`, which admits the `master` branch only — a
-run from any other branch, or from a fork's pull request, gets no secret.
+The key lives in the GitHub environment `production`, which admits the `master` branch only:
+«Run workflow» from any other branch gets no secret. It does not keep out a pull request — a
+`workflow_run` always runs on master, whatever set it off. That is the `if` of the build job:
+only a successful CI of a push to master of this repository builds, and only a build deploys.
 
 1. A key pair for Actions, no passphrase: `ssh-keygen -t ed25519 -N '' -C github-actions-deploy@molvia -f deploy_key`.
 2. On the machine, the script and the key, restricted to it:
@@ -219,6 +245,9 @@ deploy/backup/restore.sh --list
 deploy/backup/restore.sh --drill                  # latest copy into a throwaway Postgres, row counts vs live
 deploy/backup/restore.sh --into-prod <copy>       # asks for the copy's name, stops api and bot, replaces
 ```
+
+`--into-prod` holds rollouts while it runs (`deploy.hold`, «Deploys» above), so a merge meanwhile
+does not start an API on the empty database; it takes the hold off however it ends.
 
 **After `--into-prod`, erasures made after the copy have to be repeated**: a copy is a snapshot, and
 someone who wrote `/delete` after it is back. The window is at most a day — accepted for 0.1 and named

@@ -2052,12 +2052,20 @@ The shape worth knowing here:
   passes on master, builds the three images of exactly that commit as `sha-<7 hex>` and rolls
   them out over ssh — about seven minutes from the merge. The key can do one thing: its forced
   command, `deploy/deploy.sh`, takes a published tag and nothing else, so a stolen key re-deploys
-  what is already in the registry. One rollout at a time; only master's head goes out, so a
-  slower build of an older commit never lands over a newer one. A compose file or a deploy
-  script on the machine that differs from the commit stops the job before anything moves — the
-  key cannot replace them, and a copy is made by hand. A tag `v0.1.N` is set by hand every
-  10–15 tasks as a mark and a point to roll back to; it builds and does not deploy. `v0.2.0`
-  starts the 0.2 cohort. **`/api/health` names the build** — `git describe`, `v0.1.1-3-g1a2b3c4`.
+  what is already in the registry. **A rollout is told by the image its containers run, never by
+  the version `/health` names** — every image before MOL-90 calls itself `0.0.0`, and those are
+  the rollback targets. Any failure, `up -d` included, puts the previous tag back; the script
+  writes to a log rather than to ssh, so a client going away cannot cut a rollback short. One
+  rollout at a time, and never older over newer: a build stands aside only if the machine already
+  runs its commit or a descendant — not because master moved on, since the commit that moved it
+  may never pass CI. A compose file or a deploy script on the machine that differs from the
+  commit stops the job before anything moves — the key cannot replace them, and a copy is made by
+  hand. `~/molvia/deploy.hold` refuses every rollout, and `restore.sh --into-prod` sets it: an API
+  started mid-restore migrates the empty database. A tag `v0.1.N` is set by hand every 10–15
+  tasks as a mark and a point to roll back to; it builds nothing and deploys nothing, but names
+  the `sha-…` images of its commit — byte for byte what ran (owner's decision В-4). `v0.2.0`
+  starts the 0.2 cohort. **`/api/health` names the build** — `git describe --long`,
+  `v0.1.1-3-g1a2b3c4`.
 - **A failed deploy puts the previous image back, not the schema.** Pending migrations run in
   one transaction, so a migration that fails leaves the schema as it was and the old image
   finds what it knew. One that succeeded while something else failed stays applied, and the
