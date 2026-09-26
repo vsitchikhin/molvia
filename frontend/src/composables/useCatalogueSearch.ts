@@ -103,7 +103,9 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
       results.value = found
       answered.value = text
       phase.value = found.length === 0 ? 'empty' : near ? 'ready' : 'far'
-      if (!near && !(missed.value !== null && startsHeld(missed.value, text))) {
+      // By the length too: an empty answer of an API older than `near` reads as near (MOL-46).
+      const miss = found.length === 0 || !near
+      if (miss && !(missed.value !== null && startsHeld(missed.value, text))) {
         missed.value = text
       }
       // Still dimmed while a newer search waits for its pause.

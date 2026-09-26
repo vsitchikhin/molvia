@@ -343,14 +343,15 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   «Предложить товар» **under them**, in place of the quiet «Нет нужного?» — above them, the block
   moved every row under the finger as the answer flipped near and far while a word was typed
   (owner's decision on review). It is read out as «не нашли» too, and it is a miss for the
-  person's own word as an empty one is. **A client older than the field reads its absence as
-  near**, what every answer was before it existed. On MOL-14's shelf it is exactly the class: «овощи», «специи», eight of
+  person's own word as an empty one is. **An answer from a server older than the field is read as
+  near**, what every answer was before it existed — so «an empty answer is not near» is said of
+  this server, and the phone tells a miss by the rows as well (review Р-5). On MOL-14's shelf it is exactly the class: «овощи», «специи», eight of
   twelve everyday words that share only letters, «яблоки» → «яблочный» of the edits of the
   ending, and five things meant, still first — two brands spelt two edits off («хаггис», «лейс»)
   and three queries with a word in another form than the label's («собачий корм», «средство для
   полов», «таблетки для посудомойки»). The price, named: a word two edits from its label's —
-  a typo, «малако», or another form, «полов» for «пола» — reads «не нашли» above the item it
-  found, first; and a wrong word within one edit — «водка» → «Вода» — stays a find, since nothing
+  a typo, «малако», or another form, «полов» for «пола» — reads «не нашли» under the item it
+  found, first in the list; and a wrong word within one edit — «водка» → «Вода» — stays a find, since nothing
   tells it from a typo.
 - **Every candidate is ranked; there is no ceiling.** Any cut before ranking is wrong one
   way or another. By similarity it drops the typo the low threshold exists for — «малако»
@@ -1219,11 +1220,13 @@ database access. In a product about data integrity, two write paths will silentl
   holding no typing** (`pwaUpdate.ts`, MOL-46). The client reads every answer strictly, so an old page
   against a new API breaks — and nothing reloaded it: an iOS app frozen in the background came back
   on the old code until a cold start. Hidden is not enough by itself: a sheet keeps what is typed
-  in memory until its main action — the price of a purchase, a proposed item, an exchange — and so
-  does a search typed on «Что взяли?», the query and the miss that teaches the person's own word
-  (adversarial review Е); at the shelf the phone is put away mid-sheet for the calculator or the
-  bank, and mid-search to ask what a thing is called here. `holdsTyping` is that list — a
-  `dialog[open]`, a combobox with a value — and forms with a draft on the device are not on it. So
+  in memory until its main action — the price of a purchase, a proposed item, an exchange — and at
+  the shelf the phone is put away mid-sheet for the calculator or the bank. `holdsTyping` is a
+  `dialog[open]`, and nothing else: everything else typed keeps a draft on the device and comes
+  back — the settings, the ratings, and **the search on «Что взяли?» with its miss**
+  (`searchDraft.ts`, this window's shelf, put away with the screen). Held against the update
+  instead, a typed query kept out the very version that fixes a search the old code could no
+  longer read, and an erased field let the miss be lost (adversarial review Е, Ж). So
   the new worker is let in, and the page reloaded after it took over, only then; a takeover that came another way —
   another window of the app let it in, or this one came back before it activated — waits for the
   same moment. **The worker is registered by our code, not by the plugin's script**

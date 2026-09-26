@@ -14,6 +14,8 @@ interface Call {
   answer(entries: CatalogueEntry[]): void
   /** Rows, none of them close to the query (MOL-46). */
   answerFar(entries: CatalogueEntry[]): void
+  /** An answer of an API before MOL-46, as the client reads it: `near` defaults to true. */
+  answerOld(entries: CatalogueEntry[]): void
   fail(error?: Error): void
 }
 
@@ -30,6 +32,10 @@ vi.mock('@/api', () => ({
           },
           answerFar: (items) => {
             resolve({ items, near: false })
+          },
+          // What the client makes of an answer with no `near`: the contract's default.
+          answerOld: (items) => {
+            resolve({ items, near: true })
           },
           fail: (error: Error = new ApiError(ERROR.INTERNAL, 'transport')) => {
             reject(error)
@@ -530,6 +536,17 @@ describe('the query that found nothing (MOL-45)', () => {
 
     // Taken from that very answer, the item was found by the word itself — nothing to learn.
     expect(search.takeMissed('пельмени')).toBeNull()
+  })
+
+  it('holds an empty answer of an API older than `near` as a miss — it reads as near (review Р-5)', async () => {
+    const { query, search } = harness()
+    await type(query, 'бахчевые')
+    await pause()
+    calls.at(-1)?.answerOld([])
+    await settle()
+
+    expect(search.phase.value).toBe('empty')
+    expect(search.missed.value).toBe('бахчевые')
   })
 
   it('must not fire on a near answer', async () => {
