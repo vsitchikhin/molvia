@@ -7,7 +7,8 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 import { useActorStore } from '@/stores/actor'
 import { useReconnect } from './useReconnect'
 
-interface HistoryRow {
+/** A row of the history, as both the history and the home screen draw it (MOL-77). */
+export interface HistoryRow {
   id: string
   name: string
   at: Date
@@ -19,7 +20,6 @@ interface TripHistoryScreen {
   rows: ComputedRef<HistoryRow[]>
   loading: ComputedRef<boolean>
   trouble: Ref<'error' | 'offline' | null>
-  when(date: Date): string
   load(): void
   more(): void
   open(tripId: string): void
@@ -30,7 +30,7 @@ export function useTripHistory(): TripHistoryScreen {
   const queue = useTripQueueStore()
   const actor = useActorStore()
   const router = useRouter()
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const busy = ref(false)
   /**
    * Loading covers «the owner is not known yet»: the first launch is still making an identity,
@@ -105,15 +105,12 @@ export function useTripHistory(): TripHistoryScreen {
   useReconnect(() => {
     if (!loading.value) void load()
   })
-  const when = (date: Date) =>
-    new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short' }).format(date)
   return {
     t,
     history,
     rows,
     loading,
     trouble,
-    when,
     load: () => void load(),
     more: () => void load(true),
     open: (tripId: string) => void router.push({ name: 'finished-trip', params: { tripId } }),

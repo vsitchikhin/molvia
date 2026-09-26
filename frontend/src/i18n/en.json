@@ -121,6 +121,7 @@
       "local_finish": "Finished on this device — not sent yet",
       "more": "Show more",
       "finished_at": "Finished · {when}",
+      "when": "{day}, {time}",
       "missing_title": "Trip unavailable",
       "missing_body": "This trip could not be found in your account. Return to history.",
       "pending": "Changes are on this device. We will send them when connected.",
