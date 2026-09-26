@@ -374,7 +374,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         end: (actorId, currentId, id) => endSession(sessions, actorId, currentId, id),
       })
       settingsRoute(guarded, (owner, input) =>
-        saveSettings(createSettingsRepository(db), owner, input),
+        saveSettings(createSettingsRepository(db), tripData.money, owner, input),
       )
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items }, actorId, query),

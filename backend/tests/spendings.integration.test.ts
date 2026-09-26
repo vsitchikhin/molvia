@@ -23,7 +23,15 @@ import { createRateRepository } from '@/db/rates-repository'
 import { actors, expenses, moneyMonthRates, spendings } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
+import {
+  clearAll,
+  insertActor,
+  insertItem,
+  insertPlace,
+  insertTrip,
+  signIn,
+  tripContext,
+} from './fixtures'
 
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
@@ -679,5 +687,56 @@ describe('месяц «Денег» — края (адверсариальный
     // Removing the late one lets August go again.
     expect((await call(me, 'DELETE', `/exchanges/${late}`)).statusCode).toBe(200)
     expect((await month(me, '2026-08')).spentIncome).toEqual({ minor: 1000000n, currency: 'RUB' })
+  })
+})
+
+describe('второй раунд (адверсариальный Е1, Е2)', () => {
+  it('удалённая больше десяти минут назад трата пишется заново, не дожидаясь таймера (Е2)', async () => {
+    const me = await owner()
+    const body = {
+      id: randomUUID(),
+      spentOn: today,
+      amount: { amount: '5000', currency: 'AMD' },
+      categoryId: await presetId(me, 'beauty'),
+    }
+    await call(me, 'POST', '/spendings', body)
+    await call(me, 'DELETE', `/spendings/${body.id}`)
+    await db
+      .update(spendings)
+      .set({ deletedAt: sql`clock_timestamp() - interval '11 minutes'` })
+      .where(eq(spendings.id, body.id))
+    expect((await call(me, 'POST', `/spendings/${body.id}/restore`)).statusCode).toBe(404)
+    expect((await call(me, 'POST', '/spendings', body)).statusCode).toBe(201)
+    expect(idsOf(await month(me, today.slice(0, 7)))).toEqual([body.id])
+  })
+
+  it('«мой курс → ЦБ РА» размораживает прошлые месяцы: все по одному правилу (В-8, Е1)', async () => {
+    const me = await owner()
+    await rates.upsert([official('RUB', '4.50', '2026-08-31')])
+    await exchange(me, '10000 RUB', '41000 AMD', '2026-08-05')
+    await spend(me, { spentOn: '2026-08-20', amount: { amount: '45000', currency: 'AMD' } })
+    expect((await month(me, '2026-08')).rate).toMatchObject({ source: 'personal' })
+    const switched = await call(me, 'PUT', '/actors/me/rate-preference', { preference: 'official' })
+    expect(switched.statusCode).toBe(200)
+    const august = await month(me, '2026-08')
+    expect(august.rate).toMatchObject({ source: 'official', scaled: parseRate('4.5') })
+    expect(august.spentIncome).toEqual({ minor: 1000000n, currency: 'RUB' })
+  })
+
+  it('смена валюты пересчёта размораживает прошлые месяцы; смена города — нет (В-8)', async () => {
+    const me = await owner()
+    await rates.upsert([official('RUB', '4.10', '2026-08-31')])
+    await spend(me, { spentOn: '2026-08-20', amount: { amount: '41000', currency: 'AMD' } })
+    await month(me, '2026-08')
+    const before = await tripContext(db, me.id)
+    const put = (settings: typeof before, previous: typeof before) =>
+      call(me, 'PUT', '/actors/me/settings', { previous, settings })
+
+    expect((await put({ ...before, city: 'Ереван' }, before)).statusCode).toBe(200)
+    expect(await db.select().from(moneyMonthRates)).toHaveLength(1)
+
+    const moved = { ...before, city: 'Ереван' }
+    expect((await put({ ...moved, incomeCurrency: 'USD' }, moved)).statusCode).toBe(200)
+    expect(await db.select().from(moneyMonthRates)).toEqual([])
   })
 })

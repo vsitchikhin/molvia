@@ -405,14 +405,20 @@ export async function restoreExchange(
   return exchangesOverview(repositories, owner, now)
 }
 
-/** «Мой / Официальный» (В-3): for trips from now on. */
+/**
+ * «Мой / Официальный» (В-3): for trips from now on — a trip keeps the rate it took. The months of
+ * «Деньги» are counted by it, not snapshotted by it, so every frozen one is let go and counted by the
+ * new rule when next read (MOL-73, owner's decision В-8): two past months by two rules, decided by
+ * which was opened first, was the alternative.
+ */
 export async function chooseRatePreference(
-  repositories: Repositories,
+  repositories: Writing,
   owner: Owner,
   preference: RatePreference,
   now: Date = new Date(),
 ): Promise<ExchangesResponse> {
   await repositories.exchanges.purgeRemoved(owner.id)
   await repositories.exchanges.setPreference(owner.id, preference)
+  await repositories.money.thaw(owner.id)
   return exchangesOverview(repositories, owner, now)
 }

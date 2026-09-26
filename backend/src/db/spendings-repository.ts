@@ -110,6 +110,17 @@ export function createSpendingRepository(db: Conn): SpendingRepository {
   return {
     async add(actorId, input, rate) {
       return translateFailures(async () => {
+        // Past its ten minutes a removal is final whether or not the timer has come round: the
+        // same name is then a new spending, not a conflict (adversarial round 2, Е2).
+        await db
+          .delete(spendings)
+          .where(
+            and(
+              eq(spendings.id, input.id),
+              eq(spendings.actorId, actorId),
+              lte(spendings.deletedAt, undoFrom()),
+            ),
+          )
         const [inserted] = await db
           .insert(spendings)
           .values({ id: input.id, actorId, ...columnsOf(input), ...rateColumnsOf(rate) })

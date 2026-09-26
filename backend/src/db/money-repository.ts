@@ -31,9 +31,10 @@ export interface MoneyRepository {
    * Lets go of the months frozen from `day` on (owner's decision В-6): an exchange or an income of
    * that day was written, amended, removed or brought back, and every month whose last day is not
    * before it was counted without that. The running month is never frozen, so today's exchange
-   * lets go of nothing — which is what «a new exchange today does not move August» means.
+   * lets go of nothing — which is what «a new exchange today does not move August» means. With no
+   * day, every month: the rule they were counted by changed (В-8).
    */
-  thaw(actorId: string, day: string): Promise<void>
+  thaw(actorId: string, day?: string): Promise<void>
 }
 
 interface TripLineRow extends Record<string, unknown> {
@@ -124,7 +125,12 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
     async thaw(actorId, day) {
       await db
         .delete(moneyMonthRates)
-        .where(and(eq(moneyMonthRates.actorId, actorId), gte(moneyMonthRates.month, monthOf(day))))
+        .where(
+          and(
+            eq(moneyMonthRates.actorId, actorId),
+            day === undefined ? undefined : gte(moneyMonthRates.month, monthOf(day)),
+          ),
+        )
     },
   }
 }
