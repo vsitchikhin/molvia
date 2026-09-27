@@ -880,7 +880,8 @@ nothing up.
   the screen offers.
 - **A date is shown in words over its native field** (`AppField`, `display`): «Сегодня, 27 сентября»
   is drawn, the field stays underneath to open the system picker and to be read by its own value,
-  and Chrome's own calendar is kept unseen over the whole field. The spending just saved is scrolled
+  and Chrome's own calendar is kept unseen in its place — stretched over the field, it caught the
+  sheet's «Сохранить». The spending just saved is scrolled
   into view once its row is there; a finished trip opened from «Деньги» slides in as a push.
 - **The sheet says «saved» after it has closed** (adversarial И): the move to the spending's month
   made while it was open was undone by the step back that closes it. It checks the day — a cleared

@@ -262,15 +262,11 @@ textarea.control {
     color: transparent;
   }
 
-  /* Chrome's own calendar would be a second one beside the drawn icon: it is kept, unseen, over the
-     whole field, so a tap anywhere on it still opens the picker. */
+  /* Chrome's own calendar would be a second one beside the drawn icon: kept in its place, unseen.
+     Stretched over the field it caught taps far outside it — the sheet's «Сохранить» among them.
+     On a phone a tap anywhere on the field opens the picker by itself. */
   &::-webkit-calendar-picker-indicator {
-    position: absolute;
-    inset: 0;
-    width: auto;
-    height: auto;
     opacity: 0;
-    cursor: pointer;
   }
 }
 
