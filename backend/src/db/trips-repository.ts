@@ -127,6 +127,11 @@ function toTrip(row: TripRow): Trip {
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
     finishedOnDeviceAt: row.finishedOnDeviceAt,
+    accountId: row.accountId,
+    debited:
+      row.debitedMinor === null || row.debitedCurrency === null
+        ? null
+        : { minor: row.debitedMinor, currency: row.debitedCurrency },
   })
 }
 

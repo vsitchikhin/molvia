@@ -55,6 +55,18 @@ function columnsOf(input: Omit<SpendingBody, 'id'>) {
   }
 }
 
+/**
+ * Where it was paid from (MOL-115): left out is «без счёта» here — keeping the account an older
+ * screen did not send is the use case's (Р-26). Not the fact: changing only it is no amendment.
+ */
+function paymentColumnsOf(input: Omit<SpendingBody, 'id'>) {
+  return {
+    accountId: input.accountId ?? null,
+    debitedMinor: input.debited?.minor ?? null,
+    debitedCurrency: input.debited?.currency ?? null,
+  }
+}
+
 function rateColumnsOf(rate: ExchangeRate | null) {
   return {
     rateBase: rate?.base ?? null,
@@ -65,10 +77,32 @@ function rateColumnsOf(rate: ExchangeRate | null) {
   }
 }
 
-function says(row: Row, input: Omit<SpendingBody, 'id'>): boolean {
+function saysFact(row: Row, input: Omit<SpendingBody, 'id'>): boolean {
   const columns = columnsOf(input)
   return (Object.keys(columns) as (keyof typeof columns)[]).every(
     (column) => row[column] === columns[column],
+  )
+}
+
+/** Whether the account and «списано» are what the row already has. */
+function samePayment(row: Row, input: Omit<SpendingBody, 'id'>): boolean {
+  const payment = paymentColumnsOf(input)
+  return (
+    row.accountId === payment.accountId &&
+    row.debitedMinor === payment.debitedMinor &&
+    row.debitedCurrency === payment.debitedCurrency
+  )
+}
+
+/** As sent: an account or «списано» left out says nothing, so an older screen's repeat is one. */
+function says(row: Row, input: Omit<SpendingBody, 'id'>): boolean {
+  const payment = paymentColumnsOf(input)
+  return (
+    saysFact(row, input) &&
+    (input.accountId === undefined || row.accountId === payment.accountId) &&
+    (input.debited === undefined ||
+      (row.debitedMinor === payment.debitedMinor &&
+        row.debitedCurrency === payment.debitedCurrency))
   )
 }
 
@@ -100,6 +134,11 @@ function toSpending(row: Row): Spending {
     note: row.note,
     place: row.place,
     rate,
+    accountId: row.accountId,
+    debited:
+      row.debitedMinor === null || row.debitedCurrency === null
+        ? null
+        : { minor: row.debitedMinor, currency: row.debitedCurrency },
     revision: row.revision,
     createdAt: row.createdAt,
     amendedAt: row.amendedAt,
@@ -123,7 +162,13 @@ export function createSpendingRepository(db: Conn): SpendingRepository {
           )
         const [inserted] = await db
           .insert(spendings)
-          .values({ id: input.id, actorId, ...columnsOf(input), ...rateColumnsOf(rate) })
+          .values({
+            id: input.id,
+            actorId,
+            ...columnsOf(input),
+            ...paymentColumnsOf(input),
+            ...rateColumnsOf(rate),
+          })
           .onConflictDoNothing({ target: spendings.id })
           .returning()
         if (inserted) return { spending: toSpending(inserted), created: true }
@@ -156,13 +201,17 @@ export function createSpendingRepository(db: Conn): SpendingRepository {
           if (!row) throw new DomainError(ERROR.NOT_FOUND)
           if (says(row, input)) return { spending: toSpending(row), amended: false }
           if (row.revision !== input.revision) throw new DomainError(ERROR.CONFLICT)
+          // Only the account moved: where it was paid from, not a correction — no «исправлен» (Р-15).
+          const fact = saysFact(row, input)
           const [amended] = await tx
             .update(spendings)
             .set({
               ...columnsOf(input),
+              ...paymentColumnsOf(input),
               ...rateColumnsOf(rate),
+              ...(samePayment(row, input) ? {} : { accountSetAt: sql`now()` }),
               revision: row.revision + 1,
-              amendedAt: sql`now()`,
+              ...(fact ? {} : { amendedAt: sql`now()` }),
             })
             .where(eq(spendings.id, row.id))
             .returning()

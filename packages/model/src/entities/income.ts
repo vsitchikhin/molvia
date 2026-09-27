@@ -51,6 +51,8 @@ export const incomeSchema = z
     heldBefore: priceSchema.nullable(),
     source: incomeSourceSchema,
     note: exchangeNoteSchema.nullable(),
+    /** The account it came onto, in its own currency, or null (MOL-115, В-2). */
+    accountId: z.uuid().nullable(),
     revision: z.int().min(1),
     createdAt: z.date(),
     amendedAt: z.date().nullable(),

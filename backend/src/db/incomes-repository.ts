@@ -29,7 +29,7 @@ export interface IncomeRepository {
     actorId: string,
     id: string,
     input: IncomeAmendBody,
-  ): Promise<{ income: Income; amended: boolean }>
+  ): Promise<{ income: Income; amended: boolean; accountsOnly: boolean }>
 
   /** The versions of the owner's incomes before their amendments, by income, newest first. */
   history(actorId: string): Promise<ReadonlyMap<string, readonly IncomeRevision[]>>
@@ -64,11 +64,19 @@ function columnsOf(input: Omit<IncomeBody, 'id'>) {
   }
 }
 
-function says(row: Row, input: Omit<IncomeBody, 'id'>): boolean {
+function saysFact(row: Row, input: Omit<IncomeBody, 'id'>): boolean {
   const columns = columnsOf(input)
   return (Object.keys(columns) as (keyof typeof columns)[]).every(
     (column) => row[column] === columns[column],
   )
+}
+
+/**
+ * The account it came onto (MOL-115) is where the money lies, not what came in: changing only it is
+ * no amendment of the fact (Р-15) — no version, no «исправлен», the months stay frozen.
+ */
+function says(row: Row, input: Omit<IncomeBody, 'id'>): boolean {
+  return saysFact(row, input) && row.accountId === (input.accountId ?? null)
 }
 
 /** The moment before which a removal can no longer be undone, by the database's clock. */
@@ -86,6 +94,7 @@ function toIncome(row: Row): Income {
       row.heldBeforeMinor === null ? null : { minor: row.heldBeforeMinor, currency: row.currency },
     source: row.source,
     note: row.note,
+    accountId: row.accountId,
     revision: row.revision,
     createdAt: row.createdAt,
     amendedAt: row.amendedAt,
@@ -98,7 +107,12 @@ export function createIncomeRepository(db: Conn): IncomeRepository {
       return translateFailures(async () => {
         const [inserted] = await db
           .insert(incomes)
-          .values({ id: input.id, actorId, ...columnsOf(input) })
+          .values({
+            id: input.id,
+            actorId,
+            ...columnsOf(input),
+            accountId: input.accountId ?? null,
+          })
           .onConflictDoNothing({ target: incomes.id })
           .returning()
         if (inserted) return { income: toIncome(inserted), created: true }
@@ -107,7 +121,12 @@ export function createIncomeRepository(db: Conn): IncomeRepository {
         if (same?.actorId !== actorId) throw new DomainError(ERROR.CONFLICT)
         const held = theRow(same, 'incomes')
         // A removed income still holds its name until it is final; «Вернуть» brings it back.
-        if (held.deletedAt !== null || !says(held, input)) throw new DomainError(ERROR.CONFLICT)
+        // An account left out says nothing: the same income from a screen older than accounts is
+        // still a repeat after one was named on it (Р-26).
+        const asSent =
+          saysFact(held, input) &&
+          (input.accountId === undefined || held.accountId === input.accountId)
+        if (held.deletedAt !== null || !asSent) throw new DomainError(ERROR.CONFLICT)
         return { income: toIncome(held), created: false }
       })
     },
@@ -127,8 +146,26 @@ export function createIncomeRepository(db: Conn): IncomeRepository {
             )
             .for('update')
           if (!row) throw new DomainError(ERROR.NOT_FOUND)
-          if (says(row, input)) return { income: toIncome(row), amended: false }
+          if (says(row, input)) {
+            return { income: toIncome(row), amended: false, accountsOnly: false }
+          }
           if (row.revision !== input.revision) throw new DomainError(ERROR.CONFLICT)
+          if (saysFact(row, input)) {
+            const [moved] = await tx
+              .update(incomes)
+              .set({
+                accountId: input.accountId ?? null,
+                accountSetAt: sql`now()`,
+                revision: row.revision + 1,
+              })
+              .where(eq(incomes.id, row.id))
+              .returning()
+            return {
+              income: toIncome(theRow(moved, 'incomes')),
+              amended: false,
+              accountsOnly: true,
+            }
+          }
 
           await tx.insert(incomeRevisions).values({
             incomeId: row.id,
@@ -144,10 +181,20 @@ export function createIncomeRepository(db: Conn): IncomeRepository {
           })
           const [amended] = await tx
             .update(incomes)
-            .set({ ...columnsOf(input), revision: row.revision + 1, amendedAt: sql`now()` })
+            .set({
+              ...columnsOf(input),
+              accountId: input.accountId ?? null,
+              ...(row.accountId === (input.accountId ?? null) ? {} : { accountSetAt: sql`now()` }),
+              revision: row.revision + 1,
+              amendedAt: sql`now()`,
+            })
             .where(eq(incomes.id, row.id))
             .returning()
-          return { income: toIncome(theRow(amended, 'incomes')), amended: true }
+          return {
+            income: toIncome(theRow(amended, 'incomes')),
+            amended: true,
+            accountsOnly: false,
+          }
         }),
       )
     },

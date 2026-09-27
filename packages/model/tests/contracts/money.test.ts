@@ -35,6 +35,8 @@ function spendings(count: number, day: (index: number) => string): Spending[] {
     note: null,
     place: null,
     rate: null,
+    accountId: null,
+    debited: null,
     revision: 1,
     createdAt: new Date(`${day(index)}T10:${String(index % 60).padStart(2, '0')}:00Z`),
     amendedAt: null,
