@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, inArray, max, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm'
 import { placeSchema } from '@molvia/model'
 import type { NewPlace, Place, SettingsGeography } from '@molvia/model'
 import type { Conn } from './index'
@@ -104,6 +104,8 @@ export function createPlaceRepository(db: Conn): PlaceRepository {
         .where(
           and(
             eq(trips.actorId, actorId),
+            // The list is built of trips, so a place visited only by a removed one leaves it.
+            isNull(trips.deletedAt),
             // By the fold the place was stored under, never by the exact spelling: `ensure`
             // keeps the first spelling anyone wrote, so a shop created as «гюмри» is the same
             // shop as «Гюмри» and must not fall out of the list (MOL-65, adversarial Г2).

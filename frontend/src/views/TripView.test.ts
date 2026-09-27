@@ -25,6 +25,8 @@ const startTrip = vi.fn()
 const addExpense = vi.fn()
 const tripHistory = vi.fn<() => Promise<TripHistory>>()
 const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
+const removeTrip = vi.fn<(tripId: string) => Promise<void>>()
+const restoreTrip = vi.fn()
 vi.mock('@/api', () => ({
   api: {
     currentTrip: () => currentTrip(),
@@ -36,6 +38,8 @@ vi.mock('@/api', () => ({
     removeExpense: () => new Promise(() => undefined),
     startTrip: (...args: unknown[]) => startTrip(...args),
     finishTrip: () => new Promise(() => undefined),
+    removeTrip: (tripId: string) => removeTrip(tripId),
+    restoreTrip: (...args: unknown[]) => restoreTrip(...args),
   },
 }))
 
@@ -194,6 +198,11 @@ describe('TripView', () => {
     tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
     pendingVerdicts.mockReset()
     pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
+    // Без связи: удаление ждёт в очереди, а «Вернуть» снимает его оттуда.
+    removeTrip.mockReset()
+    removeTrip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+    restoreTrip.mockReset()
+    restoreTrip.mockReturnValue(new Promise(() => undefined))
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     clock = 0
     vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -926,5 +935,227 @@ describe('TripView', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('item-search')
+  })
+  describe('удалить поход (MOL-76)', () => {
+    const openSheet = () => document.body.querySelector('dialog[open]')
+
+    it('пустой уходит сразу, без вопроса, и на главной стоит «Вернуть»', async () => {
+      currentTrip.mockResolvedValue(trip())
+      const { view, queue } = await render()
+
+      await button(view, ru.trip.remove.action).trigger('click')
+      await flushPromises()
+
+      expect(openSheet()).toBeNull()
+      expect(queue.pending).toEqual([{ kind: 'delete', tripId: TRIP }])
+      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
+      expect(view.get('.dock').text()).toContain('Поход удалён: Ереван Сити')
+
+      await button(view, ru.trip.remove.restore).trigger('click')
+      await flushPromises()
+      // Удаление ещё не ушло: «Вернуть» снимает его, и поход снова на экране.
+      expect(queue.pending.some((write) => write.kind === 'delete')).toBe(false)
+      expect(view.text()).toContain(ru.trip.empty.title)
+    })
+
+    it('с покупками — сначала вопрос: место, день и число позиций, ждущие тоже', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      const { view, queue } = await render()
+      queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000041'))
+      await flushPromises()
+
+      await button(view, ru.trip.remove.action).trigger('click')
+      await flushPromises()
+      const sheet = openSheet()
+      expect(sheet?.textContent).toContain(ru.trip.remove.sheet.title)
+      expect(sheet?.textContent).toContain('Ереван Сити')
+      expect(sheet?.textContent).toContain('3 позиции')
+      expect(queue.pending.some((write) => write.kind === 'delete')).toBe(false)
+
+      // The sheet may come up a task after the tap, and it takes no tap until it has (MOL-69).
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      clock += 1000
+      inside(sheet, ru.trip.remove.action).click()
+      await flushPromises()
+      expect(queue.pending).toEqual([{ kind: 'delete', tripId: TRIP }])
+      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
+    })
+
+    it('«Завершить» у пустого похода предлагает удалить, а завершить — вторым (В-2)', async () => {
+      currentTrip.mockResolvedValue(trip())
+      const { view, queue } = await render()
+
+      await button(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      const sheet = openSheet()
+      expect(sheet?.textContent).toContain(ru.trip.remove.empty.title)
+      expect(sheet?.textContent).toContain(ru.trip.remove.empty.finish)
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      clock += 1000
+      inside(sheet, ru.trip.remove.action).click()
+      await flushPromises()
+      expect(queue.pending).toEqual([{ kind: 'delete', tripId: TRIP }])
+    })
+
+    it('у похода с покупками «Завершить» спрашивает как раньше', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      const { view } = await render()
+      await button(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      expect(openSheet()?.textContent).toContain(ru.trip.finish_confirm.title)
+      expect(openSheet()?.textContent).not.toContain(ru.trip.remove.empty.finish)
+    })
+
+    it('поход не вернулся — плашка называет его и причину', async () => {
+      currentTrip.mockResolvedValue(null)
+      const { view, queue } = await render()
+      queue.rejected = [
+        {
+          key: 'r1',
+          write: { kind: 'restore', tripId: TRIP, name: 'Ереван Сити' },
+          code: ERROR.TRIP_OPEN,
+        },
+      ]
+      await flushPromises()
+      expect(view.text()).toContain('Поход не вернулся: Ереван Сити')
+      expect(view.text()).toContain(ru.trip.remove.not_restored_open)
+    })
+
+    it('новый поход убирает полоску «Вернуть» (Р-4)', async () => {
+      currentTrip.mockResolvedValue(trip())
+      const { view, queue } = await render()
+      await button(view, ru.trip.remove.action).trigger('click')
+      await flushPromises()
+      expect(queue.lastRemoved?.tripId).toBe(TRIP)
+
+      queue.enqueue({
+        kind: 'start',
+        tripId: 'bbbbbbbb-0000-4000-8000-000000000051',
+        place: { kind: 'store', name: 'Рынок' },
+        startedAt: new Date(),
+      })
+      await flushPromises()
+      expect(queue.lastRemoved).toBeNull()
+      expect(view.text()).not.toContain('Поход удалён')
+    })
+  })
+  describe('удалить поход: замечания ревью (MOL-76)', () => {
+    const LAST = 'bbbbbbbb-0000-4000-8000-000000000061'
+    const single: TripHistory = {
+      trips: [
+        {
+          id: LAST,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'SAS' },
+          startedAt: new Date('2026-09-26T10:00:00Z'),
+          finishedAt: new Date('2026-09-26T10:30:00Z'),
+          finishedOnDeviceAt: null,
+        },
+      ],
+      nextCursor: null,
+    }
+
+    it('удалён единственный поход истории — главная встречает знакомством, а не скелетом (А5)', async () => {
+      tripHistory.mockResolvedValueOnce(single)
+      const { view, queue } = await render()
+      expect(view.findAll('.history-row')).toHaveLength(1)
+
+      tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
+      removeTrip.mockResolvedValue(undefined)
+      queue.removeTrip(LAST, 'SAS')
+      await flushPromises()
+
+      expect(tripHistory).toHaveBeenCalledTimes(2)
+      expect(view.find('.home .skeleton').exists()).toBe(false)
+      expect(view.text()).toContain(ru.trip.home.intro.title)
+    })
+
+    it('полоска считает десять секунд от удаления, а не от экрана (Р-1)', async () => {
+      const { view, queue } = await render()
+      queue.lastRemoved = {
+        tripId: LAST,
+        name: 'SAS',
+        writes: [],
+        refusals: [],
+        stamp: Date.now() - 4_000,
+      }
+      await flushPromises()
+      expect(view.get('.dock .count').text()).toBe('6')
+    })
+
+    it('истёкшая, пока её не было на экране, не показывается и забывается (Р-1)', async () => {
+      const { view, queue } = await render()
+      queue.lastRemoved = {
+        tripId: LAST,
+        name: 'SAS',
+        writes: [],
+        refusals: [],
+        stamp: Date.now() - 11_000,
+      }
+      await flushPromises()
+      expect(view.text()).not.toContain('Поход удалён')
+      expect(queue.lastRemoved).toBeNull()
+    })
+
+    it('покупки не вернувшегося похода не обещаны «уйдут со связью» (раунд 2, Б1)', async () => {
+      localStorage.setItem(
+        `molvia.trip-rejected.${ME}`,
+        JSON.stringify([
+          {
+            key: 'r1',
+            write: { kind: 'restore', tripId: TRIP, name: 'Ереван Сити' },
+            code: ERROR.NOT_FOUND,
+          },
+        ]),
+      )
+      const { view, queue } = await render()
+      queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000071'))
+      queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000072'))
+      await flushPromises()
+      expect(view.text()).toContain('Поход не вернулся: Ереван Сити')
+      expect(view.text()).toContain('в нём 2 покупки')
+      expect(view.text()).not.toContain('ещё не отправлен')
+      expect(addExpense).not.toHaveBeenCalled()
+    })
+
+    it('отказ «Вернуть» единственного похода истории — главная перечитывает историю (раунд 2, Б2)', async () => {
+      tripHistory.mockResolvedValueOnce(single)
+      const { view, queue } = await render()
+      expect(view.findAll('.history-row')).toHaveLength(1)
+
+      let land: () => void = () => undefined
+      removeTrip.mockReturnValueOnce(
+        new Promise((resolve) => {
+          land = () => {
+            resolve()
+          }
+        }),
+      )
+      restoreTrip.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, undefined, true))
+      tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
+      const undo = queue.removeTrip(LAST, 'SAS')
+      await flushPromises()
+      queue.restoreTrip(undo)
+      land()
+      await flushPromises()
+
+      expect(queue.rejected.map((item) => item.write.kind)).toEqual(['restore'])
+      expect(tripHistory).toHaveBeenCalledTimes(2)
+      expect(view.find('.home .skeleton').exists()).toBe(false)
+      expect(view.text()).toContain(ru.trip.home.intro.title)
+    })
+
+    it('единственная строка ждёт удаления — «Завершить» тоже зовёт поход пустым (Р-5)', async () => {
+      currentTrip.mockResolvedValue(trip(handoff().slice(0, 1)))
+      const { view, queue } = await render()
+      queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: ASHKHAR })
+      await flushPromises()
+
+      await button(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('dialog[open]')?.textContent).toContain(
+        ru.trip.remove.empty.title,
+      )
+    })
   })
 })

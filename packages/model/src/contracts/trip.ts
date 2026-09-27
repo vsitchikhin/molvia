@@ -293,6 +293,17 @@ export const finishTripBodySchema = z.strictObject({
 })
 export type FinishTripBody = z.output<typeof finishTripBodySchema>
 
+/**
+ * «Вернуть» (MOL-76). `finish` brings the trip back finished, in one step: a trip finished on the
+ * phone with no signal and removed before its `finish` left is open on the server, and brought back
+ * open after the next trip started it met that trip — a refusal about two open trips the person never
+ * held, and the trip with its purchases gone ten minutes later (adversarial round 3, В1).
+ */
+export const restoreTripBodySchema = z.strictObject({
+  finish: finishTripBodySchema.optional(),
+})
+export type RestoreTripBody = z.output<typeof restoreTripBodySchema>
+
 export const TRIP_HISTORY_PAGE_SIZE = 20
 export const tripHistoryCursorSchema = z.strictObject({
   // Keep PostgreSQL microseconds on the wire: decoding to Date would skip boundary rows.

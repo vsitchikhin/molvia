@@ -31,6 +31,25 @@
       "ok": "Finish",
       "cancel": "Cancel"
     },
+    "remove": {
+      "action": "Delete the trip",
+      "sheet": {
+        "title": "Delete this trip?",
+        "body": "The purchases and prices go, from “Money” and the accounts too. The ratings stay"
+      },
+      "empty": {
+        "title": "Nothing in this trip",
+        "body": "Delete it, so no empty row is left in the history?",
+        "finish": "Finish anyway"
+      },
+      "removed": "Trip deleted: {name}",
+      "removed_announced": "Trip deleted: {name}. Undo — 10 seconds",
+      "restore": "Undo",
+      "restored": "The trip is back",
+      "not_restored": "The trip did not come back: {name}",
+      "not_restored_open": "Another trip was started meanwhile, and only one can be open",
+      "not_restored_gone": "More than ten minutes have passed — the trip is deleted for good"
+    },
     "empty": {
       "title": "The trip has started",
       "body": "Add the first item — the rest can be filled in later",

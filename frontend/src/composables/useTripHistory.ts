@@ -68,10 +68,7 @@ export function useTripHistory(): TripHistoryScreen {
       })
     }
     for (const row of history.local) {
-      const refused = queue.rejected.some(
-        (item) => item.write.tripId === row.id && item.write.kind === 'start',
-      )
-      if (!refused)
+      if (!queue.orphaned(row.id))
         rows.set(row.id, {
           id: row.id,
           name: row.name,
@@ -81,6 +78,8 @@ export function useTripHistory(): TripHistoryScreen {
           ),
         })
     }
+    // A removal still waiting takes the row off every list at once (MOL-76).
+    for (const id of queue.removing) rows.delete(id)
     return [...rows.values()].sort(
       (a, b) => b.at.getTime() - a.at.getTime() || b.id.localeCompare(a.id),
     )

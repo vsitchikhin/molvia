@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ApiError } from '@molvia/client'
 import {
   ERROR,
   addExpenseBodySchema,
   catalogueEntryCodec,
   expensePatchSchema,
+  finishTripBodySchema,
   isWireCode,
   startTripBodySchema,
 } from '@molvia/model'
@@ -14,6 +15,7 @@ import type {
   AddExpenseBody,
   CatalogueEntry,
   ExpensePatch,
+  FinishTripBody,
   StartTripBody,
   TripView,
   WireCode,
@@ -65,6 +67,37 @@ export type QueuedWrite =
       readonly patch: ExpensePatch
     }
   | { readonly kind: 'remove'; readonly tripId: string; readonly expenseId: string }
+  /** «Удалить поход» (MOL-76): marked on the server, «Вернуть» for ten minutes. */
+  | { readonly kind: 'delete'; readonly tripId: string }
+  /**
+   * «Вернуть» once the removal may have reached the server. `name` is not sent: a refusal — ten
+   * minutes gone, another trip open — has to say which trip did not come back.
+   */
+  | {
+      readonly kind: 'restore'
+      readonly tripId: string
+      readonly name: string
+      /**
+       * The trip's own «Завершить», taken back with it: the trip comes back finished in one step,
+       * or, open on the server under the next trip, it could not come back at all (round 3, В1).
+       */
+      readonly finish?: FinishTripBody
+    }
+
+/**
+ * What «Удалить поход» took off the phone, for «Вернуть» to put back (MOL-76): the writes of the
+ * trip still waiting, in their order. Without them the trip is only on the server.
+ */
+export interface TripUndo {
+  readonly tripId: string
+  readonly name: string
+  readonly writes: readonly QueuedWrite[]
+  /**
+   * Its refusals: a purchase the server did not take stays one after «Вернуть», with its
+   * «Поправить» — dropped with the removal and not brought back, it was lost in silence (Р-4).
+   */
+  readonly refusals: readonly RejectedWrite[]
+}
 
 export interface RejectedWrite {
   /** Its own name on the phone: two refusals about one row are two notices, not one (В2-8). */
@@ -93,6 +126,15 @@ interface Kept {
 
 const QUEUE_KEY = 'molvia.trip-queue'
 const REJECTED_KEY = 'molvia.trip-rejected'
+/**
+ * «Удалить поход» and «Вернуть» again, under keys of their own (MOL-76, adversarial round 4, Г1):
+ * a window still on the version before them reads the shared queue, drops a kind it does not know
+ * and writes the queue back without it — the removal never happened, and said so to nobody. The
+ * version that knows them puts back what the older one lost, in its place: before the write that
+ * followed it. The same rule as MOL-77's: a phone-side cache is read by both versions.
+ */
+const MARKS_KEY = 'molvia.trip-marks'
+const MARKS_REJECTED_KEY = 'molvia.trip-marks-rejected'
 
 /**
  * A removal of a row the server does not have is the outcome it was asked for, not a refusal
@@ -101,6 +143,9 @@ const REJECTED_KEY = 'molvia.trip-rejected'
  */
 const DONE_ENOUGH: Partial<Record<QueuedWrite['kind'], readonly WireCode[]>> = {
   remove: [ERROR.NOT_FOUND],
+  // The same for a trip (MOL-76): one the server never heard of — its start was still waiting,
+  // or in another window's hands — or one already final is gone, which is what was asked.
+  delete: [ERROR.NOT_FOUND],
 }
 
 /** Wire form: the bodies carry bigints, and the codecs that read them back are the contract's. */
@@ -136,7 +181,21 @@ function encode(entry: QueuedWrite): Loose {
         patch: expensePatchSchema.encode(entry.patch),
       }
     case 'remove':
+    case 'delete':
       return { ...entry }
+    case 'restore':
+      return {
+        kind: 'restore',
+        tripId: entry.tripId,
+        name: entry.name,
+        ...(entry.finish
+          ? {
+              finish: entry.finish.finishedOnDeviceAt
+                ? { finishedOnDeviceAt: entry.finish.finishedOnDeviceAt.toISOString() }
+                : {},
+            }
+          : {}),
+      }
   }
 }
 
@@ -167,6 +226,13 @@ function decode(raw: unknown): QueuedWrite | null {
     if (raw.finishedOnDeviceAt === undefined) return { kind, tripId }
     const at = typeof raw.finishedOnDeviceAt === 'string' ? new Date(raw.finishedOnDeviceAt) : null
     return at && Number.isFinite(at.getTime()) ? { kind, tripId, finishedOnDeviceAt: at } : null
+  }
+  if (kind === 'delete') return { kind, tripId }
+  if (kind === 'restore') {
+    const name = typeof raw.name === 'string' ? raw.name : ''
+    if (raw.finish === undefined) return { kind, tripId, name }
+    const finish = finishTripBodySchema.safeParse(raw.finish)
+    return finish.success ? { kind, tripId, name, finish: finish.data } : null
   }
   if (kind === 'add') {
     const body = addExpenseBodySchema.safeParse(knownFields(raw.body, BODY_FIELDS))
@@ -237,6 +303,47 @@ function stillWaiting(past: string, waiting: ReadonlySet<string>): string | null
   return left.length > 0 ? JSON.stringify(left) : null
 }
 
+/** A removal or a «Вернуть»: the kinds a window of the previous version cannot read. */
+function isMark(write: QueuedWrite): boolean {
+  return write.kind === 'delete' || write.kind === 'restore'
+}
+
+/**
+ * The marks as the mirror keeps them, each with the key of the write it stood before (`null` — the
+ * end), and put back into a queue that lost them. A mark whose write is gone has been passed by
+ * the queue, so it goes first: it should have gone before that write.
+ */
+function withMarks(queue: Kept[], key: string): Kept[] {
+  const marks = parsedList(key).flatMap((item: unknown) => {
+    if (!isRecord(item) || typeof item.key !== 'string') return []
+    const write = decode(item.write)
+    const before = typeof item.before === 'string' ? item.before : null
+    return write && isMark(write) ? [{ key: item.key, write, before }] : []
+  })
+  const lost = marks.filter((mark) => !queue.some((item) => item.key === mark.key))
+  if (lost.length === 0) return queue
+  const result = [...queue]
+  for (const mark of lost) {
+    const at = mark.before === null ? -1 : result.findIndex((item) => item.key === mark.before)
+    const kept = { key: mark.key, write: mark.write }
+    if (mark.before === null) result.push(kept)
+    else if (at === -1) result.unshift(kept)
+    else result.splice(at, 0, kept)
+  }
+  return result
+}
+
+/** The mirror of the marks: each with the key of the next write that is not one. */
+function marksOf(queue: readonly Kept[]): string {
+  return JSON.stringify(
+    queue.flatMap((item, index) => {
+      if (!isMark(item.write)) return []
+      const next = queue.slice(index + 1).find((later) => !isMark(later.write))
+      return [{ key: item.key, write: encode(item.write), before: next?.key ?? null }]
+    }),
+  )
+}
+
 /** A broken entry is dropped alone: the ones around it are somebody's purchases. */
 function recallKept(key: string): Kept[] {
   return parsedList(key).flatMap((item: unknown) => {
@@ -298,6 +405,10 @@ function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
       return api.updateExpense(entry.tripId, entry.expenseId, entry.patch)
     case 'remove':
       return api.removeExpense(entry.tripId, entry.expenseId)
+    case 'delete':
+      return api.removeTrip(entry.tripId).then(() => null)
+    case 'restore':
+      return api.restoreTrip(entry.tripId, entry.finish)
   }
 }
 
@@ -337,6 +448,8 @@ function subject(write: QueuedWrite): string {
       return write.expenseId
     case 'start':
     case 'finish':
+    case 'delete':
+    case 'restore':
       return write.tripId
   }
 }
@@ -400,6 +513,28 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   let ahead = false
   /** The write a send is carrying right now, so «undo» can tell «gone» from «already a row». */
   let inFlight: QueuedWrite | null = null
+  /**
+   * Trips whose removal is waiting (MOL-76): no screen shows them, whatever the server or the
+   * phone's memory still says, until the answer takes them out of that memory too.
+   */
+  const removing = computed(() => {
+    // The last word of the two decides: a «Вернуть» queued behind a removal in flight brings the
+    // trip back on screen now, not after both have been answered.
+    const gone = new Set<string>()
+    for (const write of pending.value) {
+      if (write.kind === 'delete') gone.add(write.tripId)
+      if (write.kind === 'restore') gone.delete(write.tripId)
+    }
+    return gone
+  })
+  /** Raised when a removal or a «Вернуть» has landed: what the server counts has moved. */
+  const landed = ref(0)
+  /**
+   * The trip removed last on this phone, for the strip's «Вернуть» (MOL-76). In the store, not on
+   * a screen: a finished trip is removed from its own screen, and the strip stands on the one the
+   * person goes back to. Withdrawn by a new start — two open trips is what `restore` refuses (Р-4).
+   */
+  const lastRemoved = ref<(TripUndo & { readonly stamp: number }) | null>(null)
 
   function show(): void {
     pending.value = kept.map((item) => item.write)
@@ -417,9 +552,14 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   /** What storage holds now — another window may have changed it. */
   function sync(id: string | null): void {
     if (!id || ahead) return
-    kept = recallKept(`${QUEUE_KEY}.${id}`)
+    kept = withMarks(recallKept(`${QUEUE_KEY}.${id}`), `${MARKS_KEY}.${id}`)
     const refusals = recallRejected(`${REJECTED_KEY}.${id}`)
-    rejected.value = refusals.items
+    // A refused «Вернуть» holds its trip's writes back (`orphaned`); lost by an older window, it
+    // would let them go, each to earn a 404 about a trip the notice no longer names.
+    const markRefusals = recallRejected(`${MARKS_REJECTED_KEY}.${id}`).items.filter(
+      (item) => isMark(item.write) && !refusals.items.some((held) => held.key === item.key),
+    )
+    rejected.value = [...refusals.items, ...markRefusals]
     show()
     // Names given on the way in are written back at once, or the next read would invent others.
     if (refusals.named) persist(id)
@@ -450,10 +590,23 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       ),
       (past) => past,
     )
+    // The mirrors go after the queue: a window reading in between sees a mark in the queue and not
+    // yet in the mirror, which is only a mark it already has.
+    writeEverywhere(`${MARKS_KEY}.${id}`, marksOf(kept), () => null)
+    writeEverywhere(
+      `${MARKS_REJECTED_KEY}.${id}`,
+      JSON.stringify(
+        rejected.value
+          .filter((item) => isMark(item.write))
+          .map((item) => ({ key: item.key, write: encode(item.write), code: item.code })),
+      ),
+      () => null,
+    )
     ahead = !queued || !refused
   }
 
   function load(id: string | null): void {
+    lastRemoved.value = null
     elsewhere.value = null
     conflict = null
     decision = null
@@ -479,7 +632,12 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   // list, not vanish between the two (adversarial Б4).
   window.addEventListener('storage', (event) => {
     const id = actor.id
-    if (id && (event.key === `${QUEUE_KEY}.${id}` || event.key === `${REJECTED_KEY}.${id}`)) {
+    if (
+      id &&
+      [QUEUE_KEY, REJECTED_KEY, MARKS_KEY, MARKS_REJECTED_KEY].some(
+        (key) => event.key === `${key}.${id}`,
+      )
+    ) {
       sync(id)
       trips.reread()
     }
@@ -593,7 +751,14 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
           }
           continue
         }
-        refusal = DONE_ENOUGH[head.write.kind]?.includes(code) ? null : code
+        const tripId = head.write.tripId
+        // «Вернуть» of a trip the server never had — its start was still waiting when it was
+        // removed — is answered 404, and the start queued right behind it writes the trip (MOL-76).
+        const unborn =
+          head.write.kind === 'restore' &&
+          code === ERROR.NOT_FOUND &&
+          kept.some((item) => item.write.kind === 'start' && item.write.tripId === tripId)
+        refusal = DONE_ENOUGH[head.write.kind]?.includes(code) || unborn ? null : code
       } finally {
         // On every way out, the held ones included: «in the air» must not go on meaning a write
         // that is merely waiting, or undoing it would queue a removal for a row nobody wrote
@@ -613,14 +778,30 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         trips.closed(head.write.tripId)
         void useTripHistoryStore().completed(head.write.tripId)
       }
+      // A removed trip leaves the phone's memory too, or the next launch would draw it from there.
+      // …unless «Вернуть» already waits behind it: the trip would blink out until that answer.
+      if (!refusal && head.write.kind === 'delete') {
+        sync(owner)
+        const tripId = head.write.tripId
+        if (!kept.some((item) => item.write.kind === 'restore' && item.write.tripId === tripId)) {
+          forget(tripId)
+        }
+      }
+      if (!refusal && (head.write.kind === 'delete' || head.write.kind === 'restore')) {
+        landed.value += 1
+      }
       sync(owner)
+      // A write of a trip removed while it was out is news about nothing the person still has.
+      const gone = kept.some(
+        (item) => item.write.kind === 'delete' && item.write.tripId === head.write.tripId,
+      )
       // Corrected while it was out: the correction is in the queue under its own key, and what
       // came back is about a body nobody holds any more. Neither refusal nor answer is news about
       // it, and the old numbers must not be what «Поправить» offers (В2-1).
       const superseded = kept.some(
         (item) => item.key !== head.key && sameWrite(item.write, head.write),
       )
-      if (refusal && !superseded) {
+      if (refusal && !superseded && !gone) {
         if (head.write.kind === 'finish') useTripHistoryStore().forgetLocal(head.write.tripId)
         console.warn(`[trip queue] ${head.write.kind} refused: ${refusal}`)
         rejected.value = [...rejected.value, { key: newKey(), write: head.write, code: refusal }]
@@ -636,7 +817,13 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       const undoing =
         write.kind === 'add' &&
         kept.some((item) => item.write.kind === 'remove' && item.write.expenseId === write.body.id)
-      if (answered && !undoing && write.kind === 'add' && !answeredAsSent(answered, write.body)) {
+      if (
+        answered &&
+        !undoing &&
+        !gone &&
+        write.kind === 'add' &&
+        !answeredAsSent(answered, write.body)
+      ) {
         kept = [
           ...kept,
           {
@@ -658,6 +845,26 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         conflict = null
         decision = null
       }
+      // Another trip is open on the server now, and the removed one never reached it: brought
+      // back, its start would meet this one open — the question about the trip going on, and
+      // «Завершить тот» closing it at the shelf (adversarial round 2, Б3). The offer goes, as it
+      // does when a new trip is started (Р-4); the removal was never answered «back» by anyone.
+      const offered = lastRemoved.value
+      if (
+        !refusal &&
+        write.kind === 'start' &&
+        offered &&
+        offered.tripId !== write.tripId &&
+        offered.writes.some((item) => item.kind === 'start') &&
+        !kept.some((item) => item.write.kind === 'delete' && item.write.tripId === offered.tripId)
+      ) {
+        lastRemoved.value = null
+      }
+      // A trip that did not come back — ten minutes gone, another trip open — is gone from the
+      // phone's memory as a removal that landed is (review Р-3). What waits for it stays, stepped
+      // over as a refused start's is (`orphaned`) and counted by the notice: some of it was made
+      // after «Вернуть», and taking it away without a word lost it in silence (adversarial А2).
+      if (refusal && write.kind === 'restore') forget(write.tripId)
       persist(owner)
 
       // A trip the server would not take leaves its purchases naming a trip that does not exist:
@@ -770,6 +977,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function enqueue(entry: QueuedWrite): void {
     const id = actor.id
     sync(id)
+    if (entry.kind === 'start') lastRemoved.value = null
     if (entry.kind === 'finish') {
       const earlier = kept.find((item) => sameWrite(item.write, entry))?.write
       if (earlier?.kind === 'finish' && earlier.finishedOnDeviceAt) {
@@ -818,7 +1026,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     // A trip the server refused takes its purchases with it: they name a trip that will never
     // exist, and left behind they would wait for ever with nothing on screen about them (раунд 5,
     // З1). The screen says so before it asks.
-    if (item.write.kind === 'start') {
+    if (item.write.kind === 'start' || item.write.kind === 'restore') {
       useTripHistoryStore().forgetLocal(item.write.tripId)
       kept = kept.filter((entry) => entry.write.tripId !== item.write.tripId)
     }
@@ -897,10 +1105,137 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     return true
   }
 
-  /** A trip whose own start the server refused: nothing of it can be written. */
+  /**
+   * «Удалить поход» (MOL-76). Every write of the trip still on the phone is taken out and handed
+   * back for «Вернуть» — sent, they would only write what is about to go — the one this window may
+   * be sending included: every write of a trip is safe to send again, and its answer after the
+   * removal is news about nothing (`gone`). Its refusals go too, and come back with «Вернуть».
+   *
+   * **The removal stands where the trip's first write stood, never at the end** (adversarial А3):
+   * the order of the queue is the order the trips lived in — this trip's `finish` is what lets the
+   * next trip's `start` through, and a removal queued behind that start left the server holding
+   * this trip open under it, asking about a trip the person had just removed. A trip with nothing
+   * on the phone is removed first of all, for the same reason. It goes to the server **always**,
+   * even for a trip whose start never left: another window may be holding that start in the air,
+   * and a removal of a trip nobody wrote is answered 404, which counts as done (`DONE_ENOUGH`).
+   */
+  function removeTrip(tripId: string, name: string): TripUndo {
+    const id = actor.id
+    sync(id)
+    const own = kept.filter((item) => item.write.tripId === tripId && item.write.kind !== 'delete')
+    const removal = kept.some(
+      (item) => item.write.kind === 'delete' && item.write.tripId === tripId,
+    )
+    // Removed again before anything came back: what «Вернуть» holds is still the first removal's
+    // (Н1) — taken again, it would hold nothing, and the trip with its purchases was lost.
+    const held = lastRemoved.value
+    if (removal && own.length === 0 && held?.tripId === tripId) return held
+
+    const first = kept.findIndex((item) => own.includes(item))
+    const rest = kept.filter((item) => !own.includes(item))
+    if (!removal) {
+      // Everything before the first of its writes is another trip's, so the index stands as it is.
+      const at = Math.max(first, 0)
+      rest.splice(at, 0, { key: newKey(), write: { kind: 'delete', tripId } })
+    }
+    kept = rest
+    const refusals = rejected.value.filter((item) => item.write.tripId === tripId)
+    rejected.value = rejected.value.filter((item) => item.write.tripId !== tripId)
+    // A question about where this trip's purchases go, or about this trip being open in the way of
+    // another's start, has nothing left to ask about: the removal goes first and settles it.
+    if (own.some((item) => item.key === conflict?.key) || conflict?.tripId === tripId) {
+      conflict = null
+      decision = null
+      elsewhere.value = null
+    }
+    persist(id)
+    void flush()
+    const undo = { tripId, name, writes: own.map((item) => item.write), refusals }
+    lastRemoved.value = { ...undo, stamp: Date.now() }
+    return undo
+  }
+
+  /**
+   * «Вернуть»: a removal still waiting is taken back, and `restore` goes all the same — the
+   * removal may be in another window's hands right now, and a trip never removed answers `restore`
+   * with itself. Then what was taken off the phone, in its order, **in the removal's place**
+   * (adversarial А4): put at the end, a trip of yesterday stood behind the one going on now, the
+   * screen took it for the current one, and the server was asked to open it over today's. Once
+   * the removal has left, everything before it has too, and the trip goes back at the head — behind
+   * the removal this window is still sending, whose answer comes first.
+   */
+  function restoreTrip(undo: TripUndo): void {
+    // Only while it is offered: the offer is withdrawn when bringing the trip back can no longer
+    // put it where it was — its time ran out, or another trip opened on the server over a trip it
+    // never had (Р-4, round 2 Б3) — and a store asked past that must not do what the screen won't.
+    if (lastRemoved.value?.tripId !== undo.tripId) return
+    const id = actor.id
+    sync(id)
+    lastRemoved.value = null
+    // The trip's own finish goes with «Вернуть»: brought back open, a trip the next one started over
+    // on the server could not come back at all (round 3, В1). The `finish` stays behind it too —
+    // finishing twice moves nothing.
+    const finished = undo.writes.find((write) => write.kind === 'finish')
+    const back: Kept[] = [
+      {
+        key: newKey(),
+        write: {
+          kind: 'restore',
+          tripId: undo.tripId,
+          name: undo.name,
+          ...(finished?.kind === 'finish'
+            ? {
+                finish: finished.finishedOnDeviceAt
+                  ? { finishedOnDeviceAt: finished.finishedOnDeviceAt }
+                  : {},
+              }
+            : {}),
+        },
+      },
+      ...undo.writes.map((write) => ({ key: newKey(), write })),
+    ]
+    const removal = (item: Kept) =>
+      item.write.kind === 'delete' && item.write.tripId === undo.tripId
+    const still = kept.findIndex((item) => removal(item) && waiting(item))
+    if (still !== -1) {
+      kept = [...kept.slice(0, still), ...back, ...kept.slice(still + 1)]
+    } else {
+      const flying = kept.findIndex(removal)
+      kept = [...kept.slice(0, flying + 1), ...back, ...kept.slice(flying + 1)]
+    }
+    const known = new Set(rejected.value.map((item) => item.key))
+    rejected.value = [...rejected.value, ...undo.refusals.filter((item) => !known.has(item.key))]
+    persist(id)
+    void flush()
+  }
+
+  /**
+   * A trip gone for good — removed, or not brought back: out of the current trip and the history's
+   * memory, and the history read again, or the only trip of it removed left the home screen on a
+   * skeleton for a list nobody asked for (adversarial А5, round 2 Б2). One path for both ways out.
+   */
+  function forget(tripId: string): void {
+    trips.closed(tripId)
+    const history = useTripHistoryStore()
+    history.drop(tripId)
+    void history.load().catch(() => undefined)
+  }
+
+  /** Not the write this window is sending: that one has left, and its answer decides. */
+  function waiting(item: Kept): boolean {
+    return inFlight === null || !sameWrite(inFlight, item.write)
+  }
+
+  /**
+   * A trip whose own start the server refused, or whose «Вернуть» it did: nothing of it can be
+   * written, and what waits for it stays on the phone, named by the notice, until the person
+   * takes it away (MOL-76, adversarial А2).
+   */
   function orphaned(tripId: string): boolean {
     return rejected.value.some(
-      (item) => item.write.kind === 'start' && item.write.tripId === tripId,
+      (item) =>
+        (item.write.kind === 'start' || item.write.kind === 'restore') &&
+        item.write.tripId === tripId,
     )
   }
 
@@ -938,6 +1273,16 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     enqueue,
     dismiss,
     dropPurchase,
+    removeTrip,
+    restoreTrip,
+    removing,
+    landed,
+    lastRemoved,
+    orphaned,
+    /** The strip ran out: the removal stays, only the offer goes. */
+    forgetRemoved: () => {
+      lastRemoved.value = null
+    },
     heldBack,
     joinElsewhere,
     finishElsewhere,

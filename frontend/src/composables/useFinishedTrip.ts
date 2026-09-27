@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import type { TripRowView } from '@/components/tripRow'
+import { useNavigation } from '@/navigation'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import type { RetryPurchase } from './useItemDetails'
 import { useSelectedTrip } from './useSelectedTrip'
@@ -25,6 +26,11 @@ interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
   opened: Ref<OpenedPurchase | null>
   pending: ComputedRef<boolean>
   rejected: ComputedRef<boolean>
+  removing: Ref<boolean>
+  removal: Ref<{ place: string; day: Date | null; items: number }>
+  askRemove(): void
+  confirmRemove(): void
+  afterRemoveSheet(): void
   review(): void
   amend(row: TripRowView): void
   close(): void
@@ -37,6 +43,7 @@ export function useFinishedTrip(): FinishedTrip {
   const router = useRouter()
   const { t, locale } = useI18n()
   const queue = useTripQueueStore()
+  const { goBack } = useNavigation()
   const selected = useSelectedTrip(() =>
     typeof route.params.tripId === 'string' ? route.params.tripId : null,
   )
@@ -83,6 +90,46 @@ export function useFinishedTrip(): FinishedTrip {
     }
   }
   const pending = computed(() => queue.pending.some((w) => w.tripId === selected.id.value))
+
+  const removing = ref(false)
+  const removal = ref<{ place: string; day: Date | null; items: number }>({
+    place: '',
+    day: null,
+    items: 0,
+  })
+  /**
+   * «Удалить поход» of a finished trip (MOL-76, В-1): the same as an open one's — an empty one goes
+   * at once, one with purchases is asked about. Then back to where the person came from, the
+   * history, the home screen or «Деньги», where «Вернуть» stands.
+   */
+  function drop(): void {
+    const tripId = selected.id.value
+    if (tripId) queue.removeTrip(tripId, name.value)
+  }
+  function askRemove(): void {
+    const items = rows.value.filter((row) => row.mark !== 'removing').length
+    if (items === 0) {
+      drop()
+      void goBack()
+      return
+    }
+    removal.value = { place: name.value, day: finished.value ?? null, items }
+    removing.value = true
+  }
+  /** The sheet puts itself and this screen away in one step back (`steps` 2). */
+  const confirmRemove = drop
+  /**
+   * Opened cold, the screen has nothing under it to step back onto, and the sheet went alone: the
+   * way back is then the chevron's.
+   */
+  function afterRemoveSheet(): void {
+    if (
+      route.name === 'finished-trip' &&
+      selected.id.value &&
+      queue.removing.has(selected.id.value)
+    )
+      void goBack()
+  }
   return {
     ...selected,
     t,
@@ -93,6 +140,11 @@ export function useFinishedTrip(): FinishedTrip {
     opened,
     amend,
     pending,
+    removing,
+    removal,
+    askRemove,
+    confirmRemove,
+    afterRemoveSheet,
     rejected: computed(() =>
       queue.rejected.some((item) => item.write.tripId === selected.id.value),
     ),

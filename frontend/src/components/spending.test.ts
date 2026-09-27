@@ -187,6 +187,15 @@ describe('the journal with the queue laid over it', () => {
     expect(days.flatMap((day) => day.rows.map((row) => row.key))).not.toContain(NEW)
   })
 
+  it('hides the line of a trip whose removal waits, and leaves the day total the server’s (MOL-76)', () => {
+    const shown = journalOf(month(), [], [])
+    const trip = shown.flatMap((day) => day.rows).find((row) => row.kind === 'trip')
+    expect(trip).toBeDefined()
+    const hidden = journalOf(month(), [], [], new Set([TRIP]))
+    expect(hidden.flatMap((day) => day.rows).some((row) => row.kind === 'trip')).toBe(false)
+    expect(hidden.map((day) => day.total)).toEqual(shown.map((day) => day.total))
+  })
+
   it('shows one still on the phone as last typed — the amendment behind its record (Т-4)', () => {
     const days = journalOf(
       month(),

@@ -70,7 +70,11 @@ async function startTrip(page: Page, place: string): Promise<void> {
   await page.waitForTimeout(400)
   await sheet(page).getByLabel('Another place').fill(place)
   await sheet(page).getByRole('button', { name: 'Start a trip' }).click()
-  await expect(sheet(page)).toBeHidden()
+  // Gone, not only closed: a sheet slides away for `--dur` after it loses `[open]`, its buttons
+  // still drawn, and the next «Start a trip» on the screen was named twice — once in the sheet on
+  // its way out (MOL-76, review Р-7; seen under load and on CI, where a trip deleted at once leaves
+  // one tap between two starts).
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 }
 
 async function addItem(page: Page, word: string, price: string): Promise<void> {
@@ -93,7 +97,7 @@ test.describe('the trip', () => {
 
     await startTrip(page, 'Ереван Сити')
     // The place is on screen before the server has answered, and the server gets it all the same.
-    await expect(page.locator('.meta')).toContainText('Ереван Сити')
+    await expect(page.getByText(/^Ереван Сити · /)).toBeVisible()
     await expect.poll(async () => (await setting.current())?.place.name).toBe('Ереван Сити')
 
     await addItem(page, setting.word, '570')
@@ -118,10 +122,12 @@ test.describe('the trip', () => {
     await expect(row(page)).toHaveCount(0)
     await expect.poll(async () => (await setting.current())?.expenses.length).toBe(0)
 
+    // The trip is empty again, so «Finish» offers to delete it instead (MOL-76, В-2); finishing
+    // it stays the second action, and this trip is kept for the history below.
     await page.getByRole('button', { name: 'Finish the trip' }).click()
-    await expect(sheet(page)).toContainText('Finish this trip?')
+    await expect(sheet(page)).toContainText('Nothing in this trip')
     await page.waitForTimeout(400)
-    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    await sheet(page).getByRole('button', { name: 'Finish anyway' }).click()
 
     // Over on the phone at once, and over on the server as soon as the queue has been out.
     await expect(page.getByRole('button', { name: 'Start a trip' })).toBeVisible()
@@ -140,6 +146,213 @@ test.describe('the trip', () => {
     await expect(page).toHaveURL(/\/trip\/history\/[0-9a-f-]+$/)
     await page.goBack()
     await expect(page).toHaveURL(/\/$/)
+  })
+
+  test('an empty trip is deleted at once, and the next one starts (MOL-76)', async ({ page }) => {
+    const setting = await device(page)
+    await startTrip(page, 'SAS')
+    await expect.poll(async () => (await setting.current())?.place.name).toBe('SAS')
+
+    // No question for a trip with nothing in it — only «Undo» after.
+    await page.getByRole('button', { name: 'Delete the trip' }).click()
+    await expect(sheet(page)).toHaveCount(0)
+    await expect(page.locator('.undo').filter({ hasText: 'Trip deleted: SAS' })).toBeVisible()
+    await expect.poll(setting.current).toBeNull()
+
+    await startTrip(page, 'Ереван Сити')
+    await expect(page.locator('.undo').filter({ hasText: 'Trip deleted: SAS' })).toHaveCount(0)
+    await expect.poll(async () => (await setting.current())?.place.name).toBe('Ереван Сити')
+  })
+
+  test('a trip with a purchase asks first, and «Undo» brings it back whole (MOL-76)', async ({
+    page,
+  }) => {
+    const setting = await device(page)
+    await startTrip(page, 'Ереван Сити')
+    await addItem(page, setting.word, '570')
+    await expect(row(page)).toHaveCount(1)
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+
+    await page.getByRole('button', { name: 'Delete the trip' }).click()
+    await expect(sheet(page)).toContainText('Delete this trip?')
+    await expect(sheet(page)).toContainText('Ереван Сити')
+    await expect(sheet(page)).toContainText('1 item')
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Delete the trip' }).click()
+    await expect(page.getByRole('button', { name: 'Start a trip' })).toBeVisible()
+    await expect.poll(setting.current).toBeNull()
+
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await expect(row(page)).toHaveCount(1)
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+  })
+
+  test('a trip deleted with no connection goes before the next one’s start — no question about it (MOL-76, А3)', async ({
+    page,
+    context,
+  }) => {
+    const setting = await device(page)
+    await startTrip(page, 'Рынок')
+    await addItem(page, setting.word, '570')
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+
+    // No signal: «Рынок» finished, «Ереван Сити» started with a purchase, then «Рынок» deleted.
+    await context.setOffline(true)
+    await page.getByRole('button', { name: 'Finish the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    await startTrip(page, 'Ереван Сити')
+    await addItem(page, setting.word, '250')
+    await page.getByRole('button', { name: 'Trip history' }).click()
+    await page.locator('.history-row').filter({ hasText: 'Рынок' }).click()
+    await page.getByRole('button', { name: 'Delete the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Delete the trip' }).click()
+    await expect(page).toHaveURL(/\/history/)
+    await page.goBack()
+    await expect(page.getByText(/^Ереван Сити · /)).toBeVisible()
+
+    await context.setOffline(false)
+    await page.evaluate(() => window.dispatchEvent(new Event('online')))
+    await expect
+      .poll(async () => (await setting.current())?.place.name, { timeout: 15_000 })
+      .toBe('Ереван Сити')
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+    await expect(page.getByRole('heading', { name: /is already open/ })).toHaveCount(0)
+  })
+
+  test('«Undo» puts a deleted trip back in its place — the trip going on stays the one going on (MOL-76, А4)', async ({
+    page,
+    context,
+  }) => {
+    const setting = await device(page)
+    // The item has to be among the recent ones: with no signal the search looks only there.
+    await startTrip(page, 'SAS')
+    await addItem(page, setting.word, '500')
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+    await page.getByRole('button', { name: 'Finish the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    await expect.poll(setting.current).toBeNull()
+
+    await context.setOffline(true)
+    await startTrip(page, 'Рынок')
+    await addItem(page, setting.word, '570')
+    await page.getByRole('button', { name: 'Finish the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    await startTrip(page, 'Ереван Сити')
+    await addItem(page, setting.word, '250')
+
+    // A slip of the finger: «Рынок» deleted from the history, and «Undo» at once.
+    await page.getByRole('button', { name: 'Trip history' }).click()
+    await page.locator('.history-row').filter({ hasText: 'Рынок' }).click()
+    await page.getByRole('button', { name: 'Delete the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Delete the trip' }).click()
+    await expect(page).toHaveURL(/\/history/)
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await page.goBack()
+    await expect(page.getByText(/^Ереван Сити · /)).toBeVisible()
+
+    await context.setOffline(false)
+    await page.evaluate(() => window.dispatchEvent(new Event('online')))
+    await expect
+      .poll(async () => (await setting.current())?.place.name, { timeout: 15_000 })
+      .toBe('Ереван Сити')
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+    await expect(page.getByRole('heading', { name: /is already open/ })).toHaveCount(0)
+    await expect(page.getByText(/^Ереван Сити · /)).toBeVisible()
+  })
+
+  test('a trip the server never saw cannot come back once the next one has started there (MOL-76, Б3)', async ({
+    page,
+    context,
+  }) => {
+    const setting = await device(page)
+    // The item has to be among the recent ones: with no signal the search looks only there.
+    await startTrip(page, 'SAS')
+    await addItem(page, setting.word, '500')
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+    await page.getByRole('button', { name: 'Finish the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    await expect.poll(setting.current).toBeNull()
+
+    await context.setOffline(true)
+    await startTrip(page, 'Рынок')
+    await addItem(page, setting.word, '570')
+    await page.getByRole('button', { name: 'Finish the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    await startTrip(page, 'Ереван Сити')
+    await addItem(page, setting.word, '250')
+    await page.getByRole('button', { name: 'Trip history' }).click()
+    await page.locator('.history-row').filter({ hasText: 'Рынок' }).click()
+    await page.getByRole('button', { name: 'Delete the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Delete the trip' }).click()
+    await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible()
+
+    // Out of the dead zone with the strip still up: «Ереван Сити» opens on the server, and «Рынок»,
+    // which it never had, can no longer be put back before it — the offer goes.
+    await context.setOffline(false)
+    await page.evaluate(() => window.dispatchEvent(new Event('online')))
+    await expect
+      .poll(async () => (await setting.current())?.place.name, { timeout: 15_000 })
+      .toBe('Ереван Сити')
+    await expect(page.getByRole('button', { name: 'Undo' })).toHaveCount(0)
+    await page.goBack()
+    await expect(page.getByText(/^Ереван Сити · /)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /is already open/ })).toHaveCount(0)
+  })
+
+  test('«Undo» after the queue has gone brings a trip finished offline back finished (MOL-76, В1)', async ({
+    page,
+    context,
+  }) => {
+    const setting = await device(page)
+    await startTrip(page, 'Рынок')
+    await addItem(page, setting.word, '570')
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+    const market = (await setting.current()) as { id?: string } | null
+
+    // No signal: «Рынок» finished, «Ереван Сити» started, «Рынок» deleted from the history.
+    await context.setOffline(true)
+    await page.getByRole('button', { name: 'Finish the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    await startTrip(page, 'Ереван Сити')
+    await addItem(page, setting.word, '250')
+    await page.getByRole('button', { name: 'Trip history' }).click()
+    await page.locator('.history-row').filter({ hasText: 'Рынок' }).click()
+    await page.getByRole('button', { name: 'Delete the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Delete the trip' }).click()
+    await expect(page).toHaveURL(/\/history/)
+
+    // The signal comes back and the queue goes: «Рынок» marked, «Ереван Сити» open. Then «Undo».
+    await context.setOffline(false)
+    await page.evaluate(() => window.dispatchEvent(new Event('online')))
+    await expect
+      .poll(async () => (await setting.current())?.place.name, { timeout: 15_000 })
+      .toBe('Ереван Сити')
+    await page.getByRole('button', { name: 'Undo' }).click()
+
+    // Back finished, with its purchase; the trip going on stays the one going on.
+    const headers = await asBrowser(page)
+    await expect
+      .poll(async () =>
+        (await page.request.get(`/api/trips/${market?.id ?? ''}`, { headers })).status(),
+      )
+      .toBe(200)
+    const back = (await (
+      await page.request.get(`/api/trips/${market?.id ?? ''}`, { headers })
+    ).json()) as { finishedAt: string | null; expenses: unknown[] }
+    expect(back.finishedAt).not.toBeNull()
+    expect(back.expenses).toHaveLength(1)
+    expect((await setting.current())?.place.name).toBe('Ереван Сити')
+    await expect(page.getByRole('heading', { name: /did not come back/ })).toHaveCount(0)
   })
 
   test('is started with no connection, and catches up when it comes back', async ({
@@ -163,7 +376,7 @@ test.describe('the trip', () => {
     expect(await setting.current()).not.toBeNull()
 
     await startTrip(page, 'Ереван Сити')
-    await expect(page.locator('.meta')).toContainText('Ереван Сити')
+    await expect(page.getByText(/^Ереван Сити · /)).toBeVisible()
     // Nothing has gone out: the second trip exists only on the phone.
     await expect.poll(async () => (await setting.current())?.place.name).toBe('Рынок')
 

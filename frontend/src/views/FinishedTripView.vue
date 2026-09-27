@@ -53,11 +53,24 @@
         <AppButton class="add" variant="ghost" block @click="find">{{
           t('trip.add_item')
         }}</AppButton>
+        <!-- The same place as on an open trip: the end of the list (MOL-76, В-1). -->
+        <AppButton variant="danger-ghost" block @click="askRemove">{{
+          t('trip.remove.action')
+        }}</AppButton>
       </template>
     </template>
     <template v-if="available" #docked
       ><TripTotal :trip="trip" :pending="waiting" :local="trip === null"
     /></template>
+    <TripRemoveSheet
+      v-model:open="removing"
+      :place="removal.place"
+      :day="removal.day"
+      :items="removal.items"
+      :steps="2"
+      :on-closed="afterRemoveSheet"
+      @confirm="confirmRemove"
+    />
     <ItemDetailsSheet
       v-if="opened"
       :key="opened.key"
@@ -80,6 +93,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import TripRemoveSheet from '@/components/TripRemoveSheet.vue'
 import TripRow from '@/components/TripRow.vue'
 import TripTotal from '@/components/TripTotal.vue'
 import TripRateNotes from '@/components/TripRateNotes.vue'
@@ -93,6 +107,7 @@ export default defineComponent({
     AppCard,
     ScreenSkeleton,
     ScreenState,
+    TripRemoveSheet,
     TripRow,
     TripTotal,
     TripRateNotes,

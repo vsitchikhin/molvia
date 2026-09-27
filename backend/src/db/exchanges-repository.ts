@@ -370,6 +370,7 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
         .where(
           and(
             eq(trips.actorId, actorId),
+            isNull(trips.deletedAt),
             eq(expenses.amountCurrency, currency),
             gt(expenses.createdAt, since),
             or(isNull(trips.finishedAt), gt(trips.finishedAt, since)),

@@ -176,7 +176,7 @@
     <!-- «Вернуть» stands whatever the screen became under it — the only spending removed makes a
          newcomer of the person (adversarial Г); «Трата» stands wherever there is something to
          write it into, a slow answer and a broken server included (review Т-6). -->
-    <FloatingDock v-if="removed || showsAdd" class="float">
+    <FloatingDock v-if="removed || tripRemoved || showsAdd" class="float">
       <UndoStrip
         v-if="removed"
         :key="removed.stamp"
@@ -186,6 +186,8 @@
         @restore="restore"
         @expire="removed = null"
       />
+      <!-- A trip opened from here and removed comes back here, with its «Вернуть» (MOL-76). -->
+      <TripUndoStrip v-else-if="tripRemoved" class="undo" />
       <AppButton v-else-if="showsAdd" ref="addButton" size="large" class="add" @click="compose">
         <template #icon><IconPlus /></template>
         {{ t('spending.add') }}
@@ -245,6 +247,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SpendingRow from '@/components/SpendingRow.vue'
 import SpendingSheet from '@/components/SpendingSheet.vue'
+import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { categoriesWith, journalOf, rateWords, unsentIn } from '@/components/spending'
 import type { JournalRow, Removed, SpendingTarget } from '@/components/spending'
@@ -255,6 +258,7 @@ import { calendarDay, purchaseDay, shiftDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { spendingOf, useSpendingQueueStore } from '@/stores/spendingQueue'
+import { useTripQueueStore } from '@/stores/tripQueue'
 
 /**
  * «Деньги» (MOL-82, handoff 01): one month of one's own spending, counted by the server — what
@@ -282,6 +286,7 @@ export default defineComponent({
     ScreenState,
     SpendingRow,
     SpendingSheet,
+    TripUndoStrip,
     UndoStrip,
   },
   setup() {
@@ -291,6 +296,8 @@ export default defineComponent({
     const { goTab } = useNavigation()
     const actor = useActorStore()
     const queue = useSpendingQueueStore()
+    const tripQueue = useTripQueueStore()
+    const tripRemoved = computed(() => tripQueue.lastRemoved !== null)
     const announce = useAnnouncer()
 
     /**
@@ -339,7 +346,7 @@ export default defineComponent({
     /** Whether a spending can be written here at all: a category is required, and known. */
     const canWrite = computed(() => categories.value.some((category) => !category.archived))
     const journal = computed(() =>
-      month.value ? journalOf(month.value, queue.pending, queue.rejected) : [],
+      month.value ? journalOf(month.value, queue.pending, queue.rejected, tripQueue.removing) : [],
     )
     const unsent = computed(() => (month.value ? unsentIn(month.value, queue.pending) : 0))
     const spendCurrency = computed(
@@ -570,6 +577,7 @@ export default defineComponent({
       online,
       categories,
       journal,
+      tripRemoved,
       unsent,
       spendCurrency,
       liveRate,

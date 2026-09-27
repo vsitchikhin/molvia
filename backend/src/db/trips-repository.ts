@@ -1,5 +1,11 @@
-import { and, desc, eq, isNull, isNotNull, sql } from 'drizzle-orm'
-import { DomainError, ERROR, TRIP_HISTORY_PAGE_SIZE, tripSchema } from '@molvia/model'
+import { and, desc, eq, gt, isNull, isNotNull, lte, or, sql } from 'drizzle-orm'
+import {
+  DomainError,
+  ERROR,
+  TRIP_HISTORY_PAGE_SIZE,
+  TRIP_UNDO_MINUTES,
+  tripSchema,
+} from '@molvia/model'
 import type {
   TripHistory,
   TripHistoryCursor,
@@ -50,7 +56,9 @@ export interface TripRepository {
    * `TRIP_OPEN`, because which of the two goes on is the person's choice, not the server's.
    * The same identifier again is a repeat — a double tap, a queue sent twice — and returns the
    * trip already there with `created: false`, finished or not. The same identifier under
-   * someone else is `CONFLICT`.
+   * someone else is `CONFLICT`, and so is a trip of one's own removed less than ten minutes ago
+   * (MOL-76): «Вернуть» brings it back, a start sent again does not. Past its ten minutes the
+   * removal is final whether or not the timer has come round, and the start writes it anew.
    *
    * Held here under a lock per owner rather than by a partial unique index (В-10): the rule is
    * about the screen, not about whether a row is readable. So rows written around this method —
@@ -107,6 +115,21 @@ export interface TripRepository {
     choice: RateChoice,
     manual: ExchangeRate | null,
   ): Promise<Trip | null>
+  /**
+   * «Удалить поход» (MOL-76): marked, and from then on no reader but erasure and the minute timer
+   * sees it. `false` when it is not the owner's — a stranger's, a missing one, one already final.
+   * Marking a marked one again is `true` and moves nothing: a repeat from the queue.
+   */
+  remove(id: string, actorId: string): Promise<boolean>
+  /**
+   * «Вернуть» within ten minutes — `null` past them or for a trip that is not the owner's; a trip
+   * never removed comes back as it is. An unfinished trip while another is open is `TRIP_OPEN`:
+   * two open trips is the state `start` exists to refuse (Р-4) — unless it comes back finished
+   * (`finish`, round 3 В1), which is one statement, so no moment holds two open trips.
+   */
+  restore(id: string, actorId: string, finish?: { deviceAt?: Date }): Promise<Trip | null>
+  /** The minute timer: removals past their ten minutes deleted, their purchases by cascade. */
+  purgeStale(): Promise<void>
 }
 
 type TripRow = typeof trips.$inferSelect
@@ -135,9 +158,21 @@ function toTrip(row: TripRow): Trip {
   })
 }
 
-/** A trip belongs to one person, so the owner is a condition and never a later check. */
+/**
+ * A trip belongs to one person, so the owner is a condition and never a later check — and a removed
+ * one belongs to nobody but erasure and the timer (MOL-76), so the mark is part of the same condition.
+ */
 function ownedBy(id: string, actorId: string) {
-  return and(eq(trips.id, id), eq(trips.actorId, actorId))
+  return and(eq(trips.id, id), eq(trips.actorId, actorId), isNull(trips.deletedAt))
+}
+
+function undoFrom() {
+  return sql`clock_timestamp() - make_interval(mins => ${TRIP_UNDO_MINUTES})`
+}
+
+/** Per owner: a start, a removal and a «Вернуть» see one another's open trip (MOL-21, MOL-76). */
+function ownerLock(tx: Conn, actorId: string) {
+  return tx.execute(sql`select pg_advisory_xact_lock(hashtext('trips'), hashtext(${actorId}))`)
 }
 
 export function createTripRepository(db: Conn): TripRepository {
@@ -147,20 +182,32 @@ export function createTripRepository(db: Conn): TripRepository {
         db.transaction(async (tx) => {
           // Per owner: two «Начать поход» at once — a double tap after the screen lost its
           // state — would otherwise both see no open trip and both write one.
-          await tx.execute(
-            sql`select pg_advisory_xact_lock(hashtext('trips'), hashtext(${actorId}))`,
-          )
+          await ownerLock(tx, actorId)
 
+          // Past its ten minutes a removal is final, and the same name is a new trip (MOL-76).
+          await tx
+            .delete(trips)
+            .where(
+              and(
+                eq(trips.id, input.id),
+                eq(trips.actorId, actorId),
+                lte(trips.deletedAt, undoFrom()),
+              ),
+            )
           const [same] = await tx.select().from(trips).where(eq(trips.id, input.id)).limit(1)
           if (same) {
-            if (same.actorId !== actorId) throw new DomainError(ERROR.CONFLICT)
+            if (same.actorId !== actorId || same.deletedAt !== null) {
+              throw new DomainError(ERROR.CONFLICT)
+            }
             return { trip: toTrip(same), created: false }
           }
 
           const [open] = await tx
             .select({ id: trips.id })
             .from(trips)
-            .where(and(eq(trips.actorId, actorId), isNull(trips.finishedAt)))
+            .where(
+              and(eq(trips.actorId, actorId), isNull(trips.finishedAt), isNull(trips.deletedAt)),
+            )
             .limit(1)
           if (open) throw new DomainError(ERROR.TRIP_OPEN)
 
@@ -208,7 +255,7 @@ export function createTripRepository(db: Conn): TripRepository {
       const [row] = await db
         .select()
         .from(trips)
-        .where(and(eq(trips.actorId, actorId), isNull(trips.finishedAt)))
+        .where(and(eq(trips.actorId, actorId), isNull(trips.finishedAt), isNull(trips.deletedAt)))
         // `id` settles two trips started in the same moment, so two loads of one screen
         // cannot disagree about which of them came last.
         .orderBy(desc(trips.startedAt), desc(trips.id))
@@ -222,7 +269,7 @@ export function createTripRepository(db: Conn): TripRepository {
       const rows = await db
         .select()
         .from(trips)
-        .where(eq(trips.actorId, actorId))
+        .where(and(eq(trips.actorId, actorId), isNull(trips.deletedAt)))
         .orderBy(desc(trips.startedAt), desc(trips.id))
         // Through `rowLimit`, because a negative one made drizzle print no `LIMIT` clause at
         // all — handing back everything, the exact thing a limit exists to prevent.
@@ -247,6 +294,7 @@ export function createTripRepository(db: Conn): TripRepository {
           and(
             eq(trips.actorId, actorId),
             isNotNull(trips.finishedAt),
+            isNull(trips.deletedAt),
             cursor
               ? sql`(${time}, ${trips.id}) < (${cursor.at}::timestamptz, ${cursor.id}::uuid)`
               : undefined,
@@ -298,6 +346,82 @@ export function createTripRepository(db: Conn): TripRepository {
         .where(ownedBy(id, actorId))
         .returning()
       return row ? toTrip(row) : null
+    },
+
+    async remove(id, actorId) {
+      if (idOrNull(id) === null || idOrNull(actorId) === null) return false
+      return db.transaction(async (tx) => {
+        await ownerLock(tx, actorId)
+        const [row] = await tx
+          .update(trips)
+          // `coalesce`: a repeat keeps the first moment, so it cannot stretch the ten minutes.
+          .set({ deletedAt: sql`coalesce(${trips.deletedAt}, clock_timestamp())` })
+          .where(
+            and(
+              eq(trips.id, id),
+              eq(trips.actorId, actorId),
+              or(isNull(trips.deletedAt), gt(trips.deletedAt, undoFrom())),
+            ),
+          )
+          .returning({ id: trips.id })
+        return row !== undefined
+      })
+    },
+
+    async restore(id, actorId, finish) {
+      if (idOrNull(id) === null || idOrNull(actorId) === null) return null
+      return translateFailures(async () =>
+        db.transaction(async (tx) => {
+          await ownerLock(tx, actorId)
+          const [held] = await tx
+            .select()
+            .from(trips)
+            .where(
+              and(
+                eq(trips.id, id),
+                eq(trips.actorId, actorId),
+                // Past its time a removal is final even before the timer comes round.
+                or(isNull(trips.deletedAt), gt(trips.deletedAt, undoFrom())),
+              ),
+            )
+            .limit(1)
+            .for('update')
+          if (!held) return null
+          const finishing = finish !== undefined && held.finishedAt === null
+          if (held.deletedAt === null && !finishing) return toTrip(held)
+          if (held.finishedAt === null && !finishing) {
+            const [open] = await tx
+              .select({ id: trips.id })
+              .from(trips)
+              .where(
+                and(eq(trips.actorId, actorId), isNull(trips.finishedAt), isNull(trips.deletedAt)),
+              )
+              .limit(1)
+            if (open) throw new DomainError(ERROR.TRIP_OPEN)
+          }
+          const [row] = await tx
+            .update(trips)
+            .set({
+              deletedAt: null,
+              // The same stamp `finish` gives: the database's clock, and the device's moment beside it.
+              ...(finishing
+                ? {
+                    finishedAt: sql`clock_timestamp()`,
+                    finishedOnDeviceAt: finish.deviceAt ?? null,
+                  }
+                : {}),
+            })
+            .where(eq(trips.id, id))
+            .returning()
+          return toTrip(theRow(row, 'trips'))
+        }),
+      )
+    },
+
+    async purgeStale() {
+      await db
+        .delete(trips)
+        .where(and(isNotNull(trips.deletedAt), lte(trips.deletedAt, undoFrom())))
     },
   }
 }

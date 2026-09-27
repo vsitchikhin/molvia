@@ -1389,6 +1389,42 @@ database access. In a product about data integrity, two write paths will silentl
   unrated purchases and every aggregate of 0.3. A reader that forgets the filter puts a
   withdrawn opinion back on screen, silently. Rating again brings the same row back and keeps
   `rated_at`, so withdrawing and re-rating cannot move anyone in the gate.
+- **A removed trip is marked, by the money rule (MOL-76).** `DELETE /trips/:id` sets
+  `trips.deleted_at`; «Вернуть» (`POST /trips/:id/restore`) is there for ten minutes
+  (`TRIP_UNDO_MINUTES`), and then the minute timer deletes the trip with its purchases. A trip is
+  money — a line of «Деньги» and an operation of an account — and it has a reason of its own: **a
+  repeat is safe only while the row exists**, and a start sent again from the queue would have
+  written a hard-deleted trip anew. Marked, that repeat is `409 error.conflict`; past the ten
+  minutes the same name is a new trip, as a spending's is. **Every reader filters the mark** except
+  erasure, the timer and «удалить или убрать» of an account (like a marked spending): the current,
+  selected and history trips, «one open», the purchases, «Оценки», «Что брать» — other people's
+  aggregates too — the month of «Деньги», the accounts, the hint of an exchange and the recent
+  places; one integration test asks all of them about one trip before, during and after. An open
+  trip brought back while another is open is `409 error.trip_open`. On the phone removal and
+  «Вернуть» are writes of the trip's queue (`delete`, `restore`): the trip's waiting writes are taken
+  out and handed back by «Вернуть», the removal is sent **always** — 404 is done — and a trip whose
+  removal waits is shown nowhere. **The removal stands where the trip's first write stood, and
+  «Вернуть» puts the trip back in the removal's place** (adversarial А3, А4): the order of the queue
+  is the order the trips lived in — one trip's `finish` lets the next one's `start` through — and put
+  at the end, a removal left the server holding the trip open under the next start, and «Вернуть»
+  made yesterday's trip the one going on. A «Вернуть» the server refuses leaves the trip's writes on
+  the phone, stepped over and counted as a refused start's are (А2) — one predicate, `orphaned`, for
+  the queue, the screen's «not sent yet» and the history. **«Вернуть» is offered only while it can
+  put the trip back where it was**: a new start withdraws it, and so does another trip's start
+  landing on the server over a removed trip the server never had — brought back, its start would
+  meet that trip open (round 2, Б3). The store keeps the same rule as the screen. **A trip comes
+  back with its own «Завершить»** (`POST /trips/:id/restore` with `finish`, round 3, В1): finished on
+  the phone with no signal and removed before that finish left, it is open on the server, and brought
+  back open under the next trip it was refused as a second open trip the person never held — then
+  gone with its purchases ten minutes later. Brought back finished in one statement, no moment holds
+  two open trips; the `finish` behind it moves nothing, as finishing twice never does. **The
+  removals and «Вернуть» are mirrored under keys of their own** (`molvia.trip-marks`,
+  `molvia.trip-marks-rejected`, round 4, Г1), each with the write it stood before: a window still on
+  the previous version reads the shared queue, drops the kinds it does not know and writes the queue
+  back without them, and the version that knows them puts them back in their place (MOL-77's rule —
+  a phone-side cache is read by both versions). The price, named: while it sends, the older window
+  does not see the removal, and a start of the next trip it sends first meets the removed trip open. **The price, named:** removing a trip dated before a check that
+  came out even moves the balance with no reason the check can name, as a removed spending does.
 - **Exactly one field is required — the item.** Everything else may be left empty.
 - **The catalogue grows two ways: «Предложить товар» and the seed (MOL-112).** MOL-12 decided «no
   seed» and the owner reversed it on 26.09.2026: with an empty catalogue every trip began by
@@ -2391,6 +2427,12 @@ them, never counts them**: a card carries the name without the city, so «Ере
 of Yerevan are one name — a number would claim what the phone does not know (round 3, И2). The name
 alone is what every card and row already shows. A retry of the history ends with the screen that
 asked (И1).
+
+MOL-76 lets a trip be removed — open or finished, empty or not: a quiet «Удалить поход» at the end of
+its list, a question naming the shop, the day and the rows for one with purchases, none for an empty
+one, and «Поход удалён · Вернуть» for ten seconds on the screen it lands on. «Завершить» on an empty
+trip offers to remove it instead (owner's decision В-2): a finished empty trip was the rubbish in the
+history the task was filed for. The rules are in «Data rules» above.
 
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 

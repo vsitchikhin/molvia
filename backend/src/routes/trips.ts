@@ -9,6 +9,7 @@ import {
   tripHistoryCodec,
   tripHistoryQuerySchema,
   rateChoiceBodySchema,
+  restoreTripBodySchema,
   startTripBodySchema,
   tripViewCodec,
 } from '@molvia/model'
@@ -19,6 +20,7 @@ import type {
   AddExpenseBody,
   ExpensePatch,
   RateChoiceBody,
+  RestoreTripBody,
   StartTripBody,
   TripView,
 } from '@molvia/model'
@@ -40,6 +42,8 @@ export interface TripsApi {
   remove(actorId: string, tripId: string, expenseId: string): Promise<TripView>
   finish(actorId: string, tripId: string, deviceAt?: Date): Promise<void>
   chooseRate(actorId: string, tripId: string, body: RateChoiceBody): Promise<TripView>
+  removeTrip(actorId: string, tripId: string): Promise<void>
+  restoreTrip(actorId: string, tripId: string, body: RestoreTripBody): Promise<TripView>
 }
 
 /**
@@ -145,6 +149,27 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
     const body = parseBody(finishTripBodySchema, request.body ?? {})
     await api.finish(request.actorId, id, body.finishedOnDeviceAt)
     return reply.code(204).header('cache-control', 'no-store').send()
+  })
+
+  /**
+   * «Удалить поход» (MOL-76): 204, and 204 again while it is marked — the queue sending twice. A
+   * stranger's trip, a missing one and one past its ten minutes are one 404.
+   */
+  app.delete<{ Params: TripParams }>('/trips/:tripId', async (request, reply) => {
+    await api.removeTrip(request.actorId, resourceId(request.params.tripId))
+    return reply.code(204).header('cache-control', 'no-store').send()
+  })
+
+  /**
+   * «Вернуть»: the trip whole; 404 past its ten minutes or for anything not the owner's, 409
+   * `error.trip_open` for an open one while another trip is open (Р-4).
+   */
+  app.post<{ Params: TripParams }>('/trips/:tripId/restore', async (request, reply) => {
+    const body = parseBody(restoreTripBodySchema, request.body ?? {})
+    return answer(
+      reply,
+      await api.restoreTrip(request.actorId, resourceId(request.params.tripId), body),
+    )
   })
 
   /**

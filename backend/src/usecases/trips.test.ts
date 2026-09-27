@@ -128,6 +128,9 @@ function fakeRepositories(
       history: unexpected('trips.history'),
       finish: unexpected('trips.finish'),
       chooseRate: unexpected('trips.chooseRate'),
+      remove: unexpected('trips.remove'),
+      restore: unexpected('trips.restore'),
+      purgeStale: unexpected('trips.purgeStale'),
       ...overrides.trips,
     },
     expenses: {

@@ -41,11 +41,15 @@
       @click="more"
       >{{ t('trip.history.more') }}</AppButton
     >
+    <!-- A finished trip removed from its own screen lands here, with its «Вернуть» (MOL-76). -->
+    <template v-if="removed" #docked>
+      <div class="undo"><TripUndoStrip /></div>
+    </template>
   </AppScreen>
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { computed, defineComponent } from 'vue'
 import IconHistory from '~icons/mdi/history'
 import AppScreen from '@/components/AppScreen.vue'
 import AppButton from '@/components/AppButton.vue'
@@ -53,11 +57,28 @@ import AppCard from '@/components/AppCard.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import TripHistoryRow from '@/components/TripHistoryRow.vue'
+import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import { useTripHistory } from '@/composables/useTripHistory'
+import { useTripQueueStore } from '@/stores/tripQueue'
 export default defineComponent({
   name: 'TripHistoryView',
-  components: { AppScreen, AppButton, AppCard, ScreenSkeleton, ScreenState, TripHistoryRow },
-  setup: () => ({ ...useTripHistory(), IconHistory }),
+  components: {
+    AppScreen,
+    AppButton,
+    AppCard,
+    ScreenSkeleton,
+    ScreenState,
+    TripHistoryRow,
+    TripUndoStrip,
+  },
+  setup: () => {
+    const queue = useTripQueueStore()
+    return {
+      ...useTripHistory(),
+      IconHistory,
+      removed: computed(() => queue.lastRemoved !== null),
+    }
+  },
 })
 </script>
 
@@ -71,5 +92,9 @@ export default defineComponent({
 .more,
 .memory {
   margin-top: var(--space-4);
+}
+
+.undo {
+  padding: var(--space-3) 0;
 }
 </style>

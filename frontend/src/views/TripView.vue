@@ -3,7 +3,7 @@
     <template v-if="meta" #meta>{{ meta }}</template>
 
     <template v-if="phase === 'going'" #trailing>
-      <button class="finish" type="button" @click="finishing = true">{{ t('trip.finish') }}</button>
+      <button class="finish" type="button" @click="askFinish">{{ t('trip.finish') }}</button>
     </template>
 
     <ScreenSkeleton v-if="phase === 'loading'" :groups="[72, 54, 84, 46]" />
@@ -129,6 +129,11 @@
     <AppButton v-if="phase === 'going'" class="history" variant="ghost" block @click="history">{{
       t('trip.history.title')
     }}</AppButton>
+    <!-- At the end of the list, one and the same on an open and a finished trip, and never under
+         the thumb (MOL-76, В-1). -->
+    <AppButton v-if="phase === 'going'" variant="danger-ghost" block @click="askRemove">{{
+      t('trip.remove.action')
+    }}</AppButton>
 
     <!-- The one permanent place money is converted, and it stays put while the list scrolls. -->
     <!-- Without a trip the strip holds «Начать поход» instead — under the thumb, above whatever
@@ -138,6 +143,7 @@
     <template #docked>
       <TripTotal v-if="phase === 'going'" :trip="trip" :pending="waiting" :local="local !== null" />
       <div v-else class="start">
+        <TripUndoStrip class="undo" />
         <AppButton size="large" block @click="starting = true">{{
           t('trip.none.action')
         }}</AppButton>
@@ -164,18 +170,42 @@
 
     <!-- Asked before, not undone after: a trip cannot be reopened in 0.1, and «Завершить» is one
          tap away from «Добавить позицию». -->
+    <!-- An empty trip finished is a row of nothing in the history for good: it is offered to go
+         instead, and finishing it stays the second action (MOL-76, В-2). -->
     <BottomSheet v-model:open="finishing">
-      <template #title>{{ t('trip.finish_confirm.title') }}</template>
-      <p class="confirm">{{ t('trip.finish_confirm.body') }}</p>
+      <template #title>{{
+        finishingEmpty ? t('trip.remove.empty.title') : t('trip.finish_confirm.title')
+      }}</template>
+      <p class="confirm">
+        {{ finishingEmpty ? t('trip.remove.empty.body') : t('trip.finish_confirm.body') }}
+      </p>
       <template #footer>
-        <AppButton size="large" block @click="finish">
-          {{ t('trip.finish_confirm.ok') }}
-        </AppButton>
-        <AppButton variant="ghost" block @click="finishing = false">
-          {{ t('trip.finish_confirm.cancel') }}
-        </AppButton>
+        <template v-if="finishingEmpty">
+          <AppButton size="large" block @click="removeEmpty">
+            {{ t('trip.remove.action') }}
+          </AppButton>
+          <AppButton variant="ghost" block @click="finish">
+            {{ t('trip.remove.empty.finish') }}
+          </AppButton>
+        </template>
+        <template v-else>
+          <AppButton size="large" block @click="finish">
+            {{ t('trip.finish_confirm.ok') }}
+          </AppButton>
+          <AppButton variant="ghost" block @click="finishing = false">
+            {{ t('trip.finish_confirm.cancel') }}
+          </AppButton>
+        </template>
       </template>
     </BottomSheet>
+
+    <TripRemoveSheet
+      v-model:open="removing"
+      :place="removal.place"
+      :day="removal.day"
+      :items="removal.items"
+      @confirm="remove"
+    />
 
     <BottomSheet v-model:open="choosing">
       <template #title>{{ t('trip.elsewhere.title', { place: choice?.place ?? '' }) }}</template>
@@ -209,7 +239,7 @@ import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPlus from '~icons/mdi/plus'
-import { isSamePlaceName } from '@molvia/model'
+import { ERROR, isSamePlaceName } from '@molvia/model'
 import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -222,8 +252,10 @@ import TripHome from '@/components/TripHome.vue'
 import StartTripSheet from '@/components/StartTripSheet.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import TripRateNotes from '@/components/TripRateNotes.vue'
+import TripRemoveSheet from '@/components/TripRemoveSheet.vue'
 import TripRow from '@/components/TripRow.vue'
 import TripTotal from '@/components/TripTotal.vue'
+import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import type { TripRowView } from '@/components/tripRow'
 import { useTripRows } from '@/composables/useTripRows'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
@@ -276,8 +308,10 @@ export default defineComponent({
     TripContextSheet,
     TripHome,
     TripRateNotes,
+    TripRemoveSheet,
     TripRow,
     TripTotal,
+    TripUndoStrip,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -321,6 +355,15 @@ export default defineComponent({
     const starting = ref(false)
     const clarifying = ref(false)
     const finishing = ref(false)
+    /** Taken when «Завершить» is tapped: a row arriving while the sheet is up does not reword it. */
+    const finishingEmpty = ref(false)
+    const removing = ref(false)
+    /** What the question names, taken when it is asked (MOL-76, Р-2). */
+    const removal = ref<{ place: string; day: Date | null; items: number }>({
+      place: '',
+      day: null,
+      items: 0,
+    })
     /** The red block's «Повторить» without a trip asks for the history too (adversarial Д). */
     const retries = ref(0)
 
@@ -365,14 +408,12 @@ export default defineComponent({
      * their own mark and their own caveat under the total; these have nowhere else to be said.
      */
     const unsent = computed(() => {
-      // Purchases of a trip the server refused are not «not sent yet»: they are not going
-      // anywhere, and the notice about that trip is where they are counted (раунд 5, З1).
-      const refused = new Set(
-        queue.rejected.flatMap((item) => (item.write.kind === 'start' ? [item.write.tripId] : [])),
-      )
+      // Purchases of a trip the server refused — its start, or its «Вернуть» — are not «not sent
+      // yet»: they are not going anywhere, and the notice about that trip is where they are counted
+      // (раунд 5, З1; MOL-76, round 2 Б1). One predicate with the queue that steps over them.
       return queue.pending.filter(
         (write) =>
-          write.kind === 'add' && write.tripId !== tripId.value && !refused.has(write.tripId),
+          write.kind === 'add' && write.tripId !== tripId.value && !queue.orphaned(write.tripId),
       ).length
     })
 
@@ -395,6 +436,9 @@ export default defineComponent({
     }
 
     const refusalTitle = (item: RejectedWrite): string => {
+      if (item.write.kind === 'restore') {
+        return t('trip.remove.not_restored', { name: item.write.name })
+      }
       const name = nameOf(item)
       return name ? t('trip.rejected.named', { name }) : t('trip.rejected.title')
     }
@@ -406,16 +450,28 @@ export default defineComponent({
      */
     const refusalReason = (item: RejectedWrite): string => {
       const key = item.code.startsWith('error.') ? item.code : null
-      const why = key ? t(key) : t('trip.rejected.unknown', { code: item.code })
+      const why =
+        item.write.kind === 'restore'
+          ? item.code === ERROR.TRIP_OPEN
+            ? t('trip.remove.not_restored_open')
+            : t('trip.remove.not_restored_gone')
+          : key
+            ? t(key)
+            : t('trip.rejected.unknown', { code: item.code })
       // A refused trip holds its purchases, and nothing else on screen says so: «N ещё не
       // отправлено» promises they will go, and they will not (раунд 5, З1).
       const waiting = heldBack(item)
       return waiting > 0 ? `${why} · ${t('trip.rejected.orphaned', { n: waiting }, waiting)}` : why
     }
 
-    /** Purchases that will never be written because this trip was not (раунд 5, З1). */
+    /**
+     * Purchases that will never be written because this trip was not (раунд 5, З1) — or did not
+     * come back, those made after «Вернуть» among them (MOL-76, adversarial А2).
+     */
     const heldBack = (item: RejectedWrite): number =>
-      item.write.kind === 'start' ? queue.heldBack(item.write.tripId) : 0
+      item.write.kind === 'start' || item.write.kind === 'restore'
+        ? queue.heldBack(item.write.tripId)
+        : 0
 
     /** Only a purchase can be corrected, and only one whose card the phone can still read. */
     const correctable = (item: RejectedWrite): boolean =>
@@ -503,6 +559,46 @@ export default defineComponent({
       finishing.value = false
     }
 
+    /**
+     * The rows still on screen: one being removed is on its way out already. One count for both
+     * questions, or «Завершить» and «Удалить поход» called one trip empty and not (review Р-5).
+     */
+    const kept = computed(() => rows.value.filter((row) => row.mark !== 'removing').length)
+
+    function askFinish(): void {
+      finishingEmpty.value = kept.value === 0
+      finishing.value = true
+    }
+
+    /**
+     * «Удалить поход»: an empty one goes at once, with «Вернуть» on the home screen; one with
+     * purchases is asked about first, naming them (MOL-76, Р-2).
+     */
+    function askRemove(): void {
+      if (kept.value === 0) {
+        remove()
+        return
+      }
+      removal.value = {
+        place: trip.value?.place.name ?? local.value?.placeName ?? '',
+        day: trip.value?.startedAt ?? local.value?.startedAt ?? null,
+        items: kept.value,
+      }
+      removing.value = true
+    }
+
+    function remove(): void {
+      const id = tripId.value
+      const place = trip.value?.place.name ?? local.value?.placeName ?? ''
+      if (id) queue.removeTrip(id, place)
+      removing.value = false
+    }
+
+    function removeEmpty(): void {
+      remove()
+      finishing.value = false
+    }
+
     function putAway(): void {
       opened.value = null
     }
@@ -550,7 +646,14 @@ export default defineComponent({
       starting,
       clarifying,
       finishing,
+      finishingEmpty,
+      askFinish,
       finish,
+      removing,
+      removal,
+      askRemove,
+      remove,
+      removeEmpty,
       retries,
       retry: () => {
         retries.value += 1
@@ -642,6 +745,10 @@ export default defineComponent({
 
 .start {
   padding: var(--space-3) 0;
+}
+
+.undo {
+  margin-bottom: var(--space-3);
 }
 
 .footnote {

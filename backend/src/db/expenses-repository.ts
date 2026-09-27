@@ -211,14 +211,16 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
    * An expense has no `actor_id` of its own — deliberately, since MOL-6 — so it belongs to a
    * person through its trip. The ownership is a condition of the statement rather than a
    * check after loading: a check can be forgotten in one method out of ten, and nothing in
-   * the types would say so.
+   * the types would say so. A removed trip's purchases are nobody's (MOL-76).
    */
   const ownedByActor = (actorId: string) =>
     exists(
       db
         .select({ one: sql`1` })
         .from(trips)
-        .where(and(eq(trips.id, expenses.tripId), eq(trips.actorId, actorId))),
+        .where(
+          and(eq(trips.id, expenses.tripId), eq(trips.actorId, actorId), isNull(trips.deletedAt)),
+        ),
     )
 
   /**
@@ -323,6 +325,8 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
             join ${trips} on ${trips.id} = ${expenses.tripId}
             join ${places} on ${places.id} = ${trips.placeId}
             where ${inArray(expenses.itemId, known)}
+              -- A removed trip is no observation, one's own or anyone else's (MOL-76).
+              and ${trips.deletedAt} is null
               -- An observation without a price or without a quantity says nothing about a
               -- unit price, so it is skipped by an explicit condition rather than silently.
               and ${expenses.amountMinor} is not null
@@ -364,7 +368,9 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           const [trip] = await tx
             .select({ id: trips.id })
             .from(trips)
-            .where(and(eq(trips.id, input.tripId), eq(trips.actorId, actorId)))
+            .where(
+              and(eq(trips.id, input.tripId), eq(trips.actorId, actorId), isNull(trips.deletedAt)),
+            )
             .limit(1)
           if (!trip) throw new DomainError(ERROR.NOT_FOUND)
 
@@ -476,7 +482,10 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
       const rows = await db
         .select({ expense: expenses })
         .from(expenses)
-        .innerJoin(trips, and(eq(trips.id, expenses.tripId), eq(trips.actorId, actorId)))
+        .innerJoin(
+          trips,
+          and(eq(trips.id, expenses.tripId), eq(trips.actorId, actorId), isNull(trips.deletedAt)),
+        )
         .innerJoin(items, eq(items.id, expenses.itemId))
         .where(noLiveVerdict(actorId))
         .orderBy(desc(expenses.createdAt), desc(expenses.id))
@@ -502,7 +511,10 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           enteredAt: sql<Date>`${expenses.createdAt}`.as('entered_at'),
         })
         .from(expenses)
-        .innerJoin(trips, and(eq(trips.id, expenses.tripId), eq(trips.actorId, actorId)))
+        .innerJoin(
+          trips,
+          and(eq(trips.id, expenses.tripId), eq(trips.actorId, actorId), isNull(trips.deletedAt)),
+        )
         .innerJoin(items, and(eq(items.id, expenses.itemId), eq(items.kind, 'product')))
         .innerJoin(places, eq(places.id, trips.placeId))
         .where(noLiveVerdict(actorId))

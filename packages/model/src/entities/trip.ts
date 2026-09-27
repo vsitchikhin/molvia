@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { INT8_MAX, convertScaled, divideRounded } from '#model/support/decimal'
 import { DomainError, ERROR, ISSUE } from '#model/support/errors'
 import type { Expense } from './expense'
+import { EXCHANGE_UNDO_MINUTES } from '#model/entities/exchange'
 import { MINOR_EXPONENT, currencySchema, priceSchema } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
 import {
@@ -16,6 +17,13 @@ import {
   yerevanDate,
 } from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
+
+/**
+ * How long a removed trip can be brought back (MOL-76, Р-1): the same ten minutes as a spending, an
+ * exchange and an income — one rule for one's own money. After that the minute timer deletes it
+ * with its purchases.
+ */
+export const TRIP_UNDO_MINUTES = EXCHANGE_UNDO_MINUTES
 
 /**
  * Which rate a trip counts by when the one it snapshotted jumped (MOL-39, Р-19, Р-21): the jumped
