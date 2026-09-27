@@ -89,6 +89,8 @@ const trip: Trip = {
   rateChoice: null,
   startedAt: new Date('2026-09-19T10:00:00.000Z'),
   finishedAt: null,
+  accountId: null,
+  debited: null,
 }
 
 const milkBought: Expense = {
@@ -479,6 +481,8 @@ describe('startTrip: the person’s own rate (MOL-40)', () => {
     exchangedOn,
     heldBefore: held === null ? null : { minor: held, currency: currencies[1] },
     note: null,
+    givenAccountId: null,
+    receivedAccountId: null,
     revision: 1,
     createdAt: new Date(`${exchangedOn}T09:00:00.000Z`),
     amendedAt: null,

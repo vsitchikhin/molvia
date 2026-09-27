@@ -34,12 +34,17 @@ export interface ExchangeRepository {
    * returns it with `amended: false`, leaving no version behind. Otherwise `input.revision` must
    * be the version the row is at: an amendment made elsewhere in between is `CONFLICT`, not lost.
    * A missing exchange, a removed one and someone else's are one answer, `NOT_FOUND`.
+   *
+   * Only the accounts changed is not an amendment of the fact (MOL-115, Р-15): no version, no
+   * «исправлен», `accountsOnly: true` — the months stay frozen. The version still moves, so an
+   * amendment made over the old one elsewhere is a conflict. An account left out of `input` is
+   * «без счёта» here: keeping one the screen did not send is the use case's (Р-26).
    */
   amend(
     actorId: string,
     id: string,
     input: ExchangeAmendBody,
-  ): Promise<{ exchange: Exchange; amended: boolean }>
+  ): Promise<{ exchange: Exchange; amended: boolean; accountsOnly: boolean }>
 
   /** The versions of the owner's exchanges before their amendments, by exchange, newest first. */
   history(actorId: string): Promise<ReadonlyMap<string, readonly ExchangeRevision[]>>
@@ -114,10 +119,27 @@ function columnsOf(input: Omit<ExchangeBody, 'id'>) {
   }
 }
 
-function says(row: Row, input: Omit<ExchangeBody, 'id'>): boolean {
+/** The accounts each side left and landed on (MOL-115): where the money lay, not what was exchanged. */
+function accountColumnsOf(input: Omit<ExchangeBody, 'id'>) {
+  return {
+    givenAccountId: input.givenAccountId ?? null,
+    receivedAccountId: input.receivedAccountId ?? null,
+  }
+}
+
+function saysFact(row: Row, input: Omit<ExchangeBody, 'id'>): boolean {
   const columns = columnsOf(input)
   return (Object.keys(columns) as (keyof typeof columns)[]).every(
     (column) => row[column] === columns[column],
+  )
+}
+
+function says(row: Row, input: Omit<ExchangeBody, 'id'>): boolean {
+  const accounts = accountColumnsOf(input)
+  return (
+    saysFact(row, input) &&
+    row.givenAccountId === accounts.givenAccountId &&
+    row.receivedAccountId === accounts.receivedAccountId
   )
 }
 
@@ -138,6 +160,8 @@ function toExchange(row: Row): Exchange {
         ? null
         : { minor: row.heldBeforeMinor, currency: row.receivedCurrency },
     note: row.note,
+    givenAccountId: row.givenAccountId,
+    receivedAccountId: row.receivedAccountId,
     revision: row.revision,
     createdAt: row.createdAt,
     amendedAt: row.amendedAt,
@@ -150,7 +174,7 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
       return translateFailures(async () => {
         const [inserted] = await db
           .insert(exchanges)
-          .values({ id: input.id, actorId, ...columnsOf(input) })
+          .values({ id: input.id, actorId, ...columnsOf(input), ...accountColumnsOf(input) })
           .onConflictDoNothing({ target: exchanges.id })
           .returning()
         if (inserted) return { exchange: toExchange(inserted), created: true }
@@ -184,8 +208,22 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
             )
             .for('update')
           if (!row) throw new DomainError(ERROR.NOT_FOUND)
-          if (says(row, input)) return { exchange: toExchange(row), amended: false }
+          if (says(row, input)) {
+            return { exchange: toExchange(row), amended: false, accountsOnly: false }
+          }
           if (row.revision !== input.revision) throw new DomainError(ERROR.CONFLICT)
+          if (saysFact(row, input)) {
+            const [moved] = await tx
+              .update(exchanges)
+              .set({ ...accountColumnsOf(input), revision: row.revision + 1 })
+              .where(eq(exchanges.id, row.id))
+              .returning()
+            return {
+              exchange: toExchange(theRow(moved, 'exchanges')),
+              amended: false,
+              accountsOnly: true,
+            }
+          }
 
           await tx.insert(exchangeRevisions).values({
             exchangeId: row.id,
@@ -205,12 +243,17 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
             .update(exchanges)
             .set({
               ...columnsOf(input),
+              ...accountColumnsOf(input),
               revision: row.revision + 1,
               amendedAt: sql`now()`,
             })
             .where(eq(exchanges.id, row.id))
             .returning()
-          return { exchange: toExchange(theRow(amended, 'exchanges')), amended: true }
+          return {
+            exchange: toExchange(theRow(amended, 'exchanges')),
+            amended: true,
+            accountsOnly: false,
+          }
         }),
       )
     },

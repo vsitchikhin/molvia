@@ -52,6 +52,11 @@ function columnsOf(input: Omit<SpendingBody, 'id'>) {
     categoryId: input.categoryId,
     note: input.note ?? null,
     place: input.place ?? null,
+    // Where it was paid from (MOL-115): left out is «без счёта» here — keeping the account an older
+    // screen did not send is the use case's (Р-26).
+    accountId: input.accountId ?? null,
+    debitedMinor: input.debited?.minor ?? null,
+    debitedCurrency: input.debited?.currency ?? null,
   }
 }
 
@@ -100,6 +105,11 @@ function toSpending(row: Row): Spending {
     note: row.note,
     place: row.place,
     rate,
+    accountId: row.accountId,
+    debited:
+      row.debitedMinor === null || row.debitedCurrency === null
+        ? null
+        : { minor: row.debitedMinor, currency: row.debitedCurrency },
     revision: row.revision,
     createdAt: row.createdAt,
     amendedAt: row.amendedAt,

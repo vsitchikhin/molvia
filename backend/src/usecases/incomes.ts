@@ -24,6 +24,7 @@ function viewOf(income: Income, history: readonly IncomeRevision[]): IncomeView 
     heldBefore: income.heldBefore,
     source: income.source,
     note: income.note,
+    accountId: income.accountId,
     revision: income.revision,
     amendedAt: income.amendedAt,
     history: history.map(({ amount, receivedOn, heldBefore, source, note, replacedAt }) => ({

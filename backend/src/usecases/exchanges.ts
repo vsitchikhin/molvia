@@ -129,6 +129,8 @@ function viewsOf(
       received,
       heldBefore: exchange.heldBefore,
       note: exchange.note,
+      givenAccountId: exchange.givenAccountId,
+      receivedAccountId: exchange.receivedAccountId,
       revision: exchange.revision,
       amendedAt: exchange.amendedAt,
       history: (history.get(exchange.id) ?? []).map(
