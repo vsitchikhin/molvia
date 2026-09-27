@@ -1,11 +1,22 @@
 <template>
   <div class="screen" :class="{ collapsed, docked, tabbed }">
     <header ref="bar" class="bar">
-      <div class="leading">
-        <button v-if="parentTitleKey" class="back" type="button" @click="goBack">
-          <IconChevronLeft class="chevron" aria-hidden="true" />
-          <span class="hidden">{{ t('nav.back_label') }}</span> {{ t(parentTitleKey) }}
-        </button>
+      <div ref="column" class="leading">
+        <template v-if="parentTitleKey">
+          <button ref="button" class="back" type="button" @click="goBack">
+            <IconChevronLeft ref="chevron" class="chevron" aria-hidden="true" />
+            <span v-if="fit === 'short'" class="label">{{ backWord }}</span>
+            <template v-else>
+              <!-- The space is the hidden word's, so that it is read «Back Trip», not «BackTrip». -->
+              <span class="hidden">{{ `${backWord} ` }}</span>
+              <span :class="parentClass">{{ parent }}</span>
+            </template>
+          </button>
+          <span class="samples" aria-hidden="true">
+            <span ref="full">{{ parent }}</span>
+            <span ref="short">{{ backWord }}</span>
+          </span>
+        </template>
         <div v-else-if="$slots.meta" class="meta" :aria-hidden="collapsed ? 'true' : undefined">
           <slot name="meta" />
         </div>
@@ -54,10 +65,12 @@
 
 <script lang="ts">
 import { computed, defineComponent, onBeforeUpdate, ref } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconChevronLeft from '~icons/mdi/chevron-left'
 import IdentityNotice from '@/components/IdentityNotice.vue'
+import { useBackLabel } from '@/composables/useBackLabel'
 import { useCollapsed, useHeight } from '@/composables/useCollapsed'
 import { backTarget, useNavigation } from '@/navigation'
 
@@ -75,6 +88,12 @@ import { backTarget, useNavigation } from '@/navigation'
  * it leads. «Back» is still read out — as hidden text in front of the label, not an
  * `aria-label`, which would replace the visible word and leave a person saying «tap Trip» to
  * voice control with nothing to tap.
+ *
+ * At rest the row keeps no room for the small title it does not show, so the label has the
+ * row. Once the title comes in, the label gives way first and by the iOS ladder — whole,
+ * «Back», the chevron alone — and the title last, only when it alone does not fit between two
+ * chevrons (MOL-75). Hidden, the label is still read out after «Back»; shown as «Back», it is
+ * the whole name, not «Back Back».
  */
 export default defineComponent({
   name: 'AppScreen',
@@ -94,6 +113,23 @@ export default defineComponent({
     // Named by where it leads (`backTarget`): a finished trip opened from the home screen goes
     // back there, and says «Поход» (MOL-77).
     const parentTitleKey = computed(() => backTarget(router, route)?.location.meta.titleKey)
+
+    const column = ref<HTMLElement | null>(null)
+    const button = ref<HTMLElement | null>(null)
+    const chevron = ref<ComponentPublicInstance | null>(null)
+    const full = ref<HTMLElement | null>(null)
+    const short = ref<HTMLElement | null>(null)
+    const parent = computed(() => (parentTitleKey.value ? t(parentTitleKey.value) : ''))
+    const backWord = computed(() => t('nav.back_label'))
+    const fit = useBackLabel({
+      column,
+      button,
+      chevron: computed(() => (chevron.value?.$el as Element | undefined) ?? null),
+      full,
+      short,
+    })
+    // Out of sight, the parent's title is still read after «Back».
+    const parentClass = computed(() => (fit.value === 'none' ? 'hidden' : 'label'))
     // Slots are not reactive, so a computed would keep whatever it saw on mount — and the trip's
     // place and «Finish» arrive with the trip, from the API, after it. Read again before every
     // render instead: a row filled late is pinned and alive, not drawn inside an invisible one.
@@ -119,7 +155,27 @@ export default defineComponent({
 
     const { goBack } = useNavigation()
 
-    return { t, bar, dock, sentinel, collapsed, parentTitleKey, docked, tabbed, room, goBack }
+    return {
+      t,
+      bar,
+      dock,
+      sentinel,
+      collapsed,
+      parentTitleKey,
+      column,
+      button,
+      chevron,
+      full,
+      short,
+      fit,
+      parent,
+      backWord,
+      parentClass,
+      docked,
+      tabbed,
+      room,
+      goBack,
+    }
   },
 })
 </script>
@@ -142,7 +198,9 @@ export default defineComponent({
   left: 0;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
+
+  /* At rest the small title is not shown, and its column is nothing: the back label has the row. */
+  grid-template-columns: minmax(0, 1fr) 0 minmax(0, auto);
   align-items: center;
   gap: var(--space-2);
   height: calc(var(--bar-height) + var(--safe-top));
@@ -165,13 +223,19 @@ export default defineComponent({
   pointer-events: auto;
 }
 
+/* The title in the middle of the row, and the sides equal so that it is: never narrower than
+   the chevron alone, whose button stands a --space-1 out of its column — 40 here is 44 to tap. */
 .collapsed .bar {
+  grid-template-columns:
+    minmax(calc(var(--touch-target) - var(--space-1)), 1fr) minmax(0, auto)
+    minmax(calc(var(--touch-target) - var(--space-1)), 1fr);
   opacity: 1;
   pointer-events: auto;
   border-bottom-color: var(--border);
 }
 
 .leading {
+  position: relative;
   min-width: 0;
 }
 
@@ -217,6 +281,7 @@ export default defineComponent({
 .back {
   @include touch-target;
 
+  justify-content: flex-start;
   gap: var(--space-1);
   max-width: 100%;
   margin-left: calc(var(--space-1) * -1);
@@ -243,8 +308,31 @@ export default defineComponent({
   height: 1.625rem;
 }
 
+/* The ladder keeps a label from being cut; this keeps one inside its column in the frame before
+   the first measure, and where nothing can measure. */
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .hidden {
   @include visually-hidden;
+}
+
+/* In the button's type, out of sight and out of the page's width. */
+.samples {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  visibility: hidden;
+  pointer-events: none;
+
+  > span {
+    display: inline-block;
+  }
 }
 
 .head {
