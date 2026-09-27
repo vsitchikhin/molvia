@@ -67,7 +67,7 @@ describe('seed-catalogue (MOL-112)', () => {
       '  already there   2',
       '  another unit    1 (kept as they are)',
       '    Молоко: kg, the seed says l',
-      '  same key        1 (another spelling there, not written)',
+      '  same key        1 (the key is taken, not written)',
       '    Мед ← Мёд',
       'dry run: nothing changed. Run again with --yes to write.',
     ])

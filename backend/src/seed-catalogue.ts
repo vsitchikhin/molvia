@@ -50,7 +50,7 @@ export async function seedCatalogue(
   }
   if (report.twins.length > 0) {
     write(
-      `  ${'same key'.padEnd(16)}${String(report.twins.length)} (another spelling there, not written)`,
+      `  ${'same key'.padEnd(16)}${String(report.twins.length)} (the key is taken, not written)`,
     )
     for (const twin of report.twins) write(`    ${twin.name} ← ${twin.seed}`)
   }

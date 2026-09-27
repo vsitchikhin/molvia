@@ -15,8 +15,12 @@ export interface KeptItem {
 
 /**
  * A line not written because the catalogue has an item of the same search key under another
- * spelling — «Мед» for «Мёд», «Молоко 3.2%» for «Молоко 3,2%», «Լավաշ» for «Лаваш». The search
- * cannot tell the two apart, so a second one would split the purchases and ratings of one thing.
+ * name. Mostly the same thing spelt otherwise — «Мед» for «Мёд», «Молоко 3.2%» for «Молоко 3,2%»,
+ * «Լավաշ» for «Лаваш» — which the search cannot tell apart, so a second one would split the
+ * purchases and ratings of one thing. Sometimes another thing — «Milo» for «Мыло», «Kiwi» for
+ * «Киви»: the key is never an identity (MOL-12), and here it is only a reason not to write. The
+ * price is chosen on purpose: a line left out is proposed by hand, a twin written is there for
+ * good, since the seed only adds.
  */
 export interface TwinItem {
   readonly name: string

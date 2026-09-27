@@ -209,7 +209,10 @@ there stays as it is, and a second run adds nothing. Every time the list grows, 
 1. A copy first, though nothing is removed: `sudo systemctl start molvia-backup.service`, then
    `journalctl -u molvia-backup -n 5` says it went.
 2. Look — without `--yes` nothing changes, it prints how many would be added, how many are there
-   already, and the names whose unit differs from the list's (they are kept as they are):
+   already, the names whose unit differs from the list's (they are kept as they are), and the
+   lines left out because their search key is taken (`same key`, «Мед ← Мёд»). Read those pairs:
+   one that is another thing — «Milo ← Мыло» — is proposed by hand through «Предложить товар»,
+   which compares names, not keys:
 
    ```bash
    docker compose -f docker-compose.prod.yml --env-file .env.prod \
