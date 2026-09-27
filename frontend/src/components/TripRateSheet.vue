@@ -43,8 +43,16 @@ import { computed, defineComponent, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
-import { ERROR, currencySign, decimalFromRate, formatRate } from '@molvia/model'
-import type { ErrorCode, RateChoice, TripView } from '@molvia/model'
+import {
+  ERROR,
+  currencySign,
+  decimalFromRate,
+  decimalFromScaled,
+  divideRounded,
+  formatRate,
+  readingOf,
+} from '@molvia/model'
+import type { ErrorCode, RateChoice, RateChoiceBody, TripView } from '@molvia/model'
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
@@ -97,10 +105,12 @@ export default defineComponent({
       },
     )
 
-    // The pair is the snapshot's; without a snapshot there is no jump and no sheet to show.
-    const sign = computed(() =>
-      props.trip.rate ? currencySign(props.trip.rate.base, locale.value) : '',
-    )
+    // The field asks on the side the options above it are printed by — «1 $ =» under «89,77 ₽/$»
+    // for a snapshot of roubles into dollars (MOL-81, adversarial А): asked on the snapshot's, it
+    // took the number off the options the other way round. Without a snapshot there is no jump
+    // and no sheet to show.
+    const per = computed(() => (props.trip.rate ? readingOf(props.trip.rate).per : null))
+    const sign = computed(() => (per.value ? currencySign(per.value, locale.value) : ''))
 
     const options = computed(() => {
       const held = jump.value
@@ -125,8 +135,28 @@ export default defineComponent({
      */
     function shownRate(rate: TripView['rate']): string {
       if (!rate) return ''
-      const decimal = decimalFromRate(rate.scaled).replace(/0+$/, '').replace(/\.$/, '')
+      // On the side the field asks by (MOL-81). Turned over, six digits are an artefact of the
+      // turning — «89,525515» for a typed «89,53» — so it shows the two the options above print.
+      const reading = readingOf(rate)
+      const decimal = (
+        reading.per === rate.base
+          ? decimalFromRate(rate.scaled)
+          : decimalFromScaled(divideRounded(reading.scaled, 10_000n), 2)
+      )
+        .replace(/0+$/, '')
+        .replace(/\.$/, '')
       return locale.value === 'ru' ? decimal.replace('.', ',') : decimal
+    }
+
+    /**
+     * The number and the currency it is «за 1» of, named only when that is not the snapshot's
+     * base — so a server that predates the field is sent what it always understood (MOL-81).
+     */
+    function manualBody(rate: string): RateChoiceBody {
+      const snapshot = props.trip.rate
+      return snapshot && per.value && per.value !== snapshot.base
+        ? { choice: 'manual', rate, per: per.value }
+        : { choice: 'manual', rate }
     }
 
     async function submit(): Promise<void> {
@@ -138,7 +168,7 @@ export default defineComponent({
         const trip = await api.chooseTripRate(
           props.trip.id,
           choice.value === 'manual'
-            ? { choice: 'manual', rate: own.value.replace(',', '.') }
+            ? manualBody(own.value.replace(',', '.'))
             : { choice: choice.value },
         )
         trips.apply(trip)

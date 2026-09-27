@@ -1,7 +1,6 @@
 import {
   DomainError,
   ERROR,
-  RATE_SCALE,
   currencySchema,
   exchangeRateOf,
   heldEstimate,
@@ -12,6 +11,7 @@ import {
   pickOfficialRate,
   receiptDay,
   resourceIdOf,
+  uprightOf,
   yerevanDate,
   yerevanMidnight,
 } from '@molvia/model'
@@ -105,19 +105,6 @@ export function sinceDay(since: Date | null): string | null {
 }
 
 /**
- * Of a rate and the same rate built the other way round from the same rows, the one whose number
- * is at least one (MOL-81): «84,28 ₽/$» is what the screen prints, and its difference is counted
- * by it — six digits of 0,011865 are five significant ones, of 84,28 eight.
- */
-function uprightOf(
-  forward: ExchangeRate | null,
-  backward: ExchangeRate | null,
-): ExchangeRate | null {
-  if (!forward || forward.scaled >= RATE_SCALE) return forward
-  return backward ?? forward
-}
-
-/**
  * One exchange as the list shows it, compared with the official rate of its own day — the rate a
  * trip started that day would have taken, by the same rule (`pickOfficialRate`). A jumped rate is
  * measured by the one before it, and without one the comparison is withheld and the row says why.
@@ -130,11 +117,21 @@ function viewsOf(
   return [...exchanges].reverse().map((exchange): ExchangeView => {
     const { given, received, exchangedOn } = exchange
     const rows = cached.get(exchangedOn) ?? []
+    const rate = exchangeRateOf(exchange)
     const official = pickOfficialRate(given.currency, received.currency, rows, exchangedOn)
-    const measure = uprightOf(
-      steadyOf(official),
-      steadyOf(pickOfficialRate(received.currency, given.currency, rows, exchangedOn)),
+    const backward = steadyOf(
+      pickOfficialRate(received.currency, given.currency, rows, exchangedOn),
     )
+    // The bank's rate on the side the exchange's own is printed by, built from the cache that
+    // side: the plate sets the two one under the other, and near parity each chose its own side —
+    // «1,01 $/€» over «1,01 €/$» (adversarial Г). Without a rate of the exchange, the side at least
+    // one (MOL-81); the difference is measured by whichever it is.
+    const forward = steadyOf(official)
+    const measure = rate
+      ? rate.base === given.currency
+        ? forward
+        : backward
+      : uprightOf(forward, backward)
     const difference = measure ? officialDifference(exchange, measure) : null
     return {
       id: exchange.id,
@@ -157,7 +154,7 @@ function viewsOf(
           replacedAt,
         }),
       ),
-      rate: exchangeRateOf(exchange),
+      rate,
       official:
         official && measure && difference
           ? { rate: measure, provider: official.provider, difference }

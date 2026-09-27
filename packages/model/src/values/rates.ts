@@ -87,6 +87,33 @@ export const rateCodec = z.codec(exchangeRateWireSchema, exchangeRateSchema, {
 })
 
 /**
+ * Of a rate and the same rate the other way round, the one whose number is at least one — the
+ * side a person names a rate by (MOL-81). Both are made from an exact source by the caller; this
+ * only chooses, so the model and the server choose alike (review Т-7).
+ */
+export function uprightOf(
+  forward: ExchangeRate | null,
+  backward: ExchangeRate | null,
+): ExchangeRate | null {
+  if (forward && forward.scaled >= RATE_SCALE) return forward
+  return backward ?? forward
+}
+
+/**
+ * The rate turned to the side a person reads it by — `per` one unit of which, `scaled` of `of` —
+ * from its own six digits: for a figure that has no source but itself, a trip's snapshot or the own
+ * rate typed into it (MOL-81, adversarial А). A rate already at least one is itself.
+ */
+export function readingOf(rate: ExchangeRate): { of: Currency; per: Currency; scaled: bigint } {
+  if (rate.scaled >= RATE_SCALE) return { of: rate.quote, per: rate.base, scaled: rate.scaled }
+  return {
+    of: rate.base,
+    per: rate.quote,
+    scaled: divideRounded(RATE_SCALE * RATE_SCALE, rate.scaled),
+  }
+}
+
+/**
  * The rate as the screen prints it: «4,82 ֏/₽» — how much of one currency a unit of the other
  * buys, with both signs, because a bare number says nothing about which way it goes.
  *
@@ -110,6 +137,30 @@ export function formatRate(rate: ExchangeRate, locale = 'ru-RU'): string {
   }).format(decimal)
   const [of, per] = upright ? [rate.quote, rate.base] : [rate.base, rate.quote]
   return `${number} ${currencySign(of, locale)}/${currencySign(per, locale)}`
+}
+
+/**
+ * A rate printed on the side of the one it is set beside — the bank's under an exchange's own on
+ * the card of that exchange (MOL-81, adversarial Г). Near parity the two fall on either side of
+ * one, and printed each on its own side they read «1,01 $/€» over «1,01 €/$» — two equal numbers
+ * meaning the opposite, with a difference between them. Of the same pair as `beside` and `beside`
+ * at least one, it keeps that side, with the six digits a number under one needs; otherwise it is
+ * printed as any rate is.
+ */
+export function formatRateBeside(
+  rate: ExchangeRate,
+  beside: ExchangeRate,
+  locale = 'ru-RU',
+): string {
+  const sameSide = rate.base === beside.base && rate.quote === beside.quote
+  if (!sameSide || beside.scaled < RATE_SCALE || rate.scaled >= RATE_SCALE) {
+    return formatRate(rate, locale)
+  }
+  const number = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: RATE_DIGITS,
+  }).format(decimalFromRate(rate.scaled))
+  return `${number} ${currencySign(rate.quote, locale)}/${currencySign(rate.base, locale)}`
 }
 
 /**

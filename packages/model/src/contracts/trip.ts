@@ -253,7 +253,13 @@ export function tripViewOf(
 export const rateChoiceBodySchema = z.discriminatedUnion('choice', [
   z.strictObject({ choice: z.literal('jumped') }),
   z.strictObject({ choice: z.literal('previous') }),
-  z.strictObject({ choice: z.literal('manual'), rate: z.string().max(40) }),
+  // `per`: the currency the number is «за 1» of, when that is not the snapshot's base — the sheet
+  // asks on the side a person reads a rate by (MOL-81, adversarial А). Absent means the base.
+  z.strictObject({
+    choice: z.literal('manual'),
+    rate: z.string().max(40),
+    per: currencySchema.optional(),
+  }),
 ])
 export type RateChoiceBody = z.infer<typeof rateChoiceBodySchema>
 

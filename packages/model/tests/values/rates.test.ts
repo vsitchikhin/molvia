@@ -9,6 +9,7 @@ import {
   decimalFromRate,
   exchangeRateSchema,
   formatRate,
+  formatRateBeside,
   isRateDay,
   isRateFresh,
   isRateJump,
@@ -16,6 +17,8 @@ import {
   pickOfficialRate,
   rateCodec,
   rateFromAmd,
+  readingOf,
+  uprightOf,
   yerevanDate,
   yerevanMidnight,
 } from '#model/values/rates'
@@ -484,6 +487,37 @@ describe('formatRate', () => {
     expect(formatRate(of('0.002590', 'AMD', 'USD')).replaceAll('\u00a0', ' ')).toBe('386,10 ֏/$')
     // The band's lower edge turned over, not rounded to zero.
     expect(formatRate(of('0.0001')).replaceAll('\u00a0', ' ')).toBe('10 000,00 ₽/֏')
+  })
+
+  it('formatRateBeside: курс ЦБ под курсом обмена — той же стороной и у паритета (адв. Г)', () => {
+    const own = of('1.005025', 'EUR', 'USD')
+    const bank = of('0.995', 'EUR', 'USD')
+    expect(formatRateBeside(bank, own).replaceAll('\u00a0', ' ')).toBe('0,995 $/€')
+    // Обычный случай — как любой курс: обе стороны не меньше единицы.
+    expect(formatRateBeside(of('84.28', 'USD', 'RUB'), of('86.02', 'USD', 'RUB'))).toBe(
+      formatRate(of('84.28', 'USD', 'RUB')),
+    )
+    // Другая пара или курс обмена сам меньше единицы — печатается как любой курс.
+    expect(formatRateBeside(bank, of('1.005025', 'USD', 'EUR'))).toBe(formatRate(bank))
+  })
+
+  it('readingOf: сторона, которой читают, из шести знаков самого курса', () => {
+    expect(readingOf(of('4.82'))).toEqual({ of: 'AMD', per: 'RUB', scaled: parseRate('4.82') })
+    expect(readingOf(of('0.011232', 'RUB', 'USD'))).toEqual({
+      of: 'RUB',
+      per: 'USD',
+      scaled: parseRate('89.031339'),
+    })
+  })
+
+  it('uprightOf: курс не меньше единицы, иначе обратный, а без обратного — какой есть', () => {
+    const small = of('0.011232', 'RUB', 'USD')
+    const large = of('89.035302', 'USD', 'RUB')
+    expect(uprightOf(small, large)).toBe(large)
+    expect(uprightOf(large, small)).toBe(large)
+    expect(uprightOf(small, null)).toBe(small)
+    expect(uprightOf(null, large)).toBe(large)
+    expect(uprightOf(null, null)).toBeNull()
   })
 
   it('ровно единица и край полосы — своей стороной', () => {

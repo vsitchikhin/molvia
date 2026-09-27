@@ -192,6 +192,107 @@ describe('TripRateNotes', () => {
       expect(field?.value).toBe('4312,3')
     })
 
+    // Доход в рублях, траты в долларах: снимок ₽ → $ меньше единицы (MOL-81, адв. А).
+    describe('пара меньше единицы', () => {
+      const small = (value: string, source = 'official') => ({
+        ...rate(value, source),
+        quote: 'USD',
+      })
+      function smallTrip(manual: string | null): TripView {
+        return tripViewCodec.parse({
+          id: TRIP,
+          startedAt: '2026-01-16T08:00:00.000Z',
+          finishedAt: null,
+          rateProvider: 'cba',
+          rateStale: false,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
+          expenses: [],
+          total: [],
+          converted: null,
+          currency: 'USD',
+          rate: small('0.1114'),
+          rateJump: {
+            jumped: small('0.1114'),
+            previous: small('0.011143'),
+            manual: manual ? small(manual, 'personal') : null,
+            choice: manual ? 'manual' : null,
+          },
+        })
+      }
+      async function openSmall(manual: string | null) {
+        setActivePinia(createPinia())
+        const router = createRouter({ history: createMemoryHistory(), routes })
+        await router.push('/')
+        const view = mount(TripRateNotes, {
+          props: { trip: smallTrip(manual) },
+          global: { plugins: [router, createAppI18n('ru')] },
+          attachTo: document.body,
+        })
+        mounted.push(view)
+        await button(view, ru.trip.rate.choose).trigger('click')
+        await flushPromises()
+        clock += 1000
+        const sheet = document.body.querySelector('dialog[open]')
+        if (!sheet) throw new Error('шторка не открылась')
+        return sheet
+      }
+
+      it('поле спрашивает той стороной, какой напечатаны варианты: «1 $ =» под «89,74 ₽/$»', async () => {
+        const sheet = await openSmall(null)
+        expect(sheet.textContent.replaceAll('\u00a0', ' ')).toContain('89,74 ₽/$')
+        inside(sheet, ru.trip.rate.mine).click()
+        await flushPromises()
+        expect(sheet.querySelector('label')?.textContent).toContain('1 $ =')
+      })
+
+      it('введённое уходит с валютой, за единицу которой оно сказано', async () => {
+        chooseTripRate.mockResolvedValue(smallTrip('0.011173'))
+        const sheet = await openSmall(null)
+        inside(sheet, ru.trip.rate.mine).click()
+        await flushPromises()
+        const field = sheet.querySelector('input')
+        if (!field) throw new Error('нет поля')
+        field.value = '89,50'
+        field.dispatchEvent(new Event('input'))
+        await flushPromises()
+        inside(sheet, ru.trip.rate.save).click()
+        await flushPromises()
+        expect(chooseTripRate).toHaveBeenCalledWith(TRIP, {
+          choice: 'manual',
+          rate: '89.50',
+          per: 'USD',
+        })
+      })
+
+      it('свой курс подставляется той же стороной, двумя знаками — как набирали', async () => {
+        const sheet = await openSmall('0.011173')
+        // 1 / 0,011173 = 89,501…: «89,5», а не «0,011173» и не «89,501477».
+        expect(sheet.querySelector('input')?.value).toBe('89,5')
+      })
+    })
+
+    it('must not fire: у пары владельца поле «1 ₽ =» и число уходит без валюты', async () => {
+      chooseTripRate.mockResolvedValue(
+        trip({ jump: { previous: null, choice: 'manual', manual: '4.81' } }),
+      )
+      const view = await render({ jump: { previous: null } })
+      await button(view, ru.trip.rate.choose).trigger('click')
+      await flushPromises()
+      clock += 1000
+      const sheet = document.body.querySelector('dialog[open]')
+      inside(sheet, ru.trip.rate.mine).click()
+      await flushPromises()
+      expect(sheet?.querySelector('label')?.textContent).toContain('1 ₽ =')
+      const field = sheet?.querySelector('input')
+      if (!field) throw new Error('нет поля')
+      field.value = '4,81'
+      field.dispatchEvent(new Event('input'))
+      await flushPromises()
+      inside(sheet, ru.trip.rate.save).click()
+      await flushPromises()
+      expect(chooseTripRate).toHaveBeenCalledWith(TRIP, { choice: 'manual', rate: '4.81' })
+    })
+
     it('свой курс, который не курс, остаётся в поле, и шторка не закрывается', async () => {
       chooseTripRate.mockRejectedValue(new ApiError(ERROR.INVALID_RATE, undefined, true))
       const view = await render({ jump: { previous: null } })

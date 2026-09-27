@@ -749,6 +749,28 @@ describe('стоимость валют (MOL-42)', () => {
     })
   })
 
+  it('у паритета курс ЦБ на плашке — той же стороной, что курс обмена (MOL-81, адв. Г)', async () => {
+    const eur = (value: string, date: string): CachedRate => ({
+      ...rub(value, date),
+      currency: 'EUR',
+    })
+    await rates.upsert([usd('390', daysAgo(3)), eur('388.05', daysAgo(3))])
+    const me = await owner()
+    const overview = await record(me, {
+      given: { amount: '1000', currency: 'USD' },
+      received: { amount: '995', currency: 'EUR' },
+      exchangedOn: daysAgo(3),
+    })
+
+    const [row] = overview.exchanges
+    // 1 000 / 995 = 1,005025 $ за €; ЦБ той же стороной — 388,05 / 390 = 0,995 $ за €, не
+    // перевёрнутые «1,01 €/$».
+    expect(row?.rate).toMatchObject({ base: 'EUR', quote: 'USD', scaled: 1_005_025n })
+    expect(row?.official?.rate).toMatchObject({ base: 'EUR', quote: 'USD', scaled: 995_000n })
+    // 1 000 $ по 0,995 $ за € — 1 005,03 €; получено 995.
+    expect(row?.official?.difference).toEqual({ minor: -1_003n, currency: 'EUR' })
+  })
+
   it('привезённые доллары — по ЦБ РА на день обмена, с пометкой; поход берёт то же число', async () => {
     await rates.upsert([rub('4.3123', daysAgo(6)), usd('363.44', daysAgo(6))])
     const me = await owner()

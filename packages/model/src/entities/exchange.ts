@@ -12,6 +12,7 @@ import {
   RATE_SCALE,
   exchangeRateSchema,
   isRateDay,
+  uprightOf,
   yerevanMidnight,
 } from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
@@ -233,9 +234,10 @@ function uprightRateOf(
   other: Currency,
   day: string,
 ): ExchangeRate | null {
-  const forward = rateOf(ratio, one, other, day)
-  if (forward && forward.scaled >= RATE_SCALE) return forward
-  return rateOf({ quote: ratio.base, base: ratio.quote }, other, one, day) ?? forward
+  return uprightOf(
+    rateOf(ratio, one, other, day),
+    rateOf({ quote: ratio.base, base: ratio.quote }, other, one, day),
+  )
 }
 
 /** The order the wallet walks money in: by day, then as written — exchanges and incomes alike. */
@@ -542,8 +544,11 @@ export function ownRates(
   const { costs, lost, priced } = costsOf(receipts, base, day, officialOf, since)
   const cost = base === quote ? null : costs.get(quote)
   // The screen's figures, each on the side whose number is at least one (MOL-81): a trip takes
-  // `walletRate`, which stays `base → quote`.
-  const wallet = cost ? uprightRateOf(cost.ratio, base, quote, cost.day) : null
+  // `walletRate`, which stays `base → quote`. A wallet a trip could not take is not shown either —
+  // its own side outside the band while the other is inside said «мой курс» over a trip that took
+  // the bank's (adversarial В).
+  const wallet =
+    cost && costOf(cost, base, quote) ? uprightRateOf(cost.ratio, base, quote, cost.day) : null
   // Which currency a price is of is decided before it is turned over: after, it may be either side.
   const others = new Map([...costs].filter(([currency]) => currency !== quote))
   return {

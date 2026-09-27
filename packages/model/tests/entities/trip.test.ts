@@ -229,6 +229,28 @@ describe('скачок курса в походе (MOL-39, Р-19, Р-21)', () =>
     ).toEqual(own)
   })
 
+  it('свой курс стороной, какой его читают, ложится на сторону снимка (MOL-81, адв. А)', () => {
+    // Снимок ₽ → $ меньше единицы; шторка спрашивает «1 $ = 89,50 ₽».
+    const small = { ...rate('0.011143'), quote: 'USD' as const }
+    const own = manualRateFor(small, '89,50', at, 'USD')
+    expect(own).toMatchObject({ base: 'RUB', quote: 'USD', scaled: parseRate('0.011173') })
+    // Без `per` — сторона снимка, как было: старый клиент и пара владельца.
+    expect(manualRateFor(small, '0,011173', at).scaled).toBe(parseRate('0.011173'))
+    expect(manualRateFor(jumped.rate, '4,81', at, 'RUB').scaled).toBe(parseRate('4.81'))
+  })
+
+  it('must not fire: валюта вне пары и перевёрнутое вне полосы — invalid_rate', () => {
+    const small = { ...rate('0.011143'), quote: 'USD' as const }
+    for (const [typed, per] of [
+      ['89,50', 'EUR'],
+      ['0,00001', 'USD'],
+    ] as const) {
+      expect(() => manualRateFor(small, typed, at, per)).toThrow(
+        expect.objectContaining({ code: ERROR.INVALID_RATE }),
+      )
+    }
+  })
+
   it('свой курс, который не курс, — invalid_rate, как у «моего курса»', () => {
     expect(() => manualRateFor(jumped.rate, 'abc', at)).toThrow(
       expect.objectContaining({ code: ERROR.INVALID_RATE }),

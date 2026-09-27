@@ -499,6 +499,17 @@ describe('the rates of «Обмен денег» say one number (MOL-81)', () =>
     })
   })
 
+  it('must not fire: a wallet a trip could not take is not shown on its other side (адв. В)', () => {
+    // A euro at 100 000 roubles: € per ₽ is below the band, ₽ per € inside it. A trip takes no
+    // wallet here, so the screen shows none either — before, it said «мой курс 100 000,00 ₽/€».
+    const chain = [
+      exchange('1000 RUB', '1 USD', '2026-09-20'),
+      exchange('100 USD', '1 EUR', '2026-09-21'),
+    ]
+    expect(walletRate(chain, 'RUB', 'EUR', '2026-09-30')).toBeNull()
+    expect(ownRates(chain, 'RUB', 'EUR', '2026-09-30').wallet).toBeNull()
+  })
+
   it('leaves the spending currency out of the prices whichever way a price is turned', () => {
     const rates = ownRates(
       [september, exchange('100 USD', '38600 AMD', '2026-09-23')],
