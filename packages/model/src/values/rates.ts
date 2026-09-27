@@ -140,27 +140,41 @@ export function formatRate(rate: ExchangeRate, locale = 'ru-RU'): string {
 }
 
 /**
- * A rate printed on the side of the one it is set beside — the bank's under an exchange's own on
- * the card of that exchange (MOL-81, adversarial Г). Near parity the two fall on either side of
- * one, and printed each on its own side they read «1,01 $/€» over «1,01 €/$» — two equal numbers
- * meaning the opposite, with a difference between them. Of the same pair as `beside` and `beside`
- * at least one, it keeps that side, with the six digits a number under one needs; otherwise it is
- * printed as any rate is.
+ * A rate printed on the side another is read by — the bank's under an exchange's own on the card of
+ * that exchange (MOL-81, adversarial Г), the jumped rate beside the one before it in the sheet of a
+ * trip (review Т-9). Each printed on its own side, two rates on either side of one read «1,01 $/€»
+ * over «1,01 €/$», and a jump of the comma — 4,30 ֏/₽ to 0,43 — read «2,33 ₽/֏» beside «4,30 ֏/₽»,
+ * hiding the very jump the sheet is there for. Of another pair than `beside`, it is printed as any
+ * rate is. On the side under one, with the six digits such a number needs.
  */
 export function formatRateBeside(
   rate: ExchangeRate,
   beside: ExchangeRate,
   locale = 'ru-RU',
 ): string {
-  const sameSide = rate.base === beside.base && rate.quote === beside.quote
-  if (!sameSide || beside.scaled < RATE_SCALE || rate.scaled >= RATE_SCALE) {
-    return formatRate(rate, locale)
-  }
+  const samePair =
+    (rate.base === beside.base && rate.quote === beside.quote) ||
+    (rate.base === beside.quote && rate.quote === beside.base)
+  if (!samePair) return formatRate(rate, locale)
+  const per = readingOf(beside).per
+  const forward = per === rate.base
+  const of = forward ? rate.quote : rate.base
+  const six = forward ? rate.scaled : divideRounded(RATE_SCALE * RATE_SCALE, rate.scaled)
+  // At least one: two digits, rounded once from the rate itself, as `formatRate` does.
+  const decimal =
+    six >= RATE_SCALE
+      ? decimalFromScaled(
+          forward
+            ? divideRounded(rate.scaled, 10_000n)
+            : divideRounded(100n * RATE_SCALE, rate.scaled),
+          2,
+        )
+      : decimalFromRate(six)
   const number = new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
-    maximumFractionDigits: RATE_DIGITS,
-  }).format(decimalFromRate(rate.scaled))
-  return `${number} ${currencySign(rate.quote, locale)}/${currencySign(rate.base, locale)}`
+    maximumFractionDigits: six >= RATE_SCALE ? 2 : RATE_DIGITS,
+  }).format(decimal)
+  return `${number} ${currencySign(of, locale)}/${currencySign(per, locale)}`
 }
 
 /**

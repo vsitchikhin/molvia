@@ -33,7 +33,7 @@
 import { computed, defineComponent, ref } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatRate } from '@molvia/model'
+import { formatRate, formatRateBeside } from '@molvia/model'
 import type { RateProvider, TripView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import TripRateSheet from '@/components/TripRateSheet.vue'
@@ -83,8 +83,12 @@ export default defineComponent({
     const jump = computed(() => {
       const jumped = props.trip.rateJump
       if (!jumped) return null
-      const now = formatRate(jumped.jumped, locale.value)
       const previous = jumped.previous
+      // Both on the side of the rate before the jump: a jump of the comma across one — 4,30 ֏/₽ to
+      // 0,43 — read «2,33 ₽/֏ вместо 4,30 ֏/₽», two sides hiding the jump it names (review Т-9).
+      const now = previous
+        ? formatRateBeside(jumped.jumped, previous, locale.value)
+        : formatRate(jumped.jumped, locale.value)
       return previous
         ? t('trip.rate.jump_previous', {
             rate: now,

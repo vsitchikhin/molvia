@@ -45,11 +45,13 @@ import { useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
 import {
   ERROR,
+  RATE_SCALE,
   currencySign,
   decimalFromRate,
   decimalFromScaled,
   divideRounded,
   formatRate,
+  formatRateBeside,
   readingOf,
 } from '@molvia/model'
 import type { ErrorCode, RateChoice, RateChoiceBody, TripView } from '@molvia/model'
@@ -83,6 +85,17 @@ export default defineComponent({
     const trips = useTripStore()
 
     const jump = computed(() => props.trip.rateJump)
+    // One side for the whole sheet — the options and the field alike (MOL-81): the side of the rate
+    // before the jump, which is the sane one, or of the jumped when there is none. Taken from the
+    // rate the trip counts by now, the field asked on the side of the jumped rate after a jump
+    // across one — 4,30 ֏/₽ to 0,43 — and the owner's «4,30» went in as drams per rouble (review
+    // Т-9, adversarial А′); each option on its own side hid that very jump.
+    const anchor = computed(() => {
+      const held = jump.value
+      return held ? (held.previous ?? held.jumped) : null
+    })
+    const per = computed(() => (anchor.value ? readingOf(anchor.value).per : null))
+    const sign = computed(() => (per.value ? currencySign(per.value, locale.value) : ''))
     const choice = ref<RateChoice>(jump.value?.choice ?? 'jumped')
     // The decimal the person typed, printed the way the interface writes numbers — never the
     // sheet's own formatted output parsed back (adversarial В3).
@@ -105,13 +118,6 @@ export default defineComponent({
       },
     )
 
-    // The field asks on the side the options above it are printed by — «1 $ =» under «89,77 ₽/$»
-    // for a snapshot of roubles into dollars (MOL-81, adversarial А): asked on the snapshot's, it
-    // took the number off the options the other way round. Without a snapshot there is no jump
-    // and no sheet to show.
-    const per = computed(() => (props.trip.rate ? readingOf(props.trip.rate).per : null))
-    const sign = computed(() => (per.value ? currencySign(per.value, locale.value) : ''))
-
     const options = computed(() => {
       const held = jump.value
       if (!held) return []
@@ -126,7 +132,9 @@ export default defineComponent({
     })
 
     function rateOf(rate: NonNullable<TripView['rate']>): string {
-      return formatRate(rate, locale.value)
+      return anchor.value
+        ? formatRateBeside(rate, anchor.value, locale.value)
+        : formatRate(rate, locale.value)
     }
 
     /**
@@ -135,13 +143,13 @@ export default defineComponent({
      */
     function shownRate(rate: TripView['rate']): string {
       if (!rate) return ''
-      // On the side the field asks by (MOL-81). Turned over, six digits are an artefact of the
-      // turning — «89,525515» for a typed «89,53» — so it shows the two the options above print.
-      const reading = readingOf(rate)
+      // On the side the field asks by (MOL-81), not the rate's own. Turned over, six digits are an
+      // artefact of the turning — «89,525515» for a typed «89,53» — so it shows two.
+      const side = per.value ?? rate.base
       const decimal = (
-        reading.per === rate.base
+        side === rate.base
           ? decimalFromRate(rate.scaled)
-          : decimalFromScaled(divideRounded(reading.scaled, 10_000n), 2)
+          : decimalFromScaled(divideRounded(100n * RATE_SCALE, rate.scaled), 2)
       )
         .replace(/0+$/, '')
         .replace(/\.$/, '')
@@ -153,7 +161,8 @@ export default defineComponent({
      * base — so a server that predates the field is sent what it always understood (MOL-81).
      */
     function manualBody(rate: string): RateChoiceBody {
-      const snapshot = props.trip.rate
+      // The snapshot is the jumped rate: the server turns the number to its side.
+      const snapshot = jump.value?.jumped
       return snapshot && per.value && per.value !== snapshot.base
         ? { choice: 'manual', rate, per: per.value }
         : { choice: 'manual', rate }

@@ -497,8 +497,22 @@ describe('formatRate', () => {
     expect(formatRateBeside(of('84.28', 'USD', 'RUB'), of('86.02', 'USD', 'RUB'))).toBe(
       formatRate(of('84.28', 'USD', 'RUB')),
     )
-    // Другая пара или курс обмена сам меньше единицы — печатается как любой курс.
-    expect(formatRateBeside(bank, of('1.005025', 'USD', 'EUR'))).toBe(formatRate(bank))
+    // Другая пара — как любой курс.
+    expect(formatRateBeside(bank, of('386', 'USD', 'AMD'))).toBe(formatRate(bank))
+  })
+
+  it('formatRateBeside: прыжок запятой через единицу — стороной прежнего курса (Т-9)', () => {
+    // Пара владельца: прежний 4,30 ֏/₽, прыгнувший 0,43 — оба «֏/₽», прыжок виден.
+    const previous = of('4.30')
+    expect(formatRateBeside(of('0.43'), previous).replaceAll('\u00a0', ' ')).toBe('0,43 ֏/₽')
+    expect(formatRateBeside(previous, previous)).toBe(formatRate(previous))
+    // ₽ → $: прежний 0,011143 читается «₽ за $», прыгнувший 1,114 — той же стороной, под единицей.
+    const dollar = of('0.011143', 'RUB', 'USD')
+    expect(formatRateBeside(of('1.114', 'RUB', 'USD'), dollar).replaceAll('\u00a0', ' ')).toBe(
+      '0,897666 ₽/$',
+    )
+    // Перевёрнутый не меньше единицы — два знака, одно округление, как у formatRate.
+    expect(formatRateBeside(dollar, dollar)).toBe(formatRate(dollar))
   })
 
   it('readingOf: сторона, которой читают, из шести знаков самого курса', () => {

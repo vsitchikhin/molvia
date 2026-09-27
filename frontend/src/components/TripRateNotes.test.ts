@@ -271,6 +271,129 @@ describe('TripRateNotes', () => {
       })
     })
 
+    // Прыжок — это запятая не там, и он легко перешагивает единицу (ревью Т-9, адв. А′).
+    describe('прыжок через единицу', () => {
+      interface Jump {
+        quote: 'AMD' | 'USD'
+        jumped: string
+        previous: string
+        manual?: string
+        choice?: 'jumped' | 'previous' | 'manual'
+      }
+      const at = (quote: Jump['quote'], value: string, source = 'official') => ({
+        ...rate(value, source),
+        quote,
+      })
+      function jumpedTrip(jump: Jump): TripView {
+        const current =
+          jump.choice === 'manual' && jump.manual
+            ? at(jump.quote, jump.manual, 'personal')
+            : jump.choice === 'previous'
+              ? at(jump.quote, jump.previous)
+              : at(jump.quote, jump.jumped)
+        return tripViewCodec.parse({
+          id: TRIP,
+          startedAt: '2026-01-16T08:00:00.000Z',
+          finishedAt: null,
+          rateProvider: 'cba',
+          rateStale: false,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
+          expenses: [],
+          total: [],
+          converted: null,
+          currency: jump.quote,
+          rate: current,
+          rateJump: {
+            jumped: at(jump.quote, jump.jumped),
+            previous: at(jump.quote, jump.previous),
+            manual: jump.manual ? at(jump.quote, jump.manual, 'personal') : null,
+            choice: jump.choice ?? null,
+          },
+        })
+      }
+      async function open(jump: Jump) {
+        setActivePinia(createPinia())
+        const router = createRouter({ history: createMemoryHistory(), routes })
+        await router.push('/')
+        const view = mount(TripRateNotes, {
+          props: { trip: jumpedTrip(jump) },
+          global: { plugins: [router, createAppI18n('ru')] },
+          attachTo: document.body,
+        })
+        mounted.push(view)
+        const note = view.text().replaceAll('\u00a0', ' ')
+        await button(view, ru.trip.rate.choose).trigger('click')
+        await flushPromises()
+        clock += 1000
+        const sheet = document.body.querySelector('dialog[open]')
+        if (!sheet) throw new Error('шторка не открылась')
+        const values = [...sheet.querySelectorAll('.value')].map((node) =>
+          node.textContent.replaceAll('\u00a0', ' ').trim(),
+        )
+        return { sheet, note, values }
+      }
+      async function type(sheet: Element, typed: string) {
+        inside(sheet, ru.trip.rate.mine).click()
+        await flushPromises()
+        const field = sheet.querySelector('input')
+        if (!field) throw new Error('нет поля')
+        field.value = typed
+        field.dispatchEvent(new Event('input'))
+        await flushPromises()
+        inside(sheet, ru.trip.rate.save).click()
+        await flushPromises()
+      }
+
+      it('пара владельца, 4,30 → 0,43: всё «֏/₽», поле «1 ₽ =», «4,30» уходит без валюты', async () => {
+        chooseTripRate.mockResolvedValue(
+          jumpedTrip({ quote: 'AMD', jumped: '0.43', previous: '4.30' }),
+        )
+        const { sheet, note, values } = await open({
+          quote: 'AMD',
+          jumped: '0.43',
+          previous: '4.30',
+        })
+        expect(note).toContain('0,43 ֏/₽ вместо 4,30 ֏/₽')
+        expect(values.slice(0, 2)).toEqual(['0,43 ֏/₽', '4,30 ֏/₽'])
+        await type(sheet, '4,30')
+        expect(sheet.querySelector('label')?.textContent).toContain('1 ₽ =')
+        expect(chooseTripRate).toHaveBeenCalledWith(TRIP, { choice: 'manual', rate: '4.30' })
+      })
+
+      it('₽ → $, 0,011143 → 1,114: всё «₽/$», поле «1 $ =», число уходит с валютой', async () => {
+        chooseTripRate.mockResolvedValue(
+          jumpedTrip({ quote: 'USD', jumped: '1.114', previous: '0.011143' }),
+        )
+        const { sheet, values } = await open({
+          quote: 'USD',
+          jumped: '1.114',
+          previous: '0.011143',
+        })
+        expect(values.slice(0, 2)).toEqual(['0,897666 ₽/$', '89,74 ₽/$'])
+        await type(sheet, '89,50')
+        expect(sheet.querySelector('label')?.textContent).toContain('1 $ =')
+        expect(chooseTripRate).toHaveBeenCalledWith(TRIP, {
+          choice: 'manual',
+          rate: '89.50',
+          per: 'USD',
+        })
+      })
+
+      it('свой курс, выбранный раньше, при «По новому» стоит в поле стороной шторки', async () => {
+        const { sheet } = await open({
+          quote: 'USD',
+          jumped: '1.114',
+          previous: '0.011143',
+          manual: '0.01117',
+          choice: 'jumped',
+        })
+        inside(sheet, ru.trip.rate.mine).click()
+        await flushPromises()
+        expect(sheet.querySelector('label')?.textContent).toContain('1 $ =')
+        expect(sheet.querySelector('input')?.value).toBe('89,53')
+      })
+    })
+
     it('must not fire: у пары владельца поле «1 ₽ =» и число уходит без валюты', async () => {
       chooseTripRate.mockResolvedValue(
         trip({ jump: { previous: null, choice: 'manual', manual: '4.81' } }),

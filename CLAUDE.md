@@ -1249,9 +1249,15 @@ database access. In a product about data integrity, two write paths will silentl
   `rate.base` until the app takes the new version (MOL-46), naming a turned price by the wrong
   currency for that while. **The bank's rate on an exchange's card is printed on the side of the
   exchange's own** (`formatRateBeside`, adversarial Г): near parity the two fall on either side of
-  one, and each on its own side read «1,01 $/€» over «1,01 €/$». **The own rate typed after a jump
-  is asked on the side the options are printed by** — «1 $ =» — and the body names the currency
-  (`per`); the server turns it to the snapshot's side, rounded once (adversarial А).
+  one, and each on its own side read «1,01 $/€» over «1,01 €/$». **The sheet of a jump has one side
+  for everything in it** — the side of the rate before the jump, or of the jumped when there is none
+  (review Т-9): the options, the line «… вместо …» and the field «1 $ =» alike, and the body names
+  the currency of the field (`per`); the server turns the number to the snapshot's side, rounded
+  once (adversarial А). Taken from the rate the trip counted by, the field asked on the side of the
+  jumped rate after a jump of the comma across one — 4,30 ֏/₽ to 0,43 — and the owner's «4,30» went
+  in as drams per rouble. **The price, named** (adversarial А″): the own rate is kept on the
+  snapshot's side at six digits, so for a pair far under one — drams into dollars — «386,44» typed
+  comes back «386,40».
 
 ## Data rules
 
