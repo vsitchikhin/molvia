@@ -82,8 +82,10 @@ const NARROWER: readonly (readonly [readonly string[], readonly string[]])[] = [
   [['памперсы', 'памперс', 'памперсов'], ['подгузники']],
   // Brands the owner's own log names a kind by (MOL-112, owner's decision В-6). The brand's own
   // item keeps its place above the kind when it is spelled as the word is typed — both are found
-  // at no cost, and the similarity ranks before the length of the name; spelled otherwise
-  // («Doshirak», «Pringles») it stands under the kind until it is taken once. «шоколадная», not «паста»: the paste of
+  // at no cost, and the search puts what the typed word found before what a synonym found;
+  // spelled otherwise («Doshirak», «Pringles») it is an edit or two away and stands under the kind
+  // until it is taken once. A brand leads to the word of the kind, and among the kinds the shortest
+  // goes first: «дошик» is «Лапша» by the kilo before the instant noodles. «шоколадная», not «паста»: the paste of
   // «Паста зубная» and «Паста томатная» is a kind too. «читос» has no word of its own to lead to —
   // «кукурузные» is the corn flakes as much as the sticks — and is left to the person's own word.
   [['фанта', 'фанты', 'фанту'], ['лимонад']],
