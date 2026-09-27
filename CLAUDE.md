@@ -670,7 +670,7 @@ device, private always. The rate is what the two amounts say and is not stored b
   into the drams, an exchange back into the currency of conversion leaves the wallet where it was,
   and dollars getting dearer later do not re-price drams already bought. The owner's own journal
   is why this is 0.1: two thirds of their drams came through dollars, and the pair alone did not
-  see them. The screen lists the price of every currency a chain went through («$: 89,04 ₽/$») so
+  see them. The screen lists the price of every currency a chain went through («89,04 ₽/$») so
   the drams' rate can be checked by eye. Stored per currency, never per account: a dollar on a card
   and one in a pocket cost the same (MOL-43 decides accounts, not costs).
 - **Money of no known cost is valued at the official rate of the exchange's day, and says so**
@@ -1243,6 +1243,15 @@ database access. In a product about data integrity, two write paths will silentl
   where the exchange said 89,04 — so a figure with an exact source (an exchange's amounts, the
   wallet's chain, the cache's rates against the dram) comes from the server already on its side,
   and only a trip's snapshot, which a trip converts by as it is, is turned over from its six digits.
+  **The prices, named** (adversarial Б, Д): a pair kept under one — roubles into dollars — prints a
+  trip's rate from its six digits and the wallet it was taken from exactly, so «Обмен денег» may say
+  86,02 ₽/$ where the trip says 86,01; and a page on the old code reads the prices of a chain by
+  `rate.base` until the app takes the new version (MOL-46), naming a turned price by the wrong
+  currency for that while. **The bank's rate on an exchange's card is printed on the side of the
+  exchange's own** (`formatRateBeside`, adversarial Г): near parity the two fall on either side of
+  one, and each on its own side read «1,01 $/€» over «1,01 €/$». **The own rate typed after a jump
+  is asked on the side the options are printed by** — «1 $ =» — and the body names the currency
+  (`per`); the server turns it to the snapshot's side, rounded once (adversarial А).
 
 ## Data rules
 
