@@ -120,6 +120,8 @@ describe('словарь: повторяющиеся тексты', () => {
         'exchange.offline.title',
         'income.offline.title',
         'settings.offline.title',
+        'spending.categories.offline.title',
+        'spending.offline.title',
       ],
       // Один глагол, два предмета: поход и вход на устройстве. Предмет называет контекст —
       // шторка похода и строка устройства (MOL-57).
@@ -133,7 +135,7 @@ describe('словарь: повторяющиеся тексты', () => {
       // Цена Р-2 у двух экранов одной денежной модели: доходы пишутся, правятся, удаляются и
       // возвращаются по правилам обменов (MOL-66, Р-2), и слова о тех же действиях — те же.
       'исправлен {date}': ['exchange.amended', 'income.amended'],
-      Вернуть: ['exchange.restore', 'income.restore'],
+      Вернуть: ['exchange.restore', 'income.restore', 'spending.restore'],
       'Сервер не ответил как надо. Попробуйте ещё раз': [
         'exchange.load_error.body',
         'income.load_error.body',
@@ -143,6 +145,14 @@ describe('словарь: повторяющиеся тексты', () => {
       'Прежние версии': ['exchange.sheet.history', 'income.sheet.history'],
       'Сохранить правку': ['exchange.sheet.save_amend', 'income.sheet.save_amend'],
       'Сейчас записано: {details}': ['exchange.sheet.current', 'income.sheet.current'],
+      // «Деньги» (MOL-82): одно действие над отказом очереди — как у покупки похода; экран и
+      // строка, которая к нему ведёт; кнопка «Трата» и заголовок её шторки; «Прочее» и «Сумма» —
+      // одни слова у дохода и у траты.
+      Убрать: ['spending.categories.remove', 'spending.sheet.dismiss', 'trip.rejected.drop'],
+      Категории: ['spending.categories.title', 'spending.categories_link'],
+      Трата: ['spending.add', 'spending.sheet.title_edit'],
+      Прочее: ['income.source.other', 'spending.category.other'],
+      Сумма: ['income.sheet.amount', 'spending.sheet.amount'],
       // Название экрана и пункт страницы приватности о том же (MOL-58, MOL-66).
       Доходы: ['income.title', 'privacy.stored.incomes.term'],
     })
@@ -166,6 +176,8 @@ describe('словарь: повторяющиеся тексты', () => {
         'income.offline.title',
         'item.offline.title',
         'settings.offline.title',
+        'spending.categories.offline.title',
+        'spending.offline.title',
       ],
       'The server did not answer': ['advice.error.title', 'item.error.title', 'trip.error.title'],
       // Английский не различает отмену диалога и отмену ввода; русский различает.
@@ -181,6 +193,10 @@ describe('словарь: повторяющиеся тексты', () => {
       'Earlier versions': ['exchange.sheet.history', 'income.sheet.history'],
       'Save the amendment': ['exchange.sheet.save_amend', 'income.sheet.save_amend'],
       'Now recorded: {details}': ['exchange.sheet.current', 'income.sheet.current'],
+      Categories: ['spending.categories.title', 'spending.categories_link'],
+      Spending: ['spending.add', 'spending.sheet.title_edit'],
+      Other: ['income.source.other', 'spending.category.other'],
+      Amount: ['income.sheet.amount', 'spending.sheet.amount'],
       // English has one word where Russian says «было до обмена» and «было до поступления».
       'held before {amount}': ['exchange.sheet.current_held', 'income.sheet.current_held'],
       // One English word for the screen, its sheet and the privacy entry; Russian has «Доход».
@@ -229,6 +245,10 @@ describe('словарь: плюральные формы', () => {
       'item.far_announced',
       'advice.ratings_count',
       'verdict.pending_count',
+      'spending.unsent',
+      'spending.trip_row_meta',
+      'spending.more',
+      'spending.sheet.trip_meta',
       'sign_out.unsent',
     ])
   })
