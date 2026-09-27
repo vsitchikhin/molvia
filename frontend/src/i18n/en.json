@@ -628,7 +628,11 @@
     "income_in_future": "An income cannot be dated in the future",
     "spending_in_future": "A spending cannot be dated in the future",
     "spending_category_unknown": "There is no such category — choose another",
-    "spending_category_taken": "A category with this name already exists"
+    "spending_category_taken": "A category with this name already exists",
+    "money_account_in_future": "An account cannot start in the future",
+    "money_account_taken": "An account with this name already exists — choose another name",
+    "money_account_currency": "This account is in another currency",
+    "money_account_currency_locked": "This account already has operations, so its currency cannot change. Add a new account for another currency"
   },
   "settings": {
     "title": "Settings",
@@ -722,6 +726,10 @@
       "spendings": {
         "term": "Spending outside trips",
         "text": "How much, in what, when, in which category, and «what» and «where» if you write them — and your own categories. Spending in another currency keeps the rate of its day, and a past month the rate of its last day, worked out from your exchanges. Only you see it."
+      },
+      "accounts": {
+        "term": "Accounts",
+        "text": "An account's name, its currency, the «savings» mark, the balance on its start day and your checks against the fact — what you counted and what the app counted; for spending, income, exchanges and trips — which account and how much was charged. The balance is not stored but worked out. Only you see it."
       },
       "places": {
         "term": "Shops",

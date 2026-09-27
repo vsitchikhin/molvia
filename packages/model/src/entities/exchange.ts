@@ -51,6 +51,9 @@ export const exchangeSchema = z
     exchangedOn: exchangeDaySchema,
     heldBefore: priceSchema.nullable(),
     note: exchangeNoteSchema.nullable(),
+    /** The accounts each side left and landed on, each in its side's currency, or null (MOL-115). */
+    givenAccountId: z.uuid().nullable(),
+    receivedAccountId: z.uuid().nullable(),
     revision: z.int().min(1),
     createdAt: z.date(),
     amendedAt: z.date().nullable(),

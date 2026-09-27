@@ -17,11 +17,14 @@ import {
   incomes,
   items,
   loginRequests,
+  moneyAccountChecks,
+  moneyAccounts,
   moneyMonthRates,
   places,
   searchPicks,
   spendingCategories,
   spendings,
+  trips,
   verdicts,
 } from '@/db/schema'
 import { connect, connectDrizzle } from './db'
@@ -139,10 +142,34 @@ async function aLife(
     source: 'personal',
     asOf: new Date('2026-08-30T20:00:00Z'),
   })
+  // Where the money lay (MOL-115): an account, a check of it, and operations of every kind on it.
+  const accountId = randomUUID()
+  await db.insert(moneyAccounts).values({
+    id: accountId,
+    actorId,
+    name: 'Наличные ֏',
+    currency: 'AMD',
+    startMinor: 24_153_000n,
+    startOn: '2026-09-16',
+  })
+  await db.insert(moneyAccountChecks).values({
+    id: randomUUID(),
+    actorId,
+    accountId,
+    checkedOn: '2026-09-26',
+    factMinor: 18_500_000n,
+    countedMinor: 19_013_200n,
+  })
+  await db.update(spendings).set({ accountId }).where(eq(spendings.actorId, actorId))
+  await db
+    .update(exchanges)
+    .set({ receivedAccountId: accountId })
+    .where(eq(exchanges.actorId, actorId))
+  await db.update(trips).set({ accountId }).where(eq(trips.actorId, actorId))
   await insertSession(db, { actorId })
   await insertLoginRequest(db, { telegramUserId }) // confirmed, not yet collected
   await insertLoginRequest(db, { telegramUserId, consumedAt: new Date() })
-  return { ownItem, exchangeId, incomeId, spendingId }
+  return { ownItem, exchangeId, incomeId, spendingId, accountId }
 }
 
 /** Every row of every table, as text — a new table cannot hide from this. */
@@ -179,6 +206,11 @@ async function snapshot(actorId: string) {
       .from(spendingCategories)
       .where(eq(spendingCategories.actorId, actorId)),
     monthRates: await db.select().from(moneyMonthRates).where(eq(moneyMonthRates.actorId, actorId)),
+    accounts: await db.select().from(moneyAccounts).where(eq(moneyAccounts.actorId, actorId)),
+    checks: await db
+      .select()
+      .from(moneyAccountChecks)
+      .where(eq(moneyAccountChecks.actorId, actorId)),
   }
 }
 
@@ -199,7 +231,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
     const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
-    const { exchangeId, incomeId, spendingId } = await aLife(anna, tg, shared)
+    const { exchangeId, incomeId, spendingId, accountId } = await aLife(anna, tg, shared)
 
     const report = await erasure.erase(tg, { dryRun: false })
 
@@ -217,12 +249,15 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
         spendings: 2,
         spending_categories: 1,
         money_month_rates: 1,
+        money_account_checks: 1,
+        money_accounts: 1,
         login_requests: 2,
         actors: 1,
       },
       itemsReleased: 1,
     })
     expect(await rowsMentioning(anna)).toEqual([])
+    expect(await rowsMentioning(accountId)).toEqual([])
     expect(await rowsMentioning(spendingId)).toEqual([])
     expect(await rowsMentioning(String(tg), true)).toEqual([])
     expect(await rowsMentioning(exchangeId)).toEqual([])

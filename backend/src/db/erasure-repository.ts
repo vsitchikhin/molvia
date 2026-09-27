@@ -14,6 +14,8 @@ export const ACTOR_REFERENCES = [
   'exchanges.actor_id',
   'incomes.actor_id',
   'items.created_by',
+  'money_account_checks.actor_id',
+  'money_accounts.actor_id',
   'money_month_rates.actor_id',
   'search_picks.actor_id',
   'sessions.actor_id',
@@ -36,6 +38,8 @@ export const ERASED_TABLES = [
   'spendings',
   'spending_categories',
   'money_month_rates',
+  'money_account_checks',
+  'money_accounts',
   'login_requests',
   'actors',
 ] as const
@@ -119,6 +123,8 @@ export function createErasureRepository(db: Db): ErasureRepository {
             spendings: 0,
             spending_categories: 0,
             money_month_rates: 0,
+            money_account_checks: 0,
+            money_accounts: 0,
             login_requests: 0,
             actors: 0,
           }
@@ -173,6 +179,14 @@ export function createErasureRepository(db: Db): ErasureRepository {
             )
             erased.money_month_rates = await count(
               sql`delete from money_month_rates where actor_id = ${actorId} returning 1`,
+            )
+            // Where the money lay (MOL-115): the checks, then the accounts — after every operation
+            // that named one, so no key still points at them.
+            erased.money_account_checks = await count(
+              sql`delete from money_account_checks where actor_id = ${actorId} returning 1`,
+            )
+            erased.money_accounts = await count(
+              sql`delete from money_accounts where actor_id = ${actorId} returning 1`,
             )
           }
           // No foreign key reaches these — on a first login the owner does not exist yet — so

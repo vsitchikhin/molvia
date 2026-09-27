@@ -385,6 +385,8 @@ describe('/delete — человек удаляет себя сам (MOL-58)', (
       expect(prompt).toMatch(
         language === 'ru' ? /траты и их категории/ : /spending and its categories/,
       )
+      // MOL-115: the accounts and the checks against the fact go with the money.
+      expect(prompt).toMatch(language === 'ru' ? /счета и сверки/ : /accounts and checks/)
     }
   })
 

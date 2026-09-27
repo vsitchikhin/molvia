@@ -38,6 +38,7 @@ function row(patch: Partial<Row> = {}): Row {
     heldBefore: null,
     source: 'salary',
     note: null,
+    accountId: null,
     revision: 1,
     amendedAt: null,
     history: [],

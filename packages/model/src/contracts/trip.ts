@@ -151,6 +151,9 @@ export const tripViewCodec = z.strictObject({
    * for display, never a fact — null without a rate: an empty cache, or one currency (MOL-39).
    */
   converted: moneyCodec.nullable(),
+  /** The account it was paid from and «списано» (MOL-115, Р-18); defaults read an older server. */
+  accountId: z.uuid().nullable().default(null),
+  debited: moneyCodec.nullable().default(null),
 })
 export type TripView = z.output<typeof tripViewCodec>
 
@@ -238,6 +241,8 @@ export function tripViewOf(
     expenses: rows,
     total: [...total],
     converted: rate && inTripCurrency ? estimate(inTripCurrency, rate) : null,
+    accountId: trip.accountId,
+    debited: trip.debited,
   }
 }
 

@@ -45,6 +45,8 @@ function exchange(
     exchangedOn,
     heldBefore: heldBefore === null ? null : toMoney(heldBefore),
     note: null,
+    givenAccountId: null,
+    receivedAccountId: null,
     revision: 1,
     createdAt: new Date(`${exchangedOn}T12:00:00Z`),
     amendedAt: null,

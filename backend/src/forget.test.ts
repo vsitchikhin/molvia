@@ -16,6 +16,8 @@ const REPORT: ErasureReport = {
     spendings: 7,
     spending_categories: 13,
     money_month_rates: 1,
+    money_account_checks: 1,
+    money_accounts: 1,
     login_requests: 1,
     actors: 1,
   },

@@ -119,6 +119,32 @@ describe('whether the server has answered an empty history (MOL-77)', () => {
     expect(Object.keys(cached).sort()).toEqual(['local', 'page', 'selected'])
   })
 
+  it('keeps no field of a trip the previous build cannot read, and reads one it does not know (MOL-115, Р-1)', () => {
+    const store = useTripHistoryStore()
+    store.capture(
+      A,
+      'Рынок',
+      new Date('2026-09-01T10:00:00Z'),
+      new Date('2026-09-01T10:30:00Z'),
+      'AMD',
+      view(A),
+    )
+    const cached = JSON.parse(localStorage.getItem(`molvia.trip-history.${OWNER}`) ?? '{}') as {
+      local: { view: Record<string, unknown> }[]
+    }
+    const kept = Object.keys(cached.local[0]?.view ?? {})
+    expect(kept).not.toContain('accountId')
+    expect(kept).not.toContain('debited')
+    // Read back, the fields are what their absence means.
+    expect(restart().local[0]?.view).toMatchObject({ accountId: null, debited: null })
+
+    // A later build's field is dropped, not the whole cache.
+    const [row] = cached.local
+    if (row) row.view.fromLaterBuild = true
+    localStorage.setItem(`molvia.trip-history.${OWNER}`, JSON.stringify(cached))
+    expect(restart().local.map(({ id }) => id)).toEqual([A])
+  })
+
   it('another owner’s answer is not this owner’s', async () => {
     const store = useTripHistoryStore()
     tripHistory.mockResolvedValue({ trips: [], nextCursor: null })

@@ -14,6 +14,12 @@ const incomeFields = {
   heldBefore: moneyCodec.optional(),
   source: incomeSourceSchema,
   note: exchangeNoteSchema.optional(),
+  /** The account it came onto, in its currency (MOL-115); left out of an amendment, kept (Р-26). */
+  accountId: z
+    .uuid()
+    .overwrite((id) => id.toLowerCase())
+    .nullable()
+    .optional(),
 }
 
 interface IncomeFields {
@@ -55,6 +61,7 @@ export const incomeViewCodec = z.strictObject({
   heldBefore: moneyCodec.nullable(),
   source: incomeSourceSchema,
   note: z.string().nullable(),
+  accountId: z.uuid().nullable().default(null),
   revision: z.int().min(1),
   amendedAt: isoDate.nullable(),
   history: z.array(

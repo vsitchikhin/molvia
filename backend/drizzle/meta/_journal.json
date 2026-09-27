@@ -169,6 +169,13 @@
       "when": 1790440969570,
       "tag": "0023_spendings",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790501439833,
+      "tag": "0024_money_accounts",
+      "breakpoints": true
     }
   ]
 }

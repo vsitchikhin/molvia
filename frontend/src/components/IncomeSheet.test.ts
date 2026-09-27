@@ -38,6 +38,7 @@ const amended: IncomeView = {
   heldBefore: null,
   source: 'salary',
   note: 'Vikasa',
+  accountId: null,
   revision: 2,
   amendedAt: new Date('2026-09-25T09:00:00.000Z'),
   history: [

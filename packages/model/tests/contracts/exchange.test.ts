@@ -146,6 +146,8 @@ describe('exchangesResponseCodec', () => {
         received: money(9_500_000n, 'AMD'),
         heldBefore: money(2_000_000n, 'AMD'),
         note: 'ВТБ банкомат',
+        givenAccountId: null,
+        receivedAccountId: null,
         revision: 2,
         amendedAt: new Date('2026-09-25T10:00:00.000Z'),
         history: [
