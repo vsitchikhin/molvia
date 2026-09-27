@@ -479,8 +479,17 @@ describe('formatRate', () => {
     expect(formatRate(of('363.44', 'USD')).replaceAll('\u00a0', ' ')).toBe('363,44 ֏/$')
   })
 
-  it('мелкий курс не округляется в ноль', () => {
-    expect(formatRate(of('0.0001')).replaceAll('\u00a0', ' ')).toBe('0,0001 ֏/₽')
+  it('курс меньше единицы печатается другой стороной — «большее за меньшее» (MOL-81)', () => {
+    expect(formatRate(of('0.011232', 'RUB', 'USD')).replaceAll('\u00a0', ' ')).toBe('89,03 ₽/$')
+    expect(formatRate(of('0.002590', 'AMD', 'USD')).replaceAll('\u00a0', ' ')).toBe('386,10 ֏/$')
+    // The band's lower edge turned over, not rounded to zero.
+    expect(formatRate(of('0.0001')).replaceAll('\u00a0', ' ')).toBe('10 000,00 ₽/֏')
+  })
+
+  it('ровно единица и край полосы — своей стороной', () => {
+    expect(formatRate(of('1', 'USD', 'EUR')).replaceAll('\u00a0', ' ')).toBe('1,00 €/$')
+    expect(formatRate(of('0.999999', 'USD', 'EUR')).replaceAll('\u00a0', ' ')).toBe('1,00 $/€')
+    expect(formatRate(of('1000000')).replaceAll('\u00a0', ' ')).toBe('1 000 000,00 ֏/₽')
   })
 
   it('лишние знаки снимка на экран не выносит', () => {

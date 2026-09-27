@@ -725,6 +725,30 @@ describe('стоимость валют (MOL-42)', () => {
     expect(trip.rate).toMatchObject({ source: 'personal', scaled: 4_060_187n })
   })
 
+  it('₽ → $: курс обмена, цена доллара и курс ЦБ — стороной «больше единицы», одно число (MOL-81)', async () => {
+    await rates.upsert([rub('4.30', daysAgo(3)), usd('362.68', daysAgo(3))])
+    const me = await owner()
+    const overview = await record(me, {
+      given: { amount: '9000', currency: 'RUB' },
+      received: { amount: '104.63', currency: 'USD' },
+      exchangedOn: daysAgo(3),
+    })
+
+    const [row] = overview.exchanges
+    // 9 000 / 104,63 = 86,017395 ₽ per dollar — made from the amounts, never 1 / 0,011626.
+    expect(row?.rate).toMatchObject({ base: 'USD', quote: 'RUB', scaled: 86_017_395n })
+    expect(overview.costs.map(({ rate }) => [rate.base, rate.quote, rate.scaled])).toEqual([
+      ['USD', 'RUB', 86_017_395n],
+    ])
+    // 362,68 / 4,30 built from the cache as it stands, and the difference measured by it: 9 000 at
+    // 84,344186 is 106,71 $ — at the six digits of 0,011856 it would have been 106,70.
+    expect(row?.official).toMatchObject({
+      provider: 'cba',
+      rate: { base: 'USD', quote: 'RUB', scaled: 84_344_186n },
+      difference: { minor: -208n, currency: 'USD' },
+    })
+  })
+
   it('привезённые доллары — по ЦБ РА на день обмена, с пометкой; поход берёт то же число', async () => {
     await rates.upsert([rub('4.3123', daysAgo(6)), usd('363.44', daysAgo(6))])
     const me = await owner()

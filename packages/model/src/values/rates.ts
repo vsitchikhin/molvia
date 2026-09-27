@@ -87,22 +87,29 @@ export const rateCodec = z.codec(exchangeRateWireSchema, exchangeRateSchema, {
 })
 
 /**
- * The rate as the screen prints it: «4,82 ֏/₽» — how much of the quote currency one unit of the
- * base buys, with both signs, because a bare number says nothing about which way it goes.
+ * The rate as the screen prints it: «4,82 ֏/₽» — how much of one currency a unit of the other
+ * buys, with both signs, because a bare number says nothing about which way it goes.
  *
- * Two digits, and up to the snapshot's six when the rate is under one — trailing zeros go, so 0,5
- * prints «0,50». Printed to two digits a rate of 0,0001 is «0,00», a zero rate on screen (MOL-22).
+ * On the side whose number is at least one, whichever way the rate is kept (MOL-81): «89,04 ₽/$»,
+ * never «0,011232 $/₽» — a person names a rate so. Two digits always. A rate kept under one is
+ * turned over here, from its six digits: that is honest for a snapshot, which a trip converts by
+ * as it is, and a figure with an exact source — an exchange, the wallet — comes from the server
+ * already on its side (`exchangeRateOf`, `ownRates`), since six digits of a small number are too
+ * few to turn over (89,03 against 89,04).
  */
 export function formatRate(rate: ExchangeRate, locale = 'ru-RU'): string {
   // The decimal itself, as every other formatter of the domain does it: a rate is six digits, and
   // a float on the way to the screen is a float in the one value that multiplies every amount.
-  const decimal = decimalFromRate(rate.scaled)
-  const small = rate.scaled < RATE_SCALE
+  const upright = rate.scaled >= RATE_SCALE
+  const decimal = upright
+    ? decimalFromRate(rate.scaled)
+    : decimalFromScaled(divideRounded(100n * RATE_SCALE, rate.scaled), 2)
   const number = new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
-    maximumFractionDigits: small ? RATE_DIGITS : 2,
+    maximumFractionDigits: 2,
   }).format(decimal)
-  return `${number} ${currencySign(rate.quote, locale)}/${currencySign(rate.base, locale)}`
+  const [of, per] = upright ? [rate.quote, rate.base] : [rate.base, rate.quote]
+  return `${number} ${currencySign(of, locale)}/${currencySign(per, locale)}`
 }
 
 /**

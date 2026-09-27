@@ -1,6 +1,7 @@
 import {
   DomainError,
   ERROR,
+  RATE_SCALE,
   currencySchema,
   exchangeRateOf,
   heldEstimate,
@@ -104,6 +105,19 @@ export function sinceDay(since: Date | null): string | null {
 }
 
 /**
+ * Of a rate and the same rate built the other way round from the same rows, the one whose number
+ * is at least one (MOL-81): «84,28 ₽/$» is what the screen prints, and its difference is counted
+ * by it — six digits of 0,011865 are five significant ones, of 84,28 eight.
+ */
+function uprightOf(
+  forward: ExchangeRate | null,
+  backward: ExchangeRate | null,
+): ExchangeRate | null {
+  if (!forward || forward.scaled >= RATE_SCALE) return forward
+  return backward ?? forward
+}
+
+/**
  * One exchange as the list shows it, compared with the official rate of its own day — the rate a
  * trip started that day would have taken, by the same rule (`pickOfficialRate`). A jumped rate is
  * measured by the one before it, and without one the comparison is withheld and the row says why.
@@ -115,13 +129,12 @@ function viewsOf(
 ): ExchangeView[] {
   return [...exchanges].reverse().map((exchange): ExchangeView => {
     const { given, received, exchangedOn } = exchange
-    const official = pickOfficialRate(
-      given.currency,
-      received.currency,
-      cached.get(exchangedOn) ?? [],
-      exchangedOn,
+    const rows = cached.get(exchangedOn) ?? []
+    const official = pickOfficialRate(given.currency, received.currency, rows, exchangedOn)
+    const measure = uprightOf(
+      steadyOf(official),
+      steadyOf(pickOfficialRate(received.currency, given.currency, rows, exchangedOn)),
     )
-    const measure = steadyOf(official)
     const difference = measure ? officialDifference(exchange, measure) : null
     return {
       id: exchange.id,

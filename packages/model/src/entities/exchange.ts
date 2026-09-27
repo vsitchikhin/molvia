@@ -5,6 +5,7 @@ import { visibleLine } from '#model/support/text'
 import { minorPerMajor, priceSchema } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
 import type { Income } from '#model/entities/income'
+import { convertAcross } from '#model/entities/trip'
 import {
   RATE_MAX,
   RATE_MIN,
@@ -220,6 +221,23 @@ function rateOf(ratio: Ratio, base: Currency, quote: Currency, day: string): Exc
   return exchangeRateSchema.safeParse(rate).success ? rate : null
 }
 
+/**
+ * The rate between two currencies on the side whose number is at least one — «89,04 ₽/$», never
+ * «0,011232 $/₽» — made from the exact ratio (MOL-81). Turned over after rounding, six digits of a
+ * small number are five significant ones, and an exchange and the price of its currency printed
+ * 89,03 and 89,04 on one screen. For the screen only: a trip converts by the rate as it is.
+ */
+function uprightRateOf(
+  ratio: Ratio,
+  one: Currency,
+  other: Currency,
+  day: string,
+): ExchangeRate | null {
+  const forward = rateOf(ratio, one, other, day)
+  if (forward && forward.scaled >= RATE_SCALE) return forward
+  return rateOf({ quote: ratio.base, base: ratio.quote }, other, one, day) ?? forward
+}
+
 /** The order the wallet walks money in: by day, then as written — exchanges and incomes alike. */
 function chronological(a: Link, b: Link): number {
   if (a.day !== b.day) return a.day < b.day ? -1 : 1
@@ -242,9 +260,12 @@ export function isPlausibleExchange(given: Money, received: Money): boolean {
   return scaled >= RATE_MIN && scaled <= RATE_MAX
 }
 
-/** The rate a single exchange was made at: what was received per one of what was given. */
+/**
+ * The rate a single exchange was made at, from its two amounts, on the side whose number is at
+ * least one: 20 000 ₽ → 224,63 $ is 89,04 ₽ per dollar (MOL-81).
+ */
 export function exchangeRateOf(exchange: Exchange): ExchangeRate | null {
-  return rateOf(
+  return uprightRateOf(
     reduced(exchange.received.minor, exchange.given.minor),
     exchange.given.currency,
     exchange.received.currency,
@@ -417,7 +438,8 @@ function pricesOf(costs: ReadonlyMap<Currency, Cost | null>, base: Currency): Cu
   return [...costs].flatMap(([currency, cost]) => {
     if (!cost) return []
     const price = { quote: cost.ratio.base, base: cost.ratio.quote }
-    const rate = rateOf(price, currency, base, cost.day)
+    // A price is read on the side whose number is at least one, as any rate on screen (MOL-81).
+    const rate = uprightRateOf(price, currency, base, cost.day)
     return rate ? [{ rate, basis: cost.basis, estimated: cost.estimated }] : []
   })
 }
@@ -472,9 +494,7 @@ export function walletCross(
     ofOther.ratio.quote * ofOne.ratio.base,
     ofOther.ratio.base * ofOne.ratio.quote,
   )
-  const forward = rateOf(ratio, one, other, asOf)
-  if (forward && forward.scaled >= RATE_SCALE) return forward
-  return rateOf({ quote: ratio.base, base: ratio.quote }, other, one, asOf) ?? forward
+  return uprightRateOf(ratio, one, other, asOf)
 }
 
 /**
@@ -521,10 +541,15 @@ export function ownRates(
 ): OwnRates {
   const { costs, lost, priced } = costsOf(receipts, base, day, officialOf, since)
   const cost = base === quote ? null : costs.get(quote)
+  // The screen's figures, each on the side whose number is at least one (MOL-81): a trip takes
+  // `walletRate`, which stays `base → quote`.
+  const wallet = cost ? uprightRateOf(cost.ratio, base, quote, cost.day) : null
+  // Which currency a price is of is decided before it is turned over: after, it may be either side.
+  const others = new Map([...costs].filter(([currency]) => currency !== quote))
   return {
     priced,
-    wallet: cost ? costOf(cost, base, quote) : null,
-    costs: pricesOf(costs, base).filter(({ rate }) => rate.base !== quote),
+    wallet: cost && wallet ? { rate: wallet, basis: cost.basis, estimated: cost.estimated } : null,
+    costs: pricesOf(others, base),
     unknownAt: base === quote || cost ? null : (lost.get(quote) ?? null),
   }
 }
@@ -534,16 +559,18 @@ export function ownRates(
  * have, in the received currency (MOL-40, В-3). Either sign is ordinary: the difference is not a
  * commission, and a good exchanger beats the bank. `null` when the rate is not of this pair, or
  * when the difference does not fit in money at all.
+ *
+ * The rate may come either way round: the one on the side whose number is at least one is what
+ * the screen shows, and it carries more significant digits than its six-digit inverse (MOL-81).
  */
 export function officialDifference(exchange: Exchange, official: ExchangeRate): Money | null {
   const { given, received } = exchange
-  if (official.base !== given.currency || official.quote !== received.currency) return null
+  const pair = new Set([official.base, official.quote])
+  if (!pair.has(given.currency) || !pair.has(received.currency)) return null
 
-  const expected = divideRounded(
-    given.minor * official.scaled * minorPerMajor(received.currency),
-    RATE_SCALE * minorPerMajor(given.currency),
-  )
-  const minor = received.minor - expected
+  const expected = convertAcross(given, official)
+  if (!expected) return null
+  const minor = received.minor - expected.minor
   if (minor > INT8_MAX || minor < -INT8_MAX) return null
   return { minor, currency: received.currency }
 }
