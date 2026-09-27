@@ -22,6 +22,7 @@ import { useActorStore } from '@/stores/actor'
 import { useTripHistoryStore } from './tripHistory'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import type { QueuedWrite } from '@/stores/tripQueue'
 
 const addExpense =
@@ -1652,7 +1653,7 @@ describe('trip queue', () => {
       expect(queue.pending).toEqual([])
     })
 
-    it('не вернулся — отказ с именем, и записи за ним не уходят', async () => {
+    it('не вернулся — отказ с именем; записи за ним остаются на телефоне, названные (А2)', async () => {
       removeTrip.mockResolvedValue(undefined)
       restoreTrip.mockRejectedValue(new ApiError(ERROR.TRIP_OPEN, undefined, true))
       addExpense.mockRejectedValue(offline())
@@ -1663,15 +1664,24 @@ describe('trip queue', () => {
       await queue.flush()
 
       queue.restoreTrip(undo)
+      // Покупка, сделанная уже после «Вернуть».
+      queue.enqueue(add(BREAD))
       await queue.flush()
+      const refusal = queue.rejected[0]
       expect(queue.rejected).toEqual([
         expect.objectContaining({
           code: ERROR.TRIP_OPEN,
           write: { kind: 'restore', tripId: TRIP, name: 'Ереван Сити' },
         }),
       ])
-      expect(queue.pending).toEqual([])
+      // Не отправлены и не выброшены молча: ждут, пока человек не уберёт поход с покупками.
+      expect(queue.pending.map((write) => write.kind)).toEqual(['add', 'add'])
+      expect(queue.heldBack(TRIP)).toBe(2)
       expect(addExpense).toHaveBeenCalledTimes(1)
+
+      if (refusal) queue.dismiss(refusal)
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toEqual([])
     })
 
     it('«Вернуть» похода, чей старт так и не ушёл: 404 на restore — не отказ, старт пишет поход', async () => {
@@ -1705,6 +1715,153 @@ describe('trip queue', () => {
         { kind: 'delete', tripId: TRIP },
         { kind: 'restore', tripId: TRIP, name: '' },
       ])
+    })
+  })
+  describe('порядок очереди после «Удалить» и «Вернуть» (MOL-76, адверсариальные А3, А4, Н1)', () => {
+    const OTHER_TRIP = 'bbbbbbbb-0000-4000-8000-000000000077'
+    const tag = (queue: ReturnType<typeof fresh>) =>
+      queue.pending.map((write) => `${write.kind}:${write.tripId === TRIP ? 'A' : 'B'}`)
+
+    it('удаление встаёт на место первой записи похода, а не за стартом следующего (А3)', async () => {
+      for (const mock of [finishTrip, startTrip, addExpense, removeTrip])
+        mock.mockRejectedValue(offline())
+      const queue = fresh()
+      useTripStore().apply(answer('0'))
+      queue.enqueue({ kind: 'finish', tripId: TRIP, finishedOnDeviceAt: new Date() })
+      queue.enqueue(started(OTHER_TRIP, 'Рынок'))
+      queue.enqueue({ ...add(MILK), tripId: OTHER_TRIP })
+      await queue.flush()
+
+      queue.removeTrip(TRIP, 'Ереван Сити')
+      expect(tag(queue)).toEqual(['delete:A', 'start:B', 'add:B'])
+      await settled()
+
+      // Связь: удаление уходит первым, и старт следующего похода не встречает удалённый открытым.
+      removeTrip.mockResolvedValue(undefined)
+      startTrip.mockResolvedValue({ trip: answer('0', OTHER_TRIP), created: true })
+      addExpense.mockResolvedValue({ trip: answer('600', OTHER_TRIP), created: true })
+      await queue.flush()
+      expect(removeTrip.mock.invocationCallOrder.at(-1) ?? 0).toBeLessThan(
+        startTrip.mock.invocationCallOrder.at(-1) ?? 0,
+      )
+      expect(addExpense).toHaveBeenLastCalledWith(OTHER_TRIP, expect.objectContaining({ id: MILK }))
+      expect(queue.elsewhere).toBeNull()
+      expect(queue.pending).toEqual([])
+    })
+
+    it('поход, которого на телефоне нет, удаляется первым', () => {
+      startTrip.mockRejectedValue(offline())
+      removeTrip.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(started(OTHER_TRIP, 'Рынок'))
+      queue.removeTrip(TRIP, 'Ереван Сити')
+      expect(tag(queue)).toEqual(['delete:A', 'start:B'])
+    })
+
+    it('удаление похода, открытого на пути чужого старта, снимает вопрос о нём', async () => {
+      startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_OPEN, undefined, true))
+      currentTrip.mockResolvedValue(answer('0'))
+      removeTrip.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(started(OTHER_TRIP, 'Рынок'))
+      await queue.flush()
+      expect(queue.elsewhere?.tripId).toBe(TRIP)
+
+      queue.removeTrip(TRIP, 'Ереван Сити')
+      expect(queue.elsewhere).toBeNull()
+      expect(tag(queue)).toEqual(['delete:A', 'start:B'])
+    })
+
+    it('«Вернуть» кладёт поход на место удаления — идущий поход остаётся идущим (А4)', async () => {
+      for (const mock of [startTrip, addExpense, finishTrip, removeTrip])
+        mock.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      queue.enqueue({ kind: 'finish', tripId: TRIP, finishedOnDeviceAt: new Date() })
+      queue.enqueue(started(OTHER_TRIP, 'Рынок'))
+      queue.enqueue({ ...add(BREAD), tripId: OTHER_TRIP })
+      await queue.flush()
+
+      const undo = queue.removeTrip(TRIP, 'Ереван Сити')
+      await settled()
+      queue.restoreTrip(undo)
+      expect(tag(queue)).toEqual(['restore:A', 'start:A', 'add:A', 'finish:A', 'start:B', 'add:B'])
+      expect(useCurrentTrip().local.value?.id).toBe(OTHER_TRIP)
+    })
+
+    it('«Вернуть» после ушедшего удаления — в начало очереди, за удалением в полёте', async () => {
+      let land: () => void = () => undefined
+      removeTrip.mockReturnValueOnce(
+        new Promise((resolve) => {
+          land = () => {
+            resolve()
+          }
+        }),
+      )
+      startTrip.mockRejectedValue(offline())
+      restoreTrip.mockRejectedValue(offline())
+      const queue = fresh()
+      useTripStore().apply(answer('0'))
+      const undo = queue.removeTrip(TRIP, 'Ереван Сити')
+      await settled()
+      queue.enqueue(started(OTHER_TRIP, 'Рынок'))
+      queue.restoreTrip(undo)
+      expect(tag(queue)).toEqual(['delete:A', 'restore:A', 'start:B'])
+      expect(queue.removing.has(TRIP)).toBe(false)
+      land()
+      await queue.flush()
+      expect(restoreTrip).toHaveBeenCalledWith(TRIP)
+    })
+
+    it('второе «Удалить» того же похода не отнимает у «Вернуть» его записи (Н1)', async () => {
+      startTrip.mockRejectedValue(offline())
+      addExpense.mockRejectedValue(offline())
+      removeTrip.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue(add(MILK))
+      await queue.flush()
+      queue.removeTrip(TRIP, 'Ереван Сити')
+      const again = queue.removeTrip(TRIP, 'Ереван Сити')
+      expect(again.writes.map((write) => write.kind)).toEqual(['start', 'add'])
+      expect(queue.lastRemoved?.writes.map((write) => write.kind)).toEqual(['start', 'add'])
+    })
+
+    it('«Вернуть» возвращает и отказы похода — с «Поправить» (Р-4)', async () => {
+      addExpense.mockRejectedValue(new ApiError(ERROR.INVALID_AMOUNT, undefined, true))
+      removeTrip.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(add(MILK))
+      await queue.flush()
+      expect(queue.rejected).toHaveLength(1)
+      const undo = queue.removeTrip(TRIP, 'Ереван Сити')
+      expect(queue.rejected).toEqual([])
+      queue.restoreTrip(undo)
+      expect(queue.rejected.map((item) => item.code)).toEqual([ERROR.INVALID_AMOUNT])
+      expect(fresh().rejected).toHaveLength(1)
+    })
+
+    it('отказ «Вернуть» за удалением в полёте убирает поход из памяти телефона (Р-3)', async () => {
+      let land: () => void = () => undefined
+      removeTrip.mockReturnValueOnce(
+        new Promise((resolve) => {
+          land = () => {
+            resolve()
+          }
+        }),
+      )
+      restoreTrip.mockRejectedValue(new ApiError(ERROR.TRIP_OPEN, undefined, true))
+      const queue = fresh()
+      const trips = useTripStore()
+      trips.apply(answer('0'))
+      const undo = queue.removeTrip(TRIP, 'Ереван Сити')
+      await settled()
+      queue.restoreTrip(undo)
+      land()
+      await queue.flush()
+      expect(trips.current).toBeNull()
+      expect(useTripHistoryStore().known(TRIP)).toBeNull()
     })
   })
 })
