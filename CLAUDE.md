@@ -843,14 +843,21 @@ nothing up.
   revision the first was made on. **A write a send has begun on is marked on the shelf**
   (`attempted`), by whichever window sends it, and is never folded into again: its answer may
   have been lost after the server took it, and «not sent» and «no answer» are one thing to a
-  queue (adversarial А, Б, В). A change made after it goes behind it, over the next revision. **A
-  removal always goes to the server** — a record that seems to wait may have landed — and 404 on
-  it is done; «Вернуть» takes a removal back while it waits, and asks the server to restore once
-  it may have left, never writing the spending anew. **A record the server already holds with
-  other fields is this phone's own**, so a 409 on a record goes on as an amendment over revision 1.
+  queue (adversarial А, Б, В). A change made after it goes behind it, over the next revision.
+  **Nothing is tried while the browser knows there is no connection**, so a write made at the till
+  stays unmarked and foldable, and an answer that came and is not the API's — a portal — takes the
+  mark off, since that request never arrived (round 2). **A refused record or amendment takes the
+  amendments behind it** into its refusal: they were made over a revision it would have made, and
+  sent on they went over another device's amendment in silence (round 2, Н1, Н3). **Removing a
+  spending nobody has begun to send takes it out of the queue**, and «Вернуть» puts it back; once
+  a send of its record has begun, the removal goes to the server and 404 on it is done; «Вернуть»
+  then takes the removal back while it waits, or asks the server to restore, never writing the
+  spending anew. **A record the server already holds with other fields is this phone's own**, so a
+  409 on a record goes on as an amendment over revision 1.
 - **A spending in the queue is a row, never a figure** (requirements Р-3; the handoff asked
   otherwise and this rule wins): «Отправляем…» at the top of its day, «Правка отправляется» on an
-  amended row whose figures stay the server's, a removed row hidden, and «Ещё не учтено: N»
+  amended row whose figures stay the server's, a removed row hidden — unless «Вернуть» stands
+  behind its removal in the queue (round 2, Н2) — and «Ещё не учтено: N»
   on the card — not for a record the month already shows (adversarial Л). A day only the phone
   knows of has no total; a row only the phone knows of shows what was last typed, since there are
   no figures of the server's to keep (review Т-4). The month is read again from the start

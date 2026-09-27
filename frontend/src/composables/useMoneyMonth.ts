@@ -113,6 +113,8 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     const id = actor.id
     shown.value = id ? recall(id, selected.value) : null
     kept.value = id ? recallCategories(id) : []
+    // A page asked for on another month is not this month's to fetch (review У-3).
+    moreAfterRead = false
     failure.value = null
     confirmed.value = false
     more.value = 'idle'

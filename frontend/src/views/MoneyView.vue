@@ -67,6 +67,11 @@
             <AppButton variant="ghost" block @click="goTab('trip')">
               {{ t('spending.empty.trip') }}
             </AppButton>
+            <!-- A newcomer may take a preset out of the choice before the first spending too
+                 (review У-2). -->
+            <RouterLink class="empty-link" :to="{ name: 'money-categories' }">
+              {{ t('spending.categories_link') }}
+            </RouterLink>
           </template>
         </ScreenState>
 
@@ -771,6 +776,20 @@ export default defineComponent({
 
 .add {
   box-shadow: var(--shadow-md);
+}
+
+.empty-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-target);
+  color: var(--accent-ink);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
 }
 
 .categories-link {
