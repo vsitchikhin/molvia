@@ -7,7 +7,7 @@ import { convertAcross } from '#model/entities/trip'
 import { INT8_MAX } from '#model/support/decimal'
 import { ISSUE } from '#model/support/errors'
 import { visibleLine } from '#model/support/text'
-import { currencySchema, moneySchema } from '#model/values/money'
+import { currencySchema, moneySchema, subtractMoney } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
 import type { ExchangeRate } from '#model/values/rates'
 
@@ -350,7 +350,8 @@ export function accountCheck(
   return {
     fact,
     counted: balance,
-    difference: { minor: fact.minor - balance.minor, currency: account.currency },
+    // A difference no money can hold is a fact that is not one: refused, never a 500 on the way out.
+    difference: subtractMoney(fact, balance),
     approximate,
     since: mark.day,
     reasons,

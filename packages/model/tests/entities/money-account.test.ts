@@ -16,7 +16,7 @@ import type {
   MoneyAccountCheck,
   RateBetween,
 } from '#model/entities/money-account'
-import { ISSUE } from '#model/support/errors'
+import { ERROR, ISSUE } from '#model/support/errors'
 import { money } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
 import { parseRate, yerevanMidnight } from '#model/values/rates'
@@ -291,6 +291,13 @@ describe('accountCheck', () => {
     expect(new Set(result.reasons.map(({ operation }) => operation.id))).toEqual(
       new Set([sameDayLater.id, datedBack.id]),
     )
+  })
+
+  it('refuses a fact whose difference no money can hold', () => {
+    const card = account('Кредитка', '-1 AMD')
+    expect(() =>
+      accountCheck(card, [], null, money(9_223_372_036_854_775_807n, 'AMD'), noRates),
+    ).toThrow(ERROR.INVALID_AMOUNT)
   })
 
   it('never names what is before the start, which no balance holds', () => {

@@ -2,6 +2,7 @@ import {
   ACCOUNT_JOURNAL_PAGE,
   DomainError,
   ERROR,
+  INT8_MAX,
   accountBalance,
   accountCheck,
   accountOperationViewOf,
@@ -140,12 +141,20 @@ export async function moneyAccountsOf(
   for (const view of views) {
     if (view.archivedAt !== null) continue
     const inSpend = view.currency === owner.spendCurrency ? view.balance : view.inSpend
-    if (inSpend === null) {
+    const nextSpendable = view.savings ? spendable : spendable + (inSpend?.minor ?? 0n)
+    const nextSavings = view.savings ? savings + (inSpend?.minor ?? 0n) : savings
+    // One no money can hold is left out, never a failed page — the one way to amend it (MOL-66).
+    if (
+      inSpend === null ||
+      !holds(nextSpendable) ||
+      !holds(nextSavings) ||
+      !holds(nextSavings + nextSpendable)
+    ) {
       uncounted += 1
       continue
     }
-    if (view.savings) savings += inSpend.minor
-    else spendable += inSpend.minor
+    spendable = nextSpendable
+    savings = nextSavings
   }
   const live = counted.accounts.filter((account) => account.archivedAt === null)
   const money = (minor: bigint): Money => ({ minor, currency: owner.spendCurrency })
@@ -161,6 +170,10 @@ export async function moneyAccountsOf(
     unassigned: unassignedOperations(live, lastChecks, counted.operations).length,
     countedAt: now,
   }
+}
+
+function holds(minor: bigint): boolean {
+  return minor <= INT8_MAX && minor >= -INT8_MAX
 }
 
 /** The owner's account by an address in either case; a removed one too, a marked one never. */
