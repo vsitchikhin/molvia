@@ -396,7 +396,10 @@ describe('поход на счёте (п. 6, Р-18)', () => {
       startOn: daysAgo(5),
     })
     const place = await insertPlace(db, { name: 'Ереван Сити' })
-    const finished = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    // Yesterday's noon in Yerevan, not «a day ago»: started an hour before a finish taken from the
+    // clock, the trip fell on the day before in the first hour after midnight (Р-29 dates it by its
+    // start), and the test went red for that hour every night.
+    const finished = new Date(`${daysAgo(1)}T12:00:00+04:00`)
     const trip = await insertTrip(db, {
       actorId: me.id,
       placeId: place,
