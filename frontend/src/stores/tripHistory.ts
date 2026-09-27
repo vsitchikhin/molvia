@@ -285,6 +285,27 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   }
 
   /**
+   * A trip removed (MOL-76): out of every page, the selection and the completions still waiting,
+   * here and on the shelf — a cached page drew it back at the next launch otherwise. Raises the
+   * generation and the trip's revision, so a list or a read already on its way cannot put it back.
+   */
+  function drop(id: string): void {
+    syncLocal()
+    const other = (row: { id: string }) => row.id !== id
+    firstPage = { ...firstPage, trips: firstPage.trips.filter(other) }
+    deeper = deeper.filter(other)
+    page.value = { ...page.value, trips: page.value.trips.filter(other) }
+    local.value = local.value.filter(other)
+    if (selected.value?.id === id) {
+      selection += 1
+      selected.value = null
+    }
+    revisions.set(id, (revisions.get(id) ?? 0) + 1)
+    generation += 1
+    persist()
+  }
+
+  /**
    * Whether the answer was taken. A false one is not a failure: the list changed under the
    * request — another window wrote the cache, a finish was taken back — and the answer may no
    * longer be true. The caller asks again rather than wait for a reconnect that may never come:
@@ -387,6 +408,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     capture,
     apply,
     forgetLocal,
+    drop,
     load,
     known,
     open,

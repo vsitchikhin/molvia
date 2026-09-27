@@ -244,6 +244,7 @@ import { calendarDay, purchaseDay, shiftDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { spendingOf, useSpendingQueueStore } from '@/stores/spendingQueue'
+import { useTripQueueStore } from '@/stores/tripQueue'
 
 /**
  * «Деньги» (MOL-82, handoff 01): one month of one's own spending, counted by the server — what
@@ -278,6 +279,7 @@ export default defineComponent({
     const { goTab } = useNavigation()
     const actor = useActorStore()
     const queue = useSpendingQueueStore()
+    const tripQueue = useTripQueueStore()
     const announce = useAnnouncer()
 
     /**
@@ -326,7 +328,7 @@ export default defineComponent({
     /** Whether a spending can be written here at all: a category is required, and known. */
     const canWrite = computed(() => categories.value.some((category) => !category.archived))
     const journal = computed(() =>
-      month.value ? journalOf(month.value, queue.pending, queue.rejected) : [],
+      month.value ? journalOf(month.value, queue.pending, queue.rejected, tripQueue.removing) : [],
     )
     const unsent = computed(() => (month.value ? unsentIn(month.value, queue.pending) : 0))
     const spendCurrency = computed(

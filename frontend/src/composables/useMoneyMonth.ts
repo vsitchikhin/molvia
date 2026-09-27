@@ -8,6 +8,7 @@ import { useReconnect } from '@/composables/useReconnect'
 import { isRecord } from '@/stores/queueing'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
+import { useTripQueueStore } from '@/stores/tripQueue'
 import { read, write } from '@/stores/storage'
 
 /** `idle` — no identity, so there is no month to read. */
@@ -110,6 +111,7 @@ function remember(owner: string, answer: MoneyMonthView, fetchedAt: Date): void 
 export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
   const actor = useActorStore()
   const queue = useSpendingQueueStore()
+  const trips = useTripQueueStore()
 
   const shown = ref<Remembered | null>(null)
   const failure = ref<'offline' | 'error' | null>(null)
@@ -224,8 +226,9 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     adopt()
     void load()
   })
+  // A trip removed or brought back has moved the month too (MOL-76).
   watch(
-    () => queue.landed,
+    () => [queue.landed, trips.landed],
     () => void load(),
   )
   onMounted(() => void load())

@@ -15,7 +15,8 @@ export interface SelectedTrip {
   local: ComputedRef<LocalFinishedTrip | null>
   available: ComputedRef<boolean>
   loading: Ref<boolean>
-  missing: Ref<boolean>
+  /** Not found by the server, or removed here with the removal still on its way (MOL-76). */
+  missing: Readonly<Ref<boolean>>
   trouble: Ref<'error' | 'offline' | null>
   stale: Ref<boolean>
   load: () => Promise<void>
@@ -33,7 +34,11 @@ export function useSelectedTrip(target: MaybeRefOrGetter<string | null>): Select
   const stale = ref(true)
   let request = 0
   const local = computed(() => history.local.find((row) => row.id === id.value) ?? null)
-  const trip = computed(() => (id.value && !missing.value ? history.known(id.value) : null))
+  /** Removed here, and the removal not answered yet (MOL-76): the trip is gone for the screen. */
+  const removed = computed(() => id.value !== null && queue.removing.has(id.value))
+  const trip = computed(() =>
+    id.value && !missing.value && !removed.value ? history.known(id.value) : null,
+  )
   /**
    * Whether the screen has anything to draw about this trip. A trip the server has never heard
    * of is still one the phone knows, as long as the queue holds its writes: its start went in at
@@ -53,7 +58,10 @@ export function useSelectedTrip(target: MaybeRefOrGetter<string | null>): Select
    * never exist, and the notice about that refusal is what the screen has to say (Г-3).
    */
   const available = computed(
-    () => !missing.value && (trip.value !== null || local.value?.view != null || queued.value),
+    () =>
+      !missing.value &&
+      !removed.value &&
+      (trip.value !== null || local.value?.view != null || queued.value),
   )
   async function load(): Promise<void> {
     const selected = id.value
@@ -94,5 +102,15 @@ export function useSelectedTrip(target: MaybeRefOrGetter<string | null>): Select
   useReconnect(() => {
     void load()
   })
-  return { id, trip, local, available, loading, missing, trouble, stale, load }
+  return {
+    id,
+    trip,
+    local,
+    available,
+    loading,
+    missing: computed(() => missing.value || removed.value),
+    trouble,
+    stale,
+    load,
+  }
 }

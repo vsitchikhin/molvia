@@ -62,9 +62,13 @@ export function useCurrentTrip(): CurrentTrip {
     return started
   })
 
+  // Finished or removed here and not yet said so by the server: either way, not the trip going on.
   const ended = computed(() => {
     const id = trips.current?.id
-    return id !== undefined && queue.pending.some((w) => w.kind === 'finish' && w.tripId === id)
+    return (
+      id !== undefined &&
+      queue.pending.some((w) => (w.kind === 'finish' || w.kind === 'delete') && w.tripId === id)
+    )
   })
 
   // A trip the phone started is the later one: it can only have been started after whatever the

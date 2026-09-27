@@ -243,6 +243,8 @@ export function journalOf(
   month: MoneyMonthView,
   pending: readonly SpendingWrite[],
   rejected: readonly RejectedSpendingWrite[],
+  /** Trips whose removal is still on its way (MOL-76): their lines go, the figures stay the server's. */
+  removedTrips: ReadonlySet<string> = new Set(),
 ): JournalDay[] {
   const removing = beingRemoved(pending)
   const editing = new Set(pending.flatMap((write) => (write.kind === 'amend' ? [write.id] : [])))
@@ -258,17 +260,19 @@ export function journalOf(
     estimated: day.estimated,
     rows: day.entries.flatMap((entry): JournalRow[] => {
       if (entry.kind === 'trip')
-        return [
-          {
-            kind: 'trip',
-            key: `${entry.tripId}:${entry.amount.currency}`,
-            tripId: entry.tripId,
-            placeName: entry.placeName,
-            items: entry.items,
-            amount: entry.amount,
-            counted: entry.counted,
-          },
-        ]
+        return removedTrips.has(entry.tripId)
+          ? []
+          : [
+              {
+                kind: 'trip',
+                key: `${entry.tripId}:${entry.amount.currency}`,
+                tripId: entry.tripId,
+                placeName: entry.placeName,
+                items: entry.items,
+                amount: entry.amount,
+                counted: entry.counted,
+              },
+            ]
       const { id } = entry.spending
       if (removing.has(id)) return []
       const refusal = refusals.get(id) ?? null

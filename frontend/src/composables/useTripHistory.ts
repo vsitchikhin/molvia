@@ -81,6 +81,8 @@ export function useTripHistory(): TripHistoryScreen {
           ),
         })
     }
+    // A removal still waiting takes the row off every list at once (MOL-76).
+    for (const id of queue.removing) rows.delete(id)
     return [...rows.values()].sort(
       (a, b) => b.at.getTime() - a.at.getTime() || b.id.localeCompare(a.id),
     )
