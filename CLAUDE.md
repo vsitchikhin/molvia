@@ -867,6 +867,7 @@ make up          # start Postgres and apply migrations
 make down        # stop the stack, keeping the data
 make psql        # psql inside this copy's database
 make db-reset    # drop this copy's volume and start clean (DESTRUCTIVE)
+make seed        # the common names into the catalogue; YES=1 writes, without it a dry run
 make dev         # run api, pwa and bot
 make e2e         # end-to-end tests in a phone-sized browser
 make icons       # regenerate the app icons from favicon.svg
@@ -1144,6 +1145,25 @@ database access. In a product about data integrity, two write paths will silentl
   withdrawn opinion back on screen, silently. Rating again brings the same row back and keeps
   `rated_at`, so withdrawing and re-rating cannot move anyone in the gate.
 - **Exactly one field is required — the item.** Everything else may be left empty.
+- **The catalogue grows two ways: «Предложить товар» and the seed (MOL-112).** MOL-12 decided «no
+  seed» and the owner reversed it on 26.09.2026: with an empty catalogue every trip began by
+  typing the shelf in — 3–4 new words a trip in the owner's own log, 5–8 at the level of a brand
+  and a size — and a proposal needs a connection, so at a shelf with no signal a new item could
+  not be made at all. The seed is `backend/src/catalogue-seed.ts`: some six hundred common names,
+  the kind first, a variety only where the shelf tells it by a number and the common name beside
+  it, no brands, no categories, each with the unit its price is compared by. **Rating «Молоко»
+  means milk here in general** (owner's decision В-1); a brand is «Молоко Марианна», proposed by
+  hand. `dist/seed-catalogue.js` (`make seed` in a copy) writes it through `createUnlessNamed` with
+  no author, in one transaction: a dry run unless `--yes` — the real run, rolled back, as `forget`'s
+  is — a second run adds nothing, and a name already there stays as it is, its unit and author
+  included, the ones whose unit differs printed. **It only adds**: a line removed or renamed stays
+  in every database it reached, with what was bought and rated under it, so the list grows by
+  commits and a line is added with care. It is not a migration, since a migration is frozen once
+  merged and the key is computed in TypeScript. The seed never stays in the `_test` or `_e2e`
+  databases, where it would move the corpora; `seed-search.integration.test.ts` loads it and pins
+  the owner's words against it. **A brand is not a synonym of its kind** (MOL-112): found through
+  the dictionary, a row ties with an exact one, and «Лимонад» would stand above the «Фанта» a person
+  proposed, on its own query — a brand word reaches the kind as the person's own word (MOL-45).
 - **Entering an item is a catalogue lookup** with transliteration and typo tolerance,
   not free text. Free text produces `МОЛОКО МАРИАН 1Л`, which cannot be tied to the canon.
 - **Result ordering must never contain a field like `sponsored`, `boost`, `promoted`.**
@@ -1921,7 +1941,7 @@ eight write inputs and three rules in `packages/model`, with the wire codecs tha
 quantity need to cross it at all. MOL-5 added the search key; MOL-6 the nine tables of 0.1,
 the GIN index over `search_key` and the constraints that hold the product's key. MOL-8 gave
 the device an identity and the API its first routes; MOL-12 opened the catalogue — search
-and «Предложить товар»; MOL-21 the trip — start it, add, fix and remove its rows, finish it.
+and «Предложить товар» — and MOL-112 filled it with a seed of common names; MOL-21 the trip — start it, add, fix and remove its rows, finish it.
 **One trip is open at a time, and the choice is the person's:** «Начать поход» while another
 is open answers `409 error.trip_open`, and the screen asks whether to continue that one or finish
 it first. A finished trip still takes rows — the soy sauce found in the bag at home belongs to the
@@ -2118,8 +2138,9 @@ The shape worth knowing here:
   runtime image carries no `node_modules` at all: nothing to audit and nothing that can
   drift from the lockfile it was built with. It also sidesteps the fact that the workspace
   packages export TypeScript source, which a runtime image could not read. The API's image
-  carries a second file, `dist/forget.js` — the owner's fallback for erasure (MOL-58), since the
-  machine has neither the source nor a published database port.
+  carries two more files, `dist/forget.js` — the owner's fallback for erasure (MOL-58) — and
+  `dist/seed-catalogue.js` (MOL-112), since the machine has neither the source nor a published
+  database port.
 - **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
   exists only for trying the stack on a laptop, where Docker Desktop has no journald.
 - **The database is copied every night, encrypted, off the machine** (MOL-70): `pg_dump` inside the
