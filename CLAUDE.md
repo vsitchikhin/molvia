@@ -462,11 +462,20 @@ queries and 19 for what the shelf does not carry) against 64 names written for t
 of 73 have what they meant first and alone, 6 more share the first place with an item they did
 not mean — a tie the row's uuid broke: «мол» with «Кофе … молотый», «туалетка» with the
 litter's «туалета»; 45 of 45 typos land in the top three; 17 of 19 absent words find nothing.
-**Since MOL-112 a tie goes to the shorter name** (owner's decision В-5): the more of a name the
-query covers, the nearer, and with a common name beside its varieties — «Молоко», «Молоко 3,2%» —
-a tie is every common word, not six of 73. In all six it is the item meant; the price, named, is
-a short wrong name beside a long right one — «лейс» now always puts «Рис» above the chips. Names
-of one key length («1,5%», «3,2%») are still the uuid's.
+**Since MOL-112, at one distance the shorter name goes first** (owner's decision В-5, and its review):
+the more of a name the query covers, the nearer — and with a common name beside its varieties,
+«Молоко» and «Молоко 3,2%», that is every common word, not six of 73. The order at one distance is
+**found by the word before found by a synonym** («маслины» keeps «Маслины» above «Оливки»), **then
+the shorter name, then the similarity**, then the uuid. The length ranks before the similarity
+because a size in the query otherwise handed the first row to a variety: «молоко 1 л» put «Молоко
+1,5%» first by the «1» of its fat, «рис 1 кг» put «Рис круглозёрный» first by the «к» of `kg`
+(adversarial А, Б) — the purchase and the rating went to the variety. On the shelf of MOL-14 all six
+ties go to the item meant. The prices, named: a short wrong name beside a long right one — «лейс»
+puts «Рис» above the chips; «малако» finds «Молоко» where the similarity chose «Молоко
+миндальное»; among the kinds a wide word leads to, the shortest — «мясо» is «Фарш» first; names of
+one key length are still the uuid's where the similarity is equal too — «Молоко 1,5%» and «3,2%», and
+on the seed «кур» is «Курица» or «Курага»; and «молоко 1», typed on the way to «1 л», still gives
+«Молоко 1,5%», whose «1» is an exact pair.
 **No point of the grid did better on both halves.** A threshold of 0.3 empties every false hit
 but drops «Молоко Ашхар» from «малако» — the case 0.15 exists for; a budget of 1 empties them
 too and loses five typos and «собачий корм»; a budget of 3 wins one query and brings six false
@@ -474,7 +483,8 @@ hits. The slack on an unfinished word (MOL-10) moves five or six whole answers e
 never a first row, so the grid could not tell its three settings apart — kept as it is, not
 chosen. What no threshold reaches went to tasks with numbers: **synonyms** — «картошка» against
 «Картофель», 6 of 73, one of them («мясо») found by letters only — MOL-45 closed them with the
-dictionary above, which puts 67 of 73 first and alone, and the shorter name of MOL-112 the other six; **the absolute
+dictionary above, which puts 67 of 73 first and alone, and the shorter name of MOL-112 the other six
+— less the two brands of В-6 below, «дошик» and «принглс»; **the absolute
 budget** — «овощи» finds «Мука … высший сорт», «специи» «Соевый соус», «пельмени» «Чай зелёный»,
 3 of 25 — MOL-46 made them a far answer rather than a find; **a unit word grounding a match** — «сыр» is two edits from `sht` of «4 шт» —
 closed by MOL-48 for the units it lists, which took six of the ten items «сыр» found. Weighting
@@ -1161,9 +1171,20 @@ database access. In a product about data integrity, two write paths will silentl
   commits and a line is added with care. It is not a migration, since a migration is frozen once
   merged and the key is computed in TypeScript. The seed never stays in the `_test` or `_e2e`
   databases, where it would move the corpora; `seed-search.integration.test.ts` loads it and pins
-  the owner's words against it. **A brand is not a synonym of its kind** (MOL-112): found through
-  the dictionary, a row ties with an exact one, and «Лимонад» would stand above the «Фанта» a person
-  proposed, on its own query — a brand word reaches the kind as the person's own word (MOL-45).
+  the owner's words against it. **A brand people name a kind by leads to the kind** through the
+  dictionary — «фанта» to «Лимонад», «дошик» to «Лапша» (owner's decision В-6) — so the owner's
+  words find something from the first trip. A brand item spelled as the word is typed stays above
+  the kind: both at no cost, and the similarity ranks before the length. **The price, named:** one
+  spelled otherwise — «Doshirak», «Pringles», an edit or two from «дошик», «принглс» — stands under
+  the kind until it is taken once, and memory lifts it from then on (MOL-11). MOL-112 first kept
+  brands out on the claim that a synonym row ties with an exact one; the order says otherwise
+  (adversarial Д). **The seed is not the answer offline**:
+  with no connection «Что взяли?» searches only the recent items, so a seed item not yet taken is
+  as far out of reach there as one that does not exist (adversarial Ж) — «Предложить товар» offline
+  is В-4's, to come back to on MOL-38. **A line whose key is there under another spelling is not
+  written**: `nameIdentity` knows case and spacing, the key also `ё`, a decimal point and the
+  scripts, so the person's «Мед», «Молоко 3.2%» or «Լավաշ» would have got the seed's twin beside it,
+  one the search cannot tell apart — the report names each pair instead (adversarial В).
 - **Entering an item is a catalogue lookup** with transliteration and typo tolerance,
   not free text. Free text produces `МОЛОКО МАРИАН 1Л`, which cannot be tied to the canon.
 - **Result ordering must never contain a field like `sponsored`, `boost`, `promoted`.**
