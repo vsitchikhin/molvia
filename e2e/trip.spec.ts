@@ -183,6 +183,84 @@ test.describe('the trip', () => {
     await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
   })
 
+  test('a trip deleted with no connection goes before the next one’s start — no question about it (MOL-76, А3)', async ({
+    page,
+    context,
+  }) => {
+    const setting = await device(page)
+    await startTrip(page, 'Рынок')
+    await addItem(page, setting.word, '570')
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+
+    // No signal: «Рынок» finished, «Ереван Сити» started with a purchase, then «Рынок» deleted.
+    await context.setOffline(true)
+    await page.getByRole('button', { name: 'Finish the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    await startTrip(page, 'Ереван Сити')
+    await addItem(page, setting.word, '250')
+    await page.getByRole('button', { name: 'Trip history' }).click()
+    await page.locator('.history-row').filter({ hasText: 'Рынок' }).click()
+    await page.getByRole('button', { name: 'Delete the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Delete the trip' }).click()
+    await expect(page).toHaveURL(/\/history/)
+    await page.goBack()
+    await expect(page.getByText(/^Ереван Сити · /)).toBeVisible()
+
+    await context.setOffline(false)
+    await page.evaluate(() => window.dispatchEvent(new Event('online')))
+    await expect
+      .poll(async () => (await setting.current())?.place.name, { timeout: 15_000 })
+      .toBe('Ереван Сити')
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+    await expect(page.getByRole('heading', { name: /is already open/ })).toHaveCount(0)
+  })
+
+  test('«Undo» puts a deleted trip back in its place — the trip going on stays the one going on (MOL-76, А4)', async ({
+    page,
+    context,
+  }) => {
+    const setting = await device(page)
+    // The item has to be among the recent ones: with no signal the search looks only there.
+    await startTrip(page, 'SAS')
+    await addItem(page, setting.word, '500')
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+    await page.getByRole('button', { name: 'Finish the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    await expect.poll(setting.current).toBeNull()
+
+    await context.setOffline(true)
+    await startTrip(page, 'Рынок')
+    await addItem(page, setting.word, '570')
+    await page.getByRole('button', { name: 'Finish the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    await startTrip(page, 'Ереван Сити')
+    await addItem(page, setting.word, '250')
+
+    // A slip of the finger: «Рынок» deleted from the history, and «Undo» at once.
+    await page.getByRole('button', { name: 'Trip history' }).click()
+    await page.locator('.history-row').filter({ hasText: 'Рынок' }).click()
+    await page.getByRole('button', { name: 'Delete the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Delete the trip' }).click()
+    await expect(page).toHaveURL(/\/history/)
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await page.goBack()
+    await expect(page.getByText(/^Ереван Сити · /)).toBeVisible()
+
+    await context.setOffline(false)
+    await page.evaluate(() => window.dispatchEvent(new Event('online')))
+    await expect
+      .poll(async () => (await setting.current())?.place.name, { timeout: 15_000 })
+      .toBe('Ереван Сити')
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+    await expect(page.getByRole('heading', { name: /is already open/ })).toHaveCount(0)
+    await expect(page.getByText(/^Ереван Сити · /)).toBeVisible()
+  })
+
   test('is started with no connection, and catches up when it comes back', async ({
     page,
     context,
