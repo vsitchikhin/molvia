@@ -505,7 +505,8 @@
       "save": "Add",
       "bad_empty": "Enter a name",
       "bad_taken": "This category already exists"
-    }
+    },
+    "entries_label": "Exchanges and incomes"
   },
   "exchange": {
     "title": "Money exchange",
@@ -863,7 +864,6 @@
       "title": "Connection lost while saving",
       "body": "We will check with the server when it returns. Your edits will stay here."
     },
-    "group_money": "Money",
     "group_account": "Account",
     "sign_out": "Sign out"
   },

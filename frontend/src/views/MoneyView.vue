@@ -117,6 +117,8 @@
             <p class="footnote rate">{{ rateLine }}</p>
           </AppCard>
 
+          <MoneyEntries :rate="liveRate" />
+
           <CategoryBars v-if="month.byCategory.length > 0" :month="month" :name-of="nameOf" />
           <!-- The way to one's categories is there before anything is spent (review Т-7). -->
           <AppCard v-else list>
@@ -161,6 +163,9 @@
             </AppButton>
           </div>
         </template>
+        <!-- The one way left into the exchanges and incomes once they left «Настройки»: a first
+             exchange may come before a first spending (MOL-81). -->
+        <MoneyEntries v-if="newcomer" :rate="liveRate" />
       </template>
     </div>
 
@@ -228,6 +233,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CategoryBars from '@/components/CategoryBars.vue'
+import MoneyEntries from '@/components/MoneyEntries.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
@@ -263,6 +269,7 @@ export default defineComponent({
     IconCloudOff,
     IconPlus,
     IconShape,
+    MoneyEntries,
     MonthSwitcher,
     NewCategorySheet,
     ScreenSkeleton,

@@ -96,7 +96,7 @@ async function render(
   editing: ExchangeView | null = null,
 ): Promise<VueWrapper> {
   const router = createRouter({ history: createMemoryHistory(), routes })
-  await router.push('/settings/exchange')
+  await router.push('/money/exchange')
   const view = mount(ExchangeSheet, {
     props: { open: true, overview: state, record, amend, editing },
     attachTo: document.body,

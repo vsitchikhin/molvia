@@ -562,3 +562,49 @@ describe('MoneyView: what the review found (MOL-82)', () => {
     expect(view.find('a.categories-link').attributes('href')).toBe('/money/categories')
   })
 })
+
+describe('MoneyView: the way into the exchanges and incomes (MOL-81)', () => {
+  const entries = (view: VueWrapper) =>
+    view.findAll(`nav[aria-label="${en.spending.entries_label}"] a`).map((link) => ({
+      href: link.attributes('href'),
+      text: plain(link.text()),
+    }))
+
+  it('stands under «Spent» and names the person’s own rate beside the exchanges', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    expect(entries(view)).toEqual([
+      { href: '/money/exchange', text: `${en.exchange.title}4.62 ֏/₽` },
+      { href: '/money/incomes', text: en.income.title },
+    ])
+  })
+
+  it('must not fire: the central bank’s rate is not «my rate», so the row says nothing', async () => {
+    moneyMonth.mockResolvedValue(
+      month({
+        rate: {
+          base: 'RUB',
+          quote: 'AMD',
+          scaled: 4_860_000n,
+          source: 'official',
+          asOf: new Date(),
+        },
+      }),
+    )
+    const view = await render()
+    expect(entries(view).map(({ text }) => text)).toEqual([en.exchange.title, en.income.title])
+  })
+
+  it('is there for a newcomer too — the only way left into them', async () => {
+    moneyMonth.mockResolvedValue(empty())
+    const view = await render()
+    expect(view.text()).toContain(en.spending.empty.title)
+    expect(entries(view).map(({ href }) => href)).toEqual(['/money/exchange', '/money/incomes'])
+  })
+
+  it('must not fire: a month that failed to load shows no way in beside the error', async () => {
+    moneyMonth.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+    expect(entries(view)).toEqual([])
+  })
+})

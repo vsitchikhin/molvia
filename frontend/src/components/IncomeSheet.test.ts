@@ -74,7 +74,7 @@ async function render(
   editing: IncomeView | null = null,
 ): Promise<VueWrapper> {
   const router = createRouter({ history: createMemoryHistory(), routes })
-  await router.push('/settings/incomes')
+  await router.push('/money/incomes')
   const view = mount(IncomeSheet, {
     props: { open: true, overview: state, record, amend, editing },
     attachTo: document.body,

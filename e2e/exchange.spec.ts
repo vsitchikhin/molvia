@@ -14,7 +14,7 @@ test('an exchange becomes the rate of the next trip, and the preference takes it
   page,
 }) => {
   await signedIn(page)
-  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   await page.getByRole('link', { name: 'Обмен денег' }).click()
 
   // The state by its heading: its words are said out loud too (MOL-64).
@@ -63,7 +63,7 @@ test('an exchange becomes the rate of the next trip, and the preference takes it
  */
 test('roubles to dollars to drams: the chain is the rate of the next trip', async ({ page }) => {
   await signedIn(page)
-  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   await page.getByRole('link', { name: 'Обмен денег' }).click()
   await expect(page.getByRole('heading', { name: 'Обменов пока нет' })).toBeVisible()
 
@@ -109,7 +109,7 @@ test('roubles to dollars to drams: the chain is the rate of the next trip', asyn
  */
 test('an amended exchange changes the rate and keeps what it said before', async ({ page }) => {
   await signedIn(page)
-  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   await page.getByRole('link', { name: 'Обмен денег' }).click()
   await page.getByRole('button', { name: 'Записать обмен' }).click()
 

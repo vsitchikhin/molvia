@@ -70,18 +70,9 @@ export const routes = [
     component: SettingsView,
     meta: { titleKey: 'settings.title', tab: 'settings' },
   },
-  {
-    path: '/settings/exchange',
-    name: 'exchange',
-    component: ExchangeView,
-    meta: { titleKey: 'exchange.title', parent: 'settings' },
-  },
-  {
-    path: '/settings/incomes',
-    name: 'incomes',
-    component: IncomesView,
-    meta: { titleKey: 'income.title', parent: 'settings' },
-  },
+  // Moved to «Деньги» (MOL-81): a bookmark or the history of an installed app still arrives.
+  { path: '/settings/exchange', redirect: { name: 'exchange' } },
+  { path: '/settings/incomes', redirect: { name: 'incomes' } },
   {
     path: '/settings/devices',
     name: 'devices',
@@ -107,6 +98,18 @@ export const routes = [
     name: 'money',
     component: MoneyView,
     meta: { titleKey: 'spending.title', tab: 'money' },
+  },
+  {
+    path: '/money/exchange',
+    name: 'exchange',
+    component: ExchangeView,
+    meta: { titleKey: 'exchange.title', parent: 'money' },
+  },
+  {
+    path: '/money/incomes',
+    name: 'incomes',
+    component: IncomesView,
+    meta: { titleKey: 'income.title', parent: 'money' },
   },
   {
     path: '/money/categories',

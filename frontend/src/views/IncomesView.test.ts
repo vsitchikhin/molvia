@@ -69,7 +69,7 @@ async function render(): Promise<VueWrapper> {
   setActivePinia(pinia)
   useActorStore().id = ACTOR
   const router = createRouter({ history: createMemoryHistory(), routes })
-  await router.push('/settings/incomes')
+  await router.push('/money/incomes')
   const view = mount(IncomesView, {
     attachTo: document.body,
     global: { plugins: [pinia, router, createAppI18n('en')] },

@@ -14,7 +14,7 @@ test('an income lands in its month, is amended with a trace, and comes back afte
   page,
 }) => {
   await signedIn(page)
-  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   await page.getByRole('link', { name: 'Доходы' }).click()
 
   await expect(page.getByRole('heading', { name: 'Доходов пока нет' })).toBeVisible()
@@ -74,7 +74,7 @@ test('drams that came in with no rate of their day make the wallet unknown, and 
   page,
 }) => {
   await signedIn(page)
-  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   await page.getByRole('link', { name: 'Обмен денег' }).click()
 
   const sheet = page.locator('dialog[open]')
