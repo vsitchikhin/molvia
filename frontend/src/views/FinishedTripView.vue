@@ -67,6 +67,7 @@
       :place="removal.place"
       :day="removal.day"
       :items="removal.items"
+      :steps="2"
       :on-closed="afterRemoveSheet"
       @confirm="confirmRemove"
     />

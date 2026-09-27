@@ -1,12 +1,19 @@
 <template>
-  <BottomSheet :open="open" :on-closed="onClosed" @update:open="$emit('update:open', $event)">
+  <BottomSheet
+    ref="sheet"
+    :open="open"
+    :on-closed="onClosed"
+    @update:open="$emit('update:open', $event)"
+  >
     <template #title>{{ t('trip.remove.sheet.title') }}</template>
-    <template #meta>{{ meta }}</template>
+    <!-- Only while there is something to name: a closed sheet stays in the page, and «0 позиций»
+         there was a second `.meta` beside the screen's own. -->
+    <template v-if="items > 0" #meta>{{ meta }}</template>
 
     <p class="words">{{ t('trip.remove.sheet.body') }}</p>
 
     <template #footer>
-      <AppButton variant="danger-ghost" block @click="$emit('confirm')">
+      <AppButton variant="danger-ghost" block @click="confirm">
         {{ t('trip.remove.action') }}
       </AppButton>
     </template>
@@ -14,7 +21,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent } from 'vue'
+import { computed, defineComponent, ref } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppButton from '@/components/AppButton.vue'
@@ -36,13 +43,24 @@ export default defineComponent({
     day: { type: Date as PropType<Date | null>, default: null },
     items: { type: Number, required: true },
     onClosed: { type: Function as PropType<() => void>, default: undefined },
+    /**
+     * How many layers «Удалить» puts away: two on a finished trip's own screen — the sheet and the
+     * screen, in one step back, since a move made while the sheet steps off its entry is lost.
+     */
+    steps: { type: Number as PropType<1 | 2>, default: 1 },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
     confirm: () => true,
   },
-  setup(props) {
+  setup(props, { emit }) {
     const { t, locale } = useI18n()
+    const sheet = ref<{ close: (steps?: number) => void } | null>(null)
+    function confirm(): void {
+      emit('confirm')
+      if (props.steps > 1 && sheet.value) sheet.value.close(props.steps)
+      else emit('update:open', false)
+    }
     const meta = computed(() =>
       [
         props.place,
@@ -52,7 +70,7 @@ export default defineComponent({
         .filter((part) => part !== null && part !== '')
         .join(' · '),
     )
-    return { t, meta }
+    return { t, meta, sheet, confirm }
   },
 })
 </script>

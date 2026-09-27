@@ -97,36 +97,38 @@ export function useFinishedTrip(): FinishedTrip {
     day: null,
     items: 0,
   })
-  let confirmed = false
   /**
    * «Удалить поход» of a finished trip (MOL-76, В-1): the same as an open one's — an empty one goes
    * at once, one with purchases is asked about. Then back to where the person came from, the
    * history, the home screen or «Деньги», where «Вернуть» stands.
    */
-  function leave(): void {
+  function drop(): void {
     const tripId = selected.id.value
     if (tripId) queue.removeTrip(tripId, name.value)
-    void goBack()
   }
   function askRemove(): void {
     const items = rows.value.filter((row) => row.mark !== 'removing').length
     if (items === 0) {
-      leave()
+      drop()
+      void goBack()
       return
     }
     removal.value = { place: name.value, day: finished.value ?? null, items }
-    confirmed = false
     removing.value = true
   }
-  function confirmRemove(): void {
-    confirmed = true
-    removing.value = false
-  }
-  /** After the sheet has stepped off its own entry: a move made under it would close it twice. */
+  /** The sheet puts itself and this screen away in one step back (`steps` 2). */
+  const confirmRemove = drop
+  /**
+   * Opened cold, the screen has nothing under it to step back onto, and the sheet went alone: the
+   * way back is then the chevron's.
+   */
   function afterRemoveSheet(): void {
-    if (!confirmed) return
-    confirmed = false
-    leave()
+    if (
+      route.name === 'finished-trip' &&
+      selected.id.value &&
+      queue.removing.has(selected.id.value)
+    )
+      void goBack()
   }
   return {
     ...selected,
