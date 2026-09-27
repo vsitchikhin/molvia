@@ -29,6 +29,8 @@ function entry(id: string, day: string, note: string) {
       note,
       place: null,
       rate: null,
+      accountId: null,
+      debited: null,
       revision: 1,
       amendedAt: null,
     },

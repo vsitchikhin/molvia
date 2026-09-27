@@ -64,6 +64,8 @@ const trip: Trip = {
   rateChoice: null,
   startedAt: new Date('2026-09-19T10:00:00.000Z'),
   finishedAt: null,
+  accountId: null,
+  debited: null,
 }
 
 let row = 0

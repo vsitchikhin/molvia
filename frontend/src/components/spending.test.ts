@@ -39,6 +39,8 @@ function spending(id: string, spentOn: string, price: string, note: string | nul
     note,
     place: null,
     rate: null,
+    accountId: null,
+    debited: null,
     revision: 2,
     amendedAt: null,
   }

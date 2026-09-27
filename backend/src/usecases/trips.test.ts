@@ -89,6 +89,8 @@ const trip: Trip = {
   rateChoice: null,
   startedAt: new Date('2026-09-19T10:00:00.000Z'),
   finishedAt: null,
+  accountId: null,
+  debited: null,
 }
 
 const milkBought: Expense = {
@@ -214,6 +216,22 @@ function fakeRepositories(
       frozenRate: unexpected('money.frozenRate'),
       freeze: unexpected('money.freeze'),
       thaw: unexpected('money.thaw'),
+    },
+    moneyAccounts: {
+      list: unexpected('moneyAccounts.list'),
+      known: unexpected('moneyAccounts.known'),
+      add: unexpected('moneyAccounts.add'),
+      amend: unexpected('moneyAccounts.amend'),
+      remove: unexpected('moneyAccounts.remove'),
+      restore: unexpected('moneyAccounts.restore'),
+      purgeStale: unexpected('moneyAccounts.purgeStale'),
+      operations: unexpected('moneyAccounts.operations'),
+      lastChecks: unexpected('moneyAccounts.lastChecks'),
+      lastMatched: unexpected('moneyAccounts.lastMatched'),
+      saveCheck: unexpected('moneyAccounts.saveCheck'),
+      setTripPayment: unexpected('moneyAccounts.setTripPayment'),
+      // Any change of a trip's money takes its «списано» off (Р-32): nothing to see here.
+      dropTripDebited: () => Promise.resolve(),
     },
   }
 }
@@ -479,6 +497,8 @@ describe('startTrip: the person’s own rate (MOL-40)', () => {
     exchangedOn,
     heldBefore: held === null ? null : { minor: held, currency: currencies[1] },
     note: null,
+    givenAccountId: null,
+    receivedAccountId: null,
     revision: 1,
     createdAt: new Date(`${exchangedOn}T09:00:00.000Z`),
     amendedAt: null,

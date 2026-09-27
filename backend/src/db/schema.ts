@@ -366,6 +366,92 @@ export const places = pgTable(
 )
 
 /**
+ * Where a person's money lies (MOL-115): «Наличные ֏», «Карта ₽». Private as a spending — no
+ * aggregate reads it, the log of events does not either — and it goes with its owner. The start is
+ * what it held at the end of `start_on`, below zero for a card in debt; the balance is counted, never
+ * stored. Removing one with operations is `archived_at` («убран из выбора»), without them a mark
+ * offered back for ten minutes, then a delete (MOL-73 В-4).
+ */
+export const moneyAccounts = pgTable(
+  'money_accounts',
+  {
+    // Named by the device, as everything of one's money is: an account added offline is one.
+    id: uuid('id').primaryKey(),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    currency: char('currency', { length: 3 }).$type<Currency>().notNull(),
+    savings: boolean('savings').notNull().default(false),
+    startMinor: bigint('start_minor', { mode: 'bigint' }).notNull(),
+    startOn: date('start_on').notNull(),
+    revision: integer('revision').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (table) => [
+    // What an operation points at: its account is the same owner's — and for money that lands on
+    // it or leaves it as it is, of the same currency — held by the database (MOL-115).
+    unique('money_accounts_id_actor_unique').on(table.id, table.actorId),
+    unique('money_accounts_id_actor_currency_unique').on(table.id, table.actorId, table.currency),
+    index('money_accounts_actor_idx').on(table.actorId, table.createdAt),
+    check('money_accounts_currency_known', oneOf(table.currency, currencySchema.options)),
+    check('money_accounts_revision_positive', sql`${table.revision} > 0`),
+  ],
+)
+
+/**
+ * The account a spending or a trip was paid from, and «списано» (MOL-115, MOL-43 В-3): the account
+ * is the owner's own, «списано» is whole, positive, needs an account and is of the account's
+ * currency — every one of them a key or a check, not a hope.
+ */
+function paidFrom(
+  name: 'trips' | 'spendings',
+  table: {
+    actorId: AnyPgColumn
+    currency: AnyPgColumn
+    accountId: AnyPgColumn
+    debitedMinor: AnyPgColumn
+    debitedCurrency: AnyPgColumn
+  },
+) {
+  return [
+    foreignKey({
+      name: `${name}_account_is_owners`,
+      columns: [table.accountId, table.actorId],
+      foreignColumns: [moneyAccounts.id, moneyAccounts.actorId],
+    }),
+    foreignKey({
+      name: `${name}_debited_of_account_currency`,
+      columns: [table.accountId, table.actorId, table.debitedCurrency],
+      foreignColumns: [moneyAccounts.id, moneyAccounts.actorId, moneyAccounts.currency],
+    }),
+    check(
+      `${name}_debited_whole`,
+      sql`num_nonnulls(${table.debitedMinor}, ${table.debitedCurrency}) in (0, 2)`,
+    ),
+    check(
+      `${name}_debited_needs_account`,
+      sql`${table.debitedMinor} is null or (${table.accountId} is not null and ${table.debitedMinor} > 0)`,
+    ),
+    // A spending is one currency, so the row can say it; a trip's purchases may be in any, and
+    // «списано» stands for any of them that is not the account's (adversarial Д2) — the use case's.
+    ...(name === 'spendings'
+      ? [
+          check(
+            `${name}_debited_in_other_currency`,
+            sql`${table.debitedCurrency} is null or ${table.debitedCurrency} <> ${table.currency}`,
+          ),
+        ]
+      : []),
+    check(`${name}_debited_currency_known`, currencyKnownOrNull(table.debitedCurrency)),
+  ]
+}
+
+/**
  * Currency and rate are snapshots, spread over columns instead of pointing at a rate
  * table: a reference would let today's rate rewrite last month's trip, which is exactly
  * what «the rate is stored with the transaction» forbids. The plausibility band of a rate
@@ -410,6 +496,12 @@ export const trips = pgTable(
       .default(sql`clock_timestamp()`),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
     finishedOnDeviceAt: timestamp('finished_on_device_at', { withTimezone: true }),
+    // The account it was paid from, and «списано» in that account's currency (MOL-115, Р-18).
+    accountId: uuid('account_id'),
+    debitedMinor: bigint('debited_minor', { mode: 'bigint' }),
+    debitedCurrency: char('debited_currency', { length: 3 }).$type<Currency>(),
+    // When they last changed: a check's window is the server's moment, not the phone's (Д1б).
+    accountSetAt: timestamp('account_set_at', { withTimezone: true }),
   },
   (table) => [
     // The list of trips, the running one, and «what is still unrated» all walk one actor
@@ -501,6 +593,7 @@ export const trips = pgTable(
       'trips_finished_after_start',
       sql`${table.finishedAt} is null or ${table.finishedAt} >= ${table.startedAt}`,
     ),
+    ...paidFrom('trips', table),
   ],
 )
 
@@ -770,6 +863,11 @@ export const exchanges = pgTable(
     // `exchange_revisions`.
     revision: integer('revision').notNull().default(1),
     amendedAt: timestamp('amended_at', { withTimezone: true }),
+    // The accounts each side left and landed on (MOL-115), each of its side's currency.
+    givenAccountId: uuid('given_account_id'),
+    receivedAccountId: uuid('received_account_id'),
+    // When either last changed: a check's window is the server's moment (adversarial Д1б).
+    accountSetAt: timestamp('account_set_at', { withTimezone: true }),
   },
   (table) => [
     // The owner's exchanges in the order the wallet walks them.
@@ -787,6 +885,16 @@ export const exchanges = pgTable(
     ),
     check('exchanges_currencies_differ', sql`${table.givenCurrency} <> ${table.receivedCurrency}`),
     check('exchanges_revision_positive', sql`${table.revision} > 0`),
+    foreignKey({
+      name: 'exchanges_given_account_is_owners',
+      columns: [table.givenAccountId, table.actorId, table.givenCurrency],
+      foreignColumns: [moneyAccounts.id, moneyAccounts.actorId, moneyAccounts.currency],
+    }),
+    foreignKey({
+      name: 'exchanges_received_account_is_owners',
+      columns: [table.receivedAccountId, table.actorId, table.receivedCurrency],
+      foreignColumns: [moneyAccounts.id, moneyAccounts.actorId, moneyAccounts.currency],
+    }),
   ],
 )
 
@@ -851,6 +959,9 @@ export const incomes = pgTable(
     heldBeforeMinor: bigint('held_before_minor', { mode: 'bigint' }),
     source: text('source').$type<IncomeSource>().notNull(),
     note: text('note'),
+    // The account it came onto (MOL-115); of its own currency, which the key below holds.
+    accountId: uuid('account_id'),
+    accountSetAt: timestamp('account_set_at', { withTimezone: true }),
     revision: integer('revision').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -870,6 +981,11 @@ export const incomes = pgTable(
     check('incomes_currency_known', oneOf(table.currency, currencySchema.options)),
     check('incomes_source_known', oneOf(table.source, incomeSourceSchema.options)),
     check('incomes_revision_positive', sql`${table.revision} > 0`),
+    foreignKey({
+      name: 'incomes_account_is_owners',
+      columns: [table.accountId, table.actorId, table.currency],
+      foreignColumns: [moneyAccounts.id, moneyAccounts.actorId, moneyAccounts.currency],
+    }),
   ],
 )
 
@@ -969,6 +1085,12 @@ export const spendings = pgTable(
     rateScaled: bigint('rate_scaled', { mode: 'bigint' }),
     rateSource: text('rate_source').$type<RateSource>(),
     rateAsOf: timestamp('rate_as_of', { withTimezone: true }),
+    // The account it was paid from, and «списано» in that account's currency (MOL-115, В-3).
+    accountId: uuid('account_id'),
+    debitedMinor: bigint('debited_minor', { mode: 'bigint' }),
+    debitedCurrency: char('debited_currency', { length: 3 }).$type<Currency>(),
+    // When they last changed: a check's window is the server's moment, not the phone's (Д1б).
+    accountSetAt: timestamp('account_set_at', { withTimezone: true }),
     revision: integer('revision').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -1002,11 +1124,44 @@ export const spendings = pgTable(
       'spendings_rate_two_currencies',
       sql`${table.rateBase} is null or ${table.rateBase} <> ${table.rateQuote}`,
     ),
+    ...paidFrom('spendings', table),
     check('spendings_rate_quote_known', currencyKnownOrNull(table.rateQuote)),
     check(
       'spendings_rate_source_known',
       sql`${table.rateSource} is null or ${oneOf(table.rateSource, rateSourceSchema.options)}`,
     ),
+  ],
+)
+
+/**
+ * «Сверить с фактом» (MOL-115, MOL-43 В-4): what the person counted, what the server counted then,
+ * and when. It moves no balance; it is where the next check starts looking for a reason. Named by
+ * the device: the same check counted again after a reason was put right is one row.
+ */
+export const moneyAccountChecks = pgTable(
+  'money_account_checks',
+  {
+    id: uuid('id').primaryKey(),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id').notNull(),
+    checkedOn: date('checked_on').notNull(),
+    factMinor: bigint('fact_minor', { mode: 'bigint' }).notNull(),
+    countedMinor: bigint('counted_minor', { mode: 'bigint' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    // The last check of an account is one index scan.
+    index('money_account_checks_account_idx').on(table.accountId, table.createdAt),
+    // Goes with its account: an account without operations is deleted, checks and all.
+    foreignKey({
+      name: 'money_account_checks_account_is_owners',
+      columns: [table.accountId, table.actorId],
+      foreignColumns: [moneyAccounts.id, moneyAccounts.actorId],
+    }).onDelete('cascade'),
   ],
 )
 

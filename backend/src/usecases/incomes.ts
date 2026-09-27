@@ -8,12 +8,13 @@ import type {
   IncomeView,
   IncomesResponse,
 } from '@molvia/model'
+import { keptSide, knownAccounts, sideOf } from './account-of'
 import { earlier, ownMoney } from './exchanges'
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
-/** A write also lets go of the months frozen without it (MOL-73, В-6). */
-type Writing = Repositories & Pick<TripRepositories, 'money'>
+/** A write also lets go of the months frozen without it (MOL-73, В-6); it names an account too. */
+type Writing = Repositories & Pick<TripRepositories, 'money' | 'moneyAccounts'>
 type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
 
 function viewOf(income: Income, history: readonly IncomeRevision[]): IncomeView {
@@ -24,6 +25,7 @@ function viewOf(income: Income, history: readonly IncomeRevision[]): IncomeView 
     heldBefore: income.heldBefore,
     source: income.source,
     note: income.note,
+    accountId: income.accountId,
     revision: income.revision,
     amendedAt: income.amendedAt,
     history: history.map(({ amount, receivedOn, heldBefore, source, note, replacedAt }) => ({
@@ -96,8 +98,14 @@ export async function recordIncome(
   now: Date = new Date(),
 ): Promise<{ overview: IncomesResponse; created: boolean }> {
   if (body.receivedOn > yerevanDate(now)) throw new DomainError(ERROR.INCOME_IN_FUTURE)
+  const accounts = await knownAccounts(repositories, owner)
+  // Left out stays left out: a repeat from a screen older than accounts is still a repeat (Р-26).
+  const sent =
+    body.accountId === undefined
+      ? body
+      : { ...body, accountId: sideOf(accounts, body.accountId, body.amount.currency) }
   await repositories.incomes.purgeRemoved(owner.id)
-  const { created } = await repositories.incomes.add(owner.id, body)
+  const { created } = await repositories.incomes.add(owner.id, sent)
   await repositories.money.thaw(owner.id, body.receivedOn)
   return { overview: await incomesOverview(repositories, owner, now), created }
 }
@@ -115,9 +123,19 @@ export async function amendIncome(
 ): Promise<IncomesResponse> {
   if (body.receivedOn > yerevanDate(now)) throw new DomainError(ERROR.INCOME_IN_FUTURE)
   await repositories.incomes.purgeRemoved(owner.id)
-  const before = await dayOfIncome(repositories, owner, id)
-  await repositories.incomes.amend(owner.id, id, body)
-  await repositories.money.thaw(owner.id, earlier(before, body.receivedOn))
+  const own = resourceIdOf(id)
+  const held = (await repositories.incomes.list(owner.id)).find((income) => income.id === own)
+  const accounts = await knownAccounts(repositories, owner)
+  const accountId = sideOf(
+    accounts,
+    keptSide(accounts, held?.accountId ?? null, body.accountId, body.amount.currency),
+    body.amount.currency,
+  )
+  const { accountsOnly } = await repositories.incomes.amend(owner.id, id, { ...body, accountId })
+  // Only the account moved: the money is the same, and so is every month (Р-15).
+  if (!accountsOnly) {
+    await repositories.money.thaw(owner.id, earlier(held?.receivedOn ?? null, body.receivedOn))
+  }
   return incomesOverview(repositories, owner, now)
 }
 

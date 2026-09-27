@@ -61,6 +61,17 @@ export const ERROR = {
   SPENDING_CATEGORY_UNKNOWN: 'error.spending_category_unknown',
   /** One's own category under a name another live one of theirs already has (MOL-73, В-3). */
   SPENDING_CATEGORY_TAKEN: 'error.spending_category_taken',
+  /** An account whose start is dated after today in Yerevan (MOL-115): the rule of the clock again. */
+  MONEY_ACCOUNT_IN_FUTURE: 'error.money_account_in_future',
+  /** An account under a name another of the owner's — live or removed — already has (MOL-115, Р-21). */
+  MONEY_ACCOUNT_TAKEN: 'error.money_account_taken',
+  /**
+   * A check's fact in another currency than the account's (MOL-115). An operation is never refused
+   * over an account: one that does not fit is written «без счёта» (Р-28, Р-31).
+   */
+  MONEY_ACCOUNT_CURRENCY: 'error.money_account_currency',
+  /** The currency of an account that already has operations: they were counted in it (MOL-115). */
+  MONEY_ACCOUNT_CURRENCY_LOCKED: 'error.money_account_currency_locked',
 } as const
 
 export type ErrorCode = (typeof ERROR)[keyof typeof ERROR]
@@ -118,6 +129,10 @@ export const ISSUE = {
   INCOME_HELD_NOT_RECEIVED: 'issue.income_held_not_received',
   /** A spending's rate snapshot is of another currency than the spending itself (MOL-73). */
   RATE_NOT_OF_SPENDING_CURRENCY: 'issue.rate_not_of_spending_currency',
+  /** An account's start in another currency than the account's own (MOL-115). */
+  ACCOUNT_START_NOT_OF_CURRENCY: 'issue.account_start_not_of_currency',
+  /** «Списано со счёта» with no account to have been taken from (MOL-43 В-3). */
+  DEBITED_WITHOUT_ACCOUNT: 'issue.debited_without_account',
 } as const
 
 export type IssueCode = (typeof ISSUE)[keyof typeof ISSUE]

@@ -71,6 +71,8 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
               note: 'Barber',
               place: null,
               rate: null,
+              accountId: null,
+              debited: null,
               revision: 1,
               amendedAt: null,
             },

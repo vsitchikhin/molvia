@@ -27,6 +27,49 @@ const cacheCodec = z.strictObject({
   selected: tripViewCodec.nullable(),
   local: z.array(localCodec),
 })
+/**
+ * Fields of a trip this cache does not keep yet (MOL-115, review Р-1, adversarial Д9): a window
+ * still on the previous build reads the cache with a strict codec, took a cache holding them for
+ * no cache at all, and wrote its own over a finish made with no signal. Left out on the way in and
+ * filled with what their absence means on the way out; they go in with the next release, once no
+ * build without them is left.
+ */
+const NOT_CACHED_YET = new Set(['accountId', 'debited'])
+const TRIP_KEYS = new Set(Object.keys(tripViewCodec.def.shape))
+
+/** A trip view on the shelf, with only the keys `keep` says — and never anything but a record. */
+function shelved(view: unknown, keep: (key: string) => boolean): unknown {
+  if (typeof view !== 'object' || view === null || Array.isArray(view)) return view
+  return Object.fromEntries(Object.entries(view).filter(([key]) => keep(key)))
+}
+
+/** Every trip view of a cache, rewritten by `keep`: the selected one and each local one's. */
+function everyView(held: unknown, keep: (key: string) => boolean): unknown {
+  if (typeof held !== 'object' || held === null) return held
+  const cache = held as { selected?: unknown; local?: unknown }
+  return {
+    ...cache,
+    selected: shelved(cache.selected, keep),
+    local: Array.isArray(cache.local)
+      ? cache.local.map((row: unknown) =>
+          typeof row === 'object' && row !== null
+            ? { ...row, view: shelved((row as { view?: unknown }).view, keep) }
+            : row,
+        )
+      : cache.local,
+  }
+}
+
+/** Read by both builds: a field of a later one is dropped rather than failing the whole cache. */
+function fromShelf(raw: string): unknown {
+  return everyView(JSON.parse(raw), (key) => TRIP_KEYS.has(key))
+}
+
+/** Written as the previous build reads it. */
+function toShelf(cache: z.output<typeof cacheCodec>): string {
+  return JSON.stringify(everyView(cacheCodec.encode(cache), (key) => !NOT_CACHED_YET.has(key)))
+}
+
 const KEY = 'molvia.trip-history'
 /**
  * Whether the server's last first page for this owner was empty — now or on an earlier launch.
@@ -88,7 +131,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   function recall(): z.output<typeof cacheCodec> | null {
     try {
       const raw = actor.id ? read(`${KEY}.${actor.id}`) : null
-      const parsed = raw ? cacheCodec.safeParse(JSON.parse(raw)) : null
+      const parsed = raw ? cacheCodec.safeParse(fromShelf(raw)) : null
       return parsed?.success ? parsed.data : null
     } catch {
       return null
@@ -140,18 +183,16 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     if (!actor.id) return
     ahead = !writeEverywhere(
       `${KEY}.${actor.id}`,
-      JSON.stringify(
-        cacheCodec.encode({
-          page: firstPage,
-          selected: selected.value,
-          local: local.value,
-        }),
-      ),
+      toShelf({
+        page: firstPage,
+        selected: selected.value,
+        local: local.value,
+      }),
       (past) => {
         try {
-          const held = cacheCodec.parse(JSON.parse(past))
+          const held = cacheCodec.parse(fromShelf(past))
           held.local = held.local.filter((row) => local.value.some((now) => now.id === row.id))
-          return JSON.stringify(cacheCodec.encode(held))
+          return toShelf(held)
         } catch {
           return null
         }

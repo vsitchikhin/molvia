@@ -16,12 +16,13 @@ import type {
   SpendingCategoryBody,
   SpendingView,
 } from '@molvia/model'
+import { knownAccounts, paymentOf } from './account-of'
 import { dayRates } from './money-rates'
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<
   TripRepositories,
-  'spendings' | 'spendingCategories' | 'exchanges' | 'incomes' | 'rates'
+  'spendings' | 'spendingCategories' | 'exchanges' | 'incomes' | 'rates' | 'moneyAccounts'
 >
 type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
 
@@ -34,6 +35,8 @@ export function spendingViewOf(spending: Spending): SpendingView {
     note: spending.note,
     place: spending.place,
     rate: spending.rate,
+    accountId: spending.accountId,
+    debited: spending.debited,
     revision: spending.revision,
     amendedAt: spending.amendedAt,
   }
@@ -81,8 +84,16 @@ export async function recordSpending(
   now: Date = new Date(),
 ): Promise<{ spending: SpendingView; created: boolean }> {
   await checked(repositories, owner, body, now)
+  const payment = paymentOf(await knownAccounts(repositories, owner), null, body, [
+    body.amount.currency,
+  ])
   const rate = await rateOfDay(repositories, owner, body)
-  const { spending, created } = await repositories.spendings.add(owner.id, body, rate)
+  // Left out stays left out: a repeat from a screen older than accounts is still a repeat (Р-26).
+  // Either field sent decides both: «списано» with the account left out has none to be taken from
+  // (review Р2-1), and writing it as sent broke the database's own rule — a 500.
+  const sent =
+    body.accountId === undefined && body.debited === undefined ? body : { ...body, ...payment }
+  const { spending, created } = await repositories.spendings.add(owner.id, sent, rate)
   return { spending: spendingViewOf(spending), created }
 }
 
@@ -108,7 +119,15 @@ export async function amendSpending(
     held.amount.currency === body.amount.currency &&
     spendingIn(held, owner.spendCurrency) !== null
   const rate = same ? held.rate : await rateOfDay(repositories, owner, body)
-  const { spending } = await repositories.spendings.amend(owner.id, id, body, rate)
+  const payment = paymentOf(await knownAccounts(repositories, owner), held, body, [
+    body.amount.currency,
+  ])
+  const { spending } = await repositories.spendings.amend(
+    owner.id,
+    id,
+    { ...body, ...payment },
+    rate,
+  )
   return spendingViewOf(spending)
 }
 

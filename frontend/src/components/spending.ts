@@ -215,7 +215,7 @@ function localView(
         one.kind === 'amend' && one.id === write.body.id,
     )
     .at(-1)?.body
-  const { spentOn, amount, categoryId, note, place } = latest ?? write.body
+  const { spentOn, amount, categoryId, note, place, accountId, debited } = latest ?? write.body
   const id = write.body.id
   return {
     id,
@@ -225,6 +225,8 @@ function localView(
     note: note ?? null,
     place: place ?? null,
     rate: null,
+    accountId: accountId ?? null,
+    debited: debited ?? null,
     revision: 1,
     amendedAt: null,
   }

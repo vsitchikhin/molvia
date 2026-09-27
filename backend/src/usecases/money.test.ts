@@ -65,6 +65,8 @@ function exchange(given: string, received: string, on: string): Exchange {
     exchangedOn: on,
     heldBefore: null,
     note: null,
+    givenAccountId: null,
+    receivedAccountId: null,
     revision: 1,
     createdAt: new Date(`${on}T12:00:00Z`),
     amendedAt: null,
@@ -80,6 +82,7 @@ function income(amount: string, on: string): Income {
     heldBefore: null,
     source: 'freelance',
     note: null,
+    accountId: null,
     revision: 1,
     createdAt: new Date(`${on}T09:00:00Z`),
     amendedAt: null,
@@ -115,6 +118,8 @@ function spending(amount: string, on: string, rate: ExchangeRate | null = null):
     note: null,
     place: null,
     rate,
+    accountId: null,
+    debited: null,
     revision: 1,
     createdAt: new Date(`${on}T10:00:00Z`),
     amendedAt: null,
@@ -169,6 +174,8 @@ function repositoriesOf(world: World) {
             ...input,
             note: input.note ?? null,
             place: input.place ?? null,
+            accountId: input.accountId ?? null,
+            debited: input.debited ?? null,
             rate,
           },
           created: true,
@@ -178,7 +185,14 @@ function repositoriesOf(world: World) {
         written.push({ rate })
         const held = (world.spendings ?? []).find((row) => row.id === id)
         if (!held) throw new DomainError(ERROR.NOT_FOUND)
-        const spending = { ...held, ...input, note: input.note ?? null, place: input.place ?? null }
+        const spending = {
+          ...held,
+          ...input,
+          note: input.note ?? null,
+          place: input.place ?? null,
+          accountId: input.accountId ?? null,
+          debited: input.debited ?? null,
+        }
         return Promise.resolve({ spending: { ...spending, rate }, amended: true })
       },
       remove: () => Promise.resolve(),
@@ -186,6 +200,9 @@ function repositoriesOf(world: World) {
         Promise.resolve(
           (world.spendings ?? []).filter((row) => row.spentOn >= from && row.spentOn <= to),
         ),
+    }),
+    moneyAccounts: fake<TripRepositories['moneyAccounts']>('moneyAccounts', {
+      known: () => Promise.resolve([]),
     }),
     money: fake<TripRepositories['money']>('money', {
       tripLines: () => Promise.resolve([]),

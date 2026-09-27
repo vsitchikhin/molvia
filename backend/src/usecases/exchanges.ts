@@ -34,11 +34,12 @@ import type {
   Receipt,
   ReceiptView,
 } from '@molvia/model'
+import { keptSide, knownAccounts, sideOf } from './account-of'
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
 /** A write also lets go of the months frozen without it (MOL-73, В-6). */
-type Writing = Repositories & Pick<TripRepositories, 'money'>
+type Writing = Repositories & Pick<TripRepositories, 'money' | 'moneyAccounts'>
 type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
 
 const FOREIGN = currencySchema.options.filter(
@@ -129,6 +130,8 @@ function viewsOf(
       received,
       heldBefore: exchange.heldBefore,
       note: exchange.note,
+      givenAccountId: exchange.givenAccountId,
+      receivedAccountId: exchange.receivedAccountId,
       revision: exchange.revision,
       amendedAt: exchange.amendedAt,
       history: (history.get(exchange.id) ?? []).map(
@@ -341,8 +344,19 @@ export async function recordExchange(
   now: Date = new Date(),
 ): Promise<{ overview: ExchangesResponse; created: boolean }> {
   if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
+  const accounts = await knownAccounts(repositories, owner)
+  // Left out stays left out: a repeat from a screen older than accounts is still a repeat (Р-26).
+  const sent = {
+    ...body,
+    ...(body.givenAccountId === undefined
+      ? {}
+      : { givenAccountId: sideOf(accounts, body.givenAccountId, body.given.currency) }),
+    ...(body.receivedAccountId === undefined
+      ? {}
+      : { receivedAccountId: sideOf(accounts, body.receivedAccountId, body.received.currency) }),
+  }
   await repositories.exchanges.purgeRemoved(owner.id)
-  const { created } = await repositories.exchanges.add(owner.id, body)
+  const { created } = await repositories.exchanges.add(owner.id, sent)
   await repositories.money.thaw(owner.id, body.exchangedOn)
   return { overview: await exchangesOverview(repositories, owner, now), created }
 }
@@ -361,9 +375,33 @@ export async function amendExchange(
 ): Promise<ExchangesResponse> {
   if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
   await repositories.exchanges.purgeRemoved(owner.id)
-  const before = await dayOfExchange(repositories, owner, id)
-  await repositories.exchanges.amend(owner.id, id, body)
-  await repositories.money.thaw(owner.id, earlier(before, body.exchangedOn))
+  const own = resourceIdOf(id)
+  const held = (await repositories.exchanges.list(owner.id)).find((exchange) => exchange.id === own)
+  const accounts = await knownAccounts(repositories, owner)
+  const givenAccountId = sideOf(
+    accounts,
+    keptSide(accounts, held?.givenAccountId ?? null, body.givenAccountId, body.given.currency),
+    body.given.currency,
+  )
+  const receivedAccountId = sideOf(
+    accounts,
+    keptSide(
+      accounts,
+      held?.receivedAccountId ?? null,
+      body.receivedAccountId,
+      body.received.currency,
+    ),
+    body.received.currency,
+  )
+  const { accountsOnly } = await repositories.exchanges.amend(owner.id, id, {
+    ...body,
+    givenAccountId,
+    receivedAccountId,
+  })
+  // Only the accounts moved: the rate is the same fact, and so is every month (Р-15).
+  if (!accountsOnly) {
+    await repositories.money.thaw(owner.id, earlier(held?.exchangedOn ?? null, body.exchangedOn))
+  }
   return exchangesOverview(repositories, owner, now)
 }
 

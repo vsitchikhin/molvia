@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { INT8_MAX, convertScaled, divideRounded } from '#model/support/decimal'
 import { DomainError, ERROR, ISSUE } from '#model/support/errors'
 import type { Expense } from './expense'
-import { MINOR_EXPONENT, currencySchema } from '#model/values/money'
+import { MINOR_EXPONENT, currencySchema, priceSchema } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
 import {
   RATE_DIGITS,
@@ -53,6 +53,16 @@ const tripFields = z.object({
   finishedAt: z.date().nullable(),
   /** Device completion is a separate clock: an offline finish may precede server start. */
   finishedOnDeviceAt: z.date().nullable().optional(),
+  /**
+   * The account the trip was paid from (MOL-115, В-2), and what left it exactly when the trip is in
+   * another currency — «списано», the trip whole (Р-18). Set from the trip's summary at any time, a
+   * finished trip too; an open one already moves its account, the money being gone.
+   */
+  accountId: z.uuid().nullable().default(null),
+  debited: priceSchema
+    .refine((value) => value.minor > 0n, { error: ERROR.INVALID_AMOUNT })
+    .nullable()
+    .default(null),
 })
 
 export const tripSchema = tripFields
