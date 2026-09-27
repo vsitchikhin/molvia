@@ -1123,3 +1123,148 @@ describe('the incomes (MOL-66)', () => {
     expect(new URL(calls[2]?.url ?? '').pathname).toBe(`/incomes/${INCOME}/restore`)
   })
 })
+
+describe('«Деньги» (MOL-82)', () => {
+  const SPENDING = '4b0e7a1c-2d3f-4a5b-9c6d-7e8f9a0b1c2d'
+  const CATEGORY = '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d'
+  const amount = { amount: '5000.00', currency: 'AMD' }
+  const spendingWire = {
+    id: SPENDING,
+    spentOn: '2026-09-20',
+    amount,
+    categoryId: CATEGORY,
+    note: 'Барбер',
+    place: null,
+    rate: null,
+    revision: 1,
+    amendedAt: null,
+  }
+  const categoriesWire = {
+    categories: [{ id: CATEGORY, preset: 'beauty', name: null, colour: null, archived: false }],
+  }
+  const monthWire = {
+    month: '2026-09',
+    spendCurrency: 'AMD',
+    incomeCurrency: 'RUB',
+    spent: amount,
+    uncounted: [],
+    foreign: [],
+    spentIncome: null,
+    income: { amount: '0.00', currency: 'RUB' },
+    incomeUncounted: [],
+    rest: null,
+    rate: null,
+    rateKind: 'live',
+    previousSpent: null,
+    byCategory: [{ categoryId: CATEGORY, amount }],
+    categories: categoriesWire.categories,
+    days: [
+      {
+        day: '2026-09-20',
+        total: amount,
+        estimated: false,
+        entries: [{ kind: 'manual', spending: spendingWire, counted: amount }],
+      },
+    ],
+    cursor: `2026-09-20~1758355200000~${SPENDING}`,
+    remaining: 3,
+    remainingFrom: '2026-09-02',
+    remainingTo: '2026-09-17',
+  }
+
+  function clientReplying(status: number, body: unknown) {
+    const calls: { url: string; method: string; body: unknown }[] = []
+    const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      calls.push({
+        url: input instanceof URL ? input.href : typeof input === 'string' ? input : input.url,
+        method: init?.method ?? 'GET',
+        body: typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined,
+      })
+      return Promise.resolve(
+        status === 204
+          ? new Response(null, { status })
+          : new Response(JSON.stringify(body), {
+              status,
+              headers: { 'content-type': 'application/json' },
+            }),
+      )
+    }
+    return { client: createClient({ baseUrl: 'http://api', fetch }), calls }
+  }
+
+  const body = {
+    id: SPENDING,
+    spentOn: '2026-09-20',
+    amount: { minor: 500_000n, currency: 'AMD' as const },
+    categoryId: CATEGORY,
+    note: 'Барбер',
+  }
+
+  it('reads a month and the next page by the key of the last row', async () => {
+    const { client, calls } = clientReplying(200, monthWire)
+    const month = await client.moneyMonth('2026-09')
+    expect(month.spent).toEqual({ minor: 500_000n, currency: 'AMD' })
+    expect(month.cursor).toEqual({ day: '2026-09-20', moment: 1758355200000, id: SPENDING })
+    await client.moneyMonth('2026-09', month.cursor ?? undefined)
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe('/money/months/2026-09')
+    expect(new URL(calls[1]?.url ?? '').searchParams.get('cursor')).toBe(monthWire.cursor)
+  })
+
+  it('never sends a month that is not one', async () => {
+    const { client, calls } = clientReplying(200, monthWire)
+    for (const month of ['2026-13', '../actors', '2026-9', ''])
+      expect(await codeOf(client.moneyMonth(month))).toBe(ERROR.NOT_FOUND)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('records a spending and tells a new one from a repeat', async () => {
+    const fresh = clientReplying(201, spendingWire)
+    expect((await fresh.client.recordSpending(body)).created).toBe(true)
+    expect(fresh.calls[0]).toMatchObject({
+      method: 'POST',
+      body: { id: SPENDING, amount, spentOn: '2026-09-20', categoryId: CATEGORY },
+    })
+    const repeat = clientReplying(200, spendingWire)
+    expect((await repeat.client.recordSpending(body)).created).toBe(false)
+  })
+
+  it('amends, removes and brings back inside its own path segment', async () => {
+    const { client, calls } = clientReplying(200, spendingWire)
+    const { spentOn, categoryId } = body
+    await client.amendSpending(SPENDING, { revision: 1, spentOn, categoryId, amount: body.amount })
+    await client.restoreSpending(SPENDING)
+    expect(calls[0]).toMatchObject({ method: 'PUT', body: { revision: 1 } })
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/spendings/${SPENDING}`)
+    expect(new URL(calls[1]?.url ?? '').pathname).toBe(`/spendings/${SPENDING}/restore`)
+
+    const removal = clientReplying(204, null)
+    await removal.client.removeSpending('../actors/me')
+    expect(removal.calls[0]?.method).toBe('DELETE')
+    expect(new URL(removal.calls[0]?.url ?? '').pathname).toBe('/spendings/..%2Factors%2Fme')
+  })
+
+  it('takes a removal for done on 204 only — a portal page is not the API', async () => {
+    for (const client of [
+      clientServing('<html>Wi-Fi</html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      }),
+      clientServing(null, { status: 200 }),
+    ])
+      expect(await codeOf(client.removeSpending(SPENDING))).toBe(ISSUE.RESPONSE_INVALID)
+  })
+
+  it('lists, adds, removes and brings back a category', async () => {
+    const { client, calls } = clientReplying(200, categoriesWire)
+    expect((await client.spendingCategories()).categories[0]?.preset).toBe('beauty')
+    expect((await client.addSpendingCategory({ id: CATEGORY, name: 'Такси' })).created).toBe(false)
+    await client.archiveSpendingCategory(CATEGORY)
+    await client.restoreSpendingCategory(CATEGORY)
+    expect(calls.map(({ method, url }) => `${method} ${new URL(url).pathname}`)).toEqual([
+      'GET /spending-categories',
+      'POST /spending-categories',
+      `DELETE /spending-categories/${CATEGORY}`,
+      `POST /spending-categories/${CATEGORY}/restore`,
+    ])
+  })
+})

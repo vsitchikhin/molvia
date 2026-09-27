@@ -55,6 +55,13 @@ describe('direction', () => {
     ['/', '/advice', 'tab'],
     ['/verdicts', '/', 'tab'],
     ['/advice', '/verdicts', 'tab'],
+    // A finished trip opened from «Деньги» is pushed from there and popped back (MOL-82, С-3).
+    [
+      '/money?month=2026-08',
+      '/trip/history/aaaaaaaa-0000-4000-8000-000000000012?from=money',
+      'push',
+    ],
+    ['/trip/history/aaaaaaaa-0000-4000-8000-000000000012?from=money', '/money', 'pop'],
   ])('%s → %s is a %s', async (from, to, move) => {
     expect(await between(from, to)).toBe(move)
   })

@@ -174,6 +174,41 @@ describe('«Выйти» на этом устройстве', () => {
     )
   })
 
+  it('М: называет и траты, что ждут на телефоне или не приняты (MOL-82)', async () => {
+    localStorage.setItem(
+      `molvia.spending-rejected.${OWNER}`,
+      JSON.stringify([
+        {
+          key: 'k',
+          code: 'error.spending_in_future',
+          write: {
+            kind: 'record',
+            body: {
+              id: 'eeeeeeee-0000-4000-8000-000000000001',
+              spentOn: '2026-09-26',
+              amount: { amount: '1500.00', currency: 'AMD' },
+              categoryId: 'ffffffff-0000-4000-8000-000000000001',
+            },
+          },
+        },
+      ]),
+    )
+    localStorage.setItem(
+      `molvia.spending-queue.${OWNER}`,
+      JSON.stringify([
+        { key: 'q', write: { kind: 'remove', id: 'eeeeeeee-0000-4000-8000-000000000002' } },
+      ]),
+    )
+    localStorage.setItem('molvia.actor', OWNER)
+    online(false)
+    const view = await render()
+    await askToLeave(view)
+
+    expect(sheet().textContent).toContain(
+      '2 entries have not been sent or were not accepted and will be lost',
+    )
+  })
+
   it('стирает ящик только после ответа сервера и открывает приложение заново', async () => {
     fillTheDrawer()
     localStorage.setItem('molvia.total-flipped', '1')

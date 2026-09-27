@@ -44,6 +44,11 @@
   --text-footnote: 0.8125rem; /* 13 — unit price, meta */
   --text-caption: 0.6875rem; /* 11 — tab label, section caption */
 
+  /* The amount of a spending as it is typed (MOL-82): the one answer of its sheet, read at arm's
+     length — off the scale on purpose, and its currency sign beside it. */
+  --text-entry: 2.5rem; /* 40 */
+  --text-entry-sign: 2rem; /* 32 */
+
   --leading-tight: 1.15;
   --leading-snug: 1.3;
   --leading-body: 1.45;
@@ -154,6 +159,37 @@
   --bad-ink: #742018;
   --bad-tint: #f8ddd6;
 
+  /* ── Categories of spending (MOL-82) ──────────────────────────────────── */
+
+  /* A colour never works alone — a name stands beside it — and none is red, olive, ochre or
+     terracotta: those say «плохо», «хорошо», «внимание» and «здесь можно нажать». Every one is at
+     least 3:1 on --surface, for an icon and a bar; none is used for text. The thirteen presets are
+     keyed as the model keys them; one's own categories take the palette by turn (`colour` 0–7). */
+  --cat-groceries: #2e7d73;
+  --cat-cafe: #8e4f93;
+  --cat-rent: #7b5534;
+  --cat-home: #3d6d99;
+  --cat-beauty: #c4587f;
+  --cat-transport: #5a5ea6;
+  --cat-telecom: #b86f26;
+  --cat-health: #3f8f84;
+  --cat-clothes: #9a76c0;
+  --cat-pets: #2c8197;
+  --cat-leisure: #627d86;
+  --cat-documents: #7d6b94;
+  --cat-other: #8e8171;
+  --cat-own-0: #1f7a8c;
+  --cat-own-1: #9b4f6e;
+  --cat-own-2: #3f7d56;
+  --cat-own-3: #6a5aa8;
+  --cat-own-4: #3f5f99;
+  --cat-own-5: #946b8f;
+  --cat-own-6: #2f8a74;
+  --cat-own-7: #6b6b6b;
+
+  /* How much of the category's colour the circle under its icon carries. */
+  --cat-tint-share: 15%;
+
   /* Shadows are warm and shallow: a phone held at 30 cm shows banding in anything deeper. */
   --shadow-sm: 0 1px 2px rgb(63 46 26 / 10%);
   --shadow-md: 0 4px 14px rgb(63 46 26 / 14%);
@@ -191,6 +227,29 @@
   --bad: #e8836f;
   --bad-ink: #f2a494;
   --bad-tint: #3b201b;
+
+  --cat-groceries: #5fb8aa;
+  --cat-cafe: #d09bd6;
+  --cat-rent: #cfa47a;
+  --cat-home: #93b8de;
+  --cat-beauty: #ee98b6;
+  --cat-transport: #a7aae6;
+  --cat-telecom: #f2b57a;
+  --cat-health: #9ad8cc;
+  --cat-clothes: #c9b2ea;
+  --cat-pets: #7cc6d8;
+  --cat-leisure: #a9c1c9;
+  --cat-documents: #bfb0d6;
+  --cat-other: #b3a593;
+  --cat-own-0: #72c1d1;
+  --cat-own-1: #dc9ab5;
+  --cat-own-2: #8fcaa1;
+  --cat-own-3: #b4a8e6;
+  --cat-own-4: #9bb2e3;
+  --cat-own-5: #d1aecd;
+  --cat-own-6: #7fcfb9;
+  --cat-own-7: #b5b5b5;
+  --cat-tint-share: 22%;
 
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
   --shadow-md: 0 4px 14px rgb(0 0 0 / 45%);

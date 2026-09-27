@@ -827,6 +827,95 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   «Такси» at once wrote two. A name equal to a preset's («Продукты» beside `groceries`) is the
   screen's to refuse — the server does not know the language of the chips (MOL-82).
 
+**«Деньги» on the phone (MOL-82)** — the fifth tab, between «Оценки» and «Настройки»: the month
+of `GET /money/months/:month`, the sheet of a spending, and one's own categories. The screen adds
+nothing up.
+
+- **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`), by the rules
+  of the trip's (MOL-24): storage is the queue, one at a time under `navigator.locks`, held by a
+  lost connection, a 5xx, a portal, a `401` or a code the API did not say, sent only once the
+  server has named the owner; any other refusal is set aside as «Не принята». Categories go
+  through it too (owner's decision В-4), so «Такси» made at the till goes before the spending that
+  names it. The three queues share `stores/queueing.ts` — the lock, the key of a kept write, what
+  holds, the doubling pause (В-6).
+- **The writes of one spending fold while they wait — only while nobody has begun to send them**:
+  an amendment of one not yet sent rewrites its record; two amendments are one `PUT` over the
+  revision the first was made on. **A write a send has begun on is marked on the shelf**
+  (`attempted`), by whichever window sends it, and is never folded into again: its answer may
+  have been lost after the server took it, and «not sent» and «no answer» are one thing to a
+  queue (adversarial А, Б, В). A change made after it goes behind it, over the next revision.
+  **Nothing is tried while the browser knows there is no connection**, so a write made at the till
+  stays unmarked and foldable, and an answer that came and is not the API's — a portal — takes the
+  mark off, since that request never arrived (round 2). The price, named (review Ф-1): a browser
+  wrongly sure it is offline — some VPNs and WebViews — sends no spendings until `online` comes;
+  the trip's queue and the ratings still try. A refusal that comes after the person removed the
+  spending is dropped rather than shown — there is nothing left to fix (round 3, Р1). **A refused record or amendment takes the
+  amendments behind it** into its refusal: they were made over a revision it would have made, and
+  sent on they went over another device's amendment in silence (round 2, Н1, Н3). **Removing a
+  spending nobody has begun to send takes it out of the queue**, and «Вернуть» puts it back; once
+  a send of its record has begun, the removal goes to the server and 404 on it is done; «Вернуть»
+  then takes the removal back while it waits, or asks the server to restore, never writing the
+  spending anew. **A record the server already holds with other fields is this phone's own**, so a
+  409 on a record goes on as an amendment over revision 1.
+- **A spending in the queue is a row, never a figure** (requirements Р-3; the handoff asked
+  otherwise and this rule wins): «Отправляем…» at the top of its day, «Правка отправляется» on an
+  amended row whose figures stay the server's, a removed row hidden — unless «Вернуть» stands
+  behind its removal in the queue (round 2, Н2) — and «Ещё не учтено: N»
+  on the card — not for a record the month already shows (adversarial Л). A day only the phone
+  knows of has no total; a row only the phone knows of shows what was last typed, since there are
+  no figures of the server's to keep (review Т-4). The month is read again from the start
+  whenever the queue has an answer — which also puts a spending moved to another day where it
+  belongs (MOL-73, Е3) — keeping as many pages as were open.
+- **The two figures the card derives are the model's**, `percentChange` and `shareOf`: a ratio
+  of two sums the server gave, rounded as a person rounds. **«Включая 11 $ (≈ 4 290 ֏)» names no
+  rate** (Р-2): `foreign` sums a currency over the month, and every spending in it had its own
+  day's rate. The sheet converts while typing by `convertAcross` — MOL-24's exception — and only
+  between the two currencies the running month's rate joins; a third says «Посчитаем по курсу дня
+  траты» (Р-5).
+- **Removal asks nothing; `UndoStrip` gives ten seconds** where «Трата» floats, and stands still
+  while a finger or the person's focus is on it — not the focus it puts on «Вернуть» itself, or
+  the count would never run for a touch. **It stands whatever the screen becomes under it**: the
+  only spending removed turns the month into a newcomer's, and the strip went with the button it
+  shared a block with (adversarial Г). The server keeps the removal ten minutes; the strip is what
+  the screen offers.
+- **A date is shown in words over its native field** (`AppField`, `display`): «Сегодня, 27 сентября»
+  is drawn, the field stays underneath to open the system picker and to be read by its own value,
+  and Chrome's own calendar is kept unseen in its place — stretched over the field, it caught the
+  sheet's «Сохранить». The spending just saved is scrolled
+  into view once its row is there; a finished trip opened from «Деньги» slides in as a push.
+- **The sheet says «saved» after it has closed** (adversarial И): the move to the spending's month
+  made while it was open was undone by the step back that closes it. It checks the day — a cleared
+  picker or a day before 2000 would fall over in the queue's codec — and that the category is one of
+  the chips shown, since one the server called unknown stands on none (adversarial Д, Ж).
+- **Days of Yerevan are printed as calendar days, never as moments** (`calendarDay` in `days.ts`,
+  review Т-1): `yerevanMidnight(day)` is the evening before anywhere west of UTC+4, and every date
+  of the screen came out a day early on a phone in Moscow. The frontend's tests run in UTC on every
+  machine (`TZ` in its vitest config), where such a slip shows.
+- **The categories are the owner's, not a month's**, so the newest month kept names them for a
+  month not read yet: «Трата» stands while the month loads, when it failed and offline on the first
+  of a month (review Т-5, Т-6) — and does not, where no category is known at all. «Категории ›»
+  stands without bars too (Т-7). This month in Yerevan is looked at again whenever the app comes
+  back into view (adversarial З).
+- **«Пусто» is read off the answer** (Р-6): the running month empty, no income, nothing the month
+  before and nothing waiting. The server does not say «no history», and an empty August after a
+  full July is «В этом месяце трат нет», not a newcomer.
+- **The month is in the address and moves by `replace`**; there is no lower bound, since the
+  server names no first month (Р-1). The last three first pages read are kept per owner
+  (`molvia.money`), so offline is a strip over them. A next page asked for while the month is read
+  again from the start is asked again from the fresh answer (adversarial Е).
+- **A finished trip opened from «Деньги» leads back there** (owner's decision В-3):
+  `?from=money`, and the route lists which `from` it takes (`meta.from`) — an address must not
+  make any screen the parent of any other. The chevron says «‹ Деньги» and steps back onto the
+  same month; opened cold, «Деньги» is laid underneath.
+- **One's own category is made from the chips** («+ Своя», a sheet over the sheet, chosen as soon
+  as it exists) **and kept on «Деньги → Категории»** (В-1): «Убрать» asks nothing, since it erases
+  nothing, and «Вернуть» stands right under it. A name equal to a preset in the language of the
+  screen, or to a live one of one's own, is refused there. The colours are tokens — thirteen
+  presets and a palette of eight for one's own, none red, olive, ochre or terracotta, each at
+  least 3:1 on `--surface`.
+- The charts, a tap on a category and «Графики по месяцам» are MOL-74's (Р-7); accounts are
+  MOL-115's.
+
 **An account is where money lies (MOL-115)** — «Наличные ֏», «Карта ₽»: a name, a currency, «сбережения»,
 and a start — what it held at the end of a day, below zero for a card in debt (`money_accounts`,
 `MoneyAccount` in code, since «account» already means a Molvia account). Private as a spending, the

@@ -1,5 +1,5 @@
 import { useRoute, useRouter } from 'vue-router'
-import type { RouteLocationNormalizedLoaded, RouteParams, Router } from 'vue-router'
+import type { LocationQuery, RouteLocationNormalizedLoaded, RouteParams, Router } from 'vue-router'
 import type { RouteName, Tab } from '@/router'
 
 /**
@@ -37,10 +37,7 @@ export interface BackTarget {
   readonly step: boolean
 }
 
-export function backTarget(
-  router: Router,
-  route: { meta: { parent?: RouteName }; params: RouteParams },
-): BackTarget | null {
+export function backTarget(router: Router, route: Routed): BackTarget | null {
   const parent = parentOf(router, route)
   if (!parent) return null
   const below: unknown = router.options.history.state.back
@@ -71,10 +68,29 @@ function entryBelow(router: Router): RouteName | undefined {
  */
 function parentOf(
   router: Router,
-  route: { meta: { parent?: RouteName }; params: RouteParams },
+  route: Pick<Routed, 'meta' | 'params' | 'query'>,
 ): ReturnType<Router['resolve']> | null {
-  const parent = route.meta.parent
+  const parent = parentName(route)
   return parent ? router.resolve({ name: parent, params: route.params }) : null
+}
+
+/**
+ * The parent a screen names: its own, or the one `?from=` names when the screen allows it
+ * (MOL-82, В-3) — a finished trip opened from «Деньги» leads back there, «‹ Деньги», and the chevron
+ * and the system «back» go to the same month. Only a name the route lists: an address must not be
+ * able to make any screen the parent of any other.
+ */
+function parentName(route: Pick<Routed, 'meta' | 'query'>): RouteName | undefined {
+  const from = route.query?.from
+  if (typeof from === 'string' && route.meta.from?.includes(from as RouteName))
+    return from as RouteName
+  return route.meta.parent
+}
+
+interface Routed {
+  meta: { parent?: RouteName; from?: readonly RouteName[] }
+  params: RouteParams
+  query?: LocationQuery
 }
 
 /**
@@ -86,7 +102,7 @@ function parentOf(
 export async function settleColdStart(router: Router): Promise<void> {
   await router.isReady()
   const route = router.currentRoute.value
-  const parent = route.meta.parent
+  const parent = parentName(route)
   if (!parent || router.options.history.state.back) return
 
   const ancestors: string[] = []

@@ -103,6 +103,22 @@ describe('backTarget — the chevron agrees with the system button', () => {
     expect(target(router)).toEqual({ path: '/trip/history', step: true })
   })
 
+  // Opened from «Деньги», a finished trip leads back to the month it was opened on (MOL-82, В-3).
+  it('from «Деньги» the chevron says «Деньги» and steps back onto the same month', async () => {
+    const router = await fresh('/money?month=2026-08')
+    await router.push(`/trip/history/${TRIP}?from=money`)
+    expect(target(router)).toEqual({ path: '/money', step: true })
+    expect(backTarget(router, router.currentRoute.value)?.location.meta.titleKey).toBe(
+      'spending.title',
+    )
+  })
+
+  it('a `from` the route does not list is not a parent: an address makes no screen one', async () => {
+    const router = await fresh('/advice')
+    await router.push(`/trip/history/${TRIP}?from=advice`)
+    expect(target(router)).toEqual({ path: '/trip/history', step: false })
+  })
+
   it('a section has no chevron at all', async () => {
     const router = await fresh('/')
     expect(backTarget(router, router.currentRoute.value)).toBeNull()
@@ -135,6 +151,12 @@ describe('settleColdStart', () => {
   )
 
   // A reload keeps the history state: the parent is already there and must not be doubled.
+  it('lays «Деньги» under a finished trip opened cold from there', async () => {
+    const router = await fresh(`/trip/history/aaaaaaaa-0000-4000-8000-000000000012?from=money`)
+    await settleColdStart(router)
+    expect(router.options.history.state.back).toBe('/money')
+  })
+
   it('adds nothing when the parent is already underneath', async () => {
     const router = await fresh('/')
     await router.push('/trip/add')

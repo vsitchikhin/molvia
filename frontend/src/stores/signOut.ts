@@ -6,6 +6,7 @@ import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
 import { clearLeaving, forgetOwner, leavingOwner, markLeaving } from '@/stores/identity'
 import { whileQueueIsStill } from '@/stores/tripQueue'
+import { whileSpendingsAreStill } from '@/stores/spendingQueue'
 
 /** Read afresh each time: the connection read before an `await` says nothing about after it. */
 function connected(): boolean {
@@ -19,6 +20,19 @@ function connected(): boolean {
  */
 function notReached(error: unknown): boolean {
   return error instanceof ApiError && !error.answered && error.code !== ERROR.INTERNAL
+}
+
+/**
+ * The drawer goes while no window sends either queue of this owner — the trip's, then the
+ * spendings' (MOL-82), always in that order, so two windows never wait on each other.
+ */
+function whileQueuesAreStill(owner: string, work: () => void): Promise<void> {
+  return whileQueueIsStill(owner, () =>
+    whileSpendingsAreStill(owner, () => {
+      work()
+      return Promise.resolve()
+    }),
+  )
 }
 
 /**
@@ -62,9 +76,8 @@ export const useSignOutStore = defineStore('signOut', () => {
     if (finishing) return
     finishing = true
     actor.release()
-    await whileQueueIsStill(owner, () => {
+    await whileQueuesAreStill(owner, () => {
       forgetOwner(owner)
-      return Promise.resolve()
     })
     window.location.replace('/')
   }
@@ -135,9 +148,8 @@ export const useSignOutStore = defineStore('signOut', () => {
    */
   async function erase(owner: string): Promise<void> {
     clearLeaving()
-    await whileQueueIsStill(owner, () => {
+    await whileQueuesAreStill(owner, () => {
       forgetOwner(owner)
-      return Promise.resolve()
     })
   }
 

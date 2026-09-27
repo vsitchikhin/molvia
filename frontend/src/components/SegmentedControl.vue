@@ -16,7 +16,11 @@
           :checked="option.value === modelValue"
           @change="$emit('update:modelValue', option.value)"
         />
-        {{ option.label }}
+        <template v-if="option.spoken">
+          <span aria-hidden="true">{{ option.label }}</span>
+          <span class="spoken">{{ option.spoken }}</span>
+        </template>
+        <template v-else>{{ option.label }}</template>
       </label>
     </div>
   </fieldset>
@@ -29,6 +33,8 @@ import type { PropType } from 'vue'
 export interface Segment {
   value: string
   label: string
+  /** Said instead of the label where the label is a sign: «Драмы», not «֏» (MOL-82). */
+  spoken?: string
 }
 
 /** More than this stops fitting a phone's width; the handoff sends it to a `<select>`. */
@@ -69,6 +75,10 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.spoken {
+  @include visually-hidden;
+}
+
 .segmented {
   min-width: 0;
   margin: 0;
