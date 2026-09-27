@@ -111,7 +111,6 @@ import {
   isRateDay,
   parseMoney,
   yerevanDate,
-  yerevanMidnight,
 } from '@molvia/model'
 import type {
   Currency,
@@ -128,7 +127,7 @@ import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { shown } from '@/composables/useItemDetails'
-import { purchaseDay } from '@/days'
+import { calendarDay, purchaseDay } from '@/days'
 import { newId } from '@/ids'
 
 /**
@@ -274,7 +273,7 @@ export default defineComponent({
         until: purchaseDay(version.replacedAt, locale.value),
         amount: formatMoney(version.amount, locale.value),
         source: t(`income.source.${version.source}`),
-        date: purchaseDay(yerevanMidnight(version.receivedOn), locale.value),
+        date: calendarDay(version.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
       }
       return version.note
         ? t('income.sheet.version_note', { ...words, note: version.note })
@@ -286,7 +285,7 @@ export default defineComponent({
       const details = [
         formatMoney(income.amount, locale.value),
         t(`income.source.${income.source}`),
-        purchaseDay(yerevanMidnight(income.receivedOn), locale.value),
+        calendarDay(income.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
         ...(income.heldBefore
           ? [
               t('income.sheet.current_held', {

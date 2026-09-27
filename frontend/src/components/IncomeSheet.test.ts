@@ -202,6 +202,9 @@ describe('IncomeSheet', () => {
       (field(view, en.income.sheet.amount).get('input').element as HTMLInputElement).value,
     ).toBe('99615')
     expect(view.get('.versions').text()).toContain(en.income.source.bonus)
+    // The day of the version as the day it was, in UTC too — not «Sep 14» (adversarial Ж′).
+    expect(view.get('.versions').text()).toContain('Sep 15')
+    expect(view.get('.versions').text()).not.toContain('Sep 14')
     await field(view, en.income.sheet.amount).get('input').setValue('102345')
     await save(view, en.income.sheet.save_amend)
     expect(record).not.toHaveBeenCalled()

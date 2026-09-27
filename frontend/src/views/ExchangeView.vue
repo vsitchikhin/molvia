@@ -77,6 +77,12 @@
           <p v-else-if="overview.pair && overview.walletUnknown" class="meta">
             {{ unknownLineOf(overview.walletUnknown, overview.pair) }}
           </p>
+          <!-- Priced, and still no wallet: the rate falls outside what a trip can keep — two
+               slips in a chain — and «not come in yet» above the list of them would be untrue
+               (adversarial В′, as С-4 said of a missing cost). -->
+          <p v-else-if="overview.pair && pricedQuote" class="meta">
+            {{ t('exchange.wallet_out_of_band', pairSigns(overview.pair)) }}
+          </p>
           <p v-else-if="overview.pair" class="meta">
             {{ t('exchange.no_wallet', pairSigns(overview.pair)) }}
           </p>
@@ -169,7 +175,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { currencySign, yerevanDate, yerevanMidnight } from '@molvia/model'
 import type {
@@ -356,6 +362,14 @@ export default defineComponent({
       return t(cost.estimated ? 'exchange.cost_line_estimated' : 'exchange.cost_line', words)
     }
 
+    /** The spending currency came in and was priced: then «no wallet» is not «none came» (В′). */
+    const pricedQuote = computed(() => {
+      const value = exchanges.overview.value
+      const quote = value?.pair?.quote
+      if (!value || !quote) return false
+      return value.receipts.some((one) => one.currency === quote && one.priced)
+    })
+
     function choose(value: string): void {
       if (value === 'personal' || value === 'official') {
         void exchanges.prefer(value satisfies RatePreference)
@@ -389,6 +403,7 @@ export default defineComponent({
       rateLineOf,
       amountsOf,
       choose,
+      pricedQuote,
       IconSwap,
     }
   },

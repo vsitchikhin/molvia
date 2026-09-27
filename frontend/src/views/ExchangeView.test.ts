@@ -301,6 +301,21 @@ describe('ExchangeView: the rate and the list', () => {
     expect(line?.text()).not.toContain('Central Bank')
   })
 
+  it('a priced spending currency with no wallet says the rate is out of a trip’s reach (В′)', async () => {
+    const receipt = { id: row().id, currency: 'AMD' as const, on: '2026-09-15', priced: true }
+    exchanges.mockResolvedValue(overview({ wallet: null, receipts: [receipt] }))
+    const view = await render()
+    expect(view.text()).toContain('beyond what a trip can keep')
+    expect(view.text()).not.toContain('has come in yet')
+
+    // Must not fire: nothing of the spending currency priced — then it has not come in.
+    exchanges.mockResolvedValue(
+      overview({ wallet: null, exchanges: [row()], receipts: [{ ...receipt, priced: false }] }),
+    )
+    const other = await render()
+    expect(other.text()).not.toContain('beyond what a trip can keep')
+  })
+
   it('says why the rate is unknown, not «no exchanges yet» above a list of them (С-4)', async () => {
     exchanges.mockResolvedValue(
       overview({

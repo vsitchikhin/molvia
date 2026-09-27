@@ -749,6 +749,28 @@ describe('стоимость валют (MOL-42)', () => {
     })
   })
 
+  it('кошелёк вне полосы: ни кошелька, ни причины, но евро пришли с ценой — экран это видит (адв. В′)', async () => {
+    const id = await insertActor(db, { spendCurrency: 'EUR' })
+    const me = { id, cookie: await signIn(db, id) }
+    await record(me, {
+      given: { amount: '1000', currency: 'RUB' },
+      received: { amount: '1', currency: 'USD' },
+      exchangedOn: daysAgo(3),
+    })
+    const overview = await record(me, {
+      given: { amount: '100', currency: 'USD' },
+      received: { amount: '1', currency: 'EUR' },
+      exchangedOn: daysAgo(2),
+    })
+    // 100 000 ₽ за евро: поход его не возьмёт — и экран его не показывает (В).
+    expect(overview.wallet).toBeNull()
+    expect(overview.walletUnknown).toBeNull()
+    // Но евро пришли и получили цену: экран говорит «вне пределов похода», не «не приходили» (В′).
+    expect(overview.receipts).toContainEqual(
+      expect.objectContaining({ currency: 'EUR', priced: true }),
+    )
+  })
+
   it('у паритета курс ЦБ на плашке — той же стороной, что курс обмена (MOL-81, адв. Г)', async () => {
     const eur = (value: string, date: string): CachedRate => ({
       ...rub(value, date),

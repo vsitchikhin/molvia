@@ -393,6 +393,8 @@ describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
     expect(value(en.exchange.sheet.day)).toBe('2026-09-01')
     expect(value(en.exchange.sheet.note)).toBe('VTB')
     expect(view.get('.versions').text()).toContain('100,000.00')
+    // The day of the version as the day it was, in UTC too — not «Aug 31» (adversarial Ж′).
+    expect(view.get('.versions').text()).toMatch(/· Sep 1$/)
     // Its own entry is not an earlier exchange: the first link is asked nothing.
     expect(view.text()).not.toContain('held before the exchange')
   })

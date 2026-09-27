@@ -106,7 +106,6 @@ import {
   isRateDay,
   parseMoney,
   yerevanDate,
-  yerevanMidnight,
 } from '@molvia/model'
 import type {
   Currency,
@@ -121,7 +120,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { shown } from '@/composables/useItemDetails'
-import { purchaseDay } from '@/days'
+import { calendarDay, purchaseDay } from '@/days'
 import { newId } from '@/ids'
 
 type Side = 'given' | 'received'
@@ -300,7 +299,7 @@ export default defineComponent({
           given: formatMoney(version.given, locale.value),
           received: formatMoney(version.received, locale.value),
         }),
-        date: purchaseDay(yerevanMidnight(version.exchangedOn), locale.value),
+        date: calendarDay(version.exchangedOn, locale.value, { day: 'numeric', month: 'short' }),
       }
       return version.note
         ? t('exchange.sheet.version_note', { ...words, note: version.note })
@@ -318,7 +317,7 @@ export default defineComponent({
           given: formatMoney(exchange.given, locale.value),
           received: formatMoney(exchange.received, locale.value),
         }),
-        purchaseDay(yerevanMidnight(exchange.exchangedOn), locale.value),
+        calendarDay(exchange.exchangedOn, locale.value, { day: 'numeric', month: 'short' }),
         ...(exchange.heldBefore
           ? [
               t('exchange.sheet.current_held', {
