@@ -85,6 +85,6 @@ export function categoryOrder(categories: readonly SpendingCategory[]): Spending
 }
 
 /** The colour a new category of one's own takes: the palette by turn, by how many there already are. */
-export function nextCategoryColour(own: readonly SpendingCategory[]): number {
+export function nextCategoryColour(own: readonly Pick<SpendingCategory, 'preset'>[]): number {
   return own.filter((category) => category.preset === null).length % SPENDING_CATEGORY_COLOURS
 }

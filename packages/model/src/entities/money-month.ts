@@ -298,3 +298,26 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
     })),
   }
 }
+
+/**
+ * How a month's spending compares with the one before, in whole percent — «−8 % к августу»
+ * (handoff 01). Rounded half away from zero, as a person rounds; null where there is nothing to
+ * compare with: no spending the month before, or two different currencies after a move.
+ */
+export function percentChange(current: Money, previous: Money): number | null {
+  if (current.currency !== previous.currency || previous.minor <= 0n) return null
+  const delta = (current.minor - previous.minor) * 200n
+  const doubled = delta / previous.minor
+  const rounded = doubled >= 0n ? (doubled + 1n) / 2n : (doubled - 1n) / 2n
+  return Number(rounded)
+}
+
+/**
+ * A category's share of the month in whole percent, and whether it is under one — «<1 %» rather
+ * than a «0 %» beside money that was spent (handoff 01). Null where the whole is nothing.
+ */
+export function shareOf(part: Money, whole: Money): { percent: number; tiny: boolean } | null {
+  if (part.currency !== whole.currency || whole.minor <= 0n) return null
+  const hundredths = (part.minor * 10_000n) / whole.minor
+  return { percent: Number((hundredths + 50n) / 100n), tiny: part.minor > 0n && hundredths < 100n }
+}

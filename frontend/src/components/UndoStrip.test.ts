@@ -1,0 +1,67 @@
+import { mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createAppI18n } from '@/i18n'
+import UndoStrip from './UndoStrip.vue'
+
+function render() {
+  return mount(UndoStrip, {
+    attachTo: document.body,
+    props: { text: 'Удалено: барбер · 5 000 ֏', announcement: 'Удалено', action: 'Вернуть' },
+    global: { plugins: [createAppI18n('ru')] },
+  })
+}
+
+describe('UndoStrip', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    document.body.innerHTML = ''
+  })
+
+  it('counts ten seconds down and then lets the removal stand', async () => {
+    const strip = render()
+    await vi.advanceTimersByTimeAsync(9_000)
+    expect(strip.find('.count').text()).toBe('1')
+    expect(strip.emitted('expire')).toBeUndefined()
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(strip.emitted('expire')).toHaveLength(1)
+  })
+
+  it('puts the focus on «Вернуть» — and that alone does not stop the count', async () => {
+    const strip = render()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(document.activeElement?.textContent).toContain('Вернуть')
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(strip.emitted('expire')).toHaveLength(1)
+  })
+
+  it('stands still while a finger rests on it, and goes on after', async () => {
+    const strip = render()
+    await vi.advanceTimersByTimeAsync(3_000)
+    await strip.trigger('pointerenter')
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(strip.emitted('expire')).toBeUndefined()
+    expect(strip.find('.count').text()).toBe('7')
+    await strip.trigger('pointerleave')
+    await vi.advanceTimersByTimeAsync(7_000)
+    expect(strip.emitted('expire')).toHaveLength(1)
+  })
+
+  it('stands still while the person has the focus in it', async () => {
+    const strip = render()
+    await vi.advanceTimersByTimeAsync(0)
+    await strip.trigger('focusin')
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(strip.emitted('expire')).toBeUndefined()
+  })
+
+  it('«Вернуть» takes the removal back and stops the count', async () => {
+    const strip = render()
+    await strip.find('button').trigger('click')
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(strip.emitted('restore')).toHaveLength(1)
+    expect(strip.emitted('expire')).toBeUndefined()
+  })
+})

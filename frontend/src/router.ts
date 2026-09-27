@@ -11,15 +11,19 @@ import ExchangeView from '@/views/ExchangeView.vue'
 import IncomesView from '@/views/IncomesView.vue'
 import DevicesView from '@/views/DevicesView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
+import MoneyView from '@/views/MoneyView.vue'
+import MoneyCategoriesView from '@/views/MoneyCategoriesView.vue'
 import { watchBrowserAnimatedBack } from '@/transitions'
 
-/** The four sections of the tab bar. «trip» is home: the main scenario of the product. */
-export type Tab = 'trip' | 'advice' | 'verdicts' | 'settings'
+/** The five sections of the tab bar. «trip» is home: the main scenario of the product. */
+export type Tab = 'trip' | 'advice' | 'verdicts' | 'money' | 'settings'
 
 export type RouteName =
   | 'trip'
   | 'advice'
   | 'verdicts'
+  | 'money'
+  | 'money-categories'
   | 'settings'
   | 'exchange'
   | 'incomes'
@@ -42,6 +46,12 @@ declare module 'vue-router' {
      * to it, so no screen has to know where it was opened from.
      */
     parent?: RouteName
+    /**
+     * Other screens this one may be opened from and lead back to, named by `?from=` — a finished
+     * trip opened from «Деньги» says «‹ Деньги» (MOL-82, В-3). Listed, so an address cannot make
+     * just any screen the parent.
+     */
+    from?: readonly RouteName[]
     /**
      * Drawn without a session: `App.vue` puts the login screen in front of every other route
      * (MOL-56). Only what is read before deciding to sign in may carry it — today «Данные и
@@ -91,6 +101,19 @@ export const routes = [
     component: VerdictsView,
     meta: { titleKey: 'verdict.title', tab: 'verdicts' },
   },
+  // The month is in the address (`?month=2026-09`) and changes by `replace` (MOL-82).
+  {
+    path: '/money',
+    name: 'money',
+    component: MoneyView,
+    meta: { titleKey: 'spending.title', tab: 'money' },
+  },
+  {
+    path: '/money/categories',
+    name: 'money-categories',
+    component: MoneyCategoriesView,
+    meta: { titleKey: 'spending.categories.title', parent: 'money' },
+  },
   {
     path: '/trip/add',
     name: 'item-search',
@@ -107,7 +130,7 @@ export const routes = [
     path: '/trip/history/:tripId',
     name: 'finished-trip',
     component: FinishedTripView,
-    meta: { titleKey: 'trip.history.finished_title', parent: 'trip-history' },
+    meta: { titleKey: 'trip.history.finished_title', parent: 'trip-history', from: ['money'] },
   },
   {
     path: '/trip/history/:tripId/add',

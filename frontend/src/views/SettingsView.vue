@@ -182,6 +182,7 @@ import { useSettings } from '@/composables/useSettings'
 import { useSignOutStore } from '@/stores/signOut'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
+import { useSpendingQueueStore } from '@/stores/spendingQueue'
 export default defineComponent({
   name: 'SettingsView',
   components: {
@@ -221,10 +222,11 @@ export default defineComponent({
     // «Выйти» (MOL-57): what would be lost is counted while the sheet is open, and the app is
     // asked to send it first — with a connection that is usually everything. Counted is all the
     // erasure takes that the server does not hold (adversarial Б3): the queue, the purchases it
-    // refused, every rating draft — a score picked and a review typed, «Сохранить» or not — and an
-    // unsaved settings form.
+    // refused, every rating draft — a score picked and a review typed, «Сохранить» or not — an
+    // unsaved settings form, and the spendings still on the phone or refused (MOL-82, adversarial М).
     const queue = useTripQueueStore()
     const drafts = useVerdictDraftsStore()
+    const spendings = useSpendingQueueStore()
     const signOut = useSignOutStore()
     const leaveOpen = ref(false)
     const unsent = computed(
@@ -232,12 +234,15 @@ export default defineComponent({
         queue.pending.length +
         queue.rejected.length +
         Object.keys(drafts.drafts).length +
+        spendings.pending.length +
+        spendings.rejected.length +
         (settings.form.dirty ? 1 : 0),
     )
     function askToLeave(): void {
       leaveOpen.value = true
       void queue.flush()
       void drafts.flush()
+      void spendings.flush()
     }
     watch(leaveOpen, (open) => {
       if (!open) signOut.stay()

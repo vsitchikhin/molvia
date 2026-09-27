@@ -205,12 +205,17 @@ describe('какие ключи приложение пишет на устро�
     // По владельцу — `molvia.<что>.<владелец>`, всё это уходит с `forgetOwner`.
     const perOwner = [
       'molvia.advice',
+      // Первые страницы трёх последних месяцев «Денег» — для офлайна (MOL-82).
+      'molvia.money',
       'molvia.places',
       'molvia.recent',
       // Набранный поиск и промах — пережить перезагрузку этого окна (MOL-46).
       'molvia.search-draft',
       'molvia.settings',
       'molvia.settings-draft',
+      // Очередь «Денег» и её отказы (MOL-82).
+      'molvia.spending-queue',
+      'molvia.spending-rejected',
       'molvia.trip',
       'molvia.trip-history',
       // Был ли последний ответ истории пустым — своим ключом, чтобы кэш читался прежней версией

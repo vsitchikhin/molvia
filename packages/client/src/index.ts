@@ -20,6 +20,14 @@ import {
   incomeAmendBodySchema,
   incomeBodySchema,
   incomesResponseCodec,
+  journalCursorCodec,
+  moneyMonthCodec,
+  monthSchema,
+  spendingAmendBodySchema,
+  spendingBodySchema,
+  spendingCategoriesResponseCodec,
+  spendingCategoryBodySchema,
+  spendingViewCodec,
   expensePatchSchema,
   finishTripBodySchema,
   tripHistoryCodec,
@@ -54,6 +62,13 @@ import type {
   IncomeAmendBody,
   IncomeBody,
   IncomesResponse,
+  JournalKey,
+  MoneyMonthView,
+  SpendingAmendBody,
+  SpendingBody,
+  SpendingCategoriesResponse,
+  SpendingCategoryBody,
+  SpendingView,
   ExpensePatch,
   TripHistory,
   TripHistoryCursor,
@@ -190,6 +205,33 @@ export interface MolviaClient {
   removeIncome(id: string): Promise<IncomesResponse>
   /** «Вернуть»: `error.not_found` once the removal is final. */
   restoreIncome(id: string): Promise<IncomesResponse>
+  /**
+   * «Деньги» (MOL-73): one month counted by the server, and one page of its journal after
+   * `cursor` — the key of the last row shown. A month that is not one answers `error.not_found`.
+   */
+  moneyMonth(month: string, cursor?: JournalKey): Promise<MoneyMonthView>
+  /**
+   * «Сохранить» a new spending. Named by the device, so safe to repeat: `created` is `false` for
+   * the same one again, `error.conflict` for the same identifier with anything else — or while it
+   * is marked removed.
+   */
+  recordSpending(body: SpendingBody): Promise<{ spending: SpendingView; created: boolean }>
+  /** The spending whole over the version shown: `error.conflict` when it moved on elsewhere. */
+  amendSpending(id: string, body: SpendingAmendBody): Promise<SpendingView>
+  /** Marked removed for ten minutes; `error.not_found` for anything that is not the owner's. */
+  removeSpending(id: string): Promise<void>
+  /** «Вернуть»: `error.not_found` once the removal is final. */
+  restoreSpending(id: string): Promise<SpendingView>
+  /** The owner's categories in the order of the chips, the removed ones marked. */
+  spendingCategories(): Promise<SpendingCategoriesResponse>
+  /** «Добавить категорию», named by the device: `error.spending_category_taken` for a live name. */
+  addSpendingCategory(
+    body: SpendingCategoryBody,
+  ): Promise<{ categories: SpendingCategoriesResponse; created: boolean }>
+  /** «Убрать из выбора»: nothing is erased, the spendings in it keep it. */
+  archiveSpendingCategory(id: string): Promise<SpendingCategoriesResponse>
+  /** «Вернуть» a category to the chips. */
+  restoreSpendingCategory(id: string): Promise<SpendingCategoriesResponse>
   /**
    * «Поставить оценку», or give it again — safe to repeat, which is what a draft sent when the
    * network is back needs. `created` is `true` for a first verdict, or one given after it was
@@ -442,6 +484,59 @@ export function createClient(options: ClientOptions): MolviaClient {
 
     restoreIncome: async (id) =>
       request(`/incomes/${segment(id)}/restore`, incomesResponseCodec, { method: 'POST' }),
+
+    moneyMonth: async (month, cursor) => {
+      // Checked before anything is sent, as a verdict's address is: a month that is not one could
+      // only be refused, and one carrying «/» would reach another address.
+      if (!monthSchema.safeParse(month).success) throw new ApiError(ERROR.NOT_FOUND, 'month', false)
+      const query = cursor
+        ? `?${new URLSearchParams({ cursor: journalCursorCodec.encode(cursor) }).toString()}`
+        : ''
+      return request(`/money/months/${month}${query}`, moneyMonthCodec)
+    },
+
+    recordSpending: async (body) => {
+      const { status, data } = await exchange('/spendings', spendingViewCodec, {
+        method: 'POST',
+        body: encode(spendingBodySchema, body),
+      })
+      return { spending: data, created: status === 201 }
+    },
+
+    amendSpending: async (id, body) =>
+      request(`/spendings/${segment(id)}`, spendingViewCodec, {
+        method: 'PUT',
+        body: encode(spendingAmendBodySchema, body),
+      }),
+
+    // A portal's page answering a redirected DELETE with 200 is not the removal (MOL-57, round 4).
+    removeSpending: async (id) => {
+      noContent(await exchange(`/spendings/${segment(id)}`, z.undefined(), { method: 'DELETE' }))
+    },
+
+    restoreSpending: async (id) =>
+      request(`/spendings/${segment(id)}/restore`, spendingViewCodec, { method: 'POST' }),
+
+    spendingCategories: () => request('/spending-categories', spendingCategoriesResponseCodec),
+
+    addSpendingCategory: async (body) => {
+      const { status, data } = await exchange(
+        '/spending-categories',
+        spendingCategoriesResponseCodec,
+        { method: 'POST', body: encode(spendingCategoryBodySchema, body) },
+      )
+      return { categories: data, created: status === 201 }
+    },
+
+    archiveSpendingCategory: async (id) =>
+      request(`/spending-categories/${segment(id)}`, spendingCategoriesResponseCodec, {
+        method: 'DELETE',
+      }),
+
+    restoreSpendingCategory: async (id) =>
+      request(`/spending-categories/${segment(id)}/restore`, spendingCategoriesResponseCodec, {
+        method: 'POST',
+      }),
 
     // 204 has no body, and nothing else is a success here.
     finishTrip: async (tripId, finishedOnDeviceAt) => {

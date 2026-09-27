@@ -8,12 +8,22 @@ import type { RouteLocation, RouteLocationNormalized, Router } from 'vue-router'
  */
 export type Direction = 'push' | 'pop' | 'tab'
 
-type Place = Pick<RouteLocation, 'matched' | 'fullPath' | 'meta' | 'name'>
+type Place = Pick<RouteLocation, 'matched' | 'fullPath' | 'meta' | 'name'> &
+  Partial<Pick<RouteLocation, 'query'>>
+
+/** The screen a route leads back to: its own parent, or one `?from=` names that it lists (MOL-82). */
+function parentOf(place: Place): string | undefined {
+  const from = place.query?.from
+  if (typeof from === 'string' && place.meta.from?.some((name) => name === from)) return from
+  return place.meta.parent
+}
 
 export function direction(from: Place, to: Place): Direction | null {
   if (from.matched.length === 0 || from.fullPath === to.fullPath) return null
-  if (to.meta.parent && to.meta.parent === from.name) return 'push'
-  if (from.meta.parent && from.meta.parent === to.name) return 'pop'
+  const into = parentOf(to)
+  const outOf = parentOf(from)
+  if (into && into === from.name) return 'push'
+  if (outOf && outOf === to.name) return 'pop'
   if (from.meta.tab && to.meta.tab) return 'tab'
   return null
 }

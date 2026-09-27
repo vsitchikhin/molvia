@@ -95,8 +95,8 @@ test('settings draft survives tabs and offline; another device produces an expli
   const footBox = await footnote.boundingBox()
   const dockBox = await page.locator('.dock').boundingBox()
   expect(footBox && dockBox && footBox.y + footBox.height <= dockBox.y).toBe(true)
-  // Four tabs still fit the phone, and remain real navigation links.
-  await expect(page.getByRole('navigation', { name: 'Разделы' }).getByRole('link')).toHaveCount(4)
+  // Five tabs still fit the phone, and remain real navigation links.
+  await expect(page.getByRole('navigation', { name: 'Разделы' }).getByRole('link')).toHaveCount(5)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   )
@@ -232,14 +232,14 @@ test('lost save responses remain uncertain until a read confirms the result', as
 
 test.describe('narrow English settings', () => {
   test.use({ locale: 'en-US', viewport: { width: 320, height: 740 } })
-  test('all four tabs and both currency fields fit', async ({ page }, testInfo) => {
+  test('all five tabs and both currency fields fit', async ({ page }, testInfo) => {
     await signedIn(page)
     await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByLabel('Spending currency', { exact: true })).toHaveValue('AMD')
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true)
-    await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(4)
+    await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(5)
     await testInfo.attach('settings-320-en', {
       body: await page.screenshot(),
       contentType: 'image/png',

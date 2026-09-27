@@ -27,6 +27,7 @@ import IconCog from '~icons/mdi/cog-outline'
 import IconCart from '~icons/mdi/cart-outline'
 import IconLightbulb from '~icons/mdi/lightbulb-on-outline'
 import IconStar from '~icons/mdi/star-outline'
+import IconWallet from '~icons/mdi/wallet-outline'
 import { useNavigation } from '@/navigation'
 import type { Tab } from '@/router'
 
@@ -34,11 +35,13 @@ const tabs: { name: Tab; icon: object }[] = [
   { name: 'trip', icon: markRaw(IconCart) },
   { name: 'advice', icon: markRaw(IconLightbulb) },
   { name: 'verdicts', icon: markRaw(IconStar) },
+  // The personal layer beside the settings, apart from the three «what to buy and where» (MOL-82).
+  { name: 'money', icon: markRaw(IconWallet) },
   { name: 'settings', icon: markRaw(IconCog) },
 ]
 
 /**
- * The four sections of 0.1. Which one is active is the router's to say — its exact match sets
+ * The five sections. Which one is active is the router's to say — its exact match sets
  * `aria-current="page"`, and the style hangs on that attribute rather than on a class of its
  * own, so what a screen reader hears and what the eye sees cannot disagree.
  *
@@ -74,7 +77,7 @@ export default defineComponent({
   left: 0;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
 
   /* 74 + the home indicator, not the handoff's fixed 74 + 22: 22 is one iPhone's indicator,
      and a phone with buttons would get an empty strip. */
@@ -106,6 +109,13 @@ export default defineComponent({
   &:focus-visible {
     @include focus-ring(-2px);
   }
+}
+
+/* Five columns are 64 px on a 320 px phone: «What to buy» wrapped there. Tightened, never cut
+   short — and only in English, where it is needed (MOL-82, handoff 05). */
+.label:lang(en) {
+  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .icon {

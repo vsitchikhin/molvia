@@ -1,12 +1,14 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { ApiError } from '@molvia/client'
-import { ERROR, ISSUE, isWireCode, pendingVerdictCodec, ratingSchema } from '@molvia/model'
+import { ERROR, isWireCode, pendingVerdictCodec, ratingSchema } from '@molvia/model'
 import type { PendingVerdict, Rating, WireCode } from '@molvia/model'
 import { api } from '@/api'
 import type { Score } from '@/components/rating'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
+import { HOLDS, isRecord } from '@/stores/queueing'
+import type { Loose } from '@/stores/queueing'
 import { read, write } from '@/stores/storage'
 
 /**
@@ -34,20 +36,6 @@ export type Held = 'offline' | 'failed'
 
 const KEY = 'molvia.verdict-drafts'
 const CONFIRMED_KEY = 'molvia.verdict-confirmed'
-
-/**
- * What stops a run rather than refusing the draft: no connection or a server that broke (both
- * arrive as INTERNAL), an answer off the contract — the captive portal of a shop's wifi — and
- * an identity the server no longer knows. The same three hold the trip queue (MOL-24), and so
- * does any code the API did not say itself.
- */
-const HOLDS: readonly WireCode[] = [ERROR.INTERNAL, ISSUE.RESPONSE_INVALID, ERROR.NO_ACTOR]
-
-type Loose = Record<string, unknown>
-
-function isRecord(value: unknown): value is Loose {
-  return typeof value === 'object' && value !== null
-}
 
 function encode(draft: VerdictDraft): Loose {
   return { ...draft, card: pendingVerdictCodec.encode(draft.card) }

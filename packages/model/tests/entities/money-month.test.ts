@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { Income } from '#model/entities/income'
-import { lastDayOf, moneyMonth, monthOf, previousMonth } from '#model/entities/money-month'
+import {
+  lastDayOf,
+  moneyMonth,
+  monthOf,
+  percentChange,
+  previousMonth,
+  shareOf,
+} from '#model/entities/money-month'
 import type { ConvertOn, MoneyMonthInput, TripLine } from '#model/entities/money-month'
 import { spendingIn, spendingSchema } from '#model/entities/spending'
 import type { Spending } from '#model/entities/spending'
@@ -379,5 +386,36 @@ describe('categories', () => {
     expect(
       spendingCategorySchema.safeParse({ ...base, preset: null, name: '   ', colour: 1 }).success,
     ).toBe(false)
+  })
+})
+
+describe('the figures the card prints beside the server’s sums (MOL-82)', () => {
+  const amd = (minor: bigint) => ({ minor, currency: 'AMD' as const })
+
+  it.each([
+    [317_800n, 345_620n, -8],
+    [345_620n, 335_560n, 3],
+    [100n, 100n, 0],
+    // Half away from zero, both ways.
+    [1_050n, 1_000n, 5],
+    [950n, 1_000n, -5],
+    [1_049n, 1_000n, 5],
+    [951n, 1_000n, -5],
+    [300n, 100n, 200],
+  ])('%s against %s is %s %', (current, previous, percent) => {
+    expect(percentChange(amd(current), amd(previous))).toBe(percent)
+  })
+
+  it('has nothing to say without a month before, or across a move of currency', () => {
+    expect(percentChange(amd(100n), amd(0n))).toBeNull()
+    expect(percentChange(amd(100n), { minor: 100n, currency: 'RUB' })).toBeNull()
+  })
+
+  it('names a share in whole percent, and one under a percent as tiny', () => {
+    expect(shareOf(amd(160_000n), amd(317_800n))).toEqual({ percent: 50, tiny: false })
+    expect(shareOf(amd(3_150n), amd(317_800n))).toEqual({ percent: 1, tiny: true })
+    expect(shareOf(amd(3_300n), amd(317_800n))).toEqual({ percent: 1, tiny: false })
+    expect(shareOf(amd(317_800n), amd(317_800n))).toEqual({ percent: 100, tiny: false })
+    expect(shareOf(amd(0n), amd(0n))).toBeNull()
   })
 })
