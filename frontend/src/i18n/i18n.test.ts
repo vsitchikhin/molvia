@@ -126,6 +126,7 @@ describe('словарь: повторяющиеся тексты', () => {
       'Этот день ещё не наступил': [
         'error.exchange_in_future',
         'error.income_in_future',
+        'error.money_account_in_future',
         'error.spending_in_future',
       ],
       // Цена Р-2 у двух экранов одной денежной модели: доходы пишутся, правятся, удаляются и

@@ -42,6 +42,14 @@ export const spendingSchema = z
     note: spendingTextSchema.nullable(),
     place: spendingTextSchema.nullable(),
     rate: exchangeRateSchema.nullable(),
+    /** The account it was paid from, or null — it then moves no balance (MOL-115, В-2). */
+    accountId: z.uuid().nullable(),
+    /**
+     * «Списано со счёта» (MOL-43 В-3): what left the account exactly, in its currency, when the
+     * spending's is another. It moves the balance and nothing else — not the month (MOL-115 В-1),
+     * not the person's own rate: those drams were never in their hands.
+     */
+    debited: positiveMoneySchema.nullable(),
     revision: z.int().min(1),
     createdAt: z.date(),
     amendedAt: z.date().nullable(),
@@ -53,6 +61,9 @@ export const spendingSchema = z
       error: ISSUE.RATE_NOT_OF_SPENDING_CURRENCY,
     },
   )
+  .refine(({ accountId, debited }) => debited === null || accountId !== null, {
+    error: ISSUE.DEBITED_WITHOUT_ACCOUNT,
+  })
 export type Spending = z.infer<typeof spendingSchema>
 
 /**

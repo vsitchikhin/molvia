@@ -628,7 +628,12 @@
     "income_in_future": "An income cannot be dated in the future",
     "spending_in_future": "A spending cannot be dated in the future",
     "spending_category_unknown": "There is no such category — choose another",
-    "spending_category_taken": "A category with this name already exists"
+    "spending_category_taken": "A category with this name already exists",
+    "money_account_in_future": "An account cannot start in the future",
+    "money_account_taken": "An account with this name already exists — choose another name",
+    "money_account_unknown": "There is no such account — choose another",
+    "money_account_currency": "This account is in another currency",
+    "money_account_currency_locked": "This account already has operations, so its currency cannot change. Add a new account for another currency"
   },
   "settings": {
     "title": "Settings",

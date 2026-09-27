@@ -77,6 +77,7 @@ describe('incomesResponseCodec', () => {
     heldBefore: null,
     source: 'salary' as const,
     note: 'Викаса',
+    accountId: null,
     revision: 2,
     amendedAt: new Date('2026-09-25T10:00:00.000Z'),
     history: [

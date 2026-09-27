@@ -3,6 +3,7 @@ import { positiveMoneyCodec } from './exchange'
 import { deviceIdSchema, isoDate } from './trip'
 import { exchangeDaySchema } from '#model/entities/exchange'
 import { spendingTextSchema } from '#model/entities/spending'
+import { ISSUE } from '#model/support/errors'
 import {
   SPENDING_CATEGORY_COLOURS,
   spendingCategoryNameSchema,
@@ -21,23 +22,48 @@ const spendingFields = {
   categoryId: z.uuid().overwrite((id) => id.toLowerCase()),
   note: spendingTextSchema.optional(),
   place: spendingTextSchema.optional(),
+  /**
+   * The account it was paid from (MOL-115). Unlike every other field, one left out of an amendment
+   * is **kept**, not cleared: a screen older than accounts amends a note and must not take the
+   * spending off its account in silence (Р-26). `null` is «без счёта».
+   */
+  accountId: z
+    .uuid()
+    .overwrite((id) => id.toLowerCase())
+    .nullable()
+    .optional(),
+  /** «Списано со счёта», in the account's currency (MOL-43 В-3); left out, it follows the account. */
+  debited: positiveMoneyCodec.nullable().optional(),
+}
+
+function withDebitedRule<
+  Schema extends z.ZodType<{ accountId?: string | null | undefined; debited?: unknown }>,
+>(schema: Schema) {
+  return schema.refine(({ accountId, debited }) => debited == null || accountId !== null, {
+    error: ISSUE.DEBITED_WITHOUT_ACCOUNT,
+    path: ['debited'],
+  })
 }
 
 /**
  * «Сохранить» a new spending (MOL-73). Named by the device, as an exchange is, so a spending sent
  * twice from the queue is one spending. «Not after today» is the use case's, which has the clock.
  */
-export const spendingBodySchema = z.strictObject({ id: deviceIdSchema, ...spendingFields })
+export const spendingBodySchema = withDebitedRule(
+  z.strictObject({ id: deviceIdSchema, ...spendingFields }),
+)
 export type SpendingBody = z.infer<typeof spendingBodySchema>
 
 /**
  * «Сохранить» an amended one: the spending whole as it should now be, and the version it was amended
  * over — one amended on another phone in between is a conflict rather than lost (MOL-42, В-3).
  */
-export const spendingAmendBodySchema = z.strictObject({
-  revision: z.int().min(1),
-  ...spendingFields,
-})
+export const spendingAmendBodySchema = withDebitedRule(
+  z.strictObject({
+    revision: z.int().min(1),
+    ...spendingFields,
+  }),
+)
 export type SpendingAmendBody = z.infer<typeof spendingAmendBodySchema>
 
 /** One spending as the screen shows it, with the rate of its own day when it is in another currency. */
@@ -49,6 +75,9 @@ export const spendingViewCodec = z.strictObject({
   note: z.string().nullable(),
   place: z.string().nullable(),
   rate: rateCodec.nullable(),
+  // Defaults, so an answer of a server older than accounts still reads (MOL-115).
+  accountId: z.uuid().nullable().default(null),
+  debited: moneyCodec.nullable().default(null),
   revision: z.int().min(1),
   amendedAt: isoDate.nullable(),
 })

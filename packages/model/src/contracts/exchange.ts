@@ -34,6 +34,17 @@ const exchangeFields = {
   exchangedOn: exchangeDaySchema,
   heldBefore: moneyCodec.optional(),
   note: exchangeNoteSchema.optional(),
+  /** The accounts each side left and landed on (MOL-115); left out of an amendment, kept (Р-26). */
+  givenAccountId: z
+    .uuid()
+    .overwrite((id) => id.toLowerCase())
+    .nullable()
+    .optional(),
+  receivedAccountId: z
+    .uuid()
+    .overwrite((id) => id.toLowerCase())
+    .nullable()
+    .optional(),
 }
 
 interface ExchangeFields {
@@ -90,6 +101,8 @@ export const exchangeViewCodec = z.strictObject({
   received: moneyCodec,
   heldBefore: moneyCodec.nullable(),
   note: z.string().nullable(),
+  givenAccountId: z.uuid().nullable().default(null),
+  receivedAccountId: z.uuid().nullable().default(null),
   /** The version an amendment names, so one made elsewhere in between is a conflict. */
   revision: z.int().min(1),
   /** When it was last amended, or null — «исправлен 25 сент.» on the row. */

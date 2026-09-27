@@ -106,6 +106,8 @@ function spendingViewOf(spending: Spending) {
     note: spending.note,
     place: spending.place,
     rate: spending.rate,
+    accountId: spending.accountId,
+    debited: spending.debited,
     revision: spending.revision,
     amendedAt: spending.amendedAt,
   }
