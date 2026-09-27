@@ -64,6 +64,9 @@ async function render(
 beforeEach(() => {
   DrivenObserver.last = undefined
   vi.stubGlobal('IntersectionObserver', DrivenObserver)
+  // happy-dom lays nothing out, so a measured back label would land on whatever its zeros
+  // decide. Outside the tests that drive the measure, nothing is measured and the label is whole.
+  vi.stubGlobal('ResizeObserver', undefined)
 })
 
 afterEach(() => {
@@ -291,6 +294,132 @@ describe('AppScreen', () => {
         `${dictionary.nav.back_label} ${dictionary.nav.trip}`,
       )
       expect(back.get('.hidden').text()).toBe(dictionary.nav.back_label)
+    })
+
+    describe('when its label does not fit (MOL-75)', () => {
+      /** Sizes happy-dom does not lay out: the column, the labels and where the label starts. */
+      const size = { column: 200, full: 0, short: 0 }
+
+      /** Driven like the observer above: the test says «a size changed», the screen measures. */
+      class DrivenResizeObserver {
+        static all: DrivenResizeObserver[] = []
+        readonly observed: Element[] = []
+        constructor(readonly callback: ResizeObserverCallback) {
+          DrivenResizeObserver.all.push(this)
+        }
+        /** The one the label is measured by, among the row's and the strip's. */
+        static label(): DrivenResizeObserver | undefined {
+          return DrivenResizeObserver.all.find((each) =>
+            each.observed.some((node) => node.classList.contains('leading')),
+          )
+        }
+        observe(target: Element): void {
+          this.observed.push(target)
+        }
+        disconnect(): void {
+          this.observed.length = 0
+        }
+        resize(): void {
+          this.callback([], this as unknown as ResizeObserver)
+        }
+      }
+
+      beforeEach(() => {
+        Object.assign(size, { column: 200, full: 0, short: 0 })
+        DrivenResizeObserver.all = []
+        vi.stubGlobal('ResizeObserver', DrivenResizeObserver)
+        // Every width in fractions, as the browser draws them (review А1). The chevron ends 26
+        // into the button: that much of the column is never the label's.
+        vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+          this: Element,
+        ) {
+          const inSamples = this.parentElement?.classList.contains('samples') ?? false
+          const sample = this.nextElementSibling ? size.full : size.short
+          const width = this.classList.contains('leading') ? size.column : inSamples ? sample : 0
+          const right = this.classList.contains('chevron') ? 26 : width
+          return { left: 0, right, width } as DOMRect
+        })
+      })
+
+      const spoken = (view: Awaited<ReturnType<typeof render>>['view']): string =>
+        view.get('.back').text().replace(/\s+/g, ' ').trim()
+
+      it('says where it leads while that fits', async () => {
+        Object.assign(size, { full: 145, short: 40 })
+        const { view } = await render('/trip/history/5a3c3c1e-0000-4000-8000-000000000001')
+        expect(view.get('.back .label').text()).toBe(en.trip.history.title)
+        expect(spoken(view)).toBe(`${en.nav.back_label} ${en.trip.history.title}`)
+      })
+
+      // Review Р-2, owner's decision: the name keeps where it leads on every step of the ladder,
+      // the word shown first — «Back Trip history», not «Back» and not «Back Back».
+      it('shows «Back» alone, and is still named where it leads', async () => {
+        Object.assign(size, { column: 100, full: 145, short: 40 })
+        const { view } = await render('/trip/history/5a3c3c1e-0000-4000-8000-000000000001')
+        expect(view.get('.back .label').text()).toBe(en.nav.back_label)
+        expect(view.get('.back .hidden').text()).toBe(en.trip.history.title)
+        expect(spoken(view)).toBe(`${en.nav.back_label} ${en.trip.history.title}`)
+      })
+
+      it('is the chevron alone, and still read out whole', async () => {
+        Object.assign(size, { column: 60, full: 145, short: 40 })
+        const { view } = await render('/trip/history/5a3c3c1e-0000-4000-8000-000000000001', {
+          locale: 'ru',
+        })
+        expect(view.find('.back .label').exists()).toBe(false)
+        expect(view.findAll('.back .hidden')).toHaveLength(2)
+        expect(spoken(view)).toBe(`${ru.nav.back_label} ${ru.trip.history.title}`)
+      })
+
+      // The column narrows when the small title comes in and widens when it goes: the label
+      // follows it both ways, not only the first time it is measured.
+      it('measures again whenever the column or a label changes size', async () => {
+        Object.assign(size, { full: 145, short: 40 })
+        const { view } = await render('/trip/history/5a3c3c1e-0000-4000-8000-000000000001')
+        const observer = DrivenResizeObserver.label()
+        expect(observer?.observed).toHaveLength(3)
+
+        size.column = 60
+        observer?.resize()
+        await nextTick()
+        expect(view.find('.back .label').exists()).toBe(false)
+
+        size.column = 200
+        observer?.resize()
+        await nextTick()
+        expect(view.get('.back .label').text()).toBe(en.trip.history.title)
+      })
+
+      // «Назад» 51.06 wide in 51 of room: rounded, the word read 51 and «fit» by a fraction it
+      // did not have — and «Наз…» was drawn. A tenth more room, and it does fit.
+      it('decides in fractions, not in the whole pixels a browser rounds to', async () => {
+        Object.assign(size, { column: 77, full: 145.2, short: 51.06 })
+        const { view } = await render('/trip/history/5a3c3c1e-0000-4000-8000-000000000001', {
+          locale: 'ru',
+        })
+        expect(view.find('.back .label').exists()).toBe(false)
+
+        size.column = 77.1
+        DrivenResizeObserver.label()?.resize()
+        await nextTick()
+        expect(view.get('.back .label').text()).toBe(ru.nav.back_label)
+      })
+
+      // Nothing to hear a change by, so no measure to trust: the label is whole, and its
+      // ellipsis keeps it inside the column.
+      it('stays whole and measures nothing where the platform cannot observe a size', async () => {
+        vi.stubGlobal('ResizeObserver', undefined)
+        Object.assign(size, { column: 60, full: 145, short: 40 })
+        const { view } = await render('/trip/history/5a3c3c1e-0000-4000-8000-000000000001')
+        expect(view.get('.back .label').text()).toBe(en.trip.history.title)
+        expect(spoken(view)).toBe(`${en.nav.back_label} ${en.trip.history.title}`)
+      })
+
+      it('keeps no samples and observes nothing on a section', async () => {
+        const { view } = await render('/advice')
+        expect(view.find('.samples').exists()).toBe(false)
+        expect(DrivenResizeObserver.label()).toBeUndefined()
+      })
     })
 
     it('leads to the parent', async () => {
