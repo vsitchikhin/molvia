@@ -190,3 +190,81 @@ for (const choice of ['join', 'finish'] as const) {
     await expect(page.getByRole('button', { name: 'Choose trip' })).toHaveCount(0)
   })
 }
+
+test('a finished trip deleted from its own screen leaves the history, after a reload too (MOL-76)', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const trip = await createTrip(page, 'Deleted shop')
+  const itemResponse = await page.request.post('/api/catalogue/items', {
+    headers: await asBrowser(page),
+    data: { kind: 'product', name: `Deleted ${randomUUID()}`, defaultUnit: 'piece' },
+  })
+  const item = (await itemResponse.json()) as { id: string }
+  expect(
+    (
+      await page.request.post(`/api/trips/${trip.id}/expenses`, {
+        headers: await asBrowser(page),
+        data: { id: randomUUID(), itemId: item.id },
+      })
+    ).status(),
+  ).toBe(201)
+  await finish(page, trip.id, new Date().toISOString())
+  await page.reload()
+
+  const recent = page.locator('.history-row').filter({ hasText: 'Deleted shop' })
+  await recent.click()
+  await expect(page).toHaveURL(new RegExp(`/trip/history/${trip.id}$`))
+  await page.getByRole('button', { name: 'Delete the trip' }).click()
+  await expect(sheet(page)).toContainText('1 item')
+  await page.waitForTimeout(400)
+  await sheet(page).getByRole('button', { name: 'Delete the trip' }).click()
+
+  // Back where it was opened from — the home screen — with «Undo» there.
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByText('Trip deleted: Deleted shop')).toBeVisible()
+  await expect(recent).toHaveCount(0)
+  await expect
+    .poll(async () =>
+      (
+        await page.request.get(`/api/trips/${trip.id}`, { headers: await asBrowser(page) })
+      ).status(),
+    )
+    .toBe(404)
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Start a trip' })).toBeVisible()
+  await expect(recent).toHaveCount(0)
+})
+
+test('a trip deleted with no connection is gone at once, and the removal goes with the signal (MOL-76)', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const trip = await createTrip(page, 'Offline delete')
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Delete the trip' })).toBeVisible()
+  await page.route('**/api/**', (route) => route.abort())
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false })
+    window.dispatchEvent(new Event('offline'))
+  })
+  await page.getByRole('button', { name: 'Delete the trip' }).click()
+  await expect(page.getByRole('button', { name: 'Start a trip' })).toBeVisible()
+  // Kept on the phone across a reload, and the trip does not come back from memory.
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Start a trip' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Delete the trip' })).toHaveCount(0)
+
+  await page.unroute('**/api/**')
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => true })
+    window.dispatchEvent(new Event('online'))
+  })
+  await expect
+    .poll(async () =>
+      (
+        await page.request.get(`/api/trips/${trip.id}`, { headers: await asBrowser(page) })
+      ).status(),
+    )
+    .toBe(404)
+})
