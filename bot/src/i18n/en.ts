@@ -37,7 +37,7 @@ export const en: Dictionary = {
   'erase.prompt':
     'Delete all your data in Molvia?\n\n' +
     'Everything Molvia knows about you will go: purchases, spending and its categories, money ' +
-    'exchanges, income, ratings and ' +
+    'exchanges, income, accounts and checks, ratings and ' +
     'reviews, search picks, visit marks, settings and sign-ins on every device. Items and ' +
     'shops you added to the shared catalogue will stay — without your name.\n\n' +
     'This cannot be undone.',
