@@ -479,7 +479,10 @@ row to a variety: «молоко 1 л» put «Молоко 1,5%» first by the �
 variety. The fat is read off the query as typed (`percentNumbers`) and matched against the name as
 written, since the key drops the sign and splits the number at its comma; its digits are taken out of
 the distance, or the «1» of «молоко 1%» paired with «Молоко 1,5%» at no cost before the rule of fats
-was asked (review Н′). A space before «%» is `WORD_BREAK` on both sides — `\s` of JavaScript takes
+was asked (review Н′). By value, not by place: a size that shares a digit with the fat leaves with
+it — «кефир 1% 1 л» is judged by «л» alone — which loses nothing measured, since a neighbour of the
+same fat has the same digits and one of another fat is told apart by the rule of fats (review С-12).
+A space before «%» is `WORD_BREAK` on both sides — `\s` of JavaScript takes
 the no-break space a name pasted from a shop's site carries, `[[:space:]]` of Postgres does not
 (review О) — and as many fats are looked at as words (review П). On the shelf of MOL-14 all six
 ties go to the item meant. The prices, named: a short wrong name beside a long right one — «лейс»
@@ -489,8 +492,9 @@ one key length are still the uuid's where the similarity is equal too — «Мо
 on the seed «кур» is «Курица» or «Курага»; «молоко 1», typed on the way to «1 л», still gives
 «Молоко 1,5%», whose «1» is an exact pair; a fat typed without «%» is read as a size — «масло 72,5»
 and «молоко 3,2» still find their variety, both digits paired at no cost, but a size beside them
-takes it away; and a short word may pair twice with one of the name's — «творог 5,5%» is «Творог 5%»
-at no cost, by the distance and before any rule of fats.
+takes it away; and without «%» a short word may pair twice with one of the name's — «творог 5,5» is
+«Творог 5%» at no cost, by the distance (with the sign, «творог 5,5%» gives «Творог», the digits of a
+fat being out of the distance — review Р).
 **No point of the grid did better on both halves.** A threshold of 0.3 empties every false hit
 but drops «Молоко Ашхар» from «малако» — the case 0.15 exists for; a budget of 1 empties them
 too and loses five typos and «собачий корм»; a budget of 3 wins one query and brings six false
