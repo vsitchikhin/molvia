@@ -813,6 +813,25 @@ describe('the trip', () => {
     expect(new URL(finishing.calls[0]?.url ?? '').pathname).toBe(`/trips/${TRIP}/finish`)
   })
 
+  it('removes a trip and brings it back inside its own path segment (MOL-76)', async () => {
+    const removal = clientReplying(204, null)
+    await removal.client.removeTrip('../actors/me')
+    expect(removal.calls[0]?.method).toBe('DELETE')
+    expect(new URL(removal.calls[0]?.url ?? '').pathname).toBe('/trips/..%2Factors%2Fme')
+
+    const back = clientReplying(200, tripWire)
+    expect((await back.client.restoreTrip(TRIP)).id).toBe(TRIP)
+    expect(back.calls[0]?.method).toBe('POST')
+    expect(new URL(back.calls[0]?.url ?? '').pathname).toBe(`/trips/${TRIP}/restore`)
+
+    // A portal's page answering the DELETE is not the removal.
+    const portal = clientServing('<html>Wi-Fi</html>', {
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+    })
+    expect(await codeOf(portal.removeTrip(TRIP))).toBe(ISSUE.RESPONSE_INVALID)
+  })
+
   it('chooses which rate a trip counts by after a jump, and refuses a choice that is not one', async () => {
     const { client, calls } = clientReplying(200, tripWire)
 

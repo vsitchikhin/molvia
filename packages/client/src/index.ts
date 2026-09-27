@@ -161,6 +161,14 @@ export interface MolviaClient {
    */
   chooseTripRate(tripId: string, body: RateChoiceBody): Promise<TripView>
   /**
+   * «Удалить поход» (MOL-76): marked on the server, safe to send again. `error.not_found` for a
+   * trip the server does not hold — never sent, someone else's, or final — which the queue reads
+   * as done.
+   */
+  removeTrip(tripId: string): Promise<void>
+  /** «Вернуть» within ten minutes; `error.trip_open` for an open one while another is open. */
+  restoreTrip(tripId: string): Promise<TripView>
+  /**
    * «Обмен денег» whole (MOL-40): the preference, the wallet of the pair, the hint and every
    * exchange with its comparison — all the server's, so the screen divides nothing.
    */
@@ -434,6 +442,14 @@ export function createClient(options: ClientOptions): MolviaClient {
         method: 'PUT',
         body: encode(rateChoiceBodySchema, body),
       }),
+
+    // A portal's page answering a redirected DELETE with 200 is not the removal (MOL-57, round 4).
+    removeTrip: async (tripId) => {
+      noContent(await exchange(`/trips/${segment(tripId)}`, z.undefined(), { method: 'DELETE' }))
+    },
+
+    restoreTrip: async (tripId) =>
+      request(`/trips/${segment(tripId)}/restore`, tripViewCodec, { method: 'POST' }),
 
     exchanges: () => request('/exchanges', exchangesResponseCodec),
 
