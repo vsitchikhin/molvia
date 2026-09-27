@@ -24,6 +24,7 @@ import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
 import { useSignOutStore } from '@/stores/signOut'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 
 // No header of its own: no mockup carries the brand, every screen is titled by its section,
@@ -40,7 +41,8 @@ export default defineComponent({
     const closed = computed(() => login.closed)
 
     // The app, not a screen, sends what waits on the phone, whichever screen is open when the
-    // connection is back: purchases written at the shelf (MOL-24) and saved ratings (MOL-28).
+    // connection is back: purchases written at the shelf (MOL-24), saved ratings (MOL-28) and
+    // spendings (MOL-82).
     //
     // **Whether it may actually go out is each queue's own to decide**, and it is decided in
     // their `flush()`: only once the server has said who we are, because until then the app is
@@ -51,9 +53,11 @@ export default defineComponent({
     // `flush` and `flush` was never reached (adversarial Г1).
     const queue = useTripQueueStore()
     const drafts = useVerdictDraftsStore()
+    const spendings = useSpendingQueueStore()
     const send = () => {
       void queue.flush()
       void drafts.flush()
+      void spendings.flush()
     }
     onMounted(send)
     useReconnect(send)

@@ -6,6 +6,7 @@ import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
 import { clearLeaving, forgetOwner, leavingOwner, markLeaving } from '@/stores/identity'
 import { whileQueueIsStill } from '@/stores/tripQueue'
+import { whileSpendingsAreStill } from '@/stores/spendingQueue'
 
 /** Read afresh each time: the connection read before an `await` says nothing about after it. */
 function connected(): boolean {
@@ -44,6 +45,19 @@ function notReached(error: unknown): boolean {
  * A store rather than a composable for that reason: it has to hear the identity settle from the
  * moment the app starts, the screen with the button or not.
  */
+/**
+ * The drawer goes while no window sends either queue of this owner — the trip's, then the
+ * spendings' (MOL-82), always in that order, so two windows never wait on each other.
+ */
+function whileQueuesAreStill(owner: string, work: () => void): Promise<void> {
+  return whileQueueIsStill(owner, () =>
+    whileSpendingsAreStill(owner, () => {
+      work()
+      return Promise.resolve()
+    }),
+  )
+}
+
 export const useSignOutStore = defineStore('signOut', () => {
   const actor = useActorStore()
   /** The request is on its way — the sheet holds its button. */
@@ -62,9 +76,8 @@ export const useSignOutStore = defineStore('signOut', () => {
     if (finishing) return
     finishing = true
     actor.release()
-    await whileQueueIsStill(owner, () => {
+    await whileQueuesAreStill(owner, () => {
       forgetOwner(owner)
-      return Promise.resolve()
     })
     window.location.replace('/')
   }
@@ -135,9 +148,8 @@ export const useSignOutStore = defineStore('signOut', () => {
    */
   async function erase(owner: string): Promise<void> {
     clearLeaving()
-    await whileQueueIsStill(owner, () => {
+    await whileQueuesAreStill(owner, () => {
       forgetOwner(owner)
-      return Promise.resolve()
     })
   }
 

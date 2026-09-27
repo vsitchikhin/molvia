@@ -211,6 +211,9 @@ describe('какие ключи приложение пишет на устро�
       'molvia.search-draft',
       'molvia.settings',
       'molvia.settings-draft',
+      // Очередь «Денег» и её отказы (MOL-82).
+      'molvia.spending-queue',
+      'molvia.spending-rejected',
       'molvia.trip',
       'molvia.trip-history',
       // Был ли последний ответ истории пустым — своим ключом, чтобы кэш читался прежней версией
