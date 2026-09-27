@@ -107,6 +107,8 @@ describe('словарь: повторяющиеся тексты', () => {
       'Что брать': ['advice.title', 'nav.advice'],
       Оценки: ['nav.verdicts', 'verdict.title'],
       Настройки: ['nav.settings', 'settings.title'],
+      // Таб, его экран и группа настроек, где живут обмены и доходы (MOL-82): один раздел денег.
+      Деньги: ['nav.money', 'settings.group_money', 'spending.title'],
       // The settings handoff names its own save action, independently of purchase editing.
       Сохранить: ['item.save_edit', 'settings.save'],
       // Цена Р-2: одно состояние, написанное для трёх экранов.
@@ -156,6 +158,7 @@ describe('словарь: повторяющиеся тексты', () => {
       'What to buy': ['advice.title', 'nav.advice'],
       Ratings: ['nav.verdicts', 'verdict.title'],
       Settings: ['nav.settings', 'settings.title'],
+      Money: ['nav.money', 'settings.group_money', 'spending.title'],
       Save: ['item.save_edit', 'settings.save'],
       'No connection': [
         'devices.offline.title',

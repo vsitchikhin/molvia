@@ -8,6 +8,7 @@
     "advice": "What to buy",
     "verdicts": "Ratings",
     "back_label": "Back",
+    "money": "Money",
     "settings": "Settings"
   },
   "state": {
@@ -340,6 +341,10 @@
     "source_mine": "mine",
     "source_official": "official",
     "home_currency": "My currency"
+  },
+  "spending": {
+    "title": "Money",
+    "subtitle": "Only you can see this"
   },
   "exchange": {
     "title": "Money exchange",

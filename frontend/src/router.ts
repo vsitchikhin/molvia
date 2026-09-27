@@ -11,15 +11,17 @@ import ExchangeView from '@/views/ExchangeView.vue'
 import IncomesView from '@/views/IncomesView.vue'
 import DevicesView from '@/views/DevicesView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
+import MoneyView from '@/views/MoneyView.vue'
 import { watchBrowserAnimatedBack } from '@/transitions'
 
-/** The four sections of the tab bar. «trip» is home: the main scenario of the product. */
-export type Tab = 'trip' | 'advice' | 'verdicts' | 'settings'
+/** The five sections of the tab bar. «trip» is home: the main scenario of the product. */
+export type Tab = 'trip' | 'advice' | 'verdicts' | 'money' | 'settings'
 
 export type RouteName =
   | 'trip'
   | 'advice'
   | 'verdicts'
+  | 'money'
   | 'settings'
   | 'exchange'
   | 'incomes'
@@ -90,6 +92,13 @@ export const routes = [
     name: 'verdicts',
     component: VerdictsView,
     meta: { titleKey: 'verdict.title', tab: 'verdicts' },
+  },
+  // The month is in the address (`?month=2026-09`) and changes by `replace` (MOL-82).
+  {
+    path: '/money',
+    name: 'money',
+    component: MoneyView,
+    meta: { titleKey: 'spending.title', tab: 'money' },
   },
   {
     path: '/trip/add',
