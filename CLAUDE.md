@@ -1576,7 +1576,10 @@ database access. In a product about data integrity, two write paths will silentl
   gets the chevron, labelled with the title of where it leads, never the word «Back». **At rest
   the label has the row; once the small title comes in it gives way first** (MOL-75): whole, else
   «Back», else the chevron alone — never a fragment, which «Trip…» would be — and the title yields
-  last, only when it alone does not fit between two chevrons. **It
+  last, only when it alone does not fit between two chevrons. The width is read in fractions, as the
+  label is drawn: rounded, a word 0.4px too wide passed as whole and was drawn «Наз…» (review А1).
+  **The name does not follow the ladder** — «Back Trip» on every step, the word shown first
+  (owner's decision on review). **It
   leads to the screen underneath when that screen is any ancestor** — the step the system
   button takes — and otherwise replaces onto the parent (`backTarget`, MOL-77): a finished trip
   opened from the home screen says «‹ Поход» and both «back»s go home. Tabs and the
