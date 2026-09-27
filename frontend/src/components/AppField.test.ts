@@ -62,6 +62,15 @@ describe('AppField', () => {
     expect(render({ kind: 'date' }).get('input').attributes('type')).toBe('date')
   })
 
+  it('draws a date in words over the native field, which stays the one read aloud (MOL-82)', () => {
+    const field = render({ kind: 'date', display: 'Сегодня, 27 сентября' })
+    expect(field.get('.shown').text()).toBe('Сегодня, 27 сентября')
+    expect(field.get('.shown').attributes('aria-hidden')).toBe('true')
+    expect(field.get('input').classes()).toContain('veiled')
+    expect(render({ kind: 'date', display: '' }).find('.shown').exists()).toBe(false)
+    expect(render({ kind: 'text', display: 'x' }).find('.shown').exists()).toBe(false)
+  })
+
   it('writes a review in several lines', () => {
     const view = render({ kind: 'multiline' })
     expect(view.find('input').exists()).toBe(false)

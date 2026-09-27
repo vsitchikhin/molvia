@@ -352,6 +352,32 @@ describe('MoneyView: the sheet', () => {
     expect(document.querySelector('dialog[open]')).toBeNull()
   })
 
+  it('С-2: brings the spending just saved into view once its row is there', async () => {
+    moneyMonth.mockResolvedValue(month())
+    recordSpending.mockReturnValue(new Promise(() => undefined))
+    const scrolled = vi.fn()
+    Element.prototype.scrollIntoView = scrolled
+    vi.stubGlobal('matchMedia', () => ({ matches: false }) as MediaQueryList)
+    const view = await render()
+    await button(view, en.spending.add).trigger('click')
+    await risen()
+    const amount = document.querySelector<HTMLInputElement>('dialog[open] input[inputmode=decimal]')
+    if (!amount) throw new Error('no amount')
+    amount.value = '1500'
+    amount.dispatchEvent(new Event('input'))
+    document.querySelector<HTMLInputElement>(`dialog[open] input[value="${BEAUTY}"]`)?.click()
+    await flushPromises()
+    await pressUntil(en.spending.sheet.save, () => {
+      expect(scrolled).toHaveBeenCalled()
+    })
+    const saved = useSpendingQueueStore().pending[0]
+    const row = scrolled.mock.contexts[0] as Element
+    expect(saved?.kind === 'record' && row.getAttribute('data-row')).toBe(
+      saved?.kind === 'record' ? saved.body.id : 'no record',
+    )
+    vi.unstubAllGlobals()
+  })
+
   it('removes without a question and offers «Undo», which brings the same spending back', async () => {
     moneyMonth.mockResolvedValue(month())
     const view = await render()

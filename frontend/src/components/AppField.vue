@@ -36,10 +36,14 @@
         </option>
       </select>
       <IconChevronDown v-if="kind === 'select'" class="chevron" aria-hidden="true" />
+      <span v-if="shows" class="shown" aria-hidden="true">
+        <IconCalendar class="shown-icon" />{{ display }}
+      </span>
       <input
         v-if="kind !== 'multiline' && kind !== 'select'"
         :id="id"
         class="control"
+        :class="{ veiled: shows }"
         v-bind="control()"
         :type="kind === 'date' ? 'date' : 'text'"
         :inputmode="kind === 'decimal' ? 'decimal' : undefined"
@@ -63,6 +67,7 @@
 import { computed, defineComponent, useAttrs, useId, useSlots } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import IconChevronDown from '~icons/mdi/chevron-down'
 import type { ErrorCode } from '@molvia/model'
 
@@ -92,7 +97,7 @@ export type FieldKind = 'text' | 'decimal' | 'multiline' | 'date' | 'select'
  */
 export default defineComponent({
   name: 'AppField',
-  components: { IconChevronDown },
+  components: { IconCalendar, IconChevronDown },
   inheritAttrs: false,
   props: {
     modelValue: { type: String, required: true },
@@ -106,6 +111,12 @@ export default defineComponent({
     },
     placeholder: { type: String, default: undefined },
     readonly: { type: Boolean, default: false },
+    /**
+     * A date's value in words — «Сегодня, 26 сентября» — drawn over the native field, which stays
+     * underneath to open the system picker and to be read aloud by its own value (MOL-82, handoff 07).
+     * Only for `kind="date"`, and only while it has words: an empty one shows the field as it is.
+     */
+    display: { type: String as PropType<string | null>, default: null },
   },
   emits: {
     'update:modelValue': (value: string) => typeof value === 'string',
@@ -141,7 +152,9 @@ export default defineComponent({
       )
     }
 
-    return { t, attrs, id, failed, control, describedBy, update }
+    const shows = computed(() => props.kind === 'date' && !!props.display)
+
+    return { t, attrs, id, failed, shows, control, describedBy, update }
   },
 })
 </script>
@@ -221,6 +234,44 @@ textarea.control {
   padding: var(--space-3) 0;
   line-height: var(--leading-body);
   resize: vertical;
+}
+
+.shown {
+  position: absolute;
+  inset: 0 var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text);
+  font-size: var(--text-body);
+  pointer-events: none;
+}
+
+.shown-icon {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--text-muted);
+}
+
+/* The native field keeps its place and its taps; only its own rendering of the date is hidden. */
+.veiled {
+  color: transparent;
+
+  &::-webkit-datetime-edit {
+    color: transparent;
+  }
+
+  /* Chrome's own calendar would be a second one beside the drawn icon: it is kept, unseen, over the
+     whole field, so a tap anywhere on it still opens the picker. */
+  &::-webkit-calendar-picker-indicator {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    opacity: 0;
+    cursor: pointer;
+  }
 }
 
 .well:has(textarea) {

@@ -878,6 +878,10 @@ nothing up.
   only spending removed turns the month into a newcomer's, and the strip went with the button it
   shared a block with (adversarial Г). The server keeps the removal ten minutes; the strip is what
   the screen offers.
+- **A date is shown in words over its native field** (`AppField`, `display`): «Сегодня, 27 сентября»
+  is drawn, the field stays underneath to open the system picker and to be read by its own value,
+  and Chrome's own calendar is kept unseen over the whole field. The spending just saved is scrolled
+  into view once its row is there; a finished trip opened from «Деньги» slides in as a push.
 - **The sheet says «saved» after it has closed** (adversarial И): the move to the spending's month
   made while it was open was undone by the step back that closes it. It checks the day — a cleared
   picker or a day before 2000 would fall over in the queue's codec — and that the category is one of

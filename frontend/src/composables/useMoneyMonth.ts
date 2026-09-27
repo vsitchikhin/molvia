@@ -1,6 +1,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
-import { moneyMonthCodec } from '@molvia/model'
+import { monthOf, moneyMonthCodec, yerevanDate } from '@molvia/model'
 import type { MoneyMonthView } from '@molvia/model'
 import { api } from '@/api'
 import { mergePages } from '@/components/spending'
@@ -23,6 +23,11 @@ export interface MoneyMonth {
   readonly fetchedAt: ComputedRef<Date | null>
   /** The owner's categories: this month's answer's, or those of the newest month kept. */
   readonly knownCategories: ComputedRef<MoneyMonthView['categories']>
+  /**
+   * «Мой курс на сегодня» — the running month's rate, from its answer kept on the phone when another
+   * month is on screen (review С-5): a spending is written today whatever month is looked at.
+   */
+  readonly todayRate: ComputedRef<MoneyMonthView['rate']>
   /** The next page is being read, or could not be. */
   readonly more: ComputedRef<'idle' | 'loading' | 'failed'>
   readonly loadMore: () => Promise<void>
@@ -71,6 +76,13 @@ function recallCategories(owner: string): MoneyMonthView['categories'] {
   return newest?.answer.categories ?? []
 }
 
+/** The rate of the running month as last answered — only a month read while it was running. */
+function recallTodayRate(owner: string): MoneyMonthView['rate'] {
+  const today = monthOf(yerevanDate(new Date()))
+  const running = recall(owner, today)
+  return running?.answer.rateKind === 'live' ? running.answer.rate : null
+}
+
 function remember(owner: string, answer: MoneyMonthView, fetchedAt: Date): void {
   const all = recallAll(owner)
   all[answer.month] = {
@@ -108,11 +120,14 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
 
   /** The categories of any month the phone keeps: they are the owner's, not a month's. */
   const kept = ref<MoneyMonthView['categories']>([])
+  /** Today's rate as the running month last answered it, for a sheet opened on another month. */
+  const keptRate = ref<MoneyMonthView['rate']>(null)
 
   function adopt(): void {
     const id = actor.id
     shown.value = id ? recall(id, selected.value) : null
     kept.value = id ? recallCategories(id) : []
+    keptRate.value = id ? recallTodayRate(id) : null
     // A page asked for on another month is not this month's to fetch (review У-3).
     moreAfterRead = false
     failure.value = null
@@ -143,6 +158,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       if (actor.id !== id || selected.value !== month || mine !== latest) return
       shown.value = { answer, fetchedAt: firstAt }
       kept.value = answer.categories
+      if (answer.rateKind === 'live') keptRate.value = answer.rate
       failure.value = null
       confirmed.value = true
       more.value = 'idle'
@@ -230,6 +246,9 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     }),
     fetchedAt: computed(() => shown.value?.fetchedAt ?? null),
     knownCategories: computed(() => shown.value?.answer.categories ?? kept.value),
+    todayRate: computed(() =>
+      shown.value?.answer.rateKind === 'live' ? shown.value.answer.rate : keptRate.value,
+    ),
     more: computed(() => more.value),
     loadMore,
     retry: load,

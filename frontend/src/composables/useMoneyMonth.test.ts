@@ -64,11 +64,11 @@ function page(days: [string, ReturnType<typeof entry>[]][], cursor: JournalKey |
 }
 
 /** Mounts a component that uses the composable, and hands back what it returned. */
-function host(pinia: ReturnType<typeof createPinia>): MoneyMonth {
+function host(pinia: ReturnType<typeof createPinia>, month = '2026-09'): MoneyMonth {
   const holder: { month?: MoneyMonth } = {}
   const Host = defineComponent({
     setup() {
-      holder.month = useMoneyMonth(ref('2026-09'))
+      holder.month = useMoneyMonth(ref(month))
       return () => h('div')
     },
   })
@@ -146,5 +146,31 @@ describe('useMoneyMonth', () => {
     const other = host(pinia)
     await flushPromises()
     expect(other.knownCategories.value.map((one) => one.id)).toEqual([BEAUTY])
+  })
+
+  it('С-5: another month on screen still knows today’s rate, from the running month kept', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-27T08:00:00Z'))
+    try {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      useActorStore().id = ACTOR
+      const rate = {
+        base: 'RUB' as const,
+        quote: 'AMD' as const,
+        scaled: 4_620_000n,
+        source: 'personal' as const,
+        asOf: new Date('2026-09-27T00:00:00Z'),
+      }
+      moneyMonth.mockResolvedValueOnce({ ...page([], null), rate })
+      host(pinia)
+      await flushPromises()
+      moneyMonth.mockResolvedValueOnce({ ...page([], null), month: '2026-08', rateKind: 'frozen' })
+      const august = host(pinia, '2026-08')
+      await flushPromises()
+      expect(august.todayRate.value?.scaled).toBe(4_620_000n)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -144,6 +144,7 @@
                 :category="categoryOf(row)"
                 :category-name="categoryNameOf(row)"
                 :spend-currency="month.spendCurrency"
+                :data-row="row.key"
                 @open="openRow(row, day.day)"
               />
             </AppCard>
@@ -297,7 +298,7 @@ export default defineComponent({
         ? asked
         : currentMonth.value
     })
-    const { phase, month, stale, fetchedAt, more, loadMore, retry, knownCategories } =
+    const { phase, month, stale, fetchedAt, more, loadMore, retry, knownCategories, todayRate } =
       useMoneyMonth(selected)
 
     function goMonth(next: string): void {
@@ -332,9 +333,7 @@ export default defineComponent({
       () => month.value?.spendCurrency ?? actor.settings?.spendCurrency ?? 'AMD',
     )
     /** «Мой курс на сегодня» for the sheet: only a running month's rate is today's. */
-    const liveRate = computed(() =>
-      month.value?.rateKind === 'live' ? (month.value.rate ?? null) : null,
-    )
+    const liveRate = computed(() => todayRate.value)
 
     /**
      * «Пусто» is somebody with nothing yet — no spending, no trip, no income (Р-6). The server
@@ -479,23 +478,45 @@ export default defineComponent({
 
     function compose(): void {
       lookAtToday()
+      toShow.value = null
       made.value = null
       target.value = { kind: 'add' }
       sheetOpen.value = true
     }
 
     function openRow(row: JournalRow, day: string): void {
+      toShow.value = null
       made.value = null
       target.value = row.kind === 'trip' ? { kind: 'trip', row, day } : { kind: 'manual', row }
       sheetOpen.value = true
     }
 
-    function saved(spentOn: string): void {
+    /** The spending just saved, until its row is on screen and brought into view (review С-2). */
+    const toShow = ref<string | null>(null)
+
+    function saved({ id, spentOn }: { id: string; spentOn: string }): void {
       lookAtToday()
       if (!online.value) announce?.(t('spending.saved_offline'))
       const into = monthOfDay(spentOn)
       if (into !== selected.value) goMonth(into)
+      toShow.value = id
     }
+
+    // The row comes with the queue at once, or with the month read again after the server took it,
+    // or not at all on a page not loaded yet — then nothing is scrolled.
+    watch(
+      [toShow, journal],
+      async ([id]) => {
+        if (!id) return
+        await nextTick()
+        const row = document.querySelector(`[data-row="${id}"]`)
+        if (!row) return
+        toShow.value = null
+        const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        row.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' })
+      },
+      { flush: 'post' },
+    )
 
     const removed = ref<(Removed & { stamp: number }) | null>(null)
     const addButton = ref<ComponentPublicInstance | null>(null)

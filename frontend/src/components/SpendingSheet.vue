@@ -84,13 +84,10 @@
         kind="date"
         min="2000-01-02"
         :max="today"
+        :display="dayWords"
         :error-text="dayBad ? t('spending.sheet.bad_day') : null"
         @update:model-value="dayBad = false"
-      >
-        <template #label-extra>
-          <span class="day-words">{{ dayWords }}</span>
-        </template>
-      </AppField>
+      />
 
       <AppField
         v-model="note"
@@ -247,7 +244,7 @@ export default defineComponent({
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
     'add-category': () => true,
-    saved: (spentOn: string) => typeof spentOn === 'string',
+    saved: (saved: { id: string; spentOn: string }) => typeof saved.id === 'string',
     removed: (removed: Removed) => typeof removed === 'object',
   },
   setup(props, { emit }) {
@@ -497,7 +494,8 @@ export default defineComponent({
       const row = manual.value
       const refused = refusal.value
       if (refused) queue.dismiss(refused)
-      if (!row) queue.record({ id: newId(), ...fields })
+      const id = row?.spending.id ?? newId()
+      if (!row) queue.record({ id, ...fields })
       // A refused record goes again as a record; one still waiting is amended over the revision
       // its record makes, which folds into it while nobody has begun to send it (review Т-4).
       else if (refused?.write.kind === 'record') queue.record({ id: row.spending.id, ...fields })
@@ -506,7 +504,7 @@ export default defineComponent({
       // Told once the sheet is away: a move of the month made while it was open was undone by the
       // step back that closes it (adversarial И).
       after = () => {
-        emit('saved', fields.spentOn)
+        emit('saved', { id, spentOn: fields.spentOn })
       }
       emit('update:open', false)
     }
@@ -684,7 +682,6 @@ export default defineComponent({
   font-variant-numeric: tabular-nums;
 }
 
-.day-words,
 .optional {
   margin-left: var(--space-1);
   color: var(--text-muted);
