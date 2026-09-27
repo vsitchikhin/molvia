@@ -74,10 +74,12 @@ forget: ## Erase a person by Telegram id: make forget TG=<id> [YES=1] (dry run w
 	$(NEED_SCAFFOLD)
 	./bin/forget-actor.sh "$$TG" $(if $(YES),--yes)
 
-# No value from a person reaches the recipe, so unlike `forget` it needs no wrapper script.
-seed: ## Put the common names into the catalogue: make seed [YES=1] (dry run without YES)
+# No value from a person reaches the recipe, so unlike `forget` it needs no wrapper script. It
+# writes only for YES=1 typed on this command line: `$(if $(YES),…)` read YES=0 as yes, and took a
+# YES left in the shell's environment as one too (adversarial Е).
+seed: ## Put the common names into the catalogue: make seed [YES=1] (dry run without YES=1)
 	$(NEED_SCAFFOLD)
-	npm run --silent seed -w @molvia/backend -- $(if $(YES),--yes)
+	npm run --silent seed -w @molvia/backend -- $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
 
 dev: ## Run api, pwa and bot for this copy
 	$(NEED_SCAFFOLD)
