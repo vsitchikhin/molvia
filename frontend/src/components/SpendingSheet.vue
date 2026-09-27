@@ -277,7 +277,22 @@ export default defineComponent({
         if (!open) return
         after = null
         today.value = yerevanDate(new Date())
-        const spending = manual.value?.spending
+        // A refused write opens on what the person typed, not on what the server holds: their
+        // correction is the thing to fix and send again (requirement 15). The categories and the
+        // revision stay the row's.
+        const refused = refusal.value?.write
+        const typedBody =
+          refused?.kind === 'record' || refused?.kind === 'amend' ? refused.body : null
+        const spending = typedBody
+          ? {
+              ...manual.value?.spending,
+              amount: typedBody.amount,
+              spentOn: typedBody.spentOn,
+              categoryId: typedBody.categoryId,
+              note: typedBody.note ?? null,
+              place: typedBody.place ?? null,
+            }
+          : manual.value?.spending
         amount.value = spending ? typed(spending.amount) : ''
         currency.value = spending?.amount.currency ?? props.spendCurrency
         categoryId.value = spending?.categoryId ?? null

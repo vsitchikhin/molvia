@@ -16,6 +16,7 @@ import MoneyView from './MoneyView.vue'
 
 const moneyMonth = vi.fn<(month: string, cursor?: JournalKey) => Promise<MoneyMonthView>>()
 const recordSpending = vi.fn<(body: SpendingBody) => Promise<unknown>>()
+const amendSpending = vi.fn<(id: string, body: unknown) => Promise<unknown>>()
 const removeSpending = vi.fn<(id: string) => Promise<void>>()
 const restoreSpending = vi.fn<(id: string) => Promise<unknown>>()
 const trip = vi.fn<(id: string) => Promise<TripView>>()
@@ -23,6 +24,7 @@ vi.mock('@/api', () => ({
   api: {
     moneyMonth: (month: string, cursor?: JournalKey) => moneyMonth(month, cursor),
     recordSpending: (body: SpendingBody) => recordSpending(body),
+    amendSpending: (id: string, body: unknown) => amendSpending(id, body),
     removeSpending: (id: string) => removeSpending(id),
     restoreSpending: (id: string) => restoreSpending(id),
     trip: (id: string) => trip(id),
@@ -127,9 +129,17 @@ beforeEach(() => {
   vi.restoreAllMocks()
   localStorage.clear()
   sessionStorage.clear()
-  for (const mock of [moneyMonth, recordSpending, removeSpending, restoreSpending, trip])
+  for (const mock of [
+    moneyMonth,
+    recordSpending,
+    amendSpending,
+    removeSpending,
+    restoreSpending,
+    trip,
+  ])
     mock.mockReset()
   recordSpending.mockResolvedValue(undefined)
+  amendSpending.mockResolvedValue(undefined)
   removeSpending.mockResolvedValue(undefined)
   restoreSpending.mockResolvedValue(undefined)
   online(true)
@@ -343,5 +353,43 @@ describe('MoneyView: the sheet', () => {
       expect(restoreSpending).toHaveBeenCalledWith(BARBER)
     })
     expect(view.find('.undo').exists()).toBe(false)
+  })
+
+  it('a refused amendment opens on what was typed, names why, and goes again over the server’s version', async () => {
+    moneyMonth.mockResolvedValue(month())
+    localStorage.setItem('molvia.actor', ACTOR)
+    localStorage.setItem(
+      `molvia.spending-rejected.${ACTOR}`,
+      JSON.stringify([
+        {
+          key: 'k1',
+          code: 'error.conflict',
+          write: {
+            kind: 'amend',
+            id: BARBER,
+            body: {
+              revision: 1,
+              spentOn: '2026-09-26',
+              amount: { amount: '6000.00', currency: 'AMD' },
+              categoryId: BEAUTY,
+              note: 'Barber',
+            },
+          },
+        },
+      ]),
+    )
+    const view = await render()
+    expect(view.text()).toContain(en.spending.refused)
+    await view.find('.body').trigger('click')
+    await risen()
+    const sheet = document.querySelector('dialog[open]')
+    expect(sheet?.textContent).toContain(en.spending.sheet.refused_conflict)
+    expect(sheet?.querySelector<HTMLInputElement>('input[inputmode=decimal]')?.value).toBe('6000')
+    await pressUntil(en.spending.sheet.save, () => {
+      expect(amendSpending).toHaveBeenCalled()
+    })
+    expect(amendSpending.mock.calls[0]?.[0]).toBe(BARBER)
+    expect(amendSpending.mock.calls[0]?.[1]).toMatchObject({ revision: 1, amount: amd('6000') })
+    expect(useSpendingQueueStore().rejected).toEqual([])
   })
 })
