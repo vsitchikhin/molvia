@@ -5,6 +5,7 @@ import type { PendingVerdict, PendingVerdicts } from '@molvia/model'
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
+import { useTripQueueStore } from '@/stores/tripQueue'
 import { read, write } from '@/stores/storage'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 import type { Score } from '@/stores/verdictDrafts'
@@ -298,6 +299,11 @@ export function useVerdictQueue(): VerdictQueue {
       recall(id)
       void load()
     },
+  )
+  // A trip removed or brought back takes its purchases' cards with it, or brings them (MOL-76).
+  watch(
+    () => useTripQueueStore().landed,
+    () => void load(),
   )
   onMounted(() => void load())
   useReconnect(() => void load())
