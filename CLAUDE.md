@@ -468,20 +468,25 @@ the more of a name the query covers, the nearer — and with a common name besid
 **found by the word before found by a synonym** («маслины» keeps «Маслины» above «Оливки»), **a
 whole word before the exact start of a longer one** («печень» is the liver, not «Печенье»: MOL-10's
 «below the exact match, never above it», which the length alone broke — review И; a start one edit
-off is not marked, or «туалетка» put the litter above the paper), **more fats typed with «%» paired**
-(«кефир 2,5% 1 л» names «Кефир 2,5%» — review З; a bare number may be a size, and counted it would
-hand «молоко 1 л» back to «Молоко 1,5%»), **then the shorter name, then the similarity**, then the
+off is not marked, or «туалетка» put the litter above the paper), **more fats typed with «%» that the
+name carries whole** («кефир 2,5% 1 л» names «Кефир 2,5%» — review З; whole, or «3,5%» scored on the
+«3» of «Молоко 3,2%» and a fat the list lacks lost the common name it should give — review Н; a bare
+number may be a size, and counted it would hand «молоко 1 л» back to «Молоко 1,5%»), **then the
+shorter name, then the similarity**, then the
 uuid. The length ranks before the similarity because a size in the query otherwise handed the first
 row to a variety: «молоко 1 л» put «Молоко 1,5%» first by the «1» of its fat, «рис 1 кг» put «Рис
 круглозёрный» first by the «к» of `kg` (adversarial А, Б) — the purchase and the rating went to the
-variety. The fat is read off the query as typed (`percentNumbers`), since the key drops the sign. On the shelf of MOL-14 all six
+variety. The fat is read off the query as typed (`percentNumbers`) and matched against the name as
+written, since the key drops the sign and splits the number at its comma. On the shelf of MOL-14 all six
 ties go to the item meant. The prices, named: a short wrong name beside a long right one — «лейс»
 puts «Рис» above the chips; «малако» finds «Молоко» where the similarity chose «Молоко
 миндальное»; among the kinds a wide word leads to, the shortest — «мясо» is «Фарш» first; names of
 one key length are still the uuid's where the similarity is equal too — «Молоко 1,5%» and «3,2%», and
 on the seed «кур» is «Курица» or «Курага»; «молоко 1», typed on the way to «1 л», still gives
-«Молоко 1,5%», whose «1» is an exact pair; and a fat typed without «%» — «масло 72,5» — is read as a
-size, so the variety waits for the sign.
+«Молоко 1,5%», whose «1» is an exact pair; a fat typed without «%» is read as a size — «масло 72,5»
+and «молоко 3,2» still find their variety, both digits paired at no cost, but a size beside them
+takes it away; and a short word may pair twice with one of the name's — «творог 5,5%» is «Творог 5%»
+at no cost, by the distance and before any rule of fats.
 **No point of the grid did better on both halves.** A threshold of 0.3 empties every false hit
 but drops «Молоко Ашхар» from «малако» — the case 0.15 exists for; a budget of 1 empties them
 too and loses five typos and «собачий корм»; a budget of 3 wins one query and brings six false
