@@ -22,6 +22,7 @@ import {
   formatEstimate,
   formatMoney,
   formatRate,
+  nextCategoryColour,
 } from '@molvia/model'
 import type {
   ExchangeRate,
@@ -112,12 +113,12 @@ export function categoriesWith(
   const list = [...server]
   for (const write of pending) {
     if (write.kind === 'category-add' && !list.some((one) => one.id === write.body.id)) {
-      const own = list.filter((one) => one.preset === null).length
+      // The server's own rule, so the colour does not change when the answer comes (review Т-11).
       list.push({
         id: write.body.id,
         preset: null,
         name: write.body.name,
-        colour: own % 8,
+        colour: nextCategoryColour(list),
         archived: false,
       })
     }
@@ -187,8 +188,23 @@ export interface JournalDay {
   readonly rows: JournalRow[]
 }
 
-function localView(write: Extract<SpendingWrite, { kind: 'record' }>): SpendingView {
-  const { id, spentOn, amount, categoryId, note, place } = write.body
+/**
+ * A spending only the phone holds, as the person last typed it: its record, or the latest
+ * amendment waiting behind a record already on its way (review Т-4). The server has no figures of
+ * it yet, so these are the only ones there are — unlike a server row, whose figures stay its own.
+ */
+function localView(
+  write: Extract<SpendingWrite, { kind: 'record' }>,
+  pending: readonly SpendingWrite[],
+): SpendingView {
+  const latest = pending
+    .filter(
+      (one): one is Extract<SpendingWrite, { kind: 'amend' }> =>
+        one.kind === 'amend' && one.id === write.body.id,
+    )
+    .at(-1)?.body
+  const { spentOn, amount, categoryId, note, place } = latest ?? write.body
+  const id = write.body.id
   return {
     id,
     spentOn,
@@ -265,8 +281,9 @@ export function journalOf(
     ),
   ]
   for (const { write, refusal } of local) {
-    const spending = localView(write)
-    if (known.has(spending.id) || !spending.spentOn.startsWith(month.month)) continue
+    const spending = localView(write, pending)
+    if (known.has(spending.id) || removing.has(spending.id)) continue
+    if (!spending.spentOn.startsWith(month.month)) continue
     if (spending.spentOn < reached) continue
     known.add(spending.id)
     const row: JournalRow = {
@@ -301,9 +318,17 @@ export function unsentIn(month: MoneyMonthView, pending: readonly SpendingWrite[
       day.entries.flatMap((entry) => (entry.kind === 'manual' ? [entry.spending.id] : [])),
     ),
   )
+  const removing = new Set(pending.flatMap((write) => (write.kind === 'remove' ? [write.id] : [])))
   const ids = new Set<string>()
   for (const write of pending) {
-    if (write.kind === 'record' && write.body.spentOn.startsWith(month.month))
+    // A record the month already shows is counted — its answer was lost, not the spending
+    // (adversarial Л) — and one being taken back is not waiting to be counted at all.
+    if (
+      write.kind === 'record' &&
+      write.body.spentOn.startsWith(month.month) &&
+      !shown.has(write.body.id) &&
+      !removing.has(write.body.id)
+    )
       ids.add(write.body.id)
     if (
       write.kind === 'amend' &&

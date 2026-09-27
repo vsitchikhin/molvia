@@ -170,6 +170,33 @@ describe('the journal with the queue laid over it', () => {
     expect(days[1]?.rows[0]).toMatchObject({ key: RENT, mark: 'refused', local: false })
   })
 
+  it('hides a spending still on the phone once its removal waits', () => {
+    const days = journalOf(month(), [record(NEW, '2026-09-26'), { kind: 'remove', id: NEW }], [])
+    expect(days.flatMap((day) => day.rows.map((row) => row.key))).not.toContain(NEW)
+  })
+
+  it('shows one still on the phone as last typed — the amendment behind its record (Т-4)', () => {
+    const days = journalOf(
+      month(),
+      [
+        record(NEW, '2026-09-26'),
+        {
+          kind: 'amend',
+          id: NEW,
+          body: { revision: 1, ...bodyOf(NEW, '2026-09-26'), amount: amd('500') },
+        },
+      ],
+      [],
+    )
+    const row = days[0]?.rows[0]
+    expect(row?.kind === 'manual' && row.spending.amount).toEqual(amd('500'))
+  })
+
+  it('Л: a record the month already shows is not «not counted yet»', () => {
+    expect(unsentIn(month(), [record(BARBER, '2026-09-26')])).toBe(0)
+    expect(unsentIn(month(), [record(NEW, '2026-09-26'), { kind: 'remove', id: NEW }])).toBe(0)
+  })
+
   it('counts what waits in the month — records, amendments and removals of its rows', () => {
     const pending: SpendingWrite[] = [
       record(NEW, '2026-09-25'),

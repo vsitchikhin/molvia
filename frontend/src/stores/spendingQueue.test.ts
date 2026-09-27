@@ -219,6 +219,45 @@ describe('spending queue', () => {
       expect(queue.rejected).toEqual([])
     })
 
+    it('Б: an amendment whose answer was lost is never folded into — the next goes over the next revision', async () => {
+      amendSpending.mockImplementationOnce(offline)
+      const queue = fresh()
+      queue.amend(BARBER, 1, fields('6000'))
+      await settled()
+      queue.amend(BARBER, 1, fields('7000'))
+      await queue.flush()
+      expect(calls).toEqual([`amend ${BARBER} r1`, `amend ${BARBER} r1`, `amend ${BARBER} r2`])
+      expect(amendSpending.mock.calls[1]?.[1].amount.minor).toBe(600_000n)
+      expect(amendSpending.mock.calls[2]?.[1].amount.minor).toBe(700_000n)
+    })
+
+    it('В: a write another window has begun to send is marked on the shelf and not folded into', () => {
+      localStorage.setItem(
+        `molvia.spending-queue.${ME}`,
+        JSON.stringify([
+          {
+            key: 'a',
+            attempted: true,
+            write: {
+              kind: 'record',
+              body: {
+                id: BARBER,
+                spentOn: '2026-09-20',
+                amount: { amount: '5000.00', currency: 'AMD' },
+                categoryId: BEAUTY,
+              },
+            },
+          },
+        ]),
+      )
+      const queue = fresh('idle')
+      queue.amend(BARBER, 1, fields('6000'))
+      queue.remove(BARBER)
+      expect(queue.pending.map((write) => write.kind)).toEqual(['record', 'amend', 'remove'])
+      const amend = queue.pending[1]
+      expect(amend?.kind === 'amend' && amend.body.revision).toBe(1)
+    })
+
     it('does not fold into another spending', async () => {
       const queue = fresh('idle')
       queue.record({ id: BARBER, ...fields() })
@@ -230,12 +269,12 @@ describe('spending queue', () => {
   })
 
   describe('«Удалить» and «Вернуть»', () => {
-    it('a spending that never left the phone is taken out, and put back whole', async () => {
+    it('«Вернуть» before anything left sends the spending as it was last typed', async () => {
       const queue = fresh('idle')
       queue.record({ id: BARBER, ...fields() })
       queue.amend(BARBER, 1, fields('6000'))
       const undo = queue.remove(BARBER)
-      expect(queue.pending).toEqual([])
+      expect(queue.pending.map((write) => write.kind)).toEqual(['record', 'remove'])
 
       queue.restore(undo)
       useActorStore().state = 'ready'
@@ -244,13 +283,34 @@ describe('spending queue', () => {
       expect(recordSpending.mock.calls[0]?.[0].amount.minor).toBe(600_000n)
     })
 
-    it('removing one not yet sent sends nothing at all', async () => {
+    it('removing one whose record waits still tells the server — it may have landed', async () => {
       const queue = fresh('idle')
       queue.record({ id: BARBER, ...fields() })
       queue.remove(BARBER)
       useActorStore().state = 'ready'
       await queue.flush()
-      expect(calls).toEqual([])
+      expect(calls).toEqual([`record ${BARBER}`, `remove ${BARBER}`])
+    })
+
+    it('А: a record whose answer was lost, then removed, is removed on the server', async () => {
+      recordSpending.mockImplementationOnce(offline)
+      const queue = fresh()
+      queue.record({ id: BARBER, ...fields() })
+      await settled()
+      queue.remove(BARBER)
+      await queue.flush()
+      expect(calls).toEqual([`record ${BARBER}`, `record ${BARBER}`, `remove ${BARBER}`])
+      expect(queue.pending).toEqual([])
+    })
+
+    it('a removal takes the refusal of its spending with it', async () => {
+      recordSpending.mockRejectedValueOnce(new ApiError(ERROR.SPENDING_IN_FUTURE, 'spentOn'))
+      const queue = fresh()
+      queue.record({ id: BARBER, ...fields() })
+      await settled()
+      expect(queue.rejected).toHaveLength(1)
+      queue.remove(BARBER)
+      expect(queue.rejected).toEqual([])
     })
 
     it('«Вернуть» before the removal left takes the removal back — nothing is sent', async () => {
@@ -283,7 +343,7 @@ describe('spending queue', () => {
     it('«Вернуть» too late is a refusal the screen can name', async () => {
       restoreSpending.mockRejectedValueOnce(new ApiError(ERROR.NOT_FOUND, 'spendingId'))
       const queue = fresh()
-      queue.restore({ kind: 'queued', id: BARBER })
+      queue.restore({ id: BARBER })
       await settled()
       expect(queue.rejected).toMatchObject([{ code: ERROR.NOT_FOUND, write: { kind: 'restore' } }])
     })

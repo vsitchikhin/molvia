@@ -40,17 +40,21 @@ export interface RejectedSpendingWrite {
   readonly code: WireCode
 }
 
-/**
- * What «Вернуть» needs to undo a removal: the writes of a spending that never left the phone and
- * were taken out of the queue, or the removal that was queued for one the server has.
- */
-export type SpendingUndo =
-  | { readonly kind: 'unqueued'; readonly id: string; readonly writes: readonly SpendingWrite[] }
-  | { readonly kind: 'queued'; readonly id: string }
+/** What «Вернуть» needs to undo a removal: the spending it was about. */
+export interface SpendingUndo {
+  readonly id: string
+}
 
 interface Kept {
   readonly key: string
   readonly write: SpendingWrite
+  /**
+   * A send of it has begun — in this window or another, and its answer may have been lost. Such a
+   * write may have landed, so nothing is ever folded into it or taken out in its place: «not sent»
+   * and «no answer» are one thing to a queue, and only the server can tell them apart (adversarial
+   * А, В). Kept in storage, since the window that sends it is not always the window that changes.
+   */
+  readonly attempted?: true
 }
 
 const QUEUE_KEY = 'molvia.spending-queue'
@@ -147,7 +151,12 @@ function recallKept(key: string): Kept[] {
   return parsedList(key).flatMap((item: unknown) => {
     if (!isRecord(item) || typeof item.key !== 'string') return []
     const write = decode(item.write)
-    return write ? [{ key: item.key, write }] : []
+    if (!write) return []
+    return [
+      item.attempted === true
+        ? { key: item.key, write, attempted: true }
+        : { key: item.key, write },
+    ]
   })
 }
 
@@ -229,7 +238,13 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     if (!id) return
     const queued = writeEverywhere(
       `${QUEUE_KEY}.${id}`,
-      JSON.stringify(kept.map((item) => ({ key: item.key, write: encode(item.write) }))),
+      JSON.stringify(
+        kept.map((item) => ({
+          key: item.key,
+          write: encode(item.write),
+          ...(item.attempted ? { attempted: true } : {}),
+        })),
+      ),
       (past) => stillWaiting(past, new Set(kept.map((item) => item.key))),
     )
     const refused = writeEverywhere(
@@ -335,6 +350,12 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
       if (!head) break
 
       let refusal: WireCode | null = null
+      // Marked before it leaves, on every shelf: another window must not fold into it or take it
+      // out while its fate is unknown.
+      if (!head.attempted) {
+        kept = kept.map((item) => (item.key === head.key ? { ...item, attempted: true } : item))
+        persist(owner)
+      }
       inFlight = head.key
       try {
         await send(head.write)
@@ -386,7 +407,8 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     void flush()
   }
 
-  const waiting = (item: Kept) => item.key !== inFlight
+  /** Neither on its way nor ever on its way: only such a write may be folded into or taken out. */
+  const waiting = (item: Kept) => item.key !== inFlight && !item.attempted
 
   /** «Сохранить» a new spending. */
   function record(body: SpendingBody): void {
@@ -423,9 +445,11 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
         )
         return
       }
-      // One on its way right now moves the revision by one when it lands: a record makes the
-      // first, an amendment the next.
-      const moving = kept.find((item) => !waiting(item) && spendingOf(item.write) === id)?.write
+      // One that may have landed moves the revision by one: a record makes the first, an
+      // amendment the next. The last of them counts — a queue may hold several.
+      const moving = kept
+        .filter((item) => !waiting(item) && spendingOf(item.write) === id)
+        .at(-1)?.write
       const base =
         moving?.kind === 'record'
           ? 1
@@ -436,33 +460,32 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     })
   }
 
-  /** «Удалить трату», without a question (В-4): what «Вернуть» needs is handed back. */
+  /**
+   * «Удалить трату», without a question (В-4). The removal always goes to the server, even for a
+   * spending whose record still waits: that record may have landed with its answer lost, and taken
+   * out here it would live on the server and come back with the next read (adversarial А). A
+   * removal of one that never landed is answered 404, which is done (`DONE_ENOUGH`). A refusal
+   * about the spending goes with it — there is nothing left to fix.
+   */
   function remove(id: string): SpendingUndo {
-    let undo: SpendingUndo = { kind: 'queued', id }
     change(() => {
-      const own = kept.filter(
-        (item) =>
-          waiting(item) &&
-          (item.write.kind === 'record' || item.write.kind === 'amend') &&
-          spendingOf(item.write) === id,
+      rejected.value = rejected.value.filter((item) => spendingOf(item.write) !== id)
+      if (
+        kept.some((item) => waiting(item) && item.write.kind === 'remove' && item.write.id === id)
       )
-      if (own.some((item) => item.write.kind === 'record')) {
-        kept = kept.filter((item) => !own.includes(item))
-        undo = { kind: 'unqueued', id, writes: own.map((item) => item.write) }
         return
-      }
       kept = [...kept, { key: newKey(), write: { kind: 'remove', id } }]
     })
-    return undo
+    return { id }
   }
 
-  /** «Вернуть»: the spending as it was, the same identifier (В-4). */
+  /**
+   * «Вернуть»: the removal taken back while it still waits, or the spending brought back by the
+   * server once the removal may have left — never written anew, which a marked spending answers
+   * with 409 (MOL-73, Д6).
+   */
   function restore(undo: SpendingUndo): void {
     change(() => {
-      if (undo.kind === 'unqueued') {
-        kept = [...kept, ...undo.writes.map((write) => ({ key: newKey(), write }))]
-        return
-      }
       const at = kept.findIndex(
         (item) => waiting(item) && item.write.kind === 'remove' && item.write.id === undo.id,
       )
