@@ -85,7 +85,7 @@ test('roubles to dollars to drams: the chain is the rate of the next trip', asyn
   await record('100', 'USD', '36150', 'AMD')
 
   await expect(page.locator('.figure')).toHaveText('4,06 ֏/₽')
-  await expect(page.locator('.costs li')).toHaveText(/^\$: 89,04 ₽\/\$ · по последнему обмену/)
+  await expect(page.locator('.costs li')).toHaveText(/^89,04 ₽\/\$ · по последнему обмену/)
 
   const headers = await asBrowser(page)
   const me = actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json())

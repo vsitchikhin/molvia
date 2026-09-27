@@ -21,7 +21,10 @@
       </div>
     </template>
 
-    <ScreenSkeleton v-if="phase === 'loading'" :groups="[32, 64, 64]" />
+    <!-- The shape of what is coming: the card of the rate, then cards of exchanges (handoff 02). -->
+    <ScreenSkeleton v-if="phase === 'loading'" :groups="[32, 64, 48]">
+      <OperationSkeleton />
+    </ScreenSkeleton>
 
     <template v-else-if="phase !== 'idle'">
       <ScreenState
@@ -90,7 +93,11 @@
           <!-- The currencies a chain went through, each at its own price: the drams' rate above
                is only as believable as the dollars' under it (MOL-42, Р-4). -->
           <ul v-if="overview.costs.length > 0" class="costs">
-            <li v-for="cost in overview.costs" :key="cost.rate.base" class="meta">
+            <li
+              v-for="cost in overview.costs"
+              :key="`${cost.rate.base}${cost.rate.quote}`"
+              class="meta"
+            >
               {{ costLineOf(cost) }}
             </li>
           </ul>
@@ -109,51 +116,36 @@
 
         <p class="frozen"><IconCheck aria-hidden="true" />{{ t('money.rate_frozen') }}</p>
 
-        <AppButton ref="recordButton" block :inactive="!online || busy" @click="compose">
-          <template #icon><IconPlus /></template>
-          {{ t('exchange.record') }}
-        </AppButton>
-
         <!-- Incomes alone can make the rate (MOL-66): then there is the card, and no list. -->
         <section v-if="overview.exchanges.length > 0" class="list">
           <h2 class="caption">{{ t('exchange.list_title') }}</h2>
-          <AppCard as="ul" list>
-            <li v-for="exchange in overview.exchanges" :key="exchange.id" class="row">
-              <!-- The row is the way into its amendment (MOL-42, В-3), as a verdict is amended
-                   where it is met. -->
-              <!-- No `aria-label`: it would replace the name whole, and the rate, the comparison
-                   and the note would go silent (review С-3). The verb is said first, unseen. -->
-              <button
-                class="body"
-                type="button"
-                :disabled="!online || busy"
-                @click="edit(exchange)"
-              >
-                <span class="verb">{{ t('exchange.edit') }}</span>
-                <span class="amounts">
-                  {{ amountsOf(exchange) }}
-                  <span v-if="exchange.amendedAt" class="amended">{{
-                    t('exchange.amended', { date: dayOf(exchange.amendedAt) })
-                  }}</span>
-                </span>
-                <span class="meta">{{ rateLineOf(exchange) }}</span>
-                <span class="meta">{{ comparisonOf(exchange) }}</span>
-                <span v-if="exchange.note" class="meta note">{{ exchange.note }}</span>
-              </button>
-              <button
-                class="remove"
-                type="button"
-                :disabled="!online || busy"
-                :aria-label="t('exchange.remove', { amounts: amountsOf(exchange) })"
-                @click="ask(exchange)"
-              >
-                <IconDelete aria-hidden="true" />
-              </button>
-            </li>
-          </AppCard>
+          <ExchangeCard
+            v-for="exchange in overview.exchanges"
+            :key="exchange.id"
+            :exchange="exchange"
+            :disabled="!online || busy"
+            @edit="edit"
+            @remove="ask"
+          />
         </section>
       </template>
     </template>
+
+    <!-- «Записать обмен» floats where «Трата» does, under the thumb (handoff 02); the empty
+         state keeps its own button at the bottom instead. -->
+    <FloatingDock v-if="overview && phase === 'ready'">
+      <AppButton
+        ref="recordButton"
+        size="large"
+        class="add"
+        :aria-label="t('exchange.record')"
+        :inactive="!online || busy"
+        @click="compose"
+      >
+        <template #icon><IconPlus /></template>
+        {{ t('exchange.fab') }}
+      </AppButton>
+    </FloatingDock>
 
     <ExchangeSheet
       v-if="overview"
@@ -176,12 +168,11 @@
 <script lang="ts">
 import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { currencySign, formatMoney, formatRate, yerevanMidnight } from '@molvia/model'
+import { currencySign, yerevanMidnight } from '@molvia/model'
 import type {
   Currency,
   CurrencyCost,
   ExchangeAmendBody,
-  ExchangeRate,
   ExchangeView as Row,
   ExchangesResponse,
   RatePreference,
@@ -189,18 +180,21 @@ import type {
 } from '@molvia/model'
 import IconCheck from '~icons/mdi/check-bold'
 import IconCloud from '~icons/mdi/cloud-off-outline'
-import IconDelete from '~icons/mdi/trash-can-outline'
 import IconPlus from '~icons/mdi/plus'
 import IconSwap from '~icons/mdi/swap-horizontal'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import ExchangeCard from '@/components/ExchangeCard.vue'
 import ExchangeRemoveSheet from '@/components/ExchangeRemoveSheet.vue'
 import ExchangeSheet from '@/components/ExchangeSheet.vue'
+import FloatingDock from '@/components/FloatingDock.vue'
+import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useExchangeWords } from '@/composables/useExchangeWords'
 import { useExchanges } from '@/composables/useExchanges'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { purchaseDay } from '@/days'
@@ -217,19 +211,22 @@ export default defineComponent({
     AppButton,
     AppCard,
     AppScreen,
+    ExchangeCard,
     ExchangeRemoveSheet,
     ExchangeSheet,
+    FloatingDock,
+    OperationSkeleton,
     ScreenSkeleton,
     ScreenState,
     SegmentedControl,
     IconCheck,
     IconCloud,
-    IconDelete,
     IconPlus,
   },
   setup() {
     const { t, locale } = useI18n()
     const exchanges = useExchanges()
+    const { rateOf, amountsOf, rateLineOf } = useExchangeWords()
     const sheetOpen = ref(false)
     // The exchange the sheet amends, or null when it records a new one.
     const editing = ref<Row | null>(null)
@@ -310,49 +307,12 @@ export default defineComponent({
       { value: 'official', label: t('exchange.preference_official') },
     ]
 
-    const rateOf = (rate: ExchangeRate): string => formatRate(rate, locale.value)
     const dayOf = (when: Date): string => purchaseDay(when, locale.value)
     const midnightOf = (day: string): Date => yerevanMidnight(day)
     const pairSigns = (pair: { base: Currency; quote: Currency }) => ({
       base: currencySign(pair.base, locale.value),
       quote: currencySign(pair.quote, locale.value),
     })
-
-    function amountsOf(exchange: Row): string {
-      return t('exchange.row_amounts', {
-        given: formatMoney(exchange.given, locale.value),
-        received: formatMoney(exchange.received, locale.value),
-      })
-    }
-
-    /** The day and the rate it was made at — the day alone for amounts no rate in the band says. */
-    function rateLineOf(exchange: Row): string {
-      const date = dayOf(midnightOf(exchange.exchangedOn))
-      return exchange.rate ? t('exchange.row_rate', { date, rate: rateOf(exchange.rate) }) : date
-    }
-
-    function comparisonOf(exchange: Row): string {
-      const official = exchange.official
-      if (!official) {
-        return t(exchange.officialDoubtful ? 'exchange.row_doubtful' : 'exchange.row_no_official')
-      }
-      const minor = official.difference.minor
-      const words = {
-        amount: formatMoney(
-          { ...official.difference, minor: minor < 0n ? -minor : minor },
-          locale.value,
-        ),
-        rate: rateOf(official.rate),
-        date: dayOf(official.rate.asOf),
-        source: t(`trip.rate.source_${official.provider}`),
-      }
-      // An open source is named instead of the central bank, never beside it: «чем по ЦБ РА ·
-      // не ЦБ РА» said a thing and took it back in one line (review С-6).
-      const bank = official.provider === 'cba'
-      if (minor > 0n) return t(bank ? 'exchange.row_more' : 'exchange.row_more_other', words)
-      if (minor < 0n) return t(bank ? 'exchange.row_less' : 'exchange.row_less_other', words)
-      return t(bank ? 'exchange.row_equal' : 'exchange.row_equal_other', words)
-    }
 
     /** Which money the rate was last taken from — an exchange or an income (MOL-66, Р-9). */
     function basisKey(basis: WalletBasis): string {
@@ -379,10 +339,14 @@ export default defineComponent({
       })
     }
 
-    /** «$: 89,04 ₽/$ · по последнему обмену · с 31 авг.» — and whether the bank priced part of it. */
+    /**
+     * «89,04 ₽/$ · по последнему обмену · с 31 авг.» — and whether the bank priced part of it. The
+     * rate names both currencies, and one of them is always the currency of conversion; which one
+     * the price is of can no longer be read off `base`, since a price is turned to the side at
+     * least one (MOL-81).
+     */
     function costLineOf(cost: CurrencyCost): string {
       const words = {
-        currency: currencySign(cost.rate.base, locale.value),
         rate: rateOf(cost.rate),
         basis: t(basisKey(cost.basis), { date: dayOf(cost.rate.asOf) }),
       }
@@ -421,7 +385,6 @@ export default defineComponent({
       unknownLineOf,
       rateLineOf,
       amountsOf,
-      comparisonOf,
       choose,
       IconSwap,
     }
@@ -512,88 +475,20 @@ export default defineComponent({
 }
 
 .list {
-  margin-top: var(--space-6);
-}
-
-.row {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  margin-top: var(--space-6);
+
+  // Room for «Обмен» under the last card: it floats over the list, as «Трата» does on the month.
+  padding-bottom: calc(var(--space-8) + var(--space-8) + var(--space-6));
 }
 
-.body {
-  display: grid;
-  flex: 1;
-  min-width: 0;
-  min-height: var(--touch-target);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-
-  &:disabled {
-    cursor: default;
-  }
-}
-
-.amounts {
+.list .caption {
   margin: 0;
-  font-size: var(--text-callout);
-  font-weight: var(--weight-medium);
-  font-variant-numeric: tabular-nums;
 }
 
-.verb {
-  @include visually-hidden;
-}
-
-.amended {
-  margin-left: var(--space-2);
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-regular);
-}
-
-.note {
-  overflow-wrap: anywhere;
-}
-
-.remove {
-  @include touch-target;
-
-  flex: none;
-  justify-content: center;
-  width: var(--touch-target);
-  border: 0;
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-
-  &:disabled {
-    opacity: var(--opacity-stale);
-    cursor: default;
-  }
-
-  svg {
-    width: var(--space-6);
-    height: var(--space-6);
-  }
+.add {
+  box-shadow: var(--shadow-md);
 }
 </style>

@@ -156,6 +156,12 @@ describe('словарь: повторяющиеся тексты', () => {
       Сумма: ['income.sheet.amount', 'spending.sheet.amount'],
       // Название экрана и пункт страницы приватности о том же (MOL-58, MOL-66).
       Доходы: ['income.title', 'privacy.stored.incomes.term'],
+      // Плавающая кнопка и заголовок её шторки, как «Трата» (MOL-81); подписи сумм карточки и
+      // полей шторки — одни слова об одном обмене.
+      Обмен: ['exchange.fab', 'exchange.sheet.title'],
+      Доход: ['income.fab', 'income.sheet.title'],
+      Отдал: ['exchange.card_given', 'exchange.sheet.given'],
+      Получил: ['exchange.card_received', 'exchange.sheet.received'],
     })
   })
 
@@ -201,7 +207,10 @@ describe('словарь: повторяющиеся тексты', () => {
       // English has one word where Russian says «было до обмена» and «было до поступления».
       'held before {amount}': ['exchange.sheet.current_held', 'income.sheet.current_held'],
       // One English word for the screen, its sheet and the privacy entry; Russian has «Доход».
-      Income: ['income.sheet.title', 'income.title', 'privacy.stored.incomes.term'],
+      Income: ['income.fab', 'income.sheet.title', 'income.title', 'privacy.stored.incomes.term'],
+      Exchange: ['exchange.fab', 'exchange.sheet.title'],
+      Gave: ['exchange.card_given', 'exchange.sheet.given'],
+      Got: ['exchange.card_received', 'exchange.sheet.received'],
     })
   })
 })

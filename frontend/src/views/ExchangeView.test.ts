@@ -141,10 +141,20 @@ function confirmButton() {
   return found
 }
 
+/** «Записать обмен»: the floating «Обмен» named in full, or the empty state's own button. */
+function recordButton(view: VueWrapper) {
+  return view
+    .findAll('button')
+    .find(
+      (button) =>
+        button.attributes('aria-label') === en.exchange.record ||
+        button.text() === en.exchange.record,
+    )
+}
+
 /** «Записать обмен» → the sheet → 20 000 ₽ → 95 000 ֏ → «Сохранить». */
 async function recordThroughSheet(view: VueWrapper): Promise<void> {
-  const record = view.findAll('button').find((button) => button.text() === en.exchange.record)
-  await record?.trigger('click')
+  await recordButton(view)?.trigger('click')
   await flushPromises()
   clock += 1000
   await new Promise((resolve) => setTimeout(resolve, 5))
@@ -204,7 +214,7 @@ describe('ExchangeView: the four states', () => {
     expect(view.get('.figure').text()).toContain('4.3')
     expect(view.text()).toContain('by the last income')
     expect(view.text()).toContain(en.exchange.preference_legend)
-    expect(view.text()).toContain(en.exchange.record)
+    expect(recordButton(view)?.text()).toBe(en.exchange.fab)
     expect(view.text()).not.toContain(en.exchange.list_title)
   })
 
@@ -285,7 +295,8 @@ describe('ExchangeView: the rate and the list', () => {
     const view = await render()
     expect(view.text()).toContain(en.exchange.estimated)
     const [line] = view.findAll('.costs li')
-    expect(line?.text()).toContain('$: 89.04 ₽/$')
+    // The rate names both currencies; a «$:» in front of it said one of them twice (MOL-81).
+    expect(line?.text()).toMatch(/^89\.04 ₽\/\$ · /)
     expect(line?.text()).toContain('by the last exchange')
     expect(line?.text()).not.toContain('Central Bank')
   })
@@ -366,10 +377,14 @@ describe('ExchangeView: the rate and the list', () => {
       }),
     )
     const view = await render()
-    const rows = view.findAll('.row')
-    expect(rows[0]?.text()).toMatch(/8,754\.00.*more than the central bank/)
-    expect(rows[1]?.text()).toMatch(/5,000\.00.*less than the central bank/)
-    expect(rows[2]?.text()).toContain(en.exchange.row_no_official)
+    const cards = view.findAll('article')
+    // Whole amounts as they would be typed, as everywhere in «Деньги» (MOL-81, В-1).
+    expect(cards[0]?.get('.difference').text()).toBe('֏8,754 more than the central bank')
+    expect(cards[1]?.get('.difference').text()).toBe('֏5,000 less than the central bank')
+    // Nothing to compare with is one line in place of three: no bank's rate and no difference.
+    expect(cards[2]?.get('.missing').text()).toBe(en.exchange.card_no_official)
+    expect(cards[2]?.find('.difference').exists()).toBe(false)
+    expect(cards[2]?.findAll('.plate .line')).toHaveLength(1)
     expect(view.text()).not.toMatch(/commission/i)
   })
 
@@ -378,7 +393,7 @@ describe('ExchangeView: the rate and the list', () => {
       overview({ exchanges: [row({ official: null, officialDoubtful: true })] }),
     )
     const view = await render()
-    expect(view.get('.row').text()).toContain(en.exchange.row_doubtful)
+    expect(view.get('article .missing').text()).toBe(en.exchange.card_doubtful)
   })
 
   it('names an open source when the bank of that day was not the central bank', async () => {
@@ -396,10 +411,13 @@ describe('ExchangeView: the rate and the list', () => {
       }),
     )
     const view = await render()
-    const text = view.get('.row').text()
-    // Named instead of the central bank, never beside it (С-6).
+    const text = view.get('article').text()
+    // Named instead of the central bank, never beside it (С-6) — in the label and the difference.
+    expect(view.get('article .plate .line + .line .label').text()).toMatch(
+      new RegExp(`^${en.trip.rate.source_cbr} on `),
+    )
     expect(text).toContain(`than the ${en.trip.rate.source_cbr} rate`)
-    expect(text).not.toContain('central bank')
+    expect(text).not.toMatch(/central bank/i)
   })
 
   it('without a pair says there is nothing to convert, and offers no preference', async () => {
@@ -446,11 +464,11 @@ describe('ExchangeView: the rate and the list', () => {
     const view = await render()
 
     const remove = view.get('button.remove')
-    expect(remove.attributes('aria-label')).toMatch(/Delete the exchange .*20,000\.00.*95,000\.00/)
+    expect(remove.attributes('aria-label')).toMatch(/^Delete the exchange ₽20,000 → ֏95,000$/)
     await askToRemove(view)
     const sheet = document.querySelector('dialog[open]')
     expect(sheet?.textContent).toContain(en.exchange.remove_sheet.title)
-    expect(sheet?.textContent).toMatch(/20,000\.00.*95,000\.00/)
+    expect(sheet?.textContent).toContain('₽20,000 → ֏95,000')
     expect(removeExchange).not.toHaveBeenCalled()
   })
 
@@ -505,7 +523,7 @@ describe('ExchangeView: the rate and the list', () => {
     const restore = view.findAll('button').find((button) => button.text() === en.exchange.restore)
     await restore?.trigger('click')
     await flushPromises()
-    expect(document.activeElement?.textContent.trim()).toBe(en.exchange.record)
+    expect(document.activeElement?.getAttribute('aria-label')).toBe(en.exchange.record)
   })
 
   it('a new exchange that never reached the server keeps «Bring back» (Е1)', async () => {
@@ -618,6 +636,26 @@ describe('ExchangeView: the rate and the list', () => {
 
     expect(view.text()).toContain(en.exchange.offline.strip)
     expect(view.get('button.remove').attributes('disabled')).toBeDefined()
+    // «Обмен» floats on, inactive rather than gone, and a tap on it opens nothing (handoff 02).
+    const record = recordButton(view)
+    expect(record?.attributes('aria-disabled')).toBe('true')
+    await record?.trigger('click')
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+  })
+
+  it('«Обмен» floats, named in full; the empty screen keeps its own button instead (handoff 02)', async () => {
+    exchanges.mockResolvedValue(overview())
+    const full = await render()
+    const floating = full.get(`button[aria-label="${en.exchange.record}"]`)
+    expect(floating.text()).toBe(en.exchange.fab)
+    expect(floating.attributes('aria-disabled')).toBeUndefined()
+
+    exchanges.mockResolvedValue(overview({ exchanges: [], wallet: null }))
+    const empty = await render()
+    expect(empty.text()).toContain(en.exchange.empty.title)
+    expect(empty.find(`button[aria-label="${en.exchange.record}"]`).exists()).toBe(false)
+    expect(recordButton(empty)?.text()).toBe(en.exchange.record)
   })
 })
 
@@ -686,8 +724,16 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     const view = await render()
     const button = view.get('button.body')
     expect(button.attributes('aria-label')).toBeUndefined()
-    expect(button.text()).toContain(en.exchange.edit)
-    expect(button.text()).toContain('more than the central bank')
+    // The verb and the day first — the day stands in the head, outside the button (handoff 02).
+    expect(button.text()).toMatch(/^Edit the exchange of .+:/)
+    for (const words of [
+      en.exchange.card_given,
+      en.exchange.card_received,
+      en.exchange.card_rate,
+      'more than the central bank',
+    ]) {
+      expect(button.text()).toContain(words)
+    }
   })
 
   it('an exchange removed elsewhere is said to be gone, not «check the connection»', async () => {

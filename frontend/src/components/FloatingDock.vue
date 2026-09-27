@@ -1,19 +1,26 @@
 <template>
-  <div class="dock">
+  <div class="dock" :class="{ bare: !route.meta.tab }">
     <slot />
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent } from 'vue'
+import { useRoute } from 'vue-router'
 
 /**
  * Where the main action of a «Деньги» screen floats: right, over the tab bar, under the thumb —
  * «Трата», «Обмен», «Доход» (MOL-72, MOL-81). A place and not a button: on the month the same spot
  * holds «Вернуть» after a removal, and the screen decides which of the two stands there. Only what
- * it holds takes taps; the rest of its row lets them through to the list underneath.
+ * it holds takes taps; the rest of its row lets them through to the list underneath. Over the tab
+ * bar on a section, at the bottom edge on a nested screen, which has none (MOL-17).
  */
-export default defineComponent({ name: 'FloatingDock' })
+export default defineComponent({
+  name: 'FloatingDock',
+  setup() {
+    return { route: useRoute() }
+  },
+})
 </script>
 
 <style scoped lang="scss">
@@ -26,6 +33,10 @@ export default defineComponent({ name: 'FloatingDock' })
   display: flex;
   justify-content: flex-end;
   pointer-events: none;
+
+  &.bare {
+    bottom: calc(var(--safe-bottom) + var(--space-4));
+  }
 
   > :slotted(*) {
     pointer-events: auto;
