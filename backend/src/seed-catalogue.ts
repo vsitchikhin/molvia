@@ -12,7 +12,8 @@ export type SeedExit = 0 | 1 | 2
  * Puts the common names of `catalogue-seed.ts` into the catalogue (MOL-112). A dry run unless
  * `--yes` is given — on production the owner reads the count before anything is written. It
  * only ever adds: an item already there stays as it is, with its unit and its author, and the
- * names whose unit differs from the seed's are printed so the owner can see them.
+ * names whose unit differs from the seed's are printed so the owner can see them — as are the
+ * lines left out because the same thing is there under another spelling.
  */
 export async function seedCatalogue(
   argv: readonly string[],
@@ -46,6 +47,12 @@ export async function seedCatalogue(
     write(`  ${'another unit'.padEnd(16)}${String(otherUnit.length)} (kept as they are)`)
     for (const item of otherUnit)
       write(`    ${item.name}: ${item.unit}, the seed says ${item.seeded}`)
+  }
+  if (report.twins.length > 0) {
+    write(
+      `  ${'same key'.padEnd(16)}${String(report.twins.length)} (another spelling there, not written)`,
+    )
+    for (const twin of report.twins) write(`    ${twin.name} ← ${twin.seed}`)
   }
   write(dryRun ? 'dry run: nothing changed. Run again with --yes to write.' : 'written.')
   return 0

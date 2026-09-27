@@ -9,6 +9,7 @@ const REPORT: SeedReport = {
     { name: 'Молоко', unit: 'kg', seeded: 'l' },
     { name: 'хлеб', unit: 'piece', seeded: 'piece' },
   ],
+  twins: [{ name: 'Мед', seed: 'Мёд' }],
 }
 
 function run(argv: string[], report: SeedReport | Error = REPORT) {
@@ -58,7 +59,7 @@ describe('seed-catalogue (MOL-112)', () => {
     },
   )
 
-  it('называет, что добавится, что уже есть и где единица расходится со списком', async () => {
+  it('называет, что добавится, что уже есть, где единица расходится и что есть другим написанием', async () => {
     const { exit, lines } = run([])
     await exit
     expect(lines).toEqual([
@@ -66,12 +67,14 @@ describe('seed-catalogue (MOL-112)', () => {
       '  already there   2',
       '  another unit    1 (kept as they are)',
       '    Молоко: kg, the seed says l',
+      '  same key        1 (another spelling there, not written)',
+      '    Мед ← Мёд',
       'dry run: nothing changed. Run again with --yes to write.',
     ])
   })
 
-  it('без расхождений строки о единице нет', async () => {
-    const { exit, lines } = run(['--yes'], { added: 0, kept: [] })
+  it('без расхождений и двойников строк о них нет', async () => {
+    const { exit, lines } = run(['--yes'], { added: 0, kept: [], twins: [] })
     await exit
     expect(lines).toEqual(['  added           0', '  already there   0', 'written.'])
   })

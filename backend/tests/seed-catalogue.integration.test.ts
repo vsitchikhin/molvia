@@ -47,7 +47,7 @@ describe('SeedRepository.seed', () => {
     async () => {
       const report = await seeder.seed(lines, { dryRun: true })
 
-      expect(report).toEqual({ added: lines.length, kept: [] })
+      expect(report).toEqual({ added: lines.length, kept: [], twins: [] })
       expect(await itemCount()).toBe(0)
     },
     FULL_RUN_MS,
@@ -90,6 +90,7 @@ describe('SeedRepository.seed', () => {
     expect(report).toEqual({
       added: few.length - 1,
       kept: [{ name: 'МОЛОКО 1,5%', unit: 'l', seeded: 'l' }],
+      twins: [],
     })
     expect(await itemCount()).toBe(1)
   })
@@ -100,6 +101,71 @@ describe('SeedRepository.seed', () => {
  * bundled file per entry and no `node_modules`. Run here as the image would run it — a dry run
  * only, which writes nothing.
  */
+// Adversarial В: the name alone folds case and spacing, the key also `ё`, a decimal point and the
+// scripts — so the person's spelling was answered with a second item the search cannot tell apart.
+describe('SeedRepository.seed — the same thing under another spelling', () => {
+  it.each([
+    ['Мед', 'Мёд', 'kg'],
+    ['Тушенка', 'Тушёнка', 'kg'],
+    ['Молоко 3.2%', 'Молоко 3,2%', 'l'],
+    ['Լավաշ', 'Лаваш', 'piece'],
+    ['Cola', 'Кола', 'l'],
+  ] as const)('leaves «%s» alone and does not write «%s» beside it', async (theirs, line, unit) => {
+    expect(toSearchKey(theirs)).toBe(toSearchKey(line))
+    const actor = await insertActor(db)
+    await insertItem(db, {
+      name: theirs,
+      searchKey: toSearchKey(theirs),
+      defaultUnit: unit,
+      createdBy: actor,
+    })
+    const seedLine = newItemSchema.parse({ kind: 'product', name: line, defaultUnit: unit })
+
+    const others = few.filter((other) => other.name !== line)
+    const report = await seeder.seed([seedLine, ...others], { dryRun: false })
+
+    expect(report.twins).toEqual([{ name: theirs, seed: line }])
+    expect(report.added).toBe(others.length)
+    const same = await db
+      .select()
+      .from(items)
+      .where(eq(items.searchKey, toSearchKey(line)))
+    expect(same.map((item) => item.name)).toEqual([theirs])
+  })
+
+  it('an item of the same name beside a twin is still «already there», not a twin', async () => {
+    await insertItem(db, { name: 'Мед', searchKey: toSearchKey('Мед'), defaultUnit: 'kg' })
+    await insertItem(db, { name: 'мёд', searchKey: toSearchKey('мёд'), defaultUnit: 'kg' })
+
+    const report = await seeder.seed(
+      [newItemSchema.parse({ kind: 'product', name: 'Мёд', defaultUnit: 'kg' })],
+      { dryRun: true },
+    )
+
+    expect(report).toEqual({
+      added: 0,
+      kept: [{ name: 'мёд', unit: 'kg', seeded: 'kg' }],
+      twins: [],
+    })
+  })
+
+  it('a dish of the same key is another kind, and the product is written', async () => {
+    await insertItem(db, {
+      kind: 'dish',
+      name: 'Мед',
+      searchKey: toSearchKey('Мед'),
+      defaultUnit: 'kg',
+    })
+
+    const report = await seeder.seed(
+      [newItemSchema.parse({ kind: 'product', name: 'Мёд', defaultUnit: 'kg' })],
+      { dryRun: true },
+    )
+
+    expect(report).toEqual({ added: 1, kept: [], twins: [] })
+  })
+})
+
 describe('dist/seed-catalogue.js', () => {
   function seed(...args: string[]) {
     return spawnSync('node', [`${root}backend/dist/seed-catalogue.js`, ...args], {

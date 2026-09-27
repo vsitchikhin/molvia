@@ -13,7 +13,11 @@ import type { BaseUnit } from '@molvia/model'
  * How a line is written:
  *
  * - **The kind first, as a shelf writes it** — «Филе куриное», «Порошок стиральный». The search
- *   takes the words in any order, and a synonym counts only as the word of the kind (MOL-45).
+ *   takes the words in any order, and a synonym counts only as the word of the kind (MOL-45). A
+ *   set phrase keeps its own order — «Сахарная пудра», «Лавровый лист», «Жевательная резинка» —
+ *   and the kind is found all the same, since `kindKey` skips the adjective in front.
+ * - **Nothing the catalogue has under another spelling**: the seed skips a line whose search key
+ *   is there already — «Мёд» beside somebody's «Мед» — and names the pair.
  * - **A variety only where the shelf tells it by a number** — fat, grade — and the common name
  *   stays beside it, for «did not look which one» (Р-9). Not by taste and never by brand.
  * - **The unit is the one a price is compared by** — weighed goods and packs whose weight
