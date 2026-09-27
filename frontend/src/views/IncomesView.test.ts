@@ -177,8 +177,9 @@ describe('IncomesView: the months (В-2)', () => {
     )
     const view = await render()
     const heads = view.findAll('.month-head').map((head) => head.text())
-    expect(heads[0]).toMatch(/September 2026.*99,615\.00/)
-    expect(heads[1]).toMatch(/August 2026.*137,540\.00.*·.*500\.00/)
+    // Whole sums as they would be typed, as everywhere in «Деньги» (MOL-81, В-1).
+    expect(heads[0]).toMatch(/^September 2026₽99,615$/)
+    expect(heads[1]).toMatch(/^August 2026₽137,540 · \$500$/)
     expect(view.text()).toContain(en.income.source.freelance)
   })
 
@@ -198,19 +199,37 @@ describe('IncomesView: the months (В-2)', () => {
     const button = view.get('button.body')
     // Named by its words: an `aria-label` would silence the source, the day and the note.
     expect(button.attributes('aria-label')).toBeUndefined()
-    expect(button.text()).toContain(en.income.edit)
+    // The verb and the day first — the day stands in the head, outside the button (handoff 03).
+    expect(button.text()).toMatch(/^Amend income of .+:/)
     expect(button.text()).toContain(en.income.source.salary)
+    expect(button.text()).toContain('₽99,615')
     expect(view.get('.amended').text()).toContain('amended')
-    expect(view.get('.note').text()).toBe('Vikasa')
+    expect(view.get('.note-text').text()).toBe('Vikasa')
+  })
+
+  it('an income without a note has no plate — the card is shorter (handoff 03)', async () => {
+    incomes.mockResolvedValue(overview())
+    const view = await render()
+    expect(view.get('article').find('.plate').exists()).toBe(false)
   })
 })
+
+/** «Записать доход»: the floating «Доход» named in full, or the empty state's own button. */
+function recordButton(view: VueWrapper) {
+  return view
+    .findAll('button')
+    .find(
+      (button) =>
+        button.attributes('aria-label') === en.income.record || button.text() === en.income.record,
+    )
+}
 
 describe('IncomesView: recording, amending and removing', () => {
   it('records through the sheet and lands the answer', async () => {
     incomes.mockResolvedValue(overview({ months: [] }))
     recordIncome.mockResolvedValue({ incomes: overview(), created: true })
     const view = await render()
-    const record = view.findAll('button').find((button) => button.text() === en.income.record)
+    const record = recordButton(view)
     await record?.trigger('click')
     await risen()
     const sheet = document.querySelector('dialog[open]')
@@ -238,7 +257,7 @@ describe('IncomesView: recording, amending and removing', () => {
     incomes.mockResolvedValue(overview())
     const view = await render()
     recordIncome.mockRejectedValue(new ApiError(ERROR.CONFLICT))
-    const record = view.findAll('button').find((button) => button.text() === en.income.record)
+    const record = recordButton(view)
     await record?.trigger('click')
     await risen()
     const sheet = document.querySelector('dialog[open]')
@@ -302,7 +321,7 @@ describe('IncomesView: recording, amending and removing', () => {
     const view = await render()
 
     const bin = view.get('button.remove')
-    expect(bin.attributes('aria-label')).toMatch(/Remove income .*99,615\.00/)
+    expect(bin.attributes('aria-label')).toBe('Remove income ₽99,615')
     await bin.trigger('click')
     await risen()
     expect(document.querySelector('dialog[open]')?.textContent).toContain(
@@ -320,7 +339,7 @@ describe('IncomesView: recording, amending and removing', () => {
     await flushPromises()
     expect(restoreIncome).toHaveBeenCalledWith(row().id)
     expect(view.text()).not.toContain('Income removed')
-    expect(document.activeElement?.textContent.trim()).toBe(en.income.record)
+    expect(document.activeElement?.getAttribute('aria-label')).toBe(en.income.record)
   })
 
   // Whether an income is still part of the rate only the whole walk knows: roubles never are, euros
@@ -379,5 +398,24 @@ describe('IncomesView: recording, amending and removing', () => {
     expect(view.text()).toContain(en.income.offline.strip)
     expect(view.get('button.remove').attributes('disabled')).toBeDefined()
     expect(view.get('button.body').attributes('disabled')).toBeDefined()
+    // «Доход» floats on, inactive rather than gone, and a tap on it opens nothing (handoff 03).
+    const record = recordButton(view)
+    expect(record?.attributes('aria-disabled')).toBe('true')
+    await record?.trigger('click')
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+  })
+
+  it('«Доход» floats, named in full; the empty screen keeps its own button instead (handoff 03)', async () => {
+    incomes.mockResolvedValue(overview())
+    const full = await render()
+    const floating = full.get(`button[aria-label="${en.income.record}"]`)
+    expect(floating.text()).toBe(en.income.fab)
+
+    incomes.mockResolvedValue(overview({ months: [] }))
+    const empty = await render()
+    expect(empty.text()).toContain(en.income.empty.title)
+    expect(empty.find(`button[aria-label="${en.income.record}"]`).exists()).toBe(false)
+    expect(recordButton(empty)?.text()).toBe(en.income.record)
   })
 })

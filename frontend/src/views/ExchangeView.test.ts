@@ -725,7 +725,7 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     const button = view.get('button.body')
     expect(button.attributes('aria-label')).toBeUndefined()
     // The verb and the day first — the day stands in the head, outside the button (handoff 02).
-    expect(button.text()).toMatch(/^Edit the exchange of .+:/)
+    expect(button.text()).toMatch(/^Amend the exchange of .+:/)
     for (const words of [
       en.exchange.card_given,
       en.exchange.card_received,

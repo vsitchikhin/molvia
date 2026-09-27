@@ -532,7 +532,6 @@
     "row_amounts": "{given} → {received}",
     "row_rate": "{date} · {rate}",
     "remove": "Delete the exchange {amounts}",
-    "edit": "Amend the exchange:",
     "amended": "amended {date}",
     "amend_conflict": "This exchange was already amended on another device — here it is as it stands now. Amend it again if you need to",
     "vanished": "This exchange is gone — it was removed. The list is up to date",
@@ -589,7 +588,7 @@
       "bad_day": "Choose the day of the exchange"
     },
     "fab": "Exchange",
-    "edit_on": "Edit the exchange of {date}:",
+    "edit_on": "Amend the exchange of {date}:",
     "card_given": "Gave",
     "card_received": "Got",
     "card_rate": "Exchange rate",
@@ -606,7 +605,6 @@
   "income": {
     "title": "Income",
     "record": "Record income",
-    "edit": "Amend income:",
     "row_line": "{source} · {date}",
     "amended": "amended {date}",
     "remove": "Remove income {amount}",
@@ -675,7 +673,7 @@
       "current_held": "held before {amount}"
     },
     "fab": "Income",
-    "edit_on": "Edit the income of {date}:"
+    "edit_on": "Amend income of {date}:"
   },
   "devices": {
     "title": "Devices",
