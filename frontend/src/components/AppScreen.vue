@@ -5,7 +5,12 @@
         <template v-if="parentTitleKey">
           <button ref="button" class="back" type="button" @click="goBack">
             <IconChevronLeft ref="chevron" class="chevron" aria-hidden="true" />
-            <span v-if="fit === 'short'" class="label">{{ backWord }}</span>
+            <!-- «Back» shown, where it leads still read after it: the name is «Back Trip» on every
+                 step of the ladder, and the word shown starts it (review Р-2, owner's decision). -->
+            <template v-if="fit === 'short'">
+              <span class="label">{{ backWord }}</span>
+              <span class="hidden">{{ ` ${parent}` }}</span>
+            </template>
             <template v-else>
               <!-- The space is the hidden word's, so that it is read «Back Trip», not «BackTrip». -->
               <span class="hidden">{{ `${backWord} ` }}</span>
@@ -92,8 +97,9 @@ import { backTarget, useNavigation } from '@/navigation'
  * At rest the row keeps no room for the small title it does not show, so the label has the
  * row. Once the title comes in, the label gives way first and by the iOS ladder — whole,
  * «Back», the chevron alone — and the title last, only when it alone does not fit between two
- * chevrons (MOL-75). Hidden, the label is still read out after «Back»; shown as «Back», it is
- * the whole name, not «Back Back».
+ * chevrons (MOL-75). The name does not follow the ladder: whatever is shown, the button is read
+ * «Back Trip», the hidden part after the shown one — never «Back Back», and never a name that
+ * loses where it leads as the page scrolls.
  */
 export default defineComponent({
   name: 'AppScreen',
@@ -308,8 +314,8 @@ export default defineComponent({
   height: 1.625rem;
 }
 
-/* The ladder keeps a label from being cut; this keeps one inside its column in the frame before
-   the first measure, and where nothing can measure. */
+/* The ladder keeps a label from being cut; this keeps one inside its column where nothing
+   measures — a platform without ResizeObserver. */
 .label {
   min-width: 0;
   overflow: hidden;

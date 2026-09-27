@@ -35,8 +35,12 @@ export interface BackLabelParts {
  * observer on the column and the two samples hears them all. Its callbacks come after layout
  * and before paint, so the label a narrowed column cannot hold is never drawn.
  *
- * Where the platform cannot observe a size the label stays whole, and the ellipsis on it keeps
- * it inside its column.
+ * Measured in fractions, as the label is drawn: the column is a share of the row and a word is
+ * rarely a whole number of pixels wide, so `clientWidth` and `offsetWidth` — both rounded — once
+ * called a label 51.06 wide whole in 50.67 of room, and «Наз…» was drawn (MOL-75, review А1).
+ *
+ * Where the platform cannot observe a size nothing is measured and the label stays whole; the
+ * ellipsis on it keeps it inside its column.
  */
 export function useBackLabel(parts: BackLabelParts): Ref<BackLabelFit> {
   const fit = ref<BackLabelFit>('full')
@@ -48,11 +52,8 @@ export function useBackLabel(parts: BackLabelParts): Ref<BackLabelFit> {
     const gap = Number.parseFloat(getComputedStyle(button.value).columnGap) || 0
     const lead =
       chevron.value.getBoundingClientRect().right - button.value.getBoundingClientRect().left + gap
-    fit.value = backLabelFit(
-      column.value.clientWidth - lead,
-      full.value.offsetWidth,
-      short.value.offsetWidth,
-    )
+    const width = (node: Element): number => node.getBoundingClientRect().width
+    fit.value = backLabelFit(width(column.value) - lead, width(full.value), width(short.value))
   }
 
   function connect(): void {
@@ -61,8 +62,8 @@ export function useBackLabel(parts: BackLabelParts): Ref<BackLabelFit> {
     fit.value = 'full'
     const { column, full, short } = parts
     if (!column.value || !full.value || !short.value) return
-    measure()
     if (typeof ResizeObserver === 'undefined') return
+    measure()
     observer = new ResizeObserver(measure)
     for (const target of [column.value, full.value, short.value]) observer.observe(target)
   }
