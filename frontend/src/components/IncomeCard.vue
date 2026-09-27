@@ -29,12 +29,11 @@ import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconNote from '~icons/mdi/note-text-outline'
-import { yerevanMidnight } from '@molvia/model'
 import type { IncomeView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import OperationCardHead from '@/components/OperationCardHead.vue'
 import { asTyped } from '@/components/spending'
-import { purchaseDay } from '@/days'
+import { calendarDay, purchaseDay } from '@/days'
 
 /**
  * One income (MOL-81, handoff 03), in the grammar of an exchange's card: «when» on top, «from
@@ -57,7 +56,11 @@ export default defineComponent({
     return {
       t,
       dayOf,
-      day: computed(() => dayOf(yerevanMidnight(props.income.receivedOn))),
+      // A calendar day of Yerevan, never the moment of its midnight: west of UTC+4 an income of
+      // 1 September read «31 авг.» (adversarial Ж). «исправлен» is a moment, and stays one.
+      day: computed(() =>
+        calendarDay(props.income.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
+      ),
       // As it was typed, as everywhere in «Деньги» (owner's decision В-1).
       amount: computed(() => asTyped(props.income.amount, locale.value)),
     }

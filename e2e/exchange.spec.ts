@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { actorCodec, settingsOf } from '@molvia/model'
 import { asBrowser, signedIn } from './session'
 
@@ -91,16 +92,6 @@ test('roubles to dollars to drams: the chain is the rate of the next trip', asyn
   // never «0,011232 $/₽», and the very number the price of the dollar says above it.
   const roubles = page.locator('article').filter({ hasText: '224,63 $' })
   await expect(roubles.locator('.plate .line').first()).toHaveText(/^Курс обмена\s*89,04 ₽\/\$$/)
-  // At a phone's width nothing on a card wraps: each amount and each line of the plate is one line.
-  const wrapped = await page.locator('article .amount, article .plate .line').evaluateAll((nodes) =>
-    nodes
-      .filter((node) => {
-        const size = parseFloat(getComputedStyle(node).fontSize)
-        return node.getBoundingClientRect().height > size * 2
-      })
-      .map((node) => node.textContent),
-  )
-  expect(wrapped).toEqual([])
 
   const headers = await asBrowser(page)
   const me = actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json())
@@ -150,4 +141,62 @@ test('an amended exchange changes the rate and keeps what it said before', async
 
   await page.getByRole('button', { name: /^Исправить обмен/ }).click()
   await expect(sheet.locator('.versions')).toContainText('100 000,00')
+})
+
+/**
+ * What on the cards wraps or runs over another part. A figure never wraps — its spaces do not break
+ * — it runs out of its column, so the overflow of every part and the amounts against the arrow are
+ * measured, not the height alone (review Т-2).
+ */
+function brokenCards(page: Page): Promise<string[]> {
+  return page.locator('article').evaluateAll((cards) =>
+    cards.flatMap((card) => {
+      const found: string[] = []
+      for (const part of card.querySelectorAll<HTMLElement>('.side, .plate .line')) {
+        if (part.scrollWidth > part.clientWidth + 1) found.push(`overflow: ${part.textContent}`)
+        const size = parseFloat(getComputedStyle(part).fontSize)
+        const tall =
+          part.classList.contains('line') && part.getBoundingClientRect().height > size * 2
+        if (tall) found.push(`wraps: ${part.textContent}`)
+      }
+      const arrow = card.querySelector('.arrow')?.getBoundingClientRect()
+      for (const amount of card.querySelectorAll('.amount')) {
+        const box = amount.getBoundingClientRect()
+        const overlaps =
+          arrow &&
+          arrow.width > 0 &&
+          box.left < arrow.right &&
+          arrow.left < box.right &&
+          box.top < arrow.bottom &&
+          arrow.top < box.bottom
+        if (overlaps) found.push(`over the arrow: ${amount.textContent}`)
+      }
+      return found
+    }),
+  )
+}
+
+/**
+ * The card of an exchange at a phone's widths (MOL-81): the largest amounts the owner's journal has
+ * — six digits with kopecks against seven of drams — stand side by side on this phone, and one
+ * under the other on a 320 px one, and nothing wraps or runs over the arrow (review Т-2).
+ */
+test('the card of an exchange holds long amounts on this phone and on a 320 px one', async ({
+  page,
+}) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Обмен денег' }).click()
+  await page.getByRole('button', { name: 'Записать обмен' }).click()
+  const sheet = page.locator('dialog[open]')
+  await page.waitForTimeout(400)
+  await sheet.getByLabel('Отдал').fill('123456,78')
+  await sheet.getByLabel('Получил').fill('1000000')
+  await sheet.getByRole('button', { name: 'Сохранить обмен' }).click()
+  await expect(sheet).toBeHidden()
+  await expect(page.locator('article .amount').first()).toHaveText('123 456,78 ₽')
+
+  expect(await brokenCards(page)).toEqual([])
+  await page.setViewportSize({ width: 320, height: 700 })
+  expect(await brokenCards(page)).toEqual([])
 })

@@ -164,8 +164,12 @@
           </div>
         </template>
         <!-- The one way left into the exchanges and incomes once they left «Настройки»: a first
-             exchange may come before a first spending (MOL-81). -->
-        <MoneyEntries v-if="newcomer" :rate="liveRate" />
+             exchange may come before a first spending, and a month that will not load must not
+             close the way to the income that broke it (MOL-81; review Т-1, as MOL-66 argued). -->
+        <MoneyEntries
+          v-if="newcomer || phase === 'error' || phase === 'loading'"
+          :rate="liveRate"
+        />
       </template>
     </div>
 

@@ -207,6 +207,15 @@ describe('IncomesView: the months (В-2)', () => {
     expect(view.get('.note-text').text()).toBe('Vikasa')
   })
 
+  // In UTC, where Yerevan's midnight is the evening before (adversarial Ж): an income of 15
+  // September reads «Sep 15», never «Sep 14».
+  it('prints the day of the income as the day it was, west of Yerevan too', async () => {
+    incomes.mockResolvedValue(overview())
+    const view = await render()
+    expect(view.get('article .day').text()).toBe('Sep 15')
+    expect(view.get('button.body').text()).toMatch(/^Amend income of Sep 15:/)
+  })
+
   it('an income without a note has no plate — the card is shorter (handoff 03)', async () => {
     incomes.mockResolvedValue(overview())
     const view = await render()

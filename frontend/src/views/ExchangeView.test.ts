@@ -413,10 +413,12 @@ describe('ExchangeView: the rate and the list', () => {
     const view = await render()
     const text = view.get('article').text()
     // Named instead of the central bank, never beside it (С-6) — in the label and the difference.
+    // A name that stands at the head of a line and after «the» alike — no «the the» (adversarial Е).
     expect(view.get('article .plate .line + .line .label').text()).toMatch(
-      new RegExp(`^${en.trip.rate.source_cbr} on `),
+      new RegExp(`^${en.exchange.card_source_cbr} on `),
     )
-    expect(text).toContain(`than the ${en.trip.rate.source_cbr} rate`)
+    expect(text).toContain(`than the ${en.exchange.card_source_cbr} rate`)
+    expect(text).not.toMatch(/the the/)
     expect(text).not.toMatch(/central bank/i)
   })
 
@@ -717,6 +719,44 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     amendExchange.mockResolvedValue(overview())
     await saveAmendment()
     expect(amendExchange.mock.calls.at(-1)?.[1]).toMatchObject({ revision: 2 })
+  })
+
+  // Near parity the bank's rate falls on the other side of one than the exchange's own; the plate
+  // prints it on the exchange's side all the same, not «1.01 $/€» over «1.01 €/$» (adversarial Г).
+  it('prints the bank’s rate on the side of the exchange’s own, near parity too', async () => {
+    const perEuro = (value: string, source: 'personal' | 'official') => ({
+      ...rate(value, '2026-09-15', source),
+      base: 'EUR' as const,
+      quote: 'USD' as const,
+    })
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [
+          row({
+            given: { minor: 100_000n, currency: 'USD' },
+            received: { minor: 99_500n, currency: 'EUR' },
+            rate: perEuro('1.005025', 'personal'),
+            official: {
+              rate: perEuro('0.995', 'official'),
+              provider: 'cba',
+              difference: { minor: -1_003n, currency: 'EUR' },
+            },
+          }),
+        ],
+      }),
+    )
+    const view = await render()
+    const values = view.findAll('article .plate .value').map((value) => value.text())
+    expect(values).toEqual(['1.01 $/€', '0.995 $/€'])
+  })
+
+  // The tests run in UTC, where Yerevan's midnight is the evening before (adversarial Ж): a day of
+  // Yerevan is printed as that calendar day, never as the moment of its midnight.
+  it('prints the day of the exchange as the day it was, west of Yerevan too', async () => {
+    exchanges.mockResolvedValue(overview())
+    const view = await render()
+    expect(view.get('article .day').text()).toBe('Sep 15')
+    expect(view.get('button.body').text()).toMatch(/^Amend the exchange of Sep 15:/)
   })
 
   it('the row is named by its words, the rate and the comparison included (С-3)', async () => {

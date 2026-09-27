@@ -119,14 +119,17 @@
         <!-- Incomes alone can make the rate (MOL-66): then there is the card, and no list. -->
         <section v-if="overview.exchanges.length > 0" class="list">
           <h2 class="caption">{{ t('exchange.list_title') }}</h2>
-          <ExchangeCard
-            v-for="exchange in overview.exchanges"
-            :key="exchange.id"
-            :exchange="exchange"
-            :disabled="!online || busy"
-            @edit="edit"
-            @remove="ask"
-          />
+          <!-- A list, so a screen reader says how many and moves item by item (review Т-5). -->
+          <ul class="cards">
+            <li v-for="exchange in overview.exchanges" :key="exchange.id">
+              <ExchangeCard
+                :exchange="exchange"
+                :disabled="!online || busy"
+                @edit="edit"
+                @remove="ask"
+              />
+            </li>
+          </ul>
         </section>
       </template>
     </template>
@@ -168,7 +171,7 @@
 <script lang="ts">
 import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { currencySign, yerevanMidnight } from '@molvia/model'
+import { currencySign, yerevanDate, yerevanMidnight } from '@molvia/model'
 import type {
   Currency,
   CurrencyCost,
@@ -197,10 +200,9 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExchangeWords } from '@/composables/useExchangeWords'
 import { useExchanges } from '@/composables/useExchanges'
 import type { AmendOutcome } from '@/composables/useExchanges'
-import { purchaseDay } from '@/days'
 
 /**
- * «Обмен денег» (MOL-40), under «Настройки»: the person's own rate, which rate new trips take, and
+ * «Обмен денег» (MOL-40), under «Деньги» since MOL-81: the person's own rate, which rate new trips take, and
  * the exchanges it is worked out from, each beside the central bank of its day. Every figure is
  * the server's; the screen only chooses words — «больше» or «меньше», never «комиссия», because a
  * good exchanger beats the bank and the difference says nothing about why.
@@ -226,7 +228,7 @@ export default defineComponent({
   setup() {
     const { t, locale } = useI18n()
     const exchanges = useExchanges()
-    const { rateOf, amountsOf, rateLineOf } = useExchangeWords()
+    const { rateOf, day, amountsOf, rateLineOf } = useExchangeWords()
     const sheetOpen = ref(false)
     // The exchange the sheet amends, or null when it records a new one.
     const editing = ref<Row | null>(null)
@@ -307,7 +309,8 @@ export default defineComponent({
       { value: 'official', label: t('exchange.preference_official') },
     ]
 
-    const dayOf = (when: Date): string => purchaseDay(when, locale.value)
+    // The day a rate is dated by, as a calendar day of Yerevan (adversarial Ж).
+    const dayOf = (when: Date): string => day(yerevanDate(when))
     const midnightOf = (day: string): Date => yerevanMidnight(day)
     const pairSigns = (pair: { base: Currency; quote: Currency }) => ({
       base: currencySign(pair.base, locale.value),
@@ -486,6 +489,15 @@ export default defineComponent({
 
 .list .caption {
   margin: 0;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .add {

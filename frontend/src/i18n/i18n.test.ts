@@ -162,6 +162,11 @@ describe('словарь: повторяющиеся тексты', () => {
       Доход: ['income.fab', 'income.sheet.title'],
       Отдал: ['exchange.card_given', 'exchange.sheet.given'],
       Получил: ['exchange.card_received', 'exchange.sheet.received'],
+      // Имя источника на карточке обмена и в строке похода. По-английски у похода «the Bank of
+      // Russia» с артиклем, карточке нужно без него — в начале строки и после «the» (MOL-81, Е).
+      'ЦБ РА': ['exchange.card_source_cba', 'trip.rate.source_cba'],
+      'ЦБ РФ': ['exchange.card_source_cbr', 'trip.rate.source_cbr'],
+      'open.er-api.com': ['exchange.card_source_erapi', 'trip.rate.source_erapi'],
     })
   })
 
@@ -211,6 +216,7 @@ describe('словарь: повторяющиеся тексты', () => {
       Exchange: ['exchange.fab', 'exchange.sheet.title'],
       Gave: ['exchange.card_given', 'exchange.sheet.given'],
       Got: ['exchange.card_received', 'exchange.sheet.received'],
+      'open.er-api.com': ['exchange.card_source_erapi', 'trip.rate.source_erapi'],
     })
   })
 })

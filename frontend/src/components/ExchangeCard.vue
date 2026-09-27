@@ -91,6 +91,7 @@ export default defineComponent({
 <style scoped lang="scss">
 .card {
   padding: 0;
+  container-type: inline-size;
 }
 
 .body {
@@ -140,6 +141,24 @@ export default defineComponent({
 .received {
   align-items: flex-end;
   text-align: right;
+}
+
+// Two amounts and the arrow need some 290 px; narrower — a 320 px phone — the amounts no longer fit
+// side by side and ran over the arrow, since a figure never wraps (review Т-2). Then they stand one
+// under the other, both from the left, and the arrow, which only says «into», goes.
+@container (max-width: 20rem) {
+  .sums {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .arrow {
+    display: none;
+  }
+
+  .received {
+    align-items: flex-start;
+    text-align: left;
+  }
 }
 
 .caption {

@@ -602,8 +602,22 @@ describe('MoneyView: the way into the exchanges and incomes (MOL-81)', () => {
     expect(entries(view).map(({ href }) => href)).toEqual(['/money/exchange', '/money/incomes'])
   })
 
-  it('must not fire: a month that failed to load shows no way in beside the error', async () => {
+  // A month that will not load must not close the way to the income that broke it (review Т-1).
+  it('stands beside the error and under the skeleton — the month is not the way in', async () => {
     moneyMonth.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const failed = await render()
+    expect(failed.text()).toContain(en.spending.load_error.title)
+    expect(entries(failed).map(({ href }) => href)).toEqual(['/money/exchange', '/money/incomes'])
+
+    moneyMonth.mockReturnValue(new Promise(() => undefined))
+    const loading = await render()
+    expect(loading.find('.skeleton').exists()).toBe(true)
+    expect(entries(loading)).toHaveLength(2)
+  })
+
+  it('must not fire: offline with nothing kept — the screens behind it would show nothing either', async () => {
+    online(false)
+    moneyMonth.mockRejectedValue(new TypeError('network'))
     const view = await render()
     expect(entries(view)).toEqual([])
   })

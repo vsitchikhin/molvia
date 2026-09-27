@@ -1,8 +1,8 @@
 import { useI18n } from 'vue-i18n'
-import { formatRate, yerevanMidnight } from '@molvia/model'
+import { formatRate, formatRateBeside, yerevanDate } from '@molvia/model'
 import type { ExchangeRate, ExchangeView } from '@molvia/model'
 import { asTyped } from '@/components/spending'
-import { purchaseDay } from '@/days'
+import { calendarDay } from '@/days'
 
 /** What the card of an exchange says of the central bank of its day, each part on its own line. */
 export interface OfficialWords {
@@ -15,6 +15,7 @@ export interface OfficialWords {
 
 export interface ExchangeWords {
   readonly rateOf: (rate: ExchangeRate) => string
+  readonly day: (date: string) => string
   readonly dayOf: (exchange: ExchangeView) => string
   readonly moneyOf: (value: ExchangeView['given']) => string
   readonly amountsOf: (exchange: ExchangeView) => string
@@ -31,8 +32,14 @@ export function useExchangeWords(): ExchangeWords {
   const { t, locale } = useI18n()
 
   const rateOf = (rate: ExchangeRate): string => formatRate(rate, locale.value)
-  const dayOf = (exchange: ExchangeView): string =>
-    purchaseDay(yerevanMidnight(exchange.exchangedOn), locale.value)
+  /**
+   * A day of Yerevan printed as that calendar day, never as the moment of its midnight — west of
+   * UTC+4 every exchange came out a day early, as the spendings of «Деньги» once did (review Т-1 of
+   * MOL-82, adversarial Ж).
+   */
+  const day = (date: string): string =>
+    calendarDay(date, locale.value, { day: 'numeric', month: 'short' })
+  const dayOf = (exchange: ExchangeView): string => day(exchange.exchangedOn)
   /** Amounts as they were typed, as everywhere in «Деньги» (owner's decision В-1). */
   const moneyOf = (value: ExchangeView['given']): string => asTyped(value, locale.value)
 
@@ -53,7 +60,8 @@ export function useExchangeWords(): ExchangeWords {
     const official = exchange.official
     if (!official) return null
     const minor = official.difference.minor
-    const source = t(`trip.rate.source_${official.provider}`)
+    // A name to stand at the head of a line and after «the» alike (adversarial Е).
+    const source = t(`exchange.card_source_${official.provider}`)
     const words = {
       amount: moneyOf({ ...official.difference, minor: minor < 0n ? -minor : minor }),
       source,
@@ -61,11 +69,11 @@ export function useExchangeWords(): ExchangeWords {
     const bank = official.provider === 'cba'
     const key = minor > 0n ? 'more' : minor < 0n ? 'less' : 'equal'
     return {
-      label: t('exchange.card_official', {
-        source,
-        date: purchaseDay(official.rate.asOf, locale.value),
-      }),
-      rate: rateOf(official.rate),
+      label: t('exchange.card_official', { source, date: day(yerevanDate(official.rate.asOf)) }),
+      // On the side of the exchange's own rate above it, even under one (adversarial Г).
+      rate: exchange.rate
+        ? formatRateBeside(official.rate, exchange.rate, locale.value)
+        : rateOf(official.rate),
       difference: t(`exchange.card_${key}${bank ? '' : '_other'}`, words),
     }
   }
@@ -75,5 +83,5 @@ export function useExchangeWords(): ExchangeWords {
     return t(exchange.officialDoubtful ? 'exchange.card_doubtful' : 'exchange.card_no_official')
   }
 
-  return { rateOf, dayOf, moneyOf, amountsOf, rateLineOf, officialOf, noOfficialOf }
+  return { rateOf, day, dayOf, moneyOf, amountsOf, rateLineOf, officialOf, noOfficialOf }
 }

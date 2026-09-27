@@ -114,7 +114,6 @@
 <script lang="ts">
 import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { yerevanMidnight } from '@molvia/model'
 import type { IncomeAmendBody, IncomeView as Row, Money } from '@molvia/model'
 import IconCashPlus from '~icons/mdi/cash-plus'
 import IconCloud from '~icons/mdi/cloud-off-outline'
@@ -132,7 +131,7 @@ import ScreenState from '@/components/ScreenState.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { incomesOf, useIncomes } from '@/composables/useIncomes'
-import { monthOf, purchaseDay } from '@/days'
+import { calendarDay, monthOf } from '@/days'
 
 /**
  * «Доходы» (MOL-66), under «Деньги» beside «Обмен денег» (MOL-81): the money that came in, by month, each
@@ -224,14 +223,14 @@ export default defineComponent({
       window.removeEventListener('offline', follow)
     })
 
-    const dayOf = (when: Date): string => purchaseDay(when, locale.value)
     // As typed, as everywhere in «Деньги» (owner's decision В-1 of MOL-81).
     const amountOf = (income: Row): string => asTyped(income.amount, locale.value)
     /** «Зарплата · 15 сент.» */
     const lineOf = (income: Row): string =>
       t('income.row_line', {
         source: t(`income.source.${income.source}`),
-        date: dayOf(yerevanMidnight(income.receivedOn)),
+        // A calendar day of Yerevan, never the moment of its midnight (adversarial Ж).
+        date: calendarDay(income.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
       })
     const sumsOf = (sums: readonly Money[]): string =>
       sums.map((sum) => asTyped(sum, locale.value)).join(' · ')
@@ -251,7 +250,6 @@ export default defineComponent({
       ask,
       confirmRemove,
       online,
-      dayOf,
       amountOf,
       lineOf,
       sumsOf,
