@@ -125,6 +125,15 @@ describe("the owner's words, against the seed", () => {
     ['кефир 2,5% 1 л', 'Кефир 2,5%', true],
     ['молоко 3,2% 1 л', 'Молоко 3,2%', true],
     ['сметана 20% 400 г', 'Сметана 20%', true],
+    // A fat the list lacks is the common name, not the variety sharing a digit (review Н).
+    ['молоко 3,5%', 'Молоко', true],
+    ['молоко 3,5% 1 л', 'Молоко', true],
+    ['кефир 1,5%', 'Кефир', true],
+    ['творог 0,5%', 'Творог', true],
+    // Without «%» both digits of «72,5» and «3,2» pair with the name's exactly, at no cost: the
+    // variety first by the distance, before any rule of fats (review С-11). Pinned as it is.
+    ['масло 72,5', 'Масло сливочное 72,5%', true],
+    ['молоко 3,2', 'Молоко 3,2%', true],
     // Brands the owner names a kind by lead to the kind through the dictionary (MOL-112, В-6) —
     // to the word of the kind, and among the kinds the shortest: «Лапша» by the kilo, not the
     // instant noodles the word means, and «Какао», not the instant one (review Л), until one pick.

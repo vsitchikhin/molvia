@@ -1489,6 +1489,17 @@ describe('search — at one distance, the shorter name first (MOL-112, В-5)', (
     expect((await names('кефир 1 л'))[0]).toBe('Кефир')
   })
 
+  it('compares a fat whole: one the catalogue lacks gives the common name (review Н)', async () => {
+    for (const name of ['Кефир', 'Кефир 1%', 'Кефир 2,5%', 'Творог', 'Творог 5%']) await named(name)
+
+    // «1,5» is not the «1» of «1%», «0,5» not the «5» of «5%».
+    expect((await names('кефир 1,5%'))[0]).toBe('Кефир')
+    expect((await names('кефир 0,5%'))[0]).toBe('Кефир')
+    expect((await names('творог 0,5%'))[0]).toBe('Творог')
+    // A point for a comma is the same fat.
+    expect((await names('кефир 2.5%'))[0]).toBe('Кефир 2,5%')
+  })
+
   it('must not lift a shorter name over a nearer one: only ties are its to order', async () => {
     await named('Сыр')
     await named('Сыр чанах')

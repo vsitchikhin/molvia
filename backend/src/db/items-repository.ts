@@ -237,13 +237,23 @@ export function searchQueryKey(query: string): string | null {
 }
 
 /**
- * The numbers a query gives a fat by — typed with «%»: «2,5%» is `2` and `5`, as the key writes
- * them. The key drops the sign, so it is read off the query as typed (MOL-112, review З).
+ * The fats a query names — numbers typed with «%», whole: «2,5%» is `2,5`, never `2` and `5`. The
+ * key drops the sign and splits the number at its comma, so a fat is read off the query as typed
+ * and compared with the name as written (MOL-112, reviews З and Н).
  */
 export function percentNumbers(query: string): string[] {
-  return [...query.matchAll(/(\d+)(?:[.,](\d+))?\s*%/gu)].flatMap(([, whole, part]) =>
-    part === undefined ? [whole ?? ''] : [whole ?? '', part],
+  return [...query.matchAll(/(\d+)(?:[.,](\d+))?\s*%/gu)].map(([, whole, part]) =>
+    part === undefined ? (whole ?? '') : `${whole ?? ''},${part}`,
   )
+}
+
+/**
+ * A fat as a pattern over a name: the same number, point or comma, before a «%», and not the tail
+ * of another number — «5%» is not in «0,5%», «3,5%» not in «3,2%». Digits only go in, so nothing
+ * in it is a pattern of the person's making.
+ */
+function fatPattern(fat: string): string {
+  return `(^|[^0-9.,])${fat.replace(',', '[.,]')}[[:space:]]*%`
 }
 
 type ItemRow = typeof items.$inferSelect
@@ -349,6 +359,19 @@ export function rankedCandidates(
           where u.w !~ ${ADJECTIVE_WORD} or u.w ~ ${NOUN_WORD}
         ), 1000)`
 
+  // The fats typed with «%» that the name carries, whole (\`fatPattern\`): «кефир 2,5% 1 л» names
+  // «Кефир 2,5%», and «1 л», a size every row misses alike, must not hand the row to «Кефир» or
+  // «Кефир 1%» (review З). Whole, off the name: counted by the digits of the key, «3,5%» scored on
+  // the «3» of «Молоко 3,2%» and «0,5%» on the «5» of «Творог 5%», above the common name that is
+  // the right answer for a fat the catalogue lacks (review Н). Only with «%»: a bare number is as
+  // likely a size, and counted, «молоко 1 л» would give «Молоко 1,5%» its first row back (review А).
+  const fatHits =
+    fat.length === 0
+      ? sql`0`
+      : sql`(select count(*)::int
+             from unnest(string_to_array(${fat.map(fatPattern).join(' ')}, ' ')) as f(p)
+             where ${items.name} ~ f.p)`
+
   // No word after a number, no slip — and then not even the empty scan of every candidate: on
   // «мо», which has no synonym, that alone was half the time.
   const words = key.split(' ')
@@ -389,8 +412,6 @@ export function rankedCandidates(
              plain and not (anchored and unit_start) as grounds,
              plain and anchored and unit_like and not unit_start as slips,
              word ~ '[^0-9]' as lettered,
-             -- A number the person typed with «%» is a fat, not a size (\`percentNumbers\`).
-             word = any(string_to_array(${fat.join(' ')}, ' ')) as fat,
              last,
              n::int = any(string_to_array(${expanded}, ' ')::int[]) as expanded
       from (
@@ -448,7 +469,8 @@ export function rankedCandidates(
              -- applies to these alone: a name brought in by «лори» for «сыр» is no candidate
              -- of «сыр», and measured against it anyway, «Рис» passed as two edits from \`sir\`.
              ${typedHere} as typed,
-             ${kindAt} as kind_at
+             ${kindAt} as kind_at,
+             ${fatHits} as fat_hits
       from ${items}
       where ${items.searchKey} %> ${key} or ${items.searchKey} = ${key}${sql.join(bySynonym)}
       -- Every candidate is ranked, with no ceiling. Any cut here is wrong in one of two ways:
@@ -466,7 +488,8 @@ export function rankedCandidates(
       select ${items.id}, ${items.searchKey},
              word_similarity(${key}, ${items.searchKey}),
              (${items.searchKey} %> ${key} or ${items.searchKey} = ${key}),
-             ${kindAt}
+             ${kindAt},
+             ${fatHits}
       from ${items}
       join admitted a on a.id = ${items.id}
     ),
@@ -486,7 +509,7 @@ export function rankedCandidates(
     -- subquery into the select list, the filter and the order by — and with \`slipped\` joined
     -- in, 20 000 names answered half as fast again as before it. Kept, it beats both.
     per_word as materialized (
-      select c.id, qw.grounds and s.id is null as grounds, qw.lettered, qw.fat,
+      select c.id, qw.grounds and s.id is null as grounds, qw.lettered,
              -- The typed spelling is measured unless the row came by a synonym of this very word:
              -- «сыр» is not measured against «Рис» that «лори» brought, but «хаггис» of
              -- «памперсы хаггис» is still measured against the «Huggies» that «подгузники» did.
@@ -530,7 +553,7 @@ export function rankedCandidates(
       -- \`least\` skips a null, so a word found only by its synonym is still found. Not
       -- materialized: \`per_word\` is, so folding this into the aggregates below repeats a
       -- \`least\`, not the levenshtein subquery.
-      select id, grounds, lettered, fat, least(qd_typed_twice / 2, qd_synonym) as qd,
+      select id, grounds, lettered, least(qd_typed_twice / 2, qd_synonym) as qd,
              coalesce(qd_synonym = 0 and coalesce(qd_typed_twice / 2, 255) > 0, false) as by_synonym,
              coalesce(qd_typed_twice % 2 = 1
                         and qd_typed_twice / 2 <= coalesce(qd_synonym, 255), false) as by_prefix
@@ -568,14 +591,10 @@ export function rankedCandidates(
              length(c.search_key) as key_length,
              bool_or(pw.by_synonym) as by_synonym,
              bool_or(pw.by_prefix) as by_prefix,
-             -- The fats typed with «%» that found their pair: «кефир 2,5% 1 л» names «Кефир 2,5%»,
-             -- and «1 л», a size every row misses alike, must not hand the row to «Кефир» or
-             -- «Кефир 1%» (review З). Only with «%»: a bare number is as likely a size, and
-             -- counted, «молоко 1 л» would give «Молоко 1,5%» its first row back (review А).
-             count(*) filter (where pw.fat and pw.qd = 0) as fat_hits
+             c.fat_hits
       from candidates c
       join per_word_best pw on pw.id = c.id
-      group by c.id, c.ws, c.search_key
+      group by c.id, c.ws, c.search_key, c.fat_hits
     ),
     remembered as (
       -- The owner's own picks for this query, folded per item. Personal on purpose: a sum
