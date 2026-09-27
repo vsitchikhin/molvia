@@ -3,7 +3,6 @@ import { ref, watch } from 'vue'
 import { ApiError } from '@molvia/client'
 import {
   ERROR,
-  ISSUE,
   addExpenseBodySchema,
   catalogueEntryCodec,
   expensePatchSchema,
@@ -23,6 +22,8 @@ import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
 import { isIdentifier } from '@/stores/identity'
+import { HOLDS, doublingRetry, exclusively, isRecord, newKey } from '@/stores/queueing'
+import type { Loose } from '@/stores/queueing'
 import { read, writeEverywhere } from '@/stores/storage'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripStore } from '@/stores/trip'
@@ -94,41 +95,12 @@ const QUEUE_KEY = 'molvia.trip-queue'
 const REJECTED_KEY = 'molvia.trip-rejected'
 
 /**
- * What stops the queue rather than dropping a write: no connection or a server that broke
- * (both arrive as INTERNAL), an answer off the contract — the captive portal of a shop's wifi
- * answers 200 with its own page — and an identity the server no longer knows, which is waited
- * out rather than refused (MOL-56). A code the API did not say itself — a portal's 404 page read
- * as `not_found` — holds it too (adversarial A3). Every other refusal would be answered the same
- * way again, and a write retried forever would hold every write behind it (MOL-24, В-10).
- */
-const HOLDS: readonly WireCode[] = [ERROR.INTERNAL, ISSUE.RESPONSE_INVALID, ERROR.NO_ACTOR]
-
-/**
  * A removal of a row the server does not have is the outcome it was asked for, not a refusal
  * (раунд 3, Е2): a purchase undone while its `add` was in the air may never have been written at
  * all, and «не принято» about a thing the person threw away themselves is noise.
  */
 const DONE_ENOUGH: Partial<Record<QueuedWrite['kind'], readonly WireCode[]>> = {
   remove: [ERROR.NOT_FOUND],
-}
-
-/**
- * How long to wait before trying again after the server broke while the connection is up: a 502
- * during a deploy brings no `online` event, and the last purchase of a trip would otherwise wait
- * for the next time the app is opened (review Р-5). Doubling, and never longer than five minutes.
- */
-const RETRY_FIRST_MS = 15_000
-const RETRY_LAST_MS = 300_000
-
-type Loose = Record<string, unknown>
-
-function isRecord(value: unknown): value is Loose {
-  return typeof value === 'object' && value !== null
-}
-
-function newKey(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(12))
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 /** Wire form: the bodies carry bigints, and the codecs that read them back are the contract's. */
@@ -382,13 +354,6 @@ export function whileQueueIsStill(owner: string, work: () => Promise<void>): Pro
   return exclusively(`${QUEUE_KEY}.${owner}`, work)
 }
 
-/** Runs `work` alone across every window of the app where the browser can say so. */
-function exclusively(name: string, work: () => Promise<void>): Promise<void> {
-  // The DOM types promise `navigator.locks`; older WebViews do not have it (see stores/actor.ts).
-  const locks = (navigator as unknown as Record<string, unknown>).locks as LockManager | undefined
-  return locks ? locks.request(name, work) : work()
-}
-
 /**
  * Every write to a trip goes through here, with a connection or without one — one path, so the
  * sheet never waits on the network and never learns which case it was in (MOL-24, В-2). A write
@@ -520,14 +485,9 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     }
   })
 
-  let retry: ReturnType<typeof setTimeout> | undefined
-  let retryDelay = RETRY_FIRST_MS
-
+  const retry = doublingRetry(() => void attempt())
   function retryLater(): void {
-    if (!navigator.onLine) return
-    clearTimeout(retry)
-    retry = setTimeout(() => void attempt(), retryDelay)
-    retryDelay = Math.min(retryDelay * 2, RETRY_LAST_MS)
+    retry.later()
   }
 
   /**
@@ -563,7 +523,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     }
     if (!running) {
       const owner = actor.id
-      clearTimeout(retry)
+      retry.cancel()
       const run = owner
         ? exclusively(`${QUEUE_KEY}.${owner}`, () => drain(owner))
         : Promise.resolve()
@@ -705,7 +665,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       // the problem (adversarial Б2). They stay on the phone until the person decides.
       if (refusal && head.write.kind === 'start') return
     }
-    retryDelay = RETRY_FIRST_MS
+    retry.reset()
   }
 
   /**
@@ -746,7 +706,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       decision = null
       conflict = { owner, key: head.key, tripId: open.id }
       elsewhere.value = { tripId: open.id, place: open.place.name, mine: head.write.place.name }
-      clearTimeout(retry)
+      retry.cancel()
       return false
     }
     decision = null
