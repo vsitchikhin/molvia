@@ -460,8 +460,13 @@ Measured, not assumed — the numbers below come from a probe against a real dat
 queries and 19 for what the shelf does not carry) against 64 names written for the shelf of
 «Ереван Сити», plus the typo corpus of MOL-5, since the log holds no typos. At the kept point 62
 of 73 have what they meant first and alone, 6 more share the first place with an item they did
-not mean — a tie the row's uuid breaks: «мол» with «Кофе … молотый», «туалетка» with the
+not mean — a tie the row's uuid broke: «мол» with «Кофе … молотый», «туалетка» with the
 litter's «туалета»; 45 of 45 typos land in the top three; 17 of 19 absent words find nothing.
+**Since MOL-112 a tie goes to the shorter name** (owner's decision В-5): the more of a name the
+query covers, the nearer, and with a common name beside its varieties — «Молоко», «Молоко 3,2%» —
+a tie is every common word, not six of 73. In all six it is the item meant; the price, named, is
+a short wrong name beside a long right one — «лейс» now always puts «Рис» above the chips. Names
+of one key length («1,5%», «3,2%») are still the uuid's.
 **No point of the grid did better on both halves.** A threshold of 0.3 empties every false hit
 but drops «Молоко Ашхар» from «малако» — the case 0.15 exists for; a budget of 1 empties them
 too and loses five typos and «собачий корм»; a budget of 3 wins one query and brings six false
@@ -469,7 +474,7 @@ hits. The slack on an unfinished word (MOL-10) moves five or six whole answers e
 never a first row, so the grid could not tell its three settings apart — kept as it is, not
 chosen. What no threshold reaches went to tasks with numbers: **synonyms** — «картошка» against
 «Картофель», 6 of 73, one of them («мясо») found by letters only — MOL-45 closed them with the
-dictionary above, which puts 67 of 73 first and alone; **the absolute
+dictionary above, which puts 67 of 73 first and alone, and the shorter name of MOL-112 the other six; **the absolute
 budget** — «овощи» finds «Мука … высший сорт», «специи» «Соевый соус», «пельмени» «Чай зелёный»,
 3 of 25 — MOL-46 made them a far answer rather than a find; **a unit word grounding a match** — «сыр» is two edits from `sht` of «4 шт» —
 closed by MOL-48 for the units it lists, which took six of the ten items «сыр» found. Weighting

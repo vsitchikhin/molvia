@@ -537,7 +537,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                              filter (where pw.grounds and not pw.by_synonym)), 0) as words_distance,
              -- The furthest of those words, for how near the row is (MOL-46).
              coalesce(max(coalesce(pw.qd, 255))
-                        filter (where pw.grounds and not pw.by_synonym), 0) as words_worst
+                        filter (where pw.grounds and not pw.by_synonym), 0) as words_worst,
+             length(c.search_key) as key_length
       from candidates c
       join per_word_best pw on pw.id = c.id
       group by c.id, c.ws, c.search_key
@@ -598,8 +599,11 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     -- the same distance; nothing else moves. Then what the person took before,
     -- above a closer spelling — their own choice says more than a typo metric does. Among
     -- several, the latest wins: after switching brands the new one is on top from the first
-    -- trip. Then the order of MOL-10, where ties stay ties («moloko» names «Ашхар» and
-    -- «Марианна» alike) and \`id\` only keeps two loads of one screen in one order.
+    -- trip. Then the order of MOL-10, and among rows it cannot tell apart the shorter name
+    -- first (owner's decision MOL-112, В-5): the more of a name the query covers, the nearer —
+    -- «Молоко» before «Молоко 3,2%» on «молоко», and before «Кофе … молотый» on «мол». Until the
+    -- seed a tie was rare and its order was the uuid's; with a common name beside its varieties
+    -- it is every common word. \`id\` only keeps two loads of one screen in one order.
     order by case when not coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) then 1
                   when m.item_id is not null or r.words_distance = 0 then 0
                   else 2
@@ -607,7 +611,7 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              m.item_id is null,
              m.last_picked_at desc nulls last,
              m.picks desc nulls last,
-             r.distance, r.ws desc, r.id
+             r.distance, r.ws desc, r.key_length, r.id
     limit ${limit}
   `
 }

@@ -1435,3 +1435,44 @@ describe('search — how near the answer is (MOL-46)', () => {
     expect(await answer('картошка')).toEqual([['Картофель'], true])
   })
 })
+
+describe('search — rows it cannot tell apart, the shorter name first (MOL-112, В-5)', () => {
+  it('puts the common name before its varieties, which the query does not name', async () => {
+    for (const name of ['Молоко 3,2%', 'Молоко топлёное', 'Молоко', 'Молоко 1,5%']) {
+      await named(name)
+    }
+
+    // «1,5» and «3,2» are keys of one length, so between those two the uuid still decides.
+    const found = await names('молоко')
+    expect([found[0], [...found.slice(1, 3)].sort(), found[3]]).toEqual([
+      'Молоко',
+      ['Молоко 1,5%', 'Молоко 3,2%'],
+      'Молоко топлёное',
+    ])
+  })
+
+  it('puts the name the query covers more of first, on a word being typed', async () => {
+    await named('Кофе молотый')
+    await named('Молоко')
+
+    expect(await names('мол')).toEqual(['Молоко', 'Кофе молотый'])
+  })
+
+  it('must not lift a shorter name over a nearer one: only ties are its to order', async () => {
+    await named('Сыр')
+    await named('Сыр чанах')
+
+    expect(await names('сыр чанах')).toEqual(['Сыр чанах'])
+    expect(await names('чанах сыр')).toEqual(['Сыр чанах'])
+  })
+
+  it("must not lift a shorter name over the person's own pick", async () => {
+    const actor = await insertActor(db)
+    const kefir = await named('Кефир 2,5%')
+    await named('Кефир')
+    await createSearchPickRepository(db).remember(actor, 'кефир', kefir)
+
+    const { items: found } = await repo.search('кефир', 20, actor)
+    expect(found.map((item) => item.name)).toEqual(['Кефир 2,5%', 'Кефир'])
+  })
+})

@@ -40,8 +40,9 @@ async function names(query: string): Promise<string[]> {
 }
 
 /**
- * A tie is a group: equal distance and equal similarity leave the order to the row id, a
- * random uuid, so inside a group the order is not the search's to keep. Only a real tie is a
+ * A tie is a group: equal distance and equal similarity. Inside it the shorter name goes first
+ * (MOL-112, В-5), and only names of one key length are left to the row id, a random uuid — so a
+ * group is pinned by its members and by that one rule, not as a list. Only a real tie is a
  * group — where the similarity differs, the order is the search's and is pinned as a list.
  */
 type Answer = readonly (string | readonly string[])[]
@@ -52,7 +53,10 @@ async function answers(query: string, expected: Answer): Promise<void> {
   const grouped = expected.map((entry) => {
     const size = typeof entry === 'string' ? 1 : entry.length
     const slice = found.slice(at, (at += size))
-    return typeof entry === 'string' ? slice[0] : [...slice].sort()
+    if (typeof entry === 'string') return slice[0]
+    const lengths = slice.map((name) => toSearchKey(name).length)
+    expect(lengths, `${query}: the shorter name first`).toEqual([...lengths].sort((a, b) => a - b))
+    return [...slice].sort()
   })
   const wanted = expected.map((entry) => (typeof entry === 'string' ? entry : [...entry].sort()))
   expect([...grouped, ...found.slice(at)], query).toEqual(wanted)
@@ -402,29 +406,30 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
 
   /**
    * Where the first place is a tie with an item the query did not mean: equal distance and
-   * similarity, so the row id — a random uuid — decides which one the person sees. «мол» and
-   * «моло» tie the milks with «Кофе … молотый», «кол» the colas with the sausages, «кур» and
-   * «курица» the chicken with «Котлеты куриные» and «Doshirak лапша курица», «туалетка» the
-   * paper with the litter's «туалета». Memory (MOL-11) settles it from the second trip, not the
-   * first. Counted apart from a hit: 67 queries have what they meant first alone, not 73.
+   * similarity. MOL-14 found six — «мол» and «моло» tied the milks with «Кофе … молотый», «кол»
+   * the colas with the sausages, «кур» and «курица» the chicken with «Котлеты куриные» and
+   * «Doshirak лапша курица», «туалетка» the paper with the litter's «туалета» — and the row id,
+   * a random uuid, decided which one the person saw. The shorter name decides it now (MOL-112,
+   * В-5), and in each of the six the shortest is what the query meant: 73 of 73 first, alone.
+   * What the person sees first is the shortest of the head group; names of one key length are
+   * still the uuid's, and then the whole of them has to be meant.
    */
-  const TIED_WITH_FOREIGN = new Set(['кол', 'мол', 'моло', 'кур', 'курица', 'туалетка'])
-
   const meantFirst = (
     answer: Answer | undefined,
     meant: readonly string[],
   ): 'alone' | 'tied' | 'not-first' | 'empty' => {
-    const head = [answer?.[0] ?? []].flat()
-    if (head.length === 0) return 'empty'
+    const group = [answer?.[0] ?? []].flat()
+    if (group.length === 0) return 'empty'
+    const shortest = Math.min(...group.map((name) => toSearchKey(name).length))
+    const head = group.filter((name) => toSearchKey(name).length === shortest)
     if (!head.some((name) => meant.includes(name))) return 'not-first'
     return head.every((name) => meant.includes(name)) ? 'alone' : 'tied'
   }
 
-  it('puts what the query meant first alone — apart from the ties named above', () => {
+  it('puts what the query meant first alone', () => {
     // The pinned answers replace nothing in the shared list, so they must still agree with it.
     for (const [query, meant] of SHELF_QUERIES) {
-      const expected = TIED_WITH_FOREIGN.has(query) ? 'tied' : 'alone'
-      expect(meantFirst(ANSWERS[query], meant), query).toBe(expected)
+      expect(meantFirst(ANSWERS[query], meant), query).toBe('alone')
     }
   })
 
@@ -603,7 +608,8 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
    * The shelf typed another way. Latin finds its item first; two brands spelled in Cyrillic do
    * not: «хаггис» puts «Хлеб тостовый Harry's» above the Huggies wipes (both two edits, the
    * bread's similarity 0.333 against 0.167), and «лейс» ties the chips with «Рис» — pinned for
-   * MOL-47.
+   * MOL-47. The tie is the rice's now, every time: the shorter name goes first (MOL-112, В-5),
+   * and a short wrong name beside a long right one is that rule's price, named.
    */
   const OTHERWISE: Readonly<Record<string, Answer>> = {
     kola: [
@@ -657,10 +663,10 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     хаггис: ["Хлеб тостовый Harry's 470 г", 'Салфетки влажные Huggies 56 шт'],
     лейс: [["Чипсы Lay's сметана и лук 150 г", 'Рис длиннозёрный Мистраль 900 г']],
   }
-  /** «хаггис» finds the wipes — second, under the bread; «лейс» ties the chips with the rice. */
+  /** «хаггис» finds the wipes — second, under the bread; «лейс» the chips, under the rice. */
   const OTHERWISE_WRONG = new Map([
     ['хаггис', 'not-first'],
-    ['лейс', 'tied'],
+    ['лейс', 'not-first'],
   ])
 
   it('puts what a Latin or a Cyrillic brand meant first — apart from «хаггис» and «лейс»', () => {
