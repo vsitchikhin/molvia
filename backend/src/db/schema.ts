@@ -502,6 +502,10 @@ export const trips = pgTable(
     debitedCurrency: char('debited_currency', { length: 3 }).$type<Currency>(),
     // When they last changed: a check's window is the server's moment, not the phone's (Д1б).
     accountSetAt: timestamp('account_set_at', { withTimezone: true }),
+    // «Удалить поход» (MOL-76): marked, not deleted, by the money rule — «Вернуть» for ten
+    // minutes, then the minute timer, and every reader but erasure and that timer filters it
+    // out. A mark also keeps a start sent again from the queue from writing the trip anew.
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (table) => [
     // The list of trips, the running one, and «what is still unrated» all walk one actor

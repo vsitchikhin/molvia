@@ -64,6 +64,7 @@ import {
 import { moneyMonthOf } from '@/usecases/money-month'
 import { spendingRoutes } from '@/routes/spendings'
 import { createSpendingRepository } from '@/db/spendings-repository'
+import { createTripRepository } from '@/db/trips-repository'
 import {
   accountJournal,
   accountsHeld,
@@ -82,6 +83,7 @@ import { createSettingsRepository } from '@/db/settings-repository'
 import { saveSettings } from '@/usecases/save-settings'
 import { settingsRoute } from '@/routes/settings'
 import { startTrip } from '@/usecases/start-trip'
+import { removeTrip, restoreTrip } from '@/usecases/remove-trip'
 import { startLogin } from '@/usecases/start-login'
 import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
 import { createActorRepository } from '@/db/actors-repository'
@@ -286,11 +288,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const removedExchanges = createExchangeRepository(db)
     const removedIncomes = createIncomeRepository(db)
     const removedSpendings = createSpendingRepository(db)
+    const removedTrips = createTripRepository(db)
     const removedAccounts = createMoneyAccountRepository(db)
     let stopCleanup: (() => Promise<void>) | undefined
     let stopExchangeCleanup: (() => Promise<void>) | undefined
     let stopIncomeCleanup: (() => Promise<void>) | undefined
     let stopSpendingCleanup: (() => Promise<void>) | undefined
+    let stopTripCleanup: (() => Promise<void>) | undefined
     let stopAccountCleanup: (() => Promise<void>) | undefined
     let stopSessionCleanup: (() => Promise<void>) | undefined
     instance.addHook('onReady', (ready) => {
@@ -323,6 +327,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           instance.log.error('removed spending cleanup failed')
         },
       )
+      // And for trips (MOL-76, Р-1): a trip is money too, and its purchases go with it.
+      stopTripCleanup = startLoginCleanup(
+        () => removedTrips.purgeStale(),
+        () => {
+          instance.log.error('removed trip cleanup failed')
+        },
+      )
       // And for accounts without operations (MOL-115): deleted ten minutes on, whatever named one
       // meanwhile left without an account rather than lost (Р-17).
       stopAccountCleanup = startLoginCleanup(
@@ -346,6 +357,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopExchangeCleanup?.()
       await stopIncomeCleanup?.()
       await stopSpendingCleanup?.()
+      await stopTripCleanup?.()
       await stopAccountCleanup?.()
       await stopSessionCleanup?.()
     })
@@ -424,6 +436,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         finish: (actorId, tripId, deviceAt) =>
           finishTrip(tripData.trips, actorId, tripId, deviceAt),
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
+        removeTrip: (actorId, tripId) => removeTrip(tripData.trips, actorId, tripId),
+        restoreTrip: (actorId, tripId) => restoreTrip(tripData, actorId, tripId),
       })
       exchangeRoutes(guarded, {
         overview: (actor) => readExchanges(tripData, actor),

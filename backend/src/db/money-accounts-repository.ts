@@ -441,13 +441,13 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
                    where e.trip_id = t.id and e.amount_minor is null) as unpriced
             from trips t
             join places p on p.id = t.place_id
-           where t.actor_id = ${actorId}
+           where t.actor_id = ${actorId} and t.deleted_at is null
         `),
         db.execute<TripSumRow>(sql`
           select e.trip_id, e.amount_currency as currency, sum(e.amount_minor) as amount_minor
             from expenses e
             join trips t on t.id = e.trip_id
-           where t.actor_id = ${actorId} and e.amount_minor is not null
+           where t.actor_id = ${actorId} and t.deleted_at is null and e.amount_minor is not null
            group by e.trip_id, e.amount_currency
            order by e.trip_id, e.amount_currency
         `),
@@ -636,7 +636,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
               and ${trips.debitedCurrency} is not distinct from ${debited?.currency ?? null}::char(3)
               then ${trips.accountSetAt} else clock_timestamp() end`,
           })
-          .where(and(eq(trips.id, own), eq(trips.actorId, actorId)))
+          .where(and(eq(trips.id, own), eq(trips.actorId, actorId), isNull(trips.deletedAt)))
           .returning({ id: trips.id })
         return updated.length > 0
       })

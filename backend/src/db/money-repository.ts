@@ -83,6 +83,7 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
             join places p on p.id = t.place_id
            where t.actor_id = ${actorId}
              and t.finished_at is not null
+             and t.deleted_at is null
              and (coalesce(t.finished_on_device_at, t.finished_at) at time zone 'Asia/Yerevan')::date
                  between ${from}::date and ${to}::date
         )
