@@ -17,7 +17,14 @@ import FinishedTripView from './FinishedTripView.vue'
 
 const history = vi.fn<() => Promise<TripHistory>>()
 const trip = vi.fn<(id: string) => Promise<TripView>>()
-vi.mock('@/api', () => ({ api: { tripHistory: () => history(), trip: (id: string) => trip(id) } }))
+const removeTrip = vi.fn<(id: string) => Promise<void>>()
+vi.mock('@/api', () => ({
+  api: {
+    tripHistory: () => history(),
+    trip: (id: string) => trip(id),
+    removeTrip: (id: string) => removeTrip(id),
+  },
+}))
 const OWNER = 'aaaaaaaa-0000-4000-8000-000000000001'
 const ID = 'aaaaaaaa-0000-4000-8000-000000000002'
 const OTHER = 'aaaaaaaa-0000-4000-8000-000000000003'
@@ -217,5 +224,35 @@ it('offers the last cached selection offline even when it is beyond the first pa
   const { view } = await render()
   await flushPromises()
   expect(view.get('.history-row').text()).toContain('Рынок')
+  view.unmount()
+})
+
+it('a finished trip removed from its own screen leaves for the history, with «Вернуть» (MOL-76)', async () => {
+  useTripHistoryStore().apply(answer())
+  history.mockResolvedValue({
+    trips: [
+      {
+        id: ID,
+        place: { id: OWNER, name: 'Рынок', kind: 'store' },
+        startedAt: new Date('2026-09-01T10:00:00Z'),
+        finishedAt: new Date('2026-09-01T12:00:00Z'),
+        finishedOnDeviceAt: null,
+      },
+    ],
+    nextCursor: null,
+  })
+  trip.mockResolvedValue(answer())
+  removeTrip.mockReturnValue(new Promise(() => undefined))
+  const { view, router } = await render()
+  await flushPromises()
+  expect(view.findAll('.history-row')).toHaveLength(1)
+
+  const queue = useTripQueueStore()
+  queue.removeTrip(ID, 'Рынок')
+  await flushPromises()
+  // The server still lists it; a removal on its way takes it off the list all the same.
+  expect(view.findAll('.history-row')).toHaveLength(0)
+  expect(view.text()).toContain('Поход удалён: Рынок')
+  expect(router.currentRoute.value.name).toBe('trip-history')
   view.unmount()
 })

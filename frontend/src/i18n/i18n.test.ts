@@ -136,7 +136,7 @@ describe('словарь: повторяющиеся тексты', () => {
       // Цена Р-2 у двух экранов одной денежной модели: доходы пишутся, правятся, удаляются и
       // возвращаются по правилам обменов (MOL-66, Р-2), и слова о тех же действиях — те же.
       'исправлен {date}': ['exchange.amended', 'income.amended'],
-      Вернуть: ['exchange.restore', 'income.restore', 'spending.restore'],
+      Вернуть: ['exchange.restore', 'income.restore', 'spending.restore', 'trip.remove.restore'],
       'Сервер не ответил как надо. Попробуйте ещё раз': [
         'exchange.load_error.body',
         'income.load_error.body',
@@ -166,6 +166,8 @@ describe('словарь: повторяющиеся тексты', () => {
     // проверка по обоим.
     expect(duplicates(EN)).toEqual({
       Trip: ['nav.trip', 'trip.title'],
+      // The strip of a trip removed is the strip of a spending removed (MOL-76).
+      Undo: ['spending.restore', 'trip.remove.restore'],
       'What to buy': ['advice.title', 'nav.advice'],
       Ratings: ['nav.verdicts', 'verdict.title'],
       Settings: ['nav.settings', 'settings.title'],

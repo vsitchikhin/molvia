@@ -435,12 +435,24 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
    * Trips whose removal is waiting (MOL-76): no screen shows them, whatever the server or the
    * phone's memory still says, until the answer takes them out of that memory too.
    */
-  const removing = computed(
-    () =>
-      new Set(pending.value.flatMap((write) => (write.kind === 'delete' ? [write.tripId] : []))),
-  )
+  const removing = computed(() => {
+    // The last word of the two decides: a «Вернуть» queued behind a removal in flight brings the
+    // trip back on screen now, not after both have been answered.
+    const gone = new Set<string>()
+    for (const write of pending.value) {
+      if (write.kind === 'delete') gone.add(write.tripId)
+      if (write.kind === 'restore') gone.delete(write.tripId)
+    }
+    return gone
+  })
   /** Raised when a removal or a «Вернуть» has landed: what the server counts has moved. */
   const landed = ref(0)
+  /**
+   * The trip removed last on this phone, for the strip's «Вернуть» (MOL-76). In the store, not on
+   * a screen: a finished trip is removed from its own screen, and the strip stands on the one the
+   * person goes back to. Withdrawn by a new start — two open trips is what `restore` refuses (Р-4).
+   */
+  const lastRemoved = ref<(TripUndo & { readonly stamp: number }) | null>(null)
 
   function show(): void {
     pending.value = kept.map((item) => item.write)
@@ -495,6 +507,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   }
 
   function load(id: string | null): void {
+    lastRemoved.value = null
     elsewhere.value = null
     conflict = null
     decision = null
@@ -662,9 +675,14 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         void useTripHistoryStore().completed(head.write.tripId)
       }
       // A removed trip leaves the phone's memory too, or the next launch would draw it from there.
+      // …unless «Вернуть» already waits behind it: the trip would blink out until that answer.
       if (!refusal && head.write.kind === 'delete') {
-        trips.closed(head.write.tripId)
-        useTripHistoryStore().drop(head.write.tripId)
+        sync(owner)
+        const tripId = head.write.tripId
+        if (!kept.some((item) => item.write.kind === 'restore' && item.write.tripId === tripId)) {
+          trips.closed(tripId)
+          useTripHistoryStore().drop(tripId)
+        }
       }
       if (!refusal && (head.write.kind === 'delete' || head.write.kind === 'restore')) {
         landed.value += 1
@@ -841,6 +859,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function enqueue(entry: QueuedWrite): void {
     const id = actor.id
     sync(id)
+    if (entry.kind === 'start') lastRemoved.value = null
     if (entry.kind === 'finish') {
       const earlier = kept.find((item) => sameWrite(item.write, entry))?.write
       if (earlier?.kind === 'finish' && earlier.finishedOnDeviceAt) {
@@ -992,7 +1011,9 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     }
     persist(id)
     void flush()
-    return { tripId, name, writes: own.map((item) => item.write) }
+    const undo = { tripId, name, writes: own.map((item) => item.write) }
+    lastRemoved.value = { ...undo, stamp: Date.now() }
+    return undo
   }
 
   /**
@@ -1003,6 +1024,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function restoreTrip(undo: TripUndo): void {
     const id = actor.id
     sync(id)
+    if (lastRemoved.value?.tripId === undo.tripId) lastRemoved.value = null
     kept = kept.filter(
       (item) =>
         !(item.write.kind === 'delete' && item.write.tripId === undo.tripId && waiting(item)),
@@ -1066,6 +1088,11 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     restoreTrip,
     removing,
     landed,
+    lastRemoved,
+    /** The strip ran out: the removal stays, only the offer goes. */
+    forgetRemoved: () => {
+      lastRemoved.value = null
+    },
     heldBack,
     joinElsewhere,
     finishElsewhere,

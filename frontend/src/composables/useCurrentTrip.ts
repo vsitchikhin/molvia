@@ -67,7 +67,7 @@ export function useCurrentTrip(): CurrentTrip {
     const id = trips.current?.id
     return (
       id !== undefined &&
-      queue.pending.some((w) => (w.kind === 'finish' || w.kind === 'delete') && w.tripId === id)
+      (queue.removing.has(id) || queue.pending.some((w) => w.kind === 'finish' && w.tripId === id))
     )
   })
 
