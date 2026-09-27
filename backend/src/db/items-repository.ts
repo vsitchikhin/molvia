@@ -242,10 +242,16 @@ export function searchQueryKey(query: string): string | null {
  * and compared with the name as written (MOL-112, reviews З and Н).
  */
 export function percentNumbers(query: string): string[] {
-  return [...query.matchAll(/(\d+)(?:[.,](\d+))?\s*%/gu)].map(([, whole, part]) =>
-    part === undefined ? (whole ?? '') : `${whole ?? ''},${part}`,
-  )
+  return [...query.matchAll(PERCENT)]
+    .map(([, whole, part]) => (part === undefined ? (whole ?? '') : `${whole ?? ''},${part}`))
+    .slice(0, MAX_QUERY_WORDS)
 }
+
+// A space before «%» is the class the domain splits words by, `WORD_BREAK`, on both sides: `\s` of
+// JavaScript takes the no-break space «2,5 %» is pasted with from a shop's site, `[[:space:]]` of
+// Postgres does not, and the fat of such a name went unseen (review О) — the trap MOL-45 closed
+// for the words of a name. As many fats as words are looked at (review П).
+const PERCENT = new RegExp(`(\\d+)(?:[.,](\\d+))?(?:${WORD_BREAK})?%`, 'gu')
 
 /**
  * A fat as a pattern over a name: the same number, point or comma, before a «%», and not the tail
@@ -253,7 +259,7 @@ export function percentNumbers(query: string): string[] {
  * in it is a pattern of the person's making.
  */
 function fatPattern(fat: string): string {
-  return `(^|[^0-9.,])${fat.replace(',', '[.,]')}[[:space:]]*%`
+  return `(^|[^0-9.,])${fat.replace(',', '[.,]')}(${WORD_BREAK})?%`
 }
 
 type ItemRow = typeof items.$inferSelect
@@ -365,12 +371,14 @@ export function rankedCandidates(
   // the «3» of «Молоко 3,2%» and «0,5%» on the «5» of «Творог 5%», above the common name that is
   // the right answer for a fat the catalogue lacks (review Н). Only with «%»: a bare number is as
   // likely a size, and counted, «молоко 1 л» would give «Молоко 1,5%» its first row back (review А).
+  const fatDigits = fat.flatMap((one) => one.split(',')).join(' ')
   const fatHits =
     fat.length === 0
       ? sql`0`
-      : sql`(select count(*)::int
-             from unnest(string_to_array(${fat.map(fatPattern).join(' ')}, ' ')) as f(p)
-             where ${items.name} ~ f.p)`
+      : sql`(${sql.join(
+          fat.map((one) => sql`(${items.name} ~ ${fatPattern(one)})::int`),
+          sql` + `,
+        )})`
 
   // No word after a number, no slip — and then not even the empty scan of every candidate: on
   // «мо», which has no synonym, that alone was half the time.
@@ -438,6 +446,10 @@ export function rankedCandidates(
           ) w
         ) u
       ) a
+      -- The digits of a fat typed with «%» are judged whole, by \`fat_hits\`, and not word by
+      -- word here: paired by the distance, the «1» of «1%» found «Молоко 1,5%» at no cost and the
+      -- common name lost before any rule of fats was asked (review Н′).
+      where not word = any(string_to_array(${fatDigits}, ' '))
     ),
     synonyms as (
       select s.word, s.n, s.anywhere, s.kinds

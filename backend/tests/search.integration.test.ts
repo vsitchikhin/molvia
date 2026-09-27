@@ -1500,6 +1500,31 @@ describe('search — at one distance, the shorter name first (MOL-112, В-5)', (
     expect((await names('кефир 2.5%'))[0]).toBe('Кефир 2,5%')
   })
 
+  it('does not pair the digits of a typed fat one by one (review Н′)', async () => {
+    for (const name of ['Молоко', 'Молоко 1,5%', 'Молоко 2,5%', 'Кефир', 'Кефир 2,5%']) {
+      await named(name)
+    }
+
+    // «1%» is no fat of «1,5%», and «5%» none of «2,5%»: the lists lack them, the common name answers.
+    expect((await names('молоко 1%'))[0]).toBe('Молоко')
+    expect((await names('кефир 5%'))[0]).toBe('Кефир')
+    expect((await names('молоко 2,5%'))[0]).toBe('Молоко 2,5%')
+  })
+
+  it('reads a no-break space before «%» as a space, in a name and in a query (review О)', async () => {
+    for (const name of [
+      'Кефир Ашхар 1\u00a0%',
+      'Кефир Ашхар 2,5\u00a0%',
+      'Кефир Ашхар 3,2\u202f%',
+    ]) {
+      await named(name)
+    }
+
+    expect((await names('кефир ашхар 2,5% 1 л'))[0]).toBe('Кефир Ашхар 2,5\u00a0%')
+    expect((await names('кефир ашхар 3,2% 1 л'))[0]).toBe('Кефир Ашхар 3,2\u202f%')
+    expect((await names('кефир ашхар 2,5\u00a0% 1 л'))[0]).toBe('Кефир Ашхар 2,5\u00a0%')
+  })
+
   it('must not lift a shorter name over a nearer one: only ties are its to order', async () => {
     await named('Сыр')
     await named('Сыр чанах')

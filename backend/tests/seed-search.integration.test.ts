@@ -130,6 +130,10 @@ describe("the owner's words, against the seed", () => {
     ['молоко 3,5% 1 л', 'Молоко', true],
     ['кефир 1,5%', 'Кефир', true],
     ['творог 0,5%', 'Творог', true],
+    // Nor is a whole fat paired by the digit it shares with another (review Н′).
+    ['молоко 1%', 'Молоко', true],
+    ['молоко 5%', 'Молоко', true],
+    ['кефир 2%', 'Кефир', true],
     // Without «%» both digits of «72,5» and «3,2» pair with the name's exactly, at no cost: the
     // variety first by the distance, before any rule of fats (review С-11). Pinned as it is.
     ['масло 72,5', 'Масло сливочное 72,5%', true],
