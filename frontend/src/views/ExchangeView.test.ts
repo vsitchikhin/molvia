@@ -54,6 +54,8 @@ function row(patch: Partial<Row> = {}): Row {
     received: { minor: 9_500_000n, currency: 'AMD' },
     heldBefore: null,
     note: null,
+    givenAccountId: null,
+    receivedAccountId: null,
     revision: 1,
     amendedAt: null,
     history: [],

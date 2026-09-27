@@ -39,6 +39,8 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
       received: { minor: 10_000_000n, currency: 'AMD' },
       heldBefore: null,
       note: null,
+      givenAccountId: null,
+      receivedAccountId: null,
       revision: 1,
       amendedAt: null,
       history: [],
