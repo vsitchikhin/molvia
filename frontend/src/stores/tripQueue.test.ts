@@ -34,7 +34,7 @@ const startTrip = vi.fn<(body: StartTripBody) => Promise<{ trip: TripView; creat
 const finishTrip = vi.fn<(tripId: string, at?: Date) => Promise<void>>()
 const currentTrip = vi.fn<() => Promise<TripView | null>>()
 const removeTrip = vi.fn<(tripId: string) => Promise<void>>()
-const restoreTrip = vi.fn<(tripId: string) => Promise<TripView>>()
+const restoreTrip = vi.fn<(tripId: string, finish?: unknown) => Promise<TripView>>()
 const me = vi.fn<() => Promise<never>>()
 vi.mock('@/api', () => ({
   api: {
@@ -47,7 +47,8 @@ vi.mock('@/api', () => ({
     finishTrip: (tripId: string, at?: Date) => finishTrip(tripId, at),
     currentTrip: () => currentTrip(),
     removeTrip: (tripId: string) => removeTrip(tripId),
-    restoreTrip: (tripId: string) => restoreTrip(tripId),
+    restoreTrip: (tripId: string, finish?: unknown) =>
+      finish === undefined ? restoreTrip(tripId) : restoreTrip(tripId, finish),
   },
 }))
 
@@ -1925,6 +1926,46 @@ describe('trip queue', () => {
       await queue.flush()
       expect(startTrip).toHaveBeenCalled()
       expect(queue.lastRemoved?.tripId).toBe(TRIP)
+    })
+  })
+  describe('«Вернуть» похода, завершённого без связи (MOL-76, раунд 3, В1)', () => {
+    const NEXT = 'bbbbbbbb-0000-4000-8000-000000000099'
+
+    it('restore несёт свой «Завершить»: поход возвращается завершённым поверх открытого следующего', async () => {
+      for (const mock of [finishTrip, startTrip, addExpense, removeTrip])
+        mock.mockRejectedValue(offline())
+      const queue = fresh()
+      useTripStore().apply(answer('570'))
+      const at = new Date('2026-09-19T09:30:00.000Z')
+      queue.enqueue({ kind: 'finish', tripId: TRIP, finishedOnDeviceAt: at })
+      queue.enqueue(started(NEXT, 'Рынок'))
+      queue.enqueue({ ...add(BREAD), tripId: NEXT })
+      await settled()
+      const undo = queue.removeTrip(TRIP, 'Ереван Сити')
+      await settled()
+
+      removeTrip.mockResolvedValue(undefined)
+      startTrip.mockResolvedValue({ trip: answer('0', NEXT), created: true })
+      addExpense.mockResolvedValue({ trip: answer('600', NEXT), created: true })
+      await queue.flush()
+      // The server knew the trip: «Вернуть» stays offered after the next one started.
+      expect(queue.lastRemoved?.tripId).toBe(TRIP)
+
+      restoreTrip.mockResolvedValue(answer('570', TRIP, '2026-09-19T09:30:00.000Z'))
+      finishTrip.mockResolvedValue(undefined)
+      queue.restoreTrip(undo)
+      expect(queue.pending[0]).toEqual({
+        kind: 'restore',
+        tripId: TRIP,
+        name: 'Ереван Сити',
+        finish: { finishedOnDeviceAt: at },
+      })
+      // Kept on the device as it is sent.
+      expect(fresh().pending[0]).toEqual(queue.pending[0])
+      await queue.flush()
+      expect(restoreTrip).toHaveBeenCalledWith(TRIP, { finishedOnDeviceAt: at })
+      expect(queue.rejected).toEqual([])
+      expect(queue.pending).toEqual([])
     })
   })
 })

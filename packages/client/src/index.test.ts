@@ -824,6 +824,14 @@ describe('the trip', () => {
     expect(back.calls[0]?.method).toBe('POST')
     expect(new URL(back.calls[0]?.url ?? '').pathname).toBe(`/trips/${TRIP}/restore`)
 
+    const finishing = clientReplying(200, tripWire)
+    await finishing.client.restoreTrip(TRIP, {
+      finishedOnDeviceAt: new Date('2026-09-27T10:00:00.000Z'),
+    })
+    expect(finishing.calls[0]?.body).toEqual({
+      finish: { finishedOnDeviceAt: '2026-09-27T10:00:00.000Z' },
+    })
+
     // A portal's page answering the DELETE is not the removal.
     const portal = clientServing('<html>Wi-Fi</html>', {
       status: 200,

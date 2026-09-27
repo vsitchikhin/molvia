@@ -222,7 +222,9 @@ test('a finished trip deleted from its own screen leaves the history, after a re
 
   // Back where it was opened from — the home screen — with «Undo» there.
   await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByText('Trip deleted: Deleted shop')).toBeVisible()
+  await expect(
+    page.locator('.undo').filter({ hasText: 'Trip deleted: Deleted shop' }),
+  ).toBeVisible()
   await expect(recent).toHaveCount(0)
   await expect
     .poll(async () =>

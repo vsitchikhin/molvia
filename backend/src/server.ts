@@ -437,7 +437,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           finishTrip(tripData.trips, actorId, tripId, deviceAt),
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
         removeTrip: (actorId, tripId) => removeTrip(tripData.trips, actorId, tripId),
-        restoreTrip: (actorId, tripId) => restoreTrip(tripData, actorId, tripId),
+        restoreTrip: (actorId, tripId, body) => restoreTrip(tripData, actorId, tripId, body),
       })
       exchangeRoutes(guarded, {
         overview: (actor) => readExchanges(tripData, actor),

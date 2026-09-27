@@ -1391,7 +1391,12 @@ database access. In a product about data integrity, two write paths will silentl
   the queue, the screen's «not sent yet» and the history. **«Вернуть» is offered only while it can
   put the trip back where it was**: a new start withdraws it, and so does another trip's start
   landing on the server over a removed trip the server never had — brought back, its start would
-  meet that trip open (round 2, Б3). The store keeps the same rule as the screen. **The price, named:** removing a trip dated before a check that
+  meet that trip open (round 2, Б3). The store keeps the same rule as the screen. **A trip comes
+  back with its own «Завершить»** (`POST /trips/:id/restore` with `finish`, round 3, В1): finished on
+  the phone with no signal and removed before that finish left, it is open on the server, and brought
+  back open under the next trip it was refused as a second open trip the person never held — then
+  gone with its purchases ten minutes later. Brought back finished in one statement, no moment holds
+  two open trips; the `finish` behind it moves nothing, as finishing twice never does. **The price, named:** removing a trip dated before a check that
   came out even moves the balance with no reason the check can name, as a removed spending does.
 - **Exactly one field is required — the item.** Everything else may be left empty.
 - **The catalogue grows two ways: «Предложить товар» and the seed (MOL-112).** MOL-12 decided «no

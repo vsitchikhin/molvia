@@ -9,6 +9,7 @@ import {
   tripHistoryCodec,
   tripHistoryQuerySchema,
   rateChoiceBodySchema,
+  restoreTripBodySchema,
   startTripBodySchema,
   tripViewCodec,
 } from '@molvia/model'
@@ -19,6 +20,7 @@ import type {
   AddExpenseBody,
   ExpensePatch,
   RateChoiceBody,
+  RestoreTripBody,
   StartTripBody,
   TripView,
 } from '@molvia/model'
@@ -41,7 +43,7 @@ export interface TripsApi {
   finish(actorId: string, tripId: string, deviceAt?: Date): Promise<void>
   chooseRate(actorId: string, tripId: string, body: RateChoiceBody): Promise<TripView>
   removeTrip(actorId: string, tripId: string): Promise<void>
-  restoreTrip(actorId: string, tripId: string): Promise<TripView>
+  restoreTrip(actorId: string, tripId: string, body: RestoreTripBody): Promise<TripView>
 }
 
 /**
@@ -162,9 +164,13 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
    * «Вернуть»: the trip whole; 404 past its ten minutes or for anything not the owner's, 409
    * `error.trip_open` for an open one while another trip is open (Р-4).
    */
-  app.post<{ Params: TripParams }>('/trips/:tripId/restore', async (request, reply) =>
-    answer(reply, await api.restoreTrip(request.actorId, resourceId(request.params.tripId))),
-  )
+  app.post<{ Params: TripParams }>('/trips/:tripId/restore', async (request, reply) => {
+    const body = parseBody(restoreTripBodySchema, request.body ?? {})
+    return answer(
+      reply,
+      await api.restoreTrip(request.actorId, resourceId(request.params.tripId), body),
+    )
+  })
 
   /**
    * «Считать по новому курсу / по прежнему / по своему», when the rate the trip took jumped

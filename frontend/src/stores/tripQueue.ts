@@ -6,6 +6,7 @@ import {
   addExpenseBodySchema,
   catalogueEntryCodec,
   expensePatchSchema,
+  finishTripBodySchema,
   isWireCode,
   startTripBodySchema,
 } from '@molvia/model'
@@ -14,6 +15,7 @@ import type {
   AddExpenseBody,
   CatalogueEntry,
   ExpensePatch,
+  FinishTripBody,
   StartTripBody,
   TripView,
   WireCode,
@@ -71,7 +73,16 @@ export type QueuedWrite =
    * «Вернуть» once the removal may have reached the server. `name` is not sent: a refusal — ten
    * minutes gone, another trip open — has to say which trip did not come back.
    */
-  | { readonly kind: 'restore'; readonly tripId: string; readonly name: string }
+  | {
+      readonly kind: 'restore'
+      readonly tripId: string
+      readonly name: string
+      /**
+       * The trip's own «Завершить», taken back with it: the trip comes back finished in one step,
+       * or, open on the server under the next trip, it could not come back at all (round 3, В1).
+       */
+      readonly finish?: FinishTripBody
+    }
 
 /**
  * What «Удалить поход» took off the phone, for «Вернуть» to put back (MOL-76): the writes of the
@@ -162,8 +173,20 @@ function encode(entry: QueuedWrite): Loose {
       }
     case 'remove':
     case 'delete':
-    case 'restore':
       return { ...entry }
+    case 'restore':
+      return {
+        kind: 'restore',
+        tripId: entry.tripId,
+        name: entry.name,
+        ...(entry.finish
+          ? {
+              finish: entry.finish.finishedOnDeviceAt
+                ? { finishedOnDeviceAt: entry.finish.finishedOnDeviceAt.toISOString() }
+                : {},
+            }
+          : {}),
+      }
   }
 }
 
@@ -196,8 +219,12 @@ function decode(raw: unknown): QueuedWrite | null {
     return at && Number.isFinite(at.getTime()) ? { kind, tripId, finishedOnDeviceAt: at } : null
   }
   if (kind === 'delete') return { kind, tripId }
-  if (kind === 'restore')
-    return { kind, tripId, name: typeof raw.name === 'string' ? raw.name : '' }
+  if (kind === 'restore') {
+    const name = typeof raw.name === 'string' ? raw.name : ''
+    if (raw.finish === undefined) return { kind, tripId, name }
+    const finish = finishTripBodySchema.safeParse(raw.finish)
+    return finish.success ? { kind, tripId, name, finish: finish.data } : null
+  }
   if (kind === 'add') {
     const body = addExpenseBodySchema.safeParse(knownFields(raw.body, BODY_FIELDS))
     return body.success ? { kind, tripId, body: body.data, entry: cardOf(raw.entry) } : null
@@ -331,7 +358,7 @@ function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
     case 'delete':
       return api.removeTrip(entry.tripId).then(() => null)
     case 'restore':
-      return api.restoreTrip(entry.tripId)
+      return api.restoreTrip(entry.tripId, entry.finish)
   }
 }
 
@@ -1073,8 +1100,26 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     const id = actor.id
     sync(id)
     lastRemoved.value = null
+    // The trip's own finish goes with «Вернуть»: brought back open, a trip the next one started over
+    // on the server could not come back at all (round 3, В1). The `finish` stays behind it too —
+    // finishing twice moves nothing.
+    const finished = undo.writes.find((write) => write.kind === 'finish')
     const back: Kept[] = [
-      { key: newKey(), write: { kind: 'restore', tripId: undo.tripId, name: undo.name } },
+      {
+        key: newKey(),
+        write: {
+          kind: 'restore',
+          tripId: undo.tripId,
+          name: undo.name,
+          ...(finished?.kind === 'finish'
+            ? {
+                finish: finished.finishedOnDeviceAt
+                  ? { finishedOnDeviceAt: finished.finishedOnDeviceAt }
+                  : {},
+              }
+            : {}),
+        },
+      },
       ...undo.writes.map((write) => ({ key: newKey(), write })),
     ]
     const removal = (item: Kept) =>

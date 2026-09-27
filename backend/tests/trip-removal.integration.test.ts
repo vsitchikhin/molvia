@@ -238,6 +238,68 @@ describe('«Вернуть» (MOL-76)', () => {
   })
 })
 
+describe('«Вернуть» вместе с «Завершить» (MOL-76, раунд 3, В1)', () => {
+  it('открытый на сервере, когда открыт другой, возвращается завершённым — с временем телефона', async () => {
+    const me = await owner()
+    const open = await tripWithMilk(me)
+    await call(me, 'DELETE', `/trips/${open.trip}`)
+    const context = await tripContext(db, me.id)
+    const next = await call(me, 'POST', '/trips', {
+      id: randomUUID(),
+      place: { kind: 'store', name: 'SAS' },
+      context,
+    })
+    expect(next.statusCode).toBe(201)
+
+    const at = '2026-09-27T10:00:00.000Z'
+    const back = await call(me, 'POST', `/trips/${open.trip}/restore`, {
+      finish: { finishedOnDeviceAt: at },
+    })
+    expect(back.statusCode).toBe(200)
+    const view = tripViewCodec.parse(back.json())
+    expect(view.finishedAt).not.toBeNull()
+    expect(view.finishedOnDeviceAt).toEqual(new Date(at))
+    expect(view.expenses.map((row) => row.id)).toEqual([open.expense])
+    // The trip going on stays the one going on.
+    const current = currentTripResponseSchema.parse(
+      (await call(me, 'GET', '/trips/current')).json(),
+    )
+    expect(current.trip?.id).toBe(tripViewCodec.parse(next.json()).id)
+  })
+
+  it('уже завершённый — время не двигается; время телефона из будущего отброшено', async () => {
+    const me = await owner()
+    const finished = await tripWithMilk(me, { finished: true })
+    const [before] = await db.select().from(trips).where(eq(trips.id, finished.trip))
+    await call(me, 'DELETE', `/trips/${finished.trip}`)
+    const back = await call(me, 'POST', `/trips/${finished.trip}/restore`, {
+      finish: { finishedOnDeviceAt: '2026-09-01T10:00:00.000Z' },
+    })
+    expect(back.statusCode).toBe(200)
+    const [after] = await db.select().from(trips).where(eq(trips.id, finished.trip))
+    expect(after?.finishedAt).toEqual(before?.finishedAt)
+    expect(after?.finishedOnDeviceAt).toBeNull()
+
+    const open = await tripWithMilk(me)
+    await call(me, 'DELETE', `/trips/${open.trip}`)
+    const future = await call(me, 'POST', `/trips/${open.trip}/restore`, {
+      finish: { finishedOnDeviceAt: '2099-01-01T00:00:00.000Z' },
+    })
+    expect(tripViewCodec.parse(future.json()).finishedOnDeviceAt ?? null).toBeNull()
+    expect(tripViewCodec.parse(future.json()).finishedAt).not.toBeNull()
+  })
+
+  it('тело не по контракту — 400; без тела — как раньше', async () => {
+    const me = await owner()
+    const { trip } = await tripWithMilk(me, { finished: true })
+    await call(me, 'DELETE', `/trips/${trip}`)
+    expect(
+      (await call(me, 'POST', `/trips/${trip}/restore`, { finish: { at: 'вчера' } })).statusCode,
+    ).toBe(400)
+    expect((await call(me, 'POST', `/trips/${trip}/restore`)).statusCode).toBe(200)
+  })
+})
+
 describe('старт из очереди после удаления (MOL-76, Р-1)', () => {
   it('в десять минут — 409 conflict, поход не заводится заново; после — новый поход', async () => {
     const me = await owner()

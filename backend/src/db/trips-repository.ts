@@ -124,9 +124,10 @@ export interface TripRepository {
   /**
    * «Вернуть» within ten minutes — `null` past them or for a trip that is not the owner's; a trip
    * never removed comes back as it is. An unfinished trip while another is open is `TRIP_OPEN`:
-   * two open trips is the state `start` exists to refuse (Р-4).
+   * two open trips is the state `start` exists to refuse (Р-4) — unless it comes back finished
+   * (`finish`, round 3 В1), which is one statement, so no moment holds two open trips.
    */
-  restore(id: string, actorId: string): Promise<Trip | null>
+  restore(id: string, actorId: string, finish?: { deviceAt?: Date }): Promise<Trip | null>
   /** The minute timer: removals past their ten minutes deleted, their purchases by cascade. */
   purgeStale(): Promise<void>
 }
@@ -367,7 +368,7 @@ export function createTripRepository(db: Conn): TripRepository {
       })
     },
 
-    async restore(id, actorId) {
+    async restore(id, actorId, finish) {
       if (idOrNull(id) === null || idOrNull(actorId) === null) return null
       return translateFailures(async () =>
         db.transaction(async (tx) => {
@@ -386,8 +387,9 @@ export function createTripRepository(db: Conn): TripRepository {
             .limit(1)
             .for('update')
           if (!held) return null
-          if (held.deletedAt === null) return toTrip(held)
-          if (held.finishedAt === null) {
+          const finishing = finish !== undefined && held.finishedAt === null
+          if (held.deletedAt === null && !finishing) return toTrip(held)
+          if (held.finishedAt === null && !finishing) {
             const [open] = await tx
               .select({ id: trips.id })
               .from(trips)
@@ -399,7 +401,16 @@ export function createTripRepository(db: Conn): TripRepository {
           }
           const [row] = await tx
             .update(trips)
-            .set({ deletedAt: null })
+            .set({
+              deletedAt: null,
+              // The same stamp `finish` gives: the database's clock, and the device's moment beside it.
+              ...(finishing
+                ? {
+                    finishedAt: sql`clock_timestamp()`,
+                    finishedOnDeviceAt: finish.deviceAt ?? null,
+                  }
+                : {}),
+            })
             .where(eq(trips.id, id))
             .returning()
           return toTrip(theRow(row, 'trips'))

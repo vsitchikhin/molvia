@@ -30,6 +30,7 @@ import {
   spendingViewCodec,
   expensePatchSchema,
   finishTripBodySchema,
+  restoreTripBodySchema,
   tripHistoryCodec,
   healthResponseSchema,
   isWireCode,
@@ -83,6 +84,7 @@ import type {
   TripView,
   VerdictAmendment,
   VerdictCard,
+  FinishTripBody,
 } from '@molvia/model'
 import { ApiError, createTransport } from './transport'
 import type { ClientOptions } from './transport'
@@ -166,8 +168,11 @@ export interface MolviaClient {
    * as done.
    */
   removeTrip(tripId: string): Promise<void>
-  /** «Вернуть» within ten minutes; `error.trip_open` for an open one while another is open. */
-  restoreTrip(tripId: string): Promise<TripView>
+  /**
+   * «Вернуть» within ten minutes; `error.trip_open` for an open one while another is open, unless
+   * it comes back finished (`finish`).
+   */
+  restoreTrip(tripId: string, finish?: FinishTripBody): Promise<TripView>
   /**
    * «Обмен денег» whole (MOL-40): the preference, the wallet of the pair, the hint and every
    * exchange with its comparison — all the server's, so the screen divides nothing.
@@ -448,8 +453,11 @@ export function createClient(options: ClientOptions): MolviaClient {
       noContent(await exchange(`/trips/${segment(tripId)}`, z.undefined(), { method: 'DELETE' }))
     },
 
-    restoreTrip: async (tripId) =>
-      request(`/trips/${segment(tripId)}/restore`, tripViewCodec, { method: 'POST' }),
+    restoreTrip: async (tripId, finish) =>
+      request(`/trips/${segment(tripId)}/restore`, tripViewCodec, {
+        method: 'POST',
+        ...(finish ? { body: encode(restoreTripBodySchema, { finish }) } : {}),
+      }),
 
     exchanges: () => request('/exchanges', exchangesResponseCodec),
 
