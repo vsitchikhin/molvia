@@ -15,7 +15,7 @@ endif
 REQUIRE_ENV = @test -f .env || { echo "no .env in this copy — run: make setup"; exit 1; }
 NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json is missing) — this target goes live once the workspaces land"; exit 1; }
 
-.PHONY: help setup hooks up down reup ps logs psql migrate forget db-reset dev format lint typecheck test e2e check prod-build certs icons ports
+.PHONY: help setup hooks up down reup ps logs psql migrate forget seed db-reset dev format lint typecheck test e2e check prod-build certs icons ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -70,9 +70,18 @@ migrate: ## Apply migrations
 
 # TG reaches the script through the environment, never pasted into the recipe: pasted in, even
 # quoted, a value could close the quote and bring its own `--yes` (MOL-58, П-3). It is one argument.
-forget: ## Erase a person by Telegram id: make forget TG=<id> [YES=1] (dry run without YES)
+# It erases only for YES=1 typed on this command line, as `seed` writes: `$(if $(YES),…)` read YES=0
+# as yes and took a YES left in the shell as one too (MOL-112, adversarial Е).
+forget: ## Erase a person by Telegram id: make forget TG=<id> [YES=1] (dry run without YES=1)
 	$(NEED_SCAFFOLD)
-	./bin/forget-actor.sh "$$TG" $(if $(YES),--yes)
+	./bin/forget-actor.sh "$$TG" $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
+
+# No value from a person reaches the recipe, so unlike `forget` it needs no wrapper script. It
+# writes only for YES=1 typed on this command line: `$(if $(YES),…)` read YES=0 as yes, and took a
+# YES left in the shell's environment as one too (adversarial Е).
+seed: ## Put the common names into the catalogue: make seed [YES=1] (dry run without YES=1)
+	$(NEED_SCAFFOLD)
+	npm run --silent seed -w @molvia/backend -- $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
 
 dev: ## Run api, pwa and bot for this copy
 	$(NEED_SCAFFOLD)

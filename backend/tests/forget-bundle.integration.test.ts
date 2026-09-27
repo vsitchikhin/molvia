@@ -60,4 +60,33 @@ describe('make forget', () => {
       expect(run.stdout).not.toContain('PWNED')
     },
   )
+
+  // MOL-112, adversarial Е: only YES=1 typed on the command line erases. `-n` prints the recipe
+  // and runs nothing.
+  it.each([['YES=0'], ['YES=no'], ['YES=false'], ['YES=']])('%s is a dry run', (yes) => {
+    const run = spawnSync('make', ['-n', '--no-print-directory', 'forget', 'TG=184467331', yes], {
+      cwd: root,
+      encoding: 'utf8',
+    })
+    expect(run.stdout).toContain('forget-actor.sh')
+    expect(run.stdout).not.toContain('--yes')
+  })
+
+  it('YES=1 erases, and a YES left in the environment does not', () => {
+    const typed = spawnSync(
+      'make',
+      ['-n', '--no-print-directory', 'forget', 'TG=184467331', 'YES=1'],
+      {
+        cwd: root,
+        encoding: 'utf8',
+      },
+    )
+    const inherited = spawnSync('make', ['-n', '--no-print-directory', 'forget', 'TG=184467331'], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, YES: '1' },
+    })
+    expect(typed.stdout).toContain('--yes')
+    expect(inherited.stdout).not.toContain('--yes')
+  })
 })

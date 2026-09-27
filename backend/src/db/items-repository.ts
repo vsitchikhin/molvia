@@ -12,7 +12,7 @@ import {
   synonymPairedKinds,
   toSearchKey,
 } from '@molvia/model'
-import type { Item, NewItem } from '@molvia/model'
+import type { Item, ItemKind, NewItem } from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -33,8 +33,14 @@ export interface ItemRepository {
    * the search a candidate would cost this path the item itself — «Milo» would be answered
    * with the «Мыло» already there, and could never be added. Merging what is merely similar
    * is 0.2's.
+   *
+   * `createdBy` is null for the seed (MOL-112), which goes through here so that running it again
+   * doubles nothing and a name someone already proposed stays theirs.
    */
-  createUnlessNamed(input: NewItem, createdBy: string): Promise<{ item: Item; created: boolean }>
+  createUnlessNamed(
+    input: NewItem,
+    createdBy: string | null,
+  ): Promise<{ item: Item; created: boolean }>
   /**
    * The catalogue lookup behind «что взяли?». The catalogue is shared by everyone, so the
    * owner filters nothing: it only chooses whose remembered picks take part in the order.
@@ -230,6 +236,32 @@ export function searchQueryKey(query: string): string | null {
   return HAS_CONTENT.test(key) ? key : null
 }
 
+/**
+ * The fats a query names — numbers typed with «%», whole: «2,5%» is `2,5`, never `2` and `5`. The
+ * key drops the sign and splits the number at its comma, so a fat is read off the query as typed
+ * and compared with the name as written (MOL-112, reviews З and Н).
+ */
+export function percentNumbers(query: string): string[] {
+  return [...query.matchAll(PERCENT)]
+    .map(([, whole, part]) => (part === undefined ? (whole ?? '') : `${whole ?? ''},${part}`))
+    .slice(0, MAX_QUERY_WORDS)
+}
+
+// A space before «%» is the class the domain splits words by, `WORD_BREAK`, on both sides: `\s` of
+// JavaScript takes the no-break space «2,5 %» is pasted with from a shop's site, `[[:space:]]` of
+// Postgres does not, and the fat of such a name went unseen (review О) — the trap MOL-45 closed
+// for the words of a name. As many fats as words are looked at (review П).
+const PERCENT = new RegExp(`(\\d+)(?:[.,](\\d+))?(?:${WORD_BREAK})?%`, 'gu')
+
+/**
+ * A fat as a pattern over a name: the same number, point or comma, before a «%», and not the tail
+ * of another number — «5%» is not in «0,5%», «3,5%» not in «3,2%». Digits only go in, so nothing
+ * in it is a pattern of the person's making.
+ */
+function fatPattern(fat: string): string {
+  return `(^|[^0-9.,])${fat.replace(',', '[.,]')}(${WORD_BREAK})?%`
+}
+
 type ItemRow = typeof items.$inferSelect
 
 /**
@@ -255,7 +287,12 @@ function toItem(row: ItemRow, barcodes: readonly string[]): Item {
  * The ranking query, apart from the method so the test that reads its plan runs this very
  * statement and not a copy that could drift from it.
  */
-export function rankedCandidates(key: string, limit: number, actorId: string | null): SQL {
+export function rankedCandidates(
+  key: string,
+  limit: number,
+  actorId: string | null,
+  fat: readonly string[] = [],
+): SQL {
   // What else each word of the query stands for (MOL-45): «картошка» is also «картофель». Two
   // parallel lists rather than an array parameter — words of a key never hold a space.
   const synonyms = key
@@ -328,6 +365,21 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
           where u.w !~ ${ADJECTIVE_WORD} or u.w ~ ${NOUN_WORD}
         ), 1000)`
 
+  // The fats typed with «%» that the name carries, whole (\`fatPattern\`): «кефир 2,5% 1 л» names
+  // «Кефир 2,5%», and «1 л», a size every row misses alike, must not hand the row to «Кефир» or
+  // «Кефир 1%» (review З). Whole, off the name: counted by the digits of the key, «3,5%» scored on
+  // the «3» of «Молоко 3,2%» and «0,5%» on the «5» of «Творог 5%», above the common name that is
+  // the right answer for a fat the catalogue lacks (review Н). Only with «%»: a bare number is as
+  // likely a size, and counted, «молоко 1 л» would give «Молоко 1,5%» its first row back (review А).
+  const fatDigits = fat.flatMap((one) => one.split(',')).join(' ')
+  const fatHits =
+    fat.length === 0
+      ? sql`0`
+      : sql`(${sql.join(
+          fat.map((one) => sql`(${items.name} ~ ${fatPattern(one)})::int`),
+          sql` + `,
+        )})`
+
   // No word after a number, no slip — and then not even the empty scan of every candidate: on
   // «мо», which has no synonym, that alone was half the time.
   const words = key.split(' ')
@@ -394,6 +446,10 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
           ) w
         ) u
       ) a
+      -- The digits of a fat typed with «%» are judged whole, by \`fat_hits\`, and not word by
+      -- word here: paired by the distance, the «1» of «1%» found «Молоко 1,5%» at no cost and the
+      -- common name lost before any rule of fats was asked (review Н′).
+      where not word = any(string_to_array(${fatDigits}, ' '))
     ),
     synonyms as (
       select s.word, s.n, s.anywhere, s.kinds
@@ -425,7 +481,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              -- applies to these alone: a name brought in by «лори» for «сыр» is no candidate
              -- of «сыр», and measured against it anyway, «Рис» passed as two edits from \`sir\`.
              ${typedHere} as typed,
-             ${kindAt} as kind_at
+             ${kindAt} as kind_at,
+             ${fatHits} as fat_hits
       from ${items}
       where ${items.searchKey} %> ${key} or ${items.searchKey} = ${key}${sql.join(bySynonym)}
       -- Every candidate is ranked, with no ceiling. Any cut here is wrong in one of two ways:
@@ -443,7 +500,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       select ${items.id}, ${items.searchKey},
              word_similarity(${key}, ${items.searchKey}),
              (${items.searchKey} %> ${key} or ${items.searchKey} = ${key}),
-             ${kindAt}
+             ${kindAt},
+             ${fatHits}
       from ${items}
       join admitted a on a.id = ${items.id}
     ),
@@ -467,6 +525,13 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              -- The typed spelling is measured unless the row came by a synonym of this very word:
              -- «сыр» is not measured against «Рис» that «лори» brought, but «хаггис» of
              -- «памперсы хаггис» is still measured against the «Huggies» that «подгузники» did.
+             -- Twice the distance, plus one where the word is exactly the start of a longer name
+             -- word: one pass tells how near a word is and whether it was found whole. At one
+             -- distance the whole word wins — «сыр» finds «Сырок» below the exact match, never
+             -- above it (MOL-10), which the length of the name alone would break (review И:
+             -- «печень» put «Печенье» first). Only an exact start: a start one edit off is the
+             -- typo of MOL-10's slack, and marked, «туалетка» put the litter's «туалета» above
+             -- «Туалетная бумага».
              case when c.typed or not qw.expanded then (
                select min(
                  -- The screen searches while the person types, so the last word is usually
@@ -476,17 +541,18 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                  case when qw.last
                         and length(w) > length(qw.q)
                         and levenshtein(qw.q, left(w, length(qw.q))) <= (length(qw.q) - 1) / 3
-                      then levenshtein(qw.q, left(w, length(qw.q)))
+                      then 2 * levenshtein(qw.q, left(w, length(qw.q)))
+                           + (qw.q = left(w, length(qw.q)))::int
                       -- One word of a key can reach 600 characters. Cut, not skipped: such a
                       -- name is still an item.
-                      else levenshtein(qw.q, left(w, 255))
+                      else 2 * levenshtein(qw.q, left(w, 255))
                  end)
                from unnest(string_to_array(c.search_key, ' ')) as w
                -- A grounding word is measured against grounding words only: against «л» or
                -- «1» of a size every two-letter word is two edits away, inside the budget.
                where not (qw.grounds and s.id is null)
                   or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]' and w not in ${UNIT_KEYS})
-             ) end as qd_typed,
+             ) end as qd_typed_twice,
              -- A synonym is a word, not a typo: it counts only as the whole word of the kind,
              -- and then costs nothing. With the edit budget on top, «мясо» expanded into five
              -- words would have five chances of the absolute budget's false hits (MOL-46).
@@ -499,8 +565,10 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       -- \`least\` skips a null, so a word found only by its synonym is still found. Not
       -- materialized: \`per_word\` is, so folding this into the aggregates below repeats a
       -- \`least\`, not the levenshtein subquery.
-      select id, grounds, lettered, least(qd_typed, qd_synonym) as qd,
-             coalesce(qd_synonym = 0 and coalesce(qd_typed, 255) > 0, false) as by_synonym
+      select id, grounds, lettered, least(qd_typed_twice / 2, qd_synonym) as qd,
+             coalesce(qd_synonym = 0 and coalesce(qd_typed_twice / 2, 255) > 0, false) as by_synonym,
+             coalesce(qd_typed_twice % 2 = 1
+                        and qd_typed_twice / 2 <= coalesce(qd_synonym, 255), false) as by_prefix
       from per_word
     ),
     ranked as (
@@ -531,10 +599,14 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                              filter (where pw.grounds and not pw.by_synonym)), 0) as words_distance,
              -- The furthest of those words, for how near the row is (MOL-46).
              coalesce(max(coalesce(pw.qd, 255))
-                        filter (where pw.grounds and not pw.by_synonym), 0) as words_worst
+                        filter (where pw.grounds and not pw.by_synonym), 0) as words_worst,
+             length(c.search_key) as key_length,
+             bool_or(pw.by_synonym) as by_synonym,
+             bool_or(pw.by_prefix) as by_prefix,
+             c.fat_hits
       from candidates c
       join per_word_best pw on pw.id = c.id
-      group by c.id, c.ws, c.search_key
+      group by c.id, c.ws, c.search_key, c.fat_hits
     ),
     remembered as (
       -- The owner's own picks for this query, folded per item. Personal on purpose: a sum
@@ -592,8 +664,13 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     -- the same distance; nothing else moves. Then what the person took before,
     -- above a closer spelling — their own choice says more than a typo metric does. Among
     -- several, the latest wins: after switching brands the new one is on top from the first
-    -- trip. Then the order of MOL-10, where ties stay ties («moloko» names «Ашхар» and
-    -- «Марианна» alike) and \`id\` only keeps two loads of one screen in one order.
+    -- trip. Then the distance of MOL-10, and at one distance: what the typed word found before
+    -- what a synonym found («маслины» over «Оливки»), then the shorter name (owner's decision
+    -- MOL-112, В-5) — the more of a name the query covers, the nearer: «Молоко» before «Молоко
+    -- 3,2%» on «молоко», before «Кофе … молотый» on «мол». The length before the similarity: a
+    -- size in the query otherwise handed the row to a variety that shares a digit or a letter
+    -- with it — «молоко 1 л» to «Молоко 1,5%», «рис 1 кг» to «Рис круглозёрный» (review А, Б).
+    -- The similarity then orders one length, and \`id\` keeps two loads of one screen in one order.
     order by case when not coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) then 1
                   when m.item_id is not null or r.words_distance = 0 then 0
                   else 2
@@ -601,9 +678,22 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              m.item_id is null,
              m.last_picked_at desc nulls last,
              m.picks desc nulls last,
-             r.distance, r.ws desc, r.id
+             r.distance, r.by_synonym, r.by_prefix, r.fat_hits desc, r.key_length,
+             r.ws desc, r.id
     limit ${limit}
   `
+}
+
+/**
+ * The lock every write of an item takes, per kind and search key: every name of one identity has
+ * one key, so all of them meet here. Exported for the seed (MOL-112), which looks at the key
+ * itself before `createUnlessNamed` and has to do it under the same lock. Reentrant inside one
+ * transaction, as advisory locks are.
+ */
+export async function lockItemKey(tx: Conn, kind: ItemKind, key: string): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtext('items'), hashtext(${`${kind} ${key}`}))`,
+  )
 }
 
 export function createItemRepository(db: Conn): ItemRepository {
@@ -706,9 +796,7 @@ export function createItemRepository(db: Conn): ItemRepository {
           // Per kind and key rather than per name: every name that is the same by
           // `nameIdentity` has the same key — built so, and held by a property test — so they
           // all meet at this lock, and the lookup below is an equality the GIN index serves.
-          await tx.execute(
-            sql`select pg_advisory_xact_lock(hashtext('items'), hashtext(${`${input.kind} ${key}`}))`,
-          )
+          await lockItemKey(tx, input.kind, key)
           const rows = await tx
             .select({ id: items.id, name: items.name })
             .from(items)
@@ -763,7 +851,7 @@ export function createItemRepository(db: Conn): ItemRepository {
         )
 
         const ranked = await tx.execute<{ id: string; near: boolean }>(
-          rankedCandidates(key, rowLimit(limit), idOrNull(actorId)),
+          rankedCandidates(key, rowLimit(limit), idOrNull(actorId), percentNumbers(query)),
         )
 
         await tx.execute(

@@ -200,6 +200,29 @@ What goes: purchases and trips, ratings including withdrawn ones, search picks, 
 sessions, login requests and the owner. What stays: catalogue items the person added, with no
 author, and every place.
 
+## Seeding the catalogue (MOL-112)
+
+`backend/src/catalogue-seed.ts` is some six hundred common names — «Молоко», «Говядина», «Хлеб» —
+put into the catalogue by hand, in one transaction, never by a deploy. It only adds: a name already
+there stays as it is, and a second run adds nothing. Every time the list grows, after its merge:
+
+1. A copy first, though nothing is removed: `sudo systemctl start molvia-backup.service`, then
+   `journalctl -u molvia-backup -n 5` says it went.
+2. Look — without `--yes` nothing changes, it prints how many would be added, how many are there
+   already, the names whose unit differs from the list's (they are kept as they are), and the
+   lines left out because their search key is taken (`same key`, «Мед ← Мёд»). Read those pairs:
+   one that is another thing — «Milo ← Мыло» — is proposed by hand through «Предложить товар»,
+   which compares names, not keys:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml --env-file .env.prod \
+     exec backend node dist/seed-catalogue.js
+   ```
+
+3. The same command with `--yes` at the end writes. Run the dry run once more: it says `added 0`.
+
+In a working copy the same thing is `make seed` and `make seed YES=1`.
+
 ## Backups (MOL-70)
 
 Every night at 04:00 in Yerevan `molvia-backup.timer` runs `backup/backup.sh`: `pg_dump` inside the

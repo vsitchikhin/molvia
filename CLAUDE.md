@@ -460,8 +460,41 @@ Measured, not assumed — the numbers below come from a probe against a real dat
 queries and 19 for what the shelf does not carry) against 64 names written for the shelf of
 «Ереван Сити», plus the typo corpus of MOL-5, since the log holds no typos. At the kept point 62
 of 73 have what they meant first and alone, 6 more share the first place with an item they did
-not mean — a tie the row's uuid breaks: «мол» with «Кофе … молотый», «туалетка» with the
+not mean — a tie the row's uuid broke: «мол» with «Кофе … молотый», «туалетка» with the
 litter's «туалета»; 45 of 45 typos land in the top three; 17 of 19 absent words find nothing.
+**Since MOL-112, at one distance the shorter name goes first** (owner's decision В-5, and its review):
+the more of a name the query covers, the nearer — and with a common name beside its varieties,
+«Молоко» and «Молоко 3,2%», that is every common word, not six of 73. The order at one distance is
+**found by the word before found by a synonym** («маслины» keeps «Маслины» above «Оливки»), **a
+whole word before the exact start of a longer one** («печень» is the liver, not «Печенье»: MOL-10's
+«below the exact match, never above it», which the length alone broke — review И; a start one edit
+off is not marked, or «туалетка» put the litter above the paper), **more fats typed with «%» that the
+name carries whole** («кефир 2,5% 1 л» names «Кефир 2,5%» — review З; whole, or «3,5%» scored on the
+«3» of «Молоко 3,2%» and a fat the list lacks lost the common name it should give — review Н; a bare
+number may be a size, and counted it would hand «молоко 1 л» back to «Молоко 1,5%»), **then the
+shorter name, then the similarity**, then the
+uuid. The length ranks before the similarity because a size in the query otherwise handed the first
+row to a variety: «молоко 1 л» put «Молоко 1,5%» first by the «1» of its fat, «рис 1 кг» put «Рис
+круглозёрный» first by the «к» of `kg` (adversarial А, Б) — the purchase and the rating went to the
+variety. The fat is read off the query as typed (`percentNumbers`) and matched against the name as
+written, since the key drops the sign and splits the number at its comma; its digits are taken out of
+the distance, or the «1» of «молоко 1%» paired with «Молоко 1,5%» at no cost before the rule of fats
+was asked (review Н′). By value, not by place: a size that shares a digit with the fat leaves with
+it — «кефир 1% 1 л» is judged by «л» alone — which loses nothing measured, since a neighbour of the
+same fat has the same digits and one of another fat is told apart by the rule of fats (review С-12).
+A space before «%» is `WORD_BREAK` on both sides — `\s` of JavaScript takes
+the no-break space a name pasted from a shop's site carries, `[[:space:]]` of Postgres does not
+(review О) — and as many fats are looked at as words (review П). On the shelf of MOL-14 all six
+ties go to the item meant. The prices, named: a short wrong name beside a long right one — «лейс»
+puts «Рис» above the chips; «малако» finds «Молоко» where the similarity chose «Молоко
+миндальное»; among the kinds a wide word leads to, the shortest — «мясо» is «Фарш» first; names of
+one key length are still the uuid's where the similarity is equal too — «Молоко 1,5%» and «3,2%», and
+on the seed «кур» is «Курица» or «Курага»; «молоко 1», typed on the way to «1 л», still gives
+«Молоко 1,5%», whose «1» is an exact pair; a fat typed without «%» is read as a size — «масло 72,5»
+and «молоко 3,2» still find their variety, both digits paired at no cost, but a size beside them
+takes it away; and without «%» a short word may pair twice with one of the name's — «творог 5,5» is
+«Творог 5%» at no cost, by the distance (with the sign, «творог 5,5%» gives «Творог», the digits of a
+fat being out of the distance — review Р).
 **No point of the grid did better on both halves.** A threshold of 0.3 empties every false hit
 but drops «Молоко Ашхар» from «малако» — the case 0.15 exists for; a budget of 1 empties them
 too and loses five typos and «собачий корм»; a budget of 3 wins one query and brings six false
@@ -469,7 +502,8 @@ hits. The slack on an unfinished word (MOL-10) moves five or six whole answers e
 never a first row, so the grid could not tell its three settings apart — kept as it is, not
 chosen. What no threshold reaches went to tasks with numbers: **synonyms** — «картошка» against
 «Картофель», 6 of 73, one of them («мясо») found by letters only — MOL-45 closed them with the
-dictionary above, which puts 67 of 73 first and alone; **the absolute
+dictionary above, which puts 67 of 73 first and alone, and the shorter name of MOL-112 the other six
+— less the two brands of В-6 below, «дошик» and «принглс»; **the absolute
 budget** — «овощи» finds «Мука … высший сорт», «специи» «Соевый соус», «пельмени» «Чай зелёный»,
 3 of 25 — MOL-46 made them a far answer rather than a find; **a unit word grounding a match** — «сыр» is two edits from `sht` of «4 шт» —
 closed by MOL-48 for the units it lists, which took six of the ten items «сыр» found. Weighting
@@ -1057,6 +1091,7 @@ make up          # start Postgres and apply migrations
 make down        # stop the stack, keeping the data
 make psql        # psql inside this copy's database
 make db-reset    # drop this copy's volume and start clean (DESTRUCTIVE)
+make seed        # the common names into the catalogue; YES=1 writes, without it a dry run
 make dev         # run api, pwa and bot
 make e2e         # end-to-end tests in a phone-sized browser
 make icons       # regenerate the app icons from favicon.svg
@@ -1334,6 +1369,43 @@ database access. In a product about data integrity, two write paths will silentl
   withdrawn opinion back on screen, silently. Rating again brings the same row back and keeps
   `rated_at`, so withdrawing and re-rating cannot move anyone in the gate.
 - **Exactly one field is required — the item.** Everything else may be left empty.
+- **The catalogue grows two ways: «Предложить товар» and the seed (MOL-112).** MOL-12 decided «no
+  seed» and the owner reversed it on 26.09.2026: with an empty catalogue every trip began by
+  typing the shelf in — 3–4 new words a trip in the owner's own log, 5–8 at the level of a brand
+  and a size — and a proposal needs a connection, so at a shelf with no signal a new item could
+  not be made at all. The seed is `backend/src/catalogue-seed.ts`: some six hundred common names,
+  the kind first, a variety only where the shelf tells it by a number and the common name beside
+  it, no brands, no categories, each with the unit its price is compared by. **Rating «Молоко»
+  means milk here in general** (owner's decision В-1); a brand is «Молоко Марианна», proposed by
+  hand. `dist/seed-catalogue.js` (`make seed` in a copy) writes it through `createUnlessNamed` with
+  no author, in one transaction: a dry run unless `--yes` — the real run, rolled back, as `forget`'s
+  is — a second run adds nothing, and a name already there stays as it is, its unit and author
+  included, the ones whose unit differs printed. **It only adds**: a line removed or renamed stays
+  in every database it reached, with what was bought and rated under it, so the list grows by
+  commits and a line is added with care. It is not a migration, since a migration is frozen once
+  merged and the key is computed in TypeScript. The seed never stays in the `_test` or `_e2e`
+  databases, where it would move the corpora; `seed-search.integration.test.ts` loads it and pins
+  the owner's words against it. **A brand people name a kind by leads to the kind** through the
+  dictionary — «фанта» to «Лимонад», «дошик» to «Лапша» (owner's decision В-6) — so the owner's
+  words find something from the first trip. A brand item spelled as the word is typed stays above
+  the kind: both at no cost, and at one distance what the typed word found ranks before what a
+  synonym found (`by_synonym`) — not the similarity, which ranks after the length (review С-8).
+  **The prices, named:** one spelled otherwise — «Doshirak», «Pringles», an edit or two from
+  «дошик», «принглс» — stands under the kind until it is taken once, and memory lifts it from then
+  on (MOL-11); and a brand leads to the word of the kind, among whose names the shortest goes
+  first — «дошик» is «Лапша» by the kilo before «Лапша быстрого приготовления», «несквик» «Какао»
+  before the instant one (review Л). MOL-112 first kept
+  brands out on the claim that a synonym row ties with an exact one; the order says otherwise
+  (adversarial Д). **The seed is not the answer offline**:
+  with no connection «Что взяли?» searches only the recent items, so a seed item not yet taken is
+  as far out of reach there as one that does not exist (adversarial Ж) — «Предложить товар» offline
+  is В-4's, to come back to on MOL-38. **A line whose key is there under another spelling is not
+  written**: `nameIdentity` knows case and spacing, the key also `ё`, a decimal point and the
+  scripts, so the person's «Мед», «Молоко 3.2%» or «Լավաշ» would have got the seed's twin beside it,
+  one the search cannot tell apart — the report names each pair instead (adversarial В). The key is
+  still no identity: another thing with the same key is left out too — «Мыло» beside somebody's
+  «Milo» — and is proposed by hand, since «Предложить товар» compares names (review К, С-9). A line
+  left out costs a proposal; a twin written would be there for good, since the seed only adds.
 - **Entering an item is a catalogue lookup** with transliteration and typo tolerance,
   not free text. Free text produces `МОЛОКО МАРИАН 1Л`, which cannot be tied to the canon.
 - **Result ordering must never contain a field like `sponsored`, `boost`, `promoted`.**
@@ -2112,7 +2184,7 @@ eight write inputs and three rules in `packages/model`, with the wire codecs tha
 quantity need to cross it at all. MOL-5 added the search key; MOL-6 the nine tables of 0.1,
 the GIN index over `search_key` and the constraints that hold the product's key. MOL-8 gave
 the device an identity and the API its first routes; MOL-12 opened the catalogue — search
-and «Предложить товар»; MOL-21 the trip — start it, add, fix and remove its rows, finish it.
+and «Предложить товар» — and MOL-112 filled it with a seed of common names; MOL-21 the trip — start it, add, fix and remove its rows, finish it.
 **One trip is open at a time, and the choice is the person's:** «Начать поход» while another
 is open answers `409 error.trip_open`, and the screen asks whether to continue that one or finish
 it first. A finished trip still takes rows — the soy sauce found in the bag at home belongs to the
@@ -2312,8 +2384,9 @@ The shape worth knowing here:
   runtime image carries no `node_modules` at all: nothing to audit and nothing that can
   drift from the lockfile it was built with. It also sidesteps the fact that the workspace
   packages export TypeScript source, which a runtime image could not read. The API's image
-  carries a second file, `dist/forget.js` — the owner's fallback for erasure (MOL-58), since the
-  machine has neither the source nor a published database port.
+  carries two more files, `dist/forget.js` — the owner's fallback for erasure (MOL-58) — and
+  `dist/seed-catalogue.js` (MOL-112), since the machine has neither the source nor a published
+  database port.
 - **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
   exists only for trying the stack on a laptop, where Docker Desktop has no journald.
 - **The database is copied every night, encrypted, off the machine** (MOL-70): `pg_dump` inside the

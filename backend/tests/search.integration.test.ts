@@ -1435,3 +1435,111 @@ describe('search — how near the answer is (MOL-46)', () => {
     expect(await answer('картошка')).toEqual([['Картофель'], true])
   })
 })
+
+describe('search — at one distance, the shorter name first (MOL-112, В-5)', () => {
+  it('puts the common name before its varieties, which the query does not name', async () => {
+    for (const name of ['Молоко 3,2%', 'Молоко топлёное', 'Молоко', 'Молоко 1,5%']) {
+      await named(name)
+    }
+
+    // «1,5» and «3,2» are keys of one length, so between those two the uuid still decides.
+    const found = await names('молоко')
+    expect([found[0], [...found.slice(1, 3)].sort(), found[3]]).toEqual([
+      'Молоко',
+      ['Молоко 1,5%', 'Молоко 3,2%'],
+      'Молоко топлёное',
+    ])
+  })
+
+  it('puts the name the query covers more of first, on a word being typed', async () => {
+    await named('Кофе молотый')
+    await named('Молоко')
+
+    expect(await names('мол')).toEqual(['Молоко', 'Кофе молотый'])
+  })
+
+  it('puts the common name first when the query carries a size (adversarial А, Б)', async () => {
+    for (const name of ['Молоко 1,5%', 'Молоко', 'Рис круглозёрный', 'Рис']) await named(name)
+
+    expect((await names('молоко 1 л'))[0]).toBe('Молоко')
+    expect((await names('рис 1 кг'))[0]).toBe('Рис')
+  })
+
+  it('puts a whole word above the exact start of a longer one, however short (review И)', async () => {
+    for (const name of ['Печенье', 'Печень куриная', 'Сыр маскарпоне', 'Маска для лица']) {
+      await named(name)
+    }
+
+    expect((await names('печень'))[0]).toBe('Печень куриная')
+    expect((await names('маска'))[0]).toBe('Маска для лица')
+  })
+
+  it('does not mark a start one edit off: «туалетка» is the paper, not the litter', async () => {
+    await named('Наполнитель для кошачьего туалета 5 л')
+    await named('Туалетная бумага Zewa Plus 4 рулона')
+
+    expect((await names('туалетка'))[0]).toBe('Туалетная бумага Zewa Plus 4 рулона')
+  })
+
+  it('puts the fat typed with «%» first, whatever the size beside it (review З)', async () => {
+    for (const name of ['Кефир', 'Кефир 1%', 'Кефир 2,5%']) await named(name)
+
+    expect((await names('кефир 2,5% 1 л'))[0]).toBe('Кефир 2,5%')
+    // A bare number may be a size: read as a fat, «кефир 1 л» would give «Кефир 1%» the row.
+    expect((await names('кефир 1 л'))[0]).toBe('Кефир')
+  })
+
+  it('compares a fat whole: one the catalogue lacks gives the common name (review Н)', async () => {
+    for (const name of ['Кефир', 'Кефир 1%', 'Кефир 2,5%', 'Творог', 'Творог 5%']) await named(name)
+
+    // «1,5» is not the «1» of «1%», «0,5» not the «5» of «5%».
+    expect((await names('кефир 1,5%'))[0]).toBe('Кефир')
+    expect((await names('кефир 0,5%'))[0]).toBe('Кефир')
+    expect((await names('творог 0,5%'))[0]).toBe('Творог')
+    // A point for a comma is the same fat.
+    expect((await names('кефир 2.5%'))[0]).toBe('Кефир 2,5%')
+  })
+
+  it('does not pair the digits of a typed fat one by one (review Н′)', async () => {
+    for (const name of ['Молоко', 'Молоко 1,5%', 'Молоко 2,5%', 'Кефир', 'Кефир 2,5%']) {
+      await named(name)
+    }
+
+    // «1%» is no fat of «1,5%», and «5%» none of «2,5%»: the lists lack them, the common name answers.
+    expect((await names('молоко 1%'))[0]).toBe('Молоко')
+    expect((await names('кефир 5%'))[0]).toBe('Кефир')
+    expect((await names('молоко 2,5%'))[0]).toBe('Молоко 2,5%')
+  })
+
+  it('reads a no-break space before «%» as a space, in a name and in a query (review О)', async () => {
+    for (const name of [
+      'Кефир Ашхар 1\u00a0%',
+      'Кефир Ашхар 2,5\u00a0%',
+      'Кефир Ашхар 3,2\u202f%',
+    ]) {
+      await named(name)
+    }
+
+    expect((await names('кефир ашхар 2,5% 1 л'))[0]).toBe('Кефир Ашхар 2,5\u00a0%')
+    expect((await names('кефир ашхар 3,2% 1 л'))[0]).toBe('Кефир Ашхар 3,2\u202f%')
+    expect((await names('кефир ашхар 2,5\u00a0% 1 л'))[0]).toBe('Кефир Ашхар 2,5\u00a0%')
+  })
+
+  it('must not lift a shorter name over a nearer one: only ties are its to order', async () => {
+    await named('Сыр')
+    await named('Сыр чанах')
+
+    expect(await names('сыр чанах')).toEqual(['Сыр чанах'])
+    expect(await names('чанах сыр')).toEqual(['Сыр чанах'])
+  })
+
+  it("must not lift a shorter name over the person's own pick", async () => {
+    const actor = await insertActor(db)
+    const kefir = await named('Кефир 2,5%')
+    await named('Кефир')
+    await createSearchPickRepository(db).remember(actor, 'кефир', kefir)
+
+    const { items: found } = await repo.search('кефир', 20, actor)
+    expect(found.map((item) => item.name)).toEqual(['Кефир 2,5%', 'Кефир'])
+  })
+})
