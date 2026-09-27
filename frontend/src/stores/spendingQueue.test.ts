@@ -396,6 +396,33 @@ describe('spending queue', () => {
       expect(refused?.kind === 'record' && refused.body.amount.minor).toBe(600_000n)
     })
 
+    it('Р1: a record refused after the spending was removed leaves no «Не принята» behind', async () => {
+      recordSpending
+        .mockImplementationOnce(offline)
+        .mockRejectedValueOnce(new ApiError(ERROR.SPENDING_IN_FUTURE, 'spentOn'))
+      removeSpending.mockRejectedValueOnce(new ApiError(ERROR.NOT_FOUND, 'spendingId'))
+      const queue = fresh()
+      queue.record({ id: BARBER, ...fields() })
+      await settled()
+      queue.remove(BARBER)
+      await queue.flush()
+      expect(calls).toEqual([`record ${BARBER}`, `record ${BARBER}`, `remove ${BARBER}`])
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toEqual([])
+    })
+
+    it('a record refused with «Вернуть» standing after its removal is still a refusal', async () => {
+      recordSpending
+        .mockImplementationOnce(offline)
+        .mockRejectedValueOnce(new ApiError(ERROR.SPENDING_IN_FUTURE, 'spentOn'))
+      const queue = fresh()
+      queue.record({ id: BARBER, ...fields() })
+      await settled()
+      queue.restore(queue.remove(BARBER))
+      await queue.flush()
+      expect(queue.rejected).toHaveLength(1)
+    })
+
     it('a portal answering in the API’s place leaves the write unmarked — it never reached the server', async () => {
       recordSpending.mockRejectedValueOnce(new ApiError(ISSUE.RESPONSE_INVALID, 'portal', false))
       const queue = fresh()

@@ -846,7 +846,10 @@ nothing up.
   queue (adversarial А, Б, В). A change made after it goes behind it, over the next revision.
   **Nothing is tried while the browser knows there is no connection**, so a write made at the till
   stays unmarked and foldable, and an answer that came and is not the API's — a portal — takes the
-  mark off, since that request never arrived (round 2). **A refused record or amendment takes the
+  mark off, since that request never arrived (round 2). The price, named (review Ф-1): a browser
+  wrongly sure it is offline — some VPNs and WebViews — sends no spendings until `online` comes;
+  the trip's queue and the ratings still try. A refusal that comes after the person removed the
+  spending is dropped rather than shown — there is nothing left to fix (round 3, Р1). **A refused record or amendment takes the
   amendments behind it** into its refusal: they were made over a revision it would have made, and
   sent on they went over another device's amendment in silence (round 2, Н1, Н3). **Removing a
   spending nobody has begun to send takes it out of the queue**, and «Вернуть» puts it back; once

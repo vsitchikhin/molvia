@@ -398,6 +398,14 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
         ]
         refusal = null
       }
+      // Refused, but the person has removed the spending since: nothing is left to fix, and a row
+      // «Не принята» would bring back a spending they deleted (round 3, Р1). The removal behind it
+      // goes on — 404 is done, and a spending an amendment was refused about is still removed.
+      const about = spendingOf(write)
+      if (refusal && about !== null && removedLater(about)) {
+        laterFields(about)
+        refusal = null
+      }
       if (refusal) {
         console.warn(`[spending queue] ${write.kind} refused: ${refusal}`)
         rejected.value = [
@@ -430,6 +438,17 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     if (last?.kind !== 'amend') return null
     kept = kept.filter((item) => !later.includes(item))
     return fieldsOf(last.body)
+  }
+
+  /** Whether the last of «Удалить» and «Вернуть» still waiting about the spending is a removal. */
+  function removedLater(id: string): boolean {
+    const last = kept
+      .filter(
+        (item) =>
+          (item.write.kind === 'remove' || item.write.kind === 'restore') && item.write.id === id,
+      )
+      .at(-1)?.write
+    return last?.kind === 'remove'
   }
 
   /** A refused record or amendment, carrying what the person typed last — one refusal to fix. */
