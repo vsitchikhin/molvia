@@ -131,6 +131,21 @@ function bounded(minor: bigint, currency: Currency): Money | null {
   return minor > INT8_MAX || minor < -INT8_MAX ? null : { minor, currency }
 }
 
+/**
+ * `amount` by `rate`, with its sign kept: converted as a positive amount, since a rounding of a
+ * negative one would round the other way. Null when the rate is not of its currency, or the result
+ * is more than money holds.
+ */
+export function convertSigned(amount: Money, rate: ExchangeRate): Money | null {
+  const negative = amount.minor < 0n
+  const result = convertAcross(
+    { minor: negative ? -amount.minor : amount.minor, currency: amount.currency },
+    rate,
+  )
+  if (result === null) return null
+  return { minor: negative ? -result.minor : result.minor, currency: result.currency }
+}
+
 function converted(
   amount: Money,
   into: Currency,
@@ -138,20 +153,12 @@ function converted(
   snapshot: ExchangeRate | null,
   rateOf: RateBetween,
 ): Money | null {
-  // Converted as a positive amount: a rounding of a negative one would round the other way.
-  const size = {
-    minor: amount.minor < 0n ? -amount.minor : amount.minor,
-    currency: amount.currency,
-  }
-  const covers = (rate: ExchangeRate | null) =>
+  const covers = (rate: ExchangeRate | null): rate is ExchangeRate =>
     rate !== null &&
     (rate.base === amount.currency || rate.quote === amount.currency) &&
     (rate.base === into || rate.quote === into)
   const rate = covers(snapshot) ? snapshot : rateOf(amount.currency, into, day)
-  if (rate === null || !covers(rate)) return null
-  const result = convertAcross(size, rate)
-  if (result === null) return null
-  return { minor: amount.minor < 0n ? -result.minor : result.minor, currency: into }
+  return covers(rate) ? convertSigned(amount, rate) : null
 }
 
 /**

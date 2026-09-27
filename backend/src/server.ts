@@ -64,6 +64,20 @@ import {
 import { moneyMonthOf } from '@/usecases/money-month'
 import { spendingRoutes } from '@/routes/spendings'
 import { createSpendingRepository } from '@/db/spendings-repository'
+import {
+  accountJournal,
+  accountsHeld,
+  addMoneyAccount,
+  amendMoneyAccount,
+  checkAccount,
+  moneyAccountsOf,
+  payTrip,
+  removeMoneyAccount,
+  restoreMoneyAccount,
+  unassignedOf,
+} from '@/usecases/money-accounts'
+import { moneyAccountRoutes } from '@/routes/money-accounts'
+import { createMoneyAccountRepository } from '@/db/money-accounts-repository'
 import { createSettingsRepository } from '@/db/settings-repository'
 import { saveSettings } from '@/usecases/save-settings'
 import { settingsRoute } from '@/routes/settings'
@@ -98,6 +112,10 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.CONFLICT]: 409,
   // A name one of the owner's live categories already has: the same kind of answer as a conflict.
   [ERROR.SPENDING_CATEGORY_TAKEN]: 409,
+  // The same for an account's name (MOL-115, Р-21), and for the currency of an account that
+  // already counted operations in it: the request is well formed, the state refuses it.
+  [ERROR.MONEY_ACCOUNT_TAKEN]: 409,
+  [ERROR.MONEY_ACCOUNT_CURRENCY_LOCKED]: 409,
   // Also well formed: another trip of the same person is still open, and which of the two goes
   // on is the person's choice (MOL-21). The screen reads the code, the status only groups it.
   [ERROR.TRIP_OPEN]: 409,
@@ -268,10 +286,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const removedExchanges = createExchangeRepository(db)
     const removedIncomes = createIncomeRepository(db)
     const removedSpendings = createSpendingRepository(db)
+    const removedAccounts = createMoneyAccountRepository(db)
     let stopCleanup: (() => Promise<void>) | undefined
     let stopExchangeCleanup: (() => Promise<void>) | undefined
     let stopIncomeCleanup: (() => Promise<void>) | undefined
     let stopSpendingCleanup: (() => Promise<void>) | undefined
+    let stopAccountCleanup: (() => Promise<void>) | undefined
     let stopSessionCleanup: (() => Promise<void>) | undefined
     instance.addHook('onReady', (ready) => {
       stopCleanup = startLoginCleanup(
@@ -303,6 +323,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           instance.log.error('removed spending cleanup failed')
         },
       )
+      // And for accounts without operations (MOL-115): deleted ten minutes on, whatever named one
+      // meanwhile left without an account rather than lost (Р-17).
+      stopAccountCleanup = startLoginCleanup(
+        () => removedAccounts.purgeStale(),
+        () => {
+          instance.log.error('removed account cleanup failed')
+        },
+      )
       // An expired session has no reader, and it kept a device name for good while the privacy
       // page promises 180 days from the last use (MOL-57, owner's decision Q4).
       stopSessionCleanup = startLoginCleanup(
@@ -318,6 +346,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopExchangeCleanup?.()
       await stopIncomeCleanup?.()
       await stopSpendingCleanup?.()
+      await stopAccountCleanup?.()
       await stopSessionCleanup?.()
     })
     const actors = createActorRepository(db)
@@ -421,6 +450,18 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         archiveCategory: (actor, id, archived) =>
           archiveSpendingCategory(tripData, actor, id, archived),
         month: (actor, month, cursor) => moneyMonthOf(tripData, actor, month, cursor),
+      })
+      moneyAccountRoutes(guarded, {
+        overview: (actor) => moneyAccountsOf(tripData, actor),
+        add: (actor, body) => addMoneyAccount(tripData, actor, body),
+        amend: (actor, id, body) => amendMoneyAccount(tripData, actor, id, body),
+        remove: (actor, id) => removeMoneyAccount(tripData, actor, id),
+        restore: (actor, id) => restoreMoneyAccount(tripData, actor, id),
+        journal: (actor, id, cursor) => accountJournal(tripData, actor, id, cursor),
+        unassigned: (actor) => unassignedOf(tripData, actor),
+        check: (actor, id, body) => checkAccount(tripData, actor, id, body),
+        held: (actor, query) => accountsHeld(tripData, actor, query),
+        payTrip: (actor, tripId, body) => payTrip(tripData, actor, tripId, body),
       })
       adviceRoutes(guarded, {
         advice: (actorId) =>

@@ -217,6 +217,20 @@ function fakeRepositories(
       freeze: unexpected('money.freeze'),
       thaw: unexpected('money.thaw'),
     },
+    moneyAccounts: {
+      list: unexpected('moneyAccounts.list'),
+      known: unexpected('moneyAccounts.known'),
+      add: unexpected('moneyAccounts.add'),
+      amend: unexpected('moneyAccounts.amend'),
+      remove: unexpected('moneyAccounts.remove'),
+      restore: unexpected('moneyAccounts.restore'),
+      purgeStale: unexpected('moneyAccounts.purgeStale'),
+      operations: unexpected('moneyAccounts.operations'),
+      lastChecks: unexpected('moneyAccounts.lastChecks'),
+      lastCheck: unexpected('moneyAccounts.lastCheck'),
+      saveCheck: unexpected('moneyAccounts.saveCheck'),
+      setTripPayment: unexpected('moneyAccounts.setTripPayment'),
+    },
   }
 }
 

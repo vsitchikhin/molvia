@@ -6,6 +6,8 @@ import type { IncomeRepository } from './incomes-repository'
 import type { ExpenseRepository } from './expenses-repository'
 import type { Conn, Db } from './index'
 import { createItemRepository } from './items-repository'
+import { createMoneyAccountRepository } from './money-accounts-repository'
+import type { MoneyAccountRepository } from './money-accounts-repository'
 import { createMoneyRepository } from './money-repository'
 import type { MoneyRepository } from './money-repository'
 import type { ItemRepository } from './items-repository'
@@ -43,6 +45,8 @@ export interface TripRepositories {
   readonly spendingCategories: SpendingCategoryRepository
   /** What «Деньги» reads beside them: the month's finished trips and its frozen rate. */
   readonly money: MoneyRepository
+  /** Where the money lies (MOL-115): the accounts, their operations and checks. */
+  readonly moneyAccounts: MoneyAccountRepository
 }
 
 export function tripRepositories(conn: Conn): TripRepositories {
@@ -58,6 +62,7 @@ export function tripRepositories(conn: Conn): TripRepositories {
     spendings: createSpendingRepository(conn),
     spendingCategories: createSpendingCategoryRepository(conn),
     money: createMoneyRepository(conn),
+    moneyAccounts: createMoneyAccountRepository(conn),
   }
 }
 
