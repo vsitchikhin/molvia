@@ -838,17 +838,22 @@ nothing up.
   through it too (owner's decision В-4), so «Такси» made at the till goes before the spending that
   names it. The three queues share `stores/queueing.ts` — the lock, the key of a kept write, what
   holds, the doubling pause (В-6).
-- **The writes of one spending fold while they wait**: an amendment of one not yet sent rewrites
-  its record; two amendments are one `PUT` over the revision the first was made on — sent apart,
-  the second went over a revision the first had moved and came back 409; removing one not yet
-  sent takes it out of the queue, and «Вернуть» puts it back. A write already on its way is never
-  folded into, and an amendment made then goes over the next revision. **A record the server
-  already holds with other fields is this phone's own** — its answer was lost and it was amended
-  meanwhile — so a 409 on a record goes on as an amendment over revision 1.
+- **The writes of one spending fold while they wait — only while nobody has begun to send them**:
+  an amendment of one not yet sent rewrites its record; two amendments are one `PUT` over the
+  revision the first was made on. **A write a send has begun on is marked on the shelf**
+  (`attempted`), by whichever window sends it, and is never folded into again: its answer may
+  have been lost after the server took it, and «not sent» and «no answer» are one thing to a
+  queue (adversarial А, Б, В). A change made after it goes behind it, over the next revision. **A
+  removal always goes to the server** — a record that seems to wait may have landed — and 404 on
+  it is done; «Вернуть» takes a removal back while it waits, and asks the server to restore once
+  it may have left, never writing the spending anew. **A record the server already holds with
+  other fields is this phone's own**, so a 409 on a record goes on as an amendment over revision 1.
 - **A spending in the queue is a row, never a figure** (requirements Р-3; the handoff asked
   otherwise and this rule wins): «Отправляем…» at the top of its day, «Правка отправляется» on an
   amended row whose figures stay the server's, a removed row hidden, and «Ещё не учтено: N»
-  on the card. A day only the phone knows of has no total. The month is read again from the start
+  on the card — not for a record the month already shows (adversarial Л). A day only the phone
+  knows of has no total; a row only the phone knows of shows what was last typed, since there are
+  no figures of the server's to keep (review Т-4). The month is read again from the start
   whenever the queue has an answer — which also puts a spending moved to another day where it
   belongs (MOL-73, Е3) — keeping as many pages as were open.
 - **The two figures the card derives are the model's**, `percentChange` and `shareOf`: a ratio
@@ -859,14 +864,30 @@ nothing up.
   траты» (Р-5).
 - **Removal asks nothing; `UndoStrip` gives ten seconds** where «Трата» floats, and stands still
   while a finger or the person's focus is on it — not the focus it puts on «Вернуть» itself, or
-  the count would never run for a touch. The server keeps the removal ten minutes; the strip is
-  what the screen offers.
+  the count would never run for a touch. **It stands whatever the screen becomes under it**: the
+  only spending removed turns the month into a newcomer's, and the strip went with the button it
+  shared a block with (adversarial Г). The server keeps the removal ten minutes; the strip is what
+  the screen offers.
+- **The sheet says «saved» after it has closed** (adversarial И): the move to the spending's month
+  made while it was open was undone by the step back that closes it. It checks the day — a cleared
+  picker or a day before 2000 would fall over in the queue's codec — and that the category is one of
+  the chips shown, since one the server called unknown stands on none (adversarial Д, Ж).
+- **Days of Yerevan are printed as calendar days, never as moments** (`calendarDay` in `days.ts`,
+  review Т-1): `yerevanMidnight(day)` is the evening before anywhere west of UTC+4, and every date
+  of the screen came out a day early on a phone in Moscow. The frontend's tests run in UTC on every
+  machine (`TZ` in its vitest config), where such a slip shows.
+- **The categories are the owner's, not a month's**, so the newest month kept names them for a
+  month not read yet: «Трата» stands while the month loads, when it failed and offline on the first
+  of a month (review Т-5, Т-6) — and does not, where no category is known at all. «Категории ›»
+  stands without bars too (Т-7). This month in Yerevan is looked at again whenever the app comes
+  back into view (adversarial З).
 - **«Пусто» is read off the answer** (Р-6): the running month empty, no income, nothing the month
   before and nothing waiting. The server does not say «no history», and an empty August after a
   full July is «В этом месяце трат нет», not a newcomer.
 - **The month is in the address and moves by `replace`**; there is no lower bound, since the
   server names no first month (Р-1). The last three first pages read are kept per owner
-  (`molvia.money`), so offline is a strip over them.
+  (`molvia.money`), so offline is a strip over them. A next page asked for while the month is read
+  again from the start is asked again from the fresh answer (adversarial Е).
 - **A finished trip opened from «Деньги» leads back there** (owner's decision В-3):
   `?from=money`, and the route lists which `from` it takes (`meta.from`) — an address must not
   make any screen the parent of any other. The chevron says «‹ Деньги» and steps back onto the

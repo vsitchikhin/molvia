@@ -62,6 +62,10 @@ test('a spending lands in the month, and a removal comes back with «Верну�
   await sheet.getByRole('button', { name: 'Удалить трату' }).click()
   await expect(sheet).toBeHidden()
   await expect(row).toBeHidden()
+  // The only spending gone, the month read again is empty — a newcomer's screen — and «Вернуть»
+  // still stands: a person reads the strip before reaching for it (adversarial Г).
+  await expect(page.getByRole('heading', { name: 'Добавьте первую трату' })).toBeVisible()
+  await page.waitForTimeout(1000)
   await page.getByRole('button', { name: 'Вернуть' }).click()
   await expect(row).toBeVisible()
   await expect(page.locator('.spent .figure')).toHaveText(/5\s000\s֏/)
@@ -95,6 +99,22 @@ test('with no connection a spending waits on the phone, uncounted, and goes when
   await expect(page.getByRole('button', { name: /Открыть трату: Такси/ })).not.toContainText(
     'Отправляем…',
   )
+})
+
+test('a spending saved while another month is looked at brings the screen to its own month', async ({
+  page,
+}) => {
+  await openMoney(page)
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  await writeSpending(page, '5000', 'Красота и гигиена', 'Барбер')
+  await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
+  await expect(page).toHaveURL(/month=\d{4}-\d{2}/)
+
+  await page.getByRole('button', { name: 'Трата', exact: true }).click()
+  await writeSpending(page, '1500', 'Транспорт', 'Такси')
+  // Today's spending: the screen comes back to this month and shows it (adversarial И).
+  await expect(page).not.toHaveURL(/month=/)
+  await expect(page.getByRole('button', { name: /Открыть трату: Такси/ })).toBeVisible()
 })
 
 test('changing the month writes nothing into the history', async ({ page }) => {
