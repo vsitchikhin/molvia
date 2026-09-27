@@ -477,7 +477,11 @@ uuid. The length ranks before the similarity because a size in the query otherwi
 row to a variety: «молоко 1 л» put «Молоко 1,5%» first by the «1» of its fat, «рис 1 кг» put «Рис
 круглозёрный» first by the «к» of `kg` (adversarial А, Б) — the purchase and the rating went to the
 variety. The fat is read off the query as typed (`percentNumbers`) and matched against the name as
-written, since the key drops the sign and splits the number at its comma. On the shelf of MOL-14 all six
+written, since the key drops the sign and splits the number at its comma; its digits are taken out of
+the distance, or the «1» of «молоко 1%» paired with «Молоко 1,5%» at no cost before the rule of fats
+was asked (review Н′). A space before «%» is `WORD_BREAK` on both sides — `\s` of JavaScript takes
+the no-break space a name pasted from a shop's site carries, `[[:space:]]` of Postgres does not
+(review О) — and as many fats are looked at as words (review П). On the shelf of MOL-14 all six
 ties go to the item meant. The prices, named: a short wrong name beside a long right one — «лейс»
 puts «Рис» above the chips; «малако» finds «Молоко» where the similarity chose «Молоко
 миндальное»; among the kinds a wide word leads to, the shortest — «мясо» is «Фарш» first; names of
