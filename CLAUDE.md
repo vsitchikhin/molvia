@@ -835,17 +835,25 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
 
 - **The balance is counted, never stored: the start and every operation on the account dated after
   its day.** The start is the evening of `startOn` — «Старт — вечер 16.09» of the owner's sheet — so
-  an operation on that day is history and moves nothing. An open trip moves its account too, dated
-  today: the money is already gone. One loading of all four kinds (`operations`) feeds the balance,
+  an operation on that day is history and moves nothing. **A trip is dated by the day it started** —
+  the money left at the shelf — and moves its account while still open (Р-29): dated by its finish,
+  a trip left open, or finished after midnight, was taken a second time from a start that already
+  counted it (adversarial Д4). The month of «Деньги» still dates it by the finish. One loading of all four kinds (`operations`) feeds the balance,
   the journal, the check and «не попали» alike, as one shape (`AccountOperation`).
 - **An account on an operation is optional** (MOL-43 В-2): a spending, an income, each half of an
   exchange, a trip. The screen puts the default in, the server never guesses. **The database holds
   whose it is and what it may hold**: every account column is a key with the owner, and an income's
   and an exchange side's key carries the currency too — money lands on an account in its own currency
   or it is not that account. A removed account still takes operations, and so does one marked for
-  deletion: what was queued offline is not lost to an account taken away on another phone.
+  deletion: what was queued offline is not lost to an account taken away on another phone. **One the
+  owner has not got at all is «без счёта», never a refusal** (Р-28): an account deleted for good
+  while a phone was offline is gone, and a refusal would set the operation aside in the queue for
+  good (adversarial Д3); someone else's account gets the same answer, so nothing tells the two apart.
 - **«Списано со счёта»** (MOL-43 В-3) is what left the account exactly, in its currency, on a
-  spending or a trip whose currency is another — a key and four checks say so. It moves the balance
+  spending in another currency, or a trip that is itself or has a purchase in another — a trip's
+  purchases may be in any of the four, and a trip in drams with a dollar purchase would otherwise be
+  named «без списано» by every check and refused the one thing that fixes it (adversarial Д2). Keys
+  and checks hold the rest; the trip's case is the use case's, since its row cannot see its lines. It moves the balance
   and nothing else: not the month of «Деньги» (owner's decision В-1) and not the person's own rate,
   since those drams were never in their hands. **Without it the amount is converted by the rule of
   «Деньги»** — the spending's own snapshot when it is of the pair, otherwise the person's rate of that
@@ -875,16 +883,22 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
 - **A check looks for the reason before it offers to close the difference** (MOL-43 В-4, the owner's
   comment over the option they ticked). The fact is sent first and the count only answered after it,
   so the person does not fit the number; the answer is the difference and what could have made it
-  since the last check, or the start: an operation of the account's currency with no account, one on
-  it in another currency without «списано», a trip on it with purchases that have no price, one no
-  rate counts. «Since» is dated after the check's day **or written after the check** — one dated back
-  and typed only now is exactly what a difference is made of. The check is written and is where the
-  next one starts; sent again under its name it counts again, which is how the screen shows a reason
+  since the last check, or the start: an operation of the account's currency with no account — a
+  trip with nothing priced yet included, by its own currency (Д6) — one on it in another currency
+  without «списано», a trip on it with purchases that have no price, one no rate counts. «Since» is
+  dated after the check's day **or learnt by the server after the check** (`seenAt`): written,
+  amended, given or taken an account, a trip received as finished or given a purchase — never the
+  phone's clock, or a trip finished offline and delivered after a check hid behind it (Д1, Д1б).
+  **Only a check that came out even is where the next one starts** (owner's decision В-4 of the
+  review, adversarial Д7): one with a difference is written and shown («сверено»), but what it named
+  stays named — in «не попали» too — until a check comes out even; otherwise closing the sheet
+  without putting the reason right hid it, and the next check led to «Прочее · сверка», the same
+  money twice. Sent again under its name a check counts again, which is how the screen shows a reason
   put right (Р-19). Closing the difference is an ordinary «Прочее» spending or income with the note
   «сверка», written by the person's own tap through the ordinary routes with the server's sum.
 - **«Не попали в остатки» is per account, not per currency** (Р-16): an operation with no account
   that could still explain a difference of some live account of its currency — after its start and
-  its last check. A fresh check of the card does not hide last week's cash; a currency with no
+  its last check that came out even. A fresh check of the card does not hide last week's cash; a currency with no
   account is not asked about.
 - **«Сколько было до обмена» from the accounts is a hint** (Р-9, Р-20): the balances of the currency
   at the end of the day, the exchange amended left out, and nothing when an account of it starts on
@@ -892,7 +906,11 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
 - **The prices, named:** the balance of a view counts live operations while «удалить или убрать» asks
   of every row — a spending in its ten minutes of «Вернуть» makes an account «убран» rather than
   deleted; an operation naming a marked account is in no balance until the timer unlinks it; a check
-  keeps the count of its moment, and an operation amended before it later does not move it.
+  keeps the count of its moment; a new price of a purchase already written does not move its trip's
+  `seenAt` — a purchase has no moment of amendment; after «Прочее · сверка» the operation that made
+  the difference is still in «не попали» until a check comes out even; and every read counts the
+  owner's whole life, a rate per day of a foreign amount — measured at 81 ms on two years of daily
+  spending and sixty exchanges (adversarial Д8), accepted.
 
 ## Tracker and documentation
 
