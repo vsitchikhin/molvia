@@ -78,7 +78,15 @@
         @add="$emit('add-category')"
       />
 
-      <AppField v-model="day" :label="t('spending.sheet.date')" kind="date" :max="today">
+      <AppField
+        v-model="day"
+        :label="t('spending.sheet.date')"
+        kind="date"
+        min="2000-01-02"
+        :max="today"
+        :error-text="dayBad ? t('spending.sheet.bad_day') : null"
+        @update:model-value="dayBad = false"
+      >
         <template #label-extra>
           <span class="day-words">{{ dayWords }}</span>
         </template>
@@ -173,8 +181,8 @@ import {
   isWireCode,
   parseMoney,
   spendingTextSchema,
+  isRateDay,
   yerevanDate,
-  yerevanMidnight,
 } from '@molvia/model'
 import type { Currency, ExchangeRate, Money, SpendingCategoryView } from '@molvia/model'
 import { api } from '@/api'
@@ -186,6 +194,7 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
 import { asTyped, categoryColour, rateWords } from '@/components/spending'
 import type { JournalRow, Removed, SpendingTarget } from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
+import { calendarDay, shiftDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { newId } from '@/ids'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -258,6 +267,7 @@ export default defineComponent({
     const amountBad = ref(false)
     const categoryBad = ref(false)
     const noteBad = ref(false)
+    const dayBad = ref(false)
     const placeBad = ref(false)
     const amountInput = ref<HTMLInputElement | null>(null)
     const items = ref<TripItem[] | 'loading' | 'offline' | 'error'>('loading')
@@ -304,6 +314,7 @@ export default defineComponent({
         categoryBad.value = false
         noteBad.value = false
         placeBad.value = false
+        dayBad.value = false
         if (props.target.kind === 'trip') void loadTrip(props.target.row)
         // The keyboard comes up for a new spending — the sum is what it is opened for — and not
         // for an amendment, where the person came to look first.
@@ -350,18 +361,16 @@ export default defineComponent({
         props.target.kind === 'add' ? 'spending.sheet.title_add' : 'spending.sheet.title_edit',
       )
     })
-    const dayOf = (value: string) =>
-      new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'long' }).format(
-        yerevanMidnight(value),
-      )
+    // A day of Yerevan's calendar, whatever the zone of the phone (review Т-1).
+    const dayOf = (value: string) => calendarDay(value, locale.value)
     const meta = computed(() => {
       if (props.target.kind === 'trip') {
         const { row, day: finished } = props.target
-        const date = new Intl.DateTimeFormat(locale.value, {
+        const date = calendarDay(finished, locale.value, {
           weekday: 'short',
           day: 'numeric',
           month: 'long',
-        }).format(yerevanMidnight(finished))
+        })
         return t('spending.sheet.trip_meta', { date, n: row.items }, row.items)
       }
       const spending = manual.value?.spending
@@ -393,10 +402,16 @@ export default defineComponent({
       })),
     )
 
+    /** A day the server takes: a calendar day from 2000 on and not after today in Yerevan. */
+    const dayGood = computed(() => isRateDay(day.value) && day.value <= today.value)
+
+    // A cleared field — «Сбросить» of the iOS picker — is no day to name, and a date nobody can
+    // print must not take the sheet down with it (adversarial Д2).
     const dayWords = computed(() => {
+      if (!isRateDay(day.value)) return ''
       const date = dayOf(day.value)
       if (day.value === today.value) return t('spending.sheet.date_today', { date })
-      if (day.value === yerevanDate(new Date(yerevanMidnight(today.value).getTime() - 43_200_000)))
+      if (day.value === shiftDay(today.value, -1))
         return t('spending.sheet.date_yesterday', { date })
       return date
     })
@@ -453,12 +468,16 @@ export default defineComponent({
     async function submit(): Promise<void> {
       const value = parsed()
       amountBad.value = !value
-      categoryBad.value = categoryId.value === null
+      // One of the chips on screen: a category the server has refused as unknown stands on no
+      // chip, and sending it again earns the same refusal (adversarial Ж).
+      const chosen = choice.value.find((category) => category.id === categoryId.value) ?? null
+      categoryBad.value = chosen === null
+      dayBad.value = !dayGood.value
       const typedNote = text(note.value)
       const typedPlace = text(place.value)
       noteBad.value = typedNote.bad
       placeBad.value = typedPlace.bad
-      if (!value || categoryId.value === null || typedNote.bad || typedPlace.bad) {
+      if (!value || !chosen || dayBad.value || typedNote.bad || typedPlace.bad) {
         await nextTick()
         // The first field that is wrong gets the focus (handoff 02).
         if (!value) amountInput.value?.focus()
@@ -469,9 +488,9 @@ export default defineComponent({
         return
       }
       const fields: SpendingFields = {
-        spentOn: day.value > today.value ? today.value : day.value,
+        spentOn: day.value,
         amount: value,
-        categoryId: categoryId.value,
+        categoryId: chosen.id,
         ...(typedNote.value === undefined ? {} : { note: typedNote.value }),
         ...(typedPlace.value === undefined ? {} : { place: typedPlace.value }),
       }
@@ -479,10 +498,16 @@ export default defineComponent({
       const refused = refusal.value
       if (refused) queue.dismiss(refused)
       if (!row) queue.record({ id: newId(), ...fields })
-      else if (row.local || refused?.write.kind === 'record')
-        queue.record({ id: row.spending.id, ...fields })
+      // A refused record goes again as a record; one still waiting is amended over the revision
+      // its record makes, which folds into it while nobody has begun to send it (review Т-4).
+      else if (refused?.write.kind === 'record') queue.record({ id: row.spending.id, ...fields })
+      else if (row.local) queue.amend(row.spending.id, 1, fields)
       else queue.amend(row.spending.id, row.spending.revision, fields)
-      emit('saved', fields.spentOn)
+      // Told once the sheet is away: a move of the month made while it was open was undone by the
+      // step back that closes it (adversarial И).
+      after = () => {
+        emit('saved', fields.spentOn)
+      }
       emit('update:open', false)
     }
 
@@ -547,6 +572,7 @@ export default defineComponent({
       categoryBad,
       noteBad,
       placeBad,
+      dayBad,
       amountInput,
       items,
       money,

@@ -465,6 +465,7 @@
       "shop_action": "Trip ›",
       "bad_amount": "Enter an amount above zero",
       "bad_category": "Choose a category",
+      "bad_day": "Choose a day no later than today",
       "bad_text": "This has characters that cannot be saved",
       "offline": "No connection. We will keep it on the phone and send it when the internet is back",
       "save": "Save the spending",

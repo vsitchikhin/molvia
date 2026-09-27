@@ -99,6 +99,9 @@ export default defineComponent({
     const amount = computed(() => asTyped(money.value, locale.value))
     const counted = computed(() => {
       if (money.value.currency === props.spendCurrency) return null
+      // Not counted yet is not «не посчитано» — that says no rate of the day was known; a row still
+      // on the phone says «Отправляем…» already (review Т-8).
+      if (props.row.kind === 'manual' && props.row.local) return null
       const value = props.row.counted
       return value ? `≈ ${formatEstimate(value, locale.value)}` : t('spending.uncounted_row')
     })
