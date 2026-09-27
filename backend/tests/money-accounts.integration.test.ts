@@ -230,8 +230,11 @@ describe('чужое — один 404, во всех ручках и во все
       const response = await call(boris, method, url, body)
       expect(response.statusCode, `${method} ${url}`).toBe(404)
     }
+    // Someone else's account is «без счёта», exactly as one deleted for good is (Д3, Р-28): the
+    // operation is written, and nothing tells the two apart.
     const { response } = await spend(boris, { accountId: id })
-    expect(response.json()).toMatchObject({ code: ERROR.MONEY_ACCOUNT_UNKNOWN })
+    expect(response.statusCode).toBe(201)
+    expect(spendingViewCodec.parse(response.json()).accountId).toBeNull()
     const income = await call(boris, 'POST', '/incomes', {
       id: randomUUID(),
       amount: amd('100'),
@@ -239,7 +242,8 @@ describe('чужое — один 404, во всех ручках и во все
       source: 'salary',
       accountId: id,
     })
-    expect(income.json()).toMatchObject({ code: ERROR.MONEY_ACCOUNT_UNKNOWN })
+    expect(income.statusCode).toBe(201)
+    expect((await overview(boris)).unassigned).toBe(0)
     // And the account of Anna's stays as it was.
     expect((await balanceOf(anna, id)).balance.minor).toBe(10_000_000n)
   })
@@ -256,7 +260,7 @@ describe('чужое — один 404, во всех ручках и во все
     const foreign = await call(boris, 'PUT', `/trips/${borisTrip}/payment`, {
       accountId: annasAccount,
     })
-    expect(foreign.json()).toMatchObject({ code: ERROR.MONEY_ACCOUNT_UNKNOWN })
+    expect(tripViewCodec.parse(foreign.json())).toMatchObject({ accountId: null, debited: null })
   })
 
   it('база сама не даёт операции чужой счёт', async () => {
@@ -641,7 +645,27 @@ describe('сверка и «не попали» (п. 7, Р-16, Р-19)', () => {
     })
     expect(other.statusCode).toBe(409)
     expect((await balanceOf(me, id)).lastCheckedOn).toBe(today)
-    // Checked today: what was written before it is out of the window of «не попали».
+    // A check that did not come out even moves nothing (В-4 of the review, Д7): the taxi it named
+    // is still in «не попали», and a new check still names it.
+    const unassigned = unassignedOperationsCodec.parse(
+      (await call(me, 'GET', '/money/accounts/unassigned')).json(),
+    ).rows
+    expect(unassigned).toHaveLength(1)
+    const next = accountCheckCodec.parse(
+      (
+        await call(me, 'POST', `/money/accounts/${id}/checks`, {
+          id: randomUUID(),
+          fact: amd('190132'),
+        })
+      ).json(),
+    )
+    expect(next.reasons.map(({ kind }) => kind)).toEqual(['unassigned'])
+    // One that does come out even is where the next one starts.
+    const even = await call(me, 'POST', `/money/accounts/${id}/checks`, {
+      id: randomUUID(),
+      fact: amd('191332'),
+    })
+    expect(accountCheckCodec.parse(even.json()).difference.minor).toBe(0n)
     expect(
       unassignedOperationsCodec.parse((await call(me, 'GET', '/money/accounts/unassigned')).json())
         .rows,
@@ -726,5 +750,148 @@ describe('итоги (п. 8, Р-22)', () => {
       inSpend: { minor: 3_900_000n, currency: 'AMD' },
       rate: { source: 'official' },
     })
+  })
+})
+
+describe('после ревью (MOL-115, Р-3, Д1–Д6)', () => {
+  it('удаление таймером отвязывает все пять видов операций и не падает на ключе (Р-3)', async () => {
+    const me = await owner()
+    const cash = await addAccount(me, { name: 'Наличные' })
+    const card = await addAccount(me, { name: 'Карта ₽', currency: 'RUB', start: rub('0') })
+    await call(me, 'DELETE', `/money/accounts/${cash.id}`)
+    await call(me, 'DELETE', `/money/accounts/${card.id}`)
+    const spent = await spend(me, { accountId: cash.id })
+    const income = { id: randomUUID(), amount: amd('100'), receivedOn: today, source: 'gift' }
+    await call(me, 'POST', '/incomes', { ...income, accountId: cash.id })
+    const exchange = {
+      id: randomUUID(),
+      given: rub('1000'),
+      received: amd('4700'),
+      exchangedOn: today,
+      givenAccountId: card.id,
+      receivedAccountId: cash.id,
+    }
+    expect((await call(me, 'POST', '/exchanges', exchange)).statusCode).toBe(201)
+    const trip = await insertTrip(db, { actorId: me.id, placeId: await insertPlace(db) })
+    await call(me, 'PUT', `/trips/${trip}/payment`, { accountId: cash.id })
+    await db
+      .update(moneyAccounts)
+      .set({ deletedAt: sql`clock_timestamp() - interval '11 minutes'` })
+      .where(eq(moneyAccounts.actorId, me.id))
+    await accountsRepository.purgeStale()
+    expect(await db.select().from(moneyAccounts).where(eq(moneyAccounts.actorId, me.id))).toEqual(
+      [],
+    )
+    const rows = await db.execute<{ named: number } & Record<string, unknown>>(sql`
+      select (select count(*) from spendings where actor_id = ${me.id} and account_id is not null)
+           + (select count(*) from incomes where actor_id = ${me.id} and account_id is not null)
+           + (select count(*) from exchanges where actor_id = ${me.id}
+                and (given_account_id is not null or received_account_id is not null))
+           + (select count(*) from trips where actor_id = ${me.id} and account_id is not null)
+           as named`)
+    expect(Number(rows[0]?.named)).toBe(0)
+    expect(spent.response.statusCode).toBe(201)
+  })
+
+  it('повтор «Добавить счёт» после окончательного удаления с операцией — новый счёт, не 404 (Д5)', async () => {
+    const me = await owner()
+    const { id, body } = await addAccount(me)
+    await call(me, 'DELETE', `/money/accounts/${id}`)
+    const { body: spending } = await spend(me, { accountId: id })
+    await db
+      .update(moneyAccounts)
+      .set({ deletedAt: sql`clock_timestamp() - interval '11 minutes'` })
+      .where(eq(moneyAccounts.id, id))
+    const again = await call(me, 'POST', '/money/accounts', body)
+    expect(again.statusCode).toBe(201)
+    const [row] = await db.select().from(spendings).where(eq(spendings.id, spending.id))
+    expect(row?.accountId).toBeNull()
+  })
+
+  it('поход, завершённый офлайн до сверки и дошедший после неё, — причина следующей (Д1)', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me, { startOn: daysAgo(5) })
+    await call(me, 'POST', `/money/accounts/${id}/checks`, {
+      id: randomUUID(),
+      fact: amd('100000'),
+    })
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const trip = await insertTrip(db, {
+      actorId: me.id,
+      placeId: await insertPlace(db),
+      startedAt: yesterday,
+      finishedOnDeviceAt: yesterday,
+      finishedAt: new Date(),
+    })
+    await db.insert(expenses).values({
+      id: randomUUID(),
+      tripId: trip,
+      itemId: await insertItem(db),
+      amountMinor: 500000n,
+      amountCurrency: 'AMD',
+      createdAt: yesterday,
+    })
+    const check = accountCheckCodec.parse(
+      (
+        await call(me, 'POST', `/money/accounts/${id}/checks`, {
+          id: randomUUID(),
+          fact: amd('95000'),
+        })
+      ).json(),
+    )
+    expect(check.reasons.map(({ kind, operation }) => [kind, operation.id])).toEqual([
+      ['unassigned', trip],
+    ])
+  })
+
+  it('«списано» у похода в валюте счёта с покупкой в долларах принимается (Д2)', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me)
+    const trip = await insertTrip(db, { actorId: me.id, placeId: await insertPlace(db) })
+    await db.insert(expenses).values({
+      id: randomUUID(),
+      tripId: trip,
+      itemId: await insertItem(db),
+      amountMinor: 1000n,
+      amountCurrency: 'USD',
+    })
+    const paid = await call(me, 'PUT', `/trips/${trip}/payment`, {
+      accountId: id,
+      debited: amd('4000'),
+    })
+    expect(paid.statusCode, paid.body).toBe(200)
+    expect((await balanceOf(me, id)).balance.minor).toBe(9_600_000n)
+  })
+
+  it('поход, начатый до вечера старта и не завершённый, — история, а не второй вычет (Д4)', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me, { startOn: daysAgo(1) })
+    const trip = await insertTrip(db, {
+      actorId: me.id,
+      placeId: await insertPlace(db),
+      startedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    })
+    await db.insert(expenses).values({
+      id: randomUUID(),
+      tripId: trip,
+      itemId: await insertItem(db),
+      amountMinor: 500000n,
+      amountCurrency: 'AMD',
+    })
+    await call(me, 'PUT', `/trips/${trip}/payment`, { accountId: id })
+    expect((await balanceOf(me, id)).balance.minor).toBe(10_000_000n)
+  })
+
+  it('поход без счёта и без единой цены — в «не попали» (Д6)', async () => {
+    const me = await owner()
+    await addAccount(me)
+    const trip = await insertTrip(db, { actorId: me.id, placeId: await insertPlace(db) })
+    await db
+      .insert(expenses)
+      .values({ id: randomUUID(), tripId: trip, itemId: await insertItem(db) })
+    const rows = unassignedOperationsCodec.parse(
+      (await call(me, 'GET', '/money/accounts/unassigned')).json(),
+    ).rows
+    expect(rows.map(({ id }) => id)).toEqual([trip])
   })
 })
