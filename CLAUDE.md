@@ -1382,7 +1382,12 @@ database access. In a product about data integrity, two write paths will silentl
   trip brought back while another is open is `409 error.trip_open`. On the phone removal and
   «Вернуть» are writes of the trip's queue (`delete`, `restore`): the trip's waiting writes are taken
   out and handed back by «Вернуть», the removal is sent **always** — 404 is done — and a trip whose
-  removal waits is shown nowhere. **The price, named:** removing a trip dated before a check that
+  removal waits is shown nowhere. **The removal stands where the trip's first write stood, and
+  «Вернуть» puts the trip back in the removal's place** (adversarial А3, А4): the order of the queue
+  is the order the trips lived in — one trip's `finish` lets the next one's `start` through — and put
+  at the end, a removal left the server holding the trip open under the next start, and «Вернуть»
+  made yesterday's trip the one going on. A «Вернуть» the server refuses leaves the trip's writes on
+  the phone, stepped over and counted as a refused start's are (А2). **The price, named:** removing a trip dated before a check that
   came out even moves the balance with no reason the check can name, as a removed spending does.
 - **Exactly one field is required — the item.** Everything else may be left empty.
 - **The catalogue grows two ways: «Предложить товар» and the seed (MOL-112).** MOL-12 decided «no
