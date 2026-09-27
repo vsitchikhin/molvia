@@ -1573,7 +1573,10 @@ database access. In a product about data integrity, two write paths will silentl
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and
-  gets the chevron, labelled with the title of where it leads, never the word «Back». **It
+  gets the chevron, labelled with the title of where it leads, never the word «Back». **At rest
+  the label has the row; once the small title comes in it gives way first** (MOL-75): whole, else
+  «Back», else the chevron alone — never a fragment, which «Trip…» would be — and the title yields
+  last, only when it alone does not fit between two chevrons. **It
   leads to the screen underneath when that screen is any ancestor** — the step the system
   button takes — and otherwise replaces onto the parent (`backTarget`, MOL-77): a finished trip
   opened from the home screen says «‹ Поход» and both «back»s go home. Tabs and the
