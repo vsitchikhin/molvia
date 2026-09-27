@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ERROR, INT8_MAX, money, moneyAccountSchema, placeSchema } from '@molvia/model'
+import { INT8_MAX, money, moneyAccountSchema, placeSchema } from '@molvia/model'
 import type { Currency, Expense, Money, MoneyAccount, Trip } from '@molvia/model'
 import { keptSide, paymentOf } from './account-of'
 import { moneyAccountsOf, payTrip } from './money-accounts'
@@ -63,13 +63,20 @@ describe('paymentOf (Р-26, Д2, Д3)', () => {
     expect(paymentOf(accounts, held, {}, ['RUB'])).toEqual({ accountId: card.id, debited: null })
   })
 
-  it('refuses «списано» sent in the account’s own currency', () => {
-    expect(() =>
-      paymentOf(accounts, null, { accountId: cash.id, debited: amd(100n) }, ['AMD']),
-    ).toThrow(ERROR.MONEY_ACCOUNT_CURRENCY)
-    expect(() =>
-      paymentOf(accounts, null, { accountId: card.id, debited: amd(100n) }, ['AMD']),
-    ).toThrow(ERROR.MONEY_ACCOUNT_CURRENCY)
+  it('refuses nothing (Р-31, Е1): «списано» that does not apply is dropped', () => {
+    // A spending in drams from the dram account: nothing was converted, the account stays.
+    expect(paymentOf(accounts, null, { accountId: cash.id, debited: amd(100n) }, ['AMD'])).toEqual({
+      accountId: cash.id,
+      debited: null,
+    })
+  })
+
+  it('writes one whose «списано» is not in the account’s currency without the account (Е1)', () => {
+    // The phone saw a dram card; the card is in roubles now — not the account it meant.
+    expect(paymentOf(accounts, null, { accountId: card.id, debited: amd(100n) }, ['USD'])).toEqual({
+      accountId: null,
+      debited: null,
+    })
   })
 
   it('takes «списано» for a trip in the account’s currency with a purchase in another (Д2)', () => {
@@ -153,13 +160,12 @@ describe('payTrip (Р-18, Д2)', () => {
     return { repositories, written }
   }
 
-  it('refuses «списано» when the trip and every purchase are in the account’s currency', async () => {
+  it('drops «списано» when the trip and every purchase are in the account’s currency (Е3)', async () => {
     const cash = account('AMD')
-    const { repositories, written } = world([cash], ['AMD'])
-    await expect(
-      payTrip(repositories, { id: OWNER }, trip.id, { accountId: cash.id, debited: amd(1n) }),
-    ).rejects.toThrow(ERROR.MONEY_ACCOUNT_CURRENCY)
-    expect(written).toEqual([])
+    // A trip in drams with nothing priced in another currency.
+    const { repositories, written } = world([cash], [])
+    await payTrip(repositories, { id: OWNER }, trip.id, { accountId: cash.id, debited: amd(1n) })
+    expect(written).toEqual([{ accountId: cash.id, debited: null }])
   })
 
   it('takes the account off with «списано» together', async () => {

@@ -417,7 +417,10 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           .where(and(eq(exchanges.actorId, actorId), isNull(exchanges.deletedAt))),
         db.execute<TripRow>(sql`
           select t.id, p.name as place_name, t.currency, t.started_at,
-                 to_char(t.started_at at time zone 'Asia/Yerevan', 'YYYY-MM-DD') as started_on,
+                 -- The phone's side of the start where the server's is later: a trip begun
+                 -- offline in the evening and delivered after midnight (review Р2-3, В-6).
+                 to_char(least(t.started_at, t.finished_on_device_at) at time zone 'Asia/Yerevan',
+                         'YYYY-MM-DD') as started_on,
                  coalesce(t.finished_on_device_at, t.finished_at) as finished_at,
                  greatest(t.started_at, t.finished_at, t.account_set_at,
                           (select max(e.created_at) from expenses e where e.trip_id = t.id))

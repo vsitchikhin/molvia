@@ -838,7 +838,12 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   an operation on that day is history and moves nothing. **A trip is dated by the day it started** —
   the money left at the shelf — and moves its account while still open (Р-29): dated by its finish,
   a trip left open, or finished after midnight, was taken a second time from a start that already
-  counted it (adversarial Д4). The month of «Деньги» still dates it by the finish. One loading of all four kinds (`operations`) feeds the balance,
+  counted it (adversarial Д4). The day is the phone's where it is earlier than the server's — the
+  earlier of the server's start and the device's finish — or a trip begun offline in the evening and
+  delivered after midnight took the next day (owner's decision В-6, review Р2-3). The month of
+  «Деньги» still dates it by the finish. **The price, named** (adversarial Е2): a trip continued on
+  later days moves its account on its first day, and one begun before an account's start and
+  continued after it is history whole — the start line is drawn once, when the account is made. One loading of all four kinds (`operations`) feeds the balance,
   the journal, the check and «не попали» alike, as one shape (`AccountOperation`).
 - **An account on an operation is optional** (MOL-43 В-2): a spending, an income, each half of an
   exchange, a trip. The screen puts the default in, the server never guesses. **The database holds
@@ -846,14 +851,20 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   and an exchange side's key carries the currency too — money lands on an account in its own currency
   or it is not that account. A removed account still takes operations, and so does one marked for
   deletion: what was queued offline is not lost to an account taken away on another phone. **One the
-  owner has not got at all is «без счёта», never a refusal** (Р-28): an account deleted for good
-  while a phone was offline is gone, and a refusal would set the operation aside in the queue for
-  good (adversarial Д3); someone else's account gets the same answer, so nothing tells the two apart.
+  owner has not got at all, or one that does not fit, is «без счёта», never a refusal** (Р-28, Р-31):
+  an account deleted for good, or given another currency, while a phone was offline is not the one
+  the phone saw, and a refusal would set the operation aside in the queue for good (adversarial Д3,
+  Е1); someone else's account gets the same answer, so nothing tells the two apart.
 - **«Списано со счёта»** (MOL-43 В-3) is what left the account exactly, in its currency, on a
   spending in another currency, or a trip that is itself or has a purchase in another — a trip's
   purchases may be in any of the four, and a trip in drams with a dollar purchase would otherwise be
   named «без списано» by every check and refused the one thing that fixes it (adversarial Д2). Keys
-  and checks hold the rest; the trip's case is the use case's, since its row cannot see its lines. It moves the balance
+  and checks hold the rest; the trip's case is the use case's, since its row cannot see its lines.
+  **It counts only while it applies** (`debitedOn`): a trip whose dollar purchase was corrected to
+  drams keeps the figure in its row and is counted exactly by its sums (adversarial Е3). **Nothing
+  about it is refused** (Р-31): sent where it does not apply it is dropped, and in another currency
+  than the account's it means the account is not the one the phone saw — the operation is written
+  «без счёта»; a write from the queue that was refused would be lost. It moves the balance
   and nothing else: not the month of «Деньги» (owner's decision В-1) and not the person's own rate,
   since those drams were never in their hands. **Without it the amount is converted by the rule of
   «Деньги»** — the spending's own snapshot when it is of the pair, otherwise the person's rate of that
@@ -894,7 +905,11 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   stays named — in «не попали» too — until a check comes out even; otherwise closing the sheet
   without putting the reason right hid it, and the next check led to «Прочее · сверка», the same
   money twice. Sent again under its name a check counts again, which is how the screen shows a reason
-  put right (Р-19). Closing the difference is an ordinary «Прочее» spending or income with the note
+  put right (Р-19). **«Came out even» is exact** (owner's decision В-5, review Р2-2): an account
+  counted with «≈» rarely matches the bank to the kopeck, and a difference of rounding is closed like
+  any other — «Прочее · сверка» — **after which the screen sends the same check again**, so that it
+  comes out even and moves the window; without that repeat the window of such an account stays at
+  its start. Closing the difference is an ordinary «Прочее» spending or income with the note
   «сверка», written by the person's own tap through the ordinary routes with the server's sum.
 - **«Не попали в остатки» is per account, not per currency** (Р-16): an operation with no account
   that could still explain a difference of some live account of its currency — after its start and

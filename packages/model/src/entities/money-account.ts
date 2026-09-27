@@ -179,6 +179,19 @@ function converted(
 }
 
 /**
+ * «Списано» as it counts on an account in `currency`: only while some money of the operation — its
+ * own currency or a trip's purchase — is in another. A trip whose purchase in dollars was corrected
+ * to drams keeps the figure in its row, and it stops counting: the trip is then exact by its sums,
+ * and a check names nothing that is not wrong (adversarial Е3).
+ */
+export function debitedOn(operation: AccountOperation, currency: Currency): Money | null {
+  const foreign =
+    operation.currency !== currency ||
+    operation.amounts.some((amount) => amount.currency !== currency)
+  return foreign && operation.debited?.currency === currency ? operation.debited : null
+}
+
+/**
  * What `operation` did to an account in `currency`: «списано» when there is one, exactly; its own
  * amounts in that currency, exactly; any other amount converted by its day's rate and marked «≈».
  */
@@ -187,9 +200,8 @@ export function movementOf(
   currency: Currency,
   rateOf: RateBetween,
 ): Movement {
-  if (operation.debited !== null) {
-    return { amount: bounded(-operation.debited.minor, currency), approximate: false }
-  }
+  const debited = debitedOn(operation, currency)
+  if (debited !== null) return { amount: bounded(-debited.minor, currency), approximate: false }
   let minor = 0n
   let approximate = false
   for (const amount of operation.amounts) {
@@ -332,7 +344,7 @@ function reasonFor(
   }
   if (operation.accountId !== account.id) return null
   if (movementOf(operation, account.currency, rateOf).amount === null) return 'uncounted'
-  if (operation.debited !== null) return null
+  if (debitedOn(operation, account.currency) !== null) return null
   if (operation.amounts.some((amount) => amount.currency !== account.currency)) return 'noDebited'
   return operation.unpriced > 0 ? 'unpriced' : null
 }
@@ -445,7 +457,7 @@ export function conversionsNeeded(
   const needs = new Map<string, { from: Currency; into: Currency; day: string }>()
   for (const operation of operations) {
     const account = operation.accountId === null ? undefined : byId.get(operation.accountId)
-    if (!account || operation.debited !== null) continue
+    if (!account || debitedOn(operation, account.currency) !== null) continue
     for (const { currency } of operation.amounts) {
       if (currency === account.currency || covers(operation.rate, currency, account.currency)) {
         continue

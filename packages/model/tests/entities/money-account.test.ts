@@ -206,6 +206,18 @@ describe('accountBalance', () => {
     })
   })
 
+  it('stops counting «списано» once no money of the trip is in another currency (Е3)', () => {
+    const cash = account('Наличные', '100000 AMD')
+    const trip = operation('trip', ['-4000 AMD'], '2026-09-17', cash, {
+      currency: 'AMD',
+      debited: toMoney('3950 AMD'),
+    })
+    expect(movementOf(trip, 'AMD', noRates)).toEqual({
+      amount: toMoney('-4000 AMD'),
+      approximate: false,
+    })
+  })
+
   it('moves nothing for a trip with no price yet', () => {
     const cash = account('Наличные', '10000 AMD')
     const ops = [operation('trip', [], '2026-09-17', cash, { unpriced: 3 })]

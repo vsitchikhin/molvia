@@ -1,4 +1,3 @@
-import { DomainError, ERROR } from '@molvia/model'
 import type { Actor, Currency, Money, MoneyAccount } from '@molvia/model'
 import type { TripRepositories } from '@/db/unit-of-work'
 
@@ -29,7 +28,9 @@ function ownOrNone(
 
 /**
  * The account an income or a side of an exchange lands on or leaves, as it will be written: one of
- * the owner's, of the money's own currency — or it is not that account (MOL-115, п. 4).
+ * the owner's, of the money's own currency — or it is not that account, and the operation is written
+ * «без счёта» (Р-31, adversarial Е1): an account whose currency was changed on another phone while
+ * this one was offline is the same lost write as one deleted (Р-28), refused.
  */
 export function sideOf(
   accounts: ReadonlyMap<string, MoneyAccount>,
@@ -37,18 +38,19 @@ export function sideOf(
   currency: Currency,
 ): string | null {
   const account = ownOrNone(accounts, accountId)
-  if (account === null) return null
-  if (account.currency !== currency) throw new DomainError(ERROR.MONEY_ACCOUNT_CURRENCY)
-  return account.id
+  return account?.currency === currency ? account.id : null
 }
 
 /**
  * The account a spending or a trip was paid from, and «списано» as it will be written.
  *
  * Left out of the body — a screen older than accounts — the account is kept as it was (Р-26), and
- * so is «списано» while it still applies. Sent, «списано» is held to its rules: in the account's
- * currency, and only when some money of the operation — `currencies`: a spending's one, a trip's
- * own and every purchase's (adversarial Д2) — is in another (MOL-43 В-3).
+ * so is «списано» while it still applies: in the account's currency, and only when some money of
+ * the operation — `currencies`: a spending's one, a trip's own and every purchase's (adversarial
+ * Д2) — is in another (MOL-43 В-3). Nothing is refused (Р-31, adversarial Е1, Е3): «списано» in
+ * another currency than the account's means the account is not the one the phone saw, and the
+ * operation is written «без счёта»; one that no longer applies is dropped and the money counted
+ * exactly — refused, a write from the queue would be set aside for good.
  */
 export function paymentOf(
   accounts: ReadonlyMap<string, MoneyAccount>,
@@ -76,8 +78,8 @@ export function paymentOf(
   }
   // «Списано» from an account that is gone goes with it: nothing to have been taken from.
   if (body.debited === null || account === null) return { accountId, debited: null }
-  if (!applies(body.debited)) throw new DomainError(ERROR.MONEY_ACCOUNT_CURRENCY)
-  return { accountId, debited: body.debited }
+  if (body.debited.currency !== account.currency) return { accountId: null, debited: null }
+  return { accountId, debited: applies(body.debited) ? body.debited : null }
 }
 
 /**

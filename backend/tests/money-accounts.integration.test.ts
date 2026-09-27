@@ -321,7 +321,7 @@ describe('остаток — старт и всё после дня старта
     })
   })
 
-  it('доход и сторона обмена — только на счёт своей валюты', async () => {
+  it('доход и сторона обмена на счёт чужой валюты — «без счёта», не отказ (Р-31, Е1)', async () => {
     const me = await owner()
     const { id } = await addAccount(me, { name: 'Карта ₽', currency: 'RUB', start: rub('0') })
     const income = await call(me, 'POST', '/incomes', {
@@ -331,7 +331,7 @@ describe('остаток — старт и всё после дня старта
       source: 'gift',
       accountId: id,
     })
-    expect(income.json()).toMatchObject({ code: ERROR.MONEY_ACCOUNT_CURRENCY })
+    expect(income.statusCode).toBe(201)
     const exchange = await call(me, 'POST', '/exchanges', {
       id: randomUUID(),
       given: rub('1000'),
@@ -339,7 +339,10 @@ describe('остаток — старт и всё после дня старта
       exchangedOn: today,
       receivedAccountId: id,
     })
-    expect(exchange.json()).toMatchObject({ code: ERROR.MONEY_ACCOUNT_CURRENCY })
+    expect(exchange.statusCode).toBe(201)
+    expect((await balanceOf(me, id)).hasOperations).toBe(false)
+    // Only the rouble half of the exchange is asked about: there is no dram account for the rest.
+    expect((await overview(me)).unassigned).toBe(1)
   })
 
   it('«списано» — точно, без него — ≈ по курсу дня, в той же валюте — отказ', async () => {
@@ -363,10 +366,21 @@ describe('остаток — старт и всё после дня старта
       balance: { minor: 528_478n, currency: 'RUB' },
       approximate: true,
     })
+    // «Списано» in the spending's own currency does not apply: dropped, the account stays (Р-31).
     const same = await spend(me, { accountId: id, amount: rub('10'), debited: rub('10') })
-    expect(same.response.json()).toMatchObject({ code: ERROR.MONEY_ACCOUNT_CURRENCY })
+    expect(spendingViewCodec.parse(same.response.json())).toMatchObject({
+      accountId: id,
+      debited: null,
+    })
     const noAccount = await spend(me, { accountId: null, debited: rub('10') })
     expect(noAccount.response.statusCode).toBe(400)
+    // Left out, the account is none, and «списано» goes with it — not a 500 (review Р2-1).
+    const leftOut = await spend(me, { debited: rub('10'), amount: amd('100') })
+    expect(leftOut.response.statusCode, leftOut.response.body).toBe(201)
+    expect(spendingViewCodec.parse(leftOut.response.json())).toMatchObject({
+      accountId: null,
+      debited: null,
+    })
   })
 })
 
@@ -424,11 +438,12 @@ describe('поход на счёте (п. 6, Р-18)', () => {
     expect(check.difference.minor).toBe(0n)
     expect(check.reasons.map(({ kind }) => kind)).toEqual(['unpriced'])
 
+    // Everything in drams: «списано» does not apply and is dropped, a repeat is the same (Е3).
     const same = await call(me, 'PUT', `/trips/${trip}/payment`, {
       accountId: cash.id,
       debited: amd('3480'),
     })
-    expect(same.json()).toMatchObject({ code: ERROR.MONEY_ACCOUNT_CURRENCY })
+    expect(tripViewCodec.parse(same.json())).toMatchObject({ accountId: cash.id, debited: null })
     const byCard = await call(me, 'PUT', `/trips/${trip}/payment`, {
       accountId: card.id,
       debited: rub('820'),
@@ -687,9 +702,21 @@ describe('журнал счёта (п. 10)', () => {
   it('отдаёт по сорок, новые сверху, курсор ключом строки', async () => {
     const me = await owner()
     const { id } = await addAccount(me)
-    for (let index = 0; index < 45; index += 1) {
-      await spend(me, { accountId: id, amount: amd(String(index + 1)) })
-    }
+    // Written straight into the table, a second apart: forty-five requests outlived the timeout on a
+    // loaded machine, and the order is what is under test.
+    const categoryOf = await categoryId(me)
+    await db.insert(spendings).values(
+      Array.from({ length: 45 }, (_, index) => ({
+        id: randomUUID(),
+        actorId: me.id,
+        spentOn: today,
+        amountMinor: BigInt((index + 1) * 100),
+        currency: 'AMD' as const,
+        categoryId: categoryOf,
+        accountId: id,
+        createdAt: new Date(Date.now() - (45 - index) * 1000),
+      })),
+    )
     const first = accountJournalCodec.parse(
       (await call(me, 'GET', `/money/accounts/${id}/journal`)).json(),
     )
@@ -879,6 +906,33 @@ describe('после ревью (MOL-115, Р-3, Д1–Д6)', () => {
       amountCurrency: 'AMD',
     })
     await call(me, 'PUT', `/trips/${trip}/payment`, { accountId: id })
+    expect((await balanceOf(me, id)).balance.minor).toBe(10_000_000n)
+  })
+
+  it('поход, начатый офлайн вечером и дошедший после полуночи, — день телефона (Р2-3, В-6)', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me, { startOn: daysAgo(1) })
+    // At the shelf yesterday evening — before the account's start — delivered today.
+    const evening = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const trip = await insertTrip(db, {
+      actorId: me.id,
+      placeId: await insertPlace(db),
+      startedAt: new Date(),
+      finishedAt: new Date(),
+      finishedOnDeviceAt: evening,
+    })
+    await db.insert(expenses).values({
+      id: randomUUID(),
+      tripId: trip,
+      itemId: await insertItem(db),
+      amountMinor: 500000n,
+      amountCurrency: 'AMD',
+    })
+    await call(me, 'PUT', `/trips/${trip}/payment`, { accountId: id })
+    const journal = accountJournalCodec.parse(
+      (await call(me, 'GET', `/money/accounts/${id}/journal`)).json(),
+    )
+    expect(journal.rows[0]).toMatchObject({ day: daysAgo(1), inBalance: false })
     expect((await balanceOf(me, id)).balance.minor).toBe(10_000_000n)
   })
 

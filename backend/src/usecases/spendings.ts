@@ -89,7 +89,10 @@ export async function recordSpending(
   ])
   const rate = await rateOfDay(repositories, owner, body)
   // Left out stays left out: a repeat from a screen older than accounts is still a repeat (Р-26).
-  const sent = body.accountId === undefined ? body : { ...body, ...payment }
+  // Either field sent decides both: «списано» with the account left out has none to be taken from
+  // (review Р2-1), and writing it as sent broke the database's own rule — a 500.
+  const sent =
+    body.accountId === undefined && body.debited === undefined ? body : { ...body, ...payment }
   const { spending, created } = await repositories.spendings.add(owner.id, sent, rate)
   return { spending: spendingViewOf(spending), created }
 }
