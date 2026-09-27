@@ -827,6 +827,59 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   «Такси» at once wrote two. A name equal to a preset's («Продукты» beside `groceries`) is the
   screen's to refuse — the server does not know the language of the chips (MOL-82).
 
+**«Деньги» on the phone (MOL-82)** — the fifth tab, between «Оценки» and «Настройки»: the month
+of `GET /money/months/:month`, the sheet of a spending, and one's own categories. The screen adds
+nothing up.
+
+- **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`), by the rules
+  of the trip's (MOL-24): storage is the queue, one at a time under `navigator.locks`, held by a
+  lost connection, a 5xx, a portal, a `401` or a code the API did not say, sent only once the
+  server has named the owner; any other refusal is set aside as «Не принята». Categories go
+  through it too (owner's decision В-4), so «Такси» made at the till goes before the spending that
+  names it. The three queues share `stores/queueing.ts` — the lock, the key of a kept write, what
+  holds, the doubling pause (В-6).
+- **The writes of one spending fold while they wait**: an amendment of one not yet sent rewrites
+  its record; two amendments are one `PUT` over the revision the first was made on — sent apart,
+  the second went over a revision the first had moved and came back 409; removing one not yet
+  sent takes it out of the queue, and «Вернуть» puts it back. A write already on its way is never
+  folded into, and an amendment made then goes over the next revision. **A record the server
+  already holds with other fields is this phone's own** — its answer was lost and it was amended
+  meanwhile — so a 409 on a record goes on as an amendment over revision 1.
+- **A spending in the queue is a row, never a figure** (requirements Р-3; the handoff asked
+  otherwise and this rule wins): «Отправляем…» at the top of its day, «Правка отправляется» on an
+  amended row whose figures stay the server's, a removed row hidden, and «Ещё не учтено: N»
+  on the card. A day only the phone knows of has no total. The month is read again from the start
+  whenever the queue has an answer — which also puts a spending moved to another day where it
+  belongs (MOL-73, Е3) — keeping as many pages as were open.
+- **The two figures the card derives are the model's**, `percentChange` and `shareOf`: a ratio
+  of two sums the server gave, rounded as a person rounds. **«Включая 11 $ (≈ 4 290 ֏)» names no
+  rate** (Р-2): `foreign` sums a currency over the month, and every spending in it had its own
+  day's rate. The sheet converts while typing by `convertAcross` — MOL-24's exception — and only
+  between the two currencies the running month's rate joins; a third says «Посчитаем по курсу дня
+  траты» (Р-5).
+- **Removal asks nothing; `UndoStrip` gives ten seconds** where «Трата» floats, and stands still
+  while a finger or the person's focus is on it — not the focus it puts on «Вернуть» itself, or
+  the count would never run for a touch. The server keeps the removal ten minutes; the strip is
+  what the screen offers.
+- **«Пусто» is read off the answer** (Р-6): the running month empty, no income, nothing the month
+  before and nothing waiting. The server does not say «no history», and an empty August after a
+  full July is «В этом месяце трат нет», not a newcomer.
+- **The month is in the address and moves by `replace`**; there is no lower bound, since the
+  server names no first month (Р-1). The last three first pages read are kept per owner
+  (`molvia.money`), so offline is a strip over them.
+- **A finished trip opened from «Деньги» leads back there** (owner's decision В-3):
+  `?from=money`, and the route lists which `from` it takes (`meta.from`) — an address must not
+  make any screen the parent of any other. The chevron says «‹ Деньги» and steps back onto the
+  same month; opened cold, «Деньги» is laid underneath.
+- **One's own category is made from the chips** («+ Своя», a sheet over the sheet, chosen as soon
+  as it exists) **and kept on «Деньги → Категории»** (В-1): «Убрать» asks nothing, since it erases
+  nothing, and «Вернуть» stands right under it. A name equal to a preset in the language of the
+  screen, or to a live one of one's own, is refused there. The colours are tokens — thirteen
+  presets and a palette of eight for one's own, none red, olive, ochre or terracotta, each at
+  least 3:1 on `--surface`.
+- The charts, a tap on a category and «Графики по месяцам» are MOL-74's (Р-7); accounts are
+  MOL-115's.
+
 ## Tracker and documentation
 
 They live outside the repository, on the same Atlassian site, reachable through the
