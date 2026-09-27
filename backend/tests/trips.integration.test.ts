@@ -836,6 +836,43 @@ describe('скачок курса и выбор человека (MOL-39, Р-19)
     expect(row).toMatchObject({ rateScaled: 431_230_000n, rateManualScaled: 4_310_000n })
   })
 
+  it('₽ → $: свой курс стороной «1 $ = 89,50 ₽» ложится снимком 0,011173 (MOL-81, адв. А)', async () => {
+    const usd = (value: string, date: string, jump = false): CachedRate => ({
+      ...rub(value, date, jump),
+      currency: 'USD',
+    })
+    await rates.upsert([
+      rub('4.30', daysAgo(2)),
+      usd('386', daysAgo(2)),
+      usd('38.60', daysAgo(1), true),
+    ])
+    const actor = await insertActor(db, { spendCurrency: 'USD' })
+    const view = trip(await start(actor))
+    const itemId = await insertItem(db)
+    await add(actor, view.id, { itemId, amount: { amount: '100', currency: 'USD' } })
+
+    const chosen = await call('PUT', `/trips/${view.id}/rate-choice`, actor, {
+      choice: 'manual',
+      rate: '89,50',
+      per: 'USD',
+    })
+
+    expect(chosen.status).toBe(200)
+    expect(chosen.body).toMatchObject({
+      rate: { base: 'RUB', quote: 'USD', rate: '0.011173', source: 'personal' },
+      // 100 $ / 0,011173 — не 1,12 ₽, как было при числе, принятом стороной снимка.
+      converted: { amount: '8950.15', currency: 'RUB' },
+    })
+    // Валюта вне пары — не курс.
+    const stranger = await call('PUT', `/trips/${view.id}/rate-choice`, actor, {
+      choice: 'manual',
+      rate: '89,50',
+      per: 'EUR',
+    })
+    expect(stranger.status).toBe(400)
+    expect(code(stranger)).toBe(ERROR.INVALID_RATE)
+  })
+
   it('свой курс остаётся, если вернуться «по новому», и заменяется новым вводом', async () => {
     const { actor, view } = await jumpedTrip()
     const manual = (rate: string) =>

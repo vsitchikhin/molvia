@@ -17,7 +17,7 @@ import type { Exchange, OfficialRateOf } from '#model/entities/exchange'
 import { convertAcross, convertMoney } from '#model/entities/trip'
 import { formatEstimate, money } from '#model/values/money'
 import type { Currency } from '#model/values/money'
-import { RATE_MAX, parseRate, yerevanMidnight } from '#model/values/rates'
+import { RATE_MAX, formatRate, parseRate, yerevanMidnight } from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
 
 const digits = (text: string): string => text.replace(/[\s\u00a0\u202f]/g, '')
@@ -438,7 +438,11 @@ describe('currencyCosts', () => {
   it('lists what every currency held by exchange cost, and never the base itself', () => {
     const back = exchange('50 USD', '4500 RUB', '2026-09-14')
     const costs = currencyCosts([dollars, drams, back], 'RUB', '2026-09-30')
-    expect(costs.map(({ rate }) => rate.base).sort()).toEqual(['AMD', 'USD'])
+    // A dram costs a fraction of a rouble, so its price is printed the other way round (MOL-81).
+    expect(costs.map(({ rate }) => `${rate.base}/${rate.quote}`).sort()).toEqual([
+      'RUB/AMD',
+      'USD/RUB',
+    ])
     // The price of one dollar in roubles, 20000 / 224.63 — and handing dollars over, for drams or
     // back for roubles, leaves it where it was.
     expect(costs.find(({ rate }) => rate.base === 'USD')?.rate).toMatchObject({
@@ -450,14 +454,70 @@ describe('currencyCosts', () => {
 })
 
 describe('exchangeRateOf', () => {
-  it('is what one exchange was made at, in the direction it was made', () => {
+  it('is what one exchange was made at, on the side whose number is at least one (MOL-81)', () => {
     expect(exchangeRateOf(second)?.scaled).toBe(parseRate('4.75'))
     const back = exchange('10000 AMD', '2000 RUB', '2026-09-12')
     expect(exchangeRateOf(back)).toMatchObject({
-      base: 'AMD',
-      quote: 'RUB',
-      scaled: parseRate('0.2'),
+      base: 'RUB',
+      quote: 'AMD',
+      scaled: parseRate('5'),
     })
+  })
+
+  it("is made from the amounts, not turned over from six digits — the owner's own exchanges", () => {
+    const shown = (rate: ExchangeRate | null) => (rate ? digits(formatRate(rate)) : null)
+    // 20 000 / 224,63 = 89,0353…, and 9 000 / 104,63 = 86,0174…: six digits of 0,011232 and
+    // 0,011626 turned over are 89,03 and 86,01.
+    const august = exchange('20000 RUB', '224.63 USD', '2026-08-31')
+    const september = exchange('9000 RUB', '104.63 USD', '2026-09-22')
+    expect(exchangeRateOf(august)).toMatchObject({ base: 'USD', quote: 'RUB' })
+    expect(shown(exchangeRateOf(august))).toBe('89,04₽/$')
+    expect(shown(exchangeRateOf(september))).toBe('86,02₽/$')
+  })
+})
+
+describe('the rates of «Обмен денег» say one number (MOL-81)', () => {
+  const september = exchange('9000 RUB', '104.63 USD', '2026-09-22')
+  const shown = (rate: ExchangeRate | null | undefined) => (rate ? digits(formatRate(rate)) : null)
+
+  it('prints the exchange and the price of its currency alike', () => {
+    const rates = ownRates([september], 'RUB', 'AMD', '2026-09-30')
+    const [price] = rates.costs
+    expect(shown(price?.rate)).toBe(shown(exchangeRateOf(september)))
+    expect(shown(price?.rate)).toBe('86,02₽/$')
+  })
+
+  it('shows the wallet on its side and leaves the one a trip converts by as it was', () => {
+    const rates = ownRates([september], 'RUB', 'USD', '2026-09-30')
+    expect(rates.wallet?.rate).toMatchObject({ base: 'USD', quote: 'RUB' })
+    expect(shown(rates.wallet?.rate)).toBe('86,02₽/$')
+    // The trip's snapshot is `base → quote`, whatever the screen shows.
+    expect(walletRate([september], 'RUB', 'USD', '2026-09-30')?.rate).toMatchObject({
+      base: 'RUB',
+      quote: 'USD',
+      scaled: parseRate('0.011626'),
+    })
+  })
+
+  it('must not fire: a wallet a trip could not take is not shown on its other side (адв. В)', () => {
+    // A euro at 100 000 roubles: € per ₽ is below the band, ₽ per € inside it. A trip takes no
+    // wallet here, so the screen shows none either — before, it said «мой курс 100 000,00 ₽/€».
+    const chain = [
+      exchange('1000 RUB', '1 USD', '2026-09-20'),
+      exchange('100 USD', '1 EUR', '2026-09-21'),
+    ]
+    expect(walletRate(chain, 'RUB', 'EUR', '2026-09-30')).toBeNull()
+    expect(ownRates(chain, 'RUB', 'EUR', '2026-09-30').wallet).toBeNull()
+  })
+
+  it('leaves the spending currency out of the prices whichever way a price is turned', () => {
+    const rates = ownRates(
+      [september, exchange('100 USD', '38600 AMD', '2026-09-23')],
+      'USD',
+      'RUB',
+      '2026-09-30',
+    )
+    expect(rates.costs.map(({ rate }) => `${rate.base}/${rate.quote}`)).toEqual(['USD/AMD'])
   })
 })
 
@@ -481,6 +541,21 @@ describe('officialDifference', () => {
 
   it('is none for a rate of another pair', () => {
     expect(officialDifference(second, official('380', 'USD'))).toBeNull()
+  })
+
+  it('takes the rate either way round — the screen shows the side at least one (MOL-81)', () => {
+    // 9 000 ₽ at 84,28 ₽/$ is 106,79 $; the exchange gave 104,63 $.
+    const september = exchange('9000 RUB', '104.63 USD', '2026-09-22')
+    const perDollar: ExchangeRate = {
+      base: 'USD',
+      quote: 'RUB',
+      scaled: parseRate('84.28'),
+      source: 'official',
+      asOf: yerevanMidnight('2026-09-22'),
+    }
+    expect(officialDifference(september, perDollar)).toEqual(money(-216n, 'USD'))
+    const back = exchange('10000 AMD', '2000 RUB', '2026-09-12')
+    expect(officialDifference(back, official('4'))).toEqual(money(-50_000n, 'RUB'))
   })
 })
 

@@ -670,7 +670,7 @@ device, private always. The rate is what the two amounts say and is not stored b
   into the drams, an exchange back into the currency of conversion leaves the wallet where it was,
   and dollars getting dearer later do not re-price drams already bought. The owner's own journal
   is why this is 0.1: two thirds of their drams came through dollars, and the pair alone did not
-  see them. The screen lists the price of every currency a chain went through («$: 89,04 ₽/$») so
+  see them. The screen lists the price of every currency a chain went through («89,04 ₽/$») so
   the drams' rate can be checked by eye. Stored per currency, never per account: a dollar on a card
   and one in a pocket cost the same (MOL-43 decides accounts, not costs).
 - **Money of no known cost is valued at the official rate of the exchange's day, and says so**
@@ -1237,6 +1237,27 @@ database access. In a product about data integrity, two write paths will silentl
   the sixth digit a rate is printed with — which can still turn on an exact half, where any error
   decides the rounding: a chain may then print one unit of the sixth digit below the same price
   made in one pair (round 2, Л3). A named price, not a hidden one.
+- **A rate is printed on the side whose number is at least one** — «89,04 ₽/$», never «0,011232
+  $/₽» (MOL-81): the one rule is `formatRate`, and it turns a rate kept under one over on output,
+  never in storage. Six digits of a small number are too few to turn over — 1 / 0,011232 is 89,03
+  where the exchange said 89,04 — so a figure with an exact source (an exchange's amounts, the
+  wallet's chain, the cache's rates against the dram) comes from the server already on its side,
+  and only a trip's snapshot, which a trip converts by as it is, is turned over from its six digits.
+  **The prices, named** (adversarial Б, Д): a pair kept under one — roubles into dollars — prints a
+  trip's rate from its six digits and the wallet it was taken from exactly, so «Обмен денег» may say
+  86,02 ₽/$ where the trip says 86,01; and a page on the old code reads the prices of a chain by
+  `rate.base` until the app takes the new version (MOL-46), naming a turned price by the wrong
+  currency for that while. **The bank's rate on an exchange's card is printed on the side of the
+  exchange's own** (`formatRateBeside`, adversarial Г): near parity the two fall on either side of
+  one, and each on its own side read «1,01 $/€» over «1,01 €/$». **The sheet of a jump has one side
+  for everything in it** — the side of the rate before the jump, or of the jumped when there is none
+  (review Т-9): the options, the line «… вместо …» and the field «1 $ =» alike, and the body names
+  the currency of the field (`per`); the server turns the number to the snapshot's side, rounded
+  once (adversarial А). Taken from the rate the trip counted by, the field asked on the side of the
+  jumped rate after a jump of the comma across one — 4,30 ֏/₽ to 0,43 — and the owner's «4,30» went
+  in as drams per rouble. **The price, named** (adversarial А″): the own rate is kept on the
+  snapshot's side at six digits, so for a pair far under one — drams into dollars — «386,44» typed
+  comes back «386,40».
 
 ## Data rules
 
@@ -2318,18 +2339,22 @@ are typing into. «Что брать» answers with the geography it counted by,
 the phone compares it with its own: a different city is a list to load again, and an answer the
 settings will not move to is taken as it is — the screen used to stay on a skeleton for good.
 
-MOL-40 put the person's own rate under the trip — «Обмен денег», nested under «Настройки»: the
+MOL-40 put the person's own rate under the trip — «Обмен денег», nested under «Деньги» since
+MOL-81 (it lived under «Настройки» before there was a «Деньги»): the
 exchanges, the wallet worked out from them, the preference «мой / ЦБ РА», and every exchange
 beside the central bank of its day. The trip total says «мой курс» for it. MOL-42 made it every
 currency's cost rather than one pair's — chains, reversals, money of no known cost valued at the
 bank's rate of its day, a change of the currency of conversion that works forwards — and gave an
 exchange amendments with their history and a note. MOL-66 put incomes beside them — «Доходы», the
-second row of the money group: a journal by month, and an income in any currency but the one of
+second row of the way in from «Деньги»: a journal by month, and an income in any currency but the one of
 conversion is a link of the same walk at the bank's rate of its day. MOL-115 put accounts under all
 of it — where the money lies, the balance counted from a start and every operation after it, «списано»
 for a card in another currency, and a check that looks for the reason before it offers to close the
 difference; the rules are in «An account is where money lies» above. The screens are the task after
-MOL-116's handoff.
+MOL-116's handoff. MOL-81 moved «Обмен денег» and «Доходы» from «Настройки» into «Деньги» —
+`/money/exchange`, `/money/incomes`, the old addresses redirected for good, a card of two rows under
+«Потрачено» the way in, for a newcomer too — and gave them a card per operation and a floating
+«Обмен» / «Доход» where «Трата» floats; a card's lines of accounts come with MOL-116's screens.
 
 MOL-58 gave the people whose data this is the minimum 0.1 owes them: a page that says what is
 kept and for how long (`/privacy`, open without a session), `/delete` in the bot, which erases a

@@ -19,7 +19,10 @@
       </div>
     </template>
 
-    <ScreenSkeleton v-if="phase === 'loading'" :groups="[32, 64, 64]" />
+    <!-- The shape of what is coming: cards of incomes under the month (handoff 03). -->
+    <ScreenSkeleton v-if="phase === 'loading'" :groups="[32]">
+      <OperationSkeleton :plate="false" />
+    </ScreenSkeleton>
 
     <template v-else-if="phase !== 'idle'">
       <ScreenState
@@ -58,11 +61,6 @@
       </ScreenState>
 
       <template v-else-if="overview">
-        <AppButton ref="recordButton" block :inactive="!online || busy" @click="compose">
-          <template #icon><IconPlus /></template>
-          {{ t('income.record') }}
-        </AppButton>
-
         <!-- A month and what came in, per currency and never converted (В-2): the sums are the
              server's. -->
         <section v-for="month in overview.months" :key="month.month" class="month">
@@ -70,35 +68,30 @@
             <span class="caption">{{ monthOf(month.month) }}</span>
             <span class="sums">{{ sumsOf(month.sums) }}</span>
           </h2>
-          <AppCard as="ul" list>
-            <li v-for="income in month.incomes" :key="income.id" class="row">
-              <!-- The row is the way into its amendment, as an exchange's is (MOL-42, В-3). No
-                   `aria-label`: it would silence the source, the day and the note. -->
-              <button class="body" type="button" :disabled="!online || busy" @click="edit(income)">
-                <span class="verb">{{ t('income.edit') }}</span>
-                <span class="amounts">
-                  {{ amountOf(income) }}
-                  <span v-if="income.amendedAt" class="amended">{{
-                    t('income.amended', { date: dayOf(income.amendedAt) })
-                  }}</span>
-                </span>
-                <span class="meta">{{ lineOf(income) }}</span>
-                <span v-if="income.note" class="meta note">{{ income.note }}</span>
-              </button>
-              <button
-                class="remove"
-                type="button"
-                :disabled="!online || busy"
-                :aria-label="t('income.remove', { amount: amountOf(income) })"
-                @click="ask(income)"
-              >
-                <IconDelete aria-hidden="true" />
-              </button>
+          <ul class="cards">
+            <li v-for="income in month.incomes" :key="income.id">
+              <IncomeCard :income="income" :disabled="!online || busy" @edit="edit" @remove="ask" />
             </li>
-          </AppCard>
+          </ul>
         </section>
       </template>
     </template>
+
+    <!-- «Записать доход» floats where «Трата» does (handoff 03); the empty state keeps its own
+         button at the bottom instead. -->
+    <FloatingDock v-if="overview && phase === 'ready'">
+      <AppButton
+        ref="recordButton"
+        size="large"
+        class="add"
+        :aria-label="t('income.record')"
+        :inactive="!online || busy"
+        @click="compose"
+      >
+        <template #icon><IconPlus /></template>
+        {{ t('income.fab') }}
+      </AppButton>
+    </FloatingDock>
 
     <IncomeSheet
       v-if="overview"
@@ -121,26 +114,27 @@
 <script lang="ts">
 import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatMoney, yerevanMidnight } from '@molvia/model'
 import type { IncomeAmendBody, IncomeView as Row, Money } from '@molvia/model'
 import IconCashPlus from '~icons/mdi/cash-plus'
 import IconCloud from '~icons/mdi/cloud-off-outline'
-import IconDelete from '~icons/mdi/trash-can-outline'
 import IconPlus from '~icons/mdi/plus'
 import AppButton from '@/components/AppButton.vue'
-import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import FloatingDock from '@/components/FloatingDock.vue'
+import IncomeCard from '@/components/IncomeCard.vue'
 import IncomeRemoveSheet from '@/components/IncomeRemoveSheet.vue'
 import IncomeSheet from '@/components/IncomeSheet.vue'
+import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import { asTyped } from '@/components/spending'
 import ScreenState from '@/components/ScreenState.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { incomesOf, useIncomes } from '@/composables/useIncomes'
-import { monthOf, purchaseDay } from '@/days'
+import { calendarDay, monthOf } from '@/days'
 
 /**
- * «Доходы» (MOL-66), under «Настройки» beside «Обмен денег»: the money that came in, by month, each
+ * «Доходы» (MOL-66), under «Деньги» beside «Обмен денег» (MOL-81): the money that came in, by month, each
  * month with what came in per currency. Every figure is the server's. What an income does to the
  * person's own rate is said on «Обмен денег», where the rate is.
  */
@@ -148,14 +142,15 @@ export default defineComponent({
   name: 'IncomesView',
   components: {
     AppButton,
-    AppCard,
     AppScreen,
+    FloatingDock,
+    IncomeCard,
     IncomeRemoveSheet,
     IncomeSheet,
+    OperationSkeleton,
     ScreenSkeleton,
     ScreenState,
     IconCloud,
-    IconDelete,
     IconPlus,
   },
   setup() {
@@ -228,16 +223,17 @@ export default defineComponent({
       window.removeEventListener('offline', follow)
     })
 
-    const dayOf = (when: Date): string => purchaseDay(when, locale.value)
-    const amountOf = (income: Row): string => formatMoney(income.amount, locale.value)
+    // As typed, as everywhere in «Деньги» (owner's decision В-1 of MOL-81).
+    const amountOf = (income: Row): string => asTyped(income.amount, locale.value)
     /** «Зарплата · 15 сент.» */
     const lineOf = (income: Row): string =>
       t('income.row_line', {
         source: t(`income.source.${income.source}`),
-        date: dayOf(yerevanMidnight(income.receivedOn)),
+        // A calendar day of Yerevan, never the moment of its midnight (adversarial Ж).
+        date: calendarDay(income.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
       })
     const sumsOf = (sums: readonly Money[]): string =>
-      sums.map((sum) => formatMoney(sum, locale.value)).join(' · ')
+      sums.map((sum) => asTyped(sum, locale.value)).join(' · ')
 
     return {
       t,
@@ -254,7 +250,6 @@ export default defineComponent({
       ask,
       confirmRemove,
       online,
-      dayOf,
       amountOf,
       lineOf,
       sumsOf,
@@ -300,8 +295,8 @@ export default defineComponent({
   color: var(--bad-ink);
 }
 
-.month {
-  margin-top: var(--space-6);
+.month + .month {
+  margin-top: var(--space-4);
 }
 
 .month-head {
@@ -328,91 +323,21 @@ export default defineComponent({
   text-align: right;
 }
 
-.row {
+.cards {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-}
-
-.body {
-  display: grid;
-  flex: 1;
-  min-width: 0;
-  min-height: var(--touch-target);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-
-  &:disabled {
-    cursor: default;
-  }
-}
-
-.amounts {
   margin: 0;
-  font-size: var(--text-callout);
-  font-weight: var(--weight-medium);
-  font-variant-numeric: tabular-nums;
+  padding: 0;
+  list-style: none;
 }
 
-.verb {
-  @include visually-hidden;
+// Room for «Доход» under the last card: it floats over the list, as «Трата» does on the month.
+.month:last-of-type {
+  padding-bottom: calc(var(--space-8) + var(--space-8) + var(--space-6));
 }
 
-.amended {
-  margin-left: var(--space-2);
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-regular);
-}
-
-.meta {
-  margin: var(--space-1) 0 0;
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
-.note {
-  overflow-wrap: anywhere;
-}
-
-.remove {
-  @include touch-target;
-
-  flex: none;
-  justify-content: center;
-  width: var(--touch-target);
-  border: 0;
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-
-  &:disabled {
-    opacity: var(--opacity-stale);
-    cursor: default;
-  }
-
-  svg {
-    width: var(--space-6);
-    height: var(--space-6);
-  }
+.add {
+  box-shadow: var(--shadow-md);
 }
 </style>

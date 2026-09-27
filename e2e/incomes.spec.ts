@@ -14,7 +14,7 @@ test('an income lands in its month, is amended with a trace, and comes back afte
   page,
 }) => {
   await signedIn(page)
-  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   await page.getByRole('link', { name: 'Доходы' }).click()
 
   await expect(page.getByRole('heading', { name: 'Доходов пока нет' })).toBeVisible()
@@ -34,7 +34,7 @@ test('an income lands in its month, is amended with a trace, and comes back afte
   await expect(sheet).toBeHidden()
 
   // The month and its sum, by the heading — the server's figure, not the phone's.
-  await expect(page.getByRole('heading', { name: /\d{4} 99 615,00 ₽/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /\d{4} 99 615 ₽/ })).toBeVisible()
   const row = page.locator('button.body')
   await expect(row).toContainText('Зарплата')
   await expect(row).toContainText('Викаса')
@@ -46,8 +46,9 @@ test('an income lands in its month, is amended with a trace, and comes back afte
   await sheet.getByLabel('Сумма').fill('102345')
   await sheet.getByRole('button', { name: 'Сохранить правку' }).click()
   await expect(sheet).toBeHidden()
-  await expect(page.getByRole('heading', { name: /\d{4} 102 345,00 ₽/ })).toBeVisible()
-  await expect(row).toContainText('исправлен')
+  await expect(page.getByRole('heading', { name: /\d{4} 102 345 ₽/ })).toBeVisible()
+  // «исправлен» stands in the card's head, beside the day, outside the button (MOL-81).
+  await expect(page.locator('article .amended')).toContainText('исправлен')
   await row.click()
   await expect(sheet.locator('.versions')).toContainText('99 615,00 ₽')
   await page.keyboard.press('Escape')
@@ -60,8 +61,8 @@ test('an income lands in its month, is amended with a trace, and comes back afte
   await sheet.getByRole('button', { name: 'Удалить доход' }).click()
   await expect(page.getByRole('heading', { name: 'Доходов пока нет' })).toBeVisible()
   await page.getByRole('button', { name: 'Вернуть' }).click()
-  await expect(page.getByRole('heading', { name: /\d{4} 102 345,00 ₽/ })).toBeVisible()
-  await expect(row).toContainText('исправлен')
+  await expect(page.getByRole('heading', { name: /\d{4} 102 345 ₽/ })).toBeVisible()
+  await expect(page.locator('article .amended')).toContainText('исправлен')
 })
 
 /**
@@ -74,7 +75,7 @@ test('drams that came in with no rate of their day make the wallet unknown, and 
   page,
 }) => {
   await signedIn(page)
-  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   await page.getByRole('link', { name: 'Обмен денег' }).click()
 
   const sheet = page.locator('dialog[open]')

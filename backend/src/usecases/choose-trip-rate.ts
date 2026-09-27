@@ -26,7 +26,8 @@ export async function chooseTripRate(
     if (!trip.rate || !trip.rateJumped) throw new DomainError(ERROR.CONFLICT)
     if (body.choice === 'previous' && !trip.previousRate) throw new DomainError(ERROR.CONFLICT)
 
-    const manual = body.choice === 'manual' ? manualRateFor(trip.rate, body.rate, now) : null
+    const manual =
+      body.choice === 'manual' ? manualRateFor(trip.rate, body.rate, now, body.per) : null
     const chosen = await repositories.trips.chooseRate(tripId, actorId, body.choice, manual)
     if (!chosen) throw new DomainError(ERROR.NOT_FOUND)
     return tripViewFor(repositories, chosen)

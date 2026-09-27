@@ -57,6 +57,35 @@ describe('routes', () => {
     expect(route.meta.tab).toBeUndefined()
   })
 
+  it.each([
+    ['/money/exchange', 'exchange'],
+    ['/money/incomes', 'incomes'],
+  ])('%s is nested under «Деньги», not under the settings (MOL-81)', async (path, name) => {
+    const route = await resolveAt(path)
+    expect(route.name).toBe(name)
+    expect(route.meta.parent).toBe('money')
+    expect(route.meta.tab).toBeUndefined()
+  })
+
+  // A bookmark or the history of an installed app from before the move still arrives, and the
+  // old address is replaced rather than left in the history as a step of its own.
+  it.each([
+    ['/settings/exchange', 'exchange', '/money/exchange'],
+    ['/settings/incomes', 'incomes', '/money/incomes'],
+  ])(
+    'the old address %s leads to the moved screen in one step (MOL-81)',
+    async (old, name, path) => {
+      const router = createRouter({ history: createMemoryHistory(), routes })
+      await router.push('/money')
+      await router.push(old)
+      expect(router.currentRoute.value.name).toBe(name)
+      expect(router.currentRoute.value.fullPath).toBe(path)
+      router.back()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(router.currentRoute.value.name).toBe('money')
+    },
+  )
+
   // A mistyped link or a stale bookmark lands on the main scenario, not on a blank page.
   it.each(['/nowhere', '/trip/add/extra', '/advice/extra'])(
     'an unknown path %s leads home',
