@@ -23,6 +23,19 @@ function notReached(error: unknown): boolean {
 }
 
 /**
+ * The drawer goes while no window sends either queue of this owner — the trip's, then the
+ * spendings' (MOL-82), always in that order, so two windows never wait on each other.
+ */
+function whileQueuesAreStill(owner: string, work: () => void): Promise<void> {
+  return whileQueueIsStill(owner, () =>
+    whileSpendingsAreStill(owner, () => {
+      work()
+      return Promise.resolve()
+    }),
+  )
+}
+
+/**
  * «Выйти» on this device (MOL-57, owner's decisions Q1–Q3).
  *
  * **The order is the whole of it: the server first, the phone after.** A session is ended by the
@@ -45,19 +58,6 @@ function notReached(error: unknown): boolean {
  * A store rather than a composable for that reason: it has to hear the identity settle from the
  * moment the app starts, the screen with the button or not.
  */
-/**
- * The drawer goes while no window sends either queue of this owner — the trip's, then the
- * spendings' (MOL-82), always in that order, so two windows never wait on each other.
- */
-function whileQueuesAreStill(owner: string, work: () => void): Promise<void> {
-  return whileQueueIsStill(owner, () =>
-    whileSpendingsAreStill(owner, () => {
-      work()
-      return Promise.resolve()
-    }),
-  )
-}
-
 export const useSignOutStore = defineStore('signOut', () => {
   const actor = useActorStore()
   /** The request is on its way — the sheet holds its button. */
