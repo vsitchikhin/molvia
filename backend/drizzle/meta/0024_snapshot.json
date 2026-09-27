@@ -1,5 +1,5 @@
 {
-  "id": "d09b2799-2424-4921-aa38-a111fd35c7a7",
+  "id": "bc8fc4ef-828d-43aa-9056-fc85c704e5b3",
   "prevId": "da717c0d-f3f0-4f77-b3b2-ef47ffc3e82d",
   "version": "7",
   "dialect": "postgresql",
@@ -440,6 +440,12 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "account_set_at": {
+          "name": "account_set_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -827,6 +833,12 @@
         "account_id": {
           "name": "account_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "account_set_at": {
+          "name": "account_set_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -2089,6 +2101,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "account_set_at": {
+          "name": "account_set_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "revision": {
           "name": "revision",
           "type": "integer",
@@ -2375,6 +2393,12 @@
           "type": "char(3)",
           "primaryKey": false,
           "notNull": false
+        },
+        "account_set_at": {
+          "name": "account_set_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -2564,10 +2588,6 @@
         "trips_debited_needs_account": {
           "name": "trips_debited_needs_account",
           "value": "\"trips\".\"debited_minor\" is null or (\"trips\".\"account_id\" is not null and \"trips\".\"debited_minor\" > 0)"
-        },
-        "trips_debited_in_other_currency": {
-          "name": "trips_debited_in_other_currency",
-          "value": "\"trips\".\"debited_currency\" is null or \"trips\".\"debited_currency\" <> \"trips\".\"currency\""
         },
         "trips_debited_currency_known": {
           "name": "trips_debited_currency_known",

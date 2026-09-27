@@ -84,6 +84,16 @@ function saysFact(row: Row, input: Omit<SpendingBody, 'id'>): boolean {
   )
 }
 
+/** Whether the account and «списано» are what the row already has. */
+function samePayment(row: Row, input: Omit<SpendingBody, 'id'>): boolean {
+  const payment = paymentColumnsOf(input)
+  return (
+    row.accountId === payment.accountId &&
+    row.debitedMinor === payment.debitedMinor &&
+    row.debitedCurrency === payment.debitedCurrency
+  )
+}
+
 /** As sent: an account or «списано» left out says nothing, so an older screen's repeat is one. */
 function says(row: Row, input: Omit<SpendingBody, 'id'>): boolean {
   const payment = paymentColumnsOf(input)
@@ -199,6 +209,7 @@ export function createSpendingRepository(db: Conn): SpendingRepository {
               ...columnsOf(input),
               ...paymentColumnsOf(input),
               ...rateColumnsOf(rate),
+              ...(samePayment(row, input) ? {} : { accountSetAt: sql`now()` }),
               revision: row.revision + 1,
               ...(fact ? {} : { amendedAt: sql`now()` }),
             })

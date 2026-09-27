@@ -34,7 +34,7 @@ import type {
   Receipt,
   ReceiptView,
 } from '@molvia/model'
-import { checkedSide, keptSide, knownAccounts } from './account-of'
+import { keptSide, knownAccounts, sideOf } from './account-of'
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
@@ -345,10 +345,18 @@ export async function recordExchange(
 ): Promise<{ overview: ExchangesResponse; created: boolean }> {
   if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
   const accounts = await knownAccounts(repositories, owner)
-  checkedSide(accounts, body.givenAccountId ?? null, body.given.currency)
-  checkedSide(accounts, body.receivedAccountId ?? null, body.received.currency)
+  // Left out stays left out: a repeat from a screen older than accounts is still a repeat (Р-26).
+  const sent = {
+    ...body,
+    ...(body.givenAccountId === undefined
+      ? {}
+      : { givenAccountId: sideOf(accounts, body.givenAccountId, body.given.currency) }),
+    ...(body.receivedAccountId === undefined
+      ? {}
+      : { receivedAccountId: sideOf(accounts, body.receivedAccountId, body.received.currency) }),
+  }
   await repositories.exchanges.purgeRemoved(owner.id)
-  const { created } = await repositories.exchanges.add(owner.id, body)
+  const { created } = await repositories.exchanges.add(owner.id, sent)
   await repositories.money.thaw(owner.id, body.exchangedOn)
   return { overview: await exchangesOverview(repositories, owner, now), created }
 }
@@ -370,20 +378,21 @@ export async function amendExchange(
   const own = resourceIdOf(id)
   const held = (await repositories.exchanges.list(owner.id)).find((exchange) => exchange.id === own)
   const accounts = await knownAccounts(repositories, owner)
-  const givenAccountId = keptSide(
+  const givenAccountId = sideOf(
     accounts,
-    held?.givenAccountId ?? null,
-    body.givenAccountId,
+    keptSide(accounts, held?.givenAccountId ?? null, body.givenAccountId, body.given.currency),
     body.given.currency,
   )
-  const receivedAccountId = keptSide(
+  const receivedAccountId = sideOf(
     accounts,
-    held?.receivedAccountId ?? null,
-    body.receivedAccountId,
+    keptSide(
+      accounts,
+      held?.receivedAccountId ?? null,
+      body.receivedAccountId,
+      body.received.currency,
+    ),
     body.received.currency,
   )
-  checkedSide(accounts, givenAccountId, body.given.currency)
-  checkedSide(accounts, receivedAccountId, body.received.currency)
   const { accountsOnly } = await repositories.exchanges.amend(owner.id, id, {
     ...body,
     givenAccountId,

@@ -8,7 +8,7 @@ import type {
   IncomeView,
   IncomesResponse,
 } from '@molvia/model'
-import { checkedSide, keptSide, knownAccounts } from './account-of'
+import { keptSide, knownAccounts, sideOf } from './account-of'
 import { earlier, ownMoney } from './exchanges'
 import type { TripRepositories } from '@/db/unit-of-work'
 
@@ -98,13 +98,14 @@ export async function recordIncome(
   now: Date = new Date(),
 ): Promise<{ overview: IncomesResponse; created: boolean }> {
   if (body.receivedOn > yerevanDate(now)) throw new DomainError(ERROR.INCOME_IN_FUTURE)
-  checkedSide(
-    await knownAccounts(repositories, owner),
-    body.accountId ?? null,
-    body.amount.currency,
-  )
+  const accounts = await knownAccounts(repositories, owner)
+  // Left out stays left out: a repeat from a screen older than accounts is still a repeat (Р-26).
+  const sent =
+    body.accountId === undefined
+      ? body
+      : { ...body, accountId: sideOf(accounts, body.accountId, body.amount.currency) }
   await repositories.incomes.purgeRemoved(owner.id)
-  const { created } = await repositories.incomes.add(owner.id, body)
+  const { created } = await repositories.incomes.add(owner.id, sent)
   await repositories.money.thaw(owner.id, body.receivedOn)
   return { overview: await incomesOverview(repositories, owner, now), created }
 }
@@ -125,13 +126,11 @@ export async function amendIncome(
   const own = resourceIdOf(id)
   const held = (await repositories.incomes.list(owner.id)).find((income) => income.id === own)
   const accounts = await knownAccounts(repositories, owner)
-  const accountId = keptSide(
+  const accountId = sideOf(
     accounts,
-    held?.accountId ?? null,
-    body.accountId,
+    keptSide(accounts, held?.accountId ?? null, body.accountId, body.amount.currency),
     body.amount.currency,
   )
-  checkedSide(accounts, accountId, body.amount.currency)
   const { accountsOnly } = await repositories.incomes.amend(owner.id, id, { ...body, accountId })
   // Only the account moved: the money is the same, and so is every month (Р-15).
   if (!accountsOnly) {

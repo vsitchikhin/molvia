@@ -66,11 +66,6 @@ export const ERROR = {
   /** An account under a name another of the owner's — live or removed — already has (MOL-115, Р-21). */
   MONEY_ACCOUNT_TAKEN: 'error.money_account_taken',
   /**
-   * An operation names an account that is not among the person's own (MOL-115). A removed one is
-   * still theirs and still takes operations, for the reason a removed category does.
-   */
-  MONEY_ACCOUNT_UNKNOWN: 'error.money_account_unknown',
-  /**
    * Money named on an account of another currency: an income or a side of an exchange is in the
    * account's own currency or it is not that account, and «списано» is in the account's currency and
    * only when the operation's is another (MOL-43 В-3).

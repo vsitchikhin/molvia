@@ -68,7 +68,7 @@ async function counting(repositories: Repositories, owner: Owner, now: Date): Pr
   const today = yerevanDate(now)
   const [accounts, operations, rates] = await Promise.all([
     repositories.moneyAccounts.list(owner.id),
-    repositories.moneyAccounts.operations(owner.id, today),
+    repositories.moneyAccounts.operations(owner.id),
     dayRates(repositories, owner),
   ])
   const needs = [
@@ -128,9 +128,10 @@ export async function moneyAccountsOf(
   owner: Owner,
   now: Date = new Date(),
 ): Promise<MoneyAccountsResponse> {
-  const [counted, lastChecks] = await Promise.all([
+  const [counted, lastChecks, matched] = await Promise.all([
     counting(repositories, owner, now),
-    repositories.moneyAccounts.lastChecks(owner.id),
+    repositories.moneyAccounts.lastChecks(owner.id, false),
+    repositories.moneyAccounts.lastChecks(owner.id, true),
   ])
   const views = counted.accounts.map((account) =>
     accountViewOf(account, counted, owner.spendCurrency, lastChecks.get(account.id)),
@@ -167,7 +168,7 @@ export async function moneyAccountsOf(
       savings: money(savings),
       uncounted,
     },
-    unassigned: unassignedOperations(live, lastChecks, counted.operations).length,
+    unassigned: unassignedOperations(live, matched, counted.operations).length,
     countedAt: now,
   }
 }
@@ -194,7 +195,7 @@ export async function accountJournal(
 ): Promise<AccountJournalResponse> {
   const [counted, last] = await Promise.all([
     counting(repositories, owner, now),
-    repositories.moneyAccounts.lastChecks(owner.id),
+    repositories.moneyAccounts.lastChecks(owner.id, false),
   ])
   const account = accountAt(counted.accounts, id)
   const rows = counted.operations
@@ -224,13 +225,13 @@ export async function unassignedOf(
   owner: Owner,
   now: Date = new Date(),
 ): Promise<UnassignedOperationsResponse> {
-  const [counted, lastChecks] = await Promise.all([
+  const [counted, matched] = await Promise.all([
     counting(repositories, owner, now),
-    repositories.moneyAccounts.lastChecks(owner.id),
+    repositories.moneyAccounts.lastChecks(owner.id, true),
   ])
   const live = counted.accounts.filter((account) => account.archivedAt === null)
   return {
-    rows: unassignedOperations(live, lastChecks, counted.operations).map((operation) =>
+    rows: unassignedOperations(live, matched, counted.operations).map((operation) =>
       accountOperationViewOf(operation, null, true),
     ),
   }
@@ -251,7 +252,9 @@ export async function checkAccount(
   const counted = await counting(repositories, owner, now)
   const account = accountAt(counted.accounts, id)
   if (body.fact.currency !== account.currency) throw new DomainError(ERROR.MONEY_ACCOUNT_CURRENCY)
-  const before = await repositories.moneyAccounts.lastCheck(owner.id, account.id, body.id)
+  // Where to look from: the last check that came out even — one with a difference named its
+  // reasons, and they stay reasons until one does (owner's decision В-4 of the review, Д7).
+  const before = await repositories.moneyAccounts.lastMatched(owner.id, account.id, body.id)
   const result = accountCheck(account, counted.operations, before, body.fact, counted.rateOf)
   const saved = await repositories.moneyAccounts.saveCheck(owner.id, {
     id: body.id,
@@ -367,11 +370,13 @@ export async function payTrip(
 ): Promise<TripView> {
   const trip = await repositories.trips.byId(tripId, owner.id)
   if (!trip) throw new DomainError(ERROR.NOT_FOUND)
+  // «Списано» stands for the trip whole: its own currency and every purchase's (adversarial Д2).
+  const purchases = await repositories.expenses.forTrip(trip.id, owner.id)
   const { accountId, debited } = paymentOf(
     await knownAccounts(repositories, owner),
     null,
     { accountId: body.accountId, debited: body.debited ?? null },
-    trip.currency,
+    [trip.currency, ...purchases.flatMap(({ amount }) => (amount ? [amount.currency] : []))],
   )
   await repositories.moneyAccounts.setTripPayment(owner.id, trip.id, accountId, debited)
   return tripViewFor(repositories, { ...trip, accountId, debited })

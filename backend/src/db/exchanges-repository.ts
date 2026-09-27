@@ -227,7 +227,11 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
           if (saysFact(row, input)) {
             const [moved] = await tx
               .update(exchanges)
-              .set({ ...accountColumnsOf(input), revision: row.revision + 1 })
+              .set({
+                ...accountColumnsOf(input),
+                accountSetAt: sql`now()`,
+                revision: row.revision + 1,
+              })
               .where(eq(exchanges.id, row.id))
               .returning()
             return {
@@ -256,6 +260,10 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
             .set({
               ...columnsOf(input),
               ...accountColumnsOf(input),
+              ...(row.givenAccountId === accountColumnsOf(input).givenAccountId &&
+              row.receivedAccountId === accountColumnsOf(input).receivedAccountId
+                ? {}
+                : { accountSetAt: sql`now()` }),
               revision: row.revision + 1,
               amendedAt: sql`now()`,
             })

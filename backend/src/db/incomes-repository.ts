@@ -153,7 +153,11 @@ export function createIncomeRepository(db: Conn): IncomeRepository {
           if (saysFact(row, input)) {
             const [moved] = await tx
               .update(incomes)
-              .set({ accountId: input.accountId ?? null, revision: row.revision + 1 })
+              .set({
+                accountId: input.accountId ?? null,
+                accountSetAt: sql`now()`,
+                revision: row.revision + 1,
+              })
               .where(eq(incomes.id, row.id))
               .returning()
             return {
@@ -180,6 +184,7 @@ export function createIncomeRepository(db: Conn): IncomeRepository {
             .set({
               ...columnsOf(input),
               accountId: input.accountId ?? null,
+              ...(row.accountId === (input.accountId ?? null) ? {} : { accountSetAt: sql`now()` }),
               revision: row.revision + 1,
               amendedAt: sql`now()`,
             })

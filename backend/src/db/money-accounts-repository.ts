@@ -1,4 +1,5 @@
 import { and, eq, gt, isNotNull, isNull, lte, or, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import {
   DomainError,
   ERROR,
@@ -71,16 +72,25 @@ export interface MoneyAccountRepository {
 
   /**
    * Every live operation of the owner, as accounts see it: spendings, incomes, both halves of every
-   * exchange, and every trip with what its priced purchases came to per currency. An open trip is
-   * dated `today` — the money is already gone.
+   * exchange, and every trip — open ones too, the money is already gone — with what its priced
+   * purchases came to per currency.
    */
-  operations(actorId: string, today: string): Promise<readonly AccountOperation[]>
+  operations(actorId: string): Promise<readonly AccountOperation[]>
 
-  /** The latest check of every account of the owner, by account. */
-  lastChecks(actorId: string): Promise<ReadonlyMap<string, MoneyAccountCheck>>
+  /**
+   * The latest check of every account of the owner, by account — or, `matched`, the latest one that
+   * found no difference: only such a check is where the next one starts looking (owner's decision
+   * В-4 of the review, adversarial Д7). One with a difference is remembered and shown, and what it
+   * named stays in view until a check comes out even.
+   */
+  lastChecks(actorId: string, matched: boolean): Promise<ReadonlyMap<string, MoneyAccountCheck>>
 
-  /** The latest check of one account, but `except` — the one being counted again. */
-  lastCheck(actorId: string, accountId: string, except?: string): Promise<MoneyAccountCheck | null>
+  /** The latest check of one account that found no difference, but `except` — the one counted again. */
+  lastMatched(
+    actorId: string,
+    accountId: string,
+    except?: string,
+  ): Promise<MoneyAccountCheck | null>
 
   /**
    * «Сверить»: written, or counted again under the same name. The same name with another account or
@@ -149,6 +159,36 @@ function nameTaken(owned: readonly Row[], name: string, except?: string): boolea
   return owned.some((row) => row.id !== except && nameIdentity(row.name) === identity)
 }
 
+/**
+ * Every operation that names an account `which` picks left without it, «списано» too, and the moment said: it is
+ * new to every check after this (Р-17, Д1б). Before an account is deleted for good, or its key holds.
+ */
+async function unlink(tx: Conn, which: SQL | undefined): Promise<void> {
+  const ids = sql`(select ${moneyAccounts.id} from ${moneyAccounts} where ${which})`
+  const now = sql`clock_timestamp()`
+  const unpaid = { accountId: null, debitedMinor: null, debitedCurrency: null, accountSetAt: now }
+  await tx
+    .update(spendings)
+    .set(unpaid)
+    .where(sql`${spendings.accountId} in ${ids}`)
+  await tx
+    .update(trips)
+    .set(unpaid)
+    .where(sql`${trips.accountId} in ${ids}`)
+  await tx
+    .update(incomes)
+    .set({ accountId: null, accountSetAt: now })
+    .where(sql`${incomes.accountId} in ${ids}`)
+  await tx
+    .update(exchanges)
+    .set({ givenAccountId: null, accountSetAt: now })
+    .where(sql`${exchanges.givenAccountId} in ${ids}`)
+  await tx
+    .update(exchanges)
+    .set({ receivedAccountId: null, accountSetAt: now })
+    .where(sql`${exchanges.receivedAccountId} in ${ids}`)
+}
+
 const NO_DETAILS = {
   categoryId: null,
   note: null,
@@ -161,9 +201,11 @@ const NO_DETAILS = {
 interface TripRow extends Record<string, unknown> {
   id: string
   place_name: string
+  currency: Currency
   started_at: Date | string
+  started_on: string
   finished_at: Date | string | null
-  finished_on: string | null
+  seen_at: Date | string
   account_id: string | null
   debited_minor: string | bigint | null
   debited_currency: Currency | null
@@ -185,6 +227,11 @@ interface CheckRow extends Record<string, unknown> {
   counted_minor: string | bigint
   currency: Currency
   created_at: Date | string
+}
+
+/** The latest of the moments that are known. */
+function latest(...moments: (Date | null)[]): Date {
+  return new Date(Math.max(...moments.map((moment) => moment?.getTime() ?? 0)))
 }
 
 function toCheck(row: CheckRow): MoneyAccountCheck {
@@ -220,7 +267,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
     return row?.used === true
   }
 
-  async function checksOf(actorId: string, accountId?: string, except?: string) {
+  async function checksOf(actorId: string, matched: boolean, accountId?: string, except?: string) {
     const rows = await db.execute<CheckRow>(sql`
       select distinct on (c.account_id)
              c.id, c.account_id, c.checked_on::text as checked_on, c.fact_minor, c.counted_minor,
@@ -230,6 +277,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
        where c.actor_id = ${actorId}
          ${accountId === undefined ? sql`` : sql`and c.account_id = ${accountId}`}
          ${except === undefined ? sql`` : sql`and c.id <> ${except}`}
+         ${matched ? sql`and c.fact_minor = c.counted_minor` : sql``}
        order by c.account_id, c.created_at desc, c.id desc
     `)
     return rows.map(toCheck)
@@ -248,16 +296,15 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
       return translateFailures(() =>
         db.transaction(async (tx) => {
           await tx.execute(lockOwner(actorId))
-          // Past its ten minutes a deletion is final whether or not the timer has come round.
-          await tx
-            .delete(moneyAccounts)
-            .where(
-              and(
-                eq(moneyAccounts.id, input.id),
-                eq(moneyAccounts.actorId, actorId),
-                lte(moneyAccounts.deletedAt, undoFrom()),
-              ),
-            )
+          // Past its ten minutes a deletion is final whether or not the timer has come round — and
+          // final the way the timer makes it, what named it meanwhile left without it (Д5).
+          const final = and(
+            eq(moneyAccounts.id, input.id),
+            eq(moneyAccounts.actorId, actorId),
+            lte(moneyAccounts.deletedAt, undoFrom()),
+          )
+          await unlink(tx, final)
+          await tx.delete(moneyAccounts).where(final)
           const rows = await owned(actorId, tx)
           const same = rows.find((row) => row.id === input.id)
           if (same) {
@@ -345,37 +392,16 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
 
     async purgeStale() {
       await db.transaction(async (tx) => {
-        const stale = tx
-          .select({ id: moneyAccounts.id })
-          .from(moneyAccounts)
-          .where(and(isNotNull(moneyAccounts.deletedAt), lte(moneyAccounts.deletedAt, undoFrom())))
-        await tx
-          .update(spendings)
-          .set({ accountId: null, debitedMinor: null, debitedCurrency: null })
-          .where(sql`${spendings.accountId} in ${stale}`)
-        await tx
-          .update(trips)
-          .set({ accountId: null, debitedMinor: null, debitedCurrency: null })
-          .where(sql`${trips.accountId} in ${stale}`)
-        await tx
-          .update(incomes)
-          .set({ accountId: null })
-          .where(sql`${incomes.accountId} in ${stale}`)
-        await tx
-          .update(exchanges)
-          .set({ givenAccountId: null })
-          .where(sql`${exchanges.givenAccountId} in ${stale}`)
-        await tx
-          .update(exchanges)
-          .set({ receivedAccountId: null })
-          .where(sql`${exchanges.receivedAccountId} in ${stale}`)
-        await tx
-          .delete(moneyAccounts)
-          .where(and(isNotNull(moneyAccounts.deletedAt), lte(moneyAccounts.deletedAt, undoFrom())))
+        const stale = and(
+          isNotNull(moneyAccounts.deletedAt),
+          lte(moneyAccounts.deletedAt, undoFrom()),
+        )
+        await unlink(tx, stale)
+        await tx.delete(moneyAccounts).where(stale)
       })
     },
 
-    async operations(actorId, today) {
+    async operations(actorId) {
       const [spent, received, exchanged, tripRows, tripSums] = await Promise.all([
         db
           .select()
@@ -390,10 +416,12 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           .from(exchanges)
           .where(and(eq(exchanges.actorId, actorId), isNull(exchanges.deletedAt))),
         db.execute<TripRow>(sql`
-          select t.id, p.name as place_name, t.started_at,
+          select t.id, p.name as place_name, t.currency, t.started_at,
+                 to_char(t.started_at at time zone 'Asia/Yerevan', 'YYYY-MM-DD') as started_on,
                  coalesce(t.finished_on_device_at, t.finished_at) as finished_at,
-                 to_char(coalesce(t.finished_on_device_at, t.finished_at) at time zone 'Asia/Yerevan',
-                         'YYYY-MM-DD') as finished_on,
+                 greatest(t.started_at, t.finished_at, t.account_set_at,
+                          (select max(e.created_at) from expenses e where e.trip_id = t.id))
+                   as seen_at,
                  t.account_id, t.debited_minor, t.debited_currency,
                  (select count(*) from expenses e where e.trip_id = t.id) as items,
                  (select count(*) from expenses e
@@ -420,6 +448,8 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           side: null,
           day: row.spentOn,
           at: row.createdAt,
+          seenAt: latest(row.createdAt, row.amendedAt, row.accountSetAt),
+          currency: row.currency,
           accountId: row.accountId,
           amounts: [{ minor: -row.amountMinor, currency: row.currency }],
           debited: moneyFrom(row.debitedMinor, row.debitedCurrency),
@@ -440,6 +470,8 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           side: null,
           day: row.receivedOn,
           at: row.createdAt,
+          seenAt: latest(row.createdAt, row.amendedAt, row.accountSetAt),
+          currency: row.currency,
           accountId: row.accountId,
           amounts: [{ minor: row.amountMinor, currency: row.currency }],
           debited: null,
@@ -456,12 +488,14 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           id: row.id,
           day: row.exchangedOn,
           at: row.createdAt,
+          seenAt: latest(row.createdAt, row.amendedAt, row.accountSetAt),
         }
         const common = { debited: null, rate: null, unpriced: 0 }
         operations.push({
           ...half,
           ...common,
           side: 'given',
+          currency: row.givenCurrency,
           accountId: row.givenAccountId,
           amounts: [given],
           details: {
@@ -474,6 +508,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           ...half,
           ...common,
           side: 'received',
+          currency: row.receivedCurrency,
           accountId: row.receivedAccountId,
           amounts: [got],
           details: {
@@ -494,8 +529,12 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           kind: 'trip',
           id: row.id,
           side: null,
-          day: row.finished_on ?? today,
+          // The day it started: the money left at the shelf, and a trip left open for days, or
+          // finished after midnight, is not taken from a start that already counted it (Д4).
+          day: row.started_on,
           at: new Date(row.finished_at ?? row.started_at),
+          seenAt: new Date(row.seen_at),
+          currency: row.currency,
           accountId: row.account_id,
           amounts: sums.get(row.id) ?? [],
           debited:
@@ -510,13 +549,13 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
       return operations
     },
 
-    async lastChecks(actorId) {
-      const checks = await checksOf(actorId)
+    async lastChecks(actorId, matched) {
+      const checks = await checksOf(actorId, matched)
       return new Map(checks.map((check) => [check.accountId, check]))
     },
 
-    async lastCheck(actorId, accountId, except) {
-      const [check] = await checksOf(actorId, accountId, except)
+    async lastMatched(actorId, accountId, except) {
+      const [check] = await checksOf(actorId, true, accountId, except)
       return check ?? null
     },
 
@@ -571,6 +610,11 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
             accountId,
             debitedMinor: debited?.minor ?? null,
             debitedCurrency: debited?.currency ?? null,
+            // A repeat from the queue moves nothing; a change is new to every later check (Д1б).
+            accountSetAt: sql`case when ${trips.accountId} is not distinct from ${accountId}::uuid
+              and ${trips.debitedMinor} is not distinct from ${debited?.minor ?? null}::bigint
+              and ${trips.debitedCurrency} is not distinct from ${debited?.currency ?? null}::char(3)
+              then ${trips.accountSetAt} else clock_timestamp() end`,
           })
           .where(and(eq(trips.id, own), eq(trips.actorId, actorId)))
           .returning({ id: trips.id })

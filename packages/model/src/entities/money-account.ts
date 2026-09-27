@@ -83,9 +83,19 @@ export interface AccountOperation {
   readonly id: string
   /** Which half of an exchange this is; null for every other kind. */
   readonly side: 'given' | 'received' | null
+  /** A trip is dated by the day it started: the money left at the shelf (MOL-115, Р-29). */
   readonly day: string
   /** When it was written — a trip, when it was finished, or started while it is open. */
   readonly at: Date
+  /**
+   * The last moment the server learned something about it: written, amended, given or taken an
+   * account — a trip, received as finished or given a purchase. What a check's window is measured
+   * by, never the phone's clock: a trip finished offline and delivered after a check is after it
+   * (adversarial Д1, Д1б).
+   */
+  readonly seenAt: Date
+  /** Its own currency — a trip's with nothing priced yet still belongs to one (adversarial Д6). */
+  readonly currency: Currency
   readonly accountId: string | null
   readonly amounts: readonly Money[]
   readonly debited: Money | null
@@ -146,6 +156,15 @@ export function convertSigned(amount: Money, rate: ExchangeRate): Money | null {
   return { minor: negative ? -result.minor : result.minor, currency: result.currency }
 }
 
+/** Whether a rate is of the pair, on either side. */
+function covers(rate: ExchangeRate | null, one: Currency, other: Currency): rate is ExchangeRate {
+  return (
+    rate !== null &&
+    (rate.base === one || rate.quote === one) &&
+    (rate.base === other || rate.quote === other)
+  )
+}
+
 function converted(
   amount: Money,
   into: Currency,
@@ -153,12 +172,10 @@ function converted(
   snapshot: ExchangeRate | null,
   rateOf: RateBetween,
 ): Money | null {
-  const covers = (rate: ExchangeRate | null): rate is ExchangeRate =>
-    rate !== null &&
-    (rate.base === amount.currency || rate.quote === amount.currency) &&
-    (rate.base === into || rate.quote === into)
-  const rate = covers(snapshot) ? snapshot : rateOf(amount.currency, into, day)
-  return covers(rate) ? convertSigned(amount, rate) : null
+  const rate = covers(snapshot, amount.currency, into)
+    ? snapshot
+    : rateOf(amount.currency, into, day)
+  return covers(rate, amount.currency, into) ? convertSigned(amount, rate) : null
 }
 
 /**
@@ -258,14 +275,17 @@ export function markOf(account: MoneyAccount, last: MoneyAccountCheck | null): C
 }
 
 export function isAfterMark(
-  operation: Pick<AccountOperation, 'day' | 'at'>,
+  operation: Pick<AccountOperation, 'day' | 'seenAt'>,
   mark: CheckMark,
 ): boolean {
-  return operation.day > mark.day || (mark.at !== null && operation.at > mark.at)
+  return operation.day > mark.day || (mark.at !== null && operation.seenAt > mark.at)
 }
 
 function isOfCurrency(operation: AccountOperation, currency: Currency): boolean {
-  return operation.amounts.some((amount) => amount.currency === currency)
+  return (
+    operation.currency === currency ||
+    operation.amounts.some((amount) => amount.currency === currency)
+  )
 }
 
 export function operationKeyOf(operation: AccountOperation): JournalKey {
@@ -427,7 +447,9 @@ export function conversionsNeeded(
     const account = operation.accountId === null ? undefined : byId.get(operation.accountId)
     if (!account || operation.debited !== null) continue
     for (const { currency } of operation.amounts) {
-      if (currency === account.currency) continue
+      if (currency === account.currency || covers(operation.rate, currency, account.currency)) {
+        continue
+      }
       const key = `${currency}:${account.currency}:${operation.day}`
       needs.set(key, { from: currency, into: account.currency, day: operation.day })
     }

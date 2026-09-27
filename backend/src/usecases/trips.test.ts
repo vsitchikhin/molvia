@@ -227,7 +227,7 @@ function fakeRepositories(
       purgeStale: unexpected('moneyAccounts.purgeStale'),
       operations: unexpected('moneyAccounts.operations'),
       lastChecks: unexpected('moneyAccounts.lastChecks'),
-      lastCheck: unexpected('moneyAccounts.lastCheck'),
+      lastMatched: unexpected('moneyAccounts.lastMatched'),
       saveCheck: unexpected('moneyAccounts.saveCheck'),
       setTripPayment: unexpected('moneyAccounts.setTripPayment'),
     },

@@ -631,7 +631,6 @@
     "spending_category_taken": "Категория с таким названием уже есть",
     "money_account_in_future": "Этот день ещё не наступил",
     "money_account_taken": "Счёт с таким названием уже есть — назовите иначе",
-    "money_account_unknown": "Такого счёта нет — выберите другой",
     "money_account_currency": "Этот счёт в другой валюте",
     "money_account_currency_locked": "По счёту уже есть операции — валюту не сменить. Нужна другая — заведите новый счёт"
   },

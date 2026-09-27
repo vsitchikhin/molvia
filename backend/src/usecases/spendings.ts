@@ -84,12 +84,9 @@ export async function recordSpending(
   now: Date = new Date(),
 ): Promise<{ spending: SpendingView; created: boolean }> {
   await checked(repositories, owner, body, now)
-  const payment = paymentOf(
-    await knownAccounts(repositories, owner),
-    null,
-    body,
+  const payment = paymentOf(await knownAccounts(repositories, owner), null, body, [
     body.amount.currency,
-  )
+  ])
   const rate = await rateOfDay(repositories, owner, body)
   // Left out stays left out: a repeat from a screen older than accounts is still a repeat (Р-26).
   const sent = body.accountId === undefined ? body : { ...body, ...payment }
@@ -119,12 +116,9 @@ export async function amendSpending(
     held.amount.currency === body.amount.currency &&
     spendingIn(held, owner.spendCurrency) !== null
   const rate = same ? held.rate : await rateOfDay(repositories, owner, body)
-  const payment = paymentOf(
-    await knownAccounts(repositories, owner),
-    held,
-    body,
+  const payment = paymentOf(await knownAccounts(repositories, owner), held, body, [
     body.amount.currency,
-  )
+  ])
   const { spending } = await repositories.spendings.amend(
     owner.id,
     id,

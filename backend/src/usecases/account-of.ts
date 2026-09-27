@@ -15,27 +15,40 @@ export async function knownAccounts(
 }
 
 /**
- * The account an income or a side of an exchange lands on or leaves: one of the owner's, and of the
- * money's own currency — or it is not that account (MOL-115, п. 4).
+ * An account the owner has not got is «без счёта», never a refusal (adversarial Д3, Р-28): an
+ * operation queued offline onto an account deleted for good on another phone is written and lands
+ * in «не попали» — refused, the queue would set it aside and the money would be lost. Someone
+ * else's account is the same answer, so nothing tells the two apart.
  */
-export function checkedSide(
+function ownOrNone(
+  accounts: ReadonlyMap<string, MoneyAccount>,
+  accountId: string | null,
+): MoneyAccount | null {
+  return accountId === null ? null : (accounts.get(accountId) ?? null)
+}
+
+/**
+ * The account an income or a side of an exchange lands on or leaves, as it will be written: one of
+ * the owner's, of the money's own currency — or it is not that account (MOL-115, п. 4).
+ */
+export function sideOf(
   accounts: ReadonlyMap<string, MoneyAccount>,
   accountId: string | null,
   currency: Currency,
-): void {
-  if (accountId === null) return
-  const account = accounts.get(accountId)
-  if (!account) throw new DomainError(ERROR.MONEY_ACCOUNT_UNKNOWN)
+): string | null {
+  const account = ownOrNone(accounts, accountId)
+  if (account === null) return null
   if (account.currency !== currency) throw new DomainError(ERROR.MONEY_ACCOUNT_CURRENCY)
+  return account.id
 }
 
 /**
  * The account a spending or a trip was paid from, and «списано» as it will be written.
  *
  * Left out of the body — a screen older than accounts — the account is kept as it was (Р-26), and
- * so is «списано» while it still applies: to the same account, in an operation of another currency.
- * Sent, «списано» is held to its rules: an account to have been taken from, of the account's
- * currency, and only when the operation's is another (MOL-43 В-3).
+ * so is «списано» while it still applies. Sent, «списано» is held to its rules: in the account's
+ * currency, and only when some money of the operation — `currencies`: a spending's one, a trip's
+ * own and every purchase's (adversarial Д2) — is in another (MOL-43 В-3).
  */
 export function paymentOf(
   accounts: ReadonlyMap<string, MoneyAccount>,
@@ -44,13 +57,16 @@ export function paymentOf(
     readonly accountId?: string | null | undefined
     readonly debited?: Money | null | undefined
   },
-  currency: Currency,
+  currencies: readonly Currency[],
 ): { accountId: string | null; debited: Money | null } {
-  const accountId = body.accountId === undefined ? (held?.accountId ?? null) : body.accountId
-  const account = accountId === null ? null : (accounts.get(accountId) ?? null)
-  if (accountId !== null && !account) throw new DomainError(ERROR.MONEY_ACCOUNT_UNKNOWN)
+  const account = ownOrNone(
+    accounts,
+    body.accountId === undefined ? (held?.accountId ?? null) : body.accountId,
+  )
+  const accountId = account?.id ?? null
   const applies = (debited: Money) =>
-    debited.currency === account?.currency && account.currency !== currency
+    debited.currency === account?.currency &&
+    currencies.some((currency) => currency !== account.currency)
   if (body.debited === undefined) {
     const kept = held?.debited ?? null
     return {
@@ -58,8 +74,8 @@ export function paymentOf(
       debited: kept !== null && held?.accountId === accountId && applies(kept) ? kept : null,
     }
   }
-  if (body.debited === null) return { accountId, debited: null }
-  if (account === null) throw new DomainError(ERROR.MONEY_ACCOUNT_UNKNOWN)
+  // «Списано» from an account that is gone goes with it: nothing to have been taken from.
+  if (body.debited === null || account === null) return { accountId, debited: null }
   if (!applies(body.debited)) throw new DomainError(ERROR.MONEY_ACCOUNT_CURRENCY)
   return { accountId, debited: body.debited }
 }

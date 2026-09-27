@@ -28,13 +28,17 @@ CREATE TABLE "money_accounts" (
 --> statement-breakpoint
 ALTER TABLE "exchanges" ADD COLUMN "given_account_id" uuid;--> statement-breakpoint
 ALTER TABLE "exchanges" ADD COLUMN "received_account_id" uuid;--> statement-breakpoint
+ALTER TABLE "exchanges" ADD COLUMN "account_set_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "incomes" ADD COLUMN "account_id" uuid;--> statement-breakpoint
+ALTER TABLE "incomes" ADD COLUMN "account_set_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "spendings" ADD COLUMN "account_id" uuid;--> statement-breakpoint
 ALTER TABLE "spendings" ADD COLUMN "debited_minor" bigint;--> statement-breakpoint
 ALTER TABLE "spendings" ADD COLUMN "debited_currency" char(3);--> statement-breakpoint
+ALTER TABLE "spendings" ADD COLUMN "account_set_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "trips" ADD COLUMN "account_id" uuid;--> statement-breakpoint
 ALTER TABLE "trips" ADD COLUMN "debited_minor" bigint;--> statement-breakpoint
 ALTER TABLE "trips" ADD COLUMN "debited_currency" char(3);--> statement-breakpoint
+ALTER TABLE "trips" ADD COLUMN "account_set_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "money_account_checks" ADD CONSTRAINT "money_account_checks_actor_id_actors_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."actors"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "money_account_checks" ADD CONSTRAINT "money_account_checks_account_is_owners" FOREIGN KEY ("account_id","actor_id") REFERENCES "public"."money_accounts"("id","actor_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "money_accounts" ADD CONSTRAINT "money_accounts_actor_id_actors_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."actors"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -53,5 +57,4 @@ ALTER TABLE "spendings" ADD CONSTRAINT "spendings_debited_in_other_currency" CHE
 ALTER TABLE "spendings" ADD CONSTRAINT "spendings_debited_currency_known" CHECK ("spendings"."debited_currency" is null or "spendings"."debited_currency" in ('AMD', 'RUB', 'USD', 'EUR'));--> statement-breakpoint
 ALTER TABLE "trips" ADD CONSTRAINT "trips_debited_whole" CHECK (num_nonnulls("trips"."debited_minor", "trips"."debited_currency") in (0, 2));--> statement-breakpoint
 ALTER TABLE "trips" ADD CONSTRAINT "trips_debited_needs_account" CHECK ("trips"."debited_minor" is null or ("trips"."account_id" is not null and "trips"."debited_minor" > 0));--> statement-breakpoint
-ALTER TABLE "trips" ADD CONSTRAINT "trips_debited_in_other_currency" CHECK ("trips"."debited_currency" is null or "trips"."debited_currency" <> "trips"."currency");--> statement-breakpoint
 ALTER TABLE "trips" ADD CONSTRAINT "trips_debited_currency_known" CHECK ("trips"."debited_currency" is null or "trips"."debited_currency" in ('AMD', 'RUB', 'USD', 'EUR'));

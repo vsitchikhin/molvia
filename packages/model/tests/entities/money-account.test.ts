@@ -62,14 +62,19 @@ function operation(
   on: MoneyAccount | null,
   patch: Partial<AccountOperation> = {},
 ): AccountOperation {
+  const at = patch.at ?? new Date(`${day}T12:00:00Z`)
+  const sums = amounts.map(toMoney)
   return {
     kind,
     id: nextId(),
     side: null,
     day,
-    at: new Date(`${day}T12:00:00Z`),
+    at,
+    // Unless a test says otherwise, the server learned of it when it was written.
+    seenAt: at,
+    currency: sums[0]?.currency ?? on?.currency ?? 'AMD',
     accountId: on?.id ?? null,
-    amounts: amounts.map(toMoney),
+    amounts: sums,
     debited: null,
     rate: null,
     unpriced: 0,
@@ -309,6 +314,42 @@ describe('accountCheck', () => {
   })
 })
 
+describe('the window is the server’s, not the phone’s (adversarial Д1, Д6)', () => {
+  const cash = () => account('Наличные', '10000 AMD')
+  const check = (on: MoneyAccount): MoneyAccountCheck => ({
+    id: nextId(),
+    accountId: on.id,
+    checkedOn: '2026-09-26',
+    fact: toMoney('10000 AMD'),
+    counted: toMoney('10000 AMD'),
+    createdAt: new Date('2026-09-26T08:00:00Z'),
+  })
+
+  it('names a trip finished offline yesterday and received after the check', () => {
+    const on = cash()
+    const trip = operation('trip', ['-5000 AMD'], '2026-09-25', null, {
+      at: new Date('2026-09-25T07:00:00Z'),
+      seenAt: new Date('2026-09-26T09:00:00Z'),
+    })
+    const result = accountCheck(on, [trip], check(on), toMoney('5000 AMD'), noRates)
+    expect(result.reasons).toEqual([{ kind: 'unassigned', operation: trip }])
+  })
+
+  it('does not name one the server knew before the check', () => {
+    const on = cash()
+    const trip = operation('trip', ['-5000 AMD'], '2026-09-25', null, {
+      seenAt: new Date('2026-09-25T09:00:00Z'),
+    })
+    expect(accountCheck(on, [trip], check(on), toMoney('5000 AMD'), noRates).reasons).toEqual([])
+  })
+
+  it('lists a trip with no account and no price yet under its own currency', () => {
+    const on = cash()
+    const trip = operation('trip', [], '2026-09-25', null, { currency: 'AMD', unpriced: 3 })
+    expect(unassignedOperations([on], new Map(), [trip])).toEqual([trip])
+  })
+})
+
 describe('unassignedOperations', () => {
   it('keeps old cash spendings in view though the card was checked since (Р-16)', () => {
     const cash = account('Наличные ֏', '100 AMD')
@@ -397,6 +438,14 @@ describe('conversionsNeeded', () => {
     expect(conversionsNeeded([card], ops)).toEqual([
       { from: 'AMD', into: 'RUB', day: '2026-09-17' },
     ])
+  })
+
+  it('asks nothing a spending’s own snapshot of the pair already answers (review Р-6)', () => {
+    const card = account('Карта ₽', '100 RUB')
+    const ops = [
+      operation('spending', ['-100 AMD'], '2026-09-17', card, { rate: rate('RUB', 'AMD', '4.2') }),
+    ]
+    expect(conversionsNeeded([card], ops)).toEqual([])
   })
 })
 

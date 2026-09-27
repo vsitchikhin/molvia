@@ -405,8 +405,8 @@ export const moneyAccounts = pgTable(
 
 /**
  * The account a spending or a trip was paid from, and «списано» (MOL-115, MOL-43 В-3): the account
- * is the owner's own, «списано» is whole, positive, needs an account, is of the account's currency
- * and only when the operation's is another — every one of them a key or a check, not a hope.
+ * is the owner's own, «списано» is whole, positive, needs an account and is of the account's
+ * currency — every one of them a key or a check, not a hope.
  */
 function paidFrom(
   name: 'trips' | 'spendings',
@@ -437,10 +437,16 @@ function paidFrom(
       `${name}_debited_needs_account`,
       sql`${table.debitedMinor} is null or (${table.accountId} is not null and ${table.debitedMinor} > 0)`,
     ),
-    check(
-      `${name}_debited_in_other_currency`,
-      sql`${table.debitedCurrency} is null or ${table.debitedCurrency} <> ${table.currency}`,
-    ),
+    // A spending is one currency, so the row can say it; a trip's purchases may be in any, and
+    // «списано» stands for any of them that is not the account's (adversarial Д2) — the use case's.
+    ...(name === 'spendings'
+      ? [
+          check(
+            `${name}_debited_in_other_currency`,
+            sql`${table.debitedCurrency} is null or ${table.debitedCurrency} <> ${table.currency}`,
+          ),
+        ]
+      : []),
     check(`${name}_debited_currency_known`, currencyKnownOrNull(table.debitedCurrency)),
   ]
 }
@@ -494,6 +500,8 @@ export const trips = pgTable(
     accountId: uuid('account_id'),
     debitedMinor: bigint('debited_minor', { mode: 'bigint' }),
     debitedCurrency: char('debited_currency', { length: 3 }).$type<Currency>(),
+    // When they last changed: a check's window is the server's moment, not the phone's (Д1б).
+    accountSetAt: timestamp('account_set_at', { withTimezone: true }),
   },
   (table) => [
     // The list of trips, the running one, and «what is still unrated» all walk one actor
@@ -858,6 +866,8 @@ export const exchanges = pgTable(
     // The accounts each side left and landed on (MOL-115), each of its side's currency.
     givenAccountId: uuid('given_account_id'),
     receivedAccountId: uuid('received_account_id'),
+    // When either last changed: a check's window is the server's moment (adversarial Д1б).
+    accountSetAt: timestamp('account_set_at', { withTimezone: true }),
   },
   (table) => [
     // The owner's exchanges in the order the wallet walks them.
@@ -951,6 +961,7 @@ export const incomes = pgTable(
     note: text('note'),
     // The account it came onto (MOL-115); of its own currency, which the key below holds.
     accountId: uuid('account_id'),
+    accountSetAt: timestamp('account_set_at', { withTimezone: true }),
     revision: integer('revision').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -1078,6 +1089,8 @@ export const spendings = pgTable(
     accountId: uuid('account_id'),
     debitedMinor: bigint('debited_minor', { mode: 'bigint' }),
     debitedCurrency: char('debited_currency', { length: 3 }).$type<Currency>(),
+    // When they last changed: a check's window is the server's moment, not the phone's (Д1б).
+    accountSetAt: timestamp('account_set_at', { withTimezone: true }),
     revision: integer('revision').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
