@@ -30,9 +30,15 @@
 import { computed, defineComponent, ref } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatEstimate, formatMoney, formatRate } from '@molvia/model'
+import {
+  formatEstimate,
+  formatMoney,
+  formatRate,
+  formatRateBeside,
+  yerevanDate,
+} from '@molvia/model'
 import type { Money, TripView } from '@molvia/model'
-import { purchaseDay } from '@/days'
+import { calendarDay } from '@/days'
 import { read, writeEverywhere } from '@/stores/storage'
 
 const FLIPPED = 'molvia.total-flipped'
@@ -124,9 +130,18 @@ export default defineComponent({
       if (!rate) return null
       // The person's own — from their exchanges, or entered for this trip after a jump — is said
       // to be theirs: «мой курс» beside a number reads differently from the bank's (MOL-40).
+      // After a jump, on the side the jump's note and sheet print by — the rate before it, or the
+      // jumped when there is none: «23,26 ₽/֏» over «0,043 ֏/₽ вместо 4,31 ֏/₽» was one rate read
+      // two ways a line apart (review Т-11, adversarial А‴).
+      const jump = props.trip.rateJump
+      const anchor = jump ? (jump.previous ?? jump.jumped) : null
       return t(rate.source === 'personal' ? 'trip.rate_line_mine' : 'trip.rate_line', {
-        rate: formatRate(rate, locale.value),
-        date: purchaseDay(rate.asOf, locale.value),
+        rate: anchor
+          ? formatRateBeside(rate, anchor, locale.value)
+          : formatRate(rate, locale.value),
+        // A rate is dated by a day of Yerevan: printed as that day, never as the moment of its
+        // midnight, which is the evening before west of UTC+4 (adversarial Ж″).
+        date: calendarDay(yerevanDate(rate.asOf), locale.value, { day: 'numeric', month: 'short' }),
       })
     })
 

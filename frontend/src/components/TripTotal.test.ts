@@ -74,6 +74,29 @@ describe('TripTotal', () => {
     expect(plain(view)).not.toContain('ЦБ')
   })
 
+  // Прыжок запятой через единицу: строка под суммой — той же стороной, что заметка и шторка
+  // (ревью Т-11, адв. А‴), и день курса — днём Еревана, в UTC тоже (адв. Ж″).
+  it('после прыжка через единицу курс под суммой — стороной прежнего, день — днём Еревана', () => {
+    const rate = (value: string) => ({
+      base: 'RUB' as const,
+      quote: 'AMD' as const,
+      scaled: BigInt(Math.round(Number(value) * 1_000_000)),
+      source: 'official' as const,
+      // Полночь Еревана 26 сентября — вечер 25-го в UTC.
+      asOf: new Date('2026-09-25T20:00:00.000Z'),
+    })
+    const jumped = rate('0.043')
+    const view = render({
+      trip: {
+        ...trip(),
+        rate: jumped,
+        rateJump: { jumped, previous: rate('4.305'), manual: null, choice: null },
+      },
+    })
+    expect(plain(view)).toContain('курс 0,043 ֏/₽ · 26 сент.')
+    expect(plain(view)).not.toContain('₽/֏')
+  })
+
   it('до переворота крупное число — факт, без признаков оценки', () => {
     const view = render()
     expect(view.get('.sum').classes()).not.toContain('guess')

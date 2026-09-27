@@ -61,8 +61,8 @@ const LANGUAGES: [string, Words][] = [
 /** Every screen with `meta.parent`, and the title its chevron is labelled with. */
 function screens(trip: string, words: Words): [string, string][] {
   return [
-    ['/settings/exchange', words.settings],
-    ['/settings/incomes', words.settings],
+    ['/money/exchange', words.money],
+    ['/money/incomes', words.money],
     ['/settings/devices', words.settings],
     ['/privacy', words.settings],
     ['/money/categories', words.money],

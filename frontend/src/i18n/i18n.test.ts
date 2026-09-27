@@ -107,8 +107,8 @@ describe('словарь: повторяющиеся тексты', () => {
       'Что брать': ['advice.title', 'nav.advice'],
       Оценки: ['nav.verdicts', 'verdict.title'],
       Настройки: ['nav.settings', 'settings.title'],
-      // Таб, его экран и группа настроек, где живут обмены и доходы (MOL-82): один раздел денег.
-      Деньги: ['nav.money', 'settings.group_money', 'spending.title'],
+      // Таб и его экран — разные роли одного слова, как у «Поход».
+      Деньги: ['nav.money', 'spending.title'],
       // The settings handoff names its own save action, independently of purchase editing.
       Сохранить: ['item.save_edit', 'settings.save'],
       // Цена Р-2: одно состояние, написанное для трёх экранов.
@@ -156,6 +156,17 @@ describe('словарь: повторяющиеся тексты', () => {
       Сумма: ['income.sheet.amount', 'spending.sheet.amount'],
       // Название экрана и пункт страницы приватности о том же (MOL-58, MOL-66).
       Доходы: ['income.title', 'privacy.stored.incomes.term'],
+      // Плавающая кнопка и заголовок её шторки, как «Трата» (MOL-81); подписи сумм карточки и
+      // полей шторки — одни слова об одном обмене.
+      Обмен: ['exchange.fab', 'exchange.sheet.title'],
+      Доход: ['income.fab', 'income.sheet.title'],
+      Отдал: ['exchange.card_given', 'exchange.sheet.given'],
+      Получил: ['exchange.card_received', 'exchange.sheet.received'],
+      // Имя источника на карточке обмена и в строке похода. По-английски у похода «the Bank of
+      // Russia» с артиклем, карточке нужно без него — в начале строки и после «the» (MOL-81, Е).
+      'ЦБ РА': ['exchange.card_source_cba', 'trip.rate.source_cba'],
+      'ЦБ РФ': ['exchange.card_source_cbr', 'trip.rate.source_cbr'],
+      'open.er-api.com': ['exchange.card_source_erapi', 'trip.rate.source_erapi'],
     })
   })
 
@@ -171,7 +182,7 @@ describe('словарь: повторяющиеся тексты', () => {
       'What to buy': ['advice.title', 'nav.advice'],
       Ratings: ['nav.verdicts', 'verdict.title'],
       Settings: ['nav.settings', 'settings.title'],
-      Money: ['nav.money', 'settings.group_money', 'spending.title'],
+      Money: ['nav.money', 'spending.title'],
       Save: ['item.save_edit', 'settings.save'],
       'No connection': [
         'devices.offline.title',
@@ -203,7 +214,11 @@ describe('словарь: повторяющиеся тексты', () => {
       // English has one word where Russian says «было до обмена» and «было до поступления».
       'held before {amount}': ['exchange.sheet.current_held', 'income.sheet.current_held'],
       // One English word for the screen, its sheet and the privacy entry; Russian has «Доход».
-      Income: ['income.sheet.title', 'income.title', 'privacy.stored.incomes.term'],
+      Income: ['income.fab', 'income.sheet.title', 'income.title', 'privacy.stored.incomes.term'],
+      Exchange: ['exchange.fab', 'exchange.sheet.title'],
+      Gave: ['exchange.card_given', 'exchange.sheet.given'],
+      Got: ['exchange.card_received', 'exchange.sheet.received'],
+      'open.er-api.com': ['exchange.card_source_erapi', 'trip.rate.source_erapi'],
     })
   })
 })

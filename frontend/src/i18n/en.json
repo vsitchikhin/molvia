@@ -524,7 +524,8 @@
       "save": "Add",
       "bad_empty": "Enter a name",
       "bad_taken": "This category already exists"
-    }
+    },
+    "entries_label": "Exchanges and incomes"
   },
   "exchange": {
     "title": "Money exchange",
@@ -534,9 +535,10 @@
     "basis_income": "by the last income · since {date}",
     "estimated": "part of it at the Central Bank of Armenia rate of the days of exchanges and incomes: what that money cost was never recorded",
     "base_since": "Counting in {base} since {date} — earlier exchanges in another currency are not in the rate and stay as they were",
-    "cost_line": "{currency}: {rate} · {basis}",
-    "cost_line_estimated": "{currency}: {rate} · {basis} · part at the Central Bank of Armenia rate",
+    "cost_line": "{rate} · {basis}",
+    "cost_line_estimated": "{rate} · {basis} · part at the Central Bank of Armenia rate",
     "no_wallet": "No {quote} has come in yet, by exchange or income — new trips count by the Central Bank of Armenia rate",
+    "wallet_out_of_band": "Your exchanges put the rate of {quote} per {base} beyond what a trip can keep — check their amounts. New trips count by the Central Bank of Armenia rate",
     "wallet_unknown": "Rate unknown: the {given} → {quote} exchange of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New trips count by the Central Bank of Armenia rate until you record an exchange of a known price or an income on a day with a fresh Central Bank of Armenia rate",
     "wallet_old_reckoning": "Rate unknown: the {quote} bought on {date} with {given} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New trips count by the Central Bank of Armenia rate until you record an exchange paid in {base} or an income in {quote} after the change, on a day with a fresh Central Bank of Armenia rate",
     "wallet_unknown_income": "Rate unknown: the {quote} income of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New trips count by the Central Bank of Armenia rate until you record an exchange of a known price or an income on a day with a fresh Central Bank of Armenia rate",
@@ -549,16 +551,7 @@
     "list_title": "Exchanges",
     "row_amounts": "{given} → {received}",
     "row_rate": "{date} · {rate}",
-    "row_more": "{amount} more than the central bank ({rate}, {date})",
-    "row_less": "{amount} less than the central bank ({rate}, {date})",
-    "row_equal": "exactly the central bank rate ({rate}, {date})",
-    "row_more_other": "{amount} more than the {source} rate ({rate}, {date})",
-    "row_less_other": "{amount} less than the {source} rate ({rate}, {date})",
-    "row_equal_other": "exactly the {source} rate ({rate}, {date})",
-    "row_no_official": "no central bank rate for this day — nothing to compare with",
-    "row_doubtful": "the central bank rate of that day is in doubt — no comparison",
     "remove": "Delete the exchange {amounts}",
-    "edit": "Amend the exchange:",
     "amended": "amended {date}",
     "amend_conflict": "This exchange was already amended on another device — here it is as it stands now. Amend it again if you need to",
     "vanished": "This exchange is gone — it was removed. The list is up to date",
@@ -613,12 +606,28 @@
       "current_held": "held before {amount}",
       "saving": "Saving the exchange…",
       "bad_day": "Choose the day of the exchange"
-    }
+    },
+    "fab": "Exchange",
+    "edit_on": "Amend the exchange of {date}:",
+    "card_given": "Gave",
+    "card_received": "Got",
+    "card_rate": "Exchange rate",
+    "card_official": "{source} on {date}",
+    "card_source_cba": "Central bank",
+    "card_source_cbr": "Bank of Russia",
+    "card_source_erapi": "open.er-api.com",
+    "card_more": "{amount} more than the central bank",
+    "card_less": "{amount} less than the central bank",
+    "card_equal": "Exactly the central bank rate",
+    "card_more_other": "{amount} more than the {source} rate",
+    "card_less_other": "{amount} less than the {source} rate",
+    "card_equal_other": "Exactly the {source} rate",
+    "card_no_official": "No central bank rate for this day — nothing to compare with",
+    "card_doubtful": "The central bank rate of that day is in doubt — no comparison"
   },
   "income": {
     "title": "Income",
     "record": "Record income",
-    "edit": "Amend income:",
     "row_line": "{source} · {date}",
     "amended": "amended {date}",
     "remove": "Remove income {amount}",
@@ -685,7 +694,9 @@
       "amend_conflict": "While you were editing, this income was amended on another device. It now stands as below; save again to write yours over it",
       "current": "Now recorded: {details}",
       "current_held": "held before {amount}"
-    }
+    },
+    "fab": "Income",
+    "edit_on": "Amend income of {date}:"
   },
   "devices": {
     "title": "Devices",
@@ -882,7 +893,6 @@
       "title": "Connection lost while saving",
       "body": "We will check with the server when it returns. Your edits will stay here."
     },
-    "group_money": "Money",
     "group_account": "Account",
     "sign_out": "Sign out"
   },

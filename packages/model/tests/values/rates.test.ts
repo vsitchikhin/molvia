@@ -9,6 +9,7 @@ import {
   decimalFromRate,
   exchangeRateSchema,
   formatRate,
+  formatRateBeside,
   isRateDay,
   isRateFresh,
   isRateJump,
@@ -16,6 +17,8 @@ import {
   pickOfficialRate,
   rateCodec,
   rateFromAmd,
+  readingOf,
+  uprightOf,
   yerevanDate,
   yerevanMidnight,
 } from '#model/values/rates'
@@ -479,8 +482,62 @@ describe('formatRate', () => {
     expect(formatRate(of('363.44', 'USD')).replaceAll('\u00a0', ' ')).toBe('363,44 ֏/$')
   })
 
-  it('мелкий курс не округляется в ноль', () => {
-    expect(formatRate(of('0.0001')).replaceAll('\u00a0', ' ')).toBe('0,0001 ֏/₽')
+  it('курс меньше единицы печатается другой стороной — «большее за меньшее» (MOL-81)', () => {
+    expect(formatRate(of('0.011232', 'RUB', 'USD')).replaceAll('\u00a0', ' ')).toBe('89,03 ₽/$')
+    expect(formatRate(of('0.002590', 'AMD', 'USD')).replaceAll('\u00a0', ' ')).toBe('386,10 ֏/$')
+    // The band's lower edge turned over, not rounded to zero.
+    expect(formatRate(of('0.0001')).replaceAll('\u00a0', ' ')).toBe('10 000,00 ₽/֏')
+  })
+
+  it('formatRateBeside: курс ЦБ под курсом обмена — той же стороной и у паритета (адв. Г)', () => {
+    const own = of('1.005025', 'EUR', 'USD')
+    const bank = of('0.995', 'EUR', 'USD')
+    expect(formatRateBeside(bank, own).replaceAll('\u00a0', ' ')).toBe('0,995 $/€')
+    // Обычный случай — как любой курс: обе стороны не меньше единицы.
+    expect(formatRateBeside(of('84.28', 'USD', 'RUB'), of('86.02', 'USD', 'RUB'))).toBe(
+      formatRate(of('84.28', 'USD', 'RUB')),
+    )
+    // Другая пара — как любой курс.
+    expect(formatRateBeside(bank, of('386', 'USD', 'AMD'))).toBe(formatRate(bank))
+  })
+
+  it('formatRateBeside: прыжок запятой через единицу — стороной прежнего курса (Т-9)', () => {
+    // Пара владельца: прежний 4,30 ֏/₽, прыгнувший 0,43 — оба «֏/₽», прыжок виден.
+    const previous = of('4.30')
+    expect(formatRateBeside(of('0.43'), previous).replaceAll('\u00a0', ' ')).toBe('0,43 ֏/₽')
+    expect(formatRateBeside(previous, previous)).toBe(formatRate(previous))
+    // ₽ → $: прежний 0,011143 читается «₽ за $», прыгнувший 1,114 — той же стороной, под единицей.
+    const dollar = of('0.011143', 'RUB', 'USD')
+    expect(formatRateBeside(of('1.114', 'RUB', 'USD'), dollar).replaceAll('\u00a0', ' ')).toBe(
+      '0,897666 ₽/$',
+    )
+    // Перевёрнутый не меньше единицы — два знака, одно округление, как у formatRate.
+    expect(formatRateBeside(dollar, dollar)).toBe(formatRate(dollar))
+  })
+
+  it('readingOf: сторона, которой читают, из шести знаков самого курса', () => {
+    expect(readingOf(of('4.82'))).toEqual({ of: 'AMD', per: 'RUB', scaled: parseRate('4.82') })
+    expect(readingOf(of('0.011232', 'RUB', 'USD'))).toEqual({
+      of: 'RUB',
+      per: 'USD',
+      scaled: parseRate('89.031339'),
+    })
+  })
+
+  it('uprightOf: курс не меньше единицы, иначе обратный, а без обратного — какой есть', () => {
+    const small = of('0.011232', 'RUB', 'USD')
+    const large = of('89.035302', 'USD', 'RUB')
+    expect(uprightOf(small, large)).toBe(large)
+    expect(uprightOf(large, small)).toBe(large)
+    expect(uprightOf(small, null)).toBe(small)
+    expect(uprightOf(null, large)).toBe(large)
+    expect(uprightOf(null, null)).toBeNull()
+  })
+
+  it('ровно единица и край полосы — своей стороной', () => {
+    expect(formatRate(of('1', 'USD', 'EUR')).replaceAll('\u00a0', ' ')).toBe('1,00 €/$')
+    expect(formatRate(of('0.999999', 'USD', 'EUR')).replaceAll('\u00a0', ' ')).toBe('1,00 $/€')
+    expect(formatRate(of('1000000')).replaceAll('\u00a0', ' ')).toBe('1 000 000,00 ֏/₽')
   })
 
   it('лишние знаки снимка на экран не выносит', () => {

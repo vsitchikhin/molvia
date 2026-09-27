@@ -117,6 +117,8 @@
             <p class="footnote rate">{{ rateLine }}</p>
           </AppCard>
 
+          <MoneyEntries :rate="liveRate" />
+
           <CategoryBars v-if="month.byCategory.length > 0" :month="month" :name-of="nameOf" />
           <!-- The way to one's categories is there before anything is spent (review Т-7). -->
           <AppCard v-else list>
@@ -161,13 +163,20 @@
             </AppButton>
           </div>
         </template>
+        <!-- The one way left into the exchanges and incomes once they left «Настройки»: a first
+             exchange may come before a first spending, and a month that will not load must not
+             close the way to the income that broke it (MOL-81; review Т-1, as MOL-66 argued). -->
+        <MoneyEntries
+          v-if="newcomer || phase === 'error' || phase === 'loading'"
+          :rate="liveRate"
+        />
       </template>
     </div>
 
     <!-- «Вернуть» stands whatever the screen became under it — the only spending removed makes a
          newcomer of the person (adversarial Г); «Трата» stands wherever there is something to
          write it into, a slow answer and a broken server included (review Т-6). -->
-    <div v-if="removed || tripRemoved || showsAdd" class="float">
+    <FloatingDock v-if="removed || tripRemoved || showsAdd" class="float">
       <UndoStrip
         v-if="removed"
         :key="removed.stamp"
@@ -183,7 +192,7 @@
         <template #icon><IconPlus /></template>
         {{ t('spending.add') }}
       </AppButton>
-    </div>
+    </FloatingDock>
 
     <SpendingSheet
       v-model:open="sheetOpen"
@@ -230,6 +239,8 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CategoryBars from '@/components/CategoryBars.vue'
+import FloatingDock from '@/components/FloatingDock.vue'
+import MoneyEntries from '@/components/MoneyEntries.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
@@ -263,10 +274,12 @@ export default defineComponent({
     AppCard,
     AppScreen,
     CategoryBars,
+    FloatingDock,
     IconChevron,
     IconCloudOff,
     IconPlus,
     IconShape,
+    MoneyEntries,
     MonthSwitcher,
     NewCategorySheet,
     ScreenSkeleton,
@@ -786,21 +799,6 @@ export default defineComponent({
   justify-items: center;
   gap: var(--space-2);
   padding: var(--space-2) 0;
-}
-
-.float {
-  position: fixed;
-  right: calc(var(--space-4) + var(--safe-right));
-  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + var(--space-4));
-  left: calc(var(--space-4) + var(--safe-left));
-  z-index: 1;
-  display: flex;
-  justify-content: flex-end;
-  pointer-events: none;
-
-  > * {
-    pointer-events: auto;
-  }
 }
 
 .add {

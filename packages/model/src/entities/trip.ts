@@ -7,6 +7,8 @@ import { MINOR_EXPONENT, currencySchema, priceSchema } from '#model/values/money
 import type { Currency, Money } from '#model/values/money'
 import {
   RATE_DIGITS,
+  RATE_MAX,
+  RATE_MIN,
   RATE_SCALE,
   exchangeRateSchema,
   isRateFresh,
@@ -132,15 +134,25 @@ export function effectiveRate(trip: Trip): ExchangeRate | null {
 /**
  * The person's own rate for a trip whose snapshot jumped (Р-21): the snapshot's pair, their
  * number — refused as a rate typed under «мой курс» would be — and the moment they entered it.
+ *
+ * `per` is the currency the number is «за 1» of. The sheet asks on the side a person reads a rate
+ * by (MOL-81) — «1 $ = 89,50 ₽» for a snapshot kept as roubles into dollars — and the number is
+ * turned to the snapshot's side here, from what was typed, rounded once. Taken as the snapshot's
+ * side, «89,50» made 100 $ of 1,12 ₽ (adversarial А). A currency outside the pair is not a rate.
  */
-export function manualRateFor(snapshot: ExchangeRate, rate: string, at: Date): ExchangeRate {
-  return {
-    base: snapshot.base,
-    quote: snapshot.quote,
-    scaled: parseRate(rate),
-    source: 'personal',
-    asOf: at,
+export function manualRateFor(
+  snapshot: ExchangeRate,
+  rate: string,
+  at: Date,
+  per: Currency = snapshot.base,
+): ExchangeRate {
+  const typed = parseRate(rate)
+  if (per !== snapshot.base && per !== snapshot.quote) {
+    throw new DomainError(ERROR.INVALID_RATE, rate)
   }
+  const scaled = per === snapshot.base ? typed : divideRounded(RATE_SCALE * RATE_SCALE, typed)
+  if (scaled < RATE_MIN || scaled > RATE_MAX) throw new DomainError(ERROR.INVALID_RATE, rate)
+  return { base: snapshot.base, quote: snapshot.quote, scaled, source: 'personal', asOf: at }
 }
 
 /**

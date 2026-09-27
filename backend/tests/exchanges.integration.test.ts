@@ -725,6 +725,74 @@ describe('стоимость валют (MOL-42)', () => {
     expect(trip.rate).toMatchObject({ source: 'personal', scaled: 4_060_187n })
   })
 
+  it('₽ → $: курс обмена, цена доллара и курс ЦБ — стороной «больше единицы», одно число (MOL-81)', async () => {
+    await rates.upsert([rub('4.30', daysAgo(3)), usd('362.68', daysAgo(3))])
+    const me = await owner()
+    const overview = await record(me, {
+      given: { amount: '9000', currency: 'RUB' },
+      received: { amount: '104.63', currency: 'USD' },
+      exchangedOn: daysAgo(3),
+    })
+
+    const [row] = overview.exchanges
+    // 9 000 / 104,63 = 86,017395 ₽ per dollar — made from the amounts, never 1 / 0,011626.
+    expect(row?.rate).toMatchObject({ base: 'USD', quote: 'RUB', scaled: 86_017_395n })
+    expect(overview.costs.map(({ rate }) => [rate.base, rate.quote, rate.scaled])).toEqual([
+      ['USD', 'RUB', 86_017_395n],
+    ])
+    // 362,68 / 4,30 built from the cache as it stands, and the difference measured by it: 9 000 at
+    // 84,344186 is 106,71 $ — at the six digits of 0,011856 it would have been 106,70.
+    expect(row?.official).toMatchObject({
+      provider: 'cba',
+      rate: { base: 'USD', quote: 'RUB', scaled: 84_344_186n },
+      difference: { minor: -208n, currency: 'USD' },
+    })
+  })
+
+  it('кошелёк вне полосы: ни кошелька, ни причины, но евро пришли с ценой — экран это видит (адв. В′)', async () => {
+    const id = await insertActor(db, { spendCurrency: 'EUR' })
+    const me = { id, cookie: await signIn(db, id) }
+    await record(me, {
+      given: { amount: '1000', currency: 'RUB' },
+      received: { amount: '1', currency: 'USD' },
+      exchangedOn: daysAgo(3),
+    })
+    const overview = await record(me, {
+      given: { amount: '100', currency: 'USD' },
+      received: { amount: '1', currency: 'EUR' },
+      exchangedOn: daysAgo(2),
+    })
+    // 100 000 ₽ за евро: поход его не возьмёт — и экран его не показывает (В).
+    expect(overview.wallet).toBeNull()
+    expect(overview.walletUnknown).toBeNull()
+    // Но евро пришли и получили цену: экран говорит «вне пределов похода», не «не приходили» (В′).
+    expect(overview.receipts).toContainEqual(
+      expect.objectContaining({ currency: 'EUR', priced: true }),
+    )
+  })
+
+  it('у паритета курс ЦБ на плашке — той же стороной, что курс обмена (MOL-81, адв. Г)', async () => {
+    const eur = (value: string, date: string): CachedRate => ({
+      ...rub(value, date),
+      currency: 'EUR',
+    })
+    await rates.upsert([usd('390', daysAgo(3)), eur('388.05', daysAgo(3))])
+    const me = await owner()
+    const overview = await record(me, {
+      given: { amount: '1000', currency: 'USD' },
+      received: { amount: '995', currency: 'EUR' },
+      exchangedOn: daysAgo(3),
+    })
+
+    const [row] = overview.exchanges
+    // 1 000 / 995 = 1,005025 $ за €; ЦБ той же стороной — 388,05 / 390 = 0,995 $ за €, не
+    // перевёрнутые «1,01 €/$».
+    expect(row?.rate).toMatchObject({ base: 'EUR', quote: 'USD', scaled: 1_005_025n })
+    expect(row?.official?.rate).toMatchObject({ base: 'EUR', quote: 'USD', scaled: 995_000n })
+    // 1 000 $ по 0,995 $ за € — 1 005,03 €; получено 995.
+    expect(row?.official?.difference).toEqual({ minor: -1_003n, currency: 'EUR' })
+  })
+
   it('привезённые доллары — по ЦБ РА на день обмена, с пометкой; поход берёт то же число', async () => {
     await rates.upsert([rub('4.3123', daysAgo(6)), usd('363.44', daysAgo(6))])
     const me = await owner()

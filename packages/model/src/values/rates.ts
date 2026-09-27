@@ -87,22 +87,94 @@ export const rateCodec = z.codec(exchangeRateWireSchema, exchangeRateSchema, {
 })
 
 /**
- * The rate as the screen prints it: «4,82 ֏/₽» — how much of the quote currency one unit of the
- * base buys, with both signs, because a bare number says nothing about which way it goes.
+ * Of a rate and the same rate the other way round, the one whose number is at least one — the
+ * side a person names a rate by (MOL-81). Both are made from an exact source by the caller; this
+ * only chooses, so the model and the server choose alike (review Т-7).
+ */
+export function uprightOf(
+  forward: ExchangeRate | null,
+  backward: ExchangeRate | null,
+): ExchangeRate | null {
+  if (forward && forward.scaled >= RATE_SCALE) return forward
+  return backward ?? forward
+}
+
+/**
+ * The rate turned to the side a person reads it by — `per` one unit of which, `scaled` of `of` —
+ * from its own six digits: for a figure that has no source but itself, a trip's snapshot or the own
+ * rate typed into it (MOL-81, adversarial А). A rate already at least one is itself.
+ */
+export function readingOf(rate: ExchangeRate): { of: Currency; per: Currency; scaled: bigint } {
+  if (rate.scaled >= RATE_SCALE) return { of: rate.quote, per: rate.base, scaled: rate.scaled }
+  return {
+    of: rate.base,
+    per: rate.quote,
+    scaled: divideRounded(RATE_SCALE * RATE_SCALE, rate.scaled),
+  }
+}
+
+/**
+ * The rate as the screen prints it: «4,82 ֏/₽» — how much of one currency a unit of the other
+ * buys, with both signs, because a bare number says nothing about which way it goes.
  *
- * Two digits, and up to the snapshot's six when the rate is under one — trailing zeros go, so 0,5
- * prints «0,50». Printed to two digits a rate of 0,0001 is «0,00», a zero rate on screen (MOL-22).
+ * On the side whose number is at least one, whichever way the rate is kept (MOL-81): «89,04 ₽/$»,
+ * never «0,011232 $/₽» — a person names a rate so. Two digits always. A rate kept under one is
+ * turned over here, from its six digits: that is honest for a snapshot, which a trip converts by
+ * as it is, and a figure with an exact source — an exchange, the wallet — comes from the server
+ * already on its side (`exchangeRateOf`, `ownRates`), since six digits of a small number are too
+ * few to turn over (89,03 against 89,04).
  */
 export function formatRate(rate: ExchangeRate, locale = 'ru-RU'): string {
   // The decimal itself, as every other formatter of the domain does it: a rate is six digits, and
   // a float on the way to the screen is a float in the one value that multiplies every amount.
-  const decimal = decimalFromRate(rate.scaled)
-  const small = rate.scaled < RATE_SCALE
+  const upright = rate.scaled >= RATE_SCALE
+  const decimal = upright
+    ? decimalFromRate(rate.scaled)
+    : decimalFromScaled(divideRounded(100n * RATE_SCALE, rate.scaled), 2)
   const number = new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
-    maximumFractionDigits: small ? RATE_DIGITS : 2,
+    maximumFractionDigits: 2,
   }).format(decimal)
-  return `${number} ${currencySign(rate.quote, locale)}/${currencySign(rate.base, locale)}`
+  const [of, per] = upright ? [rate.quote, rate.base] : [rate.base, rate.quote]
+  return `${number} ${currencySign(of, locale)}/${currencySign(per, locale)}`
+}
+
+/**
+ * A rate printed on the side another is read by — the bank's under an exchange's own on the card of
+ * that exchange (MOL-81, adversarial Г), the jumped rate beside the one before it in the sheet of a
+ * trip (review Т-9). Each printed on its own side, two rates on either side of one read «1,01 $/€»
+ * over «1,01 €/$», and a jump of the comma — 4,30 ֏/₽ to 0,43 — read «2,33 ₽/֏» beside «4,30 ֏/₽»,
+ * hiding the very jump the sheet is there for. Of another pair than `beside`, it is printed as any
+ * rate is. On the side under one, with the six digits such a number needs.
+ */
+export function formatRateBeside(
+  rate: ExchangeRate,
+  beside: ExchangeRate,
+  locale = 'ru-RU',
+): string {
+  const samePair =
+    (rate.base === beside.base && rate.quote === beside.quote) ||
+    (rate.base === beside.quote && rate.quote === beside.base)
+  if (!samePair) return formatRate(rate, locale)
+  const per = readingOf(beside).per
+  const forward = per === rate.base
+  const of = forward ? rate.quote : rate.base
+  const six = forward ? rate.scaled : divideRounded(RATE_SCALE * RATE_SCALE, rate.scaled)
+  // At least one: two digits, rounded once from the rate itself, as `formatRate` does.
+  const decimal =
+    six >= RATE_SCALE
+      ? decimalFromScaled(
+          forward
+            ? divideRounded(rate.scaled, 10_000n)
+            : divideRounded(100n * RATE_SCALE, rate.scaled),
+          2,
+        )
+      : decimalFromRate(six)
+  const number = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: six >= RATE_SCALE ? 2 : RATE_DIGITS,
+  }).format(decimal)
+  return `${number} ${currencySign(of, locale)}/${currencySign(per, locale)}`
 }
 
 /**

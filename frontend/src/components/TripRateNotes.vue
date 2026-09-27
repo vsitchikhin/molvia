@@ -33,11 +33,11 @@
 import { computed, defineComponent, ref } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatRate } from '@molvia/model'
+import { formatRate, formatRateBeside, yerevanDate } from '@molvia/model'
 import type { RateProvider, TripView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import TripRateSheet from '@/components/TripRateSheet.vue'
-import { purchaseDay } from '@/days'
+import { calendarDay } from '@/days'
 
 /** What the terms of the open aggregator ask for beside its rate; the banks need no link. */
 const LINKS: Partial<Record<RateProvider, string>> = {
@@ -71,10 +71,14 @@ export default defineComponent({
 
     const fallback = computed(() => props.trip.rate?.source === 'fallback')
 
+    /** The day a rate is dated by, as that day of Yerevan — never the moment of its midnight (Ж″). */
+    const dayOf = (asOf: Date): string =>
+      calendarDay(yerevanDate(asOf), locale.value, { day: 'numeric', month: 'short' })
+
     const stale = computed(() => {
       const rate = props.trip.rate
       if (!props.trip.rateStale || !rate) return null
-      const date = purchaseDay(rate.asOf, locale.value)
+      const date = dayOf(rate.asOf)
       return fallback.value
         ? t('trip.rate.stale_fallback', { date })
         : t('trip.rate.stale_official', { date })
@@ -83,13 +87,17 @@ export default defineComponent({
     const jump = computed(() => {
       const jumped = props.trip.rateJump
       if (!jumped) return null
-      const now = formatRate(jumped.jumped, locale.value)
       const previous = jumped.previous
+      // Both on the side of the rate before the jump: a jump of the comma across one — 4,30 ֏/₽ to
+      // 0,43 — read «2,33 ₽/֏ вместо 4,30 ֏/₽», two sides hiding the jump it names (review Т-9).
+      const now = previous
+        ? formatRateBeside(jumped.jumped, previous, locale.value)
+        : formatRate(jumped.jumped, locale.value)
       return previous
         ? t('trip.rate.jump_previous', {
             rate: now,
             previous: formatRate(previous, locale.value),
-            date: purchaseDay(previous.asOf, locale.value),
+            date: dayOf(previous.asOf),
           })
         : t('trip.rate.jump_alone', { rate: now })
     })
