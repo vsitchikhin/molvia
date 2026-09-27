@@ -840,7 +840,9 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   a trip left open, or finished after midnight, was taken a second time from a start that already
   counted it (adversarial Д4). The day is the phone's where it is earlier than the server's — the
   earlier of the server's start and the device's finish — or a trip begun offline in the evening and
-  delivered after midnight took the next day (owner's decision В-6, review Р2-3). The month of
+  delivered after midnight took the next day (owner's decision В-6, review Р2-3). A device's finish
+  more than a day before the server's start is a wrong clock, not an evening offline, and the server's
+  day stands (adversarial Ж1). The month of
   «Деньги» still dates it by the finish. **The price, named** (adversarial Е2): a trip continued on
   later days moves its account on its first day, and one begun before an account's start and
   continued after it is history whole — the start line is drawn once, when the account is made. One loading of all four kinds (`operations`) feeds the balance,
@@ -861,7 +863,11 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   named «без списано» by every check and refused the one thing that fixes it (adversarial Д2). Keys
   and checks hold the rest; the trip's case is the use case's, since its row cannot see its lines.
   **It counts only while it applies** (`debitedOn`): a trip whose dollar purchase was corrected to
-  drams keeps the figure in its row and is counted exactly by its sums (adversarial Е3). **Nothing
+  drams is counted exactly by its sums (adversarial Е3). **And any change of a trip's money takes
+  its «списано» off** (Р-32, adversarial Ж2) — a priced purchase added, a price changed, a priced one
+  removed: the figure was what left the account for the trip as it was, and kept, it counted a
+  purchase it never covered the day a dollar one was added; the check names the trip until it is
+  entered anew. **Nothing
   about it is refused** (Р-31): sent where it does not apply it is dropped, and in another currency
   than the account's it means the account is not the one the phone saw — the operation is written
   «без счёта»; a write from the queue that was refused would be lost. It moves the balance

@@ -16,6 +16,7 @@ import {
   tripViewCodec,
   unassignedOperationsCodec,
   yerevanDate,
+  yerevanMidnight,
 } from '@molvia/model'
 import type { CachedRate, MoneyAccountsResponse } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
@@ -69,7 +70,7 @@ async function owner(): Promise<Owner> {
 
 async function call(
   me: Owner,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   url: string,
   body?: unknown,
 ) {
@@ -912,14 +913,15 @@ describe('после ревью (MOL-115, Р-3, Д1–Д6)', () => {
   it('поход, начатый офлайн вечером и дошедший после полуночи, — день телефона (Р2-3, В-6)', async () => {
     const me = await owner()
     const { id } = await addAccount(me, { startOn: daysAgo(1) })
-    // At the shelf yesterday evening — before the account's start — delivered today.
-    const evening = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    // At the shelf yesterday at ten in the evening — before the account's start — and delivered
+    // just after midnight in Yerevan.
+    const midnight = yerevanMidnight(today).getTime()
     const trip = await insertTrip(db, {
       actorId: me.id,
       placeId: await insertPlace(db),
-      startedAt: new Date(),
-      finishedAt: new Date(),
-      finishedOnDeviceAt: evening,
+      startedAt: new Date(midnight + 60 * 1000),
+      finishedAt: new Date(midnight + 2 * 60 * 1000),
+      finishedOnDeviceAt: new Date(midnight - 2 * 60 * 60 * 1000),
     })
     await db.insert(expenses).values({
       id: randomUUID(),
@@ -947,5 +949,64 @@ describe('после ревью (MOL-115, Р-3, Д1–Д6)', () => {
       (await call(me, 'GET', '/money/accounts/unassigned')).json(),
     ).rows
     expect(rows.map(({ id }) => id)).toEqual([trip])
+  })
+})
+
+describe('третий проход (Ж1, Ж2)', () => {
+  it('часы телефона, отставшие на дни, не уводят сегодняшний поход за черту старта (Ж1)', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me, { startOn: daysAgo(1) })
+    const trip = await insertTrip(db, { actorId: me.id, placeId: await insertPlace(db) })
+    await db.insert(expenses).values({
+      id: randomUUID(),
+      tripId: trip,
+      itemId: await insertItem(db),
+      amountMinor: 500000n,
+      amountCurrency: 'AMD',
+    })
+    await call(me, 'PUT', `/trips/${trip}/payment`, { accountId: id })
+    const finished = await call(me, 'POST', `/trips/${trip}/finish`, {
+      finishedOnDeviceAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    })
+    expect(finished.statusCode).toBe(204)
+    expect((await balanceOf(me, id)).balance.minor).toBe(9_500_000n)
+  })
+
+  it('смена денег похода снимает «списано», и новая покупка его не будит (Ж2, Р-32)', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me)
+    const trip = await insertTrip(db, { actorId: me.id, placeId: await insertPlace(db) })
+    const bread = randomUUID()
+    const added = await call(me, 'POST', `/trips/${trip}/expenses`, {
+      id: bread,
+      itemId: await insertItem(db),
+      amount: { amount: '10', currency: 'USD' },
+    })
+    expect(added.statusCode, added.body).toBe(201)
+    const paid = await call(me, 'PUT', `/trips/${trip}/payment`, {
+      accountId: id,
+      debited: amd('3950'),
+    })
+    expect(tripViewCodec.parse(paid.json()).debited).toEqual({ minor: 395_000n, currency: 'AMD' })
+
+    // The price corrected to drams: the figure was for the trip as it was, and it goes.
+    const fixed = await call(me, 'PATCH', `/trips/${trip}/expenses/${bread}`, {
+      amount: amd('4000'),
+    })
+    expect(fixed.statusCode, fixed.body).toBe(200)
+    expect(tripViewCodec.parse(fixed.json())).toMatchObject({ accountId: id, debited: null })
+
+    // A dollar purchase later wakes nothing: the trip is «без списано» until it is entered anew.
+    await rates.upsert([official('USD', '390', today)])
+    await db.execute(sql`update actors set rate_preference = 'official' where id = ${me.id}`)
+    await call(me, 'POST', `/trips/${trip}/expenses`, {
+      id: randomUUID(),
+      itemId: await insertItem(db),
+      amount: { amount: '5', currency: 'USD' },
+    })
+    expect(await balanceOf(me, id)).toMatchObject({
+      balance: { minor: 9_405_000n, currency: 'AMD' },
+      approximate: true,
+    })
   })
 })
