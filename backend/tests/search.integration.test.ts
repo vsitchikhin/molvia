@@ -1436,7 +1436,7 @@ describe('search — how near the answer is (MOL-46)', () => {
   })
 })
 
-describe('search — rows it cannot tell apart, the shorter name first (MOL-112, В-5)', () => {
+describe('search — at one distance, the shorter name first (MOL-112, В-5)', () => {
   it('puts the common name before its varieties, which the query does not name', async () => {
     for (const name of ['Молоко 3,2%', 'Молоко топлёное', 'Молоко', 'Молоко 1,5%']) {
       await named(name)
@@ -1456,6 +1456,13 @@ describe('search — rows it cannot tell apart, the shorter name first (MOL-112,
     await named('Молоко')
 
     expect(await names('мол')).toEqual(['Молоко', 'Кофе молотый'])
+  })
+
+  it('puts the common name first when the query carries a size (adversarial А, Б)', async () => {
+    for (const name of ['Молоко 1,5%', 'Молоко', 'Рис круглозёрный', 'Рис']) await named(name)
+
+    expect((await names('молоко 1 л'))[0]).toBe('Молоко')
+    expect((await names('рис 1 кг'))[0]).toBe('Рис')
   })
 
   it('must not lift a shorter name over a nearer one: only ties are its to order', async () => {

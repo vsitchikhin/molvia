@@ -12,7 +12,7 @@ import {
   synonymPairedKinds,
   toSearchKey,
 } from '@molvia/model'
-import type { Item, NewItem } from '@molvia/model'
+import type { Item, ItemKind, NewItem } from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -538,7 +538,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              -- The furthest of those words, for how near the row is (MOL-46).
              coalesce(max(coalesce(pw.qd, 255))
                         filter (where pw.grounds and not pw.by_synonym), 0) as words_worst,
-             length(c.search_key) as key_length
+             length(c.search_key) as key_length,
+             bool_or(pw.by_synonym) as by_synonym
       from candidates c
       join per_word_best pw on pw.id = c.id
       group by c.id, c.ws, c.search_key
@@ -599,11 +600,13 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     -- the same distance; nothing else moves. Then what the person took before,
     -- above a closer spelling — their own choice says more than a typo metric does. Among
     -- several, the latest wins: after switching brands the new one is on top from the first
-    -- trip. Then the order of MOL-10, and among rows it cannot tell apart the shorter name
-    -- first (owner's decision MOL-112, В-5): the more of a name the query covers, the nearer —
-    -- «Молоко» before «Молоко 3,2%» on «молоко», and before «Кофе … молотый» on «мол». Until the
-    -- seed a tie was rare and its order was the uuid's; with a common name beside its varieties
-    -- it is every common word. \`id\` only keeps two loads of one screen in one order.
+    -- trip. Then the distance of MOL-10, and at one distance: what the typed word found before
+    -- what a synonym found («маслины» over «Оливки»), then the shorter name (owner's decision
+    -- MOL-112, В-5) — the more of a name the query covers, the nearer: «Молоко» before «Молоко
+    -- 3,2%» on «молоко», before «Кофе … молотый» on «мол». The length before the similarity: a
+    -- size in the query otherwise handed the row to a variety that shares a digit or a letter
+    -- with it — «молоко 1 л» to «Молоко 1,5%», «рис 1 кг» to «Рис круглозёрный» (review А, Б).
+    -- The similarity then orders one length, and \`id\` keeps two loads of one screen in one order.
     order by case when not coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) then 1
                   when m.item_id is not null or r.words_distance = 0 then 0
                   else 2
@@ -611,9 +614,21 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              m.item_id is null,
              m.last_picked_at desc nulls last,
              m.picks desc nulls last,
-             r.distance, r.ws desc, r.key_length, r.id
+             r.distance, r.by_synonym, r.key_length, r.ws desc, r.id
     limit ${limit}
   `
+}
+
+/**
+ * The lock every write of an item takes, per kind and search key: every name of one identity has
+ * one key, so all of them meet here. Exported for the seed (MOL-112), which looks at the key
+ * itself before `createUnlessNamed` and has to do it under the same lock. Reentrant inside one
+ * transaction, as advisory locks are.
+ */
+export async function lockItemKey(tx: Conn, kind: ItemKind, key: string): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtext('items'), hashtext(${`${kind} ${key}`}))`,
+  )
 }
 
 export function createItemRepository(db: Conn): ItemRepository {
@@ -716,9 +731,7 @@ export function createItemRepository(db: Conn): ItemRepository {
           // Per kind and key rather than per name: every name that is the same by
           // `nameIdentity` has the same key — built so, and held by a property test — so they
           // all meet at this lock, and the lookup below is an equality the GIN index serves.
-          await tx.execute(
-            sql`select pg_advisory_xact_lock(hashtext('items'), hashtext(${`${input.kind} ${key}`}))`,
-          )
+          await lockItemKey(tx, input.kind, key)
           const rows = await tx
             .select({ id: items.id, name: items.name })
             .from(items)

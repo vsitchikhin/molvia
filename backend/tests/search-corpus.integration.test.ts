@@ -40,10 +40,10 @@ async function names(query: string): Promise<string[]> {
 }
 
 /**
- * A tie is a group: equal distance and equal similarity. Inside it the shorter name goes first
- * (MOL-112, В-5), and only names of one key length are left to the row id, a random uuid — so a
- * group is pinned by its members and by that one rule, not as a list. Only a real tie is a
- * group — where the similarity differs, the order is the search's and is pinned as a list.
+ * A group is rows at one distance, found alike — by the typed word or by a synonym. Inside it the
+ * shorter name goes first (MOL-112, В-5), then the greater similarity, and only what is equal on
+ * both is left to the row id, a random uuid — so a group is pinned by its members and by the
+ * length rule, not as a list. Where the order is the search's alone, it is pinned as a list.
  */
 type Answer = readonly (string | readonly string[])[]
 
@@ -287,17 +287,17 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     нут: ['Nutella 350 г', 'Сок Noy яблочный 1 л'],
     пиво: [['Пиво Gyumri 0,5 л', 'Пиво Kilikia 0,5 л'], 'Пирожное Наполеон'],
     говядина: ['Говядина мякоть'],
-    мясо: ['Говядина мякоть', 'Фарш говяжий'],
+    мясо: ['Фарш говяжий', 'Говядина мякоть'],
     говя: [['Фарш говяжий', 'Говядина мякоть']],
     сок: [
       ['Сок Rich апельсин 1 л', 'Сок Noy яблочный 1 л'],
       [
         'Корм для собак Pedigree 400 г',
-        'Мука пшеничная высший сорт 2 кг',
         'Соевый соус Kikkoman 150 мл',
         'Соус чесночный Махеевъ 200 г',
+        "Чипсы Lay's сметана и лук 150 г",
       ],
-      "Чипсы Lay's сметана и лук 150 г",
+      'Мука пшеничная высший сорт 2 кг',
     ],
     чипсы: ["Чипсы Lay's сметана и лук 150 г"],
     чип: ["Чипсы Lay's сметана и лук 150 г"],
@@ -320,7 +320,7 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     спаг: ['Спагетти Barilla №5 500 г'],
     кетчуп: ['Кетчуп Heinz томатный 570 г'],
     соусы: [['Соевый соус Kikkoman 150 мл', 'Соус чесночный Махеевъ 200 г']],
-    орешки: ['Фисташки жареные 100 г', 'Арахис солёный 150 г'],
+    орешки: ['Арахис солёный 150 г', 'Фисташки жареные 100 г'],
     салфетки: [['Салфетки бумажные Zewa 100 шт', 'Салфетки влажные Huggies 56 шт']],
     салф: [['Салфетки бумажные Zewa 100 шт', 'Салфетки влажные Huggies 56 шт']],
     'влажные салфетки': ['Салфетки влажные Huggies 56 шт', 'Салфетки бумажные Zewa 100 шт'],
@@ -367,8 +367,12 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
         'Курица филе',
         'Doshirak лапша курица 90 г',
       ],
-      ["Хлопья кукурузные Kellogg's Corn Flakes 375 г", 'Колбаса сервелат Макур'],
-      ['Корм для кошек Whiskas 85 г', 'Корм для собак Pedigree 400 г', 'Крекеры TUC 100 г'],
+      ['Колбаса сервелат Макур', 'Крекеры TUC 100 г'],
+      [
+        'Корм для кошек Whiskas 85 г',
+        'Корм для собак Pedigree 400 г',
+        "Хлопья кукурузные Kellogg's Corn Flakes 375 г",
+      ],
     ],
     'средство для полов': ['Средство для мытья пола Mr. Proper 1 л'],
     'собачий корм': ['Корм для собак Pedigree 400 г'],
@@ -747,7 +751,7 @@ describe('Armenian labels on the same shelf, reached from Russian and Latin', ()
     tan: ['Թան Բժնի', ["Чипсы Lay's сметана и лук 150 г", 'Крекеры TUC 100 г']],
     бжни: [['Թան Բժնի', 'Вода Бжни 1,5 л']],
     матнакаш: [['Հաց Մատնաքաշ', 'Хлеб Матнакаш']],
-    ашхар: [['Творог Ашхар 9% 400 г', 'Молоко Ашхар 2,5% 1 л'], 'Թթվասեր Աշխարհ'],
+    ашхар: [['Творог Ашхар 9% 400 г', 'Թթվասեր Աշխարհ', 'Молоко Ашхар 2,5% 1 л']],
   }
 
   it('puts a label the query meant first', () => {
