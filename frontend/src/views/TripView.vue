@@ -408,14 +408,12 @@ export default defineComponent({
      * their own mark and their own caveat under the total; these have nowhere else to be said.
      */
     const unsent = computed(() => {
-      // Purchases of a trip the server refused are not «not sent yet»: they are not going
-      // anywhere, and the notice about that trip is where they are counted (раунд 5, З1).
-      const refused = new Set(
-        queue.rejected.flatMap((item) => (item.write.kind === 'start' ? [item.write.tripId] : [])),
-      )
+      // Purchases of a trip the server refused — its start, or its «Вернуть» — are not «not sent
+      // yet»: they are not going anywhere, and the notice about that trip is where they are counted
+      // (раунд 5, З1; MOL-76, round 2 Б1). One predicate with the queue that steps over them.
       return queue.pending.filter(
         (write) =>
-          write.kind === 'add' && write.tripId !== tripId.value && !refused.has(write.tripId),
+          write.kind === 'add' && write.tripId !== tripId.value && !queue.orphaned(write.tripId),
       ).length
     })
 

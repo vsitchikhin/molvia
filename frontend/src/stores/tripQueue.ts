@@ -685,12 +685,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         sync(owner)
         const tripId = head.write.tripId
         if (!kept.some((item) => item.write.kind === 'restore' && item.write.tripId === tripId)) {
-          trips.closed(tripId)
-          const history = useTripHistoryStore()
-          history.drop(tripId)
-          // Read again: the only trip of the history removed leaves an empty answer to be had, and
-          // the home screen waited on a skeleton for a list nobody asked for (adversarial А5).
-          void history.load().catch(() => undefined)
+          forget(tripId)
         }
       }
       if (!refusal && (head.write.kind === 'delete' || head.write.kind === 'restore')) {
@@ -751,14 +746,26 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         conflict = null
         decision = null
       }
+      // Another trip is open on the server now, and the removed one never reached it: brought
+      // back, its start would meet this one open — the question about the trip going on, and
+      // «Завершить тот» closing it at the shelf (adversarial round 2, Б3). The offer goes, as it
+      // does when a new trip is started (Р-4); the removal was never answered «back» by anyone.
+      const offered = lastRemoved.value
+      if (
+        !refusal &&
+        write.kind === 'start' &&
+        offered &&
+        offered.tripId !== write.tripId &&
+        offered.writes.some((item) => item.kind === 'start') &&
+        !kept.some((item) => item.write.kind === 'delete' && item.write.tripId === offered.tripId)
+      ) {
+        lastRemoved.value = null
+      }
       // A trip that did not come back — ten minutes gone, another trip open — is gone from the
       // phone's memory as a removal that landed is (review Р-3). What waits for it stays, stepped
       // over as a refused start's is (`orphaned`) and counted by the notice: some of it was made
       // after «Вернуть», and taking it away without a word lost it in silence (adversarial А2).
-      if (refusal && write.kind === 'restore') {
-        trips.closed(write.tripId)
-        useTripHistoryStore().drop(write.tripId)
-      }
+      if (refusal && write.kind === 'restore') forget(write.tripId)
       persist(owner)
 
       // A trip the server would not take leaves its purchases naming a trip that does not exist:
@@ -1059,9 +1066,13 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
    * the removal this window is still sending, whose answer comes first.
    */
   function restoreTrip(undo: TripUndo): void {
+    // Only while it is offered: the offer is withdrawn when bringing the trip back can no longer
+    // put it where it was — its time ran out, or another trip opened on the server over a trip it
+    // never had (Р-4, round 2 Б3) — and a store asked past that must not do what the screen won't.
+    if (lastRemoved.value?.tripId !== undo.tripId) return
     const id = actor.id
     sync(id)
-    if (lastRemoved.value?.tripId === undo.tripId) lastRemoved.value = null
+    lastRemoved.value = null
     const back: Kept[] = [
       { key: newKey(), write: { kind: 'restore', tripId: undo.tripId, name: undo.name } },
       ...undo.writes.map((write) => ({ key: newKey(), write })),
@@ -1079,6 +1090,18 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     rejected.value = [...rejected.value, ...undo.refusals.filter((item) => !known.has(item.key))]
     persist(id)
     void flush()
+  }
+
+  /**
+   * A trip gone for good — removed, or not brought back: out of the current trip and the history's
+   * memory, and the history read again, or the only trip of it removed left the home screen on a
+   * skeleton for a list nobody asked for (adversarial А5, round 2 Б2). One path for both ways out.
+   */
+  function forget(tripId: string): void {
+    trips.closed(tripId)
+    const history = useTripHistoryStore()
+    history.drop(tripId)
+    void history.load().catch(() => undefined)
   }
 
   /** Not the write this window is sending: that one has left, and its answer decides. */
@@ -1138,6 +1161,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     removing,
     landed,
     lastRemoved,
+    orphaned,
     /** The strip ran out: the removal stays, only the offer goes. */
     forgetRemoved: () => {
       lastRemoved.value = null

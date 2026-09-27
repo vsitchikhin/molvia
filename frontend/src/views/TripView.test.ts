@@ -1097,6 +1097,54 @@ describe('TripView', () => {
       expect(queue.lastRemoved).toBeNull()
     })
 
+    it('покупки не вернувшегося похода не обещаны «уйдут со связью» (раунд 2, Б1)', async () => {
+      localStorage.setItem(
+        `molvia.trip-rejected.${ME}`,
+        JSON.stringify([
+          {
+            key: 'r1',
+            write: { kind: 'restore', tripId: TRIP, name: 'Ереван Сити' },
+            code: ERROR.NOT_FOUND,
+          },
+        ]),
+      )
+      const { view, queue } = await render()
+      queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000071'))
+      queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000072'))
+      await flushPromises()
+      expect(view.text()).toContain('Поход не вернулся: Ереван Сити')
+      expect(view.text()).toContain('в нём 2 покупки')
+      expect(view.text()).not.toContain('ещё не отправлен')
+      expect(addExpense).not.toHaveBeenCalled()
+    })
+
+    it('отказ «Вернуть» единственного похода истории — главная перечитывает историю (раунд 2, Б2)', async () => {
+      tripHistory.mockResolvedValueOnce(single)
+      const { view, queue } = await render()
+      expect(view.findAll('.history-row')).toHaveLength(1)
+
+      let land: () => void = () => undefined
+      removeTrip.mockReturnValueOnce(
+        new Promise((resolve) => {
+          land = () => {
+            resolve()
+          }
+        }),
+      )
+      restoreTrip.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, undefined, true))
+      tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
+      const undo = queue.removeTrip(LAST, 'SAS')
+      await flushPromises()
+      queue.restoreTrip(undo)
+      land()
+      await flushPromises()
+
+      expect(queue.rejected.map((item) => item.write.kind)).toEqual(['restore'])
+      expect(tripHistory).toHaveBeenCalledTimes(2)
+      expect(view.find('.home .skeleton').exists()).toBe(false)
+      expect(view.text()).toContain(ru.trip.home.intro.title)
+    })
+
     it('единственная строка ждёт удаления — «Завершить» тоже зовёт поход пустым (Р-5)', async () => {
       currentTrip.mockResolvedValue(trip(handoff().slice(0, 1)))
       const { view, queue } = await render()
