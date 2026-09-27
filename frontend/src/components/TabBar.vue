@@ -111,6 +111,13 @@ export default defineComponent({
   }
 }
 
+/* Five columns are 64 px on a 320 px phone: «What to buy» wrapped there. Tightened, never cut
+   short — and only in English, where it is needed (MOL-82, handoff 05). */
+.label:lang(en) {
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
 .icon {
   /* 27 — the handoff's tab icon */
   width: 1.6875rem;
