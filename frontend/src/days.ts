@@ -64,3 +64,29 @@ const DAY_MS = 86_400_000
 function startOfDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
 }
+
+/**
+ * A day of Yerevan's calendar — `2026-09-26`, the way spendings, trips and rates are dated — in
+ * words: «26 сентября», «Сб, 26 сентября» with a weekday. Printed as that calendar day in UTC, never
+ * as a moment in the phone's zone: Yerevan's midnight is the evening before in Moscow, and every
+ * date west of UTC+4 came out a day early (review Т-1).
+ */
+export function calendarDay(
+  day: string,
+  locale: string,
+  options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long' },
+): string {
+  return new Intl.DateTimeFormat(locale, { ...options, timeZone: 'UTC' }).format(utcDay(day))
+}
+
+/** The day `by` days from `day` in the same calendar — «yesterday» of a Yerevan day. */
+export function shiftDay(day: string, by: number): string {
+  const moved = utcDay(day)
+  moved.setUTCDate(moved.getUTCDate() + by)
+  return moved.toISOString().slice(0, 10)
+}
+
+function utcDay(day: string): Date {
+  const [year = 0, month = 1, date = 1] = day.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, date))
+}

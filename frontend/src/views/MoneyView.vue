@@ -45,7 +45,7 @@
           :title="t('spending.offline.title')"
           :body="t('spending.offline.body')"
         >
-          <template #action>
+          <template v-if="canWrite" #action>
             <AppButton size="large" block @click="compose">
               {{ t('spending.empty.action') }}
             </AppButton>
@@ -113,6 +113,14 @@
           </AppCard>
 
           <CategoryBars v-if="month.byCategory.length > 0" :month="month" :name-of="nameOf" />
+          <!-- The way to one's categories is there before anything is spent (review Т-7). -->
+          <AppCard v-else list>
+            <RouterLink class="categories-link" :to="{ name: 'money-categories' }">
+              <IconShape class="link-icon" aria-hidden="true" />
+              <span class="link-label">{{ t('spending.categories_link') }}</span>
+              <IconChevron class="link-chevron" aria-hidden="true" />
+            </RouterLink>
+          </AppCard>
 
           <h2 class="group-caption">{{ t('spending.days_title') }}</h2>
           <p v-if="journal.length === 0" class="footnote">{{ t('spending.month_empty') }}</p>
@@ -150,7 +158,10 @@
       </template>
     </div>
 
-    <div v-if="phase === 'ready' && !newcomer" class="float">
+    <!-- «Вернуть» stands whatever the screen became under it — the only spending removed makes a
+         newcomer of the person (adversarial Г); «Трата» stands wherever there is something to
+         write it into, a slow answer and a broken server included (review Т-6). -->
+    <div v-if="removed || showsAdd" class="float">
       <UndoStrip
         v-if="removed"
         :key="removed.stamp"
@@ -160,7 +171,7 @@
         @restore="restore"
         @expire="removed = null"
       />
-      <AppButton v-else ref="addButton" size="large" class="add" @click="compose">
+      <AppButton v-else-if="showsAdd" ref="addButton" size="large" class="add" @click="compose">
         <template #icon><IconPlus /></template>
         {{ t('spending.add') }}
       </AppButton>
@@ -195,6 +206,7 @@ import { useRoute, useRouter } from 'vue-router'
 import IconChevron from '~icons/mdi/chevron-right'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconPlus from '~icons/mdi/plus'
+import IconShape from '~icons/mdi/shape-outline'
 import IconWallet from '~icons/mdi/wallet-outline'
 import {
   formatEstimate,
@@ -204,7 +216,6 @@ import {
   percentChange,
   previousMonth,
   yerevanDate,
-  yerevanMidnight,
 } from '@molvia/model'
 import type { Money, MoneyMonthView, SpendingCategoryView, WireCode } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
@@ -222,7 +233,8 @@ import { categoriesWith, journalOf, rateWords, unsentIn } from '@/components/spe
 import type { JournalRow, Removed, SpendingTarget } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useMoneyMonth } from '@/composables/useMoneyMonth'
-import { timeOfDay, purchaseDay } from '@/days'
+import { useReconnect } from '@/composables/useReconnect'
+import { calendarDay, purchaseDay, shiftDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { spendingOf, useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -244,6 +256,7 @@ export default defineComponent({
     IconChevron,
     IconCloudOff,
     IconPlus,
+    IconShape,
     MonthSwitcher,
     NewCategorySheet,
     ScreenSkeleton,
@@ -261,7 +274,16 @@ export default defineComponent({
     const queue = useSpendingQueueStore()
     const announce = useAnnouncer()
 
+    /**
+     * This month in Yerevan, looked at again whenever the app comes back into view: an installed
+     * app frozen over the last night of a month came back to the same page, and the new month was
+     * «the future» — neither the address nor the arrow reached it (adversarial З, review Т-10).
+     */
     const currentMonth = ref(monthOfDay(yerevanDate(new Date())))
+    function lookAtToday(): void {
+      currentMonth.value = monthOfDay(yerevanDate(new Date()))
+    }
+    useReconnect(lookAtToday)
     const selected = computed(() => {
       const asked = route.query.month
       return typeof asked === 'string' &&
@@ -270,7 +292,8 @@ export default defineComponent({
         ? asked
         : currentMonth.value
     })
-    const { phase, month, stale, fetchedAt, more, loadMore, retry } = useMoneyMonth(selected)
+    const { phase, month, stale, fetchedAt, more, loadMore, retry, knownCategories } =
+      useMoneyMonth(selected)
 
     function goMonth(next: string): void {
       void router.replace({
@@ -290,7 +313,12 @@ export default defineComponent({
       window.removeEventListener('offline', offLine)
     })
 
-    const categories = computed(() => categoriesWith(month.value?.categories ?? [], queue.pending))
+    // Any month the phone keeps names the categories — they are the owner's, not the month's — so
+    // a spending can be written before this month's answer, or offline on the first of the month
+    // (review Т-5).
+    const categories = computed(() => categoriesWith(knownCategories.value, queue.pending))
+    /** Whether a spending can be written here at all: a category is required, and known. */
+    const canWrite = computed(() => categories.value.some((category) => !category.archived))
     const journal = computed(() =>
       month.value ? journalOf(month.value, queue.pending, queue.rejected) : [],
     )
@@ -321,6 +349,13 @@ export default defineComponent({
         queue.rejected.length === 0
       )
     })
+
+    const showsAdd = computed(
+      () =>
+        canWrite.value &&
+        !newcomer.value &&
+        (phase.value === 'ready' || phase.value === 'loading' || phase.value === 'error'),
+    )
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
     const signed = (value: Money) =>
@@ -359,10 +394,7 @@ export default defineComponent({
       if (!value?.rate) return t('spending.rate_none')
       const rate = rateWords(value.rate, locale.value, t)
       if (value.rateKind === 'frozen') {
-        const date = new Intl.DateTimeFormat(locale.value, {
-          day: 'numeric',
-          month: 'long',
-        }).format(yerevanMidnight(lastDayOf(value.month)))
+        const date = calendarDay(lastDayOf(value.month), locale.value)
         return t('spending.rate_frozen', { date, rate })
       }
       return value.rate.source === 'personal'
@@ -385,28 +417,24 @@ export default defineComponent({
       return category ? nameOf(category) : t('spending.category.other')
     }
 
+    /** Days of Yerevan's calendar, printed as such whatever the zone of the phone (review Т-1). */
     function dayTitle(day: string): string {
       const today = yerevanDate(new Date())
-      const date = new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'long' }).format(
-        yerevanMidnight(day),
-      )
+      const date = calendarDay(day, locale.value)
       if (day === today) return t('spending.day_today', { date })
-      const yesterday = yerevanDate(new Date(yerevanMidnight(today).getTime() - 43_200_000))
-      if (day === yesterday) return t('spending.day_yesterday', { date })
-      const text = new Intl.DateTimeFormat(locale.value, {
+      if (day === shiftDay(today, -1)) return t('spending.day_yesterday', { date })
+      const text = calendarDay(day, locale.value, {
         weekday: 'short',
         day: 'numeric',
         month: 'long',
-      }).format(yerevanMidnight(day))
+      })
       return text.charAt(0).toLocaleUpperCase(locale.value) + text.slice(1)
     }
 
     function rangeOf(value: MoneyMonthView): string {
       const { remainingFrom: from, remainingTo: to } = value
       if (!from || !to) return ''
-      const last = new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'long' }).format(
-        yerevanMidnight(to),
-      )
+      const last = calendarDay(to, locale.value)
       if (from === to) return last
       return `${String(Number(from.slice(8)))}–${last}`
     }
@@ -445,6 +473,7 @@ export default defineComponent({
     const target = ref<SpendingTarget>({ kind: 'add' })
 
     function compose(): void {
+      lookAtToday()
       made.value = null
       target.value = { kind: 'add' }
       sheetOpen.value = true
@@ -457,6 +486,7 @@ export default defineComponent({
     }
 
     function saved(spentOn: string): void {
+      lookAtToday()
       if (!online.value) announce?.(t('spending.saved_offline'))
       const into = monthOfDay(spentOn)
       if (into !== selected.value) goMonth(into)
@@ -505,6 +535,8 @@ export default defineComponent({
       spendCurrency,
       liveRate,
       newcomer,
+      canWrite,
+      showsAdd,
       whole,
       signed,
       list,
@@ -739,6 +771,36 @@ export default defineComponent({
 
 .add {
   box-shadow: var(--shadow-md);
+}
+
+.categories-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target-lg);
+  padding: 0 var(--space-4);
+  color: var(--text);
+  text-decoration: none;
+
+  &:focus-visible {
+    @include focus-ring(-2px);
+  }
+}
+
+.link-icon {
+  width: 1.375rem;
+  height: 1.375rem;
+  color: var(--text-muted);
+}
+
+.link-label {
+  flex: 1;
+}
+
+.link-chevron {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--text-muted);
 }
 
 .float > .undo {

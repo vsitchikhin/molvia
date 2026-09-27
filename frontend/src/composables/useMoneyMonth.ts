@@ -21,6 +21,8 @@ export interface MoneyMonth {
   readonly month: ComputedRef<MoneyMonthView | null>
   readonly stale: ComputedRef<MoneyStale | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  /** The owner's categories: this month's answer's, or those of the newest month kept. */
+  readonly knownCategories: ComputedRef<MoneyMonthView['categories']>
   /** The next page is being read, or could not be. */
   readonly more: ComputedRef<'idle' | 'loading' | 'failed'>
   readonly loadMore: () => Promise<void>
@@ -60,6 +62,15 @@ function recall(owner: string, month: string): Remembered | null {
   return { answer: answer.data, fetchedAt }
 }
 
+/** The categories of the newest month kept for the owner — any month names all of them. */
+function recallCategories(owner: string): MoneyMonthView['categories'] {
+  const newest = Object.keys(recallAll(owner))
+    .map((month) => recall(owner, month))
+    .filter((one): one is Remembered => one !== null)
+    .sort((a, b) => b.fetchedAt.getTime() - a.fetchedAt.getTime())[0]
+  return newest?.answer.categories ?? []
+}
+
 function remember(owner: string, answer: MoneyMonthView, fetchedAt: Date): void {
   const all = recallAll(owner)
   all[answer.month] = {
@@ -95,9 +106,13 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
   /** How many pages the person had open, to read that many again after a write lands. */
   let pages = 1
 
+  /** The categories of any month the phone keeps: they are the owner's, not a month's. */
+  const kept = ref<MoneyMonthView['categories']>([])
+
   function adopt(): void {
     const id = actor.id
     shown.value = id ? recall(id, selected.value) : null
+    kept.value = id ? recallCategories(id) : []
     failure.value = null
     confirmed.value = false
     more.value = 'idle'
@@ -106,6 +121,8 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
 
   let latest = 0
   let running: Promise<void> | null = null
+  /** A next page was asked for while a read from the start was running: asked again after it. */
+  let moreAfterRead = false
   let asks = 0
 
   async function ask(id: string, month: string): Promise<void> {
@@ -123,9 +140,14 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       }
       if (actor.id !== id || selected.value !== month || mine !== latest) return
       shown.value = { answer, fetchedAt: firstAt }
+      kept.value = answer.categories
       failure.value = null
       confirmed.value = true
       more.value = 'idle'
+      if (moreAfterRead) {
+        moreAfterRead = false
+        void loadMore()
+      }
     } catch {
       if (actor.id !== id || selected.value !== month || mine !== latest) return
       // Decided after the failure, never before the request (MOL-19, A1).
@@ -160,12 +182,21 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     more.value = 'loading'
     try {
       const next = await api.moneyMonth(month, current.answer.cursor)
-      if (actor.id !== id || selected.value !== month || mine !== latest) return
+      if (actor.id !== id || selected.value !== month) return
+      // A read from the start began or landed while this page was on its way: the page continues
+      // an answer no longer on screen, and laid over the fresh one it took away the spending just
+      // written (adversarial Е). It is asked for again from the answer shown once the read is in.
+      if (mine !== latest || shown.value !== current) {
+        more.value = 'idle'
+        if (running) moreAfterRead = true
+        else void loadMore()
+        return
+      }
       shown.value = { answer: mergePages(current.answer, next), fetchedAt: current.fetchedAt }
       pages += 1
       more.value = 'idle'
     } catch {
-      if (mine === latest) more.value = 'failed'
+      if (mine === latest && shown.value === current) more.value = 'failed'
     }
   }
 
@@ -196,6 +227,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       return failure.value ?? 'loading'
     }),
     fetchedAt: computed(() => shown.value?.fetchedAt ?? null),
+    knownCategories: computed(() => shown.value?.answer.categories ?? kept.value),
     more: computed(() => more.value),
     loadMore,
     retry: load,

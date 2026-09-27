@@ -206,13 +206,27 @@ describe('MoneyView: the four states', () => {
     expect(view.text()).toContain(en.spending.spent)
   })
 
-  it('offline with nothing kept is never red, has no «Try again», and still takes a spending', async () => {
+  it('offline with nothing kept is never red, has no «Try again», and offers nothing to write into', async () => {
     online(false)
     moneyMonth.mockRejectedValue(new TypeError('network'))
     const view = await render()
     expect(view.text()).toContain(en.spending.offline.body)
     expect(view.text()).not.toContain(en.state.retry)
-    expect(button(view, en.spending.empty.action).exists()).toBe(true)
+    // No category is known on this phone, and a spending needs one (review Т-5).
+    expect(view.text()).not.toContain(en.spending.empty.action)
+  })
+
+  it('offline on a month never read, another month kept: its categories take a spending', async () => {
+    moneyMonth.mockResolvedValueOnce(month({ month: '2026-08', rateKind: 'frozen' }))
+    const first = await render('/money?month=2026-08')
+    first.unmount()
+    online(false)
+    moneyMonth.mockRejectedValue(new TypeError('network'))
+    const view = await render()
+    expect(view.text()).toContain(en.spending.offline.body)
+    await button(view, en.spending.empty.action).trigger('click')
+    await risen()
+    expect(document.querySelector('dialog[open]')?.textContent).toContain('Beauty and hygiene')
   })
 
   it('offline with a month kept shows it under a yellow strip', async () => {
@@ -391,5 +405,132 @@ describe('MoneyView: the sheet', () => {
     expect(amendSpending.mock.calls[0]?.[0]).toBe(BARBER)
     expect(amendSpending.mock.calls[0]?.[1]).toMatchObject({ revision: 1, amount: amd('6000') })
     expect(useSpendingQueueStore().rejected).toEqual([])
+  })
+})
+
+describe('MoneyView: what the review found (MOL-82)', () => {
+  it('Г: the only spending removed makes a newcomer — and «Undo» stays and brings it back', async () => {
+    moneyMonth.mockResolvedValueOnce(month({ previousSpent: null, income: rub('0') }))
+    moneyMonth.mockResolvedValue(empty())
+    const view = await render()
+    await view.find('.body').trigger('click')
+    await risen()
+    await pressUntil(en.spending.sheet.remove, () => {
+      expect(removeSpending).toHaveBeenCalledWith(BARBER)
+    })
+    await vi.waitFor(() => {
+      expect(view.text()).toContain(en.spending.empty.title)
+    })
+    expect(view.find('.undo').exists()).toBe(true)
+    moneyMonth.mockResolvedValue(month({ previousSpent: null, income: rub('0') }))
+    await button(view, en.spending.restore).trigger('click')
+    await vi.waitFor(() => {
+      expect(restoreSpending).toHaveBeenCalledWith(BARBER)
+    })
+  })
+
+  it('Д: a cleared day is named, nothing is queued, and nothing falls over', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    await button(view, en.spending.add).trigger('click')
+    await risen()
+    const dialog = document.querySelector('dialog[open]')
+    const amount = dialog?.querySelector<HTMLInputElement>('input[inputmode=decimal]')
+    if (!amount) throw new Error('no amount')
+    amount.value = '500'
+    amount.dispatchEvent(new Event('input'))
+    dialog?.querySelector<HTMLInputElement>(`input[value="${BEAUTY}"]`)?.click()
+    for (const day of ['', '1999-12-31']) {
+      const date = dialog?.querySelector<HTMLInputElement>('input[type=date]')
+      if (!date) throw new Error('no date')
+      date.value = day
+      date.dispatchEvent(new Event('input'))
+      await flushPromises()
+      await pressUntil(en.spending.sheet.save, () => {
+        expect(dialog?.textContent).toContain(en.spending.sheet.bad_day)
+      })
+    }
+    expect(useSpendingQueueStore().pending).toEqual([])
+    expect(recordSpending).not.toHaveBeenCalled()
+  })
+
+  it('Ж: a category the server does not know stands on no chip, and is not sent again', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    const unknown = 'ffffffff-0000-4000-8000-00000000000f'
+    localStorage.setItem(
+      `molvia.spending-rejected.${ACTOR}`,
+      JSON.stringify([
+        {
+          key: 'k',
+          code: 'error.spending_category_unknown',
+          write: {
+            kind: 'record',
+            body: {
+              id: 'eeeeeeee-0000-4000-8000-000000000005',
+              spentOn: '2026-09-26',
+              amount: { amount: '1500.00', currency: 'AMD' },
+              categoryId: unknown,
+              note: 'Taxi',
+            },
+          },
+        },
+      ]),
+    )
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.spending-rejected.${ACTOR}` }))
+    await flushPromises()
+    await view.findAll('.body').at(0)?.trigger('click')
+    await risen()
+    await pressUntil(en.spending.sheet.save, () => {
+      expect(document.querySelector('dialog[open]')?.textContent).toContain(
+        en.spending.sheet.bad_category,
+      )
+    })
+    expect(recordSpending).not.toHaveBeenCalled()
+  })
+
+  it('Т-4: amending a spending still on the phone keeps one write, and the row shows it', async () => {
+    moneyMonth.mockResolvedValue(month())
+    recordSpending.mockReturnValue(new Promise(() => undefined))
+    online(false)
+    const view = await render()
+    const queue = useSpendingQueueStore()
+    queue.record({
+      id: 'eeeeeeee-0000-4000-8000-000000000006',
+      spentOn: '2026-09-27',
+      amount: amd('5000'),
+      categoryId: BEAUTY,
+      note: 'Taxi',
+    })
+    await flushPromises()
+    await view.findAll('.body').at(0)?.trigger('click')
+    await risen()
+    const amount = document.querySelector<HTMLInputElement>('dialog[open] input[inputmode=decimal]')
+    if (!amount) throw new Error('no amount')
+    amount.value = '500'
+    amount.dispatchEvent(new Event('input'))
+    await pressUntil(en.spending.sheet.save, () => {
+      expect(document.querySelector('dialog[open]')).toBeNull()
+    })
+    const waiting = queue.pending.filter((write) => write.kind === 'record')
+    expect(waiting).toHaveLength(1)
+    expect(plain(view.findAll('.body').at(0)?.text() ?? '')).toContain('֏500')
+  })
+
+  it('З: back in view after midnight at the end of the month, the new month is not «the future»', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    vi.setSystemTime(new Date('2026-09-30T20:10:00Z'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    await view.find(`button[aria-label="${en.spending.month_next}"]`).trigger('click')
+    await flushPromises()
+    expect(moneyMonth).toHaveBeenLastCalledWith('2026-10', undefined)
+  })
+
+  it('Т-7: the way to one’s categories is there before anything is spent', async () => {
+    moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('100') })
+    const view = await render()
+    expect(view.find('a.categories-link').attributes('href')).toBe('/money/categories')
   })
 })
