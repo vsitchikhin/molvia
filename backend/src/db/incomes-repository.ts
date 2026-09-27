@@ -121,7 +121,12 @@ export function createIncomeRepository(db: Conn): IncomeRepository {
         if (same?.actorId !== actorId) throw new DomainError(ERROR.CONFLICT)
         const held = theRow(same, 'incomes')
         // A removed income still holds its name until it is final; «Вернуть» brings it back.
-        if (held.deletedAt !== null || !says(held, input)) throw new DomainError(ERROR.CONFLICT)
+        // An account left out says nothing: the same income from a screen older than accounts is
+        // still a repeat after one was named on it (Р-26).
+        const asSent =
+          saysFact(held, input) &&
+          (input.accountId === undefined || held.accountId === input.accountId)
+        if (held.deletedAt !== null || !asSent) throw new DomainError(ERROR.CONFLICT)
         return { income: toIncome(held), created: false }
       })
     },

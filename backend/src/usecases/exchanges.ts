@@ -34,11 +34,12 @@ import type {
   Receipt,
   ReceiptView,
 } from '@molvia/model'
+import { checkedSide, keptSide, knownAccounts } from './account-of'
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
 /** A write also lets go of the months frozen without it (MOL-73, В-6). */
-type Writing = Repositories & Pick<TripRepositories, 'money'>
+type Writing = Repositories & Pick<TripRepositories, 'money' | 'moneyAccounts'>
 type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
 
 const FOREIGN = currencySchema.options.filter(
@@ -343,6 +344,9 @@ export async function recordExchange(
   now: Date = new Date(),
 ): Promise<{ overview: ExchangesResponse; created: boolean }> {
   if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
+  const accounts = await knownAccounts(repositories, owner)
+  checkedSide(accounts, body.givenAccountId ?? null, body.given.currency)
+  checkedSide(accounts, body.receivedAccountId ?? null, body.received.currency)
   await repositories.exchanges.purgeRemoved(owner.id)
   const { created } = await repositories.exchanges.add(owner.id, body)
   await repositories.money.thaw(owner.id, body.exchangedOn)
@@ -363,9 +367,32 @@ export async function amendExchange(
 ): Promise<ExchangesResponse> {
   if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
   await repositories.exchanges.purgeRemoved(owner.id)
-  const before = await dayOfExchange(repositories, owner, id)
-  await repositories.exchanges.amend(owner.id, id, body)
-  await repositories.money.thaw(owner.id, earlier(before, body.exchangedOn))
+  const own = resourceIdOf(id)
+  const held = (await repositories.exchanges.list(owner.id)).find((exchange) => exchange.id === own)
+  const accounts = await knownAccounts(repositories, owner)
+  const givenAccountId = keptSide(
+    accounts,
+    held?.givenAccountId ?? null,
+    body.givenAccountId,
+    body.given.currency,
+  )
+  const receivedAccountId = keptSide(
+    accounts,
+    held?.receivedAccountId ?? null,
+    body.receivedAccountId,
+    body.received.currency,
+  )
+  checkedSide(accounts, givenAccountId, body.given.currency)
+  checkedSide(accounts, receivedAccountId, body.received.currency)
+  const { accountsOnly } = await repositories.exchanges.amend(owner.id, id, {
+    ...body,
+    givenAccountId,
+    receivedAccountId,
+  })
+  // Only the accounts moved: the rate is the same fact, and so is every month (Р-15).
+  if (!accountsOnly) {
+    await repositories.money.thaw(owner.id, earlier(held?.exchangedOn ?? null, body.exchangedOn))
+  }
   return exchangesOverview(repositories, owner, now)
 }
 

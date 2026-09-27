@@ -134,6 +134,18 @@ function saysFact(row: Row, input: Omit<ExchangeBody, 'id'>): boolean {
   )
 }
 
+/**
+ * A repeat of «Записать обмен» as sent: an account left out says nothing, so the same exchange sent
+ * again by a screen older than accounts is still a repeat after one was named on it (Р-26).
+ */
+function saysAsSent(row: Row, input: Omit<ExchangeBody, 'id'>): boolean {
+  return (
+    saysFact(row, input) &&
+    (input.givenAccountId === undefined || row.givenAccountId === input.givenAccountId) &&
+    (input.receivedAccountId === undefined || row.receivedAccountId === input.receivedAccountId)
+  )
+}
+
 function says(row: Row, input: Omit<ExchangeBody, 'id'>): boolean {
   const accounts = accountColumnsOf(input)
   return (
@@ -184,7 +196,7 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
         const held = theRow(same, 'exchanges')
         // A removed exchange still holds its name until it is final; «Вернуть» brings it back.
         if (held.deletedAt !== null) throw new DomainError(ERROR.CONFLICT)
-        if (!says(held, input)) throw new DomainError(ERROR.CONFLICT)
+        if (!saysAsSent(held, input)) throw new DomainError(ERROR.CONFLICT)
         return { exchange: toExchange(held), created: false }
       })
     },

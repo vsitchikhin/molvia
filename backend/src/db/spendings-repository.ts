@@ -52,8 +52,15 @@ function columnsOf(input: Omit<SpendingBody, 'id'>) {
     categoryId: input.categoryId,
     note: input.note ?? null,
     place: input.place ?? null,
-    // Where it was paid from (MOL-115): left out is «без счёта» here — keeping the account an older
-    // screen did not send is the use case's (Р-26).
+  }
+}
+
+/**
+ * Where it was paid from (MOL-115): left out is «без счёта» here — keeping the account an older
+ * screen did not send is the use case's (Р-26). Not the fact: changing only it is no amendment.
+ */
+function paymentColumnsOf(input: Omit<SpendingBody, 'id'>) {
+  return {
     accountId: input.accountId ?? null,
     debitedMinor: input.debited?.minor ?? null,
     debitedCurrency: input.debited?.currency ?? null,
@@ -70,10 +77,22 @@ function rateColumnsOf(rate: ExchangeRate | null) {
   }
 }
 
-function says(row: Row, input: Omit<SpendingBody, 'id'>): boolean {
+function saysFact(row: Row, input: Omit<SpendingBody, 'id'>): boolean {
   const columns = columnsOf(input)
   return (Object.keys(columns) as (keyof typeof columns)[]).every(
     (column) => row[column] === columns[column],
+  )
+}
+
+/** As sent: an account or «списано» left out says nothing, so an older screen's repeat is one. */
+function says(row: Row, input: Omit<SpendingBody, 'id'>): boolean {
+  const payment = paymentColumnsOf(input)
+  return (
+    saysFact(row, input) &&
+    (input.accountId === undefined || row.accountId === payment.accountId) &&
+    (input.debited === undefined ||
+      (row.debitedMinor === payment.debitedMinor &&
+        row.debitedCurrency === payment.debitedCurrency))
   )
 }
 
@@ -133,7 +152,13 @@ export function createSpendingRepository(db: Conn): SpendingRepository {
           )
         const [inserted] = await db
           .insert(spendings)
-          .values({ id: input.id, actorId, ...columnsOf(input), ...rateColumnsOf(rate) })
+          .values({
+            id: input.id,
+            actorId,
+            ...columnsOf(input),
+            ...paymentColumnsOf(input),
+            ...rateColumnsOf(rate),
+          })
           .onConflictDoNothing({ target: spendings.id })
           .returning()
         if (inserted) return { spending: toSpending(inserted), created: true }
@@ -166,13 +191,16 @@ export function createSpendingRepository(db: Conn): SpendingRepository {
           if (!row) throw new DomainError(ERROR.NOT_FOUND)
           if (says(row, input)) return { spending: toSpending(row), amended: false }
           if (row.revision !== input.revision) throw new DomainError(ERROR.CONFLICT)
+          // Only the account moved: where it was paid from, not a correction — no «исправлен» (Р-15).
+          const fact = saysFact(row, input)
           const [amended] = await tx
             .update(spendings)
             .set({
               ...columnsOf(input),
+              ...paymentColumnsOf(input),
               ...rateColumnsOf(rate),
               revision: row.revision + 1,
-              amendedAt: sql`now()`,
+              ...(fact ? {} : { amendedAt: sql`now()` }),
             })
             .where(eq(spendings.id, row.id))
             .returning()

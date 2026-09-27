@@ -201,6 +201,9 @@ function repositoriesOf(world: World) {
           (world.spendings ?? []).filter((row) => row.spentOn >= from && row.spentOn <= to),
         ),
     }),
+    moneyAccounts: fake<TripRepositories['moneyAccounts']>('moneyAccounts', {
+      known: () => Promise.resolve([]),
+    }),
     money: fake<TripRepositories['money']>('money', {
       tripLines: () => Promise.resolve([]),
       frozenRate: () => Promise.resolve(world.frozen ?? frozen[0] ?? null),
