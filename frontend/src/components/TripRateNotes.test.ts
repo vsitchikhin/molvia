@@ -344,6 +344,12 @@ describe('TripRateNotes', () => {
         await flushPromises()
       }
 
+      it('день прежнего курса — днём Еревана, не моментом его полуночи (адв. Ж″)', async () => {
+        const { note } = await open({ quote: 'AMD', jumped: '0.43', previous: '4.30' })
+        // asOf фикстуры — 15 января, 12:00 UTC: 15 янв. и в Ереване.
+        expect(note).toContain('от 15 янв.')
+      })
+
       it('пара владельца, 4,30 → 0,43: всё «֏/₽», поле «1 ₽ =», «4,30» уходит без валюты', async () => {
         chooseTripRate.mockResolvedValue(
           jumpedTrip({ quote: 'AMD', jumped: '0.43', previous: '4.30' }),
