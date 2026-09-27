@@ -80,6 +80,20 @@ const NARROWER: readonly (readonly [readonly string[], readonly string[]])[] = [
     ['лимонад', 'газированная', 'газированный'],
   ],
   [['памперсы', 'памперс', 'памперсов'], ['подгузники']],
+  // Brands the owner's own log names a kind by (MOL-112, owner's decision В-6). The brand's own
+  // item keeps its place above the kind when it is spelled as the word is typed — both are found
+  // at no cost, and the similarity ranks before the length of the name; spelled otherwise
+  // («Doshirak», «Pringles») it stands under the kind until it is taken once. «шоколадная», not «паста»: the paste of
+  // «Паста зубная» and «Паста томатная» is a kind too. «читос» has no word of its own to lead to —
+  // «кукурузные» is the corn flakes as much as the sticks — and is left to the person's own word.
+  [['фанта', 'фанты', 'фанту'], ['лимонад']],
+  [
+    ['дошик', 'дошика', 'дошики', 'дошиков', 'доширак', 'доширака', 'дошираки', 'дошираков'],
+    ['лапша'],
+  ],
+  [['несквик', 'несквика', 'несквику'], ['какао']],
+  [['нутелла', 'нутеллы', 'нутеллу'], ['шоколадная']],
+  [['принглс', 'принглса', 'принглсы'], ['чипсы']],
   [
     ['зелень', 'зелени'],
     ['петрушка', 'укроп', 'кинза', 'киндза', 'базилик', 'тархун'],

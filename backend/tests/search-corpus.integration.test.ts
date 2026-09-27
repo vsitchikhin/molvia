@@ -301,7 +301,7 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     ],
     чипсы: ["Чипсы Lay's сметана и лук 150 г"],
     чип: ["Чипсы Lay's сметана и лук 150 г"],
-    принглс: ['Pringles Original 165 г'],
+    принглс: ["Чипсы Lay's сметана и лук 150 г", 'Pringles Original 165 г'],
     прин: ['Pringles Original 165 г'],
     читос: ['Cheetos кукурузные палочки 55 г'],
     котлеты: ['Котлеты куриные замороженные'],
@@ -348,7 +348,7 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     булки: ['Булочки с кунжутом 4 шт'],
     пирожные: ['Пирожное Наполеон'],
     вода: [['Вода Бжни 1,5 л', 'Вода Джермук 0,5 л']],
-    дошик: ['Doshirak лапша курица 90 г'],
+    дошик: ['Лапша удон 300 г', 'Doshirak лапша курица 90 г'],
     лапша: [['Лапша удон 300 г', 'Doshirak лапша курица 90 г']],
     паштет: ['Паштет печёночный Hame 105 г'],
     творог: ['Творог Ашхар 9% 400 г'],
@@ -414,7 +414,10 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
    * the colas with the sausages, «кур» and «курица» the chicken with «Котлеты куриные» and
    * «Doshirak лапша курица», «туалетка» the paper with the litter's «туалета» — and the row id,
    * a random uuid, decided which one the person saw. The shorter name decides it now (MOL-112,
-   * В-5), and in each of the six the shortest is what the query meant: 73 of 73 first, alone.
+   * В-5), and in each of the six the shortest is what the query meant. Two go back the other way
+   * (owner's decision MOL-112, В-6): «дошик» and «принглс» lead to the kind through the dictionary
+   * at no cost, and the brand the shelf spells otherwise — `doshirak`, `pringles` — is an edit or
+   * two away, so the noodles and the chips stand above it until it is taken once. 71 of 73.
    * What the person sees first is the shortest of the head group; names of one key length are
    * still the uuid's, and then the whole of them has to be meant.
    */
@@ -430,10 +433,13 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     return head.every((name) => meant.includes(name)) ? 'alone' : 'tied'
   }
 
-  it('puts what the query meant first alone', () => {
+  const BRAND_UNDER_KIND = new Set(['дошик', 'принглс'])
+
+  it('puts what the query meant first alone — apart from the two brands under their kind', () => {
     // The pinned answers replace nothing in the shared list, so they must still agree with it.
     for (const [query, meant] of SHELF_QUERIES) {
-      expect(meantFirst(ANSWERS[query], meant), query).toBe('alone')
+      const expected = BRAND_UNDER_KIND.has(query) ? 'not-first' : 'alone'
+      expect(meantFirst(ANSWERS[query], meant), query).toBe(expected)
     }
   })
 

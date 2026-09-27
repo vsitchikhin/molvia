@@ -48,6 +48,14 @@ describe('synonymKeys', () => {
     expect(synonymKeys(key('подгузники'))).not.toContain(key('памперсы'))
   })
 
+  it('leads a brand the owner names a kind by to the kind, never the other way (MOL-112)', () => {
+    expect(synonymKeys(key('фанта'))).toEqual([key('лимонад')])
+    expect(synonymKeys(key('доширак'))).toEqual([key('лапша')])
+    expect(synonymKeys(key('нутеллу'))).toEqual([key('шоколадная')])
+    expect(synonymKeys(key('лимонад'))).toEqual([])
+    expect(synonymKeys(key('чипсы'))).toEqual([])
+  })
+
   it('takes the key, so a word typed in Latin expands as the Cyrillic one does', () => {
     expect(synonymKeys(key('kartoshka'))).toEqual(synonymKeys(key('картошка')))
   })

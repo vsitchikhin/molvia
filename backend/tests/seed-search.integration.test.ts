@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { newItemSchema } from '@molvia/model'
+import { eq } from 'drizzle-orm'
+import { newItemSchema, toSearchKey } from '@molvia/model'
 import { connectDrizzle } from './db'
-import { clearAll } from './fixtures'
+import { clearAll, insertItem } from './fixtures'
 import { CATALOGUE_SEED } from '@/catalogue-seed'
 import { createItemRepository } from '@/db/items-repository'
+import { items } from '@/db/schema'
 import { createSeedRepository } from '@/db/seed-repository'
 
 /**
@@ -43,6 +45,8 @@ describe("the owner's words, against the seed", () => {
     ['молоко', 'Молоко', true],
     ['салфетки', 'Салфетки', true],
     ['колбаса', 'Колбаса', true],
+    // The length decides between the feeds: `sobak` is a letter shorter than `koshek`. A feed with
+    // a shorter name added to the list would take this row without a word (review С-6).
     ['корм', 'Корм для собак', true],
     ['сок', 'Сок', true],
     ['туалетная бумага', 'Бумага туалетная', true],
@@ -102,6 +106,27 @@ describe("the owner's words, against the seed", () => {
     ['творог', 'Творог', true],
     ['тесто для пиццы', 'Тесто для пиццы', true],
     ['хлопья', 'Хлопья', true],
+    // The herb, not the lemonade: `tarhun` is shorter than `limonad tarhun`, though in Armenia the
+    // word names the drink as often (review С-6). Pinned as it is.
+    ['тархун', 'Тархун', true],
+    // A size in the query: the common name first, not the variety whose fat or grade shares a
+    // digit or a letter with it (adversarial А, Б) — the length ranks before the similarity.
+    ['молоко 1 л', 'Молоко', true],
+    ['молоко 2 л', 'Молоко', true],
+    ['молоко 0,5 л', 'Молоко', true],
+    ['кефир 1 л', 'Кефир', true],
+    ['рис 1 кг', 'Рис', true],
+    ['сахар 1 кг', 'Сахар', true],
+    ['мука 2 кг', 'Мука', true],
+    ['малако', 'Молоко', false],
+    // Brands the owner names a kind by lead to the kind through the dictionary (MOL-112).
+    ['фанта', 'Лимонад', true],
+    ['дошик', 'Лапша', true],
+    ['несквик', 'Какао', true],
+    ['нутелла', 'Паста шоколадная', true],
+    ['принглс', 'Чипсы', true],
+    // Among the kinds a wide word leads to, the shortest name — the price of the length, named.
+    ['мясо', 'Фарш', true],
     // The right item first, and far: «собачий» is four edits from «собак». Another form than the
     // label's, the class MOL-46 draws as «Похоже по написанию».
     ['собачий корм', 'Корм для собак', false],
@@ -111,22 +136,29 @@ describe("the owner's words, against the seed", () => {
   })
 
   /**
-   * A brand is not seeded and not a synonym (MOL-112): expanded into its kind, it would tie with
-   * the brand's own item once someone proposes it, and the shorter generic name would stand above
-   * it on its own query (В-5). What reaches the kind is the person's own word (MOL-45): a miss,
-   * then a pick, is learnt. A brand over a kind is a miss as well, and the screen offers
-   * «Предложить товар» (owner's decision В-1).
+   * A brand over a kind is a miss, and the screen offers «Предложить товар» (owner's decision
+   * В-1); «читос» has no kind of its own in the dictionary and waits for the person's own word.
+   */
+  it.each(['читос', 'молоко марианна', 'кефир ашхар'])('«%s» is not near', async (query) => {
+    expect((await first(query))[1]).toBe(false)
+  })
+
+  /**
+   * The brand's own item, once proposed, stands above the kind its word leads to: both are found
+   * at no cost, and the similarity of what was typed ranks before the length of the name. The
+   * reason MOL-112 first gave for keeping brands out of the dictionary was this, stated wrongly
+   * (adversarial Д).
    */
   it.each([
-    'фанта',
-    'дошик',
-    'несквик',
-    'нутелла',
-    'принглс',
-    'читос',
-    'молоко марианна',
-    'кефир ашхар',
-  ])("«%s» is not near: the brand is the person's to propose", async (query) => {
-    expect((await first(query))[1]).toBe(false)
+    ['фанта', 'Фанта 0,5 л'],
+    ['дошик', 'Дошик курица'],
+    ['принглс', 'Принглс оригинал'],
+  ])('«%s» puts a proposed «%s» above the kind', async (query, name) => {
+    const id = await insertItem(db, { name, searchKey: toSearchKey(name), defaultUnit: 'piece' })
+    try {
+      expect((await first(query))[0]).toBe(name)
+    } finally {
+      await db.delete(items).where(eq(items.id, id))
+    }
   })
 })
