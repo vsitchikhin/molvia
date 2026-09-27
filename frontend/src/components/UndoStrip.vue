@@ -42,6 +42,11 @@ export default defineComponent({
     announcement: { type: String, required: true },
     action: { type: String, required: true },
     seconds: { type: Number, default: 10 },
+    /**
+     * Shown again — on the next screen, the same removal: the words were said and the focus given
+     * the first time, and taking them again moved the person's focus for a thing already known.
+     */
+    quiet: { type: Boolean, default: false },
   },
   emits: ['restore', 'expire'],
   setup(props, { emit }) {
@@ -88,6 +93,7 @@ export default defineComponent({
 
     onMounted(async () => {
       timer = setInterval(tick, 1000)
+      if (props.quiet) return
       unsay = announce?.(props.announcement)
       await nextTick()
       const element = button.value?.$el as HTMLElement | undefined

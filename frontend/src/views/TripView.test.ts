@@ -1040,4 +1040,74 @@ describe('TripView', () => {
       expect(view.text()).not.toContain('Поход удалён')
     })
   })
+  describe('удалить поход: замечания ревью (MOL-76)', () => {
+    const LAST = 'bbbbbbbb-0000-4000-8000-000000000061'
+    const single: TripHistory = {
+      trips: [
+        {
+          id: LAST,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'SAS' },
+          startedAt: new Date('2026-09-26T10:00:00Z'),
+          finishedAt: new Date('2026-09-26T10:30:00Z'),
+          finishedOnDeviceAt: null,
+        },
+      ],
+      nextCursor: null,
+    }
+
+    it('удалён единственный поход истории — главная встречает знакомством, а не скелетом (А5)', async () => {
+      tripHistory.mockResolvedValueOnce(single)
+      const { view, queue } = await render()
+      expect(view.findAll('.history-row')).toHaveLength(1)
+
+      tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
+      removeTrip.mockResolvedValue(undefined)
+      queue.removeTrip(LAST, 'SAS')
+      await flushPromises()
+
+      expect(tripHistory).toHaveBeenCalledTimes(2)
+      expect(view.find('.home .skeleton').exists()).toBe(false)
+      expect(view.text()).toContain(ru.trip.home.intro.title)
+    })
+
+    it('полоска считает десять секунд от удаления, а не от экрана (Р-1)', async () => {
+      const { view, queue } = await render()
+      queue.lastRemoved = {
+        tripId: LAST,
+        name: 'SAS',
+        writes: [],
+        refusals: [],
+        stamp: Date.now() - 4_000,
+      }
+      await flushPromises()
+      expect(view.get('.dock .count').text()).toBe('6')
+    })
+
+    it('истёкшая, пока её не было на экране, не показывается и забывается (Р-1)', async () => {
+      const { view, queue } = await render()
+      queue.lastRemoved = {
+        tripId: LAST,
+        name: 'SAS',
+        writes: [],
+        refusals: [],
+        stamp: Date.now() - 11_000,
+      }
+      await flushPromises()
+      expect(view.text()).not.toContain('Поход удалён')
+      expect(queue.lastRemoved).toBeNull()
+    })
+
+    it('единственная строка ждёт удаления — «Завершить» тоже зовёт поход пустым (Р-5)', async () => {
+      currentTrip.mockResolvedValue(trip(handoff().slice(0, 1)))
+      const { view, queue } = await render()
+      queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: ASHKHAR })
+      await flushPromises()
+
+      await button(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('dialog[open]')?.textContent).toContain(
+        ru.trip.remove.empty.title,
+      )
+    })
+  })
 })

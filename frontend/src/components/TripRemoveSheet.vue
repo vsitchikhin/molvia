@@ -26,7 +26,7 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
-import { purchaseDay } from '@/days'
+import { dayOfAnyYear } from '@/days'
 
 /**
  * «Удалить поход?» (MOL-76, Р-2): asked only of a trip with purchases, and it names what goes —
@@ -39,7 +39,10 @@ export default defineComponent({
   props: {
     open: { type: Boolean, required: true },
     place: { type: String, required: true },
-    /** The day the list calls the trip by: its start while open, its end once finished. */
+    /**
+     * The day the list calls the trip by: its start while open, its end once finished — with the
+     * year when it is not this one, as the history's row says it (review Р-2).
+     */
     day: { type: Date as PropType<Date | null>, default: null },
     items: { type: Number, required: true },
     onClosed: { type: Function as PropType<() => void>, default: undefined },
@@ -64,7 +67,7 @@ export default defineComponent({
     const meta = computed(() =>
       [
         props.place,
-        props.day ? purchaseDay(props.day, locale.value) : null,
+        props.day ? dayOfAnyYear(props.day, locale.value) : null,
         t('trip.items_count', { n: props.items }, props.items),
       ]
         .filter((part) => part !== null && part !== '')

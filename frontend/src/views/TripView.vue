@@ -451,22 +451,29 @@ export default defineComponent({
      * carried as the code itself, which is what a report needs.
      */
     const refusalReason = (item: RejectedWrite): string => {
-      if (item.write.kind === 'restore') {
-        return item.code === ERROR.TRIP_OPEN
-          ? t('trip.remove.not_restored_open')
-          : t('trip.remove.not_restored_gone')
-      }
       const key = item.code.startsWith('error.') ? item.code : null
-      const why = key ? t(key) : t('trip.rejected.unknown', { code: item.code })
+      const why =
+        item.write.kind === 'restore'
+          ? item.code === ERROR.TRIP_OPEN
+            ? t('trip.remove.not_restored_open')
+            : t('trip.remove.not_restored_gone')
+          : key
+            ? t(key)
+            : t('trip.rejected.unknown', { code: item.code })
       // A refused trip holds its purchases, and nothing else on screen says so: «N ещё не
       // отправлено» promises they will go, and they will not (раунд 5, З1).
       const waiting = heldBack(item)
       return waiting > 0 ? `${why} · ${t('trip.rejected.orphaned', { n: waiting }, waiting)}` : why
     }
 
-    /** Purchases that will never be written because this trip was not (раунд 5, З1). */
+    /**
+     * Purchases that will never be written because this trip was not (раунд 5, З1) — or did not
+     * come back, those made after «Вернуть» among them (MOL-76, adversarial А2).
+     */
     const heldBack = (item: RejectedWrite): number =>
-      item.write.kind === 'start' ? queue.heldBack(item.write.tripId) : 0
+      item.write.kind === 'start' || item.write.kind === 'restore'
+        ? queue.heldBack(item.write.tripId)
+        : 0
 
     /** Only a purchase can be corrected, and only one whose card the phone can still read. */
     const correctable = (item: RejectedWrite): boolean =>
@@ -554,13 +561,16 @@ export default defineComponent({
       finishing.value = false
     }
 
+    /**
+     * The rows still on screen: one being removed is on its way out already. One count for both
+     * questions, or «Завершить» and «Удалить поход» called one trip empty and not (review Р-5).
+     */
+    const kept = computed(() => rows.value.filter((row) => row.mark !== 'removing').length)
+
     function askFinish(): void {
-      finishingEmpty.value = rows.value.length === 0
+      finishingEmpty.value = kept.value === 0
       finishing.value = true
     }
-
-    /** The rows still on screen: one being removed is on its way out already. */
-    const kept = computed(() => rows.value.filter((row) => row.mark !== 'removing').length)
 
     /**
      * «Удалить поход»: an empty one goes at once, with «Вернуть» on the home screen; one with
