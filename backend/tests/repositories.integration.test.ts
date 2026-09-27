@@ -183,6 +183,22 @@ describe('справочник', () => {
   it('пустой список идентификаторов не идёт в базу', async () => {
     expect(await catalogue.byIds([])).toEqual([])
   })
+
+  it('позиция без автора заводится один раз, как у сида (MOL-112)', async () => {
+    const input = {
+      kind: 'product' as const,
+      name: 'Кефир 1%',
+      barcodes: [],
+      defaultUnit: 'l' as const,
+    }
+
+    const first = await catalogue.createUnlessNamed(input, null)
+    const again = await catalogue.createUnlessNamed({ ...input, name: 'кефир  1%' }, null)
+
+    expect(first.created).toBe(true)
+    expect(first.item.createdBy).toBeNull()
+    expect(again).toEqual({ item: first.item, created: false })
+  })
 })
 
 describe('места', () => {

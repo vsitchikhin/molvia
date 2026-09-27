@@ -33,8 +33,14 @@ export interface ItemRepository {
    * the search a candidate would cost this path the item itself — «Milo» would be answered
    * with the «Мыло» already there, and could never be added. Merging what is merely similar
    * is 0.2's.
+   *
+   * `createdBy` is null for the seed (MOL-112), which goes through here so that running it again
+   * doubles nothing and a name someone already proposed stays theirs.
    */
-  createUnlessNamed(input: NewItem, createdBy: string): Promise<{ item: Item; created: boolean }>
+  createUnlessNamed(
+    input: NewItem,
+    createdBy: string | null,
+  ): Promise<{ item: Item; created: boolean }>
   /**
    * The catalogue lookup behind «что взяли?». The catalogue is shared by everyone, so the
    * owner filters nothing: it only chooses whose remembered picks take part in the order.

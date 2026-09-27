@@ -38,7 +38,7 @@ function fakeItems(overrides: Partial<ItemRepository> = {}): ItemRepository {
 
 describe('proposeItem', () => {
   it('asks for the item in the name of the owner it was given, with no barcodes', async () => {
-    const asked: [NewItem, string][] = []
+    const asked: [NewItem, string | null][] = []
     const items = fakeItems({
       createUnlessNamed: (item, createdBy) => {
         asked.push([item, createdBy])
