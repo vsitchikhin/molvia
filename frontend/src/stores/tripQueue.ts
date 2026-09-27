@@ -126,6 +126,15 @@ interface Kept {
 
 const QUEUE_KEY = 'molvia.trip-queue'
 const REJECTED_KEY = 'molvia.trip-rejected'
+/**
+ * «Удалить поход» and «Вернуть» again, under keys of their own (MOL-76, adversarial round 4, Г1):
+ * a window still on the version before them reads the shared queue, drops a kind it does not know
+ * and writes the queue back without it — the removal never happened, and said so to nobody. The
+ * version that knows them puts back what the older one lost, in its place: before the write that
+ * followed it. The same rule as MOL-77's: a phone-side cache is read by both versions.
+ */
+const MARKS_KEY = 'molvia.trip-marks'
+const MARKS_REJECTED_KEY = 'molvia.trip-marks-rejected'
 
 /**
  * A removal of a row the server does not have is the outcome it was asked for, not a refusal
@@ -292,6 +301,47 @@ function stillWaiting(past: string, waiting: ReadonlySet<string>): string | null
   )
   if (left.length === entries.length) return past
   return left.length > 0 ? JSON.stringify(left) : null
+}
+
+/** A removal or a «Вернуть»: the kinds a window of the previous version cannot read. */
+function isMark(write: QueuedWrite): boolean {
+  return write.kind === 'delete' || write.kind === 'restore'
+}
+
+/**
+ * The marks as the mirror keeps them, each with the key of the write it stood before (`null` — the
+ * end), and put back into a queue that lost them. A mark whose write is gone has been passed by
+ * the queue, so it goes first: it should have gone before that write.
+ */
+function withMarks(queue: Kept[], key: string): Kept[] {
+  const marks = parsedList(key).flatMap((item: unknown) => {
+    if (!isRecord(item) || typeof item.key !== 'string') return []
+    const write = decode(item.write)
+    const before = typeof item.before === 'string' ? item.before : null
+    return write && isMark(write) ? [{ key: item.key, write, before }] : []
+  })
+  const lost = marks.filter((mark) => !queue.some((item) => item.key === mark.key))
+  if (lost.length === 0) return queue
+  const result = [...queue]
+  for (const mark of lost) {
+    const at = mark.before === null ? -1 : result.findIndex((item) => item.key === mark.before)
+    const kept = { key: mark.key, write: mark.write }
+    if (mark.before === null) result.push(kept)
+    else if (at === -1) result.unshift(kept)
+    else result.splice(at, 0, kept)
+  }
+  return result
+}
+
+/** The mirror of the marks: each with the key of the next write that is not one. */
+function marksOf(queue: readonly Kept[]): string {
+  return JSON.stringify(
+    queue.flatMap((item, index) => {
+      if (!isMark(item.write)) return []
+      const next = queue.slice(index + 1).find((later) => !isMark(later.write))
+      return [{ key: item.key, write: encode(item.write), before: next?.key ?? null }]
+    }),
+  )
 }
 
 /** A broken entry is dropped alone: the ones around it are somebody's purchases. */
@@ -502,9 +552,14 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   /** What storage holds now — another window may have changed it. */
   function sync(id: string | null): void {
     if (!id || ahead) return
-    kept = recallKept(`${QUEUE_KEY}.${id}`)
+    kept = withMarks(recallKept(`${QUEUE_KEY}.${id}`), `${MARKS_KEY}.${id}`)
     const refusals = recallRejected(`${REJECTED_KEY}.${id}`)
-    rejected.value = refusals.items
+    // A refused «Вернуть» holds its trip's writes back (`orphaned`); lost by an older window, it
+    // would let them go, each to earn a 404 about a trip the notice no longer names.
+    const markRefusals = recallRejected(`${MARKS_REJECTED_KEY}.${id}`).items.filter(
+      (item) => isMark(item.write) && !refusals.items.some((held) => held.key === item.key),
+    )
+    rejected.value = [...refusals.items, ...markRefusals]
     show()
     // Names given on the way in are written back at once, or the next read would invent others.
     if (refusals.named) persist(id)
@@ -534,6 +589,18 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         })),
       ),
       (past) => past,
+    )
+    // The mirrors go after the queue: a window reading in between sees a mark in the queue and not
+    // yet in the mirror, which is only a mark it already has.
+    writeEverywhere(`${MARKS_KEY}.${id}`, marksOf(kept), () => null)
+    writeEverywhere(
+      `${MARKS_REJECTED_KEY}.${id}`,
+      JSON.stringify(
+        rejected.value
+          .filter((item) => isMark(item.write))
+          .map((item) => ({ key: item.key, write: encode(item.write), code: item.code })),
+      ),
+      () => null,
     )
     ahead = !queued || !refused
   }
@@ -565,7 +632,12 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   // list, not vanish between the two (adversarial Б4).
   window.addEventListener('storage', (event) => {
     const id = actor.id
-    if (id && (event.key === `${QUEUE_KEY}.${id}` || event.key === `${REJECTED_KEY}.${id}`)) {
+    if (
+      id &&
+      [QUEUE_KEY, REJECTED_KEY, MARKS_KEY, MARKS_REJECTED_KEY].some(
+        (key) => event.key === `${key}.${id}`,
+      )
+    ) {
       sync(id)
       trips.reread()
     }

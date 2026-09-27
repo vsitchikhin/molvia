@@ -1968,4 +1968,76 @@ describe('trip queue', () => {
       expect(queue.pending).toEqual([])
     })
   })
+  describe('окно прежней версии теряет «Удалить» и «Вернуть» (MOL-76, раунд 4, Г1)', () => {
+    const NEXT = 'bbbbbbbb-0000-4000-8000-000000000055'
+    const QUEUE = `molvia.trip-queue.${ME}`
+    const REJECTED = `molvia.trip-rejected.${ME}`
+
+    /** What a window of the previous version writes back: every kind it can read, and no other. */
+    function olderWindowRewrites(key: string): void {
+      const held = JSON.parse(localStorage.getItem(key) ?? '[]') as { write: { kind: string } }[]
+      localStorage.setItem(
+        key,
+        JSON.stringify(held.filter((item) => !['delete', 'restore'].includes(item.write.kind))),
+      )
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+    }
+
+    it('удаление возвращается на своё место — перед стартом следующего похода', async () => {
+      for (const mock of [finishTrip, startTrip, addExpense, removeTrip])
+        mock.mockRejectedValue(offline())
+      const queue = fresh()
+      useTripStore().apply(answer('0'))
+      queue.enqueue({ kind: 'finish', tripId: TRIP, finishedOnDeviceAt: new Date() })
+      queue.enqueue(started(NEXT, 'Рынок'))
+      queue.enqueue({ ...add(BREAD), tripId: NEXT })
+      await settled()
+      queue.removeTrip(TRIP, 'Ереван Сити')
+      await settled()
+
+      olderWindowRewrites(QUEUE)
+      expect(queue.pending.map((write) => write.kind)).toEqual(['delete', 'start', 'add'])
+      expect(queue.removing.has(TRIP)).toBe(true)
+      // And across a launch, from what is on the device.
+      expect(fresh().pending.map((write) => write.kind)).toEqual(['delete', 'start', 'add'])
+    })
+
+    it('потерянное удаление, чьё место уже ушло, встаёт первым', async () => {
+      startTrip.mockRejectedValue(offline())
+      removeTrip.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.removeTrip(TRIP, 'Ереван Сити')
+      queue.enqueue(started(NEXT, 'Рынок'))
+      await settled()
+      olderWindowRewrites(QUEUE)
+      expect(queue.pending.map((write) => write.kind)).toEqual(['delete', 'start'])
+    })
+
+    it('ушедшее удаление не возвращается', async () => {
+      removeTrip.mockResolvedValue(undefined)
+      const queue = fresh()
+      queue.removeTrip(TRIP, 'Ереван Сити')
+      await queue.flush()
+      expect(queue.pending).toEqual([])
+      expect(fresh().pending).toEqual([])
+    })
+
+    it('отказ «Вернуть» держит записи похода и после окна прежней версии', () => {
+      localStorage.setItem(
+        REJECTED,
+        JSON.stringify([
+          {
+            key: 'r1',
+            write: { kind: 'restore', tripId: TRIP, name: 'Ереван Сити' },
+            code: ERROR.NOT_FOUND,
+          },
+        ]),
+      )
+      const queue = fresh()
+      queue.dismiss({ key: 'none', write: add(MILK), code: ERROR.NOT_FOUND })
+      olderWindowRewrites(REJECTED)
+      expect(queue.orphaned(TRIP)).toBe(true)
+      expect(queue.rejected.map((item) => item.write.kind)).toEqual(['restore'])
+    })
+  })
 })

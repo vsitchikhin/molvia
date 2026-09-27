@@ -221,6 +221,10 @@ describe('какие ключи приложение пишет на устро�
       // Был ли последний ответ истории пустым — своим ключом, чтобы кэш читался прежней версией
       // (MOL-77).
       'molvia.trip-history-empty',
+      // Удаления похода и «Вернуть» ещё раз, своим ключом: прежняя версия их не читает и теряет из
+      // очереди (MOL-76, раунд 4, Г1).
+      'molvia.trip-marks',
+      'molvia.trip-marks-rejected',
       'molvia.trip-queue',
       'molvia.trip-rejected',
       'molvia.verdict-confirmed',
