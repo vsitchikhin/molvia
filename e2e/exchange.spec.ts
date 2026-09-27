@@ -87,6 +87,21 @@ test('roubles to dollars to drams: the chain is the rate of the next trip', asyn
   await expect(page.locator('.figure')).toHaveText('4,06 ֏/₽')
   await expect(page.locator('.costs li')).toHaveText(/^89,04 ₽\/\$ · по последнему обмену/)
 
+  // The rate is «большее за меньшее» (MOL-81): the exchange of roubles for dollars says «89,04 ₽/$»,
+  // never «0,011232 $/₽», and the very number the price of the dollar says above it.
+  const roubles = page.locator('article').filter({ hasText: '224,63 $' })
+  await expect(roubles.locator('.plate .line').first()).toHaveText(/^Курс обмена\s*89,04 ₽\/\$$/)
+  // At a phone's width nothing on a card wraps: each amount and each line of the plate is one line.
+  const wrapped = await page.locator('article .amount, article .plate .line').evaluateAll((nodes) =>
+    nodes
+      .filter((node) => {
+        const size = parseFloat(getComputedStyle(node).fontSize)
+        return node.getBoundingClientRect().height > size * 2
+      })
+      .map((node) => node.textContent),
+  )
+  expect(wrapped).toEqual([])
+
   const headers = await asBrowser(page)
   const me = actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json())
   const started = await page.request.post('/api/trips', {
