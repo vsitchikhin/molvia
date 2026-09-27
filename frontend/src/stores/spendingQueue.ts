@@ -43,6 +43,8 @@ export interface RejectedSpendingWrite {
 /** What «Вернуть» needs to undo a removal: the spending it was about. */
 export interface SpendingUndo {
   readonly id: string
+  /** The writes taken out with a spending nobody had begun to send, put back as they were. */
+  readonly writes?: readonly SpendingWrite[]
 }
 
 interface Kept {
@@ -349,10 +351,16 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
       const head = kept[0]
       if (!head) break
 
+      // Nothing is tried while the browser knows there is no connection: a write made at the till
+      // with no signal stays unmarked, so the next change still folds into it (round 2, Н1–Н3).
+      // `online` brings the queue back (App.vue).
+      if (!navigator.onLine) return
+
       let refusal: WireCode | null = null
+      const tried = head.attempted === true
       // Marked before it leaves, on every shelf: another window must not fold into it or take it
       // out while its fate is unknown.
-      if (!head.attempted) {
+      if (!tried) {
         kept = kept.map((item) => (item.key === head.key ? { ...item, attempted: true } : item))
         persist(owner)
       }
@@ -363,6 +371,9 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
         const known = error instanceof ApiError
         const code = known ? error.code : ERROR.INTERNAL
         if (!known || !error.answered || HOLDS.includes(code)) {
+          // An answer that came and is not the API's — a portal's page — says the request never
+          // reached the server (MOL-57, round 4, Ж1): its fate is known, and the mark goes.
+          if (known && !error.answered && code !== ERROR.INTERNAL && !tried) unmark(owner, head.key)
           if (code !== ERROR.NO_ACTOR) retry.later()
           return
         }
@@ -380,23 +391,60 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
       // was written at revision 1, so it goes on as an amendment over that — refused only if
       // someone moved it since (the exchanges' В-6, answered here rather than on screen).
       if (refusal === ERROR.CONFLICT && write.kind === 'record') {
+        const fields = laterFields(write.body.id) ?? fieldsOf(write.body)
         kept = [
-          {
-            key: newKey(),
-            write: { kind: 'amend', id: write.body.id, body: amendOf(1, fieldsOf(write.body)) },
-          },
+          { key: newKey(), write: { kind: 'amend', id: write.body.id, body: amendOf(1, fields) } },
           ...kept,
         ]
         refusal = null
       }
       if (refusal) {
         console.warn(`[spending queue] ${write.kind} refused: ${refusal}`)
-        rejected.value = [...rejected.value, { key: newKey(), write, code: refusal }]
+        rejected.value = [
+          ...rejected.value,
+          { key: newKey(), write: withLater(write), code: refusal },
+        ]
       }
       persist(owner)
       landed.value++
     }
     retry.reset()
+  }
+
+  function unmark(owner: string, key: string): void {
+    sync(owner)
+    kept = kept.map((item) => (item.key === key ? { key: item.key, write: item.write } : item))
+    persist(owner)
+  }
+
+  /**
+   * The amendments waiting behind a write the server has just answered, taken out of the queue:
+   * the fields of the last of them, or null. They were made over what that write would have made,
+   * so once it is refused they have nothing to stand on. Sent on, a guessed revision went over
+   * another device's amendment in silence, and one behind a refused record earned a stray 404
+   * (round 2, Н1, Н3). Nothing behind the head can be on its way: one window sends, in order.
+   */
+  function laterFields(id: string): SpendingFields | null {
+    const later = kept.filter((item) => item.write.kind === 'amend' && item.write.id === id)
+    const last = later.at(-1)?.write
+    if (last?.kind !== 'amend') return null
+    kept = kept.filter((item) => !later.includes(item))
+    return fieldsOf(last.body)
+  }
+
+  /** A refused record or amendment, carrying what the person typed last — one refusal to fix. */
+  function withLater(write: SpendingWrite): SpendingWrite {
+    if (write.kind === 'record') {
+      const fields = laterFields(write.body.id)
+      return fields ? { kind: 'record', body: { id: write.body.id, ...fields } } : write
+    }
+    if (write.kind === 'amend') {
+      const fields = laterFields(write.id)
+      return fields
+        ? { kind: 'amend', id: write.id, body: amendOf(write.body.revision, fields) }
+        : write
+    }
+    return write
   }
 
   function change(work: () => void): void {
@@ -461,31 +509,46 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
   }
 
   /**
-   * «Удалить трату», without a question (В-4). The removal always goes to the server, even for a
-   * spending whose record still waits: that record may have landed with its answer lost, and taken
-   * out here it would live on the server and come back with the next read (adversarial А). A
-   * removal of one that never landed is answered 404, which is done (`DONE_ENOUGH`). A refusal
-   * about the spending goes with it — there is nothing left to fix.
+   * «Удалить трату», without a question (В-4). A spending nobody has begun to send never reached
+   * the server, so it is taken out of the queue with the amendments behind it, and «Вернуть» puts
+   * them back (review У-1). Once a send of its record has begun it may have landed with its answer
+   * lost, so the removal goes to the server, and 404 on it is done (adversarial А). A refusal about
+   * the spending goes with it — there is nothing left to fix.
    */
   function remove(id: string): SpendingUndo {
+    let undo: SpendingUndo = { id }
     change(() => {
       rejected.value = rejected.value.filter((item) => spendingOf(item.write) !== id)
+      const own = kept.filter(
+        (item) =>
+          (item.write.kind === 'record' || item.write.kind === 'amend') &&
+          spendingOf(item.write) === id,
+      )
+      if (own.some((item) => item.write.kind === 'record') && own.every(waiting)) {
+        kept = kept.filter((item) => !own.includes(item))
+        undo = { id, writes: own.map((item) => item.write) }
+        return
+      }
       if (
         kept.some((item) => waiting(item) && item.write.kind === 'remove' && item.write.id === id)
       )
         return
       kept = [...kept, { key: newKey(), write: { kind: 'remove', id } }]
     })
-    return { id }
+    return undo
   }
 
   /**
-   * «Вернуть»: the removal taken back while it still waits, or the spending brought back by the
-   * server once the removal may have left — never written anew, which a marked spending answers
-   * with 409 (MOL-73, Д6).
+   * «Вернуть»: what was taken out put back; else the removal taken back while it still waits, or
+   * the spending brought back by the server once the removal may have left — never written anew,
+   * which a marked spending answers with 409 (MOL-73, Д6).
    */
   function restore(undo: SpendingUndo): void {
     change(() => {
+      if (undo.writes) {
+        kept = [...kept, ...undo.writes.map((write) => ({ key: newKey(), write }))]
+        return
+      }
       const at = kept.findIndex(
         (item) => waiting(item) && item.write.kind === 'remove' && item.write.id === undo.id,
       )

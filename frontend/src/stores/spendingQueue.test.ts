@@ -274,7 +274,8 @@ describe('spending queue', () => {
       queue.record({ id: BARBER, ...fields() })
       queue.amend(BARBER, 1, fields('6000'))
       const undo = queue.remove(BARBER)
-      expect(queue.pending.map((write) => write.kind)).toEqual(['record', 'remove'])
+      // Nobody began to send it: it never reached the server, and goes out of the queue (У-1).
+      expect(queue.pending).toEqual([])
 
       queue.restore(undo)
       useActorStore().state = 'ready'
@@ -283,13 +284,13 @@ describe('spending queue', () => {
       expect(recordSpending.mock.calls[0]?.[0].amount.minor).toBe(600_000n)
     })
 
-    it('removing one whose record waits still tells the server — it may have landed', async () => {
+    it('removing one nobody began to send sends nothing at all (review У-1)', async () => {
       const queue = fresh('idle')
       queue.record({ id: BARBER, ...fields() })
       queue.remove(BARBER)
       useActorStore().state = 'ready'
       await queue.flush()
-      expect(calls).toEqual([`record ${BARBER}`, `remove ${BARBER}`])
+      expect(calls).toEqual([])
     })
 
     it('А: a record whose answer was lost, then removed, is removed on the server', async () => {
@@ -346,6 +347,64 @@ describe('spending queue', () => {
       queue.restore({ id: BARBER })
       await settled()
       expect(queue.rejected).toMatchObject([{ code: ERROR.NOT_FOUND, write: { kind: 'restore' } }])
+    })
+  })
+
+  describe('round 2: what a write without a connection must not do', () => {
+    it('tries nothing while the browser knows there is no connection, so changes still fold', async () => {
+      const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const queue = fresh()
+      queue.amend(BARBER, 1, fields('6000'))
+      await settled()
+      queue.amend(BARBER, 1, fields('7000'))
+      await settled()
+      expect(calls).toEqual([])
+      onLine.mockReturnValue(true)
+      await queue.flush()
+      expect(calls).toEqual([`amend ${BARBER} r1`])
+    })
+
+    it('Н1: an amendment refused as moved elsewhere takes the ones behind it — none goes over a guessed revision', async () => {
+      amendSpending
+        .mockImplementationOnce(offline)
+        .mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'revision'))
+      const queue = fresh()
+      queue.amend(BARBER, 1, fields('6000'))
+      await settled()
+      queue.amend(BARBER, 1, fields('6000', 'Барбер, борода'))
+      await queue.flush()
+      expect(calls).toEqual([`amend ${BARBER} r1`, `amend ${BARBER} r1`])
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toHaveLength(1)
+      const refused = queue.rejected[0]?.write
+      expect(refused?.kind === 'amend' && refused.body.note).toBe('Барбер, борода')
+    })
+
+    it('Н3: a refused record takes the amendments behind it — one refusal, with what was typed last', async () => {
+      recordSpending
+        .mockImplementationOnce(offline)
+        .mockRejectedValueOnce(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN, 'categoryId'))
+      const queue = fresh()
+      queue.record({ id: BARBER, ...fields() })
+      await settled()
+      queue.amend(BARBER, 1, fields('6000'))
+      await queue.flush()
+      expect(calls).toEqual([`record ${BARBER}`, `record ${BARBER}`])
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toHaveLength(1)
+      const refused = queue.rejected[0]?.write
+      expect(refused?.kind === 'record' && refused.body.amount.minor).toBe(600_000n)
+    })
+
+    it('a portal answering in the API’s place leaves the write unmarked — it never reached the server', async () => {
+      recordSpending.mockRejectedValueOnce(new ApiError(ISSUE.RESPONSE_INVALID, 'portal', false))
+      const queue = fresh()
+      queue.record({ id: BARBER, ...fields() })
+      await settled()
+      queue.remove(BARBER)
+      await queue.flush()
+      expect(calls).toEqual([`record ${BARBER}`])
+      expect(queue.pending).toEqual([])
     })
   })
 

@@ -170,6 +170,16 @@ describe('the journal with the queue laid over it', () => {
     expect(days[1]?.rows[0]).toMatchObject({ key: RENT, mark: 'refused', local: false })
   })
 
+  it('Н2: a removal taken back by «Вернуть» behind it hides nothing and counts nothing', () => {
+    const pending: SpendingWrite[] = [
+      { kind: 'remove', id: BARBER },
+      { kind: 'restore', id: BARBER },
+    ]
+    const days = journalOf(month(), pending, [])
+    expect(days.flatMap((day) => day.rows.map((row) => row.key))).toContain(BARBER)
+    expect(unsentIn(month(), pending)).toBe(0)
+  })
+
   it('hides a spending still on the phone once its removal waits', () => {
     const days = journalOf(month(), [record(NEW, '2026-09-26'), { kind: 'remove', id: NEW }], [])
     expect(days.flatMap((day) => day.rows.map((row) => row.key))).not.toContain(NEW)

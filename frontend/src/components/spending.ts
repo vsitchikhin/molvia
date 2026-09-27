@@ -154,6 +154,18 @@ export function mergePages(first: MoneyMonthView, next: MoneyMonthView): MoneyMo
   }
 }
 
+/**
+ * The spendings a waiting removal takes away: the last of «Удалить» and «Вернуть» about each is a
+ * removal. One brought back with «Вернуть» behind a removal already tried is on screen again, as
+ * the person was told (round 2, Н2).
+ */
+function beingRemoved(pending: readonly SpendingWrite[]): Set<string> {
+  const last = new Map<string, 'remove' | 'restore'>()
+  for (const write of pending)
+    if (write.kind === 'remove' || write.kind === 'restore') last.set(write.id, write.kind)
+  return new Set([...last].flatMap(([id, kind]) => (kind === 'remove' ? [id] : [])))
+}
+
 /** What the queue has to say about a row: on its way, amended, or refused. */
 export type SpendingMark = 'waiting' | 'editing' | 'refused'
 
@@ -230,7 +242,7 @@ export function journalOf(
   pending: readonly SpendingWrite[],
   rejected: readonly RejectedSpendingWrite[],
 ): JournalDay[] {
-  const removing = new Set(pending.flatMap((write) => (write.kind === 'remove' ? [write.id] : [])))
+  const removing = beingRemoved(pending)
   const editing = new Set(pending.flatMap((write) => (write.kind === 'amend' ? [write.id] : [])))
   const refusals = new Map<string, RejectedSpendingWrite>()
   for (const item of rejected) {
@@ -318,7 +330,7 @@ export function unsentIn(month: MoneyMonthView, pending: readonly SpendingWrite[
       day.entries.flatMap((entry) => (entry.kind === 'manual' ? [entry.spending.id] : [])),
     ),
   )
-  const removing = new Set(pending.flatMap((write) => (write.kind === 'remove' ? [write.id] : [])))
+  const removing = beingRemoved(pending)
   const ids = new Set<string>()
   for (const write of pending) {
     // A record the month already shows is counted — its answer was lost, not the spending
@@ -335,7 +347,7 @@ export function unsentIn(month: MoneyMonthView, pending: readonly SpendingWrite[
       (write.body.spentOn.startsWith(month.month) || shown.has(write.id))
     )
       ids.add(write.id)
-    if (write.kind === 'remove' && shown.has(write.id)) ids.add(write.id)
+    if (write.kind === 'remove' && shown.has(write.id) && removing.has(write.id)) ids.add(write.id)
   }
   return ids.size
 }
