@@ -1465,6 +1465,30 @@ describe('search — at one distance, the shorter name first (MOL-112, В-5)', (
     expect((await names('рис 1 кг'))[0]).toBe('Рис')
   })
 
+  it('puts a whole word above the exact start of a longer one, however short (review И)', async () => {
+    for (const name of ['Печенье', 'Печень куриная', 'Сыр маскарпоне', 'Маска для лица']) {
+      await named(name)
+    }
+
+    expect((await names('печень'))[0]).toBe('Печень куриная')
+    expect((await names('маска'))[0]).toBe('Маска для лица')
+  })
+
+  it('does not mark a start one edit off: «туалетка» is the paper, not the litter', async () => {
+    await named('Наполнитель для кошачьего туалета 5 л')
+    await named('Туалетная бумага Zewa Plus 4 рулона')
+
+    expect((await names('туалетка'))[0]).toBe('Туалетная бумага Zewa Plus 4 рулона')
+  })
+
+  it('puts the fat typed with «%» first, whatever the size beside it (review З)', async () => {
+    for (const name of ['Кефир', 'Кефир 1%', 'Кефир 2,5%']) await named(name)
+
+    expect((await names('кефир 2,5% 1 л'))[0]).toBe('Кефир 2,5%')
+    // A bare number may be a size: read as a fat, «кефир 1 л» would give «Кефир 1%» the row.
+    expect((await names('кефир 1 л'))[0]).toBe('Кефир')
+  })
+
   it('must not lift a shorter name over a nearer one: only ties are its to order', async () => {
     await named('Сыр')
     await named('Сыр чанах')

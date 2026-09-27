@@ -40,10 +40,11 @@ async function names(query: string): Promise<string[]> {
 }
 
 /**
- * A group is rows at one distance, found alike — by the typed word or by a synonym. Inside it the
- * shorter name goes first (MOL-112, В-5), then the greater similarity, and only what is equal on
- * both is left to the row id, a random uuid — so a group is pinned by its members and by the
- * length rule, not as a list. Where the order is the search's alone, it is pinned as a list.
+ * A group is rows at one distance, found alike — by the typed word or by a synonym, as a whole
+ * word or as the exact start of one. Inside it the shorter name goes first (MOL-112, В-5), then
+ * the greater similarity, and only what is equal on both is left to the row id, a random uuid — so
+ * a group is pinned by its members and by the length rule, not as a list. Where the order is the
+ * search's alone, it is pinned as a list.
  */
 type Answer = readonly (string | readonly string[])[]
 
@@ -757,7 +758,8 @@ describe('Armenian labels on the same shelf, reached from Russian and Latin', ()
     tan: ['Թան Բժնի', ["Чипсы Lay's сметана и лук 150 г", 'Крекеры TUC 100 г']],
     бжни: [['Թան Բժնի', 'Вода Бжни 1,5 л']],
     матнакаш: [['Հաց Մատնաքաշ', 'Хлеб Матнакаш']],
-    ашхар: [['Творог Ашхар 9% 400 г', 'Թթվասեր Աշխարհ', 'Молоко Ашхар 2,5% 1 л']],
+    // `ashhar` is exactly the start of `ashharh`, and a whole word stands above a start (MOL-10).
+    ашхар: [['Творог Ашхар 9% 400 г', 'Молоко Ашхар 2,5% 1 л'], 'Թթվասեր Աշխարհ'],
   }
 
   it('puts a label the query meant first', () => {

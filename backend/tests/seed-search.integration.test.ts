@@ -119,7 +119,15 @@ describe("the owner's words, against the seed", () => {
     ['сахар 1 кг', 'Сахар', true],
     ['мука 2 кг', 'Мука', true],
     ['малако', 'Молоко', false],
-    // Brands the owner names a kind by lead to the kind through the dictionary (MOL-112).
+    // A whole word above the exact start of a longer one (MOL-10, review И).
+    ['маска', 'Маска для лица', true],
+    // The fat typed with «%» names the variety, whatever the size beside it (review З).
+    ['кефир 2,5% 1 л', 'Кефир 2,5%', true],
+    ['молоко 3,2% 1 л', 'Молоко 3,2%', true],
+    ['сметана 20% 400 г', 'Сметана 20%', true],
+    // Brands the owner names a kind by lead to the kind through the dictionary (MOL-112, В-6) —
+    // to the word of the kind, and among the kinds the shortest: «Лапша» by the kilo, not the
+    // instant noodles the word means, and «Какао», not the instant one (review Л), until one pick.
     ['фанта', 'Лимонад', true],
     ['дошик', 'Лапша', true],
     ['несквик', 'Какао', true],
@@ -135,6 +143,12 @@ describe("the owner's words, against the seed", () => {
     expect(await first(query)).toEqual([name, near])
   })
 
+  // «Печень куриная» and «Печень говяжья» are keys of one length, so the uuid picks between them;
+  // what is held is that a liver comes first and not «Печенье» (review И).
+  it('«печень» → a liver, not «Печенье»', async () => {
+    expect((await first('печень'))[0]).toMatch(/^Печень /u)
+  })
+
   /**
    * A brand over a kind is a miss, and the screen offers «Предложить товар» (owner's decision
    * В-1); «читос» has no kind of its own in the dictionary and waits for the person's own word.
@@ -145,9 +159,10 @@ describe("the owner's words, against the seed", () => {
 
   /**
    * The brand's own item, once proposed, stands above the kind its word leads to: both are found
-   * at no cost, and the similarity of what was typed ranks before the length of the name. The
-   * reason MOL-112 first gave for keeping brands out of the dictionary was this, stated wrongly
-   * (adversarial Д).
+   * at no cost, the brand by the word typed and the kind by a synonym, and at one distance the
+   * typed word ranks first (\`by_synonym\`) — not the similarity, which ranks after the length
+   * (review С-8, М). MOL-112 first kept brands out of the dictionary on a claim about this that
+   * was wrong (adversarial Д).
    */
   it.each([
     ['фанта', 'Фанта 0,5 л'],

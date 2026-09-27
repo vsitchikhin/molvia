@@ -236,6 +236,16 @@ export function searchQueryKey(query: string): string | null {
   return HAS_CONTENT.test(key) ? key : null
 }
 
+/**
+ * The numbers a query gives a fat by — typed with «%»: «2,5%» is `2` and `5`, as the key writes
+ * them. The key drops the sign, so it is read off the query as typed (MOL-112, review З).
+ */
+export function percentNumbers(query: string): string[] {
+  return [...query.matchAll(/(\d+)(?:[.,](\d+))?\s*%/gu)].flatMap(([, whole, part]) =>
+    part === undefined ? [whole ?? ''] : [whole ?? '', part],
+  )
+}
+
 type ItemRow = typeof items.$inferSelect
 
 /**
@@ -261,7 +271,12 @@ function toItem(row: ItemRow, barcodes: readonly string[]): Item {
  * The ranking query, apart from the method so the test that reads its plan runs this very
  * statement and not a copy that could drift from it.
  */
-export function rankedCandidates(key: string, limit: number, actorId: string | null): SQL {
+export function rankedCandidates(
+  key: string,
+  limit: number,
+  actorId: string | null,
+  fat: readonly string[] = [],
+): SQL {
   // What else each word of the query stands for (MOL-45): «картошка» is also «картофель». Two
   // parallel lists rather than an array parameter — words of a key never hold a space.
   const synonyms = key
@@ -374,6 +389,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              plain and not (anchored and unit_start) as grounds,
              plain and anchored and unit_like and not unit_start as slips,
              word ~ '[^0-9]' as lettered,
+             -- A number the person typed with «%» is a fat, not a size (\`percentNumbers\`).
+             word = any(string_to_array(${fat.join(' ')}, ' ')) as fat,
              last,
              n::int = any(string_to_array(${expanded}, ' ')::int[]) as expanded
       from (
@@ -469,10 +486,17 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
     -- subquery into the select list, the filter and the order by — and with \`slipped\` joined
     -- in, 20 000 names answered half as fast again as before it. Kept, it beats both.
     per_word as materialized (
-      select c.id, qw.grounds and s.id is null as grounds, qw.lettered,
+      select c.id, qw.grounds and s.id is null as grounds, qw.lettered, qw.fat,
              -- The typed spelling is measured unless the row came by a synonym of this very word:
              -- «сыр» is not measured against «Рис» that «лори» brought, but «хаггис» of
              -- «памперсы хаггис» is still measured against the «Huggies» that «подгузники» did.
+             -- Twice the distance, plus one where the word is exactly the start of a longer name
+             -- word: one pass tells how near a word is and whether it was found whole. At one
+             -- distance the whole word wins — «сыр» finds «Сырок» below the exact match, never
+             -- above it (MOL-10), which the length of the name alone would break (review И:
+             -- «печень» put «Печенье» first). Only an exact start: a start one edit off is the
+             -- typo of MOL-10's slack, and marked, «туалетка» put the litter's «туалета» above
+             -- «Туалетная бумага».
              case when c.typed or not qw.expanded then (
                select min(
                  -- The screen searches while the person types, so the last word is usually
@@ -482,17 +506,18 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
                  case when qw.last
                         and length(w) > length(qw.q)
                         and levenshtein(qw.q, left(w, length(qw.q))) <= (length(qw.q) - 1) / 3
-                      then levenshtein(qw.q, left(w, length(qw.q)))
+                      then 2 * levenshtein(qw.q, left(w, length(qw.q)))
+                           + (qw.q = left(w, length(qw.q)))::int
                       -- One word of a key can reach 600 characters. Cut, not skipped: such a
                       -- name is still an item.
-                      else levenshtein(qw.q, left(w, 255))
+                      else 2 * levenshtein(qw.q, left(w, 255))
                  end)
                from unnest(string_to_array(c.search_key, ' ')) as w
                -- A grounding word is measured against grounding words only: against «л» or
                -- «1» of a size every two-letter word is two edits away, inside the budget.
                where not (qw.grounds and s.id is null)
                   or (length(w) >= ${SHORT_WORD} and w !~ '[0-9]' and w not in ${UNIT_KEYS})
-             ) end as qd_typed,
+             ) end as qd_typed_twice,
              -- A synonym is a word, not a typo: it counts only as the whole word of the kind,
              -- and then costs nothing. With the edit budget on top, «мясо» expanded into five
              -- words would have five chances of the absolute budget's false hits (MOL-46).
@@ -505,8 +530,10 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
       -- \`least\` skips a null, so a word found only by its synonym is still found. Not
       -- materialized: \`per_word\` is, so folding this into the aggregates below repeats a
       -- \`least\`, not the levenshtein subquery.
-      select id, grounds, lettered, least(qd_typed, qd_synonym) as qd,
-             coalesce(qd_synonym = 0 and coalesce(qd_typed, 255) > 0, false) as by_synonym
+      select id, grounds, lettered, fat, least(qd_typed_twice / 2, qd_synonym) as qd,
+             coalesce(qd_synonym = 0 and coalesce(qd_typed_twice / 2, 255) > 0, false) as by_synonym,
+             coalesce(qd_typed_twice % 2 = 1
+                        and qd_typed_twice / 2 <= coalesce(qd_synonym, 255), false) as by_prefix
       from per_word
     ),
     ranked as (
@@ -539,7 +566,13 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              coalesce(max(coalesce(pw.qd, 255))
                         filter (where pw.grounds and not pw.by_synonym), 0) as words_worst,
              length(c.search_key) as key_length,
-             bool_or(pw.by_synonym) as by_synonym
+             bool_or(pw.by_synonym) as by_synonym,
+             bool_or(pw.by_prefix) as by_prefix,
+             -- The fats typed with «%» that found their pair: «кефир 2,5% 1 л» names «Кефир 2,5%»,
+             -- and «1 л», a size every row misses alike, must not hand the row to «Кефир» or
+             -- «Кефир 1%» (review З). Only with «%»: a bare number is as likely a size, and
+             -- counted, «молоко 1 л» would give «Молоко 1,5%» its first row back (review А).
+             count(*) filter (where pw.fat and pw.qd = 0) as fat_hits
       from candidates c
       join per_word_best pw on pw.id = c.id
       group by c.id, c.ws, c.search_key
@@ -614,7 +647,8 @@ export function rankedCandidates(key: string, limit: number, actorId: string | n
              m.item_id is null,
              m.last_picked_at desc nulls last,
              m.picks desc nulls last,
-             r.distance, r.by_synonym, r.key_length, r.ws desc, r.id
+             r.distance, r.by_synonym, r.by_prefix, r.fat_hits desc, r.key_length,
+             r.ws desc, r.id
     limit ${limit}
   `
 }
@@ -786,7 +820,7 @@ export function createItemRepository(db: Conn): ItemRepository {
         )
 
         const ranked = await tx.execute<{ id: string; near: boolean }>(
-          rankedCandidates(key, rowLimit(limit), idOrNull(actorId)),
+          rankedCandidates(key, rowLimit(limit), idOrNull(actorId), percentNumbers(query)),
         )
 
         await tx.execute(
