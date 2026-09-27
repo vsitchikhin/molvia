@@ -230,6 +230,8 @@ function fakeRepositories(
       lastMatched: unexpected('moneyAccounts.lastMatched'),
       saveCheck: unexpected('moneyAccounts.saveCheck'),
       setTripPayment: unexpected('moneyAccounts.setTripPayment'),
+      // Any change of a trip's money takes its «списано» off (Р-32): nothing to see here.
+      dropTripDebited: () => Promise.resolve(),
     },
   }
 }

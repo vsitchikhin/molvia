@@ -101,6 +101,12 @@ export interface MoneyAccountRepository {
     check: Omit<MoneyAccountCheck, 'createdAt'>,
   ): Promise<MoneyAccountCheck>
 
+  /**
+   * «Списано» of a trip taken off, the account kept: its money changed, and the figure was what left
+   * the account for the trip as it was (Р-32, adversarial Ж2). Nothing when there was none.
+   */
+  dropTripDebited(tripId: string): Promise<void>
+
   /** The account a trip was paid from and «списано»; false for a trip that is not the owner's. */
   setTripPayment(
     actorId: string,
@@ -419,7 +425,11 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           select t.id, p.name as place_name, t.currency, t.started_at,
                  -- The phone's side of the start where the server's is later: a trip begun
                  -- offline in the evening and delivered after midnight (review Р2-3, В-6).
-                 to_char(least(t.started_at, t.finished_on_device_at) at time zone 'Asia/Yerevan',
+                 -- Unless it is more than a day before the server's start: an evening offline is
+                 -- hours, and a clock days behind is a wrong clock, not a shelf (Ж1).
+                 to_char(case when t.finished_on_device_at >= t.started_at - interval '1 day'
+                              then least(t.started_at, t.finished_on_device_at)
+                              else t.started_at end at time zone 'Asia/Yerevan',
                          'YYYY-MM-DD') as started_on,
                  coalesce(t.finished_on_device_at, t.finished_at) as finished_at,
                  greatest(t.started_at, t.finished_at, t.account_set_at,
@@ -601,6 +611,13 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           createdAt: row.createdAt,
         }
       })
+    },
+
+    async dropTripDebited(tripId) {
+      await db
+        .update(trips)
+        .set({ debitedMinor: null, debitedCurrency: null, accountSetAt: sql`clock_timestamp()` })
+        .where(and(eq(trips.id, tripId), isNotNull(trips.debitedMinor)))
     },
 
     async setTripPayment(actorId, tripId, accountId, debited) {

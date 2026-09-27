@@ -66,9 +66,8 @@ export const ERROR = {
   /** An account under a name another of the owner's — live or removed — already has (MOL-115, Р-21). */
   MONEY_ACCOUNT_TAKEN: 'error.money_account_taken',
   /**
-   * Money named on an account of another currency: an income or a side of an exchange is in the
-   * account's own currency or it is not that account, and «списано» is in the account's currency and
-   * only when the operation's is another (MOL-43 В-3).
+   * A check's fact in another currency than the account's (MOL-115). An operation is never refused
+   * over an account: one that does not fit is written «без счёта» (Р-28, Р-31).
    */
   MONEY_ACCOUNT_CURRENCY: 'error.money_account_currency',
   /** The currency of an account that already has operations: they were counted in it (MOL-115). */
