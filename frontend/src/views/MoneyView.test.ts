@@ -157,6 +157,19 @@ function button(view: VueWrapper, text: string) {
   return found
 }
 
+/**
+ * Presses a button of the open sheet until what it does has happened: the sheet takes no tap
+ * until it has come up, and on a loaded machine that is later than any fixed wait.
+ */
+async function pressUntil(text: string, happened: () => void): Promise<void> {
+  await vi.waitFor(() => {
+    clock += 1000
+    const open = document.querySelector('dialog[open]')
+    if (open) sheetButton(text).click()
+    happened()
+  })
+}
+
 function sheetButton(text: string): HTMLButtonElement {
   const found = [...document.querySelectorAll('dialog[open] button')].find(
     (one) => one.textContent.trim() === text,
@@ -279,10 +292,12 @@ describe('MoneyView: the sheet', () => {
     const view = await render()
     await button(view, en.spending.add).trigger('click')
     await risen()
-    sheetButton(en.spending.sheet.save).click()
-    await flushPromises()
+    await pressUntil(en.spending.sheet.save, () => {
+      expect(document.querySelector('dialog[open]')?.textContent).toContain(
+        en.spending.sheet.bad_amount,
+      )
+    })
     const sheet = document.querySelector('dialog[open]')?.textContent ?? ''
-    expect(sheet).toContain(en.spending.sheet.bad_amount)
     expect(sheet).toContain(en.spending.sheet.bad_category)
     expect(useSpendingQueueStore().pending).toEqual([])
   })
@@ -299,8 +314,9 @@ describe('MoneyView: the sheet', () => {
     amount.dispatchEvent(new Event('input'))
     document.querySelector<HTMLInputElement>(`dialog[open] input[value="${BEAUTY}"]`)?.click()
     await flushPromises()
-    sheetButton(en.spending.sheet.save).click()
-    await flushPromises()
+    await pressUntil(en.spending.sheet.save, () => {
+      expect(recordSpending).toHaveBeenCalled()
+    })
     expect(recordSpending).toHaveBeenCalledTimes(1)
     expect(recordSpending.mock.calls[0]?.[0]).toMatchObject({
       spentOn: '2026-09-27',
@@ -315,10 +331,9 @@ describe('MoneyView: the sheet', () => {
     const view = await render()
     await view.find('.body').trigger('click')
     await risen()
-    sheetButton(en.spending.sheet.remove).click()
     // Sent first: an «Undo» before the removal left takes it out of the queue instead, which
     // the queue's own tests pin.
-    await vi.waitFor(() => {
+    await pressUntil(en.spending.sheet.remove, () => {
       expect(removeSpending).toHaveBeenCalledWith(BARBER)
     })
     await flushPromises()
