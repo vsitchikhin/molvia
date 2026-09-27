@@ -1387,7 +1387,11 @@ database access. In a product about data integrity, two write paths will silentl
   is the order the trips lived in — one trip's `finish` lets the next one's `start` through — and put
   at the end, a removal left the server holding the trip open under the next start, and «Вернуть»
   made yesterday's trip the one going on. A «Вернуть» the server refuses leaves the trip's writes on
-  the phone, stepped over and counted as a refused start's are (А2). **The price, named:** removing a trip dated before a check that
+  the phone, stepped over and counted as a refused start's are (А2) — one predicate, `orphaned`, for
+  the queue, the screen's «not sent yet» and the history. **«Вернуть» is offered only while it can
+  put the trip back where it was**: a new start withdraws it, and so does another trip's start
+  landing on the server over a removed trip the server never had — brought back, its start would
+  meet that trip open (round 2, Б3). The store keeps the same rule as the screen. **The price, named:** removing a trip dated before a check that
   came out even moves the balance with no reason the check can name, as a removed spending does.
 - **Exactly one field is required — the item.** Everything else may be left empty.
 - **The catalogue grows two ways: «Предложить товар» and the seed (MOL-112).** MOL-12 decided «no

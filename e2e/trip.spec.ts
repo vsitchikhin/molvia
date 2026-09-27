@@ -261,6 +261,48 @@ test.describe('the trip', () => {
     await expect(page.getByText(/^Ереван Сити · /)).toBeVisible()
   })
 
+  test('a trip the server never saw cannot come back once the next one has started there (MOL-76, Б3)', async ({
+    page,
+    context,
+  }) => {
+    const setting = await device(page)
+    // The item has to be among the recent ones: with no signal the search looks only there.
+    await startTrip(page, 'SAS')
+    await addItem(page, setting.word, '500')
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+    await page.getByRole('button', { name: 'Finish the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    await expect.poll(setting.current).toBeNull()
+
+    await context.setOffline(true)
+    await startTrip(page, 'Рынок')
+    await addItem(page, setting.word, '570')
+    await page.getByRole('button', { name: 'Finish the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    await startTrip(page, 'Ереван Сити')
+    await addItem(page, setting.word, '250')
+    await page.getByRole('button', { name: 'Trip history' }).click()
+    await page.locator('.history-row').filter({ hasText: 'Рынок' }).click()
+    await page.getByRole('button', { name: 'Delete the trip' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Delete the trip' }).click()
+    await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible()
+
+    // Out of the dead zone with the strip still up: «Ереван Сити» opens on the server, and «Рынок»,
+    // which it never had, can no longer be put back before it — the offer goes.
+    await context.setOffline(false)
+    await page.evaluate(() => window.dispatchEvent(new Event('online')))
+    await expect
+      .poll(async () => (await setting.current())?.place.name, { timeout: 15_000 })
+      .toBe('Ереван Сити')
+    await expect(page.getByRole('button', { name: 'Undo' })).toHaveCount(0)
+    await page.goBack()
+    await expect(page.getByText(/^Ереван Сити · /)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /is already open/ })).toHaveCount(0)
+  })
+
   test('is started with no connection, and catches up when it comes back', async ({
     page,
     context,
