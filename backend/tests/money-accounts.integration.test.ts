@@ -386,7 +386,7 @@ describe('остаток — старт и всё после дня старта
 })
 
 describe('поход на счёте (п. 6, Р-18)', () => {
-  it('завершённый — днём завершения на устройстве; «списано» — вся сумма; без цены — причина', async () => {
+  it('завершённый — днём начала (Р-29); «списано» — вся сумма; без цены — причина', async () => {
     const me = await owner()
     const cash = await addAccount(me, { startOn: daysAgo(5) })
     const card = await addAccount(me, {
@@ -396,14 +396,12 @@ describe('поход на счёте (п. 6, Р-18)', () => {
       startOn: daysAgo(5),
     })
     const place = await insertPlace(db, { name: 'Ереван Сити' })
-    // Yesterday's noon in Yerevan, not «a day ago»: started an hour before a finish taken from the
-    // clock, the trip fell on the day before in the first hour after midnight (Р-29 dates it by its
-    // start), and the test went red for that hour every night.
-    const finished = new Date(`${daysAgo(1)}T12:00:00+04:00`)
+    const finished = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const started = new Date(finished.getTime() - 60 * 60 * 1000)
     const trip = await insertTrip(db, {
       actorId: me.id,
       placeId: place,
-      startedAt: new Date(finished.getTime() - 60 * 60 * 1000),
+      startedAt: started,
       finishedAt: new Date(),
       finishedOnDeviceAt: finished,
     })
@@ -424,7 +422,10 @@ describe('поход на счёте (п. 6, Р-18)', () => {
     expect(journal.rows).toEqual([
       expect.objectContaining({
         kind: 'trip',
-        day: yerevanDate(finished),
+        // A trip is dated by the day it started — the earlier of the server's start and the
+        // device's finish (Р-29). Dated by the finish, this failed for the hour after Yerevan's
+        // midnight, when the start an hour earlier fell on the day before.
+        day: yerevanDate(started),
         moved: { minor: -348000n, currency: 'AMD' },
         place: 'Ереван Сити',
         items: 2,
