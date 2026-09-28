@@ -276,6 +276,27 @@ export function accountBalance(
 }
 
 /**
+ * What every live account held at the end of `day` (MOL-134): its start and its operations dated up
+ * to that day, as `accountBalance` counts them. An account started after the day is not in it — it
+ * tells nothing of the day before it — and a removed one is in no day at all (Р-2): «Деньги» and
+ * «Счета» must not disagree about which money there is.
+ */
+export function balancesOn(
+  accounts: readonly MoneyAccount[],
+  operations: readonly AccountOperation[],
+  day: string,
+  rateOf: RateBetween,
+): { readonly account: MoneyAccount; readonly balance: Money; readonly uncounted: number }[] {
+  const until = operations.filter((operation) => operation.day <= day)
+  return accounts
+    .filter((account) => account.archivedAt === null && account.startOn <= day)
+    .map((account) => {
+      const { balance, uncounted } = accountBalance(account, until, rateOf)
+      return { account, balance, uncounted }
+    })
+}
+
+/**
  * Where a check starts looking: the moment of the last check, or the evening of the start day. An
  * operation is after it when it is dated after that day, or was written after the check — one dated
  * back, typed in only now, is exactly what a difference is made of.

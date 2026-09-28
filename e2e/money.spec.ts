@@ -1,6 +1,7 @@
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { signedIn } from './session'
+import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -187,4 +188,83 @@ test.describe('in English', () => {
   test('five tabs fit a 320 px phone, one line each', async ({ page }) => {
     await fitsNarrowPhone(page, 'Money')
   })
+})
+
+/** A day of Yerevan's calendar, `days` from today. */
+function yerevanDay(days = 0): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
+    new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+  )
+}
+
+test('«Остаток» is the money on the accounts: a spending from one moves it (MOL-134)', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const post = async (url: string, data: Record<string, unknown>) => {
+    const response = await page.request.post(url, { headers, data })
+    expect(response.status(), await response.text()).toBe(201)
+  }
+  const account = randomUUID()
+  await post('/api/money/accounts', {
+    id: account,
+    name: 'Карта ₽',
+    currency: 'RUB',
+    savings: false,
+    start: { amount: '1000', currency: 'RUB' },
+    startOn: yerevanDay(-1),
+  })
+  const categories = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string }[] }
+  await post('/api/spendings', {
+    id: randomUUID(),
+    spentOn: yerevanDay(),
+    amount: { amount: '100', currency: 'RUB' },
+    categoryId: categories.categories[0]?.id,
+    accountId: account,
+  })
+  // A newcomer's «Деньги» is an introduction with no month card: the rest is looked at once there
+  // is money to count (the tile with no account is a component test's).
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  const tile = page.locator('.tile.rest')
+  await expect(tile).toContainText(/≈\s*900\s*₽/)
+  await expect(tile).not.toContainText('курс')
+})
+
+test('«зарплата — в следующий месяц»: the salary counts next month, and «Пришло» says so (MOL-134)', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const receive = async (receivedOn: string) => {
+    const response = await page.request.post('/api/incomes', {
+      headers,
+      data: {
+        id: randomUUID(),
+        amount: { amount: '1000', currency: 'RUB' },
+        receivedOn,
+        source: 'salary',
+      },
+    })
+    expect(response.status(), await response.text()).toBe(201)
+  }
+  const today = yerevanDay()
+  const firstOfLastMonth = new Date(`${today.slice(0, 7)}-01T12:00:00Z`)
+  firstOfLastMonth.setUTCMonth(firstOfLastMonth.getUTCMonth() - 1)
+  await receive(firstOfLastMonth.toISOString().slice(0, 10))
+  await receive(today)
+  const shift = await page.request.put('/api/actors/me/salary-shift', {
+    headers,
+    data: { day: 1 },
+  })
+  expect(shift.status()).toBe(200)
+
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  const income = page.locator('.tile.income')
+  // Last month's salary is this month's «Пришло»; today's has gone to the next one.
+  await expect(income).toContainText(/1\s*000\s*₽/)
+  await expect(income).toContainText('с зарплатой')
+  await expect(income).toContainText('— в следующем месяце')
 })

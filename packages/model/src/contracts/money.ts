@@ -18,6 +18,18 @@ export const monthSchema = z
   .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
   .refine((month) => isRateDay(lastDayOf(month)))
 
+/**
+ * «Зарплата с … числа — в следующий месяц» (MOL-134, В-3): from which day of its month a salary
+ * counts in «Пришло» of the next one; null — off, as every account starts. The person's own number,
+ * 1–31: in a month without that day nothing moves (Н-7). The body and the answer of
+ * `/actors/me/salary-shift`, saved on the tap (В-5).
+ */
+export const SALARY_SHIFT_DAY_MAX = 31
+export const salaryShiftSchema = z.strictObject({
+  day: z.int().min(1).max(SALARY_SHIFT_DAY_MAX).nullable(),
+})
+export type SalaryShift = z.infer<typeof salaryShiftSchema>
+
 /** How many rows of the journal one answer carries (handoff 01, «Догрузка»). */
 export const MONEY_JOURNAL_PAGE = 40
 
@@ -74,7 +86,36 @@ export const moneyMonthCodec = z.strictObject({
   spentIncome: moneyCodec.nullable(),
   income: moneyCodec,
   incomeUncounted: z.array(moneyCodec),
-  rest: signedMoneyCodec.nullable(),
+  /** Salaries of the month before counted in this one, and this month's counted in the next (MOL-134). */
+  shiftedIn: z.array(exchangeDaySchema),
+  shiftedOut: z.array(exchangeDaySchema),
+  /**
+   * «Остаток» (MOL-134): the accounts at the end of the month in the income currency, everything and
+   * without the savings, and what nothing converts — by account, in its own currency — and how many
+   * operations no rate counted, for each figure; null before any account had started.
+   * `accountsFrom` — the earliest start of a live account, null when there is none.
+   *
+   * **The first page only.** A page after `cursor` carries no rest: `rest` and `accountsFrom` are
+   * null and `accountsRemoved` false there whatever the accounts are — the figures of the month are
+   * the first page's, never «no accounts» (adversarial Ж, self-review 10).
+   */
+  rest: z
+    .strictObject({
+      total: signedMoneyCodec,
+      spendable: signedMoneyCodec,
+      uncounted: z.strictObject({
+        total: z.array(z.strictObject({ name: z.string(), balance: signedMoneyCodec })),
+        spendable: z.array(z.strictObject({ name: z.string(), balance: signedMoneyCodec })),
+      }),
+      operationsUncounted: z.strictObject({
+        total: z.int().min(0),
+        spendable: z.int().min(0),
+      }),
+    })
+    .nullable(),
+  accountsFrom: exchangeDaySchema.nullable(),
+  /** Every account there is was removed: the way to one is «Вернуть», not «Завести счёт». */
+  accountsRemoved: z.boolean(),
   rate: rateCodec.nullable(),
   rateKind: z.enum(['live', 'frozen']),
   previousSpent: moneyCodec.nullable(),
@@ -154,12 +195,23 @@ export function moneyMonthViewOf(
     spent: month.spent,
     spentIncome: month.spentIncome,
     income: month.income,
-    rest: month.rest,
+    rest: month.rest && {
+      ...month.rest,
+      uncounted: {
+        total: [...month.rest.uncounted.total],
+        spendable: [...month.rest.uncounted.spendable],
+      },
+      operationsUncounted: { ...month.rest.operationsUncounted },
+    },
+    accountsFrom: month.accountsFrom,
+    accountsRemoved: month.accountsRemoved,
     rate: month.rate,
     rateKind: month.rateKind,
     uncounted: [...month.uncounted],
     foreign: [...month.foreign],
     incomeUncounted: [...month.incomeUncounted],
+    shiftedIn: [...month.shiftedIn],
+    shiftedOut: [...month.shiftedOut],
     byCategory: [...month.byCategory],
     previousSpent,
     categories: categoryOrder(categories).map(spendingCategoryViewOf),

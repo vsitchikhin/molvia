@@ -1,0 +1,2 @@
+ALTER TABLE "actors" ADD COLUMN "salary_shift_day" smallint;--> statement-breakpoint
+ALTER TABLE "actors" ADD CONSTRAINT "actors_salary_shift_day_of_month" CHECK ("actors"."salary_shift_day" between 1 and 31);

@@ -31,6 +31,7 @@ const rateItem = vi.fn<(itemId: string, rating: Rating) => Promise<unknown>>()
 vi.mock('@/api', () => ({
   api: {
     me: () => me(),
+    salaryShift: () => Promise.resolve({ day: null }),
     logout: () => logout(),
     rateItem: (itemId: string, rating: Rating) => rateItem(itemId, rating),
   },

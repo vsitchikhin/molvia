@@ -5,6 +5,7 @@ import {
   moneyMonthCodec,
   moneyMonthQuerySchema,
   monthSchema,
+  salaryShiftSchema,
   spendingAmendBodySchema,
   spendingBodySchema,
   spendingCategoriesResponseCodec,
@@ -15,6 +16,7 @@ import type {
   Actor,
   JournalKey,
   MoneyMonthView,
+  SalaryShift,
   SpendingAmendBody,
   SpendingBody,
   SpendingCategoriesResponse,
@@ -37,6 +39,8 @@ export interface SpendingsApi {
   ): Promise<{ list: SpendingCategoriesResponse; created: boolean }>
   archiveCategory(actor: Actor, id: string, archived: boolean): Promise<SpendingCategoriesResponse>
   month(actor: Actor, month: string, cursor?: JournalKey): Promise<MoneyMonthView>
+  salaryShift(actor: Actor): Promise<SalaryShift>
+  setSalaryShift(actor: Actor, body: SalaryShift): Promise<SalaryShift>
 }
 
 /** Spendings are the person's own money: private always, never in a shared cache. */
@@ -137,5 +141,16 @@ export function spendingRoutes(app: FastifyInstance, api: SpendingsApi): void {
       const view = await api.month(ownerOf(request), month.data, cursor)
       return privately(reply).send(z.encode(moneyMonthCodec, view))
     },
+  )
+
+  /** «Зарплата с … числа — в следующий месяц» (MOL-134, В-3): the month's rule of «Пришло». */
+  app.get('/actors/me/salary-shift', { exposeHeadRoute: false }, async (request, reply) =>
+    privately(reply).send(await api.salaryShift(ownerOf(request))),
+  )
+
+  app.put('/actors/me/salary-shift', async (request, reply) =>
+    privately(reply).send(
+      await api.setSalaryShift(ownerOf(request), parseBody(salaryShiftSchema, request.body)),
+    ),
   )
 }

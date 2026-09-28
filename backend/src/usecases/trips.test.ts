@@ -219,6 +219,8 @@ function fakeRepositories(
       frozenRate: unexpected('money.frozenRate'),
       freeze: unexpected('money.freeze'),
       thaw: unexpected('money.thaw'),
+      salaryShift: unexpected('money.salaryShift'),
+      setSalaryShift: unexpected('money.setSalaryShift'),
     },
     moneyAccounts: {
       list: unexpected('moneyAccounts.list'),

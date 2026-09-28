@@ -388,8 +388,15 @@
     "income": "Came in",
     "income_open": "Open incomes:",
     "income_uncounted": "and {amounts} not counted",
+    "income_shifted_in": "with the salary of {days}",
+    "income_shifted_out": "the salary of {days} counts next month",
     "rest": "Left",
-    "rest_unknown": "no rate",
+    "rest_spendable": "without savings ≈ {amount}",
+    "rest_uncounted": "not counted: {accounts}",
+    "rest_operations": "{n} operation not counted | {n} operations not counted",
+    "rest_from": "Accounts start on {day}",
+    "rest_add": "Add an account",
+    "rest_removed": "Accounts removed — bring back",
     "rate_live_mine": "At my rate of {rate} today",
     "rate_live_official": "At the CBA rate of {rate} today",
     "rate_frozen": "At the rate of {date}: {rate}. Past months are not recounted",
@@ -894,7 +901,17 @@
       "body": "We will check with the server when it returns. Your edits will stay here."
     },
     "group_account": "Account",
-    "sign_out": "Sign out"
+    "sign_out": "Sign out",
+    "group_money": "Money",
+    "salary_shift": {
+      "label": "Salary counts in the next month",
+      "day": "From which day",
+      "day_option": "from day {day}",
+      "hint": "A salary received on this day or later counts in «Came in» of the next month. The day it came in and the account balances stay as they are.",
+      "offline": "Cannot save without a connection — the switch comes back with it.",
+      "save_failed": "Not saved. Check the connection and try again.",
+      "load_error": "The setting could not be loaded."
+    }
   },
   "privacy": {
     "title": "Data and privacy",

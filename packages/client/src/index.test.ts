@@ -1179,7 +1179,11 @@ describe('«Деньги» (MOL-82)', () => {
     spentIncome: null,
     income: { amount: '0.00', currency: 'RUB' },
     incomeUncounted: [],
+    shiftedIn: [],
+    shiftedOut: [],
     rest: null,
+    accountsFrom: null,
+    accountsRemoved: false,
     rate: null,
     rateKind: 'live',
     previousSpent: null,
@@ -1235,6 +1239,21 @@ describe('«Деньги» (MOL-82)', () => {
     await client.moneyMonth('2026-09', month.cursor ?? undefined)
     expect(new URL(calls[0]?.url ?? '').pathname).toBe('/money/months/2026-09')
     expect(new URL(calls[1]?.url ?? '').searchParams.get('cursor')).toBe(monthWire.cursor)
+  })
+
+  it('reads and saves «зарплата с … числа» (MOL-134) at its own address, off as null', async () => {
+    const { client, calls } = clientReplying(200, { day: 25 })
+    expect(await client.salaryShift()).toEqual({ day: 25 })
+    expect(await client.chooseSalaryShift(25)).toEqual({ day: 25 })
+    expect(calls[0]?.method).toBe('GET')
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe('/actors/me/salary-shift')
+    expect(calls[1]).toMatchObject({ method: 'PUT', body: { day: 25 } })
+    expect(new URL(calls[1]?.url ?? '').pathname).toBe('/actors/me/salary-shift')
+  })
+
+  it('refuses an answer outside the days of a month, as off the contract', async () => {
+    const { client } = clientReplying(200, { day: 32 })
+    await expect(client.salaryShift()).rejects.toThrow()
   })
 
   it('never sends a month that is not one', async () => {

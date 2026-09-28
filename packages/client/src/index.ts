@@ -32,6 +32,7 @@ import {
   unassignedOperationsCodec,
   moneyMonthCodec,
   monthSchema,
+  salaryShiftSchema,
   spendingAmendBodySchema,
   spendingBodySchema,
   spendingCategoriesResponseCodec,
@@ -84,6 +85,7 @@ import type {
   TripPaymentBody,
   UnassignedOperationsResponse,
   MoneyMonthView,
+  SalaryShift,
   SpendingAmendBody,
   SpendingBody,
   SpendingCategoriesResponse,
@@ -240,8 +242,13 @@ export interface MolviaClient {
   /**
    * «Деньги» (MOL-73): one month counted by the server, and one page of its journal after
    * `cursor` — the key of the last row shown. A month that is not one answers `error.not_found`.
+   * A page after `cursor` carries no «Остаток» (MOL-134): take it from the first page.
    */
   moneyMonth(month: string, cursor?: JournalKey): Promise<MoneyMonthView>
+  /** «Зарплата с … числа — в следующий месяц» (MOL-134): `day` null is off. */
+  salaryShift(): Promise<SalaryShift>
+  /** Saved on the tap, whole each time: safe to repeat. */
+  chooseSalaryShift(day: number | null): Promise<SalaryShift>
   /**
    * «Сохранить» a new spending. Named by the device, so safe to repeat: `created` is `false` for
    * the same one again, `error.conflict` for the same identifier with anything else — or while it
@@ -562,6 +569,14 @@ export function createClient(options: ClientOptions): MolviaClient {
         : ''
       return request(`/money/months/${month}${query}`, moneyMonthCodec)
     },
+
+    salaryShift: () => request('/actors/me/salary-shift', salaryShiftSchema),
+
+    chooseSalaryShift: async (day) =>
+      request('/actors/me/salary-shift', salaryShiftSchema, {
+        method: 'PUT',
+        body: encode(salaryShiftSchema, { day }),
+      }),
 
     recordSpending: async (body) => {
       const { status, data } = await exchange('/spendings', spendingViewCodec, {

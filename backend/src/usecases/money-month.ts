@@ -1,5 +1,8 @@
 import {
+  balancesOn,
+  budgetMonthOf,
   convertAcross,
+  convertSigned,
   lastDayOf,
   monthOf,
   moneyMonth,
@@ -17,15 +20,18 @@ import type {
   Money,
   MoneyMonth,
   MoneyMonthView,
+  MonthHeld,
+  SalaryShift,
   SpendingCategory,
 } from '@molvia/model'
+import { accountsCounted } from './money-accounts'
 import { dayRates } from './money-rates'
 import type { DayRates } from './money-rates'
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<
   TripRepositories,
-  'spendings' | 'spendingCategories' | 'money' | 'exchanges' | 'incomes' | 'rates'
+  'spendings' | 'spendingCategories' | 'money' | 'exchanges' | 'incomes' | 'rates' | 'moneyAccounts'
 >
 type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
 
@@ -59,6 +65,8 @@ async function count(
   categories: readonly SpendingCategory[],
   rate: ExchangeRate | null,
   rateKind: 'live' | 'frozen',
+  salaryShiftDay: number | null,
+  held?: MonthHeld,
 ): Promise<MoneyMonth> {
   const from = `${month}-01`
   const to = lastDayOf(month)
@@ -67,7 +75,7 @@ async function count(
     repositories.money.tripLines(owner.id, from, to),
     repositories.incomes.list(owner.id),
   ])
-  const ofMonth = incomes.filter((income) => monthOf(income.receivedOn) === month)
+  const ofMonth = incomes.filter((income) => budgetMonthOf(income, salaryShiftDay) === month)
   const [inSpend, incomeInIncome] = await Promise.all([
     converter((one, other, day) => rates.between(one, other, day), owner.spendCurrency, [
       ...trips.map((trip) => ({ amount: trip.amount, day: trip.finishedOn })),
@@ -89,13 +97,63 @@ async function count(
     incomeCurrency: owner.incomeCurrency,
     spendings,
     trips,
-    incomes: ofMonth,
+    incomes,
+    salaryShiftDay,
     categories,
     rate,
     rateKind,
     inSpend,
     incomeInIncome,
+    ...(held && { held }),
   })
+}
+
+/**
+ * «Остаток» (MOL-134): what every live account held on the evening of the month's last day — the
+ * running month's too, since an operation may be dated tomorrow and «Потрачено» already counts it
+ * (Н-3) — in the income currency. The spending currency comes by the month's own rate, the one
+ * «≈ потрачено» is counted by, frozen for a closed month; any other by the rule of «Деньги» on the
+ * last day, or today for the running month, when nothing later is known. Not frozen itself (Р-3):
+ * an amended spending of August moves August's rest as it moves its «Потрачено».
+ */
+async function heldAt(
+  repositories: Repositories,
+  owner: Owner,
+  rates: DayRates,
+  month: string,
+  today: string,
+  rate: ExchangeRate | null,
+): Promise<MonthHeld> {
+  const last = lastDayOf(month)
+  const on = last < today ? last : today
+  const income = owner.incomeCurrency
+  const foreign = (currency: Currency) => currency !== income && currency !== owner.spendCurrency
+  const { accounts, operations, rateOf } = await accountsCounted(
+    repositories,
+    owner,
+    rates,
+    (all) =>
+      all
+        .filter((account) => foreign(account.currency))
+        .map((account) => ({ from: account.currency, into: income, day: on })),
+  )
+  const live = accounts.filter((account) => account.archivedAt === null)
+  const starts = live.map((account) => account.startOn).sort()
+  return {
+    balances: balancesOn(live, operations, last, rateOf).map(({ account, balance, uncounted }) => ({
+      name: account.name,
+      balance,
+      savings: account.savings,
+      uncounted,
+    })),
+    accountsFrom: starts[0] ?? null,
+    accountsRemoved: live.length === 0 && accounts.length > 0,
+    inIncome: (balance) => {
+      if (balance.currency === income) return balance
+      const by = foreign(balance.currency) ? rateOf(balance.currency, income, on) : rate
+      return by === null ? null : convertSigned(balance, by)
+    },
+  }
 }
 
 /**
@@ -135,16 +193,45 @@ export async function moneyMonthOf(
   now: Date = new Date(),
 ): Promise<MoneyMonthView> {
   const today = yerevanDate(now)
-  const [rates, categories] = await Promise.all([
+  const [rates, categories, salaryShiftDay] = await Promise.all([
     dayRates(repositories, owner),
     repositories.spendingCategories.list(owner.id),
+    repositories.money.salaryShift(owner.id),
   ])
   const { rate, kind } = await monthRate(repositories, owner, rates, month, today)
+  // The next page of the journal carries no rest: the phone keeps the first page's figures, and every
+  // account with its whole history was read for nothing on each «Показать ещё» (self-review 3).
+  const held =
+    cursor === undefined
+      ? heldAt(repositories, owner, rates, month, today, rate)
+      : Promise.resolve(undefined)
   const [counted, before] = await Promise.all([
-    count(repositories, owner, rates, month, categories, rate, kind),
-    count(repositories, owner, rates, previousMonth(month), categories, null, 'frozen'),
+    held.then((accounts) =>
+      count(repositories, owner, rates, month, categories, rate, kind, salaryShiftDay, accounts),
+    ),
+    count(repositories, owner, rates, previousMonth(month), categories, null, 'frozen', null),
   ])
   // «−8 % к августу» needs an August: a month with nothing in it is no month to compare with.
   const previousSpent = before.days.length > 0 ? before.spent : null
   return moneyMonthViewOf(counted, previousSpent, categories, cursor)
+}
+
+/** `GET /actors/me/salary-shift` (MOL-134, В-3): from which day a salary counts in the next month. */
+export async function salaryShiftOf(
+  repositories: Pick<Repositories, 'money'>,
+  owner: Pick<Actor, 'id'>,
+): Promise<SalaryShift> {
+  return { day: await repositories.money.salaryShift(owner.id) }
+}
+
+/**
+ * `PUT /actors/me/salary-shift`, saved on the tap (В-5). It lets no month go: a frozen month holds a
+ * rate, and «Пришло» is counted on every read, so the next read already moves the salary.
+ */
+export async function chooseSalaryShift(
+  repositories: Pick<Repositories, 'money'>,
+  owner: Pick<Actor, 'id'>,
+  { day }: SalaryShift,
+): Promise<SalaryShift> {
+  return { day: await repositories.money.setSalaryShift(owner.id, day) }
 }

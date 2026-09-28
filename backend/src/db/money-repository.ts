@@ -2,7 +2,7 @@ import { and, eq, gte, or, sql } from 'drizzle-orm'
 import { exchangeRateSchema, monthOf } from '@molvia/model'
 import type { Currency, ExchangeRate, TripLine } from '@molvia/model'
 import type { Conn } from './index'
-import { moneyMonthRates } from './schema'
+import { actors, moneyMonthRates } from './schema'
 
 /**
  * What «Деньги» reads beside the spendings (MOL-73): the finished trips of a month, as lines of the
@@ -35,6 +35,12 @@ export interface MoneyRepository {
    * day, every month: the rule they were counted by changed (В-8).
    */
   thaw(actorId: string, day?: string): Promise<void>
+
+  /** From which day of a month a salary counts in the next one (MOL-134, В-3); null — off. */
+  salaryShift(actorId: string): Promise<number | null>
+
+  /** Sets it, whole each time: a repeat after a lost answer is the same write. */
+  setSalaryShift(actorId: string, day: number | null): Promise<number | null>
 }
 
 interface TripLineRow extends Record<string, unknown> {
@@ -132,6 +138,23 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
             day === undefined ? undefined : gte(moneyMonthRates.month, monthOf(day)),
           ),
         )
+    },
+
+    async salaryShift(actorId) {
+      const [row] = await db
+        .select({ day: actors.salaryShiftDay })
+        .from(actors)
+        .where(eq(actors.id, actorId))
+      return row?.day ?? null
+    },
+
+    async setSalaryShift(actorId, day) {
+      const [row] = await db
+        .update(actors)
+        .set({ salaryShiftDay: day })
+        .where(eq(actors.id, actorId))
+        .returning({ day: actors.salaryShiftDay })
+      return row?.day ?? null
     },
   }
 }

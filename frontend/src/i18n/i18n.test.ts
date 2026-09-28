@@ -108,7 +108,7 @@ describe('словарь: повторяющиеся тексты', () => {
       Оценки: ['nav.verdicts', 'verdict.title'],
       Настройки: ['nav.settings', 'settings.title'],
       // Таб и его экран — разные роли одного слова, как у «Поход».
-      Деньги: ['nav.money', 'spending.title'],
+      Деньги: ['nav.money', 'settings.group_money', 'spending.title'],
       // The settings handoff names its own save action, independently of purchase editing.
       Сохранить: ['accounts.sheet.save', 'item.save_edit', 'settings.save'],
       // Цена Р-2: одно состояние, написанное для трёх экранов.
@@ -194,7 +194,7 @@ describe('словарь: повторяющиеся тексты', () => {
       'What to buy': ['advice.title', 'nav.advice'],
       Ratings: ['nav.verdicts', 'verdict.title'],
       Settings: ['nav.settings', 'settings.title'],
-      Money: ['nav.money', 'spending.title'],
+      Money: ['nav.money', 'settings.group_money', 'spending.title'],
       Save: ['accounts.sheet.save', 'item.save_edit', 'settings.save'],
       'No connection': [
         'devices.offline.title',
@@ -287,6 +287,7 @@ describe('словарь: плюральные формы', () => {
       'advice.ratings_count',
       'verdict.pending_count',
       'spending.unsent',
+      'spending.rest_operations',
       'spending.trip_row_meta',
       'spending.more',
       'spending.sheet.trip_meta',

@@ -35,6 +35,7 @@ import {
   rateChoiceSchema,
   rateProviderSchema,
   ratePreferenceSchema,
+  SALARY_SHIFT_DAY_MAX,
   rateSourceSchema,
   SPENDING_CATEGORY_COLOURS,
   spendingPresetSchema,
@@ -223,6 +224,14 @@ export const actors = pgTable(
      * nothing is cut. Set by the settings' own `UPDATE`, in the same statement as the change.
      */
     incomeCurrencySince: timestamp('income_currency_since', { withTimezone: true }),
+    /**
+     * «Зарплата с … числа — в следующий месяц» (MOL-134, В-3): a salary received on this day of a
+     * month or later counts in «Пришло» of the next one, as the owner's sheet does. Empty is off —
+     * how every account starts. It moves nothing else: the day of the income, the balances, the
+     * person's own rate. Beside the settings rather than among them, as `rate_preference` is: the
+     * form of MOL-65 compares its four fields, and those four are also a trip's context (Н-1).
+     */
+    salaryShiftDay: smallint('salary_shift_day'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.
@@ -242,6 +251,10 @@ export const actors = pgTable(
     check(
       'actors_rate_preference_known',
       oneOf(table.ratePreference, ratePreferenceSchema.options),
+    ),
+    check(
+      'actors_salary_shift_day_of_month',
+      sql`${table.salaryShiftDay} between 1 and ${sql.raw(String(SALARY_SHIFT_DAY_MAX))}`,
     ),
   ],
 )

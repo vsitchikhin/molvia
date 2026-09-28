@@ -15,7 +15,11 @@ import SettingsView from './SettingsView.vue'
 const me = vi.fn<() => Promise<ActorView>>()
 const save = vi.fn<(input: SettingsUpdate) => Promise<ActorView>>()
 vi.mock('@/api', () => ({
-  api: { me: () => me(), saveSettings: (input: SettingsUpdate) => save(input) },
+  api: {
+    me: () => me(),
+    saveSettings: (input: SettingsUpdate) => save(input),
+    salaryShift: () => Promise.resolve({ day: null }),
+  },
 }))
 const initial = actorCodec.parse({
   id: '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f',

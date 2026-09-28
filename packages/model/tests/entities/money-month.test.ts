@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import type { Income } from '#model/entities/income'
+import type { Income, IncomeSource } from '#model/entities/income'
 import {
+  budgetMonthOf,
   lastDayOf,
   moneyMonth,
   monthOf,
+  nextMonth,
   percentChange,
   previousMonth,
   shareOf,
 } from '#model/entities/money-month'
-import type { ConvertOn, MoneyMonthInput, TripLine } from '#model/entities/money-month'
+import type { ConvertOn, MoneyMonthInput, MonthHeld, TripLine } from '#model/entities/money-month'
+import { balancesOn, convertSigned } from '#model/entities/money-account'
+import type { AccountOperation, MoneyAccount } from '#model/entities/money-account'
 import { spendingIn, spendingSchema } from '#model/entities/spending'
 import type { Spending } from '#model/entities/spending'
 import {
@@ -20,7 +24,7 @@ import {
 import type { SpendingCategory } from '#model/entities/spending-category'
 import { ISSUE } from '#model/support/errors'
 import { money } from '#model/values/money'
-import type { Currency } from '#model/values/money'
+import type { Currency, Money } from '#model/values/money'
 import { parseRate, yerevanMidnight } from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
 
@@ -93,14 +97,14 @@ function trip(amount: string, on: string, at = `${on}T15:00:00Z`): TripLine {
   }
 }
 
-function income(amount: string, on: string): Income {
+function income(amount: string, on: string, source: IncomeSource = 'salary'): Income {
   return {
     id: nextId(),
     actorId: OWNER,
     amount: toMoney(amount),
     receivedOn: on,
     heldBefore: null,
-    source: 'salary',
+    source,
     note: null,
     accountId: null,
     revision: 1,
@@ -119,6 +123,7 @@ function month(input: Partial<MoneyMonthInput>) {
     spendings: [],
     trips: [],
     incomes: [],
+    salaryShiftDay: null,
     categories: presets,
     // 5 AMD for a rouble.
     rate: rate('RUB', 'AMD', '5'),
@@ -228,7 +233,7 @@ describe('the month of «Деньги»', () => {
     ).toEqual([late.id, early.id])
   })
 
-  it('counts what came in by the official rate of its day, and the rest is signed', () => {
+  it('counts what came in by the official rate of its day', () => {
     const result = month({
       spendings: [spending('500000 AMD', '2026-09-06', 'rent')],
       incomes: [income('99615 RUB', '2026-09-15'), income('100 USD', '2026-09-20')],
@@ -236,21 +241,20 @@ describe('the month of «Деньги»', () => {
     })
     expect(result.income).toEqual(toMoney('107815 RUB'))
     expect(result.spentIncome).toEqual(toMoney('100000 RUB'))
-    expect(result.rest).toEqual(toMoney('7815 RUB'))
   })
 
-  it('says a month that spent more than came in as a negative rest', () => {
+  it('no longer takes what was spent from what came in: the rest is the accounts (MOL-134, Р-5)', () => {
     const result = month({
       spendings: [spending('600000 AMD', '2026-09-06', 'rent')],
       incomes: [income('99615 RUB', '2026-09-15')],
     })
-    expect(result.rest).toEqual({ minor: -2038500n, currency: 'RUB' })
+    expect(result.rest).toBeNull()
+    expect(result.accountsFrom).toBeNull()
   })
 
-  it('has no rest and no figure in the income currency without a rate — never a zero', () => {
+  it('has no figure in the income currency without a rate — never a zero', () => {
     const result = month({ rate: null, spendings: [spending('5000 AMD', '2026-09-20')] })
     expect(result.spentIncome).toBeNull()
-    expect(result.rest).toBeNull()
   })
 
   it('needs no rate when both currencies are one', () => {
@@ -261,7 +265,6 @@ describe('the month of «Деньги»', () => {
       incomes: [income('1000 RUB', '2026-09-01')],
     })
     expect(result.spentIncome).toEqual(toMoney('400 RUB'))
-    expect(result.rest).toEqual(toMoney('600 RUB'))
     expect(result.rate).toBeNull()
   })
 
@@ -292,7 +295,6 @@ describe('the month of «Деньги»', () => {
       rate: rate('AMD', 'RUB', '10'),
     })
     expect(result.spentIncome).toBeNull()
-    expect(result.rest).toBeNull()
   })
 
   it('is an empty month, not a failure, with nothing in it', () => {
@@ -300,6 +302,324 @@ describe('the month of «Деньги»', () => {
     expect(result.spent).toEqual(toMoney('0 AMD'))
     expect(result.days).toEqual([])
     expect(result.byCategory).toEqual([])
+  })
+})
+
+describe('зарплата с N-го — в «Пришло» следующего месяца (MOL-134, В-2, В-3)', () => {
+  const salary = (on: string) => income('100 RUB', on)
+
+  it('moves a salary from the day on, and not a day before', () => {
+    expect(budgetMonthOf(salary('2026-08-24'), 25)).toBe('2026-08')
+    expect(budgetMonthOf(salary('2026-08-25'), 25)).toBe('2026-09')
+    expect(budgetMonthOf(salary('2026-08-31'), 25)).toBe('2026-09')
+    expect(budgetMonthOf(salary('2026-09-01'), 25)).toBe('2026-09')
+  })
+
+  it('moves December into January of the next year', () => {
+    expect(budgetMonthOf(salary('2026-12-28'), 25)).toBe('2027-01')
+    expect(nextMonth('2026-12')).toBe('2027-01')
+    expect(nextMonth('2026-09')).toBe('2026-10')
+  })
+
+  it('moves nothing with the setting off, nothing but a salary, and nothing past the month end (Н-7)', () => {
+    expect(budgetMonthOf(salary('2026-08-31'), null)).toBe('2026-08')
+    for (const source of ['bonus', 'gift', 'brought'] as const) {
+      expect(budgetMonthOf(income('100 RUB', '2026-08-31', source), 25), source).toBe('2026-08')
+    }
+    expect(budgetMonthOf(salary('2026-09-30'), 31)).toBe('2026-09')
+    expect(budgetMonthOf(salary('2026-08-31'), 31)).toBe('2026-09')
+    expect(budgetMonthOf(salary('2026-08-01'), 1)).toBe('2026-09')
+  })
+
+  it('counts the salary of the 31st in September and not in August, and names both days', () => {
+    const incomes = [
+      salary('2026-08-15'),
+      income('102345 RUB', '2026-08-31'),
+      income('99615 RUB', '2026-09-15'),
+      income('500 RUB', '2026-09-26', 'bonus'),
+      income('101000 RUB', '2026-09-26'),
+    ]
+    const september = month({ incomes, salaryShiftDay: 25 })
+    expect(september.income).toEqual(toMoney('202460 RUB'))
+    expect(september.shiftedIn).toEqual(['2026-08-31'])
+    expect(september.shiftedOut).toEqual(['2026-09-26'])
+
+    const august = month({ month: '2026-08', incomes, salaryShiftDay: 25 })
+    expect(august.income).toEqual(toMoney('100 RUB'))
+    expect(august.shiftedIn).toEqual([])
+    expect(august.shiftedOut).toEqual(['2026-08-31'])
+  })
+
+  it('keeps every income in its own month, and names none, with the setting off', () => {
+    const incomes = [income('102345 RUB', '2026-08-31'), income('99615 RUB', '2026-09-15')]
+    const september = month({ incomes })
+    expect(september.income).toEqual(toMoney('99615 RUB'))
+    expect(september).toMatchObject({ shiftedIn: [], shiftedOut: [] })
+  })
+
+  it('names a day once, however many salaries came on it', () => {
+    const incomes = [income('1 RUB', '2026-08-31'), income('2 RUB', '2026-08-31')]
+    expect(month({ incomes, salaryShiftDay: 25 }).shiftedIn).toEqual(['2026-08-31'])
+  })
+
+  it('counts a moved salary in another currency by the official rate of its own day', () => {
+    const days: string[] = []
+    const result = month({
+      incomes: [income('1000 USD', '2026-08-31')],
+      salaryShiftDay: 25,
+      incomeInIncome: (amount, day) => {
+        days.push(`${amount.currency} ${day}`)
+        return toMoney('86000 RUB')
+      },
+    })
+    expect(result.income).toEqual(toMoney('86000 RUB'))
+    expect(days).toEqual(['USD 2026-08-31'])
+  })
+})
+
+describe('«Остаток» — деньги на счетах на конец месяца (MOL-134)', () => {
+  // 5 AMD for a rouble, as the month's rate above; 86 RUB for a dollar by the day's rule.
+  const inIncome = (balance: Money): Money | null =>
+    balance.currency === 'RUB'
+      ? balance
+      : balance.currency === 'AMD'
+        ? convertSigned(balance, rate('RUB', 'AMD', '5'))
+        : balance.currency === 'USD'
+          ? convertSigned(balance, rate('USD', 'RUB', '86'))
+          : null
+  const held = (
+    balances: {
+      balance: string
+      savings?: boolean
+      minor?: bigint
+      uncounted?: number
+      name?: string
+    }[],
+    accountsFrom: string | null = '2026-09-16',
+    accountsRemoved = false,
+  ): MonthHeld => ({
+    balances: balances.map(({ balance, savings = false, minor, uncounted = 0, name }) => ({
+      name: name ?? `Счёт ${balance}`,
+      balance: minor === undefined ? toMoney(balance) : money(minor, toMoney(balance).currency),
+      savings,
+      uncounted,
+    })),
+    accountsFrom,
+    accountsRemoved,
+    inIncome,
+  })
+
+  it('sums every account into the income currency, and without the savings apart (В-1)', () => {
+    const result = month({
+      held: held([
+        { balance: '230000 AMD' },
+        { balance: '405 RUB' },
+        { balance: '8570 USD', savings: true },
+      ]),
+    })
+    expect(result.rest).toEqual({
+      total: toMoney('783425 RUB'),
+      spendable: toMoney('46405 RUB'),
+      uncounted: { total: [], spendable: [] },
+      operationsUncounted: { total: 0, spendable: 0 },
+    })
+    expect(result.accountsFrom).toBe('2026-09-16')
+  })
+
+  it('takes a card in debt away, and may be below zero', () => {
+    const result = month({
+      held: held([{ balance: '100 RUB' }, { balance: '1 RUB', minor: -50000n }]),
+    })
+    expect(result.rest).toMatchObject({
+      total: { minor: -40000n, currency: 'RUB' },
+      spendable: { minor: -40000n, currency: 'RUB' },
+    })
+  })
+
+  it('says a balance nothing converts apart in its own currency, never as a zero (п. 5)', () => {
+    const result = month({
+      held: held([
+        { balance: '100 RUB' },
+        { balance: '8470 EUR', savings: true, name: 'Евро дома' },
+      ]),
+    })
+    expect(result.rest).toEqual({
+      total: toMoney('100 RUB'),
+      spendable: toMoney('100 RUB'),
+      // Savings: missing from «всего» only (adversarial А, З).
+      uncounted: { total: [{ name: 'Евро дома', balance: toMoney('8470 EUR') }], spendable: [] },
+      operationsUncounted: { total: 0, spendable: 0 },
+    })
+  })
+
+  it('names every account nothing converts on its own: savings and a debt never cancel out (А)', () => {
+    const result = month({
+      held: held([
+        { balance: '1000 RUB' },
+        { balance: '100 EUR', savings: true, name: 'Евро дома' },
+        { balance: '1 EUR', minor: -10000n, name: 'Евро-карта' },
+      ]),
+    })
+    // «Всего» is whole — the euros come to nothing — and «без сбережений» misses the card alone.
+    expect(result.rest).toMatchObject({
+      total: toMoney('1000 RUB'),
+      spendable: toMoney('1000 RUB'),
+      uncounted: {
+        total: [],
+        spendable: [{ name: 'Евро-карта', balance: money(-10000n, 'EUR') }],
+      },
+    })
+  })
+
+  it('names under a figure only what that figure misses (adversarial З)', () => {
+    // Two cards of ±100 € and a safe of 50 €: «без сбережений» is whole, «всего» misses the safe…
+    const cards = month({
+      held: held([
+        { balance: '1000 RUB' },
+        { balance: '100 EUR', name: 'Карта 1 €' },
+        { balance: '1 EUR', minor: -10000n, name: 'Карта 2 €' },
+        { balance: '50 EUR', savings: true, name: 'Сейф €' },
+      ]),
+    })
+    expect(cards.rest?.uncounted).toEqual({
+      total: [
+        { name: 'Карта 1 €', balance: toMoney('100 EUR') },
+        { name: 'Карта 2 €', balance: money(-10000n, 'EUR') },
+        { name: 'Сейф €', balance: toMoney('50 EUR') },
+      ],
+      spendable: [],
+    })
+    // …and a safe of +100 € beside a card of −100 €: «всего» is whole.
+    const safe = month({
+      held: held([
+        { balance: '100 EUR', savings: true, name: 'Сейф €' },
+        { balance: '1 EUR', minor: -10000n, name: 'Карта €' },
+      ]),
+    })
+    expect(safe.rest?.uncounted.total).toEqual([])
+  })
+
+  it('counts the operations no rate counted for each figure: the savings miss «всего» only (Б, Е)', () => {
+    const result = month({
+      held: held([
+        { balance: '100 RUB', uncounted: 1 },
+        { balance: '5 RUB', uncounted: 2, savings: true },
+      ]),
+    })
+    expect(result.rest?.operationsUncounted).toEqual({ total: 3, spendable: 1 })
+  })
+
+  it('needs no rate for an empty account, and never names one as «не посчитано: 0 €» (Д)', () => {
+    const result = month({
+      held: held([{ balance: '1000 RUB' }, { balance: '0 EUR', name: 'Евро-кошелёк' }]),
+    })
+    expect(result.rest).toMatchObject({
+      total: toMoney('1000 RUB'),
+      uncounted: { total: [], spendable: [] },
+    })
+    // A currency that cannot be counted names its accounts with money, not the empty ones.
+    const mixed = month({
+      held: held([
+        { balance: '0 EUR', name: 'Пустой' },
+        { balance: '50 EUR', name: 'Кошелёк' },
+      ]),
+    })
+    expect(mixed.rest?.uncounted.total.map((entry) => entry.name)).toEqual(['Кошелёк'])
+  })
+
+  it('converts one sum per currency: the same money on one account or two is the same rest (В)', () => {
+    // 2,02 ֏ is 0,404 ₽ — rounded per account, two of them made 0,80 ₽ where 4,04 ֏ is 0,81 ₽.
+    const two = month({ held: held([{ balance: '2.02 AMD' }, { balance: '2.02 AMD' }]) })
+    const one = month({ held: held([{ balance: '4.04 AMD' }]) })
+    expect(two.rest?.total).toEqual(one.rest?.total)
+    expect(one.rest?.total).toEqual(toMoney('0.81 RUB'))
+  })
+
+  it('leaves out a currency whose sum money cannot hold, account by account', () => {
+    const result = month({
+      held: held([
+        { balance: '1 RUB', minor: 5n * 10n ** 18n },
+        { balance: '1 RUB', minor: 5n * 10n ** 18n },
+        { balance: '100 AMD' },
+      ]),
+    })
+    expect(result.rest?.total).toEqual(toMoney('20 RUB'))
+    expect(result.rest?.uncounted.total.map((entry) => entry.balance)).toEqual([
+      money(5n * 10n ** 18n, 'RUB'),
+      money(5n * 10n ** 18n, 'RUB'),
+    ])
+  })
+
+  it('has no rest before the first account, and says when the accounts begin (В-4)', () => {
+    const august = month({ month: '2026-08', held: held([], '2026-09-16') })
+    expect(august.rest).toBeNull()
+    expect(august.accountsFrom).toBe('2026-09-16')
+    const none = month({ held: held([], null) })
+    expect(none).toMatchObject({ rest: null, accountsFrom: null, accountsRemoved: false })
+    const removed = month({ held: held([], null, true) })
+    expect(removed).toMatchObject({ rest: null, accountsFrom: null, accountsRemoved: true })
+  })
+})
+
+describe('what the accounts held at the end of a day (MOL-134)', () => {
+  const account = (patch: Partial<MoneyAccount> = {}): MoneyAccount => ({
+    id: nextId(),
+    actorId: OWNER,
+    name: 'Наличные',
+    currency: 'AMD',
+    savings: false,
+    start: toMoney('1000 AMD'),
+    startOn: '2026-09-16',
+    revision: 1,
+    createdAt: new Date('2026-09-16T10:00:00Z'),
+    archivedAt: null,
+    ...patch,
+  })
+  const spent = (on: MoneyAccount, amount: string, day: string): AccountOperation => ({
+    kind: 'spending',
+    id: nextId(),
+    side: null,
+    day,
+    at: new Date(`${day}T10:00:00Z`),
+    seenAt: new Date(`${day}T10:00:00Z`),
+    currency: toMoney(amount).currency,
+    accountId: on.id,
+    amounts: [{ ...toMoney(amount), minor: -toMoney(amount).minor }],
+    debited: null,
+    rate: null,
+    unpriced: 0,
+    revision: 1,
+    details: {
+      categoryId: null,
+      note: null,
+      place: null,
+      source: null,
+      counterpart: null,
+      items: null,
+    },
+  })
+
+  it('counts the start and the operations up to the day, not the day after', () => {
+    const cash = account()
+    const operations = [
+      spent(cash, '100 AMD', '2026-09-16'),
+      spent(cash, '200 AMD', '2026-09-30'),
+      spent(cash, '400 AMD', '2026-10-01'),
+    ]
+    expect(balancesOn([cash], operations, '2026-09-30', () => null)).toEqual([
+      { account: cash, balance: toMoney('800 AMD'), uncounted: 0 },
+    ])
+  })
+
+  it('takes an account started on the day, never one started after it or one removed (Р-2)', () => {
+    const lastDay = account({ startOn: '2026-09-30' })
+    const later = account({ startOn: '2026-10-01' })
+    const removed = account({ archivedAt: new Date('2026-09-20T10:00:00Z') })
+    expect(
+      balancesOn([lastDay, later, removed], [], '2026-09-30', () => null).map(
+        ({ account: a }) => a,
+      ),
+    ).toEqual([lastDay])
   })
 })
 

@@ -6,10 +6,13 @@ paths:
   - 'backend/src/usecases/{spendings,money-month,money-rates,money}*.ts'
   - 'backend/src/routes/spendings.ts'
   - 'backend/tests/spendings*.ts'
+  - 'backend/tests/{salary-shift,month-rest}*.ts'
   - 'backend/drizzle/*spending*.sql'
   - 'frontend/src/views/Money*'
   - 'frontend/src/components/{Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*}'
   - 'frontend/src/composables/useMoneyMonth*'
+  - 'frontend/src/composables/useSalaryShift*'
+  - 'frontend/src/components/SalaryShift*'
   - 'frontend/src/stores/{spendingQueue,queueing}*'
   - 'frontend/src/days*'
   - 'e2e/money.spec.ts'
@@ -57,14 +60,14 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   trips — one line per currency, on the device's day of finishing, in «Продукты», read from the
   purchases every time so an amendment, MOL-78's receipt sum or MOL-76's removal moves it by
   itself, **each line counting the purchases behind its own sum** (owner's decision В-7) — what came
-  in, the rest, the categories and every day's total; the journal comes forty rows a page, and a
-  day cut by the page keeps its whole total. **The next page starts after the key of the last row
-  shown** — day, moment, name (`journalCursorCodec`) — never an offset, which moved under the page
-  with every write above it (Д3). The key is the row's own, so an amendment that moves a spending
-  to another day moves it across the cursor: it comes twice, or not at all, until the journal is
-  read from the start — which the screen does after its own amendment of a day (round 2, Е3). A row no money can hold is «не посчитано», never a failed month
-  (Д5, MOL-66's rule). A month is one of the days a rate may be dated by — `0000-01` is 404, not a
-  500 from Postgres (Д4).
+  in, the rest (MOL-134, below), the categories and every day's total; the journal comes forty rows
+  a page, and a day cut by the page keeps its whole total. **The next page starts after the key of
+  the last row shown** — day, moment, name (`journalCursorCodec`) — never an offset, which moved
+  under the page with every write above it (Д3). The key is the row's own, so an amendment that
+  moves a spending to another day moves it across the cursor: it comes twice, or not at all, until
+  the journal is read from the start — which the screen does after its own amendment of a day (round
+  2, Е3). A row no money can hold is «не посчитано», never a failed month (Д5, MOL-66's rule). A
+  month is one of the days a rate may be dated by — `0000-01` is 404, not a 500 from Postgres (Д4).
 - **A closed month is counted in the income currency by the rate of its last day, frozen the first
   time it is read** (`money_month_rates`): a new exchange today does not move August. **A fact of
   August amended later does** (owner's decision В-6): writing, amending, removing or bringing back
@@ -78,6 +81,57 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   a repeat of a write or an amendment lets go again, a repeat of a removal does not, since the day
   is read off a live row; an official rate reaching the cache for a past day moves the wallet of
   that month and lets nothing go.
+- **«Остаток» is the money on the accounts at the end of the month (MOL-134)**, not what came in
+  less what was spent. The owner saw «≈ −306 828 ₽» over September where the sheet said millions:
+  the roubles that bought the dollars on arrival were exchanges, not income (MOL-71), so even a
+  running sum of «пришло − потрачено» came out near −220 000 ₽, and the sheet counts its rest from a
+  starting capital — every account on the evening of 16.09, which the app already has as the
+  accounts' starts (MOL-115). So the rest is **every live account started by the month's last day,
+  its start and its operations dated up to that day** (`balancesOn`), and what is carried from month
+  to month is simply the same money. **On the last day for the running month too** (Н-3): a spending
+  may be dated tomorrow and «Потрачено» already counts it. **The price, named** (self-review 5): a
+  trip is not a spending here — an account dates it by the day it started, open ones included
+  (MOL-115, Р-29), and «Потрачено» by the day it was finished, finished ones only; a trip from the
+  30th to the 1st is in September's rest and October's «Потрачено», and an open one is in the rest
+  before «Потрачено». **In the income currency, always «≈»**: the spending currency by the month's
+  own rate — the one «≈ потрачено» is counted by, frozen for a closed month — any other by the rule
+  of «Деньги» on the last day, or today while the month runs. **Two figures** (owner's decision
+  В-1): everything, and without the savings — «всего» and «можно тратить» of «Счета». **The balances
+  of one currency are summed exactly and converted once** (adversarial В): each account rounded on
+  its own made the same money on two accounts a kopeck short of it on one; a sum of nothing needs no
+  rate. **Each figure is decided on its own, and names under it the accounts it misses** — by name,
+  in their own currency, never a zero, and never summed with another: savings and a card in debt in
+  one currency cancelled out into «не посчитано: 0 €» under both figures (adversarial А), and a
+  figure the currency came to nothing in was told it missed them all (adversarial З); an empty
+  account is in no figure and named nowhere (adversarial Д). **The operations no rate counted are
+  counted for each figure** (`operationsUncounted`), as «Счета» says of each account: without it the
+  figure looked whole in that month and every one after (adversarial Б), and one number could not
+  tell which figure it was missing from — one on the savings misses «всего» alone (adversarial Е).
+  **A removed account is in no month, past ones included** (Р-2), or «Деньги» and «Счета» disagree
+  about which money there was — the price: removing an account with money thins the months behind
+  it. **Not frozen** (Р-3): an amended spending of August moves August's rest as it moves its
+  «Потрачено». An operation with no account is in no rest (Р-4) — «Счета» says «не попали». Before
+  the first account the rest is «—» with the day the accounts begin (`accountsFrom`), and with no
+  account at all «Завести счёт» (В-4) — unless every account there is was removed
+  (`accountsRemoved`, self-review 4), when the way is «Вернуть» on «Счета», not a new one. Counted
+  for the month shown only — the month before is read for «−8 %» alone (Н-6) — and **on the first
+  page of its journal only**: the phone keeps the first page's figures, and every «Показать ещё»
+  read every account with its whole history for nothing (self-review 3). A later page says `rest:
+null` beside the same «Потрачено», and the contract says that this is not «no accounts»
+  (adversarial Ж).
+- **«Пришло» may take a salary into the next month** (MOL-134, В-2, В-3): with «Зарплата — в
+  следующий месяц» on, a salary received on the chosen day or later counts in «Пришло» of the month
+  after (`budgetMonthOf`), as the owner's sheet has it — the salary of the 25th pays for the next
+  month. Only the source «зарплата»; the day of the income, the journal of «Доходы», the balances
+  and the person's own rate go by the day it came. A day the month does not have moves nothing — «с
+  31-го» in September (Н-7). The month names the moved days both ways (`shiftedIn`, `shiftedOut`),
+  since the switch of months does not go past the running one and a salary of the 26th would
+  otherwise just be missing from September. **The setting is the person's own, off by default**
+  (`actors.salary_shift_day`, 1–31 or empty), **saved on the tap** (В-5) through
+  `/actors/me/salary-shift`, never a field of the settings form: those four fields are also a trip's
+  `context` and a draft on the shelf, and `/actors/me` is read strictly by an installed app that
+  would have failed «who am I» on a new field (Н-1). It thaws nothing — a frozen month holds a rate,
+  and «Пришло» is counted on every read.
 - **Removal is the money rule, held by the server**: a mark, «Вернуть», final after ten minutes by
   the minute timer and nothing else (В-4) — no other write makes it final sooner, unlike an
   exchange's, and a spending sent again while it is marked is 409, not a new one (Д6). After the ten

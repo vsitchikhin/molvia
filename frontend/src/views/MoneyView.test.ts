@@ -61,7 +61,16 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     spentIncome: rub('68788'),
     income: rub('120000'),
     incomeUncounted: [],
-    rest: rub('51212'),
+    shiftedIn: [],
+    shiftedOut: [],
+    rest: {
+      total: rub('51212'),
+      spendable: rub('51212'),
+      uncounted: { total: [], spendable: [] },
+      operationsUncounted: { total: 0, spendable: 0 },
+    },
+    accountsFrom: null,
+    accountsRemoved: false,
     rate: { base: 'RUB', quote: 'AMD', scaled: 4_620_000n, source: 'personal', asOf: new Date() },
     rateKind: 'live',
     previousSpent: amd('345620'),
@@ -108,6 +117,8 @@ const empty = () =>
     spentIncome: null,
     income: rub('0'),
     rest: null,
+    accountsFrom: null,
+    accountsRemoved: false,
     previousSpent: null,
     byCategory: [],
     days: [],
@@ -321,6 +332,75 @@ describe('MoneyView: the month', () => {
     expect(view.text()).toContain(en.spending.pending)
     expect(view.text()).toContain('Not counted yet: 1 spending is being sent')
     expect(plain(view.text())).toContain('317,800')
+  })
+})
+
+describe('MoneyView: «Остаток» and «Пришло» (MOL-134)', () => {
+  const tile = async (patch: Partial<MoneyMonthView>) => {
+    moneyMonth.mockResolvedValue(month(patch))
+    return plain((await render()).get('.tile.rest').text())
+  }
+
+  it('no account at all: «—» and the way to make one, never «no rate» (adversarial Г1)', async () => {
+    const text = await tile({ rest: null, accountsFrom: null })
+    expect(text).toContain('—')
+    expect(text).toContain(en.spending.rest_add)
+    expect(text).not.toMatch(/rate/i)
+  })
+
+  it('a month before the first account says when the accounts begin (В-4, Г2)', async () => {
+    const text = await tile({ rest: null, accountsFrom: '2026-09-16' })
+    expect(text).toContain('Accounts start on Sep 16')
+    expect(text).not.toContain(en.spending.rest_add)
+  })
+
+  it('every account removed: the way back, not a new one (self-review 4)', async () => {
+    const text = await tile({ rest: null, accountsFrom: null, accountsRemoved: true })
+    expect(text).toContain(en.spending.rest_removed)
+    expect(text).not.toContain(en.spending.rest_add)
+  })
+
+  it('names what each figure misses, never a bare «≈ 0» (adversarial Г3, А, Б, З)', async () => {
+    const text = await tile({
+      rest: {
+        total: rub('1000'),
+        spendable: rub('1000'),
+        uncounted: {
+          total: [{ name: 'Euro safe', balance: parseMoney('8470', 'EUR') }],
+          spendable: [],
+        },
+        operationsUncounted: { total: 1, spendable: 0 },
+      },
+    })
+    expect(text).toContain('not counted: Euro safe €8,470')
+    expect(text).toContain('1 operation not counted')
+    // «Without savings» says something «all» does not: it is complete, so it is drawn.
+    expect(text).toContain('without savings ≈ ₽1,000')
+  })
+
+  it('must not fire: without savings equal to all, the second figure is not repeated', async () => {
+    const text = await tile({})
+    expect(text).toContain('≈ ₽51,212')
+    expect(text).not.toContain('without savings')
+  })
+
+  it('a card in debt is a figure below zero, and the minus is printed', async () => {
+    const text = await tile({
+      rest: {
+        total: { minor: -50000n, currency: 'RUB' },
+        spendable: { minor: -50000n, currency: 'RUB' },
+        uncounted: { total: [], spendable: [] },
+        operationsUncounted: { total: 0, spendable: 0 },
+      },
+    })
+    expect(text).toContain('≈ −₽500')
+  })
+
+  it('«Пришло» says where a salary went, both ways (Н-2)', async () => {
+    moneyMonth.mockResolvedValue(month({ shiftedIn: ['2026-08-31'], shiftedOut: ['2026-09-26'] }))
+    const text = plain((await render()).get('.tile.income').text())
+    expect(text).toContain('with the salary of Aug 31')
+    expect(text).toContain('the salary of Sep 26 counts next month')
   })
 })
 
