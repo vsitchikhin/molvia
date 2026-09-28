@@ -1,6 +1,8 @@
 import {
+  balancesOn,
   budgetMonthOf,
   convertAcross,
+  convertSigned,
   lastDayOf,
   monthOf,
   moneyMonth,
@@ -18,16 +20,18 @@ import type {
   Money,
   MoneyMonth,
   MoneyMonthView,
+  MonthHeld,
   SalaryShift,
   SpendingCategory,
 } from '@molvia/model'
+import { accountsCounted } from './money-accounts'
 import { dayRates } from './money-rates'
 import type { DayRates } from './money-rates'
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<
   TripRepositories,
-  'spendings' | 'spendingCategories' | 'money' | 'exchanges' | 'incomes' | 'rates'
+  'spendings' | 'spendingCategories' | 'money' | 'exchanges' | 'incomes' | 'rates' | 'moneyAccounts'
 >
 type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
 
@@ -62,6 +66,7 @@ async function count(
   rate: ExchangeRate | null,
   rateKind: 'live' | 'frozen',
   salaryShiftDay: number | null,
+  held?: MonthHeld,
 ): Promise<MoneyMonth> {
   const from = `${month}-01`
   const to = lastDayOf(month)
@@ -99,7 +104,53 @@ async function count(
     rateKind,
     inSpend,
     incomeInIncome,
+    ...(held && { held }),
   })
+}
+
+/**
+ * «Остаток» (MOL-134): what every live account held on the evening of the month's last day — the
+ * running month's too, since an operation may be dated tomorrow and «Потрачено» already counts it
+ * (Н-3) — in the income currency. The spending currency comes by the month's own rate, the one
+ * «≈ потрачено» is counted by, frozen for a closed month; any other by the rule of «Деньги» on the
+ * last day, or today for the running month, when nothing later is known. Not frozen itself (Р-3):
+ * an amended spending of August moves August's rest as it moves its «Потрачено».
+ */
+async function heldAt(
+  repositories: Repositories,
+  owner: Owner,
+  rates: DayRates,
+  month: string,
+  today: string,
+  rate: ExchangeRate | null,
+): Promise<MonthHeld> {
+  const last = lastDayOf(month)
+  const on = last < today ? last : today
+  const income = owner.incomeCurrency
+  const foreign = (currency: Currency) => currency !== income && currency !== owner.spendCurrency
+  const { accounts, operations, rateOf } = await accountsCounted(
+    repositories,
+    owner,
+    rates,
+    (all) =>
+      all
+        .filter((account) => foreign(account.currency))
+        .map((account) => ({ from: account.currency, into: income, day: on })),
+  )
+  const live = accounts.filter((account) => account.archivedAt === null)
+  const starts = live.map((account) => account.startOn).sort()
+  return {
+    balances: balancesOn(live, operations, last, rateOf).map(({ account, balance }) => ({
+      balance,
+      savings: account.savings,
+    })),
+    accountsFrom: starts[0] ?? null,
+    inIncome: (balance) => {
+      if (balance.currency === income) return balance
+      const by = foreign(balance.currency) ? rateOf(balance.currency, income, on) : rate
+      return by === null ? null : convertSigned(balance, by)
+    },
+  }
 }
 
 /**
@@ -145,8 +196,9 @@ export async function moneyMonthOf(
     repositories.money.salaryShift(owner.id),
   ])
   const { rate, kind } = await monthRate(repositories, owner, rates, month, today)
+  const held = await heldAt(repositories, owner, rates, month, today, rate)
   const [counted, before] = await Promise.all([
-    count(repositories, owner, rates, month, categories, rate, kind, salaryShiftDay),
+    count(repositories, owner, rates, month, categories, rate, kind, salaryShiftDay, held),
     count(repositories, owner, rates, previousMonth(month), categories, null, 'frozen', null),
   ])
   // «−8 % к августу» needs an August: a month with nothing in it is no month to compare with.

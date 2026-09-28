@@ -89,7 +89,19 @@ export const moneyMonthCodec = z.strictObject({
   /** Salaries of the month before counted in this one, and this month's counted in the next (MOL-134). */
   shiftedIn: z.array(exchangeDaySchema),
   shiftedOut: z.array(exchangeDaySchema),
-  rest: signedMoneyCodec.nullable(),
+  /**
+   * «Остаток» (MOL-134): the accounts at the end of the month in the income currency, everything and
+   * without the savings, and what nothing converts in its own currency; null before any account had
+   * started. `accountsFrom` — the earliest start of a live account, null when there is none.
+   */
+  rest: z
+    .strictObject({
+      total: signedMoneyCodec,
+      spendable: signedMoneyCodec,
+      uncounted: z.array(signedMoneyCodec),
+    })
+    .nullable(),
+  accountsFrom: exchangeDaySchema.nullable(),
   rate: rateCodec.nullable(),
   rateKind: z.enum(['live', 'frozen']),
   previousSpent: moneyCodec.nullable(),
@@ -169,7 +181,8 @@ export function moneyMonthViewOf(
     spent: month.spent,
     spentIncome: month.spentIncome,
     income: month.income,
-    rest: month.rest,
+    rest: month.rest && { ...month.rest, uncounted: [...month.rest.uncounted] },
+    accountsFrom: month.accountsFrom,
     rate: month.rate,
     rateKind: month.rateKind,
     uncounted: [...month.uncounted],

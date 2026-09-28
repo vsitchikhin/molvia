@@ -60,6 +60,7 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     shiftedIn: [],
     shiftedOut: [],
     rest: null,
+    accountsFrom: null,
     rate: null,
     rateKind: 'live',
     previousSpent: null,

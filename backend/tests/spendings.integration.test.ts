@@ -360,7 +360,7 @@ describe('месяц «Денег» (MOL-73)', () => {
     expect(await db.select().from(moneyMonthRates)).toHaveLength(1)
   })
 
-  it('пришло — доходы месяца, остаток — со знаком; прошлый месяц для сравнения', async () => {
+  it('пришло — доходы месяца; остаток без счетов — нет (MOL-134); прошлый месяц для сравнения', async () => {
     const me = await owner()
     // The running month counts by today's rate, and only a fresh one counts (review Р-4).
     await rates.upsert([official('RUB', '5', today)])
@@ -375,7 +375,7 @@ describe('месяц «Денег» (MOL-73)', () => {
     const september = await month(me, '2026-09')
     expect(september.income).toEqual({ minor: 9961500n, currency: 'RUB' })
     expect(september.previousSpent).toEqual({ minor: 100000n, currency: 'AMD' })
-    expect(september.rest?.minor).toBeLessThan(0n)
+    expect(september).toMatchObject({ rest: null, accountsFrom: null })
   })
 
   it('чужие траты не видны; месяц, который не месяц, — 404', async () => {

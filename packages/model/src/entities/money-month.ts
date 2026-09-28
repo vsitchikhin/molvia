@@ -106,14 +106,41 @@ export interface MoneyMonth {
   readonly shiftedIn: readonly string[]
   /** Days of this month's salaries that count in the next one («зарплата 26 сент. — в октябре»). */
   readonly shiftedOut: readonly string[]
-  /** What came in less what was spent, in the income currency; signed. Null without a rate. */
-  readonly rest: Money | null
+  /**
+   * «Остаток» (MOL-134): what the accounts held at the end of the month, in the income currency —
+   * null where no account had started by then. `accountsFrom` is the earliest start of a live
+   * account, null when there is none: «Счета начинаются 16 сент.» or «Завести счёт».
+   */
+  readonly rest: MonthRest | null
+  readonly accountsFrom: string | null
   readonly rate: ExchangeRate | null
   readonly rateKind: 'live' | 'frozen'
   /** The spending currency's sum per category, largest first; categories with nothing left out. */
   readonly byCategory: readonly { readonly categoryId: string; readonly amount: Money }[]
   /** Every day with anything spent, newest first, each newest first within. */
   readonly days: readonly MonthDay[]
+}
+
+/**
+ * The money on the accounts at the end of a month (MOL-134, В-1): everything, and everything but the
+ * savings — the words of «Счета», «всего» and «можно тратить». Signed: a card in debt takes away. A
+ * balance nothing converts is not a zero but said apart, in its own currency (п. 5).
+ */
+export interface MonthRest {
+  readonly total: Money
+  readonly spendable: Money
+  readonly uncounted: readonly Money[]
+}
+
+/**
+ * What the accounts held at the end of a month, for its «Остаток»: each live account started by then,
+ * in its own currency, and how a balance comes into the income currency — the month's rate for the
+ * spending currency, the rule of «Деньги» on the day for any other. Converted with its sign kept.
+ */
+export interface MonthHeld {
+  readonly balances: readonly { readonly balance: Money; readonly savings: boolean }[]
+  readonly accountsFrom: string | null
+  readonly inIncome: (balance: Money) => Money | null
 }
 
 /** Converts an amount of another currency on a day, or says it cannot (no rate that day). */
@@ -145,6 +172,8 @@ export interface MoneyMonthInput {
    * В-1): never what the money already held cost, which is a price of other money.
    */
   readonly incomeInIncome: ConvertOn
+  /** The accounts at the end of the month; left out where the rest is not asked (the month before). */
+  readonly held?: MonthHeld
 }
 
 function add(sums: Map<Currency, bigint>, { minor, currency }: Money): void {
@@ -154,6 +183,39 @@ function add(sums: Map<Currency, bigint>, { minor, currency }: Money): void {
 /** The days incomes came in on, each once, earliest first. */
 function daysOf(incomes: readonly Income[]): string[] {
   return [...new Set(incomes.map((income) => income.receivedOn))].sort()
+}
+
+function holds(minor: bigint): boolean {
+  return minor <= INT8_MAX && minor >= -INT8_MAX
+}
+
+/** «Остаток»: every balance into the income currency, one no money can hold said apart (MOL-66). */
+function restOf(held: MonthHeld | undefined, currency: Currency): MonthRest | null {
+  if (!held || held.balances.length === 0) return null
+  let total = 0n
+  let spendable = 0n
+  const uncounted = new Map<Currency, bigint>()
+  for (const { balance, savings } of held.balances) {
+    const value = held.inIncome(balance)
+    if (
+      value === null ||
+      !holds(total + value.minor) ||
+      (!savings && !holds(spendable + value.minor))
+    ) {
+      add(uncounted, balance)
+      continue
+    }
+    total += value.minor
+    if (!savings) spendable += value.minor
+  }
+  return {
+    total: { minor: total, currency },
+    spendable: { minor: spendable, currency },
+    uncounted: [...uncounted]
+      .filter(([, minor]) => holds(minor))
+      .map(([code, minor]) => ({ minor, currency: code }))
+      .sort((a, b) => (a.currency < b.currency ? -1 : a.currency > b.currency ? 1 : 0)),
+  }
 }
 
 function listOf(sums: Map<Currency, bigint>): Money[] {
@@ -316,10 +378,8 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
     incomeUncounted: listOf(incomeUncounted),
     shiftedIn: daysOf(ofMonth.filter((income) => monthOf(income.receivedOn) !== input.month)),
     shiftedOut: daysOf(shiftedOut),
-    rest:
-      spentIncome === null
-        ? null
-        : { minor: income.minor - spentIncome.minor, currency: incomeCurrency },
+    rest: restOf(input.held, incomeCurrency),
+    accountsFrom: input.held?.accountsFrom ?? null,
     rate: spend === incomeCurrency ? null : input.rate,
     rateKind: input.rateKind,
     byCategory: [...byCategory]

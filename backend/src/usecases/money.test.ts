@@ -8,11 +8,13 @@ import {
   yerevanMidnight,
 } from '@molvia/model'
 import type {
+  AccountOperation,
   CachedRate,
   Currency,
   Exchange,
   ExchangeRate,
   Income,
+  MoneyAccount,
   RatePreference,
   Spending,
   SpendingAmendBody,
@@ -133,6 +135,8 @@ interface World {
   readonly cache?: readonly CachedRate[]
   readonly spendings?: readonly Spending[]
   readonly frozen?: ExchangeRate | null
+  readonly accounts?: readonly MoneyAccount[]
+  readonly operations?: readonly AccountOperation[]
 }
 
 /** The repositories «Деньги» reads, over a small world; `asked` records what reached the cache. */
@@ -203,6 +207,8 @@ function repositoriesOf(world: World) {
     }),
     moneyAccounts: fake<TripRepositories['moneyAccounts']>('moneyAccounts', {
       known: () => Promise.resolve([]),
+      list: () => Promise.resolve([...(world.accounts ?? [])]),
+      operations: () => Promise.resolve([...(world.operations ?? [])]),
     }),
     money: fake<TripRepositories['money']>('money', {
       tripLines: () => Promise.resolve([]),
@@ -417,6 +423,55 @@ describe('moneyMonthOf (MOL-73)', () => {
     const view = await moneyMonthOf(world.repositories, owner, '2026-09', undefined, NOW)
     expect(view.rateKind).toBe('live')
     expect(world.frozen).toEqual([])
+  })
+
+  it("counts the running month's rest on its last day by today's rate: tomorrow's row is in it (MOL-134, Н-3)", async () => {
+    const drams: MoneyAccount = {
+      id: '00000000-0000-4000-8000-00000000a001',
+      actorId: owner.id,
+      name: 'Наличные ֏',
+      currency: 'AMD',
+      savings: false,
+      start: cash('41000 AMD'),
+      startOn: '2026-09-16',
+      revision: 1,
+      createdAt: new Date('2026-09-16T10:00:00Z'),
+      archivedAt: null,
+    }
+    const tomorrow: AccountOperation = {
+      kind: 'spending',
+      id: '00000000-0000-4000-8000-00000000a002',
+      side: null,
+      day: '2026-09-27',
+      at: NOW,
+      seenAt: NOW,
+      currency: 'AMD',
+      accountId: drams.id,
+      amounts: [{ minor: -410000n, currency: 'AMD' }],
+      debited: null,
+      rate: null,
+      unpriced: 0,
+      details: {
+        categoryId: null,
+        note: null,
+        place: null,
+        source: null,
+        counterpart: null,
+        items: null,
+      },
+    }
+    const world = repositoriesOf({
+      exchanges: [exchange('100000 RUB', '410000 AMD', '2026-09-05')],
+      accounts: [drams],
+      operations: [tomorrow],
+    })
+    const view = await moneyMonthOf(world.repositories, owner, '2026-09', undefined, NOW)
+    expect(view.rest).toEqual({
+      total: cash('9000 RUB'),
+      spendable: cash('9000 RUB'),
+      uncounted: [],
+    })
+    expect(view.accountsFrom).toBe('2026-09-16')
   })
 
   it('counts an income by the bank of its day, not by what the money held cost (Р-2)', async () => {

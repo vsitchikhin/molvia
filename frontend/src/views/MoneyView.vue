@@ -106,9 +106,9 @@
                 <span class="tile-label">{{ t('spending.rest') }}</span>
                 <span
                   class="tile-figure"
-                  :class="{ negative: month.rest && month.rest.minor < 0n }"
+                  :class="{ negative: month.rest && month.rest.total.minor < 0n }"
                 >
-                  {{ month.rest ? `≈ ${signed(month.rest)}` : '—' }}
+                  {{ month.rest ? `≈ ${signed(month.rest.total)}` : '—' }}
                 </span>
                 <span v-if="!month.rest" class="tile-note">{{ t('spending.rest_unknown') }}</span>
               </div>

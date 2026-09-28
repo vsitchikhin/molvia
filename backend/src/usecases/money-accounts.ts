@@ -45,6 +45,7 @@ import { knownAccounts, paymentOf } from './account-of'
 import { dayRates } from './money-rates'
 import { tripViewFor } from './trip-view'
 import type { TripViewDeps } from './trip-view'
+import type { DayRates } from './money-rates'
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<TripRepositories, 'moneyAccounts' | 'exchanges' | 'incomes' | 'rates'>
@@ -58,36 +59,54 @@ interface Counting {
   readonly rateOf: RateBetween
 }
 
+/** A rate the counting will ask for: an amount of `from` into `into`, on `day`. */
+export interface RateNeed {
+  readonly from: Currency
+  readonly into: Currency
+  readonly day: string
+}
+
 /**
- * The owner's accounts, their operations and every rate the counting will ask for — read before the
+ * The owner's accounts, their operations and every rate their balances ask for — read before the
  * pure functions run, as the month of «Деньги» reads its rates (MOL-73). An amount in another
- * currency is counted by the rule of «Деньги» on its own day (Р-14), and a balance in another
- * currency than the spending one by today's.
+ * currency is counted by the rule of «Деньги» on its own day (Р-14); `extra` names what else the
+ * caller will convert: «Счета» every balance into the spending currency today, the month of «Деньги»
+ * its balances into the income one (MOL-134).
  */
-async function counting(repositories: Repositories, owner: Owner, now: Date): Promise<Counting> {
-  const today = yerevanDate(now)
-  const [accounts, operations, rates] = await Promise.all([
+export async function accountsCounted(
+  repositories: Pick<Repositories, 'moneyAccounts'>,
+  owner: Pick<Owner, 'id'>,
+  rates: DayRates | Promise<DayRates>,
+  extra: (accounts: readonly MoneyAccount[]) => readonly RateNeed[] = () => [],
+): Promise<Omit<Counting, 'today'>> {
+  const [accounts, operations, day] = await Promise.all([
     repositories.moneyAccounts.list(owner.id),
     repositories.moneyAccounts.operations(owner.id),
-    dayRates(repositories, owner),
+    rates,
   ])
-  const needs = [
-    ...conversionsNeeded(accounts, operations),
-    ...accounts
-      .filter((account) => account.currency !== owner.spendCurrency)
-      .map((account) => ({ from: account.currency, into: owner.spendCurrency, day: today })),
-  ]
   const known = new Map<string, ExchangeRate | null>()
-  for (const { from, into, day } of needs) {
-    const key = `${from}:${into}:${day}`
-    if (!known.has(key)) known.set(key, await rates.between(from, into, day))
+  for (const { from, into, day: on } of [
+    ...conversionsNeeded(accounts, operations),
+    ...extra(accounts),
+  ]) {
+    const key = `${from}:${into}:${on}`
+    if (!known.has(key)) known.set(key, await day.between(from, into, on))
   }
   return {
-    today,
     accounts,
     operations,
-    rateOf: (from, into, day) => known.get(`${from}:${into}:${day}`) ?? null,
+    rateOf: (from, into, on) => known.get(`${from}:${into}:${on}`) ?? null,
   }
+}
+
+async function counting(repositories: Repositories, owner: Owner, now: Date): Promise<Counting> {
+  const today = yerevanDate(now)
+  const counted = await accountsCounted(repositories, owner, dayRates(repositories, owner), (all) =>
+    all
+      .filter((account) => account.currency !== owner.spendCurrency)
+      .map((account) => ({ from: account.currency, into: owner.spendCurrency, day: today })),
+  )
+  return { today, ...counted }
 }
 
 function accountViewOf(
