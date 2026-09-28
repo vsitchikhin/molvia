@@ -343,7 +343,8 @@ export default defineComponent({
       else announce?.(t('accounts.screen.archived_done', { name: outcome.name }))
       // «Удалить» and «Убрать» from the account's own screen lead back to the page (handoff 03) —
       // a step back where «Счета» lies under it, not a second «Счета» in the history (review 19).
-      void goBack()
+      // A task later: stepped inside the pop that closed the sheet, the step was swallowed.
+      window.setTimeout(() => void goBack())
     }
 
     const restoring = ref(false)
