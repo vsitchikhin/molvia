@@ -54,7 +54,7 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     rest: {
       total: rub('51212'),
       spendable: rub('51212'),
-      uncounted: [],
+      uncounted: { total: [], spendable: [] },
       operationsUncounted: { total: 0, spendable: 0 },
     },
     accountsFrom: null,

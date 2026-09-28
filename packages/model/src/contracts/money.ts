@@ -103,9 +103,10 @@ export const moneyMonthCodec = z.strictObject({
     .strictObject({
       total: signedMoneyCodec,
       spendable: signedMoneyCodec,
-      uncounted: z.array(
-        z.strictObject({ name: z.string(), balance: signedMoneyCodec, savings: z.boolean() }),
-      ),
+      uncounted: z.strictObject({
+        total: z.array(z.strictObject({ name: z.string(), balance: signedMoneyCodec })),
+        spendable: z.array(z.strictObject({ name: z.string(), balance: signedMoneyCodec })),
+      }),
       operationsUncounted: z.strictObject({
         total: z.int().min(0),
         spendable: z.int().min(0),
@@ -196,7 +197,10 @@ export function moneyMonthViewOf(
     income: month.income,
     rest: month.rest && {
       ...month.rest,
-      uncounted: [...month.rest.uncounted],
+      uncounted: {
+        total: [...month.rest.uncounted.total],
+        spendable: [...month.rest.uncounted.spendable],
+      },
       operationsUncounted: { ...month.rest.operationsUncounted },
     },
     accountsFrom: month.accountsFrom,

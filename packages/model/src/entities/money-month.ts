@@ -131,12 +131,17 @@ export interface MonthRest {
   readonly total: Money
   readonly spendable: Money
   /**
-   * The accounts nothing converts, each on its own, by name and in its own currency, never a zero
-   * (п. 5) — the savings marked, since only «всего» misses those: summed into one figure per
-   * currency, savings and a card in debt cancelled out and «не посчитано: 0 €» stood under both
-   * (adversarial А). An empty account is in no figure, and so in none of these (adversarial Д).
+   * The accounts nothing converts, for each figure, each on its own, by name and in its own
+   * currency, never a zero (п. 5). Summed into one figure per currency, savings and a card in debt
+   * cancelled out and «не посчитано: 0 €» stood under both (adversarial А); marked «savings» on one
+   * list, a figure the currency came to nothing in was still told it missed them (adversarial З).
+   * So each figure is decided on its own and names only what it misses. An empty account is in no
+   * figure, and so in none of these (adversarial Д).
    */
-  readonly uncounted: readonly MonthRestUncounted[]
+  readonly uncounted: {
+    readonly total: readonly MonthRestUncounted[]
+    readonly spendable: readonly MonthRestUncounted[]
+  }
   /**
    * Operations no rate counted, for each figure: in no balance, which «Счета» says of each account
    * and the month must say too — the figure looked whole in this month and every one after
@@ -149,7 +154,6 @@ export interface MonthRest {
 export interface MonthRestUncounted {
   readonly name: string
   readonly balance: Money
-  readonly savings: boolean
 }
 
 /**
@@ -232,7 +236,11 @@ function restOf(held: MonthHeld | undefined, currency: Currency): MonthRest | nu
   }
   let total = 0n
   let spendable = 0n
-  const uncounted: MonthRest['uncounted'][number][] = []
+  const missing = { total: [] as MonthRestUncounted[], spendable: [] as MonthRestUncounted[] }
+  const named = (accounts: readonly MonthHeld['balances'][number][]) =>
+    accounts
+      .filter(({ balance }) => balance.minor !== 0n)
+      .map(({ name, balance }) => ({ name, balance }))
   for (const code of [...byCurrency.keys()].sort()) {
     const accounts = byCurrency.get(code) ?? []
     const sum = (pick: (entry: MonthHeld['balances'][number]) => boolean) =>
@@ -244,25 +252,21 @@ function restOf(held: MonthHeld | undefined, currency: Currency): MonthRest | nu
         : holds(minor)
           ? (held.inIncome({ minor, currency: code })?.minor ?? null)
           : null
+    // Each figure on its own: one the currency came to nothing in is whole whatever the other.
     const all = into(sum(() => true))
+    if (all === null || !holds(total + all)) missing.total.push(...named(accounts))
+    else total += all
     const own = into(sum((entry) => !entry.savings))
-    if (all === null || own === null || !holds(total + all) || !holds(spendable + own)) {
-      uncounted.push(
-        ...accounts
-          .filter(({ balance }) => balance.minor !== 0n)
-          .map(({ name, balance, savings }) => ({ name, balance, savings })),
-      )
-      continue
-    }
-    total += all
-    spendable += own
+    if (own === null || !holds(spendable + own)) {
+      missing.spendable.push(...named(accounts.filter((entry) => !entry.savings)))
+    } else spendable += own
   }
   const operations = (pick: (entry: MonthHeld['balances'][number]) => boolean) =>
     held.balances.filter(pick).reduce((count, entry) => count + entry.uncounted, 0)
   return {
     total: { minor: total, currency },
     spendable: { minor: spendable, currency },
-    uncounted,
+    uncounted: missing,
     operationsUncounted: {
       total: operations(() => true),
       spendable: operations((entry) => !entry.savings),

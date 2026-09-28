@@ -99,16 +99,17 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   В-1): everything, and without the savings — «всего» and «можно тратить» of «Счета». **The balances
   of one currency are summed exactly and converted once** (adversarial В): each account rounded on
   its own made the same money on two accounts a kopeck short of it on one; a sum of nothing needs no
-  rate. **An account nothing converts is named on its own — by its name, in its own currency, with
-  whether it is savings** — never a zero, and never summed with another: savings and a card in debt
-  in one currency cancelled out into «не посчитано: 0 €» under both figures (adversarial А); an
-  empty account is in no figure and named nowhere (adversarial Д). **The operations no rate counted
-  are counted for each figure** (`operationsUncounted`), as «Счета» says of each account: without it
-  the figure looked whole in that month and every one after (adversarial Б), and one number could
-  not tell which figure it was missing from — one on the savings misses «всего» alone (adversarial
-  Е). **A removed account is in no month, past ones included** (Р-2), or «Деньги» and «Счета»
-  disagree about which money there was — the price: removing an account with money thins the months
-  behind it. **Not frozen** (Р-3): an amended spending of August moves August's rest as it moves its
+  rate. **Each figure is decided on its own, and names under it the accounts it misses** — by name,
+  in their own currency, never a zero, and never summed with another: savings and a card in debt in
+  one currency cancelled out into «не посчитано: 0 €» under both figures (adversarial А), and a
+  figure the currency came to nothing in was told it missed them all (adversarial З); an empty
+  account is in no figure and named nowhere (adversarial Д). **The operations no rate counted are
+  counted for each figure** (`operationsUncounted`), as «Счета» says of each account: without it the
+  figure looked whole in that month and every one after (adversarial Б), and one number could not
+  tell which figure it was missing from — one on the savings misses «всего» alone (adversarial Е).
+  **A removed account is in no month, past ones included** (Р-2), or «Деньги» and «Счета» disagree
+  about which money there was — the price: removing an account with money thins the months behind
+  it. **Not frozen** (Р-3): an amended spending of August moves August's rest as it moves its
   «Потрачено». An operation with no account is in no rest (Р-4) — «Счета» says «не попали». Before
   the first account the rest is «—» with the day the accounts begin (`accountsFrom`), and with no
   account at all «Завести счёт» (В-4) — unless every account there is was removed

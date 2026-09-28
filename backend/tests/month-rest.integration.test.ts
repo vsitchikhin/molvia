@@ -120,7 +120,7 @@ describe('«Остаток» — деньги на счетах на конец 
     expect(march.rest).toEqual({
       total: rub(20000),
       spendable: rub(10000),
-      uncounted: [],
+      uncounted: { total: [], spendable: [] },
       operationsUncounted: { total: 0, spendable: 0 },
     })
     expect(march.accountsFrom).toBe('2025-03-10')
@@ -180,9 +180,10 @@ describe('«Остаток» — деньги на счетах на конец 
       total: rub(1000),
       spendable: rub(1000),
       // An empty account needs no rate and is named nowhere (adversarial Д).
-      uncounted: [
-        { name: 'Евро дома', balance: { minor: 847000n, currency: 'EUR' }, savings: true },
-      ],
+      uncounted: {
+        total: [{ name: 'Евро дома', balance: { minor: 847000n, currency: 'EUR' } }],
+        spendable: [],
+      },
       operationsUncounted: { total: 0, spendable: 0 },
     })
   })

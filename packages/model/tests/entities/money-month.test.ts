@@ -420,7 +420,7 @@ describe('«Остаток» — деньги на счетах на конец 
     expect(result.rest).toEqual({
       total: toMoney('783425 RUB'),
       spendable: toMoney('46405 RUB'),
-      uncounted: [],
+      uncounted: { total: [], spendable: [] },
       operationsUncounted: { total: 0, spendable: 0 },
     })
     expect(result.accountsFrom).toBe('2026-09-16')
@@ -446,7 +446,8 @@ describe('«Остаток» — деньги на счетах на конец 
     expect(result.rest).toEqual({
       total: toMoney('100 RUB'),
       spendable: toMoney('100 RUB'),
-      uncounted: [{ name: 'Евро дома', balance: toMoney('8470 EUR'), savings: true }],
+      // Savings: missing from «всего» only (adversarial А, З).
+      uncounted: { total: [{ name: 'Евро дома', balance: toMoney('8470 EUR') }], spendable: [] },
       operationsUncounted: { total: 0, spendable: 0 },
     })
   })
@@ -459,10 +460,43 @@ describe('«Остаток» — деньги на счетах на конец 
         { balance: '1 EUR', minor: -10000n, name: 'Евро-карта' },
       ]),
     })
-    expect(result.rest?.uncounted).toEqual([
-      { name: 'Евро дома', balance: toMoney('100 EUR'), savings: true },
-      { name: 'Евро-карта', balance: money(-10000n, 'EUR'), savings: false },
-    ])
+    // «Всего» is whole — the euros come to nothing — and «без сбережений» misses the card alone.
+    expect(result.rest).toMatchObject({
+      total: toMoney('1000 RUB'),
+      spendable: toMoney('1000 RUB'),
+      uncounted: {
+        total: [],
+        spendable: [{ name: 'Евро-карта', balance: money(-10000n, 'EUR') }],
+      },
+    })
+  })
+
+  it('names under a figure only what that figure misses (adversarial З)', () => {
+    // Two cards of ±100 € and a safe of 50 €: «без сбережений» is whole, «всего» misses the safe…
+    const cards = month({
+      held: held([
+        { balance: '1000 RUB' },
+        { balance: '100 EUR', name: 'Карта 1 €' },
+        { balance: '1 EUR', minor: -10000n, name: 'Карта 2 €' },
+        { balance: '50 EUR', savings: true, name: 'Сейф €' },
+      ]),
+    })
+    expect(cards.rest?.uncounted).toEqual({
+      total: [
+        { name: 'Карта 1 €', balance: toMoney('100 EUR') },
+        { name: 'Карта 2 €', balance: money(-10000n, 'EUR') },
+        { name: 'Сейф €', balance: toMoney('50 EUR') },
+      ],
+      spendable: [],
+    })
+    // …and a safe of +100 € beside a card of −100 €: «всего» is whole.
+    const safe = month({
+      held: held([
+        { balance: '100 EUR', savings: true, name: 'Сейф €' },
+        { balance: '1 EUR', minor: -10000n, name: 'Карта €' },
+      ]),
+    })
+    expect(safe.rest?.uncounted.total).toEqual([])
   })
 
   it('counts the operations no rate counted for each figure: the savings miss «всего» only (Б, Е)', () => {
@@ -479,7 +513,10 @@ describe('«Остаток» — деньги на счетах на конец 
     const result = month({
       held: held([{ balance: '1000 RUB' }, { balance: '0 EUR', name: 'Евро-кошелёк' }]),
     })
-    expect(result.rest).toMatchObject({ total: toMoney('1000 RUB'), uncounted: [] })
+    expect(result.rest).toMatchObject({
+      total: toMoney('1000 RUB'),
+      uncounted: { total: [], spendable: [] },
+    })
     // A currency that cannot be counted names its accounts with money, not the empty ones.
     const mixed = month({
       held: held([
@@ -487,7 +524,7 @@ describe('«Остаток» — деньги на счетах на конец 
         { balance: '50 EUR', name: 'Кошелёк' },
       ]),
     })
-    expect(mixed.rest?.uncounted.map((entry) => entry.name)).toEqual(['Кошелёк'])
+    expect(mixed.rest?.uncounted.total.map((entry) => entry.name)).toEqual(['Кошелёк'])
   })
 
   it('converts one sum per currency: the same money on one account or two is the same rest (В)', () => {
@@ -507,7 +544,7 @@ describe('«Остаток» — деньги на счетах на конец 
       ]),
     })
     expect(result.rest?.total).toEqual(toMoney('20 RUB'))
-    expect(result.rest?.uncounted.map((entry) => entry.balance)).toEqual([
+    expect(result.rest?.uncounted.total.map((entry) => entry.balance)).toEqual([
       money(5n * 10n ** 18n, 'RUB'),
       money(5n * 10n ** 18n, 'RUB'),
     ])
