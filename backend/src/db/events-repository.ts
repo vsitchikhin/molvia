@@ -15,9 +15,15 @@ export type RecordedEvent = EventInput & {
 export interface CohortReturn {
   readonly cohortSize: number
   readonly returned: number
-  /** With access, but their fourth week is not over yet: not in the cohort (MOL-91). */
+  /**
+   * Their fourth week is not over yet, with access or without: no answer yet, not in the cohort
+   * (MOL-91). Whether they will have had access is not known until then — it can still be granted.
+   */
   readonly pending: number
-  /** Appeared in the window with no access reaching their fourth week: not in the cohort (Р-24). */
+  /**
+   * Their fourth week is over, and no access reached it: not in the cohort (Р-24). A fact, not a
+   * forecast — decided only for those whose window has closed (adversarial А).
+   */
   readonly withoutAccess: number
 }
 
@@ -132,9 +138,19 @@ export function createEventRepository(db: Conn): EventRepository {
           where ${actors.createdAt} >= ${from.toISOString()}::timestamptz
             and ${actors.createdAt} <  ${to.toISOString()}::timestamptz
         ),
-        with_access as (
-          select actor_id, started
+        closed as (
+          select actor_id, started, shared_until
           from appeared
+          -- Time first, access after (MOL-91, adversarial А). A fourth week still going is no
+          -- answer yet, as gate 0.2 keeps its open windows out: counted now, a person who came
+          -- last week reads as one who did not come back. And whether access reached that week
+          -- is not known before it: judged by today's access, a newcomer read «no access in week
+          -- 4» eighteen days early, and moved to «waiting» the day access was granted.
+          where started + interval '672 hours' <= now()
+        ),
+        cohort as (
+          select actor_id, started
+          from closed
           -- Only those who could have answered the question (Р-24). The numerator is behind
           -- a paid door — advice_viewed is written in the shared mode alone — so counting
           -- everyone who ever appeared put people in the denominator who had nothing to come
@@ -149,14 +165,6 @@ export function createEventRepository(db: Conn): EventRepository {
           -- that is a task, not a line.
           where shared_until >= started + interval '504 hours'
         ),
-        cohort as (
-          select actor_id, started
-          from with_access
-          -- A fourth week still going is no answer yet (MOL-91), as gate 0.2 keeps its open
-          -- windows out: counted now, a person who came last week reads as one who did not
-          -- come back.
-          where started + interval '672 hours' <= now()
-        ),
         came_back as (
           select distinct c.actor_id
           from cohort c
@@ -169,8 +177,8 @@ export function createEventRepository(db: Conn): EventRepository {
         select
           (select count(*) from cohort)::int as cohort_size,
           (select count(*) from came_back)::int as returned,
-          (select count(*) from with_access)::int - (select count(*) from cohort)::int as pending,
-          (select count(*) from appeared)::int - (select count(*) from with_access)::int as without_access
+          (select count(*) from appeared)::int - (select count(*) from closed)::int as pending,
+          (select count(*) from closed)::int - (select count(*) from cohort)::int as without_access
       `)
 
       const row = rows[0]
