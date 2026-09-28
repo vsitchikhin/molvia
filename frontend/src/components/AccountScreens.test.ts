@@ -26,6 +26,7 @@ import { routes } from '@/router'
 import { useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
+import { useTripQueueStore } from '@/stores/tripQueue'
 
 const checkAccount = vi.fn<(id: string, body: AccountCheckBody) => Promise<AccountCheckResponse>>()
 const moneyAccounts = vi.fn<() => Promise<MoneyAccountsResponse>>()
@@ -47,6 +48,7 @@ vi.mock('@/api', () => ({
 const OWNER = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const OTHER = 'ffffffff-0000-4000-8000-00000000000d'
 const TAXI = 'eeeeeeee-0000-4000-8000-000000000001'
+const TRIP = 'eeeeeeee-0000-4000-8000-000000000002'
 /** Drams, below zero too — an account in debt, a spending out. */
 function amd(text: string) {
   const money = parseMoney(text.replace('-', ''), 'AMD')
@@ -303,6 +305,41 @@ describe('ReconcileSheet (handoff 05)', () => {
     await flushPromises()
     expect(view.text()).toContain(en.accounts.reconcile.match_title)
     expect(button(view, /Record the difference/)).toBeUndefined()
+  })
+
+  it('review 33: a count answered while a trip’s removal waits stays muted until it lands', async () => {
+    checkAccount.mockResolvedValue(answer('185000', '190132'))
+    const pinia = withAccounts([cash])
+    const trips = useTripQueueStore(pinia)
+    trips.pending = [{ kind: 'delete', tripId: TRIP }]
+    const view = await reconcile(pinia)
+    await view.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    expect(view.get('.difference').classes()).toContain('stale')
+    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
+
+    checkAccount.mockResolvedValue(answer('185000', '185000'))
+    trips.pending = []
+    trips.wrote++
+    await flushPromises()
+    expect(checkAccount).toHaveBeenCalledTimes(2)
+    expect(view.text()).toContain(en.accounts.reconcile.match_title)
+  })
+
+  it('review 34: offline is said once, and goes when the connection comes back', async () => {
+    checkAccount.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'offline', false))
+    const view = await reconcile(withAccounts([cash]))
+    await view.get('input').setValue('185000')
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    await view.setProps({ online: false })
+    expect(view.findAll('.strip')).toHaveLength(1)
+    expect(view.find('[role="alert"]').exists()).toBe(false)
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    await view.setProps({ online: true })
+    expect(view.findAll('.strip')).toHaveLength(0)
   })
 
   it('offline the check waits for the connection, and is not red', async () => {

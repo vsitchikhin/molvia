@@ -106,11 +106,9 @@
     </div>
 
     <template #footer>
-      <!-- Offline or the server: decided after the failure, and offline is never red (MOL-19). -->
-      <p v-if="failure === 'offline'" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('accounts.reconcile.offline') }}
-      </p>
-      <div v-else-if="failure === 'error'" class="failed" role="alert">
+      <!-- Offline or the server: decided after the failure, and offline is never red (MOL-19).
+           Offline is said above, by the connection itself, and goes with it (review 34). -->
+      <div v-if="failure === 'error'" class="failed" role="alert">
         <span>{{ t('accounts.reconcile.failed') }}</span>
         <AppButton v-if="result" variant="ghost" @click="recount(true)">
           {{ t('state.retry') }}
@@ -319,6 +317,11 @@ export default defineComponent({
         result.value = answer
         differenceId = newId()
         written.value = false
+        // What still waits in a queue is not in this count: the difference stays muted and is asked
+        // again once it lands — a trip's removal among it, whose reason is hidden (review 33).
+        const waiting = !landedAll()
+        recountPending.value = waiting
+        recountOnLanding = waiting
         // The account's «сверено» and, when it came out even, its window moved.
         void store.refresh()
         return true
@@ -371,7 +374,6 @@ export default defineComponent({
       // A failure keeps the difference stale and «Повторить» beside it: nothing is written over a
       // count that was not asked (review 15).
       if (!(await ask(sent))) return
-      recountPending.value = false
       if (say) {
         announce?.(t('accounts.reconcile.recounted'))
         sayResult(result.value)
@@ -379,21 +381,27 @@ export default defineComponent({
     }
 
     /**
-     * Whether what was put right has reached the server: no spending and no account of a trip still
-     * waiting. Not «some queue landed» — a spending landing first recounted before the trip's account
-     * did, and «Записать разницу» wrote the same money a second time (review 15, adversarial В).
+     * Whether what was put right has reached the server: no spending, no account of a trip and no
+     * trip's removal or return still waiting. Not «some queue landed» — a spending landing first
+     * recounted before the trip's account did, and «Записать разницу» wrote the same money a second
+     * time (review 15, adversarial В); a trip being removed is hidden from the reasons while the
+     * server still counts it (review 33).
      */
     function landedAll(): boolean {
       return (
-        spendings.pending.length === 0 && !trips.pending.some((write) => write.kind === 'payment')
+        spendings.pending.length === 0 &&
+        !trips.pending.some(
+          ({ kind }) => kind === 'payment' || kind === 'delete' || kind === 'restore',
+        )
       )
     }
 
     // A spending is put right through the queue, a trip too: its answer comes after the sheet, and
-    // the count is asked again once it has — any landing will do, the check is cheap.
+    // the count is asked again once it has — any landing will do, the check is cheap. The queues
+    // emptying count too: a write set aside lands nowhere.
     let recountOnLanding = false
     watch(
-      () => [spendings.landed, trips.wrote],
+      () => [spendings.landed, trips.wrote, landedAll()],
       () => {
         if (!recountOnLanding || !landedAll()) return
         recountOnLanding = false
