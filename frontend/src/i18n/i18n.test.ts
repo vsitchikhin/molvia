@@ -293,6 +293,7 @@ describe('словарь: плюральные формы', () => {
       'sign_out.unsent',
       'accounts.more',
       'accounts.unassigned',
+      'accounts.screen.uncounted',
       'accounts.account.more',
       'accounts.reconcile.cause_trip_unpriced_meta',
     ])

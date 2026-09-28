@@ -999,7 +999,6 @@
     "screen": {
       "spendable": "Spendable",
       "rate": "At my rate: {rates}",
-      "rate_item": "{rate} per 1 {sign}",
       "row_checked": "{currency} · checked {date}",
       "row_started": "{currency} · started {date}",
       "row_open": "Open account:",
@@ -1018,7 +1017,11 @@
       },
       "error": {
         "title": "Couldn't load accounts"
-      }
+      },
+      "offline_empty": "The accounts will show once the connection is back",
+      "uncounted": "{n} account not counted — no rate | {n} accounts not counted — no rate",
+      "rate_official": "At the CBA rate: {rates}",
+      "rate_mixed": "At the day’s rates: {rates}"
     },
     "account": {
       "edit": "Edit",
@@ -1043,7 +1046,9 @@
       "to_list": "To accounts",
       "error": {
         "title": "Couldn't load the account"
-      }
+      },
+      "row_open": "Open entry:",
+      "archived": "Taken out of the choice on {date}. Its history and balance stay"
     },
     "sheet": {
       "title_add": "New account",
@@ -1105,7 +1110,9 @@
       "written": "Recorded “Other · check”: {amount}",
       "saved_match": "Check saved",
       "saved_mismatch": "Check saved, a difference remains",
-      "note": "check"
+      "note": "check",
+      "cause_no_account_trip": "Trip {amount} with no account",
+      "cause_uncounted": "{title} — no rate to count it by"
     },
     "picker": {
       "row_spending": "Account",

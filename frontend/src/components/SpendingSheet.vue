@@ -1,5 +1,10 @@
 <template>
-  <BottomSheet :open="open" :on-closed="afterClose" @update:open="$emit('update:open', $event)">
+  <BottomSheet
+    :open="open"
+    :back="back"
+    :on-closed="afterClose"
+    @update:open="$emit('update:open', $event)"
+  >
     <template #title>{{ title }}</template>
     <template v-if="meta" #meta>{{ meta }}</template>
 
@@ -228,6 +233,8 @@ export default defineComponent({
   },
   props: {
     open: { type: Boolean, required: true },
+    /** Opened over another sheet — a check, «не попали» (MOL-123): «‹» back to it, no ×. */
+    back: { type: Boolean, default: false },
     target: { type: Object as PropType<SpendingTarget>, required: true },
     categories: { type: Array as PropType<SpendingCategoryView[]>, required: true },
     nameOf: {

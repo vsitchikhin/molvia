@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
+  <BottomSheet :open="open" :back="back" @update:open="$emit('update:open', $event)">
     <template #title>{{
       t(editing ? 'exchange.sheet.title_amend' : 'exchange.sheet.title')
     }}</template>
@@ -141,6 +141,8 @@ export default defineComponent({
   components: { AppButton, AppField, BottomSheet },
   props: {
     open: { type: Boolean, required: true },
+    /** Opened over another sheet — a check, «не попали» (MOL-123): «‹» back to it, no ×. */
+    back: { type: Boolean, default: false },
     overview: { type: Object as PropType<ExchangesResponse>, required: true },
     /** The write itself, bound by the screen: it lands the answer on the screen it came from. */
     record: {

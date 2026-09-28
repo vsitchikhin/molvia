@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
+  <BottomSheet :open="open" :back="back" @update:open="$emit('update:open', $event)">
     <template #title>{{ t(editing ? 'income.sheet.title_amend' : 'income.sheet.title') }}</template>
     <template #meta>{{ t('income.sheet.meta') }}</template>
 
@@ -145,6 +145,8 @@ export default defineComponent({
   components: { AppButton, AppField, BottomSheet },
   props: {
     open: { type: Boolean, required: true },
+    /** Opened over another sheet — a check, «не попали» (MOL-123): «‹» back to it, no ×. */
+    back: { type: Boolean, default: false },
     overview: { type: Object as PropType<IncomesResponse>, required: true },
     record: {
       type: Function as PropType<(body: IncomeBody) => Promise<unknown>>,

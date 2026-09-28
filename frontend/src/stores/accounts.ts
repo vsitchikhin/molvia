@@ -82,6 +82,16 @@ export const useAccountsStore = defineStore('accounts', () => {
   const trips = useTripQueueStore()
 
   const shown = ref<MoneyAccountsResponse | null>(null)
+  /**
+   * The account just deleted, offered back on «Счета» for the ten seconds of its strip — wherever it
+   * was deleted from: its own screen leads back to the page (handoff 03). The server keeps it ten
+   * minutes; the strip is what the screen offers.
+   */
+  const removed = ref<{
+    readonly id: string
+    readonly name: string
+    readonly stamp: number
+  } | null>(null)
   const failure = ref<'offline' | 'error' | null>(null)
   /** The answer on screen came in this session, not from the phone's memory. */
   const confirmed = ref(false)
@@ -89,6 +99,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   function adopt(): void {
     const id = actor.id
     shown.value = id ? recallOverview(id) : null
+    removed.value = null
     failure.value = null
     confirmed.value = false
   }
@@ -170,6 +181,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (!shown.value || confirmed.value) return null
       return failure.value ?? 'loading'
     }),
+    removed,
     refresh,
     accept,
   }

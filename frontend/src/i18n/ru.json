@@ -999,7 +999,6 @@
     "screen": {
       "spendable": "Можно тратить",
       "rate": "По моему курсу: {rates}",
-      "rate_item": "{rate} за 1 {sign}",
       "row_checked": "{currency} · сверено {date}",
       "row_started": "{currency} · старт {date}",
       "row_open": "Открыть счёт:",
@@ -1018,7 +1017,11 @@
       },
       "error": {
         "title": "Не удалось загрузить счета"
-      }
+      },
+      "offline_empty": "Счета появятся, когда интернет вернётся",
+      "uncounted": "{n} счёт не посчитан — нет курса | {n} счёта не посчитаны — нет курса | {n} счетов не посчитаны — нет курса",
+      "rate_official": "По курсу ЦБ РА: {rates}",
+      "rate_mixed": "По курсу дня: {rates}"
     },
     "account": {
       "edit": "Править",
@@ -1043,7 +1046,9 @@
       "to_list": "К счетам",
       "error": {
         "title": "Не удалось загрузить счёт"
-      }
+      },
+      "row_open": "Открыть операцию:",
+      "archived": "Убран из выбора {date}. История и остаток сохранены"
     },
     "sheet": {
       "title_add": "Новый счёт",
@@ -1105,7 +1110,9 @@
       "written": "Записано «Прочее · сверка»: {amount}",
       "saved_match": "Сверка записана",
       "saved_mismatch": "Сверка записана, разница осталась",
-      "note": "сверка"
+      "note": "сверка",
+      "cause_no_account_trip": "Поход {amount} без счёта",
+      "cause_uncounted": "{title} — нечем пересчитать"
     },
     "picker": {
       "row_spending": "Счёт",
