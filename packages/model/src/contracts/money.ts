@@ -98,10 +98,13 @@ export const moneyMonthCodec = z.strictObject({
     .strictObject({
       total: signedMoneyCodec,
       spendable: signedMoneyCodec,
-      uncounted: z.array(signedMoneyCodec),
+      uncounted: z.array(z.strictObject({ balance: signedMoneyCodec, savings: z.boolean() })),
+      operationsUncounted: z.int().min(0),
     })
     .nullable(),
   accountsFrom: exchangeDaySchema.nullable(),
+  /** Every account there is was removed: the way to one is «Вернуть», not «Завести счёт». */
+  accountsRemoved: z.boolean(),
   rate: rateCodec.nullable(),
   rateKind: z.enum(['live', 'frozen']),
   previousSpent: moneyCodec.nullable(),
@@ -183,6 +186,7 @@ export function moneyMonthViewOf(
     income: month.income,
     rest: month.rest && { ...month.rest, uncounted: [...month.rest.uncounted] },
     accountsFrom: month.accountsFrom,
+    accountsRemoved: month.accountsRemoved,
     rate: month.rate,
     rateKind: month.rateKind,
     uncounted: [...month.uncounted],

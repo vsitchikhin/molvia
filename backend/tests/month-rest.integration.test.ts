@@ -85,6 +85,7 @@ async function spend(
   amount: string,
   spentOn: string,
   accountId: string | null,
+  currency = 'AMD',
 ): Promise<{ id: string; revision: number; body: Record<string, unknown> }> {
   const categories = spendingCategoriesResponseCodec.parse(
     (await call(me, 'GET', '/spending-categories')).json(),
@@ -92,7 +93,7 @@ async function spend(
   const body = {
     id: randomUUID(),
     spentOn,
-    amount: { amount, currency: 'AMD' },
+    amount: { amount, currency },
     categoryId: categories.categories[0]?.id,
     note: 'аренда',
     accountId,
@@ -116,7 +117,12 @@ describe('«Остаток» — деньги на счетах на конец 
 
     const march = await month(me, '2025-03')
     // 36 900 ֏ at 4,1 ֏/₽ is 9 000 ₽; 100 $ at 410 ֏ is 10 000 ₽.
-    expect(march.rest).toEqual({ total: rub(20000), spendable: rub(10000), uncounted: [] })
+    expect(march.rest).toEqual({
+      total: rub(20000),
+      spendable: rub(10000),
+      uncounted: [],
+      operationsUncounted: 0,
+    })
     expect(march.accountsFrom).toBe('2025-03-10')
   })
 
@@ -172,7 +178,55 @@ describe('«Остаток» — деньги на счетах на конец 
     expect((await month(me, '2025-03')).rest).toEqual({
       total: rub(1000),
       spendable: rub(1000),
-      uncounted: [{ minor: 847000n, currency: 'EUR' }],
+      uncounted: [{ balance: { minor: 847000n, currency: 'EUR' }, savings: true }],
+      operationsUncounted: 0,
+    })
+  })
+
+  it('операция, которую нечем посчитать, названа числом — остаток не выглядит целым (Б)', async () => {
+    const me = await owner()
+    const card = await account(me, 'AMD', '41000')
+    await spend(me, '10', '2025-03-20', card, 'EUR')
+    const march = await month(me, '2025-03')
+    expect(march.rest).toMatchObject({ total: rub(10000), operationsUncounted: 1 })
+    // The next month carries the same account, and says the same.
+    expect((await month(me, '2025-04')).rest).toMatchObject({ operationsUncounted: 1 })
+  })
+
+  it('закрытый месяц считает счета в валюте трат по замороженному курсу, а не по новому (№6)', async () => {
+    const me = await owner()
+    const cash = await account(me, 'AMD', '41000')
+    await spend(me, '4100', '2025-03-20', cash)
+    expect((await month(me, '2025-03')).rest?.total).toEqual(rub(9000))
+    // The cache learns another rate for the same day: the frozen month keeps its own.
+    await rates.upsert([official('RUB', '5', '2025-03-31')])
+    const again = await month(me, '2025-03')
+    expect(again.rateKind).toBe('frozen')
+    expect(again.rest?.total).toEqual(rub(9000))
+  })
+
+  it('следующая страница журнала остатка не считает: телефон берёт его с первой (№3)', async () => {
+    const me = await owner()
+    await account(me, 'RUB', '1000')
+    const response = await call(
+      me,
+      'GET',
+      `/money/months/2025-03?cursor=2025-03-31~9999999999999~${randomUUID()}`,
+    )
+    expect(response.statusCode, response.body).toBe(200)
+    expect(moneyMonthCodec.parse(response.json()).rest).toBeNull()
+    expect((await month(me, '2025-03')).rest?.total).toEqual(rub(1000))
+  })
+
+  it('все счета убраны — «Завести счёт» не предлагается: accountsRemoved (№4)', async () => {
+    const me = await owner()
+    const card = await account(me, 'AMD', '41000')
+    await spend(me, '4100', '2025-03-20', card)
+    expect((await call(me, 'DELETE', `/money/accounts/${card}`)).statusCode).toBe(200)
+    expect(await month(me, '2025-03')).toMatchObject({
+      rest: null,
+      accountsFrom: null,
+      accountsRemoved: true,
     })
   })
 
@@ -180,6 +234,10 @@ describe('«Остаток» — деньги на счетах на конец 
     const me = await owner()
     const stranger = await owner()
     await account(stranger, 'RUB', '1000')
-    expect(await month(me, '2025-03')).toMatchObject({ rest: null, accountsFrom: null })
+    expect(await month(me, '2025-03')).toMatchObject({
+      rest: null,
+      accountsFrom: null,
+      accountsRemoved: false,
+    })
   })
 })

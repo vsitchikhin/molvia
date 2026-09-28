@@ -109,10 +109,12 @@ export interface MoneyMonth {
   /**
    * «Остаток» (MOL-134): what the accounts held at the end of the month, in the income currency —
    * null where no account had started by then. `accountsFrom` is the earliest start of a live
-   * account, null when there is none: «Счета начинаются 16 сент.» or «Завести счёт».
+   * account, null when there is none: «Счета начинаются 16 сент.»; with none, «Завести счёт» — unless
+   * every account there is was removed (`accountsRemoved`), when the way is «Вернуть» (review 4).
    */
   readonly rest: MonthRest | null
   readonly accountsFrom: string | null
+  readonly accountsRemoved: boolean
   readonly rate: ExchangeRate | null
   readonly rateKind: 'live' | 'frozen'
   /** The spending currency's sum per category, largest first; categories with nothing left out. */
@@ -123,13 +125,22 @@ export interface MoneyMonth {
 
 /**
  * The money on the accounts at the end of a month (MOL-134, В-1): everything, and everything but the
- * savings — the words of «Счета», «всего» and «можно тратить». Signed: a card in debt takes away. A
- * balance nothing converts is not a zero but said apart, in its own currency (п. 5).
+ * savings — the words of «Счета», «всего» and «можно тратить». Signed: a card in debt takes away.
  */
 export interface MonthRest {
   readonly total: Money
   readonly spendable: Money
-  readonly uncounted: readonly Money[]
+  /**
+   * The accounts nothing converts, each on its own and in its own currency, never a zero (п. 5) —
+   * the savings marked, since only «всего» misses those: summed into one figure per currency, savings
+   * and a card in debt cancelled out and «не посчитано: 0 €» stood under both (adversarial А).
+   */
+  readonly uncounted: readonly { readonly balance: Money; readonly savings: boolean }[]
+  /**
+   * Operations on those accounts no rate counted: in no balance, which «Счета» says of each account
+   * and the month must say too — the figure looked whole in this month and every one after (Б).
+   */
+  readonly operationsUncounted: number
 }
 
 /**
@@ -138,8 +149,15 @@ export interface MonthRest {
  * spending currency, the rule of «Деньги» on the day for any other. Converted with its sign kept.
  */
 export interface MonthHeld {
-  readonly balances: readonly { readonly balance: Money; readonly savings: boolean }[]
+  readonly balances: readonly {
+    readonly balance: Money
+    readonly savings: boolean
+    /** Its operations no rate counted (`accountBalance`). */
+    readonly uncounted: number
+  }[]
   readonly accountsFrom: string | null
+  readonly accountsRemoved: boolean
+  /** A sum of one currency into the income one, sign kept; null — nothing to count it by. */
   readonly inIncome: (balance: Money) => Money | null
 }
 
@@ -189,32 +207,47 @@ function holds(minor: bigint): boolean {
   return minor <= INT8_MAX && minor >= -INT8_MAX
 }
 
-/** «Остаток»: every balance into the income currency, one no money can hold said apart (MOL-66). */
+/**
+ * «Остаток»: the balances of one currency summed exactly and converted once — each account rounded on
+ * its own made two accounts of 2,02 ֏ a kopeck short of one of 4,04 ֏, and «Rounding happens on output
+ * only» (adversarial В). A currency nothing converts, or no money can hold, is said apart account by
+ * account (MOL-66).
+ */
 function restOf(held: MonthHeld | undefined, currency: Currency): MonthRest | null {
   if (!held || held.balances.length === 0) return null
+  const byCurrency = new Map<Currency, MonthHeld['balances'][number][]>()
+  for (const entry of held.balances) {
+    const code = entry.balance.currency
+    byCurrency.set(code, [...(byCurrency.get(code) ?? []), entry])
+  }
   let total = 0n
   let spendable = 0n
-  const uncounted = new Map<Currency, bigint>()
-  for (const { balance, savings } of held.balances) {
-    const value = held.inIncome(balance)
+  const uncounted: MonthRest['uncounted'][number][] = []
+  for (const code of [...byCurrency.keys()].sort()) {
+    const accounts = byCurrency.get(code) ?? []
+    const sum = (pick: (entry: MonthHeld['balances'][number]) => boolean) =>
+      accounts.filter(pick).reduce((minor, entry) => minor + entry.balance.minor, 0n)
+    const all = sum(() => true)
+    const own = sum((entry) => !entry.savings)
+    const allIn = holds(all) ? held.inIncome({ minor: all, currency: code }) : null
+    const ownIn = holds(own) ? held.inIncome({ minor: own, currency: code }) : null
     if (
-      value === null ||
-      !holds(total + value.minor) ||
-      (!savings && !holds(spendable + value.minor))
+      allIn === null ||
+      ownIn === null ||
+      !holds(total + allIn.minor) ||
+      !holds(spendable + ownIn.minor)
     ) {
-      add(uncounted, balance)
+      uncounted.push(...accounts.map(({ balance, savings }) => ({ balance, savings })))
       continue
     }
-    total += value.minor
-    if (!savings) spendable += value.minor
+    total += allIn.minor
+    spendable += ownIn.minor
   }
   return {
     total: { minor: total, currency },
     spendable: { minor: spendable, currency },
-    uncounted: [...uncounted]
-      .filter(([, minor]) => holds(minor))
-      .map(([code, minor]) => ({ minor, currency: code }))
-      .sort((a, b) => (a.currency < b.currency ? -1 : a.currency > b.currency ? 1 : 0)),
+    uncounted,
+    operationsUncounted: held.balances.reduce((count, entry) => count + entry.uncounted, 0),
   }
 }
 
@@ -380,6 +413,7 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
     shiftedOut: daysOf(shiftedOut),
     rest: restOf(input.held, incomeCurrency),
     accountsFrom: input.held?.accountsFrom ?? null,
+    accountsRemoved: input.held?.accountsRemoved ?? false,
     rate: spend === incomeCurrency ? null : input.rate,
     rateKind: input.rateKind,
     byCategory: [...byCategory]

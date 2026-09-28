@@ -281,11 +281,14 @@ export function balancesOn(
   operations: readonly AccountOperation[],
   day: string,
   rateOf: RateBetween,
-): { readonly account: MoneyAccount; readonly balance: Money }[] {
+): { readonly account: MoneyAccount; readonly balance: Money; readonly uncounted: number }[] {
   const until = operations.filter((operation) => operation.day <= day)
   return accounts
     .filter((account) => account.archivedAt === null && account.startOn <= day)
-    .map((account) => ({ account, balance: accountBalance(account, until, rateOf).balance }))
+    .map((account) => {
+      const { balance, uncounted } = accountBalance(account, until, rateOf)
+      return { account, balance, uncounted }
+    })
 }
 
 /**

@@ -388,14 +388,17 @@ describe('«Остаток» — деньги на счетах на конец 
           ? convertSigned(balance, rate('USD', 'RUB', '86'))
           : null
   const held = (
-    balances: { balance: string; savings?: boolean; minor?: bigint }[],
+    balances: { balance: string; savings?: boolean; minor?: bigint; uncounted?: number }[],
     accountsFrom: string | null = '2026-09-16',
+    accountsRemoved = false,
   ): MonthHeld => ({
-    balances: balances.map(({ balance, savings = false, minor }) => ({
+    balances: balances.map(({ balance, savings = false, minor, uncounted = 0 }) => ({
       balance: minor === undefined ? toMoney(balance) : money(minor, toMoney(balance).currency),
       savings,
+      uncounted,
     })),
     accountsFrom,
+    accountsRemoved,
     inIncome,
   })
 
@@ -411,6 +414,7 @@ describe('«Остаток» — деньги на счетах на конец 
       total: toMoney('783425 RUB'),
       spendable: toMoney('46405 RUB'),
       uncounted: [],
+      operationsUncounted: 0,
     })
     expect(result.accountsFrom).toBe('2026-09-16')
   })
@@ -432,19 +436,56 @@ describe('«Остаток» — деньги на счетах на конец 
     expect(result.rest).toEqual({
       total: toMoney('100 RUB'),
       spendable: toMoney('100 RUB'),
-      uncounted: [toMoney('8470 EUR')],
+      uncounted: [{ balance: toMoney('8470 EUR'), savings: true }],
+      operationsUncounted: 0,
     })
   })
 
-  it('leaves out what money cannot hold rather than failing the month', () => {
+  it('names every account nothing converts on its own: savings and a debt never cancel out (А)', () => {
+    const result = month({
+      held: held([
+        { balance: '1000 RUB' },
+        { balance: '100 EUR', savings: true },
+        { balance: '1 EUR', minor: -10000n },
+      ]),
+    })
+    expect(result.rest?.uncounted).toEqual([
+      { balance: toMoney('100 EUR'), savings: true },
+      { balance: money(-10000n, 'EUR'), savings: false },
+    ])
+  })
+
+  it('counts the operations no rate counted, as «Счета» says of each account (Б)', () => {
+    const result = month({
+      held: held([
+        { balance: '100 RUB', uncounted: 1 },
+        { balance: '5 RUB', uncounted: 2 },
+      ]),
+    })
+    expect(result.rest?.operationsUncounted).toBe(3)
+  })
+
+  it('converts one sum per currency: the same money on one account or two is the same rest (В)', () => {
+    // 2,02 ֏ is 0,404 ₽ — rounded per account, two of them made 0,80 ₽ where 4,04 ֏ is 0,81 ₽.
+    const two = month({ held: held([{ balance: '2.02 AMD' }, { balance: '2.02 AMD' }]) })
+    const one = month({ held: held([{ balance: '4.04 AMD' }]) })
+    expect(two.rest?.total).toEqual(one.rest?.total)
+    expect(one.rest?.total).toEqual(toMoney('0.81 RUB'))
+  })
+
+  it('leaves out a currency whose sum money cannot hold, account by account', () => {
     const result = month({
       held: held([
         { balance: '1 RUB', minor: 5n * 10n ** 18n },
         { balance: '1 RUB', minor: 5n * 10n ** 18n },
+        { balance: '100 AMD' },
       ]),
     })
-    expect(result.rest?.total).toEqual(money(5n * 10n ** 18n, 'RUB'))
-    expect(result.rest?.uncounted).toEqual([money(5n * 10n ** 18n, 'RUB')])
+    expect(result.rest?.total).toEqual(toMoney('20 RUB'))
+    expect(result.rest?.uncounted).toEqual([
+      { balance: money(5n * 10n ** 18n, 'RUB'), savings: false },
+      { balance: money(5n * 10n ** 18n, 'RUB'), savings: false },
+    ])
   })
 
   it('has no rest before the first account, and says when the accounts begin (В-4)', () => {
@@ -452,7 +493,9 @@ describe('«Остаток» — деньги на счетах на конец 
     expect(august.rest).toBeNull()
     expect(august.accountsFrom).toBe('2026-09-16')
     const none = month({ held: held([], null) })
-    expect(none).toMatchObject({ rest: null, accountsFrom: null })
+    expect(none).toMatchObject({ rest: null, accountsFrom: null, accountsRemoved: false })
+    const removed = month({ held: held([], null, true) })
+    expect(removed).toMatchObject({ rest: null, accountsFrom: null, accountsRemoved: true })
   })
 })
 
@@ -501,7 +544,7 @@ describe('what the accounts held at the end of a day (MOL-134)', () => {
       spent(cash, '400 AMD', '2026-10-01'),
     ]
     expect(balancesOn([cash], operations, '2026-09-30', () => null)).toEqual([
-      { account: cash, balance: toMoney('800 AMD') },
+      { account: cash, balance: toMoney('800 AMD'), uncounted: 0 },
     ])
   })
 

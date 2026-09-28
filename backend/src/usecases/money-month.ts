@@ -140,11 +140,13 @@ async function heldAt(
   const live = accounts.filter((account) => account.archivedAt === null)
   const starts = live.map((account) => account.startOn).sort()
   return {
-    balances: balancesOn(live, operations, last, rateOf).map(({ account, balance }) => ({
+    balances: balancesOn(live, operations, last, rateOf).map(({ account, balance, uncounted }) => ({
       balance,
       savings: account.savings,
+      uncounted,
     })),
     accountsFrom: starts[0] ?? null,
+    accountsRemoved: live.length === 0 && accounts.length > 0,
     inIncome: (balance) => {
       if (balance.currency === income) return balance
       const by = foreign(balance.currency) ? rateOf(balance.currency, income, on) : rate
@@ -196,9 +198,16 @@ export async function moneyMonthOf(
     repositories.money.salaryShift(owner.id),
   ])
   const { rate, kind } = await monthRate(repositories, owner, rates, month, today)
-  const held = await heldAt(repositories, owner, rates, month, today, rate)
+  // The next page of the journal carries no rest: the phone keeps the first page's figures, and every
+  // account with its whole history was read for nothing on each «Показать ещё» (review 3).
+  const held =
+    cursor === undefined
+      ? heldAt(repositories, owner, rates, month, today, rate)
+      : Promise.resolve(undefined)
   const [counted, before] = await Promise.all([
-    count(repositories, owner, rates, month, categories, rate, kind, salaryShiftDay, held),
+    held.then((accounts) =>
+      count(repositories, owner, rates, month, categories, rate, kind, salaryShiftDay, accounts),
+    ),
     count(repositories, owner, rates, previousMonth(month), categories, null, 'frozen', null),
   ])
   // «−8 % к августу» needs an August: a month with nothing in it is no month to compare with.

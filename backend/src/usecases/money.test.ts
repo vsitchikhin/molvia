@@ -470,6 +470,7 @@ describe('moneyMonthOf (MOL-73)', () => {
       total: cash('9000 RUB'),
       spendable: cash('9000 RUB'),
       uncounted: [],
+      operationsUncounted: 0,
     })
     expect(view.accountsFrom).toBe('2026-09-16')
   })

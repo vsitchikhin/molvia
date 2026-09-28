@@ -1183,6 +1183,7 @@ describe('«Деньги» (MOL-82)', () => {
     shiftedOut: [],
     rest: null,
     accountsFrom: null,
+    accountsRemoved: false,
     rate: null,
     rateKind: 'live',
     previousSpent: null,

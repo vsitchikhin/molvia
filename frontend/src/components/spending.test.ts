@@ -61,6 +61,7 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     shiftedOut: [],
     rest: null,
     accountsFrom: null,
+    accountsRemoved: false,
     rate: null,
     rateKind: 'live',
     previousSpent: null,
