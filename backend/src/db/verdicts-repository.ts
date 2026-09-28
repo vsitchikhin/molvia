@@ -89,6 +89,11 @@ export interface RatingsGateQuery {
 export interface CohortReached {
   readonly cohortSize: number
   readonly reached: number
+  /**
+   * Appeared in the window, but their `windowHours` have not run out yet: not in the cohort, and
+   * named beside it, or the first two weeks of a release read «0 of 0» over ten people (MOL-91).
+   */
+  readonly pending: number
 }
 
 /**
@@ -548,15 +553,19 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
 
       // Counted from `actors.created_at`, in hours, as gate 0.3 counts its weeks: both halves
       // of the gates stand on one axis, and hours mean the same in every time zone.
-      const rows = await db.execute<{ cohort_size: number; reached: number }>(sql`
-        with cohort as (
+      const rows = await db.execute<{ cohort_size: number; reached: number; pending: number }>(sql`
+        with appeared as (
           select ${actors.id} as actor_id, ${actors.createdAt} as started
           from ${actors}
           where ${actors.createdAt} >= ${from.toISOString()}::timestamptz
             and ${actors.createdAt} <  ${to.toISOString()}::timestamptz
-            -- A window still open is no answer yet: counted now, a person who came last week
-            -- reads as one who failed, and the gate errs towards «stop» for no reason.
-            and ${actors.createdAt} + make_interval(hours => ${windowHours}::int) <= now()
+        ),
+        cohort as (
+          select actor_id, started
+          from appeared
+          -- A window still open is no answer yet: counted now, a person who came last week
+          -- reads as one who failed, and the gate errs towards «stop» for no reason.
+          where started + make_interval(hours => ${windowHours}::int) <= now()
         ),
         reached as (
           select c.actor_id
@@ -570,11 +579,16 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         )
         select
           (select count(*) from cohort)::int as cohort_size,
-          (select count(*) from reached)::int as reached
+          (select count(*) from reached)::int as reached,
+          (select count(*) from appeared)::int - (select count(*) from cohort)::int as pending
       `)
 
       const row = rows[0]
-      return { cohortSize: row?.cohort_size ?? 0, reached: row?.reached ?? 0 }
+      return {
+        cohortSize: row?.cohort_size ?? 0,
+        reached: row?.reached ?? 0,
+        pending: row?.pending ?? 0,
+      }
     },
   }
 }

@@ -49,6 +49,8 @@ describe('week-four return', () => {
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
       cohortSize: 0,
       returned: 0,
+      pending: 0,
+      withoutAccess: 0,
     })
   })
 
@@ -64,6 +66,8 @@ describe('week-four return', () => {
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
       cohortSize: 1,
       returned: 1,
+      pending: 0,
+      withoutAccess: 0,
     })
   })
 
@@ -79,10 +83,14 @@ describe('week-four return', () => {
     await expect(repository.weekFourReturn('venue', from, to)).resolves.toEqual({
       cohortSize: 1,
       returned: 1,
+      pending: 0,
+      withoutAccess: 0,
     })
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
       cohortSize: 1,
       returned: 0,
+      pending: 0,
+      withoutAccess: 0,
     })
   })
 
@@ -106,6 +114,8 @@ describe('week-four return', () => {
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
       cohortSize: 2,
       returned: 0,
+      pending: 0,
+      withoutAccess: 0,
     })
   })
 
@@ -123,6 +133,8 @@ describe('week-four return', () => {
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
       cohortSize: 1,
       returned: 1,
+      pending: 0,
+      withoutAccess: 0,
     })
   })
 
@@ -141,6 +153,8 @@ describe('week-four return', () => {
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
       cohortSize: 1,
       returned: 0,
+      pending: 0,
+      withoutAccess: 0,
     })
   })
 
@@ -154,6 +168,8 @@ describe('week-four return', () => {
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
       cohortSize: 1,
       returned: 0,
+      pending: 0,
+      withoutAccess: 0,
     })
   })
 
@@ -166,6 +182,8 @@ describe('week-four return', () => {
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
       cohortSize: 0,
       returned: 0,
+      pending: 0,
+      withoutAccess: 1,
     })
   })
 
@@ -185,6 +203,8 @@ describe('week-four return', () => {
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
       cohortSize: 1,
       returned: 0,
+      pending: 0,
+      withoutAccess: 1,
     })
   })
 
@@ -200,9 +220,94 @@ describe('week-four return', () => {
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
       cohortSize: 0,
       returned: 0,
+      pending: 0,
+      withoutAccess: 0,
     })
   })
 })
+
+describe('week-four return: a fourth week not over is no answer yet (MOL-91)', () => {
+  const MINUTE = 60 * 1000
+  const hoursAgo = (hours: number) => new Date(Date.now() - hours * HOUR)
+  // A window that reaches today, as the gates script passes one.
+  const gate = () => repository.weekFourReturn('product', daysAgo(60), new Date(Date.now() + DAY))
+
+  it('names a person inside their fourth week as waiting, even one who already looked', async () => {
+    // The very case the rule is for: counted now, they could only lower the rate — a visit
+    // later this week would have made them a return.
+    const actorId = await actorSeenAt(hoursAgo(600))
+    await repository.record({
+      actorId,
+      type: EVENT.ADVICE_VIEWED,
+      payload: { subject: 'product' },
+      occurredAt: hoursAgo(600 - 510),
+    })
+
+    await expect(gate()).resolves.toEqual({
+      cohortSize: 0,
+      returned: 0,
+      pending: 1,
+      withoutAccess: 0,
+    })
+  })
+
+  it('names a person whose fourth week has not begun as waiting', async () => {
+    await actorSeenAt(hoursAgo(100))
+
+    await expect(gate()).resolves.toEqual({
+      cohortSize: 0,
+      returned: 0,
+      pending: 1,
+      withoutAccess: 0,
+    })
+  })
+
+  it('counts a person whose fourth week ended a minute ago, and waits for one a minute short', async () => {
+    const done = await actorSeenAt(new Date(Date.now() - 672 * HOUR - MINUTE))
+    await repository.record({
+      actorId: done,
+      type: EVENT.ADVICE_VIEWED,
+      payload: { subject: 'product' },
+      occurredAt: new Date(Date.now() - 672 * HOUR - MINUTE + 600 * HOUR),
+    })
+    await actorSeenAt(new Date(Date.now() - 672 * HOUR + MINUTE))
+
+    await expect(gate()).resolves.toEqual({
+      cohortSize: 1,
+      returned: 1,
+      pending: 1,
+      withoutAccess: 0,
+    })
+  })
+
+  it('names a recent person without access as without access, never as waiting', async () => {
+    // The three are one partition of those who appeared: nobody is named twice.
+    await insertActor(db, { createdAt: hoursAgo(100) })
+    await insertActor(db, { createdAt: hoursAgo(100), sharedUntil: hoursAgo(1) })
+
+    await expect(gate()).resolves.toEqual({
+      cohortSize: 0,
+      returned: 0,
+      pending: 0,
+      withoutAccess: 2,
+    })
+  })
+})
+
+/**
+ * Moves a person's whole life a week into the past — their appearance, their access and their
+ * log — so that a fourth week written today has ended by the time the gate reads it (MOL-91).
+ * Hours relative to `created_at` stay exactly as they were, which is all the gate reads.
+ */
+async function aWeekEarlier(actorId: string): Promise<void> {
+  await db.execute(sql`
+    update actors set created_at = created_at - interval '168 hours',
+      shared_until = shared_until - interval '168 hours'
+    where id = ${actorId}::uuid`)
+  await db.execute(sql`
+    update events set occurred_at = occurred_at - interval '168 hours'
+    where actor_id = ${actorId}::uuid`)
+}
 
 describe("recording at most once a day of the person's own life", () => {
   const view = (actorId: string, subject: 'product' | 'venue' = 'product') =>
@@ -245,9 +350,11 @@ describe("recording at most once a day of the person's own life", () => {
     await repository.record({ ...view(actorId), occurredAt: ago(2 * HOUR) }) // still week three
 
     await expect(repository.recordOncePerDay(view(actorId))).resolves.toBe(true)
+    // Read once the week is over: a fourth week still going is no answer yet (MOL-91).
+    await aWeekEarlier(actorId)
     await expect(
-      repository.weekFourReturn('product', ago(21 * DAY + 2 * HOUR), ago(21 * DAY)),
-    ).resolves.toEqual({ cohortSize: 1, returned: 1 })
+      repository.weekFourReturn('product', ago(28 * DAY + 2 * HOUR), ago(28 * DAY)),
+    ).resolves.toEqual({ cohortSize: 1, returned: 1, pending: 0, withoutAccess: 0 })
   })
 
   it('counts days and weeks the same in any time zone of the session', async () => {

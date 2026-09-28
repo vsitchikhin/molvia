@@ -77,7 +77,7 @@ async function rateMany(actorId: string, count: number): Promise<string[]> {
 
 describe('gate 0.2: five verdicts in two weeks', () => {
   it('counts nobody when nobody has appeared', async () => {
-    await expect(gate()).resolves.toEqual({ cohortSize: 0, reached: 0 })
+    await expect(gate()).resolves.toEqual({ cohortSize: 0, reached: 0, pending: 0 })
   })
 
   it.each([
@@ -87,7 +87,7 @@ describe('gate 0.2: five verdicts in two weeks', () => {
   ])('with %i verdicts in the window, %i reached the threshold', async (count, reached) => {
     await rateMany(await personSeen(), count)
 
-    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached })
+    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached, pending: 0 })
   })
 
   it('counts a fifth verdict in the last hour of the second week', async () => {
@@ -95,7 +95,7 @@ describe('gate 0.2: five verdicts in two weeks', () => {
     await rateMany(actorId, 4)
     await rateAt(actorId, GATE_RATINGS_WINDOW_HOURS - 0.5)
 
-    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 1 })
+    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 1, pending: 0 })
   })
 
   it('does not count a fifth verdict in the first hour of the third week', async () => {
@@ -103,7 +103,7 @@ describe('gate 0.2: five verdicts in two weeks', () => {
     await rateMany(actorId, 4)
     await rateAt(actorId, GATE_RATINGS_WINDOW_HOURS)
 
-    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 0 })
+    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 0, pending: 0 })
   })
 
   it('counts a withdrawn verdict: five given, one taken back, is five', async () => {
@@ -111,7 +111,7 @@ describe('gate 0.2: five verdicts in two weeks', () => {
     const [first] = await rateMany(actorId, 5)
     await expect(verdicts.withdraw(actorId, first ?? '')).resolves.toBe(true)
 
-    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 1 })
+    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 1, pending: 0 })
   })
 
   it('keeps a verdict withdrawn and given again where it was first given', async () => {
@@ -137,7 +137,7 @@ describe('gate 0.2: five verdicts in two weeks', () => {
       .from(verdictsTable)
       .where(and(eq(verdictsTable.actorId, actorId), eq(verdictsTable.itemId, itemId)))
     expect(after?.ratedAt).toEqual(before?.ratedAt)
-    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 1 })
+    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 1, pending: 0 })
   })
 
   it('counts one item rated five times as one verdict', async () => {
@@ -145,14 +145,14 @@ describe('gate 0.2: five verdicts in two weeks', () => {
     const itemId = await insertItem(db)
     for (const score of [1, 2, 3, 4, 5]) await rateAt(actorId, score, itemId)
 
-    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 0 })
+    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 0, pending: 0 })
   })
 
   it('keeps a person with no verdicts in the denominator', async () => {
     await rateMany(await personSeen(), 5)
     await personSeen()
 
-    await expect(gate()).resolves.toEqual({ cohortSize: 2, reached: 1 })
+    await expect(gate()).resolves.toEqual({ cohortSize: 2, reached: 1, pending: 0 })
   })
 
   it('counts each person by their own verdicts, not the items they share', async () => {
@@ -161,7 +161,7 @@ describe('gate 0.2: five verdicts in two weeks', () => {
     const neighbour = await personSeen()
     for (const itemId of items.slice(0, 4)) await rateAt(neighbour, 2, itemId)
 
-    await expect(gate()).resolves.toEqual({ cohortSize: 2, reached: 1 })
+    await expect(gate()).resolves.toEqual({ cohortSize: 2, reached: 1, pending: 0 })
   })
 
   it('takes a cohort from `from` inclusive to `to` exclusive', async () => {
@@ -171,27 +171,49 @@ describe('gate 0.2: five verdicts in two weeks', () => {
     await rateMany(await personSeen(end), 5)
     await personSeen(new Date(start.getTime() - 1))
 
-    await expect(gate({ from: start, to: end })).resolves.toEqual({ cohortSize: 1, reached: 1 })
+    await expect(gate({ from: start, to: end })).resolves.toEqual({
+      cohortSize: 1,
+      reached: 1,
+      pending: 0,
+    })
   })
 
   it('has no paid door: a person without access is counted', async () => {
     const actorId = await insertActor(db, { createdAt: daysAgo(30), sharedUntil: null })
     await rateMany(actorId, 5)
 
-    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 1 })
+    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 1, pending: 0 })
   })
 
   it('counts a person whose window closed a minute ago', async () => {
     await rateMany(await personSeen(new Date(Date.now() - WINDOW - MINUTE)), 5)
 
-    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 1 })
+    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 1, pending: 0 })
   })
 
   it('leaves out a person whose window is still open, even with five verdicts', async () => {
     await rateMany(await personSeen(new Date(Date.now() - WINDOW + MINUTE)), 5)
     await personSeen(daysAgo(5))
 
-    await expect(gate()).resolves.toEqual({ cohortSize: 0, reached: 0 })
+    // Named beside the cohort rather than in it (MOL-91): «0 of 0» over two people reads as
+    // «nobody came».
+    await expect(gate()).resolves.toEqual({ cohortSize: 0, reached: 0, pending: 2 })
+  })
+
+  it('names as waiting only those who appeared in the window', async () => {
+    // Waiting before `from` or from `to` on is someone else's window, like the cohort.
+    const start = daysAgo(10)
+    const end = daysAgo(2)
+    await personSeen(new Date(start.getTime() - 1))
+    await personSeen(start)
+    await personSeen(new Date(end.getTime() - 1))
+    await personSeen(end)
+
+    await expect(gate({ from: start, to: end })).resolves.toEqual({
+      cohortSize: 0,
+      reached: 0,
+      pending: 2,
+    })
   })
 
   it('counts in hours across a daylight-saving change, whatever the session zone', async () => {
@@ -214,7 +236,7 @@ describe('gate 0.2: five verdicts in two weeks', () => {
       })
     })
 
-    expect(answer).toEqual({ cohortSize: 2, reached: 1 })
+    expect(answer).toEqual({ cohortSize: 2, reached: 1, pending: 0 })
   })
 
   it('draws the line to the microsecond `created_at` carries', async () => {
@@ -225,11 +247,11 @@ describe('gate 0.2: five verdicts in two weeks', () => {
     await rateMany(actorId, 4)
     const fifth = await rateAt(actorId, GATE_RATINGS_WINDOW_HOURS - 1 / 3600 / 1_000_000)
 
-    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 1 })
+    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 1, pending: 0 })
 
     await rateAt(actorId, GATE_RATINGS_WINDOW_HOURS, fifth)
 
-    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 0 })
+    await expect(gate()).resolves.toEqual({ cohortSize: 1, reached: 0, pending: 0 })
   })
 })
 
@@ -269,6 +291,6 @@ describe('gate 0.2: what it refuses to answer', () => {
         ratings: 2 ** 31 - 1,
         windowHours: GATE_RATINGS_WINDOW_HOURS,
       }),
-    ).resolves.toEqual({ cohortSize: 1, reached: 0 })
+    ).resolves.toEqual({ cohortSize: 1, reached: 0, pending: 0 })
   })
 })

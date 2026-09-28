@@ -15,6 +15,10 @@ export type RecordedEvent = EventInput & {
 export interface CohortReturn {
   readonly cohortSize: number
   readonly returned: number
+  /** With access, but their fourth week is not over yet: not in the cohort (MOL-91). */
+  readonly pending: number
+  /** Appeared in the window with no access reaching their fourth week: not in the cohort (Р-24). */
+  readonly withoutAccess: number
 }
 
 export interface EventRepository {
@@ -56,6 +60,11 @@ export interface EventRepository {
    * behind that same door, so a denominator of everyone who ever appeared counted people who
    * had nothing to come back to. The condition is read from `actors.shared_until` and is
    * approximate — see the statement, where the direction of the error is written down.
+   *
+   * **And only those whose fourth week is over** (MOL-91), the rule gate 0.2 already kept (MOL-51).
+   * Counted before, a person who came last week read as one who did not come back — and the more
+   * people arrive, the harder that pulls the gate towards «stop». The ones still waiting are
+   * named beside the cohort, not in it; so are those without access.
    */
   weekFourReturn(subject: CatalogueSubject, from: Date, to: Date): Promise<CohortReturn>
 }
@@ -111,25 +120,42 @@ export function createEventRepository(db: Conn): EventRepository {
       // session's time zone — 23 or 25 hours across a daylight-saving change — and the days
       // of `recordOncePerDay` have to fall on exactly these weeks. Hours mean the same in
       // every zone, so neither depends on a `timezone` someone sets later.
-      const rows = await db.execute<{ cohort_size: number; returned: number }>(sql`
-        with cohort as (
-          select ${actors.id} as actor_id, ${actors.createdAt} as started
+      const rows = await db.execute<{
+        cohort_size: number
+        returned: number
+        pending: number
+        without_access: number
+      }>(sql`
+        with appeared as (
+          select ${actors.id} as actor_id, ${actors.createdAt} as started, ${actors.sharedUntil} as shared_until
           from ${actors}
           where ${actors.createdAt} >= ${from.toISOString()}::timestamptz
             and ${actors.createdAt} <  ${to.toISOString()}::timestamptz
-            -- Only those who could have answered the question (Р-24). The numerator is behind
-            -- a paid door — advice_viewed is written in the shared mode alone — so counting
-            -- everyone who ever appeared put people in the denominator who had nothing to come
-            -- back to, and the threshold read «stop» for a reason unrelated to the hypothesis
-            -- (adversarial round 2, G1).
-            --
-            -- Approximate, and knowingly: there is no history of grants, only the moment
-            -- access runs out, and it only ever moves forward. Someone who bought access after
-            -- their fourth week is counted as though they had it then, so the denominator errs
-            -- large and the return rate errs small — the gate errs towards «stop», which is
-            -- the safe side of this particular number. Exactness needs a table of grants, and
-            -- that is a task, not a line.
-            and ${actors.sharedUntil} >= ${actors.createdAt} + interval '504 hours'
+        ),
+        with_access as (
+          select actor_id, started
+          from appeared
+          -- Only those who could have answered the question (Р-24). The numerator is behind
+          -- a paid door — advice_viewed is written in the shared mode alone — so counting
+          -- everyone who ever appeared put people in the denominator who had nothing to come
+          -- back to, and the threshold read «stop» for a reason unrelated to the hypothesis
+          -- (adversarial round 2, G1).
+          --
+          -- Approximate, and knowingly: there is no history of grants, only the moment
+          -- access runs out, and it only ever moves forward. Someone who bought access after
+          -- their fourth week is counted as though they had it then, so the denominator errs
+          -- large and the return rate errs small — the gate errs towards «stop», which is
+          -- the safe side of this particular number. Exactness needs a table of grants, and
+          -- that is a task, not a line.
+          where shared_until >= started + interval '504 hours'
+        ),
+        cohort as (
+          select actor_id, started
+          from with_access
+          -- A fourth week still going is no answer yet (MOL-91), as gate 0.2 keeps its open
+          -- windows out: counted now, a person who came last week reads as one who did not
+          -- come back.
+          where started + interval '672 hours' <= now()
         ),
         came_back as (
           select distinct c.actor_id
@@ -142,11 +168,18 @@ export function createEventRepository(db: Conn): EventRepository {
         )
         select
           (select count(*) from cohort)::int as cohort_size,
-          (select count(*) from came_back)::int as returned
+          (select count(*) from came_back)::int as returned,
+          (select count(*) from with_access)::int - (select count(*) from cohort)::int as pending,
+          (select count(*) from appeared)::int - (select count(*) from with_access)::int as without_access
       `)
 
       const row = rows[0]
-      return { cohortSize: row?.cohort_size ?? 0, returned: row?.returned ?? 0 }
+      return {
+        cohortSize: row?.cohort_size ?? 0,
+        returned: row?.returned ?? 0,
+        pending: row?.pending ?? 0,
+        withoutAccess: row?.without_access ?? 0,
+      }
     },
   }
 }
