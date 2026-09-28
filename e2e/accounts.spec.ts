@@ -183,6 +183,28 @@ test('счёт без операций удаляется с «Вернуть»,
   await expect(page.getByRole('link', { name: /Лишний/ })).toBeVisible()
 })
 
+// Opened from a line of the card, the account has «Деньги» under it, not «Счета» — and «Вернуть»
+// stands on «Счета» (review 32): «Удалить» goes there, and «назад» from there is «Деньги».
+test('счёт, открытый строкой карточки, удаляется на «Счета» с «Вернуть»', async ({ page }) => {
+  await openMoney(page)
+  await page.getByRole('button', { name: 'Добавить счёт' }).click()
+  await addAccount(page, 'Лишний', '0')
+  await page.getByRole('link', { name: /Лишний/ }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Лишний')
+
+  await page.getByRole('button', { name: 'Править' }).click()
+  await page.waitForTimeout(400)
+  await topSheet(page).getByRole('button', { name: 'Удалить счёт' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Счета')
+  await expect(page.locator('.undo .text')).toHaveText('Удалено: Лишний')
+  await page.waitForTimeout(1000)
+  await page.getByRole('button', { name: 'Вернуть' }).click()
+  await expect(page.getByRole('link', { name: /Лишний/ })).toBeVisible()
+
+  await page.goBack()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+})
+
 test('без связи счета не красные, а шторка счёта ждёт связь', async ({ page, context }) => {
   await openMoney(page)
   await page.getByRole('button', { name: 'Добавить счёт' }).click()

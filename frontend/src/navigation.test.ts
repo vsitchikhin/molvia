@@ -5,7 +5,7 @@ import { defineComponent, h } from 'vue'
 import { createRouter, createWebHistory, RouterView } from 'vue-router'
 import type { Router } from 'vue-router'
 import { createAppI18n } from '@/i18n'
-import { backTarget, settleColdStart, tabMove } from '@/navigation'
+import { backTarget, settleColdStart, tabMove, upTarget } from '@/navigation'
 import type { TabMove } from '@/navigation'
 import type { RouteName, Tab } from '@/router'
 import { routes } from '@/router'
@@ -122,6 +122,34 @@ describe('backTarget — the chevron agrees with the system button', () => {
   it('a section has no chevron at all', async () => {
     const router = await fresh('/')
     expect(backTarget(router, router.currentRoute.value)).toBeNull()
+  })
+})
+
+// «Удалить» on an account leads to «Счета», where «Вернуть» stands — not to «Деньги» (review 32).
+describe('upTarget — onto the parent itself', () => {
+  const ACCOUNT = '/money/accounts/aaaaaaaa-0000-4000-8000-000000000031'
+  const target = (router: Router) => {
+    const found = upTarget(router, router.currentRoute.value)
+    return found && { path: found.location.path, step: found.step }
+  }
+
+  it('steps back when «Счета» is underneath', async () => {
+    const router = await fresh('/money')
+    await router.push('/money/accounts')
+    await router.push(ACCOUNT)
+    expect(target(router)).toEqual({ path: '/money/accounts', step: true })
+  })
+
+  it('opened from a line of the card, replaces onto «Счета» instead of stepping to «Деньги»', async () => {
+    const router = await fresh('/money')
+    await router.push(ACCOUNT)
+    expect(backTarget(router, router.currentRoute.value)?.step).toBe(true)
+    expect(target(router)).toEqual({ path: '/money/accounts', step: false })
+  })
+
+  it('opened cold, «Счета» is laid underneath and is the step', async () => {
+    const router = await openCold(ACCOUNT)
+    expect(target(router)).toEqual({ path: '/money/accounts', step: true })
   })
 })
 

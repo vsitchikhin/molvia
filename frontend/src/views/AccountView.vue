@@ -212,7 +212,7 @@ export default defineComponent({
     const route = useRoute()
     const store = useAccountsStore()
     const trips = useTripQueueStore()
-    const { goBack } = useNavigation()
+    const { goUp } = useNavigation()
     const queue = useSpendingQueueStore()
     const announce = useAnnouncer()
     const { categories, nameOf } = useOwnCategories()
@@ -341,10 +341,12 @@ export default defineComponent({
       if (outcome.kind === 'deleted')
         store.removed = { id: outcome.id, name: outcome.name, stamp: Date.now() }
       else announce?.(t('accounts.screen.archived_done', { name: outcome.name }))
-      // «Удалить» and «Убрать» from the account's own screen lead back to the page (handoff 03) —
-      // a step back where «Счета» lies under it, not a second «Счета» in the history (review 19).
+      // «Удалить» and «Убрать» from the account's own screen lead to the page (handoff 03), where
+      // «Вернуть» stands — a step back where «Счета» lies under it, not a second one in the history
+      // (review 19), and a replace onto it where «Деньги» does: opened from a line of the card, the
+      // step went to «Деньги», with nothing there to bring the account back (review 32).
       // A task later: stepped inside the pop that closed the sheet, the step was swallowed.
-      window.setTimeout(() => void goBack())
+      window.setTimeout(() => void goUp())
     }
 
     const restoring = ref(false)
@@ -375,7 +377,7 @@ export default defineComponent({
     }
 
     function toList(): void {
-      void goBack()
+      void goUp()
     }
 
     return {
