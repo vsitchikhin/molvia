@@ -52,6 +52,11 @@ export interface ErasureReport {
   readonly erased: Readonly<Record<ErasedTable, number>>
   /** Catalogue items this person added: they stay, with `created_by` nulled. */
   readonly itemsReleased: number
+  /**
+   * Whether the person was added to `erasures`, the count by week of arrival the gates print
+   * (MOL-91) — the one thing erasure leaves, and no more than a number.
+   */
+  readonly counted: boolean
 }
 
 export interface ErasureRepository {
@@ -194,12 +199,28 @@ export function createErasureRepository(db: Db): ErasureRepository {
           erased.login_requests = await count(
             sql`delete from login_requests where telegram_user_id = ${id} returning 1`,
           )
+          let counted = false
           if (actorId !== null) {
+            // One more among those who appeared that week (MOL-91), before the row it is read
+            // from goes: without it the gates lose the person with no trace. The week is a
+            // Monday in Yerevan, from the instant itself — no `timezone` of the session decides it.
+            counted =
+              (await count(sql`
+                insert into erasures (appeared_week, erased)
+                select date_trunc('week', (created_at at time zone 'UTC') + interval '4 hours')::date, 1
+                from actors where id = ${actorId}
+                on conflict (appeared_week) do update set erased = erasures.erased + 1
+                returning 1`)) > 0
             // `items.created_by` is `ON DELETE SET NULL`: the catalogue keeps what was added.
             erased.actors = await count(sql`delete from actors where id = ${actorId} returning 1`)
           }
 
-          const report: ErasureReport = { found: actorId !== null, erased, itemsReleased }
+          const report: ErasureReport = {
+            found: actorId !== null,
+            erased,
+            itemsReleased,
+            counted,
+          }
           if (dryRun) throw new DryRun(report)
           return report
         })

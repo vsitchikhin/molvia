@@ -22,6 +22,7 @@ const REPORT: ErasureReport = {
     actors: 1,
   },
   itemsReleased: 1,
+  counted: true,
 }
 
 function run(argv: string[], report: ErasureReport | Error = REPORT) {
@@ -84,13 +85,17 @@ describe('forget — стирание вручную', () => {
     await exit
     expect(lines).toContain('  verdicts            3')
     expect(lines).toContain('  items kept          1 (author removed)')
+    expect(lines).toContain(
+      '  erasures            +1 (a count by week of arrival, no id — the gates read it)',
+    )
     expect(lines.join('\n')).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/)
   })
 
   it('неизвестный владелец — не ошибка', async () => {
-    const { exit, lines } = run(['184467331'], { ...REPORT, found: false })
+    const { exit, lines } = run(['184467331'], { ...REPORT, found: false, counted: false })
     expect(await exit).toBe(0)
     expect(lines[0]).toBe('no owner with this Telegram id')
+    expect(lines.join('\n')).not.toMatch(/erasures/)
   })
 
   it('сбой базы — код 1, код сбоя и ни слова из его сообщения', async () => {

@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor } from './fixtures'
 import { createGatesReader } from '@/db/gates-reader'
+import { erasures } from '@/db/schema'
 
 const { db, close } = connectDrizzle()
 const reader = createGatesReader(db)
@@ -39,8 +40,27 @@ describe('the gates reader', () => {
     const waiting = { cohortSize: 0, returned: 0, pending: 1, withoutAccess: 1 }
     expect(report.products).toEqual(waiting)
     expect(report.venues).toEqual(waiting)
+    expect(report.erased.count).toBe(0)
     expect(report.readAt.getTime()).toBeGreaterThanOrEqual(before - 1000)
     expect(report.readAt.getTime()).toBeLessThanOrEqual(Date.now() + 1000)
+  })
+
+  it('counts the erased of the weeks the window touches, whole weeks in Yerevan', async () => {
+    await db.insert(erasures).values([
+      { appearedWeek: '2026-09-28', erased: 5 }, // the week before
+      { appearedWeek: '2026-10-05', erased: 2 },
+      { appearedWeek: '2026-10-12', erased: 1 },
+      { appearedWeek: '2026-10-19', erased: 7 }, // the week after
+    ])
+
+    // Wednesday the 7th to Sunday the 18th, the latter taken in whole: `to` is Monday the 19th
+    // at 00:00 in Yerevan, and its last millisecond is still the week of the 12th.
+    const report = await reader.read({
+      from: new Date('2026-10-07T00:00:00+04:00'),
+      to: new Date('2026-10-19T00:00:00+04:00'),
+    })
+
+    expect(report.erased).toEqual({ count: 3, firstWeek: '2026-10-05', lastWeek: '2026-10-12' })
   })
 
   it('reads inside a read-only, repeatable-read transaction', async () => {

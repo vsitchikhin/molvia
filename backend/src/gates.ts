@@ -123,7 +123,16 @@ function formatReport({ from, to }: GatesWindow, report: GatesReport): string[] 
     // The cohort is people, not what they looked at: the two halves wait and lack access alike.
     row('week 4 not over yet', [String(products.pending), 'not counted yet']),
     row('no access in week 4', [String(products.withoutAccess), 'not in the cohort']),
+    '',
+    row('erased', [String(report.erased.count), erasedWeeks(report.erased)]),
   ]
+}
+
+/** Whole weeks, and named, so the approximation of `erasures` is in sight (Р-11). */
+function erasedWeeks({ firstWeek, lastWeek }: GatesReport['erased']): string {
+  const weeks =
+    firstWeek === lastWeek ? `the week of ${firstWeek}` : `the weeks of ${firstWeek} … ${lastWeek}`
+  return `appeared ${weeks}, in neither half`
 }
 
 function heading(release: string, question: string, stopPercent: number): string {

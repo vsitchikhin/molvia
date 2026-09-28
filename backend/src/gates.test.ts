@@ -10,6 +10,7 @@ const REPORT: GatesReport = {
   ratings: { cohortSize: 12, reached: 3, pending: 4 },
   products: { cohortSize: 5, returned: 1, pending: 3, withoutAccess: 8 },
   venues: { cohortSize: 5, returned: 0, pending: 3, withoutAccess: 8 },
+  erased: { count: 2, firstWeek: '2026-10-05', lastWeek: '2026-11-16' },
 }
 
 function run(argv: string[], report: GatesReport | Error = REPORT) {
@@ -114,8 +115,21 @@ describe('gates — чтение ворот вручную', () => {
       '     venues     back in week 4           0 of 5       0.0 %',
       '     week 4 not over yet                 3          not counted yet',
       '     no access in week 4                 8          not in the cohort',
+      '',
+      '     erased                              2          appeared the weeks of 2026-10-05 … 2026-11-16, in neither half',
     ])
     expect(lines.join('\n')).not.toMatch(/STOP|pass|fail/)
+  })
+
+  it('удалённые одной недели — «the week of», и нулём тоже печатаются', async () => {
+    const { exit, lines } = run(['--from', '2026-10-05', '--to', '2026-10-07'], {
+      ...REPORT,
+      erased: { count: 0, firstWeek: '2026-10-05', lastWeek: '2026-10-05' },
+    })
+    await exit
+    expect(lines.at(-1)).toBe(
+      '     erased                              0          appeared the week of 2026-10-05, in neither half',
+    )
   })
 
   it('пустая когорта — «—», а не 0 % и не NaN', async () => {

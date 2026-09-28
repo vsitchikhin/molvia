@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { GATE_RATINGS, GATE_RATINGS_WINDOW_HOURS } from '@molvia/model'
 import type { CohortReturn } from './events-repository'
-import type { Db } from './index'
+import type { Conn, Db } from './index'
 import type { CohortReached } from './verdicts-repository'
 import { createEventRepository } from './events-repository'
 import { createVerdictRepository } from './verdicts-repository'
@@ -18,6 +18,18 @@ export interface GatesReport {
   readonly ratings: CohortReached
   readonly products: CohortReturn
   readonly venues: CohortReturn
+  readonly erased: ErasedInWindow
+}
+
+/**
+ * People who erased themselves among those who appeared in the weeks the window touches — whole
+ * weeks, Mondays in Yerevan, since that is all `erasures` keeps (MOL-91). In neither half of
+ * either gate: erasure took them out of both.
+ */
+export interface ErasedInWindow {
+  readonly count: number
+  readonly firstWeek: string
+  readonly lastWeek: string
 }
 
 export interface GatesReader {
@@ -50,10 +62,35 @@ export function createGatesReader(db: Db): GatesReader {
             }),
             products: await events.weekFourReturn('product', from, to),
             venues: await events.weekFourReturn('venue', from, to),
+            erased: await erasedIn(tx, from, to),
           }
         },
         { isolationLevel: 'repeatable read', accessMode: 'read only' },
       )
     },
+  }
+}
+
+async function erasedIn(tx: Conn, from: Date, to: Date): Promise<ErasedInWindow> {
+  // The week as `erase` writes it: a Monday in Yerevan, from the instant, whatever the session's
+  // `timezone`. The last week is the one holding the window's last millisecond, `to` being open.
+  const [row] = await tx.execute<{ count: number; first_week: string; last_week: string }>(sql`
+    with bounds as (
+      select
+        date_trunc('week', (${from.toISOString()}::timestamptz at time zone 'UTC') + interval '4 hours')::date as first_week,
+        date_trunc('week', ((${to.toISOString()}::timestamptz - interval '1 millisecond') at time zone 'UTC') + interval '4 hours')::date as last_week
+    )
+    select
+      coalesce(sum(e.erased), 0)::int as count,
+      to_char(b.first_week, 'YYYY-MM-DD') as first_week,
+      to_char(b.last_week, 'YYYY-MM-DD') as last_week
+    from bounds b
+    left join erasures e on e.appeared_week between b.first_week and b.last_week
+    group by b.first_week, b.last_week
+  `)
+  return {
+    count: row?.count ?? 0,
+    firstWeek: row?.first_week ?? '',
+    lastWeek: row?.last_week ?? '',
   }
 }

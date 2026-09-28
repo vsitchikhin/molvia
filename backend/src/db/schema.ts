@@ -1289,3 +1289,23 @@ export const loginRequests = pgTable(
     ),
   ],
 )
+
+/**
+ * How many people erased themselves (MOL-58), by the week they appeared — and nothing else
+ * (MOL-91). Erasure takes a person out of both halves of every gate without a trace, so a gate
+ * could fall with nobody seeing why; this is the one line it leaves behind. No id and no day, and
+ * no foreign key, since there is nobody left to point at: a week, a Monday in Yerevan, because
+ * among ten or fifteen people a day of arrival nearly names the person. Only a count — whether
+ * they had reached five ratings or come back would be one more fact about someone erased.
+ */
+export const erasures = pgTable(
+  'erasures',
+  {
+    appearedWeek: date('appeared_week').primaryKey(),
+    erased: integer('erased').notNull(),
+  },
+  (table) => [
+    check('erasures_erased_positive', sql`${table.erased} > 0`),
+    check('erasures_week_monday', sql`extract(isodow from ${table.appearedWeek}) = 1`),
+  ],
+)

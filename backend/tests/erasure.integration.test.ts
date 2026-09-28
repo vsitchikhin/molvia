@@ -9,6 +9,7 @@ import { completeLogin } from '@/usecases/complete-login'
 import { lockTelegramAccount } from '@/db/telegram-lock'
 import {
   actors,
+  erasures,
   events,
   exchangeRevisions,
   exchanges,
@@ -255,6 +256,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
         actors: 1,
       },
       itemsReleased: 1,
+      counted: true,
     })
     expect(await rowsMentioning(anna)).toEqual([])
     expect(await rowsMentioning(accountId)).toEqual([])
@@ -518,6 +520,77 @@ describe('стирание не закрывает вход остальным (
     } finally {
       await holder.close()
     }
+  })
+})
+
+describe('стирание оставляет одно число — сколько пришедших за неделю стёрли себя (MOL-91)', () => {
+  const weeks = async () =>
+    (await db.select().from(erasures)).map((row) => [row.appearedWeek, row.erased])
+
+  it('прибавляет единицу к неделе прихода, и только к ней', async () => {
+    // Monday 5 October 2026 in Yerevan: Wednesday and Sunday of that week, Monday of the next.
+    const wednesday = telegramId()
+    const sunday = telegramId()
+    const nextMonday = telegramId()
+    await insertActor(db, {
+      telegramUserId: wednesday,
+      createdAt: new Date('2026-10-07T09:00:00Z'),
+    })
+    await insertActor(db, { telegramUserId: sunday, createdAt: new Date('2026-10-11T12:00:00Z') })
+    await insertActor(db, {
+      telegramUserId: nextMonday,
+      createdAt: new Date('2026-10-12T09:00:00Z'),
+    })
+
+    for (const tg of [wednesday, sunday, nextMonday]) {
+      await expect(erasure.erase(tg, { dryRun: false })).resolves.toMatchObject({ counted: true })
+    }
+
+    expect((await weeks()).sort()).toEqual([
+      ['2026-10-05', 2],
+      ['2026-10-12', 1],
+    ])
+  })
+
+  it('неделя — по Еревану: воскресенье 21:00 UTC — это уже понедельник', async () => {
+    const mondayInYerevan = telegramId()
+    const sundayInYerevan = telegramId()
+    await insertActor(db, {
+      telegramUserId: mondayInYerevan,
+      createdAt: new Date('2026-10-11T20:00:00Z'), // 00:00 on Monday the 12th in Yerevan
+    })
+    await insertActor(db, {
+      telegramUserId: sundayInYerevan,
+      createdAt: new Date('2026-10-11T19:59:59.999Z'), // 23:59 on Sunday the 11th
+    })
+
+    await erasure.erase(mondayInYerevan, { dryRun: false })
+    await erasure.erase(sundayInYerevan, { dryRun: false })
+
+    expect((await weeks()).sort()).toEqual([
+      ['2026-10-05', 1],
+      ['2026-10-12', 1],
+    ])
+  })
+
+  it('сухой прогон не считает — он откатывается целиком', async () => {
+    const tg = telegramId()
+    await insertActor(db, { telegramUserId: tg })
+
+    await expect(erasure.erase(tg, { dryRun: true })).resolves.toMatchObject({ counted: true })
+
+    expect(await weeks()).toEqual([])
+  })
+
+  it('нет владельца — нечего и считать', async () => {
+    const tg = telegramId()
+    await insertLoginRequest(db, { telegramUserId: tg })
+
+    await expect(erasure.erase(tg, { dryRun: false })).resolves.toMatchObject({
+      found: false,
+      counted: false,
+    })
+    expect(await weeks()).toEqual([])
   })
 })
 

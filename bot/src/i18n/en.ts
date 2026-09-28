@@ -39,7 +39,8 @@ export const en: Dictionary = {
     'Everything Molvia knows about you will go: purchases, spending and its categories, money ' +
     'exchanges, income, accounts and checks, ratings and ' +
     'reviews, search picks, visit marks, settings and sign-ins on every device. Items and ' +
-    'shops you added to the shared catalogue will stay — without your name.\n\n' +
+    'shops you added to the shared catalogue will stay — without your name. One number will ' +
+    'stay too — how many people who came in the same week deleted their data.\n\n' +
     'This cannot be undone.',
   'erase.confirm': 'Delete for good',
   'erase.cancel': 'Cancel',
