@@ -123,7 +123,20 @@ last week reads as someone who failed. **A verdict counts from when the server r
 not from when the person pressed «Сохранить»: the drafts queue can hold it past the window, and
 that lowers the rate — towards «stop», the safe side, like Р-24 — accepted rather than trusting
 the device's clock, which stays out of the gates. A person deleted on request (MOL-58) leaves
-both halves of the fraction and no trace; counting deletions separately is 0.2's.
+both halves of the fraction and one number behind: `erasures`, how many of those who appeared in a
+week — a Monday in Yerevan — erased themselves, with no id, no day and no foreign key (MOL-91).
+Only how many: whether they had reached five would be one more fact about someone erased.
+
+**The gates are read by `dist/gates.js` (MOL-91)** — `make gates FROM=…` in a copy — in one
+`repeatable read, read only` transaction, over one window `--from`/`--to` for both halves: a day is
+Yerevan's and `--to` takes it in whole, a moment needs its offset. **Every share stands beside its
+`n`** — the cohort is «as many as we find», so «2 of 10» must not read as a sentence — and the stop
+lines (`GATE_RATINGS_STOP_PERCENT`, `GATE_RETURN_STOP_PERCENT`) are printed while no verdict is;
+the share is rounded down to a tenth, so 19.96 % never stands over «stop below 20» as 20.0.
+**Gate 0.3 closes its window as 0.2 does**: someone whose fourth week is not over is not in the
+cohort — counted, a person who came last week read as one who did not come back, and the more
+people arrived the harder the gate leaned towards «stop». Those waiting, those without access and
+the erased of the weeks the window touches are each a line of their own, in neither fraction.
 
 ## Money
 
@@ -1092,6 +1105,7 @@ make down        # stop the stack, keeping the data
 make psql        # psql inside this copy's database
 make db-reset    # drop this copy's volume and start clean (DESTRUCTIVE)
 make seed        # the common names into the catalogue; YES=1 writes, without it a dry run
+make gates FROM=2026-10-05  # read gates 0.2 and 0.3; TO= optional, a day taken in whole
 make dev         # run api, pwa and bot
 make e2e         # end-to-end tests in a phone-sized browser
 make icons       # regenerate the app icons from favicon.svg
@@ -1488,7 +1502,8 @@ database access. In a product about data integrity, two write paths will silentl
   picks, verdicts with the withdrawn ones, events, expenses, trips, exchanges and incomes (MOL-40,
   MOL-66 — the person's own money), spendings, their categories and frozen rates (MOL-73), accounts
   and their checks after every operation that named one (MOL-115), login requests by Telegram id
-  — they carry no foreign key, so no cascade reaches them — and the owner. Catalogue items the
+  — they carry no foreign key, so no cascade reaches them — and the owner, adding one to
+  `erasures` for the week they appeared (MOL-91). Catalogue items the
   person added stay with `created_by` nulled, and **every place stays** (owner's decision
   24.09.2026). People erase themselves with `/delete` in the bot; the owner's fallback is
   `dist/forget.js` in the API image (`make forget` in a copy — `TG` reaches the script through the
@@ -1512,7 +1527,8 @@ database access. In a product about data integrity, two write paths will silentl
   routes have no order of their own. **Cleaning expired requests skips locked rows** (Р-3): it runs
   under the one quota lock every login start takes, and waiting there for an erasure — or a dry
   run of one — holding a person's expired request closed the door to everybody. A dry run still
-  holds that one account's lock for as long as it runs. **The page and the bot name what stays in full** — the items and the shops —
+  holds that one account's lock for as long as it runs. **The page and the bot name what stays in full** — the items, the shops and the count of
+  `erasures` —
   and say that copies on the phone are out of the server's reach: nothing clears a device's
   storage for an owner the server no longer knows, since a 401 there is also an expired session.
 - **No third-party trackers or analytics, and so no cookie banner** (MOL-58). There are two
@@ -2457,8 +2473,9 @@ The shape worth knowing here:
   runtime image carries no `node_modules` at all: nothing to audit and nothing that can
   drift from the lockfile it was built with. It also sidesteps the fact that the workspace
   packages export TypeScript source, which a runtime image could not read. The API's image
-  carries two more files, `dist/forget.js` — the owner's fallback for erasure (MOL-58) — and
-  `dist/seed-catalogue.js` (MOL-112), since the machine has neither the source nor a published
+  carries three more files, `dist/forget.js` — the owner's fallback for erasure (MOL-58) —,
+  `dist/seed-catalogue.js` (MOL-112) and `dist/gates.js` (MOL-91), since the machine has neither
+  the source nor a published
   database port.
 - **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
   exists only for trying the stack on a laptop, where Docker Desktop has no journald.

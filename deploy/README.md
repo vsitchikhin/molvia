@@ -198,7 +198,8 @@ is the fallback for when the bot is down — not a channel people are told about
 In a working copy the same thing is `make forget TG=<id>` and `make forget TG=<id> YES=1`.
 What goes: purchases and trips, ratings including withdrawn ones, search picks, the event log,
 sessions, login requests and the owner. What stays: catalogue items the person added, with no
-author, and every place.
+author, and every place — and one more to the count of people who erased themselves among those
+who appeared in the same week (`erasures`, MOL-91), with no id, which the gates print.
 
 ## Seeding the catalogue (MOL-112)
 
@@ -222,6 +223,31 @@ there stays as it is, and a second run adds nothing. Every time the list grows, 
 3. The same command with `--yes` at the end writes. Run the dry run once more: it says `added 0`.
 
 In a working copy the same thing is `make seed` and `make seed YES=1`.
+
+## Reading the gates (MOL-91)
+
+The two numbers each release is stopped by — the plan's gates — read by hand, only ever reading,
+with nothing in the output but counts and dates:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod \
+  exec backend node dist/gates.js --from 2026-10-05
+```
+
+`--from` is where the cohort starts: for 0.2 the day of the tag `v0.2.0`, or its exact moment,
+`git log -1 --format=%cI v0.2.0` on the laptop. `--to` is optional and a day there is taken in
+whole; without it, until now. A day is Yerevan's; a moment needs its offset.
+
+- **Every share stands beside its `n`.** The cohort is as many as we find, so «2 of 10» is two
+  people, not a verdict — which is why the stop line is printed and no «stop» or «pass» is.
+- **Waiting is not failing.** Someone inside their two weeks, or before the end of their fourth,
+  is a line of their own and in neither fraction until their window closes.
+- **0.3 counts only those whose access reached their fourth week** — the numerator is behind the
+  paid door; the rest are «no access in week 4».
+- **The erased are one line under both halves**: how many of those who appeared in the weeks the
+  window touches erased themselves. Only how many — not whether they had reached five.
+
+In a working copy the same thing is `make gates FROM=2026-10-05 [TO=2026-10-31]`.
 
 ## Backups (MOL-70)
 
