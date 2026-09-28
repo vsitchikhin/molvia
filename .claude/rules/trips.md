@@ -94,7 +94,8 @@ The detail behind the trip lines of `CLAUDE.md`.
   mirrored write keeps the key it stood after as well as before, so a write behind it given a new key
   by an older window does not send it to the head (adversarial Л). **The price, named** (review 30):
   a `payment` waits behind a start held for an answer — another trip open, a missing context — with
-  no timer, and a check over that trip says «пересчитаем» until the person answers on «Поход». **The price, named:** removing a trip dated before a check that
+  no timer; a check does not wait for it — it counts without it and says the trip waits for an
+  answer on «Поход» (adversarial round 3, Н4). **The price, named:** removing a trip dated before a check that
   came out even moves the balance with no reason the check can name, as a removed spending does.
 
 ## The settings, and the geography a trip names (MOL-65)

@@ -139,7 +139,10 @@ balance, total and difference is the server's.
   first page of the journals of the three accounts opened last — read back by the strict codecs. A
   write of an account answers with the page whole and is taken over any read still on its way; a
   landing of either queue reads it again — for a trip, any write that landed (`wrote`), since a
-  price added, changed or removed moves the balance of the account the trip is on (adversarial И).
+  price added, changed or removed moves the balance of the account the trip is on (adversarial И) —
+  **while a screen of accounts is up** (`useAccountsOnScreen`): read for every purchase at the shelf,
+  the dearest answer of the server went out beside the queue itself with nobody looking (adversarial
+  round 2, Н2); every such screen reads it as it comes up.
 - **A screen asks the page every time it is shown** (adversarial А): the page kept from an earlier
   launch is no answer, and an account's screen took its balance from it over a fresh journal. The
   balance is the newer answer's — the page once it answered in this session, else the journal.
@@ -165,7 +168,11 @@ balance, total and difference is the server's.
   разницу» wrote the same money twice (review 15, adversarial В). **Any answer that comes while
   something waits is muted** and «Записать разницу» with it, until it lands: a trip being removed is
   hidden from the reasons while the server still counts it, and the difference had no reason on
-  screen (review 33). A reason removed from its sheet is offered back in the check and in «не
+  screen (review 33); the muted difference says «пересчитаем». **Not waited on: a trip's write the
+  queue will not send by itself** — behind a start standing on a question of «Поход», or of a trip
+  the server refused: waited on, it held every check of every account with nothing to say why
+  (adversarial round 3, Н4). The check counts without it and says the trip waits for an answer on
+  «Поход». A reason removed from its sheet is offered back in the check and in «не
   попали», where the person is. Only the newest answer is taken: a recount landing after «Ввести
   другую сумму» does not take the sheet back. A recount that failed leaves the difference stale with
   «Повторить»; offline is one yellow line, drawn by the connection and gone with it, never red.
@@ -177,6 +184,9 @@ balance, total and difference is the server's.
   filled — the sum, «Прочее», «сверка», the account and the day — which the person saves, answering
   «сколько было до» (owner's decision В-5 of MOL-123): an income written without it is a link that
   sets the price of the whole currency to the bank's (MOL-66 В-1), and it re-priced the person's rate.
+  The income is named by the check's answer, as the spending is: an answer lost and a second «Записать
+  разницу» are one income, and a 409 under that name is the difference written already — the check
+  counts again (adversarial round 2, Н3).
 - **An account is written with a connection only**, as an exchange: no queue, named once per opening
   of its sheet, and a 409 on a new one goes on as an amendment of the same account. The sheet decides
   «amend or new» by the account it was opened on, never by whether the page holds it (review 23):
