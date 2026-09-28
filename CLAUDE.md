@@ -214,7 +214,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **«Остаток» is the money on the accounts on the evening of the month's last day** (MOL-134), in
   the income currency, everything and without the savings — never «пришло − потрачено», and never
   frozen. **«Пришло» may take a salary from a chosen day into the next month** (the owner's 25th),
-  by the person's own setting, `actors.salary_shift_day`, kept beside the settings and never in the form of MOL-65.
+  by the person's own setting, `actors.salary_shift_day`, kept beside the settings and never in the
+  form of MOL-65.
 - **Removal is a mark, «Вернуть», final after ten minutes by the minute timer.**
 - **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`); a write a send
   has begun on is never folded into; a spending in the queue is a row, never a figure.
