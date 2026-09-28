@@ -64,7 +64,7 @@ https://molvi.atlassian.net/wiki/spaces/MOL/pages/327681
   первых правок («1л» слитно, длинное недописанное слово) и потолок кандидатов, резавший
   самые новые позиции, — закрыты. Открытыми намеренно оставлены пределы — MOL-14 их замерил и
   разнёс: бюджет правок абсолютный (MOL-46), два порога не согласованы и позиция из одних знаков
-  ненаходима (MOL-47). Правило и пределы — в `CLAUDE.md`. Ручка — MOL-12.
+  ненаходима (MOL-47). Правило и пределы — в `.claude/rules/search.md`. Ручка — MOL-12.
 - **Запомненный выбор** (MOL-11): что человек взял по запросу, в следующий раз по этому же
   запросу стоит первым — персонально, выше расстояния, но только среди найденного. «Тот же
   запрос» — равные слова, последнее по началу от трёх символов, и набираемое слово всё ещё
@@ -568,6 +568,144 @@ error.trip_open`, экран спрашивает «продолжить или 
 - **CI и хуки** работают: коммит не пройдёт с грязным форматом или линтом, пуш — с
   красными типами или тестами.
 
+## Хроника задач (раздел State из `CLAUDE.md`, MOL-130)
+
+Хроника жила в `CLAUDE.md` и грузилась в каждую сессию; MOL-130 перенёс её сюда дословно, по-английски,
+как она была написана. Правила из неё, которые касаются области, лежат в `.claude/rules/`.
+
+**Scaffolded, the domain model is in, and the schema is under it** — MOL-4: seven entities,
+eight write inputs and three rules in `packages/model`, with the wire codecs that money and
+quantity need to cross it at all. MOL-5 added the search key; MOL-6 the nine tables of 0.1,
+the GIN index over `search_key` and the constraints that hold the product's key. MOL-8 gave
+the device an identity and the API its first routes; MOL-12 opened the catalogue — search
+and «Предложить товар» — and MOL-112 filled it with a seed of common names; MOL-21 the trip — start it, add, fix and remove its rows, finish it.
+**One trip is open at a time, and the choice is the person's:** «Начать поход» while another
+is open answers `409 error.trip_open`, and the screen asks whether to continue that one or finish
+it first. A finished trip still takes rows — the soy sauce found in the bag at home belongs to the
+trip it was bought on. The trip and its rows are named by the device, so a queue sent twice is one
+purchase.
+**MOL-25 makes completed trips reachable through the whole history**, in pages of twenty, and
+lets a purchase be added, amended or removed there while another trip stays current. The selected
+trip owns the currency, rate and total of its sheet. The phone remembers the first history page,
+the last selected trip and snapshots of completions still synchronising; the queue remains the
+only source of pending writes. **Every conflicting start asks**, including the same shop. A choice
+is tied to the owner, the queued start's key and the open trip, checked again under the queue lock.
+**Completion has two clocks:** `finished_at` remains the server's receipt, while
+`finished_on_device_at` records the first tap kept in the queue. History uses the device's time,
+with the server's as fallback for old rows. It may precede the server start after an offline trip;
+it changes neither rate snapshots nor gates nor purchase dates. Finishing twice moves neither time.
+MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
+MOL-39 the official rate — a cache refreshed hourly, snapshotted by every new trip, a jump
+left to the person; MOL-24 the sheet «сколько, в чём, почём» — a live unit price, a price in any
+of the four currencies, and the queue that keeps a purchase on the phone until it is sent;
+MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of «back»; MOL-18 the kit
+screens are built from — button, field, card, verdict badge, sheet. MOL-23 the first real screen,
+«Что взяли?»: the search as the person types, the recent items on the device, «Предложить
+товар». **A pick leaves with the query it was made on** (`stores/itemEntry`): «Добавить в поход»
+sends it and the server remembers the pick under it — handed the item alone, that memory would
+silently stop filling. The recent items are written when an item goes into a trip, not on a tap,
+per identity. MOL-28 «Оценки»: `GET /verdicts/pending` gives **one card per item**, not per
+purchase — a product has one verdict per person — with the place and day of the latest purchase:
+when its row was entered, but never after its trip was finished (the sauce found at home was
+bought that week). «Сохранить» keeps the rating on the phone and moves on; the app sends it
+(`stores/verdictDrafts`, a map «item → latest rating», not an ordered queue: `PUT` is safe to
+repeat). «Не сейчас» puts a card behind the others until the item is bought again; the last
+answer is remembered for offline. MOL-31 the API of «Что брать» — the three groups, where it is
+cheaper, the threshold of «только если дёшево» — **and with it the paid layer, pulled into 0.1
+by the owner on 20.09.2026**: free is one's own data, `actors.shared_until` opens other
+people's, and the 0.3 gate moved from the search's event to this screen's. MOL-22 built the
+trip screen; MOL-32 «Что брать» itself, and with it the last placeholder is gone. **The verdict
+decides how much matter a row gets** — a card, a row, a line of text — so the product's rule is
+the layout and not a caption: in the last group there is nothing to be cheap with. The screen
+computes nothing about the data except one word: one place is «Брали здесь», two and more
+«Дешевле всего» (MOL-34), because how many there are is visible to it alone. **The last answer
+lives on the phone**, under its owner and parsed back by the same schema, so offline is a strip
+naming the age of the list to the minute rather than an empty screen; without a memory it is the
+yellow state, and neither offers a button, because the screen comes back with the connection.
+**The strip is printed by where the rows came from, not by what became of the request** (А4):
+while an answer is still on its way yesterday's prices used to look freshly loaded.
+`scope` is said in words — the subtitle, and a footnote saying the reviews and prices are still
+one's own. **A verdict is amended where it is met** (MOL-28 left this here): a tap on any row
+opens a sheet with the 1–5 scale, the review and «Снять оценку», and until it existed a
+mis-tapped «1» stood until the item was bought again. **In the shared mode the sheet offers no
+score pre-chosen** — the figure on the row is an average over several people, and a save would
+have written it down as this person's opinion — and on a row that is nobody's of one's own it
+rates rather than amends (`isMine`). Withdrawing asks nothing and says instead what it does;
+rating again brings the same row back. **The count of ratings is printed only in the shared
+mode**: in the own one it is always one, and the subtitle says as much. Release 0.1 is broken
+into epics and tasks in Jira.
+MOL-52 put the schema under accounts: the Telegram identity on the owner, `sessions` and
+`login_requests`, and the repositories over them — the routes are MOL-53 and MOL-54. Its
+migration **emptied the owners and everything hanging off them**, because a Telegram identity
+cannot be invented for a row already written; the catalogue and the places survived, with
+`created_by` nulled (owner's decision, 20.09.2026). **The invite door of MOL-8 is gone with
+its handle**: `POST /actors`, `withInvite`, `INVITE_HEADER`, `SIGNUP_CODE` and the `?c=` link.
+MOL-53 put the session under every request: `withActor` reads the cookie, `liveByToken` answers
+with the session and its owner in one statement, and `X-Molvia-Actor` is gone from the model, the
+client, the PWA and the tests — the client has no way left to name an owner at all. On the device
+the uuid stays, but as **the name of a drawer**: the trip queue, the recent items and the verdict
+drafts are filed under it and read at the shelf before the server can be asked who we are. With
+the header went everything that existed because the device held a password — the set-aside keys,
+«вернуть прежние данные», the claim two tabs negotiated over and the state `lost`; «the session
+ended, sign in again» is MOL-56's, together with the screen that can act on it.
+**The owner of an account does not change** (owner's decision 22.09.2026). The seam used to mint
+a fresh Telegram id on every call, so a session that ran out came back as somebody else — and the
+trip queue, the recent items and the verdict drafts, all filed on the device under the owner's
+id, were left where no screen could reach them. A cookie of its own now remembers the account
+this browser was given, which is what Telegram itself becomes in MOL-54; clearing the browser's
+cookies is the one thing that still makes a new person, and that is the development counterpart
+of losing the Telegram account.
+Development still gets a session from `POST /dev/login`, a seam that **is not in the production
+bundle at all** — the bundler folds its guard to a constant and the module is tree-shaken away,
+which a test asserts against the built file rather than against the intention; the PWA's call to
+it is behind `import.meta.env.DEV`, so the production bundle does not hold it either.
+MOL-54 added the real API: browser start/poll and internal bot preview/confirm/decline, shared
+contracts and separate clients. Production requires `TELEGRAM_BOT_USERNAME` and `BOT_API_SECRET`.
+MOL-55 gave the bot its half: `/start <code>` names the device and the age of the request and
+offers «Войти» and «Это не я», the answer replaces the question so its buttons go with it, and
+five kinds of dead code get one reply. With it the bot got a dictionary of its own and
+`pickLocale` moved into `packages/model`, where the PWA now reads it from too.
+MOL-56 closed the epic's user-facing half: the login screen, the gate in front of every route,
+the request that survives the round trip through Telegram, and the one seam that turns any `401`
+into a door instead of «что-то пошло не так». **And it closed what the bot's review left open:**
+«Это не я» in the chat rescues a hijacked login only while the browser is not polling — with the
+screen open a stranger confirms and the session is collected in a cycle or two. So the screen
+names the account it landed in and waits to be told it is the right one. The rules are in «The
+way in, and what stands behind it» above.
+MOL-57 closed the epic with the way out: «Устройства» under the settings, «Завершить» on any other
+device, «Выйти» that ends this session and erases this device's drawer after the server's `204`,
+and «Это не я» that now ends the stranger's session instead of only walking away from it. The
+rules are in «The way out, and what it takes with it» above.
+
+MOL-40 put the person's own rate under the trip — «Обмен денег», nested under «Деньги» since
+MOL-81 (it lived under «Настройки» before there was a «Деньги»): the
+exchanges, the wallet worked out from them, the preference «мой / ЦБ РА», and every exchange
+beside the central bank of its day. The trip total says «мой курс» for it. MOL-42 made it every
+currency's cost rather than one pair's — chains, reversals, money of no known cost valued at the
+bank's rate of its day, a change of the currency of conversion that works forwards — and gave an
+exchange amendments with their history and a note. MOL-66 put incomes beside them — «Доходы», the
+second row of the way in from «Деньги»: a journal by month, and an income in any currency but the one of
+conversion is a link of the same walk at the bank's rate of its day. MOL-115 put accounts under all
+of it — where the money lies, the balance counted from a start and every operation after it, «списано»
+for a card in another currency, and a check that looks for the reason before it offers to close the
+difference; the rules are in «An account is where money lies» above. The screens are the task after
+MOL-116's handoff. MOL-81 moved «Обмен денег» and «Доходы» from «Настройки» into «Деньги» —
+`/money/exchange`, `/money/incomes`, the old addresses redirected for good, a card of two rows under
+«Потрачено» the way in, for a newcomer too — and gave them a card per operation and a floating
+«Обмен» / «Доход» where «Трата» floats; a card's lines of accounts come with MOL-116's screens.
+
+MOL-58 gave the people whose data this is the minimum 0.1 owes them: a page that says what is
+kept and for how long (`/privacy`, open without a session), `/delete` in the bot, which erases a
+person in one transaction — the event log included, the one exception to append-only — and logs
+that keep no address and no query and live fourteen days. Export, a delete button in the
+settings, versioned policy and consent are 0.2 (Confluence, «Персональные данные», section 5).
+
+MOL-76 lets a trip be removed — open or finished, empty or not: a quiet «Удалить поход» at the end of
+its list, a question naming the shop, the day and the rows for one with purchases, none for an empty
+one, and «Поход удалён · Вернуть» for ten seconds on the screen it lands on. «Завершить» on an empty
+trip offers to remove it instead (owner's decision В-2): a finished empty trip was the rubbish in the
+history the task was filed for. The rules are in «Data rules» above.
+
 ## Откуда брать работу
 
 Не из головы и не из этого файла — **из Jira, проект MOL**. Релиз 0.1 разложен на семь
@@ -582,20 +720,20 @@ error.trip_open`, экран спрашивает «продолжить или 
 Каждое принято с обоснованием и записано. Если кажется, что решение неверное — сначала
 прочитай причину, она обычно неочевидна.
 
-| Решение                                                 | Где обоснование                           |
-| ------------------------------------------------------- | ----------------------------------------- |
-| Vue + Fastify + Drizzle, а не Nest / Prisma / TypeORM   | `CLAUDE.md`, раздел Stack                 |
-| Tailwind выкинут, всё на SCSS                           | `CLAUDE.md`, Stack                        |
-| Reka UI только там, где нативного HTML не хватает       | `CLAUDE.md`, правила фронта               |
-| Транслит в коде, а не словарём в Postgres               | `CLAUDE.md`, «How catalogue search works» |
-| Эмбеддинги — вопрос 0.2, не 0.1                         | там же                                    |
-| Сид справочника — скрипт, не миграция; только добавляет | `CLAUDE.md`, «Data rules»                 |
-| Шрифты заменены: в Caprasimo и Figtree нет кириллицы    | `CLAUDE.md`, правила фронта               |
-| Внешний вид навигации от iOS, поведение — нет           | продуктовый план, «Дизайн-система»        |
-| Релизы режутся по гипотезам с порогами провала          | продуктовый план, раздел 3                |
-| Рекламы и платных мест в выдаче нет никогда             | продуктовый план, раздел 4                |
-| Средняя показывается с трёх независимых вкладов         | `CLAUDE.md`, «Что брать» (MOL-31)         |
-| Чужие данные в 0.1 — за доступ, `actors.shared_until`   | `CLAUDE.md`, Money (решение 20.09.2026)   |
+| Решение                                                 | Где обоснование                         |
+| ------------------------------------------------------- | --------------------------------------- |
+| Vue + Fastify + Drizzle, а не Nest / Prisma / TypeORM   | `.claude/rules/workspace.md`            |
+| Tailwind выкинут, всё на SCSS                           | `CLAUDE.md`, Stack                      |
+| Reka UI только там, где нативного HTML не хватает       | `.claude/rules/frontend.md`             |
+| Транслит в коде, а не словарём в Postgres               | `.claude/rules/search.md`               |
+| Эмбеддинги — вопрос 0.2, не 0.1                         | там же                                  |
+| Сид справочника — скрипт, не миграция; только добавляет | `.claude/rules/search.md`               |
+| Шрифты заменены: в Caprasimo и Figtree нет кириллицы    | `.claude/rules/frontend.md`             |
+| Внешний вид навигации от iOS, поведение — нет           | продуктовый план, «Дизайн-система»      |
+| Релизы режутся по гипотезам с порогами провала          | продуктовый план, раздел 3              |
+| Рекламы и платных мест в выдаче нет никогда             | продуктовый план, раздел 4              |
+| Средняя показывается с трёх независимых вкладов         | `.claude/rules/advice.md`               |
+| Чужие данные в 0.1 — за доступ, `actors.shared_until`   | `CLAUDE.md`, Money (решение 20.09.2026) |
 
 ## Что решается прямо сейчас
 
@@ -612,7 +750,8 @@ error.trip_open`, экран спрашивает «продолжить или 
 
 ## Куда смотреть дальше
 
-- `CLAUDE.md` — правила: архитектура, границы слоёв, деньги, тесты, коммиты.
+- `CLAUDE.md` — правила: архитектура, границы слоёв, деньги, тесты, коммиты; разбор правил
+  каждой области — в `.claude/rules/`.
 - `docs/tracker.md` — как работать с Jira и Confluence, включая то, чего не умеет MCP.
 - `docs/README.md` — карта: что где лежит и почему именно там.
 
