@@ -199,3 +199,67 @@ test('без связи счета не красные, а шторка счёт
   await context.setOffline(false)
   await expect(sheet.getByRole('button', { name: 'Сохранить' })).toBeEnabled()
 })
+
+test('без связи «Сверить» ждёт связь и не красная; со связью — сверяет', async ({
+  page,
+  context,
+}) => {
+  await openMoney(page)
+  await page.getByRole('button', { name: 'Добавить счёт' }).click()
+  await addAccount(page, 'Наличные ֏', '1000')
+  await page.getByRole('link', { name: 'Все' }).click()
+  await page.getByRole('link', { name: /Наличные ֏/ }).click()
+
+  await context.setOffline(true)
+  await page.getByRole('button', { name: 'Сверить с фактом' }).click()
+  const check = topSheet(page)
+  await expect(check).toContainText('Сверку считает сервер')
+  await expect(check.getByRole('button', { name: 'Сверим, когда будет связь' })).toBeDisabled()
+  await expect(check.getByRole('alert')).toHaveCount(0)
+  await page.waitForTimeout(400)
+  await check.getByLabel('Сколько на счёте сейчас?').fill('1000')
+
+  await context.setOffline(false)
+  await check.getByRole('button', { name: 'Сверить', exact: true }).click()
+  await expect(check).toContainText('Сходится с приложением')
+})
+
+test.describe('320 px, English', () => {
+  test.use({ locale: 'en-US', viewport: { width: 320, height: 640 } })
+
+  test('the card, the page, the account and the check fit and speak English', async ({ page }) => {
+    await signedIn(page)
+    await page.getByRole('link', { name: 'Money', exact: true }).click()
+    await page.getByRole('button', { name: 'Add account' }).click()
+    const sheet = topSheet(page)
+    await expect(sheet).toContainText('New account')
+    await page.waitForTimeout(400)
+    await sheet.getByLabel('Name').fill('Card in roubles')
+    await sheet.getByLabel('Currency').selectOption('RUB')
+    await sheet.getByLabel('Balance').fill('-12400.50')
+    await sheet.getByLabel('As of').fill(yesterday())
+    await sheet.getByRole('button', { name: 'Save' }).click()
+    await expect(sheet).toBeHidden()
+
+    const noSideScroll = () =>
+      page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    await expect(page.getByRole('link', { name: /Card in roubles/ })).toBeVisible()
+    expect(await noSideScroll()).toBe(true)
+
+    await page.getByRole('link', { name: 'All' }).click()
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Accounts')
+    expect(await noSideScroll()).toBe(true)
+
+    await page.getByRole('link', { name: /Card in roubles/ }).click()
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Card in roubles')
+    expect(await noSideScroll()).toBe(true)
+
+    await page.getByRole('button', { name: 'Check against reality' }).click()
+    const check = topSheet(page)
+    await page.waitForTimeout(400)
+    await check.getByLabel('How much is there right now?').fill('-12000')
+    await check.getByRole('button', { name: 'Check', exact: true }).click()
+    await expect(check).toContainText(/Difference/)
+    expect(await noSideScroll()).toBe(true)
+  })
+})
