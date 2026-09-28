@@ -260,7 +260,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 ### Privacy: erasure, trackers, logs — `.claude/rules/privacy.md`
 
 - **Erasure is one function**, `ErasureRepository.erase`, in one transaction; catalogue items stay
-  with `created_by` nulled and every place stays. **A new table that points at `actors` must join
+  with `created_by` nulled, every place stays, and one is added to `erasures` — a count by week of
+  arrival, no id (MOL-91). **A new table that points at `actors` must join
   erasure** — a test holds `ACTOR_REFERENCES` to every foreign key.
 - **Locks are taken in one order everywhere**: the account, then the request rows, then the owner.
 - **No third-party trackers or analytics**; any third-party script that sees data is a decision.

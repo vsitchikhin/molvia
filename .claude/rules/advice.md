@@ -105,8 +105,11 @@ lines (`GATE_RATINGS_STOP_PERCENT`, `GATE_RETURN_STOP_PERCENT`) are printed whil
 the share is rounded down to a tenth, so 19.96 % never stands over «stop below 20» as 20.0.
 **Gate 0.3 closes its window as 0.2 does**: someone whose fourth week is not over is not in the
 cohort — counted, a person who came last week read as one who did not come back, and the more
-people arrived the harder the gate leaned towards «stop». Those waiting, those without access and
-the erased of the weeks the window touches are each a line of their own, in neither fraction.
+people arrived the harder the gate leaned towards «stop». **Time first, access after**: whoever's
+fourth week is not over is waiting, with access or without — it can still be granted — and «no
+access in week 4» is said only of a week that is over (adversarial А: judged by today's access, a
+newcomer read «no access» eighteen days early). Those waiting, those without access and the erased
+of the weeks the window touches are each a line of their own, in neither fraction.
 
 ## What «Что брать» shows, and what it refuses to (MOL-31)
 

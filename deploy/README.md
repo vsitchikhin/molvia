@@ -243,7 +243,8 @@ whole; without it, until now. A day is Yerevan's; a moment needs its offset.
 - **Waiting is not failing.** Someone inside their two weeks, or before the end of their fourth,
   is a line of their own and in neither fraction until their window closes.
 - **0.3 counts only those whose access reached their fourth week** — the numerator is behind the
-  paid door; the rest are «no access in week 4».
+  paid door. «No access in week 4» is said only of a fourth week that is over; before it, with
+  access or without, a person is waiting — access may still be granted.
 - **The erased are one line under both halves**: how many of those who appeared in the weeks the
   window touches erased themselves. Only how many — not whether they had reached five.
 
