@@ -12,6 +12,13 @@ file assumes:
 The full product plan, with the reasoning behind every decision, is in Confluence — page
 `327681`, read it through the `jira-confluence` MCP server.
 
+**This file is the core: what concerns the whole project, and a line for each rule of an area that
+is easy to break.**
+The reasons behind an area's rules — what was measured, what was tried and refuted, the price
+of each decision — live in `.claude/rules/<area>.md`, which Claude Code loads when the work
+touches that area's files. Before changing an area, read its file whole; a line here is the
+rule, not its argument.
+
 Everything below is the rules for working on the code.
 
 ## What this is
@@ -54,76 +61,21 @@ Gyumri and Yerevan, the Russian-speaking diaspora.
 The counters for these thresholds must exist **before the first 0.2 feature**, otherwise
 the gates are decorative and the project loses the ability to fail on time.
 
-The `events` table is that groundwork, and it holds only what no domain table can answer:
-whether someone came back, and to look at what. The 0.2 threshold is a query over
-verdicts, not an event — anything a domain table already knows must never be duplicated
-into the log. Nothing updates or deletes from it — with one written exception, erasing a person
-(MOL-58, below) — the gate queries are its only readers, and each is pinned by an integration
-test, boundary days included.
+The log's writer, the cohort and both gate queries are pinned in `.claude/rules/advice.md`:
 
-**The one writer is «Что брать», once a day per owner (MOL-31).** MOL-8 was going to record
-`session_started` on the first visit, and the promise was withdrawn when it was examined:
-written once, its timestamp is `actors.created_at` and the row duplicates what a domain table
-already knows — the very thing the rule above forbids; written on every launch, it answers a
-question no threshold asks, since 0.2 is counted over verdicts. The screen records
-`advice_viewed` with `subject: product` **only in the shared mode**, after the answer is
-built, at most once per owner and payload in each **day of the person's own life** — days
-counted from `actors.created_at`, as the gate counts its weeks from it, and both in hours
-rather than calendar days, so a `timezone` set on the database later cannot pull them apart.
-Not a rolling 24 hours from the last row: that window slid over the week line and swallowed a
-visit early in week four. Overlapping requests are serialised by an advisory lock per actor,
-and a failure to record is not swallowed, because a lost row lowers the gate with nothing to
-backfill from.
-
-**Both halves of the gate count from `actors.created_at`, not from a first event** (MOL-31,
-Р-20). While the search wrote on every visit the two were the same day; with one writer left,
-and that one behind a paid door, «first event» had become «first paid view». A person without
-access never entered the denominator at all, and one with access had their fourth week counted
-from the day they paid — a threshold selected on the very thing it tests, and one that could no
-longer say «no». Reading a domain table is not what the log's rule forbids; duplicating it into
-the log is, which is why `session_started` stays withdrawn. **And the visit is counted by
-intent, not by catch** (Р-21): the condition is access, not content, so someone who opens an
-empty screen — or one made entirely of their own figures, which the threshold of three
-contributors makes ordinary — counts as having come back for other people's data. They came for
-it; there was none.
-
-**The cohort is those who could have answered: access reaching their fourth week** (Р-24). The
-numerator stays behind the paid door, so a denominator of everyone who ever appeared counted
-people with nothing to come back to, and the threshold read «stop» for a reason unrelated to the
-hypothesis. It is read from `actors.shared_until` and is **approximate on purpose**: there is no
-history of grants, only the moment access runs out, and it only ever moves forward, so someone
-who bought later is counted as having had it then. The denominator errs large and the return
-rate errs small — the gate errs towards «stop», the safe side of this number. Exactness needs a
-table of grants, and that is a task rather than a line.
-
-**That question was asked and answered once already.** From MOL-12 the writer was the
-catalogue search, recording `catalogue_viewed` — and it measured entering, not reading, which
-the owner accepted knowingly while no screen showed anyone else's data. The condition was
-written down with the decision: when a screen does, who writes the visit is decided again.
-MOL-31 is that screen, so the gate moved to `advice_viewed`, and **the search stopped writing
-anything at all** — with the gate gone, `catalogue_viewed` had no reader, and whether a person
-enters purchases is what `expenses` and `verdicts` answer. The rows already written stay where
-they are: the log is append-only, and they were true when they were made.
-
-**The question MOL-6 left open is answered: the log does not outlive the person** (MOL-58,
-owner's decision 20.09.2026). The log points at `actors` with a real foreign key, so an owner
-with events could not be deleted; erasing a person on request is now the single written
-exception to append-only, and their rows go with them. The right to be erased outweighs a gate,
-and a lost row there is the lesser harm. Whether the log could instead be anonymised to keep the
-gates is 0.2's question, and an anonymisation that can be reversed is still personal data.
-
-**The 0.2 gate is `VerdictRepository.reachedRatings` (MOL-49):** of those who appeared in a
-window, how many have `GATE_RATINGS` rows in `verdicts` within `GATE_RATINGS_WINDOW_HOURS` of
-`actors.created_at` — the same axis and the same hours as 0.3. It is the one reader of
-`verdicts` without `deleted_at IS NULL`: «rated five, took one back» is five (MOL-27). **Its
-`from` is the release of 0.2, and the caller passes it** — sign-in is open since 0.1, so
-counting from the first actor would fill the denominator with people who had nothing of 0.2
-to use (MOL-51). **A window still open is left out of the cohort**: counted, someone who came
-last week reads as someone who failed. **A verdict counts from when the server received it**,
-not from when the person pressed «Сохранить»: the drafts queue can hold it past the window, and
-that lowers the rate — towards «stop», the safe side, like Р-24 — accepted rather than trusting
-the device's clock, which stays out of the gates. A person deleted on request (MOL-58) leaves
-both halves of the fraction and no trace; counting deletions separately is 0.2's.
+- **The one writer is «Что брать»** (MOL-31): `advice_viewed`, `subject: product`, only in the
+  shared mode, at most once per owner and payload per day of the person's own life, under an
+  advisory lock per actor; a failure to record is not swallowed. The catalogue search writes
+  nothing, and `session_started` stays withdrawn.
+- **Both halves of the gate count from `actors.created_at`**, never from a first event, in hours
+  rather than calendar days (Р-20). The visit is counted by intent, not by catch (Р-21).
+- **The 0.3 cohort is those whose access reached their fourth week** (`actors.shared_until`,
+  Р-24) — approximate on purpose, erring towards «stop».
+- **The log does not outlive the person** (MOL-58): erasure is the one written exception to
+  append-only.
+- **The 0.2 gate is `VerdictRepository.reachedRatings`** (MOL-49): the one reader of `verdicts`
+  without `deleted_at IS NULL`; its `from` is the release of 0.2, passed by the caller; a window
+  still open is left out; a verdict counts from when the server received it.
 
 ## Money
 
@@ -163,450 +115,14 @@ the load is I/O-bound, with three orders of magnitude of headroom.
 **Tailwind was dropped.** Not one utility class was in use — everything is styled with
 scoped SCSS through tokens — and its CSS-first `@import` cannot pass through Sass.
 
-**Nest, Prisma and TypeORM were considered and rejected**, each for a reason that is not
-obvious enough to leave unwritten:
-
-- **Nest** is Fastify plus a DI container, decorators and modules. That superstructure
-  solves a team problem — imposing one shape on ten people. Here the shape is imposed by
-  these rules and by the linter's import boundaries, for free. Worse, it works against the
-  core decision: in Nest the business logic lives in `@Injectable()` classes, so the domain
-  would import the framework, and "the domain imports nothing but zod" could not hold.
-- **TypeORM** makes an entity a decorated class, so a table becomes a framework object;
-  its migration generator has a long history of being unreliable, and the query builder
-  returns `any` down many paths — typed on paper, untyped where it matters.
-- **Prisma** has the best developer experience of the three. It breaks on exactly this
-  project: its schema is its own DSL, and everything the DSL lacks is hand-written into
-  generated migrations. Nearly all of the plan sits outside it — the `pg_trgm` and
-  `unaccent` extensions, GIN indexes, `similarity()` queries, the aggregates behind "what
-  to buy". Raw SQL exists through `$queryRaw` but loses its types, and here raw SQL is the
-  main instrument rather than an escape hatch.
-
-**Quasar was rejected for the same reason**, with one addition. It bundles a component kit
-with a build layer for SPA, PWA, Capacitor and Electron. The second half is useful one day;
-the first brings its own theme and Sass variables, which would become a second source of
-truth about colour. And the second half is available on its own: if native happens at 1.0,
-**Capacitor** wraps the existing web app for the stores without a component kit or a CLI of
-its own. Until then `vite-plugin-pwa` already ships the manifest, the service worker and
-the precache — a PWA that installs to the home screen and works offline is the mobile
-build.
+**Nest, Prisma, TypeORM and Quasar were considered and rejected**, each for a reason written in
+`.claude/rules/workspace.md`: the domain must not import a framework, raw SQL is the main
+instrument here, and a component kit would be a second source of truth about colour. If native
+happens at 1.0, **Capacitor** wraps the existing web app.
 
 **Postgres does the heavy lifting:** trigram matching and edit distance for search,
 GIN index; aggregates (average ratings, minimum price, store index) are plain SQL.
 Hence Drizzle: Prisma hides exactly what everything here rests on.
-
-### How catalogue search works, and why
-
-Measured, not assumed — the numbers below come from a probe against a real database.
-
-- **Transliteration happens in `packages/model`, not in Postgres.** `unaccent` strips
-  diacritics; it does **not** turn Cyrillic into Latin, so `moloko` scores exactly 0.000
-  against `молоко`. Items carry a `search_key`: the whole name normalised to Latin by a
-  pure function in the domain — Latin plus one letter, `ц`, for the reason below. Against that column the same query scores 0.500.
-  A custom `unaccent` rules file inside Postgres would buy only this half and cost us
-  ownership of the database image — CI can pull a service image but cannot build one.
-- **The alphabet folds the forks rather than preserving them.** A transliteration fork is
-  one letter with two spellings in common use — `ж` is zh or j, `ц` is ts or c, `х` is kh or
-  h, `щ` is shch or sch — and the product plan already named them when it picked the name
-  Molvia. `search_key` keeps one spelling per fork and folds the other half of each into it,
-  on **both** ends: the name on write and the query on read go through the same function.
-  Measured over 46 queries: without the fold four miss the distance threshold outright
-  (`jem` against `dzhem` is 3, `Grand Candy` against «Гранд Кенди» is 3), with it none do,
-  at a cost of 0.26 extra candidates per query. Folding harder than that — collapsing `ч`
-  with `ц`, `ш` with `щ` — wins no query and loses the distinction, so it was rejected.
-  **The `к`/`c` fork is closed by position (MOL-11).** Latin `c` is two letters: soft before
-  `e`, `i` and the diphthong `ae` — that is `ц` (`cena`, `Caesar`) — and `k` everywhere else
-  (`Coca-Cola`, `Picnic`); `ch` is `ч` and is left alone. So `ц` is a letter of its own in the
-  key: `ц`, `ծ`, `ց`, `ts` and a soft `c` all become `ц`, a hard `c` becomes `k`, and doubling
-  collapses before the decision. «Кока-кола» and `Coca-Cola` are one key where they were 2
-  apart, and «кока» finds Coca-Cola before «кола» is typed — before, it was not even a
-  candidate; memory could not have closed this. **Only Latin `c` is decided by the next
-  letter, never `ц`:** the first version hardened every `c`, and a case ending or the next
-  keystroke flipped `ц` — «куриц» stopped being the start of «курицы», «огурцов» fell out of
-  the budget. The price of the rule is a Russian word typed with `c` for `ц` in a hard
-  position: `otec` and `cukaty` cost an edit, `jajca` left the corpus (45 of 46); `ts`
-  spellings are untouched. A Latin word cut right after a `c` — «Nutric» on the way to
-  «Nutricia» — is not the start of the finished one; narrow, and MOL-14's shelf never met it
-  (MOL-47). The fold also fires on what the alphabet itself produced, not only on Latin someone
-  typed — `тс` becomes `ts` becomes `ц` — which is what makes «счёт» and «щёт» one key, and also
-  what reads the `тс` of «Советский» as `ц`. A false merge costs a candidate, a miss costs the
-  answer; the trade is deliberate, and it is a trade. **That is why the key is never an
-  identity:** «Предложить товар» decides a duplicate by `nameIdentity` — case, spacing,
-  invisible characters and the three Armenian spellings «և» / «եւ» / «եվ» only — because there a
-  false merge costs the item itself: «Milo» would be answered with «Мыло» (MOL-12). The identity
-  is built from the key's own first steps, and a property test holds that one identity is always
-  one key: the lookup is by key.
-- **Armenian is in the table, not passed through.** The first market is Gyumri and Yerevan,
-  so an Armenian label is the norm on the shelf. With the table «Գյումրի», «Гюмри» and
-  `Gyumri` all become `giumri`, and an Armenian name is reachable from all three keyboards;
-  worst distance across a corpus of sixteen names in three scripts is 1. Two mechanics are
-  easy to get wrong: `ու` and `և` are single letters written with two code points and must
-  be resolved before the per-character pass, and the aspirated pairs (`պ`/`փ`, `կ`/`ք`,
-  `տ`/`թ`) are collapsed deliberately — the same trade as `ш`/`щ`. A letter no table knows
-  keeps itself: dropping it would produce an empty key, and `visibleLine` refuses that, so
-  the item would become unbuildable inside the server. **What draws nothing is one list,
-  `INVISIBLE` in `text.ts`**, that the name's measure and the key both strip: two copies
-  drifted twice — the Hangul fillers in MOL-12, U+13441 in MOL-27, each time a valid name
-  whose key its own schema refused, a 500. A test walks every code point to hold them equal.
-- **The tables are frozen, and changing one is a migration.** So are the rules that fold and
-  decide `c`. The key is stored, so an edit after the first row is written makes every
-  accumulated key foreign — silently, with no error and no log line. MOL-11 changed the
-  alphabet without one only because no key was stored yet — no production, no real catalogue
-  in any copy; MOL-27 widened `INVISIBLE` under the same condition. Same standing as `MINOR_EXPONENT`. Retuning the thresholds is a
-  different thing and does not touch the alphabet.
-- **Candidates come from `word_similarity`, never `similarity`.** `similarity` compares
-  whole strings, so a long name dilutes the match: «малако» scored 0.158 against
-  «Молоко «Ашхар»» and ranked «Марианна» above it. `word_similarity` compares against the
-  best-matching part: 1.000 on a correct spelling, 0.600 on one swapped vowel — but only
-  0.167 on two, which is the corpus case «малако», so the candidate threshold is 0.15 and
-  not 0.3 (measured in MOL-10). Two traps sit under the operator. **Only `search_key %> $1`
-  reaches the GIN index** — `$1 %> search_key`, `search_key <% $1` and
-  `word_similarity($1, search_key) > t` mean the same and all fall back to a Seq Scan, which
-  a test's handful of rows cannot show. And **the threshold of `%>` is a setting of the
-  connection** (`pg_trgm.word_similarity_threshold`, default 0.6) that `set_limit()` does not
-  touch, so it is set locally inside the query's transaction and never leaks across the pool.
-- **Ranking is by minimum Levenshtein across the words**, via `fuzzystrmatch`. Two swapped
-  vowels in a six-letter word defeat every trigram measure; edit distance puts «малако» at
-  2 from `moloko` with the nearest wrong answer at 3. Across words, not the first word:
-  «чанах» is a brand, and matching only the head noun missed it. **Word against word**, never
-  the whole query against a name's words: that put «Հաց Կաթ» and `Hats Kat` at distance 4
-  while their keys are identical character for character — an artefact of the metric, not of
-  the transliteration. How the per-word distances then combine across a multi-word query is
-  MOL-10's to settle, and three traps are already known. Taking the worst query word loses an
-  item to a _correct_ extra word: «молоко ашхар пастеризованное» scores 11 against «Молоко
-  Ашхар 3.2%», and the extra word is the one printed on the package. Keeping every word lets
-  a query of nothing but digits match every name that carries them. And **dropping words
-  shorter than two characters is not the cure** — those words are the packaging size: it
-  makes «Молоко 1 л» and «Молоко 2 л» identical for ranking while «Молоко 1л» written
-  without the space stays distinct, so two shops' labels for one product rank by different
-  rules. MOL-10 took **the third way**, and its review made it hold on both sides. A word
-  **grounds** a match only if it has two characters, no digit and is not a unit — «32», «1л»,
-  «500г» are sizes, not grounds, and so are «шт», «мл», «см», «հատ», «pcs» (MOL-48): the length
-  alone let `sht` through, two edits from «сыр», and every item sold by the piece answered it.
-  The units are a list in natural spelling keyed by `toSearchKey` itself, so nothing stored
-  depends on it and a missing unit is a line; only the forms written after a number — «рулона»,
-  «пакетиков», «таблеток», never «таблетки», which begins the goods' own name. A query word right
-  after a number that starts a unit is read as that unit against every name — «батарейки 4 шту»
-  on its way to «штук», or the item vanished on every keystroke until the unit was typed whole.
-  One that is a slip from a unit — an edit, or two letters swapped: «кефир 500 мд», «500 лм» — is
-  that unit only against a name that prints it after the same number — apart or together, «500 мл»
-  or «500мл» — and elsewhere the word it spells: read as a size everywhere, «2 сом замороженный» let
-  «Котлеты … замороженные» in beside the fish, and against any «см» it let in «Пицца … 30 см» — the
-  number gives a slip away. Either way only while another word still grounds the query, because in
-  «2 суп» or «2 кап» the word is the goods. What it costs, named: «чай пакетики» misses the tea, its
-  word measured as a word (the owner's decision); a right unit no longer carries a typo through the
-  mean — «шакалат 100 гр» is lost where «шакалат голд» is found; a real word that shares a unit's
-  key goes with it — «7 Up» is `7 up`, which «7 ап» no longer reaches; a slip reaches only the unit
-  it slipped from, beside the number typed — «кефир 500 мд» loses «Кефир 1 л», which «кефир 500 мл»
-  finds, and «кефир 1 мд» loses «Кефир 1000 мл»; a small count that matches the label passes for a
-  slip — «1 суп доширак» brings «Doshirak лапша … 1 уп» in at the soup's distance, since only the
-  meaning tells the goods from a mistyped unit; the start of a brand after a number is taken for a
-  unit being typed — on «сыр 125 ка» (`ka` starts `kapsul`) every cheese comes one edit behind the
-  Camembert, for one keystroke; and «тш» for «шт» is `цh` in the key, no transposition of `sht`, and
-  two edits from it.
-  A grounding word is measured against the grounding words of the name only, never
-  against «л» or «1», which every two-letter word is within two edits of. Grounding words fold by their **mean**,
-  rounded up; short words by their **worst**, at most one edit, so each has to find its pair
-  and «1 л» against «2 л» costs one. A query with no grounding word but with letters — «M&M's» is
-  `m m s`, «m&m» is what the screen sends halfway — finds names in which every one of its words
-  is found exactly; digits alone find nothing. The screen searches while the
-  person types, so **the last word also matches the start of a name word** — exactly up to
-  three letters, one edit from four, two from seven; any slack on two letters matches every
-  word there is. The price is that a finished word matches longer ones too: «сыр» finds
-  «Сырок», «чай» finds «Чайник» — below the exact match, never above it. Measured on the MOL-10 corpus: the right item first in 20 of 20, junk queries
-  find nothing. The correct extra word is still lost (4 against a budget of 2) — chosen
-  knowingly, and pinned by a test. The distance is exact `levenshtein` on words cut to 255
-  characters: past that it raises an error, and `levenshtein_less_equal` is no substitute,
-  because its capped answer distorts the mean. Limits MOL-14 measured and left in place: the
-  budget is absolute, so a short wrong word passes where a long right one does not —
-  «молоко ашхар кефир» finds the milk, and «кока кола 0,5 л» even finds «Вода Джермук 0.5 л»,
-  every word wrong by two; the two thresholds disagree — «ыср» is two edits from «сыр» yet
-  shares no trigram with it, so it never becomes a candidate; and a name of punctuation only
-  («???») has a key but no query reaches it (both MOL-47). A name without a size ranks level
-  with a wrong size — unknown is not worse than wrong, which is likely right.
-- **The answer says how near it is (MOL-46), and nothing is dropped for it.** The budget is
-  absolute: `pelmeni` is two edits from `zeleni` of «Чай зелёный» exactly as `malako` is from
-  `moloko`. Six rules on the letters were measured against the whole corpus and 241 two-edit
-  typos, and each bought false hits with typos: vowels by sound lost 38 of 40 slips of the
-  finger, the first letter every typo touching it, keyboard neighbours explained «овощи» as
-  well, and the best of them emptied ten answers for 28 typos — the trade this search refuses.
-  So `GET /catalogue/search` answers `near` beside the items: **true when some row has every
-  word within one edit (`ACCEPTED_DISTANCE - 1`, not a number of its own), or the person took it
-  on this query before, or it is their own word for it** — their choice says more than a typo
-  metric, as in the lift. **Every word, and the words alone** (adversarial review А, Б): by the
-  mean one exact word beside a wrong one made the row near — «мыло детское» over «Масло
-  детское», even three edits over two exact words — and a size in another number made a one-edit
-  typo far, «кефр 1 л» over «Кефир 0,5 л», which the ranking already calls the kefir in another
-  size. A word found by a synonym counts as exact. **The answer is near by the rows it hands out**
-  (owner's decision on review): the order is by the mean and the size, nearness by the worst word,
-  so a near row can rank below twenty far ones — and then the screen says «не нашли» over what it
-  shows rather than «нашли» over a list with nothing near in it. An empty answer is not near. A far answer is drawn as rows headed «Похоже по написанию» with «не нашли» and
-  «Предложить товар» **under them**, in place of the quiet «Нет нужного?» — above them, the block
-  moved every row under the finger as the answer flipped near and far while a word was typed
-  (owner's decision on review). It is read out as «не нашли» too, and it is a miss for the
-  person's own word as an empty one is. **An answer from a server older than the field is read as
-  near**, what every answer was before it existed — so «an empty answer is not near» is said of
-  this server, and the phone tells a miss by the rows as well (review Р-5). On MOL-14's shelf it is exactly the class: «овощи», «специи», eight of
-  twelve everyday words that share only letters, «яблоки» → «яблочный» of the edits of the
-  ending, and five things meant, still first — two brands spelt two edits off («хаггис», «лейс»)
-  and three queries with a word in another form than the label's («собачий корм», «средство для
-  полов», «таблетки для посудомойки»). The price, named: a word two edits from its label's —
-  a typo, «малако», or another form, «полов» for «пола» — reads «не нашли» under the item it
-  found, first in the list; and a wrong word within one edit — «водка» → «Вода» — stays a find, since nothing
-  tells it from a typo.
-- **Every candidate is ranked; there is no ceiling.** Any cut before ranking is wrong one
-  way or another. By similarity it drops the typo the low threshold exists for — «малако»
-  scores 0.429 against any «Малина» and 0.167 against the milk, and two hundred raspberries
-  pushed it out. Unordered it drops by row age, that is the newest items, the ones «Предложить
-  товар» just added. `order by id` is worse still: the planner walks the primary key and
-  filters every row. The cost is bounded by the catalogue, by at most sixteen words of the
-  dictionary (MOL-45) and by taking at most twelve words of a query: a two-letter query over
-  20 000 names answers in about 370 ms.
-- **What the user picked is remembered.** A query and the item that went into a trip after
-  it are stored under the query's search key, and next time that item comes first. No model,
-  no image change, and it compounds from the first day — it is also the labelled set anything
-  smarter would later need. Four rules hold it (MOL-11). **Personal:** only the asker's own
-  picks count; a sum across people would be popularity in the results, indistinguishable from
-  the paid placement forbidden below. **Above distance, but only among what was found:** a
-  pick outranks a closer spelling and never lets in what the search did not accept — with one
-  written exception, the person's own word, below.
-  **The same query** means every word but the last equal, one last word the start of the
-  other from three characters, and the word being typed still the start of a word of the item
-  taken — the screen searches while typing, so the pick was made on «мол» and the next search
-  may fire on «моло», but «молоток» typed in full is another word and lifts nothing.
-  **Latest first**, then most frequent, summed over the keys that match. Memory belongs to
-  the query: a new brand taken on «молоко» is on top of «молоко» from the next trip, but one
-  found and taken by its own name («марианна») does not move «молоко» at all. It is written when the item is
-  added to a trip, not on a tap — a tap the sheet cancels is a changed mind. It never forgets;
-  if a stale pick starts to hurt, decay is a task with a number, not a guess.
-- **What people call a thing the shelf writes otherwise is a dictionary (MOL-45).** «картошка» for
-  «Картофель», «орешки» for «Арахис»: no spelling rule and no threshold reaches them.
-  `synonymKeys` in `packages/model` expands a word of the query, looked up by its **exact** key,
-  into the words it also stands for — a group of the same thing both ways, a wider word into
-  narrower ones one way («арахис» never finds «Фисташки»). Only the query is expanded and nothing
-  is stored, so **the dictionary is not frozen**: a word added is a commit, not a migration. **A
-  synonym counts only as the word of the kind, at no cost** — the first word of a name that is not
-  an adjective, `kindKey` (owner's decisions on review): «Вода Джермук», «Скумбрия х/к», «Молодой
-  картофель», «Армянский лаваш». Anywhere in the name it found «Мицеллярная вода» for «минералка»,
-  the tuna of a cat food for «рыба», a pizza for «сыр»; the first word alone missed every name
-  with an adjective in front, which is how people write it. An adjective is read off the name by
-  its ending (`ADJECTIVE_WORD`, one pattern for the domain and for Postgres), not off the key,
-  which collapses «солёный» to `soleni`, the ending of «огурцы»; nouns with that ending —
-  «Пирожное», «Мороженое», «Жаркое» — are listed apart (`NOUN_WORD`), or «Пирожное Картошка» was a
-  potato. The words of a name are split by one written-out class, `WORD_BREAK` — every Unicode
-  `White_Space` — in both places: `\s` of JavaScript takes the no-break space and `\s` of Postgres
-  does not, and a name pasted with one was found offline and missed online; a test walks every
-  code point, as for `INVISIBLE`. A narrower target that is itself an adjective — «минеральная»,
-  «газированная» — is never the kind, and counts as any word of the name; an adjective of a group
-  of the same thing — «гречневая», «сгущённое» — counts anywhere in a name whose kind is one of its
-  own, written beside it in the dictionary (`PAIRED`): «Крупа гречневая» and «Гречневая крупа»,
-  «Молоко цельное сгущённое» and «Сгущённое молоко» — a shelf writes both orders — and never
-  «Лапша гречневая» or «Гречневая лапша» (owner's decisions on review; the price: a kind not
-  written there, «Ядрица гречневая», is found by letters only). «вода» is no longer a target of
-  «минералка»: the water is in «Вода туалетная» first word and all. The prices: «Вода Джермук»
-  without the word is not a «минералка», a name with its brand first («Barilla спагетти») is found
-  only by its own word, and «Фарш рыбный» is meat to «мясо». Its candidates come from
-  `like 'word%'` and `like '% word%'` — the start of a word — on the same GIN index, not from
-  `%>`: at 0.15 each of the eight fish of «рыба» brought in half of 20 000 names and the query took six
-  seconds. **The typed spelling is not measured only for a word whose synonym brought the name
-  in** — «лори» brings «Рис», and `sir` is two edits from `ris`; but «хаггис» of «памперсы хаггис»
-  is still measured against the «Huggies» that «подгузники» brought. **A word found by its synonym
-  stays out of the mean** of MOL-10: free, it lent its budget to the next word, and «хлеб
-  барадинский» found «Лаваш армянский». **At most sixteen words** of the dictionary per query
-  (`MAX_SYNONYMS`): twelve wide words expanded into fifty and held a connection for a second and a
-  half. **The price, measured:** over 20 000 names built of the very words the dictionary expands
-  into, twelve wide words take about 0.47 s against 0.28 s on master, one word with synonyms
-  («мясо», «сыр») 0.2–0.3 s against 0.19, and the same word after a number («мясо 1 кг») 0.2 s
-  against 0.11; the cost is ranking the names that carry the synonyms, not finding them, so a
-  smaller cap wins little. **The check for a slipped unit (MOL-48) runs only after a number, and
-  once** (review Ш): joined to the thousands of names a synonym brings, it took «мясо» to 1.4 s
-  while having nothing to look for — and without it «мо» answers in 0.11 s where master takes 0.17.
-  **And the search runs without JIT**, set locally beside the threshold (review Щ): twelve words
-  with sizes — a shopping list pasted in — are estimated at a million, and Postgres spent 2.2 s
-  compiling a statement that answers in 0.4 s. **A target is a kind of product, never a brand**:
-  expanding into a maker would be a place in the results handed out by hand; the other way round
-  is fine («памперсы» → «подгузники» of every maker), and «белизна» is let in as the common name
-  of a kind. **No categories** — «овощи», «специи», «сладости» name a shelf, and reaching kefir
-  from «молочка» is what embeddings are for in 0.2. The forms people type are written out —
-  nominative, genitive and accusative, singular and plural; a form left out is a miss. Measured on
-  MOL-14's corpus: the six misses found, «макароны» finds the spaghetti the shelf carries, nothing
-  else moved; the words come from the owner's expense log plus the usual pairs of a grocery. The
-  prices, named: a typo in the synonym itself is not expanded, and a name with no word of its kind
-  («Coca-Cola 1 л» for «газировка») stays out of reach. Offline, «Часто берёте» reads the
-  dictionary by the same rules — the word of the kind, a pair for every word.
-- **And the person's own word (MOL-45).** A query the server found nothing for — or nothing near
-  (MOL-46) — followed on
-  the same screen by a pick found by another word, is learnt with the purchase —
-  `search_picks.admits` — and from then on **exactly that query** lets the item in: the one
-  written exception to «never lets in what the search did not accept», and personal for the
-  reason memory is. **It stands below a find of the very words and a pick, above a typo in a
-  word** (owner's decisions on review): «кефир» learnt as the milk taken in its place stops
-  standing above the kefir the day there is one, in any size — «кефир 1 л» against «0,5 л» is the
-  same words — and the potato learnt for «овощи» stays above the flour the absolute budget finds
-  there (MOL-46): the words a person teaches are the ones the search misses. The price, named: a
-  kefir found only through a typo of the query («кефра») stays below the learnt milk. **Only the first sheet opened after a miss may take it
-  along**, and every pick uses it up: a milk looked at and put back does not make the bread
-  taken next the meaning of «кефир». Not when one query starts the other — «сыр» after «сыр
-  косичка» is the same query cut short, and «Кефир» is «кефир » — compared as typed _or_ by the
-  key, since each alone misses: «дет» is not the start of `deцkoe`, and «сгущенка» is not the
-  start of «сгущёнка варёная» as typed. The server skips a missed query whose key starts the found
-  one or the other way round too. Erasing back keeps the word by the same rule; a pick from the
-  recent items or from «Предложить
-  товар» learns nothing. It is not checked against the search: a real substitution — no kefir,
-  milk taken — is learnt as it is, and costs its owner one row on that exact query. A dictionary
-  grown from everyone's words is 0.2's, and would need three people, as any aggregate does.
-
-**The thresholds — `word_similarity` > 0.15, edit distance <= 2 — were measured and kept
-(MOL-14).** The set: the owner's own words from the expense log («кола», «дошик», «туалетка», 73
-queries and 19 for what the shelf does not carry) against 64 names written for the shelf of
-«Ереван Сити», plus the typo corpus of MOL-5, since the log holds no typos. At the kept point 62
-of 73 have what they meant first and alone, 6 more share the first place with an item they did
-not mean — a tie the row's uuid broke: «мол» with «Кофе … молотый», «туалетка» with the
-litter's «туалета»; 45 of 45 typos land in the top three; 17 of 19 absent words find nothing.
-**Since MOL-112, at one distance the shorter name goes first** (owner's decision В-5, and its review):
-the more of a name the query covers, the nearer — and with a common name beside its varieties,
-«Молоко» and «Молоко 3,2%», that is every common word, not six of 73. The order at one distance is
-**found by the word before found by a synonym** («маслины» keeps «Маслины» above «Оливки»), **a
-whole word before the exact start of a longer one** («печень» is the liver, not «Печенье»: MOL-10's
-«below the exact match, never above it», which the length alone broke — review И; a start one edit
-off is not marked, or «туалетка» put the litter above the paper), **more fats typed with «%» that the
-name carries whole** («кефир 2,5% 1 л» names «Кефир 2,5%» — review З; whole, or «3,5%» scored on the
-«3» of «Молоко 3,2%» and a fat the list lacks lost the common name it should give — review Н; a bare
-number may be a size, and counted it would hand «молоко 1 л» back to «Молоко 1,5%»), **then the
-shorter name, then the similarity**, then the
-uuid. The length ranks before the similarity because a size in the query otherwise handed the first
-row to a variety: «молоко 1 л» put «Молоко 1,5%» first by the «1» of its fat, «рис 1 кг» put «Рис
-круглозёрный» first by the «к» of `kg` (adversarial А, Б) — the purchase and the rating went to the
-variety. The fat is read off the query as typed (`percentNumbers`) and matched against the name as
-written, since the key drops the sign and splits the number at its comma; its digits are taken out of
-the distance, or the «1» of «молоко 1%» paired with «Молоко 1,5%» at no cost before the rule of fats
-was asked (review Н′). By value, not by place: a size that shares a digit with the fat leaves with
-it — «кефир 1% 1 л» is judged by «л» alone — which loses nothing measured, since a neighbour of the
-same fat has the same digits and one of another fat is told apart by the rule of fats (review С-12).
-A space before «%» is `WORD_BREAK` on both sides — `\s` of JavaScript takes
-the no-break space a name pasted from a shop's site carries, `[[:space:]]` of Postgres does not
-(review О) — and as many fats are looked at as words (review П). On the shelf of MOL-14 all six
-ties go to the item meant. The prices, named: a short wrong name beside a long right one — «лейс»
-puts «Рис» above the chips; «малако» finds «Молоко» where the similarity chose «Молоко
-миндальное»; among the kinds a wide word leads to, the shortest — «мясо» is «Фарш» first; names of
-one key length are still the uuid's where the similarity is equal too — «Молоко 1,5%» and «3,2%», and
-on the seed «кур» is «Курица» or «Курага»; «молоко 1», typed on the way to «1 л», still gives
-«Молоко 1,5%», whose «1» is an exact pair; a fat typed without «%» is read as a size — «масло 72,5»
-and «молоко 3,2» still find their variety, both digits paired at no cost, but a size beside them
-takes it away; and without «%» a short word may pair twice with one of the name's — «творог 5,5» is
-«Творог 5%» at no cost, by the distance (with the sign, «творог 5,5%» gives «Творог», the digits of a
-fat being out of the distance — review Р).
-**No point of the grid did better on both halves.** A threshold of 0.3 empties every false hit
-but drops «Молоко Ашхар» from «малако» — the case 0.15 exists for; a budget of 1 empties them
-too and loses five typos and «собачий корм»; a budget of 3 wins one query and brings six false
-hits. The slack on an unfinished word (MOL-10) moves five or six whole answers either way but
-never a first row, so the grid could not tell its three settings apart — kept as it is, not
-chosen. What no threshold reaches went to tasks with numbers: **synonyms** — «картошка» against
-«Картофель», 6 of 73, one of them («мясо») found by letters only — MOL-45 closed them with the
-dictionary above, which puts 67 of 73 first and alone, and the shorter name of MOL-112 the other six
-— less the two brands of В-6 below, «дошик» and «принглс»; **the absolute
-budget** — «овощи» finds «Мука … высший сорт», «специи» «Соевый соус», «пельмени» «Чай зелёный»,
-3 of 25 — MOL-46 made them a far answer rather than a find; **a unit word grounding a match** — «сыр» is two edits from `sht` of «4 шт» —
-closed by MOL-48 for the units it lists, which took six of the ten items «сыр» found. Weighting
-vowel edits below consonant ones was tried against the budget and refuted:
-`ovoshi`/`vishi` share every consonant, while the right `canah`/«Чанах» and `grecka`/«Гречка»
-differ by two. **The owner's absent words flatter the search:** of fifty everyday purchases the
-shelf does not carry, 25 find something since MOL-45 — «макароны» finds the spaghetti through
-the dictionary, the shelf carrying it under another name — and the other 24 are two outcomes. In 12 the first row carries
-the word's root — a taste or a property printed on another item. Six of those are found exactly
-or by the start of a word («сметана» is in the chips' name), which no threshold can remove — a
-question for the screen, which MOL-23 answered: «Нет нужного? Предложить товар» stands under every
-answer. The other six are an edit of the ending inside the budget («яблоки» →
-«яблочный», gone at a budget of 1); the one two edits away, «яблоки», is a far answer since
-MOL-46. The remaining 12 share nothing but letters — the absolute
-budget («водка» → «Вода», «сыр» → «Сок»); eight of them are a far answer since MOL-46, the four
-within one edit are not; the unit word that added to them is gone (MOL-48).
-`REMEMBERED_PREFIX` was measured by typing letter by letter: a pick lifts its item on the next
-letter 18 times at 2, 9 at 3, 5 at 4. It harms 5 times at 2 — where two of the owner's words
-share two letters, a pick for Coca-Cola on «ко» puts it above «Колбаса» on «кол», one for
-«Креветки» on «кр» above «Крекеры» on «кре», and each the other way round — and once at 3 and at
-4, whatever the prefix: the owner's «кол» is a query of its own, for the cola, and a sausage
-picked on «кол» while typing «колбаса» takes its first row through the equal key. That is the
-price of memory belonging to the query — one short word serving two items. 3 stays, and real
-picks measure it again (MOL-47). The corpus pins every answer whole — the shelf, those fifty
-words, Latin and Cyrillic brand spellings, Armenian labels — so a change of either threshold
-shows what it moves.
-
-**Embeddings are a 0.2 question, not a 0.1 one.** They answer what trigrams cannot —
-«молочка» reaching kefir and curd, and the duplicate merging the canonical catalogue needs.
-They are not the answer to typos or transliteration, both of which are already solved
-deterministically above. The cost is real: `vector` is not in `postgres:17-alpine`, so it
-means owning the image, plus a model resident in memory on a cheap VPS.
-
-### What «Что брать» shows, and what it refuses to (MOL-31)
-
-One route, `GET /advice`, and the whole screen: the rated items in three groups, each given
-exactly what it is entitled to. **«Не брать нигде» has no field for a price, a place or a
-threshold** — the answer is a discriminated union on `level`, so cheapness cannot reach a bad
-item through an oversight in a later use case. That is the product's core rule held by the
-type checker rather than by a reader, the way `bad` is not a tone a screen can ask for.
-
-- **Two figures decide everything, and the domain owns both.** The repository returns a sum of
-  scores and how many people stand behind it; `verdictLevel` picks the group and
-  `averageScore` prints «4.3». The rating crosses the wire as a **decimal string**, never a
-  number: one person's whole five and an average over many share one field, and «never float»
-  has to hold for both. **The group is decided by the printed tenth, not by the exact
-  fraction** (Р-22): 79 over 20 is 3.95, prints «4.0», and grouping it below «брать» put two
-  rows carrying the same number in different groups with nothing to explain it. The person
-  reasons with the number they see, so that number decides.
-- **Free is your own data; access opens other people's.** `actors.shared_until` decides, read
-  once per request, and `scope: 'own' | 'shared'` travels with the answer because the screen
-  cannot work it out and «4,3 из 5» read as one's own score would be a lie. There is no
-  parameter with which to ask for anyone else's.
-- **An average needs three people (`AGGREGATE_MIN_CONTRIBUTIONS`).** With two, whoever knows
-  their own score gets the other's by subtraction. Below three the row falls back to the
-  person's own figures, and a row that has no own figures either — a stranger's lone verdict —
-  **does not appear at all**: its mere presence with a verdict would be that opinion, read
-  without them. A contribution is a person, never a row.
-- **Prices are stricter than ratings, and in practice almost always one's own.** The same
-  threshold counts _buyers of one item in one place_, so a place with fewer than three is shown
-  only when the asker shopped there, with their own price. Expenses are private, and one
-  stranger's price in one shop is their basket. Ratings travel with the person; **prices are
-  filtered by the asker's own country and city**, because «cheaper» across cities means
-  «elsewhere». **One's own purchases are the exception, and then the city decides the order**
-  (Р-26): the city rule is about other people's prices, so filtering it before «mine or theirs»
-  took away the Erevan prices a Gyumri resident could see for free — and leaving it out
-  entirely put their own Erevan receipt first, under the word «Дешевле всего». Own city first,
-  then by price.
-- **The threshold of «только если дёшево» is the lower median, from three purchases**
-  (`PRICE_MEDIAN_MIN_OBSERVATIONS`, MOL-33's answer) — `percentile_disc(0.5)`, a price someone
-  actually paid, the same rule `isRateJump` follows. Fewer than three and the field is `null`,
-  which the contract requires the server to say rather than omit.
-- **One «currency + unit» per item, the one with the most observations**, ties broken by the
-  latest purchase (MOL-31, Р-4). Two prices in different currencies have no common ground
-  without a rate, and a rate belongs to one trip and one day, so they are never shown side by
-  side.
-- **Order is by rating down, then by name, in all three groups.** The handoff asked for
-  ascending unit price; that sorts _different products_ by a number — milk at 570 ֏/л above
-  beef at 4 790 ֏/кг — and «compare by unit price» is about one item across places.
-- **The limit never cuts what must be seen** (Р-23). The list is ordered by rating, so the
-  worst lie at its end, and `ADVICE_LIMIT` used to eat exactly them — two hundred strangers'
-  fives deleted the one «не брать нигде» the screen exists for. What survives the cut is this
-  person's own rows and every warning; what stands at the top of the screen is still the
-  rating. Two orders in one statement, on purpose, and `total` beside the rows so a truncated
-  list can say that it is one. **«Own» and «warning» are not the same tier, and the order
-  between them mattered** (Р-25): with «own» first, a person holding `ADVICE_LIMIT` rows lost
-  every stranger's «не брать нигде» — the one thing on that screen they could not have learnt
-  themselves. So `ADVICE_WARNINGS_RESERVED` of the rows are held for them. A reserve and not a
-  reordering, because warnings have no bound in the shared mode: putting all of them first
-  returned, on a shelf of 250, a page of two hundred warnings and not one recommendation.
-- **The server names no superlative.** It returns the places and nothing else; whether that
-  reads «Дешевле всего» or «Брали здесь» is the screen's to decide (MOL-34's answer). **It
-  decides by comparing the prices, not by counting the places** (MOL-32, А1): the list comes
-  own city first and only then by price (Р-26), so the first place is the one to name but not
-  always the cheapest — and «Дешевле всего» over 4 790 ֏/кг with «Ещё: 3 000 ֏/кг» under it was
-  a lie the screen printed for a person who shops in two cities. And a review is always the
-  asker's own: words are not an aggregate, there is nothing in them to average and nothing to
-  hide behind.
-- **Every row says whose verdict stands behind it** (`isMine`, MOL-32, А2). Nothing else in it
-  does: in the shared mode a row may be entirely other people's, and a review is empty there
-  exactly as it is on one's own verdict without one. The flag was already in the statement, for
-  the warnings reserve; handing it out is what lets the screen offer «Оценить» where there is
-  nothing to amend, instead of a `PATCH` that answers 404 under the word «повторите».
 
 **Telegram Mini App was dropped:** `getUserMedia` is broken on both platforms and the
 native scanner only reads QR. Native is a 1.0 question.
@@ -614,447 +130,180 @@ native scanner only reads QR. Native is a 1.0 question.
 **Exchange rates:** official ones from the open CBA API; real exchange rates from users.
 Scraping rate.am was rejected.
 
-**How the official rate reaches a trip (MOL-39).** A trip snapshots it when it starts, from a
-cache in the database — **«Начать поход» never goes to the network**: a trip at the shelf does
-not wait for a central bank. The API refreshes the cache itself, hourly, and at boot unless
-the cache was written less than an hour ago — in development, unless it holds anything at all:
-`make dev` restarts on every save
-(`RATES_REFRESH`, on by default, off in end-to-end runs). The cache holds what the banks
-publish — **one currency against the dram per day**, never a pair; the pair is built at the
-snapshot, and an inverse or a cross is rounded there to the snapshot's six digits.
+## Rules by area
 
-- **The CBA speaks SOAP only** — the GET form answers «Runtime Error» — and dates its rate by
-  the day in Yerevan, with nothing on weekends: a Sunday trip takes Friday's rate, with Friday's
-  date. The date always travels with the rate; «≈» without one is worse than an old number.
-- **Two open sources stand in for it: the Bank of Russia, then open.er-api.com.** «The CBA is
-  silent» has two faces and both count: five failures in a row, **or** an answer whose rate is
-  over **seven days** old — a service stuck on its last date looks healthy. Every refresh still
-  asks the CBA first; an open source as stale as the CBA sends the refresh on to the next one. A
-  trip takes a fallback only when it is fresher than a CBA rate over a week old — a shorter bound
-  would mark every weekend — and such a snapshot says `source: 'fallback'`. When nothing is
-  fresher, the trip keeps the CBA rate with its date and `rateStale: true`: the screen says the
-  bank has published nothing since. A pair is never built from two providers.
-- **A jump is flagged, not refused (owner's decision).** A rate more than a quarter away from the
-  lower median of its recent rates is stored with `jump`. Recent means: the central bank's own last
-  five; an open source's own from the last week if it has three, and otherwise the central bank's
-  — it is asked only when the bank is silent, so its own history is an old episode or nothing,
-  exactly when a trip takes it. **Fewer than three earlier rates, no judgement:** with two the
-  median is their mean, one ×100 day made the next right day a jump and offered itself as
-  «previous». The trip remembers the jump and shows it always; beside the snapshot it keeps the
-  rate before the jump when there is one no older than a week, and the person chooses — the jumped
-  rate, that one, or their own for this trip, `personal` (`PUT /trips/:tripId/rate-choice`). The
-  snapshot is never rewritten — only the choice moves.
-- **Strict or nothing:** an answer missing a currency, carrying a zero or a negative, dated by a
-  day that is not one — `0001-01-01`, `1970-01-01`, the 31st of February — or past tomorrow —
-  `9999-12-31` — is not written at all. A stale rate with its date beats a mixed one.
-- **An empty cache gives a trip no rate, for good** — the snapshot is written once and never
-  filled in later (owner's decision, 19.09.2026).
+Each area below is a file in `.claude/rules/`, loaded by its `paths:`. The lines are the rules
+that are easiest to break; the file holds every rule of the area and the reason for each.
 
-**The person's own rate comes from exchanges, never from a number typed in (MOL-40).** The plan's
-decisions of MOL-41 (22.09.2026) replaced «enter your rate once and edit it» with the operation a
-person actually performs: «gave 20 000 ₽, got 95 000 ֏, on this day» — `exchanges`, named by the
-device, private always. The rate is what the two amounts say and is not stored beside them.
+### Catalogue search — `.claude/rules/search.md`
 
-- **The wallet is the average cost of what is held, and spending does not move it** — it takes
-  money and its cost away in one proportion. Only a new exchange does, and the weight of the old
-  money in it is exactly how much was left at that moment: `heldBefore`, optional, asked once the
-  received currency already came in by an exchange — never of the currency of conversion, which
-  always costs one. Unknown, the wallet takes that exchange's rate and says so
-  (`basis: 'last'`) rather than counting the remainder as zero in silence; before the first there
-  is money of no known cost, so the first exchange never asks. Not derived from purchases: a price
-  is optional and spending outside a trip is not written, so a sum of expenses would be a wrong
-  weight presented as a right one — it is offered only as a hint, «по записанным тратам».
-- **Every currency has a cost in the currency of conversion, and one rule moves them all (MOL-42).**
-  Receiving money costs what was given for it, at the cost of that; giving money away moves
-  nothing, as spending does not. So roubles → dollars → drams carries the price of the dollars
-  into the drams, an exchange back into the currency of conversion leaves the wallet where it was,
-  and dollars getting dearer later do not re-price drams already bought. The owner's own journal
-  is why this is 0.1: two thirds of their drams came through dollars, and the pair alone did not
-  see them. The screen lists the price of every currency a chain went through («89,04 ₽/$») so
-  the drams' rate can be checked by eye. Stored per currency, never per account: a dollar on a card
-  and one in a pocket cost the same (MOL-43 decides accounts, not costs).
-- **Money of no known cost is valued at the official rate of the exchange's day, and says so**
-  (В-1): dollars brought from home, whose price in roubles nobody wrote down. What the person
-  named counts as named, what they did not comes from a source — never as zero — and the wallet
-  carries `estimated` for as long as that part is in the mix. The official rate is taken by the
-  rule a comparison uses (a jumped rate gives way to the one before it); none in the cache for
-  that day, and the cost is unknown until an exchange starts it afresh — the trip then takes the
-  bank. Only a rate fresh for that day counts, by the week a trip allows — the rule for a trip falls
-  back to the freshest it has and says `rateStale`, and here nothing would say it (Ж3). The cache
-  is read once per day of the list, eight days at a time, and serves both. A wallet missing above
-  a list of exchanges says which exchange its cost was lost on (`walletUnknown`), never «no
-  exchanges yet».
-- **A change of the currency of conversion works forwards** (В-2, the owner's comment over the
-  option they ticked): «what I exchanged before is not re-counted». `actors.income_currency_since`
-  is the day of the last change — the settings' own `UPDATE` sets it on every change, and a repeat
-  of the form does not move it — and **before it no price is ever taken from the bank**: an
-  exchange counts when what was given already has a price in the new currency without one — the
-  new currency itself (dollars to drams, for someone who now counts in dollars), or a currency
-  priced by the links counted so far (euros → dollars → drams, for someone who chose euros later).
-  Roubles to drams belonged to the old reckoning and are not re-valued; the drams they brought have
-  no price in the new currency, so the link makes their cost unknown rather than vanishing — a
-  vanished link let the next dollar exchange weigh rouble drams at the price of dollar ones (review
-  round 3, М1). The rows cannot tell a chosen currency from the default `RUB` every account starts
-  with, and this rule does not need them to: attempts that cut by the day alone took the whole
-  dollar history of anyone who once changed leftover roubles (Ж2, Л1). Which exchanges gave their
-  currency a price only the whole walk knows, so the server says it per row (`priced`) and the
-  sheet asks «сколько было до обмена» when the latest exchange into that currency on or before the
-  chosen day is priced — the currency _has_ a price then, not merely had one once (round 4, Н2) —
-  and when this exchange will give one: paid in the currency of conversion, in a currency with a
-  price that day, or on or after the day of the change in anything the bank can price (round 5,
-  О1). The flags are the server's; the one case the phone cannot see is a week of the bank's
-  silence, when it still asks in vain. A wallet lost to the old reckoning says so in its own words
-  (`walletUnknown.reason: 'oldReckoning'`), since «no bank rate that day» would be untrue (Н1). Earlier exchanges stay in
-  the list as they were. A trip started offline with the old currency in its `context`
-  is not cut — the cut is about the current one.
-- **Exact to eighteen digits, rounded to six once.** `walletRate` keeps ratios of integers through
-  the chain, each link brought to 10¹⁸ (the exception under «Money and quantity rules»), and rounds
-  to the snapshot's six digits at the end, the way a cross rate is rounded. The screen walks the
-  chain once (`ownRates`) for the wallet, the prices and the reason a wallet is missing.
-- **A trip takes it at the start, like the official one, and never again** (В-4): with
-  `actors.rate_preference = 'personal'` — the default — and a known cost of the spending currency
-  dated no later than today in Yerevan — by an exchange of the pair, a chain, or an income alone
-  (MOL-66) — the snapshot is `source: 'personal'` with no provider and no jump; otherwise MOL-39's
-  branch as it was. Nothing is required of the person: without exchanges and incomes the two
-  preferences are the same answer. An exchange or an income made while a trip is open moves the
-  next one.
-- **Every exchange is set beside the central bank of its own day**, by the same `pickOfficialRate`
-  a trip started that day would use — «на 8 754 ֏ больше» or «меньше», never «комиссия»: a good
-  exchanger beats the bank, and the difference says nothing about why.
-- **An amendment keeps the version before it** (MOL-42, В-3): the rate of a past exchange is a
-  fact, so `PUT /exchanges/:id` writes the old version into `exchange_revisions` and the new one in
-  place, `created_at` untouched so the exchange keeps its place in its day. It names the version it
-  was made over (`revision`): the exchange already as sent is a repeat, 200 and no new version; a
-  version another device moved on from is 409, as the settings form is; removed or someone else's
-  is 404, and a conflict keeps the sheet open with what was typed, over the version held now —
-  which the sheet itself shows, remainder included, since the list that has it is under the sheet
-  (round 2, Л4; round 3, М2). A
-  remainder the exchange has is shown in the sheet whatever a new exchange would ask: an amendment
-  replaces the exchange whole, so a field not shown was a field cleared. The row is a button named
-  by its words — an `aria-label` silenced the rate and the comparison. The row says «исправлен», the sheet shows the versions — which is what explains a trip
-  that took a rate the exchanges no longer say. The history goes with its exchange: a removal made
-  final and erasure take it by cascade. «Где и заметка» is one private line, part of a repeat.
-- **Removing is still there, for an exchange that should not exist.** Trips already started keep
-  what they took. **The bin asks first, with the amounts and the day, and «Вернуть» stays offered after**
-  (owner's decision В-5). A removal marks the row (`deleted_at`) and hides it from every reader;
-  «Вернуть» (`POST /exchanges/:id/restore`) clears the mark, so the exchange keeps its
-  `created_at` — written anew it took the moment of the tap, which moved both the order of its day
-  and the hint. **A removal is final after ten minutes** (`EXCHANGE_UNDO_MINUTES`, owner's decision
-  В-7): the server's minute timer deletes older marks of everyone, and the owner's next request of
-  the screen deletes theirs sooner — the moment the screen stops offering them back. The screen
-  withdraws the offer on an answer, never on a tap: a write lost on the way, or refused before it
-  reached that point, leaves the removal undoable, and «Вернуть» stays. Both
-  «Вернуть» and a removal are safe to send again after a lost answer: an exchange already back
-  answers 200, and a removal never makes final the row it is marking. A «Вернуть» that comes too
-  late is told so, and the list is read again — not «check the connection», which sent people to
-  enter the exchange a second time.
-- **A repeat is the same exchange, or it is a conflict** (В-6). The same name with the same
-  amounts, day and remainder answers 200; with anything else, 409 — that is a correction sent
-  after an answer that never came, and answering it «saved» left the typo in the wallet. The
-  screen then shows what was written and says to tap it and amend it.
-- **An exchange no rate in the band says is refused where it is written** (`error.invalid_rate`),
-  never accepted and dropped from the wallet later: a zero too many once made the wallet vanish, the
-  trip take the bank in silence and the screen say there were no exchanges above a list of two.
-- **The hint counts what was spent after the exchange, in trips still open then** — a purchase
-  added to a finished trip was paid with the money held before. «After» is the moment the exchange
-  was written when that was on its own day, and the end of its day for one written later: counting
-  from the record threw away everything bought between the exchange and its entry. Without a remainder named
-  at the last exchange it speaks of that exchange's money only. A day's official rate that jumped
-  is never an exchange's measure: the rate before the jump is, or no comparison at all.
+- **Transliteration happens in `packages/model`, not in Postgres**: every name carries a
+  `search_key`, the whole name normalised to Latin plus `ц` by `toSearchKey`, on write and on read.
+- **The alphabet folds the transliteration forks** (`ж`, `ц`, `х`, `щ`), and Latin `c` is decided
+  by the next letter — soft is `ц`, hard is `k` (MOL-11); `ц` itself is never decided by position.
+- **Armenian is in the table**; `ու` and `և` are resolved before the per-character pass.
+  **What draws nothing is one list, `INVISIBLE` in `text.ts`**, for the measure and the key alike.
+- **The key is never an identity**: a duplicate is decided by `nameIdentity` (MOL-12).
+- **The tables and the fold rules are frozen: changing one after a key is stored is a migration.**
+- **Candidates come from `search_key %> $1` only** — the one form that reaches the GIN index — at
+  `word_similarity` > 0.15, with the threshold set locally inside the query's transaction.
+- **Ranking is by minimum Levenshtein word against word**, a budget of 2; sizes, units and
+  digits do not ground a match (MOL-10, MOL-48); the last word also matches the start of a word.
+- **The answer says whether it is near (MOL-46)** by every word within one edit; nothing is
+  dropped for being far.
+- **Every candidate is ranked; there is no ceiling** before ranking.
+- **A pick is remembered per person, under the query's key** (MOL-11): above distance, only among
+  what was found — except the person's own word (`search_picks.admits`, MOL-45).
+- **Synonyms are a dictionary in the domain** (`synonymKeys`, MOL-45): only the query is expanded,
+  a synonym counts only as the word of the kind, at most sixteen per query, never into a brand.
+- **At one distance the order is fixed** (MOL-112): found by the word before by a synonym, whole
+  word before a start, fats typed with «%», then the shorter name, then the similarity, the uuid.
+- **The thresholds were measured and kept** (MOL-14); a change of either is checked against the
+  pinned corpus. **Embeddings are a 0.2 question.**
+- **The catalogue grows by «Предложить товар» and the seed** (MOL-112): the seed only adds, is
+  not a migration, never stays in `_test` or `_e2e`, and holds no brands.
 
-**An income is money that came in with nothing given for it (MOL-66)** — the actual day, amount,
-currency and a source from the owner's own closed list (`incomes`, В-3); nothing expected is ever
-written. Private exactly as an exchange is, and written by an exchange's rules: a name from the
-device, a repeat is 200 and anything else under that name 409; an amendment in place with its
-version kept in `income_revisions`; a removal offered back for ten minutes. One money model, one
-set of rules — the task's own «as for exchanges in MOL-40» predates MOL-42's history.
+### «Что брать» and verdicts — `.claude/rules/advice.md`
 
-- **It is a link of the same walk** (В-1). In the currency of conversion it moves nothing — that
-  currency costs one. In any other its price in the currency of conversion was never named, so by
-  the rule of every unknown cost it is **the official rate of its own day**, fresh and judged for a
-  jump as money of no known cost is, and the wallet says «часть — по курсу ЦБ РА». It is never
-  valued at what the money already held cost — that is a price of other money. What was held
-  before it weighs it as for an exchange (`heldBefore`, asked where it will count); unknown, the
-  wallet takes the income alone and says «по последнему поступлению» (`basis: 'income'`). No fresh
-  rate, or a day before the currency of conversion changed, and the cost is unknown with the income
-  named as the reason (`walletUnknown.given: null`). **Incomes alone make a wallet**, so «Обмен
-  денег» is empty only when its card has nothing to say — no exchange, no wallet, no reason for one
-  missing, no price of another currency: drawn empty over drams that came in, it said «trips take the
-  central bank» while they took the income's rate, and hid the switch back (adversarial Д1).
-- **Money bought with the currency of conversion is an exchange, not an income** (Р-6): dollars
-  brought from home with their rouble price on the owner's sheet are «251 000 ₽ → 2 900 $», and
-  written so they carry that price instead of the bank's. The sheet says it under any other
-  currency.
-- **Both screens are one walk** (`ownMoney`): «Обмен денег» and «Доходы» read the exchanges, the
-  incomes and the cache once, and the sheets ask «сколько было до» by one list, `receipts`, of every
-  exchange and income with whether it gave its currency a price. The hint starts from the latest
-  money in, whichever kind, and says which (`from`).
-- **«Доходы» is a journal by month with what came in per currency, never converted** (В-2). The
-  sum is the model's (`incomeMonths`); one no money can hold is left out rather than thrown — the
-  screen failing whole would take away the one way to remove the income that made it. «Пришло /
-  потрачено» is not in 0.1: a purchase need not have a price, so «потрачено» would always be short.
+- **«Не брать нигде» has no field for a price, a place or a threshold** — the answer is a
+  discriminated union on `level`.
+- **The domain owns the two figures**: `verdictLevel` and `averageScore`; the rating crosses the
+  wire as a decimal string; the group is decided by the printed tenth (Р-22).
+- **Free is one's own data; `actors.shared_until` opens other people's**, and `scope` travels with
+  the answer.
+- **An aggregate needs three people** (`AGGREGATE_MIN_CONTRIBUTIONS`); a stranger's lone verdict
+  does not appear at all. **Prices are stricter**, filtered by the asker's country and city, one's
+  own purchases excepted and put own city first (Р-26).
+- **«Только если дёшево» is the lower median from three purchases**; one «currency + unit» per
+  item; order by rating down, then name.
+- **The limit never cuts one's own rows or the warnings** (Р-23, Р-25:
+  `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
+- **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, **every other reader
+  filters `deleted_at IS NULL`**.
 
-**A spending is money spent outside a trip (MOL-73)** — the barber, the rent, the domain: a day, an
-amount in its currency, one of the owner's categories, «что это» and «где» as free text
-(`spendings`). The personal accounting layer of MOL-72, private as an income. It makes no item,
-feeds no price and no verdict: a purchase at a shop is still entered in «Поход», and the sheet says
-so (В-2) — the boundary is held by the hint, not by a ban, because the owner's own sheet is full of
-«кола, молоко, несквик… · ереван сити».
+### Money: rates, exchanges, incomes — `.claude/rules/money-rates.md`
 
-- **Categories are the owner's own** (В-3): every account is given thirteen presets the first time
-  it asks — the handoff's ten and «Дом и быт», «Животные», «Документы» — and may make its own.
-  **Removing one takes it out of the choice and erases nothing** (`archived_at`): the spendings in
-  it keep it and past months keep their sums; otherwise removing «Продукты» would rewrite every
-  month. A spending's category is the same owner's, held by a composite key, and a removed one of
-  theirs still takes spendings — one queued offline must not be lost to a chip taken away elsewhere.
-- **A spending in another currency keeps the rate of its own day** — the person's, else the central
-  bank's, by the rule a trip started that day uses — written with it and never recomputed. The
-  person's is **the pair priced by one walk of the chain and rounded once** (`walletCross`, review
-  Р-1): two wallet rates divided after rounding lost 24 ֏ on 1 500 $. The bank's is **only a fresh
-  one** (`isRateFresh`, Р-4): the cache's latest may be weeks old, and a snapshot kept for good has
-  nowhere to say so — without one the spending is «не посчитано».
-- **Every rate of «Деньги» is kept on the side whose number is at least one** — «390 ֏ за $», never
-  «0,002564 $ за ֏» — the snapshot, a day's rate and the month's (`convertAcross` converts from
-  either side): six digits of a small number are four significant ones, and 11 $ came out
-  4 290,17 ֏ (С-1, adversarial Д2б).
-- **What was spent is counted by the trip's rule, what came in by the bank's alone** (review Р-2,
-  Р-3). A trip's line in another currency and a spending whose snapshot is not into the spending
-  currency of now — none was known that day, or it was written before a move — are converted on
-  the fly by the rule a spending's snapshot is taken by: ten dollars at the shop and ten at the
-  barber's on one day come to the same, and drams of August stay counted after a move to dollars
-  (Р-5, Д8). An income in another currency is the official rate of its day (MOL-66, В-1), never
-  what the money already held cost. An amendment keeps the snapshot only while the day, the
-  currency and the snapshot's use stay; otherwise it is taken anew. The price, named: on-the-fly
-  lines move when an exchange of their period is amended (С-3).
-- **The month is counted by the server** (`GET /money/months/:month`): spendings and **finished**
-  trips — one line per currency, on the device's day of finishing, in «Продукты», read from the
-  purchases every time so an amendment, MOL-78's receipt sum or MOL-76's removal moves it by
-  itself, **each line counting the purchases behind its own sum** (owner's decision В-7) — what came
-  in, the rest, the categories and every day's total; the journal comes forty rows a page, and a
-  day cut by the page keeps its whole total. **The next page starts after the key of the last row
-  shown** — day, moment, name (`journalCursorCodec`) — never an offset, which moved under the page
-  with every write above it (Д3). The key is the row's own, so an amendment that moves a spending
-  to another day moves it across the cursor: it comes twice, or not at all, until the journal is
-  read from the start — which the screen does after its own amendment of a day (round 2, Е3). A row no money can hold is «не посчитано», never a failed month
-  (Д5, MOL-66's rule). A month is one of the days a rate may be dated by — `0000-01` is 404, not a
-  500 from Postgres (Д4).
-- **A closed month is counted in the income currency by the rate of its last day, frozen the first
-  time it is read** (`money_month_rates`): a new exchange today does not move August. **A fact of
-  August amended later does** (owner's decision В-6): writing, amending, removing or bringing back
-  an exchange or an income of a day lets go of the months frozen from that day on (`thaw`), and the
-  next read freezes them again. The running month is never frozen, so today's exchange lets go of
-  nothing. **A change of the rule lets go of every month** (owner's decision В-8): «мой курс / ЦБ РА»
-  switched, or the income or spending currency changed — otherwise two past months stood on two
-  rules, decided by which was opened first. A trip keeps its snapshot either way. The prices, named:
-  a month read while the write is on its way may freeze without it; `thaw` runs after the write,
-  not inside it, so a database failing between the two leaves the write done and the answer 500 —
-  a repeat of a write or an amendment lets go again, a repeat of a removal does not, since the day
-  is read off a live row; an official rate reaching the cache for a past day moves the wallet of
-  that month and lets nothing go.
-- **Removal is the money rule, held by the server**: a mark, «Вернуть», final after ten minutes by
-  the minute timer and nothing else (В-4) — no other write makes it final sooner, unlike an
-  exchange's, and a spending sent again while it is marked is 409, not a new one (Д6). After the ten
-  minutes a spending sent again is written anew, as a trip's row is — at once, not when the timer
-  comes round (round 2, Е2). Erasure takes spendings,
-  categories and frozen rates.
-- **The names of one's own categories are checked under the owner's lock** (Д7): two phones adding
-  «Такси» at once wrote two. A name equal to a preset's («Продукты» beside `groceries`) is the
-  screen's to refuse — the server does not know the language of the chips (MOL-82).
+- **«Начать поход» never goes to the network**: a trip snapshots the official rate from the cache,
+  which the API refreshes hourly; the cache holds one currency against the dram per day.
+- **The CBA first, then the Bank of Russia, then open.er-api.com**; a pair is never built from two
+  providers; a jump is flagged, not refused; an answer that is not strict is not written; an empty
+  cache gives a trip no rate, for good.
+- **The person's own rate comes from exchanges, never from a typed number** (MOL-40): the wallet is
+  the average cost of what is held, every currency has a cost in the currency of conversion, and
+  money of no known cost is valued at the official rate of its day, marked `estimated`.
+- **A change of the currency of conversion works forwards** (В-2); the chain is exact to eighteen
+  digits and rounded to six once.
+- **An exchange or an income is amended with its version kept**, removed with «Вернуть» for ten
+  minutes, a repeat is the same write or 409, and a rate outside the band is refused where written.
+- **An income is a link of the same walk** at the official rate of its day (MOL-66); money bought
+  with the currency of conversion is an exchange, not an income.
+- **A rate is printed on the side whose number is at least one** (`formatRate`, MOL-81).
 
-**«Деньги» on the phone (MOL-82)** — the fifth tab, between «Оценки» and «Настройки»: the month
-of `GET /money/months/:month`, the sheet of a spending, and one's own categories. The screen adds
-nothing up.
+### Money: spendings and «Деньги» — `.claude/rules/money-spendings.md`
 
-- **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`), by the rules
-  of the trip's (MOL-24): storage is the queue, one at a time under `navigator.locks`, held by a
-  lost connection, a 5xx, a portal, a `401` or a code the API did not say, sent only once the
-  server has named the owner; any other refusal is set aside as «Не принята». Categories go
-  through it too (owner's decision В-4), so «Такси» made at the till goes before the spending that
-  names it. The three queues share `stores/queueing.ts` — the lock, the key of a kept write, what
-  holds, the doubling pause (В-6).
-- **The writes of one spending fold while they wait — only while nobody has begun to send them**:
-  an amendment of one not yet sent rewrites its record; two amendments are one `PUT` over the
-  revision the first was made on. **A write a send has begun on is marked on the shelf**
-  (`attempted`), by whichever window sends it, and is never folded into again: its answer may
-  have been lost after the server took it, and «not sent» and «no answer» are one thing to a
-  queue (adversarial А, Б, В). A change made after it goes behind it, over the next revision.
-  **Nothing is tried while the browser knows there is no connection**, so a write made at the till
-  stays unmarked and foldable, and an answer that came and is not the API's — a portal — takes the
-  mark off, since that request never arrived (round 2). The price, named (review Ф-1): a browser
-  wrongly sure it is offline — some VPNs and WebViews — sends no spendings until `online` comes;
-  the trip's queue and the ratings still try. A refusal that comes after the person removed the
-  spending is dropped rather than shown — there is nothing left to fix (round 3, Р1). **A refused record or amendment takes the
-  amendments behind it** into its refusal: they were made over a revision it would have made, and
-  sent on they went over another device's amendment in silence (round 2, Н1, Н3). **Removing a
-  spending nobody has begun to send takes it out of the queue**, and «Вернуть» puts it back; once
-  a send of its record has begun, the removal goes to the server and 404 on it is done; «Вернуть»
-  then takes the removal back while it waits, or asks the server to restore, never writing the
-  spending anew. **A record the server already holds with other fields is this phone's own**, so a
-  409 on a record goes on as an amendment over revision 1.
-- **A spending in the queue is a row, never a figure** (requirements Р-3; the handoff asked
-  otherwise and this rule wins): «Отправляем…» at the top of its day, «Правка отправляется» on an
-  amended row whose figures stay the server's, a removed row hidden — unless «Вернуть» stands
-  behind its removal in the queue (round 2, Н2) — and «Ещё не учтено: N»
-  on the card — not for a record the month already shows (adversarial Л). A day only the phone
-  knows of has no total; a row only the phone knows of shows what was last typed, since there are
-  no figures of the server's to keep (review Т-4). The month is read again from the start
-  whenever the queue has an answer — which also puts a spending moved to another day where it
-  belongs (MOL-73, Е3) — keeping as many pages as were open.
-- **The two figures the card derives are the model's**, `percentChange` and `shareOf`: a ratio
-  of two sums the server gave, rounded as a person rounds. **«Включая 11 $ (≈ 4 290 ֏)» names no
-  rate** (Р-2): `foreign` sums a currency over the month, and every spending in it had its own
-  day's rate. The sheet converts while typing by `convertAcross` — MOL-24's exception — and only
-  between the two currencies the running month's rate joins; a third says «Посчитаем по курсу дня
-  траты» (Р-5).
-- **Removal asks nothing; `UndoStrip` gives ten seconds** where «Трата» floats, and stands still
-  while a finger or the person's focus is on it — not the focus it puts on «Вернуть» itself, or
-  the count would never run for a touch. **It stands whatever the screen becomes under it**: the
-  only spending removed turns the month into a newcomer's, and the strip went with the button it
-  shared a block with (adversarial Г). The server keeps the removal ten minutes; the strip is what
-  the screen offers.
-- **A date is shown in words over its native field** (`AppField`, `display`): «Сегодня, 27 сентября»
-  is drawn, the field stays underneath to open the system picker and to be read by its own value,
-  and Chrome's own calendar is kept unseen in its place — stretched over the field, it caught the
-  sheet's «Сохранить». The spending just saved is scrolled
-  into view once its row is there; a finished trip opened from «Деньги» slides in as a push.
-- **The sheet says «saved» after it has closed** (adversarial И): the move to the spending's month
-  made while it was open was undone by the step back that closes it. It checks the day — a cleared
-  picker or a day before 2000 would fall over in the queue's codec — and that the category is one of
-  the chips shown, since one the server called unknown stands on none (adversarial Д, Ж).
-- **Days of Yerevan are printed as calendar days, never as moments** (`calendarDay` in `days.ts`,
-  review Т-1): `yerevanMidnight(day)` is the evening before anywhere west of UTC+4, and every date
-  of the screen came out a day early on a phone in Moscow. The frontend's tests run in UTC on every
-  machine (`TZ` in its vitest config), where such a slip shows.
-- **The categories are the owner's, not a month's**, so the newest month kept names them for a
-  month not read yet: «Трата» stands while the month loads, when it failed and offline on the first
-  of a month (review Т-5, Т-6) — and does not, where no category is known at all. «Категории ›»
-  stands without bars too (Т-7). This month in Yerevan is looked at again whenever the app comes
-  back into view (adversarial З).
-- **«Пусто» is read off the answer** (Р-6): the running month empty, no income, nothing the month
-  before and nothing waiting. The server does not say «no history», and an empty August after a
-  full July is «В этом месяце трат нет», not a newcomer.
-- **The month is in the address and moves by `replace`**; there is no lower bound, since the
-  server names no first month (Р-1). The last three first pages read are kept per owner
-  (`molvia.money`), so offline is a strip over them. A next page asked for while the month is read
-  again from the start is asked again from the fresh answer (adversarial Е).
-- **A finished trip opened from «Деньги» leads back there** (owner's decision В-3):
-  `?from=money`, and the route lists which `from` it takes (`meta.from`) — an address must not
-  make any screen the parent of any other. The chevron says «‹ Деньги» and steps back onto the
-  same month; opened cold, «Деньги» is laid underneath.
-- **One's own category is made from the chips** («+ Своя», a sheet over the sheet, chosen as soon
-  as it exists) **and kept on «Деньги → Категории»** (В-1): «Убрать» asks nothing, since it erases
-  nothing, and «Вернуть» stands right under it. A name equal to a preset in the language of the
-  screen, or to a live one of one's own, is refused there. The colours are tokens — thirteen
-  presets and a palette of eight for one's own, none red, olive, ochre or terracotta, each at
-  least 3:1 on `--surface`.
-- The charts, a tap on a category and «Графики по месяцам» are MOL-74's (Р-7); accounts are
-  MOL-115's.
+- **A spending makes no item, feeds no price and no verdict** (MOL-73); a purchase at a shop is
+  still entered in «Поход».
+- **A category is removed by archiving**, never erased; a spending in another currency keeps the
+  rate of its own day, written with it and never recomputed.
+- **The month is counted by the server**; a closed month is frozen at the rate of its last day,
+  let go (`thaw`) from the day of an exchange or an income written, amended, removed or brought
+  back, and let go whole by a change of the rule.
+- **Removal is a mark, «Вернуть», final after ten minutes by the minute timer.**
+- **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`); a write a send
+  has begun on is never folded into; a spending in the queue is a row, never a figure.
+- **Days of Yerevan are printed as calendar days** (`calendarDay`); the frontend's tests run in UTC.
 
-**An account is where money lies (MOL-115)** — «Наличные ֏», «Карта ₽»: a name, a currency, «сбережения»,
-and a start — what it held at the end of a day, below zero for a card in debt (`money_accounts`,
-`MoneyAccount` in code, since «account» already means a Molvia account). Private as a spending, the
-owner's alone, and gone with them. **There is no rate on an account, ever**: the price of money
-belongs to its currency (MOL-42, MOL-43 Р-2).
+### Money: accounts — `.claude/rules/money-accounts.md`
 
-- **The balance is counted, never stored: the start and every operation on the account dated after
-  its day.** The start is the evening of `startOn` — «Старт — вечер 16.09» of the owner's sheet — so
-  an operation on that day is history and moves nothing. **A trip is dated by the day it started** —
-  the money left at the shelf — and moves its account while still open (Р-29): dated by its finish,
-  a trip left open, or finished after midnight, was taken a second time from a start that already
-  counted it (adversarial Д4). The day is the phone's where it is earlier than the server's — the
-  earlier of the server's start and the device's finish — or a trip begun offline in the evening and
-  delivered after midnight took the next day (owner's decision В-6, review Р2-3). A device's finish
-  more than a day before the server's start is a wrong clock, not an evening offline, and the server's
-  day stands (adversarial Ж1). The month of
-  «Деньги» still dates it by the finish. **The price, named** (adversarial Е2): a trip continued on
-  later days moves its account on its first day, and one begun before an account's start and
-  continued after it is history whole — the start line is drawn once, when the account is made. One loading of all four kinds (`operations`) feeds the balance,
-  the journal, the check and «не попали» alike, as one shape (`AccountOperation`).
-- **An account on an operation is optional** (MOL-43 В-2): a spending, an income, each half of an
-  exchange, a trip. The screen puts the default in, the server never guesses. **The database holds
-  whose it is and what it may hold**: every account column is a key with the owner, and an income's
-  and an exchange side's key carries the currency too — money lands on an account in its own currency
-  or it is not that account. A removed account still takes operations, and so does one marked for
-  deletion: what was queued offline is not lost to an account taken away on another phone. **One the
-  owner has not got at all, or one that does not fit, is «без счёта», never a refusal** (Р-28, Р-31):
-  an account deleted for good, or given another currency, while a phone was offline is not the one
-  the phone saw, and a refusal would set the operation aside in the queue for good (adversarial Д3,
-  Е1); someone else's account gets the same answer, so nothing tells the two apart.
-- **«Списано со счёта»** (MOL-43 В-3) is what left the account exactly, in its currency, on a
-  spending in another currency, or a trip that is itself or has a purchase in another — a trip's
-  purchases may be in any of the four, and a trip in drams with a dollar purchase would otherwise be
-  named «без списано» by every check and refused the one thing that fixes it (adversarial Д2). Keys
-  and checks hold the rest; the trip's case is the use case's, since its row cannot see its lines.
-  **It counts only while it applies** (`debitedOn`): a trip whose dollar purchase was corrected to
-  drams is counted exactly by its sums (adversarial Е3). **And any change of a trip's money takes
-  its «списано» off** (Р-32, adversarial Ж2) — a priced purchase added, a price changed, a priced one
-  removed: the figure was what left the account for the trip as it was, and kept, it counted a
-  purchase it never covered the day a dollar one was added; the check names the trip until it is
-  entered anew. **Nothing
-  about it is refused** (Р-31): sent where it does not apply it is dropped, and in another currency
-  than the account's it means the account is not the one the phone saw — the operation is written
-  «без счёта»; a write from the queue that was refused would be lost. It moves the balance
-  and nothing else: not the month of «Деньги» (owner's decision В-1) and not the person's own rate,
-  since those drams were never in their hands. **Without it the amount is converted by the rule of
-  «Деньги»** — the spending's own snapshot when it is of the pair, otherwise the person's rate of that
-  day, else a fresh official one — and marked «≈» (Р-14): one spending is one number on the month and
-  on the account. Nothing to convert it by and it is «не посчитано»: in no balance, named by every
-  check. A trip's «списано» is the trip whole, whatever currencies its purchases were in (Р-18); it is
-  set from the summary by `PUT /trips/:id/payment`, whole each time, so the queue can send it twice.
-- **A field of the account left out of an amendment is kept, not cleared** (Р-26) — the one
-  exception to «an amendment is the operation whole»: the screens older than accounts amend a note
-  without knowing the field, and would take the operation off its account in silence. A kept account
-  the money no longer fits — the currency was changed — is dropped rather than refused. **A repeat of
-  a write sent without the field is still a repeat** after an account was named on it later, or the
-  import run again would meet 409 on every row.
-- **Naming the account is not amending the fact** (Р-15): on an exchange or an income it writes no
-  version, sets no «исправлен» and thaws no month — where the money lay is not what was exchanged. The
-  version still moves, so an amendment over the old one elsewhere is a conflict.
-- **Removing: without operations a mark, with them «убран из выбора»** (handoff 03). A marked account
-  is offered back for ten minutes and then deleted by the minute timer; an operation that named it
-  meanwhile is left without an account and lands in «не попали» — not lost (Р-17). One with operations
-  keeps its history and balance, leaves the picker and the totals (Р-22), and comes back by the same
-  «Вернуть». A name is unique among the owner's accounts that still exist, removed ones included, in
-  any case, under the owner's lock (Р-21) — so «Вернуть» never meets a conflict. The currency of an
-  account with operations does not move: they were counted in it.
-- **The totals are the live accounts in the spending currency by the rule of «Деньги», always «≈»**
-  — «всего», «можно тратить» without the savings, «сбережения» — and an account nothing converts today
-  is left out and counted as such, never as zero.
-- **A check looks for the reason before it offers to close the difference** (MOL-43 В-4, the owner's
-  comment over the option they ticked). The fact is sent first and the count only answered after it,
-  so the person does not fit the number; the answer is the difference and what could have made it
-  since the last check, or the start: an operation of the account's currency with no account — a
-  trip with nothing priced yet included, by its own currency (Д6) — one on it in another currency
-  without «списано», a trip on it with purchases that have no price, one no rate counts. «Since» is
-  dated after the check's day **or learnt by the server after the check** (`seenAt`): written,
-  amended, given or taken an account, a trip received as finished or given a purchase — never the
-  phone's clock, or a trip finished offline and delivered after a check hid behind it (Д1, Д1б).
-  **Only a check that came out even is where the next one starts** (owner's decision В-4 of the
-  review, adversarial Д7): one with a difference is written and shown («сверено»), but what it named
-  stays named — in «не попали» too — until a check comes out even; otherwise closing the sheet
-  without putting the reason right hid it, and the next check led to «Прочее · сверка», the same
-  money twice. Sent again under its name a check counts again, which is how the screen shows a reason
-  put right (Р-19). **«Came out even» is exact** (owner's decision В-5, review Р2-2): an account
-  counted with «≈» rarely matches the bank to the kopeck, and a difference of rounding is closed like
-  any other — «Прочее · сверка» — **after which the screen sends the same check again**, so that it
-  comes out even and moves the window; without that repeat the window of such an account stays at
-  its start. Closing the difference is an ordinary «Прочее» spending or income with the note
-  «сверка», written by the person's own tap through the ordinary routes with the server's sum.
-- **«Не попали в остатки» is per account, not per currency** (Р-16): an operation with no account
-  that could still explain a difference of some live account of its currency — after its start and
-  its last check that came out even. A fresh check of the card does not hide last week's cash; a currency with no
-  account is not asked about.
-- **«Сколько было до обмена» from the accounts is a hint** (Р-9, Р-20): the balances of the currency
-  at the end of the day, the exchange amended left out, and nothing when an account of it starts on
-  that day or later. Put into the wallet in silence it would have re-priced the months (MOL-73 В-6).
-- **The prices, named:** the balance of a view counts live operations while «удалить или убрать» asks
-  of every row — a spending in its ten minutes of «Вернуть» makes an account «убран» rather than
-  deleted; an operation naming a marked account is in no balance until the timer unlinks it; a check
-  keeps the count of its moment; a new price of a purchase already written does not move its trip's
-  `seenAt` — a purchase has no moment of amendment; after «Прочее · сверка» the operation that made
-  the difference is still in «не попали» until a check comes out even; and every read counts the
-  owner's whole life, a rate per day of a foreign amount — measured at 81 ms on two years of daily
-  spending and sixty exchanges (adversarial Д8), accepted.
+- **There is no rate on an account, ever**; the balance is counted, never stored: the start and
+  every operation dated after its day. A trip is dated by the day it started.
+- **An account on an operation is optional**; one the owner has not got, or one that does not fit,
+  is «без счёта», never a refusal.
+- **«Списано со счёта» moves the balance and nothing else**, counts only while it applies, and any
+  change of a trip's money takes it off.
+- **A check looks for the reason before it offers to close the difference**; only a check that came
+  out even is where the next one starts.
+
+### Trips and the queue on the device — `.claude/rules/trips.md`
+
+- **Every write to a trip goes through the queue on the device (MOL-24)**, online or not; storage
+  is the queue, one window sends at a time under `navigator.locks`, and a refusal other than the
+  ones that hold is set aside, never retried.
+- **A removed trip is marked** (MOL-76): «Вернуть» for ten minutes, **every reader filters the
+  mark** except erasure, the timer and an account's «удалить или убрать».
+- **A trip names its own geography** (`context`, MOL-65): a start without one is
+  `error.trip_context_required`, held by the queue without a timer; the settings are settled
+  choice by choice inside the `UPDATE`.
+- **The introduction on «Поход» is only for a history known to be empty** (`answeredEmpty`, MOL-77),
+  kept under a key of its own; a phone-side cache is read by both versions.
+
+### Identity, sessions, the way in and out — `.claude/rules/auth.md`
+
+- **Identity is proved by a session; `actors.id` proves only ownership** (MOL-52, MOL-53). The
+  token exists in the database only as a `sha256`; revoking a session is deleting its row.
+- **A login is a five-minute, one-use request** (MOL-54); whose Telegram confirms is not checked,
+  an accepted price; the cookie is sent after commit, only once.
+- **`backend/src/cookie.ts` is the only module that touches a cookie**: `__Host-`, `HttpOnly`,
+  `Secure` always, `SameSite=Lax`, `Max-Age`; setting it and saying `no-store` are one act.
+- **What a secret may look like is one rule, in `backend/src/secret.ts`**; more than one cookie of
+  that name is refused, and the refusal clears nothing.
+- **The term slides, moved by one write a day**; four refusals give one answer, `401 error.no_actor`.
+- **The login is a gate, not a route** (MOL-56): the door has one definition, `login.closed`; the
+  device remembers the request and never the secret; whose account this is, is asked before anyone
+  is let in; the queue and the drafts send only once the server has said who we are.
+- **«Выйти» erases this device's drawer after the server's `204`, never on the tap** (MOL-57); a
+  lost `204` is settled by the server's next answer; offline there is no way out.
+
+### Privacy: erasure, trackers, logs — `.claude/rules/privacy.md`
+
+- **Erasure is one function**, `ErasureRepository.erase`, in one transaction; catalogue items stay
+  with `created_by` nulled and every place stays. **A new table that points at `actors` must join
+  erasure** — a test holds `ACTOR_REFERENCES` to every foreign key.
+- **Locks are taken in one order everywhere**: the account, then the request rows, then the owner.
+- **No third-party trackers or analytics**; any third-party script that sees data is a decision.
+- **Logs live fourteen days and carry no address and no query**; a failure is logged by its kind
+  through `describeFailure`, never by its message.
+
+### The bot — `.claude/rules/bot.md`
+
+- **Whose data goes is `ctx.from.id`, never anything in the button.**
+- **Every message is an i18n key**; the bot keeps no state of its own and repeats none of the API's
+  rules.
+- **Updates of different people at once, of one person in order** (`@grammyjs/runner` with
+  `sequentialize`).
+- **An outcome is written into the message; a refusal is only shown over it, and written nowhere.**
+- **Telegram updates are never logged whole.**
+
+### Frontend — `.claude/rules/frontend.md`
+
+- **Two self-hosted faces, Nunito and Onest; the dram sign from a face of its own.**
+- **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
+  `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the
+  failure; polite states speak through the one live region in `App.vue`.
+- **Native HTML first, then Reka UI, never a styled kit**; the catalogue combobox is our own.
+  Interface icons come from MDI through `unplugin-icons`.
+- **An installed app takes a new version only when hidden and holding no typing** (`pwaUpdate.ts`).
+- **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17); no gesture
+  is intercepted; only the page scrolls, except a sheet.
+- **A screen is built from the kit** (MOL-18); the sheet is a native `<dialog>` with an entry in the
+  history, and puts the page back by what it was opened from (MOL-63).
+
+### End-to-end — `.claude/rules/e2e.md`
+
+- **End-to-end has a database and ports of its own**, and the database is dropped before every run.
+- **Every spec comes in through `open()` in `e2e/session.ts`.**
+- **Words said out loud are taken by a locator outside the live region**, never muted with
+  `.first()`.
+
+### Deployment — `.claude/rules/deploy.md`
+
+- **`api` and `bot` ship as a single bundled file each**; every container logs to journald for
+  fourteen days; the database is copied every night, encrypted, off the machine.
+- **Migrations run when the API starts. A merged migration is never rewritten**; before the merge
+  a task's migrations may be folded, and every database that ran the old file is brought into
+  line by hand.
+- **A merge is a deploy** (MOL-90); a failed deploy puts the previous image back, not the schema,
+  **so a migration that drops or renames goes out in two merges**.
 
 ## Tracker and documentation
 
@@ -1065,7 +314,7 @@ They live outside the repository, on the same Atlassian site, reachable through 
 | ------------------------------- | -------------------------------------------------------------------------------- |
 | Tasks, epics, sprints           | Jira, project **MOL** — `https://molvi.atlassian.net/jira/software/projects/MOL` |
 | Product plan, design, decisions | Confluence, space **MOL** — page `294930` is the root                            |
-| Rules for writing code          | `CLAUDE.md`, in the repository                                                   |
+| Rules for writing code          | `CLAUDE.md` and `.claude/rules/*.md`, in the repository                          |
 | The map of all three            | `docs/README.md`, in the repository                                              |
 
 The split is deliberate. Rules change together with the code and must be reviewed in the
@@ -1078,6 +327,13 @@ does not reopen a settled question.
 
 The operational side — what the MCP server cannot do, the field ids and the traps —
 is in `docs/tracker.md`.
+
+**Where a new rule goes.** A rule of one area goes into that area's file in `.claude/rules/`,
+with its reasons, and gets one line in «Rules by area» above only if it is easy to break. A rule
+that concerns the whole project goes here. A new area is a new file with its own `paths:`, and a
+line in the map (`docs/README.md`). The chronicle of tasks is not rules: it goes to
+`docs/onboarding.md`. Never pull an area's file into this one with `@import` — imported files
+load at launch, which is exactly what the split avoids.
 
 ## Commands
 
@@ -1161,25 +417,14 @@ npm run lint -w @molvia/backend     # its own config, from its own directory
 npm run test -w @molvia/frontend
 ```
 
-The root only gathers them. `eslint.config.base.js` is a shared preset a module opts into,
-the way separate repositories share a company config; it knows nothing about the modules'
-names. The root `eslint.config.js` ignores the module directories entirely and covers only
-`e2e/` and the repository's own config files. The root `vitest.config.ts` lists the
-modules' configs as projects rather than defining suites itself.
-
 `@/` is configured per module, so it can point somewhere different in each. In the three
 applications it points at that module's `src/`, because that is where importable code
 lives — not because a shared rule decided it. The packages under `packages/` have no `@/`
 at all: they ship their source, so they use `#<name>/…` instead, for the reason below.
 
-**What deliberately stays at the root**, with the reason:
-
-|                                         | Why                                                                                                                                                                            |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Prettier, `.editorconfig`, `.gitignore` | repository hygiene, not application config; five copies would only drift                                                                                                       |
-| `.env` (development)                    | the three must agree on ports here — the frontend proxies to the backend's port and the bot calls it. In production nothing is shared: each container gets its own environment |
-| `Makefile`                              | the entry point to the repository                                                                                                                                              |
-| `playwright.config.ts`                  | end-to-end spans the whole stack and belongs to no single application                                                                                                          |
+**The root only gathers the modules** — shared presets and a list of the modules' configs; what
+deliberately stays at the root (Prettier, `.editorconfig`, `.gitignore`, the development `.env`,
+the `Makefile`, `playwright.config.ts`) and why is in `.claude/rules/workspace.md`.
 
 **Imports are either an alias or a sibling** — checked by the linter:
 
@@ -1237,110 +482,11 @@ database access. In a product about data integrity, two write paths will silentl
   the sixth digit a rate is printed with — which can still turn on an exact half, where any error
   decides the rounding: a chain may then print one unit of the sixth digit below the same price
   made in one pair (round 2, Л3). A named price, not a hidden one.
-- **A rate is printed on the side whose number is at least one** — «89,04 ₽/$», never «0,011232
-  $/₽» (MOL-81): the one rule is `formatRate`, and it turns a rate kept under one over on output,
-  never in storage. Six digits of a small number are too few to turn over — 1 / 0,011232 is 89,03
-  where the exchange said 89,04 — so a figure with an exact source (an exchange's amounts, the
-  wallet's chain, the cache's rates against the dram) comes from the server already on its side,
-  and only a trip's snapshot, which a trip converts by as it is, is turned over from its six digits.
-  **The prices, named** (adversarial Б, Д): a pair kept under one — roubles into dollars — prints a
-  trip's rate from its six digits and the wallet it was taken from exactly, so «Обмен денег» may say
-  86,02 ₽/$ where the trip says 86,01; and a page on the old code reads the prices of a chain by
-  `rate.base` until the app takes the new version (MOL-46), naming a turned price by the wrong
-  currency for that while. **The bank's rate on an exchange's card is printed on the side of the
-  exchange's own** (`formatRateBeside`, adversarial Г): near parity the two fall on either side of
-  one, and each on its own side read «1,01 $/€» over «1,01 €/$». **The sheet of a jump has one side
-  for everything in it** — the side of the rate before the jump, or of the jumped when there is none
-  (review Т-9): the options, the line «… вместо …» and the field «1 $ =» alike, and the body names
-  the currency of the field (`per`); the server turns the number to the snapshot's side, rounded
-  once (adversarial А). Taken from the rate the trip counted by, the field asked on the side of the
-  jumped rate after a jump of the comma across one — 4,30 ֏/₽ to 0,43 — and the owner's «4,30» went
-  in as drams per rouble. **The price, named** (adversarial А″): the own rate is kept on the
-  snapshot's side at six digits, so for a pair far under one — drams into dollars — «386,44» typed
-  comes back «386,40».
+- **A rate is printed on the side whose number is at least one** (`formatRate`, MOL-81) — the
+  whole rule and its prices are in `.claude/rules/money-rates.md`.
 
 ## Data rules
 
-- **Every write to a trip goes through the queue on the device (MOL-24),** online or not — one
-  path, so the sheet never waits on the network. A write is kept first and sent after, one at a
-  time, in order, at start, on `online`, when the app comes back into view and, after a 5xx with
-  the connection up, again with a doubling pause; there is no background sync on iOS. A repeat is
-  safe because the device names every row — **while the row exists**: a remove is a hard delete,
-  and an add sent again after it writes the row anew. So **storage is the queue, not a copy of
-  it**: the installed app and a tab from the bot share it, every window reads it before each
-  change and send, takes out only the write it sent (by the write's own key), and one window
-  sends at a time (`navigator.locks`). **Without Web Locks** (Safari before 15.4, old WebViews)
-  two windows can send the same head at once, and a removed row can come back — narrowed, not
-  closed, as the identity's own fallback says of itself. What must hold is written to every shelf
-  or kept in memory, and a shelf that refused the write keeps only the part of its past still
-  true — the writes still waiting, never those sent since (removing needs no quota, and the part
-  fits into the room it frees). Left whole, its past is read at the next launch and a removed
-  purchase is sent again and comes back; emptied, it loses the purchases made with no signal.
-  While a shelf refuses, what came after lives in memory only, and a PWA killed before it sends
-  loses that — there is nowhere left to keep it. No connection, a 5xx, an answer off the contract (a shop's
-  captive portal) and a 401 hold the queue, and so does a code the API did not say itself
-  (`ApiError.answered === false` — a portal's 404 page). `error.trip_context_required` holds it
-  too, and holds it **without a timer**: nothing changes until the person names the city and the
-  currencies of a trip the old app started (MOL-65). Any other refusal is set aside in
-  `rejected` and never retried — sent again it would be refused again and hold everything behind
-  it. The last known trip is remembered per identity for the same reason: the app opened at the
-  shelf with no signal still knows where a purchase goes — but **the memory is for when the
-  server cannot be asked, not instead of asking**: the sheet asks every time it opens, and a
-  trip answered finished stops being the current one.
-- **Identity is proved by a session; `actors.id` proves only ownership (MOL-52, MOL-53).** The
-  two were one thing until now, and everything awkward about 0.1 followed from it: `created_by`
-  hidden from a catalogue card, a header that must not be logged, `no-store` on every reply
-  carrying an identifier. What a person comes back by is `actors.telegram_user_id` — unique,
-  so one Telegram account is one owner — and what a request proves itself with is a session
-  token. **The token exists in the database only as a `sha256` in hex**, and the repository
-  is what holds that: it takes raw tokens and hashes them itself, so no caller has a method
-  that could store one. **Revoking a session is deleting its row**, not marking it — which is
-  the opposite of a withdrawn verdict above, and for a reason worth keeping straight: a
-  verdict is data with a reader (the gate counts it), a session is a key, and a discarded key
-  has no readers. Deletion also makes «revoked», «expired» and «never existed» one answer for
-  free, where a flag would need every later query to remember it.
-- **A login is a five-minute, one-use request (MOL-54).** The link carries a public code;
-  `__Host-molvia_login` carries an independent secret, stored only as a hash. The bot confirms
-  the code with a Telegram id, but only the browser holding the secret can collect a session.
-  **Whose Telegram confirms is not checked against anything** (adversarial А1, owner's decision
-  23.09.2026): someone who sees the link within its five minutes can confirm it with their own
-  account, and the browser that started it silently collects _that_ account — its purchases
-  then land there — and anyone holding the code can decline it. Accepted while the code goes
-  from the browser straight into Telegram on the same device; a QR or a login from another
-  device reopens the question. The term is the database clock's alone: the row takes both of
-  its times from `clock_timestamp()` and the cookie's `Max-Age` is the lifetime itself, so an
-  API clock off Postgres neither refuses a start nor shortens the cookie.
-  Collection locks the row before checking the current database clock, then consumes it,
-  finds or creates the owner and writes the session in one transaction. A concurrent first
-  login uses `ON CONFLICT DO NOTHING` and a new read, not a caught unique violation inside an
-  already-aborted transaction. Nothing updates the existing owner's settings.
-  **The cookie is sent after commit, only once.** A lost response means checking `/actors/me`
-  and starting again if it never arrived, not replaying the token. One pending request per
-  browser cookie store; a new start replaces its secret. Polls never clear that cookie, since
-  an old response could erase a newer request. Safari and an installed PWA have separate stores.
-  Start and GET poll require `X-Molvia-Login: 1`, reject foreign fetch metadata and expose no
-  CORS; HEAD cannot consume. This GET is the deliberate exception to the usual read-only rule.
-  All auth replies are `no-store`, including refusals and what Fastify answers itself under
-  those paths — no route, a path that does not decode. The bot uses a separate `BOT_API_SECRET`,
-  never the Telegram token; Caddy additionally blocks its internal paths from outside.
-  **Thirty starts in a rolling minute, across the database**, including consumed requests:
-  the quota is serialized with an advisory lock. Its shared denial-of-service price is accepted.
-  Expired requests are removed at start, at boot and every minute; no login writes `events`.
-- **The token rides in a cookie, and `backend/src/cookie.ts` is the only module that touches
-  one (MOL-53).** `__Host-molvia_session`, with `HttpOnly` so an XSS cannot carry the account
-  away and so ITP's seven-day cap — which applies to what a _script_ writes — never reaches it;
-  `Secure` always, with no branch for the environment, because a branch saying «here it is not
-  needed» eventually reaches production; `SameSite=Lax`, with the special-header guard above
-  for the login GET; `Strict` would additionally refuse the one navigation the epic is
-  built around — the person coming back from the bot; `Path=/` with no `Domain`, because the
-  browser sees `/api/…` and both Caddy and the Vite proxy strip that prefix; `Max-Age` rather
-  than `Expires`, so the clock of the device does not decide. The **`__Host-` prefix** is the
-  browser holding the last three of those for us, and it buys the half the server cannot: nothing
-  else on this host may set a cookie of that name at a deeper path. **Setting it and saying
-  `no-store` are one act** — that is how «a cookie is never handed out by a reply that can be
-  cached» holds without anyone remembering it, and a test asserts that no second module writes
-  `set-cookie`. The one price, named: over plain http on the LAN (`PWA_EXPOSE=1 make dev`)
-  `Secure` means no session — the same place the camera already needs `make certs`.
 - **What an address of a resource may look like is one rule, in `packages/model/src/support/resource.ts`
   (MOL-25, Р-3).** An identifier in a path is taken in either case and answered in lower case:
   Postgres compares uuids without case and answers in lower case, so a path spelled `AB12…` would
@@ -1350,119 +496,9 @@ database access. In a product about data integrity, two write paths will silentl
   other way round and stay strict (`deviceIdSchema`), so the answer and the draft on the phone
   agree on one spelling. The rule lived in three places and two of them had already drifted over
   the case; tests on both sides hold the callers to it, as they do for `INVISIBLE`.
-- **What a secret may look like is one rule, in `backend/src/secret.ts`** — RFC 6265's
-  `cookie-octet`, because the only thing a session token or a login request's secret ever travels
-  in is a cookie. It was two rules once, and they drifted by four characters: a token holding
-  `"`, `,`, `;` or `\` was written and read perfectly well and then cost a 500 the day its term
-  came due, or — for `;`, the header's own separator — a row no request could ever open. A test
-  walks every printable code point and holds the rule and the cookie to the same answer, as
-  `text.ts` does for `INVISIBLE`. Narrowing does **not** bring back MOL-52's Р4: `+`, `/` and `=`
-  all pass, so plain base64 is still a token.
-- **More than one cookie of that name is refused, and a refusal then clears nothing.** A browser
-  sends the more specific path first, so anything able to set a cookie on this host — a sibling
-  app on another port in development, where the port is not part of «site» — could put its own
-  session in front of the real one and be answered as. «Which of these is ours» has no honest
-  answer; and clearing would delete ours at `Path=/` while leaving theirs, turning an attempt at
-  fixation into a lockout. Only a lone cookie that was refused is put out.
-- **The term slides, and one write a day moves it (MOL-53).** 180 days from the last use
-  (`SESSION_LIFETIME_DAYS`), and both `last_seen_at` and `expires_at` move together, at most
-  once in `SESSION_TOUCH_AFTER_HOURS` — a term extended without moving `last_seen_at` would put
-  a date in MOL-57's device list that means nothing. The condition lives inside the `UPDATE`'s
-  `WHERE`, not only in the caller, so two requests arriving together write once; the caller
-  checks it too, off the row it already holds, because an `UPDATE` on **every** request would
-  bloat the one table every request touches. The cookie is re-set by the same write, or the
-  browser would drop a session the server still holds.
-- **Four refusals, one answer.** No cookie, a token nobody was issued, a token of a revoked
-  session, a token of an expired one: `401` with `error.no_actor`, identical byte for byte.
-  Nothing arranges that — they fail one `WHERE` in the repository, and a value this server could
-  not have minted is refused before Postgres sees it, so «malformed» cannot become a third,
-  distinguishable answer. Our own refusal also puts the cookie out (`Max-Age=0`) when one was
-  sent, which a 401 from Caddy or a shop's captive portal never can, because it never reaches
-  this code.
 - **Verdict and expense are separate tables with separate write paths.** Do not merge
   them into one input screen: they have different frequencies and different motivations.
-- **A withdrawn verdict is still a row (MOL-27).** `DELETE /verdicts/:itemId` sets
-  `deleted_at` and erases the review; the row stays because the 0.2 gate asks whether someone
-  _gave_ five ratings in two weeks, and «rated five, took one back» is still five — the
-  owner's decision, with the price in view. So **the gate counts every row, and every other
-  reader filters `deleted_at IS NULL`**: the verdict itself, «Что брать», the queue of
-  unrated purchases and every aggregate of 0.3. A reader that forgets the filter puts a
-  withdrawn opinion back on screen, silently. Rating again brings the same row back and keeps
-  `rated_at`, so withdrawing and re-rating cannot move anyone in the gate.
-- **A removed trip is marked, by the money rule (MOL-76).** `DELETE /trips/:id` sets
-  `trips.deleted_at`; «Вернуть» (`POST /trips/:id/restore`) is there for ten minutes
-  (`TRIP_UNDO_MINUTES`), and then the minute timer deletes the trip with its purchases. A trip is
-  money — a line of «Деньги» and an operation of an account — and it has a reason of its own: **a
-  repeat is safe only while the row exists**, and a start sent again from the queue would have
-  written a hard-deleted trip anew. Marked, that repeat is `409 error.conflict`; past the ten
-  minutes the same name is a new trip, as a spending's is. **Every reader filters the mark** except
-  erasure, the timer and «удалить или убрать» of an account (like a marked spending): the current,
-  selected and history trips, «one open», the purchases, «Оценки», «Что брать» — other people's
-  aggregates too — the month of «Деньги», the accounts, the hint of an exchange and the recent
-  places; one integration test asks all of them about one trip before, during and after. An open
-  trip brought back while another is open is `409 error.trip_open`. On the phone removal and
-  «Вернуть» are writes of the trip's queue (`delete`, `restore`): the trip's waiting writes are taken
-  out and handed back by «Вернуть», the removal is sent **always** — 404 is done — and a trip whose
-  removal waits is shown nowhere. **The removal stands where the trip's first write stood, and
-  «Вернуть» puts the trip back in the removal's place** (adversarial А3, А4): the order of the queue
-  is the order the trips lived in — one trip's `finish` lets the next one's `start` through — and put
-  at the end, a removal left the server holding the trip open under the next start, and «Вернуть»
-  made yesterday's trip the one going on. A «Вернуть» the server refuses leaves the trip's writes on
-  the phone, stepped over and counted as a refused start's are (А2) — one predicate, `orphaned`, for
-  the queue, the screen's «not sent yet» and the history. **«Вернуть» is offered only while it can
-  put the trip back where it was**: a new start withdraws it, and so does another trip's start
-  landing on the server over a removed trip the server never had — brought back, its start would
-  meet that trip open (round 2, Б3). The store keeps the same rule as the screen. **A trip comes
-  back with its own «Завершить»** (`POST /trips/:id/restore` with `finish`, round 3, В1): finished on
-  the phone with no signal and removed before that finish left, it is open on the server, and brought
-  back open under the next trip it was refused as a second open trip the person never held — then
-  gone with its purchases ten minutes later. Brought back finished in one statement, no moment holds
-  two open trips; the `finish` behind it moves nothing, as finishing twice never does. **The
-  removals and «Вернуть» are mirrored under keys of their own** (`molvia.trip-marks`,
-  `molvia.trip-marks-rejected`, round 4, Г1), each with the write it stood before: a window still on
-  the previous version reads the shared queue, drops the kinds it does not know and writes the queue
-  back without them, and the version that knows them puts them back in their place (MOL-77's rule —
-  a phone-side cache is read by both versions). The price, named: while it sends, the older window
-  does not see the removal, and a start of the next trip it sends first meets the removed trip open. **The price, named:** removing a trip dated before a check that
-  came out even moves the balance with no reason the check can name, as a removed spending does.
 - **Exactly one field is required — the item.** Everything else may be left empty.
-- **The catalogue grows two ways: «Предложить товар» and the seed (MOL-112).** MOL-12 decided «no
-  seed» and the owner reversed it on 26.09.2026: with an empty catalogue every trip began by
-  typing the shelf in — 3–4 new words a trip in the owner's own log, 5–8 at the level of a brand
-  and a size — and a proposal needs a connection, so at a shelf with no signal a new item could
-  not be made at all. The seed is `backend/src/catalogue-seed.ts`: some six hundred common names,
-  the kind first, a variety only where the shelf tells it by a number and the common name beside
-  it, no brands, no categories, each with the unit its price is compared by. **Rating «Молоко»
-  means milk here in general** (owner's decision В-1); a brand is «Молоко Марианна», proposed by
-  hand. `dist/seed-catalogue.js` (`make seed` in a copy) writes it through `createUnlessNamed` with
-  no author, in one transaction: a dry run unless `--yes` — the real run, rolled back, as `forget`'s
-  is — a second run adds nothing, and a name already there stays as it is, its unit and author
-  included, the ones whose unit differs printed. **It only adds**: a line removed or renamed stays
-  in every database it reached, with what was bought and rated under it, so the list grows by
-  commits and a line is added with care. It is not a migration, since a migration is frozen once
-  merged and the key is computed in TypeScript. The seed never stays in the `_test` or `_e2e`
-  databases, where it would move the corpora; `seed-search.integration.test.ts` loads it and pins
-  the owner's words against it. **A brand people name a kind by leads to the kind** through the
-  dictionary — «фанта» to «Лимонад», «дошик» to «Лапша» (owner's decision В-6) — so the owner's
-  words find something from the first trip. A brand item spelled as the word is typed stays above
-  the kind: both at no cost, and at one distance what the typed word found ranks before what a
-  synonym found (`by_synonym`) — not the similarity, which ranks after the length (review С-8).
-  **The prices, named:** one spelled otherwise — «Doshirak», «Pringles», an edit or two from
-  «дошик», «принглс» — stands under the kind until it is taken once, and memory lifts it from then
-  on (MOL-11); and a brand leads to the word of the kind, among whose names the shortest goes
-  first — «дошик» is «Лапша» by the kilo before «Лапша быстрого приготовления», «несквик» «Какао»
-  before the instant one (review Л). MOL-112 first kept
-  brands out on the claim that a synonym row ties with an exact one; the order says otherwise
-  (adversarial Д). **The seed is not the answer offline**:
-  with no connection «Что взяли?» searches only the recent items, so a seed item not yet taken is
-  as far out of reach there as one that does not exist (adversarial Ж) — «Предложить товар» offline
-  is В-4's, to come back to on MOL-38. **A line whose key is there under another spelling is not
-  written**: `nameIdentity` knows case and spacing, the key also `ё`, a decimal point and the
-  scripts, so the person's «Мед», «Молоко 3.2%» or «Լավաշ» would have got the seed's twin beside it,
-  one the search cannot tell apart — the report names each pair instead (adversarial В). The key is
-  still no identity: another thing with the same key is left out too — «Мыло» beside somebody's
-  «Milo» — and is proposed by hand, since «Предложить товар» compares names (review К, С-9). A line
-  left out costs a proposal; a twin written would be there for good, since the seed only adds.
 - **Entering an item is a catalogue lookup** with transliteration and typo tolerance,
   not free text. Free text produces `МОЛОКО МАРИАН 1Л`, which cannot be tied to the canon.
 - **Result ordering must never contain a field like `sponsored`, `boost`, `promoted`.**
@@ -1483,59 +519,6 @@ database access. In a product about data integrity, two write paths will silentl
   to whoever looked twice, and the same holds for prices. Closing that needs noise or delayed
   publication, neither of which 0.1 has — a known limit, not an oversight.
 - Country and city are part of the key from the start, not "we'll add it later".
-- **A person can be erased, and erasure is one function** (MOL-58): `ErasureRepository.erase` in
-  `backend/src/db`, one transaction under a lock on the owner's row. It removes sessions, search
-  picks, verdicts with the withdrawn ones, events, expenses, trips, exchanges and incomes (MOL-40,
-  MOL-66 — the person's own money), spendings, their categories and frozen rates (MOL-73), accounts
-  and their checks after every operation that named one (MOL-115), login requests by Telegram id
-  — they carry no foreign key, so no cascade reaches them — and the owner. Catalogue items the
-  person added stay with `created_by` nulled, and **every place stays** (owner's decision
-  24.09.2026). People erase themselves with `/delete` in the bot; the owner's fallback is
-  `dist/forget.js` in the API image (`make forget` in a copy — `TG` reaches the script through the
-  environment, never pasted into the recipe, where a value could close a quote and bring its own
-  `--yes`, П-3), a dry run unless `--yes`, and
-  **a dry run is the real run, rolled back**, so its count cannot disagree with what erasure does.
-  **A new table that points at `actors` must join erasure** — a test compares every foreign key
-  on `actors` with `ACTOR_REFERENCES`, and another scans every table for the erased person's uuid
-  and Telegram id. **Its first lock is the account's, then the person's login requests, and only
-  then the owner** (adversarial О-3, П-2): `for update` on an owner who does not exist yet locks
-  nothing, and a login collected meanwhile created an owner the transaction had already decided
-  was not there — «nobody to erase» over a live account. Collection locks its request row before
-  creating the owner, so the two take turns; and a request not yet confirmed has no Telegram id to
-  be locked by, so confirmation and erasure share `lockTelegramAccount`, an advisory lock on the
-  account taken first by both — and so does **whatever makes an owner**: `create` and `createIfMissing` take
-  it themselves (Р-1), so no path — the login, the development seam, whatever comes next — makes an
-  owner inside an erasure. Collection takes the account's lock before its request row (read, lock,
-  read again), because taken after it, a collection and an erasure could each wait on the other.
-  One order everywhere: the account, then request rows, then the owner. The bot's `sequentialize`
-  happens to order one chat's presses too, but that is another module's promise and the two API
-  routes have no order of their own. **Cleaning expired requests skips locked rows** (Р-3): it runs
-  under the one quota lock every login start takes, and waiting there for an erasure — or a dry
-  run of one — holding a person's expired request closed the door to everybody. A dry run still
-  holds that one account's lock for as long as it runs. **The page and the bot name what stays in full** — the items and the shops —
-  and say that copies on the phone are out of the server's reach: nothing clears a device's
-  storage for an owner the server no longer knows, since a 401 there is also an expired session.
-- **No third-party trackers or analytics, and so no cookie banner** (MOL-58). There are two
-  cookies, both strictly necessary: the session and the five-minute one of a login in progress
-  (MOL-54); what the phone keeps in its storage is the queue and the drafts the app needs to work.
-  **Any third-party script that sees data is a decision, not a dependency** — it changes what the
-  privacy page says and is discussed before it lands.
-- **Logs live fourteen days and carry no address and no query** (MOL-58). The API logs a request
-  as its method and path — the query of `/catalogue/search` is what a person looked for; Caddy
-  keeps no access log; Postgres logs its errors `terse`, without the row values of `DETAIL`;
-  every container writes to journald, and the term is the host's
-  (`MaxRetentionSec=14day`, `deploy/README.md`). **A failure is logged by its kind, on every
-  path** (adversarial О-1): name, driver code and stack frames through `describeFailure`, never
-  its message — a driver's message is the query with its parameters, and a failed search wrote
-  what was searched for and who asked, a dropped connection the hash of every session token in
-  flight. **The frames are what follows the stack's own header, cut off whole** (П-1): picked by
-  their shape, a line of a multi-line review written as `    at …` passed as a frame, with the
-  rest of the parameters behind it. `forget` prints the same. An unknown address answers without echoing it and is not
-  logged with its query. What the privacy page (`/privacy`) says about data is a promise these
-  rules keep, and it is read before signing in — the one route with `meta.public`, which
-  `App.vue` draws past the login screen (MOL-56), linked from that screen and from the settings: a change to either is a change to both — and it says only what they keep: other
-  people's prices are shown in the shared mode (MOL-31), so «shown to nobody» is said of the list
-  of purchases, and an address can reach Caddy's error log, so «no address» is said of requests.
 
 ## Frontend and styling rules
 
@@ -1545,52 +528,7 @@ database access. In a product about data integrity, two write paths will silentl
   not a single hardcoded hex, not a single magic spacing off the scale. Stylelint enforces
   both — a literal colour or an off-scale padding fails `make lint`.
 - **Everything is SCSS.** There is no plain CSS in the project.
-- **Two faces, both self-hosted:** Nunito for titles and figures (`--font-display`), Onest
-  for text (`--font`). The design prototype used Caprasimo and Figtree; neither has a
-  single Cyrillic glyph, so its Russian mockups were rendered by a system fallback the
-  whole time. Fonts live in the repository and are precached — the app is opened where the
-  connection drops, and a request to someone else's CDN is one more thing that can hang.
-- **The dram sign `֏` comes from a face of its own,** scoped to `unicode-range: U+058F`.
-  Of the 321 Google fonts covering Cyrillic, four also cover Armenian and none is usable
-  here. Without this the glyph falls back to a system font and shifts the baseline in the
-  one place it must not: the prices.
-- **Native HTML first, then Reka UI, never a styled kit.** On a phone `<select>`,
-  `<input type="date">` and `<input inputmode="decimal">` open the system pickers, which
-  beat anything a library renders; `<dialog>` already brings a focus trap and a backdrop.
-  Reka is for the few things native cannot do; it ships unstyled primitives that tree-shake.
-  **The catalogue combobox turned out not to be one of them (MOL-23):** Reka's
-  `ComboboxContent` calls `hideOthers` whenever it is shown — an always-open list hid the back
-  chevron, the title and the app's live region from a screen reader — and both its input and its
-  listbox filter highlight the first row by themselves, so «Найти» took a row nobody chose. The
-  combobox is the ARIA 1.2 pattern on a native `<input>`, about a hundred lines
-  (`CatalogueCombobox`): no row is active until an arrow makes one.
-  A styled kit (PrimeVue, Vuetify, Naive) is rejected on purpose: its theme and our tokens
-  would be two sources of truth about colour, which empties the rule about hardcoded
-  values. shadcn-vue is rejected for the same reason in a different shape — it copies
-  components written in Tailwind utility classes, and Tailwind is gone.
-- **Interface icons come from MDI** through `unplugin-icons`: inlined as components at
-  build time, so only what is used ships, no icon font is fetched, and colour comes from
-  `currentColor` — they obey the tokens like anything else. The app icon is different:
-  `frontend/public/favicon.svg` is the source, `make icons` rasterises the manifest PNGs,
-  and the mark is a placeholder until there is real branding.
 - Touch target >= 44px. The primary action is reachable with a thumb.
-- **Every screen has four states:** loading, empty, error, offline. The empty state is not
-  "no data" but an offer to act. They are drawn by two blocks and nothing else (MOL-19):
-  `ScreenSkeleton` for loading, the screen giving the widths of its bars, and `ScreenState`
-  for the rest. The tone of the circle carries the meaning and is fixed by the kind — an error
-  is always red and always offers «Try again»; offline is green or yellow and **never red**,
-  which `vue-tsc` holds rather than memory: `bad` is not a tone a screen can ask for. The
-  type holds the prop, not the choice of kind, and that choice is the screen's: **offline or
-  error is decided after the failure** (`navigator.onLine` read then, never narrowed from a
-  check before the request) — a connection that drops while the answer is on its way is the
-  commonest break at a shelf, and drawing it red was the first consumer's bug (MOL-19, A1).
-  Back online, a screen tries again by itself, as the identity does — through `useReconnect`,
-  which also hears the app coming back into view: an iOS PWA frozen in the background misses
-  `online`. Polite states do not carry `role="status"`: they hand their words to the app's one
-  live region in `App.vue`, above the router, since a region born with its words is often not
-  read. Each announcement is a node added a task later, taken back when its block goes and
-  gone by itself after seconds — a hidden region is still read in browse mode. Only an error
-  or «attention» on the screen interrupts; anything inline is polite.
 - **Every SFC is one file in one fixed order:** `<template>`, then `<script lang="ts">`
   exporting a `defineComponent`, then `<style scoped lang="scss">`. The linter keeps the
   order, both languages and the `scoped` attribute; none of it is left to memory.
@@ -1608,449 +546,6 @@ database access. In a product about data integrity, two write paths will silentl
   total, not even for rows still in the queue.
 - Split components so they are not overloaded, but without five wrappers around one tag.
   One well-scoped component beats five trivial ones.
-- **An installed app takes a new version only when nobody can lose anything to it: hidden, and
-  holding no typing** (`pwaUpdate.ts`, MOL-46). The client reads every answer strictly, so an old page
-  against a new API breaks — and nothing reloaded it: an iOS app frozen in the background came back
-  on the old code until a cold start. Hidden is not enough by itself: a sheet keeps what is typed
-  in memory until its main action — the price of a purchase, a proposed item, an exchange — and at
-  the shelf the phone is put away mid-sheet for the calculator or the bank. `holdsTyping` is a
-  `dialog[open]`, and nothing else: everything else typed keeps a draft on the device and comes
-  back — the settings, the ratings, and **the search on «Что взяли?» with its miss**
-  (`searchDraft.ts`, this window's shelf, put away with the screen). Held against the update
-  instead, a typed query kept out the very version that fixes a search the old code could no
-  longer read, and an erased field let the miss be lost (adversarial review Е, Ж). So
-  the new worker is let in, and the page reloaded after it took over, only then; a takeover that came another way —
-  another window of the app let it in, or this one came back before it activated — waits for the
-  same moment. **The worker is registered by our code, not by the plugin's script**
-  (`injectRegister: false`): in `prompt` mode that script reloads the page on any takeover, visible
-  or not (adversarial review Г). The worker waits (`registerType: 'prompt'`) — taking control at
-  once leaves the old page on a precache that is no longer its own — and a new version is looked
-  for whenever the app is looked at again or the network comes back. The other half is the
-  contract's: a field is added so the old server's answer still reads.
-- **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
-  frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
-  bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and
-  gets the chevron, labelled with the title of where it leads, never the word «Back». **At rest
-  the label has the row; once the small title comes in it gives way first** (MOL-75): whole, else
-  «Back», else the chevron alone — never a fragment, which «Trip…» would be — and the title yields
-  last, only when it alone does not fit between two chevrons. The width is read in fractions, as the
-  label is drawn: rounded, a word 0.4px too wide passed as whole and was drawn «Наз…» (review А1).
-  **The name does not follow the ladder** — «Back Trip» on every step, the word shown first
-  (owner's decision on review). **It
-  leads to the screen underneath when that screen is any ancestor** — the step the system
-  button takes — and otherwise replaces onto the parent (`backTarget`, MOL-77): a finished trip
-  opened from the home screen says «‹ Поход» and both «back»s go home. Tabs and the
-  chevron move through `useNavigation`: «Trip» is home — leaving it pushes, moving between
-  the other sections replaces, returning is a step back — so the system «back» never walks
-  through tab taps, and a nested screen opened cold gets its parent laid underneath. A
-  section opened cold — a link from the bot — is its own home: «back» leaves the app, the trip
-  is not laid under it, because a push without a gesture is what Chrome may skip. **No
-  gesture is intercepted**: no touch listener, no `overscroll-behavior` on the root — the
-  edge swipe and Android «back» belong to the browser, and the history is the one source of
-  «back». Only the page scrolls, never an inner container: iOS hides its address bar and the
-  router restores positions only for the window.
-- **A screen is built from the kit, not drawn anew** (MOL-18): `AppButton`, `AppField`,
-  `SegmentedControl`, `VerdictBadge`, `AppCard`, `BottomSheet` in `components/`, every state of
-  them on the development-only page `/_kit`. `AppCard` carries exactly the differences between
-  the three cards of 0.1 — `as`, `tone="take"`, `list` — and nothing for later: a component over
-  a surface is one prop away from a wrapper around a `<div>`. **The sheet is a native
-  `<dialog>` with an entry in the history**, laid through the router's own `history.push` at
-  the same address — never a bare `pushState`, whose state lacks the `position` and `back` the
-  rules of «back» read. Every close — ×, the scrim, Esc, Android «back» — steps back
-  off that entry, and only the pop closes it, so exactly one entry is ever taken. **The sheet puts
-  the page back by what it was opened from, never by a number** (MOL-63): it notes the element
-  the opening click landed on — a tap, Enter, a screen reader alike, since iOS does not focus a
-  tapped button; the click is forgotten once its task is over, and a sheet opened later is measured
-  by the focus — and where it stood on the screen, and after the pop that lands on the same screen
-  scrolls by the difference. A list that changed height above it meanwhile — reread, a queued row
-  sent, a notice come or gone — Chrome and Firefox have already kept still, and the difference is
-  nothing (Safari keeps nothing still, and gets it put back); a window the platform moved under the
-  sheet — the iOS keyboard for a field in it — comes back, since `overflow: hidden` stops a finger
-  and not the platform. At the very top of the page the browser keeps nothing still on purpose —
-  what came above the list stays in sight — and there the top stays the top. The
-  router's number did the second and broke the first, moving the list by the change. So the router
-  does not scroll a move to the same address, which is a sheet's or a refused duplicate push; the
-  first navigation comes «from» `START_LOCATION`, whose address is «/», and is not one — read as
-  one, the trip loaded again forgot where the person was. And e2e takes «the list stayed» by where
-  the opener stands on the screen, never by `scrollY`, which the jump left equal. Any move of
-  the router under an open sheet — push, replace, a new query — closes it too; an entry no
-  sheet holds — left by a reload or a move away — is stepped off by `installSheetEntryGuard`.
-  `close(2)` closes it together with the screen under it, the sheets above and below included,
-  and never steps out of the app. Sheets may stack: a pop closes as many from the top as
-  entries it went back. Until it has come up the sheet takes
-  no tap, so the second tap of a double tap cannot close it or press its main action. **«Up» is
-  the end of its own rise, not a clock** (MOL-69): a rise starts with the first frame that draws
-  it, and on a busy phone that frame comes late — a clock started at `showModal` ran out while
-  the sheet still slid, and the second tap closed it. Never sooner than a double tap, for a sheet
-  with no rise; no ceiling, since a rise either finishes or is cut short (an endless animation is
-  not waited for); and a tap counts from when the finger touched — its `pointerdown`, since a click
-  carries the moment the finger lifted and one resting across the end of the rise closed the sheet
-  or pressed the action that slid under it (adversarial А1); a click from the keyboard, by its
-  own time, and it leaves the touch alone (Б1). Open a
-  sheet from a tap only: Chrome skips on «back» an entry laid without a gesture. **The sheet is the one exception to «only the
-  page scrolls»**: a panel over the screen has no window of its own, so it scrolls itself and
-  the page under it is held still.
-
-## The bot, and what it is allowed to know (MOL-55, MOL-58)
-
-The bot does two things in 0.1. It is the second half of the login: the one place a person is
-shown **which device** they are letting in and says «yes» to it by hand. And it is where a person
-**erases themselves** (MOL-58): `/delete`, one question naming what goes and what stays, one
-press — the only channel people are given, because there Telegram already says who is asking.
-Rating reminders are 0.2.
-
-- **Whose data goes is `ctx.from.id`, never anything in the button.** The button carries the
-  action and the second it was issued, and it means yes for ten minutes
-  (`ERASE_BUTTON_SECONDS`); older, without a time or from the future, it is refused over the
-  message and taken away. The API answers `204` whether there was anyone to erase or not, and the
-  bot writes one sentence for both — «ваших данных в Molvia нет» — so the second press of a double
-  tap cannot overwrite the first with something that sounds different. **«Отмена» is not an
-  outcome** (adversarial О-2): it is shown over the message and takes the buttons away, and its
-  words are true whichever button came first — written in, «Ничего не удалено» overwrote «Готово»
-  over an account already gone. When Telegram will not take the alert, the same words go under
-  the message as a reply, and the buttons go only once something was said (П-4): a refusal may be
-  silent because its buttons stay, and this one takes them. **A button too old to mean yes is
-  answered the same way** (Р-2) — it too takes the buttons, and it was «Удалить навсегда» that
-  was pressed. **Under the message speaks only the press that took the buttons away** (С-1): the bot keeps no
-  state, but Telegram refuses to take away buttons already gone («message is not modified»), so
-  the second press of a double tap stays quiet; if nothing can be said at all, the buttons are put
-  back. The erase composer is installed **before** the login's, which
-  ends in a catch-all that greets every text.
-
-- **The i18n rule of the frontend covers the bot too, and this is the line that says so.** Not a
-  string of text in the code — every message is a key, Russian first, English mirroring it. The
-  dictionaries are `.ts` rather than `.json`, unlike the PWA's: there Vite loads them, here the
-  module is read by `tsx` and bundled by esbuild, where a JSON import in ESM wants attributes.
-  The keys become a type as a result, so **the two languages mirror each other by the type
-  checker**, and the test is left to cover what types cannot see — an empty value and a lost
-  substitution. The language is `pickLocale` of `packages/model`, the very rule the PWA uses:
-  Telegram's `language_code` is an IETF tag like any other, and a second copy of that decision
-  would be a second place to drift.
-- **The bot keeps no state of its own.** The login code rides in the button's `callback_data`,
-  which is Telegram's memory rather than ours, and everything else is asked of the API — the
-  only write path there is. So nothing survives a restart, because nothing needs to.
-- **Updates of different people are handled at once; updates of one person, in order** — and
-  both halves are load-bearing (MOL-55, О-4). `bot.start()` handles updates strictly one after
-  another, which is grammY's ordering guarantee and was measured costing the next person their
-  whole turn: while the API thought for 300 ms, their request did not leave at all, and a queue
-  measured in whole timeouts outlives the login requests standing in it. `@grammyjs/runner` is
-  the answer — a dependency the owner agreed to on 24.09.2026 — with `sequentialize` by chat
-  keeping the other half: «Войти» and «Это не я» pressed one after the other must end where the
-  second press says, not where the faster answer does. Both succeed on their own — `confirm` is
-  idempotent and `decline` works on a confirmed request — so unordered they would leave «Вход
-  подтверждён» standing over a request that was in fact put out. **The price of that ordering is
-  named** (Е1): presses of one chat queue behind each other, so somebody tapping a silent API
-  waits a whole `API_TIMEOUT_MS` per tap. Nothing can fix it here — the alert _is_ the answer to
-  a press, a press is answered once, and the answer is unknown until the API replies.
-- **The question is asked from the account owner's side** (З-2, owner's decision 24.09.2026):
-  «Впустить это устройство в ваш аккаунт Molvia?», and the last line names what it costs to
-  get it wrong. «Войти в Molvia?» over a button labelled «Войти» read as «log _me_ in» — the
-  wrong way round for the one attack the button exists to stop, where a stranger's link makes
-  your tap let **their** browser into **your** account.
-- **An outcome is written into the message; a refusal is only shown over it** (О-1). Both
-  presses of a double tap leave before the first edit lands — the buttons are still on screen,
-  which at a shelf on a slow connection is ordinary — so the second was refused by the API,
-  correctly, and used to **overwrite «Вход подтверждён» with «Начните вход заново»** over a
-  session already granted. A refusal goes to `answerCallbackQuery`, which cannot rewrite what
-  is written. The buttons then go only if the link is dead: «the API did not answer, try again»
-  has to keep the very buttons it asks for.
-- **Confirming twice from the same account is a success, not a refusal** (О-2). A confirmation
-  that was written while its answer was lost left the bot unable to tell that from «not written»
-  — and it chose wrong, twice: «не получилось», and then «начните вход заново» on the link
-  opened again. So `confirm` is idempotent for the same account (another one is still refused —
-  that is what the button is for), and a preview says `confirmed`, **whether and not who** (Р-11).
-  The bot then says the one true thing: it is confirmed, go back to the app — **and offers «Это
-  не я» with it** (Б1). That sentence reaches two people, because «whether» cannot tell them
-  apart: the one who just pressed the button, and the person whose link leaked and was confirmed
-  from a stranger's Telegram, whose browser is about to collect a session of **somebody else's**
-  account. Pure reassurance at that moment is worse than the confusing «ссылка больше не
-  действует» they used to get, and `decline` still works on a confirmed request until it is
-  collected — the button is the only way to reach it. Telling the two apart needs no id to leave
-  the server (the preview could take the asker's), and until it is asked for, the answer is the
-  same for both and safe for both.
-- **A refusal is shown over the message and written nowhere — and that rule has no exceptions**
-  (О-1, and two rounds of trying to make one). Telegram will not answer a callback query that
-  aged out while the API was thinking, and then the refusal reaches nobody (В1). Both cures were
-  worse than the disease. A **new message** stayed in the chat for good, so the successful retry
-  it asked for rewrote the question above it and the last word was a refusal over a login that
-  had happened (Г1). **Editing the question** was worse still: it rested on «the API did not
-  answer, so no press of this message can have succeeded», which is false — the API can answer
-  one press and time out on the next, which is the very case idempotent `confirm` exists for —
-  and it erased «Вход подтверждён», handed the buttons back, and «Это не я» among them would
-  then put out the person's own confirmed login (Д1). So when the alert cannot be shown, nothing
-  is said: the buttons are still there, and the next press carries a **fresh** query that can be
-  answered. What that press is made cheap by is the **bot's own API timeout — five seconds, not
-  fifteen** (`API_TIMEOUT_MS`): the answer has to be given while the finger is still on the
-  button, the API's work here is one indexed row, and a press given up on early is safe to
-  repeat. The residue is named: if the alert cannot be shown, that press produces no words at
-  all — for a dead link the buttons go instead, and opening the link again says it in full.
-- **The spinner is cosmetic, and its failure is not news.** `answerCallbackQuery` throws on an
-  aged-out query; on the success path it stands in a `finally` after the outcome is written, and
-  letting it out wrote «update failed» in the log about a login that had just succeeded (Г2) —
-  the same wrong-thing-named-as-broken that З-4 removed from the other path.
-- **The «Это не я» of an already-confirmed request reaches anyone holding the link**,
-  so a stranger can put out a login somebody else confirmed — a denial of service, not a
-  takeover, since confirming with their own account is still refused (В2, owner's decision
-  24.09.2026). Accepted for the asymmetry: a cancelled login costs seconds and is visible, while
-  the hijack that button rescues is silent and permanent. The same power over an _unconfirmed_
-  request has always been there — the prompt itself carries «Это не я».
-- **«message is not modified» is an answer, not a failure.** An idempotent second confirmation
-  rewrites the message with the text it already carries, Telegram refuses that, and reading the
-  refusal as «the message is gone» put a duplicate reply in the chat on every double tap (Б2).
-  And the **outcome is written before the press is answered**, with the answer in `finally`:
-  `answerCallbackQuery` throws on a query Telegram has aged out, and with it first that left the
-  login made but the message still showing the question (П-2).
-- **It repeats none of the API's rules.** The five-minute term, the one-use rule, the quota and
-  «expired, spent, declined and unknown are one answer» belong to MOL-54 and are read off its
-  refusals. The bot adds exactly two things: the account, which only Telegram can vouch for,
-  and the person's explicit consent.
-- **Telegram updates are never logged whole** (the privacy page, п. 4.3): an update carries a
-  name, a username and a language we deliberately do not store. What goes to the log is the code
-  of the error and the operation that failed. How a press is answered — `settle`, `refuse`, the
-  spinner, the keyboard — lives in `answer.ts`, shared by the login and erasure.
-- **A copy without `TELEGRAM_BOT_TOKEN` or without `BOT_API_SECRET` does not start**, says so in
-  one line and exits 0 — «this copy has no bot» must not become a restart loop under compose.
-  Such a copy signs in through `POST /dev/login` and cannot use Telegram at all.
-
-## The way in, and what stands behind it (MOL-56)
-
-The login is the first screen a person without a session sees, and every other screen is behind
-it. The whole of it is three things the API and the bot cannot do: start the request, survive
-the round trip through Telegram, and ask whose account this turned out to be.
-
-- **It is a gate, not a route.** `App.vue` draws it instead of the router's view, so the address
-  is all along the one the person was going to: a link from the bot to `/advice` opens «Что
-  брать» the moment they are in. A `/login` entry would have to be written into the rules of
-  «back» (MOL-17) and would need to remember, separately from the address bar, where the person
-  was headed. The one price is the tab's title, which the screen sets and puts back.
-- **The door has one definition** — `login.closed`, which `App.vue` only reads — and it turns on
-  what is actually known. A session the server named and the person claimed opens it; «no
-  session» is an answer too and shuts it, whatever the device remembers. **Where nothing has
-  been answered yet** — the launch, offline, a server that did not reply — **the drawer decides**:
-  with an owner on the device the app is shown, drawing its own skeletons the way it did before
-  this screen existed, and without one there is nothing to show at all, no drawers and no cached
-  answers. That last part is the same argument as Q5's, and it is deliberately not written in
-  terms of `navigator.onLine`: a shop's captive portal reports `true`, and the rule walked
-  straight past it (adversarial А5). Holding the door shut for the whole of the loading was
-  tried and is worse than it looks — every launch with a live session flashed «Вход», and what
-  caught it was an end-to-end test rather than an eye. **The screen keeps all four of its own
-  states behind the door**: an unanswered question with no connection is «нет связи», not a
-  skeleton that loads nothing (А2).
-- **One tap is one request, and nothing starts a login by itself.** The quota is thirty starts a
-  minute **across the whole database**, so an app that started one every time the screen appeared
-  would close the door for everybody. «Открыть Telegram» reopens the same link; only «Начать
-  заново» asks for another, because a new start replaces the secret in `__Host-molvia_login` and
-  makes the previous request uncollectable.
-- **The device remembers the request and never the secret.** `{id, url}` under `molvia.login`,
-  because iOS unloads the PWA while the person is in Telegram and the confirmation they gave
-  would otherwise have nowhere to arrive. The secret stays in the `HttpOnly` cookie; putting it
-  on the device would be MOL-8's mistake again. What comes back off the shelf is checked before
-  it is opened — `https` and `t.me`, the same shape `loginStartedCodec` holds on the way in.
-  **The key is shared between windows and the request inside it is not**: a window removes or
-  rewrites only the request it started, because one whose link had died used to `forget` over a
-  neighbour's live one — and a neighbour iOS had unloaded came back to «Войти через Telegram»
-  with a confirmation on its way to nobody (adversarial А3). Starting a login still replaces what
-  is stored: a new start replaces the secret, so whatever was there is dead anyway.
-- **«Истекло» is the server's word** (`error.login_unavailable`), never `expiresAt` minus the
-  device's clock: a phone whose clock has run away would otherwise be unable to sign in at all.
-  There is no countdown on the screen; the text says the link lives five minutes.
-- **«Повторить» repeats whatever did not work.** The screen's error state covers two failures at
-  once — the login would not start, and the server would not say who we are — and a button that
-  always began a login took a person who needed only an answer into Telegram instead, with a
-  fresh request against a quota shared by everybody (adversarial Б2).
-- **The poll fires on the three ways a person comes back**: a three-second timer, the app
-  returning into view — on iOS a frozen PWA gets nothing else — and `online`. A hidden tab polls
-  nothing. Every refusal but a dead link keeps the request: the next poll is seconds away, and a
-  hiccup must not throw away a confirmation the person is about to give.
-- **Whose account this is, is asked before anyone is let in** (MOL-55's round 3). Whoever sees
-  the link within its five minutes can confirm it with their own Telegram, and the browser that
-  started the login collects _that_ session; the bot's «Это не я» rescues nobody once the screen
-  is polling. So the screen stops: it names what the wire carries — the city, the currencies and
-  the day the account appeared, «сегодня» for a fresh one — and waits.
-- **What the device writes down is the owner the person approved, never «somebody is
-  unconfirmed»**, and the difference is the whole of the second review (adversarial А1 и А4).
-  A flag saying «ask about this one» is set only when the script sees the answer that collected
-  a session — and the browser stores the cookie from that answer's _headers_ whether the script
-  lives to read it or not: a restart, or a «Начать заново» a moment earlier, left a session with
-  no flag beside it and the door opened on an account nobody had been asked about. The same flag
-  was cleared by anything that looked signed-out, and `error.no_actor` is the truth about the
-  moment a request **left**: one still in flight from before the login wiped the question, and
-  the next `me()` walked in. Written the other way round — `claimed` — the question cannot be
-  missed: whoever the server says we are is compared with whoever the person approved, and
-  anything else is a question, however the session arrived.
-- **A refusal is not a conclusion; the app asks again.** `error.no_actor` from any call sends the
-  identity to `verify()`, which asks `me()` once and believes only that: a refusal earned before
-  a login landed is discarded by a revision counter, and a server that cannot be reached says
-  nothing at all rather than signing anybody out. It steps aside while a question is already in
-  flight, or a cold start with no session would ask twice and `verify` would ask itself forever.
-- **Another window's login is this window's business.** Two windows share one cookie jar, so a
-  session collected in one is the session the other carries; a window that was already open
-  would otherwise keep showing the app — and, worse, the question itself — as the owner it
-  believed in a minute ago. A write to `molvia.login` shuts the door here and re-asks `me()`,
-  and the card is drawn only from the answer.
-- The price of the question is named and accepted (owner's decision, 24.09.2026): one extra tap
-  on a login into an account this device has not approved before, and one's own first account is
-  indistinguishable from a stranger's fresh one — which is the case with nothing yet to take.
-  Telling them apart needs the confirming Telegram's name on the wire, and that is a task of its
-  own. «Это не я» ends the stranger's session on the server first (MOL-57, `POST /auth/logout`) —
-  this browser's session only, the stranger's other devices are theirs — and nothing is claimed,
-  so a reload or a relaunch asks again instead of walking in. A way out that fails does not hold
-  the way in: the new login replaces the cookie anyway, and the row left behind has no key.
-- **Showing the app and writing into it are different rights** (adversarial Б1). The door may
-  open on the drawer's name while the first `me()` is still in flight — that is what keeps a
-  launch with a live session from flashing «Вход» — but a drawer says nothing about the cookie,
-  and in the one case where the two disagree (a session that arrived without the script seeing
-  it) a rating held back on a `401` went out into a stranger's account at the first
-  `onMounted(send)`. So **the queue and the drafts send only once the server has said who we
-  are**, and while another window's login is still being caught up with: the rule sits in
-  `flush()` of both, and **only** there — `App.vue` gives the occasion and no second opinion. A gate there as well looked harmless and took away the queue's own
-  «the server is silent, try again later»: that timer is set by `flush`, and `flush` was never
-  reached (adversarial Г1). The occasion is every settling of the identity, «error» included,
-  which is what starts the doubling retry — and the retry asks about the identity first, waiting
-  for that answer, because `start()` sets «loading» synchronously and a `flush` in the same tick
-  saw no error left to schedule the next attempt from. Nothing is lost by waiting — a queue waits for
-  the network anyway, and the answer is one round trip — **but the screen is told**, in the same
-  words a failed attempt would have used: silence there left «Отправляем оценку…» standing
-  forever at a shelf with no signal, which is the product's main scenario (adversarial В1).
-  What is **not** held is everything else: a screen's first fetch goes out in parallel with
-  `me()` on purpose, and so does a write a person makes with their own hands in a sheet — the
-  rating, the amendment, «Предложить товар». In that same rare window those may reach a session
-  the person has not claimed, or draw its figures for a moment before the door shuts. Holding
-  them would mean serialising every screen behind the identity and paying a round trip on every
-  ordinary launch, to close a case that needs a session to have arrived unseen.
-- **What the screen says while it waits is «нет связи», and that is an exception to MOL-19's
-  rule rather than its new edition.** There, offline or error is decided by `navigator.onLine`
-  read after the failure; here nothing was even attempted, and behind a shop's captive portal
-  `onLine` is `true` while «Повторить» would call the same held-back send and change nothing.
-  Silence was worse: it left «Отправляем оценку…» standing forever at a shelf (adversarial В1).
-- **A `401` anywhere is the login screen**, through one seam in `frontend/src/api.ts` wired in
-  `main.ts`. Before it, `error.no_actor` was read by three callers out of a dozen and a half and
-  every other screen said «что-то пошло не так» about an account that was simply not there.
-  Telling `error.no_actor` from a bare `401` stays where it was, in `packages/client`: a proxy, a
-  gateway and a shop's captive portal all answer `401` without knowing what an actor is.
-- **Nothing on the device is thrown away by any of this** — by a `401`, that is; «Выйти» is the
-  one exception, below. `molvia.actor` stays — it is the name
-  of a drawer, not a credential (MOL-53) — so the trip queue, the recent items and the verdict
-  drafts wait where they are, and Telegram brings the same owner back. The task's own line about
-  deleting it was written before MOL-53 and is answered by it (owner's decision, 24.09.2026).
-- **Offline with nobody on the device is the screen's own offline state**, not a notice over an
-  empty app: there are no drawers to open and no cached answers to show. Offline **with** an
-  owner opens the app, because a PWA at a shelf with no signal is the main scenario there is.
-- **The development seam is a button, and only in a development build.** It signed the app in by
-  itself until now, which made the screen this epic exists for invisible in every working copy
-  and unreachable to the end-to-end suite; `signedIn()` in `e2e/session.ts` now presses it, in
-  either language, and waits for the door rather than for the tap. Its failure stays on the login
-  screen instead of opening the app with a notice. It shows no «whose account» step: that exists
-  for a confirmation given elsewhere, and here the person signs themselves in with no Telegram
-  in it at all.
-
-## The way out, and what it takes with it (MOL-57)
-
-The epic's last task: end this device's session, and end another one — the old phone, the laptop
-somebody else owns. **Revoking is deleting the row** (MOL-52), so ended, expired and never-issued
-stay one answer, and the device that was put out learns it on its next request: `401`, its cookie
-put out, the login screen through the seam of MOL-56. Nothing reaches it sooner, and nothing can.
-
-- **Three routes, and each keeps a rule it already had.** `GET /sessions` lists the owner's live
-  sessions, **the current one first by the `ORDER BY`** — past `SESSIONS_LIMIT` a caller sorting
-  what it was given would cut off the very row in the person's hand — and `total` beside them.
-  `DELETE /sessions/:id` puts ownership in the `WHERE`: someone else's, a missing one, an expired
-  one and a malformed id are one `404`. **The current session may be ended there too**, and then
-  the cookie goes with it — the last session leaves the same way as any. `POST /auth/logout` sits
-  with the login's routes, not in the guarded scope: a way out must work for a session already
-  gone, so a repeat after a lost answer is the same `204`, and it never says whether a session
-  was behind the token. The login's guards apply (`X-Molvia-Login`, fetch metadata, no body), and
-  two cookies of the name are refused with nothing cleared — MOL-53's rule, for MOL-53's reason.
-- **`withActor` hands the session's id to the request** (`request.sessionId`), from the same read
-  that found the owner. It is what «this device» is, and what `DELETE` compares with to know it
-  ended its own session — by the id as Postgres spells it, since a path is taken in either case.
-- **Expired sessions are deleted by the minute timer** (owner's decision Q4), `skip locked` as the
-  login's cleanup is: nothing read them, and a device name kept for good contradicted the privacy
-  page's «180 days from the last use».
-- **«Выйти» erases this device's drawer — after the server's `204`, never on the tap** (owner's
-  decision Q1). This is the exception to «a `401` erases nothing» above, and it is not a
-  contradiction: that rule exists because «no session» is also an expired one, with a purchase
-  from a shelf with no signal still in the queue. Here the person says it, and the server has
-  confirmed it. Without the erasure the drawer would open the app offline — MOL-56's rule for a
-  launch with an owner on the device — and show the next person at that laptop the last one's
-  trips. `forgetOwner` takes every `molvia.*.<owner>` key and `molvia.actor` from both shelves,
-  **by the suffix and not by a list**, so a store added later is swept without anyone remembering
-  to; `identity.test.ts` pins which keys exist, so a key that breaks the shape is a decision. The
-  login record loses only this owner's approval — a login another window has in progress stays.
-  **The owner is let go in this window first** (`release`: `id` to `null`, the revision moved), so
-  a rating answering after the erasure finds nobody to file itself under and a `me()` that left
-  before it cannot write the drawer's name back (adversarial Б1, self-review С-2); then the drawer
-  goes under the trip queue's lock, and the page is loaded afresh at `/`. **Offline there is no
-  way out at all** — the cookie is `HttpOnly`, the page cannot put it out, and a session left
-  alive is what the person came to end — and the sheet says so **before a tap**: the button is
-  inactive and nothing is sent or written down (round 3, Е1). A tap known to be offline used to
-  leave an intent behind, and a person who changed their mind at the shelf met the login screen
-  at the next launch.
-- **A lost `204` is settled by the server's next answer, and by nothing else** (adversarial Б2,
-  round 2 Д1, Д3). The intent, `molvia.leaving`, is written before the request leaves: if the
-  server deleted the session and the answer never came, the first `401` closed the door on the
-  settings and the erasure never happened. The server's «nobody» now finishes it; its «this very
-  owner» means the request did not land, and the intent goes. **The identity keeps the server's
-  word apart from its own state** (`heard`, `nobody`): a launch with no connection and the intent
-  on the device shows the login screen — the door's `signed-out` — but that is the device's
-  conclusion, and erasing on it threw away a purchase from the shelf while the session lived on.
-  Closing the sheet after a failure does not withdraw the intent — the outcome is unknown — it
-  asks the server; so does a return of the connection or of the app while the intent waits. The
-  listener is a store of its own (`stores/signOut`), created with the app. **An answer that came,
-  and not from our API, is not unknown** (round 4, Ж1): a captive portal's page or a stranger's
-  `4xx` (`answered === false`, anything but `error.internal`) means the request never reached the
-  server, and the intent goes at once — kept, a portal at the till locked the app further into the
-  shop. **The way out succeeds on `204` and on nothing else**: a portal answers a redirected
-  request with `200` and a page of its own, which read as «no body», and the phone erased a drawer
-  for a session the server never heard about. **Somebody else signing in settles the intent too**
-  (self-review Р3-2): the cookie of the owner who left is gone, so their drawer is erased there and
-  then and the person now signed in is left as they are — `forgetOwner` removes the drawer's name
-  and the intent only when they name the owner being erased. **The price, named:**
-  a connection lost while the request was on its way leaves the outcome unknown, and a launch with
-  no connection then shows the login screen until the server can be asked — the drawer of someone
-  who may have left is not opened on a guess.
-- **What would be lost is counted aloud** (owner's decision Q2) — everything the erasure takes
-  that the server does not hold: the trip queue and the purchases it refused, every rating draft,
-  saved or still being typed, and an unsaved settings form (adversarial Б3). The app is asked to
-  send first when the sheet opens. Both «Выйти» and «Завершить» ask before acting, because
-  neither can be undone — there is no «Вернуть» for a deleted key.
-- **Another window lets the owner go by the drawer's disappearing, and erases its own shelves**
-  (adversarial А1). `sessionStorage` belongs to one tab, so the window where «Выйти» was pressed
-  cannot clear its neighbours' — and `read` falls back to it, so a neighbour's reload opened the
-  app of the person who left. It asks no `me()`: the window that erased did so after the `204`.
-  **A tab that slept through the event checks at every start** (round 2, Д2): a drawer on its own
-  shelf with not one key of the owner on a shared shelf that works was erased elsewhere — a tab
-  the browser unloaded, or one closed and reopened, gets its `sessionStorage` back without the
-  event. The drawer's name counts **by its value** (round 4, Ж2): once somebody else signed in, the
-  shared shelf names them. A shared shelf that refuses a probe write says nothing: then this tab's
-  shelf is the only one, legitimately (Safari's private mode). The premise was checked (self-review
-  Р3-1): Safari's seven-day cap clears `SessionStorage` together with `LocalStorage`, so ITP does
-  not leave a drawer on one shelf; clearing the shared one by hand still does, and then the tab's
-  copy goes too — a named limit, because a marker naming who left would keep their id on the device. A tab that wakes with its memory — frozen by the
-  browser, or restored from the back-forward cache — checks on `visibilitychange` and `pageshow`
-  too, because `recover` starts nothing from `ready`.
-- **«Это не я» and the login's poll take turns** (adversarial Г1). The way out's `Max-Age=0` is
-  addressed to the cookie's name, not to a token, so a poll that collected this person's own
-  session and answered first had it put out of the jar. `refuse` waits for a poll already on its
-  way — and if that one brought the person's own session, there is nobody to put out and no
-  login to begin — and holds the next poll until the way out has answered. The server still
-  clears by name, as the task asks: the race is closed where the requests are made.
-- **«Устройства» keeps nothing on the phone and reads the list again on every return** — to the
-  tab, or `online` — not only after a failure (adversarial В2): a list kept in memory for hours is
-  the copy it refuses to keep on the disk. A device ended leaves the list at once, not with the
-  next read (В1), and a list that could not be read again is not shown at all — the screen says
-  «нет связи» or offers «Повторить» instead (round 2, Д4). There is no empty state: a live session is always in its own list. «Были» is a
-  day, never a time — `last_seen_at` moves once a day — the current row says none, and a date of
-  another year carries the year. An unknown device gets its own sentences rather than its label
-  put into somebody else's case.
-- **Where they live** (owner's decision Q3, brief of MOL-41): «Устройства ›» and «Выйти» are one
-  group, «Аккаунт», on the settings screen, outside the form's states — the way into the account
-  does not depend on whether its settings loaded. The current row in «Устройства» has no button:
-  one place for one action.
-- **Named limits.** A device that was put out keeps what it stored until someone clears it — the
-  server does not reach a phone (MOL-58), and the list says so. Without Web Locks the erasure is
-  not serialised with another window's send. The development seam now names its sessions by
-  `User-Agent`, so a working copy's list is not a column of «unknown device».
 
 ## Code rules
 
@@ -2088,70 +583,6 @@ shelf, so a desktop-only pass would prove nothing about the screen that matters.
   **separate database** on the same server (`molvia_<index>_test`), created and migrated
   by the vitest global setup — a test run can never truncate data entered by hand. This is
   why `make check` needs `make up` first, and why CI runs a Postgres service.
-- **End-to-end has a database of its own too, and it is dropped before every run**
-  (`molvia_<index>_e2e`, MOL-60). Until then the suite started the API without a
-  `DATABASE_URL` of its own and wrote into the dev database, so every pass left a catalogue
-  item and a purchase behind: a leftover «Кефир 4a2d4992» outranked the canonical item a
-  test expected — deterministically, and only on a machine with history. `bin/e2e-database.mjs`
-  recreates it (and refuses any name not ending in `_e2e`); the API migrates it at boot, so
-  there is no second migrator. Recreated rather than truncated: it also makes the schema
-  match the migrations after a branch switch, with no hand-kept list of tables. Not the
-  `_test` database, because that one is never cleaned between runs — its tests own their
-  rows — and `pre-push` runs both suites back to back.
-- **The run also has its own ports** (`E2E_API_PORT`, `E2E_PWA_PORT` — the neighbouring port
-  in this copy's band). A database alone would not have closed it: `reuseExistingServer`
-  handed the suite the dev API whenever `make dev` was up, so no `DATABASE_URL` of ours
-  reached a process — and `pre-push` runs e2e exactly then. Now the two stacks coexist.
-- **Every spec comes in through `open()` in `e2e/session.ts`, and it waits for two things
-  apart** (MOL-67). The seam's answer has no limit of its own, as the app itself waits for it
-  (`devLogin` has no timeout): on an overloaded machine that answer is what is slow — up to 23 s
-  with eight workers on a throttled CPU, most of it inside the API, under a second otherwise. **And
-  the spec does not pay for it**: whatever was waited is added back to a finite test timeout, so a
-  slow stand no longer lets the login pass and the body die three seconds later on a step of its
-  own with no word about the login. A timeout of `0` (`--timeout 0`, `--debug`, `PWDEBUG=1`) is
-  left unlimited — `0 + waited` would have turned it into a budget as long as the login. A login
-  slower than five seconds leaves a «вход швом» attachment with its seconds in the report of any
-  later failure; a seam that never answers times out on `page.waitForEvent` at the line in
-  `session.ts` that says so, and a request cut off without an answer fails at once with its own
-  error. **The price, named:** a login made slow by the product — the seam goes through the same
-  `signIn` as the real one — no longer fails at the door either; on a quiet machine the seam
-  answers in under a second, so an attachment there is a finding about the product, not the
-  stand. The door after the answer keeps the default five seconds and must not be raised: from the
-  answer to the door is one synchronous chain and one render, so a failure there is the login
-  (`verify()`, `claimed`, MOL-56), not the machine, and its message says so. Measured over 284
-  logins under load: late, never «not at all».
-- **Outside CI a failed test keeps its trace** (`retain-on-failure`, MOL-67), since there are no
-  retries to write one. It is recorded for every test and dropped when it passes, which costs
-  12–22 % of a full local run (measured in four pairs); and under an overload that times a test
-  out, the trace may still be lost: it is saved while the context is torn down, and that teardown
-  shares the test's timeout.
-- **Words that are said out loud are taken end-to-end by a locator outside the live region**
-  (MOL-64). The app has one polite region, in `App.vue` above the router, and **six things write
-  to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
-  count of an answer, and an empty answer's own words), `ItemDetailsSheet` (the price per unit),
-  `VerdictCard` («Pick a rating») and `useSettings` (the form's notice). Whatever any of them
-  says is on the screen twice, so a plain `getByText` matches two nodes and playwright's strict
-  mode refuses — a failure the machine's speed decides: measured, one match at once and two from
-  200 ms onwards. Strict mode is right, and it is answered with a locator, never muted with
-  `.first()`; the region is not the place to fix it either, since the whole announcement is
-  MOL-19's decision — a screen reader hears the state whole. **The heading when the block has
-  one** (`getByRole('heading', { name: … })`), **the block's own container when it has none** —
-  the search's `.not-found-text`, the settings' `.dock`. Three things are easy to get wrong.
-  **A heading needs its name where the level is shared:** `{ level: 2 }` alone is not outside
-  anything, because a state's `h2` is the level of a card's and a sheet's too, and an inline
-  notice puts two of them on one screen (MOL-64, Н3). The `h1` is the exception rather than a
-  loophole — `AppScreen` draws one per screen and the pinned copy of the title is `aria-hidden` —
-  so `getByRole('heading', { level: 1 })` is the screen's own title, and asserting its text is
-  what says which screen this is (`navigation.spec.ts`, `sheet.spec.ts`); naming it there would
-  only restate the answer. A second `h1` would make those two the same race. **Not every state speaks** — a full-screen `error` or `attention` carries
-  `role="alert"` and hands the region nothing, so of `ScreenState`'s own states only `empty`,
-  `offline` and anything `inline` double; that is why four of MOL-64's five places were not
-  failing yet and were fixed anyway. And **`exact: true` is not the rule and holds by
-  accident:** it saves only while the announcement is longer than what the screen shows.
-  `ScreenState` joins with `[title, body].filter(Boolean)`, so a title without a body is
-  announced alone and matches exactly too; `useSettings` writes `${title}. ${body}` unfiltered,
-  and the trailing «. » is the only reason two settings assertions were ever green (Н2). Two
-  ways of joining one string, and a locator must not depend on which one ran.
 - **When a test fails, look for the bug in the code first** — do not adjust the test to
   match the behaviour. A test proves the app works, not the other way round. And **never by
   making it tolerate leftovers**: that hides the cause and leaves the suite depending on the
@@ -2242,197 +673,7 @@ Migrations that lose data, swapping a stack element, CI changes, refactoring out
 
 ## State
 
-**Scaffolded, the domain model is in, and the schema is under it** — MOL-4: seven entities,
-eight write inputs and three rules in `packages/model`, with the wire codecs that money and
-quantity need to cross it at all. MOL-5 added the search key; MOL-6 the nine tables of 0.1,
-the GIN index over `search_key` and the constraints that hold the product's key. MOL-8 gave
-the device an identity and the API its first routes; MOL-12 opened the catalogue — search
-and «Предложить товар» — and MOL-112 filled it with a seed of common names; MOL-21 the trip — start it, add, fix and remove its rows, finish it.
-**One trip is open at a time, and the choice is the person's:** «Начать поход» while another
-is open answers `409 error.trip_open`, and the screen asks whether to continue that one or finish
-it first. A finished trip still takes rows — the soy sauce found in the bag at home belongs to the
-trip it was bought on. The trip and its rows are named by the device, so a queue sent twice is one
-purchase.
-**MOL-25 makes completed trips reachable through the whole history**, in pages of twenty, and
-lets a purchase be added, amended or removed there while another trip stays current. The selected
-trip owns the currency, rate and total of its sheet. The phone remembers the first history page,
-the last selected trip and snapshots of completions still synchronising; the queue remains the
-only source of pending writes. **Every conflicting start asks**, including the same shop. A choice
-is tied to the owner, the queued start's key and the open trip, checked again under the queue lock.
-**Completion has two clocks:** `finished_at` remains the server's receipt, while
-`finished_on_device_at` records the first tap kept in the queue. History uses the device's time,
-with the server's as fallback for old rows. It may precede the server start after an offline trip;
-it changes neither rate snapshots nor gates nor purchase dates. Finishing twice moves neither time.
-MOL-27 the verdict — rate, amend and withdraw, addressed by the item;
-MOL-39 the official rate — a cache refreshed hourly, snapshotted by every new trip, a jump
-left to the person; MOL-24 the sheet «сколько, в чём, почём» — a live unit price, a price in any
-of the four currencies, and the queue that keeps a purchase on the phone until it is sent;
-MOL-17 built the shell — routes, tab bar, `AppScreen`, the rules of «back»; MOL-18 the kit
-screens are built from — button, field, card, verdict badge, sheet. MOL-23 the first real screen,
-«Что взяли?»: the search as the person types, the recent items on the device, «Предложить
-товар». **A pick leaves with the query it was made on** (`stores/itemEntry`): «Добавить в поход»
-sends it and the server remembers the pick under it — handed the item alone, that memory would
-silently stop filling. The recent items are written when an item goes into a trip, not on a tap,
-per identity. MOL-28 «Оценки»: `GET /verdicts/pending` gives **one card per item**, not per
-purchase — a product has one verdict per person — with the place and day of the latest purchase:
-when its row was entered, but never after its trip was finished (the sauce found at home was
-bought that week). «Сохранить» keeps the rating on the phone and moves on; the app sends it
-(`stores/verdictDrafts`, a map «item → latest rating», not an ordered queue: `PUT` is safe to
-repeat). «Не сейчас» puts a card behind the others until the item is bought again; the last
-answer is remembered for offline. MOL-31 the API of «Что брать» — the three groups, where it is
-cheaper, the threshold of «только если дёшево» — **and with it the paid layer, pulled into 0.1
-by the owner on 20.09.2026**: free is one's own data, `actors.shared_until` opens other
-people's, and the 0.3 gate moved from the search's event to this screen's. MOL-22 built the
-trip screen; MOL-32 «Что брать» itself, and with it the last placeholder is gone. **The verdict
-decides how much matter a row gets** — a card, a row, a line of text — so the product's rule is
-the layout and not a caption: in the last group there is nothing to be cheap with. The screen
-computes nothing about the data except one word: one place is «Брали здесь», two and more
-«Дешевле всего» (MOL-34), because how many there are is visible to it alone. **The last answer
-lives on the phone**, under its owner and parsed back by the same schema, so offline is a strip
-naming the age of the list to the minute rather than an empty screen; without a memory it is the
-yellow state, and neither offers a button, because the screen comes back with the connection.
-**The strip is printed by where the rows came from, not by what became of the request** (А4):
-while an answer is still on its way yesterday's prices used to look freshly loaded.
-`scope` is said in words — the subtitle, and a footnote saying the reviews and prices are still
-one's own. **A verdict is amended where it is met** (MOL-28 left this here): a tap on any row
-opens a sheet with the 1–5 scale, the review and «Снять оценку», and until it existed a
-mis-tapped «1» stood until the item was bought again. **In the shared mode the sheet offers no
-score pre-chosen** — the figure on the row is an average over several people, and a save would
-have written it down as this person's opinion — and on a row that is nobody's of one's own it
-rates rather than amends (`isMine`). Withdrawing asks nothing and says instead what it does;
-rating again brings the same row back. **The count of ratings is printed only in the shared
-mode**: in the own one it is always one, and the subtitle says as much. Release 0.1 is broken
-into epics and tasks in Jira.
-MOL-52 put the schema under accounts: the Telegram identity on the owner, `sessions` and
-`login_requests`, and the repositories over them — the routes are MOL-53 and MOL-54. Its
-migration **emptied the owners and everything hanging off them**, because a Telegram identity
-cannot be invented for a row already written; the catalogue and the places survived, with
-`created_by` nulled (owner's decision, 20.09.2026). **The invite door of MOL-8 is gone with
-its handle**: `POST /actors`, `withInvite`, `INVITE_HEADER`, `SIGNUP_CODE` and the `?c=` link.
-MOL-53 put the session under every request: `withActor` reads the cookie, `liveByToken` answers
-with the session and its owner in one statement, and `X-Molvia-Actor` is gone from the model, the
-client, the PWA and the tests — the client has no way left to name an owner at all. On the device
-the uuid stays, but as **the name of a drawer**: the trip queue, the recent items and the verdict
-drafts are filed under it and read at the shelf before the server can be asked who we are. With
-the header went everything that existed because the device held a password — the set-aside keys,
-«вернуть прежние данные», the claim two tabs negotiated over and the state `lost`; «the session
-ended, sign in again» is MOL-56's, together with the screen that can act on it.
-**The owner of an account does not change** (owner's decision 22.09.2026). The seam used to mint
-a fresh Telegram id on every call, so a session that ran out came back as somebody else — and the
-trip queue, the recent items and the verdict drafts, all filed on the device under the owner's
-id, were left where no screen could reach them. A cookie of its own now remembers the account
-this browser was given, which is what Telegram itself becomes in MOL-54; clearing the browser's
-cookies is the one thing that still makes a new person, and that is the development counterpart
-of losing the Telegram account.
-Development still gets a session from `POST /dev/login`, a seam that **is not in the production
-bundle at all** — the bundler folds its guard to a constant and the module is tree-shaken away,
-which a test asserts against the built file rather than against the intention; the PWA's call to
-it is behind `import.meta.env.DEV`, so the production bundle does not hold it either.
-MOL-54 added the real API: browser start/poll and internal bot preview/confirm/decline, shared
-contracts and separate clients. Production requires `TELEGRAM_BOT_USERNAME` and `BOT_API_SECRET`.
-MOL-55 gave the bot its half: `/start <code>` names the device and the age of the request and
-offers «Войти» and «Это не я», the answer replaces the question so its buttons go with it, and
-five kinds of dead code get one reply. With it the bot got a dictionary of its own and
-`pickLocale` moved into `packages/model`, where the PWA now reads it from too.
-MOL-56 closed the epic's user-facing half: the login screen, the gate in front of every route,
-the request that survives the round trip through Telegram, and the one seam that turns any `401`
-into a door instead of «что-то пошло не так». **And it closed what the bot's review left open:**
-«Это не я» in the chat rescues a hijacked login only while the browser is not polling — with the
-screen open a stranger confirms and the session is collected in a cycle or two. So the screen
-names the account it landed in and waits to be told it is the right one. The rules are in «The
-way in, and what stands behind it» above.
-MOL-57 closed the epic with the way out: «Устройства» under the settings, «Завершить» on any other
-device, «Выйти» that ends this session and erases this device's drawer after the server's `204`,
-and «Это не я» that now ends the stranger's session instead of only walking away from it. The
-rules are in «The way out, and what it takes with it» above.
-
-MOL-65 gave the person their four fields and a fourth tab: Armenia, Гюмри or Ереван, the currency
-purchases are written in and the one they are converted into. `PUT /actors/me/settings` compares
-the four it was handed **inside the `UPDATE`**, so two devices cannot both overwrite one form,
-and an exact repeat after a lost answer is successful because the target matches as well. The
-form is settled **choice by choice**: one nobody here touched follows whatever the account holds
-now, and «conflict» means both devices changed the same one — sending the whole stale form took
-the other device's move back silently, with nothing on the screen to say which field was about to
-go. **A trip names its own geography** (`context`): the settings as the phone knew them when it
-started, which offline may be older than the row, so a move made elsewhere neither renames the
-shop nor changes the currency of a trip already begun. A start from the old queue carries none,
-and so does one naming a geography nothing may be written under — **one answer,
-`error.trip_context_required`, because it is one question for the person**; the queue **holds it
-without a retry** until they name the city and the currencies, because nothing else knows where
-that trip was. A 400 there would have been the end of that trip: the queue sets a start it cannot
-send aside, and the purchases behind it go too. **What a trip may name is the rule the settings
-refuse by** — `geographyAllowed`: one's own current city, or AM with one of `SETTINGS_CITIES`.
-`places` is a table everyone shares, and «the country is fixed as Armenia» must not be held by
-the form alone. The city is read by the fold
-`places.ensure` stores it under, never by the exact spelling, or a shop written «гюмри» once
-falls out of its own owner's prices. **The form's draft belongs to the account and not to the
-window**: it is kept under the owner's key on the device, as verdict drafts are, because the
-system closes an installed app by itself — and «изменения останутся только пока приложение
-открыто» is then what it says, a shelf that refused, rather than a permanent condition nobody
-is told about. It is written to both shelves and **read from this window's own one first**, so
-a new launch takes the last draft written while two windows open at once keep the forms they
-are typing into. «Что брать» answers with the geography it counted by, and
-the phone compares it with its own: a different city is a list to load again, and an answer the
-settings will not move to is taken as it is — the screen used to stay on a skeleton for good.
-
-MOL-40 put the person's own rate under the trip — «Обмен денег», nested under «Деньги» since
-MOL-81 (it lived under «Настройки» before there was a «Деньги»): the
-exchanges, the wallet worked out from them, the preference «мой / ЦБ РА», and every exchange
-beside the central bank of its day. The trip total says «мой курс» for it. MOL-42 made it every
-currency's cost rather than one pair's — chains, reversals, money of no known cost valued at the
-bank's rate of its day, a change of the currency of conversion that works forwards — and gave an
-exchange amendments with their history and a note. MOL-66 put incomes beside them — «Доходы», the
-second row of the way in from «Деньги»: a journal by month, and an income in any currency but the one of
-conversion is a link of the same walk at the bank's rate of its day. MOL-115 put accounts under all
-of it — where the money lies, the balance counted from a start and every operation after it, «списано»
-for a card in another currency, and a check that looks for the reason before it offers to close the
-difference; the rules are in «An account is where money lies» above. The screens are the task after
-MOL-116's handoff. MOL-81 moved «Обмен денег» and «Доходы» from «Настройки» into «Деньги» —
-`/money/exchange`, `/money/incomes`, the old addresses redirected for good, a card of two rows under
-«Потрачено» the way in, for a newcomer too — and gave them a card per operation and a floating
-«Обмен» / «Доход» where «Трата» floats; a card's lines of accounts come with MOL-116's screens.
-
-MOL-58 gave the people whose data this is the minimum 0.1 owes them: a page that says what is
-kept and for how long (`/privacy`, open without a session), `/delete` in the bot, which erases a
-person in one transaction — the event log included, the one exception to append-only — and logs
-that keep no address and no query and live fourteen days. Export, a delete button in the
-settings, versioned policy and consent are 0.2 (Confluence, «Персональные данные», section 5).
-
-MOL-77 gave «Поход» without a trip a face — the first screen a new person meets. **No circle over an
-action anywhere on it**: the empty state's «+» read as a button and was the thing the owner tapped,
-so `ScreenState` draws an empty state without a circle when it is given no icon, and «Поход начат»
-has none. **«Начать поход» stands in the strip above the tab bar** in every state without a trip,
-loading included — a start goes through the queue, and an open trip the server then names is asked
-about as before. A newcomer gets «Что брать и где» and the cycle «у двери → у полки → дома «Оценки»
-→ «Что брать»», whose last two steps change tab; a person with a history gets «N покупок ждут
-оценки» and their last three trips (`TripHistoryRow`, shared with the history). **The introduction
-is only for a history known to be empty**: every write to a trip persists the history cache, so an
-empty stored page proves nothing, and the store keeps whether the server's last answer was empty
-(`answeredEmpty`) — «empty», not «answered», since the flag and a page a full shelf kept can outlive
-each other, and an answer with trips takes it off every shelf (round 2, Ж1) — **under a key of its
-own, never as a field of the cache**: the cache codec is strict, and a window still on the previous
-version read an unknown field as no cache and wrote its empty one over a finish made with no signal
-(adversarial Е). A change to a phone-side cache is read by both versions, as a field added to the
-contract is. An answer the list moved under — another window wrote the cache, a finish was taken
-back — is asked for again after a doubling pause, since another window may be sending its whole
-queue, rather than taken for a success (А, Ж2). Today's error, and purchases waiting for a verdict,
-outweigh an empty answer remembered from an earlier launch (Г); an error or no connection with
-nothing remembered is a quiet card of its own, never «newcomer» — MOL-56's «no answer is not the
-answer „no“». With the server down there is one «Повторить», the red block's, and it asks for the
-history too (Д). The price, named: offline with an empty answer remembered, the introduction stands
-— Safari and the installed app keep separate shelves. «Ждут оценки» names places, not trips: a card
-carries the place and the moment the server took the purchase, and a purchase made with no signal
-arrives with the queue hours later, so no gap tells one trip from two (round 2, З1). **And it names
-them, never counts them**: a card carries the name without the city, so «Ереван Сити» of Gyumri and
-of Yerevan are one name — a number would claim what the phone does not know (round 3, И2). The name
-alone is what every card and row already shows. A retry of the history ends with the screen that
-asked (И1).
-
-MOL-76 lets a trip be removed — open or finished, empty or not: a quiet «Удалить поход» at the end of
-its list, a question naming the shop, the day and the rows for one with purchases, none for an empty
-one, and «Поход удалён · Вернуть» for ten seconds on the screen it lands on. «Завершить» on an empty
-trip offers to remove it instead (owner's decision В-2): a finished empty trip was the rubbish in the
-history the task was filed for. The rules are in «Data rules» above.
+The chronicle of what each task built is in `docs/onboarding.md`, «Хроника задач».
 
 What exists, what is decided and what is still open — `docs/onboarding.md`.
 
@@ -2450,78 +691,8 @@ script: the schema belongs to migrations, and a second source of truth for it wo
 
 ## Deployment
 
-One VPS, one compose file, Caddy holding the certificate — see `deploy/README.md`.
-The shape worth knowing here:
-
-- **`api` and `bot` ship as a single bundled file each** (`bin/bundle.mjs`, esbuild). The
-  runtime image carries no `node_modules` at all: nothing to audit and nothing that can
-  drift from the lockfile it was built with. It also sidesteps the fact that the workspace
-  packages export TypeScript source, which a runtime image could not read. The API's image
-  carries two more files, `dist/forget.js` — the owner's fallback for erasure (MOL-58) — and
-  `dist/seed-catalogue.js` (MOL-112), since the machine has neither the source nor a published
-  database port.
-- **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
-  exists only for trying the stack on a laptop, where Docker Desktop has no journald.
-- **The database is copied every night, encrypted, off the machine** (MOL-70): `pg_dump` inside the
-  container, `age` to the owner's public key, a Cloudflare R2 bucket in the EU — one pipe, so no
-  unencrypted dump touches a disk, and the private key lives only with the owner, so a compromised
-  server cannot read old copies. **Fourteen days**, enforced by the bucket's own lifecycle rule and
-  written on the privacy page: an erased person lives in the copies exactly that long, so the term is
-  a promise, not a setting. A restore brings back whoever was erased after the copy — a window of
-  at most a day, accepted for 0.1 and named on the page (owner's decision, 26.09.2026); a record of
-  erasures that outlives the database is 0.2's, with the lawyer. A missing copy is an alarm
-  (healthchecks.io), not a log line. `deploy/README.md`, «Backups».
-- **Migrations run when the API starts.** There is one instance, and a schema that lags
-  the code deployed against it is the worse of the two failures. `make migrate`, the test
-  setup and the boot path all go through the same code, so a migration cannot behave one
-  way locally and another in production.
-- **A merged migration is never rewritten.** drizzle decides what to run by the journal's
-  `created_at` alone and never compares a file with what was applied: a rewritten migration is
-  skipped silently if its stamp is older, and fails on its first `CREATE` if newer — then the
-  API does not start.
-
-  **The line is the merge of the pull request, not the first database to run it** (owner's
-  decision, 23.09.2026). The rule is about the production database and about branches other
-  people build on; a working copy's database is pushed around all through development anyway.
-  So while the task is still open, a task's migrations may be folded into one — and then **every
-  database that already ran the old file is brought into line by hand, in the same sitting**,
-  because those are the ones drizzle will silently skip. MOL-39 checked every copy's journal
-  before and after doing it; MOL-25 did the same and applied the added index to this copy's
-  three databases with the very statement the file now carries. After the merge the file is
-  frozen and a change to the schema is a new migration, always.
-
-- **Postgres publishes no port.** It is reachable only over the compose network.
-- **The PWA calls `/api/...`** and Caddy strips the prefix — the same shape the Vite dev
-  proxy has, so nothing about the origin differs between development and production.
-- **A merge is a deploy (MOL-90, owner's decisions В-7 and В-11).** `release.yml` runs when CI
-  passes on master, builds the three images of exactly that commit as `sha-<7 hex>` and rolls
-  them out over ssh — about seven minutes from the merge. The key can do one thing: its forced
-  command, `deploy/deploy.sh`, takes a published tag and nothing else, so a stolen key re-deploys
-  what is already in the registry. **A rollout is told by the image its containers run, never by
-  the version `/health` names** — every image before MOL-90 calls itself `0.0.0`, and those are
-  the rollback targets. Any failure, `up -d` included, puts the previous tag back; the script
-  writes to a log rather than to ssh, so a client going away cannot cut a rollback short. One
-  rollout at a time, and never older over newer: a build stands aside only if the machine already
-  runs its commit or a descendant — not because master moved on, since the commit that moved it
-  may never pass CI. A compose file or a deploy script on the machine that differs from the
-  commit stops the job before anything moves — the key cannot replace them, and a copy is made by
-  hand. `~/molvia/deploy.hold` refuses every rollout, and `restore.sh --into-prod` sets it: an API
-  started mid-restore migrates the empty database. It comes off only once the copy is in — a pour
-  cut short leaves tables without keys that an API still calls healthy — and a hold set by hand
-  is never the restore's to take off. A tag `v0.1.N` is set by hand every 10–15
-  tasks as a mark and a point to roll back to; it builds nothing and deploys nothing, but names
-  the `sha-…` images of its commit, and only once production's `/health` names that commit — a
-  tag is the build that runs, never one that rolled back (owner's decision В-4). **`.env.prod` is
-  read by asking compose** (`config --environment`), never by parsing it: two rounds of review found
-  a form the copied grammar missed each time. `v0.2.0`
-  starts the 0.2 cohort. **`/api/health` names the build** — `git describe --long`,
-  `v0.1.1-3-g1a2b3c4`.
-- **A failed deploy puts the previous image back, not the schema.** Pending migrations run in
-  one transaction, so a migration that fails leaves the schema as it was and the old image
-  finds what it knew. One that succeeded while something else failed stays applied, and the
-  previous image then runs on the new schema: an added column costs it nothing, a dropped or
-  renamed one breaks it. **So a migration that drops or renames goes out in two merges** — the
-  code stops reading the thing first, the schema loses it after.
+One VPS, one compose file, Caddy holding the certificate — see `deploy/README.md` and
+`.claude/rules/deploy.md`.
 
 ## Camera on a real phone
 
@@ -2549,23 +720,6 @@ out in two copies. A full clone is only needed when an independent `.git` is req
 make setup   # bin/link-shared.sh, then bin/init-env.sh, then npm install
 ```
 
-`bin/link-shared.sh` points `.scratch` and `.lavish` at the shared directory and is
-idempotent. `bin/init-env.sh` takes the index from the directory name (`molvia` -> 0, `molvia2` -> 2) or
-from an argument, computes the ports and warns if they are already taken. It does not
-overwrite an existing `.env` without `--force`.
-
-**A new copy also needs the tracker.** The `jira-confluence` MCP server is configured per
-directory and does not come with the checkout; without it a session cannot read the plan or
-the tasks. The command is in `docs/tracker.md`.
-
-**What is shared and what is per-copy:**
-
-|                                | Where                             | Why                                                     |
-| ------------------------------ | --------------------------------- | ------------------------------------------------------- |
-| Plan, task plans, lavish       | shared, `../_shared/molvia/`      | one truth for all copies; survives deleting any of them |
-| Branch, `node_modules`, `.env` | per-copy                          | otherwise the copies are not independent                |
-| Ports, database, bot           | per-copy, spread by `CLONE_INDEX` | see below                                               |
-
 **Isolation between copies rests on `CLONE_INDEX` from `.env`.** Ports are base plus
 `CLONE_INDEX*10`; the database and compose project names get a suffix. The main copy is `0`.
 
@@ -2579,48 +733,14 @@ the tasks. The command is in `docs/tracker.md`.
 | PWA in e2e   | 5301           | 5321           |
 | e2e database | `molvia_0_e2e` | `molvia_2_e2e` |
 
-The band is ten ports wide, so the neighbouring one is always free: a run at `+1` coexists
-with `make dev` instead of taking it over. **A copy whose `.env` predates MOL-60 needs
-`bin/init-env.sh <index> --force` once** — `make setup` keeps an existing `.env`, and
-without the three `E2E_*` values playwright refuses to start and says exactly that.
-**`--force` carries `TELEGRAM_BOT_TOKEN` over**: everything else in the file is computed
-from the index, that one is typed in by hand, and BotFather does not show it twice — a
-reissue revokes the old one. Regenerating was a once-per-copy event until MOL-60 made it
-compulsory for every existing copy, which is what turned the loss from unlikely into
-documented.
-
-Molvia has its own port band rather than the defaults: the machine already has the work
-project's Postgres and Vite listening on 5432 and 5173, so with the defaults Molvia would
-fight with work, not just copy with copy.
-
-**`.env` holds literals only, no `${...}`.** Compose does perform that substitution but
-`dotenv` in Node does not; a file that looks computed would silently behave differently
-from how it reads. That is why `.env` is generated by `bin/init-env.sh` and not edited
-by hand.
-
 - **Each copy gets its own database.** A shared database plus parallel migrations kill each
   other, and silently: the second copy sees a foreign schema and assumes the migration is
   already applied.
-- **One bot for development and one for production, and the development token lives in the one
-  copy that is testing the login** (owner's decision, 24.09.2026; MOL-56 asked again). Two
-  processes on one token do not each get a copy of an update — Telegram hands every update to
-  exactly one of them, at random. So with the token in two copies at once, the tap on «Войти»
-  reaches the bot of the _other_ copy, that bot asks _its_ API, which holds no such request, the
-  person reads «ссылка больше не действует», and the screen under test waits out its five
-  minutes. Nothing errors, and the next attempt may work. **A copy without a token cannot sign in
-  through Telegram at all** — it says one line, exits 0, and its only door is `POST /dev/login`;
-  the same holds without `TELEGRAM_BOT_USERNAME`, which is what the API builds the link from:
-  starting a real login there answers `503 error.login_disabled`. That is why moving the token
-  costs nothing: a copy without it is not broken, it is simply not the one being tested.
+- **One development bot token, in the one copy that is testing the login**: two processes on one
+  token split Telegram's updates between them at random.
 
-**Plans and requirements live in `.scratch/tasks/`, not in the working copy and not on the
-Jira issue.** A copy is temporary and a task is not; `.scratch` is the shared directory, so
-the same file is visible from every copy and survives deleting any of them.
-
-`.scratch` and `.lavish` are symlinks to `../_shared/molvia/{scratch,lavish}`, outside the
-repository and in `.gitignore`. The links are relative, so the whole `projects/` tree can be
-moved at once. The `_shared` directory is deliberately not in git — in a fresh clone
-`bin/link-shared.sh` restores it.
+How a copy is linked and filled, what is shared, the port band and the bot token in detail —
+`.claude/rules/dev-copies.md`.
 
 ## Related
 
