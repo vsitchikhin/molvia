@@ -88,19 +88,31 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   capital — every account on the evening of 16.09, which the app already has as the accounts' starts
   (MOL-115). So the rest is **every live account started by the month's last day, its start and its
   operations dated up to that day** (`balancesOn`), and what is carried from month to month is
-  simply the same money. **On the last day for the running month too** (Н-3): an operation may be
-  dated tomorrow and «Потрачено» already counts it. **In the income currency, always «≈»**: the
+  simply the same money. **On the last day for the running month too** (Н-3): a spending may be
+  dated tomorrow and «Потрачено» already counts it. **The price, named** (review 5): a trip is not a
+  spending here — an account dates it by the day it started, open ones included (MOL-115, Р-29),
+  and «Потрачено» by the day it was finished, finished ones only; a trip from the 30th to the 1st is
+  in September's rest and October's «Потрачено», and an open one is in the rest before «Потрачено». **In the income currency, always «≈»**: the
   spending currency by the month's own rate — the one «≈ потрачено» is counted by, frozen for a
   closed month — any other by the rule of «Деньги» on the last day, or today while the month runs.
   **Two figures** (owner's decision В-1): everything, and without the savings — «всего» and «можно
-  тратить» of «Счета». A balance nothing converts is said apart in its own currency, never a zero.
+  тратить» of «Счета». **The balances of one currency are summed exactly and converted once**
+  (adversarial В): each account rounded on its own made the same money on two accounts a kopeck
+  short of it on one. **An account nothing converts is named on its own, in its own currency, with
+  whether it is savings** — never a zero, and never summed with another: savings and a card in debt
+  in one currency cancelled out into «не посчитано: 0 €» under both figures (А). **The operations no
+  rate counted are a number** (`operationsUncounted`), as «Счета» says of each account: without it
+  the figure looked whole in that month and every one after (Б).
   **A removed account is in no month, past ones included** (Р-2), or «Деньги» and «Счета» disagree
   about which money there was — the price: removing an account with money thins the months behind
   it. **Not frozen** (Р-3): an amended spending of August moves August's rest as it moves its
   «Потрачено». An operation with no account is in no rest (Р-4) — «Счета» says «не попали». Before
   the first account the rest is «—» with the day the accounts begin (`accountsFrom`), and with no
-  account at all «Завести счёт» (В-4). Counted for the month shown only — the month before is read
-  for «−8 %» alone (Н-6).
+  account at all «Завести счёт» (В-4) — unless every account there is was removed
+  (`accountsRemoved`, review 4), when the way is «Вернуть» on «Счета», not a new one. Counted for the
+  month shown only — the month before is read for «−8 %» alone (Н-6) — and on the first page of its
+  journal only: the phone keeps the first page's figures, and every «Показать ещё» read every account
+  with its whole history for nothing (review 3).
 - **«Пришло» may take a salary into the next month** (MOL-134, В-2, В-3): with «Зарплата — в
   следующий месяц» on, a salary received on the chosen day or later counts in «Пришло» of the month
   after (`budgetMonthOf`), as the owner's sheet has it — the salary of the 25th pays for the next
