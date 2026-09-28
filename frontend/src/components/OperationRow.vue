@@ -29,7 +29,15 @@ import IconChevron from '~icons/mdi/chevron-right'
 import IconSwap from '~icons/mdi/swap-horizontal'
 import type { AccountOperationView, SpendingCategoryView } from '@molvia/model'
 import { signedAmount } from '@/components/accounts'
+import en from '@/i18n/en.json'
+import ru from '@/i18n/ru.json'
 import { asTyped, categoryColour, categoryIcon } from '@/components/spending'
+
+/**
+ * The note «Записать разницу» writes, in every language the app speaks: written on a Russian screen
+ * and read on an English one it is still «Прочее · сверка» (review 29).
+ */
+const RECONCILE_NOTES = new Set([ru.accounts.reconcile.note, en.accounts.reconcile.note])
 
 /**
  * One operation as the journal of an account, «не попали» and a check list it (MOL-123, handoff
@@ -79,7 +87,7 @@ export default defineComponent({
     /** «Прочее · сверка»: what «Записать разницу» wrote (handoff 05) — its note and «Прочее». */
     const reconciled = computed(() => {
       const { kind, note, source } = props.operation
-      if (note !== t('accounts.reconcile.note')) return false
+      if (note === null || !RECONCILE_NOTES.has(note)) return false
       return kind === 'income' ? source === 'other' : category.value?.preset === 'other'
     })
 

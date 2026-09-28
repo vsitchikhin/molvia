@@ -35,7 +35,9 @@
     </form>
 
     <!-- Step two: the server's count, the difference and what could have made it. -->
-    <div v-else class="result" aria-live="polite">
+    <!-- Said through the app's one live region (MOL-19), and the focus comes here: the field and
+         the button it was on are gone (review 20). -->
+    <div v-else ref="resultBox" class="result" tabindex="-1">
       <p v-if="!online" class="strip">
         <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('accounts.reconcile.offline') }}
       </p>
@@ -66,13 +68,13 @@
           {{ t('accounts.reconcile.edit_fact') }}
         </AppButton>
 
-        <template v-if="result.reasons.length > 0">
+        <template v-if="reasons.length > 0">
           <h3 class="caption">
             {{ t('accounts.reconcile.causes_title', { date: shortDay(result.since) }) }}
           </h3>
           <AppCard as="ul" list>
             <OperationRow
-              v-for="reason in result.reasons"
+              v-for="reason in reasons"
               :key="`${reason.kind}-${reason.operation.id}-${reason.operation.side ?? ''}`"
               :operation="reason.operation"
               :categories="categories"
@@ -104,7 +106,27 @@
     </div>
 
     <template #footer>
-      <p v-if="failed" class="failed" role="alert">{{ t('accounts.sheet.failed') }}</p>
+      <!-- Offline or the server: decided after the failure, and offline is never red (MOL-19). -->
+      <p v-if="failure === 'offline'" class="strip">
+        <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('accounts.reconcile.offline') }}
+      </p>
+      <div v-else-if="failure === 'error'" class="failed" role="alert">
+        <span>{{ t('accounts.reconcile.failed') }}</span>
+        <AppButton v-if="result" variant="ghost" @click="recount(true)">
+          {{ t('state.retry') }}
+        </AppButton>
+      </div>
+      <!-- A reason removed from its own sheet over this one comes back here (MOL-82's ten seconds). -->
+      <UndoStrip
+        v-if="removedReason"
+        :key="removedReason.stamp"
+        class="undo"
+        :text="t('spending.removed', removedReason)"
+        :announcement="t('spending.removed_announced', removedReason)"
+        :action="t('spending.restore')"
+        @restore="restoreReason"
+        @expire="removedReason = null"
+      />
       <template v-if="!result">
         <AppButton size="large" block :busy="sending" :disabled="sending || !online" @click="check">
           <template #icon><IconScale v-if="online" /><IconCloudOff v-else /></template>
@@ -136,6 +158,15 @@
     back
     :online="online"
     @saved="reasonSaved"
+    @removed="reasonRemoved"
+  />
+  <!-- A difference above zero is an income, and an income answers «сколько было до» (В-5). -->
+  <OperationIncomeSheet
+    v-if="incomeDraft"
+    v-model:open="incomeOpen"
+    :draft="incomeDraft"
+    @saved="incomeSaved"
+    @unavailable="incomeUnavailable"
   />
 </template>
 
@@ -161,10 +192,14 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
+import OperationIncomeSheet from '@/components/OperationIncomeSheet.vue'
 import OperationSheet from '@/components/OperationSheet.vue'
+import UndoStrip from '@/components/UndoStrip.vue'
 import { parseSigned, shortDay as dayOf, signedAmount } from '@/components/accounts'
 import { asTyped } from '@/components/spending'
+import type { Removed } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import type { IncomeDraft } from '@/composables/useIncomes'
 import { useReconnect } from '@/composables/useReconnect'
 import { newId } from '@/ids'
 import { useAccountsStore } from '@/stores/accounts'
@@ -193,8 +228,10 @@ export default defineComponent({
     IconCloudOff,
     IconHelp,
     IconScale,
+    OperationIncomeSheet,
     OperationRow,
     OperationSheet,
+    UndoStrip,
   },
   props: {
     open: { type: Boolean, required: true },
@@ -226,7 +263,12 @@ export default defineComponent({
     const factInput = ref<HTMLInputElement | null>(null)
     const result = ref<AccountCheckResponse | null>(null)
     const sending = ref(false)
-    const failed = ref(false)
+    /** Why the last ask did not answer — read after the failure, never before (MOL-19, A1). */
+    const failure = ref<'offline' | 'error' | null>(null)
+    const resultBox = ref<HTMLElement | null>(null)
+    const removedReason = ref<(Removed & { stamp: number }) | null>(null)
+    const incomeDraft = ref<IncomeDraft | null>(null)
+    const incomeOpen = ref(false)
     /** A reason was put right and the count has not been asked again yet. */
     const recountPending = ref(false)
     const writing = ref(false)
@@ -247,7 +289,8 @@ export default defineComponent({
         fact.value = ''
         factBad.value = false
         result.value = null
-        failed.value = false
+        failure.value = null
+        removedReason.value = null
         recountPending.value = false
         written.value = false
         sent = null
@@ -267,7 +310,7 @@ export default defineComponent({
     const matched = computed(() => result.value?.difference.minor === 0n)
 
     async function ask(check: { id: string; fact: Money }): Promise<boolean> {
-      failed.value = false
+      failure.value = null
       const mine = ++asking
       try {
         const answer = await api.checkAccount(props.account.id, check)
@@ -280,9 +323,18 @@ export default defineComponent({
         void store.refresh()
         return true
       } catch {
-        if (mine === asking) failed.value = true
+        if (mine === asking) failure.value = navigator.onLine ? 'error' : 'offline'
         return false
       }
+    }
+
+    /** What step two says, aloud: the result and its figure (review 20). */
+    function sayResult(answer: AccountCheckResponse): void {
+      announce?.(
+        answer.difference.minor === 0n
+          ? `${t('accounts.reconcile.match_title')}. ${money(answer.counted)}`
+          : `${t('accounts.reconcile.mismatch', { app: money(answer.counted), fact: money(answer.fact) })}. ${t('accounts.reconcile.difference')} ${signed(answer.difference)}`,
+      )
     }
 
     async function check(): Promise<void> {
@@ -296,8 +348,12 @@ export default defineComponent({
       const earlier = [sent, tried].find((one) => one?.fact.minor === value.minor)
       tried = { id: earlier?.id ?? newId(), fact: value }
       sending.value = true
-      await ask(tried)
+      const answered = await ask(tried)
       sending.value = false
+      if (!answered || !result.value) return
+      sayResult(result.value)
+      await nextTick()
+      resultBox.value?.focus()
     }
 
     function again(): void {
@@ -312,25 +368,41 @@ export default defineComponent({
     /** The same check once more, after a reason was put right or the difference written. */
     async function recount(say: boolean): Promise<void> {
       if (!sent || !result.value || !navigator.onLine) return
+      // A failure keeps the difference stale and «Повторить» beside it: nothing is written over a
+      // count that was not asked (review 15).
       if (!(await ask(sent))) return
       recountPending.value = false
-      if (say) announce?.(t('accounts.reconcile.recounted'))
+      if (say) {
+        announce?.(t('accounts.reconcile.recounted'))
+        sayResult(result.value)
+      }
+    }
+
+    /**
+     * Whether what was put right has reached the server: no spending and no account of a trip still
+     * waiting. Not «some queue landed» — a spending landing first recounted before the trip's account
+     * did, and «Записать разницу» wrote the same money a second time (review 15, adversarial В).
+     */
+    function landedAll(): boolean {
+      return (
+        spendings.pending.length === 0 && !trips.pending.some((write) => write.kind === 'payment')
+      )
     }
 
     // A spending is put right through the queue, a trip too: its answer comes after the sheet, and
     // the count is asked again once it has — any landing will do, the check is cheap.
     let recountOnLanding = false
     watch(
-      () => [spendings.landed, trips.landed],
+      () => [spendings.landed, trips.wrote],
       () => {
-        if (!recountOnLanding || spendings.pending.length > 0) return
+        if (!recountOnLanding || !landedAll()) return
         recountOnLanding = false
         void recount(props.open)
       },
     )
 
     useReconnect(() => {
-      if (recountPending.value) void recount(props.open)
+      if (recountPending.value && landedAll()) void recount(props.open)
     })
 
     const reasonOpen = ref(false)
@@ -339,6 +411,29 @@ export default defineComponent({
       reasonOperation.value = operation
       reasonOpen.value = true
     }
+    /** A reason removed from its sheet: offered back here, and the difference is stale again. */
+    function reasonRemoved(removed: Removed): void {
+      removedReason.value = { ...removed, stamp: Date.now() }
+      recountPending.value = true
+      recountOnLanding = true
+    }
+    function restoreReason(): void {
+      const removed = removedReason.value
+      if (!removed) return
+      spendings.restore(removed.undo)
+      removedReason.value = null
+      recountPending.value = true
+      recountOnLanding = true
+      announce?.(t('spending.restored'))
+    }
+
+    /** A trip whose removal waits in the queue is shown nowhere (MOL-76), a reason neither. */
+    const reasons = computed(() =>
+      (result.value?.reasons ?? []).filter(
+        ({ operation }) => operation.kind !== 'trip' || !trips.removing.has(operation.id),
+      ),
+    )
+
     function reasonSaved(): void {
       recountPending.value = true
       const kind = reasonOperation.value?.kind
@@ -415,52 +510,63 @@ export default defineComponent({
     })
 
     /**
-     * «Прочее · сверка»: an ordinary spending or income, for the sum the server gave, on this
-     * account, through the routes that write them — a spending through its queue. Then the same
-     * check again, once what was written has reached the server.
+     * «Прочее · сверка» for the sum the server gave, on this account. Below zero it is a spending,
+     * written at once through its queue and the same check sent again once it has landed. Above zero
+     * it is an income, and its sheet opens filled over this one — the person answers «сколько было
+     * до», or the income would become the price of the whole currency (owner's decision В-5).
      */
-    async function writeDifference(): Promise<void> {
+    function writeDifference(): void {
       const value = result.value
       if (!value || writing.value || written.value || !sent) return
-      const other = props.categories.find((category) => category.preset === 'other')
       const size = {
         ...value.difference,
         minor: value.difference.minor < 0n ? -value.difference.minor : value.difference.minor,
       }
-      writing.value = true
-      failed.value = false
-      try {
-        if (value.difference.minor < 0n) {
-          if (!other) throw new Error('no «Прочее»')
-          spendings.record({
-            id: differenceId,
-            spentOn: value.checkedOn,
-            amount: size,
-            categoryId: other.id,
-            note: t('accounts.reconcile.note'),
-            accountId: props.account.id,
-          })
-          // Sent again once this spending has landed, whatever becomes of the sheet (В-5 MOL-115).
-          store.repeatAfter(differenceId, props.account.id, sent)
-        } else {
-          await api.recordIncome({
-            id: differenceId,
-            receivedOn: value.checkedOn,
-            amount: size,
-            source: 'other',
-            note: t('accounts.reconcile.note'),
-            accountId: props.account.id,
-          })
-          void store.repeat(props.account.id, sent)
+      if (value.difference.minor > 0n) {
+        incomeDraft.value = {
+          amount: size,
+          source: 'other',
+          note: t('accounts.reconcile.note'),
+          accountId: props.account.id,
+          receivedOn: value.checkedOn,
         }
-        written.value = true
-        announce?.(t('accounts.reconcile.written', { amount: signed(value.difference) }))
-        emit('update:open', false)
-      } catch {
-        failed.value = true
-      } finally {
-        writing.value = false
+        incomeOpen.value = true
+        return
       }
+      const other = props.categories.find((category) => category.preset === 'other')
+      if (!other) {
+        failure.value = 'error'
+        return
+      }
+      writing.value = true
+      failure.value = null
+      spendings.record({
+        id: differenceId,
+        spentOn: value.checkedOn,
+        amount: size,
+        categoryId: other.id,
+        note: t('accounts.reconcile.note'),
+        accountId: props.account.id,
+      })
+      // Sent again once this spending has landed, whatever becomes of the sheet (В-5 MOL-115).
+      store.repeatAfter(differenceId, props.account.id, sent)
+      written.value = true
+      writing.value = false
+      announce?.(t('accounts.reconcile.written', { amount: signed(value.difference) }))
+      emit('update:open', false)
+    }
+
+    /** The income is written: the same check once more, here — it comes out even (В-5 MOL-115). */
+    function incomeSaved(): void {
+      const value = result.value
+      if (value) announce?.(t('accounts.reconcile.written', { amount: signed(value.difference) }))
+      written.value = true
+      recountPending.value = true
+      void recount(true)
+    }
+    function incomeUnavailable(): void {
+      incomeOpen.value = false
+      failure.value = navigator.onLine ? 'error' : 'offline'
     }
 
     function finish(): void {
@@ -484,7 +590,17 @@ export default defineComponent({
       factInput,
       result,
       sending,
-      failed,
+      failure,
+      resultBox,
+      removedReason,
+      restoreReason,
+      reasonRemoved,
+      reasons,
+      incomeDraft,
+      incomeOpen,
+      incomeSaved,
+      incomeUnavailable,
+      recount,
       recountPending,
       writing,
       written,
@@ -710,8 +826,16 @@ export default defineComponent({
 }
 
 .failed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   margin: 0 0 var(--space-2);
   color: var(--bad-ink);
   font-size: var(--text-footnote);
+}
+
+.undo {
+  margin-bottom: var(--space-2);
 }
 </style>

@@ -1021,7 +1021,9 @@
       "offline_empty": "The accounts will show once the connection is back",
       "uncounted": "{n} account not counted — no rate | {n} accounts not counted — no rate",
       "rate_official": "At the CBA rate: {rates}",
-      "rate_mixed": "At the day’s rates: {rates}"
+      "rate_mixed": "At the day’s rates: {rates}",
+      "restore_late": "Too late: “{name}” is deleted for good",
+      "restore_failed": "The account didn’t come back — check the connection and tap “Undo” again"
     },
     "account": {
       "edit": "Edit",
@@ -1112,7 +1114,8 @@
       "saved_mismatch": "Check saved, a difference remains",
       "note": "check",
       "cause_no_account_trip": "Trip {amount} with no account",
-      "cause_uncounted": "{title} — no rate to count it by"
+      "cause_uncounted": "{title} — no rate to count it by",
+      "failed": "Couldn’t check the account — try again"
     },
     "picker": {
       "row_spending": "Account",
@@ -1150,6 +1153,7 @@
     "held_fill": "Fill in",
     "card_from": "from “{name}”",
     "card_to": "to “{name}”",
-    "card_name": "“{name}”"
+    "card_name": "“{name}”",
+    "stale_error": "Couldn’t refresh — balances as of {time}"
   }
 }

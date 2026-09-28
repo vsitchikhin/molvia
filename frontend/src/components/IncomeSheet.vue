@@ -155,6 +155,7 @@ import type { AmendOutcome } from '@/composables/useExchanges'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, purchaseDay } from '@/days'
 import { newId } from '@/ids'
+import type { IncomeDraft } from '@/composables/useIncomes'
 import { useAccountsStore } from '@/stores/accounts'
 
 /**
@@ -192,6 +193,12 @@ export default defineComponent({
     },
     /** The income being amended, or null for a new one. */
     editing: { type: Object as PropType<IncomeView | null>, default: null },
+    /**
+     * A new income already filled — «Записать разницу» of a check (MOL-123, owner's decision В-5):
+     * the sum, «Прочее», «сверка», the account and the day, and the person still answers «сколько
+     * было до», which an income written without it would take as the price of the whole currency.
+     */
+    draft: { type: Object as PropType<IncomeDraft | null>, default: null },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
@@ -230,16 +237,18 @@ export default defineComponent({
       (open) => {
         if (!open) return
         const editing = props.editing
-        amount.value = editing ? typed(editing.amount) : ''
+        const draft = editing ? null : props.draft
+        const filled = editing?.amount ?? draft?.amount ?? null
+        amount.value = filled ? typed(filled) : ''
         // Most money comes in the currency it is counted in — the salary of the owner does.
-        currency.value = editing?.amount.currency ?? props.overview.base
-        source.value = editing?.source ?? ''
+        currency.value = filled?.currency ?? props.overview.base
+        source.value = editing?.source ?? draft?.source ?? ''
         amountError.value = null
         sourceMissing.value = false
         today.value = yerevanDate(new Date())
-        day.value = editing?.receivedOn ?? today.value
+        day.value = editing?.receivedOn ?? draft?.receivedOn ?? today.value
         held.value = editing?.heldBefore ? typed(editing.heldBefore) : ''
-        note.value = editing?.note ?? ''
+        note.value = editing?.note ?? draft?.note ?? ''
         noteInvalid.value = false
         dayError.value = null
         dayInvalid.value = false
@@ -248,7 +257,7 @@ export default defineComponent({
         conflict.value = false
         incomeId = newId()
         pickerOpen.value = false
-        choice.reset(editing ? editing.accountId : undefined)
+        choice.reset(editing ? editing.accountId : draft ? draft.accountId : undefined)
       },
       { immediate: true },
     )

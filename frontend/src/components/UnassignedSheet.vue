@@ -10,14 +10,14 @@
     <p v-else-if="state === 'error'" class="failed" role="alert">
       {{ t('accounts.load_failed') }}
     </p>
-    <p v-else-if="rows.length === 0" class="done">
+    <p v-else-if="visible.length === 0" class="done">
       <IconCheck class="strip-icon" aria-hidden="true" />{{
         t('accounts.unassigned_sheet.all_done')
       }}
     </p>
     <AppCard v-else as="ul" list>
       <OperationRow
-        v-for="row in rows"
+        v-for="row in visible"
         :key="`${row.id}-${row.side ?? ''}`"
         :operation="row"
         :categories="categories"
@@ -29,6 +29,17 @@
     </AppCard>
 
     <template #footer>
+      <!-- A spending removed from its own sheet over this one comes back here (MOL-82). -->
+      <UndoStrip
+        v-if="removed"
+        :key="removed.stamp"
+        class="undo"
+        :text="t('spending.removed', removed)"
+        :announcement="t('spending.removed_announced', removed)"
+        :action="t('spending.restore')"
+        @restore="restore"
+        @expire="removed = null"
+      />
       <AppButton size="large" block @click="$emit('update:open', false)">
         <template #icon><IconCheck /></template>
         {{ t('accounts.done') }}
@@ -41,11 +52,12 @@
     back
     :online="online"
     @saved="saved"
+    @removed="onRemoved"
   />
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCheck from '~icons/mdi/check'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
@@ -56,8 +68,12 @@ import AppCard from '@/components/AppCard.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
 import OperationSheet from '@/components/OperationSheet.vue'
+import UndoStrip from '@/components/UndoStrip.vue'
 import { shortDay } from '@/components/accounts'
+import type { Removed } from '@/components/spending'
+import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useOwnCategories } from '@/composables/useOwnCategories'
+import { useReconnect } from '@/composables/useReconnect'
 import { useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -77,6 +93,7 @@ export default defineComponent({
     IconCloudOff,
     OperationRow,
     OperationSheet,
+    UndoStrip,
   },
   props: {
     open: { type: Boolean, required: true },
@@ -119,11 +136,34 @@ export default defineComponent({
     )
     // A spending given its account goes through the queue: the list is read again once it lands.
     watch(
-      () => [spendings.landed, trips.landed],
+      () => [spendings.landed, trips.wrote],
       () => {
         if (props.open) void load()
       },
     )
+
+    // Back online, a list that could not be read is read again.
+    useReconnect(() => {
+      if (props.open && state.value !== 'ready') void load()
+    })
+
+    /** A trip whose removal waits in the queue is shown nowhere (MOL-76, review 25). */
+    const visible = computed(() =>
+      rows.value.filter((row) => row.kind !== 'trip' || !trips.removing.has(row.id)),
+    )
+
+    const announce = useAnnouncer()
+    const removed = ref<(Removed & { stamp: number }) | null>(null)
+    function onRemoved(value: Removed): void {
+      removed.value = { ...value, stamp: Date.now() }
+    }
+    function restore(): void {
+      const value = removed.value
+      if (!value) return
+      spendings.restore(value.undo)
+      removed.value = null
+      announce?.(t('spending.restored'))
+    }
 
     const accountName = (id: string) => store.accounts.find((one) => one.id === id)?.name ?? null
 
@@ -155,6 +195,10 @@ export default defineComponent({
     return {
       t,
       rows,
+      visible,
+      removed,
+      onRemoved,
+      restore,
       state,
       categories,
       nameOf,
@@ -170,6 +214,10 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.undo {
+  margin-bottom: var(--space-2);
+}
+
 .note {
   margin: 0;
   color: var(--text-muted);

@@ -1021,7 +1021,9 @@
       "offline_empty": "Счета появятся, когда интернет вернётся",
       "uncounted": "{n} счёт не посчитан — нет курса | {n} счёта не посчитаны — нет курса | {n} счетов не посчитаны — нет курса",
       "rate_official": "По курсу ЦБ РА: {rates}",
-      "rate_mixed": "По курсу дня: {rates}"
+      "rate_mixed": "По курсу дня: {rates}",
+      "restore_late": "Поздно: «{name}» уже удалён насовсем",
+      "restore_failed": "Счёт не вернулся — проверьте связь и нажмите «Вернуть» ещё раз"
     },
     "account": {
       "edit": "Править",
@@ -1112,7 +1114,8 @@
       "saved_mismatch": "Сверка записана, разница осталась",
       "note": "сверка",
       "cause_no_account_trip": "Поход {amount} без счёта",
-      "cause_uncounted": "{title} — нечем пересчитать"
+      "cause_uncounted": "{title} — нечем пересчитать",
+      "failed": "Не удалось сверить — попробуйте ещё раз"
     },
     "picker": {
       "row_spending": "Счёт",
@@ -1150,6 +1153,7 @@
     "held_fill": "Подставить",
     "card_from": "с «{name}»",
     "card_to": "на «{name}»",
-    "card_name": "«{name}»"
+    "card_name": "«{name}»",
+    "stale_error": "Не удалось обновить — остатки на {time}"
   }
 }

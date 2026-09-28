@@ -1,11 +1,12 @@
 <template>
   <IncomeSheet
-    v-if="incomes.overview.value && editing"
-    :open="open && !!editing"
+    v-if="incomes.overview.value && (editing || draft)"
+    :open="open && (!!editing || !!draft)"
     back
     :overview="incomes.overview.value"
     :editing="editing"
-    :record="incomes.record"
+    :draft="draft"
+    :record="record"
     :amend="amend"
     @update:open="$emit('update:open', $event)"
   />
@@ -13,10 +14,12 @@
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch } from 'vue'
-import type { IncomeAmendBody, IncomeView } from '@molvia/model'
+import type { PropType } from 'vue'
+import type { IncomeAmendBody, IncomeBody, IncomeView } from '@molvia/model'
 import IncomeSheet from '@/components/IncomeSheet.vue'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { incomesOf, useIncomes } from '@/composables/useIncomes'
+import type { IncomeDraft } from '@/composables/useIncomes'
 
 /**
  * An income opened from an account's journal, «не попали» or a check (MOL-123): its own sheet, over
@@ -28,7 +31,9 @@ export default defineComponent({
   components: { IncomeSheet },
   props: {
     open: { type: Boolean, required: true },
-    id: { type: String, required: true },
+    /** The income to amend; or none, with a `draft` of a new one (В-5). */
+    id: { type: String as PropType<string | null>, default: null },
+    draft: { type: Object as PropType<IncomeDraft | null>, default: null },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
@@ -51,17 +56,26 @@ export default defineComponent({
           held.value = income
           return
         }
+        if (props.draft) {
+          if (phase === 'error' || phase === 'offline') emit('unavailable')
+          return
+        }
         if (phase !== 'idle' && phase !== 'loading') emit('unavailable')
       },
       { immediate: true },
     )
+    async function record(body: IncomeBody): Promise<unknown> {
+      const written = await incomes.record(body)
+      if (written) emit('saved')
+      return written
+    }
     async function amend(id: string, body: IncomeAmendBody): Promise<AmendOutcome> {
       const outcome = await incomes.amend(id, body)
       if (outcome === 'conflict') held.value = found.value ?? held.value
       if (outcome === 'saved') emit('saved')
       return outcome
     }
-    return { incomes, editing, amend }
+    return { incomes, editing, record, amend }
   },
 })
 </script>
