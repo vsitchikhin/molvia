@@ -327,6 +327,31 @@ describe('ReconcileSheet (handoff 05)', () => {
     expect(view.text()).toContain(en.accounts.reconcile.match_title)
   })
 
+  it('round 3, Н4: a trip’s write held on a question of «Поход» is named, not waited on', async () => {
+    checkAccount.mockResolvedValue(answer('9000', '10000'))
+    const pinia = withAccounts([cash])
+    const trips = useTripQueueStore(pinia)
+    trips.elsewhere = { tripId: TRIP, place: 'Ереван Сити', mine: 'Рынок' }
+    trips.pending = [{ kind: 'payment', tripId: TRIP, body: { accountId: cash.id, debited: null } }]
+    const view = await reconcile(pinia)
+    await view.get('input').setValue('9000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    expect(view.get('.difference').classes()).not.toContain('stale')
+    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeUndefined()
+    expect(view.text()).toContain(en.accounts.reconcile.trips_held)
+
+    // Control: a write the queue sends by itself is waited on, and the wait is said.
+    trips.elsewhere = null
+    await button(view, en.accounts.reconcile.edit_fact)?.trigger('click')
+    await view.get('input').setValue('9000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    expect(view.get('.difference').classes()).toContain('stale')
+    expect(view.text()).toContain(en.accounts.reconcile.recounting)
+    expect(view.text()).not.toContain(en.accounts.reconcile.trips_held)
+  })
+
   it('review 34: offline is said once, and goes when the connection comes back', async () => {
     checkAccount.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'offline', false))
     const view = await reconcile(withAccounts([cash]))

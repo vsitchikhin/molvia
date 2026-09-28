@@ -255,7 +255,7 @@ export default defineComponent({
         heldError.value = null
         failed.value = false
         conflict.value = false
-        incomeId = newId()
+        incomeId = draft?.id ?? newId()
         pickerOpen.value = false
         choice.reset(editing ? editing.accountId : draft ? draft.accountId : undefined)
       },

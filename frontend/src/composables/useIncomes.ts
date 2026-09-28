@@ -20,6 +20,8 @@ export type IncomesPhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'o
 
 /** What a new income is opened with, when something else has already said it. */
 export interface IncomeDraft {
+  /** The income's name, when the one who fills the sheet has named it already. */
+  readonly id?: string
   readonly amount: Money
   readonly source: IncomeSource
   readonly note: string

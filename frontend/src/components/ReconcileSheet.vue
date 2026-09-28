@@ -64,6 +64,9 @@
           <span class="difference-label">{{ t('accounts.reconcile.difference') }}</span>
           <span class="difference-figure">{{ signed(result.difference) }}</span>
         </p>
+        <!-- A muted difference says what it waits for (adversarial round 3, Н4). -->
+        <p v-if="recountPending" class="hint">{{ t('accounts.reconcile.recounting') }}</p>
+        <p v-if="tripsHeld" class="hint">{{ t('accounts.reconcile.trips_held') }}</p>
         <AppButton variant="ghost" @click="again">
           {{ t('accounts.reconcile.edit_fact') }}
         </AppButton>
@@ -203,6 +206,7 @@ import { newId } from '@/ids'
 import { useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import type { QueuedWrite } from '@/stores/tripQueue'
 
 type Reason = AccountCheckResponse['reasons'][number]
 
@@ -390,11 +394,28 @@ export default defineComponent({
     function landedAll(): boolean {
       return (
         spendings.pending.length === 0 &&
-        !trips.pending.some(
-          ({ kind }) => kind === 'payment' || kind === 'delete' || kind === 'restore',
-        )
+        !trips.pending.some((write) => countsMoney(write) && tripsSend(write))
       )
     }
+
+    /** A write of a trip that moves what an account counts. */
+    function countsMoney({ kind }: QueuedWrite): boolean {
+      return kind === 'payment' || kind === 'delete' || kind === 'restore'
+    }
+
+    /**
+     * Whether the trip queue sends this write by itself. Not while it stands on a question of
+     * «Поход» — another trip open, a missing context — which only the person answers, with no
+     * timer; and never a write of a trip the server refused. Waited on, such a write held every
+     * check of every account, with nothing to say why (adversarial round 3, Н4): it is named instead.
+     */
+    function tripsSend({ tripId }: QueuedWrite): boolean {
+      return trips.elsewhere === null && trips.needsContext === null && !trips.orphaned(tripId)
+    }
+
+    const tripsHeld = computed(() =>
+      trips.pending.some((write) => countsMoney(write) && !tripsSend(write)),
+    )
 
     // A spending is put right through the queue, a trip too: its answer comes after the sheet, and
     // the count is asked again once it has — any landing will do, the check is cheap. The queues
@@ -532,6 +553,9 @@ export default defineComponent({
       }
       if (value.difference.minor > 0n) {
         incomeDraft.value = {
+          // Named once per answer, as the spending is: an income whose answer was lost and a
+          // second «Записать разницу» are one income, not two (adversarial round 2, Н3).
+          id: differenceId,
           amount: size,
           source: 'other',
           note: t('accounts.reconcile.note'),
@@ -604,6 +628,7 @@ export default defineComponent({
       restoreReason,
       reasonRemoved,
       reasons,
+      tripsHeld,
       incomeDraft,
       incomeOpen,
       incomeSaved,

@@ -407,4 +407,28 @@ describe('a check and the operations of its reasons', () => {
     })
     expect(recordIncome).not.toHaveBeenCalled()
   })
+
+  it('round 2, Н3: an income whose answer was lost, opened again, goes under the same name', async () => {
+    const pinia = session()
+    incomes.mockResolvedValue({
+      base: 'AMD',
+      baseSince: null,
+      months: [],
+      receipts: [],
+      heldEstimates: [],
+    })
+    recordIncome.mockReset().mockRejectedValue(new ApiError(ERROR.INTERNAL, 'lost', false))
+    const view = await checkWith(pinia, answer('10500', '10000'))
+    for (let opening = 0; opening < 2; opening += 1) {
+      await button(view, /Record the difference/)?.trigger('click')
+      await settle()
+      await button(view, en.income.sheet.save)?.trigger('click')
+      await settle()
+      view.findComponent(IncomeSheet).vm.$emit('update:open', false)
+      await settle()
+    }
+    const [first, second] = recordIncome.mock.calls.map(([body]) => (body as { id: string }).id)
+    expect(recordIncome).toHaveBeenCalledTimes(2)
+    expect(second).toBe(first)
+  })
 })

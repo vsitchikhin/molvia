@@ -66,7 +66,9 @@ export default defineComponent({
     )
     async function record(body: IncomeBody): Promise<unknown> {
       const written = await incomes.record(body)
-      if (written) emit('saved')
+      // A draft names its income (В-5): a conflict under that name is the same difference written
+      // already, by an answer that never came — the check counts again all the same.
+      if (written || props.draft?.id) emit('saved')
       return written
     }
     async function amend(id: string, body: IncomeAmendBody): Promise<AmendOutcome> {
