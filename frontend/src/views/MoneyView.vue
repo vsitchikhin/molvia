@@ -104,16 +104,44 @@
                 <span v-if="month.incomeUncounted.length > 0" class="tile-note">
                   {{ t('spending.income_uncounted', { amounts: list(month.incomeUncounted) }) }}
                 </span>
-              </button>
-              <div class="tile">
-                <span class="tile-label">{{ t('spending.rest') }}</span>
-                <span
-                  class="tile-figure"
-                  :class="{ negative: month.rest && month.rest.total.minor < 0n }"
-                >
-                  {{ month.rest ? `≈ ${signed(month.rest.total)}` : '—' }}
+                <!-- Where a salary went, both ways (MOL-134, Н-2): the switch of months does not
+                     go past the running one, and a salary of the 26th would just be missing. -->
+                <span v-if="month.shiftedIn.length > 0" class="tile-note">
+                  {{ t('spending.income_shifted_in', { days: days(month.shiftedIn) }) }}
                 </span>
-                <span v-if="!month.rest" class="tile-note">{{ t('spending.rest_unknown') }}</span>
+                <span v-if="month.shiftedOut.length > 0" class="tile-note">
+                  {{ t('spending.income_shifted_out', { days: days(month.shiftedOut) }) }}
+                </span>
+              </button>
+              <!-- «Остаток» (MOL-134): the accounts at the end of the month, each figure with what
+                   it misses; «—» says why from the answer, never a rate that is not the reason. -->
+              <div class="tile rest">
+                <span class="tile-label">{{ t('spending.rest') }}</span>
+                <template v-if="month.rest">
+                  <span class="tile-figure" :class="{ negative: month.rest.total.minor < 0n }">
+                    ≈ {{ signed(month.rest.total) }}
+                  </span>
+                  <span v-for="line in restNotes.total" :key="line" class="tile-note">
+                    {{ line }}
+                  </span>
+                  <template v-if="restNotes.spendable">
+                    <span class="tile-sub" :class="{ negative: month.rest.spendable.minor < 0n }">
+                      {{ t('spending.rest_spendable', { amount: signed(month.rest.spendable) }) }}
+                    </span>
+                    <span v-for="line in restNotes.spendable" :key="line" class="tile-note">
+                      {{ line }}
+                    </span>
+                  </template>
+                </template>
+                <template v-else>
+                  <span class="tile-figure">—</span>
+                  <span v-if="month.accountsFrom" class="tile-note">
+                    {{ t('spending.rest_from', { day: shortDay(month.accountsFrom) }) }}
+                  </span>
+                  <RouterLink v-else class="tile-link" :to="{ name: 'money-accounts' }">
+                    {{ t(month.accountsRemoved ? 'spending.rest_removed' : 'spending.rest_add') }}
+                  </RouterLink>
+                </template>
               </div>
             </div>
 
@@ -395,6 +423,33 @@ export default defineComponent({
         ? `−${formatEstimate({ ...value, minor: -value.minor }, locale.value)}`
         : formatEstimate(value, locale.value)
     const list = (values: readonly Money[]) => values.map(whole).join(', ')
+    const shortDay = (day: string) =>
+      calendarDay(day, locale.value, { day: 'numeric', month: 'short' })
+    const days = (values: readonly string[]) => values.map(shortDay).join(', ')
+
+    // What each figure of «Остаток» misses, in the server's words (MOL-134, adversarial А, Б, З):
+    // «без сбережений» is drawn only where it says something «всего» does not.
+    const restNotes = computed(() => {
+      const rest = month.value?.rest
+      if (!rest) return { total: [], spendable: null }
+      const notes = (
+        accounts: readonly { name: string; balance: Money }[],
+        operations: number,
+      ): string[] => [
+        ...(accounts.length > 0
+          ? [
+              t('spending.rest_uncounted', {
+                accounts: accounts.map((one) => `${one.name} ${signed(one.balance)}`).join(', '),
+              }),
+            ]
+          : []),
+        ...(operations > 0 ? [t('spending.rest_operations', { n: operations }, operations)] : []),
+      ]
+      const total = notes(rest.uncounted.total, rest.operationsUncounted.total)
+      const spendable = notes(rest.uncounted.spendable, rest.operationsUncounted.spendable)
+      const same = rest.spendable.minor === rest.total.minor && spendable.join() === total.join()
+      return { total, spendable: same ? null : spendable }
+    })
 
     const change = computed(() => {
       const value = month.value
@@ -595,6 +650,9 @@ export default defineComponent({
       whole,
       signed,
       list,
+      shortDay,
+      days,
+      restNotes,
       change,
       foreign,
       rateLine,
@@ -779,6 +837,26 @@ export default defineComponent({
 .tile-note {
   color: var(--text-muted);
   font-size: var(--text-footnote);
+}
+
+.tile-sub {
+  font-size: var(--text-callout);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+
+  &.negative {
+    color: var(--bad-ink);
+  }
+}
+
+.tile-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  color: var(--accent-ink);
+  font-size: var(--text-footnote);
+  font-weight: var(--weight-medium);
 }
 
 .day {

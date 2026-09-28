@@ -451,6 +451,7 @@ describe('moneyMonthOf (MOL-73)', () => {
       debited: null,
       rate: null,
       unpriced: 0,
+      revision: 1,
       details: {
         categoryId: null,
         note: null,

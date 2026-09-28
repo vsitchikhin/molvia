@@ -287,6 +287,7 @@ describe('словарь: плюральные формы', () => {
       'advice.ratings_count',
       'verdict.pending_count',
       'spending.unsent',
+      'spending.rest_operations',
       'spending.trip_row_meta',
       'spending.more',
       'spending.sheet.trip_meta',
