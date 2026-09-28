@@ -2,10 +2,10 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { z } from 'zod'
 import { accountJournalCodec, moneyAccountsCodec } from '@molvia/model'
-import type { AccountJournalResponse, MoneyAccountsResponse } from '@molvia/model'
+import type { AccountCheckBody, AccountJournalResponse, MoneyAccountsResponse } from '@molvia/model'
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
-import { useSpendingQueueStore } from '@/stores/spendingQueue'
+import { spendingOf, useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { read, write } from '@/stores/storage'
 
@@ -151,6 +151,35 @@ export const useAccountsStore = defineStore('accounts', () => {
     rememberOverview(owner, answer)
   }
 
+  /**
+   * A check to send again once the «Прочее · сверка» written for it has reached the server (В-5
+   * MOL-115), by the spending's name: kept here and not in the sheet, which may be closed, or the
+   * screen left, before the queue is through — and one unrelated spending stuck in the queue must
+   * not hold it back. Lost with the page on a reload: the next check counts from the last even one.
+   */
+  const repeats = new Map<string, { accountId: string; check: AccountCheckBody }>()
+
+  async function repeat(accountId: string, check: AccountCheckBody): Promise<void> {
+    try {
+      await api.checkAccount(accountId, check)
+    } catch {
+      // Not repeated: the next check of the account counts again from its last even one.
+    }
+    void refresh()
+  }
+
+  function settleRepeats(): void {
+    for (const [spendingId, waiting] of repeats) {
+      if (spendings.pending.some((write) => spendingOf(write) === spendingId)) continue
+      repeats.delete(spendingId)
+      void repeat(waiting.accountId, waiting.check)
+    }
+  }
+
+  function repeatAfter(spendingId: string, accountId: string, check: AccountCheckBody): void {
+    repeats.set(spendingId, { accountId, check })
+  }
+
   adopt()
   watch(
     () => actor.id,
@@ -162,6 +191,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   watch(
     () => [spendings.landed, trips.landed],
     () => {
+      settleRepeats()
       if (shown.value || failure.value) void refresh()
     },
   )
@@ -184,5 +214,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     removed,
     refresh,
     accept,
+    repeat,
+    repeatAfter,
   }
 })

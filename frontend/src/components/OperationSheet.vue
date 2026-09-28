@@ -13,6 +13,7 @@
         @update:open="$emit('update:open', $event)"
         @add-category="newCategoryOpen = true"
         @saved="$emit('saved')"
+        @paid="$emit('saved')"
         @removed="$emit('removed', $event)"
       />
       <NewCategorySheet

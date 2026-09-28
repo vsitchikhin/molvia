@@ -19,13 +19,17 @@ export interface AccountChoice {
  * of the operation's currency in the order of «Счета», following the currency until the person
  * chooses — then the choice holds. The screen puts it in; the server never guesses (Р-13 MOL-115).
  */
-export function useAccountChoice(currency: Ref<Currency>): AccountChoice {
+export function useAccountChoice(currency: Ref<Currency>, strict = false): AccountChoice {
   const store = useAccountsStore()
   const accountId = ref<string | null>(null)
   const byHand = ref(false)
   const account = computed(() => store.accounts.find(({ id }) => id === accountId.value) ?? null)
 
   function follow(): void {
+    // Money lands on an account in its own currency or not at all (Р-31 MOL-115): a choice the new
+    // currency does not fit goes back to the default, rather than being written «без счёта» unseen.
+    const held = account.value
+    if (strict && held && held.currency !== currency.value) byHand.value = false
     if (!byHand.value) accountId.value = defaultAccount(store.accounts, currency.value)?.id ?? null
   }
   watch([currency, () => store.accounts], follow)

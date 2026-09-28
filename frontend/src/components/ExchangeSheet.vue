@@ -222,8 +222,8 @@ export default defineComponent({
     const conflict = ref(false)
     let exchangeId = newId()
     const accounts = useAccountsStore()
-    const givenChoice = useAccountChoice(toRef(currencies, 'given'))
-    const receivedChoice = useAccountChoice(toRef(currencies, 'received'))
+    const givenChoice = useAccountChoice(toRef(currencies, 'given'), true)
+    const receivedChoice = useAccountChoice(toRef(currencies, 'received'), true)
     const choices = { given: givenChoice, received: receivedChoice }
     const pickerOpen = ref(false)
     const pickerSide = ref<Side>('given')

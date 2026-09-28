@@ -187,6 +187,13 @@ export default defineComponent({
     const failed = ref(false)
     const conflict = ref(false)
     let accountId = newId()
+    /**
+     * The version the form was filled from: a save goes over it, never over whatever the page reads
+     * meanwhile — a landing refreshes the page, and an amendment over the newer version undid another
+     * device's edit with no 409 (review 5). Moved on only by a conflict, which shows what is held now.
+     */
+    let revision: number | null = null
+    let outcome: AccountOutcome | null = null
     const nameField = ref<ComponentPublicInstance | null>(null)
     const startField = ref<ComponentPublicInstance | null>(null)
 
@@ -212,6 +219,8 @@ export default defineComponent({
         failed.value = false
         conflict.value = false
         if (!account) accountId = newId()
+        revision = account?.revision ?? null
+        outcome = null
       },
       { immediate: true },
     )
@@ -285,8 +294,12 @@ export default defineComponent({
      * that moves on the answer — «Удалить» on the account's own screen leads to «Счета» — had its
      * move undone by the pop that closed the sheet.
      */
-    let outcome: AccountOutcome | null = null
     function finished(done: AccountOutcome): void {
+      // Closed while the answer was on its way: there is no step back left to wait for (review 10).
+      if (!props.open) {
+        emit('done', done)
+        return
+      }
       outcome = done
       emit('update:open', false)
     }
@@ -327,7 +340,10 @@ export default defineComponent({
         let answer: MoneyAccountsResponse
         const held = current.value
         if (held) {
-          answer = await api.amendMoneyAccount(held.id, { revision: held.revision, ...fields })
+          answer = await api.amendMoneyAccount(held.id, {
+            revision: revision ?? held.revision,
+            ...fields,
+          })
         } else {
           answer = await addOrAmend(fields)
         }
@@ -344,6 +360,7 @@ export default defineComponent({
           // What was typed stays, and the next «Сохранить» goes over the version held now.
           conflict.value = true
           await store.refresh()
+          revision = current.value?.revision ?? revision
         } else {
           failed.value = true
         }

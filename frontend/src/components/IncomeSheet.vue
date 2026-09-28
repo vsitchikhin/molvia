@@ -218,7 +218,7 @@ export default defineComponent({
     const conflict = ref(false)
     let incomeId = newId()
     const accounts = useAccountsStore()
-    const choice = useAccountChoice(currency)
+    const choice = useAccountChoice(currency, true)
     const pickerOpen = ref(false)
 
     const typed = (value: Money): string =>

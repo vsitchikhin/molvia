@@ -8,7 +8,13 @@ import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 
 const moneyAccounts = vi.fn<() => Promise<MoneyAccountsResponse>>()
-vi.mock('@/api', () => ({ api: { moneyAccounts: () => moneyAccounts() } }))
+const checkAccount = vi.fn<(id: string, body: unknown) => Promise<unknown>>()
+vi.mock('@/api', () => ({
+  api: {
+    moneyAccounts: () => moneyAccounts(),
+    checkAccount: (id: string, body: unknown) => checkAccount(id, body),
+  },
+}))
 
 const OWNER = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const OTHER = '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d'
@@ -54,6 +60,7 @@ describe('useAccountsStore', () => {
     localStorage.clear()
     sessionStorage.clear()
     moneyAccounts.mockReset()
+    checkAccount.mockReset().mockResolvedValue(undefined)
     setActivePinia(createPinia())
   })
 
@@ -156,5 +163,38 @@ describe('useAccountsStore', () => {
     const [oldest, , , newest] = ids
     expect(recallJournal(OWNER, oldest ?? '')).toBeNull()
     expect(recallJournal(OWNER, newest ?? '')?.account.id).toBe(newest)
+  })
+
+  it('sends a check again once «Прочее · сверка» has landed — and not for another spending', async () => {
+    const actor = signedIn()
+    actor.state = 'idle'
+    moneyAccounts.mockResolvedValue(page('100'))
+    const store = useAccountsStore()
+    const queue = useSpendingQueueStore()
+    const WRITTEN = 'aaaaaaaa-0000-4000-8000-000000000001'
+    const OTHER = 'aaaaaaaa-0000-4000-8000-000000000002'
+    const body = (id: string) => ({
+      id,
+      spentOn: '2026-09-26',
+      amount: amd('5132'),
+      categoryId: 'ffffffff-0000-4000-8000-00000000000d',
+    })
+    queue.record(body(OTHER))
+    queue.record(body(WRITTEN))
+    const check = { id: 'cccccccc-0000-4000-8000-000000000001', fact: amd('185000') }
+    store.repeatAfter(WRITTEN, CASH, check)
+    queue.landed++
+    await flushPromises()
+    expect(checkAccount).not.toHaveBeenCalled()
+    // The written one leaves the queue; the other stays stuck — the repeat does not wait for it.
+    queue.pending = queue.pending.filter(
+      (write) => write.kind !== 'record' || write.body.id !== WRITTEN,
+    )
+    queue.landed++
+    await flushPromises()
+    expect(checkAccount).toHaveBeenCalledExactlyOnceWith(CASH, check)
+    queue.landed++
+    await flushPromises()
+    expect(checkAccount).toHaveBeenCalledTimes(1)
   })
 })

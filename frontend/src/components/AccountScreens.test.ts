@@ -18,6 +18,7 @@ import type {
 } from '@molvia/model'
 import AccountSheet from './AccountSheet.vue'
 import AccountsCard from './AccountsCard.vue'
+import OperationSheet from './OperationSheet.vue'
 import ReconcileSheet from './ReconcileSheet.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
@@ -235,6 +236,43 @@ describe('ReconcileSheet (handoff 05)', () => {
     expect(checkAccount.mock.calls[2]?.[1].id).not.toBe(first)
   })
 
+  it('review 6: the same fact after an answer that never came goes under the same name', async () => {
+    checkAccount
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'offline', false))
+      .mockResolvedValue(answer('185000', '190132'))
+    const view = await reconcile(withAccounts([cash]))
+    await view.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    const [first, second] = checkAccount.mock.calls.map(([, body]) => body.id)
+    expect(second).toBe(first)
+  })
+
+  it('review 3: a recount that lands after «Ввести другую сумму» does not take the sheet back', async () => {
+    checkAccount.mockResolvedValueOnce(
+      answer('185000', '190132', [{ kind: 'unassigned', operation: taxi() }]),
+    )
+    const pinia = withAccounts([cash])
+    const view = await reconcile(pinia)
+    await view.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    // The reason is put right in its sheet; the check is asked again once the queue lands…
+    view.findComponent(OperationSheet).vm.$emit('saved')
+    let late: (value: AccountCheckResponse) => void = () => undefined
+    checkAccount.mockImplementationOnce(() => new Promise((resolve) => (late = resolve)))
+    useSpendingQueueStore(pinia).landed++
+    await flushPromises()
+    // …and while that answer is out, the person goes back to type another fact.
+    await button(view, en.accounts.reconcile.edit_fact)?.trigger('click')
+    late(answer('185000', '190132'))
+    await flushPromises()
+    expect(view.text()).toContain(en.accounts.reconcile.question)
+    expect(view.text()).not.toMatch(/190,132/)
+  })
+
   it('«Записать разницу» writes one «Прочее» for the server’s sum, however many taps', async () => {
     checkAccount.mockResolvedValue(answer('185000', '190132'))
     const pinia = withAccounts([cash])
@@ -355,6 +393,28 @@ describe('AccountSheet (handoff 03)', () => {
     await vi.waitFor(() => {
       expect(view.emitted('done')?.[0]).toEqual([{ kind: 'deleted', id: spare.id, name: 'Spare' }])
     })
+  })
+
+  it('review 5: a save goes over the version the form was filled from, not a newer one read since', async () => {
+    const amendMoneyAccount = vi.fn()
+    const card = account('Card ₽', 'RUB')
+    const pinia = withAccounts([card])
+    const view = await mounted(
+      AccountSheet,
+      { open: true, account: card, spendCurrency: 'AMD' },
+      pinia,
+    )
+    // Another device renamed it; a landing read the page again while this form was open.
+    useAccountsStore(pinia).accept(page([{ ...card, name: 'Card of mine', revision: 2 }]))
+    await flushPromises()
+    const { api } = await import('@/api')
+    ;(api as unknown as Record<string, unknown>).amendMoneyAccount =
+      amendMoneyAccount.mockRejectedValue(new ApiError(ERROR.CONFLICT, 'revision'))
+    moneyAccounts.mockResolvedValue(page([{ ...card, name: 'Card of mine', revision: 2 }]))
+    await button(view, en.accounts.sheet.save)?.trigger('click')
+    await flushPromises()
+    expect(amendMoneyAccount.mock.calls[0]?.[1]).toMatchObject({ revision: 1 })
+    expect(view.text()).toContain(en.accounts.sheet.conflict)
   })
 
   it('offline it keeps what was typed and waits for the connection', async () => {

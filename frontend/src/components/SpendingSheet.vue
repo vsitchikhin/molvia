@@ -305,6 +305,8 @@ export default defineComponent({
     'update:open': (open: boolean) => typeof open === 'boolean',
     'add-category': () => true,
     saved: (saved: { id: string; spentOn: string }) => typeof saved.id === 'string',
+    /** The account of a trip, or its «списано», went into the trip's queue from the summary. */
+    paid: () => true,
     removed: (removed: Removed) => typeof removed === 'object',
   },
   setup(props, { emit }) {
@@ -340,6 +342,8 @@ export default defineComponent({
     const debited = ref('')
     const debitedBad = ref(false)
     const pickerOpen = ref(false)
+    /** «Списано» the spending was opened with — sent back as it was when its account is unknown. */
+    let knownDebited: Money | null = null
     /** The trip as the server holds it, for its account and currencies. */
     const tripView = ref<TripView | null>(null)
     const account = computed(
@@ -426,6 +430,7 @@ export default defineComponent({
               ? (spending.accountId ?? null)
               : (defaultAccount(accounts.accounts, currency.value)?.id ?? null)
         const typedDebited = typedBody?.debited ?? spending?.debited ?? null
+        knownDebited = typedDebited
         debited.value = typedDebited ? typed(typedDebited) : ''
         if (props.target.kind === 'trip') void loadTrip(props.target.row)
         // The keyboard comes up for a new spending — the sum is what it is opened for — and not
@@ -461,6 +466,8 @@ export default defineComponent({
       items.value = 'loading'
       try {
         const trip = await api.trip(row.tripId)
+        // Another trip opened meanwhile: this answer is not its account (review 8).
+        if (props.target.kind !== 'trip' || props.target.row.tripId !== row.tripId) return
         tripView.value = trip
         accountId.value = trip.accountId
         debited.value = trip.debited ? typed(trip.debited) : ''
@@ -599,6 +606,8 @@ export default defineComponent({
       debitedBad.value = false
       if (props.target.kind === 'trip') {
         payTrip(null)
+        // What the server now holds: the new account, and no «списано» for it yet (review 2).
+        if (tripView.value) tripView.value = { ...tripView.value, accountId: id, debited: null }
         const name = accounts.accounts.find((one) => one.id === id)?.name
         announce?.(
           name ? t('accounts.picker.trip_saved', { name }) : t('accounts.picker.trip_saved_none'),
@@ -614,19 +623,27 @@ export default defineComponent({
         tripId: props.target.row.tripId,
         body: { accountId: accountId.value, debited: accountId.value ? charge : null },
       })
+      // A check over this summary counts again once it lands (review 1).
+      emit('paid')
     }
 
     /** «Списано» of a trip is saved once the field is left, if it changed. */
     function saveTripCharge(event: FocusEvent): void {
       const leaving = event.currentTarget as HTMLElement | null
       if (leaving?.contains(event.relatedTarget as Node | null)) return
+      // Nothing to say about an account the phone does not know — least of all by a look (review 4).
+      if (!account.value || !charged.value) return
       const charge = parsedCharge()
       if (charge === 'bad') {
         debitedBad.value = true
         return
       }
       const before = tripView.value?.debited ?? null
-      if ((charge?.minor ?? null) === (before?.minor ?? null)) return
+      if (
+        (charge?.minor ?? null) === (before?.minor ?? null) &&
+        (charge?.currency ?? null) === (before?.currency ?? null)
+      )
+        return
       payTrip(charge)
       if (tripView.value) tripView.value = { ...tripView.value, debited: charge }
     }
@@ -687,7 +704,12 @@ export default defineComponent({
         ...(typedPlace.value === undefined ? {} : { place: typedPlace.value }),
         // Always said once accounts exist: left out, the server keeps the account it has (Р-26).
         ...(showsAccounts.value
-          ? { accountId: accountId.value, debited: accountId.value ? charge : null }
+          ? {
+              accountId: accountId.value,
+              // An account this phone does not know — made or marked on another — keeps the
+              // «списано» it was written with: a note amended here must not undo it (review 4).
+              debited: !accountId.value ? null : account.value ? charge : knownDebited,
+            }
           : {}),
       }
       const row = manual.value

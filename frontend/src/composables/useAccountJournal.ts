@@ -59,7 +59,8 @@ export function useAccountJournal(accountId: Ref<string>): AccountJournal {
     const wanted = pages
     try {
       const first = await api.accountJournal(id)
-      if (actor.id === owner) rememberJournal(owner, first)
+      // Kept only when it is the newest answer: a late one must not overwrite a fresher memory.
+      if (actor.id === owner && mine === latest) rememberJournal(owner, first)
       let answer = first
       for (let page = 1; page < wanted && answer.cursor; page++) {
         const next = await api.accountJournal(id, answer.cursor)

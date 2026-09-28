@@ -233,6 +233,10 @@ export default defineComponent({
     const written = ref(false)
     /** The check as sent: the same fact goes under the same name, another under a new one (Р-19). */
     let sent: { id: string; fact: Money } | null = null
+    /** The check last asked — its answer may be lost after the server wrote it (review 6). */
+    let tried: { id: string; fact: Money } | null = null
+    /** Which answer is awaited: a recount landing late must not take the sheet back (review 3). */
+    let asking = 0
     /** The name of «Прочее · сверка» for this difference: a second tap writes the same one. */
     let differenceId = newId()
 
@@ -247,6 +251,9 @@ export default defineComponent({
         recountPending.value = false
         written.value = false
         sent = null
+        tried = null
+        asking += 1
+        recountOnLanding = false
         await nextTick()
         factInput.value?.focus()
       },
@@ -261,8 +268,10 @@ export default defineComponent({
 
     async function ask(check: { id: string; fact: Money }): Promise<boolean> {
       failed.value = false
+      const mine = ++asking
       try {
         const answer = await api.checkAccount(props.account.id, check)
+        if (mine !== asking) return false
         sent = check
         result.value = answer
         differenceId = newId()
@@ -271,7 +280,7 @@ export default defineComponent({
         void store.refresh()
         return true
       } catch {
-        failed.value = true
+        if (mine === asking) failed.value = true
         return false
       }
     }
@@ -284,57 +293,42 @@ export default defineComponent({
         factInput.value?.focus()
         return
       }
-      const same = sent?.fact.minor === value.minor ? sent.id : newId()
+      const earlier = [sent, tried].find((one) => one?.fact.minor === value.minor)
+      tried = { id: earlier?.id ?? newId(), fact: value }
       sending.value = true
-      await ask({ id: same, fact: value })
+      await ask(tried)
       sending.value = false
     }
 
     function again(): void {
+      // A recount still on its way is about the fact being replaced.
+      asking += 1
+      recountOnLanding = false
+      recountPending.value = false
       result.value = null
       void nextTick(() => factInput.value?.focus())
     }
 
     /** The same check once more, after a reason was put right or the difference written. */
     async function recount(say: boolean): Promise<void> {
-      if (!sent || !navigator.onLine) return
-      const before = result.value
+      if (!sent || !result.value || !navigator.onLine) return
       if (!(await ask(sent))) return
       recountPending.value = false
-      if (say && before && result.value) announce?.(t('accounts.reconcile.recounted'))
+      if (say) announce?.(t('accounts.reconcile.recounted'))
     }
 
     // A spending is put right through the queue, a trip too: its answer comes after the sheet, and
     // the count is asked again once it has — any landing will do, the check is cheap.
     let recountOnLanding = false
-    /**
-     * The check to send again once «Прочее · сверка» has reached the server — kept apart from the
-     * sheet's own state: the sheet is closed by then, and may be opened on another check before the
-     * queue is through (В-5 MOL-115: without the repeat the window of an account with «≈» stays).
-     */
-    let repeatAfterLanding: { id: string; fact: Money } | null = null
     watch(
       () => [spendings.landed, trips.landed],
       () => {
-        if (spendings.pending.length > 0) return
-        const repeat = repeatAfterLanding
-        repeatAfterLanding = null
-        if (repeat) void repeatQuietly(repeat)
-        if (!recountOnLanding) return
+        if (!recountOnLanding || spendings.pending.length > 0) return
         recountOnLanding = false
         void recount(props.open)
       },
     )
 
-    async function repeatQuietly(check: { id: string; fact: Money }): Promise<void> {
-      try {
-        await api.checkAccount(props.account.id, check)
-      } catch {
-        // Not repeated: the next check of the account counts again from its last even one.
-      } finally {
-        void store.refresh()
-      }
-    }
     useReconnect(() => {
       if (recountPending.value) void recount(props.open)
     })
@@ -446,7 +440,8 @@ export default defineComponent({
             note: t('accounts.reconcile.note'),
             accountId: props.account.id,
           })
-          repeatAfterLanding = sent
+          // Sent again once this spending has landed, whatever becomes of the sheet (В-5 MOL-115).
+          store.repeatAfter(differenceId, props.account.id, sent)
         } else {
           await api.recordIncome({
             id: differenceId,
@@ -456,7 +451,7 @@ export default defineComponent({
             note: t('accounts.reconcile.note'),
             accountId: props.account.id,
           })
-          void repeatQuietly(sent)
+          void store.repeat(props.account.id, sent)
         }
         written.value = true
         announce?.(t('accounts.reconcile.written', { amount: signed(value.difference) }))

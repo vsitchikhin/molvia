@@ -248,6 +248,99 @@ describe('the account of an income: its own currency only, and no «Списан
   })
 })
 
+describe('an amendment moved to another currency (review 11)', () => {
+  it('an income moved to another currency leaves an account that cannot hold it', async () => {
+    const dollars = account('Dollars', 'USD')
+    const pinia = withAccounts([card, dollars])
+    const view = await mounted(
+      IncomeSheet,
+      {
+        open: true,
+        overview: { base: 'RUB', baseSince: null, months: [], receipts: [], heldEstimates: [] },
+        record: vi.fn(),
+        amend: vi.fn(),
+        editing: {
+          id: '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c2d',
+          receivedOn: '2026-09-15',
+          amount: { minor: 9_961_500n, currency: 'RUB' },
+          heldBefore: null,
+          source: 'salary',
+          note: null,
+          accountId: card.id,
+          revision: 1,
+          amendedAt: null,
+          history: [],
+        },
+      },
+      pinia,
+    )
+    const row = () =>
+      view
+        .findAll('button[aria-haspopup="dialog"]')
+        .find((one) => one.text().includes(en.accounts.picker.row_income))
+    expect(row()?.text()).toContain('Card ₽')
+    const currencyField = view
+      .findAll('.field')
+      .find((one) => one.text().includes(en.income.sheet.currency))
+    await currencyField?.get('select').setValue('USD')
+    await flushPromises()
+    expect(row()?.text()).toContain('Dollars')
+  })
+})
+
+describe('the account of a trip from its summary (review 1, 2)', () => {
+  it('a choice goes into the trip’s queue at once and says so; a look sends nothing', async () => {
+    const pinia = withAccounts([cash, card])
+    const trip = vi.fn()
+    const { api } = await import('@/api')
+    ;(api as unknown as Record<string, unknown>).trip = trip
+    trip.mockResolvedValue({
+      id: 'bbbbbbbb-0000-4000-8000-000000000001',
+      accountId: cash.id,
+      debited: null,
+      currency: 'AMD',
+      expenses: [],
+    })
+    const view = await mounted(
+      SpendingSheet,
+      {
+        open: true,
+        target: {
+          kind: 'trip',
+          day: '2026-09-25',
+          row: {
+            kind: 'trip',
+            key: 'bbbbbbbb-0000-4000-8000-000000000001',
+            tripId: 'bbbbbbbb-0000-4000-8000-000000000001',
+            placeName: 'SAS',
+            items: 2,
+            amount: parseMoney('3480', 'AMD'),
+            counted: null,
+          },
+        },
+        categories,
+        nameOf: () => 'Groceries',
+        spendCurrency: 'AMD',
+      },
+      pinia,
+    )
+    await flushPromises()
+    const { useTripQueueStore } = await import('@/stores/tripQueue')
+    const queue = useTripQueueStore(pinia)
+    expect(queue.pending).toEqual([])
+    view.findComponent(AccountPickerSheet).vm.$emit('pick', card.id)
+    await flushPromises()
+    expect(queue.pending).toEqual([
+      {
+        kind: 'payment',
+        tripId: 'bbbbbbbb-0000-4000-8000-000000000001',
+        body: { accountId: card.id, debited: null },
+      },
+    ])
+    expect(view.emitted('paid')).toHaveLength(1)
+  })
+})
+
 describe('AccountPickerSheet', () => {
   it('a strict picker with nothing of the currency says the operation goes without one', async () => {
     const view = await mounted(

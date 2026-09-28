@@ -381,7 +381,9 @@ function marksOf(queue: readonly Kept[], holds: (write: QueuedWrite) => boolean)
   return JSON.stringify(
     queue.flatMap((item, index) => {
       if (!holds(item.write)) return []
-      const next = queue.slice(index + 1).find((later) => !holds(later.write))
+      // The next write every older version can read: a window older than both mirrors drops the
+      // marks and the payments alike, and a key it never had is no place to come back to (review 9).
+      const next = queue.slice(index + 1).find((later) => !isMirrored(later.write))
       return [{ key: item.key, write: encode(item.write), before: next?.key ?? null }]
     }),
   )

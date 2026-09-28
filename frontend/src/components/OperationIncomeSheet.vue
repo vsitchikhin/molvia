@@ -45,13 +45,13 @@ export default defineComponent({
     watch(
       () => [incomes.phase.value, found.value] as const,
       ([phase, income]) => {
-        if (income && !held.value) held.value = income
-        if (
-          phase === 'error' ||
-          phase === 'offline' ||
-          ((phase === 'ready' || phase === 'empty') && !income)
-        )
-          emit('unavailable')
+        // Only until the sheet is up: a failed read later must not close it under the typing.
+        if (held.value) return
+        if (income) {
+          held.value = income
+          return
+        }
+        if (phase !== 'idle' && phase !== 'loading') emit('unavailable')
       },
       { immediate: true },
     )

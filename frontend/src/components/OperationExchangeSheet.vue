@@ -46,13 +46,13 @@ export default defineComponent({
     watch(
       () => [exchanges.phase.value, found.value] as const,
       ([phase, exchange]) => {
-        if (exchange && !held.value) held.value = exchange
-        if (
-          phase === 'error' ||
-          phase === 'offline' ||
-          ((phase === 'ready' || phase === 'empty') && !exchange)
-        )
-          emit('unavailable')
+        // Only until the sheet is up: a failed read later must not close it under the typing.
+        if (held.value) return
+        if (exchange) {
+          held.value = exchange
+          return
+        }
+        if (phase !== 'idle' && phase !== 'loading') emit('unavailable')
       },
       { immediate: true },
     )
