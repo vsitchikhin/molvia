@@ -84,7 +84,17 @@ The detail behind the trip lines of `CLAUDE.md`.
   the previous version reads the shared queue, drops the kinds it does not know and writes the queue
   back without them, and the version that knows them puts them back in their place (MOL-77's rule —
   a phone-side cache is read by both versions). The price, named: while it sends, the older window
-  does not see the removal, and a start of the next trip it sends first meets the removed trip open. **The price, named:** removing a trip dated before a check that
+  does not see the removal, and a start of the next trip it sends first meets the removed trip open.
+  **The account of a trip is a write of its own** (`payment`, `PUT /trips/:id/payment`, MOL-123 Р-3),
+  from the summary in «Деньги»: behind the trip's start, whole each time, 404 done. A new one goes
+  last and takes the place of none — the earlier one still waiting leaves — because the server takes
+  «списано» off at any change of the trip's money (Р-32 MOL-115) and one typed after a price change
+  must reach it after that change (adversarial К). It is mirrored under `molvia.trip-payments(-rejected)`,
+  as the marks are, since the version before it knows the marks and writes their mirror back; every
+  mirrored write keeps the key it stood after as well as before, so a write behind it given a new key
+  by an older window does not send it to the head (adversarial Л). **The price, named** (review 30):
+  a `payment` waits behind a start held for an answer — another trip open, a missing context — with
+  no timer, and a check over that trip says «пересчитаем» until the person answers on «Поход». **The price, named:** removing a trip dated before a check that
   came out even moves the balance with no reason the check can name, as a removed spending does.
 
 ## The settings, and the geography a trip names (MOL-65)

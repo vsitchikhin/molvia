@@ -8,6 +8,9 @@ paths:
   - 'backend/tests/money-accounts*.ts'
   - 'backend/drizzle/*money_accounts*.sql'
   - 'frontend/src/**/*{Account,account}*'
+  - 'frontend/src/components/{ReconcileSheet,UnassignedSheet,ChargedField,HeldFromAccounts}.vue'
+  - 'frontend/src/components/{OperationRow,OperationSheet,OperationIncomeSheet,OperationExchangeSheet}.vue'
+  - 'e2e/accounts.spec.ts'
 ---
 
 # Money: accounts, balances and checks
@@ -119,3 +122,69 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   the difference is still in «не попали» until a check comes out even; and every read counts the
   owner's whole life, a rate per day of a foreign amount — measured at 81 ms on two years of daily
   spending and sixty exchanges (adversarial Д8), accepted.
+
+## «Счета» on the phone (MOL-123)
+
+The handoff of MOL-116 whole: a card on top of «Деньги», the page `/money/accounts`, one account at
+`/money/accounts/:accountId`, the sheet of an account, the check, and the choice of an account in the
+sheets of a spending, an income, an exchange and a trip's summary. The phone adds nothing up; every
+balance, total and difference is the server's.
+
+- **One store for every screen that shows or picks an account** (`stores/accounts`, Р-1): the card,
+  the page, three sheets and the cards of exchanges and incomes read the same page. It is kept per
+  owner under `molvia.accounts` — the page with its `countedAt`, the «на 14:05» of offline, and the
+  first page of the journals of the three accounts opened last — read back by the strict codecs. A
+  write of an account answers with the page whole and is taken over any read still on its way; a
+  landing of either queue reads it again — for a trip, any write that landed (`wrote`), since a
+  price added, changed or removed moves the balance of the account the trip is on (adversarial И).
+- **A screen asks the page every time it is shown** (adversarial А): the page kept from an earlier
+  launch is no answer, and an account's screen took its balance from it over a fresh journal. The
+  balance is the newer answer's — the page once it answered in this session, else the journal.
+- **A row of an account's journal carries the `revision` of its operation** (Р-2): a spending is
+  amended from the journal, from «не попали» and from a check — offline too, through its queue.
+  Exchanges and incomes open from their own lists: they need the connection they are written with.
+  One component opens a row in its own sheet everywhere (`OperationSheet`), where the account is also
+  changed; the rows are `OperationRow`, not an extended `SpendingRow` — another shape of data. A trip
+  whose removal waits in the queue is shown in no journal, «не попали» or check (MOL-76).
+- **The default is the screen's** (`defaultAccount`, `useAccountChoice`): the first live account of
+  the operation's currency in the order of «Счета», following the currency until chosen by hand;
+  an amendment opens on the account it was written with, a removed one too; a removed account is
+  never offered. An amendment on an account this phone does not know sends its «Списано» back as it
+  was, and an income or an exchange moved to another currency leaves an account that cannot hold it
+  for the default. No account at all — no row. An income and an exchange offer only their own
+  currency and never «Списано»; a spending and a trip offer the others with «Списано» under the row.
+- **The check asks the fact first and shows nothing of the count until the server answers** — not in
+  text, not in `aria`; the result is said through the app's live region and takes the focus. The
+  same fact goes again under the same name, also after an answer that never came (Р-19). A reason
+  is put right in its own sheet over the check, and the same check is sent again **once nothing put
+  right is still waiting** — no spending and no account of a trip in either queue: «some queue
+  landed» recounted before the trip's account did, and «Записать разницу» wrote the same money twice
+  (review 15, adversarial В). A reason removed from its sheet is offered back in the check and in «не
+  попали», where the person is. Only the newest answer is taken: a recount landing after «Ввести
+  другую сумму» does not take the sheet back. A recount that failed leaves the difference stale with
+  «Повторить»; offline is a yellow line, never red.
+- **«Записать разницу»** writes the server's `difference` as «Прочее» with the note «сверка» — read
+  back as «Прочее · сверка» in either language. **Below zero**: a spending through its queue, named
+  once per answer, and the same check once more after that spending has landed, kept in the store
+  by the spending's name, so a closed sheet or another stuck spending neither loses nor holds it (В-5
+  MOL-115); a reload before the landing loses the repeat. **Above zero**: the sheet of an income,
+  filled — the sum, «Прочее», «сверка», the account and the day — which the person saves, answering
+  «сколько было до» (owner's decision В-5 of MOL-123): an income written without it is a link that
+  sets the price of the whole currency to the bank's (MOL-66 В-1), and it re-priced the person's rate.
+- **An account is written with a connection only**, as an exchange: no queue, named once per opening
+  of its sheet, and a 409 on a new one goes on as an amendment of the same account. The sheet decides
+  «amend or new» by the account it was opened on, never by whether the page holds it (review 23):
+  opened cold, a rename made a second account. An amendment goes over the version the form was
+  filled from; a refused currency (an operation came meanwhile) goes back to the account's own. Its
+  outcome is told once the sheet is away, and «Удалить» or «Убрать» on the account's own screen then
+  step back to «Счета» a task later — stepped inside the pop that closed the sheet, the step was lost.
+  «Вернуть» of a deleted account goes with the answer, never with the tap; 404 is «too late».
+- **A removed account's screen says so and offers «Вернуть» where «Сверить» stands** (owner's decision
+  В-2); its sheet offers no «Убрать». «Все ›» stands while there is any account, a removed one too.
+- **«По счетам на …: … · Подставить» under «сколько было до»** (owner's decision В-3): the server's sum
+  of the accounts of the currency (Р-20 MOL-115), put in by a tap only; nothing below zero; no
+  answer, no line.
+- **The prices, named:** the journal of an account cannot say «и ещё N операций» — the server answers
+  a cursor, not a count; the names on the cards of exchanges and incomes are the accounts' names now;
+  the sheets of an income and an exchange over a check open once their list has answered, not on the
+  tap itself.

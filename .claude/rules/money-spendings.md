@@ -119,7 +119,10 @@ nothing up.
   a send of its record has begun, the removal goes to the server and 404 on it is done; «Вернуть»
   then takes the removal back while it waits, or asks the server to restore, never writing the
   spending anew. **A record the server already holds with other fields is this phone's own**, so a
-  409 on a record goes on as an amendment over revision 1.
+  409 on a record goes on as an amendment over revision 1. **Every fold carries the account and
+  «списано»** (MOL-123, Р-4): left out of an amendment the server keeps the account it had (Р-26
+  MOL-115), so a fold that dropped them sent the spending back onto its old account; and once the
+  owner has an account the sheets send it always, «без счёта» as an explicit `null`.
 - **A spending in the queue is a row, never a figure** (requirements Р-3; the handoff asked
   otherwise and this rule wins): «Отправляем…» at the top of its day, «Правка отправляется» on an
   amended row whose figures stay the server's, a removed row hidden — unless «Вернуть» stands
