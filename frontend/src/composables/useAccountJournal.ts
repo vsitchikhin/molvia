@@ -56,13 +56,14 @@ export function useAccountJournal(accountId: Ref<string>): AccountJournal {
     const id = accountId.value
     if (!owner) return
     const mine = ++latest
-    const wanted = pages
     try {
       const first = await api.accountJournal(id)
       // Kept only when it is the newest answer: a late one must not overwrite a fresher memory.
       if (actor.id === owner && mine === latest) rememberJournal(owner, first)
       let answer = first
-      for (let page = 1; page < wanted && answer.cursor; page++) {
+      // As many pages as are open when the pages come — a next page that landed during this read
+      // counts, or it vanished from under the finger (review 28).
+      for (let page = 1; page < pages && answer.cursor; page++) {
         const next = await api.accountJournal(id, answer.cursor)
         answer = { ...next, rows: [...answer.rows, ...next.rows] }
       }
@@ -111,7 +112,7 @@ export function useAccountJournal(accountId: Ref<string>): AccountJournal {
     void load()
   })
   watch(
-    () => [spendings.landed, trips.landed],
+    () => [spendings.landed, trips.wrote],
     () => void load(),
   )
   // A write of the account itself answers with the page, not the journal: its start may have moved.

@@ -361,14 +361,23 @@ function withMarks(queue: Kept[], key: string, holds: (write: QueuedWrite) => bo
     if (!isRecord(item) || typeof item.key !== 'string') return []
     const write = decode(item.write)
     const before = typeof item.before === 'string' ? item.before : null
-    return write && holds(write) ? [{ key: item.key, write, before }] : []
+    const after = typeof item.after === 'string' ? item.after : null
+    return write && holds(write) ? [{ key: item.key, write, before, after }] : []
   })
   const lost = marks.filter((mark) => !queue.some((item) => item.key === mark.key))
   if (lost.length === 0) return queue
   const result = [...queue]
   for (const mark of lost) {
-    const at = mark.before === null ? -1 : result.findIndex((item) => item.key === mark.before)
     const kept = { key: mark.key, write: mark.write }
+    // After the write it followed, while that is still waiting: a key gone from behind it is no
+    // proof it was sent — an older window gives a corrected or undone write a new key, and the
+    // mark jumped to the head, ahead of a price change it followed (adversarial Л).
+    const previous = mark.after === null ? -1 : result.findIndex((item) => item.key === mark.after)
+    if (previous !== -1) {
+      result.splice(previous + 1, 0, kept)
+      continue
+    }
+    const at = mark.before === null ? -1 : result.findIndex((item) => item.key === mark.before)
     if (mark.before === null) result.push(kept)
     else if (at === -1) result.unshift(kept)
     else result.splice(at, 0, kept)
@@ -384,7 +393,18 @@ function marksOf(queue: readonly Kept[], holds: (write: QueuedWrite) => boolean)
       // The next write every older version can read: a window older than both mirrors drops the
       // marks and the payments alike, and a key it never had is no place to come back to (review 9).
       const next = queue.slice(index + 1).find((later) => !isMirrored(later.write))
-      return [{ key: item.key, write: encode(item.write), before: next?.key ?? null }]
+      const previous = queue
+        .slice(0, index)
+        .reverse()
+        .find((earlier) => !isMirrored(earlier.write))
+      return [
+        {
+          key: item.key,
+          write: encode(item.write),
+          before: next?.key ?? null,
+          after: previous?.key ?? null,
+        },
+      ]
     }),
   )
 }
@@ -580,6 +600,12 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
    * has moved.
    */
   const landed = ref(0)
+  /**
+   * Raised when any write of a trip has landed (MOL-123, adversarial И): a priced purchase added,
+   * a price changed or a purchase removed moves the balance of the account the trip is on, and
+   * «Счета», a journal and «не попали» read again by it. `landed` stays what the month reads by.
+   */
+  const wrote = ref(0)
   /**
    * The trip removed last on this phone, for the strip's «Вернуть» (MOL-76). In the store, not on
    * a screen: a finished trip is removed from its own screen, and the strip stands on the one the
@@ -853,6 +879,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       if (!refusal && isMirrored(head.write)) {
         landed.value += 1
       }
+      if (!refusal) wrote.value += 1
       sync(owner)
       // A write of a trip removed while it was out is news about nothing the person still has.
       const gone = kept.some(
@@ -1062,7 +1089,20 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         )
       }
     }
-    const replaceable = entry.kind !== 'update' && entry.kind !== 'remove'
+    // The account of a trip goes last, never into the place of an earlier one (adversarial К): the
+    // server takes «списано» off at any change of the trip's money (Р-32), so one typed after a
+    // price was changed must reach it after that change. The earlier one still waiting says less
+    // and goes; one already in the air is left to land.
+    if (entry.kind === 'payment') {
+      const paid = entry
+      kept = kept.filter(
+        (item) =>
+          item.write === inFlight ||
+          !(item.write.kind === 'payment' && sameWrite(item.write, paid)),
+      )
+    }
+    const replaceable =
+      entry.kind !== 'update' && entry.kind !== 'remove' && entry.kind !== 'payment'
     const at = replaceable ? kept.findIndex((item) => sameWrite(item.write, entry)) : -1
     if (at === -1) {
       kept = [...kept, { key: newKey(), write: entry }]
@@ -1340,6 +1380,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     restoreTrip,
     removing,
     landed,
+    wrote,
     lastRemoved,
     orphaned,
     /** The strip ran out: the removal stays, only the offer goes. */

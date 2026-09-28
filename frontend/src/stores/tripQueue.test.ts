@@ -2102,6 +2102,64 @@ describe('trip queue', () => {
       expect(fresh().pending.map((write) => write.kind)).toEqual(['payment', 'add'])
     })
 
+    it('новая оплата встаёт за правкой цены, а не на место прежней (К)', async () => {
+      payTrip.mockRejectedValue(offline())
+      updateExpense.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(payment(CARD))
+      queue.enqueue({
+        kind: 'update',
+        tripId: TRIP,
+        expenseId: MILK,
+        patch: { amount: parseMoney('600', 'AMD') },
+      })
+      queue.enqueue({ kind: 'payment', tripId: TRIP, body: { accountId: CARD, debited: null } })
+      await settled()
+      // «Списано» that goes before a price change is taken off by the server (Р-32 MOL-115).
+      expect(queue.pending.map((write) => write.kind)).toEqual(['update', 'payment'])
+    })
+
+    it('окно прежней версии правит запись за оплатой — оплата остаётся за той, что шла до неё (Л)', async () => {
+      payTrip.mockRejectedValue(offline())
+      updateExpense.mockRejectedValue(offline())
+      addExpense.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue({
+        kind: 'update',
+        tripId: TRIP,
+        expenseId: MILK,
+        patch: { amount: parseMoney('600', 'AMD') },
+      })
+      queue.enqueue(payment(CARD))
+      queue.enqueue(add(BREAD))
+      await settled()
+      // The older window drops the payment and gives the purchase behind it a new key.
+      const held = JSON.parse(localStorage.getItem(QUEUE) ?? '[]') as {
+        key: string
+        write: { kind: string }
+      }[]
+      localStorage.setItem(
+        QUEUE,
+        JSON.stringify(
+          held
+            .filter((item) => item.write.kind !== 'payment')
+            .map((item) => (item.write.kind === 'add' ? { ...item, key: 'rekeyed' } : item)),
+        ),
+      )
+      window.dispatchEvent(new StorageEvent('storage', { key: QUEUE }))
+      expect(queue.pending.map((write) => write.kind)).toEqual(['update', 'payment', 'add'])
+    })
+
+    it('любая дошедшая запись похода поднимает wrote — остаток счёта сдвинулся (И)', async () => {
+      addExpense.mockResolvedValue({ trip: answer('520'), created: true })
+      const queue = fresh()
+      const before = queue.wrote
+      queue.enqueue(add(BREAD))
+      await queue.flush()
+      expect(queue.wrote).toBe(before + 1)
+      expect(queue.landed).toBe(0)
+    })
+
     it('поход, которого больше нет, — не отказ: класть счёт некуда', async () => {
       payTrip.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'trip'))
       const queue = fresh()

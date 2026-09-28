@@ -189,7 +189,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     },
   )
   watch(
-    () => [spendings.landed, trips.landed],
+    () => [spendings.landed, trips.wrote],
     () => {
       settleRepeats()
       if (shown.value || failure.value) void refresh()
