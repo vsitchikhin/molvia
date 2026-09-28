@@ -110,7 +110,7 @@ export interface MoneyMonth {
    * «Остаток» (MOL-134): what the accounts held at the end of the month, in the income currency —
    * null where no account had started by then. `accountsFrom` is the earliest start of a live
    * account, null when there is none: «Счета начинаются 16 сент.»; with none, «Завести счёт» — unless
-   * every account there is was removed (`accountsRemoved`), when the way is «Вернуть» (review 4).
+   * every account there is was removed (`accountsRemoved`), when the way is «Вернуть» (self-review 4).
    */
   readonly rest: MonthRest | null
   readonly accountsFrom: string | null
@@ -131,16 +131,25 @@ export interface MonthRest {
   readonly total: Money
   readonly spendable: Money
   /**
-   * The accounts nothing converts, each on its own and in its own currency, never a zero (п. 5) —
-   * the savings marked, since only «всего» misses those: summed into one figure per currency, savings
-   * and a card in debt cancelled out and «не посчитано: 0 €» stood under both (adversarial А).
+   * The accounts nothing converts, each on its own, by name and in its own currency, never a zero
+   * (п. 5) — the savings marked, since only «всего» misses those: summed into one figure per
+   * currency, savings and a card in debt cancelled out and «не посчитано: 0 €» stood under both
+   * (adversarial А). An empty account is in no figure, and so in none of these (adversarial Д).
    */
-  readonly uncounted: readonly { readonly balance: Money; readonly savings: boolean }[]
+  readonly uncounted: readonly MonthRestUncounted[]
   /**
-   * Operations on those accounts no rate counted: in no balance, which «Счета» says of each account
-   * and the month must say too — the figure looked whole in this month and every one after (Б).
+   * Operations no rate counted, for each figure: in no balance, which «Счета» says of each account
+   * and the month must say too — the figure looked whole in this month and every one after
+   * (adversarial Б). Two numbers, as the figures are two: one of the savings is missing from «всего»
+   * alone (adversarial Е).
    */
-  readonly operationsUncounted: number
+  readonly operationsUncounted: { readonly total: number; readonly spendable: number }
+}
+
+export interface MonthRestUncounted {
+  readonly name: string
+  readonly balance: Money
+  readonly savings: boolean
 }
 
 /**
@@ -150,6 +159,7 @@ export interface MonthRest {
  */
 export interface MonthHeld {
   readonly balances: readonly {
+    readonly name: string
     readonly balance: Money
     readonly savings: boolean
     /** Its operations no rate counted (`accountBalance`). */
@@ -227,27 +237,36 @@ function restOf(held: MonthHeld | undefined, currency: Currency): MonthRest | nu
     const accounts = byCurrency.get(code) ?? []
     const sum = (pick: (entry: MonthHeld['balances'][number]) => boolean) =>
       accounts.filter(pick).reduce((minor, entry) => minor + entry.balance.minor, 0n)
-    const all = sum(() => true)
-    const own = sum((entry) => !entry.savings)
-    const allIn = holds(all) ? held.inIncome({ minor: all, currency: code }) : null
-    const ownIn = holds(own) ? held.inIncome({ minor: own, currency: code }) : null
-    if (
-      allIn === null ||
-      ownIn === null ||
-      !holds(total + allIn.minor) ||
-      !holds(spendable + ownIn.minor)
-    ) {
-      uncounted.push(...accounts.map(({ balance, savings }) => ({ balance, savings })))
+    // Nothing is nothing in any currency, and needs no rate (adversarial Д).
+    const into = (minor: bigint): bigint | null =>
+      minor === 0n
+        ? 0n
+        : holds(minor)
+          ? (held.inIncome({ minor, currency: code })?.minor ?? null)
+          : null
+    const all = into(sum(() => true))
+    const own = into(sum((entry) => !entry.savings))
+    if (all === null || own === null || !holds(total + all) || !holds(spendable + own)) {
+      uncounted.push(
+        ...accounts
+          .filter(({ balance }) => balance.minor !== 0n)
+          .map(({ name, balance, savings }) => ({ name, balance, savings })),
+      )
       continue
     }
-    total += allIn.minor
-    spendable += ownIn.minor
+    total += all
+    spendable += own
   }
+  const operations = (pick: (entry: MonthHeld['balances'][number]) => boolean) =>
+    held.balances.filter(pick).reduce((count, entry) => count + entry.uncounted, 0)
   return {
     total: { minor: total, currency },
     spendable: { minor: spendable, currency },
     uncounted,
-    operationsUncounted: held.balances.reduce((count, entry) => count + entry.uncounted, 0),
+    operationsUncounted: {
+      total: operations(() => true),
+      spendable: operations((entry) => !entry.savings),
+    },
   }
 }
 

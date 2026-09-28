@@ -388,11 +388,18 @@ describe('«Остаток» — деньги на счетах на конец 
           ? convertSigned(balance, rate('USD', 'RUB', '86'))
           : null
   const held = (
-    balances: { balance: string; savings?: boolean; minor?: bigint; uncounted?: number }[],
+    balances: {
+      balance: string
+      savings?: boolean
+      minor?: bigint
+      uncounted?: number
+      name?: string
+    }[],
     accountsFrom: string | null = '2026-09-16',
     accountsRemoved = false,
   ): MonthHeld => ({
-    balances: balances.map(({ balance, savings = false, minor, uncounted = 0 }) => ({
+    balances: balances.map(({ balance, savings = false, minor, uncounted = 0, name }) => ({
+      name: name ?? `Счёт ${balance}`,
       balance: minor === undefined ? toMoney(balance) : money(minor, toMoney(balance).currency),
       savings,
       uncounted,
@@ -414,7 +421,7 @@ describe('«Остаток» — деньги на счетах на конец 
       total: toMoney('783425 RUB'),
       spendable: toMoney('46405 RUB'),
       uncounted: [],
-      operationsUncounted: 0,
+      operationsUncounted: { total: 0, spendable: 0 },
     })
     expect(result.accountsFrom).toBe('2026-09-16')
   })
@@ -431,13 +438,16 @@ describe('«Остаток» — деньги на счетах на конец 
 
   it('says a balance nothing converts apart in its own currency, never as a zero (п. 5)', () => {
     const result = month({
-      held: held([{ balance: '100 RUB' }, { balance: '8470 EUR', savings: true }]),
+      held: held([
+        { balance: '100 RUB' },
+        { balance: '8470 EUR', savings: true, name: 'Евро дома' },
+      ]),
     })
     expect(result.rest).toEqual({
       total: toMoney('100 RUB'),
       spendable: toMoney('100 RUB'),
-      uncounted: [{ balance: toMoney('8470 EUR'), savings: true }],
-      operationsUncounted: 0,
+      uncounted: [{ name: 'Евро дома', balance: toMoney('8470 EUR'), savings: true }],
+      operationsUncounted: { total: 0, spendable: 0 },
     })
   })
 
@@ -445,24 +455,39 @@ describe('«Остаток» — деньги на счетах на конец 
     const result = month({
       held: held([
         { balance: '1000 RUB' },
-        { balance: '100 EUR', savings: true },
-        { balance: '1 EUR', minor: -10000n },
+        { balance: '100 EUR', savings: true, name: 'Евро дома' },
+        { balance: '1 EUR', minor: -10000n, name: 'Евро-карта' },
       ]),
     })
     expect(result.rest?.uncounted).toEqual([
-      { balance: toMoney('100 EUR'), savings: true },
-      { balance: money(-10000n, 'EUR'), savings: false },
+      { name: 'Евро дома', balance: toMoney('100 EUR'), savings: true },
+      { name: 'Евро-карта', balance: money(-10000n, 'EUR'), savings: false },
     ])
   })
 
-  it('counts the operations no rate counted, as «Счета» says of each account (Б)', () => {
+  it('counts the operations no rate counted for each figure: the savings miss «всего» only (Б, Е)', () => {
     const result = month({
       held: held([
         { balance: '100 RUB', uncounted: 1 },
-        { balance: '5 RUB', uncounted: 2 },
+        { balance: '5 RUB', uncounted: 2, savings: true },
       ]),
     })
-    expect(result.rest?.operationsUncounted).toBe(3)
+    expect(result.rest?.operationsUncounted).toEqual({ total: 3, spendable: 1 })
+  })
+
+  it('needs no rate for an empty account, and never names one as «не посчитано: 0 €» (Д)', () => {
+    const result = month({
+      held: held([{ balance: '1000 RUB' }, { balance: '0 EUR', name: 'Евро-кошелёк' }]),
+    })
+    expect(result.rest).toMatchObject({ total: toMoney('1000 RUB'), uncounted: [] })
+    // A currency that cannot be counted names its accounts with money, not the empty ones.
+    const mixed = month({
+      held: held([
+        { balance: '0 EUR', name: 'Пустой' },
+        { balance: '50 EUR', name: 'Кошелёк' },
+      ]),
+    })
+    expect(mixed.rest?.uncounted.map((entry) => entry.name)).toEqual(['Кошелёк'])
   })
 
   it('converts one sum per currency: the same money on one account or two is the same rest (В)', () => {
@@ -482,9 +507,9 @@ describe('«Остаток» — деньги на счетах на конец 
       ]),
     })
     expect(result.rest?.total).toEqual(toMoney('20 RUB'))
-    expect(result.rest?.uncounted).toEqual([
-      { balance: money(5n * 10n ** 18n, 'RUB'), savings: false },
-      { balance: money(5n * 10n ** 18n, 'RUB'), savings: false },
+    expect(result.rest?.uncounted.map((entry) => entry.balance)).toEqual([
+      money(5n * 10n ** 18n, 'RUB'),
+      money(5n * 10n ** 18n, 'RUB'),
     ])
   })
 

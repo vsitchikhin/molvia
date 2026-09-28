@@ -223,6 +223,7 @@ export interface MolviaClient {
   /**
    * «Деньги» (MOL-73): one month counted by the server, and one page of its journal after
    * `cursor` — the key of the last row shown. A month that is not one answers `error.not_found`.
+   * A page after `cursor` carries no «Остаток» (MOL-134): take it from the first page.
    */
   moneyMonth(month: string, cursor?: JournalKey): Promise<MoneyMonthView>
   /** «Зарплата с … числа — в следующий месяц» (MOL-134): `day` null is off. */

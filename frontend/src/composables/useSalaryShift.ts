@@ -64,7 +64,7 @@ export function useSalaryShift(): SalaryShiftState {
     } catch {
       day.value = shown
       // Offline or failed is decided after the failure (MOL-19, A1): a connection that dropped while
-      // the answer was on its way is the grey «без связи», never the red «не сохранилось» (review 7).
+      // the answer was on its way is the grey «без связи», never the red «не сохранилось» (self-review 7).
       online.value = navigator.onLine
       saveFailed.value = online.value
     } finally {

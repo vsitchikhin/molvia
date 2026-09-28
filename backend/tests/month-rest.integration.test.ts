@@ -121,7 +121,7 @@ describe('«Остаток» — деньги на счетах на конец 
       total: rub(20000),
       spendable: rub(10000),
       uncounted: [],
-      operationsUncounted: 0,
+      operationsUncounted: { total: 0, spendable: 0 },
     })
     expect(march.accountsFrom).toBe('2025-03-10')
   })
@@ -174,12 +174,16 @@ describe('«Остаток» — деньги на счетах на конец 
   it('счёт, который нечем пересчитать, — «не посчитано» в своей валюте, не ноль (п. 5)', async () => {
     const me = await owner()
     await account(me, 'RUB', '1000')
-    await account(me, 'EUR', '8470', { savings: true })
+    await account(me, 'EUR', '8470', { savings: true, name: 'Евро дома' })
+    await account(me, 'EUR', '0', { name: 'Евро-кошелёк' })
     expect((await month(me, '2025-03')).rest).toEqual({
       total: rub(1000),
       spendable: rub(1000),
-      uncounted: [{ balance: { minor: 847000n, currency: 'EUR' }, savings: true }],
-      operationsUncounted: 0,
+      // An empty account needs no rate and is named nowhere (adversarial Д).
+      uncounted: [
+        { name: 'Евро дома', balance: { minor: 847000n, currency: 'EUR' }, savings: true },
+      ],
+      operationsUncounted: { total: 0, spendable: 0 },
     })
   })
 
@@ -188,9 +192,25 @@ describe('«Остаток» — деньги на счетах на конец 
     const card = await account(me, 'AMD', '41000')
     await spend(me, '10', '2025-03-20', card, 'EUR')
     const march = await month(me, '2025-03')
-    expect(march.rest).toMatchObject({ total: rub(10000), operationsUncounted: 1 })
+    expect(march.rest).toMatchObject({
+      total: rub(10000),
+      operationsUncounted: { total: 1, spendable: 1 },
+    })
     // The next month carries the same account, and says the same.
-    expect((await month(me, '2025-04')).rest).toMatchObject({ operationsUncounted: 1 })
+    expect((await month(me, '2025-04')).rest).toMatchObject({
+      operationsUncounted: { total: 1, spendable: 1 },
+    })
+  })
+
+  it('операция без курса на сбережениях не метит «без сбережений» (адверсариальный Е)', async () => {
+    const me = await owner()
+    await account(me, 'RUB', '1000')
+    const savings = await account(me, 'AMD', '41000', { savings: true })
+    await spend(me, '10', '2025-03-20', savings, 'EUR')
+    expect((await month(me, '2025-03')).rest).toMatchObject({
+      spendable: rub(1000),
+      operationsUncounted: { total: 1, spendable: 0 },
+    })
   })
 
   it('закрытый месяц считает счета в валюте трат по замороженному курсу, а не по новому (№6)', async () => {

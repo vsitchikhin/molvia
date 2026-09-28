@@ -91,15 +91,25 @@ export const moneyMonthCodec = z.strictObject({
   shiftedOut: z.array(exchangeDaySchema),
   /**
    * «Остаток» (MOL-134): the accounts at the end of the month in the income currency, everything and
-   * without the savings, and what nothing converts in its own currency; null before any account had
-   * started. `accountsFrom` — the earliest start of a live account, null when there is none.
+   * without the savings, and what nothing converts — by account, in its own currency — and how many
+   * operations no rate counted, for each figure; null before any account had started.
+   * `accountsFrom` — the earliest start of a live account, null when there is none.
+   *
+   * **The first page only.** A page after `cursor` carries no rest: `rest` and `accountsFrom` are
+   * null and `accountsRemoved` false there whatever the accounts are — the figures of the month are
+   * the first page's, never «no accounts» (adversarial Ж, self-review 10).
    */
   rest: z
     .strictObject({
       total: signedMoneyCodec,
       spendable: signedMoneyCodec,
-      uncounted: z.array(z.strictObject({ balance: signedMoneyCodec, savings: z.boolean() })),
-      operationsUncounted: z.int().min(0),
+      uncounted: z.array(
+        z.strictObject({ name: z.string(), balance: signedMoneyCodec, savings: z.boolean() }),
+      ),
+      operationsUncounted: z.strictObject({
+        total: z.int().min(0),
+        spendable: z.int().min(0),
+      }),
     })
     .nullable(),
   accountsFrom: exchangeDaySchema.nullable(),
@@ -184,7 +194,11 @@ export function moneyMonthViewOf(
     spent: month.spent,
     spentIncome: month.spentIncome,
     income: month.income,
-    rest: month.rest && { ...month.rest, uncounted: [...month.rest.uncounted] },
+    rest: month.rest && {
+      ...month.rest,
+      uncounted: [...month.rest.uncounted],
+      operationsUncounted: { ...month.rest.operationsUncounted },
+    },
     accountsFrom: month.accountsFrom,
     accountsRemoved: month.accountsRemoved,
     rate: month.rate,

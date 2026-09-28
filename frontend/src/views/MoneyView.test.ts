@@ -51,7 +51,12 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     incomeUncounted: [],
     shiftedIn: [],
     shiftedOut: [],
-    rest: { total: rub('51212'), spendable: rub('51212'), uncounted: [], operationsUncounted: 0 },
+    rest: {
+      total: rub('51212'),
+      spendable: rub('51212'),
+      uncounted: [],
+      operationsUncounted: { total: 0, spendable: 0 },
+    },
     accountsFrom: null,
     accountsRemoved: false,
     rate: { base: 'RUB', quote: 'AMD', scaled: 4_620_000n, source: 'personal', asOf: new Date() },

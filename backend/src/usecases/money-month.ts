@@ -141,6 +141,7 @@ async function heldAt(
   const starts = live.map((account) => account.startOn).sort()
   return {
     balances: balancesOn(live, operations, last, rateOf).map(({ account, balance, uncounted }) => ({
+      name: account.name,
       balance,
       savings: account.savings,
       uncounted,
@@ -199,7 +200,7 @@ export async function moneyMonthOf(
   ])
   const { rate, kind } = await monthRate(repositories, owner, rates, month, today)
   // The next page of the journal carries no rest: the phone keeps the first page's figures, and every
-  // account with its whole history was read for nothing on each «Показать ещё» (review 3).
+  // account with its whole history was read for nothing on each «Показать ещё» (self-review 3).
   const held =
     cursor === undefined
       ? heldAt(repositories, owner, rates, month, today, rate)
