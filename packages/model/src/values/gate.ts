@@ -19,3 +19,11 @@ export const GATE_RATINGS = 5
  * someone may set later.
  */
 export const GATE_RATINGS_WINDOW_HOURS = 14 * 24
+
+/**
+ * The stop lines of the gates table in `CLAUDE.md`: gate 0.2 stops below this share of people
+ * reaching `GATE_RATINGS`, gate 0.3 below this share coming back in their fourth week — each half
+ * of it on its own. Percent, since that is how the plan states them and how they are printed.
+ */
+export const GATE_RATINGS_STOP_PERCENT = 20
+export const GATE_RETURN_STOP_PERCENT = 15

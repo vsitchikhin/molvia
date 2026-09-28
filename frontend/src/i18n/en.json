@@ -898,7 +898,7 @@
   },
   "privacy": {
     "title": "Data and privacy",
-    "revised": "Revised 26 September 2026",
+    "revised": "Revised 28 September 2026",
     "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
@@ -965,7 +965,7 @@
     },
     "erase": {
       "title": "Delete everything",
-      "text": "Send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they and the items you added to the shared catalogue stay, without your name. Saved copies may remain on your phone: to remove them, sign out in Settings, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account."
+      "text": "Send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they and the items you added to the shared catalogue stay, without your name. Saved copies may remain on your phone: to remove them, sign out in Settings, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data. It is there so that whether Molvia gets used is counted honestly."
     }
   }
 }

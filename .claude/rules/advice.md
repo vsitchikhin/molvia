@@ -4,9 +4,12 @@ paths:
   - 'packages/model/src/values/gate.ts'
   - 'packages/model/tests/{entities,contracts}/{advice,verdict}.test.ts'
   - 'backend/src/db/{verdicts,events,expenses}-repository.ts'
+  - 'backend/src/db/gates-reader.ts'
+  - 'backend/src/{gates,gates-cli}*.ts'
+  - 'bin/gates.sh'
   - 'backend/src/usecases/{advice,rate-item,amend-verdict,withdraw-verdict,pending-verdicts}*.ts'
   - 'backend/src/routes/{advice,verdicts}.ts'
-  - 'backend/tests/{advice,verdicts,ratings-gate,events,pending}*.ts'
+  - 'backend/tests/{advice,verdicts,ratings-gate,events,pending,gates-reader}*.ts'
   - 'backend/drizzle/*{events,verdict,advice}*.sql'
   - 'frontend/src/views/{AdviceView,VerdictsView}*'
   - 'frontend/src/components/{Advice*,adviceRow*,Verdict*,rating*,RatingScale*}'
@@ -90,7 +93,23 @@ last week reads as someone who failed. **A verdict counts from when the server r
 not from when the person pressed «Сохранить»: the drafts queue can hold it past the window, and
 that lowers the rate — towards «stop», the safe side, like Р-24 — accepted rather than trusting
 the device's clock, which stays out of the gates. A person deleted on request (MOL-58) leaves
-both halves of the fraction and no trace; counting deletions separately is 0.2's.
+both halves of the fraction and one number behind: `erasures`, how many of those who appeared in a
+week — a Monday in Yerevan — erased themselves, with no id, no day and no foreign key (MOL-91).
+Only how many: whether they had reached five would be one more fact about someone erased.
+
+**The gates are read by `dist/gates.js` (MOL-91)** — `make gates FROM=…` in a copy — in one
+`repeatable read, read only` transaction, over one window `--from`/`--to` for both halves: a day is
+Yerevan's and `--to` takes it in whole, a moment needs its offset. **Every share stands beside its
+`n`** — the cohort is «as many as we find», so «2 of 10» must not read as a sentence — and the stop
+lines (`GATE_RATINGS_STOP_PERCENT`, `GATE_RETURN_STOP_PERCENT`) are printed while no verdict is;
+the share is rounded down to a tenth, so 19.96 % never stands over «stop below 20» as 20.0.
+**Gate 0.3 closes its window as 0.2 does**: someone whose fourth week is not over is not in the
+cohort — counted, a person who came last week read as one who did not come back, and the more
+people arrived the harder the gate leaned towards «stop». **Time first, access after**: whoever's
+fourth week is not over is waiting, with access or without — it can still be granted — and «no
+access in week 4» is said only of a week that is over (adversarial А: judged by today's access, a
+newcomer read «no access» eighteen days early). Those waiting, those without access and the erased
+of the weeks the window touches are each a line of their own, in neither fraction.
 
 ## What «Что брать» shows, and what it refuses to (MOL-31)
 

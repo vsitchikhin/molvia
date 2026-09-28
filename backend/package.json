@@ -9,6 +9,7 @@
     "migrate": "tsx src/db/migrate-cli.ts",
     "forget": "tsx src/forget-cli.ts",
     "seed": "tsx src/seed-catalogue-cli.ts",
+    "gates": "tsx src/gates-cli.ts",
     "bundle": "node ../bin/bundle.mjs backend",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

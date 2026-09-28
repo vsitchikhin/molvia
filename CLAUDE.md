@@ -76,6 +76,9 @@ The log's writer, the cohort and both gate queries are pinned in `.claude/rules/
 - **The 0.2 gate is `VerdictRepository.reachedRatings`** (MOL-49): the one reader of `verdicts`
   without `deleted_at IS NULL`; its `from` is the release of 0.2, passed by the caller; a window
   still open is left out; a verdict counts from when the server received it.
+- **Both gates are read by `dist/gates.js`** (MOL-91), `make gates FROM=…` in a copy: `n` beside
+  every share, the stop line printed and no verdict; gate 0.3 closes its window as 0.2 does; the
+  erased leave one number, by week of arrival, in `erasures`.
 
 ## Money
 
@@ -257,7 +260,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 ### Privacy: erasure, trackers, logs — `.claude/rules/privacy.md`
 
 - **Erasure is one function**, `ErasureRepository.erase`, in one transaction; catalogue items stay
-  with `created_by` nulled and every place stays. **A new table that points at `actors` must join
+  with `created_by` nulled, every place stays, and one is added to `erasures` — a count by week of
+  arrival, no id (MOL-91). **A new table that points at `actors` must join
   erasure** — a test holds `ACTOR_REFERENCES` to every foreign key.
 - **Locks are taken in one order everywhere**: the account, then the request rows, then the owner.
 - **No third-party trackers or analytics**; any third-party script that sees data is a decision.
@@ -348,6 +352,7 @@ make down        # stop the stack, keeping the data
 make psql        # psql inside this copy's database
 make db-reset    # drop this copy's volume and start clean (DESTRUCTIVE)
 make seed        # the common names into the catalogue; YES=1 writes, without it a dry run
+make gates FROM=2026-10-05  # read gates 0.2 and 0.3; TO= optional, a day taken in whole
 make dev         # run api, pwa and bot
 make e2e         # end-to-end tests in a phone-sized browser
 make icons       # regenerate the app icons from favicon.svg

@@ -20,9 +20,9 @@ The shape worth knowing here:
   runtime image carries no `node_modules` at all: nothing to audit and nothing that can
   drift from the lockfile it was built with. It also sidesteps the fact that the workspace
   packages export TypeScript source, which a runtime image could not read. The API's image
-  carries two more files, `dist/forget.js` — the owner's fallback for erasure (MOL-58) — and
-  `dist/seed-catalogue.js` (MOL-112), since the machine has neither the source nor a published
-  database port.
+  carries three more files, `dist/forget.js` — the owner's fallback for erasure (MOL-58) —,
+  `dist/seed-catalogue.js` (MOL-112) and `dist/gates.js` (MOL-91), since the machine has neither
+  the source nor a published database port.
 - **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
   exists only for trying the stack on a laptop, where Docker Desktop has no journald.
 - **The database is copied every night, encrypted, off the machine** (MOL-70): `pg_dump` inside the

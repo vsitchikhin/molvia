@@ -22,12 +22,14 @@ The detail behind the privacy lines of `CLAUDE.md`.
   picks, verdicts with the withdrawn ones, events, expenses, trips, exchanges and incomes (MOL-40,
   MOL-66 — the person's own money), spendings, their categories and frozen rates (MOL-73), accounts
   and their checks after every operation that named one (MOL-115), login requests by Telegram id
-  — they carry no foreign key, so no cascade reaches them — and the owner. Catalogue items the
+  — they carry no foreign key, so no cascade reaches them — and the owner, adding one to
+  `erasures` for the week they appeared (MOL-91). Catalogue items the
   person added stay with `created_by` nulled, and **every place stays** (owner's decision
   24.09.2026). People erase themselves with `/delete` in the bot; the owner's fallback is
   `dist/forget.js` in the API image (`make forget` in a copy — `TG` reaches the script through the
   environment, never pasted into the recipe, where a value could close a quote and bring its own
-  `--yes`, П-3), a dry run unless `--yes`, and
+  `--yes`, П-3; and only a `TG` typed on that command line — one left in the shell erased that
+  person, MOL-91 Г), a dry run unless `--yes`, and
   **a dry run is the real run, rolled back**, so its count cannot disagree with what erasure does.
   **A new table that points at `actors` must join erasure** — a test compares every foreign key
   on `actors` with `ACTOR_REFERENCES`, and another scans every table for the erased person's uuid
@@ -46,7 +48,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   routes have no order of their own. **Cleaning expired requests skips locked rows** (Р-3): it runs
   under the one quota lock every login start takes, and waiting there for an erasure — or a dry
   run of one — holding a person's expired request closed the door to everybody. A dry run still
-  holds that one account's lock for as long as it runs. **The page and the bot name what stays in full** — the items and the shops —
+  holds that one account's lock for as long as it runs. **The page and the bot name what stays in full** — the items, the shops and the count of
+  `erasures` —
   and say that copies on the phone are out of the server's reach: nothing clears a device's
   storage for an owner the server no longer knows, since a 401 there is also an expired session.
 - **No third-party trackers or analytics, and so no cookie banner** (MOL-58). There are two
