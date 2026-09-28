@@ -398,9 +398,15 @@ export default defineComponent({
       )
     }
 
-    /** A write of a trip that moves what an account counts. */
+    /**
+     * A write of a trip that may move what an account counts: its account, its removal or return, and
+     * a purchase added, amended or removed — a priced one moves the balance of the account the trip is
+     * on and takes its «списано» off (Р-32); the sauce found at home and added the same evening was
+     * written as «Прочее» and then again with the trip (adversarial round 6, Н8). A start or a finish
+     * moves no money.
+     */
     function countsMoney({ kind }: QueuedWrite): boolean {
-      return kind === 'payment' || kind === 'delete' || kind === 'restore'
+      return kind !== 'start' && kind !== 'finish'
     }
 
     /**
@@ -443,7 +449,10 @@ export default defineComponent({
     watch(tripsHeld, (held, was) => {
       if (!was || held || !result.value) return
       recountPending.value = true
-      recountOnLanding = true
+      // Gone without being sent — a refused trip taken away in another window — leaves nothing to
+      // land: asked again at once (review, sixth pass).
+      if (landedAll()) void recount(props.open)
+      else recountOnLanding = true
     })
 
     useReconnect(() => {

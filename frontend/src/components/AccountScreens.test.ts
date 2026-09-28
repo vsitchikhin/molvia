@@ -5,7 +5,7 @@ import type { Pinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
-import { ERROR, parseMoney } from '@molvia/model'
+import { ERROR, parseMoney, parseQuantity } from '@molvia/model'
 import type {
   AccountCheckBody,
   AccountCheckResponse,
@@ -50,6 +50,8 @@ const OTHER = 'ffffffff-0000-4000-8000-00000000000d'
 const TAXI = 'eeeeeeee-0000-4000-8000-000000000001'
 const TRIP = 'eeeeeeee-0000-4000-8000-000000000002'
 const CARD = 'eeeeeeee-0000-4000-8000-000000000003'
+const SAUCE = 'eeeeeeee-0000-4000-8000-000000000004'
+const ITEM = 'eeeeeeee-0000-4000-8000-000000000005'
 /** Drams, below zero too — an account in debt, a spending out. */
 function amd(text: string) {
   const money = parseMoney(text.replace('-', ''), 'AMD')
@@ -397,6 +399,55 @@ describe('ReconcileSheet (handoff 05)', () => {
     expect(view.get('.difference').classes()).toContain('stale')
     expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
     expect(checkAccount).toHaveBeenCalledTimes(1)
+  })
+
+  it('round 6, Н8: a purchase of a trip in the queue is waited for — or, held, shuts the write', async () => {
+    checkAccount.mockResolvedValue(answer('8800', '10000'))
+    const pinia = withAccounts([cash])
+    const trips = useTripQueueStore(pinia)
+    // The sauce found at home, added to last week's trip on the cash: its answer still out.
+    trips.pending = [
+      {
+        kind: 'add',
+        tripId: TRIP,
+        entry: null,
+        body: { id: SAUCE, itemId: ITEM, quantity: parseQuantity('1', 'l'), amount: amd('1200') },
+      },
+    ]
+    const view = await reconcile(pinia)
+    await view.get('input').setValue('8800')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    expect(view.get('.difference').classes()).toContain('stale')
+    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
+
+    // Behind a question of «Поход»: not waited on, named, and nothing written over it.
+    trips.elsewhere = { tripId: TRIP, place: 'Ереван Сити', mine: 'Рынок' }
+    await button(view, en.accounts.reconcile.edit_fact)?.trigger('click')
+    await view.get('input').setValue('8800')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    expect(view.get('.difference').classes()).not.toContain('stale')
+    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
+    expect(view.text()).toContain(en.accounts.reconcile.trips_held)
+  })
+
+  it('review, sixth pass: a held write gone without being sent — the check is asked again at once', async () => {
+    checkAccount.mockResolvedValue(answer('6200', '10000'))
+    const pinia = withAccounts([cash])
+    const trips = useTripQueueStore(pinia)
+    trips.elsewhere = { tripId: TRIP, place: 'Ереван Сити', mine: 'Рынок' }
+    trips.pending = [{ kind: 'payment', tripId: TRIP, body: { accountId: cash.id, debited: null } }]
+    const view = await reconcile(pinia)
+    await view.get('input').setValue('6200')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    // Another window took the refused trip away: nothing will land.
+    checkAccount.mockResolvedValue(answer('6200', '6200'))
+    trips.pending = []
+    await flushPromises()
+    expect(checkAccount).toHaveBeenCalledTimes(2)
+    expect(view.text()).toContain(en.accounts.reconcile.match_title)
   })
 
   it('review 34: offline is said once, and goes when the connection comes back', async () => {
