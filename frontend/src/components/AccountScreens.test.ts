@@ -49,6 +49,7 @@ const OWNER = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const OTHER = 'ffffffff-0000-4000-8000-00000000000d'
 const TAXI = 'eeeeeeee-0000-4000-8000-000000000001'
 const TRIP = 'eeeeeeee-0000-4000-8000-000000000002'
+const CARD = 'eeeeeeee-0000-4000-8000-000000000003'
 /** Drams, below zero too — an account in debt, a spending out. */
 function amd(text: string) {
   const money = parseMoney(text.replace('-', ''), 'AMD')
@@ -332,7 +333,8 @@ describe('ReconcileSheet (handoff 05)', () => {
     const pinia = withAccounts([cash])
     const trips = useTripQueueStore(pinia)
     trips.elsewhere = { tripId: TRIP, place: 'Ереван Сити', mine: 'Рынок' }
-    trips.pending = [{ kind: 'payment', tripId: TRIP, body: { accountId: cash.id, debited: null } }]
+    // Another account's trip: this check is not held, and says what waits.
+    trips.pending = [{ kind: 'payment', tripId: TRIP, body: { accountId: CARD, debited: null } }]
     const view = await reconcile(pinia)
     await view.get('input').setValue('9000')
     await button(view, en.accounts.reconcile.check)?.trigger('click')
@@ -350,6 +352,32 @@ describe('ReconcileSheet (handoff 05)', () => {
     expect(view.get('.difference').classes()).toContain('stale')
     expect(view.text()).toContain(en.accounts.reconcile.recounting)
     expect(view.text()).not.toContain(en.accounts.reconcile.trips_held)
+  })
+
+  it('review 36, round 4 Н5: this account’s trip held on «Поход» — nothing written until it lands', async () => {
+    checkAccount.mockResolvedValue(answer('6200', '10000'))
+    const pinia = withAccounts([cash])
+    const trips = useTripQueueStore(pinia)
+    trips.elsewhere = { tripId: TRIP, place: 'Ереван Сити', mine: 'Рынок' }
+    trips.pending = [{ kind: 'payment', tripId: TRIP, body: { accountId: cash.id, debited: null } }]
+    const view = await reconcile(pinia)
+    await view.get('input').setValue('6200')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    // Counted without it — honest — but its money cannot become «Прочее».
+    expect(view.get('.difference').classes()).not.toContain('stale')
+    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
+    expect(view.text()).toContain(en.accounts.reconcile.trips_held_here)
+
+    // The person answers on «Поход», the account lands: the same check once more.
+    checkAccount.mockResolvedValue(answer('6200', '6200'))
+    trips.elsewhere = null
+    await flushPromises()
+    trips.pending = []
+    trips.wrote++
+    await flushPromises()
+    expect(checkAccount).toHaveBeenCalledTimes(2)
+    expect(view.text()).toContain(en.accounts.reconcile.match_title)
   })
 
   it('review 34: offline is said once, and goes when the connection comes back', async () => {
