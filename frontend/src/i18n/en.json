@@ -894,7 +894,17 @@
       "body": "We will check with the server when it returns. Your edits will stay here."
     },
     "group_account": "Account",
-    "sign_out": "Sign out"
+    "sign_out": "Sign out",
+    "group_money": "Money",
+    "salary_shift": {
+      "label": "Salary counts in the next month",
+      "day": "From which day",
+      "day_option": "from day {day}",
+      "hint": "A salary received on this day or later counts in «Came in» of the next month. The day it came in and the account balances stay as they are.",
+      "offline": "Cannot save without a connection — the switch comes back with it.",
+      "save_failed": "Not saved. Check the connection and try again.",
+      "load_error": "The setting could not be loaded."
+    }
   },
   "privacy": {
     "title": "Data and privacy",

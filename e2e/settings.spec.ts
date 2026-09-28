@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import { actorCodec, settingsOf } from '@molvia/model'
+import { actorCodec, salaryShiftSchema, settingsOf } from '@molvia/model'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -245,4 +245,36 @@ test.describe('narrow English settings', () => {
       contentType: 'image/png',
     })
   })
+})
+
+test('«зарплата — в следующий месяц» saves on the tap and stays after a reload (MOL-134)', async ({
+  page,
+}) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  const toggle = page.getByRole('switch', { name: 'Зарплата — в следующий месяц' })
+  await expect(toggle).not.toBeChecked()
+  await expect(toggle).toBeEnabled()
+  await toggle.check()
+  const day = page.getByLabel('С какого числа', { exact: true })
+  await expect(day).toHaveValue('25')
+  await day.selectOption('28')
+  // Saved by the tap, not by the form: nothing waits under «Сохранить».
+  await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
+  const headers = await asBrowser(page)
+  await expect
+    .poll(async () =>
+      salaryShiftSchema.parse(
+        await (await page.request.get('/api/actors/me/salary-shift', { headers })).json(),
+      ),
+    )
+    .toEqual({ day: 28 })
+  await page.reload()
+  await expect(toggle).toBeChecked()
+  await expect(day).toHaveValue('28')
+  await toggle.uncheck()
+  await expect(day).toHaveCount(0)
 })

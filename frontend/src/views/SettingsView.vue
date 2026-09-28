@@ -58,6 +58,9 @@
         <p class="note">{{ t('settings.scope') }}</p>
       </form>
     </template>
+    <!-- Saved on the tap, beside the form and never under its «Сохранить»: the form's four fields
+         are also a trip's context (MOL-134, Н-1, В-5). -->
+    <SalaryShiftGroup class="group" />
     <!-- Outside the form's states: the way into the account does not depend on whether its
          settings loaded (MOL-57). -->
     <section class="group">
@@ -152,6 +155,7 @@ import IconLogout from '~icons/mdi/logout'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
+import SalaryShiftGroup from '@/components/SalaryShiftGroup.vue'
 import SettingsFields from '@/components/SettingsFields.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
@@ -167,6 +171,7 @@ export default defineComponent({
     AppScreen,
     AppCard,
     AppButton,
+    SalaryShiftGroup,
     SettingsFields,
     ScreenSkeleton,
     ScreenState,
