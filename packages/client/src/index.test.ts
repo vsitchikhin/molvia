@@ -1295,3 +1295,180 @@ describe('«Деньги» (MOL-82)', () => {
     ])
   })
 })
+
+describe('«Счета» (MOL-123)', () => {
+  const ACCOUNT = '5c1f8b2d-3e4a-4b6c-8d7e-9f0a1b2c3d4e'
+  const TRIP = '6d2a9c3e-4f5b-4c7d-9e8f-0a1b2c3d4e5f'
+  const cash = { amount: '190132.00', currency: 'AMD' }
+  const accountWire = {
+    id: ACCOUNT,
+    name: 'Наличные ֏',
+    currency: 'AMD',
+    savings: false,
+    start: { amount: '241530.00', currency: 'AMD' },
+    startOn: '2026-09-16',
+    balance: cash,
+    approximate: false,
+    uncounted: 0,
+    inSpend: null,
+    rate: null,
+    lastCheckedOn: null,
+    hasOperations: true,
+    archivedAt: null,
+    revision: 1,
+  }
+  const overviewWire = {
+    spendCurrency: 'AMD',
+    accounts: [accountWire],
+    totals: {
+      total: cash,
+      spendable: cash,
+      savings: { amount: '0.00', currency: 'AMD' },
+      uncounted: 0,
+    },
+    unassigned: 2,
+    countedAt: '2026-09-27T10:05:00.000Z',
+  }
+  const rowWire = {
+    kind: 'spending',
+    id: '7e3b0d4f-5a6c-4d8e-8f9a-1b2c3d4e5f6a',
+    side: null,
+    day: '2026-09-21',
+    at: '2026-09-21T09:00:00.000Z',
+    accountId: ACCOUNT,
+    amounts: [{ amount: '-3932.00', currency: 'AMD' }],
+    moved: { amount: '-3932.00', currency: 'AMD' },
+    approximate: false,
+    debited: null,
+    inBalance: true,
+    unpriced: 0,
+    revision: 2,
+    items: null,
+    categoryId: null,
+    note: 'Кофе',
+    place: null,
+    source: null,
+    counterpart: null,
+  }
+
+  function clientReplying(status: number, body: unknown) {
+    const calls: { url: string; method: string; body: unknown }[] = []
+    const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      calls.push({
+        url: input instanceof URL ? input.href : typeof input === 'string' ? input : input.url,
+        method: init?.method ?? 'GET',
+        body: typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined,
+      })
+      return Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    }
+    return { client: createClient({ baseUrl: 'http://api', fetch }), calls }
+  }
+
+  const body = {
+    name: 'Наличные ֏',
+    currency: 'AMD' as const,
+    savings: false,
+    start: { minor: 24_153_000n, currency: 'AMD' as const },
+    startOn: '2026-09-16',
+  }
+
+  it('reads the page and tells a new account from a repeat', async () => {
+    const read = clientReplying(200, overviewWire)
+    const page = await read.client.moneyAccounts()
+    expect(page.accounts[0]?.balance).toEqual({ minor: 19_013_200n, currency: 'AMD' })
+    expect(page.countedAt).toEqual(new Date('2026-09-27T10:05:00.000Z'))
+
+    const fresh = clientReplying(201, overviewWire)
+    expect((await fresh.client.addMoneyAccount({ id: ACCOUNT, ...body })).created).toBe(true)
+    expect(fresh.calls[0]).toMatchObject({
+      method: 'POST',
+      body: { id: ACCOUNT, start: { amount: '241530.00', currency: 'AMD' } },
+    })
+    const repeat = clientReplying(200, overviewWire)
+    expect((await repeat.client.addMoneyAccount({ id: ACCOUNT, ...body })).created).toBe(false)
+  })
+
+  it('amends, removes and brings back inside its own path segment', async () => {
+    const { client, calls } = clientReplying(200, overviewWire)
+    await client.amendMoneyAccount(ACCOUNT, { revision: 1, ...body })
+    await client.removeMoneyAccount('../actors/me')
+    await client.restoreMoneyAccount(ACCOUNT)
+    expect(calls.map(({ method, url }) => `${method} ${new URL(url).pathname}`)).toEqual([
+      `PUT /money/accounts/${ACCOUNT}`,
+      'DELETE /money/accounts/..%2Factors%2Fme',
+      `POST /money/accounts/${ACCOUNT}/restore`,
+    ])
+    expect(calls[0]?.body).toMatchObject({ revision: 1 })
+  })
+
+  it('reads a journal by the key of the last row, and «не попали»', async () => {
+    const journal = clientReplying(200, { account: accountWire, rows: [rowWire], cursor: null })
+    const page = await journal.client.accountJournal(ACCOUNT, {
+      day: '2026-09-21',
+      moment: 1758445200000,
+      id: rowWire.id,
+    })
+    expect(page.rows[0]?.revision).toBe(2)
+    const url = new URL(journal.calls[0]?.url ?? '')
+    expect(url.pathname).toBe(`/money/accounts/${ACCOUNT}/journal`)
+    expect(url.searchParams.get('cursor')).toBe(`2026-09-21~1758445200000~${rowWire.id}`)
+
+    const unassigned = clientReplying(200, { rows: [{ ...rowWire, accountId: null, moved: null }] })
+    expect((await unassigned.client.unassignedOperations()).rows).toHaveLength(1)
+    expect(new URL(unassigned.calls[0]?.url ?? '').pathname).toBe('/money/accounts/unassigned')
+  })
+
+  it('sends a check and the hint of what was held', async () => {
+    const check = clientReplying(200, {
+      id: ACCOUNT,
+      checkedOn: '2026-09-26',
+      fact: { amount: '185000.00', currency: 'AMD' },
+      counted: cash,
+      difference: { amount: '-5132.00', currency: 'AMD' },
+      approximate: false,
+      since: '2026-09-16',
+      reasons: [{ kind: 'unassigned', operation: { ...rowWire, accountId: null } }],
+    })
+    const result = await check.client.checkAccount(ACCOUNT, {
+      id: ACCOUNT,
+      fact: { minor: 18_500_000n, currency: 'AMD' },
+    })
+    expect(result.difference.minor).toBe(-513_200n)
+    expect(check.calls[0]).toMatchObject({
+      method: 'POST',
+      body: { fact: { amount: '185000.00', currency: 'AMD' } },
+    })
+
+    const held = clientReplying(200, { held: null, approximate: false })
+    await held.client.accountsHeld({ currency: 'RUB', day: '2026-09-25', except: ACCOUNT })
+    const url = new URL(held.calls[0]?.url ?? '')
+    expect(url.pathname).toBe('/money/accounts/held')
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      currency: 'RUB',
+      day: '2026-09-25',
+      except: ACCOUNT,
+    })
+  })
+
+  it('puts the account of a trip whole', async () => {
+    const { client, calls } = clientReplying(200, {})
+    expect(
+      await codeOf(
+        client.payTrip(TRIP, {
+          accountId: ACCOUNT,
+          debited: { minor: 214_091n, currency: 'RUB' },
+        }),
+      ),
+    ).toBe(ISSUE.RESPONSE_INVALID)
+    expect(calls[0]).toMatchObject({
+      method: 'PUT',
+      body: { accountId: ACCOUNT, debited: { amount: '2140.91', currency: 'RUB' } },
+    })
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/trips/${TRIP}/payment`)
+  })
+})

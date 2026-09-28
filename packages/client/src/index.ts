@@ -21,6 +21,15 @@ import {
   incomeBodySchema,
   incomesResponseCodec,
   journalCursorCodec,
+  accountCheckBodySchema,
+  accountCheckCodec,
+  accountJournalCodec,
+  accountsHeldCodec,
+  moneyAccountAmendBodySchema,
+  moneyAccountBodySchema,
+  moneyAccountsCodec,
+  tripPaymentBodySchema,
+  unassignedOperationsCodec,
   moneyMonthCodec,
   monthSchema,
   spendingAmendBodySchema,
@@ -64,6 +73,16 @@ import type {
   IncomeBody,
   IncomesResponse,
   JournalKey,
+  AccountCheckBody,
+  AccountCheckResponse,
+  AccountJournalResponse,
+  AccountsHeldQuery,
+  AccountsHeldResponse,
+  MoneyAccountAmendBody,
+  MoneyAccountBody,
+  MoneyAccountsResponse,
+  TripPaymentBody,
+  UnassignedOperationsResponse,
   MoneyMonthView,
   SpendingAmendBody,
   SpendingBody,
@@ -235,6 +254,31 @@ export interface MolviaClient {
   removeSpending(id: string): Promise<void>
   /** «Вернуть»: `error.not_found` once the removal is final. */
   restoreSpending(id: string): Promise<SpendingView>
+  /**
+   * «Счета» (MOL-115): the accounts, their totals and how many operations fell out of them. Every
+   * write below answers with the page whole — which of «удалить» and «убрать» it was is the server's.
+   */
+  moneyAccounts(): Promise<MoneyAccountsResponse>
+  /** Named by the device: `created` is `false` for the same one again, `error.conflict` otherwise. */
+  addMoneyAccount(
+    body: MoneyAccountBody,
+  ): Promise<{ accounts: MoneyAccountsResponse; created: boolean }>
+  /** Whole, over the version shown: `error.conflict` when it moved on elsewhere. */
+  amendMoneyAccount(id: string, body: MoneyAccountAmendBody): Promise<MoneyAccountsResponse>
+  /** «Удалить» an account with no operations (ten minutes of «Вернуть»), «убрать» one with them. */
+  removeMoneyAccount(id: string): Promise<MoneyAccountsResponse>
+  /** «Вернуть» — a deleted one within its ten minutes, a removed one at any time. */
+  restoreMoneyAccount(id: string): Promise<MoneyAccountsResponse>
+  /** The account and one page of its journal after `cursor`, the key of the last row shown. */
+  accountJournal(id: string, cursor?: JournalKey): Promise<AccountJournalResponse>
+  /** «Не попали в остатки»: the operations with no account that could explain a difference. */
+  unassignedOperations(): Promise<UnassignedOperationsResponse>
+  /** «Сверить»: the same id and fact again count once more; another fact under it is a conflict. */
+  checkAccount(id: string, body: AccountCheckBody): Promise<AccountCheckResponse>
+  /** The hint of «сколько было до обмена» from the accounts; `held: null` when they cannot say. */
+  accountsHeld(query: AccountsHeldQuery): Promise<AccountsHeldResponse>
+  /** The account of a trip and «списано», whole each time — safe for the queue to send twice. */
+  payTrip(tripId: string, body: TripPaymentBody): Promise<TripView>
   /** The owner's categories in the order of the chips, the removed ones marked. */
   spendingCategories(): Promise<SpendingCategoriesResponse>
   /** «Добавить категорию», named by the device: `error.spending_category_taken` for a live name. */
@@ -540,6 +584,54 @@ export function createClient(options: ClientOptions): MolviaClient {
 
     restoreSpending: async (id) =>
       request(`/spendings/${segment(id)}/restore`, spendingViewCodec, { method: 'POST' }),
+
+    moneyAccounts: () => request('/money/accounts', moneyAccountsCodec),
+
+    addMoneyAccount: async (body) => {
+      const { status, data } = await exchange('/money/accounts', moneyAccountsCodec, {
+        method: 'POST',
+        body: encode(moneyAccountBodySchema, body),
+      })
+      return { accounts: data, created: status === 201 }
+    },
+
+    amendMoneyAccount: async (id, body) =>
+      request(`/money/accounts/${segment(id)}`, moneyAccountsCodec, {
+        method: 'PUT',
+        body: encode(moneyAccountAmendBodySchema, body),
+      }),
+
+    removeMoneyAccount: async (id) =>
+      request(`/money/accounts/${segment(id)}`, moneyAccountsCodec, { method: 'DELETE' }),
+
+    restoreMoneyAccount: async (id) =>
+      request(`/money/accounts/${segment(id)}/restore`, moneyAccountsCodec, { method: 'POST' }),
+
+    accountJournal: async (id, cursor) => {
+      const query = cursor
+        ? `?${new URLSearchParams({ cursor: journalCursorCodec.encode(cursor) }).toString()}`
+        : ''
+      return request(`/money/accounts/${segment(id)}/journal${query}`, accountJournalCodec)
+    },
+
+    unassignedOperations: () => request('/money/accounts/unassigned', unassignedOperationsCodec),
+
+    checkAccount: async (id, body) =>
+      request(`/money/accounts/${segment(id)}/checks`, accountCheckCodec, {
+        method: 'POST',
+        body: encode(accountCheckBodySchema, body),
+      }),
+
+    accountsHeld: async ({ currency, day, except }) => {
+      const query = new URLSearchParams({ currency, day, ...(except ? { except } : {}) })
+      return request(`/money/accounts/held?${query.toString()}`, accountsHeldCodec)
+    },
+
+    payTrip: async (tripId, body) =>
+      request(`/trips/${segment(tripId)}/payment`, tripViewCodec, {
+        method: 'PUT',
+        body: encode(tripPaymentBodySchema, body),
+      }),
 
     spendingCategories: () => request('/spending-categories', spendingCategoriesResponseCodec),
 
