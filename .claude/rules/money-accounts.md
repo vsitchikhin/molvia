@@ -57,7 +57,10 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   its «списано» off** (Р-32, adversarial Ж2) — a priced purchase added, a price changed, a priced one
   removed: the figure was what left the account for the trip as it was, and kept, it counted a
   purchase it never covered the day a dollar one was added; the check names the trip until it is
-  entered anew. **Nothing
+  entered anew. **A spending's is kept through a change of its amount** (MOL-123, by the letter of the
+  requirement — only a change of account clears it): it stands under the sum in the same sheet, where
+  a trip's is typed apart from the purchases. **The price, named:** 10 $ amended to 12 $ with the old
+  «списано» left moves the account by the old figure, and the check does not name it. **Nothing
   about it is refused** (Р-31): sent where it does not apply it is dropped, and in another currency
   than the account's it means the account is not the one the phone saw — the operation is written
   «без счёта»; a write from the queue that was refused would be lost. It moves the balance
@@ -157,12 +160,15 @@ balance, total and difference is the server's.
   text, not in `aria`; the result is said through the app's live region and takes the focus. The
   same fact goes again under the same name, also after an answer that never came (Р-19). A reason
   is put right in its own sheet over the check, and the same check is sent again **once nothing put
-  right is still waiting** — no spending and no account of a trip in either queue: «some queue
-  landed» recounted before the trip's account did, and «Записать разницу» wrote the same money twice
-  (review 15, adversarial В). A reason removed from its sheet is offered back in the check and in «не
+  right is still waiting** — no spending, no account of a trip and no removal or «Вернуть» of a trip
+  in either queue: «some queue landed» recounted before the trip's account did, and «Записать
+  разницу» wrote the same money twice (review 15, adversarial В). **Any answer that comes while
+  something waits is muted** and «Записать разницу» with it, until it lands: a trip being removed is
+  hidden from the reasons while the server still counts it, and the difference had no reason on
+  screen (review 33). A reason removed from its sheet is offered back in the check and in «не
   попали», where the person is. Only the newest answer is taken: a recount landing after «Ввести
   другую сумму» does not take the sheet back. A recount that failed leaves the difference stale with
-  «Повторить»; offline is a yellow line, never red.
+  «Повторить»; offline is one yellow line, drawn by the connection and gone with it, never red.
 - **«Записать разницу»** writes the server's `difference` as «Прочее» with the note «сверка» — read
   back as «Прочее · сверка» in either language. **Below zero**: a spending through its queue, named
   once per answer, and the same check once more after that spending has landed, kept in the store
@@ -177,7 +183,10 @@ balance, total and difference is the server's.
   opened cold, a rename made a second account. An amendment goes over the version the form was
   filled from; a refused currency (an operation came meanwhile) goes back to the account's own. Its
   outcome is told once the sheet is away, and «Удалить» or «Убрать» on the account's own screen then
-  step back to «Счета» a task later — stepped inside the pop that closed the sheet, the step was lost.
+  go to «Счета» a task later — stepped inside the pop that closed the sheet, the step was lost. Onto
+  «Счета» itself (`goUp`), never past it: a step back where it lies underneath, a replace onto it where
+  «Деньги» does — an account opened from a line of the card stepped back to «Деньги», and its
+  «Вернуть», which stands on «Счета», was nowhere (review 32).
   «Вернуть» of a deleted account goes with the answer, never with the tap; 404 is «too late».
 - **A removed account's screen says so and offers «Вернуть» where «Сверить» stands** (owner's decision
   В-2); its sheet offers no «Убрать». «Все ›» stands while there is any account, a removed one too.
