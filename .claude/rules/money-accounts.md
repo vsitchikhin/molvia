@@ -163,9 +163,11 @@ balance, total and difference is the server's.
   text, not in `aria`; the result is said through the app's live region and takes the focus. The
   same fact goes again under the same name, also after an answer that never came (Р-19). A reason
   is put right in its own sheet over the check, and the same check is sent again **once nothing put
-  right is still waiting** — no spending, no account of a trip and no removal or «Вернуть» of a trip
-  in either queue: «some queue landed» recounted before the trip's account did, and «Записать
-  разницу» wrote the same money twice (review 15, adversarial В). **Any answer that comes while
+  right is still waiting** — no spending, and no write of a trip but its start and finish (its account,
+  its removal or «Вернуть», a purchase added, amended or removed) in either queue: «some queue landed»
+  recounted before the trip's account did, and «Записать разницу» wrote the same money twice (review
+  15, adversarial В); a priced purchase added to a trip on the account the same evening was written
+  as «Прочее» and again with the trip (adversarial round 6, Н8). **Any answer that comes while
   something waits is muted** and «Записать разницу» with it, until it lands: a trip being removed is
   hidden from the reasons while the server still counts it, and the difference had no reason on
   screen (review 33); the muted difference says «пересчитаем». **Not waited on: a trip's write the
@@ -177,7 +179,8 @@ balance, total and difference is the server's.
   adversarial round 4, Н5). Any trip's, not only this account's: a payment names the account it moves
   the trip to, never the one it takes it off, and a removal names none (review 37, round 5, Н6). Once
   the write moves — answered, or the question settled by itself — the difference is muted until it
-  lands and the same check is asked again then (Н7). A reason removed from its sheet is offered back in the check and in «не
+  lands and the same check is asked again then (Н7); gone without being sent — a refused trip taken
+  away in another window — it is asked again at once. A reason removed from its sheet is offered back in the check and in «не
   попали», where the person is. Only the newest answer is taken: a recount landing after «Ввести
   другую сумму» does not take the sheet back. A recount that failed leaves the difference stale with
   «Повторить»; offline is one yellow line, drawn by the connection and gone with it, never red.
