@@ -35,6 +35,7 @@ const finishTrip = vi.fn<(tripId: string, at?: Date) => Promise<void>>()
 const currentTrip = vi.fn<() => Promise<TripView | null>>()
 const removeTrip = vi.fn<(tripId: string) => Promise<void>>()
 const restoreTrip = vi.fn<(tripId: string, finish?: unknown) => Promise<TripView>>()
+const payTrip = vi.fn<(tripId: string, body: unknown) => Promise<TripView>>()
 const me = vi.fn<() => Promise<never>>()
 vi.mock('@/api', () => ({
   api: {
@@ -49,6 +50,7 @@ vi.mock('@/api', () => ({
     removeTrip: (tripId: string) => removeTrip(tripId),
     restoreTrip: (tripId: string, finish?: unknown) =>
       finish === undefined ? restoreTrip(tripId) : restoreTrip(tripId, finish),
+    payTrip: (tripId: string, body: unknown) => payTrip(tripId, body),
   },
 }))
 
@@ -268,6 +270,7 @@ describe('trip queue', () => {
     localStorage.clear()
     sessionStorage.clear()
     addExpense.mockReset()
+    payTrip.mockReset()
     updateExpense.mockReset()
     removeExpense.mockReset()
     startTrip.mockReset()
@@ -2038,6 +2041,74 @@ describe('trip queue', () => {
       olderWindowRewrites(REJECTED)
       expect(queue.orphaned(TRIP)).toBe(true)
       expect(queue.rejected.map((item) => item.write.kind)).toEqual(['restore'])
+    })
+  })
+  describe('счёт похода (MOL-123, Р-3)', () => {
+    const CARD = 'aaaaaaaa-0000-4000-8000-000000000001'
+    const QUEUE = `molvia.trip-queue.${ME}`
+    const PAYMENTS = `molvia.trip-payments.${ME}`
+    const payment = (accountId: string | null): QueuedWrite => ({
+      kind: 'payment',
+      tripId: TRIP,
+      body: { accountId, debited: accountId ? parseMoney('2140.91', 'RUB') : null },
+    })
+
+    /** A window of the version before accounts: it reads and writes the marks, never a payment. */
+    function olderWindowRewrites(key: string): void {
+      const held = JSON.parse(localStorage.getItem(key) ?? '[]') as { write: { kind: string } }[]
+      localStorage.setItem(
+        key,
+        JSON.stringify(held.filter((item) => item.write.kind !== 'payment')),
+      )
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+    }
+
+    it('уходит после старта похода, начатого без связи, и целиком', async () => {
+      startTrip.mockRejectedValueOnce(offline())
+      const queue = fresh()
+      queue.enqueue(started(TRIP, 'Ереван Сити'))
+      queue.enqueue(payment(CARD))
+      await settled()
+      expect(payTrip).not.toHaveBeenCalled()
+      startTrip.mockResolvedValue({ trip: answer('0'), created: true })
+      payTrip.mockResolvedValue(answer('0'))
+      await queue.flush()
+      expect(payTrip).toHaveBeenCalledExactlyOnceWith(TRIP, {
+        accountId: CARD,
+        debited: parseMoney('2140.91', 'RUB'),
+      })
+      expect(queue.pending).toEqual([])
+    })
+
+    it('вторая смена счёта того же похода занимает место первой — уходит одна', async () => {
+      payTrip.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(payment(CARD))
+      queue.enqueue(payment(null))
+      await settled()
+      expect(queue.pending).toEqual([payment(null)])
+    })
+
+    it('возвращается на место, когда окно прежней версии её потеряло', async () => {
+      payTrip.mockRejectedValue(offline())
+      addExpense.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(payment(CARD))
+      queue.enqueue(add(BREAD))
+      await settled()
+      expect(localStorage.getItem(PAYMENTS)).toContain(CARD)
+      olderWindowRewrites(QUEUE)
+      expect(queue.pending.map((write) => write.kind)).toEqual(['payment', 'add'])
+      expect(fresh().pending.map((write) => write.kind)).toEqual(['payment', 'add'])
+    })
+
+    it('поход, которого больше нет, — не отказ: класть счёт некуда', async () => {
+      payTrip.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'trip'))
+      const queue = fresh()
+      queue.enqueue(payment(CARD))
+      await queue.flush()
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toEqual([])
     })
   })
 })

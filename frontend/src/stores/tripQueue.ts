@@ -9,6 +9,7 @@ import {
   finishTripBodySchema,
   isWireCode,
   startTripBodySchema,
+  tripPaymentBodySchema,
 } from '@molvia/model'
 import type {
   ActorSettings,
@@ -17,6 +18,7 @@ import type {
   ExpensePatch,
   FinishTripBody,
   StartTripBody,
+  TripPaymentBody,
   TripView,
   WireCode,
 } from '@molvia/model'
@@ -83,6 +85,12 @@ export type QueuedWrite =
        */
       readonly finish?: FinishTripBody
     }
+  /**
+   * The account of a trip and «списано», from its summary in «Деньги» (MOL-123, Р-3): whole each
+   * time, so it is safe to send twice, and queued behind the trip's start — a trip begun with no
+   * signal is not on the server yet.
+   */
+  | { readonly kind: 'payment'; readonly tripId: string; readonly body: TripPaymentBody }
 
 /**
  * What «Удалить поход» took off the phone, for «Вернуть» to put back (MOL-76): the writes of the
@@ -135,6 +143,12 @@ const REJECTED_KEY = 'molvia.trip-rejected'
  */
 const MARKS_KEY = 'molvia.trip-marks'
 const MARKS_REJECTED_KEY = 'molvia.trip-marks-rejected'
+/**
+ * The account of a trip, under keys of its own for the same reason (MOL-123): the version before
+ * it knows the marks and would write their mirror back without a kind it cannot read.
+ */
+const PAYMENTS_KEY = 'molvia.trip-payments'
+const PAYMENTS_REJECTED_KEY = 'molvia.trip-payments-rejected'
 
 /**
  * A removal of a row the server does not have is the outcome it was asked for, not a refusal
@@ -146,6 +160,8 @@ const DONE_ENOUGH: Partial<Record<QueuedWrite['kind'], readonly WireCode[]>> = {
   // The same for a trip (MOL-76): one the server never heard of — its start was still waiting,
   // or in another window's hands — or one already final is gone, which is what was asked.
   delete: [ERROR.NOT_FOUND],
+  // The account of a trip removed meanwhile: there is nothing left to put it on.
+  payment: [ERROR.NOT_FOUND],
 }
 
 /** Wire form: the bodies carry bigints, and the codecs that read them back are the contract's. */
@@ -183,6 +199,12 @@ function encode(entry: QueuedWrite): Loose {
     case 'remove':
     case 'delete':
       return { ...entry }
+    case 'payment':
+      return {
+        kind: 'payment',
+        tripId: entry.tripId,
+        body: tripPaymentBodySchema.encode(entry.body),
+      }
     case 'restore':
       return {
         kind: 'restore',
@@ -228,6 +250,10 @@ function decode(raw: unknown): QueuedWrite | null {
     return at && Number.isFinite(at.getTime()) ? { kind, tripId, finishedOnDeviceAt: at } : null
   }
   if (kind === 'delete') return { kind, tripId }
+  if (kind === 'payment') {
+    const body = tripPaymentBodySchema.safeParse(raw.body)
+    return body.success ? { kind, tripId, body: body.data } : null
+  }
   if (kind === 'restore') {
     const name = typeof raw.name === 'string' ? raw.name : ''
     if (raw.finish === undefined) return { kind, tripId, name }
@@ -308,17 +334,34 @@ function isMark(write: QueuedWrite): boolean {
   return write.kind === 'delete' || write.kind === 'restore'
 }
 
+function isPayment(write: QueuedWrite): boolean {
+  return write.kind === 'payment'
+}
+
+/**
+ * Every kind some older version cannot read, each group with the keys of its mirror. Put back in
+ * this order: a payment may stand before a mark, and the mark has to be back to be found.
+ */
+const MIRRORS = [
+  { key: MARKS_KEY, rejected: MARKS_REJECTED_KEY, holds: isMark },
+  { key: PAYMENTS_KEY, rejected: PAYMENTS_REJECTED_KEY, holds: isPayment },
+] as const
+
+function isMirrored(write: QueuedWrite): boolean {
+  return MIRRORS.some((mirror) => mirror.holds(write))
+}
+
 /**
  * The marks as the mirror keeps them, each with the key of the write it stood before (`null` — the
  * end), and put back into a queue that lost them. A mark whose write is gone has been passed by
  * the queue, so it goes first: it should have gone before that write.
  */
-function withMarks(queue: Kept[], key: string): Kept[] {
+function withMarks(queue: Kept[], key: string, holds: (write: QueuedWrite) => boolean): Kept[] {
   const marks = parsedList(key).flatMap((item: unknown) => {
     if (!isRecord(item) || typeof item.key !== 'string') return []
     const write = decode(item.write)
     const before = typeof item.before === 'string' ? item.before : null
-    return write && isMark(write) ? [{ key: item.key, write, before }] : []
+    return write && holds(write) ? [{ key: item.key, write, before }] : []
   })
   const lost = marks.filter((mark) => !queue.some((item) => item.key === mark.key))
   if (lost.length === 0) return queue
@@ -334,11 +377,11 @@ function withMarks(queue: Kept[], key: string): Kept[] {
 }
 
 /** The mirror of the marks: each with the key of the next write that is not one. */
-function marksOf(queue: readonly Kept[]): string {
+function marksOf(queue: readonly Kept[], holds: (write: QueuedWrite) => boolean): string {
   return JSON.stringify(
     queue.flatMap((item, index) => {
-      if (!isMark(item.write)) return []
-      const next = queue.slice(index + 1).find((later) => !isMark(later.write))
+      if (!holds(item.write)) return []
+      const next = queue.slice(index + 1).find((later) => !holds(later.write))
       return [{ key: item.key, write: encode(item.write), before: next?.key ?? null }]
     }),
   )
@@ -409,6 +452,8 @@ function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
       return api.removeTrip(entry.tripId).then(() => null)
     case 'restore':
       return api.restoreTrip(entry.tripId, entry.finish)
+    case 'payment':
+      return api.payTrip(entry.tripId, entry.body)
   }
 }
 
@@ -450,6 +495,7 @@ function subject(write: QueuedWrite): string {
     case 'finish':
     case 'delete':
     case 'restore':
+    case 'payment':
       return write.tripId
   }
 }
@@ -527,7 +573,10 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     }
     return gone
   })
-  /** Raised when a removal or a «Вернуть» has landed: what the server counts has moved. */
+  /**
+   * Raised when a removal, a «Вернуть» or the account of a trip has landed: what the server counts
+   * has moved.
+   */
   const landed = ref(0)
   /**
    * The trip removed last on this phone, for the strip's «Вернуть» (MOL-76). In the store, not on
@@ -552,12 +601,17 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   /** What storage holds now — another window may have changed it. */
   function sync(id: string | null): void {
     if (!id || ahead) return
-    kept = withMarks(recallKept(`${QUEUE_KEY}.${id}`), `${MARKS_KEY}.${id}`)
+    kept = MIRRORS.reduce(
+      (queue, mirror) => withMarks(queue, `${mirror.key}.${id}`, mirror.holds),
+      recallKept(`${QUEUE_KEY}.${id}`),
+    )
     const refusals = recallRejected(`${REJECTED_KEY}.${id}`)
     // A refused «Вернуть» holds its trip's writes back (`orphaned`); lost by an older window, it
     // would let them go, each to earn a 404 about a trip the notice no longer names.
-    const markRefusals = recallRejected(`${MARKS_REJECTED_KEY}.${id}`).items.filter(
-      (item) => isMark(item.write) && !refusals.items.some((held) => held.key === item.key),
+    const markRefusals = MIRRORS.flatMap((mirror) =>
+      recallRejected(`${mirror.rejected}.${id}`).items.filter(
+        (item) => mirror.holds(item.write) && !refusals.items.some((held) => held.key === item.key),
+      ),
     )
     rejected.value = [...refusals.items, ...markRefusals]
     show()
@@ -592,16 +646,18 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     )
     // The mirrors go after the queue: a window reading in between sees a mark in the queue and not
     // yet in the mirror, which is only a mark it already has.
-    writeEverywhere(`${MARKS_KEY}.${id}`, marksOf(kept), () => null)
-    writeEverywhere(
-      `${MARKS_REJECTED_KEY}.${id}`,
-      JSON.stringify(
-        rejected.value
-          .filter((item) => isMark(item.write))
-          .map((item) => ({ key: item.key, write: encode(item.write), code: item.code })),
-      ),
-      () => null,
-    )
+    for (const mirror of MIRRORS) {
+      writeEverywhere(`${mirror.key}.${id}`, marksOf(kept, mirror.holds), () => null)
+      writeEverywhere(
+        `${mirror.rejected}.${id}`,
+        JSON.stringify(
+          rejected.value
+            .filter((item) => mirror.holds(item.write))
+            .map((item) => ({ key: item.key, write: encode(item.write), code: item.code })),
+        ),
+        () => null,
+      )
+    }
     ahead = !queued || !refused
   }
 
@@ -634,9 +690,14 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     const id = actor.id
     if (
       id &&
-      [QUEUE_KEY, REJECTED_KEY, MARKS_KEY, MARKS_REJECTED_KEY].some(
-        (key) => event.key === `${key}.${id}`,
-      )
+      [
+        QUEUE_KEY,
+        REJECTED_KEY,
+        MARKS_KEY,
+        MARKS_REJECTED_KEY,
+        PAYMENTS_KEY,
+        PAYMENTS_REJECTED_KEY,
+      ].some((key) => event.key === `${key}.${id}`)
     ) {
       sync(id)
       trips.reread()
@@ -787,7 +848,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
           forget(tripId)
         }
       }
-      if (!refusal && (head.write.kind === 'delete' || head.write.kind === 'restore')) {
+      if (!refusal && isMirrored(head.write)) {
         landed.value += 1
       }
       sync(owner)

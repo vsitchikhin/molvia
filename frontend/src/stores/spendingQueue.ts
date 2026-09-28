@@ -174,14 +174,21 @@ function amendOf(revision: number, fields: SpendingFields): SpendingAmendBody {
   return { revision, ...fields }
 }
 
+/**
+ * The fields of a write, for a fold or for a record turned into an amendment. The account and
+ * «списано» travel too (MOL-123, Р-4): left out of an amendment the server keeps the account it has
+ * (Р-26 MOL-115), so a fold that dropped them sent the spending back onto its old account in silence.
+ */
 function fieldsOf(body: SpendingBody | SpendingAmendBody): SpendingFields {
-  const { spentOn, amount, categoryId, note, place } = body
+  const { spentOn, amount, categoryId, note, place, accountId, debited } = body
   return {
     spentOn,
     amount,
     categoryId,
     ...(note === undefined ? {} : { note }),
     ...(place === undefined ? {} : { place }),
+    ...(accountId === undefined ? {} : { accountId }),
+    ...(debited === undefined ? {} : { debited }),
   }
 }
 

@@ -219,6 +219,30 @@ describe('spending queue', () => {
       expect(queue.rejected).toEqual([])
     })
 
+    it('MOL-123: a fold keeps the account and «списано», and «без счёта» stays an explicit null', async () => {
+      const CARD = 'aaaaaaaa-0000-4000-8000-000000000001'
+      const debited = parseMoney('1200', 'RUB')
+      const queue = fresh('idle')
+      queue.record({ id: BARBER, ...fields(), accountId: CARD, debited })
+      queue.amend(BARBER, 1, { ...fields('6000'), accountId: CARD, debited })
+      queue.amend(RENT, 2, { ...fields('7000'), accountId: CARD })
+      queue.amend(RENT, 2, { ...fields('8000'), accountId: null })
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(recordSpending.mock.calls[0]?.[0]).toMatchObject({ accountId: CARD, debited })
+      expect(amendSpending.mock.calls[0]?.[1]).toMatchObject({ revision: 2, accountId: null })
+    })
+
+    it('MOL-123: a record turned into an amendment after 409 keeps its account', async () => {
+      const CARD = 'aaaaaaaa-0000-4000-8000-000000000001'
+      recordSpending.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'id'))
+      const queue = fresh()
+      queue.record({ id: BARBER, ...fields(), accountId: CARD })
+      await settled()
+      await queue.flush()
+      expect(amendSpending.mock.calls[0]?.[1]).toMatchObject({ revision: 1, accountId: CARD })
+    })
+
     it('Б: an amendment whose answer was lost is never folded into — the next goes over the next revision', async () => {
       amendSpending.mockImplementationOnce(offline)
       const queue = fresh()
