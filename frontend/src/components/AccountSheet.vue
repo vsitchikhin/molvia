@@ -132,8 +132,10 @@ type Kind = 'spending' | 'savings'
 
 /** What the sheet hands the screen once it has closed: which of the three it was. */
 export type AccountOutcome =
-  | { readonly kind: 'added' | 'saved'; readonly name: string }
-  | { readonly kind: 'deleted' | 'archived'; readonly id: string; readonly name: string }
+  | { readonly kind: 'added'; readonly name: string }
+  | { readonly kind: 'saved'; readonly name: string }
+  | { readonly kind: 'deleted'; readonly id: string; readonly name: string }
+  | { readonly kind: 'archived'; readonly id: string; readonly name: string }
 
 /**
  * «Новый счёт» and «Счёт» (MOL-123, handoff 03): where money lies, and what it held at the end of a
@@ -382,7 +384,8 @@ export default defineComponent({
         const answer = await api.removeMoneyAccount(account.id)
         store.accept(answer)
         const archived = answer.accounts.some(({ id }) => id === account.id)
-        finished({ kind: archived ? 'archived' : 'deleted', id: account.id, name: account.name })
+        const named = { id: account.id, name: account.name }
+        finished(archived ? { kind: 'archived', ...named } : { kind: 'deleted', ...named })
       } catch {
         failed.value = true
       } finally {

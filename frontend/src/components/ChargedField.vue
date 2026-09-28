@@ -61,7 +61,7 @@ export default defineComponent({
     const hintId = useId()
     const sign = computed(() => currencySign(props.account.currency, locale.value))
     const placeholder = computed(() =>
-      props.estimate ? asTyped(props.estimate, locale.value).replace(/\s*\D+$/u, '') : undefined,
+      props.estimate ? asTyped(props.estimate, locale.value).replace(/\s*\D+$/u, '') : '',
     )
     const hint = computed(() => {
       const filled = typedCharge(props.modelValue, props.account.currency)

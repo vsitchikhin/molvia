@@ -110,7 +110,7 @@ async function mounted(
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/money')
   const view = mount(component as never, {
-    props,
+    props: props as never,
     attachTo: document.body,
     global: { plugins: [router, pinia, createAppI18n('en')] },
   })
