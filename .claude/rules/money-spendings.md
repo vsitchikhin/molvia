@@ -6,10 +6,13 @@ paths:
   - 'backend/src/usecases/{spendings,money-month,money-rates,money}*.ts'
   - 'backend/src/routes/spendings.ts'
   - 'backend/tests/spendings*.ts'
+  - 'backend/tests/{salary-shift,month-rest}*.ts'
   - 'backend/drizzle/*spending*.sql'
   - 'frontend/src/views/Money*'
   - 'frontend/src/components/{Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*}'
   - 'frontend/src/composables/useMoneyMonth*'
+  - 'frontend/src/composables/useSalaryShift*'
+  - 'frontend/src/components/SalaryShift*'
   - 'frontend/src/stores/{spendingQueue,queueing}*'
   - 'frontend/src/days*'
   - 'e2e/money.spec.ts'
@@ -57,7 +60,7 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   trips — one line per currency, on the device's day of finishing, in «Продукты», read from the
   purchases every time so an amendment, MOL-78's receipt sum or MOL-76's removal moves it by
   itself, **each line counting the purchases behind its own sum** (owner's decision В-7) — what came
-  in, the rest, the categories and every day's total; the journal comes forty rows a page, and a
+  in, the rest (MOL-134, below), the categories and every day's total; the journal comes forty rows a page, and a
   day cut by the page keeps its whole total. **The next page starts after the key of the last row
   shown** — day, moment, name (`journalCursorCodec`) — never an offset, which moved under the page
   with every write above it (Д3). The key is the row's own, so an amendment that moves a spending
@@ -78,6 +81,39 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   a repeat of a write or an amendment lets go again, a repeat of a removal does not, since the day
   is read off a live row; an official rate reaching the cache for a past day moves the wallet of
   that month and lets nothing go.
+- **«Остаток» is the money on the accounts at the end of the month (MOL-134)**, not what came in less
+  what was spent. The owner saw «≈ −306 828 ₽» over September where the sheet said millions: the
+  roubles that bought the dollars on arrival were exchanges, not income (MOL-71), so even a running
+  sum of «пришло − потрачено» came out near −220 000 ₽, and the sheet counts its rest from a starting
+  capital — every account on the evening of 16.09, which the app already has as the accounts' starts
+  (MOL-115). So the rest is **every live account started by the month's last day, its start and its
+  operations dated up to that day** (`balancesOn`), and what is carried from month to month is
+  simply the same money. **On the last day for the running month too** (Н-3): an operation may be
+  dated tomorrow and «Потрачено» already counts it. **In the income currency, always «≈»**: the
+  spending currency by the month's own rate — the one «≈ потрачено» is counted by, frozen for a
+  closed month — any other by the rule of «Деньги» on the last day, or today while the month runs.
+  **Two figures** (owner's decision В-1): everything, and without the savings — «всего» and «можно
+  тратить» of «Счета». A balance nothing converts is said apart in its own currency, never a zero.
+  **A removed account is in no month, past ones included** (Р-2), or «Деньги» and «Счета» disagree
+  about which money there was — the price: removing an account with money thins the months behind
+  it. **Not frozen** (Р-3): an amended spending of August moves August's rest as it moves its
+  «Потрачено». An operation with no account is in no rest (Р-4) — «Счета» says «не попали». Before
+  the first account the rest is «—» with the day the accounts begin (`accountsFrom`), and with no
+  account at all «Завести счёт» (В-4). Counted for the month shown only — the month before is read
+  for «−8 %» alone (Н-6).
+- **«Пришло» may take a salary into the next month** (MOL-134, В-2, В-3): with «Зарплата — в
+  следующий месяц» on, a salary received on the chosen day or later counts in «Пришло» of the month
+  after (`budgetMonthOf`), as the owner's sheet has it — the salary of the 25th pays for the next
+  month. Only the source «зарплата»; the day of the income, the journal of «Доходы», the balances
+  and the person's own rate go by the day it came. A day the month does not have moves nothing —
+  «с 31-го» in September (Н-7). The month names the moved days both ways (`shiftedIn`,
+  `shiftedOut`), since the switch of months does not go past the running one and a salary of the
+  26th would otherwise just be missing from September. **The setting is the person's own, off by
+  default** (`actors.salary_shift_day`, 1–31 or empty), **saved on the tap** (В-5) through
+  `/actors/me/salary-shift`, never a field of the settings form: those four fields are also a trip's
+  `context` and a draft on the shelf, and `/actors/me` is read strictly by an installed app that
+  would have failed «who am I» on a new field (Н-1). It thaws nothing — a frozen month holds a rate,
+  and «Пришло» is counted on every read.
 - **Removal is the money rule, held by the server**: a mark, «Вернуть», final after ten minutes by
   the minute timer and nothing else (В-4) — no other write makes it final sooner, unlike an
   exchange's, and a spending sent again while it is marked is 409, not a new one (Д6). After the ten

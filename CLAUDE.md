@@ -211,6 +211,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The month is counted by the server**; a closed month is frozen at the rate of its last day,
   let go (`thaw`) from the day of an exchange or an income written, amended, removed or brought
   back, and let go whole by a change of the rule.
+- **«Остаток» is the money on the accounts on the evening of the month's last day** (MOL-134), in
+  the income currency, everything and without the savings — never «пришло − потрачено», and never
+  frozen. **«Пришло» may take a salary from the 25th into the next month**, by the person's own
+  setting, `actors.salary_shift_day`, kept beside the settings and never in the form of MOL-65.
 - **Removal is a mark, «Вернуть», final after ten minutes by the minute timer.**
 - **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`); a write a send
   has begun on is never folded into; a spending in the queue is a row, never a figure.

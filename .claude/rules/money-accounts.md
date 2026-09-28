@@ -84,6 +84,9 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
 - **The totals are the live accounts in the spending currency by the rule of «Деньги», always «≈»**
   — «всего», «можно тратить» without the savings, «сбережения» — and an account nothing converts today
   is left out and counted as such, never as zero.
+- **The month of «Деньги» reads the same balances for its «Остаток»** (MOL-134): `balancesOn` — the
+  live accounts started by a day, their operations up to it — through `accountsCounted`, the one
+  loading of accounts, operations and rates both screens share. A removed account is in neither.
 - **A check looks for the reason before it offers to close the difference** (MOL-43 В-4, the owner's
   comment over the option they ticked). The fact is sent first and the count only answered after it,
   so the person does not fit the number; the answer is the difference and what could have made it
