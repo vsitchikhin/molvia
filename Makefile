@@ -71,10 +71,12 @@ migrate: ## Apply migrations
 # TG reaches the script through the environment, never pasted into the recipe: pasted in, even
 # quoted, a value could close the quote and bring its own `--yes` (MOL-58, П-3). It is one argument.
 # It erases only for YES=1 typed on this command line, as `seed` writes: `$(if $(YES),…)` read YES=0
-# as yes and took a YES left in the shell as one too (MOL-112, adversarial Е).
+# as yes and took a YES left in the shell as one too (MOL-112, adversarial Е). And TG is taken from
+# this command line alone for the same reason: a TG left in the shell, with YES=1 typed without it,
+# erased that person instead of printing the usage (MOL-91, adversarial Г).
 forget: ## Erase a person by Telegram id: make forget TG=<id> [YES=1] (dry run without YES=1)
 	$(NEED_SCAFFOLD)
-	./bin/forget-actor.sh "$$TG" $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
+	$(if $(filter command line,$(origin TG)),,unset TG;) ./bin/forget-actor.sh "$${TG:-}" $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
 
 # No value from a person reaches the recipe, so unlike `forget` it needs no wrapper script. It
 # writes only for YES=1 typed on this command line: `$(if $(YES),…)` read YES=0 as yes, and took a
