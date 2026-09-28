@@ -17,6 +17,7 @@ import type {
   Money,
   MoneyMonth,
   MoneyMonthView,
+  SalaryShift,
   SpendingCategory,
 } from '@molvia/model'
 import { dayRates } from './money-rates'
@@ -147,4 +148,24 @@ export async function moneyMonthOf(
   // «−8 % к августу» needs an August: a month with nothing in it is no month to compare with.
   const previousSpent = before.days.length > 0 ? before.spent : null
   return moneyMonthViewOf(counted, previousSpent, categories, cursor)
+}
+
+/** `GET /actors/me/salary-shift` (MOL-134, В-3): from which day a salary counts in the next month. */
+export async function salaryShiftOf(
+  repositories: Pick<Repositories, 'money'>,
+  owner: Pick<Actor, 'id'>,
+): Promise<SalaryShift> {
+  return { day: await repositories.money.salaryShift(owner.id) }
+}
+
+/**
+ * `PUT /actors/me/salary-shift`, saved on the tap (В-5). It lets no month go: a frozen month holds a
+ * rate, and «Пришло» is counted on every read, so the next read already moves the salary.
+ */
+export async function chooseSalaryShift(
+  repositories: Pick<Repositories, 'money'>,
+  owner: Pick<Actor, 'id'>,
+  { day }: SalaryShift,
+): Promise<SalaryShift> {
+  return { day: await repositories.money.setSalaryShift(owner.id, day) }
 }

@@ -18,6 +18,18 @@ export const monthSchema = z
   .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
   .refine((month) => isRateDay(lastDayOf(month)))
 
+/**
+ * «Зарплата с … числа — в следующий месяц» (MOL-134, В-3): from which day of its month a salary
+ * counts in «Пришло» of the next one; null — off, as every account starts. The person's own number,
+ * 1–31: in a month without that day nothing moves (Н-7). The body and the answer of
+ * `/actors/me/salary-shift`, saved on the tap (В-5).
+ */
+export const SALARY_SHIFT_DAY_MAX = 31
+export const salaryShiftSchema = z.strictObject({
+  day: z.int().min(1).max(SALARY_SHIFT_DAY_MAX).nullable(),
+})
+export type SalaryShift = z.infer<typeof salaryShiftSchema>
+
 /** How many rows of the journal one answer carries (handoff 01, «Догрузка»). */
 export const MONEY_JOURNAL_PAGE = 40
 

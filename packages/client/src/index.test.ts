@@ -1237,6 +1237,21 @@ describe('«Деньги» (MOL-82)', () => {
     expect(new URL(calls[1]?.url ?? '').searchParams.get('cursor')).toBe(monthWire.cursor)
   })
 
+  it('reads and saves «зарплата с … числа» (MOL-134) at its own address, off as null', async () => {
+    const { client, calls } = clientReplying(200, { day: 25 })
+    expect(await client.salaryShift()).toEqual({ day: 25 })
+    expect(await client.chooseSalaryShift(25)).toEqual({ day: 25 })
+    expect(calls[0]?.method).toBe('GET')
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe('/actors/me/salary-shift')
+    expect(calls[1]).toMatchObject({ method: 'PUT', body: { day: 25 } })
+    expect(new URL(calls[1]?.url ?? '').pathname).toBe('/actors/me/salary-shift')
+  })
+
+  it('refuses an answer outside the days of a month, as off the contract', async () => {
+    const { client } = clientReplying(200, { day: 32 })
+    await expect(client.salaryShift()).rejects.toThrow()
+  })
+
   it('never sends a month that is not one', async () => {
     const { client, calls } = clientReplying(200, monthWire)
     for (const month of ['2026-13', '../actors', '2026-9', ''])
