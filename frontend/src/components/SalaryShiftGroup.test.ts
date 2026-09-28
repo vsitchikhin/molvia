@@ -103,3 +103,25 @@ it('offers «Try again» after a server failure, and reads again on it', async (
   expect(switchOf(view).element.checked).toBe(true)
   expect(view.text()).not.toContain(en.settings.salary_shift.load_error)
 })
+
+it('a connection lost while saving is «without a connection», not a red failure (review 7)', async () => {
+  const view = await render()
+  choose.mockImplementation(() => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    return Promise.reject(new TypeError('network'))
+  })
+  await switchOf(view).setValue(true)
+  await flushPromises()
+  expect(switchOf(view).element.checked).toBe(false)
+  expect(view.find('[role="alert"]').exists()).toBe(false)
+  expect(view.text()).toContain(en.settings.salary_shift.offline)
+})
+
+it('tells a screen reader why the switch is inactive offline (review 8)', async () => {
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  read.mockRejectedValue(new TypeError('network'))
+  const view = await render()
+  const described = (switchOf(view).attributes('aria-describedby') ?? '').split(' ')
+  const texts = described.map((id) => view.find(`[id="${id}"]`).text())
+  expect(texts).toContain(en.settings.salary_shift.offline)
+})

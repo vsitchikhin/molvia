@@ -10,7 +10,7 @@
           role="switch"
           :checked="!!day"
           :disabled="day === undefined || saving || !online"
-          :aria-describedby="`${id}-hint`"
+          :aria-describedby="online ? `${id}-hint` : `${id}-hint ${id}-offline`"
           @change="toggle"
         />
       </label>
@@ -24,7 +24,9 @@
         @update:model-value="choose(Number($event))"
       />
       <p :id="`${id}-hint`" class="hint">{{ t('settings.salary_shift.hint') }}</p>
-      <p v-if="!online" class="hint">{{ t('settings.salary_shift.offline') }}</p>
+      <p v-if="!online" :id="`${id}-offline`" class="hint">
+        {{ t('settings.salary_shift.offline') }}
+      </p>
       <p v-else-if="saveFailed" class="failed" role="alert">
         <IconAlert aria-hidden="true" />{{ t('settings.salary_shift.save_failed') }}
       </p>
