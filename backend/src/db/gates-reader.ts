@@ -5,6 +5,7 @@ import type { Conn, Db } from './index'
 import type { CohortReached } from './verdicts-repository'
 import { createEventRepository } from './events-repository'
 import { createVerdictRepository } from './verdicts-repository'
+import { yerevanWeek } from './yerevan-week'
 
 /** People who appeared in `[from, to)` — the one window both gates are read over (MOL-91, Р-1). */
 export interface GatesWindow {
@@ -72,13 +73,13 @@ export function createGatesReader(db: Db): GatesReader {
 }
 
 async function erasedIn(tx: Conn, from: Date, to: Date): Promise<ErasedInWindow> {
-  // The week as `erase` writes it: a Monday in Yerevan, from the instant, whatever the session's
-  // `timezone`. The last week is the one holding the window's last millisecond, `to` being open.
+  // The week as `erase` writes it. The last week is the one holding the window's last
+  // millisecond, `to` being open.
   const [row] = await tx.execute<{ count: number; first_week: string; last_week: string }>(sql`
     with bounds as (
       select
-        date_trunc('week', (${from.toISOString()}::timestamptz at time zone 'UTC') + interval '4 hours')::date as first_week,
-        date_trunc('week', ((${to.toISOString()}::timestamptz - interval '1 millisecond') at time zone 'UTC') + interval '4 hours')::date as last_week
+        ${yerevanWeek(sql`${from.toISOString()}::timestamptz`)} as first_week,
+        ${yerevanWeek(sql`${to.toISOString()}::timestamptz - interval '1 millisecond'`)} as last_week
     )
     select
       coalesce(sum(e.erased), 0)::int as count,

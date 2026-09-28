@@ -84,10 +84,12 @@ seed: ## Put the common names into the catalogue: make seed [YES=1] (dry run wit
 	npm run --silent seed -w @molvia/backend -- $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
 
 # FROM and TO reach the script through the environment, never pasted into the recipe, for the
-# reason `forget` gives (MOL-58, П-3). It only reads.
+# reason `forget` gives (MOL-58, П-3). It only reads. Only a value typed on this command line
+# counts, as `YES` of `forget`: a TO left in the shell turned «no TO — until now» into last
+# week's window, and a FROM left there answered a bare `make gates` (adversarial В).
 gates: ## Read gates 0.2 and 0.3: make gates FROM=<day|moment> [TO=<day|moment>]
 	$(NEED_SCAFFOLD)
-	./bin/gates.sh "$$FROM" "$$TO"
+	$(if $(filter command line,$(origin FROM)),,unset FROM;) $(if $(filter command line,$(origin TO)),,unset TO;) ./bin/gates.sh "$${FROM:-}" "$${TO:-}"
 
 dev: ## Run api, pwa and bot for this copy
 	$(NEED_SCAFFOLD)

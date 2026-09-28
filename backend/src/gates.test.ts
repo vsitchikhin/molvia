@@ -103,8 +103,8 @@ describe('gates — чтение ворот вручную', () => {
     const { exit, lines } = run(['--from', '2026-10-05'])
     await exit
     expect(lines).toEqual([
-      'Molvia gates · appeared from 2026-10-05 00:00 until 2026-11-20 14:03, Yerevan time',
-      'read at 2026-11-20 14:03',
+      'Molvia gates · appeared from 2026-10-05 until now, days in Yerevan',
+      'read at 2026-11-20 14:03, Yerevan time',
       '',
       '0.2  do strangers fill the base?                    stop below 20 %',
       '     gave 5 ratings within 14 days       3 of 12     25.0 %',
@@ -130,6 +130,28 @@ describe('gates — чтение ворот вручную', () => {
     expect(lines.at(-1)).toBe(
       '     erased                              0          appeared the week of 2026-10-05, in neither half',
     )
+  })
+
+  it.each([
+    [
+      ['--from', '2026-10-05', '--to', '2026-10-31'],
+      '2026-10-05 through 2026-10-31, days in Yerevan',
+    ],
+    // The moment of a tag, seconds and all: «14:20» let a person of 14:20:10 look inside it.
+    [['--from', '2026-10-05T14:20:31+04:00'], '2026-10-05T14:20:31+04:00 until now'],
+    // The last day Postgres reads, and a moment past midnight of 9999 in Yerevan: no year 10000.
+    [
+      ['--from', '2026-10-05', '--to', '9999-12-31'],
+      '2026-10-05 through 9999-12-31, days in Yerevan',
+    ],
+    [
+      ['--from', '2026-10-05T00:00Z', '--to', '9999-12-31T23:59Z'],
+      '2026-10-05T00:00Z until 9999-12-31T23:59Z',
+    ],
+  ])('%j — заголовок называет окно так, как его задали (adversarial Б)', async (argv, edges) => {
+    const { exit, lines } = run(argv)
+    expect(await exit).toBe(0)
+    expect(lines[0]).toBe(`Molvia gates · appeared from ${edges}`)
   })
 
   it('пустая когорта — «—», а не 0 % и не NaN', async () => {

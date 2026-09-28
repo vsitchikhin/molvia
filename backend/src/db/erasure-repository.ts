@@ -3,6 +3,7 @@ import { telegramUserIdSchema } from '@molvia/model'
 import type { TelegramUserId } from '@molvia/model'
 import type { Db } from './index'
 import { lockTelegramAccount } from './telegram-lock'
+import { yerevanWeek } from './yerevan-week'
 
 /**
  * Every column in the schema that points at `actors`, as `table.column`. Erasure has to know
@@ -202,12 +203,11 @@ export function createErasureRepository(db: Db): ErasureRepository {
           let counted = false
           if (actorId !== null) {
             // One more among those who appeared that week (MOL-91), before the row it is read
-            // from goes: without it the gates lose the person with no trace. The week is a
-            // Monday in Yerevan, from the instant itself — no `timezone` of the session decides it.
+            // from goes: without it the gates lose the person with no trace.
             counted =
               (await count(sql`
                 insert into erasures (appeared_week, erased)
-                select date_trunc('week', (created_at at time zone 'UTC') + interval '4 hours')::date, 1
+                select ${yerevanWeek(sql`created_at`)}, 1
                 from actors where id = ${actorId}
                 on conflict (appeared_week) do update set erased = erasures.erased + 1
                 returning 1`)) > 0

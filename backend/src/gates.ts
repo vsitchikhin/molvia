@@ -15,9 +15,9 @@ export const GATES_USAGE =
 /** 0 — read, 1 — the database failed, 2 — the command was wrong. */
 export type GatesExit = 0 | 1 | 2
 
-const HOUR_MS = 60 * 60 * 1000
+const MINUTE_MS = 60 * 1000
+const HOUR_MS = 60 * MINUTE_MS
 const DAY_MS = 24 * HOUR_MS
-const YEREVAN_OFFSET_MS = 4 * HOUR_MS
 // What `reachedRatings` hands Postgres, checked here so a wrong year is `usage`, not a RangeError.
 const FIRST_READABLE = Date.parse('0001-01-01T00:00:00Z')
 const PAST_READABLE = Date.parse('+010000-01-01T00:00:00Z')
@@ -40,11 +40,12 @@ export async function gates(
   write: (line: string) => void,
   now: () => Date = () => new Date(),
 ): Promise<GatesExit> {
-  const window = parseWindow(argv, now)
-  if (window === null) {
+  const parsed = parseWindow(argv, now)
+  if (parsed === null) {
     write(GATES_USAGE)
     return 2
   }
+  const { window } = parsed
 
   let report: GatesReport
   try {
@@ -57,11 +58,23 @@ export async function gates(
     return 1
   }
 
-  for (const line of formatReport(window, report)) write(line)
+  for (const line of formatReport(parsed, report)) write(line)
   return 0
 }
 
-function parseWindow(argv: readonly string[], now: () => Date): GatesWindow | null {
+/**
+ * The window, and how its edges were given, for the heading: a day is printed as the day and a
+ * moment as it was typed, never as an instant turned back into Yerevan time — that lost the
+ * seconds of a tag's moment and printed the year after 9999 as `+010000-01 01T00` (adversarial Б),
+ * and a day taken in whole read as though the next one were in (self-review С-5).
+ */
+interface ParsedWindow {
+  readonly window: GatesWindow
+  /** `2026-10-05 through 2026-10-31, days in Yerevan`, `2026-10-05T14:20:31+04:00 until now`. */
+  readonly edges: string
+}
+
+function parseWindow(argv: readonly string[], now: () => Date): ParsedWindow | null {
   const given = new Map<string, string>()
   for (let at = 0; at < argv.length; at += 2) {
     const flag = argv[at] ?? ''
@@ -76,7 +89,10 @@ function parseWindow(argv: readonly string[], now: () => Date): GatesWindow | nu
   const from = parseWhen(fromValue, 'start')
   const to = toValue === undefined ? now() : parseWhen(toValue, 'end')
   if (from === null || to === null || !(from.getTime() < to.getTime())) return null
-  return { from, to }
+  const until =
+    toValue === undefined ? 'until now' : `${DAY.test(toValue) ? 'through' : 'until'} ${toValue}`
+  const days = DAY.test(fromValue) || (toValue !== undefined && DAY.test(toValue))
+  return { window: { from, to }, edges: `${fromValue} ${until}${days ? ', days in Yerevan' : ''}` }
 }
 
 /**
@@ -97,18 +113,18 @@ function parseWhen(value: string, edge: 'start' | 'end'): Date | null {
     // And so does a moment, in its own offset: `24:00` and the 31st of February are refused.
     const sign = parts[5] === '-' ? -1 : 1
     const offset =
-      parts[4] === 'Z' ? 0 : sign * (Number(parts[6]) * HOUR_MS + Number(parts[7]) * 60 * 1000)
+      parts[4] === 'Z' ? 0 : sign * (Number(parts[6]) * HOUR_MS + Number(parts[7]) * MINUTE_MS)
     if (new Date(instant + offset).toISOString().slice(0, 16) !== parts[1]) return null
   }
   return instant >= FIRST_READABLE && instant < PAST_READABLE ? new Date(instant) : null
 }
 
-function formatReport({ from, to }: GatesWindow, report: GatesReport): string[] {
+function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
   const { ratings, products, venues } = report
   const days = String(GATE_RATINGS_WINDOW_HOURS / 24)
   return [
-    `Molvia gates · appeared from ${inYerevan(from)} until ${inYerevan(to)}, Yerevan time`,
-    `read at ${inYerevan(report.readAt)}`,
+    `Molvia gates · appeared from ${parsed.edges}`,
+    `read at ${inYerevan(report.readAt)}, Yerevan time`,
     '',
     heading('0.2', 'do strangers fill the base?', GATE_RATINGS_STOP_PERCENT),
     row(
@@ -155,6 +171,8 @@ function share(part: number, whole: number): [string, string] {
 }
 
 function inYerevan(instant: Date): string {
-  const shifted = new Date(instant.getTime() + YEREVAN_OFFSET_MS).toISOString()
-  return `${yerevanDate(instant)} ${shifted.slice(11, 16)}`
+  const day = yerevanDate(instant)
+  const minutes = Math.floor((instant.getTime() - yerevanMidnight(day).getTime()) / MINUTE_MS)
+  const hh = String(Math.floor(minutes / 60)).padStart(2, '0')
+  return `${day} ${hh}:${String(minutes % 60).padStart(2, '0')}`
 }
