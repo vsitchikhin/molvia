@@ -172,7 +172,11 @@ balance, total and difference is the server's.
   queue will not send by itself** — behind a start standing on a question of «Поход», or of a trip
   the server refused: waited on, it held every check of every account with nothing to say why
   (adversarial round 3, Н4). The check counts without it and says the trip waits for an answer on
-  «Поход». A reason removed from its sheet is offered back in the check and in «не
+  «Поход». **But «Записать разницу» stays shut while such a write moves this account** — a trip put
+  on it, one of its reasons or put right in this check, any removal or return (whose account the
+  queue cannot say): the difference it explains became «Прочее», and the trip's own money followed
+  once the person answered — twice (review 36, adversarial round 4, Н5). Once the write moves, it is
+  waited on, and the same check is asked again when it lands. A reason removed from its sheet is offered back in the check and in «не
   попали», where the person is. Only the newest answer is taken: a recount landing after «Ввести
   другую сумму» does not take the sheet back. A recount that failed leaves the difference stale with
   «Повторить»; offline is one yellow line, drawn by the connection and gone with it, never red.
