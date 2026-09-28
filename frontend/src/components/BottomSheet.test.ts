@@ -138,7 +138,7 @@ describe('BottomSheet', () => {
   it('over another sheet: «Back» on the left takes this one away, and there is no ×', async () => {
     const { host, open, go, dialog } = await render({ open: true, back: true })
     const buttons = host.findAll('.head button')
-    expect(buttons.map((button) => button.attributes('aria-label'))).toEqual([en.sheet.back])
+    expect(buttons.map((button) => button.attributes('aria-label'))).toEqual([en.nav.back_label])
     expect(dialog().classList.contains('over')).toBe(true)
     await buttons[0]?.trigger('click')
     expect(go).toHaveBeenCalledExactlyOnceWith(-1)

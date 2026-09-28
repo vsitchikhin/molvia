@@ -13,7 +13,7 @@
   >
     <div class="panel">
       <header class="head" :class="{ over: back }">
-        <AppButton v-if="back" variant="icon" :label="t('sheet.back')" @click="close()">
+        <AppButton v-if="back" variant="icon" :label="t('nav.back_label')" @click="close()">
           <IconBack />
         </AppButton>
         <div class="heading">

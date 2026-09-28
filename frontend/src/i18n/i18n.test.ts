@@ -110,7 +110,7 @@ describe('словарь: повторяющиеся тексты', () => {
       // Таб и его экран — разные роли одного слова, как у «Поход».
       Деньги: ['nav.money', 'spending.title'],
       // The settings handoff names its own save action, independently of purchase editing.
-      Сохранить: ['item.save_edit', 'settings.save'],
+      Сохранить: ['accounts.sheet.save', 'item.save_edit', 'settings.save'],
       // Цена Р-2: одно состояние, написанное для трёх экранов.
       'Сервер не ответил': ['advice.error.title', 'item.error.title', 'trip.error.title'],
       // Та же цена у офлайна: у настроек, у обменов, у доходов и у устройств своё состояние
@@ -136,13 +136,19 @@ describe('словарь: повторяющиеся тексты', () => {
       // Цена Р-2 у двух экранов одной денежной модели: доходы пишутся, правятся, удаляются и
       // возвращаются по правилам обменов (MOL-66, Р-2), и слова о тех же действиях — те же.
       'исправлен {date}': ['exchange.amended', 'income.amended'],
-      Вернуть: ['exchange.restore', 'income.restore', 'spending.restore', 'trip.remove.restore'],
+      Вернуть: [
+        'accounts.screen.restore',
+        'exchange.restore',
+        'income.restore',
+        'spending.restore',
+        'trip.remove.restore',
+      ],
       'Сервер не ответил как надо. Попробуйте ещё раз': [
         'exchange.load_error.body',
         'income.load_error.body',
       ],
       'Не получилось. Проверьте связь и попробуйте ещё раз': ['exchange.failed', 'income.failed'],
-      Валюта: ['exchange.sheet.currency', 'income.sheet.currency'],
+      Валюта: ['accounts.sheet.currency', 'exchange.sheet.currency', 'income.sheet.currency'],
       'Прежние версии': ['exchange.sheet.history', 'income.sheet.history'],
       'Сохранить правку': ['exchange.sheet.save_amend', 'income.sheet.save_amend'],
       'Сейчас записано: {details}': ['exchange.sheet.current', 'income.sheet.current'],
@@ -158,7 +164,7 @@ describe('словарь: повторяющиеся тексты', () => {
       Доходы: ['income.title', 'privacy.stored.incomes.term'],
       // Плавающая кнопка и заголовок её шторки, как «Трата» (MOL-81); подписи сумм карточки и
       // полей шторки — одни слова об одном обмене.
-      Обмен: ['exchange.fab', 'exchange.sheet.title'],
+      Обмен: ['accounts.account.exchange', 'exchange.fab', 'exchange.sheet.title'],
       Доход: ['income.fab', 'income.sheet.title'],
       Отдал: ['exchange.card_given', 'exchange.sheet.given'],
       Получил: ['exchange.card_received', 'exchange.sheet.received'],
@@ -167,6 +173,12 @@ describe('словарь: повторяющиеся тексты', () => {
       'ЦБ РА': ['exchange.card_source_cba', 'trip.rate.source_cba'],
       'ЦБ РФ': ['exchange.card_source_cbr', 'trip.rate.source_cbr'],
       'open.er-api.com': ['exchange.card_source_erapi', 'trip.rate.source_erapi'],
+      // Счета (MOL-123): остаток счёта и остаток месяца — одно слово о разном; экран и пункт
+      // страницы приватности о том же; плавающая «Счёт», заголовок её шторки в правке и строка
+      // выбора счёта в шторках операций, как «Трата».
+      Остаток: ['accounts.balance', 'spending.rest'],
+      Счета: ['accounts.title', 'privacy.stored.accounts.term'],
+      Счёт: ['accounts.picker.row_spending', 'accounts.screen.add', 'accounts.sheet.title_edit'],
     })
   })
 
@@ -183,7 +195,7 @@ describe('словарь: повторяющиеся тексты', () => {
       Ratings: ['nav.verdicts', 'verdict.title'],
       Settings: ['nav.settings', 'settings.title'],
       Money: ['nav.money', 'spending.title'],
-      Save: ['item.save_edit', 'settings.save'],
+      Save: ['accounts.sheet.save', 'item.save_edit', 'settings.save'],
       'No connection': [
         'devices.offline.title',
         'exchange.offline.title',
@@ -203,7 +215,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'income.load_error.body',
       ],
       'That did not work. Check the connection and try again': ['exchange.failed', 'income.failed'],
-      Currency: ['exchange.sheet.currency', 'income.sheet.currency'],
+      Currency: ['accounts.sheet.currency', 'exchange.sheet.currency', 'income.sheet.currency'],
       'Earlier versions': ['exchange.sheet.history', 'income.sheet.history'],
       'Save the amendment': ['exchange.sheet.save_amend', 'income.sheet.save_amend'],
       'Now recorded: {details}': ['exchange.sheet.current', 'income.sheet.current'],
@@ -215,10 +227,21 @@ describe('словарь: повторяющиеся тексты', () => {
       'held before {amount}': ['exchange.sheet.current_held', 'income.sheet.current_held'],
       // One English word for the screen, its sheet and the privacy entry; Russian has «Доход».
       Income: ['income.fab', 'income.sheet.title', 'income.title', 'privacy.stored.incomes.term'],
-      Exchange: ['exchange.fab', 'exchange.sheet.title'],
+      Exchange: ['accounts.account.exchange', 'exchange.fab', 'exchange.sheet.title'],
       Gave: ['exchange.card_given', 'exchange.sheet.given'],
       Got: ['exchange.card_received', 'exchange.sheet.received'],
       'open.er-api.com': ['exchange.card_source_erapi', 'trip.rate.source_erapi'],
+      // One English word for a trip's total and the accounts' (MOL-123); Russian says «Итого».
+      Total: ['accounts.total', 'trip.total'],
+      Name: ['accounts.sheet.name', 'spending.new_category.name'],
+      // The settings group of one's Molvia account and a money account are one English word.
+      Account: [
+        'accounts.picker.row_spending',
+        'accounts.screen.add',
+        'accounts.sheet.title_edit',
+        'settings.group_account',
+      ],
+      Accounts: ['accounts.title', 'privacy.stored.accounts.term'],
     })
   })
 })
@@ -268,6 +291,10 @@ describe('словарь: плюральные формы', () => {
       'spending.more',
       'spending.sheet.trip_meta',
       'sign_out.unsent',
+      'accounts.more',
+      'accounts.unassigned',
+      'accounts.account.more',
+      'accounts.reconcile.cause_trip_unpriced_meta',
     ])
   })
 })
