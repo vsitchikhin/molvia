@@ -1,0 +1,180 @@
+---
+paths:
+  - 'packages/model/src/{entities,contracts}/{spending,spending-category,money,money-month}.ts'
+  - 'packages/model/tests/{entities,contracts}/{spending,money,money-month}*.test.ts'
+  - 'backend/src/db/{spendings,spending-categories,money}-repository.ts'
+  - 'backend/src/usecases/{spendings,money-month,money-rates,money}*.ts'
+  - 'backend/src/routes/spendings.ts'
+  - 'backend/tests/spendings*.ts'
+  - 'backend/drizzle/*spending*.sql'
+  - 'frontend/src/views/Money*'
+  - 'frontend/src/components/{Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*}'
+  - 'frontend/src/composables/useMoneyMonth*'
+  - 'frontend/src/stores/{spendingQueue,queueing}*'
+  - 'frontend/src/days*'
+  - 'e2e/money.spec.ts'
+---
+
+# Money: spendings, the month, and «Деньги» on the phone
+
+The detail behind the spending and «Деньги» lines of `CLAUDE.md`.
+
+## Spendings and the month, on the server
+
+**A spending is money spent outside a trip (MOL-73)** — the barber, the rent, the domain: a day, an
+amount in its currency, one of the owner's categories, «что это» and «где» as free text
+(`spendings`). The personal accounting layer of MOL-72, private as an income. It makes no item,
+feeds no price and no verdict: a purchase at a shop is still entered in «Поход», and the sheet says
+so (В-2) — the boundary is held by the hint, not by a ban, because the owner's own sheet is full of
+«кола, молоко, несквик… · ереван сити».
+
+- **Categories are the owner's own** (В-3): every account is given thirteen presets the first time
+  it asks — the handoff's ten and «Дом и быт», «Животные», «Документы» — and may make its own.
+  **Removing one takes it out of the choice and erases nothing** (`archived_at`): the spendings in
+  it keep it and past months keep their sums; otherwise removing «Продукты» would rewrite every
+  month. A spending's category is the same owner's, held by a composite key, and a removed one of
+  theirs still takes spendings — one queued offline must not be lost to a chip taken away elsewhere.
+- **A spending in another currency keeps the rate of its own day** — the person's, else the central
+  bank's, by the rule a trip started that day uses — written with it and never recomputed. The
+  person's is **the pair priced by one walk of the chain and rounded once** (`walletCross`, review
+  Р-1): two wallet rates divided after rounding lost 24 ֏ on 1 500 $. The bank's is **only a fresh
+  one** (`isRateFresh`, Р-4): the cache's latest may be weeks old, and a snapshot kept for good has
+  nowhere to say so — without one the spending is «не посчитано».
+- **Every rate of «Деньги» is kept on the side whose number is at least one** — «390 ֏ за $», never
+  «0,002564 $ за ֏» — the snapshot, a day's rate and the month's (`convertAcross` converts from
+  either side): six digits of a small number are four significant ones, and 11 $ came out
+  4 290,17 ֏ (С-1, adversarial Д2б).
+- **What was spent is counted by the trip's rule, what came in by the bank's alone** (review Р-2,
+  Р-3). A trip's line in another currency and a spending whose snapshot is not into the spending
+  currency of now — none was known that day, or it was written before a move — are converted on
+  the fly by the rule a spending's snapshot is taken by: ten dollars at the shop and ten at the
+  barber's on one day come to the same, and drams of August stay counted after a move to dollars
+  (Р-5, Д8). An income in another currency is the official rate of its day (MOL-66, В-1), never
+  what the money already held cost. An amendment keeps the snapshot only while the day, the
+  currency and the snapshot's use stay; otherwise it is taken anew. The price, named: on-the-fly
+  lines move when an exchange of their period is amended (С-3).
+- **The month is counted by the server** (`GET /money/months/:month`): spendings and **finished**
+  trips — one line per currency, on the device's day of finishing, in «Продукты», read from the
+  purchases every time so an amendment, MOL-78's receipt sum or MOL-76's removal moves it by
+  itself, **each line counting the purchases behind its own sum** (owner's decision В-7) — what came
+  in, the rest, the categories and every day's total; the journal comes forty rows a page, and a
+  day cut by the page keeps its whole total. **The next page starts after the key of the last row
+  shown** — day, moment, name (`journalCursorCodec`) — never an offset, which moved under the page
+  with every write above it (Д3). The key is the row's own, so an amendment that moves a spending
+  to another day moves it across the cursor: it comes twice, or not at all, until the journal is
+  read from the start — which the screen does after its own amendment of a day (round 2, Е3). A row no money can hold is «не посчитано», never a failed month
+  (Д5, MOL-66's rule). A month is one of the days a rate may be dated by — `0000-01` is 404, not a
+  500 from Postgres (Д4).
+- **A closed month is counted in the income currency by the rate of its last day, frozen the first
+  time it is read** (`money_month_rates`): a new exchange today does not move August. **A fact of
+  August amended later does** (owner's decision В-6): writing, amending, removing or bringing back
+  an exchange or an income of a day lets go of the months frozen from that day on (`thaw`), and the
+  next read freezes them again. The running month is never frozen, so today's exchange lets go of
+  nothing. **A change of the rule lets go of every month** (owner's decision В-8): «мой курс / ЦБ РА»
+  switched, or the income or spending currency changed — otherwise two past months stood on two
+  rules, decided by which was opened first. A trip keeps its snapshot either way. The prices, named:
+  a month read while the write is on its way may freeze without it; `thaw` runs after the write,
+  not inside it, so a database failing between the two leaves the write done and the answer 500 —
+  a repeat of a write or an amendment lets go again, a repeat of a removal does not, since the day
+  is read off a live row; an official rate reaching the cache for a past day moves the wallet of
+  that month and lets nothing go.
+- **Removal is the money rule, held by the server**: a mark, «Вернуть», final after ten minutes by
+  the minute timer and nothing else (В-4) — no other write makes it final sooner, unlike an
+  exchange's, and a spending sent again while it is marked is 409, not a new one (Д6). After the ten
+  minutes a spending sent again is written anew, as a trip's row is — at once, not when the timer
+  comes round (round 2, Е2). Erasure takes spendings,
+  categories and frozen rates.
+- **The names of one's own categories are checked under the owner's lock** (Д7): two phones adding
+  «Такси» at once wrote two. A name equal to a preset's («Продукты» beside `groceries`) is the
+  screen's to refuse — the server does not know the language of the chips (MOL-82).
+
+## «Деньги» on the phone
+
+**«Деньги» on the phone (MOL-82)** — the fifth tab, between «Оценки» and «Настройки»: the month
+of `GET /money/months/:month`, the sheet of a spending, and one's own categories. The screen adds
+nothing up.
+
+- **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`), by the rules
+  of the trip's (MOL-24): storage is the queue, one at a time under `navigator.locks`, held by a
+  lost connection, a 5xx, a portal, a `401` or a code the API did not say, sent only once the
+  server has named the owner; any other refusal is set aside as «Не принята». Categories go
+  through it too (owner's decision В-4), so «Такси» made at the till goes before the spending that
+  names it. The three queues share `stores/queueing.ts` — the lock, the key of a kept write, what
+  holds, the doubling pause (В-6).
+- **The writes of one spending fold while they wait — only while nobody has begun to send them**:
+  an amendment of one not yet sent rewrites its record; two amendments are one `PUT` over the
+  revision the first was made on. **A write a send has begun on is marked on the shelf**
+  (`attempted`), by whichever window sends it, and is never folded into again: its answer may
+  have been lost after the server took it, and «not sent» and «no answer» are one thing to a
+  queue (adversarial А, Б, В). A change made after it goes behind it, over the next revision.
+  **Nothing is tried while the browser knows there is no connection**, so a write made at the till
+  stays unmarked and foldable, and an answer that came and is not the API's — a portal — takes the
+  mark off, since that request never arrived (round 2). The price, named (review Ф-1): a browser
+  wrongly sure it is offline — some VPNs and WebViews — sends no spendings until `online` comes;
+  the trip's queue and the ratings still try. A refusal that comes after the person removed the
+  spending is dropped rather than shown — there is nothing left to fix (round 3, Р1). **A refused record or amendment takes the
+  amendments behind it** into its refusal: they were made over a revision it would have made, and
+  sent on they went over another device's amendment in silence (round 2, Н1, Н3). **Removing a
+  spending nobody has begun to send takes it out of the queue**, and «Вернуть» puts it back; once
+  a send of its record has begun, the removal goes to the server and 404 on it is done; «Вернуть»
+  then takes the removal back while it waits, or asks the server to restore, never writing the
+  spending anew. **A record the server already holds with other fields is this phone's own**, so a
+  409 on a record goes on as an amendment over revision 1.
+- **A spending in the queue is a row, never a figure** (requirements Р-3; the handoff asked
+  otherwise and this rule wins): «Отправляем…» at the top of its day, «Правка отправляется» on an
+  amended row whose figures stay the server's, a removed row hidden — unless «Вернуть» stands
+  behind its removal in the queue (round 2, Н2) — and «Ещё не учтено: N»
+  on the card — not for a record the month already shows (adversarial Л). A day only the phone
+  knows of has no total; a row only the phone knows of shows what was last typed, since there are
+  no figures of the server's to keep (review Т-4). The month is read again from the start
+  whenever the queue has an answer — which also puts a spending moved to another day where it
+  belongs (MOL-73, Е3) — keeping as many pages as were open.
+- **The two figures the card derives are the model's**, `percentChange` and `shareOf`: a ratio
+  of two sums the server gave, rounded as a person rounds. **«Включая 11 $ (≈ 4 290 ֏)» names no
+  rate** (Р-2): `foreign` sums a currency over the month, and every spending in it had its own
+  day's rate. The sheet converts while typing by `convertAcross` — MOL-24's exception — and only
+  between the two currencies the running month's rate joins; a third says «Посчитаем по курсу дня
+  траты» (Р-5).
+- **Removal asks nothing; `UndoStrip` gives ten seconds** where «Трата» floats, and stands still
+  while a finger or the person's focus is on it — not the focus it puts on «Вернуть» itself, or
+  the count would never run for a touch. **It stands whatever the screen becomes under it**: the
+  only spending removed turns the month into a newcomer's, and the strip went with the button it
+  shared a block with (adversarial Г). The server keeps the removal ten minutes; the strip is what
+  the screen offers.
+- **A date is shown in words over its native field** (`AppField`, `display`): «Сегодня, 27 сентября»
+  is drawn, the field stays underneath to open the system picker and to be read by its own value,
+  and Chrome's own calendar is kept unseen in its place — stretched over the field, it caught the
+  sheet's «Сохранить». The spending just saved is scrolled
+  into view once its row is there; a finished trip opened from «Деньги» slides in as a push.
+- **The sheet says «saved» after it has closed** (adversarial И): the move to the spending's month
+  made while it was open was undone by the step back that closes it. It checks the day — a cleared
+  picker or a day before 2000 would fall over in the queue's codec — and that the category is one of
+  the chips shown, since one the server called unknown stands on none (adversarial Д, Ж).
+- **Days of Yerevan are printed as calendar days, never as moments** (`calendarDay` in `days.ts`,
+  review Т-1): `yerevanMidnight(day)` is the evening before anywhere west of UTC+4, and every date
+  of the screen came out a day early on a phone in Moscow. The frontend's tests run in UTC on every
+  machine (`TZ` in its vitest config), where such a slip shows.
+- **The categories are the owner's, not a month's**, so the newest month kept names them for a
+  month not read yet: «Трата» stands while the month loads, when it failed and offline on the first
+  of a month (review Т-5, Т-6) — and does not, where no category is known at all. «Категории ›»
+  stands without bars too (Т-7). This month in Yerevan is looked at again whenever the app comes
+  back into view (adversarial З).
+- **«Пусто» is read off the answer** (Р-6): the running month empty, no income, nothing the month
+  before and nothing waiting. The server does not say «no history», and an empty August after a
+  full July is «В этом месяце трат нет», not a newcomer.
+- **The month is in the address and moves by `replace`**; there is no lower bound, since the
+  server names no first month (Р-1). The last three first pages read are kept per owner
+  (`molvia.money`), so offline is a strip over them. A next page asked for while the month is read
+  again from the start is asked again from the fresh answer (adversarial Е).
+- **A finished trip opened from «Деньги» leads back there** (owner's decision В-3):
+  `?from=money`, and the route lists which `from` it takes (`meta.from`) — an address must not
+  make any screen the parent of any other. The chevron says «‹ Деньги» and steps back onto the
+  same month; opened cold, «Деньги» is laid underneath.
+- **One's own category is made from the chips** («+ Своя», a sheet over the sheet, chosen as soon
+  as it exists) **and kept on «Деньги → Категории»** (В-1): «Убрать» asks nothing, since it erases
+  nothing, and «Вернуть» stands right under it. A name equal to a preset in the language of the
+  screen, or to a live one of one's own, is refused there. The colours are tokens — thirteen
+  presets and a palette of eight for one's own, none red, olive, ochre or terracotta, each at
+  least 3:1 on `--surface`.
+- The charts, a tap on a category and «Графики по месяцам» are MOL-74's (Р-7); accounts are
+  MOL-115's.
