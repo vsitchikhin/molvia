@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { z } from 'zod'
 import { accountJournalCodec, moneyAccountsCodec } from '@molvia/model'
 import type { AccountCheckBody, AccountJournalResponse, MoneyAccountsResponse } from '@molvia/model'
@@ -93,6 +93,12 @@ export const useAccountsStore = defineStore('accounts', () => {
     readonly stamp: number
   } | null>(null)
   const failure = ref<'offline' | 'error' | null>(null)
+  /**
+   * Screens showing accounts that are up now. A queue's answer reads the page again only for them:
+   * read for every purchase at the shelf, the dearest answer of the server went out beside the queue
+   * itself with nobody looking (adversarial round 2, Н2). Each of them reads it as it comes up.
+   */
+  const viewers = ref(0)
   /** The answer on screen came in this session, not from the phone's memory. */
   const confirmed = ref(false)
 
@@ -192,7 +198,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     () => [spendings.landed, trips.wrote],
     () => {
       settleRepeats()
-      if (shown.value || failure.value) void refresh()
+      if (viewers.value > 0 && (shown.value || failure.value)) void refresh()
     },
   )
 
@@ -212,9 +218,20 @@ export const useAccountsStore = defineStore('accounts', () => {
       return failure.value ?? 'loading'
     }),
     removed,
+    viewers,
     refresh,
     accept,
     repeat,
     repeatAfter,
   }
 })
+
+/**
+ * The calling screen shows accounts (the card of «Деньги», «Счета», an account, «Обмен денег»):
+ * while it is up, a queue's answer reads the page again (adversarial round 2, Н2).
+ */
+export function useAccountsOnScreen(): void {
+  const store = useAccountsStore()
+  onMounted(() => (store.viewers += 1))
+  onUnmounted(() => (store.viewers -= 1))
+}

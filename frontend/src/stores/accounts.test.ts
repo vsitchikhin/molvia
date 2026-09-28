@@ -6,6 +6,7 @@ import type { AccountJournalResponse, MoneyAccountsResponse } from '@molvia/mode
 import { recallJournal, rememberJournal, useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
+import { useTripQueueStore } from '@/stores/tripQueue'
 
 const moneyAccounts = vi.fn<() => Promise<MoneyAccountsResponse>>()
 const checkAccount = vi.fn<(id: string, body: unknown) => Promise<unknown>>()
@@ -131,10 +132,22 @@ describe('useAccountsStore', () => {
     moneyAccounts.mockResolvedValueOnce(page('100')).mockResolvedValueOnce(page('90'))
     const store = useAccountsStore()
     await store.refresh()
+    store.viewers = 1
     useSpendingQueueStore().landed++
     await flushPromises()
     expect(moneyAccounts).toHaveBeenCalledTimes(2)
     expect(store.accounts[0]?.balance).toEqual(amd('90'))
+  })
+
+  // Adversarial round 2, Н2: purchases at the shelf, «Деньги» opened earlier in the launch.
+  it('reads nothing on a trip’s landing while no screen of accounts is up', async () => {
+    signedIn()
+    moneyAccounts.mockResolvedValue(page('100'))
+    const store = useAccountsStore()
+    await store.refresh()
+    for (let purchase = 0; purchase < 5; purchase += 1) useTripQueueStore().wrote++
+    await flushPromises()
+    expect(moneyAccounts).toHaveBeenCalledTimes(1)
   })
 
   it('does not ask on a landing before anyone looked at the accounts', async () => {

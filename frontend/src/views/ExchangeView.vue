@@ -206,7 +206,7 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExchangeWords } from '@/composables/useExchangeWords'
 import { useExchanges } from '@/composables/useExchanges'
 import type { AmendOutcome } from '@/composables/useExchanges'
-import { useAccountsStore } from '@/stores/accounts'
+import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 
 /**
  * «Обмен денег» (MOL-40), under «Деньги» since MOL-81: the person's own rate, which rate new trips take, and
@@ -304,6 +304,7 @@ export default defineComponent({
     }
     // The names of the accounts on the cards (MOL-123): the page as the server has it now.
     const accounts = useAccountsStore()
+    useAccountsOnScreen()
     onMounted(() => void accounts.refresh())
     onMounted(() => {
       window.addEventListener('online', follow)

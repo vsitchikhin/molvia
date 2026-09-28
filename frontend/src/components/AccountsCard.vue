@@ -113,7 +113,7 @@ import UnassignedSheet from '@/components/UnassignedSheet.vue'
 import { countedWhen, pageOrder, signedAmount } from '@/components/accounts'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
-import { useAccountsStore } from '@/stores/accounts'
+import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 
 /** Up to five rows on the card; from six, four and «Ещё N счетов ›» (handoff 01, question 1). */
 const ALL_UP_TO = 5
@@ -148,6 +148,7 @@ export default defineComponent({
   setup() {
     const { t, locale } = useI18n()
     const store = useAccountsStore()
+    useAccountsOnScreen()
     const announce = useAnnouncer()
     onMounted(() => void store.refresh())
     useReconnect(() => void store.refresh())

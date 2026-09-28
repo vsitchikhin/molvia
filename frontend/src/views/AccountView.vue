@@ -178,7 +178,7 @@ import { useOwnCategories } from '@/composables/useOwnCategories'
 import { useReconnect } from '@/composables/useReconnect'
 import { calendarDay, shiftDay } from '@/days'
 import { useNavigation } from '@/navigation'
-import { useAccountsStore } from '@/stores/accounts'
+import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -211,6 +211,7 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const route = useRoute()
     const store = useAccountsStore()
+    useAccountsOnScreen()
     const trips = useTripQueueStore()
     const { goUp } = useNavigation()
     const queue = useSpendingQueueStore()

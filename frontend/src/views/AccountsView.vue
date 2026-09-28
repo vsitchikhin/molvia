@@ -186,7 +186,7 @@ import { countedWhen, pageOrder, removedOf, shortDay, signedAmount } from '@/com
 import { rateWords } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
-import { useAccountsStore } from '@/stores/accounts'
+import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 
 /** The order the rate line names the currencies in (handoff 02). */
@@ -220,6 +220,7 @@ export default defineComponent({
   setup() {
     const { t, locale } = useI18n()
     const store = useAccountsStore()
+    useAccountsOnScreen()
     const actor = useActorStore()
     const announce = useAnnouncer()
 
