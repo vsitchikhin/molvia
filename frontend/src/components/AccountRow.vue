@@ -56,8 +56,10 @@ export default defineComponent({
   text-align: left;
   cursor: pointer;
 
-  &:hover {
-    background: var(--accent-tint);
+  @media (hover: hover) {
+    &:hover {
+      background: var(--accent-tint);
+    }
   }
 
   &:focus-visible {

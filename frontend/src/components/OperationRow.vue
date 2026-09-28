@@ -10,7 +10,7 @@
         <span class="title">{{ title ?? ownTitle }}</span>
         <span v-if="(meta ?? ownMeta) !== ''" class="meta">{{ meta ?? ownMeta }}</span>
       </span>
-      <span class="sums">
+      <span v-if="!plain" class="sums">
         <span class="amount">{{ amount }}</span>
         <span v-if="source" class="source">{{ source }}</span>
       </span>
@@ -59,6 +59,8 @@ export default defineComponent({
     /** A check names its reasons in its own words (handoff 05). */
     title: { type: String as PropType<string | null>, default: null },
     meta: { type: String as PropType<string | null>, default: null },
+    /** A reason of a check: its title already says the sum, so the row carries none. */
+    plain: { type: Boolean, default: false },
   },
   emits: {
     open: (operation: AccountOperationView) => typeof operation === 'object',
@@ -218,8 +220,10 @@ export default defineComponent({
   text-align: left;
   cursor: pointer;
 
-  &:hover {
-    background: var(--surface-2);
+  @media (hover: hover) {
+    &:hover {
+      background: var(--surface-2);
+    }
   }
 
   &:focus-visible {

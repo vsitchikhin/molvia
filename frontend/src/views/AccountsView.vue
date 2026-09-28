@@ -454,6 +454,7 @@ export default defineComponent({
 
 .tile-figure {
   font-size: var(--text-headline);
+  white-space: nowrap;
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
 }

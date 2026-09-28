@@ -123,6 +123,7 @@ import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { parseSigned, shortDay, signedAmount } from '@/components/accounts'
+import { shown } from '@/composables/useItemDetails'
 import { calendarDay, shiftDay } from '@/days'
 import { newId } from '@/ids'
 import { useAccountsStore } from '@/stores/accounts'
@@ -189,8 +190,7 @@ export default defineComponent({
 
     /** The amount as it would be typed back: «241530», «-12400,5», never the grouping spaces. */
     function typed(account: MoneyAccountView): string {
-      const decimal = decimalFromMinor(account.start)
-      return locale.value === 'ru' ? decimal.replace('.', ',') : decimal
+      return shown(decimalFromMinor(account.start), locale.value === 'ru' ? ',' : '.')
     }
 
     watch(

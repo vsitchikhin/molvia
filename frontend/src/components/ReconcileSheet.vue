@@ -80,6 +80,7 @@
               :account-name="accountName"
               :title="reasonTitle(reason)"
               :meta="reasonMeta(reason)"
+              plain
               @open="openReason"
             />
           </AppCard>

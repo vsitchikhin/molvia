@@ -78,8 +78,10 @@ export default defineComponent({
   color: var(--text);
   text-decoration: none;
 
-  &:hover {
-    background: var(--surface-2);
+  @media (hover: hover) {
+    &:hover {
+      background: var(--surface-2);
+    }
   }
 
   .dense & {

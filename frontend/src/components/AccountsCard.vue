@@ -1,5 +1,5 @@
 <template>
-  <AppCard class="card">
+  <AppCard class="card" list>
     <div class="head">
       <h2 class="caption">{{ t('accounts.title') }}</h2>
       <RouterLink v-if="live.length > 0" class="all" :to="{ name: 'money-accounts' }">
