@@ -248,7 +248,8 @@
     }
   },
   "sheet": {
-    "close": "Close"
+    "close": "Close",
+    "back": "Back"
   },
   "advice": {
     "title": "What to buy",

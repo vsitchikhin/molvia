@@ -49,7 +49,9 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-async function render(options: { open?: boolean; at?: string; rising?: boolean } = {}) {
+async function render(
+  options: { open?: boolean; at?: string; rising?: boolean; back?: boolean } = {},
+) {
   const router: Router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/')
   if (options.at) await router.push(options.at)
@@ -65,6 +67,7 @@ async function render(options: { open?: boolean; at?: string; rising?: boolean }
           BottomSheet,
           {
             open: open.value,
+            back: options.back ?? false,
             'onUpdate:open': (next: boolean) => (open.value = next),
             onClosed: closed,
           },
@@ -130,6 +133,16 @@ describe('BottomSheet', () => {
     await vi.waitFor(() => {
       expect(closed).toHaveBeenCalledOnce()
     })
+  })
+
+  it('over another sheet: «Back» on the left takes this one away, and there is no ×', async () => {
+    const { host, open, go, dialog } = await render({ open: true, back: true })
+    const buttons = host.findAll('.head button')
+    expect(buttons.map((button) => button.attributes('aria-label'))).toEqual([en.sheet.back])
+    expect(dialog().classList.contains('over')).toBe(true)
+    await buttons[0]?.trigger('click')
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+    expect(open.value).toBe(false)
   })
 
   // Esc, and Android's «back» that Chrome hands to a modal dialog: the browser would close it

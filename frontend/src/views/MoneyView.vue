@@ -209,6 +209,7 @@
     />
     <NewCategorySheet
       v-model:open="newCategoryOpen"
+      over
       :categories="categories"
       @created="made = $event"
     />
