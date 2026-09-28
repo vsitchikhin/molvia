@@ -86,6 +86,9 @@ export const moneyMonthCodec = z.strictObject({
   spentIncome: moneyCodec.nullable(),
   income: moneyCodec,
   incomeUncounted: z.array(moneyCodec),
+  /** Salaries of the month before counted in this one, and this month's counted in the next (MOL-134). */
+  shiftedIn: z.array(exchangeDaySchema),
+  shiftedOut: z.array(exchangeDaySchema),
   rest: signedMoneyCodec.nullable(),
   rate: rateCodec.nullable(),
   rateKind: z.enum(['live', 'frozen']),
@@ -172,6 +175,8 @@ export function moneyMonthViewOf(
     uncounted: [...month.uncounted],
     foreign: [...month.foreign],
     incomeUncounted: [...month.incomeUncounted],
+    shiftedIn: [...month.shiftedIn],
+    shiftedOut: [...month.shiftedOut],
     byCategory: [...month.byCategory],
     previousSpent,
     categories: categoryOrder(categories).map(spendingCategoryViewOf),

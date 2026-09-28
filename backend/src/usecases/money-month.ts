@@ -1,4 +1,5 @@
 import {
+  budgetMonthOf,
   convertAcross,
   lastDayOf,
   monthOf,
@@ -60,6 +61,7 @@ async function count(
   categories: readonly SpendingCategory[],
   rate: ExchangeRate | null,
   rateKind: 'live' | 'frozen',
+  salaryShiftDay: number | null,
 ): Promise<MoneyMonth> {
   const from = `${month}-01`
   const to = lastDayOf(month)
@@ -68,7 +70,7 @@ async function count(
     repositories.money.tripLines(owner.id, from, to),
     repositories.incomes.list(owner.id),
   ])
-  const ofMonth = incomes.filter((income) => monthOf(income.receivedOn) === month)
+  const ofMonth = incomes.filter((income) => budgetMonthOf(income, salaryShiftDay) === month)
   const [inSpend, incomeInIncome] = await Promise.all([
     converter((one, other, day) => rates.between(one, other, day), owner.spendCurrency, [
       ...trips.map((trip) => ({ amount: trip.amount, day: trip.finishedOn })),
@@ -90,7 +92,8 @@ async function count(
     incomeCurrency: owner.incomeCurrency,
     spendings,
     trips,
-    incomes: ofMonth,
+    incomes,
+    salaryShiftDay,
     categories,
     rate,
     rateKind,
@@ -136,14 +139,15 @@ export async function moneyMonthOf(
   now: Date = new Date(),
 ): Promise<MoneyMonthView> {
   const today = yerevanDate(now)
-  const [rates, categories] = await Promise.all([
+  const [rates, categories, salaryShiftDay] = await Promise.all([
     dayRates(repositories, owner),
     repositories.spendingCategories.list(owner.id),
+    repositories.money.salaryShift(owner.id),
   ])
   const { rate, kind } = await monthRate(repositories, owner, rates, month, today)
   const [counted, before] = await Promise.all([
-    count(repositories, owner, rates, month, categories, rate, kind),
-    count(repositories, owner, rates, previousMonth(month), categories, null, 'frozen'),
+    count(repositories, owner, rates, month, categories, rate, kind, salaryShiftDay),
+    count(repositories, owner, rates, previousMonth(month), categories, null, 'frozen', null),
   ])
   // «−8 % к августу» needs an August: a month with nothing in it is no month to compare with.
   const previousSpent = before.days.length > 0 ? before.spent : null

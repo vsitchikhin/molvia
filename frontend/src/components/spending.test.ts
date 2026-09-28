@@ -57,6 +57,8 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     spentIncome: null,
     income: parseMoney('0', 'RUB'),
     incomeUncounted: [],
+    shiftedIn: [],
+    shiftedOut: [],
     rest: null,
     rate: null,
     rateKind: 'live',

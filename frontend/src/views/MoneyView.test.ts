@@ -49,6 +49,8 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     spentIncome: rub('68788'),
     income: rub('120000'),
     incomeUncounted: [],
+    shiftedIn: [],
+    shiftedOut: [],
     rest: rub('51212'),
     rate: { base: 'RUB', quote: 'AMD', scaled: 4_620_000n, source: 'personal', asOf: new Date() },
     rateKind: 'live',

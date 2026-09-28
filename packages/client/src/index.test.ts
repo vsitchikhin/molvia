@@ -1179,6 +1179,8 @@ describe('«Деньги» (MOL-82)', () => {
     spentIncome: null,
     income: { amount: '0.00', currency: 'RUB' },
     incomeUncounted: [],
+    shiftedIn: [],
+    shiftedOut: [],
     rest: null,
     rate: null,
     rateKind: 'live',

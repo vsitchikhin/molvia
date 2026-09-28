@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { Income } from '#model/entities/income'
+import type { Income, IncomeSource } from '#model/entities/income'
 import {
+  budgetMonthOf,
   lastDayOf,
   moneyMonth,
   monthOf,
+  nextMonth,
   percentChange,
   previousMonth,
   shareOf,
@@ -93,14 +95,14 @@ function trip(amount: string, on: string, at = `${on}T15:00:00Z`): TripLine {
   }
 }
 
-function income(amount: string, on: string): Income {
+function income(amount: string, on: string, source: IncomeSource = 'salary'): Income {
   return {
     id: nextId(),
     actorId: OWNER,
     amount: toMoney(amount),
     receivedOn: on,
     heldBefore: null,
-    source: 'salary',
+    source,
     note: null,
     accountId: null,
     revision: 1,
@@ -119,6 +121,7 @@ function month(input: Partial<MoneyMonthInput>) {
     spendings: [],
     trips: [],
     incomes: [],
+    salaryShiftDay: null,
     categories: presets,
     // 5 AMD for a rouble.
     rate: rate('RUB', 'AMD', '5'),
@@ -300,6 +303,78 @@ describe('the month of «Деньги»', () => {
     expect(result.spent).toEqual(toMoney('0 AMD'))
     expect(result.days).toEqual([])
     expect(result.byCategory).toEqual([])
+  })
+})
+
+describe('зарплата с N-го — в «Пришло» следующего месяца (MOL-134, В-2, В-3)', () => {
+  const salary = (on: string) => income('100 RUB', on)
+
+  it('moves a salary from the day on, and not a day before', () => {
+    expect(budgetMonthOf(salary('2026-08-24'), 25)).toBe('2026-08')
+    expect(budgetMonthOf(salary('2026-08-25'), 25)).toBe('2026-09')
+    expect(budgetMonthOf(salary('2026-08-31'), 25)).toBe('2026-09')
+    expect(budgetMonthOf(salary('2026-09-01'), 25)).toBe('2026-09')
+  })
+
+  it('moves December into January of the next year', () => {
+    expect(budgetMonthOf(salary('2026-12-28'), 25)).toBe('2027-01')
+    expect(nextMonth('2026-12')).toBe('2027-01')
+    expect(nextMonth('2026-09')).toBe('2026-10')
+  })
+
+  it('moves nothing with the setting off, nothing but a salary, and nothing past the month end (Н-7)', () => {
+    expect(budgetMonthOf(salary('2026-08-31'), null)).toBe('2026-08')
+    for (const source of ['bonus', 'gift', 'brought'] as const) {
+      expect(budgetMonthOf(income('100 RUB', '2026-08-31', source), 25), source).toBe('2026-08')
+    }
+    expect(budgetMonthOf(salary('2026-09-30'), 31)).toBe('2026-09')
+    expect(budgetMonthOf(salary('2026-08-31'), 31)).toBe('2026-09')
+    expect(budgetMonthOf(salary('2026-08-01'), 1)).toBe('2026-09')
+  })
+
+  it('counts the salary of the 31st in September and not in August, and names both days', () => {
+    const incomes = [
+      salary('2026-08-15'),
+      income('102345 RUB', '2026-08-31'),
+      income('99615 RUB', '2026-09-15'),
+      income('500 RUB', '2026-09-26', 'bonus'),
+      income('101000 RUB', '2026-09-26'),
+    ]
+    const september = month({ incomes, salaryShiftDay: 25 })
+    expect(september.income).toEqual(toMoney('202460 RUB'))
+    expect(september.shiftedIn).toEqual(['2026-08-31'])
+    expect(september.shiftedOut).toEqual(['2026-09-26'])
+
+    const august = month({ month: '2026-08', incomes, salaryShiftDay: 25 })
+    expect(august.income).toEqual(toMoney('100 RUB'))
+    expect(august.shiftedIn).toEqual([])
+    expect(august.shiftedOut).toEqual(['2026-08-31'])
+  })
+
+  it('keeps every income in its own month, and names none, with the setting off', () => {
+    const incomes = [income('102345 RUB', '2026-08-31'), income('99615 RUB', '2026-09-15')]
+    const september = month({ incomes })
+    expect(september.income).toEqual(toMoney('99615 RUB'))
+    expect(september).toMatchObject({ shiftedIn: [], shiftedOut: [] })
+  })
+
+  it('names a day once, however many salaries came on it', () => {
+    const incomes = [income('1 RUB', '2026-08-31'), income('2 RUB', '2026-08-31')]
+    expect(month({ incomes, salaryShiftDay: 25 }).shiftedIn).toEqual(['2026-08-31'])
+  })
+
+  it('counts a moved salary in another currency by the official rate of its own day', () => {
+    const days: string[] = []
+    const result = month({
+      incomes: [income('1000 USD', '2026-08-31')],
+      salaryShiftDay: 25,
+      incomeInIncome: (amount, day) => {
+        days.push(`${amount.currency} ${day}`)
+        return toMoney('86000 RUB')
+      },
+    })
+    expect(result.income).toEqual(toMoney('86000 RUB'))
+    expect(days).toEqual(['USD 2026-08-31'])
   })
 })
 

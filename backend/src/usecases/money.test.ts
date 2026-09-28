@@ -211,6 +211,7 @@ function repositoriesOf(world: World) {
         frozen.push(rate)
         return Promise.resolve(rate)
       },
+      salaryShift: () => Promise.resolve(null),
     }),
   }
   return { repositories, asked, frozen, written }

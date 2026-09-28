@@ -59,6 +59,7 @@ function monthOf(list: Spending[]) {
     spendings: list,
     trips: [],
     incomes: [],
+    salaryShiftDay: null,
     categories,
     rate: null,
     rateKind: 'live',

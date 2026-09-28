@@ -24,6 +24,30 @@ export function previousMonth(month: Month): Month {
     : `${String(year)}-${String(number - 1).padStart(2, '0')}`
 }
 
+export function nextMonth(month: Month): Month {
+  const [year, number] = month.split('-').map(Number) as [number, number]
+  return number === 12
+    ? `${String(year + 1)}-01`
+    : `${String(year)}-${String(number + 1).padStart(2, '0')}`
+}
+
+/**
+ * The month an income counts in «Пришло» (MOL-134, В-2): with «зарплата с … числа» on, a salary
+ * received on that day of its month or later counts in the next one, as the owner's sheet has it —
+ * the salary of the 25th pays for the month after. Every other source, and every salary with the
+ * setting off, counts in its own month. The day of the income itself is never moved: the journal of
+ * «Доходы», the balances and the person's own rate go by it. A day the month does not have moves
+ * nothing — «с 31-го» in September (Н-7).
+ */
+export function budgetMonthOf(
+  income: Pick<Income, 'receivedOn' | 'source'>,
+  salaryShiftDay: number | null,
+): Month {
+  const month = monthOf(income.receivedOn)
+  if (salaryShiftDay === null || income.source !== 'salary') return month
+  return Number(income.receivedOn.slice(8, 10)) >= salaryShiftDay ? nextMonth(month) : month
+}
+
 export function lastDayOf(month: Month): string {
   const [year, number] = month.split('-').map(Number) as [number, number]
   const days = new Date(Date.UTC(year, number, 0)).getUTCDate()
@@ -78,6 +102,10 @@ export interface MoneyMonth {
   /** What came in, in the income currency, each income by the official rate of its own day (MOL-66). */
   readonly income: Money
   readonly incomeUncounted: readonly Money[]
+  /** Days of the salaries of the month before that count in this one («с зарплатой 31 авг.»). */
+  readonly shiftedIn: readonly string[]
+  /** Days of this month's salaries that count in the next one («зарплата 26 сент. — в октябре»). */
+  readonly shiftedOut: readonly string[]
   /** What came in less what was spent, in the income currency; signed. Null without a rate. */
   readonly rest: Money | null
   readonly rate: ExchangeRate | null
@@ -97,7 +125,10 @@ export interface MoneyMonthInput {
   readonly incomeCurrency: Currency
   readonly spendings: readonly Spending[]
   readonly trips: readonly TripLine[]
+  /** Every income of the owner: which count in this month is `budgetMonthOf`'s to say. */
   readonly incomes: readonly Income[]
+  /** «Зарплата с … числа — в следующий месяц» (MOL-134); null — off. */
+  readonly salaryShiftDay: number | null
   readonly categories: readonly SpendingCategory[]
   /** The month's rate between the spending currency and the income one, on either side. */
   readonly rate: ExchangeRate | null
@@ -118,6 +149,11 @@ export interface MoneyMonthInput {
 
 function add(sums: Map<Currency, bigint>, { minor, currency }: Money): void {
   sums.set(currency, (sums.get(currency) ?? 0n) + minor)
+}
+
+/** The days incomes came in on, each once, earliest first. */
+function daysOf(incomes: readonly Income[]): string[] {
+  return [...new Set(incomes.map((income) => income.receivedOn))].sort()
 }
 
 function listOf(sums: Map<Currency, bigint>): Money[] {
@@ -234,9 +270,17 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
     days.set(day, [...(days.get(day) ?? []), entry])
   }
 
+  const ofMonth = input.incomes.filter(
+    (income) => budgetMonthOf(income, input.salaryShiftDay) === input.month,
+  )
+  const shiftedOut = input.incomes.filter(
+    (income) =>
+      monthOf(income.receivedOn) === input.month &&
+      budgetMonthOf(income, input.salaryShiftDay) !== input.month,
+  )
   let incomeMinor = 0n
   const incomeUncounted = new Map<Currency, bigint>()
-  for (const income of input.incomes) {
+  for (const income of ofMonth) {
     const counted =
       income.amount.currency === incomeCurrency
         ? income.amount
@@ -270,6 +314,8 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
     spentIncome,
     income,
     incomeUncounted: listOf(incomeUncounted),
+    shiftedIn: daysOf(ofMonth.filter((income) => monthOf(income.receivedOn) !== input.month)),
+    shiftedOut: daysOf(shiftedOut),
     rest:
       spentIncome === null
         ? null
