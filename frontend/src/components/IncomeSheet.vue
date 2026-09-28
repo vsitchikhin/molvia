@@ -24,6 +24,13 @@
       <p v-if="currency !== overview.base" class="hint">
         {{ t('income.sheet.bought_hint', { base: sign(overview.base) }) }}
       </p>
+      <!-- Where it came in, under the pair it is about; only accounts of its currency (06). -->
+      <AccountRow
+        v-if="showsAccount"
+        :label="t('accounts.picker.row_income')"
+        :account="account"
+        @open="pickerOpen = true"
+      />
 
       <AppField
         v-model="source"
@@ -56,6 +63,12 @@
           {{ t('income.sheet.held_hint') }}
           <template v-if="estimate"> <br />{{ estimate }} </template>
         </p>
+        <HeldFromAccounts
+          :currency="currency"
+          :day="day"
+          :except="editing?.id ?? null"
+          @fill="held = typed($event)"
+        />
       </div>
 
       <AppField
@@ -92,6 +105,15 @@
       </AppButton>
     </template>
   </BottomSheet>
+  <AccountPickerSheet
+    v-model:open="pickerOpen"
+    :title="t('accounts.picker.row_income')"
+    :accounts="accounts.accounts"
+    :currency="currency"
+    strict
+    :selected="accountId"
+    @pick="pick"
+  />
 </template>
 
 <script lang="ts">
@@ -122,13 +144,18 @@ import type {
   IncomesResponse,
   Money,
 } from '@molvia/model'
+import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
+import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
+import { useAccountChoice } from '@/composables/useAccountChoice'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, purchaseDay } from '@/days'
 import { newId } from '@/ids'
+import { useAccountsStore } from '@/stores/accounts'
 
 /**
  * «Записать доход» (MOL-66): how much came in, in which currency, from where and on which day. What
@@ -142,7 +169,14 @@ import { newId } from '@/ids'
  */
 export default defineComponent({
   name: 'IncomeSheet',
-  components: { AppButton, AppField, BottomSheet },
+  components: {
+    AccountPickerSheet,
+    AccountRow,
+    AppButton,
+    AppField,
+    BottomSheet,
+    HeldFromAccounts,
+  },
   props: {
     open: { type: Boolean, required: true },
     /** Opened over another sheet — a check, «не попали» (MOL-123): «‹» back to it, no ×. */
@@ -183,6 +217,9 @@ export default defineComponent({
     const failed = ref(false)
     const conflict = ref(false)
     let incomeId = newId()
+    const accounts = useAccountsStore()
+    const choice = useAccountChoice(currency)
+    const pickerOpen = ref(false)
 
     const typed = (value: Money): string =>
       shown(decimalFromMinor(value), locale.value === 'ru' ? ',' : '.')
@@ -210,6 +247,8 @@ export default defineComponent({
         failed.value = false
         conflict.value = false
         incomeId = newId()
+        pickerOpen.value = false
+        choice.reset(editing ? editing.accountId : undefined)
       },
       { immediate: true },
     )
@@ -335,6 +374,8 @@ export default defineComponent({
         source: chosen,
         ...(heldBefore ? { heldBefore } : {}),
         ...(typedNote?.success ? { note: typedNote.data } : {}),
+        // Said whenever there are accounts: left out, the server keeps the one it has (Р-26).
+        ...(choice.shows.value ? { accountId: choice.accountId.value } : {}),
       }
       sending.value = true
       conflict.value = false
@@ -364,6 +405,13 @@ export default defineComponent({
     }
 
     return {
+      accounts,
+      accountId: choice.accountId,
+      account: choice.account,
+      showsAccount: choice.shows,
+      pickerOpen,
+      pick: choice.pick,
+      typed,
       t,
       id,
       amount,

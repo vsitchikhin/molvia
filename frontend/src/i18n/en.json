@@ -1135,7 +1135,8 @@
     "charged": {
       "label": "Charged to account, {sign}",
       "hint_empty": "Empty — we'll use the day's rate, about {amount}",
-      "hint_filled": "“{name}” goes down by exactly {amount}"
+      "hint_filled": "“{name}” goes down by exactly {amount}",
+      "hint_empty_plain": "Empty — it will be counted at the rate of the day"
     },
     "trip_hint": "Items without a price don't reduce the balance. Prices are edited in the trip, the account here — the choice saves right away",
     "trip_unpriced": "no price",
@@ -1144,6 +1145,8 @@
       "RUB": "in roubles",
       "USD": "in dollars",
       "EUR": "in euros"
-    }
+    },
+    "held_hint": "Accounts on {date}: {amount}",
+    "held_fill": "Fill in"
   }
 }
