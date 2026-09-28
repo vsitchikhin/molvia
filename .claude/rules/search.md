@@ -54,8 +54,9 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   the budget. The price of the rule is a Russian word typed with `c` for `ц` in a hard
   position: `otec` and `cukaty` cost an edit, `jajca` left the corpus (45 of 46); `ts`
   spellings are untouched. A Latin word cut right after a `c` — «Nutric» on the way to
-  «Nutricia» — is not the start of the finished one; narrow, and MOL-14's shelf never met it
-  (MOL-47). The fold also fires on what the alphabet itself produced, not only on Latin someone
+  «Nutricia» — is not the start of the finished one, but it is one edit from it, and from four
+  letters a start is allowed one: «Nutric» finds «Nutricia» (MOL-47, measured). Only a cut of
+  three letters or fewer is lost, which is narrower still. The fold also fires on what the alphabet itself produced, not only on Latin someone
   typed — `тс` becomes `ts` becomes `ц` — which is what makes «счёт» and «щёт» one key, and also
   what reads the `тс` of «Советский» as `ц`. A false merge costs a candidate, a miss costs the
   answer; the trade is deliberate, and it is a trade. **That is why the key is never an
@@ -150,7 +151,11 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   «молоко ашхар кефир» finds the milk, and «кока кола 0,5 л» even finds «Вода Джермук 0.5 л»,
   every word wrong by two; the two thresholds disagree — «ыср» is two edits from «сыр» yet
   shares no trigram with it, so it never becomes a candidate; and a name of punctuation only
-  («???») has a key but no query reaches it (both MOL-47). A name without a size ranks level
+  («???») has a key but no query reaches it. MOL-47 measured all of them again on the seed
+  (28.09.2026) and both still stand — there «ыср» is a far answer of «Икра красная» — and two
+  more with them: «Сааар» folds its doubling to `sar`, so «Сардельки», «Сардины» and «Сыр» rank
+  above «Сахар»; «Cheesecake» finds nothing, since no alphabet makes «чиз» of `cheese` — only the
+  dictionary could. Left for the real input MOL-47 waits for. A name without a size ranks level
   with a wrong size — unknown is not worse than wrong, which is likely right.
 - **The answer says how near it is (MOL-46), and nothing is dropped for it.** The budget is
   absolute: `pelmeni` is two edits from `zeleni` of «Чай зелёный» exactly as `malako` is from
