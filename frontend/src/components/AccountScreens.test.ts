@@ -35,13 +35,14 @@ const addMoneyAccount =
     (body: MoneyAccountBody) => Promise<{ accounts: MoneyAccountsResponse; created: boolean }>
   >()
 const removeMoneyAccount = vi.fn<(id: string) => Promise<MoneyAccountsResponse>>()
+const spendingCategories = vi.fn<() => Promise<{ categories: SpendingCategoryView[] }>>()
 vi.mock('@/api', () => ({
   api: {
     checkAccount: (id: string, body: AccountCheckBody) => checkAccount(id, body),
     moneyAccounts: () => moneyAccounts(),
     addMoneyAccount: (body: MoneyAccountBody) => addMoneyAccount(body),
     removeMoneyAccount: (id: string) => removeMoneyAccount(id),
-    spendingCategories: () => Promise.resolve({ categories: [] }),
+    spendingCategories: () => spendingCategories(),
   },
 }))
 
@@ -115,6 +116,7 @@ beforeEach(() => {
   sessionStorage.clear()
   for (const mock of [checkAccount, moneyAccounts, addMoneyAccount, removeMoneyAccount])
     mock.mockReset()
+  spendingCategories.mockReset().mockResolvedValue({ categories: [] })
   vi.restoreAllMocks()
   clock = 0
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -448,6 +450,34 @@ describe('ReconcileSheet (handoff 05)', () => {
     await flushPromises()
     expect(checkAccount).toHaveBeenCalledTimes(2)
     expect(view.text()).toContain(en.accounts.reconcile.match_title)
+  })
+
+  it('review 35: no «Прочее» known — asked for, named when it fails, and «Повторить» writes', async () => {
+    checkAccount.mockResolvedValue(answer('185000', '190132'))
+    spendingCategories.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'down', true))
+    const pinia = withAccounts([cash])
+    moneyAccounts.mockResolvedValue(page([cash]))
+    const view = await mounted(
+      ReconcileSheet,
+      { open: true, account: cash, categories: [], nameOf: () => 'Other', accountName: () => null },
+      pinia,
+    )
+    await view.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    await button(view, /Record the difference/)?.trigger('click')
+    await flushPromises()
+    expect(view.text()).toContain(en.accounts.reconcile.no_other)
+    const records = () =>
+      useSpendingQueueStore(pinia).pending.filter((one) => one.kind === 'record')
+    expect(records()).toHaveLength(0)
+
+    spendingCategories.mockResolvedValueOnce({ categories })
+    await button(view, en.state.retry)?.trigger('click')
+    await flushPromises()
+    expect(checkAccount).toHaveBeenCalledTimes(1)
+    expect(records()).toHaveLength(1)
+    expect(records()[0]?.kind === 'record' && records()[0]?.body.categoryId).toBe(OTHER)
   })
 
   it('review 34: offline is said once, and goes when the connection comes back', async () => {

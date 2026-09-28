@@ -1117,6 +1117,7 @@
       "note": "check",
       "cause_no_account_trip": "Trip {amount} with no account",
       "cause_uncounted": "{title} — no rate to count it by",
+      "no_other": "The categories did not load — the difference needs “Other” to be recorded",
       "failed": "Couldn’t check the account — try again"
     },
     "picker": {

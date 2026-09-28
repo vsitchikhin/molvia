@@ -111,9 +111,15 @@
     <template #footer>
       <!-- Offline or the server: decided after the failure, and offline is never red (MOL-19).
            Offline is said above, by the connection itself, and goes with it (review 34). -->
-      <div v-if="failure === 'error'" class="failed" role="alert">
-        <span>{{ t('accounts.reconcile.failed') }}</span>
-        <AppButton v-if="result" variant="ghost" @click="recount(true)">
+      <div v-if="failure === 'error' || failure === 'categories'" class="failed" role="alert">
+        <span>{{
+          t(failure === 'categories' ? 'accounts.reconcile.no_other' : 'accounts.reconcile.failed')
+        }}</span>
+        <AppButton
+          v-if="result"
+          variant="ghost"
+          @click="failure === 'categories' ? writeDifference() : recount(true)"
+        >
           {{ t('state.retry') }}
         </AppButton>
       </div>
@@ -266,7 +272,7 @@ export default defineComponent({
     const result = ref<AccountCheckResponse | null>(null)
     const sending = ref(false)
     /** Why the last ask did not answer — read after the failure, never before (MOL-19, A1). */
-    const failure = ref<'offline' | 'error' | null>(null)
+    const failure = ref<'offline' | 'error' | 'categories' | null>(null)
     const resultBox = ref<HTMLElement | null>(null)
     const removedReason = ref<(Removed & { stamp: number }) | null>(null)
     const incomeDraft = ref<IncomeDraft | null>(null)
@@ -569,7 +575,7 @@ export default defineComponent({
      * it is an income, and its sheet opens filled over this one — the person answers «сколько было
      * до», or the income would become the price of the whole currency (owner's decision В-5).
      */
-    function writeDifference(): void {
+    async function writeDifference(): Promise<void> {
       const value = result.value
       if (!value || writing.value || written.value || tripsHeld.value || !sent) return
       const size = {
@@ -590,13 +596,16 @@ export default defineComponent({
         incomeOpen.value = true
         return
       }
-      const other = props.categories.find((category) => category.preset === 'other')
-      if (!other) {
-        failure.value = 'error'
-        return
-      }
       writing.value = true
       failure.value = null
+      const other = await otherCategory()
+      // The answer may have moved on meanwhile: the difference written is the one still shown.
+      if (!other || result.value !== value) {
+        writing.value = false
+        // Offline is not red; the categories are named, and «Повторить» writes, not recounts (35).
+        if (!other) failure.value = navigator.onLine ? 'categories' : 'offline'
+        return
+      }
       spendings.record({
         id: differenceId,
         spentOn: value.checkedOn,
@@ -611,6 +620,21 @@ export default defineComponent({
       writing.value = false
       announce?.(t('accounts.reconcile.written', { amount: signed(value.difference) }))
       emit('update:open', false)
+    }
+
+    /**
+     * «Прочее» of the owner. None known — no list kept on this phone and the screen's unanswered —
+     * is asked here once more (review 35): «Повторить» of a check recounted, and wrote nothing.
+     */
+    async function otherCategory(): Promise<SpendingCategoryView | null> {
+      const isOther = (category: SpendingCategoryView) => category.preset === 'other'
+      const known = props.categories.find(isOther)
+      if (known) return known
+      try {
+        return (await api.spendingCategories()).categories.find(isOther) ?? null
+      } catch {
+        return null
+      }
     }
 
     /** The income is written: the same check once more, here — it comes out even (В-5 MOL-115). */
