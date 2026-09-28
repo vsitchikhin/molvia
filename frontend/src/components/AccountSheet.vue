@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
+  <BottomSheet :open="open" :on-closed="afterClose" @update:open="$emit('update:open', $event)">
     <template #title>{{
       t(account ? 'accounts.sheet.title_edit' : 'accounts.sheet.title_add')
     }}</template>
@@ -278,9 +278,20 @@ export default defineComponent({
       ;(field?.$el as HTMLElement | undefined)?.querySelector<HTMLElement>('input')?.focus()
     }
 
-    function finished(outcome: AccountOutcome): void {
+    /**
+     * Told once the sheet is away (`onClosed`), never while its step back is on its way: a screen
+     * that moves on the answer — «Удалить» on the account's own screen leads to «Счета» — had its
+     * move undone by the pop that closed the sheet.
+     */
+    let outcome: AccountOutcome | null = null
+    function finished(done: AccountOutcome): void {
+      outcome = done
       emit('update:open', false)
-      emit('done', outcome)
+    }
+    function afterClose(): void {
+      const done = outcome
+      outcome = null
+      if (done) emit('done', done)
     }
 
     async function submit(): Promise<void> {
@@ -406,6 +417,7 @@ export default defineComponent({
       startField,
       submit,
       remove,
+      afterClose,
     }
   },
 })
