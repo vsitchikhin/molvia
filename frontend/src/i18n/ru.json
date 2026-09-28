@@ -1147,6 +1147,9 @@
       "EUR": "в евро"
     },
     "held_hint": "По счетам на {date}: {amount}",
-    "held_fill": "Подставить"
+    "held_fill": "Подставить",
+    "card_from": "с «{name}»",
+    "card_to": "на «{name}»",
+    "card_name": "«{name}»"
   }
 }

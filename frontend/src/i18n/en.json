@@ -1147,6 +1147,9 @@
       "EUR": "in euros"
     },
     "held_hint": "Accounts on {date}: {amount}",
-    "held_fill": "Fill in"
+    "held_fill": "Fill in",
+    "card_from": "from “{name}”",
+    "card_to": "to “{name}”",
+    "card_name": "“{name}”"
   }
 }
