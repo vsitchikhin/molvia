@@ -15,7 +15,7 @@ endif
 REQUIRE_ENV = @test -f .env || { echo "no .env in this copy — run: make setup"; exit 1; }
 NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json is missing) — this target goes live once the workspaces land"; exit 1; }
 
-.PHONY: help setup hooks up down reup ps logs psql migrate forget seed db-reset dev format lint typecheck test e2e check prod-build certs icons ports
+.PHONY: help setup hooks up down reup ps logs psql migrate forget seed gates db-reset dev format lint typecheck test e2e check prod-build certs icons ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -82,6 +82,12 @@ forget: ## Erase a person by Telegram id: make forget TG=<id> [YES=1] (dry run w
 seed: ## Put the common names into the catalogue: make seed [YES=1] (dry run without YES=1)
 	$(NEED_SCAFFOLD)
 	npm run --silent seed -w @molvia/backend -- $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
+
+# FROM and TO reach the script through the environment, never pasted into the recipe, for the
+# reason `forget` gives (MOL-58, П-3). It only reads.
+gates: ## Read gates 0.2 and 0.3: make gates FROM=<day|moment> [TO=<day|moment>]
+	$(NEED_SCAFFOLD)
+	./bin/gates.sh "$$FROM" "$$TO"
 
 dev: ## Run api, pwa and bot for this copy
 	$(NEED_SCAFFOLD)
