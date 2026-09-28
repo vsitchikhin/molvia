@@ -26,6 +26,9 @@
       </ScreenState>
 
       <template v-if="phase !== 'idle'">
+        <!-- Balances are «now», not the month's: above the switcher, and the same on every month
+             (MOL-123, handoff 01). -->
+        <AccountsCard :online="online" :spend-currency="spendCurrency" />
         <MonthSwitcher :month="selected" :current="currentMonth" @change="goMonth" />
 
         <ScreenSkeleton v-if="phase === 'loading'" :groups="[44, 70, 34, 60, 80, 48, 66]" />
@@ -236,6 +239,7 @@ import {
   yerevanDate,
 } from '@molvia/model'
 import type { Money, MoneyMonthView, SpendingCategoryView, WireCode } from '@molvia/model'
+import AccountsCard from '@/components/AccountsCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
@@ -271,6 +275,7 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 export default defineComponent({
   name: 'MoneyView',
   components: {
+    AccountsCard,
     AppButton,
     AppCard,
     AppScreen,
