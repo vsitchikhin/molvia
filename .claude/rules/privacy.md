@@ -28,7 +28,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   24.09.2026). People erase themselves with `/delete` in the bot; the owner's fallback is
   `dist/forget.js` in the API image (`make forget` in a copy — `TG` reaches the script through the
   environment, never pasted into the recipe, where a value could close a quote and bring its own
-  `--yes`, П-3), a dry run unless `--yes`, and
+  `--yes`, П-3; and only a `TG` typed on that command line — one left in the shell erased that
+  person, MOL-91 Г), a dry run unless `--yes`, and
   **a dry run is the real run, rolled back**, so its count cannot disagree with what erasure does.
   **A new table that points at `actors` must join erasure** — a test compares every foreign key
   on `actors` with `ACTOR_REFERENCES`, and another scans every table for the erased person's uuid
