@@ -46,7 +46,9 @@ export function useOwnCategories(): OwnCategories {
     },
   )
 
-  const categories = computed(() => categoriesWith(server.value, queue.pending))
+  const categories = computed(() =>
+    categoriesWith(server.value, [...queue.arrived, ...queue.pending]),
+  )
   function nameOf(category: SpendingCategoryView): string {
     return category.preset ? t(`spending.category.${category.preset}`) : (category.name ?? '')
   }

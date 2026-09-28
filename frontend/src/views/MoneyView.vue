@@ -348,7 +348,9 @@ export default defineComponent({
     // Any month the phone keeps names the categories — they are the owner's, not the month's — so
     // a spending can be written before this month's answer, or offline on the first of the month
     // (review Т-5).
-    const categories = computed(() => categoriesWith(knownCategories.value, queue.pending))
+    const categories = computed(() =>
+      categoriesWith(knownCategories.value, [...queue.arrived, ...queue.pending]),
+    )
     /** Whether a spending can be written here at all: a category is required, and known. */
     const canWrite = computed(() => categories.value.some((category) => !category.archived))
     const journal = computed(() =>

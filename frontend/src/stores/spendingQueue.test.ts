@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE, parseMoney } from '@molvia/model'
 import type { SpendingAmendBody, SpendingBody, SpendingCategoryBody } from '@molvia/model'
+import { categoriesWith } from '@/components/spending'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import type { SpendingFields } from '@/stores/spendingQueue'
@@ -486,6 +487,18 @@ describe('spending queue', () => {
       queue.addCategory({ id: TAXI, name: 'Такси' })
       await settled()
       expect(queue.rejected).toMatchObject([{ code: ERROR.SPENDING_CATEGORY_TAKEN }])
+      expect(queue.arrived).toEqual([])
+    })
+
+    // Out of the queue on its answer, not yet in the list the server is asked for again: the chip
+    // just chosen must not vanish from under «Сохранить трату» in between.
+    it('a category that landed stays on the chips until the server’s list names it', async () => {
+      const queue = fresh()
+      queue.addCategory({ id: TAXI, name: 'Такси' })
+      await settled()
+      expect(queue.pending).toEqual([])
+      const names = categoriesWith([], [...queue.arrived, ...queue.pending]).map((one) => one.name)
+      expect(names).toEqual(['Такси'])
     })
   })
 

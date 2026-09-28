@@ -160,7 +160,9 @@ export default defineComponent({
       if (server.value) return 'ready'
       return failure.value ?? 'loading'
     })
-    const all = computed(() => categoriesWith(server.value ?? [], queue.pending))
+    const all = computed(() =>
+      categoriesWith(server.value ?? [], [...queue.arrived, ...queue.pending]),
+    )
     const live = computed(() => all.value.filter((category) => !category.archived))
     const archived = computed(() => all.value.filter((category) => category.archived))
 

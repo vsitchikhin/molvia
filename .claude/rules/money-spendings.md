@@ -175,7 +175,10 @@ nothing up.
   same month; opened cold, «Деньги» is laid underneath.
 - **One's own category is made from the chips** («+ Своя», a sheet over the sheet, chosen as soon
   as it exists) **and kept on «Деньги → Категории»** (В-1): «Убрать» asks nothing, since it erases
-  nothing, and «Вернуть» stands right under it. A name equal to a preset in the language of the
+  nothing, and «Вернуть» stands right under it. **A category that landed stays on the chips until the
+  server's list names it** (`arrived`, found by e2e in MOL-123): it leaves the queue on its answer and
+  the list is read again only after, and in between «Сохранить трату» said «Выберите категорию» over
+  the one just made and chosen. A name equal to a preset in the language of the
   screen, or to a live one of one's own, is refused there. The colours are tokens — thirteen
   presets and a palette of eight for one's own, none red, olive, ochre or terracotta, each at
   least 3:1 on `--surface`.
