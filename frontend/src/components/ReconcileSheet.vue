@@ -66,8 +66,7 @@
         </p>
         <!-- A muted difference says what it waits for (adversarial round 3, Н4). -->
         <p v-if="recountPending" class="hint">{{ t('accounts.reconcile.recounting') }}</p>
-        <p v-if="heldHere" class="hint">{{ t('accounts.reconcile.trips_held_here') }}</p>
-        <p v-else-if="tripsHeld" class="hint">{{ t('accounts.reconcile.trips_held') }}</p>
+        <p v-if="tripsHeld" class="hint">{{ t('accounts.reconcile.trips_held') }}</p>
         <AppButton variant="ghost" @click="again">
           {{ t('accounts.reconcile.edit_fact') }}
         </AppButton>
@@ -140,7 +139,7 @@
           <AppButton
             variant="secondary"
             block
-            :disabled="writing || !online || recountPending || heldHere"
+            :disabled="writing || !online || recountPending || tripsHeld"
             @click="writeDifference"
           >
             {{ t('accounts.reconcile.write_difference') }}
@@ -300,7 +299,6 @@ export default defineComponent({
         tried = null
         asking += 1
         recountOnLanding = false
-        touched.value.clear()
         await nextTick()
         factInput.value?.focus()
       },
@@ -415,33 +413,15 @@ export default defineComponent({
       return trips.elsewhere === null && trips.needsContext === null && !trips.orphaned(tripId)
     }
 
+    /**
+     * A write held so shuts «Записать разницу», whichever account it names: counted without it, the
+     * difference is honest, but written as «Прочее» it was the trip's money, and the trip's own came
+     * after the answer on «Поход» — twice (review 36, adversarial round 4, Н5). Any trip's: a payment
+     * names only the account it moves to, never the one it takes the trip off, and a removal names
+     * none (review 37, round 5, Н6). The check itself is not held (Н4) and says why.
+     */
     const tripsHeld = computed(() =>
       trips.pending.some((write) => countsMoney(write) && !tripsSend(write)),
-    )
-
-    /** Trips put right from this check: whatever account they are moved to, it is this check's money. */
-    const touched = ref(new Set<string>())
-
-    /**
-     * Whether a write held on «Поход» moves this account: a trip put on it, one of its reasons or put
-     * right here, and any removal or return — whose account the queue cannot say. Counted without,
-     * the difference is honest, but «Записать разницу» over it wrote the trip's money as «Прочее»,
-     * and the trip's own came after the answer on «Поход»: twice (review 36, adversarial round 4, Н5).
-     */
-    function concerns(write: QueuedWrite): boolean {
-      if (write.kind === 'delete' || write.kind === 'restore') return true
-      if (write.kind !== 'payment') return false
-      return (
-        write.body.accountId === props.account.id ||
-        touched.value.has(write.tripId) ||
-        (result.value?.reasons ?? []).some(
-          ({ operation }) => operation.kind === 'trip' && operation.id === write.tripId,
-        )
-      )
-    }
-
-    const heldHere = computed(() =>
-      trips.pending.some((write) => countsMoney(write) && !tripsSend(write) && concerns(write)),
     )
 
     // A spending is put right through the queue, a trip too: its answer comes after the sheet, and
@@ -457,10 +437,13 @@ export default defineComponent({
       },
     )
 
-    // A write held on «Поход» moves once the person has answered there: from then it is waited on
-    // like any other, and the same check is asked again when it has landed (review 36).
+    // A write held on «Поход» moves once the person has answered there, or the question settled by
+    // itself: from then it is waited on like any other — the difference muted until it lands, and
+    // the same check asked again then (review 36, 37; adversarial round 5, Н7).
     watch(tripsHeld, (held, was) => {
-      if (was && !held && result.value) recountOnLanding = true
+      if (!was || held || !result.value) return
+      recountPending.value = true
+      recountOnLanding = true
     })
 
     useReconnect(() => {
@@ -470,7 +453,6 @@ export default defineComponent({
     const reasonOpen = ref(false)
     const reasonOperation = ref<AccountOperationView | null>(null)
     function openReason(operation: AccountOperationView): void {
-      if (operation.kind === 'trip') touched.value.add(operation.id)
       reasonOperation.value = operation
       reasonOpen.value = true
     }
@@ -580,7 +562,7 @@ export default defineComponent({
      */
     function writeDifference(): void {
       const value = result.value
-      if (!value || writing.value || written.value || heldHere.value || !sent) return
+      if (!value || writing.value || written.value || tripsHeld.value || !sent) return
       const size = {
         ...value.difference,
         minor: value.difference.minor < 0n ? -value.difference.minor : value.difference.minor,
@@ -663,7 +645,6 @@ export default defineComponent({
       reasonRemoved,
       reasons,
       tripsHeld,
-      heldHere,
       incomeDraft,
       incomeOpen,
       incomeSaved,

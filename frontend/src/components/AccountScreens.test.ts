@@ -333,14 +333,15 @@ describe('ReconcileSheet (handoff 05)', () => {
     const pinia = withAccounts([cash])
     const trips = useTripQueueStore(pinia)
     trips.elsewhere = { tripId: TRIP, place: 'Ереван Сити', mine: 'Рынок' }
-    // Another account's trip: this check is not held, and says what waits.
+    // Put on the card — maybe taken off this cash, which the queue cannot say (review 37, Н6): the
+    // check counts without it, is not muted, says what waits, and writes nothing over it.
     trips.pending = [{ kind: 'payment', tripId: TRIP, body: { accountId: CARD, debited: null } }]
     const view = await reconcile(pinia)
     await view.get('input').setValue('9000')
     await button(view, en.accounts.reconcile.check)?.trigger('click')
     await flushPromises()
     expect(view.get('.difference').classes()).not.toContain('stale')
-    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeUndefined()
+    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
     expect(view.text()).toContain(en.accounts.reconcile.trips_held)
 
     // Control: a write the queue sends by itself is waited on, and the wait is said.
@@ -367,7 +368,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     // Counted without it — honest — but its money cannot become «Прочее».
     expect(view.get('.difference').classes()).not.toContain('stale')
     expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
-    expect(view.text()).toContain(en.accounts.reconcile.trips_held_here)
+    expect(view.text()).toContain(en.accounts.reconcile.trips_held)
 
     // The person answers on «Поход», the account lands: the same check once more.
     checkAccount.mockResolvedValue(answer('6200', '6200'))
@@ -378,6 +379,24 @@ describe('ReconcileSheet (handoff 05)', () => {
     await flushPromises()
     expect(checkAccount).toHaveBeenCalledTimes(2)
     expect(view.text()).toContain(en.accounts.reconcile.match_title)
+  })
+
+  it('review 37, round 5 Н7: the question settled by itself — muted while the write is on its way', async () => {
+    checkAccount.mockResolvedValue(answer('6200', '10000'))
+    const pinia = withAccounts([cash])
+    const trips = useTripQueueStore(pinia)
+    trips.elsewhere = { tripId: TRIP, place: 'Ереван Сити', mine: 'Рынок' }
+    trips.pending = [{ kind: 'payment', tripId: TRIP, body: { accountId: cash.id, debited: null } }]
+    const view = await reconcile(pinia)
+    await view.get('input').setValue('6200')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    // The open trip was finished on another phone: the payment leaves, its answer still out.
+    trips.elsewhere = null
+    await flushPromises()
+    expect(view.get('.difference').classes()).toContain('stale')
+    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
+    expect(checkAccount).toHaveBeenCalledTimes(1)
   })
 
   it('review 34: offline is said once, and goes when the connection comes back', async () => {
