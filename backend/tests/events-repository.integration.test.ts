@@ -390,12 +390,14 @@ describe("recording at most once a day of the person's own life", () => {
     //
     // The zone is made up around today rather than named: a real one (Chile, 6 September 2026)
     // put its change inside the last three weeks only for a while, and then this test would
-    // pass on the old arithmetic too. A POSIX rule whose summer time starts ten days ago keeps
-    // the change inside the window on whatever day the test runs.
-    const tenDaysAgo = new Date(Date.now() - 10 * DAY)
+    // pass on the old arithmetic too. A POSIX rule whose summer time starts seventeen days ago
+    // keeps the change inside both lives on whatever day the test runs: the one written today,
+    // 21 days back, and the one the gate reads, moved two weeks further (self-review С-7). At ten
+    // days the move left the change after the third week, and `interval '21 days'` passed there.
+    const changeDay = new Date(Date.now() - 17 * DAY)
     // `Jn` counts 1..365 and never counts 29 February, so the day is taken in a common year.
     const julian =
-      (Date.UTC(2001, tenDaysAgo.getUTCMonth(), tenDaysAgo.getUTCDate()) - Date.UTC(2001, 0, 1)) /
+      (Date.UTC(2001, changeDay.getUTCMonth(), changeDay.getUTCDate()) - Date.UTC(2001, 0, 1)) /
         DAY +
       1
     const summerEnds = ((julian + 60 - 1) % 365) + 1
