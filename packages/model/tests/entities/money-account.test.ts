@@ -78,6 +78,7 @@ function operation(
     debited: null,
     rate: null,
     unpriced: 0,
+    revision: kind === 'trip' ? null : 1,
     details: {
       categoryId: null,
       note: null,

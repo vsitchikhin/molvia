@@ -48,6 +48,21 @@ export function backTarget(router: Router, route: Routed): BackTarget | null {
 }
 
 /**
+ * Onto the parent itself, never past it to an older ancestor: a step back when the parent is the
+ * entry underneath, otherwise a replace onto it. For a screen that is gone and whose parent has
+ * something to say about it — a deleted account, whose «Вернуть» stands on «Счета» (MOL-123,
+ * review 32): opened from a line of the card on «Деньги», the chevron's step went to «Деньги»,
+ * where nothing offered it back.
+ */
+export function upTarget(router: Router, route: Routed): BackTarget | null {
+  const parent = parentOf(router, route)
+  if (!parent) return null
+  const below: unknown = router.options.history.state.back
+  const path = typeof below === 'string' ? router.resolve(below).path : null
+  return { location: parent, step: parent.path === path }
+}
+
+/**
  * Which screen the entry underneath the current one is — by route, never by address. The
  * history records the address whole, and `/?utm_source=telegram` or `/#top` is the trip as
  * much as `/` is; a string compared with `'/'` took them for somewhere else, and «back» from
@@ -71,7 +86,13 @@ function parentOf(
   route: Pick<Routed, 'meta' | 'params' | 'query'>,
 ): ReturnType<Router['resolve']> | null {
   const parent = parentName(route)
-  return parent ? router.resolve({ name: parent, params: route.params }) : null
+  if (!parent) return null
+  // Only the parameters the parent names: an account's id handed to «Счета» is discarded with a
+  // warning on every draw of the chevron.
+  const path = router.getRoutes().find((record) => record.name === parent)?.path ?? ''
+  const named = new Set(Array.from(path.matchAll(/:(\w+)/g), ([, key]) => key))
+  const params = Object.fromEntries(Object.entries(route.params).filter(([key]) => named.has(key)))
+  return router.resolve({ name: parent, params })
 }
 
 /**
@@ -158,6 +179,7 @@ export function stepBack(router: Router, steps = 1, force = false): void {
 export function useNavigation(): {
   goTab: (to: Tab) => Promise<void>
   goBack: () => Promise<void>
+  goUp: () => Promise<void>
 } {
   const router = useRouter()
   const route: RouteLocationNormalizedLoaded = useRoute()
@@ -176,11 +198,19 @@ export function useNavigation(): {
 
   async function goBack(): Promise<void> {
     if (stepping) return
-    const target = backTarget(router, route)
+    await go(backTarget(router, route))
+  }
+
+  async function goUp(): Promise<void> {
+    if (stepping) return
+    await go(upTarget(router, route))
+  }
+
+  async function go(target: BackTarget | null): Promise<void> {
     if (!target) return
     if (target.step) stepBack(router)
     else await router.replace(target.location.fullPath)
   }
 
-  return { goTab, goBack }
+  return { goTab, goBack, goUp }
 }

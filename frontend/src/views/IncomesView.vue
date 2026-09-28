@@ -132,6 +132,7 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { incomesOf, useIncomes } from '@/composables/useIncomes'
 import { calendarDay, monthOf } from '@/days'
+import { useAccountsStore } from '@/stores/accounts'
 
 /**
  * «Доходы» (MOL-66), under «Деньги» beside «Обмен денег» (MOL-81): the money that came in, by month, each
@@ -214,6 +215,9 @@ export default defineComponent({
     const follow = (): void => {
       online.value = navigator.onLine
     }
+    // The names of the accounts on the cards (MOL-123): the page as the server has it now.
+    const accounts = useAccountsStore()
+    onMounted(() => void accounts.refresh())
     onMounted(() => {
       window.addEventListener('online', follow)
       window.addEventListener('offline', follow)

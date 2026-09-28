@@ -15,10 +15,16 @@
         <span class="source">{{ t(`income.source.${income.source}`) }}</span>
         <span class="amount">{{ amount }}</span>
       </span>
-      <!-- Only when there is something to say: an income without a note is shorter. -->
-      <span v-if="income.note" class="plate">
-        <IconNote class="note-icon" aria-hidden="true" />
-        <span class="note-text">{{ income.note }}</span>
+      <!-- Only when there is something to say: an income with neither is shorter. -->
+      <span v-if="accountName || income.note" class="plate">
+        <span v-if="accountName" class="account">
+          <span class="account-label">{{ t('accounts.picker.row_income') }}</span>
+          <span class="account-name">{{ t('accounts.card_name', { name: accountName }) }}</span>
+        </span>
+        <span v-if="income.note" class="note" :class="{ under: accountName }">
+          <IconNote class="note-icon" aria-hidden="true" />
+          <span class="note-text">{{ income.note }}</span>
+        </span>
       </span>
     </button>
   </AppCard>
@@ -34,6 +40,7 @@ import AppCard from '@/components/AppCard.vue'
 import OperationCardHead from '@/components/OperationCardHead.vue'
 import { asTyped } from '@/components/spending'
 import { calendarDay, purchaseDay } from '@/days'
+import { useAccountsStore } from '@/stores/accounts'
 
 /**
  * One income (MOL-81, handoff 03), in the grammar of an exchange's card: «when» on top, «from
@@ -53,9 +60,17 @@ export default defineComponent({
   setup(props) {
     const { t, locale } = useI18n()
     const dayOf = (when: Date): string => purchaseDay(when, locale.value)
+    const accounts = useAccountsStore()
     return {
       t,
       dayOf,
+      // «На счёт «Наличные ₽»», by the name the account has now (MOL-81 Р-6, MOL-123).
+      accountName: computed(() =>
+        props.income.accountId
+          ? (accounts.accounts.find((account) => account.id === props.income.accountId)?.name ??
+            null)
+          : null,
+      ),
       // A calendar day of Yerevan, never the moment of its midnight: west of UTC+4 an income of
       // 1 September read «31 авг.» (adversarial Ж). «исправлен» is a moment, and stays one.
       day: computed(() =>
@@ -126,14 +141,37 @@ export default defineComponent({
 }
 
 .plate {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius);
   background: var(--surface-2);
   color: var(--text-muted);
   font-size: var(--text-footnote);
+}
+
+.account {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.account-name {
+  color: var(--text);
+  font-weight: var(--weight-bold);
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+
+  &.under {
+    padding-top: var(--space-2);
+    border-top: var(--hairline) solid var(--border);
+  }
 }
 
 .note-icon {

@@ -468,6 +468,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           debited: moneyFrom(row.debitedMinor, row.debitedCurrency),
           rate: rateFrom(row),
           unpriced: 0,
+          revision: row.revision,
           details: {
             ...NO_DETAILS,
             categoryId: row.categoryId,
@@ -490,6 +491,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           debited: null,
           rate: null,
           unpriced: 0,
+          revision: row.revision,
           details: { ...NO_DETAILS, note: row.note, source: row.source },
         })
       }
@@ -503,7 +505,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           at: row.createdAt,
           seenAt: latest(row.createdAt, row.amendedAt, row.accountSetAt),
         }
-        const common = { debited: null, rate: null, unpriced: 0 }
+        const common = { debited: null, rate: null, unpriced: 0, revision: row.revision }
         operations.push({
           ...half,
           ...common,
@@ -556,6 +558,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
               : { minor: BigInt(row.debited_minor), currency: row.debited_currency },
           rate: null,
           unpriced: Number(row.unpriced),
+          revision: null,
           details: { ...NO_DETAILS, place: row.place_name, items: Number(row.items) },
         })
       }

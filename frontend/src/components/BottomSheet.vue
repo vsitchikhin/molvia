@@ -2,6 +2,7 @@
   <dialog
     ref="dialog"
     class="sheet"
+    :class="{ over: back }"
     :aria-labelledby="titleId"
     @cancel.prevent="close()"
     @close="closedNatively"
@@ -11,12 +12,15 @@
     @click="closeOnScrim"
   >
     <div class="panel">
-      <header class="head">
+      <header class="head" :class="{ over: back }">
+        <AppButton v-if="back" variant="icon" :label="t('nav.back_label')" @click="close()">
+          <IconBack />
+        </AppButton>
         <div class="heading">
           <h2 :id="titleId" class="title"><slot name="title" /></h2>
           <p v-if="$slots.meta" class="meta"><slot name="meta" /></p>
         </div>
-        <AppButton variant="icon" :label="t('sheet.close')" @click="close()">
+        <AppButton v-if="!back" variant="icon" :label="t('sheet.close')" @click="close()">
           <IconClose />
         </AppButton>
       </header>
@@ -34,6 +38,7 @@
 import { defineComponent, nextTick, onMounted, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconBack from '~icons/mdi/chevron-left'
 import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
@@ -60,7 +65,7 @@ const DOUBLE_TAP = 300
  */
 export default defineComponent({
   name: 'BottomSheet',
-  components: { AppButton, IconClose },
+  components: { AppButton, IconBack, IconClose },
   props: {
     open: { type: Boolean, required: true },
     /**
@@ -73,6 +78,13 @@ export default defineComponent({
      * Д-1 — each fix undid the other until the delivery stopped depending on the component.
      */
     onClosed: { type: Function as PropType<() => void>, default: undefined },
+    /**
+     * A sheet over another sheet (MOL-123, owner's decision В-4): «‹» on the left takes this one
+     * away and nothing else, and there is no × — under a picker lies a spending with its amount
+     * typed, and a × that closed the stack threw it away at the till. One scrim: the sheet under
+     * it already dims the screen.
+     */
+    back: { type: Boolean, default: false },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
@@ -302,6 +314,10 @@ export default defineComponent({
       opacity: 0;
     }
   }
+
+  &.over::backdrop {
+    background: transparent;
+  }
 }
 
 .panel {
@@ -319,6 +335,15 @@ export default defineComponent({
   > :last-child {
     flex: none;
     margin-left: auto;
+  }
+
+  &.over > :first-child {
+    flex: none;
+  }
+
+  &.over > :last-child {
+    flex: 1;
+    margin-left: 0;
   }
 }
 

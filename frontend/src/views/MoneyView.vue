@@ -26,6 +26,9 @@
       </ScreenState>
 
       <template v-if="phase !== 'idle'">
+        <!-- Balances are «now», not the month's: above the switcher, and the same on every month
+             (MOL-123, handoff 01). -->
+        <AccountsCard :online="online" :spend-currency="spendCurrency" />
         <MonthSwitcher :month="selected" :current="currentMonth" @change="goMonth" />
 
         <ScreenSkeleton v-if="phase === 'loading'" :groups="[44, 70, 34, 60, 80, 48, 66]" />
@@ -209,6 +212,7 @@
     />
     <NewCategorySheet
       v-model:open="newCategoryOpen"
+      over
       :categories="categories"
       @created="made = $event"
     />
@@ -235,6 +239,7 @@ import {
   yerevanDate,
 } from '@molvia/model'
 import type { Money, MoneyMonthView, SpendingCategoryView, WireCode } from '@molvia/model'
+import AccountsCard from '@/components/AccountsCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
@@ -270,6 +275,7 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 export default defineComponent({
   name: 'MoneyView',
   components: {
+    AccountsCard,
     AppButton,
     AppCard,
     AppScreen,
@@ -342,7 +348,9 @@ export default defineComponent({
     // Any month the phone keeps names the categories — they are the owner's, not the month's — so
     // a spending can be written before this month's answer, or offline on the first of the month
     // (review Т-5).
-    const categories = computed(() => categoriesWith(knownCategories.value, queue.pending))
+    const categories = computed(() =>
+      categoriesWith(knownCategories.value, [...queue.arrived, ...queue.pending]),
+    )
     /** Whether a spending can be written here at all: a category is required, and known. */
     const canWrite = computed(() => categories.value.some((category) => !category.archived))
     const journal = computed(() =>

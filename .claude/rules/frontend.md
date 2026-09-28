@@ -120,7 +120,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the router under an open sheet — push, replace, a new query — closes it too; an entry no
   sheet holds — left by a reload or a move away — is stepped off by `installSheetEntryGuard`.
   `close(2)` closes it together with the screen under it, the sheets above and below included,
-  and never steps out of the app. Sheets may stack: a pop closes as many from the top as
+  and never steps out of the app. **A sheet over a sheet has «‹» and no ×** (`back`, MOL-123,
+  owner's decision В-4): under a picker lies a spending with its sum typed, and a × that closed the
+  stack threw it away at the till; one scrim, the lower sheet's. Sheets may stack: a pop closes as many from the top as
   entries it went back. Until it has come up the sheet takes
   no tap, so the second tap of a double tap cannot close it or press its main action. **«Up» is
   the end of its own rise, not a clock** (MOL-69): a rise starts with the first frame that draws

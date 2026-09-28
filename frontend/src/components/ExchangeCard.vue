@@ -18,11 +18,17 @@
         <span class="side">
           <span class="caption">{{ t('exchange.card_given') }}</span>
           <span class="amount">{{ moneyOf(exchange.given) }}</span>
+          <span v-if="givenName" class="account">
+            {{ t('accounts.card_from', { name: givenName }) }}
+          </span>
         </span>
         <span class="arrow" aria-hidden="true"><IconArrow /></span>
         <span class="side received">
           <span class="caption">{{ t('exchange.card_received') }}</span>
           <span class="amount">{{ moneyOf(exchange.received) }}</span>
+          <span v-if="receivedName" class="account">
+            {{ t('accounts.card_to', { name: receivedName }) }}
+          </span>
         </span>
       </span>
       <span class="plate">
@@ -58,6 +64,7 @@ import AppCard from '@/components/AppCard.vue'
 import OperationCardHead from '@/components/OperationCardHead.vue'
 import { useExchangeWords } from '@/composables/useExchangeWords'
 import { purchaseDay } from '@/days'
+import { useAccountsStore } from '@/stores/accounts'
 
 /**
  * One exchange (MOL-81, handoff 02): «when» on top, «how much» — what was given and what came —
@@ -78,9 +85,15 @@ export default defineComponent({
   setup(props) {
     const { t, locale } = useI18n()
     const words = useExchangeWords()
+    const accounts = useAccountsStore()
+    // Where the money lay, by the name the account has now (MOL-81 Р-6, MOL-123).
+    const nameOf = (id: string | null) =>
+      id ? (accounts.accounts.find((account) => account.id === id)?.name ?? null) : null
     return {
       t,
       ...words,
+      givenName: computed(() => nameOf(props.exchange.givenAccountId)),
+      receivedName: computed(() => nameOf(props.exchange.receivedAccountId)),
       official: computed(() => words.officialOf(props.exchange)),
       shortDay: (when: Date) => purchaseDay(when, locale.value),
     }
@@ -167,6 +180,11 @@ export default defineComponent({
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
+}
+
+.account {
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
 }
 
 .amount {
