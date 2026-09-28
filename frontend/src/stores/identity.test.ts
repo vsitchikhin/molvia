@@ -204,6 +204,8 @@ describe('какие ключи приложение пишет на устро�
     ]
     // По владельцу — `molvia.<что>.<владелец>`, всё это уходит с `forgetOwner`.
     const perOwner = [
+      // Остатки и первые страницы журналов трёх счетов — для офлайна (MOL-123).
+      'molvia.accounts',
       'molvia.advice',
       // Первые страницы трёх последних месяцев «Денег» — для офлайна (MOL-82).
       'molvia.money',
@@ -225,6 +227,9 @@ describe('какие ключи приложение пишет на устро�
       // очереди (MOL-76, раунд 4, Г1).
       'molvia.trip-marks',
       'molvia.trip-marks-rejected',
+      // Счёт похода из сводки, своим ключом по той же причине (MOL-123, Р-3).
+      'molvia.trip-payments',
+      'molvia.trip-payments-rejected',
       'molvia.trip-queue',
       'molvia.trip-rejected',
       'molvia.verdict-confirmed',

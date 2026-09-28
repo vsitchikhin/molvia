@@ -69,7 +69,7 @@ function recall(owner: string, month: string): Remembered | null {
 }
 
 /** The categories of the newest month kept for the owner — any month names all of them. */
-function recallCategories(owner: string): MoneyMonthView['categories'] {
+export function recallCategories(owner: string): MoneyMonthView['categories'] {
   const newest = Object.keys(recallAll(owner))
     .map((month) => recall(owner, month))
     .filter((one): one is Remembered => one !== null)

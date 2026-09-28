@@ -430,6 +430,7 @@ describe('поход на счёте (п. 6, Р-18)', () => {
         place: 'Ереван Сити',
         items: 2,
         unpriced: 1,
+        revision: null,
       }),
     ])
     const check = accountCheckCodec.parse(
@@ -740,6 +741,23 @@ describe('журнал счёта (п. 10)', () => {
       -100n,
     ])
     expect(second.cursor).toBeNull()
+  })
+
+  it('строка несёт версию операции — шторка правит поверх неё (MOL-123, Р-2)', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me)
+    const { body } = await spend(me, { accountId: id })
+    await call(me, 'PUT', `/spendings/${body.id}`, {
+      ...without(body, 'id'),
+      revision: 1,
+      note: 'поправил',
+    })
+    const journal = accountJournalCodec.parse(
+      (await call(me, 'GET', `/money/accounts/${id}/journal`)).json(),
+    )
+    expect(journal.rows).toEqual([
+      expect.objectContaining({ id: body.id, revision: 2, note: 'поправил' }),
+    ])
   })
 })
 

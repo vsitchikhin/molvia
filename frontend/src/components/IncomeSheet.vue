@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
+  <BottomSheet :open="open" :back="back" @update:open="$emit('update:open', $event)">
     <template #title>{{ t(editing ? 'income.sheet.title_amend' : 'income.sheet.title') }}</template>
     <template #meta>{{ t('income.sheet.meta') }}</template>
 
@@ -24,6 +24,13 @@
       <p v-if="currency !== overview.base" class="hint">
         {{ t('income.sheet.bought_hint', { base: sign(overview.base) }) }}
       </p>
+      <!-- Where it came in, under the pair it is about; only accounts of its currency (06). -->
+      <AccountRow
+        v-if="showsAccount"
+        :label="t('accounts.picker.row_income')"
+        :account="account"
+        @open="pickerOpen = true"
+      />
 
       <AppField
         v-model="source"
@@ -56,6 +63,12 @@
           {{ t('income.sheet.held_hint') }}
           <template v-if="estimate"> <br />{{ estimate }} </template>
         </p>
+        <HeldFromAccounts
+          :currency="currency"
+          :day="day"
+          :except="editing?.id ?? null"
+          @fill="held = typed($event)"
+        />
       </div>
 
       <AppField
@@ -92,6 +105,15 @@
       </AppButton>
     </template>
   </BottomSheet>
+  <AccountPickerSheet
+    v-model:open="pickerOpen"
+    :title="t('accounts.picker.row_income')"
+    :accounts="accounts.accounts"
+    :currency="currency"
+    strict
+    :selected="accountId"
+    @pick="pick"
+  />
 </template>
 
 <script lang="ts">
@@ -122,13 +144,19 @@ import type {
   IncomesResponse,
   Money,
 } from '@molvia/model'
+import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
+import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
+import { useAccountChoice } from '@/composables/useAccountChoice'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, purchaseDay } from '@/days'
 import { newId } from '@/ids'
+import type { IncomeDraft } from '@/composables/useIncomes'
+import { useAccountsStore } from '@/stores/accounts'
 
 /**
  * «Записать доход» (MOL-66): how much came in, in which currency, from where and on which day. What
@@ -142,9 +170,18 @@ import { newId } from '@/ids'
  */
 export default defineComponent({
   name: 'IncomeSheet',
-  components: { AppButton, AppField, BottomSheet },
+  components: {
+    AccountPickerSheet,
+    AccountRow,
+    AppButton,
+    AppField,
+    BottomSheet,
+    HeldFromAccounts,
+  },
   props: {
     open: { type: Boolean, required: true },
+    /** Opened over another sheet — a check, «не попали» (MOL-123): «‹» back to it, no ×. */
+    back: { type: Boolean, default: false },
     overview: { type: Object as PropType<IncomesResponse>, required: true },
     record: {
       type: Function as PropType<(body: IncomeBody) => Promise<unknown>>,
@@ -156,6 +193,12 @@ export default defineComponent({
     },
     /** The income being amended, or null for a new one. */
     editing: { type: Object as PropType<IncomeView | null>, default: null },
+    /**
+     * A new income already filled — «Записать разницу» of a check (MOL-123, owner's decision В-5):
+     * the sum, «Прочее», «сверка», the account and the day, and the person still answers «сколько
+     * было до», which an income written without it would take as the price of the whole currency.
+     */
+    draft: { type: Object as PropType<IncomeDraft | null>, default: null },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
@@ -181,6 +224,9 @@ export default defineComponent({
     const failed = ref(false)
     const conflict = ref(false)
     let incomeId = newId()
+    const accounts = useAccountsStore()
+    const choice = useAccountChoice(currency, true)
+    const pickerOpen = ref(false)
 
     const typed = (value: Money): string =>
       shown(decimalFromMinor(value), locale.value === 'ru' ? ',' : '.')
@@ -191,23 +237,27 @@ export default defineComponent({
       (open) => {
         if (!open) return
         const editing = props.editing
-        amount.value = editing ? typed(editing.amount) : ''
+        const draft = editing ? null : props.draft
+        const filled = editing?.amount ?? draft?.amount ?? null
+        amount.value = filled ? typed(filled) : ''
         // Most money comes in the currency it is counted in — the salary of the owner does.
-        currency.value = editing?.amount.currency ?? props.overview.base
-        source.value = editing?.source ?? ''
+        currency.value = filled?.currency ?? props.overview.base
+        source.value = editing?.source ?? draft?.source ?? ''
         amountError.value = null
         sourceMissing.value = false
         today.value = yerevanDate(new Date())
-        day.value = editing?.receivedOn ?? today.value
+        day.value = editing?.receivedOn ?? draft?.receivedOn ?? today.value
         held.value = editing?.heldBefore ? typed(editing.heldBefore) : ''
-        note.value = editing?.note ?? ''
+        note.value = editing?.note ?? draft?.note ?? ''
         noteInvalid.value = false
         dayError.value = null
         dayInvalid.value = false
         heldError.value = null
         failed.value = false
         conflict.value = false
-        incomeId = newId()
+        incomeId = draft?.id ?? newId()
+        pickerOpen.value = false
+        choice.reset(editing ? editing.accountId : draft ? draft.accountId : undefined)
       },
       { immediate: true },
     )
@@ -333,6 +383,8 @@ export default defineComponent({
         source: chosen,
         ...(heldBefore ? { heldBefore } : {}),
         ...(typedNote?.success ? { note: typedNote.data } : {}),
+        // Said whenever there are accounts: left out, the server keeps the one it has (Р-26).
+        ...(choice.shows.value ? { accountId: choice.accountId.value } : {}),
       }
       sending.value = true
       conflict.value = false
@@ -362,6 +414,13 @@ export default defineComponent({
     }
 
     return {
+      accounts,
+      accountId: choice.accountId,
+      account: choice.account,
+      showsAccount: choice.shows,
+      pickerOpen,
+      pick: choice.pick,
+      typed,
       t,
       id,
       amount,

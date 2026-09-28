@@ -119,7 +119,10 @@ nothing up.
   a send of its record has begun, the removal goes to the server and 404 on it is done; «Вернуть»
   then takes the removal back while it waits, or asks the server to restore, never writing the
   spending anew. **A record the server already holds with other fields is this phone's own**, so a
-  409 on a record goes on as an amendment over revision 1.
+  409 on a record goes on as an amendment over revision 1. **Every fold carries the account and
+  «списано»** (MOL-123, Р-4): left out of an amendment the server keeps the account it had (Р-26
+  MOL-115), so a fold that dropped them sent the spending back onto its old account; and once the
+  owner has an account the sheets send it always, «без счёта» as an explicit `null`.
 - **A spending in the queue is a row, never a figure** (requirements Р-3; the handoff asked
   otherwise and this rule wins): «Отправляем…» at the top of its day, «Правка отправляется» on an
   amended row whose figures stay the server's, a removed row hidden — unless «Вернуть» stands
@@ -172,7 +175,10 @@ nothing up.
   same month; opened cold, «Деньги» is laid underneath.
 - **One's own category is made from the chips** («+ Своя», a sheet over the sheet, chosen as soon
   as it exists) **and kept on «Деньги → Категории»** (В-1): «Убрать» asks nothing, since it erases
-  nothing, and «Вернуть» stands right under it. A name equal to a preset in the language of the
+  nothing, and «Вернуть» stands right under it. **A category that landed stays on the chips until the
+  server's list names it** (`arrived`, found by e2e in MOL-123): it leaves the queue on its answer and
+  the list is read again only after, and in between «Сохранить трату» said «Выберите категорию» over
+  the one just made and chosen. A name equal to a preset in the language of the
   screen, or to a live one of one's own, is refused there. The colours are tokens — thirteen
   presets and a palette of eight for one's own, none red, olive, ochre or terracotta, each at
   least 3:1 on `--surface`.

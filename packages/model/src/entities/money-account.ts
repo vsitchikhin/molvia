@@ -107,6 +107,11 @@ export interface AccountOperation {
   readonly rate: ExchangeRate | null
   /** A trip's purchases without a price: they move nothing, and a check names them. */
   readonly unpriced: number
+  /**
+   * The version of the operation's own row — what its sheet amends over (MOL-123, Р-2). A trip has
+   * none: its account is set whole from the summary, and its purchases have their own path.
+   */
+  readonly revision: number | null
   readonly details: AccountOperationDetails
 }
 

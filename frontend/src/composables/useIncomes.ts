@@ -2,7 +2,14 @@ import { computed, onMounted, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
-import type { IncomeAmendBody, IncomeBody, IncomeView, IncomesResponse } from '@molvia/model'
+import type {
+  IncomeAmendBody,
+  IncomeBody,
+  IncomeSource,
+  IncomeView,
+  IncomesResponse,
+  Money,
+} from '@molvia/model'
 import { api } from '@/api'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { useReconnect } from '@/composables/useReconnect'
@@ -10,6 +17,17 @@ import { useActorStore } from '@/stores/actor'
 
 /** `idle` — no identity yet, so there is nobody whose incomes to ask for. */
 export type IncomesPhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'offline'
+
+/** What a new income is opened with, when something else has already said it. */
+export interface IncomeDraft {
+  /** The income's name, when the one who fills the sheet has named it already. */
+  readonly id?: string
+  readonly amount: Money
+  readonly source: IncomeSource
+  readonly note: string
+  readonly accountId: string
+  readonly receivedOn: string
+}
 
 export interface Incomes {
   readonly phase: ComputedRef<IncomesPhase>

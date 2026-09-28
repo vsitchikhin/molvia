@@ -1,5 +1,10 @@
 <template>
-  <BottomSheet :open="open" :on-closed="afterClose" @update:open="$emit('update:open', $event)">
+  <BottomSheet
+    :open="open"
+    :back="back"
+    :on-closed="afterClose"
+    @update:open="$emit('update:open', $event)"
+  >
     <template #title>{{ title }}</template>
     <template v-if="meta" #meta>{{ meta }}</template>
 
@@ -12,6 +17,23 @@
           {{ tripCategory }}
         </span>
       </p>
+      <!-- The account of the trip: chosen here and saved at once, through the trip's queue (handoff
+           06, 6h). Drawn once the trip is read — what it is on now is the server's. -->
+      <div v-if="showsAccounts && tripView" class="accounts" @focusout="saveTripCharge">
+        <AccountRow
+          :label="t('accounts.picker.row_trip')"
+          :account="account"
+          @open="pickerOpen = true"
+        />
+        <ChargedField
+          v-if="charged && account"
+          v-model="debited"
+          :account="account"
+          :bad="debitedBad"
+          @update:model-value="debitedBad = false"
+        />
+        <p class="note">{{ t('accounts.trip_hint') }}</p>
+      </div>
       <p v-if="items === 'loading'" class="note">{{ t('state.loading') }}</p>
       <p v-else-if="items === 'offline'" class="note">
         {{ t('spending.sheet.trip_items_offline') }}
@@ -66,6 +88,24 @@
         />
         <p v-if="conversion" class="conversion">{{ conversion }}</p>
       </div>
+
+      <!-- Where the money came from, beside the sum it is about (handoff 06). No account at all —
+           no row: the sheet is as it was before accounts. -->
+      <template v-if="showsAccounts">
+        <AccountRow
+          :label="t('accounts.picker.row_spending')"
+          :account="account"
+          @open="pickerOpen = true"
+        />
+        <ChargedField
+          v-if="charged && account"
+          v-model="debited"
+          :account="account"
+          :estimate="chargedEstimate"
+          :bad="debitedBad"
+          @update:model-value="debitedBad = false"
+        />
+      </template>
 
       <CategoryChips
         v-model="categoryId"
@@ -152,6 +192,14 @@
       </template>
     </template>
   </BottomSheet>
+  <AccountPickerSheet
+    v-model:open="pickerOpen"
+    :title="t(target.kind === 'trip' ? 'accounts.picker.row_trip' : 'accounts.picker.row_spending')"
+    :accounts="accounts.accounts"
+    :currency="operationCurrency"
+    :selected="accountId"
+    @pick="pick"
+  />
 </template>
 
 <script lang="ts">
@@ -181,21 +229,28 @@ import {
   isRateDay,
   yerevanDate,
 } from '@molvia/model'
-import type { Currency, ExchangeRate, Money, SpendingCategoryView } from '@molvia/model'
+import type { Currency, ExchangeRate, Money, SpendingCategoryView, TripView } from '@molvia/model'
 import { api } from '@/api'
+import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
+import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CategoryChips from '@/components/CategoryChips.vue'
+import ChargedField from '@/components/ChargedField.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import { defaultAccount, pageOrder } from '@/components/accounts'
 import { asTyped, categoryColour, rateWords } from '@/components/spending'
 import type { JournalRow, Removed, SpendingTarget } from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, shiftDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { newId } from '@/ids'
+import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import type { SpendingFields } from '@/stores/spendingQueue'
+import { useTripQueueStore } from '@/stores/tripQueue'
 
 type TripRow = Extract<JournalRow, { kind: 'trip' }>
 
@@ -215,10 +270,13 @@ interface TripItem {
 export default defineComponent({
   name: 'SpendingSheet',
   components: {
+    AccountPickerSheet,
+    AccountRow,
     AppButton,
     AppField,
     BottomSheet,
     CategoryChips,
+    ChargedField,
     IconAlert,
     IconCart,
     IconCheck,
@@ -228,6 +286,8 @@ export default defineComponent({
   },
   props: {
     open: { type: Boolean, required: true },
+    /** Opened over another sheet — a check, «не попали» (MOL-123): «‹» back to it, no ×. */
+    back: { type: Boolean, default: false },
     target: { type: Object as PropType<SpendingTarget>, required: true },
     categories: { type: Array as PropType<SpendingCategoryView[]>, required: true },
     nameOf: {
@@ -245,6 +305,8 @@ export default defineComponent({
     'update:open': (open: boolean) => typeof open === 'boolean',
     'add-category': () => true,
     saved: (saved: { id: string; spentOn: string }) => typeof saved.id === 'string',
+    /** The account of a trip, or its «списано», went into the trip's queue from the summary. */
+    paid: () => true,
     removed: (removed: Removed) => typeof removed === 'object',
   },
   setup(props, { emit }) {
@@ -269,6 +331,49 @@ export default defineComponent({
     const amountInput = ref<HTMLInputElement | null>(null)
     const items = ref<TripItem[] | 'loading' | 'offline' | 'error'>('loading')
     let after: (() => void) | null = null
+
+    // The account (MOL-123, handoff 06): the screen puts the default in, the server never guesses.
+    const accounts = useAccountsStore()
+    const trips = useTripQueueStore()
+    const announce = useAnnouncer()
+    const accountId = ref<string | null>(null)
+    /** Chosen by the person — a change of currency no longer moves it. */
+    const byHand = ref(false)
+    const debited = ref('')
+    const debitedBad = ref(false)
+    const pickerOpen = ref(false)
+    /** «Списано» the spending was opened with — sent back as it was when its account is unknown. */
+    let knownDebited: Money | null = null
+    /** The trip as the server holds it, for its account and currencies. */
+    const tripView = ref<TripView | null>(null)
+    const account = computed(
+      () => accounts.accounts.find((one) => one.id === accountId.value) ?? null,
+    )
+    const showsAccounts = computed(
+      () => pageOrder(accounts.accounts).length > 0 || account.value !== null,
+    )
+    const operationCurrency = computed<Currency>(() =>
+      props.target.kind === 'trip'
+        ? (tripView.value?.currency ?? props.target.row.amount.currency)
+        : currency.value,
+    )
+    /**
+     * «Списано со счёта» where the money was in another currency than the account's — for a trip,
+     * the trip's own or any of its purchases' (Р-30 MOL-115).
+     */
+    const charged = computed(() => {
+      const held = account.value
+      if (!held) return false
+      if (props.target.kind !== 'trip') return held.currency !== currency.value
+      const trip = tripView.value
+      return (
+        held.currency !== operationCurrency.value ||
+        (trip?.expenses.some(
+          (expense) => expense.amount && expense.amount.currency !== held.currency,
+        ) ??
+          false)
+      )
+    })
 
     const money = (value: Money) => formatMoney(value, locale.value)
     const sign = (value: Currency) => currencySign(value, locale.value)
@@ -312,6 +417,21 @@ export default defineComponent({
         noteBad.value = false
         placeBad.value = false
         dayBad.value = false
+        debitedBad.value = false
+        pickerOpen.value = false
+        tripView.value = null
+        // An amendment keeps the account it was written with, a removed one too, until changed.
+        const typedAccount = typedBody?.accountId
+        byHand.value = props.target.kind !== 'add'
+        accountId.value =
+          typedAccount !== undefined
+            ? typedAccount
+            : spending
+              ? (spending.accountId ?? null)
+              : (defaultAccount(accounts.accounts, currency.value)?.id ?? null)
+        const typedDebited = typedBody?.debited ?? spending?.debited ?? null
+        knownDebited = typedDebited
+        debited.value = typedDebited ? typed(typedDebited) : ''
         if (props.target.kind === 'trip') void loadTrip(props.target.row)
         // The keyboard comes up for a new spending — the sum is what it is opened for — and not
         // for an amendment, where the person came to look first.
@@ -322,6 +442,15 @@ export default defineComponent({
       },
       { immediate: true },
     )
+
+    // A new spending follows its currency to the first account of it — until one is chosen by hand;
+    // and the accounts may only arrive after the sheet has opened.
+    watch([currency, () => accounts.accounts], () => {
+      if (!props.open || props.target.kind !== 'add' || byHand.value) return
+      const next = defaultAccount(accounts.accounts, currency.value)?.id ?? null
+      if (next !== accountId.value) debited.value = ''
+      accountId.value = next
+    })
 
     watch(
       () => props.made,
@@ -337,6 +466,11 @@ export default defineComponent({
       items.value = 'loading'
       try {
         const trip = await api.trip(row.tripId)
+        // Another trip opened meanwhile: this answer is not its account (review 8).
+        if (props.target.kind !== 'trip' || props.target.row.tripId !== row.tripId) return
+        tripView.value = trip
+        accountId.value = trip.accountId
+        debited.value = trip.debited ? typed(trip.debited) : ''
         items.value = trip.expenses
           .filter((expense) => expense.amount?.currency === row.amount.currency)
           .map((expense) => ({
@@ -445,6 +579,75 @@ export default defineComponent({
         : t('spending.sheet.conversion_official', words)
     })
 
+    /** «≈ 2 140,91 ₽» — what the server would count, where the account's rate joins the two. */
+    const chargedEstimate = computed(() => {
+      const value = parsed()
+      const rate = account.value?.rate
+      if (!value || !rate) return null
+      return convertAcross(value, rate)
+    })
+
+    function parsedCharge(): Money | null | 'bad' {
+      const held = account.value
+      if (!held || !charged.value || !debited.value.trim()) return null
+      try {
+        const value = parseMoney(debited.value, held.currency)
+        return value.minor > 0n ? value : 'bad'
+      } catch {
+        return 'bad'
+      }
+    }
+
+    function pick(id: string | null): void {
+      if (id === accountId.value) return
+      accountId.value = id
+      byHand.value = true
+      debited.value = ''
+      debitedBad.value = false
+      if (props.target.kind === 'trip') {
+        payTrip(null)
+        // What the server now holds: the new account, and no «списано» for it yet (review 2).
+        if (tripView.value) tripView.value = { ...tripView.value, accountId: id, debited: null }
+        const name = accounts.accounts.find((one) => one.id === id)?.name
+        announce?.(
+          name ? t('accounts.picker.trip_saved', { name }) : t('accounts.picker.trip_saved_none'),
+        )
+      }
+    }
+
+    /** The account of a trip, whole, through the trip's queue: at once, no «Сохранить» (6h). */
+    function payTrip(charge: Money | null): void {
+      if (props.target.kind !== 'trip') return
+      trips.enqueue({
+        kind: 'payment',
+        tripId: props.target.row.tripId,
+        body: { accountId: accountId.value, debited: accountId.value ? charge : null },
+      })
+      // A check over this summary counts again once it lands (review 1).
+      emit('paid')
+    }
+
+    /** «Списано» of a trip is saved once the field is left, if it changed. */
+    function saveTripCharge(event: FocusEvent): void {
+      const leaving = event.currentTarget as HTMLElement | null
+      if (leaving?.contains(event.relatedTarget as Node | null)) return
+      // Nothing to say about an account the phone does not know — least of all by a look (review 4).
+      if (!account.value || !charged.value) return
+      const charge = parsedCharge()
+      if (charge === 'bad') {
+        debitedBad.value = true
+        return
+      }
+      const before = tripView.value?.debited ?? null
+      if (
+        (charge?.minor ?? null) === (before?.minor ?? null) &&
+        (charge?.currency ?? null) === (before?.currency ?? null)
+      )
+        return
+      payTrip(charge)
+      if (tripView.value) tripView.value = { ...tripView.value, debited: charge }
+    }
+
     const refusalText = computed(() => {
       const item = refusal.value
       if (!item) return null
@@ -474,7 +677,16 @@ export default defineComponent({
       const typedPlace = text(place.value)
       noteBad.value = typedNote.bad
       placeBad.value = typedPlace.bad
-      if (!value || !chosen || dayBad.value || typedNote.bad || typedPlace.bad) {
+      const charge = parsedCharge()
+      debitedBad.value = charge === 'bad'
+      if (
+        !value ||
+        !chosen ||
+        dayBad.value ||
+        typedNote.bad ||
+        typedPlace.bad ||
+        charge === 'bad'
+      ) {
         await nextTick()
         // The first field that is wrong gets the focus (handoff 02).
         if (!value) amountInput.value?.focus()
@@ -490,6 +702,15 @@ export default defineComponent({
         categoryId: chosen.id,
         ...(typedNote.value === undefined ? {} : { note: typedNote.value }),
         ...(typedPlace.value === undefined ? {} : { place: typedPlace.value }),
+        // Always said once accounts exist: left out, the server keeps the account it has (Р-26).
+        ...(showsAccounts.value
+          ? {
+              accountId: accountId.value,
+              // An account this phone does not know — made or marked on another — keeps the
+              // «списано» it was written with: a note amended here must not undo it (review 4).
+              debited: !accountId.value ? null : account.value ? charge : knownDebited,
+            }
+          : {}),
       }
       const row = manual.value
       const refused = refusal.value
@@ -583,6 +804,19 @@ export default defineComponent({
       currencyOptions,
       dayWords,
       conversion,
+      accounts,
+      accountId,
+      account,
+      showsAccounts,
+      operationCurrency,
+      charged,
+      chargedEstimate,
+      debited,
+      debitedBad,
+      pickerOpen,
+      tripView,
+      pick,
+      saveTripCharge,
       refusal,
       refusalText,
       textMax,
@@ -598,6 +832,11 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.accounts {
+  display: grid;
+  gap: var(--space-2);
+}
+
 .form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

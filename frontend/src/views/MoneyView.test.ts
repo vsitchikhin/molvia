@@ -20,6 +20,16 @@ const amendSpending = vi.fn<(id: string, body: unknown) => Promise<unknown>>()
 const removeSpending = vi.fn<(id: string) => Promise<void>>()
 const restoreSpending = vi.fn<(id: string) => Promise<unknown>>()
 const trip = vi.fn<(id: string) => Promise<TripView>>()
+// The card of the accounts sits above the month (MOL-123): a person with no account yet.
+const moneyAccounts = vi.fn(() =>
+  Promise.resolve({
+    spendCurrency: 'AMD' as const,
+    accounts: [],
+    totals: { total: amd('0'), spendable: amd('0'), savings: amd('0'), uncounted: 0 },
+    unassigned: 0,
+    countedAt: new Date(),
+  }),
+)
 vi.mock('@/api', () => ({
   api: {
     moneyMonth: (month: string, cursor?: JournalKey) => moneyMonth(month, cursor),
@@ -28,6 +38,8 @@ vi.mock('@/api', () => ({
     removeSpending: (id: string) => removeSpending(id),
     restoreSpending: (id: string) => restoreSpending(id),
     trip: (id: string) => trip(id),
+    moneyAccounts: () => moneyAccounts(),
+    spendingCategories: () => Promise.resolve({ categories: [] }),
   },
 }))
 

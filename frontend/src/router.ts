@@ -12,6 +12,8 @@ import IncomesView from '@/views/IncomesView.vue'
 import DevicesView from '@/views/DevicesView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
 import MoneyView from '@/views/MoneyView.vue'
+import AccountView from '@/views/AccountView.vue'
+import AccountsView from '@/views/AccountsView.vue'
 import MoneyCategoriesView from '@/views/MoneyCategoriesView.vue'
 import { watchBrowserAnimatedBack } from '@/transitions'
 
@@ -24,6 +26,8 @@ export type RouteName =
   | 'verdicts'
   | 'money'
   | 'money-categories'
+  | 'money-accounts'
+  | 'money-account'
   | 'settings'
   | 'exchange'
   | 'incomes'
@@ -116,6 +120,19 @@ export const routes = [
     name: 'money-categories',
     component: MoneyCategoriesView,
     meta: { titleKey: 'spending.categories.title', parent: 'money' },
+  },
+  // «Счета» and one account (MOL-123): where the money lies, counted by the server.
+  {
+    path: '/money/accounts',
+    name: 'money-accounts',
+    component: AccountsView,
+    meta: { titleKey: 'accounts.title', parent: 'money' },
+  },
+  {
+    path: '/money/accounts/:accountId',
+    name: 'money-account',
+    component: AccountView,
+    meta: { titleKey: 'accounts.title', parent: 'money-accounts' },
   },
   {
     path: '/trip/add',

@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
+  <BottomSheet :open="open" :back="over" @update:open="$emit('update:open', $event)">
     <template #title>{{ t('spending.new_category.title') }}</template>
     <form class="form" novalidate @submit.prevent="submit">
       <AppField
@@ -56,6 +56,8 @@ export default defineComponent({
   props: {
     open: { type: Boolean, required: true },
     categories: { type: Array as PropType<SpendingCategoryView[]>, required: true },
+    /** Opened over the sheet of a spending: «‹» back to it, no × (MOL-123, В-4). */
+    over: { type: Boolean, default: false },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',

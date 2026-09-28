@@ -174,14 +174,21 @@ function amendOf(revision: number, fields: SpendingFields): SpendingAmendBody {
   return { revision, ...fields }
 }
 
+/**
+ * The fields of a write, for a fold or for a record turned into an amendment. The account and
+ * «списано» travel too (MOL-123, Р-4): left out of an amendment the server keeps the account it has
+ * (Р-26 MOL-115), so a fold that dropped them sent the spending back onto its old account in silence.
+ */
 function fieldsOf(body: SpendingBody | SpendingAmendBody): SpendingFields {
-  const { spentOn, amount, categoryId, note, place } = body
+  const { spentOn, amount, categoryId, note, place, accountId, debited } = body
   return {
     spentOn,
     amount,
     categoryId,
     ...(note === undefined ? {} : { note }),
     ...(place === undefined ? {} : { place }),
+    ...(accountId === undefined ? {} : { accountId }),
+    ...(debited === undefined ? {} : { debited }),
   }
 }
 
@@ -220,6 +227,13 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
   const rejected = ref<RejectedSpendingWrite[]>([])
   /** How many writes the server has answered in this window — the screen reads the month again. */
   const landed = ref(0)
+  /**
+   * The categories this window wrote that have landed. A category leaves the queue on its answer,
+   * and the list that names it is read again only after: in between it stood on no chip, and
+   * «Сохранить трату» said «Выберите категорию» over the one just made and chosen. The lists take
+   * these until the server's names them (`categoriesWith` skips one it holds).
+   */
+  const arrived = ref<Extract<SpendingWrite, { kind: 'category-add' }>[]>([])
   let ahead = false
   /** The key of the write a send is carrying right now: it is never folded into. */
   let inFlight: string | null = null
@@ -268,6 +282,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     inFlight = null
     kept = []
     rejected.value = []
+    arrived.value = []
     sync(id)
     show()
   }
@@ -413,6 +428,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
           { key: newKey(), write: withLater(write), code: refusal },
         ]
       }
+      if (!refusal && write.kind === 'category-add') arrived.value = [...arrived.value, write]
       persist(owner)
       landed.value++
     }
@@ -612,6 +628,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     pending,
     rejected,
     landed,
+    arrived,
     flush,
     record,
     amend,

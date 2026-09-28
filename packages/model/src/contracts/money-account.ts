@@ -129,6 +129,8 @@ export const accountOperationViewCodec = z.strictObject({
   /** Dated after the account's start: an earlier one is history, and in the balance it is not. */
   inBalance: z.boolean(),
   unpriced: z.int().min(0),
+  /** What «Сохранить» in the operation's own sheet amends over; null for a trip. */
+  revision: z.int().min(1).nullable(),
   items: z.int().min(0).nullable(),
   categoryId: z.uuid().nullable(),
   note: z.string().nullable(),
@@ -158,6 +160,7 @@ export function accountOperationViewOf(
     debited: operation.debited,
     inBalance,
     unpriced: operation.unpriced,
+    revision: operation.revision,
     items: operation.details.items,
     categoryId: operation.details.categoryId,
     note: operation.details.note,

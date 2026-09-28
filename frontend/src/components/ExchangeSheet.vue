@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
+  <BottomSheet :open="open" :back="back" @update:open="$emit('update:open', $event)">
     <template #title>{{
       t(editing ? 'exchange.sheet.title_amend' : 'exchange.sheet.title')
     }}</template>
@@ -22,6 +22,16 @@
           :error-text="
             side === 'received' && sameCurrency ? t('exchange.sheet.same_currency') : null
           "
+        />
+        <!-- The account of this side, under its own pair; only accounts of its currency (06). -->
+        <AccountRow
+          v-if="showsAccounts"
+          class="side-account"
+          :label="
+            t(side === 'given' ? 'accounts.picker.row_given' : 'accounts.picker.row_received')
+          "
+          :account="sideAccount[side]"
+          @open="openPicker(side)"
         />
       </div>
 
@@ -47,6 +57,12 @@
           {{ t('exchange.sheet.held_hint') }}
           <template v-if="estimate"> <br />{{ estimate }} </template>
         </p>
+        <HeldFromAccounts
+          :currency="currencies.received"
+          :day="day"
+          :except="editing?.id ?? null"
+          @fill="fillHeld"
+        />
       </div>
 
       <AppField
@@ -87,10 +103,21 @@
       </AppButton>
     </template>
   </BottomSheet>
+  <AccountPickerSheet
+    v-model:open="pickerOpen"
+    :title="
+      t(pickerSide === 'given' ? 'accounts.picker.row_given' : 'accounts.picker.row_received')
+    "
+    :accounts="accounts.accounts"
+    :currency="currencies[pickerSide]"
+    strict
+    :selected="sideId[pickerSide]"
+    @pick="pickSide"
+  />
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, reactive, ref, useId, watch } from 'vue'
+import { computed, defineComponent, reactive, ref, toRef, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
@@ -116,9 +143,14 @@ import type {
   ExchangesResponse,
   Money,
 } from '@molvia/model'
+import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
+import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
+import { useAccountChoice } from '@/composables/useAccountChoice'
+import { useAccountsStore } from '@/stores/accounts'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, purchaseDay } from '@/days'
 import { newId } from '@/ids'
@@ -138,9 +170,18 @@ type Side = 'given' | 'received'
  */
 export default defineComponent({
   name: 'ExchangeSheet',
-  components: { AppButton, AppField, BottomSheet },
+  components: {
+    AccountPickerSheet,
+    AccountRow,
+    AppButton,
+    AppField,
+    BottomSheet,
+    HeldFromAccounts,
+  },
   props: {
     open: { type: Boolean, required: true },
+    /** Opened over another sheet — a check, «не попали» (MOL-123): «‹» back to it, no ×. */
+    back: { type: Boolean, default: false },
     overview: { type: Object as PropType<ExchangesResponse>, required: true },
     /** The write itself, bound by the screen: it lands the answer on the screen it came from. */
     record: {
@@ -180,6 +221,28 @@ export default defineComponent({
     const failed = ref(false)
     const conflict = ref(false)
     let exchangeId = newId()
+    const accounts = useAccountsStore()
+    const givenChoice = useAccountChoice(toRef(currencies, 'given'), true)
+    const receivedChoice = useAccountChoice(toRef(currencies, 'received'), true)
+    const choices = { given: givenChoice, received: receivedChoice }
+    const pickerOpen = ref(false)
+    const pickerSide = ref<Side>('given')
+    const showsAccounts = computed(() => givenChoice.shows.value || receivedChoice.shows.value)
+    const sideAccount = computed(() => ({
+      given: givenChoice.account.value,
+      received: receivedChoice.account.value,
+    }))
+    const sideId = computed(() => ({
+      given: givenChoice.accountId.value,
+      received: receivedChoice.accountId.value,
+    }))
+    function openPicker(side: Side): void {
+      pickerSide.value = side
+      pickerOpen.value = true
+    }
+    function pickSide(id: string | null): void {
+      choices[pickerSide.value].pick(id)
+    }
 
     // Made afresh at every opening: the last exchange's numbers, or its error, are not this one's.
     watch(
@@ -207,9 +270,16 @@ export default defineComponent({
         failed.value = false
         conflict.value = false
         exchangeId = newId()
+        pickerOpen.value = false
+        givenChoice.reset(editing ? editing.givenAccountId : undefined)
+        receivedChoice.reset(editing ? editing.receivedAccountId : undefined)
       },
       { immediate: true },
     )
+
+    function fillHeld(value: Money): void {
+      held.value = shown(decimalFromMinor(value), locale.value === 'ru' ? ',' : '.')
+    }
 
     const currencyOptions = currencySchema.options.map((currency) => ({
       value: currency,
@@ -374,6 +444,13 @@ export default defineComponent({
         exchangedOn: day.value,
         ...(heldBefore ? { heldBefore } : {}),
         ...(typedNote?.success ? { note: typedNote.data } : {}),
+        // Said whenever there are accounts: left out, the server keeps the ones it has (Р-26).
+        ...(showsAccounts.value
+          ? {
+              givenAccountId: givenChoice.accountId.value,
+              receivedAccountId: receivedChoice.accountId.value,
+            }
+          : {}),
       }
       sending.value = true
       conflict.value = false
@@ -406,6 +483,15 @@ export default defineComponent({
     }
 
     return {
+      accounts,
+      showsAccounts,
+      sideAccount,
+      sideId,
+      pickerOpen,
+      pickerSide,
+      openPicker,
+      pickSide,
+      fillHeld,
       t,
       id,
       sides,
@@ -448,6 +534,10 @@ export default defineComponent({
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: var(--space-3);
+}
+
+.side-account {
+  grid-column: 1 / -1;
 }
 
 .hint {
