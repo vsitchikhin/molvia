@@ -169,6 +169,8 @@ import IconUndo from '~icons/mdi/undo-variant'
 import IconUp from '~icons/mdi/chevron-up'
 import IconWallet from '~icons/mdi/wallet-outline'
 import type { Currency, ExchangeRate, Money, MoneyAccountView } from '@molvia/model'
+import { ApiError } from '@molvia/client'
+import { ERROR } from '@molvia/model'
 import { api } from '@/api'
 import AccountLine from '@/components/AccountLine.vue'
 import AccountSheet from '@/components/AccountSheet.vue'
@@ -232,6 +234,8 @@ export default defineComponent({
     onUnmounted(() => {
       window.removeEventListener('online', onLine)
       window.removeEventListener('offline', offLine)
+      // The strip is this screen's offer: left, it is not made again on a later visit (review 18).
+      store.removed = null
     })
     useReconnect(() => void store.refresh())
 
@@ -322,15 +326,30 @@ export default defineComponent({
       else store.removed = { id: outcome.id, name: outcome.name, stamp: Date.now() }
     }
 
+    /**
+     * The offer goes with the answer, never with the tap (the rule of an exchange, an income and a
+     * spending): a write lost on the way leaves the removal undoable, and «Вернуть» stays — a deleted
+     * account is in no list it could be brought back from (adversarial Г).
+     */
     async function undoRemoval(): Promise<void> {
       const removal = store.removed
       if (!removal) return
-      store.removed = null
       try {
         store.accept(await api.restoreMoneyAccount(removal.id))
+        store.removed = null
         announce?.(t('accounts.screen.restored', { name: removal.name }))
-      } catch {
-        announce?.(t('accounts.sheet.failed'))
+      } catch (caught) {
+        const late =
+          caught instanceof ApiError && caught.answered && caught.code === ERROR.NOT_FOUND
+        if (late) {
+          store.removed = null
+          announce?.(t('accounts.screen.restore_late', { name: removal.name }))
+        } else {
+          // The strip anew, for another ten seconds: the server keeps the mark ten minutes.
+          store.removed = { ...removal, stamp: Date.now() }
+          announce?.(t('accounts.screen.restore_failed'))
+        }
+        return
       }
       await nextTick()
       ;(addButton.value?.$el as HTMLElement | undefined)?.focus()

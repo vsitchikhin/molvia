@@ -1,5 +1,6 @@
 <template>
-  <p v-if="answer?.held" class="held">
+  <!-- Below zero — a card in debt — is no «сколько было»: the sheet itself refuses it (review 22). -->
+  <p v-if="answer?.held && answer.held.minor >= 0n" class="held">
     <span>{{ words }}</span>
     <button type="button" class="fill" @click="$emit('fill', answer.held)">
       {{ t('accounts.held_fill') }}

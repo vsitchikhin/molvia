@@ -150,7 +150,7 @@
 <script lang="ts">
 import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import IconArchive from '~icons/mdi/archive-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconScale from '~icons/mdi/scale-balance'
@@ -175,9 +175,12 @@ import type { Removed } from '@/components/spending'
 import { useAccountJournal } from '@/composables/useAccountJournal'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useOwnCategories } from '@/composables/useOwnCategories'
+import { useReconnect } from '@/composables/useReconnect'
 import { calendarDay, shiftDay } from '@/days'
+import { useNavigation } from '@/navigation'
 import { useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
+import { useTripQueueStore } from '@/stores/tripQueue'
 
 /**
  * One account (MOL-123, handoff 04): what it holds — the server's count, «≈» where a rate counted
@@ -207,8 +210,9 @@ export default defineComponent({
   setup() {
     const { t, locale } = useI18n()
     const route = useRoute()
-    const router = useRouter()
     const store = useAccountsStore()
+    const trips = useTripQueueStore()
+    const { goBack } = useNavigation()
     const queue = useSpendingQueueStore()
     const announce = useAnnouncer()
     const { categories, nameOf } = useOwnCategories()
@@ -222,7 +226,9 @@ export default defineComponent({
     onMounted(() => {
       window.addEventListener('online', onLine)
       window.addEventListener('offline', offLine)
-      if (!store.overview) void store.refresh()
+      // Always asked: a page kept from an earlier launch is no answer, and its balance stood over a
+      // fresh journal with nothing to say it was old (adversarial А).
+      void store.refresh()
     })
     onUnmounted(() => {
       window.removeEventListener('online', onLine)
@@ -230,10 +236,20 @@ export default defineComponent({
     })
 
     /** The page's account where it is newer — a write answers with the page, not the journal. */
-    const account = computed(
-      () =>
-        store.accounts.find(({ id }) => id === accountId.value) ?? journal.value?.account ?? null,
-    )
+    useReconnect(() => void store.refresh())
+
+    /**
+     * The account as the newer answer has it: the page once it answered in this session — a write
+     * answers with the page, not the journal — else the journal once it answered, else whichever
+     * the phone kept (adversarial А).
+     */
+    const account = computed(() => {
+      const fromPage = store.accounts.find(({ id }) => id === accountId.value) ?? null
+      const fromJournal = journal.value?.account ?? null
+      if (fromPage && store.stale === null) return fromPage
+      if (fromJournal && stale.value === null) return fromJournal
+      return fromPage ?? fromJournal
+    })
     const accountName = (id: string) => store.accounts.find((one) => one.id === id)?.name ?? null
 
     const money = (value: Money) => signedAmount(value, locale.value)
@@ -273,6 +289,8 @@ export default defineComponent({
     const days = computed(() => {
       const list: { day: string; rows: AccountOperationView[] }[] = []
       for (const row of journal.value?.rows ?? []) {
+        // A trip whose removal waits in the queue is shown nowhere (MOL-76, review 25).
+        if (row.kind === 'trip' && trips.removing.has(row.id)) continue
         const last = list.at(-1)
         if (last?.day === row.day) last.rows.push(row)
         else list.push({ day: row.day, rows: [row] })
@@ -323,8 +341,9 @@ export default defineComponent({
       if (outcome.kind === 'deleted')
         store.removed = { id: outcome.id, name: outcome.name, stamp: Date.now() }
       else announce?.(t('accounts.screen.archived_done', { name: outcome.name }))
-      // «Удалить» and «Убрать» from the account's own screen lead back to the page (handoff 03).
-      void router.replace({ name: 'money-accounts' })
+      // «Удалить» and «Убрать» from the account's own screen lead back to the page (handoff 03) —
+      // a step back where «Счета» lies under it, not a second «Счета» in the history (review 19).
+      void goBack()
     }
 
     const restoring = ref(false)
@@ -355,7 +374,7 @@ export default defineComponent({
     }
 
     function toList(): void {
-      void router.replace({ name: 'money-accounts' })
+      void goBack()
     }
 
     return {

@@ -25,7 +25,7 @@
       <div v-if="locked" class="locked">
         <p class="label">{{ t('accounts.sheet.currency') }}</p>
         <p class="lock">
-          <IconLock class="lock-icon" aria-hidden="true" />{{ currencyName(currency) }}
+          <IconLock class="lock-icon" aria-hidden="true" />{{ currencyName(lockedCurrency) }}
         </p>
         <p class="hint">{{ t('error.money_account_currency_locked') }}</p>
       </div>
@@ -79,7 +79,7 @@
         <template #icon><IconCheck v-if="online" /><IconCloudOff v-else /></template>
         {{ online ? t('accounts.sheet.save') : t('accounts.sheet.wait_online') }}
       </AppButton>
-      <template v-if="account">
+      <template v-if="account && !account.archivedAt">
         <AppButton variant="danger-ghost" block :disabled="sending || !online" @click="remove">
           <template #icon>
             <IconArchive v-if="account.hasOperations" /><IconDelete v-else />
@@ -226,10 +226,19 @@ export default defineComponent({
     )
 
     /** The one the screen holds now — after a conflict, the version another device wrote. */
+    /**
+     * The account amended — the page's version where the page has it, the one the sheet was opened
+     * on where it has not (a screen opened cold, the page not read): an amendment is decided by
+     * what was opened, never by what the page happens to hold (review 23, adversarial Б).
+     */
     const current = computed(() =>
-      props.account ? (store.accounts.find(({ id }) => id === props.account?.id) ?? null) : null,
+      props.account
+        ? (store.accounts.find(({ id }) => id === props.account?.id) ?? props.account)
+        : null,
     )
     const locked = computed(() => current.value?.hasOperations === true)
+    /** The account's own currency — never the one typed before the lock came (adversarial Ж). */
+    const lockedCurrency = computed(() => current.value?.currency ?? currency.value)
 
     const meta = computed(() => {
       const account = current.value
@@ -356,7 +365,16 @@ export default defineComponent({
           void focusFirstProblem()
         } else if (code === ERROR.MONEY_ACCOUNT_IN_FUTURE) {
           dayProblem.value = t('error.money_account_in_future')
-        } else if (code === ERROR.CONFLICT || code === ERROR.MONEY_ACCOUNT_CURRENCY_LOCKED) {
+        } else if (code === ERROR.MONEY_ACCOUNT_CURRENCY_LOCKED) {
+          // An operation came meanwhile: the currency goes back to the account's, and the lock says
+          // why in its own words — sent again it would only be refused again (adversarial Ж).
+          await store.refresh()
+          revision = current.value?.revision ?? revision
+          if (current.value) currency.value = current.value.currency
+        } else if (code === ERROR.CONFLICT && !props.account) {
+          // A new account the server holds otherwise, and no version of it to show: said plainly.
+          failed.value = true
+        } else if (code === ERROR.CONFLICT) {
           // What was typed stays, and the next «Сохранить» goes over the version held now.
           conflict.value = true
           await store.refresh()
@@ -428,6 +446,7 @@ export default defineComponent({
       failed,
       conflict,
       locked,
+      lockedCurrency,
       meta,
       sign,
       currencyName,

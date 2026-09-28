@@ -2,15 +2,20 @@
   <AppCard class="card" list>
     <div class="head">
       <h2 class="caption">{{ t('accounts.title') }}</h2>
-      <RouterLink v-if="live.length > 0" class="all" :to="{ name: 'money-accounts' }">
+      <!-- Any account at all, a removed one too: «Вернуть» lives on «Счета» (review 27). -->
+      <RouterLink v-if="store.accounts.length > 0" class="all" :to="{ name: 'money-accounts' }">
         {{ t('accounts.all') }}<IconChevron class="all-chevron" aria-hidden="true" />
       </RouterLink>
     </div>
 
     <ScreenSkeleton v-if="phase === 'loading'" :groups="[62, 48, 56, 44]" class="skeleton" />
 
+    <!-- Offline is never red (MOL-19): the yellow circle and the cloud; an error is. -->
     <div v-else-if="phase === 'error' || phase === 'offline'" class="failed">
-      <span class="circle" aria-hidden="true"><IconAlert class="circle-icon" /></span>
+      <span class="circle" :class="phase" aria-hidden="true">
+        <IconAlert v-if="phase === 'error'" class="circle-icon" />
+        <IconCloudOff v-else class="circle-icon" />
+      </span>
       <p class="failed-text" :role="phase === 'error' ? 'alert' : undefined">
         {{ phase === 'error' ? t('accounts.load_failed') : t('spending.offline.title') }}
       </p>
@@ -56,6 +61,10 @@
           <p v-if="stale === 'offline' || !online" class="footnote stale">
             {{ t('accounts.stale', { time: when(overview.countedAt) }) }}
           </p>
+          <!-- Kept figures under a server that failed are said to be kept, not shown as fresh (26). -->
+          <p v-else-if="stale === 'error'" class="footnote stale">
+            {{ t('accounts.stale_error', { time: when(overview.countedAt) }) }}
+          </p>
         </div>
       </template>
 
@@ -88,6 +97,7 @@ import { computed, defineComponent, onMounted, ref } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
+import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconChevron from '~icons/mdi/chevron-right'
 import IconInfo from '~icons/mdi/information-outline'
 import IconPlus from '~icons/mdi/plus'
@@ -124,6 +134,7 @@ export default defineComponent({
     AppCard,
     IconAlert,
     IconChevron,
+    IconCloudOff,
     IconInfo,
     IconPlus,
     IconRefresh,
@@ -241,6 +252,11 @@ export default defineComponent({
   border-radius: var(--radius-pill);
   background: var(--bad-tint);
   color: var(--bad-ink);
+
+  &.offline {
+    background: var(--warn-tint);
+    color: var(--warn-ink);
+  }
 }
 
 .circle-icon {
