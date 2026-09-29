@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -84,6 +85,51 @@ test('the period moves by replace: «назад» from twelve months is «Ден
 
   await page.goBack()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+})
+
+// The category card is the third: a choice that took the page to the top took the chart away from
+// the person who asked for it (MOL-136). Where the card stands on the screen is what the eye sees.
+test('a category chosen further down keeps the page where it is, and so does the period', async ({
+  page,
+}) => {
+  await seed(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Графики по месяцам' }).click()
+  const card = page.getByRole('region', { name: 'Категория во времени' })
+  const choice = page.getByRole('combobox', { name: 'Категория' })
+  await expect(choice.locator('option:checked')).toHaveText('Аренда жилья')
+
+  // The card is the last on the page and cannot reach the top; it stands off the bottom of the page.
+  // At the very bottom a shorter card brings the end of the page up under it — 2 px between two
+  // categories, a line where a missing one was named: the height of the page, MOL-138, not the router.
+  await standAt(card, 480)
+  const scrolled = await page.evaluate(() => window.scrollY)
+  expect(scrolled).toBeGreaterThan(0)
+  const before = await topOf(card)
+
+  await choice.selectOption({ label: 'Кафе и рестораны' })
+  await expect(page).toHaveURL(/category=/)
+  await expect(card).toContainText(/30\s000\s֏/)
+  expect(await topOf(card)).toBe(before)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
+
+  // The first twelve months on a phone are read under the skeleton, a page one screen tall, and the
+  // browser brings any scroll up to it — the height of the page, not the router. Back to six, the
+  // period the phone keeps is drawn at once, and the page is only a little down: the period is at
+  // the top, and a little is enough to tell it from the top.
+  await page.getByText('12 месяцев', { exact: true }).click()
+  const bars = page.locator('fieldset.chart').first().locator('label.bar')
+  await expect(bars).toHaveCount(12)
+  const periods = page.getByRole('group', { name: 'Период' })
+  await standAt(periods, 60)
+  const down = await page.evaluate(() => window.scrollY)
+  expect(down).toBeGreaterThan(0)
+  const period = await topOf(periods)
+  await page.getByText('6 месяцев', { exact: true }).click()
+  await expect(page).not.toHaveURL(/period=/)
+  await expect(bars).toHaveCount(6)
+  expect(await topOf(periods)).toBe(period)
+  expect(await page.evaluate(() => window.scrollY)).toBe(down)
 })
 
 test('with no connection the charts are the last ones read, under a strip that is not red', async ({

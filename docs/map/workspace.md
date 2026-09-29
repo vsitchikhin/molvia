@@ -48,7 +48,7 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `.env.example` — Sample of the generated `.env` for copy 0: ports, databases (dev, test, e2e), bot settings, rate provider URLs.
 - `.githooks/commit-msg` — Git hook: refuses a subject that is not a Conventional Commit with the Jira key as scope.
 - `.githooks/pre-commit` — Git hook: refuses a commit whose formatting or lint is not clean.
-- `.githooks/pre-push` — Git hook: refuses a push whose types, unit, integration or end-to-end tests are not green.
+- `.githooks/pre-push` — Git hook: refuses a push whose types, unit, integration or end-to-end tests are not green; waits its turn and skips a step already green on the tree.
 - `.github/dependabot.yml` — Dependabot: weekly grouped npm updates and monthly GitHub Actions updates.
 - `.github/workflows/ci.yml` — CI on push and pull request: format check, lint, types and tests against Postgres, then end-to-end in a phone browser.
 - `.gitignore` — Ignored files: env files, the `.scratch` and `.lavish` links, dependencies, builds, certificates, Playwright output.
@@ -57,8 +57,10 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `.prettierrc.json` — Prettier settings: no semicolons, single quotes, width 100, trailing commas.
 - `Makefile` — The canonical entry point: setup, stack, database, migrate, forget, seed, gates, dev, format, lint, typecheck, test, check, certs, icons.
 - `bin/check-code-map.mjs` — Refuses a code map that lies: a file it does not cover, a path that does not exist, a file with two homes; run by `npm run lint`.
+- `bin/green.sh` — Remembers which checks passed on which clean tree, so `make check` and the push do not check one tree twice.
 - `bin/init-env.sh` — Generates this copy's `.env` from its index: ports, databases, compose project; keeps bot settings across `--force`.
 - `bin/link-shared.sh` — Points `.scratch` and `.lavish` at the directory shared by all working copies; idempotent.
+- `bin/one-at-a-time.sh` — Runs a command under the one lock all copies share, so the heavy checks of several copies take turns.
 - `docker-compose.yml` — Development stack: this copy's Postgres only, on the loopback, named by the copy's index.
 - `eslint.config.base.js` — Shared lint preset every module opts into: type-aware rules, the alias-or-sibling import shape, the `deny` helper.
 - `eslint.config.js` — Root lint config: only `e2e/` and the repository's own config files; each module lints itself.

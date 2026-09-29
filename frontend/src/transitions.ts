@@ -8,8 +8,21 @@ import type { RouteLocation, RouteLocationNormalized, Router } from 'vue-router'
  */
 export type Direction = 'push' | 'pop' | 'tab'
 
-type Place = Pick<RouteLocation, 'matched' | 'fullPath' | 'meta' | 'name'> &
+type Place = Pick<RouteLocation, 'matched' | 'fullPath' | 'path' | 'meta' | 'name'> &
   Partial<Pick<RouteLocation, 'query'>>
+
+/**
+ * A move that leaves the path as it was is the screen's own state, not another screen: the same
+ * address — a sheet put away — or only the query — the category and the period of «Графики», the
+ * month of «Деньги», each by `replace` (MOL-136). It is not scrolled to the top, not animated and not
+ * an arrival. The first navigation is always another screen: it comes from `START_LOCATION`, at «/».
+ */
+export function sameScreen(
+  from: Pick<RouteLocation, 'matched' | 'path'>,
+  to: Pick<RouteLocation, 'path'>,
+): boolean {
+  return from.matched.length > 0 && from.path === to.path
+}
 
 /** The screen a route leads back to: its own parent, or one `?from=` names that it lists (MOL-82). */
 function parentOf(place: Place): string | undefined {
@@ -19,7 +32,7 @@ function parentOf(place: Place): string | undefined {
 }
 
 export function direction(from: Place, to: Place): Direction | null {
-  if (from.matched.length === 0 || from.fullPath === to.fullPath) return null
+  if (from.matched.length === 0 || sameScreen(from, to)) return null
   const into = parentOf(to)
   const outOf = parentOf(from)
   if (into && into === from.name) return 'push'
@@ -125,14 +138,16 @@ export function focusScreenTitle(): void {
  * Nor when the address stayed the same. The router calls every `popstate` a move, and a sheet
  * closed by «back» is one: the screen did not change, the button that opened the sheet is still
  * there, and `<dialog>` has just handed focus back to it — taking it to the heading would drop a
- * screen-reader user at the top of the page (MOL-18).
+ * screen-reader user at the top of the page (MOL-18). Nor when only the query changed: the arrow of
+ * the month, the period, the category keep the focus, and the next Enter or arrow is theirs — taken
+ * to the heading, the second tap on «‹» went into the title (MOL-136, adversarial Ф).
  */
 export function installArrival(router: Router, t: (key: string) => string): void {
   const name = (to: RouteLocationNormalized): string => `${t(to.meta.titleKey)} · ${t('app.name')}`
 
   document.title = name(router.currentRoute.value)
   router.afterEach(async (to, from, failure) => {
-    if (failure || to.fullPath === from.fullPath) return
+    if (failure || to.fullPath === from.fullPath || sameScreen(from, to)) return
     document.title = name(to)
     if (from.matched.length === 0) return
     await nextTick()

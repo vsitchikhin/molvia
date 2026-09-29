@@ -175,6 +175,40 @@ describe('BottomSheet', () => {
 
   // A text selection that began in a field and overshot is clicked on the dialog — the common
   // ancestor — and would throw away what was typed (adversarial Б-4).
+  // iOS hands a touch to the page only where a listener stands, and the scrim lies outside the
+  // dialog's box: a listener on the dialog never heard a tap there, and on an iPhone the sheet did
+  // not close (MOL-80). Measured on the owner's phone; happy-dom has no such layer, so what is held
+  // here is where the listener stands.
+  it('hears a press on the document while it is open, and lets go of it once it is shut', async () => {
+    const add = vi.spyOn(document, 'addEventListener')
+    const remove = vi.spyOn(document, 'removeEventListener')
+    const { host } = await render({ open: true })
+    const heard = add.mock.calls.find(([type]) => type === 'pointerdown')
+    expect(heard?.[2]).toEqual({ capture: true, passive: true })
+    await host.get('.head button').trigger('click')
+    await nextTick()
+    expect(remove).toHaveBeenCalledWith('pointerdown', heard?.[1], { capture: true, passive: true })
+    expect(remove).toHaveBeenCalledWith('pointercancel', expect.any(Function), {
+      capture: true,
+      passive: true,
+    })
+  })
+
+  it('must not fire: a shut sheet does not listen on the document', async () => {
+    const add = vi.spyOn(document, 'addEventListener')
+    await render()
+    expect(add.mock.calls.some(([type]) => type === 'pointerdown')).toBe(false)
+  })
+
+  it('closes on a tap on the scrim that only the document heard pressed', async () => {
+    const { dialog, go } = await render({ open: true })
+    const press = new PointerEvent('pointerdown', { bubbles: true })
+    Object.defineProperty(press, 'target', { value: dialog() })
+    document.dispatchEvent(press)
+    dialog().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+  })
+
   it('must not fire: a press that began inside the sheet and ended on the scrim', async () => {
     const { host, go, dialog } = await render({ open: true })
     host.get('.content').element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
@@ -983,5 +1017,442 @@ describe('the page under the sheet', () => {
     document.body.append(dialog)
     button.click()
     expect(pageAnchor()).toBeNull()
+  })
+})
+
+describe('focus after the sheet', () => {
+  /** A button with an icon in it, as the screens have: a tap lands on the icon. */
+  function opener(): { button: HTMLButtonElement; icon: HTMLSpanElement } {
+    const button = document.createElement('button')
+    const icon = document.createElement('span')
+    button.append(icon)
+    document.body.append(button)
+    return { button, icon }
+  }
+
+  async function openFrom(target: HTMLElement, options: { at?: string } = {}) {
+    const rendered = await render(options)
+    target.addEventListener('click', () => {
+      rendered.open.value = true
+    })
+    target.click()
+    await nextTick()
+    return rendered
+  }
+
+  /** Where Safari leaves it: a tapped button never had focus, so the dialog gives it to nothing. */
+  function leftNowhere(): void {
+    ;(document.activeElement as HTMLElement | null)?.blur()
+  }
+
+  // Safari does not focus a tapped button, so the dialog had nothing to give focus back to, and a
+  // screen reader was left at the top of the page (MOL-80).
+  it('goes back to the button it was opened from when the platform left it nowhere', async () => {
+    const { button, icon } = opener()
+    const { router, dialog } = await openFrom(icon)
+    leftNowhere()
+    router.back()
+    expect(dialog().open).toBe(false)
+    expect(document.activeElement).toBe(button)
+  })
+
+  // WebKit still names the closed dialog as focused — a tap on no control in it focused the dialog.
+  it('goes back to the button when focus is still inside the closed dialog', async () => {
+    const { button } = opener()
+    const { router, host } = await openFrom(button)
+    ;(host.get('.head button').element as HTMLButtonElement).focus()
+    const close = vi.spyOn(HTMLDialogElement.prototype, 'close').mockImplementation(function (
+      this: HTMLDialogElement,
+    ) {
+      this.removeAttribute('open')
+    })
+    router.back()
+    close.mockRestore()
+    expect(document.activeElement).toBe(button)
+  })
+
+  // Over a sheet in Safari the platform gives focus back to what the sheet under it held — its
+  // field — not to the row that opened the picker, which the tap never focused (review Р-3).
+  it('goes back to the button when the platform gave focus back to what held it at the opening', async () => {
+    const { button } = opener()
+    const field = document.createElement('input')
+    document.body.append(field)
+    field.focus()
+    const { router } = await openFrom(button)
+    field.focus()
+    router.back()
+    expect(document.activeElement).toBe(button)
+  })
+
+  // Chromium and a keyboard give focus back themselves; the sheet does not take it from there.
+  it('must not fire: focus the platform gave back somewhere stays there', async () => {
+    const { button } = opener()
+    const field = document.createElement('input')
+    document.body.append(field)
+    const { router } = await openFrom(button)
+    field.focus()
+    router.back()
+    expect(document.activeElement).toBe(field)
+  })
+
+  it('must not fire: the button is gone — the row the sheet deleted', async () => {
+    const { button } = opener()
+    const { router } = await openFrom(button)
+    button.remove()
+    leftNowhere()
+    router.back()
+    expect(document.activeElement).toBe(document.body)
+  })
+
+  it('must not fire: a button under `inert` is not given focus', async () => {
+    const { button } = opener()
+    const { router } = await openFrom(button)
+    button.setAttribute('inert', '')
+    leftNowhere()
+    router.back()
+    expect(document.activeElement).not.toBe(button)
+  })
+
+  // The screen goes with the sheet, and what the next screen focuses is the router's business.
+  it('must not fire: close(2) leaves the screen', async () => {
+    const { button } = opener()
+    const { sheet } = await openFrom(button, { at: '/trip/add' })
+    leftNowhere()
+    ;(sheet().vm as unknown as { close: (steps: number) => void }).close(2)
+    expect(document.activeElement).not.toBe(button)
+  })
+})
+
+describe('pulled down', () => {
+  const HEIGHT = 400
+
+  async function pulled(options: { rising?: boolean } = {}) {
+    const rendered = await render({ open: true, ...options })
+    const dialog = rendered.dialog()
+    Object.defineProperty(dialog, 'offsetHeight', { value: HEIGHT, configurable: true })
+    return rendered
+  }
+
+  function point(target: Element, x: number, y: number): Touch {
+    return new Touch({ identifier: 0, target, clientX: x, clientY: y })
+  }
+
+  /** One finger on `target`, down at `y`; `to` moves it `after` ms later. */
+  function finger(target: Element, y: number, x = 100) {
+    const events: TouchEvent[] = []
+    const send = (type: string, touches: Touch[], changed: Touch[]) => {
+      const event = new TouchEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        touches,
+        changedTouches: changed,
+      })
+      events.push(event)
+      target.dispatchEvent(event)
+      return event
+    }
+    let last = point(target, x, y)
+    send('touchstart', [last], [last])
+    return {
+      events,
+      to(nextY: number, nextX = x, after = 16) {
+        wait(after)
+        last = point(target, nextX, nextY)
+        return send('touchmove', [last], [last])
+      },
+      /** A second finger comes down as a browser tells it: its own `touchstart` comes first. */
+      second() {
+        let other = new Touch({ identifier: 1, target, clientX: x + 100, clientY: last.clientY })
+        send('touchstart', [last, other], [other])
+        return {
+          to(nextY: number) {
+            wait(16)
+            last = point(target, last.clientX, nextY)
+            other = new Touch({ identifier: 1, target, clientX: x + 100, clientY: nextY })
+            return send('touchmove', [last, other], [last, other])
+          },
+          up() {
+            send('touchend', [last], [other])
+          },
+        }
+      },
+      /** Lifts the finger — `after` ms later and at `atY`, if it went on since the last move. */
+      up(atY = last.clientY, after = 0) {
+        wait(after)
+        last = point(target, last.clientX, atY)
+        send('touchend', [], [last])
+      },
+      cancel() {
+        send('touchcancel', [], [last])
+      },
+    }
+  }
+
+  async function frame(): Promise<void> {
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+  }
+
+  // A shut sheet stays on many screens, and the shell holds no touch listener anywhere (MOL-17,
+  // e2e `navigation.spec.ts`). Counted from after the mount: the test wrapper listens to every
+  // native event of the component's root to record what it emits.
+  it('listens for touches only while it is open', async () => {
+    const { open, host, dialog } = await render()
+    const add = vi.spyOn(dialog(), 'addEventListener')
+    const remove = vi.spyOn(dialog(), 'removeEventListener')
+    const touches = (spy: typeof add) =>
+      spy.mock.calls
+        .filter(([type]) => type.startsWith('touch'))
+        .map(([type, listener]) => [type, listener])
+    open.value = true
+    await nextTick()
+    const added = touches(add)
+    expect(added.map(([type]) => type)).toEqual([
+      'touchstart',
+      'touchmove',
+      'touchend',
+      'touchcancel',
+    ])
+    expect(add.mock.calls.find(([type]) => type === 'touchmove')?.[2]).toEqual({ passive: false })
+    wait(1000)
+    await realTime()
+    await host.get('.head button').trigger('click')
+    await nextTick()
+    expect(touches(remove)).toEqual(added)
+  })
+
+  it('follows the finger, and the scrim fades with it', async () => {
+    const { dialog, host } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    const move = drag.to(210)
+    expect(move.defaultPrevented).toBe(true)
+    expect(dialog().style.transform).toBe('translateY(100px)')
+    expect(dialog().style.getPropertyValue('--sheet-drag')).toBe(String(100 / HEIGHT))
+    expect(dialog().classList.contains('dragging')).toBe(false)
+    await nextTick()
+    expect(dialog().classList.contains('dragging')).toBe(true)
+  })
+
+  // A quarter is the owner's line (В-4); slow, so no flick decides it.
+  it('closes through the history once let go past a quarter of its height', async () => {
+    const { host, go, open } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(110 + HEIGHT / 4 + 1, 100, 500)
+    drag.up()
+    await frame()
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+    expect(open.value).toBe(false)
+  })
+
+  it('must not fire: let go exactly at a quarter, slowly — it goes back up', async () => {
+    const { host, go, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(110 + HEIGHT / 4, 100, 500)
+    drag.up()
+    await frame()
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().open).toBe(true)
+    expect(dialog().style.transform).toBe('')
+    expect(dialog().style.getPropertyValue('--sheet-drag')).toBe('')
+  })
+
+  it('closes on a flick short of the quarter', async () => {
+    const { host, go } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(150, 100, 20)
+    drag.up()
+    await frame()
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+  })
+
+  it('must not fire: a short slow pull goes back up', async () => {
+    const { host, go, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(150, 100, 400)
+    drag.up()
+    await frame()
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().style.transform).toBe('')
+  })
+
+  it('must not fire: a finger that moves less than a tap does', async () => {
+    const { host, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    const move = drag.to(103)
+    drag.up()
+    expect(move.defaultPrevented).toBe(false)
+    expect(dialog().style.transform).toBe('')
+  })
+
+  it('must not fire: content scrolled down scrolls back first', async () => {
+    const { host, dialog, go } = await pulled()
+    dialog().scrollTop = 60
+    const drag = finger(host.get('.content').element, 100)
+    const move = drag.to(200)
+    drag.up()
+    await frame()
+    expect(move.defaultPrevented).toBe(false)
+    expect(dialog().style.transform).toBe('')
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  // A finger in a field moves the caret and selects (owner's decision В-6).
+  it('must not fire: a pull that starts in a field', async () => {
+    const { dialog, go } = await pulled()
+    const field = document.createElement('input')
+    dialog().append(field)
+    const drag = finger(field, 100)
+    drag.to(110)
+    const move = drag.to(300)
+    drag.up()
+    await frame()
+    expect(move.defaultPrevented).toBe(false)
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  it('must not fire: a finger that goes sideways first, then down', async () => {
+    const { host, go } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(104, 120)
+    drag.to(300, 120)
+    drag.up()
+    await frame()
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  it('must not fire: a finger that goes up — a scroll', async () => {
+    const { host, go, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 300)
+    const move = drag.to(250)
+    drag.to(400)
+    drag.up()
+    await frame()
+    expect(move.defaultPrevented).toBe(false)
+    expect(dialog().style.transform).toBe('')
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  // The opener's second tap lands on the sheet while it rises (MOL-69); nor may a finger pull it.
+  it('must not fire: a finger that came down while it was still coming up', async () => {
+    const { host, go, dialog } = await pulled({ rising: true })
+    const drag = finger(host.get('.content').element, 100)
+    wait(1000)
+    drag.to(110)
+    drag.to(300)
+    drag.up()
+    await frame()
+    expect(dialog().style.transform).toBe('')
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  // The browser sends the second finger's `touchstart` before any move of two: the pull froze where
+  // it was, and lifting either finger closed the sheet with its sum typed (adversarial Б).
+  it('must not fire: a second finger puts it back, and neither lift closes it', async () => {
+    const { host, go, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(300, 100, 200)
+    expect(dialog().style.transform).toBe('translateY(190px)')
+    const second = drag.second()
+    await frame()
+    expect(dialog().style.transform).toBe('')
+    const move = second.to(400)
+    expect(move.defaultPrevented).toBe(false)
+    expect(dialog().style.transform).toBe('')
+    second.up()
+    drag.to(420)
+    drag.up()
+    await frame()
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().style.transform).toBe('')
+  })
+
+  // A finger at rest sends no move: a fast pull held still and then let go — changed its mind — was
+  // read at the speed of the pull and closed the sheet (adversarial А, review Р-1).
+  it('must not fire: a fast short pull held still, then let go — it goes back up', async () => {
+    const { host, go, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    for (const y of [110, 130, 150, 170]) drag.to(y)
+    wait(1000)
+    drag.up()
+    await frame()
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().style.transform).toBe('')
+  })
+
+  // A flick is measured over the moments before the lift: at the window's edge it still counts.
+  it('closes on a fast short pull let go within the flick window', async () => {
+    const { host, go } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    for (const y of [110, 130, 150, 170, 190, 210, 230, 250]) drag.to(y)
+    wait(40)
+    drag.up()
+    await frame()
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+  })
+
+  // A lift comes between two frames, and the finger went on meanwhile: that way counts with that
+  // time, or a flick just over the line read as under it (adversarial Г).
+  it('closes on a short flick let go between two moves, where the finger went on', async () => {
+    const { host, go } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    // 0.5 px/ms, a frame a report: to the last report 16 px in 40 ms — the line itself; to the lift,
+    // 20 px.
+    drag.to(110)
+    drag.to(118)
+    drag.to(126)
+    drag.up(130, 8)
+    await frame()
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+  })
+
+  // A sheet inside this one — in its slot — pulls itself; the touch that bubbles up is not ours,
+  // or both would step back and the one under it would go with its sum typed (review Р-2).
+  it('must not fire: a pull on a sheet inside it', async () => {
+    const { dialog, go } = await pulled()
+    const inner = document.createElement('dialog')
+    const row = document.createElement('p')
+    inner.append(row)
+    dialog().append(inner)
+    const drag = finger(row, 100)
+    drag.to(110)
+    const move = drag.to(300)
+    drag.up()
+    await frame()
+    expect(move.defaultPrevented).toBe(false)
+    expect(dialog().style.transform).toBe('')
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  it('must not fire: a touch the platform took back puts it back', async () => {
+    const { host, go, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(300)
+    drag.cancel()
+    await frame()
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().style.transform).toBe('')
+  })
+
+  // Opened again after it was pulled away, it comes up as the stylesheet draws it.
+  it('opens again without the offset it was pulled away with', async () => {
+    const { host, open, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(300)
+    drag.up()
+    await frame()
+    landed()
+    await nextTick()
+    open.value = true
+    await nextTick()
+    expect(dialog().open).toBe(true)
+    expect(dialog().style.transform).toBe('')
+    expect(dialog().style.getPropertyValue('--sheet-drag')).toBe('')
   })
 })

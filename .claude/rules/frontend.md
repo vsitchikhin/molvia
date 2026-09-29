@@ -162,8 +162,36 @@ The detail behind the frontend lines of `CLAUDE.md`.
   real browser: happy-dom dispatches `popstate` inside `go`). **No
   gesture is intercepted**: no touch listener, no `overscroll-behavior` on the root — the
   edge swipe and Android «back» belong to the browser, and the history is the one source of
-  «back». Only the page scrolls, never an inner container: iOS hides its address bar and the
-  router restores positions only for the window.
+  «back». **One written exception: a sheet pulled down** (MOL-80, the owner's request) — a
+  vertical drag inside the sheet, which neither the edge swipe nor «back» is, and which closes
+  it through the history like everything else (below). Only the page scrolls, never an inner
+  container: iOS hides its address bar and the router restores positions only for the window. **A move that changes only the query of the
+  screen is the screen's own state, not another screen** (`sameScreen` in `transitions.ts`,
+  MOL-136): the category and the period of «Графики», the month of «Деньги» live in the address and
+  change by `replace`. **It is not scrolled, not animated and not an arrival** — three readers of
+  one move, and all three go by the one definition. Read as a new screen, it took the page to the
+  top — the category card is the third, and the chart the person chose it for was gone; it took the
+  focus to the heading, so the second Enter on «‹» went into the title and the arrows of the period
+  worked once (adversarial Ф); and the month cross-faded as a move between tabs, whose overlay took
+  the second quick tap (Д). One rule rather than a flag on the screen: a flag has to be remembered
+  by every screen that keeps its state in the address, and the one that forgets it is this bug
+  again; no screen wants the top on a change of its query — one that does scrolls itself after its
+  `replace`. Back and forward still return to what was saved, and the same route with other params
+  (`/money/accounts/a` → `/b`) is another screen, from the top. What the rule cannot hold is the
+  height of the page: a shorter version of the screen brings the scroll up to its new end — a month
+  or a period read for the first time on the phone, under the skeleton, and at the very bottom of
+  «Графики» a category card a line shorter (MOL-138). So e2e takes «the page stayed» on a month or a
+  period the phone already keeps, by where the control stands on the screen (`e2e/scroll.ts`), off
+  the bottom of the page.
+- **A scroll the eye follows is smooth; a scroll that sets a screen in place is instant**
+  (owner's remark on MOL-136). Smooth: the tab of the section one is in, back to the top
+  (`goTab`), and a spending just saved brought to the middle (`toShow` in «Деньги») — each
+  instant under «reduce motion». Instant: a new screen at the top and a screen back where it was
+  — it slides in already there, and a smooth scroll would show the old page travelling under the
+  transition; the sheet putting the page back (MOL-63), a compensation the eye must not see at
+  all; the arrows in the catalogue list, which a smooth scroll lags behind. **Never
+  `scroll-behavior: smooth` in the CSS** — Stylelint refuses it: a scroll with `behavior: 'auto'`
+  takes it from the CSS, and the sheet's compensation would slide; a smooth scroll says so itself.
 - **A screen is built from the kit, not drawn anew** (MOL-18): `AppButton`, `AppField`,
   `SegmentedControl`, `VerdictBadge`, `AppCard`, `BottomSheet` in `components/`, every state of
   them on the development-only page `/_kit`. `AppCard` carries exactly the differences between
@@ -171,8 +199,33 @@ The detail behind the frontend lines of `CLAUDE.md`.
   a surface is one prop away from a wrapper around a `<div>`. **The sheet is a native
   `<dialog>` with an entry in the history**, laid through the router's own `history.push` at
   the same address — never a bare `pushState`, whose state lacks the `position` and `back` the
-  rules of «back» read. Every close — ×, the scrim, Esc, Android «back» — steps back
-  off that entry, and only the pop closes it, so exactly one entry is ever taken. **The sheet puts
+  rules of «back» read. Every close — ×, the scrim, a pull down, Esc, Android «back» — steps back
+  off that entry, and only the pop closes it, so exactly one entry is ever taken. **A pull down
+  closes it** (`useSheetDrag`, MOL-80, owner's decisions В-4…В-6): only once it is up (as a tap,
+  MOL-69), only with its content at the very top, only from outside a field — a finger in a field
+  moves the caret and selects — and only down more than sideways, past the tap slop; up or sideways
+  is the browser's scroll. The sheet follows the finger and the scrim fades with it; let go past a
+  quarter of its height, or flicked faster than 0.4 px/ms, it slides away and closes, otherwise it
+  goes back up. **The flick is measured up to the lift**, where the finger lifted included, not up
+  to the last move: a finger at rest sends no `touchmove`, and a fast pull held still and then let
+  go — a change of mind — closed the sheet (adversarial А); a lift comes between two frames, and the
+  way since the last move counts with its time (Г). **A second finger ends the pull and puts it back**: a pinch or a change of
+  grip is not a decision, and the browser tells of the finger by its own `touchstart` first
+  (adversarial Б). A touch that comes up from a sheet inside the sheet is that sheet's to pull. A
+  pull that starts on a button does not press it: a touch that moved past the tap slop makes no
+  click, in Chromium as on iOS, and e2e holds that for the main action. Touch events, not pointer
+  events: once the browser starts a scroll it takes the pointer back, and only a `touchmove` that is
+  not passive stops the content springing. Listened to only while the sheet is open, on the dialog:
+  a shut sheet stays on many screens, and with no sheet open the shell holds no touch listener at
+  all (`navigation.spec.ts` holds that). **No grab handle** (В-5): the gesture is there, the sign is
+  not. **Focus comes back to what opened it, wherever the platform gave it** (MOL-80): a `<dialog>`
+  returns focus to what was focused when it was shown, and Safari does not focus a tapped button — a
+  screen reader was left at the top of the page, or, over a sheet, on whatever the sheet under it
+  held. When the pop lands on the same screen and focus is on the body, still on the closed dialog
+  (WebKit's way), or back on what held it at the opening, the opener's button takes it, without a
+  scroll; on the opener already — Chromium, a keyboard — or anywhere else, it is left there, and
+  `close(2)` leaves it to the next screen. No ring appears: a script's focus after a tap is not
+  `:focus-visible` in either engine. **The sheet puts
   the page back by what it was opened from, never by a number** (MOL-63): it notes the element
   the opening click landed on — a tap, Enter, a screen reader alike, since iOS does not focus a
   tapped button; the click is forgotten once its task is over, and a sheet opened later is measured
@@ -194,7 +247,14 @@ The detail behind the frontend lines of `CLAUDE.md`.
   and never steps out of the app. **A sheet over a sheet has «‹» and no ×** (`back`, MOL-123,
   owner's decision В-4): under a picker lies a spending with its sum typed, and a × that closed the
   stack threw it away at the till; one scrim, the lower sheet's. Sheets may stack: a pop closes as many from the top as
-  entries it went back. Until it has come up the sheet takes
+  entries it went back. **A tap on the scrim is heard on the document** (MOL-80): iOS hands a touch
+  to the page only where a listener of touches or of the pointer stands, and a listener on the
+  `<dialog>` covers the panel's box — the scrim lies outside it, its `pointerdown` never came, and
+  on an iPhone a tap on the scrim did nothing at all. Measured on the owner's phone: a passive
+  `pointerdown` on the document, and the same tap closed it. Chromium and Playwright's WebKit have
+  no such layer, which is why e2e was green; what holds it is a component test of where the
+  listener stands. The press is still judged by its target — the scrim's is the dialog itself — so
+  the rules below are unchanged. Until it has come up the sheet takes
   no tap, so the second tap of a double tap cannot close it or press its main action. **«Up» is
   the end of its own rise, not a clock** (MOL-69): a rise starts with the first frame that draws
   it, and on a busy phone that frame comes late — a clock started at `showModal` ran out while
