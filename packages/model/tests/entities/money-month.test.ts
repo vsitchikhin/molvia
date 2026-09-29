@@ -198,6 +198,20 @@ describe('the month of «Деньги»', () => {
     ])
   })
 
+  it('names the categories whose sums are short: a spending and a trip with no rate (d9 round 3, В3)', () => {
+    const result = month({
+      spendings: [
+        spending('5 USD', '2026-09-12', 'cafe'),
+        spending('900 AMD', '2026-09-12', 'clothes'),
+      ],
+      trips: [trip('20 EUR', '2026-09-14')],
+    })
+    expect(result.uncountedIn).toEqual([categoryId('cafe'), categoryId('groceries')].sort())
+    expect(month({ spendings: [spending('900 AMD', '2026-09-12', 'cafe')] }).uncountedIn).toEqual(
+      [],
+    )
+  })
+
   it('takes a finished trip into the groceries, one line per currency', () => {
     const result = month({
       trips: [trip('8940 AMD', '2026-09-24')],
@@ -255,6 +269,19 @@ describe('the month of «Деньги»', () => {
   it('has no figure in the income currency without a rate — never a zero', () => {
     const result = month({ rate: null, spendings: [spending('5000 AMD', '2026-09-20')] })
     expect(result.spentIncome).toBeNull()
+  })
+
+  it('is «0» in the income currency with nothing spent, rate or none (review of MOL-74, С-7)', () => {
+    const empty = month({ rate: null, incomes: [income('50000 RUB', '2026-09-10')] })
+    expect(empty.spentIncome).toEqual(toMoney('0 RUB'))
+    // A month spent only in what did not convert: nothing counted, nothing to convert.
+    const unconverted = month({
+      rate: null,
+      spendings: [spending('10 EUR', '2026-09-20')],
+      inSpend: () => null,
+    })
+    expect(unconverted.spent).toEqual(toMoney('0 AMD'))
+    expect(unconverted.spentIncome).toEqual(toMoney('0 RUB'))
   })
 
   it('needs no rate when both currencies are one', () => {

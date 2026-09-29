@@ -2,6 +2,8 @@ import { z } from 'zod'
 import {
   DomainError,
   ERROR,
+  moneyChartsCodec,
+  moneyChartsQuerySchema,
   moneyMonthCodec,
   moneyMonthQuerySchema,
   monthSchema,
@@ -14,7 +16,9 @@ import {
 } from '@molvia/model'
 import type {
   Actor,
+  ChartPeriod,
   JournalKey,
+  MoneyChartsView,
   MoneyMonthView,
   SalaryShift,
   SpendingAmendBody,
@@ -39,6 +43,7 @@ export interface SpendingsApi {
   ): Promise<{ list: SpendingCategoriesResponse; created: boolean }>
   archiveCategory(actor: Actor, id: string, archived: boolean): Promise<SpendingCategoriesResponse>
   month(actor: Actor, month: string, cursor?: JournalKey): Promise<MoneyMonthView>
+  charts(actor: Actor, period: ChartPeriod): Promise<MoneyChartsView>
   salaryShift(actor: Actor): Promise<SalaryShift>
   setSalaryShift(actor: Actor, body: SalaryShift): Promise<SalaryShift>
 }
@@ -142,6 +147,13 @@ export function spendingRoutes(app: FastifyInstance, api: SpendingsApi): void {
       return privately(reply).send(z.encode(moneyMonthCodec, view))
     },
   )
+
+  /** «Графики» (MOL-74): the months of the period side by side, the exchanges and the rate. */
+  app.get('/money/charts', { exposeHeadRoute: false }, async (request, reply) => {
+    const { period } = parseQuery(moneyChartsQuerySchema, request.query)
+    const view = await api.charts(ownerOf(request), period)
+    return privately(reply).send(z.encode(moneyChartsCodec, view))
+  })
 
   /** «Зарплата с … числа — в следующий месяц» (MOL-134, В-3): the month's rule of «Пришло». */
   app.get('/actors/me/salary-shift', { exposeHeadRoute: false }, async (request, reply) =>

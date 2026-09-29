@@ -15,6 +15,7 @@ import MoneyView from '@/views/MoneyView.vue'
 import AccountView from '@/views/AccountView.vue'
 import AccountsView from '@/views/AccountsView.vue'
 import MoneyCategoriesView from '@/views/MoneyCategoriesView.vue'
+import MoneyChartsView from '@/views/MoneyChartsView.vue'
 import { watchBrowserAnimatedBack } from '@/transitions'
 
 /**
@@ -30,6 +31,7 @@ export type RouteName =
   | 'verdicts'
   | 'money'
   | 'money-categories'
+  | 'money-charts'
   | 'money-accounts'
   | 'money-account'
   | 'settings'
@@ -162,6 +164,13 @@ export const routes = [
     name: 'incomes',
     component: IncomesView,
     meta: { titleKey: 'income.title', parent: 'money' },
+  },
+  // «Графики» (MOL-74): the period (`?period=12`) and the category (`?category=`) move by `replace`.
+  {
+    path: '/money/charts',
+    name: 'money-charts',
+    component: MoneyChartsView,
+    meta: { titleKey: 'spending.charts.title', parent: 'money' },
   },
   {
     path: '/money/categories',

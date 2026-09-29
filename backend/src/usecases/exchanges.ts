@@ -28,6 +28,7 @@ import type {
   ExchangeView,
   ExchangesResponse,
   Income,
+  Money,
   OfficialRate,
   OfficialRateOf,
   OwnRates,
@@ -48,7 +49,7 @@ const FOREIGN = currencySchema.options.filter(
 )
 
 /** How many days of the cache are read at once: a long list must not take the whole pool (Ч-3). */
-const RATE_READS_AT_ONCE = 8
+export const RATE_READS_AT_ONCE = 8
 
 /** The official rates cached on or before each of `days`, one query a day, a few at a time. */
 export async function officialRatesOn(
@@ -105,10 +106,39 @@ export function sinceDay(since: Date | null): string | null {
 }
 
 /**
- * One exchange as the list shows it, compared with the official rate of its own day — the rate a
- * trip started that day would have taken, by the same rule (`pickOfficialRate`). A jumped rate is
- * measured by the one before it, and without one the comparison is withheld and the row says why.
+ * An exchange compared with the official rate of its own day — the rate a trip started that day
+ * would have taken, by the same rule (`pickOfficialRate`). A jumped rate is measured by the one
+ * before it, and without one there is no comparison. «Обмен денег» and «Графики» (MOL-74) measure
+ * by this one function, so the card of losses sums the very differences the list shows.
  */
+export function comparisonOf(
+  exchange: Exchange,
+  rows: readonly CachedRate[],
+): {
+  rate: ExchangeRate | null
+  official: OfficialRate | null
+  measure: ExchangeRate | null
+  difference: Money | null
+} {
+  const { given, received, exchangedOn } = exchange
+  const rate = exchangeRateOf(exchange)
+  const official = pickOfficialRate(given.currency, received.currency, rows, exchangedOn)
+  const backward = steadyOf(pickOfficialRate(received.currency, given.currency, rows, exchangedOn))
+  // The bank's rate on the side the exchange's own is printed by, built from the cache that
+  // side: the plate sets the two one under the other, and near parity each chose its own side —
+  // «1,01 $/€» over «1,01 €/$» (adversarial Г). Without a rate of the exchange, the side at least
+  // one (MOL-81); the difference is measured by whichever it is.
+  const forward = steadyOf(official)
+  const measure = rate
+    ? rate.base === given.currency
+      ? forward
+      : backward
+    : uprightOf(forward, backward)
+  const difference = measure ? officialDifference(exchange, measure) : null
+  return { rate, official, measure, difference }
+}
+
+/** One exchange as the list shows it, with its comparison — or why there is none. */
 function viewsOf(
   exchanges: readonly Exchange[],
   cached: ReadonlyMap<string, readonly CachedRate[]>,
@@ -116,23 +146,10 @@ function viewsOf(
 ): ExchangeView[] {
   return [...exchanges].reverse().map((exchange): ExchangeView => {
     const { given, received, exchangedOn } = exchange
-    const rows = cached.get(exchangedOn) ?? []
-    const rate = exchangeRateOf(exchange)
-    const official = pickOfficialRate(given.currency, received.currency, rows, exchangedOn)
-    const backward = steadyOf(
-      pickOfficialRate(received.currency, given.currency, rows, exchangedOn),
+    const { rate, official, measure, difference } = comparisonOf(
+      exchange,
+      cached.get(exchangedOn) ?? [],
     )
-    // The bank's rate on the side the exchange's own is printed by, built from the cache that
-    // side: the plate sets the two one under the other, and near parity each chose its own side —
-    // «1,01 $/€» over «1,01 €/$» (adversarial Г). Without a rate of the exchange, the side at least
-    // one (MOL-81); the difference is measured by whichever it is.
-    const forward = steadyOf(official)
-    const measure = rate
-      ? rate.base === given.currency
-        ? forward
-        : backward
-      : uprightOf(forward, backward)
-    const difference = measure ? officialDifference(exchange, measure) : null
     return {
       id: exchange.id,
       exchangedOn,

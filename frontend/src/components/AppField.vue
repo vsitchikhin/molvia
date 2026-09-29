@@ -1,11 +1,12 @@
 <template>
   <div class="field" :class="[attrs.class, { invalid: failed, readonly }]" :style="attrs.style">
-    <div class="label">
+    <div class="label" :class="{ unseen: hideLabel }">
       <label :for="id">{{ label }}</label>
       <slot name="label-extra" />
     </div>
 
     <div class="well">
+      <span v-if="$slots.lead" class="lead" aria-hidden="true"><slot name="lead" /></span>
       <textarea
         v-if="kind === 'multiline'"
         :id="id"
@@ -117,6 +118,11 @@ export default defineComponent({
      * Only for `kind="date"`, and only while it has words: an empty one shows the field as it is.
      */
     display: { type: String as PropType<string | null>, default: null },
+    /**
+     * Where the card's own caption already names the field — «Категория во времени» over its select
+     * (MOL-74): the label is still there for a screen reader, only not drawn.
+     */
+    hideLabel: { type: Boolean, default: false },
   },
   emits: {
     'update:modelValue': (value: string) => typeof value === 'string',
@@ -168,6 +174,16 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
+}
+
+.unseen {
+  @include visually-hidden;
+}
+
+/* A mark before the value — the colour of the category chosen (MOL-74); the words are the value's. */
+.lead {
+  display: flex;
+  flex: none;
 }
 
 .well {

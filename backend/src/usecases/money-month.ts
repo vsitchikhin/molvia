@@ -15,14 +15,18 @@ import type {
   Actor,
   ConvertOn,
   Currency,
+  Exchange,
   ExchangeRate,
+  Income,
   JournalKey,
   Money,
   MoneyMonth,
   MoneyMonthView,
   MonthHeld,
   SalaryShift,
+  Spending,
   SpendingCategory,
+  TripLine,
 } from '@molvia/model'
 import { accountsCounted } from './money-accounts'
 import { dayRates } from './money-rates'
@@ -57,24 +61,45 @@ async function converter(
   }
 }
 
-async function count(
-  repositories: Repositories,
+/** What months are counted from: the spendings and trip lines of a span of days, and every income. */
+export interface MonthRows {
+  readonly spendings: readonly Spending[]
+  readonly trips: readonly TripLine[]
+  readonly incomes: readonly Income[]
+}
+
+/** The rows of the months `first` to `last`, read once however many months are counted of them. */
+export async function monthRows(
+  repositories: Pick<Repositories, 'spendings' | 'money' | 'incomes'>,
+  owner: Pick<Owner, 'id'>,
+  first: string,
+  last: string,
+): Promise<MonthRows> {
+  const from = `${first}-01`
+  const to = lastDayOf(last)
+  const [spendings, trips, incomes] = await Promise.all([
+    repositories.spendings.between(owner.id, from, to),
+    repositories.money.tripLines(owner.id, from, to),
+    repositories.incomes.list(owner.id),
+  ])
+  return { spendings, trips, incomes }
+}
+
+/** One month counted from rows already read — `moneyMonth` with the rates it asks for looked up. */
+export async function countMonth(
   owner: Owner,
   rates: DayRates,
   month: string,
+  rows: MonthRows,
   categories: readonly SpendingCategory[],
   rate: ExchangeRate | null,
   rateKind: 'live' | 'frozen',
   salaryShiftDay: number | null,
   held?: MonthHeld,
 ): Promise<MoneyMonth> {
-  const from = `${month}-01`
-  const to = lastDayOf(month)
-  const [spendings, trips, incomes] = await Promise.all([
-    repositories.spendings.between(owner.id, from, to),
-    repositories.money.tripLines(owner.id, from, to),
-    repositories.incomes.list(owner.id),
-  ])
+  const spendings = rows.spendings.filter((spending) => monthOf(spending.spentOn) === month)
+  const trips = rows.trips.filter((trip) => monthOf(trip.finishedOn) === month)
+  const { incomes } = rows
   const ofMonth = incomes.filter((income) => budgetMonthOf(income, salaryShiftDay) === month)
   const [inSpend, incomeInIncome] = await Promise.all([
     converter((one, other, day) => rates.between(one, other, day), owner.spendCurrency, [
@@ -106,6 +131,22 @@ async function count(
     incomeInIncome,
     ...(held && { held }),
   })
+}
+
+/** One month read and counted — what `moneyMonthOf` asks of this month and the one before. */
+async function count(
+  repositories: Repositories,
+  owner: Owner,
+  rates: DayRates,
+  month: string,
+  categories: readonly SpendingCategory[],
+  rate: ExchangeRate | null,
+  rateKind: 'live' | 'frozen',
+  salaryShiftDay: number | null,
+  held?: MonthHeld,
+): Promise<MoneyMonth> {
+  const rows = await monthRows(repositories, owner, month, month)
+  return countMonth(owner, rates, month, rows, categories, rate, rateKind, salaryShiftDay, held)
 }
 
 /**
@@ -164,7 +205,7 @@ async function heldAt(
  * (owner's decision В-6). Nothing known that day, and nothing is frozen: the next read tries again
  * rather than locking an empty answer in.
  */
-async function monthRate(
+export async function monthRate(
   repositories: Pick<Repositories, 'money'>,
   owner: Owner,
   rates: DayRates,
@@ -184,6 +225,55 @@ async function monthRate(
   return { rate: await repositories.money.freeze(owner.id, month, closing), kind: 'frozen' }
 }
 
+/**
+ * What a read froze its months by, held against the receipts after it (adversarial Ж, Ж2): the
+ * exchanges and incomes are read once, by `dayRates`, and the months are frozen one by one after. A
+ * write landing between the two lets go of nothing — nothing is frozen yet — and the month froze
+ * without it, for good. So once the read has frozen what it froze, anything written, amended, removed
+ * or brought back since the rates were worked out lets the months go from its day, as the write
+ * itself would have; a changed rule lets go of all. **Against the very rows the rates came from**, not
+ * a snapshot of its own: a removal and a «Вернуть» both inside the read left the row as it was before
+ * and after, with the rates worked out while it was away. A write that lands later lets go by itself.
+ */
+export async function settleThaws(
+  repositories: Pick<Repositories, 'exchanges' | 'incomes' | 'money'>,
+  owner: Pick<Owner, 'id'>,
+  basis: DayRates['basis'],
+): Promise<void> {
+  const [exchanges, incomes, rule] = await Promise.all([
+    repositories.exchanges.list(owner.id),
+    repositories.incomes.list(owner.id),
+    repositories.exchanges.rateSettings(owner.id),
+  ])
+  const ruleOf = (preference: string, since: Date | null) =>
+    `${preference}:${String(since?.getTime() ?? null)}`
+  if (ruleOf(rule.preference, rule.since) !== ruleOf(basis.preference, basis.since)) {
+    await repositories.money.thaw(owner.id)
+    return
+  }
+  const daysOf = (
+    exchanges: readonly Pick<Exchange, 'id' | 'revision' | 'exchangedOn'>[],
+    incomes: readonly Pick<Income, 'id' | 'revision' | 'receivedOn'>[],
+  ) =>
+    new Map([
+      ...exchanges.map(
+        (one) => [one.id, { revision: one.revision, day: one.exchangedOn }] as const,
+      ),
+      ...incomes.map((one) => [one.id, { revision: one.revision, day: one.receivedOn }] as const),
+    ])
+  const before = daysOf(basis.exchanges, basis.incomes)
+  const after = daysOf(exchanges, incomes)
+  const moved: string[] = []
+  for (const [id, was] of before) {
+    const now = after.get(id)
+    if (!now) moved.push(was.day)
+    else if (now.revision !== was.revision) moved.push(was.day, now.day)
+  }
+  for (const [id, now] of after) if (!before.has(id)) moved.push(now.day)
+  const from = moved.sort()[0]
+  if (from !== undefined) await repositories.money.thaw(owner.id, from)
+}
+
 /** `GET /money/months/:month` (MOL-73): the month counted, a page of its journal after `cursor`. */
 export async function moneyMonthOf(
   repositories: Repositories,
@@ -198,7 +288,14 @@ export async function moneyMonthOf(
     repositories.spendingCategories.list(owner.id),
     repositories.money.salaryShift(owner.id),
   ])
-  const { rate, kind } = await monthRate(repositories, owner, rates, month, today)
+  let frozen: Awaited<ReturnType<typeof monthRate>>
+  try {
+    frozen = await monthRate(repositories, owner, rates, month, today)
+  } finally {
+    // Only a closed month is frozen by a read, so only it is held against what landed meanwhile.
+    if (month < monthOf(today)) await settleThaws(repositories, owner, rates.basis)
+  }
+  const { rate, kind } = frozen
   // The next page of the journal carries no rest: the phone keeps the first page's figures, and every
   // account with its whole history was read for nothing on each «Показать ещё» (self-review 3).
   const held =
