@@ -85,9 +85,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   button takes — and otherwise replaces onto the parent (`backTarget`, MOL-77): the search of a
   record opened cold, with the record and «Покупки» laid underneath, says «‹ Запись»; with
   «Покупки» right underneath and no record, «‹ Покупки» — and both «back»s go there. A tab
-  tapped on a nested screen is tapped from its section: up the chain the way «back» goes while an
-  ancestor is underneath, then the tab from there (MOL-128, adversarial Б) — read as «from no
-  section», every round of the shop left two more entries before «back» left the app.
+  asked for on a nested screen — never tapped there, the bar is shown only on a section's root, but
+  a screen may send a person to a tab when it is done — goes from its section: up the chain the way
+  «back» goes while an ancestor is underneath, then the tab from there (MOL-128, adversarial Б) —
+  read as «from no section», every such move would leave two more entries before «back» left the
+  app. The tab follows only the router's move off that screen, and only once the step has landed
+  (review Р-24): a pop a sheet's guard ate must not leave it to fire on a later move.
   Tabs and the chevron move through `useNavigation`: **«Что брать» is home** (MOL-128; «Поход»
   was, MOL-17) — at the shelf a person reads, at home they write — leaving it pushes, moving
   between the other sections replaces, returning is a step back — so the system «back» never

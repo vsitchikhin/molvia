@@ -147,7 +147,11 @@ record once the sheet is away; with one open it asks «Продолжить» or
 the rule «one open at a time» unchanged. **«Закончить и начать новую» puts the open record away only
 with the new start** (review Р-2), in the queue before it: finished at once, a «Где вы?» dismissed
 left no record at all — and an empty one is removed with «Вернуть» rather than finished into a row
-of nothing (MOL-76, В-2). **Every sheet over the record asks it to leave once it is away** — the
+of nothing (MOL-76, В-2). **«Empty» is the server's answer, asked at the choice** (review Р-21): the
+phone's memory may predate purchases added on another device, and «Что брать» never asks for the
+record; until the answer comes, or with none, the record is finished — a finished empty record is a
+row of nothing, a removed full one loses its purchases once «Вернуть» is over. A record started here
+and not yet sent has nothing elsewhere and needs no answer. **Every sheet over the record asks it to leave once it is away** — the
 purchase's, the queue's notices' (review Р-7): the record may end under any of them. With receipts (MOL-127) it becomes «Записать вручную».
 
 **What the queue says about any record is said on both screens** (`TripNotices`): purchases the
