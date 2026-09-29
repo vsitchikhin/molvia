@@ -267,3 +267,20 @@ The detail behind the frontend lines of `CLAUDE.md`.
   sheet from a tap only: Chrome skips on «back» an entry laid without a gesture. **The sheet is the one exception to «only the
   page scrolls»**: a panel over the screen has no window of its own, so it scrolls itself and
   the page under it is held still.
+- **Over the iOS keyboard the sheet's height is a share of the visual viewport's own height**
+  (`--viewport-height`, MOL-135), never worked out from the window. Measured on the owner's iPhone,
+  Safari: with the keyboard up the window shrank to the visible part (`innerHeight` 699 → 395),
+  `100dvh` stayed 699, and the visible part was reported 304px down the page. The lift
+  (`--keyboard-inset`) came out right at zero — the sheet's bottom sat on the keys — but a share of
+  `100dvh` less the lift was 573px of 395 visible, and the top went 178px off the screen with the sum
+  being typed; what showed was the categories. A formula of the window less the lift less the scroll
+  gave 395 too, only because a negative lift is clamped to zero — which is why it is the viewport's
+  height, whatever the platform did to the window. **The field being typed in is kept in sight by the
+  sheet's own scroll**, just far enough and only when it is out of sight — never by the window's:
+  `scrollIntoView` moves the page too. Nothing holds the window against the platform — a `scrollTo`
+  back is a fight iOS wins on the next frame — and the focus is not put off until the rise ends, since
+  iOS raises no keyboard for a focus outside a tap. Pinched in, the height is not set and the sheet
+  keeps its share of the screen; with no keyboard, and on Android where `resizes-content` shrinks the
+  window and `dvh` together, it is the height it was. Playwright has no iOS keyboard: e2e replaces
+  `visualViewport` before the app loads (`fakeKeyboard` in `money.spec.ts`), and the phone itself is
+  checked by hand.

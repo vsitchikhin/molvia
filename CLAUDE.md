@@ -327,7 +327,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A screen is built from the kit** (MOL-18); the sheet is a native `<dialog>` with an entry in the
   history, and puts the page back — and focus, wherever the platform gave it — by what it was
   opened from (MOL-63, MOL-80). **Its press is heard on the document**: iOS hands a tap on the
-  scrim only to a listener there (MOL-80).
+  scrim only to a listener there (MOL-80). **Over the keyboard its height is a share of the visual
+  viewport**, never of the window, and it scrolls itself to the field being typed in (MOL-135).
 
 ### End-to-end — `.claude/rules/e2e.md`
 
