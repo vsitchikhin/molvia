@@ -69,42 +69,10 @@
       "action": "Start a trip"
     },
     "home": {
-      "intro": {
-        "title": "What to buy, and where",
-        "body": "Molvia remembers what you bought and how you liked it — and tells you at the shelf what to buy again and where it costs less."
-      },
-      "how": {
-        "caption": "How it works",
-        "start_title": "At the shop door",
-        "start_body": "Start a trip — the button below",
-        "shelf_title": "At the shelf",
-        "shelf_body": "Add what you take. The price can wait",
-        "rate_title": "At home — “Ratings”",
-        "rate_body": "Give every purchase a 1 to 5",
-        "advice_title": "“What to buy”",
-        "advice_body": "Sorts what you rated: buy, only if cheap, never — and shows where it costs less"
-      },
       "pending": {
         "one_place": "From {place}, the latest {when}",
         "two_places": "From {a} and {b}",
         "more_places": "From {a}, {b} and other places"
-      },
-      "recent": {
-        "caption": "Recent trips",
-        "all": "All trips"
-      },
-      "offline": {
-        "title": "No connection — you can still start",
-        "body": "Items stay on the phone and go when you're back online. The trips below are from the phone's memory",
-        "body_no_memory": "Items stay on the phone and go when you're back online"
-      },
-      "no_memory": {
-        "title": "Trips will appear once online",
-        "body": "This phone has none saved yet"
-      },
-      "error": {
-        "title": "Trips didn't load",
-        "body": "You can start a trip anyway"
       }
     },
     "quantity": "{amount} {unit}",
@@ -313,11 +281,6 @@
       "failed": "Could not save it. Try again",
       "offline": "A rating can be changed once you are online"
     },
-    "empty": {
-      "title": "Nothing to advise yet",
-      "body": "Rate your first purchase — and what to buy will show up here",
-      "action": "Rate a purchase"
-    },
     "error": {
       "title": "The server did not answer",
       "body": "Verdicts are worked out on the server, there is no local copy"
@@ -331,6 +294,39 @@
     "cities_genitive": {
       "Гюмри": "Gyumri",
       "Ереван": "Yerevan"
+    },
+    "search": {
+      "label": "Search the catalogue",
+      "placeholder": "Milk, lavash, cheese…",
+      "clear": "Clear",
+      "group_unrated": "Not rated yet",
+      "rate": "Rate",
+      "empty": {
+        "title": "No «{query}» found",
+        "body": "The catalogue has no such item yet. Check the spelling — Latin letters and typos are fine",
+        "body_offline": "Without a connection we search only what was rated. The whole catalogue — with a connection"
+      },
+      "error_body": "The search did not work. The list below is as it was",
+      "offline": "Without a connection we search only the list as of {day} at {time}",
+      "offline_more": "Unrated items and the whole catalogue — once there is a connection"
+    },
+    "home": {
+      "new": {
+        "title": "Record your first purchases",
+        "body": "{app} will remember what you took and what it cost. And from your ratings it will tell you at the shelf what to take again and where it is cheaper."
+      },
+      "pending": {
+        "title": "Now rate them",
+        "body": "The purchases are recorded. Rate them at home — and this is where what to take again and where it is cheaper will show up."
+      },
+      "next": "What comes next",
+      "step_purchases_title": "At the shop — «Purchases»",
+      "step_purchases_body": "What you took and what it cost — the price per litre and kilo is ours to work out",
+      "step_verdicts_title": "At home — «Ratings»",
+      "step_verdicts_body": "Give each purchase 1 to 5",
+      "step_advice_title": "Here — «What to buy»",
+      "step_advice_body": "What to take again, only if cheap, never — and where it is cheaper",
+      "trust": "Your own ratings and prices are free, other people’s come with access. There are no ads and no paid places here, and there never will be."
     }
   },
   "verdict": {

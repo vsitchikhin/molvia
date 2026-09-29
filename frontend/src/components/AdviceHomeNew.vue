@@ -1,0 +1,215 @@
+<template>
+  <div class="home">
+    <div class="intro">
+      <h2 class="intro-title">
+        {{ pending > 0 ? t('advice.home.pending.title') : t('advice.home.new.title') }}
+      </h2>
+      <p class="intro-body">
+        {{
+          pending > 0
+            ? t('advice.home.pending.body')
+            : t('advice.home.new.body', { app: t('app.name') })
+        }}
+      </p>
+    </div>
+
+    <!-- (в): purchases recorded and none rated — the one thing left to do, and where. -->
+    <AppCard v-if="pending > 0" class="pending" list>
+      <PurchaseRow
+        :icon="IconStar"
+        accent
+        :title="t('verdict.pending_count', { n: pending }, pending)"
+        :meta="pendingFrom"
+        @open="goTab('verdicts')"
+      />
+    </AppCard>
+
+    <p class="caption">{{ t('advice.home.next') }}</p>
+    <!-- The cycle explains the tab bar too: every step wears its tab's icon. The steps that lead
+         to another tab are buttons; the last is this screen, and nothing to tap. -->
+    <AppCard as="ol" list>
+      <li>
+        <button class="line link" type="button" @click="goTab('purchases')">
+          <IconCart class="icon" aria-hidden="true" />
+          <span class="text">
+            <span class="title">{{ t('advice.home.step_purchases_title') }}</span>
+            <span class="sub">{{ t('advice.home.step_purchases_body') }}</span>
+          </span>
+          <IconChevronRight class="chevron" aria-hidden="true" />
+        </button>
+      </li>
+      <li>
+        <button class="line link" type="button" @click="goTab('verdicts')">
+          <IconStar class="icon" aria-hidden="true" />
+          <span class="text">
+            <span class="title">{{ t('advice.home.step_verdicts_title') }}</span>
+            <span class="sub">{{ t('advice.home.step_verdicts_body') }}</span>
+          </span>
+          <IconChevronRight class="chevron" aria-hidden="true" />
+        </button>
+      </li>
+      <li class="line">
+        <IconLightbulb class="icon" aria-hidden="true" />
+        <span class="text">
+          <span class="title">{{ t('advice.home.step_advice_title') }}</span>
+          <span class="sub">{{ t('advice.home.step_advice_body') }}</span>
+        </span>
+      </li>
+    </AppCard>
+
+    <p class="trust">{{ t('advice.home.trust') }}</p>
+  </div>
+</template>
+
+<script lang="ts">
+import { computed, defineComponent } from 'vue'
+import { useI18n } from 'vue-i18n'
+import IconCart from '~icons/mdi/cart-outline'
+import IconChevronRight from '~icons/mdi/chevron-right'
+import IconLightbulb from '~icons/mdi/lightbulb-on-outline'
+import IconStar from '~icons/mdi/star-outline'
+import AppCard from '@/components/AppCard.vue'
+import PurchaseRow from '@/components/PurchaseRow.vue'
+import { usePendingFrom } from '@/composables/usePendingFrom'
+import { useVerdictQueue } from '@/composables/useVerdictQueue'
+import { useNavigation } from '@/navigation'
+
+/**
+ * «Что брать» of a person it is known to be empty for (MOL-128, handoff `02`) — the first screen a
+ * new person meets, and an offer to act rather than «no data». Moved here from «Поход» (MOL-77):
+ * the cycle is the same, and it starts where the app now opens.
+ *
+ * Without a receipt yet (В-7): (а) «Запишите первые покупки», or (в) «Осталось оценить» once
+ * purchases wait for a verdict. The receipt's (б) comes with MOL-127. «Записать покупки» is not
+ * here: it stands in the strip above the tab bar, under the thumb.
+ *
+ * Only the person's own data: other people's figures are behind access (MOL-31).
+ */
+export default defineComponent({
+  name: 'AdviceHomeNew',
+  components: { AppCard, IconCart, IconChevronRight, IconLightbulb, IconStar, PurchaseRow },
+  setup() {
+    const { t } = useI18n()
+    const { goTab } = useNavigation()
+    const queue = useVerdictQueue()
+    return {
+      t,
+      IconStar,
+      pending: computed(() => queue.count.value),
+      pendingFrom: usePendingFrom(queue),
+      goTab: (tab: 'purchases' | 'verdicts') => void goTab(tab),
+    }
+  },
+})
+</script>
+
+<style scoped lang="scss">
+.home {
+  display: flex;
+  flex-direction: column;
+}
+
+.intro {
+  padding: 0 var(--space-1);
+}
+
+.intro-title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+
+.intro-body {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+
+.pending {
+  margin-top: var(--space-4);
+}
+
+.caption {
+  margin: var(--space-6) var(--space-1) var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.line {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+  min-height: calc(var(--touch-target-lg) + var(--space-3));
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  color: var(--text);
+  background: var(--surface);
+  text-align: left;
+  font: inherit;
+}
+
+/* At no weight, so the rule between rows stays `AppCard list`'s. */
+:where(.line) {
+  border: 0;
+}
+
+.link {
+  cursor: pointer;
+
+  &:hover {
+    background: var(--surface-2);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.icon {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--text-muted);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.title,
+.sub {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.title {
+  font-size: var(--text-headline);
+  font-weight: var(--weight-medium);
+}
+
+.sub {
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+}
+
+.chevron {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--text-muted);
+}
+
+.trust {
+  margin: var(--space-4) var(--space-1) 0;
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+}
+</style>

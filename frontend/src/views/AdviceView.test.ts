@@ -4,7 +4,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
-import type { AdvicePlace, AdviceResponse, AdviceRow } from '@molvia/model'
+import type {
+  AdvicePlace,
+  AdviceResponse,
+  AdviceRow,
+  AdviceSearchResponse,
+  PendingVerdicts,
+} from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
@@ -12,7 +18,15 @@ import { useActorStore } from '@/stores/actor'
 import AdviceView from '@/views/AdviceView.vue'
 
 const advice = vi.fn<() => Promise<AdviceResponse>>()
-vi.mock('@/api', () => ({ api: { advice: () => advice() } }))
+const adviceSearch = vi.fn<(query: string) => Promise<AdviceSearchResponse>>()
+const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
+vi.mock('@/api', () => ({
+  api: {
+    advice: () => advice(),
+    adviceSearch: (query: string) => adviceSearch(query),
+    pendingVerdicts: () => pendingVerdicts(),
+  },
+}))
 
 const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 
@@ -89,7 +103,7 @@ async function render({ identity = true } = {}) {
   setActivePinia(pinia)
   useActorStore().id = identity ? ME : null
   const router = createRouter({ history: createMemoryHistory(), routes })
-  await router.push('/advice')
+  await router.push('/')
   const view = mount(AdviceView, {
     global: { plugins: [router, pinia, createAppI18n('en')] },
     attachTo: document.body,
@@ -104,6 +118,9 @@ describe('AdviceView', () => {
     localStorage.clear()
     sessionStorage.clear()
     advice.mockReset()
+    adviceSearch.mockReset()
+    pendingVerdicts.mockReset()
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
     vi.restoreAllMocks()
     online(true)
   })
@@ -165,16 +182,66 @@ describe('AdviceView', () => {
     expect(whole.view.text()).not.toContain('Showing')
   })
 
-  it('nothing rated yet: the empty state explains «rate one → it shows up here»', async () => {
-    advice.mockResolvedValue(answer([]))
-    const { view, router } = await render()
+  describe('the newcomer (MOL-128, handoff `02`)', () => {
+    it('nothing rated: an offer to act — first purchases, the cycle, «Записать покупки» below', async () => {
+      advice.mockResolvedValue(answer([]))
+      const { view, router } = await render()
 
-    expect(view.text()).toContain(en.advice.empty.title)
-    const action = view.findAll('button').find((button) => button.text() === en.advice.empty.action)
-    await action?.trigger('click')
-    await flushPromises()
+      expect(view.text()).toContain(en.advice.home.new.title)
+      expect(view.text()).toContain(en.advice.home.new.body.replace('{app}', en.app.name))
+      expect(view.text()).toContain(en.advice.home.trust)
+      // No search before the first verdict, and nobody's data to speak of in a subtitle.
+      expect(view.find('input[type="search"]').exists()).toBe(false)
+      expect(view.text()).not.toContain(en.advice.own_data_only)
+      expect(view.get('.dock').text()).toContain(en.purchases.manual)
+      // No circle anywhere: a «+» in one read as a button (MOL-77).
+      expect(view.find('.circle').exists()).toBe(false)
 
-    expect(router.currentRoute.value.name).toBe('verdicts')
+      const step = view
+        .findAll('button')
+        .find((button) => button.text().includes(en.advice.home.step_purchases_title))
+      await step?.trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.name).toBe('purchases')
+    })
+
+    it('the last step is this screen: said, and not a button', async () => {
+      advice.mockResolvedValue(answer([]))
+      const { view } = await render()
+      expect(view.text()).toContain(en.advice.home.step_advice_title)
+      expect(
+        view.findAll('button').some((b) => b.text().includes(en.advice.home.step_advice_title)),
+      ).toBe(false)
+    })
+
+    it('purchases waiting for a verdict: «Now rate them», and the card leads to «Оценки»', async () => {
+      advice.mockResolvedValue(answer([]))
+      pendingVerdicts.mockResolvedValue({
+        items: [
+          {
+            itemId: 'cccccccc-0000-4000-8000-000000000009',
+            name: 'Лаваш',
+            placeName: 'Рынок',
+            boughtAt: new Date(),
+          },
+        ],
+        total: 1,
+      })
+      const { view, router } = await render()
+
+      expect(view.text()).toContain(en.advice.home.pending.title)
+      expect(view.text()).not.toContain(en.advice.home.new.title)
+      await view.get('.pending .purchase-row').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.name).toBe('verdicts')
+    })
+
+    it('no answer and nothing remembered is not a newcomer: offline, not the offer', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render()
+      expect(view.text()).not.toContain(en.advice.home.new.title)
+    })
   })
 
   it('the server broke: red, with «Try again» — and the retry brings the list', async () => {
@@ -304,7 +371,7 @@ describe('AdviceView', () => {
     advice.mockRejectedValue(broke())
     const { view } = await render()
 
-    expect(view.text()).toContain(en.advice.empty.title)
+    expect(view.text()).toContain(en.advice.home.new.title)
     expect(view.text()).toContain('The list as of today at')
   })
 
@@ -315,5 +382,143 @@ describe('AdviceView', () => {
     expect(view.text()).not.toContain(en.advice.error.title)
     expect(view.text()).not.toContain(en.advice.offline.title)
     expect(view.find('.skeleton').exists()).toBe(false)
+  })
+
+  describe('the search (MOL-128, handoff `01`)', () => {
+    const plait = {
+      itemId: 'cccccccc-0000-4000-8000-000000000004',
+      name: 'Сыр «Косичка»',
+      advice: null,
+    }
+    const found = (
+      items: AdviceSearchResponse['items'],
+      over: Partial<AdviceSearchResponse> = {},
+    ): AdviceSearchResponse => ({
+      geography: { country: 'AM', city: 'Гюмри' },
+      scope: 'own',
+      near: true,
+      items,
+      ...over,
+    })
+
+    async function typed(view: Awaited<ReturnType<typeof render>>['view'], text: string) {
+      await view.get('input[type="search"]').setValue(text)
+      await vi.waitFor(() => {
+        expect(view.find('.skeleton').exists()).toBe(false)
+      })
+      await flushPromises()
+    }
+
+    it('asks the server, and lays the found out by the list`s groups, «not rated» last', async () => {
+      advice.mockResolvedValue(answer([milk]))
+      adviceSearch.mockResolvedValue(
+        found([
+          { itemId: plait.itemId, name: plait.name, advice: null },
+          { itemId: sausage.itemId, name: sausage.name, advice: sausage },
+          { itemId: cheese.itemId, name: cheese.name, advice: cheese },
+        ]),
+      )
+      const { view } = await render()
+      await typed(view, 'syr')
+
+      await vi.waitFor(() => {
+        expect(adviceSearch).toHaveBeenCalledWith('syr')
+      })
+      await flushPromises()
+      expect(view.findAll('h2').map((head) => head.text())).toEqual([
+        en.advice.group_if_cheap,
+        en.advice.group_never,
+        en.advice.search.group_unrated,
+      ])
+      // The list gives way while something is typed.
+      expect(view.text()).not.toContain(milk.name)
+      // Here too «не брать нигде» has nothing to be cheap with, and no «no price on purpose» tail.
+      expect(view.findComponent({ name: 'AdviceNeverRow' }).text()).not.toMatch(/֏/)
+      expect(view.text()).not.toContain(en.advice.no_price_shown)
+      // Nothing to propose: nothing was bought here.
+      expect(view.text()).not.toContain(en.item.empty.action)
+    })
+
+    it('«Rate» on an item not rated opens the sheet for a first verdict', async () => {
+      advice.mockResolvedValue(answer([milk]))
+      adviceSearch.mockResolvedValue(found([{ ...plait }]))
+      const { view } = await render()
+      await typed(view, 'косичка')
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.advice.search.rate)
+      })
+
+      await view.get('.unrated-row').trigger('click')
+      await flushPromises()
+      const sheet = view.findComponent({ name: 'VerdictEditSheet' })
+      expect(sheet.props('itemId')).toBe(plait.itemId)
+      expect(sheet.props('name')).toBe(plait.name)
+      expect(sheet.props('mine')).toBe(false)
+
+      // A save asks again for the list and for what is found.
+      advice.mockResolvedValue(answer([milk]))
+      sheet.vm.$emit('saved')
+      await vi.waitFor(() => {
+        expect(adviceSearch).toHaveBeenCalledTimes(2)
+      })
+      expect(advice).toHaveBeenCalledTimes(2)
+    })
+
+    it('nothing found: «No … found», no circle and no action', async () => {
+      advice.mockResolvedValue(answer([milk]))
+      adviceSearch.mockResolvedValue(found([], { near: false }))
+      const { view } = await render()
+      await typed(view, 'кускус')
+
+      await vi.waitFor(() => {
+        expect(view.text()).toContain('No «кускус» found')
+      })
+      expect(view.find('.circle').exists()).toBe(false)
+    })
+
+    it('only far rows: said above them — the server`s word (MOL-46)', async () => {
+      advice.mockResolvedValue(answer([milk]))
+      adviceSearch.mockResolvedValue(found([{ ...plait }], { near: false }))
+      const { view } = await render()
+      await typed(view, 'пельмени')
+
+      await vi.waitFor(() => {
+        expect(view.get('.miss').text()).toBe('No «пельмени» found')
+      })
+      expect(view.text()).toContain(plait.name)
+    })
+
+    it('offline: the remembered list, searched on the phone with the transliteration (В-3)', async () => {
+      advice.mockResolvedValue(answer([milk, cheese]))
+      await render()
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render()
+
+      await view.get('input[type="search"]').setValue('syr')
+      await flushPromises()
+
+      expect(adviceSearch).not.toHaveBeenCalled()
+      expect(view.findAllComponents({ name: 'AdviceCheapRow' })).toHaveLength(1)
+      expect(view.text()).not.toContain(milk.name)
+      expect(view.text()).toContain('Without a connection we search only the list as of')
+      expect(view.text()).toContain(en.advice.search.offline_more)
+    })
+
+    it('clearing the field brings the list back and asks nothing', async () => {
+      advice.mockResolvedValue(answer([milk]))
+      adviceSearch.mockResolvedValue(found([{ ...plait }]))
+      const { view } = await render()
+      await typed(view, 'сыр')
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(plait.name)
+      })
+
+      await view.get('.clear').trigger('click')
+      await flushPromises()
+      expect(view.text()).toContain(milk.name)
+      expect(view.text()).not.toContain(plait.name)
+      expect(view.find('.clear').exists()).toBe(false)
+    })
   })
 })
