@@ -19,8 +19,9 @@ interface Words {
   /**
    * A screen where the whole label must survive the scroll at 320px — room for it with 6–8px to
    * spare, which no difference of font rasterising closes: the ladder must not step down where it
-   * need not (review Р-3). «Запись» in ~60 over «Что взяли?»; «Settings» 68 in ~74 over
-   * «Devices».
+   * need not (review Р-3). «Деньги» 59 in ~74 over «Доходы»; «Settings» 68 in ~74 over
+   * «Devices». Not «Запись» over «Что взяли?», which took «Поход»'s place (MOL-128): 59.4 in 60.2 on
+   * macOS, and on Linux it steps to «Назад» — the ladder is right, the margin is not there.
    */
   kept: string
   back: string
@@ -37,7 +38,7 @@ const LANGUAGES: [string, Words][] = [
   [
     'ru-RU',
     {
-      kept: '/purchases/manual/add',
+      kept: '/money/incomes',
       back: 'Назад',
       settings: 'Настройки',
       money: 'Деньги',
