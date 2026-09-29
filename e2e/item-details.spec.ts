@@ -78,11 +78,11 @@ async function onTrip(page: Page): Promise<Setting> {
 
 const field = (page: Page) => page.getByRole('combobox', { name: 'What did you pick up?' })
 const sheet = (page: Page) => page.locator('dialog[open]')
-const addButton = (page: Page) => sheet(page).getByRole('button', { name: 'Add to the trip' })
+const addButton = (page: Page) => sheet(page).getByRole('button', { name: 'Record', exact: true })
 
 /** From the trip to the search, the item found and picked, its sheet up. */
 async function pick({ page, word }: Setting): Promise<void> {
-  await page.goto('/trip/add')
+  await page.goto('/purchases/manual/add')
   await field(page).fill(word)
   await page.getByRole('option').first().click()
   await expect(sheet(page)).toContainText(`Молоко «${word}»`)
@@ -106,7 +106,7 @@ test.describe('the sheet', () => {
     await addButton(page).click()
 
     // The sheet and the search go in one step back, to the trip.
-    await expect(page).toHaveURL(/\/$/)
+    await expect(page).toHaveURL(/\/purchases\/manual$/)
     const body = (await sent).postDataJSON() as { query?: string }
     expect(body.query).toBe(setting.word)
 
@@ -149,7 +149,7 @@ test.describe('the sheet', () => {
 
     await addButton(page).dblclick()
 
-    await expect(page).toHaveURL(/\/$/)
+    await expect(page).toHaveURL(/\/purchases\/manual$/)
     await expect.poll(setting.rows).toHaveLength(1)
     await page.waitForTimeout(300)
     expect(await setting.rows()).toHaveLength(1)
@@ -198,7 +198,7 @@ test.describe('with no connection', () => {
     await addButton(page).click()
 
     // Closed at once, as with a connection: nothing waits on the network.
-    await expect(page).toHaveURL(/\/$/)
+    await expect(page).toHaveURL(/\/purchases\/manual$/)
     const queued = () =>
       page.evaluate(
         (key) => (JSON.parse(localStorage.getItem(key) ?? '[]') as unknown[]).length,

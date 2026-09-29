@@ -19,15 +19,17 @@ interface Words {
   /**
    * A screen where the whole label must survive the scroll at 320px — room for it with 6–8px to
    * spare, which no difference of font rasterising closes: the ladder must not step down where it
-   * need not (review Р-3). «Поход» 52 in ~60 over «Что взяли?»; «Settings» 68 in ~74 over
+   * need not (review Р-3). «Запись» in ~60 over «Что взяли?»; «Settings» 68 in ~74 over
    * «Devices».
    */
   kept: string
   back: string
   settings: string
   money: string
-  trip: string
-  history: string
+  /** The record typed by hand, over its search. */
+  entry: string
+  purchases: string
+  /** The longest label: «Записанные покупки» over «Что взяли?». */
   finished: string
 }
 
@@ -35,13 +37,13 @@ const LANGUAGES: [string, Words][] = [
   [
     'ru-RU',
     {
-      kept: '/trip/add',
+      kept: '/purchases/manual/add',
       back: 'Назад',
       settings: 'Настройки',
       money: 'Деньги',
-      trip: 'Поход',
-      history: 'История походов',
-      finished: 'Завершённый поход',
+      entry: 'Запись',
+      purchases: 'Покупки',
+      finished: 'Записанные покупки',
     },
   ],
   [
@@ -51,9 +53,9 @@ const LANGUAGES: [string, Words][] = [
       back: 'Back',
       settings: 'Settings',
       money: 'Money',
-      trip: 'Trip',
-      history: 'Trip history',
-      finished: 'Completed trip',
+      entry: 'Entry',
+      purchases: 'Purchases',
+      finished: 'Recorded purchases',
     },
   ],
 ]
@@ -66,15 +68,14 @@ function screens(trip: string, words: Words): [string, string][] {
     ['/settings/devices', words.settings],
     ['/privacy', words.settings],
     ['/money/categories', words.money],
-    ['/trip/add', words.trip],
-    ['/trip/history', words.trip],
-    // The longest labels: «История походов» over the trip's place, «Завершённый поход» over «Что взяли?».
-    [`/trip/history/${trip}`, words.history],
-    [`/trip/history/${trip}/add`, words.finished],
+    ['/purchases/manual/add', words.entry],
+    [`/purchases/${trip}`, words.purchases],
+    // The longest label: «Записанные покупки» over «Что взяли?».
+    [`/purchases/${trip}/add`, words.finished],
   ]
 }
 
-/** A finished trip, so the two screens under the history have something to open. */
+/** A finished record, so the two screens under «Покупки» have something to open. */
 async function finishedTrip(page: Page): Promise<string> {
   const headers = await asBrowser(page)
   const context = settingsOf(

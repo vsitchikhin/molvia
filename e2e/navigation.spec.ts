@@ -16,7 +16,8 @@ import { open } from './session'
 const tabs = (page: Page) => page.getByRole('navigation', { name: 'Sections' })
 const tab = (page: Page, name: string) => tabs(page).getByRole('link', { name })
 const heading = (page: Page) => page.getByRole('heading', { level: 1 })
-const chevron = (page: Page) => page.getByRole('button', { name: 'Back Trip' })
+/** The chevron of the search under a record: «‹ Entry», read «Back Entry». */
+const chevron = (page: Page) => page.getByRole('button', { name: 'Back Entry' })
 
 async function expectOn(page: Page, path: string, title: string): Promise<void> {
   await expect(page).toHaveURL(path)
@@ -25,8 +26,8 @@ async function expectOn(page: Page, path: string, title: string): Promise<void> 
 
 test.describe('sections', () => {
   for (const [path, title, label] of [
-    ['/', 'Trip', 'Trip'],
-    ['/advice', 'What to buy', 'What to buy'],
+    ['/', 'What to buy', 'What to buy'],
+    ['/purchases', 'Purchases', 'Purchases'],
     ['/verdicts', 'Ratings', 'Ratings'],
   ] as const) {
     test(`${path} opens cold on its own tab, with no chevron`, async ({ page }) => {
@@ -39,50 +40,62 @@ test.describe('sections', () => {
     })
   }
 
-  test('an unknown path leads to the trip', async ({ page }) => {
+  test('an unknown path leads home', async ({ page }) => {
     await open(page, '/nowhere')
-    await expectOn(page, '/', 'Trip')
+    await expectOn(page, '/', 'What to buy')
   })
 
-  // The chain the owner answered (В-2): whatever was tapped in between, «back» from a section
-  // goes to the trip, and from the trip out of the app.
-  test('Trip → What to buy → Ratings, then back: Trip, then out', async ({ page }) => {
+  // The addresses of «Поход» and of the old «Что брать» still arrive, for good (MOL-81, MOL-128).
+  for (const [old, path, title] of [
+    ['/advice', '/', 'What to buy'],
+    ['/trip', '/purchases', 'Purchases'],
+    ['/trip/history', '/purchases', 'Purchases'],
+  ] as const) {
+    test(`the old address ${old} leads to ${path}`, async ({ page }) => {
+      await open(page, old)
+      await expectOn(page, path, title)
+    })
+  }
+
+  // The chain the owner answered (В-2), with the home of MOL-128: whatever was tapped in between,
+  // «back» from a section goes to «Что брать», and from there out of the app.
+  test('What to buy → Purchases → Ratings, then back: What to buy, then out', async ({ page }) => {
     await open(page, '/')
-    await tab(page, 'What to buy').click()
-    await expectOn(page, '/advice', 'What to buy')
+    await tab(page, 'Purchases').click()
+    await expectOn(page, '/purchases', 'Purchases')
     await tab(page, 'Ratings').click()
     await expectOn(page, '/verdicts', 'Ratings')
 
     await page.goBack()
-    await expectOn(page, '/', 'Trip')
+    await expectOn(page, '/', 'What to buy')
 
     await page.goBack()
     await expect(page).toHaveURL('about:blank')
   })
 
-  test('a tap on Trip from another section is the same step back', async ({ page }) => {
+  test('a tap on What to buy from another section is the same step back', async ({ page }) => {
     await open(page, '/')
-    await tab(page, 'What to buy').click()
+    await tab(page, 'Purchases').click()
     await tab(page, 'Ratings').click()
-    await tab(page, 'Trip').click()
-    await expectOn(page, '/', 'Trip')
+    await tab(page, 'What to buy').click()
+    await expectOn(page, '/', 'What to buy')
 
     await page.goBack()
     await expect(page).toHaveURL('about:blank')
   })
 
-  // The trip is the trip whatever its address carries — a tracking tag on a shared link, a
+  // Home is home whatever its address carries — a tracking tag on a shared link, a
   // hash. The invite link that used to arrive here is gone with the door (MOL-52), but what it
   // caught is not: a query rewritten behind the router's back left `/?c=…` remembered as where
   // it came from, and the way home stopped being a step back.
   for (const entry of ['/?utm_source=telegram', '/#top']) {
     test(`arriving at ${entry}, the way home is still a step back`, async ({ page }) => {
       await open(page, entry)
-      await expect(heading(page)).toHaveText('Trip')
+      await expect(heading(page)).toHaveText('What to buy')
+      await tab(page, 'Purchases').click()
+      await expectOn(page, '/purchases', 'Purchases')
       await tab(page, 'What to buy').click()
-      await expectOn(page, '/advice', 'What to buy')
-      await tab(page, 'Trip').click()
-      await expect(heading(page)).toHaveText('Trip')
+      await expect(heading(page)).toHaveText('What to buy')
 
       await page.goBack()
       await expect(page).toHaveURL('about:blank')
@@ -91,7 +104,7 @@ test.describe('sections', () => {
 
   test('each tab is a thumb-sized target', async ({ page }) => {
     await open(page, '/')
-    for (const name of ['Trip', 'What to buy', 'Ratings']) {
+    for (const name of ['What to buy', 'Purchases', 'Ratings']) {
       const box = await tab(page, name).boundingBox()
       expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
       expect(box?.width ?? 0).toBeGreaterThanOrEqual(44)
@@ -99,9 +112,9 @@ test.describe('sections', () => {
   })
 
   // Decided in review (О-5): a section opened cold — a link from the bot to «Ratings» — is its
-  // own home. Laying the trip under it would be a push without a gesture, which Chrome may skip.
+  // own home. Laying home under it would be a push without a gesture, which Chrome may skip.
   for (const [path, label] of [
-    ['/advice', 'What to buy'],
+    ['/purchases', 'Purchases'],
     ['/verdicts', 'Ratings'],
   ] as const) {
     test(`${path} opened cold is its own home: «back» leaves the app`, async ({ page }) => {
@@ -114,8 +127,8 @@ test.describe('sections', () => {
 })
 
 test.describe('the nested search', () => {
-  test('has a chevron to the trip and no tab bar', async ({ page }) => {
-    await open(page, '/trip/add')
+  test('has a chevron to the record and no tab bar', async ({ page }) => {
+    await open(page, '/purchases/manual/add')
     await expect(heading(page)).toHaveText('What did you pick up?')
     await expect(chevron(page)).toBeVisible()
     await expect(tabs(page)).toHaveCount(0)
@@ -124,31 +137,32 @@ test.describe('the nested search', () => {
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
   })
 
-  // Opened cold — a reload, a restored tab, a link — the trip is laid underneath (В-3), so the
-  // system button does what the chevron promises instead of leaving the app.
-  test('the system «back» leads to the trip, not out of the app', async ({ page }) => {
-    await open(page, '/trip/add')
+  // Opened cold — a reload, a restored tab, a link — the record and «Покупки» are laid underneath
+  // (В-3), so the system button does what the chevron promises instead of leaving the app. With no
+  // record open, the record goes up to «Покупки» by itself (MOL-128).
+  test('the system «back» leads to «Покупки», not out of the app', async ({ page }) => {
+    await open(page, '/purchases/manual/add')
     await page.goBack()
-    await expectOn(page, '/', 'Trip')
+    await expectOn(page, '/purchases', 'Purchases')
   })
 
   test('the chevron takes that same step, leaving nothing behind to return to', async ({
     page,
   }) => {
-    await open(page, '/trip/add')
+    await open(page, '/purchases/manual/add')
     await chevron(page).click()
-    await expectOn(page, '/', 'Trip')
+    await expectOn(page, '/purchases', 'Purchases')
 
     await page.goBack()
     await expect(page).toHaveURL('about:blank')
   })
 
-  test('a reload keeps the trip underneath without laying a second one', async ({ page }) => {
-    await open(page, '/trip/add')
+  test('a reload keeps the chain underneath without laying a second one', async ({ page }) => {
+    await open(page, '/purchases/manual/add')
     await page.reload()
     await expect(heading(page)).toHaveText('What did you pick up?')
     await page.goBack()
-    await expectOn(page, '/', 'Trip')
+    await expectOn(page, '/purchases', 'Purchases')
     await page.goBack()
     await expect(page).toHaveURL('about:blank')
   })
@@ -172,7 +186,7 @@ test.describe('the large title', () => {
 
   const screen = (page: Page) => page.locator('.screen')
 
-  for (const path of ['/', '/trip/add']) {
+  for (const path of ['/', '/purchases/manual/add']) {
     test(`on ${path} collapses past 24px and opens again, the row never changing height`, async ({
       page,
     }) => {
@@ -195,12 +209,12 @@ test.describe('the large title', () => {
   }
 
   test('a tap on the open tab scrolls back to the top', async ({ page }) => {
-    await open(page, '/advice')
+    await open(page, '/purchases')
     await makeScrollable(page)
     await scrollTo(page, 800)
-    await tab(page, 'What to buy').click()
+    await tab(page, 'Purchases').click()
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
-    await expect(page).toHaveURL('/advice')
+    await expect(page).toHaveURL('/purchases')
   })
 })
 
@@ -245,7 +259,7 @@ test.describe('safe areas', () => {
     await insets(page, portrait)
     await open(page, '/')
     await expect(page.locator('nav.tabbar')).toHaveJSProperty('offsetHeight', 74 + 34)
-    await open(page, '/trip/add')
+    await open(page, '/purchases/manual/add')
     await expect(bar(page)).toHaveJSProperty('offsetHeight', 44 + 47)
   })
 
@@ -253,7 +267,7 @@ test.describe('safe areas', () => {
   // screen is not collapsed at rest.
   test('turning the phone keeps the title open at rest', async ({ page }) => {
     await insets(page, portrait)
-    await open(page, '/trip/add')
+    await open(page, '/purchases/manual/add')
     await expect(bar(page)).toHaveJSProperty('offsetHeight', 91)
 
     await page.setViewportSize({ width: 915, height: 412 })
@@ -266,7 +280,7 @@ test.describe('safe areas', () => {
   test('turned the other way, it still collapses past 24px', async ({ page }) => {
     await page.setViewportSize({ width: 915, height: 412 })
     await insets(page, landscape)
-    await open(page, '/trip/add')
+    await open(page, '/purchases/manual/add')
     await page.setViewportSize({ width: 412, height: 915 })
     await insets(page, portrait)
     await expect(bar(page)).toHaveJSProperty('offsetHeight', 91)
@@ -287,7 +301,7 @@ test.describe('safe areas', () => {
     test(`the search, ${name}: its last row stays above the home indicator`, async ({ page }) => {
       await page.setViewportSize(size)
       await insets(page, { top: side ? 0 : 47, bottom, left: side, right: side })
-      await open(page, '/trip/add')
+      await open(page, '/purchases/manual/add')
       await expect(heading(page)).toHaveText('What did you pick up?')
       const { lastRow, height } = await page.evaluate(() => {
         const filler = document.createElement('div')
@@ -306,7 +320,7 @@ test.describe('safe areas', () => {
   test('held sideways, nothing starts under the notch', async ({ page }) => {
     await page.setViewportSize({ width: 915, height: 412 })
     await insets(page, landscape)
-    await open(page, '/trip/add')
+    await open(page, '/purchases/manual/add')
     const back = await chevron(page).boundingBox()
     const title = await heading(page).boundingBox()
     expect(back?.x ?? 0).toBeGreaterThanOrEqual(landscape.left)
@@ -334,10 +348,10 @@ test.describe('what the shell leaves alone', () => {
       }
     })
     await open(page, '/')
-    await tab(page, 'What to buy').click()
-    await open(page, '/trip/add')
+    await tab(page, 'Purchases').click()
+    await open(page, '/purchases/manual/add')
     await chevron(page).click()
-    await expectOn(page, '/', 'Trip')
+    await expectOn(page, '/purchases', 'Purchases')
     expect(
       await page.evaluate(() => (window as unknown as { touchListeners: string[] }).touchListeners),
     ).toEqual([])
@@ -363,8 +377,8 @@ test.describe('moves', () => {
   test('a change of section is animated where the platform can', async ({ page }) => {
     await countTransitions(page)
     await open(page, '/')
-    await tab(page, 'What to buy').click()
-    await expectOn(page, '/advice', 'What to buy')
+    await tab(page, 'Purchases').click()
+    await expectOn(page, '/purchases', 'Purchases')
     expect(await transitions(page)).toBe(1)
   })
 
@@ -374,14 +388,14 @@ test.describe('moves', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await countTransitions(page)
     await open(page, '/')
-    await tab(page, 'What to buy').click()
-    await expectOn(page, '/advice', 'What to buy')
+    await tab(page, 'Purchases').click()
+    await expectOn(page, '/purchases', 'Purchases')
     expect(await transitions(page)).toBe(0)
   })
 
   test('the title collapses without motion when motion is reduced', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await open(page, '/trip/add')
+    await open(page, '/purchases/manual/add')
     const durations = await page.evaluate(() =>
       ['.bar', '.small'].map((selector) => {
         const node = document.querySelector(selector)
@@ -406,11 +420,11 @@ test.describe('moves', () => {
     expect(await transitions(page)).toBe(1)
 
     await page.goBack()
-    await expectOn(page, '/', 'Trip')
+    await expectOn(page, '/', 'What to buy')
     expect(await transitions(page)).toBe(1)
 
-    await tab(page, 'What to buy').click()
-    await expectOn(page, '/advice', 'What to buy')
+    await tab(page, 'Purchases').click()
+    await expectOn(page, '/purchases', 'Purchases')
     expect(await transitions(page)).toBe(2)
   })
 

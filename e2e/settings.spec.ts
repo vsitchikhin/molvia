@@ -86,7 +86,7 @@ test('settings draft survives tabs and offline; another device produces an expli
     contentType: 'image/png',
   })
   const footnote = page.getByText(
-    'Новые настройки — для следующих походов. Уже начатые сохранят свою валюту и курс',
+    'Новые настройки — для следующих записей. Уже начатые сохранят свою валюту и курс',
     { exact: true },
   )
   await page.evaluate(() => {
@@ -111,12 +111,13 @@ test('an offline trip keeps the context captured before another device changed s
     actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
   )
   await page.context().setOffline(true)
-  await page.getByRole('button', { name: 'Начать поход', exact: true }).click()
+  // The newcomer's «Что брать» holds «Записать покупки» in its strip (MOL-128).
+  await page.getByRole('button', { name: 'Записать покупки', exact: true }).click()
   const sheet = page.locator('dialog[open]')
   await expect(sheet).toBeVisible()
   await page.waitForTimeout(400)
   await page.getByLabel('Другое место', { exact: true }).fill('SAS')
-  await sheet.getByRole('button', { name: 'Начать поход', exact: true }).click()
+  await sheet.getByRole('button', { name: 'Начать запись', exact: true }).click()
   await expect(sheet).toHaveCount(0)
   // The API request context models the connected second device while the page is offline.
   const moved = await page.request.put('/api/actors/me/settings', {
@@ -168,9 +169,10 @@ test('a trip started by the old app asks for its city and currencies before it i
     },
     { key: `molvia.trip-queue.${owner}`, id: tripId },
   )
-  await page.reload()
+  // The queue speaks on «Покупки» (MOL-128): «Что брать» has nothing to say about it.
+  await page.goto('/purchases')
   // By the action, not by the title: the sheet below carries the same words, mounted and hidden.
-  const clarify = page.getByRole('button', { name: 'Уточнить настройки похода', exact: true })
+  const clarify = page.getByRole('button', { name: 'Уточнить настройки записи', exact: true })
   await expect(clarify).toBeVisible()
   await clarify.click()
   const sheet = page.locator('dialog[open]')
