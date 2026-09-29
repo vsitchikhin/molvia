@@ -186,6 +186,14 @@ export interface ServerOptions {
   readonly logStream?: { write(line: string): void }
 }
 
+/**
+ * The build as a header can carry it. A tag is whatever `git describe` found under `v[0-9]*`, and
+ * Node refuses to write a header with a character outside latin1: a `v0.2-бета` failed every answer
+ * of the API, `/health` included (adversarial Д4). Encoded, a latin tag stays as it is — the page
+ * only compares two answers with each other.
+ */
+const NAMED_BUILD = encodeURIComponent(VERSION)
+
 export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const app = Fastify({
     logger: {
@@ -217,7 +225,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     frameworkErrors: (error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
       if (isAuthRequest(request)) void reply.header('cache-control', 'no-store')
       // No hook runs for these, the one below included.
-      void reply.header(VERSION_HEADER, VERSION)
+      void reply.header(VERSION_HEADER, NAMED_BUILD)
       // Both are the caller's: a path that does not decode, and one past a raised header limit.
       if (error.code === 'FST_ERR_BAD_URL' || error.code === 'FST_ERR_MAX_PARAM_LENGTH') {
         void reply
@@ -244,7 +252,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   // under it, and looks for its own new version at once — on the very answer it may no longer
   // read (MOL-132). `onSend`, not `onRequest`: a reply the error handler builds anew keeps it.
   app.addHook('onSend', (_request, reply, payload, next) => {
-    void reply.header(VERSION_HEADER, VERSION)
+    void reply.header(VERSION_HEADER, NAMED_BUILD)
     next(null, payload)
   })
 
