@@ -78,8 +78,9 @@ export function useMoneyCharts(period: Ref<6 | 12>): MoneyChartsState {
   const failure = ref<'offline' | 'error' | null>(null)
   const confirmed = ref(false)
   let latest = 0
-  /** The latest read of each period that came back with an answer. */
+  /** The latest read of each period that came back with an answer, and that came back with none. */
   const answered = new Map<number, number>()
+  const failed = new Map<number, number>()
 
   function adopt(): void {
     const id = actor.id
@@ -104,9 +105,13 @@ export function useMoneyCharts(period: Ref<6 | 12>): MoneyChartsState {
       if (actor.id === id) remember(id, answer, fetchedAt)
       if (actor.id !== id || period.value !== asked) return
       shown.value = { answer, fetchedAt }
+      // A later read already failed: this answer is older than what the phone knows it wrote, so it
+      // stays under the strip, with its hour (review С-10).
+      if (mine < (failed.get(asked) ?? 0)) return
       failure.value = null
       confirmed.value = true
     } catch {
+      failed.set(asked, Math.max(mine, failed.get(asked) ?? 0))
       if (actor.id !== id || period.value !== asked || mine !== latest) return
       failure.value = navigator.onLine ? 'error' : 'offline'
     }

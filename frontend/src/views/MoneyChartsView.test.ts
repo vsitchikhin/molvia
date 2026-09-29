@@ -368,7 +368,7 @@ describe('MoneyChartsView: the charts', () => {
     expect(kept['6']?.answer.spentAverage?.amount).toBe('999999.00')
   })
 
-  it('an answer whose later read failed is still shown and kept (d9 round 2 Е2)', async () => {
+  it('an answer whose later read failed is still shown and kept, under the strip (d9 round 2 Е2, review С-10)', async () => {
     let first: (value: MoneyChartsView) => void = () => undefined
     moneyCharts
       .mockReturnValueOnce(new Promise((resolve) => (first = resolve)))
@@ -382,6 +382,18 @@ describe('MoneyChartsView: the charts', () => {
     await flushPromises()
     expect(plain(view.text())).toContain('֏350,000')
     expect(localStorage.getItem(`molvia.charts.${ACTOR}`)).not.toBeNull()
+    // Asked before the write landed, it is not the charts with it: still «Нет связи. Графики на …».
+    expect(view.find('.strip').text()).toContain('No connection. Charts as of')
+  })
+
+  it('must not fire: a later read that answers takes the strip away', async () => {
+    moneyCharts.mockRejectedValueOnce(new TypeError('network')).mockResolvedValue(charts())
+    online(false)
+    const view = await render()
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(plain(view.text())).toContain('֏350,000')
+    expect(view.find('.strip').exists()).toBe(false)
   })
 
   it('has no card of exchanges and none of the rate where there is nothing for them', async () => {
