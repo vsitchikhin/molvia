@@ -3,10 +3,11 @@ import {
   GATE_RATINGS_STOP_PERCENT,
   GATE_RATINGS_WINDOW_HOURS,
   GATE_RETURN_STOP_PERCENT,
+  LOGIN_SECOND_WAY_PERCENT,
   yerevanDate,
   yerevanMidnight,
 } from '@molvia/model'
-import type { GatesReader, GatesReport, GatesWindow } from '@/db/gates-reader'
+import type { GatesReader, GatesReport, GatesWindow, LoginsInWindow } from '@/db/gates-reader'
 import { describeFailure } from '@/db/failure'
 
 export const GATES_USAGE =
@@ -141,8 +142,68 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
     row('no access in week 4', [String(products.withoutAccess), 'not in the cohort']),
     '',
     row('erased', [String(report.erased.count), erasedWeeks(report.erased)]),
+    '',
+    ...loginLines(report.logins),
   ]
 }
+
+/**
+ * The login's funnel (MOL-68) under the gates: how many who began a login came in. «Began» is the
+ * starts less those a device said were its own again — «Начать заново», or a return after the link
+ * ran out — so a person who needed two tries is one who began and one who got in.
+ *
+ * Where they were lost is counted in requests, not people, so those lines need not add up to
+ * «lost». And «lost» is not held at zero: a repeat inside the window of a start before it can make
+ * more come in than began, and printed as it is, that edge stays in sight.
+ */
+function loginLines({ firstDay, lastDay, days }: LoginsInWindow): string[] {
+  const total = (pick: (day: LoginsInWindow['days'][number]) => number): number =>
+    days.reduce((sum, day) => sum + pick(day), 0)
+  const again = total((day) => day.again)
+  const began = total((day) => day.started) - again
+  const gotIn = total((day) => day.collected)
+  const lost = began - gotIn
+  const span = firstDay === lastDay ? `the day ${firstDay}` : `days ${firstDay} … ${lastDay}`
+  const lines = [
+    `login ${'how many who began got in?'.padEnd(46)}second way in above ${String(LOGIN_SECOND_WAY_PERCENT)} %`,
+    row('began', [String(began), `${span} in Yerevan`]),
+    row('got in', share(gotIn, began)),
+    row(
+      'lost',
+      lost < 0
+        ? [`${String(lost)} of ${String(began)}`, 'repeats of starts before the window']
+        : share(lost, began),
+    ),
+    row('  never confirmed in the bot', [String(total((day) => day.expiredUnconfirmed)), '']),
+    row('  confirmed, did not come back', [String(total((day) => day.expiredConfirmed)), '']),
+    row('  «not me» in the bot', [String(total((day) => day.declined)), '']),
+    row('  refused by the quota', [String(total((day) => day.refused)), 'starts, not in «began»']),
+    row('began again on the same device', [String(again), 'not counted as beginning']),
+  ]
+  if (days.length === 0) return lines
+  return [
+    ...lines,
+    '',
+    `     ${['day'.padEnd(10), ...DAY_COLUMNS.map((name) => name.padStart(10))].join('')}`,
+    ...days.map(
+      (day) =>
+        `     ${[
+          day.day.padEnd(10),
+          ...[
+            day.started - day.again,
+            day.again,
+            day.confirmed,
+            day.declined,
+            day.collected,
+            day.expiredUnconfirmed + day.expiredConfirmed,
+            day.refused,
+          ].map((count) => String(count).padStart(10)),
+        ].join('')}`,
+    ),
+  ]
+}
+
+const DAY_COLUMNS = ['began', 'again', 'confirmed', 'declined', 'got in', 'expired', 'refused']
 
 /** Whole weeks, and named, so the approximation of `erasures` is in sight (Р-11). */
 function erasedWeeks({ firstWeek, lastWeek }: GatesReport['erased']): string {
