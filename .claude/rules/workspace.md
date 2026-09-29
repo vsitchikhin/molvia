@@ -8,6 +8,10 @@ paths:
   - '.prettierrc.json'
   - '.editorconfig'
   - 'bin/check-code-map.mjs'
+  - 'bin/one-at-a-time.sh'
+  - 'bin/green.sh'
+  - '.githooks/**'
+  - 'Makefile'
   - 'docs/map/**'
 ---
 
@@ -83,3 +87,30 @@ the backend» and still pass. A file with two homes is refused: the map gives on
 points at after its own (`Tests: …`) must exist too, unless it is outside the repository's
 directories — a route or a build output. What it cannot check is meaning: an entry describing old
 behaviour passes, and that is left to review.
+
+## The heavy checks take turns
+
+**One lock for the whole machine, taken by `pre-push` and by `make format`, `lint`, `typecheck`,
+`test`, `e2e` and `check` (MOL-139).** The copies exist so that several sessions work at once, and
+each push ran every check: four at once were four typechecks, four vitest runs and four Playwright
+runs with their browsers on eight cores and 16 GB. Measured on 29.09.2026: a load average of
+95–223, the swap full, a push of 10–20 minutes against about five alone the day before, and
+`search.integration.test.ts` running seventy minutes. Worse than slow: a test timed out under that
+load failed the push — locally there are no retries — and the push was started again into the same
+crowd. In turn, the last of four waits for three runs of a few minutes, and none of them fails for
+want of a core.
+
+**The lock is `flock` held by the process that runs the command**, so the kernel drops it however
+that process ends: a lock file with a pid in it was the alternative, and breaking a stale one is a
+race between two waiters. The descriptor is closed on exec, so a server a run leaves behind does
+not hold the lock. `make check` takes one turn for all four steps — one per step would let another
+copy slip in between — and a run already inside the lock does not take it again.
+
+**A step green on this tree is not run again** (`bin/green.sh`): `make check` records typecheck and
+test, the push records each step it passes, and a push skips what is recorded for `HEAD^{tree}`.
+The Definition of Done runs `make check` just before the push, and the push used to repeat both
+steps on the same tree; a push the remote rejected repeated everything. A mark is written and
+trusted only when `git status` is empty, untracked files included — vitest would run a test git
+does not know. What is outside the tree — `.env`, `node_modules`, the database — is not in the
+mark; the price is accepted for a mark that lives minutes between a check and its push. The marks
+are per worktree (`git rev-parse --git-path`), since each copy has its own environment.

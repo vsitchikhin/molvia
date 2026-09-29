@@ -3,17 +3,32 @@
 # The push is the moment the work leaves this machine, so it is the right place for the
 # slow checks; the fast ones already ran at commit time.
 #
+# The copies on this machine take turns (MOL-139): a push waits while another copy's push or
+# `make check` runs, and says whose. A step that already passed on this very tree — by
+# `make check`, or by a push the remote then rejected — is not run again.
+#
 # Deliberate bypass: git push --no-verify
 
 set -euo pipefail
 
-echo "pre-push: types"
-npm run --silent typecheck
+if [[ -z "${MOLVIA_ONE_AT_A_TIME:-}" ]]; then
+  exec bin/one-at-a-time.sh pre-push "$0" "$@"
+fi
 
-echo "pre-push: unit and component tests"
-npm run --silent test
+step() {
+  local name=$1 title=$2
+  shift 2
+  if bin/green.sh has "$name"; then
+    echo "pre-push: $title — already green on this tree"
+    return
+  fi
+  echo "pre-push: $title"
+  "$@"
+  bin/green.sh record "$name"
+}
 
-echo "pre-push: end-to-end"
-npm run --silent test:e2e
+step typecheck "types" npm run --silent typecheck
+step test "unit and component tests" npm run --silent test
+step e2e "end-to-end" npm run --silent test:e2e
 
 echo "pre-push: green"

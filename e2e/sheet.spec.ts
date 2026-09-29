@@ -11,6 +11,15 @@ import { open } from './session'
  * development-only kit page, before any screen uses the sheet.
  */
 
+/**
+ * Why a test is left to Chromium in the iPhone project (MOL-80), which runs this file for what only
+ * WebKit shows — where the sheet gives focus back. WebKit keeps no `Secure` cookie on a plain-http
+ * loopback, so every page load after the first comes in signed out; and the rise is held still
+ * through the Chrome DevTools Protocol, which WebKit does not speak.
+ */
+const NO_SECOND_LOAD = 'WebKit keeps no Secure cookie on http://127.0.0.1: a second load signs out'
+const CDP_ONLY = 'the rise is held through CDP, which only Chromium speaks'
+
 const opener = (page: Page) => page.getByRole('button', { name: 'Open the sheet' })
 const sheet = (page: Page) => page.getByRole('dialog', { name: 'Milk «Ashkhar»' })
 // The same sheet as an element, whether it is open or not: its animations are read while it is
@@ -77,7 +86,14 @@ async function openSheet(page: Page): Promise<{ top: number; length: number }> {
   const length = await historyLength(page)
   await opener(page).click()
   await expect(sheet(page)).toBeVisible()
-  // Until it has come up the sheet takes no tap — the second of a double tap (Б-5).
+  // Until it has come up the sheet takes no tap — the second of a double tap (Б-5) — and «up» is
+  // the end of its rise, not a clock (MOL-69). Headless WebKit on Linux draws some twenty frames
+  // a second, and the 220 ms rise ended there after 800: a tap on the scrim at a fixed 400 ms was
+  // held as the opener's second tap (MOL-80, CI). The wait past it stands for the double tap's
+  // floor.
+  await sheet(page).evaluate(async (dialog) => {
+    await Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished))
+  })
   await page.waitForTimeout(400)
   return { top, length }
 }
@@ -137,6 +153,95 @@ test.describe('the sheet', () => {
     const { top } = await openSheet(page)
     await page.mouse.click(12, 12)
     await expectPutAway(page, top)
+  })
+
+  /**
+   * A finger pulling the sheet down from `from` by `by` px in `steps` moves `gap` ms apart —
+   * through CDP, the one way to move a touch in Playwright (MOL-80).
+   */
+  async function pull(
+    page: Page,
+    from: { x: number; y: number },
+    by: number,
+    { steps = 10, gap = 16 }: { steps?: number; gap?: number } = {},
+  ): Promise<void> {
+    const cdp = await page.context().newCDPSession(page)
+    const at = (y: number) => [{ x: from.x, y }]
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(from.y) })
+    for (let step = 1; step <= steps; step += 1) {
+      await page.waitForTimeout(gap)
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: at(from.y + (by * step) / steps),
+      })
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  }
+
+  async function centreOf(page: Page, name: string): Promise<{ x: number; y: number }> {
+    const box = await sheet(page).getByRole('heading', { name }).boundingBox()
+    if (!box) throw new Error(`no ${name}`)
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  }
+
+  test('a pull down past a quarter of it closes it through the same step', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', CDP_ONLY)
+    const { top, length } = await openSheet(page)
+    const height = await sheet(page).evaluate((dialog) => dialog.getBoundingClientRect().height)
+    await pull(page, await centreOf(page, 'Milk «Ashkhar»'), height / 3, { steps: 12, gap: 40 })
+    await expectPutAway(page, top)
+    expect(await historyLength(page)).toBe(length + 1)
+  })
+
+  test('a short slow pull lets it go back up', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', CDP_ONLY)
+    await openSheet(page)
+    await pull(page, await centreOf(page, 'Milk «Ashkhar»'), 40, { steps: 8, gap: 60 })
+    await page.waitForTimeout(500)
+    await expect(sheet(page)).toBeVisible()
+    expect(await sheet(page).evaluate((dialog) => getComputedStyle(dialog).transform)).toBe('none')
+  })
+
+  // A pull that starts on the main action closes the sheet and does not press the action: a touch
+  // that moved past the tap slop makes no click, in Chromium as on iOS (review Р-4).
+  test('a pull that starts on the main action does not press it', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', CDP_ONLY)
+    const { top } = await openSheet(page)
+    const action = sheet(page).locator('.footer button').first()
+    await action.evaluate((button) => {
+      const counted = window as unknown as { pressed: number }
+      counted.pressed = 0
+      button.addEventListener('click', () => (counted.pressed += 1))
+    })
+    const box = await action.boundingBox()
+    if (!box) throw new Error('no action')
+    const height = await sheet(page).evaluate((dialog) => dialog.getBoundingClientRect().height)
+    await pull(page, { x: box.x + box.width / 2, y: box.y + box.height / 2 }, height / 3, {
+      steps: 12,
+      gap: 40,
+    })
+    await expectPutAway(page, top)
+    expect(await page.evaluate(() => (window as unknown as { pressed: number }).pressed)).toBe(0)
+  })
+
+  // A finger in a field moves the caret and selects, and what is typed stays (owner's В-6).
+  test('a pull that starts in a field keeps the sheet and what was typed', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', CDP_ONLY)
+    await openSheet(page)
+    const field = sheet(page).getByLabel('How much')
+    await field.fill('1.5')
+    const box = await field.boundingBox()
+    if (!box) throw new Error('no field')
+    await pull(page, { x: box.x + box.width / 2, y: box.y + box.height / 2 }, 300)
+    await page.waitForTimeout(500)
+    await expect(sheet(page)).toBeVisible()
+    await expect(field).toHaveValue('1.5')
   })
 
   test('a tap inside the sheet does not', async ({ page }) => {
@@ -225,7 +330,8 @@ test.describe('the sheet', () => {
 
   // One entry laid, one taken: the «back» after a closed sheet leaves the screen for home
   // laid under it, instead of «closing» a sheet that is already gone.
-  test('«back» after it closed leaves the screen', async ({ page }) => {
+  test('«back» after it closed leaves the screen', async ({ page, browserName }) => {
+    test.skip(browserName === 'webkit', NO_SECOND_LOAD)
     await openSheet(page)
     await page.keyboard.press('Escape')
     await expect(sheet(page)).toBeHidden()
@@ -249,7 +355,8 @@ test.describe('the sheet', () => {
 
   // An entry is not an address: a reload on it opens no sheet and breaks nothing, and the start
   // steps off the entry no sheet holds — the first «back» leaves the screen, as without a sheet.
-  test('a reload on its entry opens no sheet and breaks nothing', async ({ page }) => {
+  test('a reload on its entry opens no sheet and breaks nothing', async ({ page, browserName }) => {
+    test.skip(browserName === 'webkit', NO_SECOND_LOAD)
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     await openSheet(page)
@@ -266,7 +373,9 @@ test.describe('the sheet', () => {
   // back onto it and took it for its own — the sheet stayed open (adversarial А-1, А-2).
   test('after a reload on its entry, a sheet opened again closes on the first ×', async ({
     page,
+    browserName,
   }) => {
+    test.skip(browserName === 'webkit', NO_SECOND_LOAD)
     await openSheet(page)
     await page.reload()
     await expect(heading(page)).toHaveText('Kit')
@@ -296,7 +405,9 @@ test.describe('the sheet', () => {
   // itself, and the chevron replaced instead of stepping back (adversarial А-3).
   test('after a reload on its entry, the chevron and «back» keep the rules of MOL-17', async ({
     page,
+    browserName,
   }) => {
+    test.skip(browserName === 'webkit', NO_SECOND_LOAD)
     await openSheet(page)
     await page.reload()
     await expect(heading(page)).toHaveText('Kit')
@@ -308,7 +419,11 @@ test.describe('the sheet', () => {
 
   // Left by a push with the sheet open: the entry stays behind, and «back» steps over it — one
   // «back» to the screen, one more off it, as without a sheet (adversarial А-4).
-  test('a push away from an open sheet leaves no extra «back» behind', async ({ page }) => {
+  test('a push away from an open sheet leaves no extra «back» behind', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName === 'webkit', NO_SECOND_LOAD)
     await openSheet(page)
     await page.evaluate(async () => {
       const root = document.querySelector('#app') as unknown as {
@@ -350,7 +465,11 @@ test.describe('the sheet', () => {
   // The rise is held still, so the second tap lands while the sheet comes up however slow the
   // machine is: a pause of 80 ms between the taps became 330 under load, the clock the sheet
   // was held by ran out while it was still sliding, and the tap closed it (MOL-69).
-  test('two quick taps of a finger on the opener leave the sheet open', async ({ page }) => {
+  test('two quick taps of a finger on the opener leave the sheet open', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', CDP_ONLY)
     const { x, y } = await centreOpener(page)
     const cdp = await page.context().newCDPSession(page)
     await cdp.send('Animation.enable')
@@ -423,7 +542,9 @@ test.describe('the sheet', () => {
 
   test('a finger put down on the scrim while the sheet rose and lifted once it is up keeps it', async ({
     page,
+    browserName,
   }) => {
+    test.skip(browserName !== 'chromium', CDP_ONLY)
     const through = await restingFinger(page, (current) =>
       Promise.resolve({ x: (current.viewportSize()?.width ?? 0) / 2, y: 40 }),
     )
@@ -435,7 +556,9 @@ test.describe('the sheet', () => {
   // went into the trip (adversarial А2, Б-5).
   test('a finger put down while the sheet rose does not press the action that slid under it', async ({
     page,
+    browserName,
   }) => {
+    test.skip(browserName !== 'chromium', CDP_ONLY)
     const through = await restingFinger(page, (current) =>
       sheetElement(current).evaluate((dialog: HTMLDialogElement) => {
         const below = new DOMMatrix(getComputedStyle(dialog).transform).m42
@@ -534,7 +657,11 @@ async function childOverDeadEntry(page: Page): Promise<void> {
 // The guard's step over the dead entry runs inside the chevron's pop. Stepping outside the block
 // of «a step in flight», it let a second tap on the chevron through between the two pops, and the
 // person asked for the kit and got the trip (adversarial В-3).
-test('a double tap on the chevron over a dead entry still takes one step', async ({ page }) => {
+test('a double tap on the chevron over a dead entry still takes one step', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName === 'webkit', NO_SECOND_LOAD)
   await childOverDeadEntry(page)
   // The second tap comes in the window the defect had: inside the chevron's pop, after its own
   // landing has run and before the guard's step lands. Registered after the first tap, the
@@ -558,7 +685,8 @@ test('a double tap on the chevron over a dead entry still takes one step', async
 
 // Arrived at a dead entry by «forward», the guard goes on forward; stepping back cut the screen
 // beyond off from «forward» for good (adversarial В-4).
-test('«forward» passes over the dead entry a push left', async ({ page }) => {
+test('«forward» passes over the dead entry a push left', async ({ page, browserName }) => {
+  test.skip(browserName === 'webkit', NO_SECOND_LOAD)
   await openSheet(page)
   await page.evaluate(async () => {
     const root = document.querySelector('#app') as unknown as {
