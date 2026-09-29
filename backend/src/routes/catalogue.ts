@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import {
+  catalogueBarcodeQuerySchema,
+  catalogueBarcodeResponseSchema,
   catalogueEntryCodec,
   catalogueEntryOf,
   catalogueSearchQuerySchema,
@@ -14,6 +16,7 @@ export interface CatalogueApi {
   /** The use case, already bound to its repositories by the composition point. */
   search(actorId: string, query: string): Promise<{ items: Item[]; near: boolean }>
   propose(actorId: string, input: ProposedItem): Promise<{ item: Item; created: boolean }>
+  byBarcode(code: string): Promise<Item | null>
 }
 
 /**
@@ -33,6 +36,21 @@ export function catalogueRoutes(app: FastifyInstance, api: CatalogueApi): void {
     return reply
       .header('cache-control', 'no-store')
       .send(z.encode(catalogueSearchResponseSchema, { items: items.map(catalogueEntryOf), near }))
+  })
+
+  /**
+   * The item a scanned or typed code belongs to (MOL-99). Behind the door like the search, though
+   * nobody's picks take part: the catalogue is shared, and so is who holds a code.
+   */
+  app.get('/catalogue/barcode', async (request, reply) => {
+    const { code } = parseQuery(catalogueBarcodeQuerySchema, request.query)
+    const item = await api.byBarcode(code)
+
+    return reply.header('cache-control', 'no-store').send(
+      z.encode(catalogueBarcodeResponseSchema, {
+        item: item === null ? null : catalogueEntryOf(item),
+      }),
+    )
   })
 
   /**

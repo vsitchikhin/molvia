@@ -48,6 +48,12 @@ export interface ItemRepository {
    * and no test of the results would notice.
    */
   search(query: string, limit: number, actorId: string): Promise<SearchAnswer>
+  /**
+   * The item holding the first of these codes that any item holds (MOL-99), or `null`. The codes
+   * come in the order they are wanted — the code as read, then its twins — and one code belongs to
+   * one item, so the answer is one item at most.
+   */
+  byBarcode(codes: readonly string[]): Promise<Item | null>
 }
 
 /**
@@ -792,6 +798,20 @@ export function createItemRepository(db: Conn): ItemRepository {
     },
 
     byIds: load,
+
+    async byBarcode(codes) {
+      if (codes.length === 0) return null
+      const rows = await db
+        .select()
+        .from(itemBarcodes)
+        .where(inArray(itemBarcodes.code, [...codes]))
+      const held = codes
+        .map((code) => rows.find((row) => row.code === code))
+        .find((row) => row !== undefined)
+      if (!held) return null
+      const [item] = await load([held.itemId])
+      return item ?? null
+    },
 
     createUnlessNamed(input, createdBy) {
       const key = toSearchKey(input.name)
