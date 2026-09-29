@@ -11,11 +11,12 @@ import type {
 import { keptSide, knownAccounts, sideOf } from './account-of'
 import { earlier, ownMoney } from './exchanges'
 import type { TripRepositories } from '@/db/unit-of-work'
+import type { Today } from './today'
 
 type Repositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
 /** A write also lets go of the months frozen without it (MOL-73, В-6); it names an account too. */
 type Writing = Repositories & Pick<TripRepositories, 'money' | 'moneyAccounts'>
-type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
+type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'> & Today
 
 function viewOf(income: Income, history: readonly IncomeRevision[]): IncomeView {
   return {

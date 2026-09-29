@@ -21,7 +21,6 @@ import type {
   AccountJournalResponse,
   AccountsHeldQuery,
   AccountsHeldResponse,
-  Actor,
   JournalKey,
   MoneyAccountAmendBody,
   MoneyAccountBody,
@@ -31,23 +30,24 @@ import type {
   UnassignedOperationsResponse,
 } from '@molvia/model'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { Asking } from './actor'
 import { parseBody, parseQuery } from '@/parse'
 
 export interface MoneyAccountsApi {
   /** The use cases, already bound to their repositories by the composition point. */
-  overview(actor: Actor): Promise<MoneyAccountsResponse>
+  overview(actor: Asking): Promise<MoneyAccountsResponse>
   add(
-    actor: Actor,
+    actor: Asking,
     body: MoneyAccountBody,
   ): Promise<{ overview: MoneyAccountsResponse; created: boolean }>
-  amend(actor: Actor, id: string, body: MoneyAccountAmendBody): Promise<MoneyAccountsResponse>
-  remove(actor: Actor, id: string): Promise<MoneyAccountsResponse>
-  restore(actor: Actor, id: string): Promise<MoneyAccountsResponse>
-  journal(actor: Actor, id: string, cursor?: JournalKey): Promise<AccountJournalResponse>
-  unassigned(actor: Actor): Promise<UnassignedOperationsResponse>
-  check(actor: Actor, id: string, body: AccountCheckBody): Promise<AccountCheckResponse>
-  held(actor: Actor, query: AccountsHeldQuery): Promise<AccountsHeldResponse>
-  payTrip(actor: Actor, tripId: string, body: TripPaymentBody): Promise<TripView>
+  amend(actor: Asking, id: string, body: MoneyAccountAmendBody): Promise<MoneyAccountsResponse>
+  remove(actor: Asking, id: string): Promise<MoneyAccountsResponse>
+  restore(actor: Asking, id: string): Promise<MoneyAccountsResponse>
+  journal(actor: Asking, id: string, cursor?: JournalKey): Promise<AccountJournalResponse>
+  unassigned(actor: Asking): Promise<UnassignedOperationsResponse>
+  check(actor: Asking, id: string, body: AccountCheckBody): Promise<AccountCheckResponse>
+  held(actor: Asking, query: AccountsHeldQuery): Promise<AccountsHeldResponse>
+  payTrip(actor: Asking, tripId: string, body: TripPaymentBody): Promise<TripView>
 }
 
 /** Accounts are the person's own money: private always, never in a shared cache. */
@@ -55,10 +55,10 @@ function privately(reply: FastifyReply) {
   return reply.header('cache-control', 'no-store')
 }
 
-function ownerOf(request: FastifyRequest): Actor {
+function ownerOf(request: FastifyRequest): Asking {
   const actor = request.actor
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
-  return actor
+  return { ...actor, today: request.today }
 }
 
 interface AccountParams {

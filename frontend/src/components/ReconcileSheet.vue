@@ -208,7 +208,6 @@ import type { Removed } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import type { IncomeDraft } from '@/composables/useIncomes'
 import { useReconnect } from '@/composables/useReconnect'
-import { localDay } from '@/days'
 import { newId } from '@/ids'
 import { useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -216,11 +215,10 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 import type { QueuedWrite } from '@/stores/tripQueue'
 
 type Reason = AccountCheckResponse['reasons'][number]
-/** A check as this sheet sends it, dated by the phone's today (MOL-121, adversarial М). */
+/** A check as this sheet sends it: the day is the request's (MOL-121). */
 interface Check {
   readonly id: string
   readonly fact: Money
-  readonly checkedOn: string
 }
 
 /**
@@ -288,10 +286,7 @@ export default defineComponent({
     const recountPending = ref(false)
     const writing = ref(false)
     const written = ref(false)
-    /**
-     * The check as sent: the same fact goes under the same name, another under a new one (Р-19) —
-     * dated by the phone's today it was first counted on (MOL-121, adversarial М).
-     */
+    /** The check as sent: the same fact goes under the same name, another under a new one (Р-19). */
     let sent: Check | null = null
     /** The check last asked — its answer may be lost after the server wrote it (review 6). */
     let tried: Check | null = null
@@ -369,9 +364,7 @@ export default defineComponent({
         return
       }
       const earlier = [sent, tried].find((one) => one?.fact.minor === value.minor)
-      tried = earlier
-        ? { id: earlier.id, fact: value, checkedOn: earlier.checkedOn }
-        : { id: newId(), fact: value, checkedOn: localDay() }
+      tried = { id: earlier?.id ?? newId(), fact: value }
       sending.value = true
       const answered = await ask(tried)
       sending.value = false

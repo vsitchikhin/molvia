@@ -19,6 +19,7 @@ import {
   pickOfficialRate,
   rateCodec,
   rateFromAmd,
+  todayFrom,
   readingOf,
   uprightOf,
   yerevanDate,
@@ -186,6 +187,28 @@ describe('earliestDay', () => {
     const lastMinute = new Date('2026-09-18T19:59:00.000Z')
     expect(earliestDay(lastMinute)).toBe('2026-09-18')
     expect(latestDay(lastMinute)).toBe('2026-09-19')
+  })
+})
+
+describe('todayFrom (MOL-121)', () => {
+  // 20:30 UTC on the 28th: the 28th west of Yerevan, the 29th there; the earliest day on Earth is the
+  // 28th, the latest the 29th.
+  const instant = new Date('2026-09-28T20:30:00Z')
+
+  it('takes the phone’s day while it is today somewhere', () => {
+    expect(todayFrom('2026-09-28', instant)).toBe('2026-09-28')
+    expect(todayFrom('2026-09-29', instant)).toBe('2026-09-29')
+  })
+
+  it('brings a wrong clock to the nearest day that is today somewhere', () => {
+    expect(todayFrom('2026-09-20', instant)).toBe('2026-09-28')
+    expect(todayFrom('2027-01-01', instant)).toBe('2026-09-29')
+  })
+
+  it('without a day — the bot, an old page, rubbish — counts by Yerevan’s', () => {
+    for (const sent of [undefined, '', 'today', '2026-9-28', '2026-02-31', ' 2026-09-28']) {
+      expect(todayFrom(sent, instant)).toBe('2026-09-29')
+    }
   })
 })
 

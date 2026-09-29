@@ -29,12 +29,14 @@ import { countMonth, monthRate, monthRows, settleThaws } from './money-month'
 import { dayRates } from './money-rates'
 import type { DayRates } from './money-rates'
 import type { TripRepositories } from '@/db/unit-of-work'
+import { todayOf } from './today'
+import type { Today } from './today'
 
 type Repositories = Pick<
   TripRepositories,
   'spendings' | 'spendingCategories' | 'money' | 'exchanges' | 'incomes' | 'rates'
 >
-type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
+type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'> & Today
 
 /**
  * Each of `items` through `read`, a few at a time: the reads of the cache are independent, and at
@@ -141,7 +143,7 @@ export async function moneyChartsOf(
   period: ChartPeriod,
   now: Date = new Date(),
 ): Promise<MoneyChartsView> {
-  const today = yerevanDate(now)
+  const today = todayOf(owner, now)
   const current = monthOf(today)
   const months = chartMonths(current, period)
   const first = months[0] ?? current

@@ -980,3 +980,44 @@ describe('курс устарел (MOL-39, Р-18)', () => {
     expect(trip(await start(actor)).rateStale).toBe(false)
   })
 })
+
+// The phone's day of the taps (MOL-121, round 2): kept as it came, the first one wins, and a day no
+// phone could have lived through is dropped rather than refused — as a device's moment is.
+describe('день телефона у похода (MOL-121)', () => {
+  async function days(id: string) {
+    const [row] = await db
+      .select({ startedOn: trips.startedOn, finishedOn: trips.finishedOn })
+      .from(trips)
+      .where(eq(trips.id, id))
+    return row
+  }
+
+  it('старт и завершение хранят день нажатия; повтор его не двигает; день из будущего отброшен', async () => {
+    const actor = await insertActor(db)
+    const yesterday = yerevanDate(new Date(Date.now() - 24 * 60 * 60 * 1000))
+    const id = randomUUID()
+    const started = await call('POST', '/trips', actor, {
+      context: await tripContext(db, actor),
+      id,
+      startedOn: yesterday,
+      place: { kind: 'store', name: 'Ереван Сити' },
+    })
+    expect(started.status).toBe(201)
+    expect(
+      (await call('POST', `/trips/${id}/finish`, actor, { finishedOn: yesterday })).status,
+    ).toBe(204)
+    expect(
+      (await call('POST', `/trips/${id}/finish`, actor, { finishedOn: '2026-01-01' })).status,
+    ).toBe(204)
+    expect(await days(id)).toEqual({ startedOn: yesterday, finishedOn: yesterday })
+
+    const future = randomUUID()
+    await call('POST', '/trips', actor, {
+      context: await tripContext(db, actor),
+      id: future,
+      startedOn: '2099-12-31',
+      place: { kind: 'store', name: 'Ереван Сити' },
+    })
+    expect(await days(future)).toEqual({ startedOn: null, finishedOn: null })
+  })
+})

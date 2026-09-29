@@ -31,7 +31,7 @@ const updateExpense =
   vi.fn<(tripId: string, expenseId: string, patch: ExpensePatch) => Promise<TripView>>()
 const removeExpense = vi.fn<(tripId: string, expenseId: string) => Promise<TripView>>()
 const startTrip = vi.fn<(body: StartTripBody) => Promise<{ trip: TripView; created: boolean }>>()
-const finishTrip = vi.fn<(tripId: string, at?: Date) => Promise<void>>()
+const finishTrip = vi.fn<(tripId: string, at?: Date, day?: string) => Promise<void>>()
 const currentTrip = vi.fn<() => Promise<TripView | null>>()
 const removeTrip = vi.fn<(tripId: string) => Promise<void>>()
 const restoreTrip = vi.fn<(tripId: string, finish?: unknown) => Promise<TripView>>()
@@ -45,7 +45,7 @@ vi.mock('@/api', () => ({
       updateExpense(tripId, expenseId, patch),
     removeExpense: (tripId: string, expenseId: string) => removeExpense(tripId, expenseId),
     startTrip: (body: StartTripBody) => startTrip(body),
-    finishTrip: (tripId: string, at?: Date) => finishTrip(tripId, at),
+    finishTrip: (tripId: string, at?: Date, day?: string) => finishTrip(tripId, at, day),
     currentTrip: () => currentTrip(),
     removeTrip: (tripId: string) => removeTrip(tripId),
     restoreTrip: (tripId: string, finish?: unknown) =>
@@ -897,7 +897,8 @@ describe('trip queue', () => {
       await queue.flush()
       expect(fresh().pending[0]).toEqual({ kind: 'finish', tripId: TRIP, finishedOnDeviceAt: at })
       expect(useTripHistoryStore().local[0]?.completedAt).toEqual(at)
-      expect(finishTrip).toHaveBeenLastCalledWith(TRIP, at)
+      // With the phone's day of the tap (MOL-121) — the tests run in UTC.
+      expect(finishTrip).toHaveBeenLastCalledWith(TRIP, at, '2026-09-19')
     })
 
     it('does not leave a refused completion in local history', async () => {
@@ -925,9 +926,10 @@ describe('trip queue', () => {
       expect(startTrip).toHaveBeenCalledWith({
         id: TRIP,
         place: { kind: 'store', name: 'Ереван Сити' },
+        startedOn: '2026-09-19',
       })
       expect(addExpense).toHaveBeenCalledTimes(1)
-      expect(finishTrip).toHaveBeenCalledWith(TRIP, undefined)
+      expect(finishTrip).toHaveBeenCalledWith(TRIP, undefined, undefined)
       expect(queue.pending).toEqual([])
     })
 
@@ -1236,7 +1238,7 @@ describe('trip queue', () => {
       queue.finishElsewhere()
       await settled()
 
-      expect(finishTrip).toHaveBeenCalledWith(OPEN, expect.any(Date))
+      expect(finishTrip).toHaveBeenCalledWith(OPEN, expect.any(Date), expect.any(String))
       expect(startTrip).toHaveBeenCalled()
       expect(queue.elsewhere).toBeNull()
       expect(queue.pending).toEqual([])
@@ -1966,7 +1968,11 @@ describe('trip queue', () => {
       // Kept on the device as it is sent.
       expect(fresh().pending[0]).toEqual(queue.pending[0])
       await queue.flush()
-      expect(restoreTrip).toHaveBeenCalledWith(TRIP, { finishedOnDeviceAt: at })
+      // With the phone's day of its tap (MOL-121) — the tests run in UTC.
+      expect(restoreTrip).toHaveBeenCalledWith(TRIP, {
+        finishedOnDeviceAt: at,
+        finishedOn: '2026-09-19',
+      })
       expect(queue.rejected).toEqual([])
       expect(queue.pending).toEqual([])
     })

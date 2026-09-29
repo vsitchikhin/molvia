@@ -509,6 +509,11 @@ export const trips = pgTable(
       .default(sql`clock_timestamp()`),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
     finishedOnDeviceAt: timestamp('finished_on_device_at', { withTimezone: true }),
+    // The phone's today at the tap of «Начать» and «Завершить» (MOL-121): what an account and «Деньги»
+    // date the trip by, beside the spendings the same phone dated. Empty for a trip from an old
+    // queue — then the server's day of the moment, as before.
+    startedOn: date('started_on'),
+    finishedOn: date('finished_on'),
     // The account it was paid from, and «списано» in that account's currency (MOL-115, Р-18).
     accountId: uuid('account_id'),
     debitedMinor: bigint('debited_minor', { mode: 'bigint' }),

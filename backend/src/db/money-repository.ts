@@ -84,22 +84,26 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
       const rows = await db.execute<TripLineRow>(sql`
         with finished as (
           select t.id, p.name as place_name,
-                 coalesce(t.finished_on_device_at, t.finished_at) as finished_at
+                 coalesce(t.finished_on_device_at, t.finished_at) as finished_at,
+                 -- The phone's day of the tap (MOL-121), beside the spendings the same phone dated;
+                 -- a trip from an old queue has none, and the server's day of the moment stands.
+                 coalesce(t.finished_on,
+                          (coalesce(t.finished_on_device_at, t.finished_at)
+                             at time zone 'Asia/Yerevan')::date) as finished_day
             from trips t
             join places p on p.id = t.place_id
            where t.actor_id = ${actorId}
              and t.finished_at is not null
              and t.deleted_at is null
-             and (coalesce(t.finished_on_device_at, t.finished_at) at time zone 'Asia/Yerevan')::date
-                 between ${from}::date and ${to}::date
         )
         select f.id as trip_id, f.place_name, f.finished_at,
-               to_char(f.finished_at at time zone 'Asia/Yerevan', 'YYYY-MM-DD') as finished_on,
+               to_char(f.finished_day, 'YYYY-MM-DD') as finished_on,
                e.amount_currency as currency, sum(e.amount_minor) as amount_minor,
                count(*) as items
           from finished f
           join expenses e on e.trip_id = f.id and e.amount_minor is not null
-         group by f.id, f.place_name, f.finished_at, e.amount_currency
+         where f.finished_day between ${from}::date and ${to}::date
+         group by f.id, f.place_name, f.finished_at, f.finished_day, e.amount_currency
       `)
       return rows.map((row) => ({
         tripId: row.trip_id,

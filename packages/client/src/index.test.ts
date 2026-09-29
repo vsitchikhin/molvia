@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ERROR, ISSUE, VERSION_HEADER } from '@molvia/model'
+import { ERROR, ISSUE, TODAY_HEADER, VERSION_HEADER } from '@molvia/model'
 import { ApiError, createClient } from '#client/index'
 
 function clientAnswering(status: number, body: unknown) {
@@ -245,6 +245,52 @@ describe('the build an answer names (MOL-132)', () => {
     const { client, heard } = clientHearing('<html>502 Bad Gateway</html>', { status: 502 })
     expect(await codeOf(client.health())).toBe(ERROR.INTERNAL)
     expect(heard).toEqual([])
+  })
+})
+
+describe('the phone’s today on every request (MOL-121)', () => {
+  function clientWith(today?: () => string) {
+    const sent: { headers: Headers; body: unknown }[] = []
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: (_url, init) => {
+        sent.push({
+          headers: new Headers(init?.headers),
+          body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+        })
+        return Promise.resolve(new Response(null, { status: 204 }))
+      },
+      ...(today ? { today } : {}),
+    })
+    return { client, sent }
+  }
+
+  it('names the day it is asked at, each request anew', async () => {
+    let day = '2026-09-28'
+    const { client, sent } = clientWith(() => day)
+    await client.finishTrip('0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d')
+    day = '2026-09-29'
+    await client.finishTrip('0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d')
+    expect(sent.map(({ headers }) => headers.get(TODAY_HEADER))).toEqual([
+      '2026-09-28',
+      '2026-09-29',
+    ])
+  })
+
+  it('names none where no day was given — the bot', async () => {
+    const { client, sent } = clientWith()
+    await client.finishTrip('0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d')
+    expect(sent[0]?.headers.has(TODAY_HEADER)).toBe(false)
+  })
+
+  it('a finish carries the day of its tap beside the moment', async () => {
+    const { client, sent } = clientWith()
+    const at = new Date('2026-09-28T20:30:00Z')
+    await client.finishTrip('0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d', at, '2026-09-28')
+    expect(sent[0]?.body).toEqual({
+      finishedOnDeviceAt: at.toISOString(),
+      finishedOn: '2026-09-28',
+    })
   })
 })
 

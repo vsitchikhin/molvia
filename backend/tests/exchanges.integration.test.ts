@@ -1154,17 +1154,16 @@ describe('правка обмена с историей (MOL-42)', () => {
   })
 })
 
-// The phone's day (MOL-121, adversarial О): 16:00 UTC is 20:00 on the 10th in Yerevan and 01:00 on
-// the 11th in Tokyo. The wallet stops at Yerevan's today; what a sheet asks «сколько было до» by
-// does not, or the second exchange of the night is never asked and its answer is lost for good.
+// The phone's day (MOL-121, adversarial О, round 2): «today» of the wallet is the phone's. 16:00
+// UTC is 20:00 on the 10th in Yerevan and 01:00 on the 11th in Tokyo.
 describe('обмен дня, до которого Ереван не дошёл (MOL-121)', () => {
   const instant = new Date('2026-09-10T16:00:00Z')
-  const later = new Date('2026-09-12T08:00:00Z')
+  const tokyo = '2026-09-11'
 
-  async function actorOf(id: string) {
+  async function actorOf(id: string, today?: string) {
     const [actor] = await db.select().from(actors).where(eq(actors.id, id))
     if (!actor) throw new Error('no actor')
-    return actor
+    return today === undefined ? actor : { ...actor, today }
   }
 
   async function exchangeAt(
@@ -1181,23 +1180,30 @@ describe('обмен дня, до которого Ереван не дошёл 
       exchangedOn,
       ...(held === undefined ? {} : { heldBefore: { amount: held, currency: 'AMD' } }),
     })
-    const { created } = await recordExchange(tripRepositories(db), await actorOf(me), body, at)
+    const actor = await actorOf(me, exchangedOn)
+    const { created } = await recordExchange(tripRepositories(db), actor, body, at)
     expect(created).toBe(true)
   }
 
-  it('первый обмен ночи уже дал цену — второй спрашивают, и кошелёк взвешен', async () => {
+  it('первый обмен ночи — в кошельке телефона и дал цену; второй спрашивают, и кошелёк взвешен', async () => {
     const me = await insertActor(db)
     await exchangeAt(me, '2026-09-05', '43000', new Date('2026-09-05T08:00:00Z'))
-    await exchangeAt(me, '2026-09-11', '45000', instant, '20000')
+    await exchangeAt(me, tokyo, '45000', instant, '20000')
 
-    const onScreen = await exchangesOverview(tripRepositories(db), await actorOf(me), instant)
-    expect(onScreen.receipts.find((receipt) => receipt.on === '2026-09-11')?.priced).toBe(true)
-    // The wallet itself is Yerevan's: the 11th is not in it yet.
-    expect(onScreen.wallet?.rate.scaled).toBe(parseRate('4.3'))
+    const onScreen = await exchangesOverview(
+      tripRepositories(db),
+      await actorOf(me, tokyo),
+      instant,
+    )
+    expect(onScreen.receipts.find((receipt) => receipt.on === tokyo)?.priced).toBe(true)
+    expect(onScreen.wallet?.basis).toBe('weighted')
+    // The same instant asked from Yerevan: the 11th has not come, and its wallet is the 5th alone.
+    const inYerevan = await exchangesOverview(tripRepositories(db), await actorOf(me), instant)
+    expect(inYerevan.wallet?.rate.scaled).toBe(parseRate('4.3'))
 
-    await exchangeAt(me, '2026-09-11', '46000', instant, '65000')
-    const settled = await exchangesOverview(tripRepositories(db), await actorOf(me), later)
-    expect(settled.wallet?.basis).toBe('weighted')
-    expect(settled.wallet?.rate.scaled).not.toBe(parseRate('4.6'))
+    await exchangeAt(me, tokyo, '46000', instant, '65000')
+    const later = await exchangesOverview(tripRepositories(db), await actorOf(me, tokyo), instant)
+    expect(later.wallet?.basis).toBe('weighted')
+    expect(later.wallet?.rate.scaled).not.toBe(parseRate('4.6'))
   })
 })

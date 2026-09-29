@@ -444,23 +444,6 @@ describe('the phone’s day on the accounts (MOL-121)', () => {
     vi.useRealTimers()
   })
 
-  it('a check goes with the phone’s day, the one its difference is written on (adversarial М)', async () => {
-    const pinia = session()
-    useAccountsStore(pinia).accept(page([cash()]))
-    checkAccount.mockResolvedValueOnce(answer('10000', '10000'))
-    const view = await open(ReconcileSheet, '/money/accounts', pinia, {
-      open: true,
-      account: cash(),
-      categories,
-      nameOf: () => 'Other',
-      accountName: () => null,
-    })
-    await view.get('input').setValue('10000')
-    await button(view, en.accounts.reconcile.check)?.trigger('click')
-    await settle()
-    expect(checkAccount.mock.calls[0]?.[1].checkedOn).toBe('2026-09-28')
-  })
-
   it('a new account starts on the phone’s today, and no later (Т-3)', async () => {
     const view = await open(AccountSheet, '/money/accounts', session(), {
       open: true,

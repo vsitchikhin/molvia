@@ -8,26 +8,26 @@ import {
   ratePreferenceBodySchema,
 } from '@molvia/model'
 import type {
-  Actor,
   ExchangeAmendBody,
   ExchangeBody,
   ExchangesResponse,
   RatePreference,
 } from '@molvia/model'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { Asking } from './actor'
 import { parseBody } from '@/parse'
 
 export interface ExchangesApi {
   /** The use cases, already bound to their repositories by the composition point. */
-  overview(actor: Actor): Promise<ExchangesResponse>
+  overview(actor: Asking): Promise<ExchangesResponse>
   record(
-    actor: Actor,
+    actor: Asking,
     body: ExchangeBody,
   ): Promise<{ overview: ExchangesResponse; created: boolean }>
-  amend(actor: Actor, id: string, body: ExchangeAmendBody): Promise<ExchangesResponse>
-  remove(actor: Actor, id: string): Promise<ExchangesResponse>
-  restore(actor: Actor, id: string): Promise<ExchangesResponse>
-  prefer(actor: Actor, preference: RatePreference): Promise<ExchangesResponse>
+  amend(actor: Asking, id: string, body: ExchangeAmendBody): Promise<ExchangesResponse>
+  remove(actor: Asking, id: string): Promise<ExchangesResponse>
+  restore(actor: Asking, id: string): Promise<ExchangesResponse>
+  prefer(actor: Asking, preference: RatePreference): Promise<ExchangesResponse>
 }
 
 /** Exchanges are the person's own money: private always, never in a shared cache. */
@@ -36,10 +36,10 @@ function answer(reply: FastifyReply, overview: ExchangesResponse) {
 }
 
 /** The hook guarantees it; checked rather than asserted, so a reader need not know that. */
-function ownerOf(request: FastifyRequest): Actor {
+function ownerOf(request: FastifyRequest): Asking {
   const actor = request.actor
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
-  return actor
+  return { ...actor, today: request.today }
 }
 
 /**

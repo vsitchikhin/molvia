@@ -26,6 +26,14 @@ export type HealthResponse = z.infer<typeof healthResponseSchema>
  */
 export const VERSION_HEADER = 'X-Molvia-Version'
 
+/**
+ * The header every request of the phone names its own today in, `2026-09-28` (MOL-121, round 2): the
+ * day it is for the person, which the server counts «today» by — the running month, the wallet, a
+ * check — held to the days that are today somewhere (`todayFrom`). Absent — the bot, a page older
+ * than it — and the server counts by Yerevan's.
+ */
+export const TODAY_HEADER = 'X-Molvia-Today'
+
 /** The build a copy that was not built by the release runs as: nothing to compare. */
 export const UNNAMED_BUILD = 'dev'
 

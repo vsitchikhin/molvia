@@ -2,14 +2,16 @@ import {
   DomainError,
   ERROR,
   geographyAllowed,
+  isDeviceDay,
   pickOfficialRate,
   walletRate,
-  yerevanDate,
 } from '@molvia/model'
 import type { Actor, AmdRate, OfficialRate, StartTripBody, TripView } from '@molvia/model'
 import type { TripSnapshot } from '@/db/trips-repository'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
 import { officialRateOf, officialRatesOn, sinceDay } from './exchanges'
+import { todayOf } from './today'
+import type { Today } from './today'
 import { tripViewFor } from './trip-view'
 
 export interface Started {
@@ -33,7 +35,7 @@ export interface Started {
  */
 export async function startTrip(
   transact: Transact,
-  actor: Actor,
+  actor: Actor & Today,
   body: StartTripBody,
   now: Date = new Date(),
 ): Promise<Started> {
@@ -63,12 +65,16 @@ export async function startTrip(
       country: context.country,
       city: context.city,
     })
+    // The rates of the phone's today (MOL-121): an exchange made on it is in the wallet of this trip.
+    const today = todayOf(actor, now)
     const snapshot =
-      (await personalRateFor(repositories, actor, context, now)) ??
-      (await officialRateFor(repositories, context, now))
+      (await personalRateFor(repositories, actor, context, today)) ??
+      (await officialRateFor(repositories, context, today))
+    // The day it began for the person, judged as a device's moment is: past the latest day, dropped.
+    const startedOn = body.startedOn && isDeviceDay(body.startedOn, now) ? body.startedOn : null
     const { trip, created } = await repositories.trips.start(
       actor.id,
-      { id: body.id, placeId: place.id },
+      { id: body.id, placeId: place.id, startedOn },
       context.spendCurrency,
       snapshot,
     )
@@ -92,7 +98,7 @@ async function personalRateFor(
   repositories: Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>,
   actor: Pick<Actor, 'id' | 'incomeCurrency'>,
   pair: Pick<Actor, 'incomeCurrency' | 'spendCurrency'>,
-  now: Date,
+  today: string,
 ): Promise<TripSnapshot | null> {
   const { exchanges } = repositories
   const base = pair.incomeCurrency
@@ -117,7 +123,7 @@ async function personalRateFor(
     [...list, ...incomes],
     base,
     quote,
-    yerevanDate(now),
+    today,
     officialRateOf(cached, base),
     base === actor.incomeCurrency ? sinceDay(since) : null,
   )
@@ -125,7 +131,7 @@ async function personalRateFor(
 }
 
 /**
- * The official rate from the income currency into the spending one, as of `now` in Yerevan, or
+ * The official rate from the income currency into the spending one, as of `today`, or
  * none: nothing to convert when both are one currency, and nothing known when the cache is empty.
  * Which provider — the central bank, or an open source after a week of its silence — is the
  * domain's rule; a stale rate keeps its date, which the screen shows beside it. A rate that jumped
@@ -134,13 +140,12 @@ async function personalRateFor(
 async function officialRateFor(
   { rates }: Pick<TripRepositories, 'rates'>,
   actor: Pick<Actor, 'incomeCurrency' | 'spendCurrency'>,
-  now: Date,
+  today: string,
 ): Promise<OfficialRate | null> {
   const base = actor.incomeCurrency
   const quote = actor.spendCurrency
   if (base === quote) return null
 
-  const today = yerevanDate(now)
   const foreign = [base, quote].filter(
     (currency): currency is AmdRate['currency'] => currency !== 'AMD',
   )

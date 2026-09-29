@@ -23,6 +23,7 @@ import type {
   WireCode,
 } from '@molvia/model'
 import { api } from '@/api'
+import { localDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
 import { isIdentifier } from '@/stores/identity'
@@ -447,6 +448,12 @@ function recallRejected(key: string): { items: RejectedWrite[]; named: boolean }
  * purchase can be corrected on the phone after its first `add` has gone, and sent again it would
  * be answered «yes» while the new price quietly went nowhere.
  */
+/** A finish taken back with «Вернуть», with the phone's day of its tap (MOL-121). */
+function finishWithDay(finish: FinishTripBody | undefined): FinishTripBody | undefined {
+  const at = finish?.finishedOnDeviceAt
+  return finish && at ? { ...finish, finishedOn: localDay(at) } : finish
+}
+
 function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
   switch (entry.kind) {
     case 'start':
@@ -455,10 +462,18 @@ function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
           id: entry.tripId,
           place: entry.place,
           ...(entry.context ? { context: entry.context } : {}),
+          // The phone's day of the tap, by its own calendar (MOL-121): the queue may send it tomorrow.
+          startedOn: localDay(entry.startedAt),
         })
         .then(({ trip }) => trip)
     case 'finish':
-      return api.finishTrip(entry.tripId, entry.finishedOnDeviceAt).then(() => null)
+      return api
+        .finishTrip(
+          entry.tripId,
+          entry.finishedOnDeviceAt,
+          entry.finishedOnDeviceAt ? localDay(entry.finishedOnDeviceAt) : undefined,
+        )
+        .then(() => null)
     case 'add':
       return written
         ? api.updateExpense(entry.tripId, entry.body.id, {
@@ -473,7 +488,7 @@ function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
     case 'delete':
       return api.removeTrip(entry.tripId).then(() => null)
     case 'restore':
-      return api.restoreTrip(entry.tripId, entry.finish)
+      return api.restoreTrip(entry.tripId, finishWithDay(entry.finish))
     case 'payment':
       return api.payTrip(entry.tripId, entry.body)
   }

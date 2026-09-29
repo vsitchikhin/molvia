@@ -38,12 +38,14 @@ import type {
   ReceiptView,
 } from '@molvia/model'
 import { keptSide, knownAccounts, sideOf } from './account-of'
+import { todayOf } from './today'
+import type { Today } from './today'
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
 /** A write also lets go of the months frozen without it (MOL-73, В-6). */
 type Writing = Repositories & Pick<TripRepositories, 'money' | 'moneyAccounts'>
-type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
+type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'> & Today
 
 const FOREIGN = currencySchema.options.filter(
   (currency): currency is AmdRate['currency'] => currency !== 'AMD',
@@ -250,7 +252,7 @@ export async function ownMoney(
   now: Date = new Date(),
 ): Promise<OwnMoney> {
   const { exchanges, incomes } = repositories
-  const today = yerevanDate(now)
+  const today = todayOf(owner, now)
   const base = owner.incomeCurrency
   const quote = owner.spendCurrency
   const [{ preference, since }, list, received] = await Promise.all([
@@ -267,16 +269,10 @@ export async function ownMoney(
 
   const receipts: Receipt[] = [...list, ...received]
   const baseSince = sinceDay(since)
+  // Walked to the phone's today (MOL-121): an exchange of a day Yerevan has not reached did give its
+  // currency a price, and a second one that night must be asked «сколько было до» — an answer not
+  // asked is lost for good (adversarial О).
   const rates = ownRates(receipts, base, quote, today, officialRateOf(cached, base), baseSince)
-  // What a sheet asks by is walked to the phone's day, not Yerevan's (MOL-121, adversarial О): the
-  // wallet stops at Yerevan's today so tomorrow's money enters no trip, but an exchange of a day
-  // Yerevan has not reached did give its currency a price, and a second one that night must be asked
-  // «сколько было до» — an answer not asked is lost for good. The same day starts the hint.
-  const latest = latestDay(now)
-  const ahead = receipts.some((receipt) => receiptDay(receipt) > today)
-  const asked = ahead
-    ? ownRates(receipts, base, quote, latest, officialRateOf(cached, base), baseSince)
-    : rates
 
   const currencies = [
     ...new Set(
@@ -287,7 +283,7 @@ export async function ownMoney(
   ].filter((currency) => currency !== base)
   const heldEstimates = await Promise.all(
     currencies.map(async (currency) => {
-      const last = lastReceipt(receipts, currency, latest)
+      const last = lastReceipt(receipts, currency, today)
       if (!last) return null
       const spent = await exchanges.spentSince(owner.id, currency, spentFrom(last))
       const estimate = heldEstimate(receipts, last, spent)
@@ -307,7 +303,7 @@ export async function ownMoney(
     cached,
     rates,
     heldEstimates: heldEstimates.filter((estimate) => estimate !== null),
-    receipts: receiptsOf(receipts, asked.priced),
+    receipts: receiptsOf(receipts, rates.priced),
   }
 }
 

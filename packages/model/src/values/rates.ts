@@ -269,6 +269,22 @@ export function earliestDay(instant: Date): string {
 }
 
 /**
+ * Today as a request names it (`TODAY_HEADER`, MOL-121): the phone's day, held to the days that are
+ * today somewhere at `instant` — a phone with a wrong clock is brought to the nearest of them, since
+ * «today» is the person's now and not a fact they typed. Nothing sent, or not a day, and it is
+ * Yerevan's: the bot, a page older than the header.
+ */
+export function todayFrom(sent: string | undefined, instant: Date): string {
+  if (sent === undefined || !/^\d{4}-\d{2}-\d{2}$/.test(sent) || !isRateDay(sent)) {
+    return yerevanDate(instant)
+  }
+  const earliest = earliestDay(instant)
+  const latest = latestDay(instant)
+  if (sent < earliest) return earliest
+  return sent > latest ? latest : sent
+}
+
+/**
  * A day a rate may be dated by: a real calendar day whose Yerevan midnight the snapshot accepts.
  * `Date.parse('2026-02-31')` is the 3rd of March, not NaN, and `0001-01-01` is what a .NET service
  * answers for a date it does not have. One rule for the cache and the snapshot, so the cache never

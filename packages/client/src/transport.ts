@@ -1,5 +1,5 @@
 import type { ZodType } from 'zod'
-import { ERROR, ISSUE, VERSION_HEADER, errorResponseSchema } from '@molvia/model'
+import { ERROR, ISSUE, TODAY_HEADER, VERSION_HEADER, errorResponseSchema } from '@molvia/model'
 import type { WireCode } from '@molvia/model'
 
 /**
@@ -80,6 +80,12 @@ export interface ClientOptions {
    * most. An answer without it (a proxy's 502 during a rollout) tells nothing.
    */
   readonly onVersion?: (version: string) => void
+  /**
+   * The phone's today, named on every request (`TODAY_HEADER`, MOL-121): what the server counts
+   * «today» of money by. Asked at each request, so a page open across midnight names the new day.
+   * The bot names none, and the server takes Yerevan's.
+   */
+  readonly today?: () => string
 }
 
 interface RequestOptions {
@@ -108,6 +114,7 @@ export function createTransport({
   credentials = 'same-origin',
   timeoutMs = DEFAULT_TIMEOUT_MS,
   onVersion,
+  today,
   botSecret,
 }: ClientOptions & { readonly botSecret?: string }): Transport {
   async function exchange<T>(
@@ -117,6 +124,7 @@ export function createTransport({
   ): Promise<{ status: number; data: T }> {
     const headers = new Headers(options.headers)
     if (botSecret) headers.set('authorization', `Bearer ${botSecret}`)
+    if (today) headers.set(TODAY_HEADER, today())
     if (options.body !== undefined) headers.set('content-type', 'application/json')
 
     // `AbortController` and a timer rather than `AbortSignal.timeout`, which Safari only

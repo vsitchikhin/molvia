@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {
   ERROR,
+  TODAY_HEADER,
   accountCheckCodec,
   accountJournalCodec,
   accountsHeldCodec,
@@ -29,6 +30,7 @@ import { actors, expenses, moneyAccounts, moneyMonthRates, spendings } from '@/d
 import { tripRepositories } from '@/db/unit-of-work'
 import { buildServer } from '@/server'
 import { checkAccount } from '@/usecases/money-accounts'
+import { moneyMonthOf } from '@/usecases/money-month'
 import { recordSpending } from '@/usecases/spendings'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
@@ -1039,38 +1041,51 @@ describe('третий проход (Ж1, Ж2)', () => {
   })
 })
 
-// The phone's day (MOL-121, adversarial М, И): a check is dated by the day the phone sent, as every
-// day a person writes is. 16:00 UTC is 20:00 on the 10th in Yerevan and 01:00 on the 11th in Tokyo.
+// The phone's day (MOL-121, adversarial М, И): a check is dated by the day the request names
+// (`TODAY_HEADER`). 16:00 UTC is 20:00 on the 10th in Yerevan and 01:00 on the 11th in Tokyo.
 describe('день сверки — день телефона (MOL-121)', () => {
   const instant = new Date('2026-09-10T16:00:00Z')
 
-  async function actorOf(me: Owner) {
+  async function actorOf(me: Owner, today?: string) {
     const [actor] = await db.select().from(actors).where(eq(actors.id, me.id))
     if (!actor) throw new Error('no actor')
-    return actor
+    return today === undefined ? actor : { ...actor, today }
   }
 
-  async function checkAt(me: Owner, account: string, fact: string, checkedOn?: string) {
+  async function checkAt(me: Owner, account: string, fact: string, today?: string) {
     return checkAccount(
       tripRepositories(db),
-      await actorOf(me),
+      await actorOf(me, today),
       account,
-      {
-        id: randomUUID(),
-        fact: { minor: BigInt(fact) * 100n, currency: 'AMD' },
-        ...(checkedOn === undefined ? {} : { checkedOn }),
-      },
+      { id: randomUUID(), fact: { minor: BigInt(fact) * 100n, currency: 'AMD' } },
       instant,
     )
   }
 
-  it('берёт присланный день; без него — день Еревана; вне окна — ближайший, который где-то сегодня', async () => {
+  it('сверка — днём запроса, без него — днём Еревана', async () => {
     const me = await owner()
     const { id } = await addAccount(me, { startOn: '2026-09-01' })
     expect((await checkAt(me, id, '100000', '2026-09-11')).checkedOn).toBe('2026-09-11')
     expect((await checkAt(me, id, '100000')).checkedOn).toBe(yerevanDate(instant))
-    expect((await checkAt(me, id, '100000', '2020-01-01')).checkedOn).toBe(earliestDay(instant))
-    expect((await checkAt(me, id, '100000', '2099-12-31')).checkedOn).toBe(latestDay(instant))
+  })
+
+  it('заголовок дня: свой день, мусор — день Еревана, неверные часы — ближайший день, что где-то идёт', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me)
+    async function checkedOn(today: string): Promise<string> {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/money/accounts/${id}/checks`,
+        headers: { cookie: me.cookie, [TODAY_HEADER]: today },
+        payload: { id: randomUUID(), fact: amd('100000') },
+      })
+      expect(response.statusCode, response.body).toBe(200)
+      return accountCheckCodec.parse(response.json()).checkedOn
+    }
+    const now = new Date()
+    expect(await checkedOn(latestDay(now))).toBe(latestDay(now))
+    expect(await checkedOn('вчера')).toBe(yerevanDate(now))
+    expect(await checkedOn('2020-01-01')).toBe(earliestDay(now))
   })
 
   it('ровная сверка днём телефона закрывает окно и для того, что записано этим днём до неё (И)', async () => {
@@ -1096,5 +1111,83 @@ describe('день сверки — день телефона (MOL-121)', () => 
     ).rows
     expect(unassigned).toEqual([])
     expect((await checkAt(me, id, '99000', '2026-09-11')).reasons).toEqual([])
+  })
+})
+
+// A trip is dated by the phone's day too (MOL-121, adversarial К, round 2): its line in «Деньги» by
+// the day «Завершить» was tapped, beside the spendings that phone dated, and an account's trip by
+// the day «Начать» was. Without it — an old queue — the server's day of the moment, as before.
+describe('поход — днём телефона (MOL-121)', () => {
+  async function pricedTrip(me: Owner, patch: Record<string, unknown> = {}): Promise<string> {
+    const placeId = await insertPlace(db, { name: `Магазин ${randomUUID()}` })
+    const trip = await insertTrip(db, { actorId: me.id, placeId, ...patch })
+    await db.insert(expenses).values({
+      id: randomUUID(),
+      tripId: trip,
+      itemId: await insertItem(db),
+      amountMinor: 120_000n,
+      amountCurrency: 'AMD',
+    })
+    return trip
+  }
+
+  async function dayInMonth(me: Owner, day: string, trip: string): Promise<string | undefined> {
+    const response = await call(me, 'GET', `/money/months/${day.slice(0, 7)}`)
+    expect(response.statusCode, response.body).toBe(200)
+    const { days } = response.json<{
+      days: { day: string; entries: { kind: string; tripId?: string }[] }[]
+    }>()
+    return days.find((one) => one.entries.some((entry) => entry.tripId === trip))?.day
+  }
+
+  it('строка похода в «Деньгах» — день нажатия «Завершить», без него — день сервера (К)', async () => {
+    const me = await owner()
+    const yesterday = daysAgo(1)
+    const tapped = await pricedTrip(me)
+    const finished = await call(me, 'POST', `/trips/${tapped}/finish`, { finishedOn: yesterday })
+    expect(finished.statusCode).toBe(204)
+    expect(await dayInMonth(me, yesterday, tapped)).toBe(yesterday)
+
+    const old = await pricedTrip(me)
+    await call(me, 'POST', `/trips/${old}/finish`, {})
+    expect(await dayInMonth(me, today, old)).toBe(today)
+  })
+
+  it('поход у счёта — день нажатия «Начать», но не дальше суток до дня сервера (Ж1)', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me, { startOn: daysAgo(2), start: amd('100000') })
+    const trip = await pricedTrip(me, { startedOn: daysAgo(1) })
+    await call(me, 'PUT', `/trips/${trip}/payment`, { accountId: id })
+    const journal = accountJournalCodec.parse(
+      (await call(me, 'GET', `/money/accounts/${id}/journal`)).json(),
+    )
+    expect(journal.rows.find((row) => row.id === trip)?.day).toBe(daysAgo(1))
+
+    // A clock three days behind is a wrong clock: the server's day stands, inside the account.
+    const late = await pricedTrip(me, { startedOn: daysAgo(3) })
+    await call(me, 'PUT', `/trips/${late}/payment`, { accountId: id })
+    const again = accountJournalCodec.parse(
+      (await call(me, 'GET', `/money/accounts/${id}/journal`)).json(),
+    )
+    expect(again.rows.find((row) => row.id === late)?.day).toBe(today)
+  })
+
+  // Т-2: west of Yerevan in the last hour of a month the phone's month is still running — its rate
+  // live, not frozen by the closing day Yerevan has already passed.
+  it('месяц телефона западнее Еревана в последний час идёт, а не заморожен (Т-2)', async () => {
+    const me = await owner()
+    const [actor] = await db.select().from(actors).where(eq(actors.id, me.id))
+    if (!actor) throw new Error('no actor')
+    const moscow = new Date('2026-09-30T20:30:00Z')
+    const asked = await moneyMonthOf(
+      tripRepositories(db),
+      { ...actor, today: '2026-09-30' },
+      '2026-09',
+      undefined,
+      moscow,
+    )
+    expect(asked.rateKind).toBe('live')
+    const yerevan = await moneyMonthOf(tripRepositories(db), actor, '2026-09', undefined, moscow)
+    expect(yerevan.rateKind).toBe('frozen')
   })
 })

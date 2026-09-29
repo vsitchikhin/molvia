@@ -1,10 +1,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
-import { monthOf, moneyMonthCodec, yerevanDate } from '@molvia/model'
+import { monthOf, moneyMonthCodec } from '@molvia/model'
 import type { MoneyMonthView } from '@molvia/model'
 import { api } from '@/api'
 import { mergePages } from '@/components/spending'
 import { useReconnect } from '@/composables/useReconnect'
+import { localDay } from '@/days'
 import { isRecord } from '@/stores/queueing'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -79,7 +80,7 @@ export function recallCategories(owner: string): MoneyMonthView['categories'] {
 
 /** The rate of the running month as last answered — only a month read while it was running. */
 function recallTodayRate(owner: string): MoneyMonthView['rate'] {
-  const today = monthOf(yerevanDate(new Date()))
+  const today = monthOf(localDay())
   const running = recall(owner, today)
   return running?.answer.rateKind === 'live' ? running.answer.rate : null
 }

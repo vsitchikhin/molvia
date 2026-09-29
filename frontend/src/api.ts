@@ -1,6 +1,7 @@
 import { ApiError, createClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { MolviaClient } from '@molvia/client'
+import { localDay } from '@/days'
 
 // Nothing about identity is passed in, and that is the change MOL-53 made: what proves a
 // request is the session cookie, which the browser attaches and no script can read.
@@ -14,6 +15,8 @@ const client = createClient({
   onVersion: (version) => {
     heard?.(version)
   },
+  // The phone's today on every request (MOL-121): the server counts «today» of money by it.
+  today: () => localDay(),
 })
 
 /** Told that the session behind this browser is gone. Registered by the actor store. */
