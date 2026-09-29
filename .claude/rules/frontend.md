@@ -149,7 +149,28 @@ The detail behind the frontend lines of `CLAUDE.md`.
   gesture is intercepted**: no touch listener, no `overscroll-behavior` on the root — the
   edge swipe and Android «back» belong to the browser, and the history is the one source of
   «back». Only the page scrolls, never an inner container: iOS hides its address bar and the
-  router restores positions only for the window.
+  router restores positions only for the window. **A move that changes only the query of the
+  screen keeps the page where it is** (`scrollBehavior`, MOL-136): the category and the period of
+  «Графики», the month of «Деньги» live in the address and change by `replace`, and read as a new
+  screen they took the page to the top — the category card is the third, and the chart the person
+  chose it for was gone. One rule in the router rather than a flag on the screen: a flag has to be
+  remembered by every screen that keeps its state in the address, and the one that forgets it is
+  this bug again; no screen wants the top on a change of its query — one that does scrolls itself
+  after its `replace`. Back and forward still return to what was saved, and the same route with
+  other params (`/money/accounts/a` → `/b`) is another screen, from the top. What the rule cannot
+  hold is the height of the page: a month or a period read for the first time on the phone comes
+  under the skeleton, shorter than the answer, and the browser brings the scroll up to its end
+  (MOL-138). So e2e takes «the page stayed» on a month or a period the phone already keeps, by
+  where the control stands on the screen, off the bottom of the page.
+- **A scroll the eye follows is smooth; a scroll that sets a screen in place is instant**
+  (owner's remark on MOL-136). Smooth: the tab of the section one is in, back to the top
+  (`goTab`), and a spending just saved brought to the middle (`toShow` in «Деньги») — each
+  instant under «reduce motion». Instant: a new screen at the top and a screen back where it was
+  — it slides in already there, and a smooth scroll would show the old page travelling under the
+  transition; the sheet putting the page back (MOL-63), a compensation the eye must not see at
+  all; the arrows in the catalogue list, which a smooth scroll lags behind. **Never
+  `scroll-behavior: smooth` on the root**: a scroll with `behavior: 'auto'` takes it from the CSS,
+  and the sheet's compensation would slide.
 - **A screen is built from the kit, not drawn anew** (MOL-18): `AppButton`, `AppField`,
   `SegmentedControl`, `VerdictBadge`, `AppCard`, `BottomSheet` in `components/`, every state of
   them on the development-only page `/_kit`. `AppCard` carries exactly the differences between
