@@ -82,13 +82,20 @@ The detail behind the frontend lines of `CLAUDE.md`.
   **The name does not follow the ladder** — «Back Trip» on every step, the word shown first
   (owner's decision on review). **It
   leads to the screen underneath when that screen is any ancestor** — the step the system
-  button takes — and otherwise replaces onto the parent (`backTarget`, MOL-77): a finished trip
-  opened from the home screen says «‹ Поход» and both «back»s go home. Tabs and the
-  chevron move through `useNavigation`: «Trip» is home — leaving it pushes, moving between
-  the other sections replaces, returning is a step back — so the system «back» never walks
-  through tab taps, and a nested screen opened cold gets its parent laid underneath. A
-  section opened cold — a link from the bot — is its own home: «back» leaves the app, the trip
-  is not laid under it, because a push without a gesture is what Chrome may skip. **No
+  button takes — and otherwise replaces onto the parent (`backTarget`, MOL-77): the search of a
+  record with «Покупки» right underneath says «‹ Покупки», and both «back»s go there.
+  Tabs and the chevron move through `useNavigation`: **«Что брать» is home** (MOL-128; «Поход»
+  was, MOL-17) — at the shelf a person reads, at home they write — leaving it pushes, moving
+  between the other sections replaces, returning is a step back — so the system «back» never
+  walks through tab taps, and a nested screen opened cold gets its parents laid underneath. A
+  section opened cold — a link from the bot — is its own home: «back» leaves the app, home is
+  not laid under it, because a push without a gesture is what Chrome may skip. **The addresses
+  of «Поход» redirect for good** (MOL-81): `/trip*` to «Покупки», `/advice` to `/`. A screen that
+  has nothing left to show — the record typed by hand once it is finished or removed — goes up to
+  its parent (`goUp`), and never under an open sheet: the sheet's `onClosed` asks again, **through
+  `afterStep`** — a sheet is told it is closed from inside the pop that closed it, before that step
+  has landed, and a move made there was taken for a second tap and dropped (MOL-128, seen only in a
+  real browser: happy-dom dispatches `popstate` inside `go`). **No
   gesture is intercepted**: no touch listener, no `overscroll-behavior` on the root — the
   edge swipe and Android «back» belong to the browser, and the history is the one source of
   «back». Only the page scrolls, never an inner container: iOS hides its address bar and the

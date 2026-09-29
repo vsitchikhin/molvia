@@ -183,6 +183,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
 - **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, **every other reader
   filters `deleted_at IS NULL`**.
+- **The search on «Что брать» is answered by the server** (`GET /advice/search`, MOL-128): the
+  list's own statement and rules for what is found, never glued on the phone; it writes no visit and
+  no pick; offline — the remembered list by the start of words.
 
 ### Money: rates, exchanges, incomes — `.claude/rules/money-rates.md`
 
@@ -245,8 +248,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A trip names its own geography** (`context`, MOL-65): a start without one is
   `error.trip_context_required`, held by the queue without a timer; the settings are settled
   choice by choice inside the `UPDATE`.
-- **The introduction on «Поход» is only for a history known to be empty** (`answeredEmpty`, MOL-77),
-  kept under a key of its own; a phone-side cache is read by both versions.
+- **«Покупки» is empty, and «Что брать» greets a newcomer, only for an answer known to be empty**
+  (`answeredEmpty`, MOL-77; the memory of `useAdvice`, MOL-128); a phone-side cache is read by both
+  versions. **The record typed by hand goes up to «Покупки» once none is open**, never under a sheet.
 
 ### Identity, sessions, the way in and out — `.claude/rules/auth.md`
 
@@ -296,7 +300,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   Interface icons come from MDI through `unplugin-icons`.
 - **An installed app takes a new version only when hidden and holding no typing** (`pwaUpdate.ts`).
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17); no gesture
-  is intercepted; only the page scrolls, except a sheet.
+  is intercepted; only the page scrolls, except a sheet. **«Что брать» is home** (MOL-128): the
+  `tabMove` of «back»; old addresses of «Поход» redirect for good.
 - **A screen is built from the kit** (MOL-18); the sheet is a native `<dialog>` with an entry in the
   history, and puts the page back by what it was opened from (MOL-63).
 

@@ -8,9 +8,9 @@ paths:
   - 'backend/src/routes/{trips,places,settings}.ts'
   - 'backend/tests/{trip*,place*,settings*}.ts'
   - 'backend/drizzle/*trip*.sql'
-  - 'frontend/src/views/{TripView,TripHistoryView,FinishedTripView,SettingsView}*'
-  - 'frontend/src/components/{Trip*,tripRow*,StartTripSheet*,ItemDetailsSheet*,SettingsFields*}'
-  - 'frontend/src/composables/{useCurrentTrip,useSelectedTrip,useFinishedTrip,useTripContext,useTripHistory,useTripRows,useItemDetails,useSettings}*'
+  - 'frontend/src/views/{TripView,PurchasesView,FinishedTripView,SettingsView}*'
+  - 'frontend/src/components/{Trip*,tripRow*,StartTripSheet*,ItemDetailsSheet*,SettingsFields*,PurchaseRow*,ManualEntryButton*}'
+  - 'frontend/src/composables/{useCurrentTrip,useSelectedTrip,useFinishedTrip,useTripContext,useTripHistory,useTripRows,useItemDetails,useSettings,usePendingFrom}*'
   - 'frontend/src/stores/{trip,tripQueue,tripHistory,queueing,recentPlaces,settingsMemory,storage}*'
   - 'e2e/{trip,trip-history,settings,item-details}.spec.ts'
 ---
@@ -129,34 +129,52 @@ are typing into. «Что брать» answers with the geography it counted by,
 the phone compares it with its own: a different city is a list to load again, and an answer the
 settings will not move to is taken as it is — the screen used to stay on a skeleton for good.
 
-## «Поход» without a trip (MOL-77)
+## «Покупки», the record typed by hand, and the newcomer's home (MOL-77, MOL-128)
 
-MOL-77 gave «Поход» without a trip a face — the first screen a new person meets. **No circle over an
-action anywhere on it**: the empty state's «+» read as a button and was the thing the owner tapped,
-so `ScreenState` draws an empty state without a circle when it is given no icon, and «Поход начат»
-has none. **«Начать поход» stands in the strip above the tab bar** in every state without a trip,
-loading included — a start goes through the queue, and an open trip the server then names is asked
-about as before. A newcomer gets «Что брать и где» and the cycle «у двери → у полки → дома «Оценки»
-→ «Что брать»», whose last two steps change tab; a person with a history gets «N покупок ждут
-оценки» and their last three trips (`TripHistoryRow`, shared with the history). **The introduction
-is only for a history known to be empty**: every write to a trip persists the history cache, so an
-empty stored page proves nothing, and the store keeps whether the server's last answer was empty
-(`answeredEmpty`) — «empty», not «answered», since the flag and a page a full shelf kept can outlive
-each other, and an answer with trips takes it off every shelf (round 2, Ж1) — **under a key of its
-own, never as a field of the cache**: the cache codec is strict, and a window still on the previous
-version read an unknown field as no cache and wrote its empty one over a finish made with no signal
-(adversarial Е). A change to a phone-side cache is read by both versions, as a field added to the
-contract is. An answer the list moved under — another window wrote the cache, a finish was taken
-back — is asked for again after a doubling pause, since another window may be sending its whole
-queue, rather than taken for a success (А, Ж2). Today's error, and purchases waiting for a verdict,
-outweigh an empty answer remembered from an earlier launch (Г); an error or no connection with
-nothing remembered is a quiet card of its own, never «newcomer» — MOL-56's «no answer is not the
-answer „no“». With the server down there is one «Повторить», the red block's, and it asks for the
-history too (Д). The price, named: offline with an empty answer remembered, the introduction stands
-— Safari and the installed app keep separate shelves. «Ждут оценки» names places, not trips: a card
-carries the place and the moment the server took the purchase, and a purchase made with no signal
-arrives with the queue hours later, so no gap tells one trip from two (round 2, З1). **And it names
-them, never counts them**: a card carries the name without the city, so «Ереван Сити» of Gyumri and
-of Yerevan are one name — a number would claim what the phone does not know (round 3, И2). The name
-alone is what every card and row already shows. A retry of the history ends with the screen that
-asked (И1).
+**«Поход» became «Покупки», and «Что брать» became home** (MOL-128, the owner's decision on the
+receipts epic: at the shelf a person reads, at home they write). The word «поход» left the whole
+dictionary: open — «запись», finished — «покупки»; the code keeps its `trip*` names. «Покупки»
+(`/purchases`) is one list by what asks to be done: the record still being written first, then
+«N покупок ждут оценки», then «Записаны» — each row with the server's count and sums (`itemCount`,
+`total` of the history, В-4), `null` from an older server and from the phone's cache, which keeps
+neither yet: a window on the previous build reads the cache with a strict codec (`ENTRY_NOT_CACHED_YET`,
+as `NOT_CACHED_YET` for a trip view). **The record typed by hand is a screen under it**
+(`/purchases/manual`, the old `TripView`), named by its place, and **with no record open it goes
+up to «Покупки»** — finished here or on another device, removed, or reached by an old address —
+never under an open sheet. «Записать покупки» (`ManualEntryButton`) stands in the strip of
+«Покупки» and of the newcomer's «Что брать»: with no record open it asks «Где вы?» and opens the
+record once the sheet is away; with one open it asks «Продолжить» or «Закончить и начать новую» —
+the rule «one open at a time» unchanged. With receipts (MOL-127) it becomes «Записать вручную».
+
+**What the queue says about any record is said on both screens** (`TripNotices`): purchases the
+server refused, a record already open elsewhere, purchases not sent for a record that is over, a
+city to name. «Поход» said them in every phase, its home without a trip included; with the record
+a nested screen, «Покупки» without one would have said none of it.
+
+**No circle over an action anywhere** (MOL-77): the empty state's «+» read as a button and was the
+thing the owner tapped, so `ScreenState` draws an empty state without a circle when it is given no
+icon. **«Покупки» is empty only for a history known to be empty**: every write to a record persists
+the history cache, so an empty stored page proves nothing, and the store keeps whether the server's
+last answer was empty (`answeredEmpty`) — «empty», not «answered», since the flag and a page a full
+shelf kept can outlive each other, and an answer with trips takes it off every shelf (round 2, Ж1) —
+**under a key of its own, never as a field of the cache**: the cache codec is strict, and a window
+still on the previous version read an unknown field as no cache and wrote its empty one over a
+finish made with no signal (adversarial Е). A change to a phone-side cache is read by both versions,
+as a field added to the contract is. An answer the list moved under — another window wrote the
+cache, a finish was taken back — is asked for again after a doubling pause, since another window may
+be sending its whole queue, rather than taken for a success (А, Ж2), and what is left after that is
+an error that blames nobody. Purchases waiting for a verdict, and a record open, outweigh an empty
+answer. A retry of the history ends with the screen that asked (И1).
+
+**The newcomer's home is «Что брать»** (`AdviceHomeNew`, handoff `02`): «Запишите первые
+покупки», or «Осталось оценить» once purchases wait for a verdict, the cycle of three steps whose
+first two change tab, the line about money and trust, and «Записать покупки» below. **Only for a
+list known to be empty** — the answer of `GET /advice` now or remembered, with no rows; no answer and
+no memory is offline or a failure, never a newcomer — MOL-56's «no answer is not the answer „no“».
+The memory of `useAdvice` is that knowledge, so no flag of its own is kept; `answeredEmpty` stays
+«Покупки»'s. «Ждут оценки» names places, not trips: a card carries the place and the moment the
+server took the purchase, and a purchase made with no signal arrives with the queue hours later, so
+no gap tells one trip from two (round 2, З1). **And it names them, never counts them**: a card
+carries the name without the city, so «Ереван Сити» of Gyumri and of Yerevan are one name — a
+number would claim what the phone does not know (round 3, И2). The handoff's «Из чека «SAS»» is not
+used: the queue of verdicts does not know a source (MOL-124, П-9).
