@@ -22,6 +22,12 @@ export interface ReminderCandidate {
    * whoever rated yesterday's milk at once, or bought only a dish, has nothing to be asked either.
    */
   readonly lastUnratedAt: Date | null
+  /**
+   * When the latest of those purchases was **entered** — any new entry moves it, one written into a
+   * trip closed the day before included, where `lastUnratedAt` stands still. The memory of settled
+   * evenings is opened again by it (adversarial И).
+   */
+  readonly lastUnratedEnteredAt: Date | null
 }
 
 export interface ClaimRequest {
@@ -87,6 +93,7 @@ export function createReminderRepository(db: Conn): ReminderRepository {
         window_from: string | null
         rated_since: boolean
         last_unrated_at: string | null
+        last_unrated_entered_at: string | null
       }>(sql`
         select
           a.id as actor_id,
@@ -100,18 +107,23 @@ export function createReminderRepository(db: Conn): ReminderRepository {
             select 1 from verdicts v
             where v.actor_id = a.id and v.deleted_at is null and v.updated_at > r.reminded_at
           ), false) as rated_since,
-          (
-            select max(least(e.created_at, t.finished_at))::text from expenses e
-            join trips t on t.id = e.trip_id
-            join items i on i.id = e.item_id and i.kind = 'product'
-            where t.actor_id = a.id and t.deleted_at is null
-              and not exists (
-                select 1 from verdicts v
-                where v.actor_id = a.id and v.item_id = e.item_id and v.deleted_at is null
-              )
-          ) as last_unrated_at
+          unrated.last_at as last_unrated_at,
+          unrated.last_entered_at as last_unrated_entered_at
         from actors a
         left join rating_reminders r on r.actor_id = a.id
+        left join lateral (
+          select
+            max(least(e.created_at, t.finished_at))::text as last_at,
+            max(e.created_at)::text as last_entered_at
+          from expenses e
+          join trips t on t.id = e.trip_id
+          join items i on i.id = e.item_id and i.kind = 'product'
+          where t.actor_id = a.id and t.deleted_at is null
+            and not exists (
+              select 1 from verdicts v
+              where v.actor_id = a.id and v.item_id = e.item_id and v.deleted_at is null
+            )
+        ) unrated on true
         order by a.id
       `)
       return rows.map((row) => ({
@@ -124,6 +136,8 @@ export function createReminderRepository(db: Conn): ReminderRepository {
             : null,
         ratedSince: row.rated_since,
         lastUnratedAt: row.last_unrated_at === null ? null : new Date(row.last_unrated_at),
+        lastUnratedEnteredAt:
+          row.last_unrated_entered_at === null ? null : new Date(row.last_unrated_entered_at),
       }))
     },
 

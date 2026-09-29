@@ -159,7 +159,11 @@ The lever of gate 0.2: the day after a purchase the bot asks «вчера · Е�
   `least(entered, trip finished)`, as the claim reads it, not by the entry (adversarial Е). **A
   claim that found nothing settles the evening** (`QuietToday`, the API's memory of one entry a
   person): an item only with a name the bot cannot be handed passes the filter and would otherwise
-  open an empty claim every minute. A restart forgets it; the cost is one more empty claim.
+  open an empty claim every minute. **A purchase entered after it opens the evening again**
+  (adversarial И): the memory keeps the latest entry of an unrated purchase it saw, and the milk
+  written into yesterday's closed trip at 20:00 moves it — «nothing at 19:00» is an answer about
+  19:00, and tomorrow that milk would be too old to ask about. A restart forgets it; the cost is one
+  more empty claim.
 - **The ladder is the owner's** (29.09.2026), and it lives in the domain (`planReminder`): step 1 at
   19:00 of the day after a purchase; nothing rated since — step 2 three days later, step 3 a week
   after that, then **six calendar months of silence**, and after it only what was bought after the
@@ -198,7 +202,10 @@ The lever of gate 0.2: the day after a purchase the bot asks «вчера · Е�
   **A 429 is waited out once** (review Т-4), by Telegram's `retry_after`: at 19:00 all of Armenia
   is one batch. **Asked to wait longer than ten seconds, the bot gives the rest of the run up at
   once** (adversarial З) — that is flood control over the whole bot, a retry before it ends is
-  refused for certain, and waiting the cap on every message spent minutes to send nothing. The
+  refused for certain, and waiting the cap on every message spent minutes to send nothing. **An
+  assumption, not a measurement:** that a long `retry_after` is the whole bot's and not one chat's
+  — if Telegram gave it for one chat, the rest of that minute is given up with it. Only live
+  Telegram can say. The
   bot's container has thirty seconds to stop (`stop_grace_period`); **a stop cuts every wait
   short**, the messages left go without pauses, and the runner stops beside the reminders rather
   than after them.

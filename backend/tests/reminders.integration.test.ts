@@ -677,6 +677,71 @@ describe('лишних выдач нет (адверсариальный В, р�
     expect(claims()).toBe(1)
   })
 
+  /** A trip of yesterday, closed at 11:00: what is written into it later is yesterday's. */
+  async function closedYesterday(who: Person): Promise<string> {
+    return insertTrip(db, {
+      actorId: who.id,
+      placeId: shop,
+      startedAt: yerevan('2026-07-13', '10:00'),
+      finishedAt: yerevan('2026-07-13', '11:00'),
+    })
+  }
+
+  async function enter(tripId: string, itemId: string, at: Date): Promise<void> {
+    await db.insert(expenses).values({ id: randomUUID(), tripId, itemId, createdAt: at })
+  }
+
+  it('пустая выдача не глушит покупку, дописанную в тот же вечер (адверсариальный И1)', async () => {
+    const anna = await person()
+    const trip = await closedYesterday(anna)
+    await enter(
+      trip,
+      await insertItem(db, { name: LEGACY_NAME, searchKey: 'sir lori' }),
+      yerevan('2026-07-13', '10:30'),
+    )
+    const quiet: QuietToday = new Map()
+    const at = async (time: string) =>
+      asked(
+        dueRemindersSchema.parse(
+          await remindRatings(
+            reminders,
+            yerevan('2026-07-14', time),
+            (e) => failures.push(e),
+            quiet,
+          ),
+        ),
+      )
+
+    expect(await at('19:00')).toEqual({})
+    expect(await at('19:30')).toEqual({})
+    await enter(trip, await item('Молоко'), yerevan('2026-07-14', '20:00'))
+    expect(await at('20:01')).toEqual({ [anna.tg]: ['Молоко'] })
+  })
+
+  it('и после оценки, снятой вчера (MOL-29): дописанное вечером спрашивается (И2)', async () => {
+    const anna = await person()
+    const trip = await closedYesterday(anna)
+    const kefir = await item('Кефир')
+    await enter(trip, kefir, yerevan('2026-07-13', '10:30'))
+    await verdict(anna, kefir, yerevan('2026-07-13', '21:00'), yerevan('2026-07-13', '21:05'))
+    const quiet: QuietToday = new Map()
+    const at = async (time: string) =>
+      asked(
+        dueRemindersSchema.parse(
+          await remindRatings(
+            reminders,
+            yerevan('2026-07-14', time),
+            (e) => failures.push(e),
+            quiet,
+          ),
+        ),
+      )
+
+    expect(await at('19:00')).toEqual({})
+    await enter(trip, await item('Молоко'), yerevan('2026-07-14', '20:00'))
+    expect(await at('20:01')).toEqual({ [anna.tg]: ['Молоко'] })
+  })
+
   it('кому напоминание ушло, того вечер больше не открывает', async () => {
     const anna = await person()
     await bought(anna, await item('Молоко'), yerevan('2026-07-13', '10:00'))

@@ -20,14 +20,17 @@ function sendable(item: PendingVerdict): boolean {
 }
 
 /**
- * Whose evening is already settled, and on which of their days: an owner's id and the day a claim
- * found nothing to send (adversarial Е). Kept by the API's one process between the bot's minutes —
- * a claim that finds nothing writes nothing, so without it the same empty claim was opened every
- * minute of the evening: a purchase only with a name the bot cannot be handed, or one the filter
- * could not rule out. One entry a person, overwritten the next day; a restart forgets it, and the
- * cost is one more empty claim each.
+ * Whose evening is already settled: an owner's id, the day a claim found nothing to send, and the
+ * latest entry of an unrated purchase it saw then (adversarial Е). Kept by the API's one process
+ * between the bot's minutes — a claim that finds nothing writes nothing, so without it the same
+ * empty claim was opened every minute of the evening: a purchase only with a name the bot cannot
+ * be handed, or one the filter could not rule out. **A purchase entered after it opens the evening
+ * again** (adversarial И): «nothing at 19:00» is an answer about 19:00, and the milk remembered at
+ * 20:00 and written into yesterday's trip is yesterday's too — tomorrow it would be too old to ask.
+ * One entry a person, overwritten the next time; a restart forgets it, and the cost is one more
+ * empty claim each.
  */
-export type QuietToday = Map<string, string>
+export type QuietToday = Map<string, { readonly day: string; readonly entered: number | null }>
 
 /**
  * «Напомнить об оценке» (MOL-101): the reminders due now, handed to the bot and marked as sent.
@@ -68,7 +71,9 @@ export async function remindRatings(
       today: clock.day,
     })
     if (plan === null) continue
-    if (quiet.get(candidate.actorId) === clock.day) continue
+    const entered = candidate.lastUnratedEnteredAt?.getTime() ?? null
+    const settled = quiet.get(candidate.actorId)
+    if (settled?.day === clock.day && settled.entered === entered) continue
     // Only step 1 is skipped this way: a later step with nothing to ask about has to reach the
     // claim, which ends the ladder (Л-2).
     if (
@@ -99,7 +104,7 @@ export async function remindRatings(
     }
     if (claimed === null) {
       // Nothing to send today, or somebody else sent it: either way the evening is done for them.
-      quiet.set(candidate.actorId, clock.day)
+      quiet.set(candidate.actorId, { day: clock.day, entered })
       continue
     }
     due.push({
