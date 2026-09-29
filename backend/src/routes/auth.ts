@@ -7,6 +7,7 @@ import {
   SESSION_COOKIE,
   actorViewSchema,
   loginPollCodec,
+  loginStartQuerySchema,
   loginStartedCodec,
 } from '@molvia/model'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
@@ -31,7 +32,7 @@ function browserOnly(request: FastifyRequest): Promise<void> {
 export function authRoutes(
   app: FastifyInstance,
   api: {
-    start(deviceName: string | null): Promise<StartedLogin>
+    start(deviceName: string | null, again: boolean): Promise<StartedLogin>
     poll(id: string, secret: string): Promise<CompletedLogin>
     logout(token: string): Promise<void>
   },
@@ -44,8 +45,11 @@ export function authRoutes(
     scope.addHook('onRequest', browserOnly)
     scope.addHook('onRequest', refuseAnyBody)
     scope.post('/auth/login', async (request, reply) => {
-      parseQuery(z.strictObject({}), request.query)
-      const { view, secret } = await api.start(deviceName(request.headers['user-agent']))
+      const { again } = parseQuery(loginStartQuerySchema, request.query)
+      const { view, secret } = await api.start(
+        deviceName(request.headers['user-agent']),
+        again !== undefined,
+      )
       setLoginCookie(reply, secret)
       return reply.code(201).send(z.encode(loginStartedCodec, view))
     })

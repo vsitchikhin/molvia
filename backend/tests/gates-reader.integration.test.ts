@@ -7,7 +7,7 @@ import { sql } from 'drizzle-orm'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor } from './fixtures'
 import { createGatesReader } from '@/db/gates-reader'
-import { erasures } from '@/db/schema'
+import { erasures, loginDays } from '@/db/schema'
 
 const { db, close } = connectDrizzle()
 const reader = createGatesReader(db)
@@ -61,6 +61,38 @@ describe('the gates reader', () => {
     })
 
     expect(report.erased).toEqual({ count: 3, firstWeek: '2026-10-05', lastWeek: '2026-10-12' })
+  })
+
+  it('reads the login funnel of the days the window touches, whole days in Yerevan (MOL-68)', async () => {
+    const counts = {
+      again: 0,
+      confirmed: 1,
+      declined: 0,
+      collected: 1,
+      expiredUnconfirmed: 0,
+      expiredConfirmed: 0,
+      refused: 0,
+    }
+    await db.insert(loginDays).values([
+      { day: '2026-10-06', started: 9, ...counts }, // the day before
+      { day: '2026-10-07', started: 1, ...counts },
+      { day: '2026-10-18', started: 2, ...counts },
+      { day: '2026-10-19', started: 9, ...counts }, // the day after
+    ])
+
+    // From Wednesday the 7th at noon to Sunday the 18th taken in whole: `to` is the 19th at 00:00
+    // in Yerevan, and its last millisecond is still the 18th.
+    const report = await reader.read({
+      from: new Date('2026-10-07T12:00:00+04:00'),
+      to: new Date('2026-10-19T00:00:00+04:00'),
+    })
+
+    expect(report.logins.firstDay).toBe('2026-10-07')
+    expect(report.logins.lastDay).toBe('2026-10-18')
+    expect(report.logins.days.map((day) => [day.day, day.started])).toEqual([
+      ['2026-10-07', 1],
+      ['2026-10-18', 2],
+    ])
   })
 
   it('reads inside a read-only, repeatable-read transaction', async () => {

@@ -10,7 +10,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 - `packages/model/src/contracts/verdict.ts` — Wire contract of verdicts: the path by item, the rating and amendment bodies, the verdict card and the pending list.
 - `packages/model/src/entities/catalogue.ts` — Frozen mapping of item kinds and place kinds onto the two halves of the 0.3 gate, product and venue.
 - `packages/model/src/entities/verdict.ts` — Entity: a verdict, one per item, plus `verdictLevel`, `averageScore`, the level thresholds and `AGGREGATE_MIN_CONTRIBUTIONS`.
-- `packages/model/src/values/gate.ts` — Values of the gates: the product/venue subject, five ratings in two weeks, and the stop percentages of 0.2 and 0.3.
+- `packages/model/src/values/gate.ts` — Values of the gates: the product/venue subject, five ratings in two weeks, the stop percentages of 0.2 and 0.3, and the login's line for a second way in.
 
 ## backend · routes
 
@@ -28,13 +28,13 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 ## backend · db
 
 - `backend/src/db/events-repository.ts` — Repository of the event log: record, record once per day of the person's life, and the 0.3 week-four return. Tests: `backend/tests/events-repository.integration.test.ts`.
-- `backend/src/db/gates-reader.ts` — Reader of both gates over one window in a read-only snapshot, with the erased counted by week. Tests: `backend/tests/gates-reader.integration.test.ts`.
+- `backend/src/db/gates-reader.ts` — Reader of both gates over one window in a read-only snapshot, with the erased counted by week and the login funnel (`login_days`) by day. Tests: `backend/tests/gates-reader.integration.test.ts`.
 - `backend/src/db/verdicts-repository.ts` — Repository of verdicts: put, amend, withdraw, the «Что брать» rows (optionally of given items, for the search) and `reachedRatings` for gate 0.2. Tests: `backend/tests/advice-verdicts.integration.test.ts`.
 
 ## backend · other
 
 - `backend/src/gates-cli.ts` — Entry point of `dist/gates.js`: connects to the database and runs the gates command.
-- `backend/src/gates.ts` — The gates command behind `make gates`: parses the window, reads gates 0.2 and 0.3, prints counts and dates only.
+- `backend/src/gates.ts` — The gates command behind `make gates`: parses the window, reads gates 0.2 and 0.3 and the login funnel, prints counts and dates only.
 
 ## backend · tests
 
@@ -87,4 +87,4 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 ## repository
 
-- `bin/gates.sh` — Script behind `make gates`: reads gates 0.2 and 0.3 from this copy's database for a window.
+- `bin/gates.sh` — Script behind `make gates`: reads gates 0.2 and 0.3 and the login funnel from this copy's database for a window.

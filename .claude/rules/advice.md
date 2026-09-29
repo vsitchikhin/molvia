@@ -110,6 +110,23 @@ fourth week is not over is waiting, with access or without — it can still be g
 access in week 4» is said only of a week that is over (adversarial А: judged by today's access, a
 newcomer read «no access» eighteen days early). Those waiting, those without access and the erased
 of the weeks the window touches are each a line of their own, in neither fraction.
+**The login's funnel is the third block** (MOL-68, rules in `auth.md`): the logins begun on the days
+the window touches — not the people who appeared, since those lost at the door never appear — with
+«began» (starts less a device's repeats), «got in» and «lost» beside their `n`, the line
+`LOGIN_SECOND_WAY_PERCENT` (25 %) printed and no verdict. **The share of «lost» is rounded up**, the
+mirror of the gates' rounding down: that line fires _above_, and 25.09 % printed «25.0 %» sat on it
+(review Б) — each share leans towards its own line's side. Where they were lost is counted in
+requests, so it need not add up to «lost»; logins still inside their five minutes are «still under
+way», a line of their own and not in «lost» — below zero only with outcomes whose start was never
+counted, a request an older image made after a rollback, and then it adds nothing to «lost»
+(round 2, Р5); above zero it also holds for good a request erased mid-login, which ends in no
+outcome at all, and the line says so (Р4). The three are one difference and cannot be told apart
+— `login_days` does not know whose start was counted — so on the day of a rollback, logins under
+way and outcomes of uncounted starts cancel out: the line reads 0 and the ones under way count as
+lost (adversarial round 3, Т3). Named, since it needs a rollback. **Both edges of the window cut a repeat
+from its beginning**: begun before `--from` and in after it, «lost» may go below zero; begun on
+the last day and in on the next, it is a loss inside the window (review В2). Printed as they are.
+Then a row per day that counted anything.
 
 ## What «Что брать» shows, and what it refuses to (MOL-31)
 

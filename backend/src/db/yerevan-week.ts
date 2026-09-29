@@ -14,3 +14,11 @@ export function yerevanWeek(instant: SQLWrapper): SQL {
   // handed in — `to` less a millisecond — would otherwise be read inside out.
   return sql`date_trunc('week', ((${instant}) at time zone 'UTC') + interval '4 hours')::date`
 }
+
+/**
+ * The day an instant falls in, in Yerevan — the key of `login_days` (MOL-68), by the same arithmetic
+ * as the week and for the same reason: never the session's `timezone`.
+ */
+export function yerevanDay(instant: SQLWrapper): SQL {
+  return sql`(((${instant}) at time zone 'UTC') + interval '4 hours')::date`
+}
