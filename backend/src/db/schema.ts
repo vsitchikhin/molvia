@@ -1368,3 +1368,61 @@ export const loginDays = pgTable(
     check('login_days_again_within_started', sql`${table.again} <= ${table.started}`),
   ],
 )
+
+/**
+ * Where a person stands on the ladder of rating reminders (MOL-101): the last step sent, the day
+ * of their own it went out, the moment — a rating after it resets the ladder (Л-1) — and the
+ * first day whose purchases the ladder asks about. One row a person, rewritten by each reminder;
+ * no row is «no ladder». A table rather than columns on `actors`, so the owner's row is not
+ * rewritten every evening.
+ *
+ * **The switch of MOL-103 cannot simply be a column here** (review Т-3): a ladder that ends with
+ * nothing to ask about deletes its row (Л-2), and a switch in it would go with it. MOL-103 either
+ * ends a ladder by clearing it — a nullable `step` — or keeps the switch elsewhere.
+ *
+ * The pause after step 3 is not a column: it is step 3 and its day, and `planReminder` knows how
+ * long it lasts.
+ */
+export const ratingReminders = pgTable(
+  'rating_reminders',
+  {
+    // Cascades like the person's money does (MOL-40): erasure deletes it first to count it.
+    actorId: uuid('actor_id')
+      .primaryKey()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    step: smallint('step').notNull(),
+    remindedOn: date('reminded_on').notNull(),
+    remindedAt: timestamp('reminded_at', { withTimezone: true }).notNull(),
+    windowFrom: date('window_from').notNull(),
+  },
+  (table) => [
+    check('rating_reminders_step', sql`${table.step} between 1 and 3`),
+    check('rating_reminders_window_before', sql`${table.windowFrom} < ${table.remindedOn}`),
+  ],
+)
+
+/**
+ * The reminder's lever, counted by day (MOL-101, В-4): how many people got each step, how many
+ * items the messages asked about, and how many of those were rated by a press in the bot. The same
+ * shape as `login_days` and for the same reason — no id of anyone, so erasure has nothing to reach
+ * — and the day is Yerevan's, like there. A person who keeps silent after step 3 goes into the
+ * pause, so `third_steps` is also how many were at the edge of it.
+ */
+export const reminderDays = pgTable(
+  'reminder_days',
+  {
+    day: date('day').primaryKey(),
+    firstSteps: integer('first_steps').notNull().default(0),
+    secondSteps: integer('second_steps').notNull().default(0),
+    thirdSteps: integer('third_steps').notNull().default(0),
+    items: integer('items').notNull().default(0),
+    /** New verdicts given by a press under a reminder, on the day of the press. */
+    rated: integer('rated').notNull().default(0),
+  },
+  (table) => [
+    check(
+      'reminder_days_counts_non_negative',
+      sql`least(${table.firstSteps}, ${table.secondSteps}, ${table.thirdSteps}, ${table.items}, ${table.rated}) >= 0`,
+    ),
+  ],
+)

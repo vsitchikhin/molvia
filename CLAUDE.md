@@ -186,7 +186,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The limit never cuts one's own rows or the warnings** (Р-23, Р-25:
   `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
 - **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, **every other reader
-  filters `deleted_at IS NULL`**.
+  filters `deleted_at IS NULL`**; the reminder skips a purchase made before the withdrawal (MOL-101).
 - **The search on «Что брать» is answered by the server** (`GET /advice/search`, MOL-128): the
   list's own statement and rules for what is found, never glued on the phone; it writes no visit and
   no pick; offline — the remembered list by the start of words.
@@ -261,6 +261,16 @@ that are easiest to break; the file holds every rule of the area and the reason 
   (`answeredEmpty`, MOL-77; the memory of `useAdvice`, MOL-128); a phone-side cache is read by both
   versions. **The record typed by hand goes up to «Покупки» once none is open**, never under a sheet.
 
+### Barcodes: the scanner — `.claude/rules/barcodes.md`
+
+- **EAN-13, EAN-8, UPC-A, UPC-E and nothing else**; UPC comes out as thirteen digits, and a code
+  typed by hand is brought to that same form by `typedBarcode` — one package, one code (MOL-98).
+- **A code is taken after two frames in a row read it**; decoding is in a worker, one frame at a
+  time, only what lies under the frame on the screen.
+- **The wasm comes from the app's own origin and is precached** — never the library's default CDN.
+- **No camera track outlives the scanner**, the reader's error included; every refusal offers the
+  digits typed by hand. **A reader is thrown away only when it is the one that failed.**
+
 ### Identity, sessions, the way in and out — `.claude/rules/auth.md`
 
 - **Identity is proved by a session; `actors.id` proves only ownership** (MOL-52, MOL-53). The
@@ -284,6 +294,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   with `created_by` nulled, every place stays, and one is added to `erasures` — a count by week of
   arrival, no id (MOL-91). **A new table that points at `actors` must join
   erasure** — a test holds `ACTOR_REFERENCES` to every foreign key.
+- **The copy is what erasure takes** (`GET /actors/me/export`, MOL-93): a section per erased table,
+  counted against a dry run, **and every column exported or left out with its reason**
+  (`EXPORT_COLUMNS`); stored, never counted; the removed marked; no secret.
 - **Locks are taken in one order everywhere**: the account, then the request rows, then the owner.
 - **No third-party trackers or analytics**; any third-party script that sees data is a decision.
 - **Logs live fourteen days and carry no address and no query**; a failure is logged by its kind
@@ -297,6 +310,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Updates of different people at once, of one person in order** (`@grammyjs/runner` with
   `sequentialize`).
 - **An outcome is written into the message; a refusal is only shown over it, and written nowhere.**
+- **The rating reminder: the API decides and marks the step as it hands it out, the bot only
+  sends** (MOL-101) — at most once; 19:00 of the person's day, then 3 and 7 days, then six months
+  of silence, and any own verdict starts over; a press is the verdict of `ctx.from.id` and keeps
+  the scale.
 - **Telegram updates are never logged whole.**
 
 ### Frontend — `.claude/rules/frontend.md`

@@ -39,6 +39,15 @@ const REPORT: GatesReport = {
       },
     ],
   },
+  reminders: {
+    firstDay: '2026-10-05',
+    lastDay: '2026-11-20',
+    firstSteps: 12,
+    secondSteps: 5,
+    thirdSteps: 3,
+    items: 40,
+    rated: 9,
+  },
 }
 
 function run(argv: string[], report: GatesReport | Error = REPORT) {
@@ -56,6 +65,37 @@ function run(argv: string[], report: GatesReport | Error = REPORT) {
 }
 
 describe('gates — чтение ворот вручную', () => {
+  it('нажатий больше, чем спрошено, — край окна: как есть и с причиной, не долей за сотню', async () => {
+    const { exit, lines } = run(['--from', '2026-10-05'], {
+      ...REPORT,
+      reminders: { ...REPORT.reminders, items: 1, rated: 2 },
+    })
+    await exit
+    const rated = lines.find((line) => line.includes('rated by a press in the bot'))
+    expect(rated).toContain('2 of 1')
+    expect(rated).toContain('forwarded, or asked before the window')
+    expect(rated).not.toMatch(/%/)
+  })
+
+  it('напоминания без единого — нули и прочерк вместо доли (MOL-101)', async () => {
+    const { exit, lines } = run(['--from', '2026-10-05', '--to', '2026-10-05'], {
+      ...REPORT,
+      reminders: {
+        firstDay: '2026-10-05',
+        lastDay: '2026-10-05',
+        firstSteps: 0,
+        secondSteps: 0,
+        thirdSteps: 0,
+        items: 0,
+        rated: 0,
+      },
+    })
+    await exit
+    const block = lines.slice(lines.findIndex((line) => line.startsWith('remind ')))
+    expect(block[1]).toContain('the day 2026-10-05 in Yerevan')
+    expect(block.at(-1)).toBe('     rated by a press in the bot         0 of 0     —')
+  })
+
   it('день --from — полночь по Еревану, без --to — до сейчас', async () => {
     const { exit, read } = run(['--from', '2026-10-05'])
     expect(await exit).toBe(0)
@@ -160,6 +200,13 @@ describe('gates — чтение ворот вручную', () => {
       '     day            began     again confirmed  declined    got in   expired   refused',
       '     2026-10-05         3         2         3         0         3         2         0',
       '     2026-11-20        38        10        34         1        30        17         2',
+      '',
+      'remind do reminders bring ratings?                  read beside 0.2',
+      '     first step, the next day            12         days 2026-10-05 … 2026-11-20 in Yerevan',
+      '     second step, 3 days on              5',
+      '     third step, then the pause          3          silent after it: 6 months',
+      '     items asked about                   40',
+      '     rated by a press in the bot         9 of 40     22.5 %',
     ])
     expect(lines.join('\n')).not.toMatch(/STOP|pass|fail/)
   })
@@ -235,7 +282,11 @@ describe('gates — чтение ворот вручную', () => {
       logins: { firstDay: '2026-10-05', lastDay: '2026-10-05', days: [] },
     })
     await exit
-    const login = lines.slice(lines.findIndex((line) => line.startsWith('login ')))
+    // Up to the blank line before the reminder's block (MOL-101).
+    const login = lines.slice(
+      lines.findIndex((line) => line.startsWith('login ')),
+      lines.findIndex((line) => line.startsWith('remind ')) - 1,
+    )
     expect(login).toEqual([
       'login how many who began got in?                    second way in above 25 %',
       '     began                               0          the day 2026-10-05 in Yerevan',

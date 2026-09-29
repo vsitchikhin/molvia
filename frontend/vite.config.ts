@@ -50,7 +50,11 @@ export default defineConfig(({ mode }) => {
           // falls back to a system font. Offline is a state this app is designed for, not
           // an edge case. Digits live in the Latin subset, so both subsets are needed even
           // for a fully Russian screen.
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          // And the barcode reader's wasm (MOL-98, owner's decision В-1): the scanner is needed at
+          // the shelf, where the connection drops, and fetched on first use it would fail exactly
+          // there. Downloaded once — its hashed name changes only with the library, not with a
+          // deploy of ours.
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,wasm}'],
         },
         manifest: {
           name: 'Molvia',

@@ -6,6 +6,7 @@ import { eraseComposer } from './erase'
 import type { EraseDeps } from './erase'
 import { loginComposer } from './login'
 import type { LoginDeps } from './login'
+import { rateComposer } from './rate'
 
 /**
  * The bot, wired in the one order that matters.
@@ -44,6 +45,8 @@ export function assembleBot(
   // Before the login, which ends in a catch-all: every text is greeted and every unknown press
   // is refused there, so `/delete` and its buttons would never get past it.
   bot.use(eraseComposer(deps))
+  // The scale under a rating reminder (MOL-101), before the same catch-all.
+  bot.use(rateComposer(deps))
   bot.use(loginComposer(deps))
 
   // The last resort: a handler that throws must not take the process with it. The update itself

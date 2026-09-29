@@ -11,10 +11,7 @@ import {
   actors,
   erasures,
   events,
-  exchangeRevisions,
   exchanges,
-  expenses,
-  incomeRevisions,
   incomes,
   items,
   loginRequests,
@@ -25,10 +22,10 @@ import {
   searchPicks,
   spendingCategories,
   spendings,
-  trips,
   verdicts,
 } from '@/db/schema'
 import { connect, connectDrizzle } from './db'
+import { aLife } from './life'
 import {
   anHourFromNow,
   clearAll,
@@ -36,8 +33,6 @@ import {
   insertItem,
   insertLoginRequest,
   insertPlace,
-  insertSession,
-  insertTrip,
   telegramId,
 } from './fixtures'
 
@@ -46,132 +41,6 @@ const erasure = createErasureRepository(db)
 
 afterAll(close)
 beforeEach(() => clearAll(db))
-
-/** Everything a person leaves behind in 0.1, each table touched at least once. */
-async function aLife(
-  actorId: string,
-  telegramUserId: number,
-  shared: { itemId: string; placeId: string },
-) {
-  const ownItem = await insertItem(db, {
-    name: 'Рынок-сыр',
-    searchKey: 'rinok sir',
-    createdBy: actorId,
-  })
-  const tripId = await insertTrip(db, { actorId, placeId: shared.placeId })
-  await db.insert(expenses).values([
-    { id: randomUUID(), tripId, itemId: shared.itemId },
-    { id: randomUUID(), tripId, itemId: ownItem },
-  ])
-  await db.insert(verdicts).values([
-    {
-      id: randomUUID(),
-      actorId,
-      itemId: shared.itemId,
-      itemKind: 'product',
-      score: 5,
-      review: 'Вкусно',
-    },
-    // Withdrawn: the gate keeps it, erasure must not.
-    {
-      id: randomUUID(),
-      actorId,
-      itemId: ownItem,
-      itemKind: 'product',
-      score: 1,
-      ratedAt: new Date(Date.now() - 60_000),
-      deletedAt: new Date(),
-    },
-  ])
-  await db.insert(searchPicks).values({ actorId, queryKey: 'moloko', itemId: shared.itemId })
-  await db
-    .insert(events)
-    .values({ actorId, type: 'advice_viewed', payload: { subject: 'product' } })
-  // Their own money (MOL-40): one exchange live, one removed but still offered back.
-  const exchange = {
-    actorId,
-    givenMinor: 1_000_000n,
-    givenCurrency: 'RUB',
-    receivedMinor: 4_700_000n,
-    receivedCurrency: 'AMD',
-    exchangedOn: '2026-09-20',
-  } as const
-  const exchangeId = randomUUID()
-  await db.insert(exchanges).values([
-    { id: exchangeId, ...exchange, revision: 2 },
-    { id: randomUUID(), ...exchange, deletedAt: new Date() },
-  ])
-  // An amendment's trace (MOL-42): it names the exchange, not the person, and goes with it.
-  await db.insert(exchangeRevisions).values({ exchangeId, revision: 1, ...exchange })
-  // Money that came in (MOL-66): one live income with a version before it, one removed.
-  const income = {
-    actorId,
-    amountMinor: 9_961_500n,
-    currency: 'RUB',
-    receivedOn: '2026-09-15',
-    source: 'salary',
-  } as const
-  const incomeId = randomUUID()
-  await db.insert(incomes).values([
-    { id: incomeId, ...income, revision: 2 },
-    { id: randomUUID(), ...income, deletedAt: new Date() },
-  ])
-  await db.insert(incomeRevisions).values({ incomeId, revision: 1, ...income })
-  // Spending outside trips (MOL-73): one's own category, a spending in it and a removed one, and a
-  // closed month's frozen rate — all of it the person's, all of it goes.
-  const categoryId = randomUUID()
-  await db.insert(spendingCategories).values({ id: categoryId, actorId, name: 'Такси', colour: 0 })
-  const spendingId = randomUUID()
-  const spending = {
-    actorId,
-    spentOn: '2026-09-20',
-    amountMinor: 500_000n,
-    currency: 'AMD',
-    categoryId,
-    note: 'барбер',
-  } as const
-  await db.insert(spendings).values([
-    { id: spendingId, ...spending },
-    { id: randomUUID(), ...spending, deletedAt: new Date() },
-  ])
-  await db.insert(moneyMonthRates).values({
-    actorId,
-    month: '2026-08',
-    base: 'RUB',
-    quote: 'AMD',
-    scaled: 4_100_000n,
-    source: 'personal',
-    asOf: new Date('2026-08-30T20:00:00Z'),
-  })
-  // Where the money lay (MOL-115): an account, a check of it, and operations of every kind on it.
-  const accountId = randomUUID()
-  await db.insert(moneyAccounts).values({
-    id: accountId,
-    actorId,
-    name: 'Наличные ֏',
-    currency: 'AMD',
-    startMinor: 24_153_000n,
-    startOn: '2026-09-16',
-  })
-  await db.insert(moneyAccountChecks).values({
-    id: randomUUID(),
-    actorId,
-    accountId,
-    checkedOn: '2026-09-26',
-    factMinor: 18_500_000n,
-    countedMinor: 19_013_200n,
-  })
-  await db.update(spendings).set({ accountId }).where(eq(spendings.actorId, actorId))
-  await db
-    .update(exchanges)
-    .set({ receivedAccountId: accountId })
-    .where(eq(exchanges.actorId, actorId))
-  await db.update(trips).set({ accountId }).where(eq(trips.actorId, actorId))
-  await insertSession(db, { actorId })
-  await insertLoginRequest(db, { telegramUserId }) // confirmed, not yet collected
-  await insertLoginRequest(db, { telegramUserId, consumedAt: new Date() })
-  return { ownItem, exchangeId, incomeId, spendingId, accountId }
-}
 
 /** Every row of every table, as text — a new table cannot hide from this. */
 async function rowsMentioning(needle: string, digits = false): Promise<string[]> {
@@ -232,7 +101,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
     const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
-    const { exchangeId, incomeId, spendingId, accountId } = await aLife(anna, tg, shared)
+    const { exchangeId, incomeId, spendingId, accountId } = await aLife(db, anna, tg, shared)
 
     const report = await erasure.erase(tg, { dryRun: false })
 
@@ -241,6 +110,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
       erased: {
         sessions: 1,
         search_picks: 1,
+        rating_reminders: 1,
         verdicts: 2,
         events: 1,
         expenses: 2,
@@ -269,7 +139,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
   it('товар, который человек завёл, остаётся в справочнике без автора', async () => {
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
-    const { ownItem } = await aLife(anna, tg, {
+    const { ownItem } = await aLife(db, anna, tg, {
       itemId: await insertItem(db),
       placeId: await insertPlace(db),
     })
@@ -285,7 +155,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
     const onlyHers = await insertPlace(db, { name: 'Рынок у дома' })
-    await aLife(anna, tg, { itemId: await insertItem(db), placeId: onlyHers })
+    await aLife(db, anna, tg, { itemId: await insertItem(db), placeId: onlyHers })
 
     await erasure.erase(tg, { dryRun: false })
 
@@ -298,9 +168,9 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const anna = await insertActor(db, { telegramUserId: tg })
     const witness = await insertActor(db, { telegramUserId: boris })
     const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
-    const { ownItem } = await aLife(anna, tg, shared)
+    const { ownItem } = await aLife(db, anna, tg, shared)
     // Boris bought and rated what Anna added to the catalogue.
-    await aLife(witness, boris, { ...shared, itemId: ownItem })
+    await aLife(db, witness, boris, { ...shared, itemId: ownItem })
     const before = await snapshot(witness)
 
     await erasure.erase(tg, { dryRun: false })
@@ -316,7 +186,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
   it('сухой прогон считает ровно то же и не меняет ни строки', async () => {
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
-    await aLife(anna, tg, { itemId: await insertItem(db), placeId: await insertPlace(db) })
+    await aLife(db, anna, tg, { itemId: await insertItem(db), placeId: await insertPlace(db) })
     const before = await snapshot(anna)
 
     const dry = await erasure.erase(tg, { dryRun: true })

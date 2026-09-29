@@ -1,5 +1,5 @@
 {
-  "id": "c3f799b2-3a10-47d6-8fe4-08349db43126",
+  "id": "ec4fa1c3-1bcb-486b-a8b9-57013c897f62",
   "prevId": "7ff9babd-8770-4367-9543-5fb4567dcfbe",
   "version": "7",
   "dialect": "postgresql",
@@ -1838,6 +1838,127 @@
       },
       "isRLSEnabled": false
     },
+    "public.rating_reminders": {
+      "name": "rating_reminders",
+      "schema": "",
+      "columns": {
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "step": {
+          "name": "step",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reminded_on": {
+          "name": "reminded_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reminded_at": {
+          "name": "reminded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "window_from": {
+          "name": "window_from",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rating_reminders_actor_id_actors_id_fk": {
+          "name": "rating_reminders_actor_id_actors_id_fk",
+          "tableFrom": "rating_reminders",
+          "tableTo": "actors",
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "rating_reminders_step": {
+          "name": "rating_reminders_step",
+          "value": "\"rating_reminders\".\"step\" between 1 and 3"
+        },
+        "rating_reminders_window_before": {
+          "name": "rating_reminders_window_before",
+          "value": "\"rating_reminders\".\"window_from\" < \"rating_reminders\".\"reminded_on\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.reminder_days": {
+      "name": "reminder_days",
+      "schema": "",
+      "columns": {
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "first_steps": {
+          "name": "first_steps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "second_steps": {
+          "name": "second_steps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "third_steps": {
+          "name": "third_steps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "items": {
+          "name": "items",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "rated": {
+          "name": "rated",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "reminder_days_counts_non_negative": {
+          "name": "reminder_days_counts_non_negative",
+          "value": "least(\"reminder_days\".\"first_steps\", \"reminder_days\".\"second_steps\", \"reminder_days\".\"third_steps\", \"reminder_days\".\"items\", \"reminder_days\".\"rated\") >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.search_picks": {
       "name": "search_picks",
       "schema": "",
@@ -2501,18 +2622,6 @@
         "finished_on_device_at": {
           "name": "finished_on_device_at",
           "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "started_on": {
-          "name": "started_on",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "finished_on": {
-          "name": "finished_on",
-          "type": "date",
           "primaryKey": false,
           "notNull": false
         },

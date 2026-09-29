@@ -85,3 +85,22 @@ it('any other request that fails logs its kind and where, never the query or its
   expect(failure?.errorName).toBeTruthy()
   expect(Array.isArray(failure?.frames)).toBe(true)
 })
+
+// Adversarial Г of MOL-101: the bot's channel carries more than the login now, and a failed press
+// under a reminder read «authentication failed» — whoever read the log looked at the login.
+it('a failed press under a rating reminder is logged as the bot’s, without the Telegram id', async () => {
+  lines.length = 0
+  const account = telegramId()
+  const response = await app.inject({
+    method: 'PUT',
+    url: '/internal/verdicts/5b0e7c0e-6d3e-4a53-9c4a-1f1f0b7e2a11',
+    headers: { authorization: `Bearer ${botSecret}` },
+    payload: { telegramUserId: account, score: 4 },
+  })
+  expect(response.statusCode).toBe(500)
+
+  const entries = lines.map((line) => JSON.parse(line) as { msg?: string; errorName?: string })
+  expect(entries.find((entry) => entry.msg === 'bot request failed')?.errorName).toBeTruthy()
+  expect(entries.some((entry) => entry.msg === 'authentication failed')).toBe(false)
+  expect(lines.join('')).not.toContain(String(account))
+})

@@ -16,7 +16,7 @@ import { startLoginCleanup } from '@/login-cleanup'
 import { healthRoutes } from '@/routes/health'
 import { internalAuthRoutes } from '@/routes/internal-auth'
 import { withActor } from '@/routes/actor'
-import { actorMeRoute } from '@/routes/actors'
+import { actorExportRoute, actorMeRoute } from '@/routes/actors'
 import { authRoutes } from '@/routes/auth'
 import { adviceRoutes } from '@/routes/advice'
 import { devLoginRoute } from '@/routes/dev-login'
@@ -30,11 +30,15 @@ import { advice, adviceSearch } from '@/usecases/advice'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
+import { exportMine } from '@/usecases/export-mine'
 import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
 import { recentPlaces } from '@/usecases/recent-places'
+import { rateFromBot } from '@/usecases/rate-from-bot'
 import { rateItem } from '@/usecases/rate-item'
+import { remindRatings } from '@/usecases/remind-ratings'
+import type { QuietToday } from '@/usecases/remind-ratings'
 import { amendVerdict } from '@/usecases/amend-verdict'
 import { withdrawVerdict } from '@/usecases/withdraw-verdict'
 import { pendingVerdicts } from '@/usecases/pending-verdicts'
@@ -101,6 +105,8 @@ import { createItemRepository } from '@/db/items-repository'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
+import { createExportRepository } from '@/db/export-repository'
+import { createReminderRepository } from '@/db/reminders-repository'
 import { describeFailure } from '@/db/failure'
 import { authTransactOn } from '@/db/auth-unit-of-work'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
@@ -161,8 +167,25 @@ function isBodyFault(error: FastifyError): boolean {
  * or a URL refused before routing — the decoded path stands in for it.
  */
 function isAuthRequest(request: FastifyRequest): boolean {
-  const path = request.routeOptions.url ?? decodedPath(request.url)
+  const path = routePath(request)
   return path.startsWith('/auth/') || path.startsWith('/internal/')
+}
+
+/**
+ * What a failure is called in the log. The bot's channel carries more than the login since MOL-101
+ * — the reminder's claim and a press of 1–5 — and «authentication failed» over a failed reminder
+ * sent whoever read the log to look at the login, which was fine (adversarial Г).
+ */
+function failureMessage(request: FastifyRequest): string {
+  const path = routePath(request)
+  if (path.startsWith('/auth/') || path.startsWith('/internal/auth/')) {
+    return 'authentication failed'
+  }
+  return path.startsWith('/internal/') ? 'bot request failed' : 'request failed'
+}
+
+function routePath(request: FastifyRequest): string {
+  return request.routeOptions.url ?? decodedPath(request.url)
 }
 
 function decodedPath(url: string): string {
@@ -299,10 +322,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     // the query with its parameters, so a failed search wrote what was searched for and who
     // asked, and a dropped connection wrote the hash of every session token in flight — into a
     // log the privacy page promises holds neither.
-    app.log.error(
-      describeFailure(error),
-      isAuthRequest(request) ? 'authentication failed' : 'request failed',
-    )
+    app.log.error(describeFailure(error), failureMessage(request))
     return reply.status(error.statusCode ?? 500).send({ code: ERROR.INTERNAL })
   })
 
@@ -395,6 +415,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const transact = transactOn(db)
     const sessions = createSessionRepository(db)
     const verdicts = createVerdictRepository(db)
+    const reminders = createReminderRepository(db)
+    const quietToday: QuietToday = new Map()
 
     healthRoutes(instance, { databaseIsReachable })
     const login = options.login === undefined ? loginConfig : options.login
@@ -412,6 +434,18 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       confirm: (code, telegramId) => confirmLogin(loginRequests, code, telegramId),
       decline: (code) => declineLogin(loginRequests, code),
       erase: (telegramUserId) => eraseMe(createErasureRepository(db), telegramUserId),
+      // One person's claim that fails is logged by its kind and the others of the minute go on.
+      claimReminders: () =>
+        remindRatings(
+          reminders,
+          new Date(),
+          (error) => {
+            instance.log.error(describeFailure(error), 'rating reminder failed')
+          },
+          quietToday,
+        ),
+      rateFromBot: (itemId, body) =>
+        rateFromBot({ actors, items, verdicts, reminders }, itemId, body),
     })
 
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).
@@ -437,6 +471,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     void instance.register((guarded, _guardedOptions, guardedDone) => {
       withActor(guarded, (token) => authenticate(sessions, token))
       actorMeRoute(guarded)
+      actorExportRoute(guarded, (actorId, sessionId) =>
+        exportMine(createExportRepository(db), actorId, sessionId),
+      )
       sessionRoutes(guarded, {
         list: (actorId, currentId) => listSessions(sessions, actorId, currentId),
         end: (actorId, currentId, id) => endSession(sessions, actorId, currentId, id),
