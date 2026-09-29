@@ -102,6 +102,30 @@ interface Box {
   bottom: number
 }
 
+/**
+ * Waits until the row has settled after the scroll: the class comes first, and the column narrows
+ * under the small title a frame or two later, the label following it by the observer. Read in
+ * between, the label of the wide column was caught and gone by the next read.
+ */
+async function settled(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        const width = () => document.querySelector('.leading')?.getBoundingClientRect().width
+        let last = width()
+        let still = 0
+        const frame = () => {
+          const now = width()
+          still = now === last ? still + 1 : 0
+          last = now
+          if (still >= 3) done()
+          else requestAnimationFrame(frame)
+        }
+        requestAnimationFrame(frame)
+      }),
+  )
+}
+
 /** The button, the small title and the page's width, read in one frame. */
 async function row(
   page: Page,
@@ -193,6 +217,7 @@ for (const [locale, words] of LANGUAGES) {
             window.scrollTo(0, 400)
           })
           await expect(page.locator('.screen')).toHaveClass(/collapsed/)
+          await settled(page)
 
           const { back, small, label, page: width } = await row(page)
           expect(back.left).toBeGreaterThanOrEqual(0)
