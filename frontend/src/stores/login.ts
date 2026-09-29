@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { ApiError } from '@molvia/client'
-import { ERROR } from '@molvia/model'
+import { ERROR, ISSUE } from '@molvia/model'
 import type { ActorView } from '@molvia/model'
 import { api } from '@/api'
 import { forget, read, write } from '@/stores/storage'
@@ -277,16 +277,22 @@ export const useLoginStore = defineStore('login', () => {
   }
 
   /**
-   * Whether a failed start may still have made a request. Only when nothing answered at all — a
-   * dropped connection, a deadline, a bare 5xx. Whatever did answer made none: the API's own
-   * refusal (its transaction rolled back or never began), and a captive portal's page, which
-   * means the request never reached us — with `200` that page reads as a reply off the contract
-   * (review В1), so an off-contract reply is taken for a portal's. The price, named: the API's own
-   * `201` off the contract — a deploy half done — leaves the retry unmarked; and a portal
-   * answering `511`, a bare 5xx, marks one.
+   * Whether a failed start may still have made a request: when nothing answered at all — a
+   * dropped connection, a deadline, a bare 5xx — or when our `201` came and its body did not.
+   * Whatever else answered made none: the API's own refusal (its transaction rolled back or never
+   * began), and a captive portal's page, which means the request never reached us — with `200`
+   * that page reads as a reply off the contract (review В1), and only the status tells it from ours.
+   *
+   * The prices, named. A portal answering `511`, a bare 5xx, marks one. And a break is ambiguous:
+   * a start that never left, on a phone with bars and no internet, fails the way one whose answer
+   * was lost does, and is marked too (round 4, Г1) — settled towards a repeat, away from the line,
+   * for В-1's reason: a retry read as a loss pushes towards the dearer decision, a second way in.
    */
   function mayHaveStarted(error: unknown): boolean {
     if (!(error instanceof ApiError)) return true
+    // `201` is the API saying it wrote the request — no portal says it — and the body was lost on
+    // its way (review Т1): a reply cut off mid-flight reads as one off the contract.
+    if (error.code === ISSUE.RESPONSE_INVALID && error.status === 201) return true
     return !error.answered && error.code === ERROR.INTERNAL
   }
 

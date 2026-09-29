@@ -60,7 +60,7 @@ support types, the shared integration tests, the migrations.
 ### packages/client
 
 - `packages/client/src/index.ts` — The typed API client: one method per route of the API, every answer parsed with the model's codecs; re-exports the bot client.
-- `packages/client/src/transport.ts` — Client transport: fetch with a timeout and `ApiError` with `answered`; only the API's own error body may say `error.no_actor`, never a bare 401.
+- `packages/client/src/transport.ts` — Client transport: fetch with a timeout and `ApiError` with `answered` and, for a reply off the contract, its `status`; only the API's own error body may say `error.no_actor`, never a bare 401.
 
 ### backend · routes
 

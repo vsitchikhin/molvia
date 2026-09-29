@@ -120,7 +120,10 @@ requests, so it need not add up to «lost»; logins still inside their five minu
 way», a line of their own and not in «lost» — below zero only with outcomes whose start was never
 counted, a request an older image made after a rollback, and then it adds nothing to «lost»
 (round 2, Р5); above zero it also holds for good a request erased mid-login, which ends in no
-outcome at all, and the line says so (Р4). **Both edges of the window cut a repeat
+outcome at all, and the line says so (Р4). The three are one difference and cannot be told apart
+— `login_days` does not know whose start was counted — so on the day of a rollback, logins under
+way and outcomes of uncounted starts cancel out: the line reads 0 and the ones under way count as
+lost (adversarial round 3, Т3). Named, since it needs a rollback. **Both edges of the window cut a repeat
 from its beginning**: begun before `--from` and in after it, «lost» may go below zero; begun on
 the last day and in on the next, it is a loss inside the window (review В2). Printed as they are.
 Then a row per day that counted anything.

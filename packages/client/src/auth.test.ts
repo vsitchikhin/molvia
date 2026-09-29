@@ -26,6 +26,23 @@ describe('login clients', () => {
     }
   })
 
+  it('a reply of ours cut off on its body keeps its status, so a login can tell it from a portal (MOL-68)', async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response('{"id":"9f1b', { status: 201 }))
+      .mockResolvedValueOnce(new Response('<html>portal</html>', { status: 200 }))
+    const client = createClient({ baseUrl: '/api', fetch })
+    await expect(client.startLogin()).rejects.toMatchObject({
+      code: ISSUE.RESPONSE_INVALID,
+      answered: true,
+      status: 201,
+    })
+    await expect(client.startLogin()).rejects.toMatchObject({
+      code: ISSUE.RESPONSE_INVALID,
+      status: 200,
+    })
+  })
+
   it('a start says again=1 only when asked to, and nothing else in its query (MOL-68)', async () => {
     const started = (): Response =>
       new Response(JSON.stringify({ id, url: 'https://t.me/molvia_bot?start=x', expiresAt }), {

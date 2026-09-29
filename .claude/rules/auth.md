@@ -88,9 +88,16 @@ is in `bot.md`.
   left the request and its count behind (review Д), and the phone that lost it is often offline by
   then, so whether a start could leave is `onLine` read **before** it does (round 2, Р1). Whatever
   did answer made none: the API's own refusal, and a captive portal's page — with `200` it reads as
-  a reply off the contract, so such a reply counts as a portal's (review В1); a start with no
-  connection made none either. The price, named: the API's own `201` off the contract — a deploy
-  half done — leaves the retry unmarked, and a portal answering `511`, a bare 5xx, marks one. **Taken away by any session collected here**,
+  a reply off the contract, so such a reply counts as a portal's (review В1) — unless its status is
+  our `201`, whose body was lost on the way (review Т1, `ApiError.status`); a start with no
+  connection made none either. The prices, named: a portal answering `511`, a bare 5xx, marks one;
+  and a break is ambiguous — a start that never left, on a phone with bars and no internet, fails
+  the way one whose answer was lost does, and is marked too (round 4, Г1). Settled towards a repeat,
+  away from the line, for В-1's own reason: a retry read as a loss pushes towards the dearer
+  decision. **The term is the phone's clock**: a clock set back by more than a day between a start
+  and its retry — a phone waking in the past and caught up by the network — breaks that one repeat
+  into a loss and a beginning (adversarial round 3, Т2); measuring it by the server's clock would
+  need the server to know the device, which is what the mark avoids. **Taken away by any session collected here**,
   whosever: the attempt ended in it — an owner claimed before comes in with no question (review А1),
   and after a stranger's session «Это не я» begins anew (review Г3) — by «Да, это я», and by «Выйти»
   with the claim. **The day's term** (review Е), measured forwards only — a mark from the future,

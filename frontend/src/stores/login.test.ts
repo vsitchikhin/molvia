@@ -234,6 +234,8 @@ describe('повтор с того же устройства (MOL-68)', () => {
   it.each([
     ['обрыв связи', new ApiError(ERROR.INTERNAL, 'Failed to fetch', false)],
     ['голый 5xx', new ApiError(ERROR.INTERNAL, 'HTTP 502', false)],
+    // Наш `201` пришёл, тело оборвалось: сервер запрос записал (ревью Т1).
+    ['оборванное тело 201', new ApiError(ISSUE.RESPONSE_INVALID, undefined, true, 201)],
   ])('%s при старте — исход неизвестен, и повтор идёт с меткой (ревью Д)', async (_, error) => {
     opened()
     const { login } = await signedOut()
@@ -250,7 +252,7 @@ describe('повтор с того же устройства (MOL-68)', () => {
     ['собственный отказ сервера', new ApiError(ERROR.INTERNAL), true],
     ['страница портала с 404', new ApiError(ISSUE.RESPONSE_INVALID, 'HTTP 404', false), true],
     // `302 → 200` со своей страницей: транспорт читает её как ответ не по контракту (ревью В1).
-    ['страница портала с 200', new ApiError(ISSUE.RESPONSE_INVALID), true],
+    ['страница портала с 200', new ApiError(ISSUE.RESPONSE_INVALID, undefined, true, 200), true],
     ['без сети', new ApiError(ERROR.INTERNAL, 'Failed to fetch', false), false],
   ])('%s — запроса нет, повтор не метится', async (_, error, onLine) => {
     opened()
