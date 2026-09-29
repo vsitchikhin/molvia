@@ -5,29 +5,58 @@ import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
-import { ReaderFailed, type BarcodeReader } from '@/scanner/barcodeReader'
+import type * as ReaderModule from '@/scanner/barcodeReader'
+import type { ReaderWorker } from '@/scanner/barcodeReader'
+import type { ReaderReply } from '@/scanner/protocol'
 
-// What the worker would read, frame by frame; a frame past the end is never answered.
-let codes: (string | null | ReaderFailed)[] = []
-let warm: () => Promise<void> = () => Promise.resolve()
-const created = vi.fn()
+// The real reader over a fake worker, so what a dispose does to a warm still waiting is the app's
+// own code (adversarial Б). The worker answers a warm at once, never — a wasm still on its way — or
+// with a failure; each frame with the next of `codes`, and a frame past the end is never answered.
+let codes: (string | null)[] = []
+let warmAnswer: 'ok' | 'never' | 'fail' = 'ok'
+const workers: { terminate: ReturnType<typeof vi.fn> }[] = []
 
-vi.mock('@/scanner/barcodeReader', async (actual) => ({
-  ...(await actual<object>()),
-  createBarcodeReader: (): BarcodeReader => {
-    created()
-    let index = 0
-    return {
-      warm: () => warm(),
-      read: () => {
-        const code = codes[index++]
-        if (code === undefined) return new Promise(() => undefined)
-        return code instanceof ReaderFailed ? Promise.reject(code) : Promise.resolve(code)
-      },
-      dispose: vi.fn(),
-    }
-  },
-}))
+vi.mock('@/scanner/barcodeReader', async (importActual) => {
+  const actual = await importActual<typeof ReaderModule>()
+  return {
+    ...actual,
+    createBarcodeReader: () => {
+      const listeners: ((event: MessageEvent<ReaderReply>) => void)[] = []
+      const terminate = vi.fn()
+      workers.push({ terminate })
+      let index = 0
+      const worker: ReaderWorker = {
+        postMessage: (request) => {
+          let answer: ReaderReply | null = null
+          if (request.kind === 'warm') {
+            if (warmAnswer !== 'never') {
+              answer =
+                warmAnswer === 'ok'
+                  ? { id: request.id, ok: true, code: null }
+                  : { id: request.id, ok: false }
+            }
+          } else {
+            const code = codes[index++]
+            if (code !== undefined) answer = { id: request.id, ok: true, code }
+          }
+          if (answer) {
+            const reply = answer
+            queueMicrotask(() => {
+              for (const listener of listeners) {
+                listener(new MessageEvent('message', { data: reply }))
+              }
+            })
+          }
+        },
+        addEventListener: (type: 'message' | 'error', listener: never) => {
+          if (type === 'message') listeners.push(listener)
+        },
+        terminate,
+      }
+      return actual.createBarcodeReader(worker)
+    },
+  }
+})
 
 vi.mock('@/scanner/capture', () => ({
   videoFrames: () => ({
@@ -97,8 +126,8 @@ function heading(sheet: VueWrapper): string {
 beforeEach(() => {
   clock = 0
   codes = []
-  warm = () => Promise.resolve()
-  created.mockClear()
+  warmAnswer = 'ok'
+  workers.length = 0
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
   Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
@@ -150,7 +179,7 @@ describe('BarcodeScannerSheet', () => {
   it('warms the reader while the camera starts', async () => {
     getUserMedia.mockResolvedValue(fakeStream().stream)
     await render()
-    expect(created).toHaveBeenCalledOnce()
+    expect(workers).toHaveLength(1)
   })
 
   it('offers the torch only where the camera has one', async () => {
@@ -209,25 +238,105 @@ describe('BarcodeScannerSheet', () => {
     expect(sheet.find('video').exists()).toBe(true)
   })
 
-  it('draws a reader that failed as an error too', async () => {
-    getUserMedia.mockResolvedValue(fakeStream().stream)
-    warm = () => Promise.reject(new ReaderFailed())
+  it('draws a reader that failed in its own words, and stops the camera under them', async () => {
+    const { stream, track } = fakeStream()
+    getUserMedia.mockResolvedValue(stream)
+    warmAnswer = 'fail'
     const sheet = await render()
-    expect(sheet.find('[role="alert"]').text()).toContain(en.scanner.error_title)
+    expect(sheet.find('[role="alert"]').text()).toContain(en.scanner.reader_title)
+    expect(sheet.text()).not.toContain(en.scanner.error_body)
+    // Adversarial В: no video on the screen, so no camera running behind it.
+    expect(track.stop).toHaveBeenCalled()
+  })
+
+  it('starts a failed reader over on «Scan» from the digits, rather than land on its error', async () => {
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    warmAnswer = 'fail'
+    const sheet = await render()
+    await button(sheet, en.scanner.manual).trigger('click')
+    await settle()
+    warmAnswer = 'ok'
+    await button(sheet, en.scanner.scan).trigger('click')
+    await settle()
+    expect(sheet.find('[role="alert"]').exists()).toBe(false)
+    expect(sheet.find('video').exists()).toBe(true)
+    expect(workers).toHaveLength(2)
+  })
+
+  describe('a retry while the reader still loads (adversarial Б)', () => {
+    it('«Check again» after the camera was allowed lands on the viewfinder', async () => {
+      warmAnswer = 'never'
+      getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+      const sheet = await render()
+      expect(heading(sheet)).toBe(en.scanner.denied_title)
+      getUserMedia.mockResolvedValue(fakeStream().stream)
+      await button(sheet, en.scanner.try_again).trigger('click')
+      await settle()
+      expect(sheet.find('[role="alert"]').exists()).toBe(false)
+      expect(sheet.find('video').exists()).toBe(true)
+    })
+
+    it('«Try again» keeps the reader that is loading instead of starting its load over', async () => {
+      warmAnswer = 'never'
+      getUserMedia.mockRejectedValueOnce(named('NotReadableError'))
+      getUserMedia.mockRejectedValueOnce(named('NotReadableError'))
+      getUserMedia.mockResolvedValue(fakeStream().stream)
+      const sheet = await render()
+      for (let tap = 0; tap < 2; tap++) {
+        await button(sheet, en.state.retry).trigger('click')
+        await settle()
+      }
+      expect(sheet.find('video').exists()).toBe(true)
+      expect(workers).toHaveLength(1)
+      expect(workers[0]?.terminate).not.toHaveBeenCalled()
+    })
+  })
+
+  it('offers «Scan» from the digits again once the sheet is opened anew', async () => {
+    getUserMedia.mockRejectedValueOnce(named('NotFoundError'))
+    const sheet = await render()
+    await sheet.setProps({ open: false })
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    await sheet.setProps({ open: true })
+    // Risen again: the sheet takes no tap before that.
+    clock += 1000
+    await settle()
+    await button(sheet, en.scanner.manual).trigger('click')
+    await settle()
+    expect(sheet.findAll('button').some((b) => b.text() === en.scanner.scan)).toBe(true)
+  })
+
+  it('buzzes for a code read by the camera, and not for digits typed', async () => {
+    const vibrate = vi.fn(() => true)
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true })
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    codes = ['4850000000007', '4850000000007']
+    await render()
+    expect(vibrate).toHaveBeenCalledOnce()
+
+    vibrate.mockClear()
+    codes = []
+    const typedSheet = await render()
+    await button(typedSheet, en.scanner.manual).trigger('click')
+    await settle()
+    await typedSheet.get('input').setValue('4850000000007')
+    await button(typedSheet, en.scanner.done).trigger('click')
+    expect(typedSheet.emitted('read')).toEqual([['4850000000007']])
+    expect(vibrate).not.toHaveBeenCalled()
   })
 
   it('starts the reader over when the sheet opens again after it failed', async () => {
     getUserMedia.mockResolvedValue(fakeStream().stream)
-    warm = () => Promise.reject(new ReaderFailed())
+    warmAnswer = 'fail'
     const sheet = await render()
     expect(sheet.find('[role="alert"]').exists()).toBe(true)
     await sheet.setProps({ open: false })
-    warm = () => Promise.resolve()
+    warmAnswer = 'ok'
     await sheet.setProps({ open: true })
     await settle()
     expect(sheet.find('[role="alert"]').exists()).toBe(false)
     expect(sheet.find('video').exists()).toBe(true)
-    expect(created).toHaveBeenCalledTimes(2)
+    expect(workers).toHaveLength(2)
   })
 
   describe('typing the digits', () => {
@@ -267,6 +376,13 @@ describe('BarcodeScannerSheet', () => {
       await sheet.get('form').trigger('submit')
       expect(sheet.emitted('read')).toEqual([['0012345678905']])
       expect(sheet.props('open')).toBe(false)
+    })
+
+    it('takes digits pasted with a character that draws nothing (adversarial Д)', async () => {
+      const { sheet } = await typing()
+      await sheet.get('input').setValue(`4850000000007${String.fromCodePoint(0x200b)}`)
+      await button(sheet, en.scanner.done).trigger('click')
+      expect(sheet.emitted('read')).toEqual([['4850000000007']])
     })
 
     it('forgets the error once the digits change', async () => {

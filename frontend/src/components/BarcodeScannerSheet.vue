@@ -45,7 +45,7 @@
 
     <ScreenState
       v-else-if="refusal"
-      :kind="refusal === 'error' ? 'error' : 'attention'"
+      :kind="refusal === 'error' || refusal === 'reader' ? 'error' : 'attention'"
       :title="t(REFUSALS[refusal].title)"
       :body="t(REFUSALS[refusal].body)"
       @retry="retry"
@@ -56,7 +56,7 @@
         </AppButton>
         <AppButton
           block
-          :variant="refusal === 'denied' || refusal === 'error' ? 'secondary' : 'primary'"
+          :variant="refusal === 'insecure' || refusal === 'none' ? 'primary' : 'secondary'"
           @click="toTyping"
         >
           <template #icon><IconKeyboard /></template>
@@ -105,6 +105,9 @@ const REFUSALS = {
   denied: { title: 'scanner.denied_title', body: 'scanner.denied_body' },
   none: { title: 'scanner.none_title', body: 'scanner.none_body' },
   error: { title: 'scanner.error_title', body: 'scanner.error_body' },
+  // The reader, not the camera: its wasm would not load or its worker died. Words of its own — «another
+  // app holds the camera» sent the person to close apps that were not at fault (review С-10).
+  reader: { title: 'scanner.reader_title', body: 'scanner.reader_body' },
 } as const
 type Refusal = keyof typeof REFUSALS
 
@@ -152,8 +155,6 @@ export default defineComponent({
     const camera = useCamera(video)
 
     function done(code: string): void {
-      // A buzz where the phone has one (not iPhone): the code was taken, look at the screen.
-      if ('vibrate' in navigator) navigator.vibrate(40)
       emit('read', code)
       emit('update:open', false)
     }
@@ -161,11 +162,16 @@ export default defineComponent({
     const scan = useBarcodeScan({
       live: computed(() => props.open && !typing.value && camera.kind.value === 'live'),
       frames: () => (video.value && frame.value ? videoFrames(video.value, frame.value) : null),
-      onCode: done,
+      onCode: (code) => {
+        // A buzz where the phone has one (not iPhone): the code was taken, look at the screen. Not
+        // for digits typed by hand — there the person is looking already (review С-11).
+        if ('vibrate' in navigator) navigator.vibrate(40)
+        done(code)
+      },
     })
 
     const refusal = computed<Refusal | null>(() => {
-      if (scan.failed.value) return 'error'
+      if (scan.failed.value) return 'reader'
       const kind = camera.kind.value
       return kind === 'insecure' || kind === 'denied' || kind === 'none' || kind === 'error'
         ? kind
@@ -176,8 +182,17 @@ export default defineComponent({
     watch(camera.kind, (kind) => {
       if (kind === 'insecure' || kind === 'none') cameraMissing.value = true
     })
+    // A reader that failed leaves nothing for the camera to do: no video is drawn and no frame is
+    // read, so it stops rather than run unseen under the error (review С-6, adversarial В).
+    watch(scan.failed, (failed) => {
+      if (failed) camera.stop()
+    })
 
+    // Every way back to the camera — opening the sheet, «Сканировать» from the digits, a retry —
+    // starts the reader over only if it was the one that failed: one that was merely warming is
+    // kept, or every tap would throw its load away (review С-7, С-8, adversarial Б).
     async function startCamera(): Promise<void> {
+      if (scan.failed.value) scan.reset()
       // The video must be in the page before the stream is handed to it.
       await nextTick()
       scan.warm()
@@ -191,8 +206,8 @@ export default defineComponent({
           typing.value = false
           typed.value = ''
           typedError.value = null
-          // A reader that failed last time is given a new start with the sheet, not kept as its error.
-          if (scan.failed.value) scan.reset()
+          // A camera missing last time may be there now — another browser, a camera plugged in.
+          cameraMissing.value = false
           void startCamera()
         } else {
           camera.stop()
@@ -213,7 +228,6 @@ export default defineComponent({
     }
 
     function retry(): void {
-      scan.reset()
       void startCamera()
     }
 
