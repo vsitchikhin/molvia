@@ -12,6 +12,12 @@ export interface ReminderCandidate {
   readonly ladder: ReminderLadder | null
   /** A live verdict of theirs written after their last reminder — the ladder starts over (Л-1). */
   readonly ratedSince: boolean
+  /**
+   * When their latest purchase was entered. A purchase's day is never after its entry, so a person
+   * whose latest entry is older than step 1's day has nothing to be asked about — and is not
+   * claimed, rather than claimed empty every minute of every evening.
+   */
+  readonly lastEnteredAt: Date | null
 }
 
 export interface ClaimRequest {
@@ -66,6 +72,7 @@ export function createReminderRepository(db: Conn): ReminderRepository {
         reminded_on: string | null
         window_from: string | null
         rated_since: boolean
+        last_entered_at: string | null
       }>(sql`
         select
           a.id as actor_id,
@@ -78,7 +85,12 @@ export function createReminderRepository(db: Conn): ReminderRepository {
           coalesce(exists (
             select 1 from verdicts v
             where v.actor_id = a.id and v.deleted_at is null and v.updated_at > r.reminded_at
-          ), false) as rated_since
+          ), false) as rated_since,
+          (
+            select max(e.created_at)::text from expenses e
+            join trips t on t.id = e.trip_id
+            where t.actor_id = a.id and t.deleted_at is null
+          ) as last_entered_at
         from actors a
         left join rating_reminders r on r.actor_id = a.id
         order by a.id
@@ -92,6 +104,7 @@ export function createReminderRepository(db: Conn): ReminderRepository {
             ? { step: row.step, remindedOn: row.reminded_on, windowFrom: row.window_from }
             : null,
         ratedSince: row.rated_since,
+        lastEnteredAt: row.last_entered_at === null ? null : new Date(row.last_entered_at),
       }))
     },
 

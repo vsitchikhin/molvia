@@ -36,6 +36,15 @@ export async function remindRatings(
       today: clock.day,
     })
     if (plan === null) continue
+    // Only step 1 is skipped this way: a later step with nothing to ask about has to reach the
+    // claim, which ends the ladder (Л-2).
+    if (
+      plan.step === 1 &&
+      (candidate.lastEnteredAt === null ||
+        localClock(candidate.lastEnteredAt, timeZone).day < plan.from)
+    ) {
+      continue
+    }
 
     const claimed = await reminders.claim(
       {

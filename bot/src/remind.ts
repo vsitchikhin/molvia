@@ -43,7 +43,7 @@ export function reminderText(item: ReminderItem, more: number, appUrl: string): 
     name: item.name,
   })
   return more > 0
-    ? `${question}\n\n${t(undefined, 'remind.more', { n: more, url: `${appUrl}/verdicts` })}`
+    ? `${question}\n\n${t(undefined, 'remind.more', { n: more, url: `${appUrl.replace(/\/+$/, '')}/verdicts` })}`
     : question
 }
 

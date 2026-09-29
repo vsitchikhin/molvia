@@ -61,6 +61,11 @@ describe('текст напоминания', () => {
     expect(reminderText(item('Сыр', 11), 0, APP)).toMatch(/^11 дн\. назад · /)
   })
 
+  it('адрес приложения со слешем на конце не даёт двойного слеша', () => {
+    expect(reminderText(item('Молоко'), 1, `${APP}/`)).toContain(`${APP}/verdicts`)
+    expect(reminderText(item('Молоко'), 1, `${APP}/`)).not.toContain('//verdicts')
+  })
+
   it('под последним — сколько ещё ждут в «Оценках», со ссылкой', () => {
     expect(reminderText(item('Молоко'), 2, APP)).toBe(
       `${reminderText(item('Молоко'), 0, APP)}\n\n${t(undefined, 'remind.more', {
