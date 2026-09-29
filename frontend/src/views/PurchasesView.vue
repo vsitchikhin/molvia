@@ -83,7 +83,7 @@
          through the queue and needs neither the list nor the network (MOL-77). «Вернуть» of a
          record removed from its own screen stands above it (MOL-76). -->
     <template #docked>
-      <div class="dock">
+      <div class="strip">
         <TripUndoStrip class="undo" />
         <ManualEntryButton />
       </div>
@@ -260,7 +260,7 @@ export default defineComponent({
   margin-top: var(--space-4);
 }
 
-.dock {
+.strip {
   padding: var(--space-3) 0;
 }
 

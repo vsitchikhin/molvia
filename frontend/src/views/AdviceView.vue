@@ -110,7 +110,7 @@
     <!-- The newcomer's one action, under the thumb (MOL-128, В-5); with receipts (MOL-127) this
          strip holds «Сфотографировать чек». -->
     <template v-if="phase === 'empty'" #docked>
-      <div class="dock"><ManualEntryButton /></div>
+      <div class="strip"><ManualEntryButton /></div>
     </template>
 
     <!-- Mounted on a tap and put away from `onClosed`: each opening starts from the row as the
@@ -320,7 +320,7 @@ export default defineComponent({
   font-style: italic;
 }
 
-.dock {
+.strip {
   padding: var(--space-3) 0;
 }
 

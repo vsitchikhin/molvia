@@ -299,7 +299,7 @@
         "body": "The catalogue has no such item yet. Check the spelling — Latin letters and typos are fine",
         "body_offline": "Without a connection we search only what was rated. The whole catalogue — with a connection"
       },
-      "error_body": "The search did not work. The list below is as it was",
+      "error_body": "The search did not go through. Try again — or clear the field: the list is still there",
       "offline": "Without a connection we search only the list as of {day} at {time}",
       "offline_more": "Unrated items and the whole catalogue — once there is a connection"
     },

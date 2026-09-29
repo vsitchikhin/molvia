@@ -5,7 +5,14 @@ import { defineComponent, h } from 'vue'
 import { createRouter, createWebHistory, RouterView } from 'vue-router'
 import type { Router } from 'vue-router'
 import { createAppI18n } from '@/i18n'
-import { backTarget, settleColdStart, tabMove, upTarget } from '@/navigation'
+import {
+  afterStep,
+  backTarget,
+  settleColdStart,
+  stepBack as step,
+  tabMove,
+  upTarget,
+} from '@/navigation'
 import type { TabMove } from '@/navigation'
 import type { RouteName, Tab } from '@/router'
 import { routes } from '@/router'
@@ -195,6 +202,31 @@ describe('settleColdStart', () => {
     await settleColdStart(router)
     expect(push).not.toHaveBeenCalled()
     expect(replace).not.toHaveBeenCalled()
+  })
+})
+
+// A sheet is told it is closed from inside the pop that closed it, before that step has landed; a
+// move made there was taken for a second tap and dropped (MOL-128: the record did not go up).
+describe('afterStep — a move after a step waits for it to land', () => {
+  it('runs at once with no step in flight', async () => {
+    await fresh('/purchases')
+    const ran: string[] = []
+    afterStep(() => ran.push('now'))
+    expect(ran).toEqual(['now'])
+  })
+
+  it('with a step in flight, runs once it has landed, not before', async () => {
+    const router = await fresh('/purchases')
+    // The step is held in the air: the browser answers `go` with a `popstate` later, never within.
+    vi.spyOn(router, 'go').mockImplementation(() => undefined)
+    const ran: string[] = []
+    step(router)
+    afterStep(() => ran.push('after'))
+    expect(ran).toEqual([])
+
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    expect(ran).toEqual(['after'])
+    vi.restoreAllMocks()
   })
 })
 

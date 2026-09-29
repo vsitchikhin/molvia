@@ -163,6 +163,8 @@ function prefersReducedMotion(): boolean {
  * tap on the chevron slipped through between the two pops (adversarial В-3).
  */
 let stepping: object | null = null
+/** Moves asked for while a step was in flight, made once it has landed (`afterStep`). */
+let waiting: (() => void)[] = []
 
 /** Moves `steps` entries back — or forward, if negative — once no other step is in flight. */
 export function stepBack(router: Router, steps = 1, force = false): void {
@@ -170,13 +172,28 @@ export function stepBack(router: Router, steps = 1, force = false): void {
   const token = {}
   stepping = token
   const landed = (): void => {
-    if (stepping === token) stepping = null
     window.clearTimeout(timer)
     window.removeEventListener('popstate', landed)
+    if (stepping !== token) return
+    stepping = null
+    const due = waiting
+    waiting = []
+    for (const run of due) run()
   }
   const timer = window.setTimeout(landed, 1000)
   window.addEventListener('popstate', landed)
   router.go(-steps)
+}
+
+/**
+ * Runs `run` once no step is in flight — at once when none is (MOL-128). A sheet is told it is
+ * closed from inside the pop that closed it, before the step that pop answers has landed: a move
+ * made there — the record typed by hand going up once it is finished — was ignored as a second
+ * tap. So a move that follows a sheet waits here for the step, not for a clock.
+ */
+export function afterStep(run: () => void): void {
+  if (stepping) waiting.push(run)
+  else run()
 }
 
 export function useNavigation(): {

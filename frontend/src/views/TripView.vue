@@ -154,7 +154,7 @@ import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import type { RetryPurchase } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
 import { purchaseDay, timeOfDay } from '@/days'
-import { useNavigation } from '@/navigation'
+import { afterStep, useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -268,12 +268,15 @@ export default defineComponent({
     const { rows, waiting } = useTripRows(tripId, trip, () => t('trip.queued.unnamed'))
 
     /**
-     * Up to «Покупки» once no record is open — but never under a sheet: its own step back is in
-     * flight, and a move made then is lost (MOL-18). A sheet that closes calls this again.
+     * Up to «Покупки» once no record is open — but never under a sheet: a sheet that closes calls
+     * this again, and its own step back has to land first (`afterStep`), or the move is taken for a
+     * second tap and dropped.
      */
     function leaveIfOver(): void {
-      if (phase.value !== 'none' || document.querySelector('dialog[open]')) return
-      void goUp()
+      afterStep(() => {
+        if (phase.value !== 'none' || document.querySelector('dialog[open]')) return
+        void goUp()
+      })
     }
     watch(phase, (now) => {
       if (now === 'none') void nextTick(leaveIfOver)
