@@ -323,17 +323,19 @@ describe('rateLine', () => {
         { day: '2026-09-13', rate: rate('RUB', 'AMD', '4.5', '2026-09-13') },
       ],
       [
-        { day: '2026-08-30', rate: rate('RUB', 'AMD', '9', '2026-08-30') },
+        // Between the start of the period and its first Sunday: the first week's.
+        { day: '2026-09-02', rate: rate('RUB', 'AMD', '4.2', '2026-09-02') },
         { day: '2026-09-08', rate: rate('RUB', 'AMD', '3.5', '2026-09-08') },
         // Drams back into roubles: the same pair, turned to the line's side.
         { day: '2026-09-13', rate: rate('AMD', 'RUB', '0.2', '2026-09-13') },
       ],
     )
     expect(line?.exchanges.map((exchange) => [exchange.week, exchange.level])).toEqual([
+      [0, 467],
       [1, 0],
       [1, CHART_LEVEL],
     ])
-    expect(line?.exchanges[1]?.rate.base).toBe('RUB')
+    expect(line?.exchanges[2]?.rate.base).toBe('RUB')
     expect(line?.points.map((point) => point.level)).toEqual([333, 667])
   })
 

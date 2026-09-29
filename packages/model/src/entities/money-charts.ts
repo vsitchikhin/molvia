@@ -397,14 +397,12 @@ export function rateLine(
     day: week.day,
     rate: week.rate && sideOf(week.rate, per, of),
   }))
-  const firstWeek = weeks[0]?.day ?? ''
-  const own = exchanges
-    .filter((exchange) => exchange.day >= firstWeek || weeks.length === 0)
-    .flatMap((exchange) => {
-      const rate = sideOf(exchange.rate, per, of)
-      const week = weeks.findIndex((one) => one.day >= exchange.day)
-      return rate && week !== -1 ? [{ day: exchange.day, week, rate }] : []
-    })
+  // Which exchanges are of the period is the caller's to say; each goes on the week it falls in.
+  const own = exchanges.flatMap((exchange) => {
+    const rate = sideOf(exchange.rate, per, of)
+    const week = weeks.findIndex((one) => one.day >= exchange.day)
+    return rate && week !== -1 ? [{ day: exchange.day, week, rate }] : []
+  })
   const values = [
     ...points.flatMap((point) => (point.rate ? [point.rate.scaled] : [])),
     ...own.map((exchange) => exchange.rate.scaled),
