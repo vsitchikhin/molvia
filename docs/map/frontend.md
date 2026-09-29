@@ -29,7 +29,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/composables/useCollapsed.ts` — Composable: whether the large title has scrolled past the pinned row (sentinel observer), and an element's live height.
 - `frontend/src/composables/useKeyboardInset.ts` — Composable: lifts an open sheet above the iOS on-screen keyboard through `--keyboard-inset`.
 - `frontend/src/composables/useReconnect.ts` — Composable: calls a screen's retry when the connection may be back — `online` or the app coming into view.
-- `frontend/src/composables/useSheetHistory.ts` — Composable: the history entry an open sheet holds, closing on pop, putting the page back by its opener; the stale-entry guard.
+- `frontend/src/composables/useSheetHistory.ts` — Composable: the history entry an open sheet holds, closing on pop, putting the page back and focus on its opener; the stale-entry guard.
 
 ## frontend · stores
 

@@ -37,6 +37,8 @@ interface Holder {
   /** The address the sheet was laid at, as the history spells it. */
   at: string
   anchor: SheetAnchor | null
+  /** The element the sheet was opened from, over a sheet too — see `giveFocusBack`. */
+  from: Element | null
 }
 
 // The element activated in the task now running. A click reaches it however it was activated — a
@@ -70,14 +72,18 @@ function inPage(candidate: Element | null): candidate is Element {
   )
 }
 
+/** The element a sheet is opened from: activated just now, or else focused. Taken before it is shown. */
+export function sheetOpener(): Element | null {
+  return [activated, document.activeElement].find(inPage) ?? null
+}
+
 /**
- * How the page stands as the sheet opens: its scroll, and the element the sheet is opened from —
- * activated just now, or else focused — with where it stands on the screen. Taken before the sheet
- * is shown. A sheet over a sheet is opened from inside a dialog, which the page's scroll does not
- * move, and takes none.
+ * How the page stands as the sheet opens: its scroll, and the element the sheet is opened from,
+ * with where it stands on the screen. Taken before the sheet is shown. A sheet over a sheet is
+ * opened from inside a dialog, which the page's scroll does not move, and takes none.
  */
 export function pageAnchor(): SheetAnchor | null {
-  const element = [activated, document.activeElement].find(inPage) ?? null
+  const element = sheetOpener()
   if (element?.closest('dialog')) return null
   return {
     scrolled: window.scrollY,
@@ -112,6 +118,28 @@ function putBack(anchor: SheetAnchor | null): void {
   if (shift !== 0) window.scrollBy({ top: shift, behavior: 'auto' })
 }
 
+const FOCUSABLE = 'button, a[href], input, select, textarea, summary, [tabindex]'
+
+/**
+ * Gives focus back to what opened the sheet when the platform had nothing to give it back to
+ * (MOL-80). A `<dialog>` returns focus to the element focused when it was shown, and Safari does
+ * not focus a tapped button: on an iPhone that element is the page itself, and a screen reader
+ * was left at the top of the page. Where the platform did its part — Chromium, a keyboard — focus
+ * is already somewhere else, and it is left there. What was tapped may be the icon in a button; the
+ * button is what takes it.
+ */
+function giveFocusBack(from: Element | null): void {
+  const current = document.activeElement
+  // WebKit still names the closed dialog as focused — a tap on no control in it focused the
+  // dialog itself — until it lets go of it to the page.
+  const nowhere =
+    current === null || current === document.body || current.closest('dialog:not([open])') !== null
+  if (!nowhere) return
+  const target = from?.closest(FOCUSABLE)
+  if (!(target instanceof HTMLElement) || !target.isConnected || target.closest('[inert]')) return
+  target.focus({ preventScroll: true })
+}
+
 /**
  * The open sheets of each router, the last opened on top. One listener per router reads the pop
  * and closes as many sheets from the top as entries it went back — a sheet over a sheet closes
@@ -135,7 +163,10 @@ function stackOf(router: Router): Holder[] {
       // where it stood. Here and not in the router's `scrollBehavior`, which comes a tick later —
       // after a sheet opened again at once («save and next») has taken its measure.
       const lowest = gone.at(-1)
-      if (to === lowest?.at) putBack(lowest.anchor)
+      if (to === lowest?.at) {
+        putBack(lowest.anchor)
+        giveFocusBack(lowest.from)
+      }
     })
     stack = created
   }
@@ -143,7 +174,7 @@ function stackOf(router: Router): Holder[] {
 }
 
 export function useSheetHistory(onLeft: () => void): {
-  lay: (anchor?: SheetAnchor | null) => void
+  lay: (anchor?: SheetAnchor | null, from?: Element | null) => void
   leave: (steps?: number) => void
   laid: () => boolean
 } {
@@ -174,7 +205,7 @@ export function useSheetHistory(onLeft: () => void): {
     if (history.state.sheet === true) history.replace(history.location, { sheet: false })
   }
 
-  function lay(anchor: SheetAnchor | null = null): void {
+  function lay(anchor: SheetAnchor | null = null, from: Element | null = null): void {
     if (holder) return
     const at = router.currentRoute.value.fullPath
     const where = history.location
@@ -187,6 +218,7 @@ export function useSheetHistory(onLeft: () => void): {
       },
       at: where,
       anchor,
+      from,
     }
     holder = own
     stack.push(own)

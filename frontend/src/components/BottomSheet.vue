@@ -40,7 +40,7 @@ import IconBack from '~icons/mdi/chevron-left'
 import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
-import { pageAnchor, useSheetHistory } from '@/composables/useSheetHistory'
+import { pageAnchor, sheetOpener, useSheetHistory } from '@/composables/useSheetHistory'
 
 /** A double tap lands within this — a platform convention, not a design token. */
 const DOUBLE_TAP = 300
@@ -143,10 +143,11 @@ export default defineComponent({
       }
       // Measured before the sheet is up, with the page as the person left it.
       const anchor = pageAnchor()
+      const from = sheetOpener()
       shown.value = true
       element.showModal()
       settle(element)
-      history.lay(anchor)
+      history.lay(anchor, from)
     }
 
     // «Up» is the end of the sheet's own rise, not a clock started at `showModal`: a rise starts

@@ -1019,3 +1019,93 @@ describe('the page under the sheet', () => {
     expect(pageAnchor()).toBeNull()
   })
 })
+
+describe('focus after the sheet', () => {
+  /** A button with an icon in it, as the screens have: a tap lands on the icon. */
+  function opener(): { button: HTMLButtonElement; icon: HTMLSpanElement } {
+    const button = document.createElement('button')
+    const icon = document.createElement('span')
+    button.append(icon)
+    document.body.append(button)
+    return { button, icon }
+  }
+
+  async function openFrom(target: HTMLElement, options: { at?: string } = {}) {
+    const rendered = await render(options)
+    target.addEventListener('click', () => {
+      rendered.open.value = true
+    })
+    target.click()
+    await nextTick()
+    return rendered
+  }
+
+  /** Where Safari leaves it: a tapped button never had focus, so the dialog gives it to nothing. */
+  function leftNowhere(): void {
+    ;(document.activeElement as HTMLElement | null)?.blur()
+  }
+
+  // Safari does not focus a tapped button, so the dialog had nothing to give focus back to, and a
+  // screen reader was left at the top of the page (MOL-80).
+  it('goes back to the button it was opened from when the platform left it nowhere', async () => {
+    const { button, icon } = opener()
+    const { router, dialog } = await openFrom(icon)
+    leftNowhere()
+    router.back()
+    expect(dialog().open).toBe(false)
+    expect(document.activeElement).toBe(button)
+  })
+
+  // WebKit still names the closed dialog as focused — a tap on no control in it focused the dialog.
+  it('goes back to the button when focus is still inside the closed dialog', async () => {
+    const { button } = opener()
+    const { router, host } = await openFrom(button)
+    ;(host.get('.head button').element as HTMLButtonElement).focus()
+    const close = vi.spyOn(HTMLDialogElement.prototype, 'close').mockImplementation(function (
+      this: HTMLDialogElement,
+    ) {
+      this.removeAttribute('open')
+    })
+    router.back()
+    close.mockRestore()
+    expect(document.activeElement).toBe(button)
+  })
+
+  // Chromium and a keyboard give focus back themselves; the sheet does not take it from there.
+  it('must not fire: focus the platform gave back somewhere stays there', async () => {
+    const { button } = opener()
+    const field = document.createElement('input')
+    document.body.append(field)
+    const { router } = await openFrom(button)
+    field.focus()
+    router.back()
+    expect(document.activeElement).toBe(field)
+  })
+
+  it('must not fire: the button is gone — the row the sheet deleted', async () => {
+    const { button } = opener()
+    const { router } = await openFrom(button)
+    button.remove()
+    leftNowhere()
+    router.back()
+    expect(document.activeElement).toBe(document.body)
+  })
+
+  it('must not fire: a button under `inert` is not given focus', async () => {
+    const { button } = opener()
+    const { router } = await openFrom(button)
+    button.setAttribute('inert', '')
+    leftNowhere()
+    router.back()
+    expect(document.activeElement).not.toBe(button)
+  })
+
+  // The screen goes with the sheet, and what the next screen focuses is the router's business.
+  it('must not fire: close(2) leaves the screen', async () => {
+    const { button } = opener()
+    const { sheet } = await openFrom(button, { at: '/trip/add' })
+    leftNowhere()
+    ;(sheet().vm as unknown as { close: (steps: number) => void }).close(2)
+    expect(document.activeElement).not.toBe(button)
+  })
+})
