@@ -60,7 +60,7 @@
           v-else-if="barcode === 'error'"
           kind="error"
           inline
-          :title="t('item.barcode.error_title')"
+          :title="t('item.error.title')"
           :body="t('item.barcode.error_body', { code: barcodeCode })"
           @retry="lookup.retry"
         />

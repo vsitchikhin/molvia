@@ -838,7 +838,7 @@ describe('«What did you pick up?»', () => {
 
       await scan(view, CODE)
       await vi.waitFor(() => {
-        expect(view.text()).toContain(en.item.barcode.error_title)
+        expect(view.text()).toContain(en.item.barcode.error_body.replace('{code}', CODE))
       })
       await button(view, en.state.retry).trigger('click')
 

@@ -183,7 +183,12 @@ async function render({ memory = null as TripViewModel | null, settings = true }
   await router.push('/purchases')
   await router.push('/purchases/manual')
   const view = mount(App, {
-    global: { plugins: [router, pinia, createAppI18n('ru')] },
+    // The scanner the search opens over itself needs a camera and a worker, which happy-dom has
+    // not; what it does with a code is ItemSearchView's test (MOL-99).
+    global: {
+      plugins: [router, pinia, createAppI18n('ru')],
+      stubs: { BarcodeScannerSheet: true },
+    },
     attachTo: document.body,
   })
   mounted.push(view)
