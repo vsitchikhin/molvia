@@ -21,7 +21,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
 
 - **A person can be erased, and erasure is one function** (MOL-58): `ErasureRepository.erase` in
   `backend/src/db`, one transaction under a lock on the owner's row. It removes sessions, search
-  picks, verdicts with the withdrawn ones, events, expenses, trips, exchanges and incomes (MOL-40,
+  picks, where the person stands on the ladder of rating reminders (MOL-101), verdicts with the
+  withdrawn ones, events, expenses, trips, exchanges and incomes (MOL-40,
   MOL-66 — the person's own money), spendings, their categories and frozen rates (MOL-73), accounts
   and their checks after every operation that named one (MOL-115), login requests by Telegram id
   — they carry no foreign key, so no cascade reaches them — and the owner, adding one to
@@ -83,7 +84,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   only one's own); `actor_id` is said once, in `account`, and `search_key` is left out, made from
   the name. The format is the wire's: English keys, money and quantity as decimal strings beside
   their currency and unit, rates to six digits, days `YYYY-MM-DD`, moments in UTC, and a header
-  `format: "molvia-export"`, `version: 1` — a change of what goes in is a new version. Its codec
+  `format: "molvia-export"`, `version` — a change of what goes in is a new version: 2 since the
+  ladder of rating reminders joined it (MOL-101). Its codec
   is looser than a screen's on purpose: a copy of what is stored is never refused by a rule a
   stored row predates — an event type since withdrawn, a rate outside today's band. **One
   snapshot:** one transaction, `repeatable read, read only`; it writes nothing, not even the log.

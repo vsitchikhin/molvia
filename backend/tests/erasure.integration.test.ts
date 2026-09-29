@@ -110,6 +110,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
       erased: {
         sessions: 1,
         search_picks: 1,
+        rating_reminders: 1,
         verdicts: 2,
         events: 1,
         expenses: 2,

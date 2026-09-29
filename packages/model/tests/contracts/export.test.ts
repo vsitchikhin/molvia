@@ -88,6 +88,9 @@ const file: ExportFile = {
     },
   ],
   searchPicks: [{ queryKey: 'moloko', itemId: id(8), picks: 3, lastPickedAt: at, admits: false }],
+  ratingReminders: [
+    { step: 2, remindedOn: '2026-09-23', remindedAt: at, windowFrom: '2026-09-19' },
+  ],
   events: [
     { id: '41', occurredAt: at, type: 'advice_viewed', payload: { subject: 'product' } },
     { id: '7', occurredAt: at, type: 'session_started', payload: {} },
@@ -219,7 +222,7 @@ describe('exportFileCodec', () => {
       asOf: '2026-09-20T10:00:00.000Z',
     })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(1)
+    expect(wire.version).toBe(2)
   })
 
   it('reads its own file back into the same values', () => {
@@ -251,7 +254,7 @@ describe('exportFileCodec', () => {
   })
 
   it('refuses a version it was not written for', () => {
-    expect(exportFileCodec.safeParse({ ...wire, version: 2 }).success).toBe(false)
+    expect(exportFileCodec.safeParse({ ...wire, version: 1 }).success).toBe(false)
   })
 })
 

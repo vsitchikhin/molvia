@@ -19,6 +19,7 @@ import {
   moneyAccountChecks,
   moneyAccounts,
   moneyMonthRates,
+  ratingReminders,
   searchPicks,
   sessions,
   spendingCategories,
@@ -117,6 +118,14 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     createdBy: actorId,
   })
   await db.insert(itemBarcodes).values({ code: '4850001234567', itemId })
+  // Where they stand on the ladder of rating reminders (MOL-101).
+  await db.insert(ratingReminders).values({
+    actorId,
+    step: 2,
+    remindedOn: '2026-09-23',
+    remindedAt: at(2),
+    windowFrom: '2026-09-19',
+  })
   const cash = randomUUID()
   const dollars = randomUUID()
   const card = randomUUID()

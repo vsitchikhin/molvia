@@ -17,6 +17,7 @@ import {
   moneyAccounts,
   moneyMonthRates,
   places,
+  ratingReminders,
   searchPicks,
   sessions,
   spendingCategories,
@@ -32,6 +33,7 @@ import {
 export const EXPORT_SECTION_OF: Readonly<Record<ErasedTable, keyof ExportContent>> = {
   sessions: 'sessions',
   search_picks: 'searchPicks',
+  rating_reminders: 'ratingReminders',
   verdicts: 'verdicts',
   events: 'events',
   expenses: 'expenses',
@@ -144,6 +146,10 @@ export const EXPORT_COLUMNS: Readonly<
   },
   search_picks: {
     exported: ['query_key', 'item_id', 'picks', 'last_picked_at', 'admits'],
+    omitted: { actor_id: OWNER },
+  },
+  rating_reminders: {
+    exported: ['step', 'reminded_on', 'reminded_at', 'window_from'],
     omitted: { actor_id: OWNER },
   },
   events: {
@@ -335,6 +341,10 @@ export function createExportRepository(db: Db): ExportRepository {
             .from(searchPicks)
             .where(eq(searchPicks.actorId, actorId))
             .orderBy(asc(searchPicks.lastPickedAt), asc(searchPicks.queryKey))
+          const ladderRows = await tx
+            .select()
+            .from(ratingReminders)
+            .where(eq(ratingReminders.actorId, actorId))
           const eventRows = await tx
             .select()
             .from(events)
@@ -571,6 +581,12 @@ export function createExportRepository(db: Db): ExportRepository {
               picks: row.picks,
               lastPickedAt: row.lastPickedAt,
               admits: row.admits,
+            })),
+            ratingReminders: ladderRows.map((row) => ({
+              step: row.step,
+              remindedOn: row.remindedOn,
+              remindedAt: row.remindedAt,
+              windowFrom: row.windowFrom,
             })),
             events: eventRows.map((row) => ({
               id: row.id.toString(),

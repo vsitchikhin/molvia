@@ -10,7 +10,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `packages/model/src/entities/expense.ts` — Entity of a trip purchase: item required, quantity and amount optional; the new-row and patch schemas.
 - `packages/model/src/entities/place.ts` — Entity of a place (shop or venue) with its country and city; the schema a new place is named by.
 - `packages/model/src/entities/trip.ts` — Entity of a trip: rate snapshot and rate choice, `TRIP_UNDO_MINUTES`, the effective rate, staleness, totals and conversion.
-- `packages/model/src/values/geo.ts` — Value schemas of a country code and a city name.
+- `packages/model/src/values/geo.ts` — Value schemas of a country code and a city name, and the time zone a country's day is read in (MOL-101).
 - `packages/model/src/values/place-identity.ts` — When two spellings name one place, the TypeScript twin of the database's place index. Tests: `backend/tests/place-identity.integration.test.ts`.
 
 ## backend · routes
@@ -32,7 +32,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 
 ## backend · db
 
-- `backend/src/db/expenses-repository.ts` — Repository of purchases: rows of a trip, unrated ones, and the price queries (cheapest, median) «Что брать» reads.
+- `backend/src/db/expenses-repository.ts` — Repository of purchases: rows of a trip, unrated ones — for the reminder, by days and not before a withdrawal (MOL-101) — and the price queries (cheapest, median) «Что брать» reads.
 - `backend/src/db/places-repository.ts` — Repository of places: `ensure` one shop per name, reads by id, and the person's recent places.
 - `backend/src/db/settings-repository.ts` — Repository of the settings: one conditional `UPDATE` of the actor row against the form's base. Tests: `backend/tests/settings.integration.test.ts`.
 - `backend/src/db/trips-repository.ts` — Repository of trips: start, lock, current, history page with each row's count and sums, finish, rate choice, mark, restore, purge. Tests: `backend/tests/trip-rules.integration.test.ts`.

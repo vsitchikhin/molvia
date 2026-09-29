@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { exportFileCodec } from '@molvia/model'
+import { EXPORT_VERSION, exportFileCodec } from '@molvia/model'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -66,7 +66,7 @@ test('«Скачать мои данные» отдаёт файл со свои
 
   expect(download.suggestedFilename()).toMatch(/^molvia-\d{4}-\d{2}-\d{2}\.json$/)
   const file = exportFileCodec.parse(JSON.parse(await readFile(await download.path(), 'utf8')))
-  expect(file.version).toBe(1)
+  expect(file.version).toBe(EXPORT_VERSION)
   expect(file.proposedItems.map((item) => item.name)).toEqual([mine.name])
   expect(file.verdicts.map((verdict) => verdict.review)).toEqual([mine.review])
 })

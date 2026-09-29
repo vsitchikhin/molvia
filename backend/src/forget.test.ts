@@ -7,6 +7,7 @@ const REPORT: ErasureReport = {
   erased: {
     sessions: 2,
     search_picks: 1,
+    rating_reminders: 1,
     verdicts: 3,
     events: 4,
     expenses: 5,
