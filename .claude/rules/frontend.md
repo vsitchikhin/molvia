@@ -84,13 +84,16 @@ The detail behind the frontend lines of `CLAUDE.md`.
   minutes at most** (review С-8, adversarial Е2): the API may come out a moment before the static
   files, and the first look finds the old worker; but a merge that touches no frontend ships the same
   `sw.js`, and looking for the page's whole life found nothing a hundred and twenty times an hour —
-  past five minutes the quarter-hour look is enough, and the next build the server names starts over.
+  past five minutes the quarter-hour look is enough, and the next build the server names starts
+  over — so does the same build rolled out again after the server named the page's own in between, a
+  rollback (adversarial Ж1).
   The build alone offers nothing: only a worker has a version to let in. **A first visit is
   controlled by nothing to its end** (no `clientsClaim`), and a version come out meanwhile becomes
   the active worker at once when no other window uses the registration (adversarial Д2), and waits
   when one does (Е1): the worker the page came up with is its own, and any other — waiting or become
   active — is a version for it; with no takeover to hear, its «Обновить» reloads when the version it
-  let in becomes the active worker — after a hard reload the offer
+  let in becomes the active worker; a worker already installing or waiting as the page came up is followed too (review С-14), or the
+  version taken would be called failed — after a hard reload the offer
   may be a reload onto what the page already runs, a harmless price. **`phase` is one state for the app** (`none` / `ready` / `applying` /
   `failed`), provided from `main.ts` and read through `usePwaUpdate`; without a worker — the dev
   server, the tests — it is `none`. **The strip is the top row of `AppScreen`'s pinned strip over the
@@ -105,8 +108,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the app is put away without a sheet. **It is said out loud once for the version, not once for each
   strip** (adversarial Д1): every screen draws its own strip, born with the version already waiting,
   so what was said — `ready`, `failed` — is kept by the version's state (a `WeakMap` over the one
-  `PwaUpdate`), and a strip drawn anew on the next screen says nothing — unless the strip that was
-  to say it went before its words reached the region (the announcer tells, review С-13). **An error while a version waits offers
+  `PwaUpdate`), and a strip drawn anew on the next screen says nothing. **Words still true are not taken back when
+  the strip goes with its screen** (review С-13, adversarial Ж2): taken back, they were gone before a
+  screen reader read them — or before they reached the region at all — and the next strip, silent,
+  never said them; only words that stopped being true are taken back. **An error while a version waits offers
   «Обновить» first and «Повторить» second, whatever the error was** (В-2): which answer the old code
   could not read is not always known — a new server's unknown code arrives as `response_invalid`, a
   proxy's 502 during the rollout as `internal` — and the reload loses nothing: the queues hold both
