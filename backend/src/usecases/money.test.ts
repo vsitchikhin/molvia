@@ -20,6 +20,7 @@ import type {
   SpendingAmendBody,
   SpendingCategory,
 } from '@molvia/model'
+import { moneyChartsOf } from './money-charts'
 import { moneyMonthOf } from './money-month'
 import { dayRates } from './money-rates'
 import { amendSpending, recordSpending, removeSpending } from './spendings'
@@ -499,5 +500,55 @@ describe('moneyMonthOf (MOL-73)', () => {
     const world = repositoriesOf({ spendings: [spending('500 AMD', '2026-08-20')] })
     const view = await moneyMonthOf(world.repositories, owner, '2026-08', undefined, NOW)
     expect(view.previousSpent).toBeNull()
+  })
+})
+
+describe('moneyChartsOf (MOL-74)', () => {
+  it('reads the rows of the whole period once, however many months it counts (Р-3)', async () => {
+    const world = repositoriesOf({
+      exchanges: [exchange('100000 RUB', '410000 AMD', '2026-08-05')],
+      spendings: [spending('41000 AMD', '2026-08-20'), spending('5000 AMD', '2026-04-02')],
+    })
+    const reads: string[] = []
+    const spendings = world.repositories.spendings
+    const money = world.repositories.money
+    const repositories = {
+      ...world.repositories,
+      spendings: fake<TripRepositories['spendings']>('spendings', {
+        between: (actorId, from, to) => {
+          reads.push(`spendings ${from}..${to}`)
+          return spendings.between(actorId, from, to)
+        },
+      }),
+      money: fake<TripRepositories['money']>('money', {
+        tripLines: (actorId, from, to) => {
+          reads.push(`trips ${from}..${to}`)
+          return money.tripLines(actorId, from, to)
+        },
+        frozenRate: () => Promise.resolve(null),
+        freeze: (_, __, rate) => Promise.resolve(rate),
+        salaryShift: () => Promise.resolve(null),
+      }),
+    }
+    const view = await moneyChartsOf(repositories, owner, 12, NOW)
+    expect(view.months).toHaveLength(12)
+    // The month before the period too: «к октябрю» of the first bar.
+    expect(reads).toEqual(['spendings 2025-09-01..2026-09-30', 'trips 2025-09-01..2026-09-30'])
+  })
+
+  it('draws each bar from the month «Деньги» shows', async () => {
+    const world = () =>
+      repositoriesOf({
+        exchanges: [exchange('100000 RUB', '410000 AMD', '2026-08-05')],
+        spendings: [spending('41000 AMD', '2026-08-20'), spending('20 USD', '2026-09-03')],
+        cache: [official('USD', '390', '2026-09-03')],
+      }).repositories
+    const view = await moneyChartsOf(world(), owner, 6, NOW)
+    for (const month of ['2026-08', '2026-09']) {
+      const shown = await moneyMonthOf(world(), owner, month, undefined, NOW)
+      const bar = view.months.find((one) => one.month === month)
+      expect(bar?.spent).toEqual(shown.spent)
+      expect(bar?.spentIncome).toEqual(shown.spentIncome)
+    }
   })
 })
