@@ -24,6 +24,11 @@ export interface AdviceSearch {
   /** The query the answer on screen belongs to — «Не нашли «{query}»» names that one. */
   readonly answered: Ref<string>
   readonly retry: () => void
+  /**
+   * Asks again for what is typed, quietly: the answer on screen stays, dimmed, until the new one
+   * replaces it — after a verdict is saved from a row of it (Ч.5, review Р-3).
+   */
+  readonly refresh: () => void
 }
 
 // Asked afresh each time, never narrowed: the answer before the request says nothing about the
@@ -32,14 +37,32 @@ function connected(): boolean {
   return navigator.onLine
 }
 
+/** A word as typed, case aside. */
+function typed(word: string): string {
+  return word.toLocaleLowerCase()
+}
+
 /**
- * The words of a name as the search key spells them: transliteration and the forks folded by the
- * domain's own `toSearchKey`, so «syr» meets «Сыр» on the phone as it does on the server.
+ * A word's search key with «ц» spelt out. The key folds «ts» into «ц» (and «Детское» becomes
+ * `deцkoe`), so a key cut short — `det`, `mat` — is not the start of the whole one; spelt out, it
+ * is. Only for «is this the start of that»: the key itself is the domain's (MOL-5).
  */
+function spelt(word: string): string {
+  return toSearchKey(word).replaceAll('ц', 'ts')
+}
+
+/** The words of a text, as it is written. */
 function words(text: string): string[] {
-  return toSearchKey(text)
-    .split(/\s+/u)
-    .filter((word) => word.length > 0)
+  return text.split(/\s+/u).filter((word) => !drawsNothing(word))
+}
+
+/**
+ * Whether a word typed starts a word of a name — as typed, or by the search key: the text alone
+ * does not see that «syr» starts «Сыр», the key alone that «дет» starts «Детское» (review Р-9; the
+ * catalogue's `startsHeld` met the same, review К).
+ */
+function starts(part: string, word: string): boolean {
+  return typed(part).startsWith(typed(word)) || spelt(part).startsWith(spelt(word))
 }
 
 /**
@@ -54,7 +77,7 @@ export function searchRemembered(rows: AdviceResponse['rows'], text: string): Ad
   return rows
     .filter((row) => {
       const name = words(row.name)
-      return asked.every((word) => name.some((part) => part.startsWith(word)))
+      return asked.every((word) => name.some((part) => starts(part, word)))
     })
     .map((row) => ({ itemId: row.itemId, name: row.name, advice: row }))
 }
@@ -128,7 +151,7 @@ export function useAdviceSearch(
     }
   }
 
-  watch(query, (text) => {
+  function search(text: string): void {
     // By what draws, not by `trim`: a pasted U+200B looks empty.
     if (drawsNothing(text)) {
       latest += 1
@@ -153,7 +176,18 @@ export function useAdviceSearch(
       pending = undefined
       void run(text)
     }, SEARCH_DEBOUNCE_MS)
-  })
+  }
+  // Mounted with something typed already — the field came back over a list asked for again —
+  // what is typed is searched at once, not left without an answer (review Р-14, adversarial Д).
+  watch(query, search, { immediate: true })
+
+  function refresh(): void {
+    if (drawsNothing(query.value)) return
+    if (phase.value === 'ready' || phase.value === 'far' || phase.value === 'empty') {
+      stale.value = true
+      void run(query.value)
+    } else retry()
+  }
 
   function retry(): void {
     if (drawsNothing(query.value)) return
@@ -172,5 +206,5 @@ export function useAdviceSearch(
     cancel()
   })
 
-  return { phase, found, scope, stale, answered, retry }
+  return { phase, found, scope, stale, answered, retry, refresh }
 }

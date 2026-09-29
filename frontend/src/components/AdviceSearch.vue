@@ -4,6 +4,7 @@
     <IconMagnify class="magnify" aria-hidden="true" />
     <input
       :id="id"
+      ref="input"
       class="input"
       type="search"
       enterkeyhint="search"
@@ -67,7 +68,7 @@
           :key="row.itemId"
           :row="row"
           :scope="scope"
-          @edit="$emit('edit', row)"
+          @edit="$emit('edit', row, scope)"
         />
       </AdviceGroup>
 
@@ -77,7 +78,7 @@
           :key="row.itemId"
           :row="row"
           :scope="scope"
-          @edit="$emit('edit', row)"
+          @edit="$emit('edit', row, scope)"
         />
       </AdviceGroup>
 
@@ -88,7 +89,7 @@
           :key="row.itemId"
           :row="row"
           :scope="scope"
-          @edit="$emit('edit', row)"
+          @edit="$emit('edit', row, scope)"
         />
       </AdviceGroup>
 
@@ -99,7 +100,7 @@
             :key="item.itemId"
             class="unrated-row"
             type="button"
-            @click="$emit('rate', item)"
+            @click="$emit('rate', item, scope)"
           >
             <span class="text">
               <span class="name">{{ item.name }}</span>
@@ -116,12 +117,12 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, toRef, useId, watch } from 'vue'
+import { computed, defineComponent, onUnmounted, ref, toRef, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCloseCircle from '~icons/mdi/close-circle'
 import IconMagnify from '~icons/mdi/magnify'
-import type { AdviceFound, AdviceResponse, AdviceRow } from '@molvia/model'
+import type { AdviceFound, AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
 import AdviceCheapRow from '@/components/AdviceCheapRow.vue'
 import AdviceGroup from '@/components/AdviceGroup.vue'
 import AdviceNeverRow from '@/components/AdviceNeverRow.vue'
@@ -187,8 +188,9 @@ export default defineComponent({
   },
   emits: {
     'update:modelValue': (text: string) => typeof text === 'string',
-    edit: (row: AdviceRow) => typeof row === 'object',
-    rate: (item: AdviceFound) => typeof item === 'object',
+    /** With the scope of the answer the row came in: the list's may be another (review Р-13, Е). */
+    edit: (row: AdviceRow, scope: AdviceScope) => typeof row === 'object' && !!scope,
+    rate: (item: AdviceFound, scope: AdviceScope) => typeof item === 'object' && !!scope,
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
@@ -197,25 +199,33 @@ export default defineComponent({
     const { phase, found, stale, answered } = search
     const announce = useAnnouncer()
 
+    // After a save the rows on screen are asked for again quietly, dimmed rather than taken away
+    // under the sheet that is closing over them (review Р-3, adversarial Г).
     watch(
       () => props.refreshes,
       () => {
-        search.retry()
+        search.refresh()
       },
     )
 
     // Read out once per answer, and never a dimmed one: it answers the text before (MOL-23, Р-10).
+    // Nothing found is not read here: the empty block says it itself (review Р-8).
     let withdraw: (() => void) | undefined
     watch([phase, found, stale], ([next, rows, dimmed]) => {
       withdraw?.()
       withdraw = undefined
-      if (dimmed || !['ready', 'far', 'empty', 'memory'].includes(next)) return
+      if (dimmed || rows.length === 0 || !['ready', 'far', 'memory'].includes(next)) return
       withdraw = announce?.(
-        rows.length > 0 && next !== 'far'
-          ? t('item.results_announced', { n: rows.length }, rows.length)
-          : t('advice.search.empty.title', { query: answered.value }),
+        next === 'far'
+          ? t('advice.search.empty.title', { query: answered.value })
+          : t('item.results_announced', { n: rows.length }, rows.length),
       )
     })
+    onUnmounted(() => {
+      withdraw?.()
+    })
+
+    const input = ref<HTMLInputElement | null>(null)
 
     return {
       t,
@@ -230,8 +240,12 @@ export default defineComponent({
       type: (event: Event) => {
         emit('update:modelValue', (event.target as HTMLInputElement).value)
       },
+      input,
+      // Back into the field: the button goes with what it cleared, and the focus would be left on
+      // nothing — the keyboard folded, a screen reader thrown to the top (review Р-12).
       clear: () => {
         emit('update:modelValue', '')
+        input.value?.focus()
       },
       day: (when: Date) => purchaseDay(when, locale.value),
       time: (when: Date) => timeOfDay(when, locale.value),

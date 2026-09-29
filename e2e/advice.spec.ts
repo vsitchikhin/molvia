@@ -313,8 +313,10 @@ test.describe('the search (MOL-128)', () => {
     await expect(page.locator('section.never').getByText(bad)).toBeVisible()
     const unrated = page.locator('section.unrated')
     await expect(unrated.getByText(`Сыр Косичка ${tag}`)).toBeVisible()
-    // «Не брать нигде» has nothing to be cheap with here either.
+    // «Не брать нигде» has nothing to be cheap with here either: no price, and no place.
     await expect(page.locator('section.never').getByText('577.78')).toHaveCount(0)
+    await expect(page.locator('section.never').getByText('SAS')).toHaveCount(0)
+    await expect(page.locator('section.take').getByText('SAS')).toBeVisible()
     await expect(page.getByRole('button', { name: /Propose/ })).toHaveCount(0)
 
     await unrated.getByRole('button', { name: new RegExp(`Сыр Косичка ${tag}`) }).click()
@@ -332,7 +334,8 @@ test.describe('the search (MOL-128)', () => {
     await page.goto('/')
     const field = page.getByRole('searchbox', { name: 'Search the catalogue' })
     await field.fill(`кускус${tag}`)
-    await expect(page.getByText(`No «кускус${tag}» found`).first()).toBeVisible()
+    // The empty block's own heading, outside the live region (`e2e.md`): said once, not muted.
+    await expect(page.getByRole('heading', { name: `No «кускус${tag}» found` })).toBeVisible()
     await expect(page.locator('section.take')).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Clear' }).click()

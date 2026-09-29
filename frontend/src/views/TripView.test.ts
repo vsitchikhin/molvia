@@ -309,6 +309,16 @@ describe('TripView', () => {
     expect(router.currentRoute.value.name).toBe('purchase-manual')
   })
 
+  // Review Р-18: before the record going on is known, its own waiting purchases are not «не
+  // отправлено» — they are its rows the moment the server answers.
+  it('пока запись не известна, её ждущие покупки не названы неотправленными', async () => {
+    currentTrip.mockReturnValue(new Promise(() => undefined))
+    const { view, queue } = await render()
+    queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000081'))
+    await flushPromises()
+    expect(view.text()).not.toContain('ещё не отправлена')
+  })
+
   it('весь смысл продукта в двух числах: 520 ֏ за 0,9 л дороже 570 ֏ за литр', async () => {
     currentTrip.mockResolvedValue(trip(handoff()))
     const { view } = await render()
@@ -1124,7 +1134,7 @@ describe('TripView', () => {
       queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000072'))
       await flushPromises()
       expect(view.text()).toContain('Запись не вернулась: Ереван Сити')
-      expect(view.text()).toContain('в нём 2 покупки')
+      expect(view.text()).toContain('в ней 2 покупки')
       expect(view.text()).not.toContain('ещё не отправлен')
       expect(addExpense).not.toHaveBeenCalled()
     })

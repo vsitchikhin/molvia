@@ -44,7 +44,7 @@
          go quiet with it — on iOS nothing is sent in the background, and an app that was closed
          here would never say a word (adversarial В1). -->
     <ScreenState
-      v-if="unsent > 0"
+      v-if="ready && unsent > 0"
       class="notice"
       kind="attention"
       inline
@@ -68,9 +68,9 @@
 
   <!-- Mounted always and led by `open`: under a `v-if` a sheet would be gone before it could step
        back off its own history entry (MOL-18; review 5). -->
-  <TripContextSheet v-model:open="clarifying" />
+  <TripContextSheet v-model:open="clarifying" :on-closed="settled" />
 
-  <BottomSheet v-model:open="choosing">
+  <BottomSheet v-model:open="choosing" :on-closed="settled">
     <template #title>{{ t('trip.elsewhere.title', { place: choice?.place ?? '' }) }}</template>
     <p class="confirm">{{ choice ? elsewhereBody(choice) : '' }}</p>
     <template #footer>
@@ -135,7 +135,19 @@ export default defineComponent({
     ScreenState,
     TripContextSheet,
   },
-  setup() {
+  props: {
+    /**
+     * The record going on is known — asked or remembered. Before that its own waiting purchases
+     * would be counted «не отправлено» (review Р-18; the record screen held this under
+     * `phase !== 'loading'` before MOL-128).
+     */
+    ready: { type: Boolean, default: true },
+  },
+  emits: {
+    /** A sheet of its own is away: the screen under it may move now (Р-7). */
+    settled: () => true,
+  },
+  setup(_props, { emit }) {
     const { t } = useI18n()
     const queue = useTripQueueStore()
     const { trip, tripId } = useCurrentTrip()
@@ -302,6 +314,10 @@ export default defineComponent({
       opened,
       putAway: () => {
         opened.value = null
+        emit('settled')
+      },
+      settled: () => {
+        emit('settled')
       },
     }
   },

@@ -38,7 +38,7 @@
       },
       "empty": {
         "title": "Nothing in this entry",
-        "body": "Delete it, so no empty row is left in the history?",
+        "body": "Delete it, so no empty row is left in Purchases?",
         "finish": "Finish anyway"
       },
       "removed": "Entry deleted: {name}",
@@ -80,9 +80,9 @@
       "unnamed": "Item"
     },
     "rejected": {
-      "title": "One record was not accepted",
+      "title": "One change was not accepted",
       "named": "«{name}» was not accepted",
-      "unknown": "The server did not accept the record ({code})",
+      "unknown": "The server did not accept the change ({code})",
       "fix": "Correct it",
       "drop": "Dismiss",
       "orphaned": "it holds {n} purchase, and it is waiting | it holds {n} purchases, and they are waiting",
@@ -148,7 +148,7 @@
       "pending": "Changes are on this device. We will send them when connected.",
       "no_purchases": "No purchases here yet. Add anything you forgot.",
       "rejected_title": "A change was not accepted",
-      "rejected_body": "Purchases remain on this device. Purchases shows the reason and lets you correct the entry.",
+      "rejected_body": "Purchases remain on this device. Purchases shows the reason and lets you correct the purchase.",
       "review": "Review the refusal",
       "unfinished": "This entry is still open"
     },
@@ -441,7 +441,7 @@
     "saved_offline": "Spending saved on the phone, we will send it later",
     "empty": {
       "title": "Add your first spending",
-      "body": "Barber, rent, café, taxi — anything that is not a shop. Purchases from “Purchases” land here by themselves",
+      "body": "Barber, rent, café, taxi — anything that is not a shop. Recorded purchases land here by themselves",
       "action": "Add a spending",
       "trip": "Record purchases at a shop"
     },
@@ -1036,7 +1036,7 @@
       "add": "Account",
       "archived": "Put away ({n})",
       "archived_row": "{currency} · {amount} · put away {date}",
-      "archived_note": "A put-away account isn't offered for new entries. Its history and balance are kept",
+      "archived_note": "A put-away account isn’t offered for new spending, income or exchanges. Its history and balance are kept",
       "restore": "Restore",
       "restored": "“{name}” is back in the list",
       "removed": "Deleted: {name}",

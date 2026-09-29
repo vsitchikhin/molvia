@@ -522,3 +522,192 @@ describe('AdviceView', () => {
     })
   })
 })
+
+// The review of MOL-128 (adversarial В, Г, Д, Е; review Р-3, Р-12, Р-13, Р-14, Р-16).
+describe('AdviceView after the review', () => {
+  const lori: AdviceRow = {
+    level: 'take',
+    isMine: true,
+    itemId: 'cccccccc-0000-4000-8000-000000000012',
+    name: 'Сыр «Лори»',
+    rating: '5.0',
+    ratingsCount: 1,
+    review: null,
+    places: [],
+  }
+  const ours = (items: AdviceSearchResponse['items'], over: Partial<AdviceSearchResponse> = {}) =>
+    ({
+      geography: { country: 'AM', city: 'Гюмри' },
+      scope: 'own',
+      near: true,
+      items,
+      ...over,
+    }) satisfies AdviceSearchResponse
+
+  async function renderIn(city: string) {
+    localStorage.setItem('molvia.actor', ME)
+    localStorage.setItem(
+      `molvia.settings.${ME}`,
+      JSON.stringify({ country: 'AM', city, spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+    )
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    useActorStore().id = ME
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/')
+    const view = mount(AdviceView, {
+      global: { plugins: [router, pinia, createAppI18n('en')] },
+      attachTo: document.body,
+    })
+    mounted.push(view)
+    await flushPromises()
+    return view
+  }
+
+  async function type(view: VueWrapper, text: string): Promise<void> {
+    await view.get('input[type="search"]').setValue(text)
+    await vi.waitFor(() => {
+      expect(adviceSearch).toHaveBeenCalled()
+    })
+    await flushPromises()
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+    advice.mockReset()
+    adviceSearch.mockReset()
+    pendingVerdicts.mockReset()
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
+    vi.restoreAllMocks()
+    online(true)
+  })
+
+  afterEach(() => {
+    for (const view of mounted.splice(0)) view.unmount()
+  })
+
+  describe('В: the newcomer`s headline speaks only of a queue known', () => {
+    it('the queue still on its way — no «record your first», the skeleton in its place', async () => {
+      advice.mockResolvedValue(answer([]))
+      pendingVerdicts.mockReturnValue(new Promise(() => undefined))
+      const view = await renderIn('Гюмри')
+
+      expect(view.text()).not.toContain(en.advice.home.new.title)
+      expect(view.text()).not.toContain(en.advice.home.pending.title)
+      expect(view.find('.skeleton').exists()).toBe(true)
+      // The action is there all the same.
+      expect(view.get('.dock').text()).toContain(en.purchases.manual)
+    })
+
+    it('offline with no queue remembered — no headline at all, the cycle still there', async () => {
+      advice.mockResolvedValue(answer([]))
+      pendingVerdicts.mockRejectedValue(broke())
+      await renderIn('Гюмри')
+      for (const view of mounted.splice(0)) view.unmount()
+
+      online(false)
+      advice.mockRejectedValue(broke())
+      pendingVerdicts.mockRejectedValue(broke())
+      const view = await renderIn('Гюмри')
+
+      expect(view.text()).not.toContain(en.advice.home.new.title)
+      expect(view.text()).toContain(en.advice.home.step_verdicts_title)
+    })
+
+    it('the queue answered empty — «record your first»', async () => {
+      advice.mockResolvedValue(answer([]))
+      const view = await renderIn('Гюмри')
+      expect(view.text()).toContain(en.advice.home.new.title)
+    })
+  })
+
+  it('Г: after a save from the search the answer stays, dimmed, while it is asked again', async () => {
+    advice.mockResolvedValue(answer([milk, lori]))
+    adviceSearch.mockResolvedValue(ours([{ itemId: lori.itemId, name: lori.name, advice: lori }]))
+    const view = await renderIn('Гюмри')
+    await type(view, 'сыр')
+
+    await view.get('.tap').trigger('click')
+    await flushPromises()
+    adviceSearch.mockReturnValue(new Promise(() => undefined))
+    view.findComponent({ name: 'VerdictEditSheet' }).vm.$emit('saved')
+    await flushPromises()
+
+    expect(view.find('.skeleton').exists()).toBe(false)
+    expect(view.find('.found.stale').exists()).toBe(true)
+    expect(view.text()).toContain(lori.name)
+  })
+
+  it('Д: the field back over a list asked again searches what it holds', async () => {
+    advice.mockResolvedValue(answer([milk]))
+    await renderIn('Гюмри')
+    for (const view of mounted.splice(0)) view.unmount()
+
+    online(false)
+    advice.mockRejectedValue(broke())
+    const view = await renderIn('Ереван')
+    await view.get('input[type="search"]').setValue('мол')
+    await flushPromises()
+    expect(view.text()).toContain(milk.name)
+
+    online(true)
+    advice.mockResolvedValue(answer([milk], { geography: { country: 'AM', city: 'Ереван' } }))
+    adviceSearch.mockResolvedValue(ours([{ itemId: milk.itemId, name: milk.name, advice: milk }]))
+    window.dispatchEvent(new Event('online'))
+    // The list asked again, then the search's own pause.
+    await vi.waitFor(
+      () => {
+        expect(adviceSearch).toHaveBeenCalledWith('мол')
+        expect(view.find('.found').exists()).toBe(true)
+        expect(view.text()).toContain(milk.name)
+      },
+      { timeout: 3000 },
+    )
+  })
+
+  it('Е: the sheet from the search reads whose figure it is from the search`s answer', async () => {
+    const shared: AdviceRow = { ...lori, rating: '4.0', ratingsCount: 3 }
+    advice.mockResolvedValue(answer([lori]))
+    adviceSearch.mockResolvedValue(
+      ours([{ itemId: shared.itemId, name: shared.name, advice: shared }], { scope: 'shared' }),
+    )
+    const view = await renderIn('Гюмри')
+    await type(view, 'сыр')
+
+    await view.get('.tap').trigger('click')
+    await flushPromises()
+    const sheet = view.findComponent({ name: 'VerdictEditSheet' })
+
+    // An average of three is nobody's own score: nothing is chosen for the person.
+    expect(sheet.props('ownScore')).toBeNull()
+    expect(sheet.props('shared')).toBe(true)
+  })
+
+  it('Р-12: «Clear» puts the focus back into the field', async () => {
+    advice.mockResolvedValue(answer([milk]))
+    adviceSearch.mockResolvedValue(ours([]))
+    const view = await renderIn('Гюмри')
+    await type(view, 'сыр')
+
+    await view.get('.clear').trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(view.get('input[type="search"]').element)
+  })
+
+  it('Р-16: searching with no connection — one strip of the age, the search`s, under the field', async () => {
+    advice.mockResolvedValue(answer([milk]))
+    await renderIn('Гюмри')
+    for (const view of mounted.splice(0)) view.unmount()
+    online(false)
+    advice.mockRejectedValue(broke())
+    const view = await renderIn('Гюмри')
+    expect(view.find('.stale').exists()).toBe(true)
+
+    await view.get('input[type="search"]').setValue('мол')
+    await flushPromises()
+
+    expect(view.find('.stale').exists()).toBe(false)
+    expect(view.text()).toContain('Without a connection we search only the list as of')
+  })
+})

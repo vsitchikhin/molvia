@@ -4,7 +4,9 @@
 // the lib it has.
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { open } from './session'
+import { randomUUID } from 'node:crypto'
+import { actorCodec, settingsOf } from '@molvia/model'
+import { asBrowser, open } from './session'
 
 /**
  * The shell through a real phone-sized browser: a real history, a real layout and real view
@@ -166,6 +168,30 @@ test.describe('the nested search', () => {
     await page.goBack()
     await expect(page).toHaveURL('about:blank')
   })
+})
+
+// Review Р-19: the chain with a record open — the case the bug of `afterStep` hid in, since
+// happy-dom never showed it.
+test('a record open, its search opened cold: the record, «Покупки», then out', async ({ page }) => {
+  await open(page, '/purchases/manual/add')
+  const headers = await asBrowser(page)
+  const context = settingsOf(
+    actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+  )
+  const started = await page.request.post('/api/trips', {
+    headers,
+    data: { context, id: randomUUID(), place: { kind: 'store', name: 'Рынок' } },
+  })
+  expect(started.status()).toBe(201)
+  await page.reload()
+
+  await chevron(page).click()
+  await expectOn(page, '/purchases/manual', 'Рынок')
+  await page.goBack()
+  await expectOn(page, '/purchases', 'Purchases')
+  await expect(page.locator('.open')).toContainText('Рынок')
+  await page.goBack()
+  await expect(page).toHaveURL('about:blank')
 })
 
 test.describe('the large title', () => {

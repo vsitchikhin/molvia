@@ -78,6 +78,14 @@ function entryBelow(router: Router): RouteName | undefined {
   return typeof name === 'string' ? (name as RouteName) : undefined
 }
 
+/** The section a screen belongs to: its own tab, or the nearest ancestor's. */
+function sectionOf(router: Router, route: Routed & { meta: { tab?: Tab } }): Tab | undefined {
+  if (route.meta.tab) return route.meta.tab
+  for (let up = parentOf(router, route); up; up = parentOf(router, up))
+    if (up.meta.tab) return up.meta.tab
+  return undefined
+}
+
 /**
  * Where a parent is, with the parameters it needs. Taken from the route below rather than
  * listed: this used to be spelled out in `settleColdStart` and in `goBack` both, and the next
@@ -206,8 +214,24 @@ export function useNavigation(): {
 
   async function goTab(to: Tab): Promise<void> {
     if (stepping) return
-    const move = tabMove(route.meta.tab, to, entryBelow(router))
-    if (move === 'top') {
+    // On a nested screen the tab is tapped from its section, not from nowhere (adversarial Б): up
+    // the chain the way «back» goes while an ancestor is underneath, then the tab from there. Read
+    // as «from no section», a tab replaced the nested screen and left its section underneath —
+    // every round of the shop, «Покупки → запись → Что брать», two more entries before «back»
+    // left the app.
+    if (!route.meta.tab && backTarget(router, route)?.step) {
+      const stop = router.afterEach(() => {
+        stop()
+        void goTab(to)
+      })
+      stepBack(router)
+      return
+    }
+    const nested = !route.meta.tab
+    const move = tabMove(sectionOf(router, route), to, entryBelow(router))
+    if (move === 'top' && nested) {
+      await router.replace({ name: to })
+    } else if (move === 'top') {
       window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
     } else if (move === 'back') {
       stepBack(router)

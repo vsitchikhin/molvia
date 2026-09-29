@@ -76,6 +76,16 @@ export default defineComponent({
      * on the screen just opened.
      */
     onClosed: { type: Function as PropType<() => void>, default: undefined },
+    /**
+     * The record open now, to be put away by this very start and not before it (MOL-128, review
+     * Р-2): «Закончить и начать новую» finished it at once, and a «Где вы?» dismissed then left
+     * no record at all. Finished — or removed, with «Вернуть», when nothing is in it: a finished
+     * empty record is a row of nothing in «Записаны» for good (MOL-76, В-2).
+     */
+    replacing: {
+      type: Object as PropType<{ tripId: string; place: string; empty: boolean } | null>,
+      default: null,
+    },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
@@ -121,6 +131,11 @@ export default defineComponent({
 
     function start(place: string): void {
       if (drawsNothing(place) || !actor.settings) return
+      // In the queue before the start, so the server sees the one open record end first.
+      const old = props.replacing
+      if (old?.empty) queue.removeTrip(old.tripId, old.place)
+      else if (old)
+        queue.enqueue({ kind: 'finish', tripId: old.tripId, finishedOnDeviceAt: new Date() })
       queue.enqueue({
         kind: 'start',
         context: { ...actor.settings },

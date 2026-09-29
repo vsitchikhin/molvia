@@ -244,7 +244,7 @@ import { asTyped, categoryColour, rateWords } from '@/components/spending'
 import type { JournalRow, Removed, SpendingTarget } from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, shiftDay } from '@/days'
-import { useNavigation } from '@/navigation'
+import { afterStep, useNavigation } from '@/navigation'
 import { newId } from '@/ids'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useAccountsStore } from '@/stores/accounts'
@@ -757,9 +757,15 @@ export default defineComponent({
       emit('update:open', false)
     }
 
-    /** «→ Поход»: the sheet goes first, then the tab — a move under an open sheet closes it anyway. */
+    /**
+     * «Покупки ›»: the sheet goes first, then the tab — after the sheet's own step has landed
+     * (`afterStep`, review Р-11): told it is closed from inside that step, a tab tapped there was
+     * dropped as a second tap, and the person stayed on «Деньги».
+     */
     function toTrip(): void {
-      after = () => void goTab('purchases')
+      after = () => {
+        afterStep(() => void goTab('purchases'))
+      }
       emit('update:open', false)
     }
 

@@ -6,7 +6,12 @@
 
   <!-- Mounted always and led by `open`: under a `v-if` a sheet would be gone before it could step
        back off its own history entry (MOL-18; review 5). -->
-  <StartTripSheet v-model:open="starting" :on-closed="afterStart" @started="started = true" />
+  <StartTripSheet
+    v-model:open="starting"
+    :replacing="replacing"
+    :on-closed="afterStart"
+    @started="started = true"
+  />
 
   <!-- «Уже записываете «Рынок»» (handoff `03`, 3e): the rule «one open at a time» is unchanged,
        and the choice between going on and starting anew is asked, never guessed. -->
@@ -26,7 +31,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPencil from '~icons/mdi/pencil-outline'
@@ -34,8 +39,9 @@ import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import StartTripSheet from '@/components/StartTripSheet.vue'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
+import { useTripRows } from '@/composables/useTripRows'
 import { purchaseDay, timeOfDay } from '@/days'
-import { useTripQueueStore } from '@/stores/tripQueue'
+import { afterStep } from '@/navigation'
 
 /**
  * «Записать покупки» (MOL-128, В-5): the one way into a record typed by hand, on «Покупки» and on
@@ -49,15 +55,24 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 export default defineComponent({
   name: 'ManualEntryButton',
   components: { AppButton, BottomSheet, IconPencil, StartTripSheet },
-  setup() {
+  emits: {
+    /** Whether a sheet of its own is up: the screen keeps the button mounted meanwhile (Р-15). */
+    busy: (up: boolean) => typeof up === 'boolean',
+  },
+  setup(_props, { emit }) {
     const { t, locale } = useI18n()
     const router = useRouter()
-    const queue = useTripQueueStore()
     const { trip, local, tripId } = useCurrentTrip()
+    const { rows } = useTripRows(tripId, trip, () => '')
+    /** The record «Закончить и начать новую» puts away — only once the new one starts (Р-2). */
+    const replacing = ref<{ tripId: string; place: string; empty: boolean } | null>(null)
 
     const starting = ref(false)
     const started = ref(false)
     const asking = ref(false)
+    watch([starting, asking], ([start, ask]) => {
+      emit('busy', start || ask)
+    })
     let chosen: 'continue' | 'anew' | null = null
 
     /** The record going on, as the question names it; taken when asked, not while it is up. */
@@ -91,25 +106,39 @@ export default defineComponent({
 
     function choose(choice: 'continue' | 'anew'): void {
       chosen = choice
-      // «Закончить и начать новую»: the finish goes into the queue behind every purchase of the
-      // record, as «Закончить» on the record itself does (MOL-22, В-1).
-      if (choice === 'anew' && tripId.value !== null)
-        queue.enqueue({ kind: 'finish', tripId: tripId.value, finishedOnDeviceAt: new Date() })
+      // «Закончить и начать новую» puts nothing away yet: «Где вы?» may still be dismissed, and
+      // then the open record stays as it was. The start itself ends it (Р-2).
+      const id = tripId.value
+      replacing.value =
+        choice === 'anew' && id !== null
+          ? {
+              tripId: id,
+              place: open.value?.place ?? '',
+              empty: rows.value.every((row) => row.mark === 'removing'),
+            }
+          : null
       asking.value = false
     }
 
+    // Every move follows the step back of the sheet that asked for it (`afterStep`): the sheet is
+    // told it is closed before that step has landed, and a move made there is dropped (Р-11).
     function afterAsk(): void {
-      if (chosen === 'continue') void router.push({ name: 'purchase-manual' })
-      else if (chosen === 'anew') {
-        started.value = false
-        starting.value = true
-      }
+      const choice = chosen
       chosen = null
+      afterStep(() => {
+        if (choice === 'continue') void router.push({ name: 'purchase-manual' })
+        else if (choice === 'anew') {
+          started.value = false
+          starting.value = true
+        }
+      })
     }
 
     function afterStart(): void {
-      if (started.value) void router.push({ name: 'purchase-manual' })
+      const go = started.value
       started.value = false
+      replacing.value = null
+      if (go) afterStep(() => void router.push({ name: 'purchase-manual' }))
     }
 
     return {
@@ -118,6 +147,7 @@ export default defineComponent({
       started,
       asking,
       open,
+      replacing,
       begin,
       choose,
       afterAsk,

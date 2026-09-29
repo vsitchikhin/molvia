@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
+  <BottomSheet :open="open" :on-closed="onClosed" @update:open="$emit('update:open', $event)">
     <template #title>{{ t('settings.legacy.title') }}</template>
     <p>{{ t('settings.legacy.body') }}</p>
     <!-- Keyed by the opening: the sheet stays in the tree, and a form that stayed with it
@@ -15,6 +15,7 @@
 </template>
 <script lang="ts">
 import { defineComponent, toRef } from 'vue'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -23,7 +24,11 @@ import { useTripContext } from '@/composables/useTripContext'
 export default defineComponent({
   name: 'TripContextSheet',
   components: { AppButton, BottomSheet, SettingsFields },
-  props: { open: { type: Boolean, required: true } },
+  props: {
+    open: { type: Boolean, required: true },
+    /** Called once the sheet is away (MOL-128): the screen under it may move then. */
+    onClosed: { type: Function as PropType<() => void>, default: undefined },
+  },
   emits: ['update:open'],
   setup(props, { emit }) {
     const { t } = useI18n()

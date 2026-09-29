@@ -266,7 +266,7 @@ describe('PurchasesView (MOL-128)', () => {
       const [row, other] = rows(view)
       expect(row?.text()).toContain('Ереван Сити')
       expect(row?.text()).toContain('12 позиций · вчера')
-      expect(row?.get('.sum').text().replaceAll('\u00a0', ' ')).toBe('9 870,00 ֏ + 12,00 $')
+      expect(row?.get('.sum').text().replaceAll('\u00a0', ' ')).toBe('9 870,00 ֏ · 12,00 $')
       // A row read back from the phone, or from an older server, says where and when, nothing more.
       expect(other?.find('.sum').exists()).toBe(false)
       expect(other?.text()).not.toContain('позиц')
@@ -542,7 +542,7 @@ describe('PurchasesView (MOL-128)', () => {
       expect(queue.pending).toEqual([])
     })
 
-    it('«Закончить и начать новую» — открытая заканчивается, и спрашивается «Где вы?»', async () => {
+    it('«Закончить и начать новую» puts nothing away until the new one starts (Р-2)', async () => {
       currentTrip.mockResolvedValue(openTrip())
       const { view, queue } = await render()
       await view.get('.dock button').trigger('click')
@@ -553,7 +553,45 @@ describe('PurchasesView (MOL-128)', () => {
       await vi.waitFor(() => {
         expect(openSheet()?.textContent).toContain(ru.trip.start.title)
       })
-      expect(queue.pending).toEqual([expect.objectContaining({ kind: 'finish', tripId: OPEN })])
+      // «Где вы?» may still be dismissed: the open record is as it was.
+      expect(queue.pending).toEqual([])
+
+      const sheet = openSheet()
+      const field = sheet?.querySelector('input')
+      if (!field) throw new Error('нет поля места')
+      field.value = 'SAS'
+      field.dispatchEvent(new Event('input'))
+      await flushPromises()
+      clock += 1000
+      inside(sheet, ru.trip.none.action).click()
+      await flushPromises()
+
+      // Nothing in it, so removed with «Вернуть» rather than finished into a row of nothing —
+      // and before the start, so the server meets one open record at a time.
+      expect(queue.pending.map((write) => write.kind)).toEqual(['delete', 'start'])
+    })
+
+    it('«Где вы?» dismissed after «Закончить и начать новую» — the open record stays', async () => {
+      currentTrip.mockResolvedValue(openTrip())
+      const { view, queue } = await render()
+      await view.get('.dock button').trigger('click')
+      await flushPromises()
+      clock += 1000
+      inside(openSheet(), ru.purchases.manual_ask.finish).click()
+      await vi.waitFor(() => {
+        expect(openSheet()?.textContent).toContain(ru.trip.start.title)
+      })
+      clock += 1000
+
+      openSheet()
+        ?.querySelector<HTMLButtonElement>(`button[aria-label="${ru.sheet.close}"]`)
+        ?.click()
+      await vi.waitFor(() => {
+        expect(openSheet()).toBeNull()
+      })
+
+      expect(queue.pending).toEqual([])
+      expect(view.get('.open').text()).toContain('Рынок')
     })
   })
 

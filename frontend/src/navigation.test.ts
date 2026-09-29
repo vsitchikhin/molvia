@@ -230,6 +230,87 @@ describe('afterStep — a move after a step waits for it to land', () => {
   })
 })
 
+// Adversarial Б (MOL-128): the record typed by hand is two levels under home, and a tab tapped
+// there was decided as if from no section — every round of the shop left two more entries.
+describe('a tab tapped on a nested screen', () => {
+  const HOME = 0
+  const PURCHASES = 1
+
+  /** The tab bar alone — no screen under it, so no screen moves on its own. */
+  function bar(router: Router) {
+    const view = mount(TabBar, {
+      global: { plugins: [router, createPinia(), createAppI18n('en')] },
+    })
+    return async (index: number): Promise<void> => {
+      await view.findAll('.tab')[index]?.trigger('click', { button: 0 })
+      await vi.waitFor(() => {
+        expect(router.currentRoute.value.meta.tab).toBeDefined()
+      })
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    }
+  }
+
+  async function pressesToLeave(router: Router): Promise<string[]> {
+    const walked: string[] = []
+    while (router.options.history.state.back) walked.push(await stepBack(router))
+    return walked
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('«Что брать» on the record is home, with nothing underneath', async () => {
+    const router = await fresh('/')
+    const tap = bar(router)
+    await tap(PURCHASES)
+    await router.push('/purchases/manual')
+
+    await tap(HOME)
+
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.name).toBe('advice')
+    })
+    expect(router.options.history.state.back).toBeNull()
+  })
+
+  it('«Покупки» on the record is the step up, not «Покупки» over «Покупки»', async () => {
+    const router = await fresh('/')
+    const tap = bar(router)
+    await tap(PURCHASES)
+    await router.push('/purchases/manual')
+
+    await tap(PURCHASES)
+
+    expect(router.currentRoute.value.fullPath).toBe('/purchases')
+    expect(await pressesToLeave(router)).toEqual(['/'])
+  })
+
+  it('three rounds of the shop leave one press of «back» on home — out of the app', async () => {
+    const router = await fresh('/')
+    const tap = bar(router)
+    for (let round = 0; round < 3; round += 1) {
+      await tap(PURCHASES)
+      await router.push('/purchases/manual')
+      await router.push('/purchases/manual/add')
+      await tap(HOME)
+      expect(router.currentRoute.value.name).toBe('advice')
+    }
+    expect(router.options.history.state.back).toBeNull()
+  })
+
+  it('opened with no ancestor underneath, a tab acts from the screen`s section', async () => {
+    const router = await fresh('/')
+    await router.push('/purchases/manual')
+    const tap = bar(router)
+
+    await tap(PURCHASES)
+
+    expect(router.currentRoute.value.fullPath).toBe('/purchases')
+    expect(router.options.history.state.back).toBe('/')
+  })
+})
+
 describe('the tab bar walks the history as В-2 decided', () => {
   async function app(path: string) {
     const router = await fresh(path)

@@ -33,8 +33,8 @@
     </template>
 
     <!-- What the queue has to say about any record, this one or another — on «Покупки» as well
-         (MOL-128). -->
-    <TripNotices />
+         (MOL-128). Its sheets, like every sheet here, ask to leave once they are away (Р-7). -->
+    <TripNotices :ready="phase !== 'loading'" @settled="leaveIfOver" />
 
     <template v-if="phase === 'going'">
       <TripRateNotes v-if="trip" :trip="trip" />
@@ -421,8 +421,11 @@ export default defineComponent({
       leaveIfOver,
       retry: () => void load(),
       amend,
+      // The record may have ended under the sheet — finished on another phone, its purchase's answer
+      // carrying `finishedAt` — and nothing else would take the screen up then (review Р-7).
       putAway: () => {
         opened.value = null
+        leaveIfOver()
       },
       find,
     }

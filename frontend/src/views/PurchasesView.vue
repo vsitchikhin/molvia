@@ -1,6 +1,6 @@
 <template>
   <AppScreen :title="t('purchases.title')">
-    <TripNotices />
+    <TripNotices :ready="asked" />
 
     <!-- The record going on comes first, without a caption: it is the one thing on this screen
          that is still being done (handoff `03`, Р-4). From the phone as much as from the server —
@@ -92,7 +92,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, watch } from 'vue'
+import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPencil from '~icons/mdi/pencil-outline'
@@ -177,12 +177,16 @@ export default defineComponent({
      * The record going on is the server's to name; asked once per showing, and a failure is the
      * history's to say — the red block's «Повторить» asks for both (adversarial Д).
      */
+    /** The record going on is known — remembered, or the server was asked (review Р-18). */
+    const asked = ref(trips.current !== null)
     async function loadTrip(): Promise<void> {
       if (!actor.id) return
       try {
         await trips.load()
       } catch {
         // Said by the history's own trouble: one red block, not two.
+      } finally {
+        asked.value = true
       }
     }
     onMounted(() => void loadTrip())
@@ -198,6 +202,7 @@ export default defineComponent({
 
     return {
       t,
+      asked,
       IconPencil,
       IconStar,
       history,
@@ -217,7 +222,7 @@ export default defineComponent({
       },
       sum: (row: HistoryRow): string | null =>
         row.total && row.total.length > 0
-          ? row.total.map((amount) => formatMoney(amount, locale.value)).join(' + ')
+          ? row.total.map((amount) => formatMoney(amount, locale.value)).join(' · ')
           : null,
       goTab: (tab: 'verdicts') => void goTab(tab),
       goOn: () => void router.push({ name: 'purchase-manual' }),

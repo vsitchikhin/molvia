@@ -83,8 +83,10 @@ export function useTripHistory(): TripHistoryScreen {
           pending: queue.pending.some(
             (write) => write.kind === 'finish' && write.tripId === row.id,
           ),
-          itemCount: row.view?.expenses.length ?? null,
-          total: row.view?.total ?? null,
+          // Unknown, not the snapshot's: it was taken at «Закончить», before what the queue still
+          // holds of this record, and read as the total it was not (review Р-10).
+          itemCount: null,
+          total: null,
         })
     }
     // A removal still waiting takes the row off every list at once (MOL-76).

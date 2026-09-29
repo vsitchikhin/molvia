@@ -1,17 +1,21 @@
 <template>
   <div class="home">
-    <div class="intro">
+    <!-- The headline speaks of the queue of verdicts, and only of one known: «первые покупки»
+         over a queue not yet answered told a person with twelve purchases they had none
+         (adversarial В) — so until it answers, the skeleton; with no answer to be had, nothing. -->
+    <div v-if="variant !== 'unknown'" class="intro">
       <h2 class="intro-title">
-        {{ pending > 0 ? t('advice.home.pending.title') : t('advice.home.new.title') }}
+        {{ variant === 'pending' ? t('advice.home.pending.title') : t('advice.home.new.title') }}
       </h2>
       <p class="intro-body">
         {{
-          pending > 0
+          variant === 'pending'
             ? t('advice.home.pending.body')
             : t('advice.home.new.body', { app: t('app.name') })
         }}
       </p>
     </div>
+    <ScreenSkeleton v-else-if="asking" :groups="[70]" />
 
     <!-- (в): purchases recorded and none rated — the one thing left to do, and where. -->
     <AppCard v-if="pending > 0" class="pending" list>
@@ -70,6 +74,7 @@ import IconLightbulb from '~icons/mdi/lightbulb-on-outline'
 import IconStar from '~icons/mdi/star-outline'
 import AppCard from '@/components/AppCard.vue'
 import PurchaseRow from '@/components/PurchaseRow.vue'
+import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import { usePendingFrom } from '@/composables/usePendingFrom'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
 import { useNavigation } from '@/navigation'
@@ -87,15 +92,29 @@ import { useNavigation } from '@/navigation'
  */
 export default defineComponent({
   name: 'AdviceHomeNew',
-  components: { AppCard, IconCart, IconChevronRight, IconLightbulb, IconStar, PurchaseRow },
+  components: {
+    AppCard,
+    IconCart,
+    IconChevronRight,
+    IconLightbulb,
+    IconStar,
+    PurchaseRow,
+    ScreenSkeleton,
+  },
   setup() {
     const { t } = useI18n()
     const { goTab } = useNavigation()
     const queue = useVerdictQueue()
+    const pending = computed(() => queue.count.value)
     return {
       t,
       IconStar,
-      pending: computed(() => queue.count.value),
+      pending,
+      variant: computed<'pending' | 'new' | 'unknown'>(() => {
+        if (pending.value > 0) return 'pending'
+        return queue.phase.value === 'empty' ? 'new' : 'unknown'
+      }),
+      asking: computed(() => queue.phase.value === 'loading'),
       pendingFrom: usePendingFrom(queue),
       goTab: (tab: 'purchases' | 'verdicts') => void goTab(tab),
     }

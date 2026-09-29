@@ -110,8 +110,8 @@ test('погашенная ссылка предлагает начать зан
 })
 
 test('сессия, которой не стало, поднимает экран входа с любого экрана', async ({ page }) => {
-  // Шов на `error.no_actor` живёт в одном месте, и проверить его можно только так: у экрана
-  // «Что брать» своего разбора отказа нет, и до MOL-56 он показывал «что-то пошло не так».
+  // Шов на `error.no_actor` живёт в одном месте, и проверить его можно только так: у экранов
+  // своего разбора этого отказа нет, и до MOL-56 «Что брать» показывала «что-то пошло не так».
   await page.goto('/')
   // Home asks for the list and, for a newcomer, the verdict queue by itself (MOL-128). Answered
   // after the session is gone, either one raises the door before «Purchases» is pressed — right,

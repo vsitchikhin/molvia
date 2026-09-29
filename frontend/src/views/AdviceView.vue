@@ -11,10 +11,25 @@
 
     <!-- Without an identity there is nobody to advise; the notice above says why. -->
     <template v-else-if="phase !== 'idle'">
+      <!-- At the top of the list and scrolled with it, never pinned: at a shelf a person starts
+           from the top of the screen (handoff `01`). Only over a list: with none — loading, a
+           failure, a newcomer — there is nothing to say about what is found (question 1). Above
+           the strip of the list's age, as the handoff draws it (review Р-16). -->
+      <AdviceSearch
+        v-if="phase === 'ready'"
+        v-model="query"
+        :remembered="remembered"
+        :fetched-at="fetchedAt"
+        :refreshes="refreshes"
+        @edit="edit"
+        @rate="rate"
+      />
+
       <!-- The rows come from the phone, and the strip says how old they are — while the
            request is still on its way as well, not only once it has failed (А4). Above the
-           branch, so an empty list from memory is dated too (С-4). -->
-      <div v-if="stale && fetchedAt" class="stale">
+           branch, so an empty list from memory is dated too (С-4). Not while something is typed:
+           the list is out of sight then, and the search dates what it searched itself. -->
+      <div v-if="stale && fetchedAt && !searching" class="stale">
         <p class="stale-text">
           <IconCloud v-if="otherCity" aria-hidden="true" />
           {{
@@ -33,19 +48,6 @@
           {{ t('state.retry') }}
         </AppButton>
       </div>
-
-      <!-- At the top of the list and scrolled with it, never pinned: at a shelf a person starts
-           from the top of the screen (handoff `01`). Only over a list: with none — loading, a
-           failure, a newcomer — there is nothing to say about what is found (question 1). -->
-      <AdviceSearch
-        v-if="phase === 'ready'"
-        v-model="query"
-        :remembered="remembered"
-        :fetched-at="fetchedAt"
-        :refreshes="refreshes"
-        @edit="edit"
-        @rate="rate"
-      />
 
       <ScreenState
         v-if="phase === 'error'"
@@ -109,8 +111,10 @@
 
     <!-- The newcomer's one action, under the thumb (MOL-128, В-5); with receipts (MOL-127) this
          strip holds «Сфотографировать чек». -->
-    <template v-if="phase === 'empty'" #docked>
-      <div class="strip"><ManualEntryButton /></div>
+    <!-- Kept while a sheet of its own is up: an answer with rows arriving under «Где вы?» took
+         the strip and the sheet with it (review Р-15). -->
+    <template v-if="phase === 'empty' || entering" #docked>
+      <div class="strip"><ManualEntryButton @busy="entering = $event" /></div>
     </template>
 
     <!-- Mounted on a tap and put away from `onClosed`: each opening starts from the row as the
@@ -133,7 +137,7 @@
 import { computed, defineComponent, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { drawsNothing } from '@molvia/model'
-import type { AdviceFound, AdviceRow } from '@molvia/model'
+import type { AdviceFound, AdviceRow, AdviceScope } from '@molvia/model'
 import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconSync from '~icons/mdi/sync'
 import AdviceCheapRow from '@/components/AdviceCheapRow.vue'
@@ -209,6 +213,8 @@ export default defineComponent({
     const searching = computed(() => !drawsNothing(query.value))
     /** Raised by a save, so the search asks again for the rows it shows. */
     const refreshes = ref(0)
+    /** A sheet of «Записать покупки» is up. */
+    const entering = ref(false)
     /** The row whose verdict is being amended, as the last answer described it. */
     const editing = ref<{
       itemId: string
@@ -219,8 +225,13 @@ export default defineComponent({
       review: string | null
     } | null>(null)
 
-    function edit(row: AdviceRow): void {
-      const scope = advice.scope.value ?? 'own'
+    /**
+     * A row found by the search carries the scope of the search's answer, which may not be the
+     * list's — access opened or ran out between the two (review Р-13, adversarial Е): read by the
+     * list's, an average of three was offered pre-chosen as one's own score.
+     */
+    function edit(row: AdviceRow, answered?: AdviceScope): void {
+      const scope = answered ?? advice.scope.value ?? 'own'
       editing.value = {
         itemId: row.itemId,
         name: row.name,
@@ -237,12 +248,12 @@ export default defineComponent({
      * «Оценить» on an item nobody has rated in sight — found by the search, with no row of its own.
      * Without a place, as a verdict from «Оценки» is (MOL-27).
      */
-    function rate(item: AdviceFound): void {
+    function rate(item: AdviceFound, answered: AdviceScope): void {
       editing.value = {
         itemId: item.itemId,
         name: item.name,
         mine: false,
-        shared: advice.scope.value === 'shared',
+        shared: answered === 'shared',
         score: null,
         review: null,
       }
@@ -253,6 +264,7 @@ export default defineComponent({
       STALE,
       query,
       searching,
+      entering,
       refreshes,
       remembered: advice.answer,
       phase: advice.phase,
