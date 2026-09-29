@@ -67,7 +67,7 @@
             <AppButton size="large" block @click="compose">
               {{ t('spending.empty.action') }}
             </AppButton>
-            <AppButton variant="ghost" block @click="goTab('trip')">
+            <AppButton variant="ghost" block @click="goTab('purchases')">
               {{ t('spending.empty.trip') }}
             </AppButton>
             <!-- A newcomer may take a preset out of the choice before the first spending too

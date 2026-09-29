@@ -193,7 +193,7 @@ describe('AppScreen', () => {
         },
       )
 
-      await render('/trip/add')
+      await render('/purchases/manual/add')
       await nextTick()
       expect(DrivenObserver.last?.options?.rootMargin).toBe('-91px 0px 0px 0px')
       const first = DrivenObserver.last
@@ -268,16 +268,16 @@ describe('AppScreen', () => {
 
   describe('the back chevron', () => {
     it('is absent on a section', async () => {
-      for (const path of ['/', '/advice', '/verdicts']) {
+      for (const path of ['/', '/purchases', '/verdicts']) {
         const { view } = await render(path)
         expect(view.find('.back').exists()).toBe(false)
       }
     })
 
     it('is labelled with where it leads, not with the word «Back»', async () => {
-      const { view } = await render('/trip/add')
+      const { view } = await render('/purchases/manual')
       const back = view.get('.back')
-      expect(back.text()).toContain(en.nav.trip)
+      expect(back.text()).toContain(en.purchases.title)
       expect(view.get('.screen').classes()).toContain('docked')
     })
 
@@ -287,11 +287,11 @@ describe('AppScreen', () => {
       ['en', en],
       ['ru', ru],
     ] as const)('is named «Back, <parent>» in %s', async (locale, dictionary) => {
-      const { view } = await render('/trip/add', { locale })
+      const { view } = await render('/purchases/manual', { locale })
       const back = view.get('.back')
       expect(back.attributes('aria-label')).toBeUndefined()
       expect(back.text().replace(/\s+/g, ' ').trim()).toBe(
-        `${dictionary.nav.back_label} ${dictionary.nav.trip}`,
+        `${dictionary.nav.back_label} ${dictionary.purchases.title}`,
       )
       expect(back.get('.hidden').text()).toBe(dictionary.nav.back_label)
     })
@@ -346,36 +346,36 @@ describe('AppScreen', () => {
 
       it('says where it leads while that fits', async () => {
         Object.assign(size, { full: 145, short: 40 })
-        const { view } = await render('/trip/history/5a3c3c1e-0000-4000-8000-000000000001')
-        expect(view.get('.back .label').text()).toBe(en.trip.history.title)
-        expect(spoken(view)).toBe(`${en.nav.back_label} ${en.trip.history.title}`)
+        const { view } = await render('/purchases/5a3c3c1e-0000-4000-8000-000000000001')
+        expect(view.get('.back .label').text()).toBe(en.purchases.title)
+        expect(spoken(view)).toBe(`${en.nav.back_label} ${en.purchases.title}`)
       })
 
       // Review Р-2, owner's decision: the name keeps where it leads on every step of the ladder,
-      // the word shown first — «Back Trip history», not «Back» and not «Back Back».
+      // the word shown first — «Back Purchases», not «Back» and not «Back Back».
       it('shows «Back» alone, and is still named where it leads', async () => {
         Object.assign(size, { column: 100, full: 145, short: 40 })
-        const { view } = await render('/trip/history/5a3c3c1e-0000-4000-8000-000000000001')
+        const { view } = await render('/purchases/5a3c3c1e-0000-4000-8000-000000000001')
         expect(view.get('.back .label').text()).toBe(en.nav.back_label)
-        expect(view.get('.back .hidden').text()).toBe(en.trip.history.title)
-        expect(spoken(view)).toBe(`${en.nav.back_label} ${en.trip.history.title}`)
+        expect(view.get('.back .hidden').text()).toBe(en.purchases.title)
+        expect(spoken(view)).toBe(`${en.nav.back_label} ${en.purchases.title}`)
       })
 
       it('is the chevron alone, and still read out whole', async () => {
         Object.assign(size, { column: 60, full: 145, short: 40 })
-        const { view } = await render('/trip/history/5a3c3c1e-0000-4000-8000-000000000001', {
+        const { view } = await render('/purchases/5a3c3c1e-0000-4000-8000-000000000001', {
           locale: 'ru',
         })
         expect(view.find('.back .label').exists()).toBe(false)
         expect(view.findAll('.back .hidden')).toHaveLength(2)
-        expect(spoken(view)).toBe(`${ru.nav.back_label} ${ru.trip.history.title}`)
+        expect(spoken(view)).toBe(`${ru.nav.back_label} ${ru.purchases.title}`)
       })
 
       // The column narrows when the small title comes in and widens when it goes: the label
       // follows it both ways, not only the first time it is measured.
       it('measures again whenever the column or a label changes size', async () => {
         Object.assign(size, { full: 145, short: 40 })
-        const { view } = await render('/trip/history/5a3c3c1e-0000-4000-8000-000000000001')
+        const { view } = await render('/purchases/5a3c3c1e-0000-4000-8000-000000000001')
         const observer = DrivenResizeObserver.label()
         expect(observer?.observed).toHaveLength(3)
 
@@ -387,14 +387,14 @@ describe('AppScreen', () => {
         size.column = 200
         observer?.resize()
         await nextTick()
-        expect(view.get('.back .label').text()).toBe(en.trip.history.title)
+        expect(view.get('.back .label').text()).toBe(en.purchases.title)
       })
 
       // «Назад» 51.06 wide in 51 of room: rounded, the word read 51 and «fit» by a fraction it
       // did not have — and «Наз…» was drawn. A tenth more room, and it does fit.
       it('decides in fractions, not in the whole pixels a browser rounds to', async () => {
         Object.assign(size, { column: 77, full: 145.2, short: 51.06 })
-        const { view } = await render('/trip/history/5a3c3c1e-0000-4000-8000-000000000001', {
+        const { view } = await render('/purchases/5a3c3c1e-0000-4000-8000-000000000001', {
           locale: 'ru',
         })
         expect(view.find('.back .label').exists()).toBe(false)
@@ -410,9 +410,9 @@ describe('AppScreen', () => {
       it('stays whole and measures nothing where the platform cannot observe a size', async () => {
         vi.stubGlobal('ResizeObserver', undefined)
         Object.assign(size, { column: 60, full: 145, short: 40 })
-        const { view } = await render('/trip/history/5a3c3c1e-0000-4000-8000-000000000001')
-        expect(view.get('.back .label').text()).toBe(en.trip.history.title)
-        expect(spoken(view)).toBe(`${en.nav.back_label} ${en.trip.history.title}`)
+        const { view } = await render('/purchases/5a3c3c1e-0000-4000-8000-000000000001')
+        expect(view.get('.back .label').text()).toBe(en.purchases.title)
+        expect(spoken(view)).toBe(`${en.nav.back_label} ${en.purchases.title}`)
       })
 
       it('keeps no samples and observes nothing on a section', async () => {
@@ -423,10 +423,10 @@ describe('AppScreen', () => {
     })
 
     it('leads to the parent', async () => {
-      const { view, router } = await render('/trip/add')
+      const { view, router } = await render('/purchases/manual')
       await view.get('.back').trigger('click')
       await vi.waitFor(() => {
-        expect(router.currentRoute.value.name).toBe('trip')
+        expect(router.currentRoute.value.name).toBe('purchases')
       })
     })
   })

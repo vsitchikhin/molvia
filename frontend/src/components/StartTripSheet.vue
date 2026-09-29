@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
+  <BottomSheet :open="open" :on-closed="onClosed" @update:open="$emit('update:open', $event)">
     <template #title>{{ t('trip.start.title') }}</template>
 
     <ScreenState
@@ -40,6 +40,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch } from 'vue'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { drawsNothing, newPlaceSchema, pastedLine } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
@@ -69,9 +70,17 @@ export default defineComponent({
   components: { AppButton, AppField, BottomSheet, ScreenState },
   props: {
     open: { type: Boolean, required: true },
+    /**
+     * Called once the sheet is away — the moment its opener may move (MOL-128): «Покупки» opens
+     * the record then, since a move under an open sheet closes it and its own step back would land
+     * on the screen just opened.
+     */
+    onClosed: { type: Function as PropType<() => void>, default: undefined },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
+    /** A trip went into the queue: the sheet closes with a record to go to. */
+    started: () => true,
   },
   setup(props, { emit }) {
     const { t } = useI18n()
@@ -121,6 +130,7 @@ export default defineComponent({
         place: { kind: 'store', name: place },
         startedAt: new Date(),
       })
+      emit('started')
       emit('update:open', false)
     }
 

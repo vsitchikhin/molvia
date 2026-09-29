@@ -1,6 +1,6 @@
 <template>
-  <AppScreen :title="t('trip.title')">
-    <template v-if="meta" #meta>{{ meta }}</template>
+  <AppScreen :title="place || t('trip.title')">
+    <template v-if="meta" #subtitle>{{ meta }}</template>
 
     <template v-if="phase === 'going'" #trailing>
       <button class="finish" type="button" @click="askFinish">{{ t('trip.finish') }}</button>
@@ -11,13 +11,9 @@
     <template v-else>
       <!-- Over whatever the screen shows, never instead of it: at a shelf the list the phone
            remembers is worth more than a red square, and the purchases are all still there
-           (MOL-19). Without a trip the home screen says it in its own words — the trip can still
-           start (MOL-77). The price, named: offline with nothing remembered, a trip left open on
-           another device reads as «no trip» until the connection comes back; a start made then
-           goes through the queue, and `trip.elsewhere` asks about the open one. The error below
-           stays in both phases, in words that fit each. -->
+           (MOL-19). -->
       <ScreenState
-        v-if="trouble === 'offline' && phase !== 'none'"
+        v-if="trouble === 'offline'"
         class="notice"
         kind="offline"
         tone="good"
@@ -31,71 +27,16 @@
         kind="error"
         inline
         :title="t('trip.error.title')"
-        :body="phase === 'none' ? t('trip.error.body_none') : t('trip.error.body')"
+        :body="t('trip.error.body')"
         @retry="retry"
       />
     </template>
 
-    <!-- A purchase the server refused: what it was, why, and a way to correct it. Shown whatever
-         else is on the screen, and for every trip, not only the one going on — a purchase that was
-         never recorded does not stop mattering when its trip is finished (MOL-22, В-3, review 2). -->
-    <ScreenState
-      v-for="item in rejected"
-      :key="refusalKey(item)"
-      class="notice"
-      kind="attention"
-      inline
-      :title="refusalTitle(item)"
-      :body="refusalReason(item)"
-    >
-      <template #action>
-        <div class="refusal-actions">
-          <AppButton v-if="correctable(item)" variant="ghost" @click="correct(item)">
-            {{ t('trip.rejected.fix') }}
-          </AppButton>
-          <AppButton variant="ghost" @click="queue.dismiss(item)">
-            {{ heldBack(item) > 0 ? t('trip.rejected.drop_trip') : t('trip.rejected.drop') }}
-          </AppButton>
-        </div>
-      </template>
-    </ScreenState>
+    <!-- What the queue has to say about any record, this one or another — on «Покупки» as well
+         (MOL-128). -->
+    <TripNotices />
 
-    <!-- A trip is already open: the purchases wait rather than move there by themselves,
-         because «item + place» is the key the product rests on. The choice is the person's
-         (adversarial Б1, owner's decision). -->
-    <ScreenState
-      v-if="queue.elsewhere"
-      class="notice"
-      kind="attention"
-      inline
-      :title="t('trip.elsewhere.title', { place: queue.elsewhere.place })"
-      :body="elsewhereBody(queue.elsewhere)"
-    >
-      <template #action>
-        <AppButton variant="ghost" @click="chooseTrip">{{ t('trip.elsewhere.choose') }}</AppButton>
-      </template>
-    </ScreenState>
-
-    <!-- Finished with no signal: the trip is over on the phone, and what it still holds must not
-         go quiet with it — on iOS nothing is sent in the background, and an app that was closed
-         here would never say a word (adversarial В1). -->
-    <ScreenState
-      v-if="phase !== 'loading' && unsent > 0"
-      class="notice"
-      kind="attention"
-      inline
-      :title="t('trip.unsent.title', { n: unsent }, unsent)"
-      :body="t('trip.unsent.body')"
-    />
-
-    <TripHome
-      v-if="phase === 'none'"
-      :offline="trouble === 'offline'"
-      :trip-failed="trouble === 'error'"
-      :retries="retries"
-    />
-
-    <template v-else-if="phase === 'going'">
+    <template v-if="phase === 'going'">
       <TripRateNotes v-if="trip" :trip="trip" />
 
       <!-- No circle: over «Найти товар» it read as a button of its own, and was tapped (MOL-77). -->
@@ -121,58 +62,24 @@
         </AppCard>
         <p class="footnote">{{ t('trip.footnote') }}</p>
       </template>
-    </template>
 
-    <!-- Under the list, and only once there is a screen to put it under: over the skeleton it
-         was the one thing drawn while everything else was still loading (З-9). Without a trip the
-         home screen has «Вся история» of its own (MOL-77). -->
-    <AppButton v-if="phase === 'going'" class="history" variant="ghost" block @click="history">{{
-      t('trip.history.title')
-    }}</AppButton>
-    <!-- At the end of the list, one and the same on an open and a finished trip, and never under
-         the thumb (MOL-76, В-1). -->
-    <AppButton v-if="phase === 'going'" variant="danger-ghost" block @click="askRemove">{{
-      t('trip.remove.action')
-    }}</AppButton>
+      <!-- At the end of the list, one and the same on an open and a finished record, and never
+           under the thumb (MOL-76, В-1). -->
+      <AppButton class="remove" variant="danger-ghost" block @click="askRemove">{{
+        t('trip.remove.action')
+      }}</AppButton>
+    </template>
 
     <!-- The one permanent place money is converted, and it stays put while the list scrolls. -->
-    <!-- Without a trip the strip holds «Начать поход» instead — under the thumb, above whatever
-         the home screen says, however long (MOL-77). Loading with no trip remembered is almost
-         always «no trip», and a start there goes through the queue like any other: an open trip
-         the server then names is asked about by `trip.elsewhere`. -->
-    <template #docked>
-      <TripTotal v-if="phase === 'going'" :trip="trip" :pending="waiting" :local="local !== null" />
-      <div v-else class="start">
-        <TripUndoStrip class="undo" />
-        <AppButton size="large" block @click="starting = true">{{
-          t('trip.none.action')
-        }}</AppButton>
-      </div>
+    <template v-if="phase === 'going'" #docked>
+      <TripTotal :trip="trip" :pending="waiting" :local="local !== null" />
     </template>
 
-    <ScreenState
-      v-if="queue.needsContext"
-      kind="attention"
-      inline
-      :title="t('settings.legacy.title')"
-      :body="t('settings.legacy.body')"
-    >
-      <template #action
-        ><AppButton @click="clarifying = true">{{
-          t('settings.legacy.action')
-        }}</AppButton></template
-      >
-    </ScreenState>
-    <!-- Mounted always and led by `open`, as «Предложить товар» is: under a `v-if` the sheet
-         would be gone before it could step back off its own history entry (MOL-18; review 5). -->
-    <TripContextSheet v-model:open="clarifying" />
-    <StartTripSheet v-model:open="starting" />
-
-    <!-- Asked before, not undone after: a trip cannot be reopened in 0.1, and «Завершить» is one
-         tap away from «Добавить позицию». -->
-    <!-- An empty trip finished is a row of nothing in the history for good: it is offered to go
-         instead, and finishing it stays the second action (MOL-76, В-2). -->
-    <BottomSheet v-model:open="finishing">
+    <!-- Asked before, not undone after: a record cannot be reopened in 0.1, and «Закончить» is one
+         tap away from «Добавить позицию». An empty one finished is a row of nothing in «Покупки»
+         for good: it is offered to go instead, and finishing it stays the second action (MOL-76,
+         В-2). Away, the screen goes up to «Покупки» — there is nothing left on it. -->
+    <BottomSheet v-model:open="finishing" :on-closed="leaveIfOver">
       <template #title>{{
         finishingEmpty ? t('trip.remove.empty.title') : t('trip.finish_confirm.title')
       }}</template>
@@ -204,22 +111,12 @@
       :place="removal.place"
       :day="removal.day"
       :items="removal.items"
+      :on-closed="leaveIfOver"
       @confirm="remove"
     />
 
-    <BottomSheet v-model:open="choosing">
-      <template #title>{{ t('trip.elsewhere.title', { place: choice?.place ?? '' }) }}</template>
-      <p class="confirm">{{ choice ? elsewhereBody(choice) : '' }}</p>
-      <template #footer>
-        <AppButton size="large" block @click="joinTrip">{{ t('trip.elsewhere.join') }}</AppButton>
-        <AppButton variant="ghost" block @click="finishOtherTrip">{{
-          t('trip.elsewhere.finish')
-        }}</AppButton>
-      </template>
-    </BottomSheet>
-
     <!-- Mounted on a tap and put away from `onClosed`, as the search does it: one opening, one
-         purchase. One step back — the trip is the screen under it. -->
+         purchase. One step back — the record is the screen under it. -->
     <ItemDetailsSheet
       v-if="opened"
       :key="opened.key"
@@ -229,17 +126,15 @@
       :retry="opened.retry"
       :close-steps="1"
       :on-closed="putAway"
-      @added="corrected"
     />
   </AppScreen>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPlus from '~icons/mdi/plus'
-import { ERROR, isSamePlaceName } from '@molvia/model'
 import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -247,28 +142,24 @@ import AppScreen from '@/components/AppScreen.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
-import TripContextSheet from '@/components/TripContextSheet.vue'
-import TripHome from '@/components/TripHome.vue'
-import StartTripSheet from '@/components/StartTripSheet.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import TripNotices from '@/components/TripNotices.vue'
 import TripRateNotes from '@/components/TripRateNotes.vue'
 import TripRemoveSheet from '@/components/TripRemoveSheet.vue'
 import TripRow from '@/components/TripRow.vue'
 import TripTotal from '@/components/TripTotal.vue'
-import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import type { TripRowView } from '@/components/tripRow'
 import { useTripRows } from '@/composables/useTripRows'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import type { RetryPurchase } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
-import { purchaseDay } from '@/days'
+import { purchaseDay, timeOfDay } from '@/days'
+import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
-import type { TripElsewhere } from '@/stores/tripQueue'
-import type { RejectedWrite } from '@/stores/tripQueue'
 
-/** What the sheet is open on: a row being amended, or a refused purchase being corrected. */
+/** What the sheet is open on: a row being amended. */
 interface Opened {
   readonly key: string
   readonly entry: CatalogueEntry
@@ -276,12 +167,12 @@ interface Opened {
   /** The trip the row belongs to, which is not always the one going on now. */
   readonly tripId: string | null
   readonly retry: RetryPurchase | null
-  readonly refusal: RejectedWrite | null
 }
 
 /**
- * «Поход» — the screen the product is built around: what is in the basket, what it costs, and
- * one tap to the next purchase.
+ * The record typed by hand (MOL-128) — the screen that was «Поход» with a trip going on: what is
+ * in the basket, what it costs, and one tap to the next purchase. A screen under «Покупки» now,
+ * called by its place; the rules of writing are MOL-21, MOL-24 and MOL-25, unchanged.
  *
  * **Nothing is added up here** (MOL-24, В-11). The list, the price per unit of every row and the
  * total are the server's; the one number the phone computes is the price per unit of a purchase
@@ -290,8 +181,11 @@ interface Opened {
  *
  * **The trip is the queue's as much as the store's** (Р-2): started or finished with no signal,
  * it exists on the phone before the server hears about it, and the screen draws it either way.
- * A failure to reach the server is a notice above the list, never in place of it: the purchases
- * are on the phone and the trip goes on.
+ * A failure to reach the server is a notice above the list, never in place of it.
+ *
+ * **With no record open the screen goes up to «Покупки»** — finished here or on another device,
+ * removed, or opened by an old address: there is nothing left on it, and «Покупки» is where a new
+ * one starts and where «Вернуть» stands.
  */
 export default defineComponent({
   name: 'TripView',
@@ -304,58 +198,27 @@ export default defineComponent({
     ItemDetailsSheet,
     ScreenSkeleton,
     ScreenState,
-    StartTripSheet,
-    TripContextSheet,
-    TripHome,
+    TripNotices,
     TripRateNotes,
     TripRemoveSheet,
     TripRow,
     TripTotal,
-    TripUndoStrip,
   },
   setup() {
     const { t, locale } = useI18n()
     const router = useRouter()
+    const { goUp } = useNavigation()
     const actor = useActorStore()
     const trips = useTripStore()
     const queue = useTripQueueStore()
-    const choosing = ref(false)
-    const choice = ref<TripElsewhere | null>(null)
-    /**
-     * Moving purchases into a trip of another shop is said in words before it is offered (Р-2):
-     * «item + place» is the key the product rests on, and a price of «Ереван Сити» written down
-     * against «SAS» is later indistinguishable from a real one. For the same shop the sentence
-     * would be untrue, so it is a second key rather than a longer one (З-4).
-     *
-     * «The same shop» is the database's own answer, not equal strings: a trailing space made the
-     * screen promise damage that the server's own index rules out (В3).
-     */
-    const elsewhereBody = (asked: TripElsewhere): string =>
-      isSamePlaceName(asked.place, asked.mine)
-        ? t('trip.elsewhere.body', { mine: asked.mine })
-        : t('trip.elsewhere.body_other', { mine: asked.mine, place: asked.place })
-    function chooseTrip(): void {
-      choice.value = queue.elsewhere
-      choosing.value = choice.value !== null
-    }
-    function joinTrip(): void {
-      if (choice.value) queue.joinElsewhere(choice.value)
-      choosing.value = false
-    }
-    function finishOtherTrip(): void {
-      if (choice.value) queue.finishElsewhere(choice.value)
-      choosing.value = false
-    }
 
     const { trip, local, tripId } = useCurrentTrip()
 
     /** Asked once at the start; the memory covers every later opening (MOL-24, Н-7). */
     const asked = ref(trips.current !== null)
     const trouble = ref<'offline' | 'error' | null>(null)
-    const starting = ref(false)
-    const clarifying = ref(false)
     const finishing = ref(false)
-    /** Taken when «Завершить» is tapped: a row arriving while the sheet is up does not reword it. */
+    /** Taken when «Закончить» is tapped: a row arriving while the sheet is up does not reword it. */
     const finishingEmpty = ref(false)
     const removing = ref(false)
     /** What the question names, taken when it is asked (MOL-76, Р-2). */
@@ -364,14 +227,11 @@ export default defineComponent({
       day: null,
       items: 0,
     })
-    /** The red block's «Повторить» without a trip asks for the history too (adversarial Д). */
-    const retries = ref(0)
 
     async function load(): Promise<void> {
       // No identity yet — the first launch is still making one, and there is nothing to ask for
       // (MOL-28 does the same). A red «the server did not answer» before the app has an identity
-      // would be about the app's own start, not about the network; the identity notice above says
-      // what is happening.
+      // would be about the app's own start, not about the network.
       if (!actor.id) return
       try {
         await trips.load()
@@ -390,92 +250,34 @@ export default defineComponent({
       return tripId.value === null ? 'none' : 'going'
     })
 
+    const place = computed(() => trip.value?.place.name ?? local.value?.placeName ?? '')
+
+    /** «Записываете вручную · сегодня, с 18:40» (handoff `07`). */
     const meta = computed(() => {
-      const place = trip.value?.place.name ?? local.value?.placeName
-      const when = trip.value?.startedAt ?? local.value?.startedAt
-      return place && when
-        ? t('trip.at_place', { place, when: purchaseDay(when, locale.value) })
+      const since = trip.value?.startedAt ?? local.value?.startedAt
+      return since
+        ? t('trip.manual_meta', {
+            when: t('trip.manual_since', {
+              day: purchaseDay(since, locale.value),
+              time: timeOfDay(since, locale.value),
+            }),
+          })
         : null
     })
 
     const { rows, waiting } = useTripRows(tripId, trip, () => t('trip.queued.unnamed'))
 
-    const rejected = computed(() => queue.rejected)
-
     /**
-     * Purchases waiting for a trip that is not the one on screen — after «Завершить», and after
-     * the next trip has been started (Т-11). Those of the trip on screen are lines of it, with
-     * their own mark and their own caveat under the total; these have nowhere else to be said.
+     * Up to «Покупки» once no record is open — but never under a sheet: its own step back is in
+     * flight, and a move made then is lost (MOL-18). A sheet that closes calls this again.
      */
-    const unsent = computed(() => {
-      // Purchases of a trip the server refused — its start, or its «Вернуть» — are not «not sent
-      // yet»: they are not going anywhere, and the notice about that trip is where they are counted
-      // (раунд 5, З1; MOL-76, round 2 Б1). One predicate with the queue that steps over them.
-      return queue.pending.filter(
-        (write) =>
-          write.kind === 'add' && write.tripId !== tripId.value && !queue.orphaned(write.tripId),
-      ).length
+    function leaveIfOver(): void {
+      if (phase.value !== 'none' || document.querySelector('dialog[open]')) return
+      void goUp()
+    }
+    watch(phase, (now) => {
+      if (now === 'none') void nextTick(leaveIfOver)
     })
-
-    // Its own name on the phone: two refusals about one row differ in nothing a screen can see,
-    // and Vue would reuse one's node for the other (review 7, В2-8).
-    const refusalKey = (item: RejectedWrite): string => item.key
-
-    /**
-     * What to call the refused write. A purchase carries its own card; an amendment or a removal
-     * is named by the row it is about — and only while that row is on screen. A refusal from a
-     * trip that is over stays nameless (В2-9): the row is not there to ask, and inventing a name
-     * is worse than «одна запись».
-     */
-    function nameOf(item: RejectedWrite): string | null {
-      const write = item.write
-      if (write.kind === 'add') return write.entry?.name ?? null
-      if (!('expenseId' in write)) return null
-      const expense = trip.value?.expenses.find((row) => row.id === write.expenseId)
-      return expense?.item.name ?? null
-    }
-
-    const refusalTitle = (item: RejectedWrite): string => {
-      if (item.write.kind === 'restore') {
-        return t('trip.remove.not_restored', { name: item.write.name })
-      }
-      const name = nameOf(item)
-      return name ? t('trip.rejected.named', { name }) : t('trip.rejected.title')
-    }
-
-    /**
-     * Why it was refused, in the person's words where the dictionary has them. A code from the
-     * `issue.*` half is a fault of the app rather than of what was typed: it is named plainly and
-     * carried as the code itself, which is what a report needs.
-     */
-    const refusalReason = (item: RejectedWrite): string => {
-      const key = item.code.startsWith('error.') ? item.code : null
-      const why =
-        item.write.kind === 'restore'
-          ? item.code === ERROR.TRIP_OPEN
-            ? t('trip.remove.not_restored_open')
-            : t('trip.remove.not_restored_gone')
-          : key
-            ? t(key)
-            : t('trip.rejected.unknown', { code: item.code })
-      // A refused trip holds its purchases, and nothing else on screen says so: «N ещё не
-      // отправлено» promises they will go, and they will not (раунд 5, З1).
-      const waiting = heldBack(item)
-      return waiting > 0 ? `${why} · ${t('trip.rejected.orphaned', { n: waiting }, waiting)}` : why
-    }
-
-    /**
-     * Purchases that will never be written because this trip was not (раунд 5, З1) — or did not
-     * come back, those made after «Вернуть» among them (MOL-76, adversarial А2).
-     */
-    const heldBack = (item: RejectedWrite): number =>
-      item.write.kind === 'start' || item.write.kind === 'restore'
-        ? queue.heldBack(item.write.tripId)
-        : 0
-
-    /** Only a purchase can be corrected, and only one whose card the phone can still read. */
-    const correctable = (item: RejectedWrite): boolean =>
-      item.write.kind === 'add' && item.write.entry !== null
 
     const opened = ref<Opened | null>(null)
     let openings = 0
@@ -502,7 +304,6 @@ export default defineComponent({
         expense: row.expense,
         tripId: row.expense ? (trip.value?.id ?? null) : tripId.value,
         retry: purchase,
-        refusal: null,
       }
     }
 
@@ -521,37 +322,9 @@ export default defineComponent({
       }
     }
 
-    function correct(item: RejectedWrite): void {
-      const write = item.write
-      if (write.kind !== 'add' || !write.entry) return
-      openings += 1
-      opened.value = {
-        key: `fix-${write.body.id}-${String(openings)}`,
-        entry: write.entry,
-        expense: null,
-        tripId: write.tripId,
-        // The purchase keeps its own identifier: the server never took it, so it cannot meet
-        // a second copy of itself.
-        retry: {
-          id: write.body.id,
-          quantity: write.body.quantity ?? null,
-          amount: write.body.amount ?? null,
-          query: write.body.query ?? null,
-          missedQuery: write.body.missedQuery ?? null,
-        },
-        refusal: item,
-      }
-    }
-
-    /** The corrected purchase is queued first, and only then the refusal is forgotten. */
-    function corrected(): void {
-      const refusal = opened.value?.refusal
-      if (refusal) queue.dismiss(refusal)
-    }
-
     /**
-     * The trip is over on the phone the moment it is asked for: the write goes into the queue
-     * behind every purchase of this trip, so «завершить» reaches the server last (MOL-22, В-1).
+     * The record is over on the phone the moment it is asked for: the write goes into the queue
+     * behind every purchase of it, so «закончить» reaches the server last (MOL-22, В-1).
      */
     function finish(): void {
       const id = tripId.value
@@ -561,7 +334,7 @@ export default defineComponent({
 
     /**
      * The rows still on screen: one being removed is on its way out already. One count for both
-     * questions, or «Завершить» and «Удалить поход» called one trip empty and not (review Р-5).
+     * questions, or «Закончить» and «Удалить запись» called one record empty and not (review Р-5).
      */
     const kept = computed(() => rows.value.filter((row) => row.mark !== 'removing').length)
 
@@ -571,8 +344,8 @@ export default defineComponent({
     }
 
     /**
-     * «Удалить поход»: an empty one goes at once, with «Вернуть» on the home screen; one with
-     * purchases is asked about first, naming them (MOL-76, Р-2).
+     * «Удалить запись»: an empty one goes at once, with «Вернуть» on «Покупки»; one with purchases
+     * is asked about first, naming them (MOL-76, Р-2).
      */
     function askRemove(): void {
       if (kept.value === 0) {
@@ -580,7 +353,7 @@ export default defineComponent({
         return
       }
       removal.value = {
-        place: trip.value?.place.name ?? local.value?.placeName ?? '',
+        place: place.value,
         day: trip.value?.startedAt ?? local.value?.startedAt ?? null,
         items: kept.value,
       }
@@ -589,8 +362,7 @@ export default defineComponent({
 
     function remove(): void {
       const id = tripId.value
-      const place = trip.value?.place.name ?? local.value?.placeName ?? ''
-      if (id) queue.removeTrip(id, place)
+      if (id) queue.removeTrip(id, place.value)
       removing.value = false
     }
 
@@ -599,11 +371,7 @@ export default defineComponent({
       finishing.value = false
     }
 
-    function putAway(): void {
-      opened.value = null
-    }
-
-    /** A nested screen, so an ordinary push: «back» from it lands on the trip (MOL-17). */
+    /** A nested screen, so an ordinary push: «back» from it lands on the record (MOL-17). */
     function find(): void {
       void router.push({ name: 'item-search' })
     }
@@ -622,29 +390,22 @@ export default defineComponent({
 
     onMounted(() => {
       void load()
+      // Opened with nothing to show — an old address, a record finished on another device and
+      // already known here.
+      leaveIfOver()
     })
 
     return {
-      choosing,
-      choice,
-      chooseTrip,
-      elsewhereBody,
-      joinTrip,
-      finishOtherTrip,
       t,
-      queue,
       trip,
       local,
       waiting,
       phase,
       trouble,
+      place,
       meta,
       rows,
-      rejected,
-      unsent,
       opened,
-      starting,
-      clarifying,
       finishing,
       finishingEmpty,
       askFinish,
@@ -654,22 +415,13 @@ export default defineComponent({
       askRemove,
       remove,
       removeEmpty,
-      retries,
-      retry: () => {
-        retries.value += 1
-        void load()
-      },
-      refusalKey,
-      refusalTitle,
-      heldBack,
-      refusalReason,
-      correctable,
-      correct,
-      corrected,
+      leaveIfOver,
+      retry: () => void load(),
       amend,
-      putAway,
+      putAway: () => {
+        opened.value = null
+      },
       find,
-      history: () => void router.push({ name: 'trip-history' }),
     }
   },
 })
@@ -707,13 +459,6 @@ export default defineComponent({
   margin-bottom: var(--space-3);
 }
 
-.refusal-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  justify-content: center;
-}
-
 .add {
   @include touch-target;
 
@@ -739,16 +484,8 @@ export default defineComponent({
   height: 1.375rem;
 }
 
-.history {
+.remove {
   margin-top: var(--space-6);
-}
-
-.start {
-  padding: var(--space-3) 0;
-}
-
-.undo {
-  margin-bottom: var(--space-3);
 }
 
 .footnote {

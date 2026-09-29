@@ -1,18 +1,22 @@
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { Money } from '@molvia/model'
 import { useRouter } from 'vue-router'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { useActorStore } from '@/stores/actor'
 import { useReconnect } from './useReconnect'
 
-/** A row of the history, as both the history and the home screen draw it (MOL-77). */
+/** A row of «Записаны» on «Покупки» (MOL-128; the history and the home screen, MOL-77). */
 export interface HistoryRow {
   id: string
   name: string
   at: Date
   pending: boolean
+  /** The server's count and sums (В-4); `null` where only the phone knows the row. */
+  itemCount: number | null
+  total: readonly Money[] | null
 }
 interface TripHistoryScreen {
   t: ReturnType<typeof useI18n>['t']
@@ -23,7 +27,6 @@ interface TripHistoryScreen {
   load(): void
   more(): void
   open(tripId: string): void
-  home(): void
 }
 /** How many times one load asks, when every answer came back to a list that had moved. */
 const ATTEMPTS = 4
@@ -54,6 +57,8 @@ export function useTripHistory(): TripHistoryScreen {
           name: row.place.name,
           at: row.finishedOnDeviceAt ?? row.finishedAt,
           pending: false,
+          itemCount: row.itemCount,
+          total: row.total,
         },
       ]),
     )
@@ -65,6 +70,8 @@ export function useTripHistory(): TripHistoryScreen {
         name: saved.place.name,
         at: saved.finishedOnDeviceAt ?? saved.finishedAt,
         pending: false,
+        itemCount: saved.expenses.length,
+        total: saved.total,
       })
     }
     for (const row of history.local) {
@@ -76,6 +83,8 @@ export function useTripHistory(): TripHistoryScreen {
           pending: queue.pending.some(
             (write) => write.kind === 'finish' && write.tripId === row.id,
           ),
+          itemCount: row.view?.expenses.length ?? null,
+          total: row.view?.total ?? null,
         })
     }
     // A removal still waiting takes the row off every list at once (MOL-76).
@@ -130,7 +139,6 @@ export function useTripHistory(): TripHistoryScreen {
     trouble,
     load: () => void load(),
     more: () => void load(true),
-    open: (tripId: string) => void router.push({ name: 'finished-trip', params: { tripId } }),
-    home: () => void router.push({ name: 'trip' }),
+    open: (tripId: string) => void router.push({ name: 'purchase', params: { tripId } }),
   }
 }

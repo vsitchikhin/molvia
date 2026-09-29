@@ -759,7 +759,7 @@ export default defineComponent({
 
     /** «→ Поход»: the sheet goes first, then the tab — a move under an open sheet closes it anyway. */
     function toTrip(): void {
-      after = () => void goTab('trip')
+      after = () => void goTab('purchases')
       emit('update:open', false)
     }
 
@@ -767,7 +767,7 @@ export default defineComponent({
       if (props.target.kind !== 'trip') return
       const tripId = props.target.row.tripId
       after = () =>
-        void router.push({ name: 'finished-trip', params: { tripId }, query: { from: 'money' } })
+        void router.push({ name: 'purchase', params: { tripId }, query: { from: 'money' } })
       emit('update:open', false)
     }
 

@@ -123,11 +123,7 @@ export function useFinishedTrip(): FinishedTrip {
    * way back is then the chevron's.
    */
   function afterRemoveSheet(): void {
-    if (
-      route.name === 'finished-trip' &&
-      selected.id.value &&
-      queue.removing.has(selected.id.value)
-    )
+    if (route.name === 'purchase' && selected.id.value && queue.removing.has(selected.id.value))
       void goBack()
   }
   return {
@@ -148,13 +144,13 @@ export function useFinishedTrip(): FinishedTrip {
     rejected: computed(() =>
       queue.rejected.some((item) => item.write.tripId === selected.id.value),
     ),
-    review: () => void router.push({ name: 'trip' }),
+    review: () => void router.push({ name: 'purchases' }),
     close: () => {
       opened.value = null
     },
     find: () =>
       void router.push({ name: 'finished-search', params: { tripId: selected.id.value } }),
-    history: () => void router.replace({ name: 'trip-history' }),
+    history: () => void router.replace({ name: 'purchases' }),
     load: () => void selected.load(),
   }
 }

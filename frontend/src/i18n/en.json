@@ -9,7 +9,8 @@
     "verdicts": "Ratings",
     "back_label": "Back",
     "money": "Money",
-    "settings": "Settings"
+    "settings": "Settings",
+    "purchases": "Purchases"
   },
   "state": {
     "loading": "Loading…",
@@ -189,6 +190,30 @@
       "rejected_body": "Purchases remain on this device. The Trip screen shows the reason and lets you correct the entry.",
       "review": "Review the refusal",
       "unfinished": "This trip is still open"
+    },
+    "manual_meta": "Recording by hand · {when}",
+    "manual_since": "{day}, since {time}"
+  },
+  "purchases": {
+    "title": "Purchases",
+    "manual": "Record purchases",
+    "open_manual_meta": "{count} · recording by hand",
+    "continue": "Continue",
+    "group_recorded": "Recorded",
+    "recorded": "{count} · {day}",
+    "empty": {
+      "title": "Your purchases will be here",
+      "body": "Record what you took and what it cost — the button below. Rate them at home, and «What to buy» will tell you what to take again."
+    },
+    "error": {
+      "title": "Purchases did not load",
+      "body": "You can still record new ones — the button below"
+    },
+    "manual_ask": {
+      "title": "Already recording «{place}»",
+      "body": "Only one entry can be open. Continue this one — or finish it and start a new one.",
+      "continue": "Continue «{place}»",
+      "finish": "Finish and start a new one"
     }
   },
   "item": {

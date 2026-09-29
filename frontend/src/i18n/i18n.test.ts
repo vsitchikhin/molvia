@@ -104,6 +104,8 @@ describe('словарь: повторяющиеся тексты', () => {
     expect(duplicates(RU)).toEqual({
       // Подпись таба и заголовок экрана — разные роли одного слова, живут отдельно осознанно.
       Поход: ['nav.trip', 'trip.title'],
+      // Таб, его экран и строка приватности о том же (MOL-128).
+      Покупки: ['nav.purchases', 'privacy.stored.purchases.term', 'purchases.title'],
       'Что брать': ['advice.title', 'nav.advice'],
       Оценки: ['nav.verdicts', 'verdict.title'],
       Настройки: ['nav.settings', 'settings.title'],
@@ -188,6 +190,7 @@ describe('словарь: повторяющиеся тексты', () => {
     // текстов меньше, расходится там, где первичный разведён, и заметить это может только
     // проверка по обоим.
     expect(duplicates(EN)).toEqual({
+      Purchases: ['nav.purchases', 'privacy.stored.purchases.term', 'purchases.title'],
       Trip: ['nav.trip', 'trip.title'],
       // The strip of a trip removed is the strip of a spending removed (MOL-76).
       Undo: ['spending.restore', 'trip.remove.restore'],

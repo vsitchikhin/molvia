@@ -5,20 +5,23 @@ import type { RouteName, Tab } from '@/router'
 /**
  * How a tap on a tab is written into the history.
  *
- * The trip is home — it is the main scenario. Leaving it pushes, moving between the other
- * sections replaces, and coming back to it is a step back. So the system «back» on Android
- * walks «Ratings → Trip → out of the app» however many tabs were tapped in between, which is
- * what Android apps do, and an iPhone, with no such button, sees no difference.
+ * «Что брать» is home (MOL-128; «Поход» was, MOL-17). Leaving it pushes, moving between the other
+ * sections replaces, and coming back to it is a step back. So the system «back» on Android walks
+ * «Оценки → Что брать → out of the app» however many tabs were tapped in between, which is what
+ * Android apps do, and an iPhone, with no such button, sees no difference.
  *
  * `top` is a tap on the section already open: iOS scrolls it to the top, and nothing in a
  * browser stands in the way of doing the same.
  */
 export type TabMove = 'push' | 'replace' | 'back' | 'top'
 
+/** The section the app opens on and «back» ends at. */
+export const HOME = 'advice' satisfies Tab
+
 export function tabMove(from: Tab | undefined, to: Tab, below: RouteName | undefined): TabMove {
   if (from === to) return 'top'
-  if (to === 'trip') return below === 'trip' ? 'back' : 'replace'
-  return from === 'trip' ? 'push' : 'replace'
+  if (to === HOME) return below === HOME ? 'back' : 'replace'
+  return from === HOME ? 'push' : 'replace'
 }
 
 /**
@@ -27,9 +30,9 @@ export function tabMove(from: Tab | undefined, to: Tab, below: RouteName | undef
  * takes, so the two never disagree — and otherwise a replace onto the parent, so the chevron
  * never leads out of the app.
  *
- * Any ancestor, not only the parent (MOL-77, owner's decision): a finished trip is opened from
- * the history and from the home screen as well, and from there «back» is the home screen it was
- * opened from — «‹ Поход», not «‹ История походов» over a system button that goes home anyway.
+ * Any ancestor, not only the parent (MOL-77, owner's decision): a screen opened from further up
+ * than its parent leads back to where it was opened from, not to a parent the system button
+ * would walk past anyway.
  * Opened cold, the chain is laid underneath (`settleColdStart`) and the parent is below it.
  */
 export interface BackTarget {
@@ -64,9 +67,9 @@ export function upTarget(router: Router, route: Routed): BackTarget | null {
 
 /**
  * Which screen the entry underneath the current one is — by route, never by address. The
- * history records the address whole, and `/?utm_source=telegram` or `/#top` is the trip as
- * much as `/` is; a string compared with `'/'` took them for somewhere else, and «back» from
- * the trip then led to the trip again.
+ * history records the address whole, and `/?utm_source=telegram` or `/#top` is home as much as
+ * `/` is; a string compared with `'/'` took them for somewhere else, and «back» from home then
+ * led home again.
  */
 function entryBelow(router: Router): RouteName | undefined {
   const back: unknown = router.options.history.state.back
@@ -152,7 +155,7 @@ function prefersReducedMotion(): boolean {
  * never lands.
  *
  * Exported for the sheet (MOL-18): closing it takes its own entry away, and closing it together
- * with the screen under it — «Add to trip» on the search — takes two in one move.
+ * with the screen under it — «Записать» on the search — takes two in one move.
  *
  * The block is a token rather than a flag. The sheet's guard steps over a dead entry from inside
  * the pop of a step already in flight — the chevron's — and takes the block over with `force`: the
