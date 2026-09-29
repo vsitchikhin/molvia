@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { defineComponent, h, nextTick, ref } from 'vue'
+import { defineComponent, h, nextTick, ref, shallowRef } from 'vue'
 import type { AppLocale } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
@@ -10,6 +10,7 @@ import { createAppI18n } from '@/i18n'
 import AppScreen from '@/components/AppScreen.vue'
 import { useActorStore } from '@/stores/actor'
 import { routes } from '@/router'
+import { pwaUpdateKey, type UpdatePhase } from '@/pwaUpdate'
 
 /**
  * happy-dom lays nothing out, so no observer ever fires on its own. This one is driven by the
@@ -49,14 +50,27 @@ class DrivenObserver {
 
 async function render(
   path: string,
-  options: { locale?: AppLocale; slots?: Record<string, () => unknown> } = {},
+  options: {
+    locale?: AppLocale
+    slots?: Record<string, () => unknown>
+    update?: UpdatePhase
+  } = {},
 ) {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push(path)
   const view = mount(AppScreen, {
     props: { title: 'Trip' },
     slots: options.slots ?? {},
-    global: { plugins: [router, createPinia(), createAppI18n(options.locale ?? 'en')] },
+    global: {
+      plugins: [router, createPinia(), createAppI18n(options.locale ?? 'en')],
+      provide: {
+        [pwaUpdateKey as symbol]: {
+          phase: shallowRef(options.update ?? 'none'),
+          apply: vi.fn(),
+          serverVersion: vi.fn(),
+        },
+      },
+    },
   })
   return { view, router }
 }
@@ -237,6 +251,31 @@ describe('AppScreen', () => {
       // при этом внутри — последняя строка списка должна доставаться пальцем.
       expect(view.get('.content').element.contains(dock.element)).toBe(false)
       expect(view.get('.content').find('.dock-room').exists()).toBe(true)
+    })
+
+    describe('a new version waiting (MOL-132, В-1)', () => {
+      it('is the strip’s top row, over what the screen pins there', async () => {
+        const { view } = await render('/', {
+          update: 'ready',
+          slots: { docked: () => h('p', { class: 'total' }, 'ИТОГО') },
+        })
+        const rows = view.get('.dock').element.children
+        expect(rows[0]?.classList.contains('band')).toBe(true)
+        expect(rows[1]?.classList.contains('total')).toBe(true)
+        expect(view.get('.content').find('.dock-room').exists()).toBe(true)
+      })
+
+      it('brings the strip, and the room for it, to a screen that pins nothing', async () => {
+        const { view } = await render('/', { update: 'ready' })
+        expect(view.get('.dock').find('.band').exists()).toBe(true)
+        expect(view.get('.content').find('.dock-room').exists()).toBe(true)
+      })
+
+      it('must not bring a strip when nothing waits', async () => {
+        const { view } = await render('/', { update: 'none' })
+        expect(view.find('.dock').exists()).toBe(false)
+        expect(view.find('.band').exists()).toBe(false)
+      })
     })
 
     it('appears with the trip it belongs to, not only on mount', async () => {

@@ -13,7 +13,18 @@
       <slot />
     </div>
     <div v-if="kind === 'error' || $slots.action" class="action">
-      <AppButton v-if="kind === 'error'" block @click="$emit('retry')">
+      <!-- A version waits: the error may well be the old code reading the new server's answer,
+           and the reload loses nothing (MOL-132, В-2). -->
+      <AppButton v-if="kind === 'error' && updating" block :busy="applying" @click="update.apply()">
+        <template #icon><IconUpdate /></template>
+        {{ t('update.apply') }}
+      </AppButton>
+      <AppButton
+        v-if="kind === 'error'"
+        block
+        :variant="updating ? 'secondary' : 'primary'"
+        @click="$emit('retry')"
+      >
         <template #icon><IconRefresh /></template>
         {{ t('state.retry') }}
       </AppButton>
@@ -37,8 +48,10 @@ import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconRefresh from '~icons/mdi/refresh'
+import IconUpdate from '~icons/mdi/update'
 import AppButton from '@/components/AppButton.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { usePwaUpdate } from '@/pwaUpdate'
 import { focusScreenTitle } from '@/transitions'
 
 export type StateKind = 'empty' | 'error' | 'offline' | 'attention'
@@ -96,7 +109,8 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  *
  * An error always offers «Try again», drawn here and reported as `retry`: twelve copies of one
  * word would drift apart. Every other action is the screen's own and comes through `action`,
- * after the retry where there is one — the search's «Take from recent».
+ * after the retry where there is one — the search's «Take from recent». While a new version of the
+ * app waits, the error offers it first, «Обновить», and the retry second (MOL-132).
  *
  * Texts arrive translated, never as a key prefix: a key assembled from a string is invisible
  * to the linter and to vue-tsc alike (MOL-16, О-12).
@@ -107,7 +121,7 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  */
 export default defineComponent({
   name: 'ScreenState',
-  components: { AppButton, IconRefresh },
+  components: { AppButton, IconRefresh, IconUpdate },
   props: {
     kind: { type: String as PropType<StateKind>, required: true, validator: fits },
     tone: { type: String as PropType<StateTone | undefined>, default: undefined },
@@ -169,7 +183,11 @@ export default defineComponent({
       if (root.value?.contains(document.activeElement)) focusScreenTitle()
     })
 
-    return { t, root, glyph, toneClass, role }
+    const update = usePwaUpdate()
+    const updating = computed(() => ['ready', 'applying'].includes(update.phase.value))
+    const applying = computed(() => update.phase.value === 'applying')
+
+    return { t, root, glyph, toneClass, role, update, updating, applying }
   },
 })
 </script>
