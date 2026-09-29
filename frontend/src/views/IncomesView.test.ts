@@ -216,6 +216,29 @@ describe('IncomesView: the months (В-2)', () => {
     expect(view.get('button.body').text()).toMatch(/^Amend income of Sep 15:/)
   })
 
+  it('heads the card of the phone’s today «Today», and the button still says the date (MOL-121)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-28T20:30:00Z'))
+    try {
+      incomes.mockResolvedValue(
+        overview({
+          months: [
+            {
+              month: '2026-09',
+              sums: [{ minor: 9_961_500n, currency: 'RUB' }],
+              incomes: [row({ receivedOn: '2026-09-28' })],
+            },
+          ],
+        }),
+      )
+      const view = await render()
+      expect(view.get('article .day').text()).toBe('Today')
+      expect(view.get('button.body').text()).toMatch(/^Amend income of Sep 28:/)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('an income without a note has no plate — the card is shorter (handoff 03)', async () => {
     incomes.mockResolvedValue(overview())
     const view = await render()

@@ -264,7 +264,6 @@ import {
   monthSchema,
   percentChange,
   previousMonth,
-  yerevanDate,
 } from '@molvia/model'
 import type { Money, MoneyMonthView, SpendingCategoryView, WireCode } from '@molvia/model'
 import AccountsCard from '@/components/AccountsCard.vue'
@@ -287,7 +286,7 @@ import type { JournalRow, Removed, SpendingTarget } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useMoneyMonth } from '@/composables/useMoneyMonth'
 import { useReconnect } from '@/composables/useReconnect'
-import { calendarDay, purchaseDay, shiftDay, timeOfDay } from '@/days'
+import { calendarDay, localDay, purchaseDay, shiftDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { spendingOf, useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -335,13 +334,13 @@ export default defineComponent({
     const announce = useAnnouncer()
 
     /**
-     * This month in Yerevan, looked at again whenever the app comes back into view: an installed
+     * This month on the phone (MOL-121), looked at again whenever the app comes back into view: an installed
      * app frozen over the last night of a month came back to the same page, and the new month was
      * «the future» — neither the address nor the arrow reached it (adversarial З, review Т-10).
      */
-    const currentMonth = ref(monthOfDay(yerevanDate(new Date())))
+    const currentMonth = ref(monthOfDay(localDay()))
     function lookAtToday(): void {
-      currentMonth.value = monthOfDay(yerevanDate(new Date()))
+      currentMonth.value = monthOfDay(localDay())
     }
     useReconnect(lookAtToday)
     const selected = computed(() => {
@@ -504,9 +503,12 @@ export default defineComponent({
       return category ? nameOf(category) : t('spending.category.other')
     }
 
-    /** Days of Yerevan's calendar, printed as such whatever the zone of the phone (review Т-1). */
+    /**
+     * Days of the calendar, printed as such whatever the zone of the phone (review Т-1); «Сегодня»
+     * is the phone's today (MOL-121).
+     */
     function dayTitle(day: string): string {
-      const today = yerevanDate(new Date())
+      const today = localDay()
       const date = calendarDay(day, locale.value)
       if (day === today) return t('spending.day_today', { date })
       if (day === shiftDay(today, -1)) return t('spending.day_yesterday', { date })

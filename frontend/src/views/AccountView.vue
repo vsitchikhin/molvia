@@ -155,7 +155,6 @@ import IconArchive from '~icons/mdi/archive-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconScale from '~icons/mdi/scale-balance'
 import IconUndo from '~icons/mdi/undo-variant'
-import { yerevanDate } from '@molvia/model'
 import type { AccountOperationView, Money } from '@molvia/model'
 import { api } from '@/api'
 import AccountSheet from '@/components/AccountSheet.vue'
@@ -176,7 +175,7 @@ import { useAccountJournal } from '@/composables/useAccountJournal'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useOwnCategories } from '@/composables/useOwnCategories'
 import { useReconnect } from '@/composables/useReconnect'
-import { calendarDay, shiftDay } from '@/days'
+import { calendarDay, localDay, shiftDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -300,7 +299,7 @@ export default defineComponent({
     })
 
     function dayTitle(day: string): string {
-      const today = yerevanDate(new Date())
+      const today = localDay()
       const date = calendarDay(day, locale.value)
       if (day === today) return t('spending.day_today', { date })
       if (day === shiftDay(today, -1)) return t('spending.day_yesterday', { date })

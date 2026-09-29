@@ -1,7 +1,7 @@
 <template>
   <AppCard as="article" class="card">
     <OperationCardHead
-      :day="day"
+      :day="head"
       :amended="income.amendedAt ? t('income.amended', { date: dayOf(income.amendedAt) }) : null"
       :remove-label="t('income.remove', { amount })"
       :disabled="disabled"
@@ -39,7 +39,7 @@ import type { IncomeView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import OperationCardHead from '@/components/OperationCardHead.vue'
 import { asTyped } from '@/components/spending'
-import { calendarDay, purchaseDay } from '@/days'
+import { calendarDay, dayWords, purchaseDay } from '@/days'
 import { useAccountsStore } from '@/stores/accounts'
 
 /**
@@ -76,6 +76,8 @@ export default defineComponent({
       day: computed(() =>
         calendarDay(props.income.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
       ),
+      // «Сегодня», «Вчера» by the phone's today (MOL-121, В-1); the button says the date.
+      head: computed(() => dayWords(props.income.receivedOn, locale.value)),
       // As it was typed, as everywhere in «Деньги» (owner's decision В-1).
       amount: computed(() => asTyped(props.income.amount, locale.value)),
     }

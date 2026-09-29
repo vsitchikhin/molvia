@@ -227,7 +227,6 @@ import {
   parseMoney,
   spendingTextSchema,
   isRateDay,
-  yerevanDate,
 } from '@molvia/model'
 import type { Currency, ExchangeRate, Money, SpendingCategoryView, TripView } from '@molvia/model'
 import { api } from '@/api'
@@ -243,7 +242,7 @@ import { defaultAccount, pageOrder } from '@/components/accounts'
 import { asTyped, categoryColour, rateWords } from '@/components/spending'
 import type { JournalRow, Removed, SpendingTarget } from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, shiftDay } from '@/days'
+import { calendarDay, localDay, shiftDay } from '@/days'
 import { afterStep, useNavigation } from '@/navigation'
 import { newId } from '@/ids'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -319,7 +318,7 @@ export default defineComponent({
     const amount = ref('')
     const currency = ref<Currency>('AMD')
     const categoryId = ref<string | null>(null)
-    const today = ref(yerevanDate(new Date()))
+    const today = ref(localDay())
     const day = ref(today.value)
     const note = ref('')
     const place = ref('')
@@ -388,7 +387,7 @@ export default defineComponent({
       async (open) => {
         if (!open) return
         after = null
-        today.value = yerevanDate(new Date())
+        today.value = localDay()
         // A refused write opens on what the person typed, not on what the server holds: their
         // correction is the thing to fix and send again (requirement 15). The categories and the
         // revision stay the row's.
@@ -492,7 +491,7 @@ export default defineComponent({
         props.target.kind === 'add' ? 'spending.sheet.title_add' : 'spending.sheet.title_edit',
       )
     })
-    // A day of Yerevan's calendar, whatever the zone of the phone (review Т-1).
+    // A calendar day, whatever the zone of the phone (review Т-1).
     const dayOf = (value: string) => calendarDay(value, locale.value)
     const meta = computed(() => {
       if (props.target.kind === 'trip') {
@@ -533,7 +532,7 @@ export default defineComponent({
       })),
     )
 
-    /** A day the server takes: a calendar day from 2000 on and not after today in Yerevan. */
+    /** A day the server takes: a calendar day from 2000 on and not after the phone's today. */
     const dayGood = computed(() => isRateDay(day.value) && day.value <= today.value)
 
     // A cleared field — «Сбросить» of the iOS picker — is no day to name, and a date nobody can
