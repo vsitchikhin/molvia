@@ -216,6 +216,20 @@ describe('BarcodeScannerSheet', () => {
     expect(sheet.find('[role="alert"]').text()).toContain(en.scanner.error_title)
   })
 
+  it('starts the reader over when the sheet opens again after it failed', async () => {
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    warm = () => Promise.reject(new ReaderFailed())
+    const sheet = await render()
+    expect(sheet.find('[role="alert"]').exists()).toBe(true)
+    await sheet.setProps({ open: false })
+    warm = () => Promise.resolve()
+    await sheet.setProps({ open: true })
+    await settle()
+    expect(sheet.find('[role="alert"]').exists()).toBe(false)
+    expect(sheet.find('video').exists()).toBe(true)
+    expect(created).toHaveBeenCalledTimes(2)
+  })
+
   describe('typing the digits', () => {
     async function typing() {
       const { stream, track } = fakeStream()

@@ -191,6 +191,8 @@ export default defineComponent({
           typing.value = false
           typed.value = ''
           typedError.value = null
+          // A reader that failed last time is given a new start with the sheet, not kept as its error.
+          if (scan.failed.value) scan.reset()
           void startCamera()
         } else {
           camera.stop()
