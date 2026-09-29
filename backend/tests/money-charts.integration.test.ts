@@ -16,6 +16,7 @@ import { moneyMonthRates } from '@/db/schema'
 import { tripRepositories } from '@/db/unit-of-work'
 import { buildServer } from '@/server'
 import { moneyChartsOf } from '@/usecases/money-charts'
+import { moneyMonthOf } from '@/usecases/money-month'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
 
@@ -113,15 +114,17 @@ async function exchange(
   received: [string, string],
   exchangedOn: string,
   note: string | null = null,
-) {
+): Promise<string> {
+  const id = randomUUID()
   const response = await call(me, 'POST', '/exchanges', {
-    id: randomUUID(),
+    id,
     given: { amount: given[0], currency: given[1] },
     received: { amount: received[0], currency: received[1] },
     exchangedOn,
     ...(note === null ? {} : { note }),
   })
   expect(response.statusCode).toBe(201)
+  return id
 }
 
 /** The central bank's rouble and dollar for every day of the last two hundred, steady. */
@@ -136,8 +139,8 @@ async function cacheRates(from = 200, to = 0, rub = '4.0', usd = '390') {
 }
 
 /**
- * The two cases that set every bar beside its month read one by one: some thirty writes and seven
- * reads of whole months, 1–2 s on a quiet machine — past the default five under a loaded one.
+ * The cases heavy with writes — every bar beside its month, freezing, five exchanges that each walk
+ * the wallet: 1–2 s on a quiet machine, past the default five under a loaded one.
  */
 const MONTH_BY_MONTH_MS = 30_000
 
@@ -205,35 +208,39 @@ describe('«Графики» (MOL-74)', () => {
     MONTH_BY_MONTH_MS,
   )
 
-  it('потери на обменах — по обменникам, в валюте трат, худшие сверху, неизмеренное названо', async () => {
-    await cacheRates()
-    const me = await owner()
-    // 390 ֏ за $ у ЦБ: 800 $ по 372 — на 14 400 ֏ меньше.
-    await exchange(me, ['800', 'USD'], ['297600', 'AMD'], daysAgo(40), 'Аэропорт')
-    await exchange(me, ['100', 'USD'], ['38000', 'AMD'], daysAgo(30), ' аэропорт ')
-    await exchange(me, ['100', 'USD'], ['39500', 'AMD'], daysAgo(20), 'Fast Bank')
-    // Roubles into dollars: the difference is in dollars and comes into drams by the bank's day.
-    await exchange(me, ['9750', 'RUB'], ['100', 'USD'], daysAgo(10), 'ВТБ')
-    // Before the cache: no comparison — named, not summed.
-    await exchange(me, ['100', 'USD'], ['39000', 'AMD'], daysAgo(300), 'Старый')
-    // More than twelve months back: not in the card at all.
-    await exchange(me, ['100', 'USD'], ['39000', 'AMD'], daysAgo(400), 'Давний')
+  it(
+    'потери на обменах — по обменникам, в валюте трат, худшие сверху, неизмеренное названо',
+    async () => {
+      await cacheRates()
+      const me = await owner()
+      // 390 ֏ за $ у ЦБ: 800 $ по 372 — на 14 400 ֏ меньше.
+      await exchange(me, ['800', 'USD'], ['297600', 'AMD'], daysAgo(40), 'Аэропорт')
+      await exchange(me, ['100', 'USD'], ['38000', 'AMD'], daysAgo(30), ' аэропорт ')
+      await exchange(me, ['100', 'USD'], ['39500', 'AMD'], daysAgo(20), 'Fast Bank')
+      // Roubles into dollars: the difference is in dollars and comes into drams by the bank's day.
+      await exchange(me, ['9750', 'RUB'], ['100', 'USD'], daysAgo(10), 'ВТБ')
+      // Before the cache: no comparison — named, not summed.
+      await exchange(me, ['100', 'USD'], ['39000', 'AMD'], daysAgo(300), 'Старый')
+      // More than twelve months back: not in the card at all.
+      await exchange(me, ['100', 'USD'], ['39000', 'AMD'], daysAgo(400), 'Давний')
 
-    const losses = (await charts(me)).exchanges
-    expect(losses?.groups.map((group) => [group.place, group.count])).toEqual([
-      ['аэропорт', 2],
-      ['ВТБ', 1],
-      ['Fast Bank', 1],
-    ])
-    const airport = losses?.groups[0]
-    // −14 400 − 1 000 of 312 000 + 39 000.
-    expect(airport?.difference).toEqual({ minor: -1_540_000n, currency: 'AMD' })
-    expect(airport?.percent).toBe(-439)
-    expect(losses?.groups[1]?.difference.currency).toBe('AMD')
-    expect(losses?.groups[1]).toMatchObject({ place: 'ВТБ', percent: 0 })
-    expect(losses?.groups[2]).toMatchObject({ place: 'Fast Bank', percent: 128 })
-    expect(losses?.uncounted).toBe(1)
-  })
+      const losses = (await charts(me)).exchanges
+      expect(losses?.groups.map((group) => [group.place, group.count])).toEqual([
+        ['аэропорт', 2],
+        ['ВТБ', 1],
+        ['Fast Bank', 1],
+      ])
+      const airport = losses?.groups[0]
+      // −14 400 − 1 000 of 312 000 + 39 000.
+      expect(airport?.difference).toEqual({ minor: -1_540_000n, currency: 'AMD' })
+      expect(airport?.percent).toBe(-439)
+      expect(losses?.groups[1]?.difference.currency).toBe('AMD')
+      expect(losses?.groups[1]).toMatchObject({ place: 'ВТБ', percent: 0 })
+      expect(losses?.groups[2]).toMatchObject({ place: 'Fast Bank', percent: 128 })
+      expect(losses?.uncounted).toBe(1)
+    },
+    MONTH_BY_MONTH_MS,
+  )
 
   it('курс ₽ и ֏ по неделям, с разрывом там, где курса нет, и моими обменами пары точками', async () => {
     await cacheRates(200, 60)
@@ -417,4 +424,130 @@ describe('«Графики» — по ревью PR #77', () => {
     },
     MONTH_BY_MONTH_MS,
   )
+})
+
+describe('«Графики» — второй заход ревью PR #77', () => {
+  /** Last month spent 100 000 ֏; the own rate 4,0 ֏ a rouble, and 3,0 from the first of last month. */
+  async function scene(): Promise<{ me: Owner; late: string }> {
+    await cacheRates()
+    const me = await owner()
+    await spend(me, '100000', 'AMD', `${m1}-10`, 'cafe')
+    await exchange(me, ['10000', 'RUB'], ['40000', 'AMD'], daysAgo(150))
+    const late = await exchange(me, ['10000', 'RUB'], ['30000', 'AMD'], `${m1}-01`)
+    return { me, late }
+  }
+  const takeOut = async (me: Owner, id: string) => {
+    expect((await call(me, 'DELETE', `/exchanges/${id}`)).statusCode).toBeLessThan(300)
+  }
+  const bringBack = async (me: Owner, id: string) => {
+    expect((await call(me, 'POST', `/exchanges/${id}/restore`)).statusCode).toBeLessThan(300)
+  }
+
+  it(
+    '«Удалить» and «Вернуть» inside one read still let the month go after it (d9 round 2 Ж2)',
+    async () => {
+      const { me, late } = await scene()
+      const withIt = (await month(me, m1)).spentIncome
+      // Let the month go, so the read below is the one that freezes it.
+      await takeOut(me, late)
+      await bringBack(me, late)
+      const repositories = tripRepositories(db)
+      const list = repositories.exchanges.list.bind(repositories.exchanges)
+      const freeze = repositories.money.freeze.bind(repositories.money)
+      let lists = 0
+      let restored = false
+      const racing = {
+        ...repositories,
+        exchanges: {
+          ...repositories.exchanges,
+          // The first read is the rates': «Удалить» lands just before it.
+          async list(...args: Parameters<typeof list>) {
+            lists += 1
+            if (lists === 1) await takeOut(me, late)
+            return list(...args)
+          },
+        },
+        money: {
+          ...repositories.money,
+          // «Вернуть» lands after the rates are worked out, before the first month is frozen.
+          async freeze(...args: Parameters<typeof freeze>) {
+            if (!restored) {
+              restored = true
+              await bringBack(me, late)
+            }
+            return freeze(...args)
+          },
+        },
+      }
+      await moneyChartsOf(racing, { id: me.id, incomeCurrency: 'RUB', spendCurrency: 'AMD' }, 6)
+      expect(restored).toBe(true)
+      expect((await month(me, m1)).spentIncome).toEqual(withIt)
+    },
+    MONTH_BY_MONTH_MS,
+  )
+
+  it(
+    'a closed month of «Деньги» frozen while an exchange lands still counts it after (review С-9)',
+    async () => {
+      const { me, late } = await scene()
+      const withIt = (await month(me, m1)).spentIncome
+      await takeOut(me, late)
+      const repositories = tripRepositories(db)
+      const freeze = repositories.money.freeze.bind(repositories.money)
+      let restored = false
+      const racing = {
+        ...repositories,
+        money: {
+          ...repositories.money,
+          async freeze(...args: Parameters<typeof freeze>) {
+            if (!restored) {
+              restored = true
+              await bringBack(me, late)
+            }
+            return freeze(...args)
+          },
+        },
+      }
+      const owner = { id: me.id, incomeCurrency: 'RUB', spendCurrency: 'AMD' } as const
+      await moneyMonthOf(racing, owner, m1)
+      expect(restored).toBe(true)
+      expect((await month(me, m1)).spentIncome).toEqual(withIt)
+    },
+    MONTH_BY_MONTH_MS,
+  )
+
+  it('must not fire: the running month of «Деньги» freezes nothing and reads the receipts once more for nothing (review С-9)', async () => {
+    const { me } = await scene()
+    const repositories = tripRepositories(db)
+    const list = repositories.exchanges.list.bind(repositories.exchanges)
+    let lists = 0
+    const counting = {
+      ...repositories,
+      exchanges: {
+        ...repositories.exchanges,
+        async list(...args: Parameters<typeof list>) {
+          lists += 1
+          return list(...args)
+        },
+      },
+    }
+    const owner = { id: me.id, incomeCurrency: 'RUB', spendCurrency: 'AMD' } as const
+    await moneyMonthOf(counting, owner, current)
+    const running = lists
+    lists = 0
+    await moneyMonthOf(counting, owner, m1)
+    // A closed month reads the receipts once more, after freezing; the running one does not.
+    expect(lists).toBe(running + 1)
+  })
+
+  it('a month with nothing spent and no rate is «ушло 0», and «Разница» is what came in (review С-7)', async () => {
+    const me = await owner()
+    await receive(me, '50000', `${m2}-10`)
+    const view = await charts(me)
+    const bar = view.months.find((one) => one.month === m2)
+    expect(bar?.spentIncome).toEqual({ minor: 0n, currency: 'RUB' })
+    expect(bar?.spentIncomeLevel).toBe(0)
+    expect(bar?.difference).toEqual({ minor: 5_000_000n, currency: 'RUB' })
+    expect((await month(me, m2)).spentIncome).toEqual({ minor: 0n, currency: 'RUB' })
+  })
 })

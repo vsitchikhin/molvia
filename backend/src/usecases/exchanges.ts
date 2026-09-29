@@ -49,7 +49,7 @@ const FOREIGN = currencySchema.options.filter(
 )
 
 /** How many days of the cache are read at once: a long list must not take the whole pool (Ч-3). */
-const RATE_READS_AT_ONCE = 8
+export const RATE_READS_AT_ONCE = 8
 
 /** The official rates cached on or before each of `days`, one query a day, a few at a time. */
 export async function officialRatesOn(

@@ -24,8 +24,8 @@ import type {
   MoneyChartsView,
   MoneyMonth,
 } from '@molvia/model'
-import { comparisonOf, officialRatesOn } from './exchanges'
-import { countMonth, monthRate, monthRows, watchThaws } from './money-month'
+import { RATE_READS_AT_ONCE, comparisonOf, officialRatesOn } from './exchanges'
+import { countMonth, monthRate, monthRows, settleThaws } from './money-month'
 import { dayRates } from './money-rates'
 import type { DayRates } from './money-rates'
 import type { TripRepositories } from '@/db/unit-of-work'
@@ -35,6 +35,19 @@ type Repositories = Pick<
   'spendings' | 'spendingCategories' | 'money' | 'exchanges' | 'incomes' | 'rates'
 >
 type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
+
+/**
+ * Each of `items` through `read`, a few at a time: the reads of the cache are independent, and at
+ * most as many hold a connection as «Обмен денег» lets (`RATE_READS_AT_ONCE`) — 53 weeks at once
+ * would take the whole pool (adversarial d9, round 2).
+ */
+async function few<T, R>(items: readonly T[], read: (item: T) => Promise<R>): Promise<R[]> {
+  const done: R[] = []
+  for (let at = 0; at < items.length; at += RATE_READS_AT_ONCE) {
+    done.push(...(await Promise.all(items.slice(at, at + RATE_READS_AT_ONCE).map(read))))
+  }
+  return done
+}
 
 /**
  * The exchanges of the last twelve months against the central bank of each one's day, in the
@@ -58,28 +71,26 @@ async function lossesOf(
     exchanges.map(({ exchangedOn }) => exchangedOn),
   )
   const spend = owner.spendCurrency
-  const inputs = await Promise.all(
-    exchanges.map(async (exchange): Promise<ExchangeLossInput> => {
-      const { received, exchangedOn, note } = exchange
-      const { measure, difference } = comparisonOf(exchange, cached.get(exchangedOn) ?? [])
-      const unknown = { note, exchangedOn, difference: null, expected: null }
-      if (!measure || !difference || !isRateFresh(yerevanDate(measure.asOf), exchangedOn)) {
-        return unknown
-      }
-      // What the bank would have given for the same money: what came, less what came beyond it.
-      const expected = { minor: received.minor - difference.minor, currency: received.currency }
-      if (received.currency === spend) return { note, exchangedOn, difference, expected }
-      // The cache of the day is asked once, however many ask for it (`dayRates`).
-      const rate = await rates.official(received.currency, spend, exchangedOn)
-      const inSpend = rate && {
-        difference: convertSigned(difference, rate),
-        expected: convertAcross(expected, rate),
-      }
-      return inSpend?.difference && inSpend.expected
-        ? { note, exchangedOn, difference: inSpend.difference, expected: inSpend.expected }
-        : unknown
-    }),
-  )
+  const inputs = await few(exchanges, async (exchange): Promise<ExchangeLossInput> => {
+    const { received, exchangedOn, note } = exchange
+    const { measure, difference } = comparisonOf(exchange, cached.get(exchangedOn) ?? [])
+    const unknown = { note, exchangedOn, difference: null, expected: null }
+    if (!measure || !difference || !isRateFresh(yerevanDate(measure.asOf), exchangedOn)) {
+      return unknown
+    }
+    // What the bank would have given for the same money: what came, less what came beyond it.
+    const expected = { minor: received.minor - difference.minor, currency: received.currency }
+    if (received.currency === spend) return { note, exchangedOn, difference, expected }
+    // The cache of the day is asked once, however many ask for it (`dayRates`).
+    const rate = await rates.official(received.currency, spend, exchangedOn)
+    const inSpend = rate && {
+      difference: convertSigned(difference, rate),
+      expected: convertAcross(expected, rate),
+    }
+    return inSpend?.difference && inSpend.expected
+      ? { note, exchangedOn, difference: inSpend.difference, expected: inSpend.expected }
+      : unknown
+  })
   return exchangeLosses(inputs, spend)
 }
 
@@ -97,12 +108,10 @@ async function lineOf(
 ) {
   const { incomeCurrency: income, spendCurrency: spend } = owner
   if (income === spend) return null
-  // At once: `dayRates` keeps one read of the cache per day, and nothing here is written.
-  const weeks: { day: string; rate: ExchangeRate | null }[] = await Promise.all(
-    weekEnds(from, today).map(async (day) => ({
-      day,
-      rate: await rates.official(income, spend, day),
-    })),
+  // A few at a time: nothing here is written, and `dayRates` reads the cache once per day.
+  const weeks: { day: string; rate: ExchangeRate | null }[] = await few(
+    weekEnds(from, today),
+    async (day) => ({ day, rate: await rates.official(income, spend, day) }),
   )
   const pair = new Set([income, spend])
   const own = exchanges
@@ -124,7 +133,7 @@ async function lineOf(
  * `GET /money/charts` (MOL-74): the months of the period counted by the function «Деньги» counts one
  * by — the same rows, the same rate of the month, frozen by this read as by opening it (Р-4) — so a
  * bar is the month on «Деньгах» (requirements 4). The rows of the whole period are read once (Р-3).
- * A write that lands while the months are being frozen lets them go after (`watchThaws`).
+ * A write that lands while the months are being frozen lets them go after (`settleThaws`).
  */
 export async function moneyChartsOf(
   repositories: Repositories,
@@ -139,22 +148,25 @@ export async function moneyChartsOf(
   const before = previousMonth(first)
   const lossFrom = `${chartMonths(current, EXCHANGE_LOSS_MONTHS)[0] ?? current}-01`
 
-  const settle = await watchThaws(repositories, owner)
-  const [rates, categories, salaryShiftDay, rows, exchanges] = await Promise.all([
+  const [rates, categories, salaryShiftDay, rows] = await Promise.all([
     dayRates(repositories, owner),
     repositories.spendingCategories.list(owner.id),
     repositories.money.salaryShift(owner.id),
     monthRows(repositories, owner, before, current),
-    repositories.exchanges.list(owner.id),
   ])
+  const exchanges = rates.basis.exchanges
 
   const counted: MoneyMonth[] = []
-  // One month after another: a closed month's rate may be frozen by this very read.
-  for (const month of months) {
-    const { rate, kind } = await monthRate(repositories, owner, rates, month, today)
-    counted.push(
-      await countMonth(owner, rates, month, rows, categories, rate, kind, salaryShiftDay),
-    )
+  try {
+    // One month after another: a closed month's rate may be frozen by this very read.
+    for (const month of months) {
+      const { rate, kind } = await monthRate(repositories, owner, rates, month, today)
+      counted.push(
+        await countMonth(owner, rates, month, rows, categories, rate, kind, salaryShiftDay),
+      )
+    }
+  } finally {
+    await settleThaws(repositories, owner, rates.basis)
   }
   // The month before is there for «к августу» alone, as on «Деньгах» (Н-6).
   const previous = await countMonth(owner, rates, before, rows, categories, null, 'frozen', null)
@@ -168,7 +180,6 @@ export async function moneyChartsOf(
     ),
     lineOf(owner, rates, exchanges, `${first}-01`, today),
   ])
-  await settle()
   // Every category the owner can choose is offered, spent in the period or not (adversarial А).
   const offered = categoryOrder(categories)
     .filter((category) => category.archivedAt === null)
