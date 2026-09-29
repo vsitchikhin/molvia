@@ -296,6 +296,12 @@ function cash(minor: bigint | null, currency: Currency | null): Money | null {
   return minor === null || currency === null ? null : { minor, currency }
 }
 
+function grouped<T>(rows: readonly T[], keyOf: (row: T) => string): Map<string, T[]> {
+  const groups = new Map<string, T[]>()
+  for (const row of rows) groups.set(keyOf(row), [...(groups.get(keyOf(row)) ?? []), row])
+  return groups
+}
+
 export function createExportRepository(db: Db): ExportRepository {
   return {
     exportOf(actorId, currentSessionId) {
@@ -456,6 +462,19 @@ export function createExportRepository(db: Db): ExportRepository {
             )
             .orderBy(asc(places.name), asc(places.id))
 
+          const exchangeVersionsOf = grouped(
+            exchangeVersions.map((row) => row.exchange_revisions),
+            (version) => version.exchangeId,
+          )
+          const incomeVersionsOf = grouped(
+            incomeVersions.map((row) => row.income_revisions),
+            (version) => version.incomeId,
+          )
+          const barcodesOf = new Map<string, string[]>()
+          for (const { itemId, code } of barcodeRows) {
+            barcodesOf.set(itemId, [...(barcodesOf.get(itemId) ?? []), code])
+          }
+
           return {
             account: {
               id: account.id,
@@ -572,17 +591,15 @@ export function createExportRepository(db: Db): ExportRepository {
               createdAt: row.createdAt,
               amendedAt: row.amendedAt,
               removedAt: row.deletedAt,
-              earlierVersions: exchangeVersions
-                .filter((version) => version.exchange_revisions.exchangeId === row.id)
-                .map(({ exchange_revisions: version }) => ({
-                  revision: version.revision,
-                  given: { minor: version.givenMinor, currency: version.givenCurrency },
-                  received: { minor: version.receivedMinor, currency: version.receivedCurrency },
-                  exchangedOn: version.exchangedOn,
-                  heldBefore: cash(version.heldBeforeMinor, version.receivedCurrency),
-                  note: version.note,
-                  replacedAt: version.replacedAt,
-                })),
+              earlierVersions: (exchangeVersionsOf.get(row.id) ?? []).map((version) => ({
+                revision: version.revision,
+                given: { minor: version.givenMinor, currency: version.givenCurrency },
+                received: { minor: version.receivedMinor, currency: version.receivedCurrency },
+                exchangedOn: version.exchangedOn,
+                heldBefore: cash(version.heldBeforeMinor, version.receivedCurrency),
+                note: version.note,
+                replacedAt: version.replacedAt,
+              })),
             })),
             incomes: incomeRows.map((row) => ({
               id: row.id,
@@ -597,17 +614,15 @@ export function createExportRepository(db: Db): ExportRepository {
               createdAt: row.createdAt,
               amendedAt: row.amendedAt,
               removedAt: row.deletedAt,
-              earlierVersions: incomeVersions
-                .filter((version) => version.income_revisions.incomeId === row.id)
-                .map(({ income_revisions: version }) => ({
-                  revision: version.revision,
-                  amount: { minor: version.amountMinor, currency: version.currency },
-                  receivedOn: version.receivedOn,
-                  heldBefore: cash(version.heldBeforeMinor, version.currency),
-                  source: version.source,
-                  note: version.note,
-                  replacedAt: version.replacedAt,
-                })),
+              earlierVersions: (incomeVersionsOf.get(row.id) ?? []).map((version) => ({
+                revision: version.revision,
+                amount: { minor: version.amountMinor, currency: version.currency },
+                receivedOn: version.receivedOn,
+                heldBefore: cash(version.heldBeforeMinor, version.currency),
+                source: version.source,
+                note: version.note,
+                replacedAt: version.replacedAt,
+              })),
             })),
             spendings: spendingRows.map((row) => ({
               id: row.id,
@@ -686,9 +701,7 @@ export function createExportRepository(db: Db): ExportRepository {
                 row.typicalQtyMilli === null || row.typicalQtyUnit === null
                   ? null
                   : { milli: row.typicalQtyMilli, unit: row.typicalQtyUnit },
-              barcodes: barcodeRows
-                .filter((barcode) => barcode.itemId === row.id)
-                .map((barcode) => barcode.code),
+              barcodes: barcodesOf.get(row.id) ?? [],
               createdAt: row.createdAt,
             })),
             catalogue: { items: namedItems, places: namedPlaces },

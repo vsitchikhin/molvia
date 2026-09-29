@@ -1,16 +1,36 @@
 import { randomUUID } from 'node:crypto'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { EXPORT_FORMAT, EXPORT_VERSION, exportFileCodec } from '@molvia/model'
 import { ACTOR_REFERENCES, ERASED_TABLES, createErasureRepository } from '@/db/erasure-repository'
 import { EXPORT_COLUMNS, EXPORT_SECTION_OF, createExportRepository } from '@/db/export-repository'
-import { events, expenses, itemBarcodes, loginRequests, sessions, spendings } from '@/db/schema'
+import {
+  actors,
+  events,
+  exchangeRevisions,
+  exchanges,
+  expenses,
+  incomeRevisions,
+  incomes,
+  itemBarcodes,
+  loginRequests,
+  moneyAccountChecks,
+  moneyAccounts,
+  moneyMonthRates,
+  searchPicks,
+  sessions,
+  spendingCategories,
+  spendings,
+  trips,
+  verdicts,
+} from '@/db/schema'
 import { connectDrizzle } from './db'
 import {
   clearAll,
   insertActor,
   insertItem,
+  insertLoginRequest,
   insertPlace,
   insertSession,
   insertTrip,
@@ -44,6 +64,206 @@ async function someone() {
   return { tg, actorId }
 }
 
+/** Keys whose value is empty in every row: a column mapped to the wrong field reads as one. */
+function emptyEverywhere(rows: readonly unknown[], prefix = ''): string[] {
+  const keys = new Set(rows.flatMap((row) => Object.keys(row as object)))
+  return [...keys].flatMap((key) => {
+    const values = rows.map((row) => (row as Record<string, unknown>)[key])
+    const present = values.filter((value) => value !== null && value !== undefined)
+    if (present.length === 0) return [`${prefix}${key}`]
+    const nested = present.filter(
+      (value): value is object => typeof value === 'object' && !Array.isArray(value),
+    )
+    return nested.length === present.length ? emptyEverywhere(nested, `${prefix}${key}.`) : []
+  })
+}
+
+/** A person with every column the file names filled in some row of theirs. */
+async function aFullLife(actorId: string, telegramUserId: number) {
+  const at = (minute: number) => new Date(Date.UTC(2026, 8, 20, 10, minute))
+  await db
+    .update(actors)
+    .set({ incomeCurrencySince: at(0), salaryShiftDay: 25, sharedUntil: at(1) })
+    .where(eq(actors.id, actorId))
+  await insertSession(db, { actorId, deviceName: 'iPhone · Safari' })
+  await insertLoginRequest(db, { telegramUserId, deviceName: 'Mac', consumedAt: new Date() })
+  const placeId = await insertPlace(db, { name: 'Ереван Сити' })
+  const itemId = await insertItem(db, {
+    name: 'Сыр чанах',
+    searchKey: 'sir chanah',
+    note: 'в рассоле',
+    defaultUnit: 'kg',
+    typicalQtyMilli: 500n,
+    typicalQtyUnit: 'kg',
+    createdBy: actorId,
+  })
+  await db.insert(itemBarcodes).values({ code: '4850001234567', itemId })
+  const cash = randomUUID()
+  const dollars = randomUUID()
+  const card = randomUUID()
+  await db.insert(moneyAccounts).values([
+    {
+      id: cash,
+      actorId,
+      name: 'Наличные',
+      currency: 'AMD',
+      startMinor: 1_000_000n,
+      startOn: '2026-09-01',
+      savings: true,
+      archivedAt: at(2),
+    },
+    {
+      id: dollars,
+      actorId,
+      name: 'Доллары',
+      currency: 'USD',
+      startMinor: 10_000n,
+      startOn: '2026-09-01',
+      deletedAt: at(3),
+    },
+    { id: card, actorId, name: 'Карта ₽', currency: 'RUB', startMinor: 0n, startOn: '2026-09-01' },
+  ])
+  await db.insert(moneyAccountChecks).values({
+    id: randomUUID(),
+    actorId,
+    accountId: cash,
+    checkedOn: '2026-09-10',
+    factMinor: 900_000n,
+    countedMinor: 950_000n,
+  })
+  const tripId = await insertTrip(db, {
+    actorId,
+    placeId,
+    rateBase: 'RUB',
+    rateQuote: 'AMD',
+    rateScaled: 4_812_345n,
+    rateSource: 'official',
+    rateAsOf: at(4),
+    rateProvider: 'cba',
+    rateJumped: true,
+    ratePreviousScaled: 4_700_000n,
+    ratePreviousAsOf: at(5),
+    rateManualScaled: 4_900_000n,
+    rateManualAsOf: at(6),
+    rateChoice: 'manual',
+    startedAt: at(3),
+    finishedAt: at(8),
+    finishedOnDeviceAt: at(7),
+    accountId: cash,
+    debitedMinor: 52_000n,
+    debitedCurrency: 'AMD',
+    accountSetAt: at(9),
+    deletedAt: at(10),
+  })
+  await db.insert(expenses).values({
+    id: randomUUID(),
+    tripId,
+    itemId,
+    qtyMilli: 350n,
+    qtyUnit: 'kg',
+    amountMinor: 52_000n,
+    amountCurrency: 'AMD',
+  })
+  const dish = await insertItem(db, { kind: 'dish', name: 'Хоровац', searchKey: 'horovac' })
+  const venue = await insertPlace(db, { kind: 'venue', name: 'Кафе у рынка' })
+  await db.insert(verdicts).values([
+    { id: randomUUID(), actorId, itemId, itemKind: 'product', score: 4, review: 'Солёный' },
+    {
+      id: randomUUID(),
+      actorId,
+      itemId: dish,
+      itemKind: 'dish',
+      placeId: venue,
+      score: 2,
+      ratedAt: at(0),
+      updatedAt: at(0),
+      deletedAt: at(1),
+    },
+  ])
+  await db.insert(searchPicks).values({ actorId, queryKey: 'sir', itemId, admits: true })
+  await db
+    .insert(events)
+    .values({ actorId, type: 'advice_viewed', payload: { subject: 'product' } })
+  const exchangeId = randomUUID()
+  const exchange = {
+    givenMinor: 1_000_000n,
+    givenCurrency: 'RUB',
+    receivedMinor: 4_700_000n,
+    receivedCurrency: 'AMD',
+    exchangedOn: '2026-09-20',
+    heldBeforeMinor: 100_000n,
+    note: 'Абовяна',
+  } as const
+  await db.insert(exchanges).values({
+    id: exchangeId,
+    actorId,
+    ...exchange,
+    givenAccountId: card,
+    receivedAccountId: cash,
+    accountSetAt: at(11),
+    revision: 2,
+    amendedAt: at(12),
+    deletedAt: at(13),
+  })
+  await db.insert(exchangeRevisions).values({ exchangeId, revision: 1, ...exchange })
+  const incomeId = randomUUID()
+  const income = {
+    amountMinor: 9_961_500n,
+    currency: 'RUB',
+    receivedOn: '2026-09-15',
+    heldBeforeMinor: 5_000n,
+    source: 'salary',
+    note: 'аванс',
+  } as const
+  await db.insert(incomes).values({
+    id: incomeId,
+    actorId,
+    ...income,
+    accountId: card,
+    accountSetAt: at(22),
+    revision: 2,
+    amendedAt: at(14),
+    deletedAt: at(15),
+  })
+  await db.insert(incomeRevisions).values({ incomeId, revision: 1, ...income })
+  const own = randomUUID()
+  await db.insert(spendingCategories).values([
+    { id: own, actorId, name: 'Такси', colour: 3, archivedAt: at(16) },
+    { id: randomUUID(), actorId, preset: 'groceries' },
+  ])
+  await db.insert(spendings).values({
+    id: randomUUID(),
+    actorId,
+    spentOn: '2026-09-20',
+    amountMinor: 50_000n,
+    currency: 'RUB',
+    categoryId: own,
+    note: 'барбер',
+    place: 'Гюмри',
+    rateBase: 'RUB',
+    rateQuote: 'AMD',
+    rateScaled: 4_812_345n,
+    rateSource: 'official',
+    rateAsOf: at(17),
+    accountId: cash,
+    debitedMinor: 240_000n,
+    debitedCurrency: 'AMD',
+    accountSetAt: at(18),
+    revision: 2,
+    amendedAt: at(19),
+    deletedAt: at(20),
+  })
+  await db.insert(moneyMonthRates).values({
+    actorId,
+    month: '2026-08',
+    base: 'RUB',
+    quote: 'AMD',
+    scaled: 4_100_000n,
+    source: 'personal',
+    asOf: at(21),
+  })
+}
+
 describe('состав экспорта — один источник правды со стиранием (MOL-93)', () => {
   it('каждая таблица со ссылкой на actors выгружается', () => {
     const tables = new Set(
@@ -51,6 +271,30 @@ describe('состав экспорта — один источник правд
     )
     expect([...tables].filter((table) => !(table in EXPORT_COLUMNS))).toEqual([])
     expect(ERASED_TABLES.filter((table) => !(table in EXPORT_COLUMNS))).toEqual([])
+  })
+
+  it('и каждая таблица, что ведёт к actors через другую, — тоже (ревизии, покупки, штрихкоды)', async () => {
+    const edges = await db.execute<{ child: string; parent: string }>(sql`
+      select distinct kcu.table_name as child, ccu.table_name as parent
+      from information_schema.referential_constraints rc
+      join information_schema.key_column_usage kcu
+        on kcu.constraint_name = rc.constraint_name and kcu.constraint_schema = rc.constraint_schema
+      join information_schema.constraint_column_usage ccu
+        on ccu.constraint_name = rc.unique_constraint_name
+       and ccu.constraint_schema = rc.unique_constraint_schema
+      where kcu.constraint_schema = 'public'`)
+    const reaching = new Set(['actors'])
+    for (let grown = true; grown;) {
+      grown = false
+      for (const { child, parent } of edges) {
+        if (reaching.has(parent) && !reaching.has(child)) {
+          reaching.add(child)
+          grown = true
+        }
+      }
+    }
+
+    expect([...reaching].filter((table) => !(table in EXPORT_COLUMNS)).sort()).toEqual([])
   })
 
   it('каждая колонка этих таблиц — в файле или в пропущенных с причиной', async () => {
@@ -66,6 +310,37 @@ describe('состав экспорта — один источник правд
       expect({ table, columns: actual }).toEqual({ table, columns: [...declared].sort() })
       expect(new Set(declared).size).toBe(declared.length)
     }
+  })
+
+  it('каждое поле файла заполнено хоть в одной строке, когда заполнено в базе', async () => {
+    const { tg, actorId } = await someone()
+    await aFullLife(actorId, tg)
+    await insertItem(db, { name: 'Чужое', createdBy: (await someone()).actorId })
+
+    const { wire } = await fileOf(actorId)
+
+    const { account, catalogue, format, version, exportedAt, ...sections } = wire
+    expect(emptyEverywhere([account])).toEqual([])
+    expect(emptyEverywhere(catalogue.items)).toEqual([])
+    expect(emptyEverywhere(catalogue.places)).toEqual([])
+    for (const [section, rows] of Object.entries(sections)) {
+      expect({ section, empty: emptyEverywhere(rows) }).toEqual({ section, empty: [] })
+    }
+    expect([format, version, exportedAt]).not.toContain(null)
+    const trip = wire.trips[0]
+    expect([trip?.rateChoice, trip?.ratePrevious?.rate, trip?.rateManual?.rate]).toEqual([
+      'manual',
+      '4.700000',
+      '4.900000',
+    ])
+    expect(trip?.finishedOnDeviceAt).toBe('2026-09-20T10:07:00.000Z')
+    expect(trip?.finishedAt).toBe('2026-09-20T10:08:00.000Z')
+    expect(wire.exchanges[0]?.heldBefore).toEqual({ amount: '1000.00', currency: 'AMD' })
+    expect(wire.spendings[0]?.debited).toEqual({ amount: '2400.00', currency: 'AMD' })
+    expect(wire.accountChecks[0]).toMatchObject({
+      fact: { amount: '9000.00', currency: 'AMD' },
+      counted: { amount: '9500.00', currency: 'AMD' },
+    })
   })
 
   it('строк в каждом разделе столько же, сколько насчитает сухой прогон стирания', async () => {
@@ -112,6 +387,30 @@ describe('экспорт всего своего (MOL-93)', () => {
     expect(text).not.toContain('Бориса')
     expect(content.proposedItems.map((item) => item.name)).toEqual(['Рынок-сыр'])
     expect(text).toContain(anna.actorId)
+  })
+
+  it('тот же магазин и та же позиция у другого человека — его строк в файле нет', async () => {
+    const anna = await someone()
+    const boris = await someone()
+    const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
+    await aLife(db, anna.actorId, anna.tg, shared)
+    await aLife(db, boris.actorId, boris.tg, shared)
+    await db
+      .update(verdicts)
+      .set({ review: 'Отзыв Бориса' })
+      .where(and(eq(verdicts.actorId, boris.actorId), isNull(verdicts.deletedAt)))
+    const [annaFile, borisTrips] = [
+      await fileOf(anna.actorId),
+      await db.select({ id: trips.id }).from(trips).where(eq(trips.actorId, boris.actorId)),
+    ]
+
+    const { content, text } = annaFile
+    const { erased } = await erasure.erase(anna.tg, { dryRun: true })
+    expect(content.expenses).toHaveLength(erased.expenses)
+    expect(content.verdicts).toHaveLength(erased.verdicts)
+    expect(text).not.toContain('Отзыв Бориса')
+    for (const { id } of borisTrips) expect(text).not.toContain(id)
+    expect(content.catalogue.places.map((place) => place.id)).toEqual([shared.placeId])
   })
 
   it('удалённое и снятое — в файле, каждое со своей отметкой', async () => {
