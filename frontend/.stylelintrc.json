@@ -18,6 +18,12 @@
         "/^(0|auto|inherit|initial|unset|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\))*( \\* -1)?\\))(\\s+(0|auto|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\))*( \\* -1)?\\))){0,3}$/"
       ]
     },
+    "declaration-property-value-disallowed-list": [
+      { "scroll-behavior": ["smooth"] },
+      {
+        "message": "A scroll with behavior 'auto' takes it from the CSS, and the sheet's compensation would slide (MOL-136). Pass behavior: 'smooth' where the eye follows."
+      }
+    ],
     "function-disallowed-list": [
       ["env"],
       {
