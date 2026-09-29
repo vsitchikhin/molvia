@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { EXPORT_FORMAT, EXPORT_VERSION, exportFileCodec } from '@molvia/model'
+import { EXPORT_FORMAT, EXPORT_VERSION, eventTypeSchema, exportFileCodec } from '@molvia/model'
+import type { EventPayload, EventType } from '@molvia/model'
 import { ACTOR_REFERENCES, ERASED_TABLES, createErasureRepository } from '@/db/erasure-repository'
 import { EXPORT_COLUMNS, EXPORT_SECTION_OF, createExportRepository } from '@/db/export-repository'
 import {
@@ -87,6 +88,13 @@ function referencesIn(value: unknown): { key: string; id: string }[] {
       ? [{ key, id: inner }]
       : referencesIn(inner),
   )
+}
+
+/** A payload the log accepts for each kind: a kind added to `EVENT` does not compile without one. */
+const PAYLOAD_OF: Readonly<Record<EventType, EventPayload | Record<string, never>>> = {
+  session_started: {},
+  catalogue_viewed: { subject: 'venue' },
+  advice_viewed: { subject: 'product' },
 }
 
 /** A person with every column the file names filled in some row of theirs. */
@@ -192,9 +200,11 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     },
   ])
   await db.insert(searchPicks).values({ actorId, queryKey: 'sir', itemId, admits: true })
+  // One of every kind the log knows: a kind whose payload the file refuses fails here, not on
+  // the person's copy (review 21).
   await db
     .insert(events)
-    .values({ actorId, type: 'advice_viewed', payload: { subject: 'product' } })
+    .values(eventTypeSchema.options.map((type) => ({ actorId, type, payload: PAYLOAD_OF[type] })))
   const exchangeId = randomUUID()
   const exchange = {
     givenMinor: 1_000_000n,
