@@ -133,61 +133,75 @@ async function cacheRates(from = 200, to = 0, rub = '4.0', usd = '390') {
   await rates.upsert(rows)
 }
 
+/**
+ * The two cases that set every bar beside its month read one by one: some thirty writes and seven
+ * reads of whole months, 1–2 s on a quiet machine — past the default five under a loaded one.
+ */
+const MONTH_BY_MONTH_MS = 30_000
+
 describe('«Графики» (MOL-74)', () => {
-  it('каждый столбец — тот же месяц, что на «Деньгах»: траты, «≈», «Пришло», категории', async () => {
-    await cacheRates()
-    const me = await owner()
-    await call(me, 'PUT', '/actors/me/salary-shift', { day: 25 })
-    await spend(me, '317800', 'AMD', today, 'groceries')
-    await spend(me, '120000', 'AMD', `${m1}-05`, 'cafe')
-    await spend(me, '11', 'USD', `${m1}-12`, 'cafe')
-    await spend(me, '50000', 'AMD', `${m3}-20`, 'groceries')
-    await receive(me, '100000', `${m1}-10`)
-    // The salary of the 26th counts in the month after (MOL-134).
-    await receive(me, '51000', `${m2}-26`)
-    await exchange(me, ['20000', 'RUB'], ['81000', 'AMD'], `${m2}-15`, 'Обменник')
+  it(
+    'каждый столбец — тот же месяц, что на «Деньгах»: траты, «≈», «Пришло», категории',
+    async () => {
+      await cacheRates()
+      const me = await owner()
+      await call(me, 'PUT', '/actors/me/salary-shift', { day: 25 })
+      await spend(me, '317800', 'AMD', today, 'groceries')
+      await spend(me, '120000', 'AMD', `${m1}-05`, 'cafe')
+      await spend(me, '11', 'USD', `${m1}-12`, 'cafe')
+      await spend(me, '50000', 'AMD', `${m3}-20`, 'groceries')
+      await receive(me, '100000', `${m1}-10`)
+      // The salary of the 26th counts in the month after (MOL-134).
+      await receive(me, '51000', `${m2}-26`)
+      await exchange(me, ['20000', 'RUB'], ['81000', 'AMD'], `${m2}-15`, 'Обменник')
 
-    const view = await charts(me)
-    expect(view.months.map((one) => one.month)).toHaveLength(6)
-    expect(view.months.at(-1)?.month).toBe(current)
-    for (const bar of view.months) {
-      const shown = await month(me, bar.month)
-      expect(bar.spent, bar.month).toEqual(shown.spent)
-      expect(bar.spentIncome, bar.month).toEqual(shown.spentIncome)
-      expect(bar.income, bar.month).toEqual(shown.income)
-      expect(bar.uncounted, bar.month).toEqual(shown.uncounted)
-      for (const row of shown.byCategory) {
-        const series = view.categories.find((one) => one.category.id === row.categoryId)
-        expect(series?.points.find((point) => point.month === bar.month)?.amount).toEqual(
-          row.amount,
-        )
+      const view = await charts(me)
+      expect(view.months.map((one) => one.month)).toHaveLength(6)
+      expect(view.months.at(-1)?.month).toBe(current)
+      for (const bar of view.months) {
+        const shown = await month(me, bar.month)
+        expect(bar.spent, bar.month).toEqual(shown.spent)
+        expect(bar.spentIncome, bar.month).toEqual(shown.spentIncome)
+        expect(bar.income, bar.month).toEqual(shown.income)
+        expect(bar.uncounted, bar.month).toEqual(shown.uncounted)
+        for (const row of shown.byCategory) {
+          const series = view.categories.find((one) => one.category.id === row.categoryId)
+          expect(series?.points.find((point) => point.month === bar.month)?.amount).toEqual(
+            row.amount,
+          )
+        }
       }
-    }
-    expect(view.months.find((one) => one.month === m1)?.income.minor).toBe(15_100_000n)
-    expect(view.since).toBe(m3)
-  })
+      expect(view.months.find((one) => one.month === m1)?.income.minor).toBe(15_100_000n)
+      expect(view.since).toBe(m3)
+    },
+    MONTH_BY_MONTH_MS,
+  )
 
-  it('первое чтение замораживает закрытые месяцы, сегодняшний обмен их не двигает, а обмен их дня — двигает, как на «Деньгах»', async () => {
-    await cacheRates()
-    const me = await owner()
-    await spend(me, '100000', 'AMD', `${m1}-10`, 'cafe')
-    await exchange(me, ['10000', 'RUB'], ['40000', 'AMD'], `${m2}-10`)
+  it(
+    'первое чтение замораживает закрытые месяцы, сегодняшний обмен их не двигает, а обмен их дня — двигает, как на «Деньгах»',
+    async () => {
+      await cacheRates()
+      const me = await owner()
+      await spend(me, '100000', 'AMD', `${m1}-10`, 'cafe')
+      await exchange(me, ['10000', 'RUB'], ['40000', 'AMD'], `${m2}-10`)
 
-    const before = await charts(me)
-    const frozen = await db.select().from(moneyMonthRates)
-    // Every closed month of the period with a rate on its last day: five of six.
-    expect(frozen).toHaveLength(5)
-    const august = before.months.find((one) => one.month === m1)
+      const before = await charts(me)
+      const frozen = await db.select().from(moneyMonthRates)
+      // Every closed month of the period with a rate on its last day: five of six.
+      expect(frozen).toHaveLength(5)
+      const august = before.months.find((one) => one.month === m1)
 
-    await exchange(me, ['10000', 'RUB'], ['50000', 'AMD'], today)
-    expect((await charts(me)).months.find((one) => one.month === m1)).toEqual(august)
+      await exchange(me, ['10000', 'RUB'], ['50000', 'AMD'], today)
+      expect((await charts(me)).months.find((one) => one.month === m1)).toEqual(august)
 
-    await exchange(me, ['10000', 'RUB'], ['30000', 'AMD'], `${m1}-01`)
-    const after = await charts(me)
-    const moved = after.months.find((one) => one.month === m1)
-    expect(moved?.spentIncome).not.toEqual(august?.spentIncome)
-    expect(moved?.spentIncome).toEqual((await month(me, m1)).spentIncome)
-  })
+      await exchange(me, ['10000', 'RUB'], ['30000', 'AMD'], `${m1}-01`)
+      const after = await charts(me)
+      const moved = after.months.find((one) => one.month === m1)
+      expect(moved?.spentIncome).not.toEqual(august?.spentIncome)
+      expect(moved?.spentIncome).toEqual((await month(me, m1)).spentIncome)
+    },
+    MONTH_BY_MONTH_MS,
+  )
 
   it('потери на обменах — по обменникам, в валюте трат, худшие сверху, неизмеренное названо', async () => {
     await cacheRates()
