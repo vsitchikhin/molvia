@@ -10,6 +10,7 @@ import {
   actorCodec,
   settingsUpdateSchema,
   adviceResponseSchema,
+  adviceSearchResponseSchema,
   addExpenseBodySchema,
   catalogueEntryCodec,
   catalogueSearchResponseSchema,
@@ -64,6 +65,7 @@ import type {
   SettingsUpdate,
   SettingsGeography,
   AdviceResponse,
+  AdviceSearchResponse,
   AddExpenseBody,
   CatalogueEntry,
   CatalogueSearchResponse,
@@ -317,6 +319,14 @@ export interface MolviaClient {
    * and is said in `scope`, so there is no parameter with which to ask for anyone else's.
    */
   advice(): Promise<AdviceResponse>
+  /**
+   * The search on «Что брать» (MOL-128): the whole catalogue, each item found with its row of
+   * «Что брать» or none. Cancelled through `signal` as the catalogue search is.
+   */
+  adviceSearch(
+    query: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<AdviceSearchResponse>
 }
 
 /**
@@ -699,5 +709,13 @@ export function createClient(options: ClientOptions): MolviaClient {
     pendingVerdicts: async () => request('/verdicts/pending', pendingVerdictsCodec),
 
     advice: async () => request('/advice', adviceResponseSchema),
+    adviceSearch: async (query, options = {}) => {
+      const search = new URLSearchParams({ q: query })
+      return request(
+        `/advice/search?${search.toString()}`,
+        adviceSearchResponseSchema,
+        options.signal === undefined ? {} : { signal: options.signal },
+      )
+    },
   }
 }

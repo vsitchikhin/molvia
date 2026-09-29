@@ -9,6 +9,7 @@ import {
   NEVER_BELOW_TENTHS,
   PRICE_MEDIAN_MIN_OBSERVATIONS,
   adviceResponseSchema,
+  adviceSearchResponseSchema,
   averageScore,
   hasSharedAccess,
   verdictLevel,
@@ -18,18 +19,26 @@ import type {
   AdviceResponse,
   AdviceRow,
   AdviceScope,
+  AdviceSearchResponse,
   VerdictLevel,
 } from '@molvia/model'
 import type { ActorRepository } from '@/db/actors-repository'
 import type { EventRepository } from '@/db/events-repository'
 import type { ExpenseRepository, PlacePrice, PriceMedian } from '@/db/expenses-repository'
+import type { ItemRepository } from '@/db/items-repository'
 import type { AdviceVerdictRow, VerdictRepository } from '@/db/verdicts-repository'
+import { SEARCH_LIMIT } from '@/usecases/search-catalogue'
 
 export interface AdviceDeps {
   readonly actors: ActorRepository
   readonly verdicts: VerdictRepository
   readonly expenses: ExpenseRepository
   readonly events: EventRepository
+}
+
+/** The search writes nothing, so it is handed no log (В-2). */
+export interface AdviceSearchDeps extends Omit<AdviceDeps, 'events'> {
+  readonly items: ItemRepository
 }
 
 /**
@@ -69,32 +78,7 @@ export async function advice(
     limit: ADVICE_LIMIT,
   })
 
-  const levelled = rated.rows.map((row) => ({ row, level: verdictLevel(row.sum, row.count) }))
-  const asked = (...levels: readonly VerdictLevel[]) =>
-    levelled.filter((entry) => levels.includes(entry.level)).map((entry) => entry.row.itemId)
-
-  const query = {
-    actorId,
-    scope,
-    minBuyers: AGGREGATE_MIN_CONTRIBUTIONS,
-    country: actor.country,
-    city: actor.city,
-  }
-  // Two questions, so two lists of items. «Не брать нигде» is in neither: its price is not
-  // filtered out of an answer, it is never asked for. And a threshold is only ever printed on
-  // «только если дёшево», so asking for the medians of everything else was half the work of
-  // every screen spent on a number nobody would read.
-  const [places, medians] = await Promise.all([
-    expenses.cheapestFor({ ...query, itemIds: asked('take', 'if_cheap') }),
-    expenses.medianPriceFor({ ...query, itemIds: asked('if_cheap') }),
-  ])
-
-  const byItem = groupPrices(places)
-  const medianOf = new Map(
-    medians.map((median) => [`${median.itemId}${groupKeyOf(median)}`, median]),
-  )
-
-  const rows = levelled.map(({ row, level }) => rowOf(row, level, byItem.get(row.itemId), medianOf))
+  const rows = await describe(expenses, actor, scope, rated.rows)
 
   // Encoded here rather than only in the route, the way `tripViewFor` is: an answer the wire
   // cannot carry has to fail where it was built, beside the data that made it.
@@ -130,6 +114,99 @@ export async function advice(
   }
 
   return answer
+}
+
+/**
+ * The search on «Что брать» (MOL-128, В-1): the catalogue searched as «Что взяли?» searches it,
+ * and every item found answered with its row of «Что брать» — built by `describe`, the list's own
+ * rules — or `null`, «ещё не оценивали». In the order of the search.
+ *
+ * **It records no visit** (В-2, the owner's decision): `advice` does, and the screen asks for the
+ * list whenever it opens and whenever the connection comes back — the field is not shown without
+ * a list. The one visit missed is a list that failed and a search that then worked, and that
+ * errs towards «stop», the safe side of the gate. Nor does it record a pick: a pick teaches the
+ * entry of a purchase, and here nothing was bought.
+ */
+export async function adviceSearch(
+  { actors, verdicts, expenses, items }: AdviceSearchDeps,
+  actorId: string,
+  query: string,
+): Promise<AdviceSearchResponse> {
+  const actor = await actors.byId(actorId)
+  if (!actor) throw new DomainError(ERROR.NO_ACTOR)
+  const scope: AdviceScope = hasSharedAccess(actor, new Date()) ? 'shared' : 'own'
+
+  const found = await items.search(query, SEARCH_LIMIT, actorId)
+  const itemIds = found.items.map((item) => item.id)
+  const rated =
+    itemIds.length === 0
+      ? []
+      : (
+          await verdicts.adviceRowsFor({
+            actorId,
+            scope,
+            minContributions: AGGREGATE_MIN_CONTRIBUTIONS,
+            neverBelowTenths: NEVER_BELOW_TENTHS,
+            warningsReserved: ADVICE_WARNINGS_RESERVED,
+            limit: itemIds.length,
+            itemIds,
+          })
+        ).rows
+  const rows = await describe(expenses, actor, scope, rated)
+  const byItem = new Map(rows.map((row) => [row.itemId, row]))
+
+  const answer = {
+    scope,
+    geography: { country: actor.country, city: actor.city },
+    near: found.near,
+    items: found.items.map((item) => ({
+      itemId: item.id,
+      name: item.name,
+      advice: byItem.get(item.id) ?? null,
+    })),
+  }
+  z.encode(adviceSearchResponseSchema, answer)
+  return answer
+}
+
+/**
+ * Rated rows made into rows of «Что брать»: the level, and prices where a price is allowed. One
+ * read of the places and one of the medians, whatever the number of rows. The rows of «не брать
+ * нигде» are left out of the price query — not filtered out of its answer afterwards, but never
+ * asked about: cheapness must not be able to reach a bad item even by accident.
+ */
+async function describe(
+  expenses: ExpenseRepository,
+  actor: { readonly id: string; readonly country: string; readonly city: string },
+  scope: AdviceScope,
+  rated: readonly AdviceVerdictRow[],
+): Promise<AdviceRow[]> {
+  const levelled = rated.map((row) => ({ row, level: verdictLevel(row.sum, row.count) }))
+  const asked = (...levels: readonly VerdictLevel[]) =>
+    levelled.filter((entry) => levels.includes(entry.level)).map((entry) => entry.row.itemId)
+
+  const query = {
+    actorId: actor.id,
+    scope,
+    minBuyers: AGGREGATE_MIN_CONTRIBUTIONS,
+    country: actor.country,
+    city: actor.city,
+  }
+  // Two questions, so two lists of items. «Не брать нигде» is in neither: its price is not
+  // filtered out of an answer, it is never asked for. And a threshold is only ever printed on
+  // «только если дёшево», so asking for the medians of everything else was half the work of
+  // every screen spent on a number nobody would read.
+  const [places, medians] = await Promise.all([
+    expenses.cheapestFor({ ...query, itemIds: asked('take', 'if_cheap') }),
+    expenses.medianPriceFor({ ...query, itemIds: asked('if_cheap') }),
+  ])
+
+  const byItem = groupPrices(places)
+  const medianOf = new Map(
+    medians.map((median) => [`${median.itemId}${groupKeyOf(median)}`, median]),
+  )
+
+  return levelled.map(({ row, level }) => rowOf(row, level, byItem.get(row.itemId), medianOf))
 }
 
 /** Every price of one item, kept apart by the pair it may be compared inside. */

@@ -928,6 +928,36 @@ describe('the trip', () => {
 
       await expect(client.advice()).rejects.toThrow()
     })
+
+    it('searches with the query encoded, and reads a found item without a verdict as null', async () => {
+      const { client, calls } = clientReplying(200, {
+        geography: { country: 'AM', city: 'Гюмри' },
+        scope: 'own',
+        near: true,
+        items: [
+          { itemId: BEEF, name: beef.name, advice: beef },
+          { itemId: MARKET, name: 'Сыр косичка', advice: null },
+        ],
+      })
+
+      const answer = await client.adviceSearch('сыр & хлеб')
+
+      const url = new URL(calls[0]?.url ?? '')
+      expect(url.pathname).toBe('/advice/search')
+      expect(url.searchParams.get('q')).toBe('сыр & хлеб')
+      expect(answer.items.map((found) => found.advice?.level ?? null)).toEqual(['take', null])
+    })
+
+    it('refuses a found item whose row is about another item', async () => {
+      const { client } = clientReplying(200, {
+        geography: { country: 'AM', city: 'Гюмри' },
+        scope: 'own',
+        near: true,
+        items: [{ itemId: MARKET, name: 'Сыр косичка', advice: beef }],
+      })
+
+      await expect(client.adviceSearch('сыр')).rejects.toThrow()
+    })
   })
 })
 
