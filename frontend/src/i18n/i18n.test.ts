@@ -102,6 +102,8 @@ describe('словарь: повторяющиеся тексты', () => {
     // решение, за которое заплачено. Поэтому цена закреплена снимком: новый незаявленный
     // дубль уронит тест, а заявленные видно списком.
     expect(duplicates(RU)).toEqual({
+      // Один глагол у двух шторок: закончить с балансом счёта и с цифрами штрихкода (MOL-98).
+      Готово: ['accounts.done', 'scanner.done'],
       // Подпись таба и заголовок экрана — разные роли одного слова, живут отдельно осознанно.
       Поход: ['nav.trip', 'trip.title'],
       'Что брать': ['advice.title', 'nav.advice'],
@@ -188,6 +190,8 @@ describe('словарь: повторяющиеся тексты', () => {
     // текстов меньше, расходится там, где первичный разведён, и заметить это может только
     // проверка по обоим.
     expect(duplicates(EN)).toEqual({
+      // One verb for two sheets, as in Russian: an account's balance, a barcode's digits (MOL-98).
+      Done: ['accounts.done', 'scanner.done'],
       Trip: ['nav.trip', 'trip.title'],
       // The strip of a trip removed is the strip of a spending removed (MOL-76).
       Undo: ['spending.restore', 'trip.remove.restore'],

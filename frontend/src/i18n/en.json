@@ -860,7 +860,9 @@
       "open_sheet": "Open the sheet",
       "sample_milk": "Milk «Ashkhar»",
       "sample_meta": "UHT, 2.5%",
-      "date": "Date"
+      "date": "Date",
+      "open_scanner": "Scan a barcode",
+      "scanned": "Read: {code}"
     },
     "login_seam": "Sign in for development",
     "login_insecure": "Signing in needs https: run make certs"
@@ -1241,5 +1243,24 @@
       "title": "The update did not take",
       "body": "Close Molvia completely and open it again. iPhone: swipe it up in the app switcher. Android: Recents — swipe Molvia away."
     }
+  },
+  "scanner": {
+    "title": "Barcode",
+    "hint": "Point the frame at the barcode",
+    "torch_on": "Turn on the torch",
+    "torch_off": "Turn off the torch",
+    "manual": "Type it in",
+    "scan": "Scan",
+    "field": "Digits under the barcode",
+    "done": "Done",
+    "try_again": "Check again",
+    "insecure_title": "The camera needs a secure connection",
+    "insecure_body": "Open the app at an https address — or type the code's digits in.",
+    "denied_title": "No access to the camera",
+    "denied_body": "iPhone: Settings → Safari → Camera → “Allow”. Android: the icon left of the address → Permissions → Camera. Or type the code's digits in.",
+    "none_title": "No camera",
+    "none_body": "This device has no camera. Type the code's digits in.",
+    "error_title": "The camera did not start",
+    "error_body": "Another app may be holding it. Close it and try again."
   }
 }

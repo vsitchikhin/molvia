@@ -10,10 +10,10 @@ export interface ReaderWorker {
 
 export interface BarcodeReader {
   /** Loads the reader ahead, while the camera starts. */
-  warm(): Promise<void>
+  warm: () => Promise<void>
   /** Reads one frame; its pixels move to the worker and are gone from the caller. */
-  read(frame: ImageData): Promise<string | null>
-  dispose(): void
+  read: (frame: ImageData) => Promise<string | null>
+  dispose: () => void
 }
 
 export class ReaderFailed extends Error {

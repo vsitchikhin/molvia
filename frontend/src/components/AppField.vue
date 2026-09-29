@@ -47,7 +47,7 @@
         :class="{ veiled: shows }"
         v-bind="control()"
         :type="kind === 'date' ? 'date' : 'text'"
-        :inputmode="kind === 'decimal' ? 'decimal' : undefined"
+        :inputmode="kind === 'decimal' ? 'decimal' : kind === 'digits' ? 'numeric' : undefined"
         :value="modelValue"
         :readonly="readonly"
         :placeholder="placeholder"
@@ -72,7 +72,7 @@ import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import IconChevronDown from '~icons/mdi/chevron-down'
 import type { ErrorCode } from '@molvia/model'
 
-export type FieldKind = 'text' | 'decimal' | 'multiline' | 'date' | 'select'
+export type FieldKind = 'text' | 'decimal' | 'digits' | 'multiline' | 'date' | 'select'
 
 /**
  * A native input with its label, its error and its tail, wired the same way every time: the
@@ -86,7 +86,8 @@ export type FieldKind = 'text' | 'decimal' | 'multiline' | 'date' | 'select'
  * `kind` sets what a phone needs to open the right keyboard, so a screen never has to remember
  * it. Money and quantities are `type="text" inputmode="decimal"`, never `type="number"`: that
  * one gives spinners, refuses the comma of a Russian keyboard and silently drops what it cannot
- * read.
+ * read. `digits` is a code copied from a package — the barcode's digits (MOL-98): the digit pad,
+ * and still text, so a leading zero stays.
  *
  * The error is a code from the domain registry and doubles as its i18n key, so no message is
  * written where it is shown. `errorText` is for a refusal the registry has no code for — the

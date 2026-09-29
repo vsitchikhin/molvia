@@ -80,6 +80,15 @@
         <AppButton size="large" block @click="sheetOpen = false">{{ t('item.save') }}</AppButton>
       </template>
     </BottomSheet>
+
+    <!-- The scanner, until a screen opens it (MOL-99): for end-to-end and for a real phone. -->
+    <section class="group">
+      <AppButton block variant="secondary" @click="scannerOpen = true">
+        {{ t('dev.kit.open_scanner') }}
+      </AppButton>
+      <p v-if="scanned" class="scanned">{{ t('dev.kit.scanned', { code: scanned }) }}</p>
+    </section>
+    <BarcodeScannerSheet v-model:open="scannerOpen" @read="scanned = $event" />
   </AppScreen>
 </template>
 
@@ -101,6 +110,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import VerdictBadge from '@/components/VerdictBadge.vue'
@@ -121,6 +131,7 @@ export default defineComponent({
     AppCard,
     AppField,
     AppScreen,
+    BarcodeScannerSheet,
     BottomSheet,
     IconClose,
     IconPlus,
@@ -152,6 +163,8 @@ export default defineComponent({
       date: ref('2026-09-19'),
       unit: ref('l'),
       sheetOpen: ref(false),
+      scannerOpen: ref(false),
+      scanned: ref(''),
       // The verdict card blank, and as a refused draft comes back: a score, words, the error.
       verdictCard: computed(() => ({
         itemId: '00000000-0000-4000-8000-000000000001',
@@ -205,6 +218,11 @@ export default defineComponent({
 .figure {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.scanned {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .name {
