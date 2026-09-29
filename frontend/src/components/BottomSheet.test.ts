@@ -175,6 +175,40 @@ describe('BottomSheet', () => {
 
   // A text selection that began in a field and overshot is clicked on the dialog — the common
   // ancestor — and would throw away what was typed (adversarial Б-4).
+  // iOS hands a touch to the page only where a listener stands, and the scrim lies outside the
+  // dialog's box: a listener on the dialog never heard a tap there, and on an iPhone the sheet did
+  // not close (MOL-80). Measured on the owner's phone; happy-dom has no such layer, so what is held
+  // here is where the listener stands.
+  it('hears a press on the document while it is open, and lets go of it once it is shut', async () => {
+    const add = vi.spyOn(document, 'addEventListener')
+    const remove = vi.spyOn(document, 'removeEventListener')
+    const { host } = await render({ open: true })
+    const heard = add.mock.calls.find(([type]) => type === 'pointerdown')
+    expect(heard?.[2]).toEqual({ capture: true, passive: true })
+    await host.get('.head button').trigger('click')
+    await nextTick()
+    expect(remove).toHaveBeenCalledWith('pointerdown', heard?.[1], { capture: true, passive: true })
+    expect(remove).toHaveBeenCalledWith('pointercancel', expect.any(Function), {
+      capture: true,
+      passive: true,
+    })
+  })
+
+  it('must not fire: a shut sheet does not listen on the document', async () => {
+    const add = vi.spyOn(document, 'addEventListener')
+    await render()
+    expect(add.mock.calls.some(([type]) => type === 'pointerdown')).toBe(false)
+  })
+
+  it('closes on a tap on the scrim that only the document heard pressed', async () => {
+    const { dialog, go } = await render({ open: true })
+    const press = new PointerEvent('pointerdown', { bubbles: true })
+    Object.defineProperty(press, 'target', { value: dialog() })
+    document.dispatchEvent(press)
+    dialog().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+  })
+
   it('must not fire: a press that began inside the sheet and ended on the scrim', async () => {
     const { host, go, dialog } = await render({ open: true })
     host.get('.content').element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))

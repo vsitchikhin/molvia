@@ -6,8 +6,6 @@
     :aria-labelledby="titleId"
     @cancel.prevent="close()"
     @close="closedNatively"
-    @pointerdown="pressed"
-    @pointercancel="takenBack"
     @click.capture="holdWhileRising"
     @click="closeOnScrim"
   >
@@ -35,7 +33,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, onMounted, ref, useId, watch } from 'vue'
+import { defineComponent, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconBack from '~icons/mdi/chevron-left'
@@ -226,6 +224,27 @@ export default defineComponent({
 
     useKeyboardInset(dialog, shown)
 
+    // Heard on the document, not on the dialog (MOL-80). iOS hands a touch to the page only where
+    // a listener of touches or of the pointer stands, and on the dialog that is the panel's box:
+    // the scrim lies outside it, its `pointerdown` never came, and on an iPhone a tap on the scrim
+    // did nothing at all — measured on the owner's phone, and invisible to Chromium and to
+    // Playwright's WebKit, which have no such layer. A tap on the scrim still lands on the dialog
+    // itself, so what counts as the scrim is unchanged.
+    function listen(on: boolean): void {
+      const options = { capture: true, passive: true }
+      if (on) {
+        document.addEventListener('pointerdown', pressed, options)
+        document.addEventListener('pointercancel', takenBack, options)
+      } else {
+        document.removeEventListener('pointerdown', pressed, options)
+        document.removeEventListener('pointercancel', takenBack, options)
+      }
+    }
+    watch(shown, listen)
+    onBeforeUnmount(() => {
+      listen(false)
+    })
+
     watch(
       () => props.open,
       (open) => {
@@ -249,8 +268,6 @@ export default defineComponent({
       dialog,
       titleId,
       close,
-      pressed,
-      takenBack,
       holdWhileRising,
       closeOnScrim,
       closedNatively,
