@@ -54,10 +54,10 @@ const DOUBLE_TAP = 300
  * Six ways to close it, one way it closes. The ×, a tap on the scrim, a pull down (`useSheetDrag`,
  * MOL-80), Esc, Android's «back» (which Chrome delivers to a modal dialog as `cancel`) and the
  * browser's «back» or the iOS edge swipe (a pop) — the first five step back off the sheet's entry
- * in the history, and the pop that follows is what closes it (`useSheetHistory`).
+ * in the history, and the pop that follows is what closes it (`useSheetHistory`). A screen that
+ * must close the sheet and itself at once — «Add to trip» over the search — calls `close(2)`.
  *
- * No grab handle on top, though the sheet can be pulled down: the owner's decision (MOL-80, В-5). A screen that must close the sheet and itself
- * at once — «Add to trip» over the search — calls `close(2)`.
+ * No grab handle on top, though the sheet can be pulled down: the owner's decision (MOL-80, В-5).
  *
  * The page under an open sheet does not scroll (main.scss). The sheet is the one place where a
  * container scrolls rather than the page: a panel over the screen has no window of its own.

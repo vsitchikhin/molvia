@@ -6,14 +6,20 @@ const SLOP = 8
 /** Past this share of its height, a sheet let go goes away (owner's decision В-4). */
 const AWAY_SHARE = 0.25
 /**
- * A flick: faster than this, downwards, over the last moments of the drag — px/ms. The number the
- * sheets of iOS and of the `vaul` library settle on; a platform convention, not a design token.
+ * A flick: faster than this, downwards, over the last moments before the lift — px/ms. The number
+ * the sheets of iOS and of the `vaul` library settle on; a platform convention, not a design token.
  */
 const FLICK = 0.4
-/** How far back the flick is measured from the lift. */
+/**
+ * How far back from the lift the flick is measured. Up to the lift, not up to the last move: a
+ * finger at rest sends no `touchmove`, and a fast pull held still and then let go — a change of
+ * mind — was read at the speed of the pull and closed the sheet (adversarial А, review Р-1).
+ */
 const FLICK_WINDOW = 100
+/** Enough moves to reach back past the window at any rate a screen sends them. */
+const SAMPLES = 32
 
-/** Where a finger in a field moves the caret and selects — never the sheet (owner's decision В-6). */
+/** Where a finger moves the caret and selects — never the sheet (owner's decision В-6). */
 const TYPING = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])'
 
 interface Sample {
@@ -70,12 +76,22 @@ export function useSheetDrag(
   }
 
   function began(event: TouchEvent): void {
+    // A second finger ends the pull and puts the sheet back: it is a pinch or a change of grip, not
+    // a decision. The browser sends its `touchstart` before any move of two fingers, and wiping the
+    // pull here without letting go froze the sheet where it was — then the first lift closed it
+    // (adversarial Б).
+    if (event.touches.length > 1) {
+      letGo(false)
+      return
+    }
     start = null
     const element = target.value
     const touch = event.touches[0]
-    if (!element || !touch || event.touches.length > 1) return
+    if (!element || !touch) return
     if (element.scrollTop > 0 || !options.canStart(event)) return
-    if (event.target instanceof Element && event.target.closest(TYPING)) return
+    if (!(event.target instanceof Element)) return
+    // A touch that came up from a sheet inside this one is that sheet's to pull (review Р-2).
+    if (event.target.closest('dialog') !== element || event.target.closest(TYPING)) return
     start = { x: touch.clientX, y: touch.clientY }
   }
 
@@ -105,19 +121,22 @@ export function useSheetDrag(
     const offset = Math.max(0, touch.clientY - origin)
     offsetTo(element, offset)
     samples.push({ y: touch.clientY, at: event.timeStamp })
-    while (samples.length > 2 && event.timeStamp - (samples[0]?.at ?? 0) > FLICK_WINDOW) {
-      samples.shift()
-    }
+    if (samples.length > SAMPLES) samples.shift()
   }
 
-  function flicked(): boolean {
-    const first = samples[0]
+  /**
+   * Down faster than a flick over the window that ends at the lift: from the last move at least
+   * the window before it — or the first move, for a pull shorter than that — to where the finger
+   * rests, over the time up to the lift. A pause before the lift slows it to nothing.
+   */
+  function flicked(lift: number): boolean {
     const last = samples.at(-1)
-    if (!first || !last || last.at <= first.at) return false
-    return (last.y - first.y) / (last.at - first.at) > FLICK
+    const from = samples.findLast((sample) => lift - sample.at >= FLICK_WINDOW) ?? samples[0]
+    if (!last || !from || lift <= from.at) return false
+    return (last.y - from.y) / (lift - from.at) > FLICK
   }
 
-  function letGo(counts: boolean): void {
+  function letGo(counts: boolean, lift = 0): void {
     const element = target.value
     if (!element || !dragging.value) {
       start = null
@@ -125,7 +144,7 @@ export function useSheetDrag(
     }
     const last = samples.at(-1)
     const offset = last ? Math.max(0, last.y - origin) : 0
-    const away = counts && (offset > element.offsetHeight * AWAY_SHARE || flicked())
+    const away = counts && (offset > element.offsetHeight * AWAY_SHARE || flicked(lift))
     start = null
     samples = []
     // The transition comes back with the class; the sheet slides from where the finger left it.
@@ -142,8 +161,14 @@ export function useSheetDrag(
     })
   }
 
-  const ended = () => {
-    letGo(true)
+  const ended = (event: TouchEvent) => {
+    // Where the finger lifted counts as well: it may have gone on since the last move reported,
+    // and the flick took that time without that way — a short flick just over the line read as
+    // under it (adversarial Г).
+    const lifted = event.changedTouches[0]
+    if (dragging.value && lifted) samples.push({ y: lifted.clientY, at: event.timeStamp })
+    // A finger lifted while another stays down would have ended the pull at its `touchstart`.
+    letGo(event.touches.length === 0, event.timeStamp)
   }
   const cancelled = () => {
     letGo(false)

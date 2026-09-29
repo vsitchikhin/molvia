@@ -1071,6 +1071,19 @@ describe('focus after the sheet', () => {
     expect(document.activeElement).toBe(button)
   })
 
+  // Over a sheet in Safari the platform gives focus back to what the sheet under it held — its
+  // field — not to the row that opened the picker, which the tap never focused (review Р-3).
+  it('goes back to the button when the platform gave focus back to what held it at the opening', async () => {
+    const { button } = opener()
+    const field = document.createElement('input')
+    document.body.append(field)
+    field.focus()
+    const { router } = await openFrom(button)
+    field.focus()
+    router.back()
+    expect(document.activeElement).toBe(button)
+  })
+
   // Chromium and a keyboard give focus back themselves; the sheet does not take it from there.
   it('must not fire: focus the platform gave back somewhere stays there', async () => {
     const { button } = opener()
@@ -1124,7 +1137,7 @@ describe('pulled down', () => {
     return new Touch({ identifier: 0, target, clientX: x, clientY: y })
   }
 
-  /** One finger on `target`: down at `y`, then through each of `path` — `[y]` or `[y, x]` — `gap` ms apart. */
+  /** One finger on `target`, down at `y`; `to` moves it `after` ms later. */
   function finger(target: Element, y: number, x = 100) {
     const events: TouchEvent[] = []
     const send = (type: string, touches: Touch[], changed: Touch[]) => {
@@ -1147,11 +1160,26 @@ describe('pulled down', () => {
         last = point(target, nextX, nextY)
         return send('touchmove', [last], [last])
       },
+      /** A second finger comes down as a browser tells it: its own `touchstart` comes first. */
       second() {
-        const other = new Touch({ identifier: 1, target, clientX: x, clientY: y })
-        return send('touchmove', [last, other], [other])
+        let other = new Touch({ identifier: 1, target, clientX: x + 100, clientY: last.clientY })
+        send('touchstart', [last, other], [other])
+        return {
+          to(nextY: number) {
+            wait(16)
+            last = point(target, last.clientX, nextY)
+            other = new Touch({ identifier: 1, target, clientX: x + 100, clientY: nextY })
+            return send('touchmove', [last, other], [last, other])
+          },
+          up() {
+            send('touchend', [last], [other])
+          },
+        }
       },
-      up() {
+      /** Lifts the finger — `after` ms later and at `atY`, if it went on since the last move. */
+      up(atY = last.clientY, after = 0) {
+        wait(after)
+        last = point(target, last.clientX, atY)
         send('touchend', [], [last])
       },
       cancel() {
@@ -1321,16 +1349,83 @@ describe('pulled down', () => {
     expect(go).not.toHaveBeenCalled()
   })
 
-  it('must not fire: a second finger puts it back', async () => {
+  // The browser sends the second finger's `touchstart` before any move of two: the pull froze where
+  // it was, and lifting either finger closed the sheet with its sum typed (adversarial Б).
+  it('must not fire: a second finger puts it back, and neither lift closes it', async () => {
     const { host, go, dialog } = await pulled()
     const drag = finger(host.get('.content').element, 100)
     drag.to(110)
-    drag.to(300)
-    drag.second()
+    drag.to(300, 100, 200)
+    expect(dialog().style.transform).toBe('translateY(190px)')
+    const second = drag.second()
+    await frame()
+    expect(dialog().style.transform).toBe('')
+    const move = second.to(400)
+    expect(move.defaultPrevented).toBe(false)
+    expect(dialog().style.transform).toBe('')
+    second.up()
+    drag.to(420)
     drag.up()
     await frame()
     expect(go).not.toHaveBeenCalled()
     expect(dialog().style.transform).toBe('')
+  })
+
+  // A finger at rest sends no move: a fast pull held still and then let go — changed its mind — was
+  // read at the speed of the pull and closed the sheet (adversarial А, review Р-1).
+  it('must not fire: a fast short pull held still, then let go — it goes back up', async () => {
+    const { host, go, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    for (const y of [110, 130, 150, 170]) drag.to(y)
+    wait(1000)
+    drag.up()
+    await frame()
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().style.transform).toBe('')
+  })
+
+  // A flick is measured over the moments before the lift: at the window's edge it still counts.
+  it('closes on a fast short pull let go within the flick window', async () => {
+    const { host, go } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    for (const y of [110, 130, 150, 170, 190, 210, 230, 250]) drag.to(y)
+    wait(40)
+    drag.up()
+    await frame()
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+  })
+
+  // A lift comes between two frames, and the finger went on meanwhile: that way counts with that
+  // time, or a flick just over the line read as under it (adversarial Г).
+  it('closes on a short flick let go between two moves, where the finger went on', async () => {
+    const { host, go } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    // 0.5 px/ms, a frame a report: to the last report 16 px in 40 ms — the line itself; to the lift,
+    // 20 px.
+    drag.to(110)
+    drag.to(118)
+    drag.to(126)
+    drag.up(130, 8)
+    await frame()
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+  })
+
+  // A sheet inside this one — in its slot — pulls itself; the touch that bubbles up is not ours,
+  // or both would step back and the one under it would go with its sum typed (review Р-2).
+  it('must not fire: a pull on a sheet inside it', async () => {
+    const { dialog, go } = await pulled()
+    const inner = document.createElement('dialog')
+    const row = document.createElement('p')
+    inner.append(row)
+    dialog().append(inner)
+    const drag = finger(row, 100)
+    drag.to(110)
+    const move = drag.to(300)
+    drag.up()
+    await frame()
+    expect(move.defaultPrevented).toBe(false)
+    expect(dialog().style.transform).toBe('')
+    expect(go).not.toHaveBeenCalled()
   })
 
   it('must not fire: a touch the platform took back puts it back', async () => {
