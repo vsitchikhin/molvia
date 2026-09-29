@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { defineComponent, h, nextTick, ref, shallowRef } from 'vue'
+import { defineComponent, h, nextTick, ref, shallowRef, watch } from 'vue'
 import type { AppLocale } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
@@ -11,6 +11,7 @@ import AppScreen from '@/components/AppScreen.vue'
 import { useActorStore } from '@/stores/actor'
 import { routes } from '@/router'
 import { pwaUpdateKey, type UpdatePhase } from '@/pwaUpdate'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 
 /**
  * happy-dom lays nothing out, so no observer ever fires on its own. This one is driven by the
@@ -269,6 +270,42 @@ describe('AppScreen', () => {
         const { view } = await render('/', { update: 'ready' })
         expect(view.get('.dock').find('.band').exists()).toBe(true)
         expect(view.get('.content').find('.dock-room').exists()).toBe(true)
+      })
+
+      it('says the version out loud when it comes while the screen is open (adversarial Д1)', async () => {
+        vi.useFakeTimers()
+        const phase = shallowRef<UpdatePhase>('none')
+        const said: string[] = []
+        const router = createRouter({ history: createMemoryHistory(), routes })
+        await router.push('/')
+        // A plain component: `h` with the frame under the app's live region, as `App.vue` has it.
+        const Root = {
+          setup() {
+            const announcements = provideAnnouncer()
+            watch(announcements, (now, before) => {
+              for (const added of now.filter((a) => !before.some((b) => b.id === a.id))) {
+                said.push(added.text)
+              }
+            })
+            return () => h(AppScreen, { title: 'Trip' })
+          },
+        }
+        mount(Root, {
+          global: {
+            plugins: [router, createPinia(), createAppI18n('en')],
+            provide: {
+              [pwaUpdateKey as symbol]: { phase, apply: vi.fn(), serverVersion: vi.fn() },
+            },
+          },
+        })
+
+        phase.value = 'ready'
+        await nextTick()
+        vi.advanceTimersByTime(200)
+        await nextTick()
+
+        expect(said).toEqual(['A new version is out'])
+        vi.useRealTimers()
       })
 
       it('must not bring a strip when nothing waits', async () => {

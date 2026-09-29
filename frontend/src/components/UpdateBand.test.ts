@@ -93,12 +93,37 @@ describe('«Вышла новая версия · Обновить» (MOL-132)',
       expect(said).toEqual(['A new version is out'])
     })
 
-    it('must not be said again by a strip drawn anew on the next screen', async () => {
+    it('by a strip born with the version already waiting — as every screen draws its own (Д1)', async () => {
       const { said } = render(fakeUpdate('ready'))
       await nextTick()
       vi.advanceTimersByTime(200)
       await nextTick()
-      expect(said).toEqual([])
+      expect(said).toEqual(['A new version is out'])
+    })
+
+    it('must not be said again by the strip the next screen draws anew', async () => {
+      const update = fakeUpdate('ready')
+      const first = render(update)
+      await nextTick()
+      vi.advanceTimersByTime(200)
+      await nextTick()
+      first.view.unmount()
+
+      const next = render(update)
+      await nextTick()
+      vi.advanceTimersByTime(200)
+      await nextTick()
+
+      expect(first.said).toEqual(['A new version is out'])
+      expect(next.said).toEqual([])
+    })
+
+    it('says a failure the page came up with, before any strip was there (Д1)', async () => {
+      const { said } = render(fakeUpdate('failed'))
+      await nextTick()
+      vi.advanceTimersByTime(200)
+      await nextTick()
+      expect(said).toEqual(['The update did not take'])
     })
 
     it('says the failure, and not the moment in between', async () => {

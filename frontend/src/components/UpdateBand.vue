@@ -20,7 +20,7 @@ import { useI18n } from 'vue-i18n'
 import IconUpdate from '~icons/mdi/update'
 import AppButton from '@/components/AppButton.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
-import { usePwaUpdate } from '@/pwaUpdate'
+import { usePwaUpdate, type PwaUpdate, type UpdatePhase } from '@/pwaUpdate'
 
 /**
  * «Вышла новая версия · Обновить» (MOL-132): a version waits, and the person takes it — the one way
@@ -36,6 +36,9 @@ import { usePwaUpdate } from '@/pwaUpdate'
  * app to be closed all the way, in the words of both phones — a guess from the user agent is wrong
  * on an iPad, which calls itself a Mac (Р-3).
  */
+/** What each version's state last had said out loud, across every strip and screen. */
+const said = new WeakMap<PwaUpdate, UpdatePhase>()
+
 export default defineComponent({
   name: 'UpdateBand',
   components: { AppButton, IconUpdate },
@@ -45,13 +48,22 @@ export default defineComponent({
     const announce = useAnnouncer()
     const phase = computed(() => update.phase.value)
 
-    // Said as it comes and as it fails, not again on every screen the strip is drawn on anew.
+    // Said as it comes and as it fails — once for the app, not once for each strip: a screen
+    // draws its own, born with the version already waiting, and a strip that spoke only of what it
+    // saw change said nothing at all (adversarial Д1). What was said is kept by the version's own
+    // state, the one object every strip reads.
     let unsay: (() => void) | undefined
-    watch(phase, (now) => {
-      if (now !== 'ready' && now !== 'failed') return
-      unsay?.()
-      unsay = announce?.(now === 'failed' ? t('update.failed.title') : t('update.ready'))
-    })
+    watch(
+      phase,
+      (now) => {
+        if (now !== 'ready' && now !== 'failed') return
+        if (said.get(update) === now) return
+        said.set(update, now)
+        unsay?.()
+        unsay = announce?.(now === 'failed' ? t('update.failed.title') : t('update.ready'))
+      },
+      { immediate: true },
+    )
     onBeforeUnmount(() => unsay?.())
 
     return {
