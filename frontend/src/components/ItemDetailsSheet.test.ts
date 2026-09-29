@@ -184,7 +184,7 @@ describe('ItemDetailsSheet', () => {
     await type(view, 'amount', '800')
     expect(perUnit(view)).toBe('800,00֏/л')
     expect(view.text().replace(/\s/g, ' ')).toContain('≈ 2 ₽')
-    await button(view, 'Добавить в поход').trigger('click')
+    await button(view, 'Записать').trigger('click')
     const write = queue.pending.find((row) => row.kind === 'add')
     expect(write?.tripId).toBe(selected.id)
     expect(write?.body.amount?.currency).toBe('AMD')
@@ -234,7 +234,7 @@ describe('ItemDetailsSheet', () => {
 
   it('adds the item alone when nothing else is filled in, with the query it was found by', async () => {
     const { view, queue } = await render({ query: 'мол' })
-    await button(view, 'Добавить в поход').trigger('click')
+    await button(view, 'Записать').trigger('click')
 
     expect(queue.pending).toHaveLength(1)
     const [write] = queue.pending
@@ -248,7 +248,7 @@ describe('ItemDetailsSheet', () => {
     const { view, queue, go } = await render({ closeSteps: 2 })
     await type(view, 'quantity', '0,9')
     await type(view, 'amount', '520')
-    await button(view, 'Добавить в поход').trigger('click')
+    await button(view, 'Записать').trigger('click')
 
     const [write] = queue.pending
     if (write?.kind !== 'add') throw new Error('no add queued')
@@ -260,7 +260,7 @@ describe('ItemDetailsSheet', () => {
   it('does not send what was typed as a price and is not one (В-5)', async () => {
     const { view, queue } = await render()
     await type(view, 'amount', '57о')
-    await button(view, 'Добавить в поход').trigger('click')
+    await button(view, 'Записать').trigger('click')
 
     expect(queue.pending).toEqual([])
     expect(view.text()).toContain('Это не похоже на сумму')
@@ -270,7 +270,7 @@ describe('ItemDetailsSheet', () => {
 
   it('queues one purchase for a double tap', async () => {
     const { view, queue } = await render()
-    const add = button(view, 'Добавить в поход')
+    const add = button(view, 'Записать')
     await add.trigger('click')
     await add.trigger('click')
     expect(queue.pending).toHaveLength(1)
@@ -299,7 +299,7 @@ describe('ItemDetailsSheet', () => {
   it('asks the server for the trip when it has none in memory', async () => {
     const { view } = await render({ trip: null, server: trip() })
     await vi.waitFor(() => {
-      expect(view.findAll('button').some((b) => b.text() === 'Добавить в поход')).toBe(true)
+      expect(view.findAll('button').some((b) => b.text() === 'Записать')).toBe(true)
     })
     expect(currentTrip).toHaveBeenCalledTimes(1)
   })
@@ -309,7 +309,7 @@ describe('ItemDetailsSheet', () => {
     const { view } = await render({ server: null })
     expect(currentTrip).toHaveBeenCalledTimes(1)
     await vi.waitFor(() => {
-      expect(view.text()).toContain('Сначала начните поход')
+      expect(view.text()).toContain('Сначала начните запись')
     })
   })
 
@@ -347,14 +347,14 @@ describe('ItemDetailsSheet', () => {
   it('keeps the trip it remembers when the server cannot be asked', async () => {
     const { view } = await render({ server: 'down' })
     await new Promise((resolve) => setTimeout(resolve, 5))
-    expect(view.text()).toContain('Добавить в поход')
+    expect(view.text()).toContain('Записать')
   })
 
   it('asks for a trip first when there is none, and leads back to it (В-6)', async () => {
     const { view, go, queue } = await render({ trip: null, closeSteps: 2 })
-    expect(view.text()).toContain('Сначала начните поход')
-    expect(view.findAll('button').some((b) => b.text() === 'Добавить в поход')).toBe(false)
-    await button(view, 'К походу').trigger('click')
+    expect(view.text()).toContain('Сначала начните запись')
+    expect(view.findAll('button').some((b) => b.text() === 'Записать')).toBe(false)
+    await button(view, 'К покупкам').trigger('click')
     expect(go).toHaveBeenCalledWith(-2)
     expect(queue.pending).toEqual([])
   })
@@ -372,9 +372,9 @@ describe('ItemDetailsSheet', () => {
     })
     const { view } = await render({ trip: null, server: null })
 
-    expect(view.text()).not.toContain('Сначала начните поход')
+    expect(view.text()).not.toContain('Сначала начните запись')
     await type(view, 'amount', '520')
-    await button(view, 'Добавить в поход').trigger('click')
+    await button(view, 'Записать').trigger('click')
 
     const written = queue.pending.filter((write) => write.kind === 'add')
     expect(written).toHaveLength(1)
@@ -384,14 +384,14 @@ describe('ItemDetailsSheet', () => {
   it('refuses, under the field, a price the trip could not add to what is queued (A9)', async () => {
     const first = await render()
     await type(first.view, 'amount', '50 000 000 000 000 000')
-    await button(first.view, 'Добавить в поход').trigger('click')
+    await button(first.view, 'Записать').trigger('click')
     // Its own purchase, once queued, is not counted against it while the sheet goes.
     expect(first.view.text()).not.toContain('Это не похоже на сумму')
     expect(first.queue.pending).toHaveLength(1)
 
     const second = await render()
     await type(second.view, 'amount', '50 000 000 000 000 000')
-    await button(second.view, 'Добавить в поход').trigger('click')
+    await button(second.view, 'Записать').trigger('click')
     expect(second.view.text()).toContain('Это не похоже на сумму')
     expect(second.queue.pending).toHaveLength(1)
   })

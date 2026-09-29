@@ -152,3 +152,42 @@ export const adviceResponseSchema = z
   })
   .refine((answer) => answer.total >= answer.rows.length, { error: ISSUE.RESPONSE_INVALID })
 export type AdviceResponse = z.output<typeof adviceResponseSchema>
+
+/**
+ * One item the search on «Что брать» found, and its row of «Что брать» — or `null`, «ещё не
+ * оценивали» (MOL-128, В-1). The row is built by the same use case and to the same rules as the
+ * list's: the mode, the threshold of three, no price on «не брать нигде». So an item nobody may
+ * yet be shown a verdict for — a stranger's lone one below the threshold — reads as not rated,
+ * exactly as the list leaves it out.
+ *
+ * Only the id and the name of the item: what a row and the verdict sheet need, an allowlist for
+ * the reason `catalogueEntrySchema` is one.
+ */
+export const adviceFoundSchema = z
+  .strictObject({
+    itemId: z.uuid(),
+    name: itemSchema.shape.name,
+    advice: adviceRowSchema.nullable(),
+  })
+  .refine((found) => found.advice === null || found.advice.itemId === found.itemId, {
+    error: ISSUE.RESPONSE_INVALID,
+  })
+export type AdviceFound = z.output<typeof adviceFoundSchema>
+
+/**
+ * `GET /advice/search?q=` (MOL-128, В-1). The catalogue searched the way «Что взяли?» searches
+ * it — transliteration, typos, synonyms — and each item found answered with its advice by the
+ * server, never glued to the list on the phone: the list is cut at `ADVICE_LIMIT`, and an item
+ * past the cut would read «ещё не оценивали» over a verdict it has.
+ *
+ * In the order of the search; the screen lays the items out by group and keeps that order inside
+ * each. `near` as the catalogue's answer has it (MOL-46). It records no visit: `GET /advice`
+ * does, and the screen asks for it whenever it opens (В-2).
+ */
+export const adviceSearchResponseSchema = z.strictObject({
+  scope: adviceScopeSchema,
+  geography: settingsGeographySchema,
+  near: z.boolean(),
+  items: z.array(adviceFoundSchema),
+})
+export type AdviceSearchResponse = z.output<typeof adviceSearchResponseSchema>

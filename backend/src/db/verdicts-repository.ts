@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { DomainError, ERROR, verdictSchema } from '@molvia/model'
 import type { AdviceScope, NewVerdict, Verdict, VerdictPatch } from '@molvia/model'
 import { translateFailures } from './failure'
@@ -124,6 +124,13 @@ export interface AdviceQuery {
    */
   readonly warningsReserved: number
   readonly limit: number
+  /**
+   * Only these items — the ones the search on «Что брать» found (MOL-128). The same statement
+   * rather than a second one, so the mode and the threshold of three cannot drift apart between
+   * the list and the search; the reserve and the cut then have nothing to do, since the caller
+   * asks for no more rows than it names.
+   */
+  readonly itemIds?: readonly string[]
 }
 
 /**
@@ -387,8 +394,13 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
       neverBelowTenths,
       warningsReserved,
       limit,
+      itemIds,
     }) {
       if (idOrNull(actorId) === null) return { rows: [], total: 0 }
+      // A malformed identifier can match nothing, so it is dropped rather than sent to meet
+      // `22P02`, as the prices do it.
+      const only = itemIds?.map(idOrNull).filter((id): id is string => id !== null)
+      if (only?.length === 0) return { rows: [], total: 0 }
 
       /*
        * Raw SQL, and one statement: the choice between «everyone's figures» and «my own»
@@ -426,6 +438,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
           -- it is neither a score nor a contribution here.
           where ${verdicts.deletedAt} is null
             ${scope === 'own' ? sql`and ${mine}` : sql``}
+            ${only ? sql`and ${inArray(verdicts.itemId, only)}` : sql``}
           group by ${verdicts.itemId}
         ),
         shown as (

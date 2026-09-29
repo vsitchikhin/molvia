@@ -57,6 +57,12 @@ export interface ItemRepository {
 export interface SearchAnswer {
   readonly items: Item[]
   readonly near: boolean
+  /**
+   * The items found that are near by themselves — every word within one edit (MOL-46). The search
+   * on «Что брать» keeps a rated one of them past the limit (MOL-128, adversarial А): cut at twenty
+   * like the rest, «Сыр маскарпоне» rated «не брать нигде» went missing behind twenty other cheeses.
+   */
+  readonly nearIds: readonly string[]
 }
 
 /**
@@ -816,7 +822,7 @@ export function createItemRepository(db: Conn): ItemRepository {
 
     async search(query, limit, actorId) {
       const key = searchQueryKey(query)
-      if (key === null) return { items: [], near: false }
+      if (key === null) return { items: [], near: false, nearIds: [] }
 
       const rows = await db.transaction(async (tx) => {
         /*
@@ -867,6 +873,7 @@ export function createItemRepository(db: Conn): ItemRepository {
       return {
         items: kept.flatMap((row) => found.get(row.id) ?? []),
         near: kept.some((row) => row.near),
+        nearIds: kept.filter((row) => row.near).map((row) => row.id),
       }
     },
   }

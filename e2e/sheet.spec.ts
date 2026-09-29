@@ -144,7 +144,7 @@ test.describe('the sheet', () => {
 
   test('its main action closes it through the same step', async ({ page }) => {
     const { top } = await openSheet(page)
-    await sheet(page).getByRole('button', { name: 'Add to the trip' }).click()
+    await sheet(page).getByRole('button', { name: 'Record', exact: true }).click()
     await expectPutAway(page, top)
   })
 
@@ -220,7 +220,7 @@ test.describe('the sheet', () => {
     await expect(heading(page)).toBeInViewport()
   })
 
-  // One entry laid, one taken: the «back» after a closed sheet leaves the screen for the trip
+  // One entry laid, one taken: the «back» after a closed sheet leaves the screen for home
   // laid under it, instead of «closing» a sheet that is already gone.
   test('«back» after it closed leaves the screen', async ({ page }) => {
     await openSheet(page)
@@ -228,7 +228,7 @@ test.describe('the sheet', () => {
     await expect(sheet(page)).toBeHidden()
     await page.goBack()
     await expect(page).toHaveURL('/')
-    await expect(heading(page)).toHaveText('Trip')
+    await expect(heading(page)).toHaveText('What to buy')
   })
 
   test('Tab keeps to the sheet', async ({ page }) => {
@@ -255,7 +255,7 @@ test.describe('the sheet', () => {
     await expect(sheet(page)).toBeHidden()
 
     await page.goBack()
-    await expectOn(page, '/', 'Trip')
+    await expectOn(page, '/', 'What to buy')
     expect(errors).toEqual([])
   })
 
@@ -297,8 +297,8 @@ test.describe('the sheet', () => {
     await openSheet(page)
     await page.reload()
     await expect(heading(page)).toHaveText('Kit')
-    await page.getByRole('button', { name: 'Back Trip' }).click()
-    await expectOn(page, '/', 'Trip')
+    await page.getByRole('button', { name: 'Back What to buy' }).click()
+    await expectOn(page, '/', 'What to buy')
     await page.goBack()
     await expect(page).not.toHaveURL(/_kit/)
   })
@@ -320,7 +320,7 @@ test.describe('the sheet', () => {
     await expectOn(page, '/_kit', 'Kit')
     await expect(sheet(page)).toBeHidden()
     await page.goBack()
-    await expectOn(page, '/', 'Trip')
+    await expectOn(page, '/', 'What to buy')
   })
 
   /** The opener in the middle of the screen, so a second tap there lands on the scrim. */
@@ -550,7 +550,7 @@ test('a double tap on the chevron over a dead entry still takes one step', async
   await page.waitForTimeout(1500)
   await expectOn(page, '/_kit', 'Kit')
   await page.goBack()
-  await expectOn(page, '/', 'Trip')
+  await expectOn(page, '/', 'What to buy')
 })
 
 // Arrived at a dead entry by «forward», the guard goes on forward; stepping back cut the screen

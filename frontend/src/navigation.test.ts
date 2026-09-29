@@ -5,7 +5,14 @@ import { defineComponent, h } from 'vue'
 import { createRouter, createWebHistory, RouterView } from 'vue-router'
 import type { Router } from 'vue-router'
 import { createAppI18n } from '@/i18n'
-import { backTarget, settleColdStart, tabMove, upTarget } from '@/navigation'
+import {
+  afterStep,
+  backTarget,
+  settleColdStart,
+  stepBack as step,
+  tabMove,
+  upTarget,
+} from '@/navigation'
 import type { TabMove } from '@/navigation'
 import type { RouteName, Tab } from '@/router'
 import { routes } from '@/router'
@@ -14,24 +21,24 @@ import TabBar from '@/components/TabBar.vue'
 // «What to buy» still asks the server whether it is up; here nothing needs the answer.
 vi.mock('@/api', () => ({ api: { health: () => new Promise(() => undefined) } }))
 
-describe('tabMove — «Trip» is home', () => {
+describe('tabMove — «Что брать» is home (MOL-128)', () => {
   it.each<[Tab, Tab, RouteName | undefined, TabMove]>([
     // Leaving home pushes, so «back» returns to it.
-    ['trip', 'advice', undefined, 'push'],
-    ['trip', 'verdicts', 'advice', 'push'],
+    ['advice', 'purchases', undefined, 'push'],
+    ['advice', 'verdicts', 'purchases', 'push'],
     // Between the other sections nothing piles up.
-    ['advice', 'verdicts', 'trip', 'replace'],
-    ['verdicts', 'advice', 'trip', 'replace'],
-    ['advice', 'verdicts', undefined, 'replace'],
+    ['purchases', 'verdicts', 'advice', 'replace'],
+    ['verdicts', 'purchases', 'advice', 'replace'],
+    ['purchases', 'verdicts', undefined, 'replace'],
     // Home again is a step back — when home is the entry underneath.
-    ['advice', 'trip', 'trip', 'back'],
-    ['verdicts', 'trip', 'trip', 'back'],
+    ['purchases', 'advice', 'advice', 'back'],
+    ['verdicts', 'advice', 'advice', 'back'],
     // Opened cold on a section: home is not underneath, and a step back would leave the app.
-    ['verdicts', 'trip', undefined, 'replace'],
-    ['advice', 'trip', 'verdicts', 'replace'],
+    ['verdicts', 'advice', undefined, 'replace'],
+    ['purchases', 'advice', 'verdicts', 'replace'],
     // The section already open scrolls to its top.
-    ['trip', 'trip', undefined, 'top'],
-    ['advice', 'advice', 'trip', 'top'],
+    ['advice', 'advice', undefined, 'top'],
+    ['purchases', 'purchases', 'advice', 'top'],
   ])('%s → %s with %s underneath: %s', (from, to, below, move) => {
     expect(tabMove(from, to, below)).toBe(move)
   })
@@ -73,40 +80,42 @@ describe('backTarget — the chevron agrees with the system button', () => {
   }
 
   it('steps back when the parent is underneath', async () => {
-    const router = await fresh('/')
-    await router.push('/trip/add')
-    expect(target(router)).toEqual({ path: '/', step: true })
+    const router = await fresh('/purchases')
+    await router.push('/purchases/manual')
+    expect(target(router)).toEqual({ path: '/purchases', step: true })
   })
 
   it('replaces onto the parent when nothing of ours is underneath, never leaving the app', async () => {
-    const router = await fresh('/trip/add')
-    expect(target(router)).toEqual({ path: '/', step: false })
+    const router = await fresh('/purchases/manual')
+    expect(target(router)).toEqual({ path: '/purchases', step: false })
   })
 
   it('replaces onto the parent over a screen that is not an ancestor', async () => {
-    const router = await fresh('/advice')
-    await router.push(`/trip/history/${TRIP}`)
-    expect(target(router)).toEqual({ path: '/trip/history', step: false })
+    const router = await fresh('/verdicts')
+    await router.push(`/purchases/${TRIP}`)
+    expect(target(router)).toEqual({ path: '/purchases', step: false })
   })
 
-  // A finished trip opened from the home screen goes back there — both «back»s (MOL-77).
-  it('steps back onto an ancestor further up: the home screen under a finished trip', async () => {
-    const router = await fresh('/')
-    await router.push(`/trip/history/${TRIP}`)
-    expect(target(router)).toEqual({ path: '/', step: true })
-    expect(backTarget(router, router.currentRoute.value)?.location.meta.titleKey).toBe('trip.title')
+  // A screen opened from further up than its parent goes back there — both «back»s (MOL-77).
+  it('steps back onto an ancestor further up: «Покупки» under the search of a record', async () => {
+    const router = await fresh('/purchases')
+    await router.push('/purchases/manual/add')
+    expect(target(router)).toEqual({ path: '/purchases', step: true })
+    expect(backTarget(router, router.currentRoute.value)?.location.meta.titleKey).toBe(
+      'purchases.title',
+    )
   })
 
-  it('opened from the history, a finished trip still goes back to the history', async () => {
-    const router = await fresh('/trip/history')
-    await router.push(`/trip/history/${TRIP}`)
-    expect(target(router)).toEqual({ path: '/trip/history', step: true })
+  it('opened from «Покупки», a recorded row goes back to «Покупки»', async () => {
+    const router = await fresh('/purchases')
+    await router.push(`/purchases/${TRIP}`)
+    expect(target(router)).toEqual({ path: '/purchases', step: true })
   })
 
-  // Opened from «Деньги», a finished trip leads back to the month it was opened on (MOL-82, В-3).
+  // Opened from «Деньги», a recorded row leads back to the month it was opened on (MOL-82, В-3).
   it('from «Деньги» the chevron says «Деньги» and steps back onto the same month', async () => {
     const router = await fresh('/money?month=2026-08')
-    await router.push(`/trip/history/${TRIP}?from=money`)
+    await router.push(`/purchases/${TRIP}?from=money`)
     expect(target(router)).toEqual({ path: '/money', step: true })
     expect(backTarget(router, router.currentRoute.value)?.location.meta.titleKey).toBe(
       'spending.title',
@@ -114,9 +123,9 @@ describe('backTarget — the chevron agrees with the system button', () => {
   })
 
   it('a `from` the route does not list is not a parent: an address makes no screen one', async () => {
-    const router = await fresh('/advice')
-    await router.push(`/trip/history/${TRIP}?from=advice`)
-    expect(target(router)).toEqual({ path: '/trip/history', step: false })
+    const router = await fresh('/verdicts')
+    await router.push(`/purchases/${TRIP}?from=advice`)
+    expect(target(router)).toEqual({ path: '/purchases', step: false })
   })
 
   it('a section has no chevron at all', async () => {
@@ -154,22 +163,22 @@ describe('upTarget — onto the parent itself', () => {
 })
 
 describe('settleColdStart', () => {
-  it('lays the parent underneath a nested screen opened cold', async () => {
-    const router = await openCold('/trip/add')
-    expect(router.currentRoute.value.fullPath).toBe('/trip/add')
-    expect(router.options.history.state.back).toBe('/')
-    expect(await stepBack(router)).toBe('/')
+  it('lays the chain underneath a nested screen opened cold', async () => {
+    const router = await openCold('/purchases/manual/add')
+    expect(router.currentRoute.value.fullPath).toBe('/purchases/manual/add')
+    expect(router.options.history.state.back).toBe('/purchases/manual')
+    expect(await stepBack(router)).toBe('/purchases/manual')
+    expect(await stepBack(router)).toBe('/purchases')
   })
 
-  it('lays the full chain under a cold history search, keeping the trip id', async () => {
+  it('lays the full chain under a cold search of a recorded row, keeping its id', async () => {
     const id = 'aaaaaaaa-0000-4000-8000-000000000012'
-    const router = await openCold(`/trip/history/${id}/add`)
-    expect(await stepBack(router)).toBe(`/trip/history/${id}`)
-    expect(await stepBack(router)).toBe('/trip/history')
-    expect(await stepBack(router)).toBe('/')
+    const router = await openCold(`/purchases/${id}/add`)
+    expect(await stepBack(router)).toBe(`/purchases/${id}`)
+    expect(await stepBack(router)).toBe('/purchases')
   })
 
-  it.each(['/', '/advice', '/verdicts', '/settings'])(
+  it.each(['/', '/purchases', '/verdicts', '/settings'])(
     'leaves the section %s alone',
     async (path) => {
       const router = await openCold(path)
@@ -179,20 +188,148 @@ describe('settleColdStart', () => {
   )
 
   // A reload keeps the history state: the parent is already there and must not be doubled.
-  it('lays «Деньги» under a finished trip opened cold from there', async () => {
-    const router = await fresh(`/trip/history/aaaaaaaa-0000-4000-8000-000000000012?from=money`)
+  it('lays «Деньги» under a recorded row opened cold from there', async () => {
+    const router = await fresh(`/purchases/aaaaaaaa-0000-4000-8000-000000000012?from=money`)
     await settleColdStart(router)
     expect(router.options.history.state.back).toBe('/money')
   })
 
   it('adds nothing when the parent is already underneath', async () => {
-    const router = await fresh('/')
-    await router.push('/trip/add')
+    const router = await fresh('/purchases')
+    await router.push('/purchases/manual')
     const push = vi.spyOn(router, 'push')
     const replace = vi.spyOn(router, 'replace')
     await settleColdStart(router)
     expect(push).not.toHaveBeenCalled()
     expect(replace).not.toHaveBeenCalled()
+  })
+})
+
+// A sheet is told it is closed from inside the pop that closed it, before that step has landed; a
+// move made there was taken for a second tap and dropped (MOL-128: the record did not go up).
+describe('afterStep — a move after a step waits for it to land', () => {
+  it('runs at once with no step in flight', async () => {
+    await fresh('/purchases')
+    const ran: string[] = []
+    afterStep(() => ran.push('now'))
+    expect(ran).toEqual(['now'])
+  })
+
+  it('with a step in flight, runs once it has landed, not before', async () => {
+    const router = await fresh('/purchases')
+    // The step is held in the air: the browser answers `go` with a `popstate` later, never within.
+    vi.spyOn(router, 'go').mockImplementation(() => undefined)
+    const ran: string[] = []
+    step(router)
+    afterStep(() => ran.push('after'))
+    expect(ran).toEqual([])
+
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    expect(ran).toEqual(['after'])
+    vi.restoreAllMocks()
+  })
+})
+
+// Adversarial Б (MOL-128): the record typed by hand is two levels under home, and a tab tapped
+// there was decided as if from no section — every round of the shop left two more entries.
+describe('a tab tapped on a nested screen', () => {
+  const HOME = 0
+  const PURCHASES = 1
+
+  /** The tab bar alone — no screen under it, so no screen moves on its own. */
+  function bar(router: Router) {
+    const view = mount(TabBar, {
+      global: { plugins: [router, createPinia(), createAppI18n('en')] },
+    })
+    return async (index: number): Promise<void> => {
+      await view.findAll('.tab')[index]?.trigger('click', { button: 0 })
+      await vi.waitFor(() => {
+        expect(router.currentRoute.value.meta.tab).toBeDefined()
+      })
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    }
+  }
+
+  async function pressesToLeave(router: Router): Promise<string[]> {
+    const walked: string[] = []
+    while (router.options.history.state.back) walked.push(await stepBack(router))
+    return walked
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('«Что брать» on the record is home, with nothing underneath', async () => {
+    const router = await fresh('/')
+    const tap = bar(router)
+    await tap(PURCHASES)
+    await router.push('/purchases/manual')
+
+    await tap(HOME)
+
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.name).toBe('advice')
+    })
+    expect(router.options.history.state.back).toBeNull()
+  })
+
+  it('«Покупки» on the record is the step up, not «Покупки» over «Покупки»', async () => {
+    const router = await fresh('/')
+    const tap = bar(router)
+    await tap(PURCHASES)
+    await router.push('/purchases/manual')
+
+    await tap(PURCHASES)
+
+    expect(router.currentRoute.value.fullPath).toBe('/purchases')
+    expect(await pressesToLeave(router)).toEqual(['/'])
+  })
+
+  it('three rounds of the shop leave one press of «back» on home — out of the app', async () => {
+    const router = await fresh('/')
+    const tap = bar(router)
+    for (let round = 0; round < 3; round += 1) {
+      await tap(PURCHASES)
+      await router.push('/purchases/manual')
+      await router.push('/purchases/manual/add')
+      await tap(HOME)
+      expect(router.currentRoute.value.name).toBe('advice')
+    }
+    expect(router.options.history.state.back).toBeNull()
+  })
+
+  it('opened with no ancestor underneath, a tab acts from the screen`s section', async () => {
+    const router = await fresh('/')
+    await router.push('/purchases/manual')
+    const tap = bar(router)
+
+    await tap(PURCHASES)
+
+    expect(router.currentRoute.value.fullPath).toBe('/purchases')
+    expect(router.options.history.state.back).toBe('/')
+  })
+
+  // Review Р-24: a step that never landed — its pop eaten by a sheet's guard — left the tab
+  // waiting for any later move off the record, and the tab then opened by itself.
+  it('a step that never moved leaves nothing to fire on a later move', async () => {
+    const router = await fresh('/')
+    const tap = bar(router)
+    await tap(PURCHASES)
+    await router.push('/purchases/manual')
+    const go = vi.spyOn(router, 'go').mockImplementation(() => undefined)
+
+    const tabs = mount(TabBar, {
+      global: { plugins: [router, createPinia(), createAppI18n('en')] },
+    })
+    await tabs.findAll('.tab')[HOME]?.trigger('click', { button: 0 })
+    // The step's own timer, then the tab's deadline.
+    await new Promise((resolve) => setTimeout(resolve, 2100))
+    go.mockRestore()
+
+    await router.push('/purchases/manual/add')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(router.currentRoute.value.name).toBe('item-search')
   })
 })
 
@@ -214,43 +351,43 @@ describe('the tab bar walks the history as В-2 decided', () => {
     vi.restoreAllMocks()
   })
 
-  // The trip is the trip whatever its address carries: a query from a shared link, a hash.
+  // Home is home whatever its address carries: a query from a shared link, a hash.
   it.each(['/?utm_source=telegram', '/#top'])(
-    'arrived at %s: What to buy → Trip is still the step back',
+    'arrived at %s: Purchases → What to buy is still the step back',
     async (entry) => {
       const { router, tap } = await app(entry)
       await tap(1)
-      expect(router.currentRoute.value.name).toBe('advice')
+      expect(router.currentRoute.value.name).toBe('purchases')
       const back = vi.spyOn(router, 'go')
       await tap(0)
       await vi.waitFor(() => {
-        expect(router.currentRoute.value.name).toBe('trip')
+        expect(router.currentRoute.value.name).toBe('advice')
       })
       expect(back).toHaveBeenCalledExactlyOnceWith(-1)
       expect(router.options.history.state.back).toBeNull()
     },
   )
 
-  // Two taps before the history moves: the second must not step past the trip, out of the app.
-  it('two taps on Trip in one go take one step back', async () => {
+  // Two taps before the history moves: the second must not step past home, out of the app.
+  it('two taps on What to buy in one go take one step back', async () => {
     const { router } = await app('/')
-    await router.push('/advice')
+    await router.push('/purchases')
     const view = mount(TabBar, {
       global: { plugins: [router, createPinia(), createAppI18n('en')] },
     })
     const back = vi.spyOn(router, 'go')
-    const trip = view.findAll('.tab')[0]
-    void trip?.trigger('click', { button: 0 })
-    void trip?.trigger('click', { button: 0 })
+    const home = view.findAll('.tab')[0]
+    void home?.trigger('click', { button: 0 })
+    void home?.trigger('click', { button: 0 })
     await vi.waitFor(() => {
-      expect(router.currentRoute.value.name).toBe('trip')
+      expect(router.currentRoute.value.name).toBe('advice')
     })
     expect(back).toHaveBeenCalledExactlyOnceWith(-1)
   })
 
   it('two taps on the chevron in one go take one step back', async () => {
-    const router = await fresh('/')
-    await router.push('/trip/add')
+    const router = await fresh('/settings')
+    await router.push('/privacy')
     const view = mount(
       defineComponent(() => () => h(RouterView)),
       { global: { plugins: [router, createPinia(), createAppI18n('en')] } },
@@ -260,16 +397,16 @@ describe('the tab bar walks the history as В-2 decided', () => {
     void chevron.trigger('click')
     void chevron.trigger('click')
     await vi.waitFor(() => {
-      expect(router.currentRoute.value.name).toBe('trip')
+      expect(router.currentRoute.value.name).toBe('settings')
     })
     expect(back).toHaveBeenCalledExactlyOnceWith(-1)
   })
 
-  // The example the owner answered: Trip → What to buy → Ratings, then «back».
-  it('Trip → What to buy → Ratings, back → Trip', async () => {
+  // The example the owner answered, with the new home: What to buy → Purchases → Ratings, «back».
+  it('What to buy → Purchases → Ratings, back → What to buy', async () => {
     const { router, tap } = await app('/')
     await tap(1)
-    expect(router.currentRoute.value.name).toBe('advice')
+    expect(router.currentRoute.value.name).toBe('purchases')
     await tap(2)
     expect(router.currentRoute.value.name).toBe('verdicts')
     expect(router.options.history.state.back).toBe('/')
@@ -277,20 +414,20 @@ describe('the tab bar walks the history as В-2 decided', () => {
     expect(router.options.history.state.back).toBeNull()
   })
 
-  it('a tap on Trip from another section is that same step back', async () => {
+  it('a tap on What to buy from another section is that same step back', async () => {
     const { router, tap } = await app('/')
     await tap(1)
     await tap(2)
     await tap(0)
     await vi.waitFor(() => {
-      expect(router.currentRoute.value.name).toBe('trip')
+      expect(router.currentRoute.value.name).toBe('advice')
     })
     expect(router.options.history.state.back).toBeNull()
   })
 
   it('a tap on the open section scrolls to the top and writes nothing', async () => {
     const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
-    const { router, tap } = await app('/advice')
+    const { router, tap } = await app('/purchases')
     const push = vi.spyOn(router, 'push')
     const replace = vi.spyOn(router, 'replace')
     await tap(1)

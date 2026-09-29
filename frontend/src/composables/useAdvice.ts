@@ -38,6 +38,8 @@ export interface Advice {
   readonly cityReloading: ComputedRef<string | null>
   readonly otherCity: ComputedRef<{ oldCity: string; city: string } | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  /** The answer on screen, remembered or fresh: the search reads it with no connection (MOL-128). */
+  readonly answer: ComputedRef<AdviceResponse | null>
   retry(): Promise<void>
 }
 
@@ -267,6 +269,7 @@ export function useAdvice(): Advice {
         : null,
     ),
     fetchedAt: computed(() => remembered.value?.fetchedAt ?? null),
+    answer: computed(() => remembered.value?.answer ?? null),
     retry: load,
   }
 }

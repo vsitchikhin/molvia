@@ -26,7 +26,7 @@ import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
 import { sessionRoutes } from '@/routes/sessions'
 import { exchangeRoutes } from '@/routes/exchanges'
-import { advice } from '@/usecases/advice'
+import { advice, adviceSearch } from '@/usecases/advice'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
@@ -510,6 +510,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       adviceRoutes(guarded, {
         advice: (actorId) =>
           advice({ actors, verdicts, expenses: tripData.expenses, events }, actorId),
+        search: (actorId, query) =>
+          adviceSearch({ actors, verdicts, expenses: tripData.expenses, items }, actorId, query),
       })
       verdictRoutes(guarded, {
         rate: (actorId, itemId, rating) => rateItem({ items, verdicts }, actorId, itemId, rating),

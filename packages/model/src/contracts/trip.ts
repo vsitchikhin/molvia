@@ -324,6 +324,13 @@ export const tripHistoryEntryCodec = z.strictObject({
   startedAt: isoDate,
   finishedAt: isoDate,
   finishedOnDeviceAt: isoDate.nullable(),
+  /**
+   * How many purchases and what they came to, one sum per currency (MOL-128, В-4): a row of
+   * «Записаны» says «12 позиций · 25 сент.» and «9 870 ֏». `null` from a server that predates
+   * them — unknown, which is not zero — so the screen says nothing rather than «0 позиций».
+   */
+  itemCount: z.int().nonnegative().nullable().default(null),
+  total: z.array(moneyCodec).nullable().default(null),
 })
 export type TripHistoryEntry = z.output<typeof tripHistoryEntryCodec>
 export const tripHistoryCodec = z.strictObject({

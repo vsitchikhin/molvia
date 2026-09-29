@@ -1,7 +1,8 @@
-import { and, desc, eq, gt, isNull, isNotNull, lte, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, isNull, isNotNull, lte, or, sql } from 'drizzle-orm'
 import {
   DomainError,
   ERROR,
+  INT8_MAX,
   TRIP_HISTORY_PAGE_SIZE,
   TRIP_UNDO_MINUTES,
   tripSchema,
@@ -11,6 +12,7 @@ import type {
   TripHistoryCursor,
   Currency,
   ExchangeRate,
+  Money,
   NewTrip,
   RateChoice,
   RateProvider,
@@ -20,7 +22,7 @@ import { rateFrom, rateTo, sideRateFrom } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit, theRow } from './rows'
-import { trips, places } from './schema'
+import { expenses, trips, places } from './schema'
 
 /**
  * The rate a trip is started with, as the trip keeps it: who published it, whether it jumped when
@@ -176,6 +178,46 @@ function ownerLock(tx: Conn, actorId: string) {
 }
 
 export function createTripRepository(db: Conn): TripRepository {
+  /**
+   * «12 позиций · 9 870 ֏» of every row on a page of the history (MOL-128, В-4): how many
+   * purchases, and one sum per currency — the trip's own `total`, by the same rule `tripTotal`
+   * adds it up: a purchase with no price counts as a purchase and adds nothing. One statement for
+   * the page, after it, so the order and the cursor stay the history's own.
+   */
+  async function purchasesOf(
+    tripIds: readonly string[],
+  ): Promise<Map<string, { itemCount: number; total: Money[] | null }>> {
+    const counted = new Map<string, { itemCount: number; total: Money[] | null }>()
+    if (tripIds.length === 0) return counted
+    const rows = await db
+      .select({
+        tripId: expenses.tripId,
+        currency: expenses.amountCurrency,
+        // Text: a sum over bigint is a numeric, and the driver would hand it over as a double.
+        minor: sql<string | null>`sum(${expenses.amountMinor})::text`,
+        items: sql<number>`count(*)::int`,
+      })
+      .from(expenses)
+      .where(inArray(expenses.tripId, [...tripIds]))
+      .groupBy(expenses.tripId, expenses.amountCurrency)
+      .orderBy(expenses.tripId, expenses.amountCurrency)
+    for (const row of rows) {
+      const entry = counted.get(row.tripId) ?? { itemCount: 0, total: [] }
+      entry.itemCount += row.items
+      if (row.currency !== null && row.minor !== null) {
+        const minor = BigInt(row.minor)
+        // A sum no amount can carry — only an absurd entry makes one — is unknown rather than a
+        // failure of the whole page: the cursor could never walk past it (review, MOL-128).
+        entry.total =
+          entry.total && minor <= INT8_MAX
+            ? [...entry.total, { minor, currency: row.currency }]
+            : null
+      }
+      counted.set(row.tripId, entry)
+    }
+    return counted
+  }
+
   return {
     async start(actorId, input, currency, snapshot) {
       return translateFailures(async () =>
@@ -304,10 +346,20 @@ export function createTripRepository(db: Conn): TripRepository {
         .limit(TRIP_HISTORY_PAGE_SIZE + 1)
       const page = rows.slice(0, TRIP_HISTORY_PAGE_SIZE)
       const last = page.at(-1)
+      const sums = await purchasesOf(page.map((row) => row.id))
       return {
         trips: page.map(({ id, place, startedAt, finishedAt, finishedOnDeviceAt }) => {
           if (!finishedAt) throw new Error('history contained an unfinished trip')
-          return { id, place, startedAt, finishedAt, finishedOnDeviceAt }
+          const counted = sums.get(id)
+          return {
+            id,
+            place,
+            startedAt,
+            finishedAt,
+            finishedOnDeviceAt,
+            itemCount: counted?.itemCount ?? 0,
+            total: counted ? counted.total : [],
+          }
         }),
         nextCursor:
           rows.length > TRIP_HISTORY_PAGE_SIZE && last ? { at: last.cursorAt, id: last.id } : null,
