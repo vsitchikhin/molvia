@@ -63,10 +63,14 @@ The detail behind the privacy lines of `CLAUDE.md`.
   must be exported as it must be erased. **And every column** — beyond the ticket: `EXPORT_COLUMNS`
   names each column of those tables as exported or left out with its reason, and a test compares
   it with `information_schema.columns`; a key alone would have let a new note on an exchange miss
-  the copy in silence. A table that reaches `actors` through another — a version of an exchange, a
-  barcode — is found by walking the graph of foreign keys, and a fully filled life holds each
-  field of the file non-empty in some row, so a column mapped to the wrong field shows (adversarial
-  review 1, 2). **A new table or column that is a person's joins erasure and the copy in the
+  the copy in silence. A table that goes with the person through another — a version of an exchange, a
+  purchase of a trip — is found by walking the graph of foreign keys, never across a key that lets
+  go (`ON DELETE SET NULL`: `items.created_by` — the item is the catalogue's, and so are the tables
+  under it; `item_barcodes` is listed by hand). A fully filled life holds each field of the file
+  non-empty in some row, so a column mapped to the wrong field shows, and **every `…Id` in the file
+  finds its row in the file** — found by walking the fields, not by a list, so a new reference
+  without a section or a name in `catalogue` fails by itself (adversarial review 1, 2; review 11,
+  15). **A new table or column that is a person's joins erasure and the copy in the
   same commit.** Besides them: the catalogue items the person added (erasure keeps them, their
   author is still this person), with barcodes, and — as a reference, not their data — the names of
   the items and places their rows point at, so the file reads; nobody else's author is in it.
@@ -84,20 +88,29 @@ The detail behind the privacy lines of `CLAUDE.md`.
   stored row predates — an event type since withdrawn, a rate outside today's band. **One
   snapshot:** one transaction, `repeatable read, read only`; it writes nothing, not even the log.
   **The phone hands over the server's file, checking only its envelope** (`format`, `version`): an
-  installed app older than the server must not refuse a copy for a field it does not know. On the
+  installed app older than the server must not refuse a copy for a field it does not know. It
+  rebuilds the text, indented, **so every number in the file is a safe integer and everything else a
+  string** — a test walks the codec's JSON Schema for it, and an event's `payload` is a record of
+  strings, as the database's CHECK holds it (review 18). **The file is named by `exportedAt`**, the
+  day the server took it, never by the phone's clock after the answer (adversarial Г). On the
   phone (В-1) the file goes to the share sheet — «Сохранить в Файлы», to oneself in Telegram — and
   Safari opens that sheet only close to a tap, with the request in between: refused
   (`NotAllowedError`), the file waits under «Файл готов» for a second tap on «Сохранить или
   отправить», which calls `navigator.share` before any await. **A computer downloads** — a fine
   pointer, since the sheet of a Mac has no «Save» — and so does a browser that cannot share a file
   (Android Chrome does not share `.json`). A sheet the person closed is not an error: the file stays
-  under «Файл готов»; a tap while a sheet is open does nothing (`InvalidStateError` is not a reason
-  to download as well). The row is inactive (`aria-disabled`), never disabled, and the focus goes
+  under «Файл готов»; a second `share` over an open sheet is `InvalidStateError`, never a reason to
+  download as well — guarded only there, so a sheet whose promise never settles cannot leave the row
+  dead (review 14). **Leaving the screen while the file is prepared is changing one's mind**: the
+  request is cancelled and nothing is handed over on another screen (review 13, adversarial В). The row is inactive (`aria-disabled`), never disabled, and the focus goes
   back to it when the button tapped goes. **Limits, named:** a download inside an installed iOS app
   is checked on the phone, not here; and `spendings` has no CHECK on `rate_base` nor on a positive
   rate, so a row written past the app — by hand, by a bug — would make that person's copy a 500
-  until put right. Measured: 10 000 spendings, 2 000 purchases and 500 events read in about
-  0.13 s and weigh 4 MB (5.9 MB as the phone writes it, indented); the client waits up to a minute.
+  until put right. Measured (`.scratch/tasks/selftests/MOL-93.md`): 10 000 spendings, 2 000 purchases and 500
+  events read in 0.12–0.14 s, 0.16–0.22 s with the encoding, and weigh 4 MB (5.9 MB as the phone
+  writes it, indented); the client waits up to a minute. Rows are grouped by pushing into a `Map`,
+  never by copying the group: 40 000 versions of one exchange held the whole API for seconds
+  (adversarial Б).
   `/privacy` says what the copy holds — the removed and the withdrawn included — under «Копия ваших
   данных», and names the row by its words.
 - **No third-party trackers or analytics, and so no cookie banner** (MOL-58). There are two
