@@ -54,12 +54,13 @@ export function useExport(): ExportState {
   // Shallow: a File behind a reactive proxy is not a File to `navigator.share`.
   const ready = shallowRef<File | null>(null)
 
-  let sharing = false
+  // How many sheets are open: a refused call must not take the guard off one still hanging.
+  let sharing = 0
 
   // Called straight from a tap on the second try: `navigator.share` goes out before any await.
   async function deliver(file: File, retryable: boolean): Promise<void> {
     if (onTouch() && 'canShare' in navigator && navigator.canShare({ files: [file] })) {
-      sharing = true
+      sharing += 1
       try {
         await navigator.share({ files: [file] })
         ready.value = null
@@ -71,10 +72,14 @@ export function useExport(): ExportState {
           ready.value = file
           return
         }
-        // A sheet still open from the tap before: it is that sheet's file, not a download too.
-        if (named(error, 'InvalidStateError')) return
+        // A sheet still open from a tap before: no download over it, and the file — a new one when
+        // the row was tapped — waits under «Файл готов» rather than vanish (adversarial Р2-А).
+        if (named(error, 'InvalidStateError')) {
+          ready.value = file
+          return
+        }
       } finally {
-        sharing = false
+        sharing -= 1
       }
     }
     ready.value = null
@@ -114,7 +119,7 @@ export function useExport(): ExportState {
   // Guarded here and not in `start`: a sheet whose promise never settles must not leave the row
   // dead, and only a second `share` over an open sheet is refused (`InvalidStateError`).
   function handOver(): void {
-    if (ready.value && !sharing) void deliver(ready.value, false)
+    if (ready.value && sharing === 0) void deliver(ready.value, false)
   }
 
   const offline = (): void => {

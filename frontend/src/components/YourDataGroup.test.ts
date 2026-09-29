@@ -159,7 +159,7 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     expect(share).toHaveBeenCalledTimes(2)
   })
 
-  it('a row tapped while a sheet hangs still answers, and never downloads over the sheet', async () => {
+  it('a row tapped while a sheet hangs still answers — the file waits, never downloads over it', async () => {
     share
       .mockReturnValueOnce(new Promise(() => undefined))
       .mockRejectedValueOnce(refusal('InvalidStateError'))
@@ -173,6 +173,8 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     expect(exportMine).toHaveBeenCalledTimes(2)
     expect(share).toHaveBeenCalledTimes(2)
     expect(clicked).toEqual([])
+    // The new file is not thrown away: it waits for the sheet to go (adversarial Р2-А).
+    expect(view.get('.ready').text()).toContain(en.settings.export.ready)
   })
 
   it('leaving the screen while the file is prepared cancels it, and nothing is handed over', async () => {
