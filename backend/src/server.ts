@@ -16,7 +16,7 @@ import { startLoginCleanup } from '@/login-cleanup'
 import { healthRoutes } from '@/routes/health'
 import { internalAuthRoutes } from '@/routes/internal-auth'
 import { withActor } from '@/routes/actor'
-import { actorMeRoute } from '@/routes/actors'
+import { actorExportRoute, actorMeRoute } from '@/routes/actors'
 import { authRoutes } from '@/routes/auth'
 import { adviceRoutes } from '@/routes/advice'
 import { devLoginRoute } from '@/routes/dev-login'
@@ -30,6 +30,7 @@ import { advice, adviceSearch } from '@/usecases/advice'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
+import { exportMine } from '@/usecases/export-mine'
 import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
@@ -103,6 +104,7 @@ import { createItemRepository } from '@/db/items-repository'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
+import { createExportRepository } from '@/db/export-repository'
 import { createReminderRepository } from '@/db/reminders-repository'
 import { describeFailure } from '@/db/failure'
 import { authTransactOn } from '@/db/auth-unit-of-work'
@@ -444,6 +446,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     void instance.register((guarded, _guardedOptions, guardedDone) => {
       withActor(guarded, (token) => authenticate(sessions, token))
       actorMeRoute(guarded)
+      actorExportRoute(guarded, (actorId, sessionId) =>
+        exportMine(createExportRepository(db), actorId, sessionId),
+      )
       sessionRoutes(guarded, {
         list: (actorId, currentId) => listSessions(sessions, actorId, currentId),
         end: (actorId, currentId, id) => endSession(sessions, actorId, currentId, id),

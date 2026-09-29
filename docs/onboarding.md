@@ -761,6 +761,13 @@ one, and «Поход удалён · Вернуть» for ten seconds on the sc
 trip offers to remove it instead (owner's decision В-2): a finished empty trip was the rubbish in the
 history the task was filed for. The rules are in «Data rules» above.
 
+MOL-98 opened the epic «Штрихкоды» with the scanner itself: a sheet with a live viewfinder that reads
+EAN-13, EAN-8, UPC-A and UPC-E in a worker, takes a code two frames in a row agree on and hands it
+over, and a field for the digits typed by hand as the way out of every refusal of the camera. The
+wasm comes from the app itself and is precached — the scanner is needed at the shelf, where the
+connection drops. It opens only on `/_kit` until MOL-99 puts it on a screen and finds the item. The
+rules are in `.claude/rules/barcodes.md`.
+
 ## Откуда брать работу
 
 Не из головы и не из этого файла — **из Jira, проект MOL**. Релиз 0.1 разложен на семь
@@ -971,6 +978,20 @@ MOL-138. `scroll-behavior: smooth` запрещён Stylelint. Правило �
 открытая — «запись», законченная — «покупки» (В-6). Всё чековое — MOL-127: пока сервер чеков не
 принимает, кнопки «Сфотографировать чек» нет (В-7 сверки MOL-124). Требования и план —
 `.scratch/tasks/{requirements,plans}/MOL-128.md`.
+
+## Копия своих данных (MOL-93)
+
+Право «знать, что о тебе хранят, и получить копию» (раздел 5.2 «Персональных данных»,
+Confluence 3244067) — функцией: «Скачать мои данные» в новой группе настроек «Ваши данные» (В-2), рядом со
+ссылкой «Данные и приватность». Файл — JSON с `format: "molvia-export"` и `version: 1`, а состав
+держит правило: **в копию идёт то, что стирает `ErasureRepository.erase`**, раздел на каждую
+таблицу, и строк столько же, сколько насчитает сухой прогон стирания; плюс позиции, которые человек
+завёл в справочник, и справка с именами позиций и мест, на которые ссылаются его строки. Сверх
+тикета сверяются и колонки (`EXPORT_COLUMNS` против `information_schema`): каждая — в файле или в
+пропущенных с причиной. Хранимое, не вычисленное; удалённое и снятое — с отметкой; секретов нет.
+На телефоне файл уходит в лист «Поделиться», а если Safari отказал так поздно после тапа — ждёт
+второго тапа «Сохранить или отправить»; без листа — скачивание (В-1). Замер: 10 000 трат читаются
+за 0,12–0,14 с, с кодированием — за 0,16–0,22 с, файл — 4 МБ. Требования и план — `.scratch/tasks/{requirements,plans}/MOL-93.md`.
 
 ## Настройки 0.1 (MOL-65, бриф MOL-41)
 

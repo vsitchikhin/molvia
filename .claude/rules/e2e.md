@@ -5,7 +5,7 @@ paths:
   - 'bin/e2e-database.mjs'
 ---
 
-# End-to-end: its database, its ports, the login seam, traces, the live region
+# End-to-end: its database, its ports, the login seam, the camera, traces, the live region
 
 The detail behind the end-to-end lines of `CLAUDE.md`.
 
@@ -54,6 +54,11 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   keeps plain http even in a copy with certificates (`PWA_PLAIN_HTTP`), since the loopback is a
   secure context anyway. Chromium only: Safari's worker lives by rules of its own, and that is
   checked on a phone.
+- **The camera needs the full Chromium, so the scanner's specs run in one project** (MOL-98): `camera`
+  is the same phone with `channel: 'chromium'` and a fake camera filming a barcode drawn by
+  `globalSetup` (`e2e/barcode-video.ts`); `phone` ignores `scanner.spec.ts`. The headless shell every
+  other spec runs in answers any `getUserMedia` with `NotSupportedError`, fake camera or not. Why the
+  video is drawn rather than kept, and what each spec holds — `.claude/rules/barcodes.md`.
 - **The sheet also runs on an iPhone's engine** (`iphone`, `devices['iPhone 14']`, MOL-80), and
   nothing else runs on WebKit. WebKit shows what Chromium hides: Safari does not focus a tapped
   button, so a closed `<dialog>` has nothing to give focus back to, and only there does the sheet's
@@ -72,10 +77,11 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   out, the trace may still be lost: it is saved while the context is torn down, and that teardown
   shares the test's timeout.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
-  (MOL-64). The app has one polite region, in `App.vue` above the router, and **six things write
+  (MOL-64). The app has one polite region, in `App.vue` above the router, and **seven things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
   count of an answer, and an empty answer's own words), `ItemDetailsSheet` (the price per unit),
-  `VerdictCard` («Pick a rating») and `useSettings` (the form's notice). Whatever any of them
+  `VerdictCard` («Pick a rating»), `useSettings` (the form's notice) and `YourDataGroup` («Файл
+  готов», MOL-93). Whatever any of them
   says is on the screen twice, so a plain `getByText` matches two nodes and playwright's strict
   mode refuses — a failure the machine's speed decides: measured, one match at once and two from
   200 ms onwards. Strict mode is right, and it is answered with a locator, never muted with

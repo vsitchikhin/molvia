@@ -1592,3 +1592,38 @@ describe('«Счета» (MOL-123)', () => {
     expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/trips/${TRIP}/payment`)
   })
 })
+
+describe('«Скачать мои данные» (MOL-93)', () => {
+  const file = {
+    format: 'molvia-export',
+    version: 1,
+    exportedAt: '2026-10-12T08:14:03.000Z',
+    account: { id: actorWire.id, telegramUserId: 510_000_001 },
+    spendings: [{ amount: { amount: '5000.00', currency: 'AMD' }, fieldOfTomorrow: true }],
+  }
+
+  it('hands over the file whole, a field this build does not know included', async () => {
+    const { text, exportedAt } = await clientAnswering(200, file).exportMine()
+
+    expect(JSON.parse(text)).toEqual(file)
+    expect(text).toContain('\n  "format": "molvia-export"')
+    expect(exportedAt).toEqual(new Date('2026-10-12T08:14:03.000Z'))
+  })
+
+  it('refuses a page that is not the file — a portal answering 200 is not a copy', async () => {
+    expect(await codeOf(clientServing('<html>Wi-Fi</html>', { status: 200 }).exportMine())).toBe(
+      ISSUE.RESPONSE_INVALID,
+    )
+    expect(await codeOf(clientAnswering(200, { ...file, format: 'other' }).exportMine())).toBe(
+      ISSUE.RESPONSE_INVALID,
+    )
+  })
+
+  it('asks by the path alone — no owner is named', async () => {
+    const { client, calls } = clientRecording()
+
+    await client.exportMine().catch(() => undefined)
+
+    expect(calls.map((call) => call.url)).toEqual(['http://api/actors/me/export'])
+  })
+})
