@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { APPLY_TIMEOUT_MS, CHECK_EVERY_MS, holdsTyping, installPwaUpdate } from '@/pwaUpdate'
+import {
+  APPLY_TIMEOUT_MS,
+  CHECK_EVERY_MS,
+  LOOK_AGAIN_MS,
+  holdsTyping,
+  installPwaUpdate,
+} from '@/pwaUpdate'
 
 type Handler = () => void
 
@@ -21,6 +27,7 @@ class Worker extends Target {
 class Registration extends Target {
   waiting: Worker | null = null
   installing: Worker | null = null
+  active: Worker | null = null
   readonly update = vi.fn(() => Promise.resolve())
 
   /** A new version found and installed: it waits, as `registerType: 'prompt'` builds it. */
@@ -30,6 +37,20 @@ class Registration extends Target {
     this.emit('updatefound')
     this.installing = null
     this.waiting = worker
+    worker.emit('statechange')
+    return worker
+  }
+
+  /**
+   * A version on a registration no page uses: it does not wait but becomes the active worker at
+   * once — what Chromium does on a first visit, which nothing controls (adversarial Д2).
+   */
+  takeOver(): Worker {
+    const worker = new Worker()
+    this.installing = worker
+    this.emit('updatefound')
+    this.installing = null
+    this.active = worker
     worker.emit('statechange')
     return worker
   }
@@ -48,15 +69,20 @@ let sheet = false
 /** The notes «Обновить» leaves for the page it brings up — the moments they were written at. */
 let marks: number[] = []
 const now = Date.parse('2026-09-29T10:00:00Z')
+/** The page's own clock, `now()`; moved by hand where the time between two answers matters. */
+let clock = now
 
 function show(state: 'visible' | 'hidden'): void {
   hidden = state === 'hidden'
   document.dispatchEvent(new Event('visibilitychange'))
 }
 
-async function installed(options: { controlled?: boolean; waiting?: boolean } = {}) {
+async function installed(
+  options: { controlled?: boolean; waiting?: boolean; active?: boolean } = {},
+) {
   const container = new Container(options.controlled === false ? null : {})
   if (options.waiting) container.registration.waiting = new Worker()
+  if (options.active ?? options.controlled !== false) container.registration.active = new Worker()
   const reload = vi.fn()
   const update = installPwaUpdate({
     serviceWorker: container as unknown as ServiceWorkerContainer,
@@ -66,7 +92,7 @@ async function installed(options: { controlled?: boolean; waiting?: boolean } = 
     reload,
     mark: (at) => marks.push(at),
     takeMark: () => marks.splice(0).at(-1) ?? null,
-    now: () => now,
+    now: () => clock,
   })
   expect(container.register).toHaveBeenCalled()
   // The registration settles on the microtask queue; the clock stays where it is.
@@ -79,6 +105,7 @@ beforeEach(() => {
   hidden = false
   sheet = false
   marks = []
+  clock = now
   vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() =>
     hidden ? 'hidden' : 'visible',
   )
@@ -387,7 +414,130 @@ describe('a new version taken by the button (MOL-132)', () => {
     })
   })
 
+  describe('a sheet opened after the tap (adversarial Д3)', () => {
+    it('must not reload under it: the button comes back, and the reload waits for the tap', async () => {
+      const { update, container, registration, reload } = await installed()
+      registration.arrive()
+      update.apply()
+      sheet = true
+
+      container.emit('controllerchange')
+
+      expect(reload).not.toHaveBeenCalled()
+      expect(update.phase.value).toBe('ready')
+      sheet = false
+      update.apply()
+      expect(reload).toHaveBeenCalledOnce()
+    })
+
+    it('must not reload behind it either, with the app put away for the calculator', async () => {
+      const { update, container, registration, reload } = await installed()
+      registration.arrive()
+      update.apply()
+      sheet = true
+      show('hidden')
+
+      container.emit('controllerchange')
+      expect(reload).not.toHaveBeenCalled()
+
+      // Back, the purchase added, the sheet put away — and away again: the quiet way takes it.
+      show('visible')
+      sheet = false
+      show('hidden')
+      expect(reload).toHaveBeenCalledOnce()
+    })
+
+    it('still gives up after ten seconds when the version does not take over at all', async () => {
+      const { update, registration } = await installed()
+      registration.arrive()
+      update.apply()
+      sheet = true
+      vi.advanceTimersByTime(APPLY_TIMEOUT_MS)
+      expect(update.phase.value).toBe('failed')
+    })
+  })
+
+  describe('a first visit, which nothing controls (adversarial Д2)', () => {
+    it('offers a version that became the active worker behind it, and «Обновить» only reloads', async () => {
+      const { update, registration, reload } = await installed({ controlled: false })
+      // The page's own build installs first; that is not a version.
+      const own = registration.takeOver()
+      expect(update.phase.value).toBe('none')
+
+      const next = registration.takeOver()
+      expect(update.phase.value).toBe('ready')
+
+      update.apply()
+      expect(reload).toHaveBeenCalledOnce()
+      expect(own.postMessage).not.toHaveBeenCalled()
+      expect(next.postMessage).not.toHaveBeenCalled()
+    })
+
+    it('takes it quietly once put away, as any version', async () => {
+      const { registration, reload } = await installed({ controlled: false })
+      registration.takeOver()
+      registration.takeOver()
+
+      show('hidden')
+
+      expect(reload).toHaveBeenCalledOnce()
+    })
+
+    it('knows its own worker when it was already installing as the page came up', async () => {
+      const container = new Container(null)
+      container.registration.installing = new Worker()
+      const reload = vi.fn()
+      const update = installPwaUpdate({
+        serviceWorker: container as unknown as ServiceWorkerContainer,
+        script: '/sw.js',
+        scope: '/',
+        holdsTyping: () => sheet,
+        reload,
+        mark: (at) => marks.push(at),
+        takeMark: () => null,
+        now: () => now,
+      })
+      await vi.advanceTimersByTimeAsync(0)
+      const own = container.registration.installing
+      container.registration.installing = null
+      container.registration.active = own
+      own.emit('statechange')
+
+      expect(update.phase.value).toBe('none')
+    })
+
+    it('takes the worker already active as it came up for its own, as a fast first install leaves it', async () => {
+      const { update, registration } = await installed({ controlled: false, active: true })
+      expect(update.phase.value).toBe('none')
+
+      registration.takeOver()
+
+      expect(update.phase.value).toBe('ready')
+    })
+  })
+
   describe('the build an answer names (Т-3)', () => {
+    it('looks again while nothing is found, but not more often than every half a minute (С-8)', async () => {
+      const { update, registration } = await installed()
+      update.serverVersion('v0.1.4-1-g3a00000')
+      update.serverVersion('v0.1.4-2-g9f00000')
+      expect(registration.update).toHaveBeenCalledOnce()
+
+      // The API came out a moment before the static files: the first look found the old worker.
+      clock += LOOK_AGAIN_MS - 1
+      update.serverVersion('v0.1.4-2-g9f00000')
+      expect(registration.update).toHaveBeenCalledOnce()
+      clock += 1
+      update.serverVersion('v0.1.4-2-g9f00000')
+      expect(registration.update).toHaveBeenCalledTimes(2)
+
+      // Found: nothing more to look for.
+      registration.arrive()
+      clock += LOOK_AGAIN_MS
+      update.serverVersion('v0.1.4-2-g9f00000')
+      expect(registration.update).toHaveBeenCalledTimes(2)
+    })
+
     it('looks at once when the server names another build than it did', async () => {
       const { update, registration } = await installed()
       update.serverVersion('v0.1.4-1-g3a00000')

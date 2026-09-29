@@ -13,9 +13,12 @@ test.beforeAll(() => {
   built = readFileSync(WORKER, 'utf8')
 })
 
-test.afterAll(() => {
+test.afterEach(() => {
   writeFileSync(WORKER, built)
 })
+
+// Both specs rewrite the one built worker.
+test.describe.configure({ mode: 'serial' })
 
 test('a version that comes out while the app is on the screen is taken by «Update»', async ({
   page,
@@ -38,8 +41,16 @@ test('a version that comes out while the app is on the screen is taken by «Upda
   const update = page.getByRole('button', { name: 'Update', exact: true })
   await expect(update).toBeVisible()
   // Offered, not taken: a page that is looked at is never reloaded without the person (MOL-46, Г).
+  // Time for a takeover to have come, and the worker still waiting — not let in behind the strip
+  // (review С-10): checked at once, a reload that was on its way would pass unseen.
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await page.waitForTimeout(1_500)
   expect(await page.evaluate(() => 'stayed' in window)).toBe(true)
+  expect(
+    await page.evaluate(
+      async () => (await navigator.serviceWorker.getRegistration())?.waiting !== null,
+    ),
+  ).toBe(true)
 
   await Promise.all([page.waitForEvent('load'), update.click()])
 
@@ -50,4 +61,27 @@ test('a version that comes out while the app is on the screen is taken by «Upda
     async () => (await navigator.serviceWorker.getRegistration())?.waiting !== null,
   )
   expect(waiting).toBe(false)
+})
+
+// A first visit is controlled by nothing to its end, and a version come out meanwhile does not wait
+// but becomes the active worker at once — the page was left on the old code with nothing offered
+// (adversarial Д2).
+test('a first visit learns of a version too, and «Update» brings it up on it', async ({ page }) => {
+  await page.goto('/privacy')
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready
+  })
+  expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull()
+
+  writeFileSync(WORKER, `${built}\n// ${String(Date.now())}\n`)
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+
+  const update = page.getByRole('button', { name: 'Update', exact: true })
+  await expect(update).toBeVisible()
+  await Promise.all([page.waitForEvent('load'), update.click()])
+
+  await expect
+    .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))
+    .toBe(true)
+  await expect(update).toHaveCount(0)
 })

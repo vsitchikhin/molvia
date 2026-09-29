@@ -43,6 +43,12 @@ export const CHECK_EVERY_MS = 15 * 60 * 1000
 export const APPLY_TIMEOUT_MS = 10 * 1000
 /** A note older than this is not about the reload that just happened. */
 const MARK_LIFETIME_MS = 60 * 1000
+/**
+ * How often another build named by the server looks again while no version has been found: the
+ * API may be rolled out a moment before the static files, and the first look finds the old worker
+ * (review С-8).
+ */
+export const LOOK_AGAIN_MS = 30 * 1000
 
 /** Provided by the app once the worker is registered; read by the band and the error state. */
 export const pwaUpdateKey: InjectionKey<PwaUpdate> = Symbol('pwa-update')
@@ -105,7 +111,19 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
   // A first install takes control of nothing it replaces: no reload is owed for it.
   let owed = false
   const controlled = serviceWorker.controller !== null
+  /**
+   * A first visit runs what it fetched, and nothing controls it to the end: the build has no
+   * `clientsClaim`. A version come out meanwhile does not wait — no page uses the registration —
+   * but becomes the active worker at once, and this page is left on the old code with nothing to
+   * take (adversarial Д2). So on a first visit the worker of the page's own build is noted, and
+   * any other that becomes active is a version owed to this page. The same holds for a page a hard
+   * reload left uncontrolled, where the worker it met may be older than its code: then the offer is
+   * a reload onto what it already runs — harmless, and not worth telling the two apart.
+   */
+  let own: ServiceWorker | null = null
+  // The first build this page met, and when the server naming another last sent a look.
   let build: string | undefined
+  let lookedAt: number | undefined
   let looking: ReturnType<typeof setInterval> | undefined
   let giveUp: ReturnType<typeof setTimeout> | undefined
 
@@ -114,8 +132,14 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
     owed = true
     if (phase.value === 'applying') {
       clearTimeout(giveUp)
-      reload()
-      return
+      // A sheet opened after the tap holds what is typed in memory: the tap was a consent to a
+      // reload then, not to losing that (adversarial Д3). The button comes back; the quiet way
+      // still takes it once the app is put away without a sheet.
+      if (!environment.holdsTyping()) {
+        reload()
+        return
+      }
+      phase.value = 'none'
     }
     // Taken over after all, past the ten seconds: «close the app» is no longer true, and a reload
     // is all that is left — offered again, never done under the finger.
@@ -186,17 +210,35 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
 
   function serverVersion(version: string): void {
     if (version === UNNAMED_BUILD) return
-    if (build !== undefined && build !== version) check()
-    build = version
+    build ??= version
+    if (version === build || phase.value !== 'none') return
+    const at = environment.now()
+    if (lookedAt !== undefined && at - lookedAt < LOOK_AGAIN_MS) return
+    lookedAt = at
+    check()
+  }
+
+  /** A worker this first visit did not come with has become the active one (Д2). */
+  function arrived(worker: ServiceWorker | null): void {
+    if (controlled || worker === null || worker === own) return
+    if (registration?.active !== worker) return
+    owed = true
+    refresh()
+    settle()
   }
 
   serviceWorker
     .register(environment.script, { scope: environment.scope })
     .then((found) => {
       registration = found
+      own = found.active ?? found.waiting ?? found.installing
       // A worker installed while the page was not looking waits for the same moment.
       found.addEventListener('updatefound', () => {
-        found.installing?.addEventListener('statechange', () => {
+        const worker = found.installing
+        // The first install may begin only after the registration is handed over.
+        own ??= worker
+        worker?.addEventListener('statechange', () => {
+          arrived(worker)
           refresh()
           settle()
         })
