@@ -66,30 +66,44 @@ describe('searchRemembered — the list on the phone, searched with no connectio
     expect(find('matsun')).toEqual(['Мацун'])
   })
 
-  // Review Р-23: a Latin letter that may still fold — «k» of «kh», «shc» of «shch» — keeps
-  // what was found before it, rather than losing a row for one keystroke.
-  it('a word typed halfway through a Latin fold keeps the rows it had', () => {
+  // Review Р-23, Р-26: a Latin letter that may still fold — «k» of «kh», «shc» of «shch» — is also
+  // the start of what it folds into, and of nothing else.
+  describe('a word typed halfway through a Latin fold', () => {
     const more = [
       row('cccccccc-0000-4000-8000-000000000008', 'Хачапури'),
       row('cccccccc-0000-4000-8000-000000000009', 'Щи'),
       row('cccccccc-0000-4000-8000-00000000000a', 'Жижиг'),
       row('cccccccc-0000-4000-8000-00000000000b', 'Цахтон'),
       row('cccccccc-0000-4000-8000-00000000000c', 'Сыр Чечил'),
+      row('cccccccc-0000-4000-8000-00000000000d', 'Молоко'),
+      row('cccccccc-0000-4000-8000-00000000000e', 'Пхали'),
+      row('cccccccc-0000-4000-8000-00000000000f', 'Сок'),
+      row('cccccccc-0000-4000-8000-000000000010', 'Соль'),
+      row('cccccccc-0000-4000-8000-000000000011', 'Морс'),
+      row('cccccccc-0000-4000-8000-000000000012', 'Морковь'),
+      row('cccccccc-0000-4000-8000-000000000013', 'Кефир'),
     ]
     const find = (text: string) => searchRemembered(more, text).map((found) => found.name)
-    expect(find('k')).toContain('Хачапури')
-    expect(find('kh')).toEqual(['Хачапури'])
-    expect(find('shc')).toContain('Щи')
-    expect(find('z')).toContain('Жижиг')
-    expect(find('c')).toEqual(expect.arrayContaining(['Цахтон', 'Сыр Чечил']))
-    expect(find('сыр c')).toEqual(['Сыр Чечил'])
-  })
 
-  it('must not fire: a word finished with a space, or one not the last', () => {
-    const more = [row('cccccccc-0000-4000-8000-000000000008', 'Хачапури')]
-    const find = (text: string) => searchRemembered(more, text).map((found) => found.name)
-    expect(find('k ')).toEqual([])
-    expect(find('k хач')).toEqual([])
+    it('keeps the row the whole fold will find', () => {
+      expect(find('k')).toEqual(['Хачапури', 'Кефир'])
+      expect(find('kh')).toEqual(['Хачапури'])
+      expect(find('shc')).toEqual(['Щи'])
+      expect(find('z')).toEqual(['Жижиг'])
+      expect(find('p')).toEqual(['Пхали'])
+      expect(find('c')).toEqual(['Цахтон', 'Сыр Чечил', 'Кефир'])
+      expect(find('сыр c')).toEqual(['Сыр Чечил'])
+    })
+
+    it('must not fire: a name the fold does not start, a word finished, a word not the last', () => {
+      expect(find('k')).not.toContain('Молоко')
+      expect(find('s')).not.toContain('Хачапури')
+      expect(find('sok')).toEqual(['Сок'])
+      expect(find('mors')).toEqual(['Морс'])
+      expect(find('kefir')).toEqual(['Кефир'])
+      expect(find('k ')).toEqual(['Кефир'])
+      expect(find('k хач')).toEqual([])
+    })
   })
 
   it('nothing typed that draws finds nothing, not everything', () => {

@@ -43,6 +43,7 @@ import { useTripRows } from '@/composables/useTripRows'
 import { purchaseDay, timeOfDay } from '@/days'
 import { afterStep } from '@/navigation'
 import { useTripStore } from '@/stores/trip'
+import { useTripQueueStore } from '@/stores/tripQueue'
 
 /**
  * «Записать покупки» (MOL-128, В-5): the one way into a record typed by hand, on «Покупки» and on
@@ -64,6 +65,7 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const router = useRouter()
     const trips = useTripStore()
+    const queue = useTripQueueStore()
     const { trip, local, tripId } = useCurrentTrip()
     const { rows } = useTripRows(tripId, trip, () => '')
     /** The record «Закончить и начать новую» puts away — only once the new one starts (Р-2). */
@@ -115,7 +117,7 @@ export default defineComponent({
       const unsent = local.value?.id === id
       replacing.value =
         choice === 'anew' && id !== null
-          ? { tripId: id, place: open.value?.place ?? '', empty: unsent && isEmpty() }
+          ? { tripId: id, place: open.value?.place ?? '', empty: unsent && isEmpty(id) }
           : null
       if (replacing.value && !unsent) void emptyAsked(replacing.value.tripId)
       asking.value = false
@@ -135,11 +137,18 @@ export default defineComponent({
       }
       const old = replacing.value
       if (old?.tripId !== id || trips.current?.id !== id) return
-      replacing.value = { ...old, empty: isEmpty() }
+      replacing.value = { ...old, empty: isEmpty(id) }
     }
 
-    function isEmpty(): boolean {
-      return rows.value.every((row) => row.mark === 'removing')
+    /**
+     * Nothing in it, anywhere: a purchase the server refused is a purchase too — it waits on
+     * «Покупки» to be put right, and a removed record would take it along (adversarial М).
+     */
+    function isEmpty(id: string): boolean {
+      return (
+        rows.value.every((row) => row.mark === 'removing') &&
+        !queue.rejected.some((item) => item.write.kind === 'add' && item.write.tripId === id)
+      )
     }
 
     // Every move follows the step back of the sheet that asked for it (`afterStep`): the sheet is

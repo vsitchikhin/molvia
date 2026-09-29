@@ -1,6 +1,6 @@
 import { onUnmounted, ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
-import { drawsNothing, toSearchKey, withoutUnfinishedFold } from '@molvia/model'
+import { drawsNothing, toSearchKey, unfinishedFoldSpellings } from '@molvia/model'
 import type { AdviceFound, AdviceResponse, AdviceScope } from '@molvia/model'
 import { api } from '@/api'
 import { SEARCH_DEBOUNCE_MS } from '@/composables/useCatalogueSearch'
@@ -75,16 +75,18 @@ export function searchRemembered(rows: AdviceResponse['rows'], text: string): Ad
   const asked = words(text)
   const last = asked.at(-1)
   if (last === undefined) return []
-  // The word still being typed may end halfway through a Latin fold — «k» of «kh» — and is held to
-  // what was typed before it, or a row went missing for one keystroke (review Р-23).
-  const held = /\S$/u.test(text) ? withoutUnfinishedFold(last) : null
+  // The word still being typed may end halfway through a Latin fold — «k» of «kh» — and is also
+  // the start of what that tail may still become, or a row went missing for one keystroke (review
+  // Р-23); spelt out, never cut off, or «k» started every name (Р-26).
+  const also = /\S$/u.test(text) ? unfinishedFoldSpellings(last).map(spelt) : []
   return rows
     .filter((row) => {
       const name = words(row.name)
       return asked.every((word, n) =>
         name.some(
           (part) =>
-            starts(part, word) || (n === asked.length - 1 && held !== null && starts(part, held)),
+            starts(part, word) ||
+            (n === asked.length - 1 && also.some((start) => spelt(part).startsWith(start))),
         ),
       )
     })

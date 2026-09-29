@@ -281,29 +281,40 @@ export function toSearchKey(text: string): string {
 }
 
 /**
- * Proper starts of the Latin folds, and `c`, which the letter after it decides: a word typed up to
- * one of them has not said yet which letter it is — `k` may be `kh`, `shc` may be `shch`.
+ * What a Latin tail may still become: every proper start of a fold, with the letter that fold
+ * gives — `k` may be the `h` of `kh`, `shc` the `sh` of `shch`, `p` the `f` of `ph` — and `c`, which
+ * the letter after it decides, the `ц` of a soft one or the `ch` of «ч».
  */
-const UNFINISHED_FOLDS: ReadonlySet<string> = new Set([
-  ...LATIN_FOLDS.flatMap(([from]) =>
-    Array.from({ length: from.length - 1 }, (_, n) => from.slice(0, n + 1)),
-  ),
-  'c',
-])
-const LONGEST_UNFINISHED = Math.max(...[...UNFINISHED_FOLDS].map((start) => start.length))
+const UNFINISHED_FOLDS: ReadonlyMap<string, readonly string[]> = (() => {
+  const ends = new Map<string, string[]>()
+  const add = (start: string, key: string): void => {
+    ends.set(start, [...(ends.get(start) ?? []), key])
+  }
+  for (const [from, to] of LATIN_FOLDS) {
+    for (let size = 1; size < from.length; size += 1) add(from.slice(0, size), to)
+  }
+  add('c', 'ц')
+  add('c', 'ch')
+  return ends
+})()
 
 /**
- * A word as typed so far, without a Latin tail the next keystroke may still fold into another
- * letter — `hachapuri` is the key of «Хачапури», and `k` is not its start until `kh` is typed
- * (MOL-128, review Р-23). Null when nothing at the end is unfinished. For the start of a word
- * searched on the phone only; the key itself is `toSearchKey`'s.
+ * The other spellings a word typed so far may be the start of, when it ends halfway through a
+ * Latin fold: `k` is also `h`, since «Хачапури» is `hachapuri` and `k` is not its start until `kh`
+ * is typed (MOL-128, review Р-23). The tail is spelt out into what it may still fold into, never cut
+ * off: cut, «k» was the start of every name and «sok» of «Соль» (review Р-26, adversarial Н). Empty
+ * when nothing at the end is unfinished. For the start of a word searched on the phone only; the
+ * key itself is `toSearchKey`'s.
  */
-export function withoutUnfinishedFold(word: string): string | null {
+export function unfinishedFoldSpellings(word: string): string[] {
   const lower = word.toLocaleLowerCase()
-  for (let size = Math.min(LONGEST_UNFINISHED, lower.length); size > 0; size -= 1) {
-    if (UNFINISHED_FOLDS.has(lower.slice(-size))) return lower.slice(0, -size)
+  const spellings = new Set<string>()
+  for (const [start, keys] of UNFINISHED_FOLDS) {
+    if (!lower.endsWith(start)) continue
+    const before = lower.slice(0, -start.length)
+    for (const key of keys) spellings.add(before + key)
   }
-  return null
+  return [...spellings]
 }
 
 /**

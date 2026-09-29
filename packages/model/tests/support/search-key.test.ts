@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SEARCH_KEY_TABLES, toSearchKey, withoutUnfinishedFold } from '#model/support/search-key'
+import { SEARCH_KEY_TABLES, toSearchKey, unfinishedFoldSpellings } from '#model/support/search-key'
 import { INVISIBLE, visibleLine } from '#model/support/text'
 
 describe('toSearchKey', () => {
@@ -432,29 +432,28 @@ describe('пределы, записанные явно', () => {
   })
 })
 
-// Review Р-23 (MOL-128): the phone's offline filter keeps a word whose Latin tail may still fold.
-describe('withoutUnfinishedFold', () => {
-  it('cuts the start of a fold, the longest first', () => {
-    expect(withoutUnfinishedFold('k')).toBe('')
-    expect(withoutUnfinishedFold('bors')).toBe('bor')
-    expect(withoutUnfinishedFold('shc')).toBe('')
-    expect(withoutUnfinishedFold('Z')).toBe('')
-    expect(withoutUnfinishedFold('p')).toBe('')
-    expect(withoutUnfinishedFold('c')).toBe('')
+// Review Р-23, Р-26 (MOL-128): a Latin tail that may still fold is spelt out, never cut off.
+describe('unfinishedFoldSpellings', () => {
+  it('spells the start of a fold out into what it folds into', () => {
+    expect(unfinishedFoldSpellings('k')).toEqual(['h'])
+    expect(unfinishedFoldSpellings('bors')).toEqual(['borsh'])
+    expect(unfinishedFoldSpellings('shc')).toEqual(expect.arrayContaining(['sh']))
+    expect(unfinishedFoldSpellings('Z')).toEqual(['j'])
+    expect(unfinishedFoldSpellings('p')).toEqual(['f'])
+    expect(unfinishedFoldSpellings('c')).toEqual(expect.arrayContaining(['ц', 'ch']))
   })
 
-  it('must not fire: a fold finished, a letter that folds alone, Cyrillic', () => {
-    expect(withoutUnfinishedFold('kh')).toBeNull()
-    expect(withoutUnfinishedFold('shch')).toBeNull()
-    expect(withoutUnfinishedFold('x')).toBeNull()
-    expect(withoutUnfinishedFold('сыр')).toBeNull()
-    expect(withoutUnfinishedFold('')).toBeNull()
+  it('must not fire: a fold finished, a letter that folds alone, Cyrillic, nothing', () => {
+    expect(unfinishedFoldSpellings('kh')).toEqual([])
+    expect(unfinishedFoldSpellings('x')).toEqual([])
+    expect(unfinishedFoldSpellings('сыр')).toEqual([])
+    expect(unfinishedFoldSpellings('')).toEqual([])
   })
 
   it('every start of every fold is one, so a fold added is held too', () => {
-    for (const [from] of SEARCH_KEY_TABLES.latinFolds) {
+    for (const [from, to] of SEARCH_KEY_TABLES.latinFolds) {
       for (let size = 1; size < from.length; size += 1) {
-        expect(withoutUnfinishedFold(from.slice(0, size))).toBe('')
+        expect(unfinishedFoldSpellings(from.slice(0, size))).toContain(to)
       }
     }
   })

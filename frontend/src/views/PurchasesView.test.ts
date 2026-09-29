@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { RouterView, createRouter, createWebHistory } from 'vue-router'
-import { currentTripResponseSchema, parseMoney, tripViewCodec } from '@molvia/model'
+import { ERROR, currentTripResponseSchema, parseMoney, tripViewCodec } from '@molvia/model'
 import type {
   AdviceResponse,
   PendingVerdicts,
@@ -11,6 +11,7 @@ import type {
   TripHistoryEntry,
   TripView as TripViewModel,
 } from '@molvia/model'
+import { ApiError } from '@molvia/client'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
@@ -22,6 +23,7 @@ const tripHistory = vi.fn<() => Promise<TripHistory>>()
 const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
 const currentTrip = vi.fn<() => Promise<TripViewModel | null>>()
 const advice = vi.fn<() => Promise<AdviceResponse>>()
+const addExpense = vi.fn<() => Promise<unknown>>()
 vi.mock('@/api', () => ({
   api: {
     advice: () => advice(),
@@ -32,7 +34,7 @@ vi.mock('@/api', () => ({
     startTrip: () => new Promise(() => undefined),
     finishTrip: () => new Promise(() => undefined),
     removeTrip: () => new Promise(() => undefined),
-    addExpense: () => new Promise(() => undefined),
+    addExpense: () => addExpense(),
   },
 }))
 
@@ -183,6 +185,8 @@ describe('PurchasesView (MOL-128)', () => {
     pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
     currentTrip.mockReset()
     currentTrip.mockResolvedValue(null)
+    addExpense.mockReset()
+    addExpense.mockReturnValue(new Promise(() => undefined))
     advice.mockReset()
     advice.mockResolvedValue({
       geography: { country: 'AM', city: 'Гюмри' },
@@ -679,6 +683,32 @@ describe('PurchasesView (MOL-128)', () => {
       const { view, queue } = await render()
       await replaceWith(view, 'SAS')
       expect(queue.pending.map((write) => write.kind)).toEqual(['finish', 'start'])
+    })
+
+    // Adversarial М: a purchase the server refused waits on «Покупки» to be put right; a record
+    // removed as empty would take it along.
+    it('a purchase the server refused keeps the record from being removed as empty', async () => {
+      currentTrip.mockResolvedValue(openTrip())
+      addExpense.mockRejectedValue(new ApiError(ERROR.INVALID_AMOUNT, undefined, true))
+      const { view, queue } = await render()
+      queue.enqueue({
+        kind: 'add',
+        tripId: OPEN,
+        entry: null,
+        body: {
+          id: 'eeeeeeee-0000-4000-8000-000000000003',
+          itemId: 'dddddddd-0000-4000-8000-000000000001',
+          amount: parseMoney('600', 'AMD'),
+        },
+      })
+      await queue.flush()
+      await flushPromises()
+      expect(queue.rejected).toHaveLength(1)
+
+      await replaceWith(view, 'SAS')
+
+      expect(queue.pending.map((write) => write.kind)).toEqual(['finish', 'start'])
+      expect(queue.rejected).toHaveLength(1)
     })
 
     it('a record started here and not yet sent needs no answer to be removed', async () => {
