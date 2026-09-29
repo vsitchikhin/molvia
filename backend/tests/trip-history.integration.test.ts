@@ -2,10 +2,11 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { ERROR, tripHistoryCodec, tripViewCodec } from '@molvia/model'
+import { expenses } from '@/db/schema'
 import { createTripRepository } from '@/db/trips-repository'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { insertActor, insertPlace, insertTrip, signIn } from './fixtures'
+import { insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const app = buildServer({ db })
@@ -219,5 +220,61 @@ describe('history of completed trips', () => {
       ).statusCode,
     ).toBe(204)
     expect((await createTripRepository(db).byId(id, actor))?.finishedOnDeviceAt).toEqual(ahead)
+  })
+
+  it('counts every purchase of a row and adds it up per currency (MOL-128, В-4)', async () => {
+    const actor = await insertActor(db)
+    const place = await insertPlace(db, { name: `History ${randomUUID()}` })
+    const empty = await insertTrip(db, { actorId: actor, placeId: place })
+    const full = await insertTrip(db, { actorId: actor, placeId: place })
+    const other = await insertTrip(db, { actorId: actor, placeId: place })
+    const item = await insertItem(db)
+    const buy = (tripId: string, amount: { minor: bigint; currency: 'AMD' | 'USD' } | null) =>
+      db.insert(expenses).values({
+        id: randomUUID(),
+        tripId,
+        itemId: item,
+        amountMinor: amount?.minor ?? null,
+        amountCurrency: amount?.currency ?? null,
+      })
+    await buy(full, { minor: 53_100n, currency: 'AMD' })
+    await buy(full, { minor: 103_200n, currency: 'AMD' })
+    await buy(full, { minor: 1_200n, currency: 'USD' })
+    // A purchase with no price is a purchase, and adds nothing.
+    await buy(full, null)
+    await buy(other, null)
+    await db.execute(sql`update trips set finished_at = now() where actor_id = ${actor}`)
+    const cookie = await signIn(db, actor)
+
+    const page = tripHistoryCodec.parse(
+      (await app.inject({ url: '/trips/history', headers: { cookie } })).json(),
+    )
+    const row = (id: string) => page.trips.find((trip) => trip.id === id)
+
+    expect(row(full)).toMatchObject({
+      itemCount: 4,
+      total: [
+        { minor: 156_300n, currency: 'AMD' },
+        { minor: 1_200n, currency: 'USD' },
+      ],
+    })
+    expect(row(empty)).toMatchObject({ itemCount: 0, total: [] })
+    expect(row(other)).toMatchObject({ itemCount: 1, total: [] })
+  })
+
+  it('reads an answer of a server that did not count them as unknown, not as zero', () => {
+    const [entry] = tripHistoryCodec.parse({
+      trips: [
+        {
+          id: randomUUID(),
+          place: { id: randomUUID(), kind: 'store', name: 'SAS' },
+          startedAt: '2026-09-01T10:00:00.000Z',
+          finishedAt: '2026-09-01T11:00:00.000Z',
+          finishedOnDeviceAt: null,
+        },
+      ],
+      nextCursor: null,
+    }).trips
+    expect(entry).toMatchObject({ itemCount: null, total: null })
   })
 })

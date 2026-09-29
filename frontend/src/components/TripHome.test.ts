@@ -30,6 +30,8 @@ function trip(n: number, name = 'Ереван Сити', finishedOnDeviceAt: Dat
     startedAt: new Date(finishedAt.getTime() - 3_600_000),
     finishedAt,
     finishedOnDeviceAt,
+    itemCount: null,
+    total: null,
   } satisfies TripHistoryEntry
 }
 

@@ -1050,6 +1050,8 @@ describe('TripView', () => {
           startedAt: new Date('2026-09-26T10:00:00Z'),
           finishedAt: new Date('2026-09-26T10:30:00Z'),
           finishedOnDeviceAt: null,
+          itemCount: null,
+          total: null,
         },
       ],
       nextCursor: null,

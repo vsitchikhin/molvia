@@ -237,6 +237,8 @@ it('a finished trip removed from its own screen leaves for the history, with Â«Ð
         startedAt: new Date('2026-09-01T10:00:00Z'),
         finishedAt: new Date('2026-09-01T12:00:00Z'),
         finishedOnDeviceAt: null,
+        itemCount: null,
+        total: null,
       },
     ],
     nextCursor: null,
