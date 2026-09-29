@@ -1062,6 +1062,29 @@ describe('день сверки — день телефона (MOL-121)', () => 
     )
   }
 
+  it('повтор той же сверки после полуночи держит её день (адверсариальное Р)', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me, { startOn: '2026-09-01' })
+    const check = { id: randomUUID(), fact: { minor: 9_900_000n, currency: 'AMD' as const } }
+    const first = await checkAccount(
+      tripRepositories(db),
+      await actorOf(me, '2026-09-10'),
+      id,
+      check,
+      instant,
+    )
+    const again = await checkAccount(
+      tripRepositories(db),
+      await actorOf(me, '2026-09-11'),
+      id,
+      check,
+      new Date(instant.getTime() + 60 * 60 * 1000),
+    )
+    expect(first.checkedOn).toBe('2026-09-10')
+    expect(again.checkedOn).toBe('2026-09-10')
+    expect((await balanceOf(me, id)).lastCheckedOn).toBe('2026-09-10')
+  })
+
   it('сверка — днём запроса, без него — днём Еревана', async () => {
     const me = await owner()
     const { id } = await addAccount(me, { startOn: '2026-09-01' })

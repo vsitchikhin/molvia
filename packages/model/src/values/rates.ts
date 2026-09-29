@@ -252,7 +252,9 @@ const LATEST_OFFSET_MS = 14 * 60 * 60 * 1000
  * The latest calendar day at `instant` anywhere on Earth — UTC+14. A day a person writes is their
  * phone's (MOL-121, owner's decision В-3): east of Yerevan after the phone's midnight it is a day
  * Yerevan has not reached yet, and «not in the future» means not past this one, never past
- * Yerevan's. At most Yerevan's tomorrow, so nobody in Yerevan writes tomorrow's spending.
+ * Yerevan's. At most Yerevan's tomorrow — and from 14:00 in Yerevan it is that tomorrow already, so
+ * the server alone lets a person in Yerevan write tomorrow's spending: the sheet's `max`, the
+ * phone's today, is what keeps them to today (review Т-5).
  */
 export function latestDay(instant: Date): string {
   return new Date(instant.getTime() + LATEST_OFFSET_MS).toISOString().slice(0, 10)

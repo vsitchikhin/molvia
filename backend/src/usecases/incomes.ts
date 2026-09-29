@@ -90,8 +90,8 @@ async function dayOfIncome(
 
 /**
  * «Записать доход». Not a day that has not come yet anywhere (`latestDay`, MOL-121): the phone's day
- * may be ahead of Yerevan's, and the walk leaves it out of today's trips until Yerevan gets there.
- * 201 for a new income, and the screen whole either way.
+ * may be ahead of Yerevan's, and the walk leaves an income past the request's today out of the trips
+ * that request starts. 201 for a new income, and the screen whole either way.
  */
 export async function recordIncome(
   repositories: Writing,

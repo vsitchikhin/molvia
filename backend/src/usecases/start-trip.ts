@@ -5,6 +5,7 @@ import {
   isDeviceDay,
   pickOfficialRate,
   walletRate,
+  yerevanDate,
 } from '@molvia/model'
 import type { Actor, AmdRate, OfficialRate, StartTripBody, TripView } from '@molvia/model'
 import type { TripSnapshot } from '@/db/trips-repository'
@@ -13,6 +14,8 @@ import { officialRateOf, officialRatesOn, sinceDay } from './exchanges'
 import { todayOf } from './today'
 import type { Today } from './today'
 import { tripViewFor } from './trip-view'
+
+const DAY_MS = 24 * 60 * 60 * 1000
 
 export interface Started {
   readonly trip: TripView
@@ -65,13 +68,18 @@ export async function startTrip(
       country: context.country,
       city: context.city,
     })
-    // The rates of the phone's today (MOL-121): an exchange made on it is in the wallet of this trip.
-    const today = todayOf(actor, now)
-    const snapshot =
-      (await personalRateFor(repositories, actor, context, today)) ??
-      (await officialRateFor(repositories, context, today))
-    // The day it began for the person, judged as a device's moment is: past the latest day, dropped.
+    // The day it began for the person, judged as a device's moment is: dropped, never refused.
     const startedOn = body.startedOn && isDeviceDay(body.startedOn, now) ? body.startedOn : null
+    // The rates of the day the trip is dated by (MOL-121, review Т-7): the day of the tap, as an
+    // account dates it — within a day of the server's, the rule of Ж1 — else the request's today.
+    // A start the queue sent after midnight takes the wallet of the evening it was tapped in.
+    const rateDay =
+      startedOn !== null && startedOn >= yerevanDate(new Date(now.getTime() - DAY_MS))
+        ? startedOn
+        : todayOf(actor, now)
+    const snapshot =
+      (await personalRateFor(repositories, actor, context, rateDay)) ??
+      (await officialRateFor(repositories, context, rateDay))
     const { trip, created } = await repositories.trips.start(
       actor.id,
       { id: body.id, placeId: place.id, startedOn },

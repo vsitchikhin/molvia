@@ -367,10 +367,9 @@ export function earlier(one: string | null, other: string): string {
 
 /**
  * «Записать обмен». The day is the person's to name — their phone's (MOL-121) — but not a day that
- * has not come yet anywhere (`latestDay`). One Yerevan has not reached waits in the list: the walk
- * takes no link after Yerevan's today, so a rate from tomorrow never enters today's trips (the same
- * line «not from the future» draws for an official rate). 201 for a new exchange, and the screen
- * whole either way.
+ * has not come yet anywhere (`latestDay`). The walk takes no link after the request's today, so an
+ * exchange of a day the phone has not reached enters no trip it starts (the same line «not from the
+ * future» draws for an official rate). 201 for a new exchange, and the screen whole either way.
  */
 export async function recordExchange(
   repositories: Writing,

@@ -439,6 +439,12 @@ function recallRejected(key: string): { items: RejectedWrite[]; named: boolean }
   return { items, named }
 }
 
+/** A finish taken back with «Вернуть», with the phone's day of its tap (MOL-121). */
+function finishWithDay(finish: FinishTripBody | undefined): FinishTripBody | undefined {
+  const at = finish?.finishedOnDeviceAt
+  return finish && at ? { ...finish, finishedOn: localDay(at) } : finish
+}
+
 /**
  * The trip as the server answers it, or nothing: «завершить» answers `204`.
  *
@@ -448,12 +454,6 @@ function recallRejected(key: string): { items: RejectedWrite[]; named: boolean }
  * purchase can be corrected on the phone after its first `add` has gone, and sent again it would
  * be answered «yes» while the new price quietly went nowhere.
  */
-/** A finish taken back with «Вернуть», with the phone's day of its tap (MOL-121). */
-function finishWithDay(finish: FinishTripBody | undefined): FinishTripBody | undefined {
-  const at = finish?.finishedOnDeviceAt
-  return finish && at ? { ...finish, finishedOn: localDay(at) } : finish
-}
-
 function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
   switch (entry.kind) {
     case 'start':

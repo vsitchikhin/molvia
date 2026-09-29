@@ -118,7 +118,9 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   a check at 23:30 in Moscow was of tomorrow and the next month, and east of Yerevan what was typed
   on the phone's day before an even check stayed «after» it, so the window did not close. A trip is
   dated by the phone's day of «Начать» (`started_on`), not more than a day before the server's —
-  the rule of Ж1 above.
+  the rule of Ж1 above. **A check sent again under its name keeps the day it was first written**
+  (adversarial round 2 Р): «Записать разницу» repeats it once the correction lands, maybe after
+  midnight, and the check stays beside its correction.
 - **«Не попали в остатки» is per account, not per currency** (Р-16): an operation with no account
   that could still explain a difference of some live account of its currency — after its start and
   its last check that came out even. A fresh check of the card does not hide last week's cash; a currency with no

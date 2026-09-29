@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { actorSettingsSchema } from './settings'
 import { CATALOGUE_QUERY_MAX, catalogueEntryCodec, catalogueEntryOf } from './catalogue'
-import { exchangeDaySchema } from '#model/entities/exchange'
 import type { Expense } from '#model/entities/expense'
 import { newExpenseSchema } from '#model/entities/expense'
 import type { Item } from '#model/entities/item'
@@ -31,6 +30,21 @@ import { quantityCodec, unitPrice, unitPriceCodec } from '#model/values/units'
 export const deviceIdSchema = z.uuid().regex(/^[0-9a-f-]+$/)
 
 /**
+ * A day a phone named at a tap (MOL-121): any real calendar day, whatever the year. Whether it is
+ * one the phone could have lived through is the use case's — `isDeviceDay` — which drops it rather
+ * than refuse: a clock reset to 1970 is the one a dead battery leaves, and a refusal of a start or a
+ * finish is set aside by the queue for good (Р-33, adversarial round 2 П).
+ */
+export const deviceDaySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((day) => {
+    // `Date.parse('2026-02-31')` is the 3rd of March, and a month 13 is no date at all.
+    const at = Date.parse(`${day}T00:00:00.000Z`)
+    return Number.isFinite(at) && new Date(at).toISOString().slice(0, 10) === day
+  })
+
+/**
  * The body of «Начать поход».
  *
  * The identifier comes from the device, not the server (MOL-21, В-2): a trip started with no
@@ -49,7 +63,7 @@ export const startTripBodySchema = z.strictObject({
   context: actorSettingsSchema.optional(),
   // The phone's today at the tap (MOL-121): a start may reach the server a day later from the queue,
   // and an account dates the trip by the day it began for the person. Absent from an old queue.
-  startedOn: exchangeDaySchema.optional(),
+  startedOn: deviceDaySchema.optional(),
   place: z.strictObject({
     kind: z.literal('store'),
     name: newPlaceSchema.shape.name,
@@ -293,11 +307,11 @@ export function isDeviceTime(at: Date, now: Date): boolean {
 
 /**
  * Whether a day a phone named at a tap — `startedOn`, `finishedOn` (MOL-121) — is one it could have
- * lived through: not past the latest day on Earth. The schema already holds it to a calendar day
- * from 2000 on; a day that fails this is dropped, not refused, as a device time is (Р-33).
+ * lived through: from 2000 on, as a device time is, and not past the latest day on Earth. A day
+ * that fails this is dropped, not refused (Р-33).
  */
 export function isDeviceDay(day: string, now: Date): boolean {
-  return day <= latestDay(now)
+  return day >= DEVICE_TIME_EPOCH.toISOString().slice(0, 10) && day <= latestDay(now)
 }
 
 /** Old queued finishes have no device time; retries preserve whichever time first arrived. */
@@ -305,7 +319,7 @@ export const finishTripBodySchema = z.strictObject({
   finishedOnDeviceAt: isoDate.optional(),
   // The phone's today at the tap (MOL-121): the day «Деньги» file the trip under, beside the
   // spendings of that day. Absent from an old queue — then the server's day of the moment above.
-  finishedOn: exchangeDaySchema.optional(),
+  finishedOn: deviceDaySchema.optional(),
 })
 export type FinishTripBody = z.output<typeof finishTripBodySchema>
 

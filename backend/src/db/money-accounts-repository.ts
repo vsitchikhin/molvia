@@ -93,8 +93,8 @@ export interface MoneyAccountRepository {
   ): Promise<MoneyAccountCheck | null>
 
   /**
-   * «Сверить»: written, or counted again under the same name. The same name with another account or
-   * another fact is `CONFLICT` — another fact is another check.
+   * «Сверить»: written, or counted again under the same name — on the day it was first written. The
+   * same name with another account or another fact is `CONFLICT` — another fact is another check.
    */
   saveCheck(
     actorId: string,
@@ -598,7 +598,10 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           (
             await db
               .update(moneyAccountChecks)
-              .set({ checkedOn: values.checkedOn, countedMinor: values.countedMinor })
+              // The day stays the first one's (MOL-121, adversarial round 2 Р): «Записать разницу»
+              // sends the same check again once its correction lands — after midnight, perhaps —
+              // and the check was made on the day it was made, beside that correction.
+              .set({ countedMinor: values.countedMinor })
               .where(
                 and(
                   eq(moneyAccountChecks.id, check.id),

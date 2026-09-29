@@ -10,9 +10,10 @@ import { actors, moneyMonthRates } from './schema'
  */
 export interface MoneyRepository {
   /**
-   * The owner's trips finished on a day from `from` to `to` in Yerevan — the device's moment of
-   * finishing, the server's for old rows (MOL-25) — one line per currency their purchases were paid
-   * in. Summed from the purchases each time: nothing is copied, so amending one moves the month.
+   * The owner's trips finished on a day from `from` to `to` — the phone's day of the tap of
+   * «Завершить» (`finished_on`, MOL-121), and for a trip from an old queue Yerevan's day of the
+   * device's moment of finishing, or the server's (MOL-25) — one line per currency their purchases
+   * were paid in. Summed from the purchases each time: nothing is copied, so amending one moves the month.
    */
   tripLines(actorId: string, from: string, to: string): Promise<readonly TripLine[]>
 

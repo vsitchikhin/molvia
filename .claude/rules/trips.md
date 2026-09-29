@@ -54,7 +54,12 @@ The detail behind the trip lines of `CLAUDE.md`.
   worked out when they are sent from the moment the queue already keeps (`startedAt`,
   `finishedOnDeviceAt`) by the phone's calendar — so a write queued before this, and sent after,
   has its day too, and the queue's shape did not change. The server keeps the first, as it keeps
-  the first moment, and drops a day past the latest on Earth rather than refuse it.
+  the first moment, and **drops a day it cannot believe rather than refuse it** — before 2000 or past
+  the latest on Earth (`isDeviceDay`): the body takes any calendar day, since a clock at 1970 — a dead
+  battery — sends 1970's day beside its moment, and a refused start or finish is set aside for good
+  (Р-33, adversarial round 2 П). **A trip's rate is snapshotted on the day it is dated by** — the tap
+  of «Начать», within a day of the server's (Ж1), else the request's today (review Т-7): a start
+  the queue sent after midnight takes the wallet of the evening it was tapped in.
 - **A removed trip is marked, by the money rule (MOL-76).** `DELETE /trips/:id` sets
   `trips.deleted_at`; «Вернуть» (`POST /trips/:id/restore`) is there for ten minutes
   (`TRIP_UNDO_MINUTES`), and then the minute timer deletes the trip with its purchases. A trip is

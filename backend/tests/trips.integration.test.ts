@@ -1020,4 +1020,63 @@ describe('день телефона у похода (MOL-121)', () => {
     })
     expect(await days(future)).toEqual({ startedOn: null, finishedOn: null })
   })
+
+  // A clock at 1970 — a dead battery — leaves 1970's day beside its moment: dropped with it, never
+  // refused, or the queue sets the start or the finish aside for good (Р-33, adversarial round 2 П).
+  it('день нажатия из 1970 отброшен, а не отказан: старт, завершение и «Вернуть» проходят', async () => {
+    const actor = await insertActor(db)
+    const id = randomUUID()
+    const started = await call('POST', '/trips', actor, {
+      context: await tripContext(db, actor),
+      id,
+      startedOn: '1970-01-01',
+      place: { kind: 'store', name: 'Ереван Сити' },
+    })
+    expect(started.status).toBe(201)
+    const finished = await call('POST', `/trips/${id}/finish`, actor, {
+      finishedOnDeviceAt: '1970-01-01T00:00:00.000Z',
+      finishedOn: '1970-01-01',
+    })
+    expect(finished.status).toBe(204)
+    expect(await days(id)).toEqual({ startedOn: null, finishedOn: null })
+
+    const other = randomUUID()
+    await call('POST', '/trips', actor, {
+      context: await tripContext(db, actor),
+      id: other,
+      place: { kind: 'store', name: 'Рынок' },
+    })
+    expect((await call('DELETE', `/trips/${other}`, actor)).status).toBe(204)
+    const back = await call('POST', `/trips/${other}/restore`, actor, {
+      finish: { finishedOnDeviceAt: '1999-12-31T23:59:59.999Z', finishedOn: '1999-12-31' },
+    })
+    expect(back.status).toBe(200)
+    expect(await days(other)).toEqual({ startedOn: null, finishedOn: null })
+  })
+
+  // The rate a trip is snapshotted with is of the day it is dated by (review Т-7): a start the queue
+  // sends after midnight takes the wallet of the evening it was tapped in.
+  it('курс похода — днём нажатия «Начать», а не днём отправки', async () => {
+    const actor = await insertActor(db)
+    const day = (ago: number) => yerevanDate(new Date(Date.now() - ago * 24 * 60 * 60 * 1000))
+    for (const [exchangedOn, received] of [
+      [day(2), '43000'],
+      [day(0), '46000'],
+    ] as const) {
+      const recorded = await call('POST', '/exchanges', actor, {
+        id: randomUUID(),
+        given: { amount: '10000', currency: 'RUB' },
+        received: { amount: received, currency: 'AMD' },
+        exchangedOn,
+      })
+      expect(recorded.status, JSON.stringify(recorded.body)).toBe(201)
+    }
+    const tapped = await call('POST', '/trips', actor, {
+      context: await tripContext(db, actor),
+      id: randomUUID(),
+      startedOn: day(1),
+      place: { kind: 'store', name: 'Ереван Сити' },
+    })
+    expect(trip(tapped).rate?.scaled).toBe(parseRate('4.3'))
+  })
 })
