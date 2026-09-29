@@ -171,15 +171,14 @@ export async function moneyChartsOf(
   // The month before is there for «к августу» alone, as on «Деньгах» (Н-6).
   const previous = await countMonth(owner, rates, before, rows, categories, null, 'frozen', null)
 
-  const [losses, line] = await Promise.all([
-    lossesOf(
-      repositories,
-      owner,
-      rates,
-      exchanges.filter(({ exchangedOn }) => exchangedOn >= lossFrom && exchangedOn <= today),
-    ),
-    lineOf(owner, rates, exchanges, `${first}-01`, today),
-  ])
+  // One after the other, so no more than `RATE_READS_AT_ONCE` hold a connection (review С-11).
+  const losses = await lossesOf(
+    repositories,
+    owner,
+    rates,
+    exchanges.filter(({ exchangedOn }) => exchangedOn >= lossFrom && exchangedOn <= today),
+  )
+  const line = await lineOf(owner, rates, exchanges, `${first}-01`, today)
   // Every category the owner can choose is offered, spent in the period or not (adversarial А).
   const offered = categoryOrder(categories)
     .filter((category) => category.archivedAt === null)
