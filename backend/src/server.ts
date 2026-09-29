@@ -497,8 +497,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         update: (actorId, tripId, expenseId, patch) =>
           updateExpense(transact, actorId, tripId, expenseId, patch),
         remove: (actorId, tripId, expenseId) => removeExpense(transact, actorId, tripId, expenseId),
-        finish: (actorId, tripId, deviceAt) =>
-          finishTrip(tripData.trips, actorId, tripId, deviceAt),
+        finish: (actorId, tripId, deviceAt, deviceDay) =>
+          finishTrip(tripData.trips, actorId, tripId, deviceAt, deviceDay),
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
         removeTrip: (actorId, tripId) => removeTrip(tripData.trips, actorId, tripId),
         restoreTrip: (actorId, tripId, body) => restoreTrip(tripData, actorId, tripId, body),

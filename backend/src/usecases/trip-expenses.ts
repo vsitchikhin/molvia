@@ -1,4 +1,4 @@
-import { DomainError, ERROR, isDeviceTime, toSearchKey } from '@molvia/model'
+import { DomainError, ERROR, isDeviceDay, isDeviceTime, toSearchKey } from '@molvia/model'
 import type { AddExpenseBody, ExpensePatch, Money, Trip, TripView } from '@molvia/model'
 import type { TripRepository } from '@/db/trips-repository'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
@@ -146,12 +146,16 @@ export async function finishTrip(
   actorId: string,
   tripId: string,
   deviceAt?: Date,
+  deviceDay?: string,
 ): Promise<void> {
   // Both ends of the window are judged here, where the clock is, and neither is a refusal
   // (Р-33): the queue never retries a refusal, so a trip nobody can close is worse than one
   // timed by the server — and that holds for a clock that fell back exactly as it does for one
   // that ran ahead. A battery that died is the ordinary way a clock reaches 1970 (В2, Г1).
-  const believable = deviceAt && isDeviceTime(deviceAt, new Date()) ? deviceAt : undefined
-  const trip = await trips.finish(tripId, actorId, undefined, believable)
+  const now = new Date()
+  const believable = deviceAt && isDeviceTime(deviceAt, now) ? deviceAt : undefined
+  // The phone's day of the tap (MOL-121) by the same measure: past the latest day on Earth, dropped.
+  const day = deviceDay && isDeviceDay(deviceDay, now) ? deviceDay : undefined
+  const trip = await trips.finish(tripId, actorId, undefined, believable, day)
   if (!trip) throw new DomainError(ERROR.NOT_FOUND)
 }

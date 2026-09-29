@@ -50,6 +50,23 @@ The detail behind the trip lines of `CLAUDE.md`.
 
 ## Removing a trip
 
+- **A start and a finish carry the phone's day of their tap** (MOL-121): `startedOn` and `finishedOn`,
+  **taken at the tap** and kept with the write (`tapDay`, `finishDay` of a «Вернуть»), since worked
+  out when sent a start tapped at 23:30 in Yerevan and sent after a flight east was the next day
+  (adversarial round 4 Ф). A write queued by an earlier build has none and gets it from the moment
+  it keeps (`startedAt`, `finishedOnDeviceAt`); the kept days sit beside the bodies, which an
+  earlier build reads strictly. **A server that refuses the day** — an API rolled back to a build
+  before MOL-121 — gets the write again without it (`refusedDay`, adversarial round 4 Х): the day
+  is the one thing lost, never the start or the finish. The server keeps the first, as it keeps
+  the first moment, and **drops a day it cannot believe rather than refuse it** — before 2000 or past
+  the latest on Earth, or no calendar day at all (`isDeviceDay`): the body takes any short string,
+  since a clock at 1970 — a dead battery — sends 1970's day beside its moment, one in year 1 or past
+  9999 a day no calendar check passes, and a refused start or finish is set aside for good (Р-33,
+  adversarial rounds 2 П and 3 С). The phone sends nothing the wire cannot carry — a moment past
+  9999, a day of five digits — and the history on the phone keeps such a trip in memory rather than
+  fail the write it came with. **A trip's rate is snapshotted on the day it is dated by** — the tap
+  of «Начать», within a day of the server's (Ж1), else the request's today (review Т-7): a start
+  the queue sent after midnight takes the wallet of the evening it was tapped in.
 - **A removed trip is marked, by the money rule (MOL-76).** `DELETE /trips/:id` sets
   `trips.deleted_at`; «Вернуть» (`POST /trips/:id/restore`) is there for ten minutes
   (`TRIP_UNDO_MINUTES`), and then the minute timer deletes the trip with its purchases. A trip is

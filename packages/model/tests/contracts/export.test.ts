@@ -57,6 +57,8 @@ const file: ExportFile = {
       startedAt: at,
       finishedAt: null,
       finishedOnDeviceAt: null,
+      startedOn: '2026-09-18',
+      finishedOn: null,
       accountId: id(6),
       debited: money(520_000n, 'AMD'),
       accountSetAt: at,

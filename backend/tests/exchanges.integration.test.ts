@@ -1,11 +1,24 @@
 import { randomUUID } from 'node:crypto'
+import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { ERROR, exchangesResponseCodec, parseRate, tripViewCodec, yerevanDate } from '@molvia/model'
+import {
+  ERROR,
+  exchangeBodySchema,
+  exchangesResponseCodec,
+  incomeBodySchema,
+  latestDay,
+  parseRate,
+  tripViewCodec,
+  yerevanDate,
+} from '@molvia/model'
 import type { CachedRate, ExchangesResponse } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
-import { exchangeRevisions, exchanges, expenses } from '@/db/schema'
+import { actors, exchangeRevisions, exchanges, expenses } from '@/db/schema'
+import { tripRepositories } from '@/db/unit-of-work'
 import { buildServer } from '@/server'
+import { exchangesOverview, recordExchange } from '@/usecases/exchanges'
+import { recordIncome } from '@/usecases/incomes'
 import { connectDrizzle } from './db'
 import {
   clearAll,
@@ -185,14 +198,15 @@ describe('«Обмен денег» через API (MOL-40)', () => {
     expect(corrected.json()).toEqual({ code: ERROR.CONFLICT })
   })
 
-  it('завтрашний день — отказ; сегодняшний — можно', async () => {
+  // The day is the phone's (MOL-121): one Yerevan has not reached is taken while it has come
+  // somewhere, and refused only past the latest day on Earth.
+  it('день, который ещё нигде не наступил, — отказ; сегодняшний где-то на Земле — можно', async () => {
     const { cookie } = await owner()
-    const tomorrow = yerevanDate(new Date(Date.now() + 24 * 60 * 60 * 1000))
     const future = await app.inject({
       method: 'POST',
       url: '/exchanges',
       headers: { cookie },
-      payload: payload({ exchangedOn: tomorrow }),
+      payload: payload({ exchangedOn: latestDay(new Date(Date.now() + 24 * 60 * 60 * 1000)) }),
     })
     expect(future.statusCode).toBe(400)
     expect(future.json()).toEqual({ code: ERROR.EXCHANGE_IN_FUTURE })
@@ -204,6 +218,14 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       payload: payload({ exchangedOn: today }),
     })
     expect(now.statusCode).toBe(201)
+
+    const east = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload({ exchangedOn: latestDay(new Date()) }),
+    })
+    expect(east.statusCode).toBe(201)
   })
 
   it('тело чужого формата — 400 до записи', async () => {
@@ -1131,5 +1153,169 @@ describe('правка обмена с историей (MOL-42)', () => {
       payload: { ...body, note: 'обменник' },
     })
     expect(other.statusCode).toBe(409)
+  })
+})
+
+// The phone's day (MOL-121, adversarial О, round 2): «today» of the wallet is the phone's. 16:00
+// UTC is 20:00 on the 10th in Yerevan and 01:00 on the 11th in Tokyo.
+describe('обмен дня, до которого Ереван не дошёл (MOL-121)', () => {
+  const instant = new Date('2026-09-10T16:00:00Z')
+  const tokyo = '2026-09-11'
+
+  async function actorOf(id: string, today?: string) {
+    const [actor] = await db.select().from(actors).where(eq(actors.id, id))
+    if (!actor) throw new Error('no actor')
+    return today === undefined ? actor : { ...actor, today }
+  }
+
+  async function exchangeAt(
+    me: string,
+    exchangedOn: string,
+    received: string,
+    at: Date,
+    held?: string,
+  ) {
+    const body = exchangeBodySchema.parse({
+      id: randomUUID(),
+      given: { amount: '10000', currency: 'RUB' },
+      received: { amount: received, currency: 'AMD' },
+      exchangedOn,
+      ...(held === undefined ? {} : { heldBefore: { amount: held, currency: 'AMD' } }),
+    })
+    const actor = await actorOf(me, exchangedOn)
+    const { created } = await recordExchange(tripRepositories(db), actor, body, at)
+    expect(created).toBe(true)
+  }
+
+  it('первый обмен ночи — в кошельке телефона и дал цену; второй спрашивают, и кошелёк взвешен', async () => {
+    const me = await insertActor(db)
+    await exchangeAt(me, '2026-09-05', '43000', new Date('2026-09-05T08:00:00Z'))
+    await exchangeAt(me, tokyo, '45000', instant, '20000')
+
+    const onScreen = await exchangesOverview(
+      tripRepositories(db),
+      await actorOf(me, tokyo),
+      instant,
+    )
+    expect(onScreen.receipts.find((receipt) => receipt.on === tokyo)?.priced).toBe(true)
+    expect(onScreen.wallet?.basis).toBe('weighted')
+    // The same instant asked from Yerevan: the 11th has not come, and its wallet is the 5th alone.
+    const inYerevan = await exchangesOverview(tripRepositories(db), await actorOf(me), instant)
+    expect(inYerevan.wallet?.rate.scaled).toBe(parseRate('4.3'))
+
+    await exchangeAt(me, tokyo, '46000', instant, '65000')
+    const later = await exchangesOverview(tripRepositories(db), await actorOf(me, tokyo), instant)
+    expect(later.wallet?.basis).toBe('weighted')
+    expect(later.wallet?.rate.scaled).not.toBe(parseRate('4.6'))
+  })
+})
+
+// Where the phone's days begin and end (adversarial round 4 У, Ч): a moment the server stamped — an
+// exchange written, the currency of conversion changed — is a day in the phone's zone, beside the
+// days the phone names.
+describe('границы дня — в поясе телефона (MOL-121)', () => {
+  const minutes = (at: Date, by: number) => new Date(at.getTime() + by * 60_000)
+
+  async function asking(id: string, at: Date, zone: string) {
+    const [actor] = await db.select().from(actors).where(eq(actors.id, id))
+    if (!actor) throw new Error('no actor')
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: zone }).format(at)
+    return { ...actor, today, zone }
+  }
+
+  /** 5 000 ֏ bought at `boughtAt`, then 10 000 ₽ → 50 000 ֏ with 20 000 ֏ held, dated `on`. */
+  async function hintAfter(boughtAt: Date, writtenAt: Date, on: string, zone: string) {
+    const me = await insertActor(db)
+    const trip = await insertTrip(db, {
+      actorId: me,
+      placeId: await insertPlace(db, { name: `Лавка ${randomUUID()}` }),
+      startedAt: minutes(boughtAt, -10),
+    })
+    await db.insert(expenses).values({
+      id: randomUUID(),
+      tripId: trip,
+      itemId: await insertItem(db),
+      amountMinor: 500_000n,
+      amountCurrency: 'AMD',
+      createdAt: boughtAt,
+    })
+    const id = randomUUID()
+    await recordExchange(
+      tripRepositories(db),
+      await asking(me, writtenAt, zone),
+      exchangeBodySchema.parse({
+        id,
+        given: { amount: '10000', currency: 'RUB' },
+        received: { amount: '50000', currency: 'AMD' },
+        exchangedOn: on,
+        heldBefore: { amount: '20000', currency: 'AMD' },
+      }),
+      writtenAt,
+    )
+    await db
+      .update(exchanges)
+      .set({ createdAt: writtenAt })
+      .where(and(eq(exchanges.id, id), eq(exchanges.actorId, me)))
+    const later = minutes(writtenAt, 10)
+    const overview = await exchangesOverview(
+      tripRepositories(db),
+      await asking(me, later, zone),
+      later,
+    )
+    return overview.heldEstimates.find((estimate) => estimate.held.currency === 'AMD')?.held.minor
+  }
+
+  it('Москва, 23:30: покупка до обмена того же дня не вычитается второй раз (У1)', async () => {
+    const hint = await hintAfter(
+      new Date('2026-08-31T20:10:00Z'),
+      new Date('2026-08-31T20:30:00Z'),
+      '2026-08-31',
+      'Europe/Moscow',
+    )
+    expect(hint).toBe(7_000_000n)
+  })
+
+  it('Токио, 01:00: вчерашний обмен — купленное после его полуночи вычтено (У2)', async () => {
+    const hint = await hintAfter(
+      new Date('2026-09-10T15:30:00Z'),
+      new Date('2026-09-10T16:00:00Z'),
+      '2026-09-10',
+      'Asia/Tokyo',
+    )
+    expect(hint).toBe(6_500_000n)
+  })
+
+  it('Москва, 23:30: доход сразу после смены валюты пересчёта — уже новый счёт (Ч1)', async () => {
+    const changed = new Date('2026-08-31T20:30:00Z')
+    const me = await insertActor(db, { incomeCurrency: 'USD', incomeCurrencySince: changed })
+    await rates.upsert([
+      {
+        provider: 'cba',
+        currency: 'USD',
+        date: '2026-08-31',
+        scaled: parseRate('386.5'),
+        jump: false,
+      },
+    ])
+    const written = minutes(changed, 10)
+    await recordIncome(
+      tripRepositories(db),
+      await asking(me, written, 'Europe/Moscow'),
+      incomeBodySchema.parse({
+        id: randomUUID(),
+        amount: { amount: '200000', currency: 'AMD' },
+        receivedOn: '2026-08-31',
+        source: 'salary',
+      }),
+      written,
+    )
+    const read = minutes(changed, 20)
+    const overview = await exchangesOverview(
+      tripRepositories(db),
+      await asking(me, read, 'Europe/Moscow'),
+      read,
+    )
+    expect(overview.walletUnknown).toBeNull()
+    expect(overview.wallet).toMatchObject({ basis: 'income', estimated: true })
   })
 })

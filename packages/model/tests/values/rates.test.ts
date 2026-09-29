@@ -6,17 +6,23 @@ import { money } from '#model/values/money'
 import {
   OFFICIAL_RATE_FRESH_DAYS,
   RATE_SCALE,
+  dayIn,
   decimalFromRate,
+  earliestDay,
   exchangeRateSchema,
   formatRate,
   formatRateBeside,
   isRateDay,
   isRateFresh,
   isRateJump,
+  isTimeZone,
+  latestDay,
+  midnightIn,
   parseRate,
   pickOfficialRate,
   rateCodec,
   rateFromAmd,
+  todayFrom,
   readingOf,
   uprightOf,
   yerevanDate,
@@ -154,6 +160,58 @@ describe('yerevanDate and yerevanMidnight', () => {
   it('starts a Yerevan day at 20:00 UTC of the day before', () => {
     expect(yerevanMidnight('2026-09-18').toISOString()).toBe('2026-09-17T20:00:00.000Z')
     expect(yerevanDate(yerevanMidnight('2026-09-18'))).toBe('2026-09-18')
+  })
+})
+
+describe('latestDay', () => {
+  it('turns the day at 10:00 UTC, which is midnight at UTC+14', () => {
+    expect(latestDay(new Date('2026-09-18T09:59:59.999Z'))).toBe('2026-09-18')
+    expect(latestDay(new Date('2026-09-18T10:00:00.000Z'))).toBe('2026-09-19')
+  })
+
+  it('is Yerevan’s tomorrow at most, never the day after', () => {
+    // 23:59 in Yerevan: the latest day is the next, and not one more.
+    const lastMinute = new Date('2026-09-18T19:59:00.000Z')
+    expect(yerevanDate(lastMinute)).toBe('2026-09-18')
+    expect(latestDay(lastMinute)).toBe('2026-09-19')
+    // Before 14:00 in Yerevan the two agree; from 14:00 to its midnight it is tomorrow somewhere.
+    const evening = new Date('2026-09-18T12:00:00.000Z')
+    expect(latestDay(evening)).toBe('2026-09-19')
+    const morning = new Date('2026-09-18T06:00:00.000Z')
+    expect(latestDay(morning)).toBe(yerevanDate(morning))
+  })
+})
+
+describe('earliestDay', () => {
+  it('turns the day at 12:00 UTC, which is midnight at UTC−12 — Yerevan’s yesterday at most', () => {
+    expect(earliestDay(new Date('2026-09-18T11:59:59.999Z'))).toBe('2026-09-17')
+    expect(earliestDay(new Date('2026-09-18T12:00:00.000Z'))).toBe('2026-09-18')
+    // 23:59 in Yerevan on the 18th: the earliest day is its own, the latest the next.
+    const lastMinute = new Date('2026-09-18T19:59:00.000Z')
+    expect(earliestDay(lastMinute)).toBe('2026-09-18')
+    expect(latestDay(lastMinute)).toBe('2026-09-19')
+  })
+})
+
+describe('todayFrom (MOL-121)', () => {
+  // 20:30 UTC on the 28th: the 28th west of Yerevan, the 29th there; the earliest day on Earth is the
+  // 28th, the latest the 29th.
+  const instant = new Date('2026-09-28T20:30:00Z')
+
+  it('takes the phone’s day while it is today somewhere', () => {
+    expect(todayFrom('2026-09-28', instant)).toBe('2026-09-28')
+    expect(todayFrom('2026-09-29', instant)).toBe('2026-09-29')
+  })
+
+  it('brings a wrong clock to the nearest day that is today somewhere', () => {
+    expect(todayFrom('2026-09-20', instant)).toBe('2026-09-28')
+    expect(todayFrom('2027-01-01', instant)).toBe('2026-09-29')
+  })
+
+  it('without a day — the bot, an old page, rubbish — counts by Yerevan’s', () => {
+    for (const sent of [undefined, '', 'today', '2026-9-28', '2026-02-31', ' 2026-09-28']) {
+      expect(todayFrom(sent, instant)).toBe('2026-09-29')
+    }
   })
 })
 
@@ -542,5 +600,40 @@ describe('formatRate', () => {
 
   it('лишние знаки снимка на экран не выносит', () => {
     expect(formatRate(of('4.821234')).replaceAll('\u00a0', ' ')).toBe('4,82 ֏/₽')
+  })
+})
+
+describe('dayIn and midnightIn (MOL-121, adversarial round 4)', () => {
+  it('names the day of a moment in the phone’s zone, Yerevan’s without one', () => {
+    const at = new Date('2026-08-31T20:30:00Z')
+    expect(dayIn(at, 'Europe/Moscow')).toBe('2026-08-31')
+    expect(dayIn(at, 'Asia/Tokyo')).toBe('2026-09-01')
+    expect(dayIn(at)).toBe('2026-09-01')
+  })
+
+  it('finds where a day begins, summer time included', () => {
+    expect(midnightIn('2026-08-31', 'Europe/Moscow').toISOString()).toBe('2026-08-30T21:00:00.000Z')
+    expect(midnightIn('2026-09-11', 'Asia/Tokyo').toISOString()).toBe('2026-09-10T15:00:00.000Z')
+    expect(midnightIn('2026-09-11').toISOString()).toBe('2026-09-10T20:00:00.000Z')
+    // New York: summer time ends on 1 November 2026 at 02:00 — that day begins at −4, the next at −5.
+    expect(midnightIn('2026-11-01', 'America/New_York').toISOString()).toBe(
+      '2026-11-01T04:00:00.000Z',
+    )
+    expect(midnightIn('2026-11-02', 'America/New_York').toISOString()).toBe(
+      '2026-11-02T05:00:00.000Z',
+    )
+    expect(midnightIn('2026-03-08', 'America/New_York').toISOString()).toBe(
+      '2026-03-08T05:00:00.000Z',
+    )
+    expect(midnightIn('2026-03-09', 'America/New_York').toISOString()).toBe(
+      '2026-03-09T04:00:00.000Z',
+    )
+  })
+
+  it('knows a zone by its name only', () => {
+    expect(isTimeZone('Europe/Moscow')).toBe(true)
+    for (const zone of ['', 'Mars/Olympus', '+03:00', 'Europe/Moscow'.repeat(8)]) {
+      expect(isTimeZone(zone)).toBe(false)
+    }
   })
 })

@@ -1,7 +1,7 @@
 <template>
   <AppCard as="article" class="card">
     <OperationCardHead
-      :day="day"
+      :day="head"
       :amended="income.amendedAt ? t('income.amended', { date: dayOf(income.amendedAt) }) : null"
       :remove-label="t('income.remove', { amount })"
       :disabled="disabled"
@@ -39,7 +39,7 @@ import type { IncomeView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import OperationCardHead from '@/components/OperationCardHead.vue'
 import { asTyped } from '@/components/spending'
-import { calendarDay, purchaseDay } from '@/days'
+import { calendarDay, dayWords, purchaseDay } from '@/days'
 import { useAccountsStore } from '@/stores/accounts'
 
 /**
@@ -51,6 +51,8 @@ export default defineComponent({
   components: { AppCard, IconNote, OperationCardHead },
   props: {
     income: { type: Object as PropType<IncomeView>, required: true },
+    /** The phone's today, held by the screen and asked again when it comes back (adversarial Н). */
+    today: { type: String, required: true },
     disabled: { type: Boolean, default: false },
   },
   emits: {
@@ -71,11 +73,13 @@ export default defineComponent({
             null)
           : null,
       ),
-      // A calendar day of Yerevan, never the moment of its midnight: west of UTC+4 an income of
+      // A calendar day, never the moment of Yerevan's midnight: west of UTC+4 an income of
       // 1 September read «31 авг.» (adversarial Ж). «исправлен» is a moment, and stays one.
       day: computed(() =>
         calendarDay(props.income.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
       ),
+      // «Сегодня», «Вчера» by the phone's today (MOL-121, В-1); the button says the date.
+      head: computed(() => dayWords(props.income.receivedOn, locale.value, props.today)),
       // As it was typed, as everywhere in «Деньги» (owner's decision В-1).
       amount: computed(() => asTyped(props.income.amount, locale.value)),
     }

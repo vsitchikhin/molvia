@@ -19,6 +19,9 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   match the migrations after a branch switch, with no hand-kept list of tables. Not the
   `_test` database, because that one is never cleaned between runs — its tests own their
   rows — and `pre-push` runs both suites back to back.
+- **The browser is in `Asia/Yerevan`** (`timezoneId`, MOL-121): the app dates by the phone's
+  calendar and the specs by Yerevan's, and in CI's UTC the two parted from 20:00 to midnight. A
+  phone in another zone is the component tests' — they run in UTC.
 - **The run also has its own ports** (`E2E_API_PORT`, `E2E_PWA_PORT` — the neighbouring port
   in this copy's band). A database alone would not have closed it: `reuseExistingServer`
   handed the suite the dev API whenever `make dev` was up, so no `DATABASE_URL` of ours

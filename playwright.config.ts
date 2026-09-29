@@ -73,7 +73,16 @@ export default defineConfig({
   // it is recorded for every test and dropped when it passes — measured at 12–22 % of a full run
   // (four pairs, 26.09.2026, ~66 s against ~59 s). And an overload that times a test out can
   // still lose it: it is saved while the context is torn down, which shares the test's timeout.
-  use: { baseURL, trace: ci ? 'on-first-retry' : 'retain-on-failure', locale: 'en-US' },
+  //
+  // The phone is in Armenia (MOL-121): the app dates by the phone's calendar and the specs by
+  // Yerevan's, and in CI's UTC the two part from 20:00 to midnight. The component tests run in UTC
+  // and hold the phone's day where it is not Yerevan's.
+  use: {
+    baseURL,
+    trace: ci ? 'on-first-retry' : 'retain-on-failure',
+    locale: 'en-US',
+    timezoneId: 'Asia/Yerevan',
+  },
 
   // A phone: that is the device the product is designed for, so a desktop-only pass would prove
   // nothing about the screen that matters. The other projects are the same phone: with a camera,

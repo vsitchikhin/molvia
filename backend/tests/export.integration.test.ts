@@ -177,6 +177,8 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     startedAt: at(3),
     finishedAt: at(8),
     finishedOnDeviceAt: at(7),
+    startedOn: '2026-09-20',
+    finishedOn: '2026-09-20',
     accountId: cash,
     debitedMinor: 52_000n,
     debitedCurrency: 'AMD',
@@ -370,6 +372,8 @@ describe('состав экспорта — один источник правд
       '4.900000',
     ])
     expect(trip?.finishedOnDeviceAt).toBe('2026-09-20T10:07:00.000Z')
+    expect(trip?.startedOn).toBe('2026-09-20')
+    expect(trip?.finishedOn).toBe('2026-09-20')
     expect(trip?.finishedAt).toBe('2026-09-20T10:08:00.000Z')
     expect(wire.exchanges[0]?.heldBefore).toEqual({ amount: '1000.00', currency: 'AMD' })
     expect(wire.spendings[0]?.debited).toEqual({ amount: '2400.00', currency: 'AMD' })

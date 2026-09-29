@@ -132,7 +132,6 @@ import {
   incomeSourceSchema,
   isRateDay,
   parseMoney,
-  yerevanDate,
 } from '@molvia/model'
 import type {
   Currency,
@@ -153,7 +152,7 @@ import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
 import { useAccountChoice } from '@/composables/useAccountChoice'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, purchaseDay } from '@/days'
+import { calendarDay, localDay, purchaseDay } from '@/days'
 import { newId } from '@/ids'
 import type { IncomeDraft } from '@/composables/useIncomes'
 import { useAccountsStore } from '@/stores/accounts'
@@ -212,7 +211,7 @@ export default defineComponent({
     const source = ref<IncomeSource | ''>('')
     const amountError = ref<ErrorCode | null>(null)
     const sourceMissing = ref(false)
-    const today = ref(yerevanDate(new Date()))
+    const today = ref(localDay())
     const day = ref(today.value)
     const held = ref('')
     const note = ref('')
@@ -245,7 +244,7 @@ export default defineComponent({
         source.value = editing?.source ?? draft?.source ?? ''
         amountError.value = null
         sourceMissing.value = false
-        today.value = yerevanDate(new Date())
+        today.value = localDay()
         day.value = editing?.receivedOn ?? draft?.receivedOn ?? today.value
         held.value = editing?.heldBefore ? typed(editing.heldBefore) : ''
         note.value = editing?.note ?? draft?.note ?? ''

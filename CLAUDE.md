@@ -226,7 +226,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Removal is a mark, «Вернуть», final after ten minutes by the minute timer.**
 - **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`); a write a send
   has begun on is never folded into; a spending in the queue is a row, never a figure.
-- **Days of Yerevan are printed as calendar days** (`calendarDay`); the frontend's tests run in UTC.
+- **A day is printed as a calendar day** (`calendarDay`), and **«сегодня» is the phone's**
+  (`localDay`, MOL-121), on the server too: every request names it (`TODAY_HEADER`) and its zone
+  (`ZONE_HEADER`), and every «today» of money and every day of a moment the server stamped is
+  counted by them; a write is «in the future» only past `latestDay`; a trip keeps
+  the phone's day of its taps. The frontend's tests run in UTC.
 - **A bar of «Графики» is the month of «Деньги»** (MOL-74): `countMonth` with `monthRate`, never a
   second count; its third figure is «Разница», since «Остаток» is the money on the accounts.
 

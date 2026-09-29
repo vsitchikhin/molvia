@@ -4,6 +4,7 @@ import {
   ERROR,
   exchangesResponseCodec,
   incomesResponseCodec,
+  latestDay,
   money,
   parseRate,
   tripViewCodec,
@@ -114,15 +115,22 @@ describe('«Доходы» через API (MOL-66)', () => {
     expect(other.json()).toEqual({ code: ERROR.CONFLICT })
   })
 
-  it('день после сегодняшнего — отказ своим кодом, сегодня — можно', async () => {
+  it('день, который ещё нигде не наступил, — отказ своим кодом, сегодня — можно (MOL-121)', async () => {
     const me = await owner()
-    const tomorrow = yerevanDate(new Date(Date.now() + 24 * 60 * 60 * 1000))
-    const future = await call(me, 'POST', '/incomes', payload({ receivedOn: tomorrow }))
+    const future = await call(
+      me,
+      'POST',
+      '/incomes',
+      payload({ receivedOn: latestDay(new Date(Date.now() + 24 * 60 * 60 * 1000)) }),
+    )
     expect(future.statusCode).toBe(400)
     expect(future.json()).toEqual({ code: ERROR.INCOME_IN_FUTURE })
     expect((await call(me, 'POST', '/incomes', payload({ receivedOn: today }))).statusCode).toBe(
       201,
     )
+    // A phone east of Yerevan after its midnight: a day Yerevan has not reached, come somewhere.
+    const east = await call(me, 'POST', '/incomes', payload({ receivedOn: latestDay(new Date()) }))
+    expect(east.statusCode).toBe(201)
   })
 
   it('источник обязателен и из списка; лишнее поле — отказ', async () => {

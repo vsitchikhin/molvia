@@ -14,7 +14,6 @@ import {
   tripViewCodec,
 } from '@molvia/model'
 import type {
-  Actor,
   TripHistory,
   TripHistoryCursor,
   AddExpenseBody,
@@ -25,11 +24,12 @@ import type {
   TripView,
 } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
+import type { Asking } from './actor'
 import { parseBody, parseQuery, resourceId } from '@/parse'
 
 export interface TripsApi {
   /** The use cases, already bound to their repositories by the composition point. */
-  start(actor: Actor, body: StartTripBody): Promise<{ trip: TripView; created: boolean }>
+  start(actor: Asking, body: StartTripBody): Promise<{ trip: TripView; created: boolean }>
   current(actorId: string): Promise<TripView | null>
   selected(actorId: string, id: string): Promise<TripView>
   history(actorId: string, cursor?: TripHistoryCursor): Promise<TripHistory>
@@ -40,7 +40,7 @@ export interface TripsApi {
   ): Promise<{ trip: TripView; created: boolean }>
   update(actorId: string, tripId: string, expenseId: string, patch: ExpensePatch): Promise<TripView>
   remove(actorId: string, tripId: string, expenseId: string): Promise<TripView>
-  finish(actorId: string, tripId: string, deviceAt?: Date): Promise<void>
+  finish(actorId: string, tripId: string, deviceAt?: Date, deviceDay?: string): Promise<void>
   chooseRate(actorId: string, tripId: string, body: RateChoiceBody): Promise<TripView>
   removeTrip(actorId: string, tripId: string): Promise<void>
   restoreTrip(actorId: string, tripId: string, body: RestoreTripBody): Promise<TripView>
@@ -83,7 +83,12 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
     const actor = request.actor
     if (!actor) throw new DomainError(ERROR.NO_ACTOR)
 
-    const { trip, created } = await api.start(actor, body)
+    const asking = {
+      ...actor,
+      today: request.today,
+      ...(request.zone ? { zone: request.zone } : {}),
+    }
+    const { trip, created } = await api.start(asking, body)
     return answer(reply.code(created ? 201 : 200), trip)
   })
 
@@ -147,7 +152,7 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
   app.post<{ Params: TripParams }>('/trips/:tripId/finish', async (request, reply) => {
     const id = resourceId(request.params.tripId)
     const body = parseBody(finishTripBodySchema, request.body ?? {})
-    await api.finish(request.actorId, id, body.finishedOnDeviceAt)
+    await api.finish(request.actorId, id, body.finishedOnDeviceAt, body.finishedOn)
     return reply.code(204).header('cache-control', 'no-store').send()
   })
 

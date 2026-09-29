@@ -91,7 +91,7 @@
             {{
               t('exchange.base_since', {
                 base: pairSigns(overview.pair).base,
-                date: dayOf(midnightOf(overview.baseSince)),
+                date: day(overview.baseSince),
               })
             }}
           </p>
@@ -130,6 +130,7 @@
             <li v-for="exchange in overview.exchanges" :key="exchange.id">
               <ExchangeCard
                 :exchange="exchange"
+                :today="today"
                 :disabled="!online || busy"
                 @edit="edit"
                 @remove="ask"
@@ -177,7 +178,7 @@
 <script lang="ts">
 import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { currencySign, yerevanDate, yerevanMidnight } from '@molvia/model'
+import { currencySign, yerevanDate } from '@molvia/model'
 import type {
   Currency,
   CurrencyCost,
@@ -206,6 +207,7 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExchangeWords } from '@/composables/useExchangeWords'
 import { useExchanges } from '@/composables/useExchanges'
 import type { AmendOutcome } from '@/composables/useExchanges'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 
 /**
@@ -236,6 +238,8 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const exchanges = useExchanges()
     const { rateOf, day, amountsOf, rateLineOf } = useExchangeWords()
+    // «Сегодня» of the cards, asked again when the app comes back into view (MOL-121, adversarial Н).
+    const today = useLocalDay()
     const sheetOpen = ref(false)
     // The exchange the sheet amends, or null when it records a new one.
     const editing = ref<Row | null>(null)
@@ -322,7 +326,6 @@ export default defineComponent({
 
     // The day a rate is dated by, as a calendar day of Yerevan (adversarial Ж).
     const dayOf = (when: Date): string => day(yerevanDate(when))
-    const midnightOf = (day: string): Date => yerevanMidnight(day)
     const pairSigns = (pair: { base: Currency; quote: Currency }) => ({
       base: currencySign(pair.base, locale.value),
       quote: currencySign(pair.quote, locale.value),
@@ -339,7 +342,7 @@ export default defineComponent({
       unknown: NonNullable<ExchangesResponse['walletUnknown']>,
       pair: NonNullable<ExchangesResponse['pair']>,
     ): string {
-      const words = { ...pairSigns(pair), date: dayOf(midnightOf(unknown.on)) }
+      const words = { ...pairSigns(pair), date: day(unknown.on) }
       const old = unknown.reason === 'oldReckoning'
       if (unknown.given === null) {
         return t(
@@ -384,6 +387,7 @@ export default defineComponent({
     return {
       t,
       ...exchanges,
+      today,
       sheetOpen,
       editing,
       compose,
@@ -399,7 +403,7 @@ export default defineComponent({
       preferenceOptions,
       rateOf,
       dayOf,
-      midnightOf,
+      day,
       currencySignOf: (currency: Currency) => currencySign(currency, locale.value),
       pairSigns,
       costLineOf,

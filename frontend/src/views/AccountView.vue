@@ -155,7 +155,6 @@ import IconArchive from '~icons/mdi/archive-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconScale from '~icons/mdi/scale-balance'
 import IconUndo from '~icons/mdi/undo-variant'
-import { yerevanDate } from '@molvia/model'
 import type { AccountOperationView, Money } from '@molvia/model'
 import { api } from '@/api'
 import AccountSheet from '@/components/AccountSheet.vue'
@@ -174,6 +173,7 @@ import { countedWhen, shortDay, signedAmount } from '@/components/accounts'
 import type { Removed } from '@/components/spending'
 import { useAccountJournal } from '@/composables/useAccountJournal'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useOwnCategories } from '@/composables/useOwnCategories'
 import { useReconnect } from '@/composables/useReconnect'
 import { calendarDay, shiftDay } from '@/days'
@@ -299,11 +299,12 @@ export default defineComponent({
       return list
     })
 
+    // The phone's today, asked again when the app comes back into view (MOL-121, adversarial Н).
+    const today = useLocalDay()
     function dayTitle(day: string): string {
-      const today = yerevanDate(new Date())
       const date = calendarDay(day, locale.value)
-      if (day === today) return t('spending.day_today', { date })
-      if (day === shiftDay(today, -1)) return t('spending.day_yesterday', { date })
+      if (day === today.value) return t('spending.day_today', { date })
+      if (day === shiftDay(today.value, -1)) return t('spending.day_yesterday', { date })
       const text = calendarDay(day, locale.value, {
         weekday: 'short',
         day: 'numeric',

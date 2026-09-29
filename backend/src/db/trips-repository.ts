@@ -45,7 +45,11 @@ export interface TripSnapshot {
 }
 
 /** A trip to start, named by the device that starts it (MOL-21, В-2). */
-export type TripToStart = NewTrip & { readonly id: string }
+export type TripToStart = NewTrip & {
+  readonly id: string
+  /** The phone's today at the tap (MOL-121), already judged; none from an old queue. */
+  readonly startedOn?: string | null
+}
 
 export interface TripRepository {
   /**
@@ -105,7 +109,13 @@ export interface TripRepository {
    * Finishing twice moves nothing (MOL-21): a repeat from a queue is not a later finish, and
    * the moment a trip ended is a fact. The trip comes back as it was.
    */
-  finish(id: string, actorId: string, at?: Date, deviceAt?: Date): Promise<Trip | null>
+  finish(
+    id: string,
+    actorId: string,
+    at?: Date,
+    deviceAt?: Date,
+    deviceDay?: string,
+  ): Promise<Trip | null>
   /**
    * Which rate a trip counts by, when its snapshot jumped (MOL-39, Р-19, Р-21), and the
    * person's own when that is the choice. The snapshot is not rewritten. Whether the choice is
@@ -129,7 +139,11 @@ export interface TripRepository {
    * two open trips is the state `start` exists to refuse (Р-4) — unless it comes back finished
    * (`finish`, round 3 В1), which is one statement, so no moment holds two open trips.
    */
-  restore(id: string, actorId: string, finish?: { deviceAt?: Date }): Promise<Trip | null>
+  restore(
+    id: string,
+    actorId: string,
+    finish?: { deviceAt?: Date; deviceDay?: string },
+  ): Promise<Trip | null>
   /** The minute timer: removals past their ten minutes deleted, their purchases by cascade. */
   purgeStale(): Promise<void>
 }
@@ -267,6 +281,7 @@ export function createTripRepository(db: Conn): TripRepository {
               rateJumped: snapshot?.jumped ?? false,
               ratePreviousScaled: snapshot?.previous?.scaled ?? null,
               ratePreviousAsOf: snapshot?.previous?.asOf ?? null,
+              startedOn: input.startedOn ?? null,
             })
             .returning()
           return { trip: toTrip(theRow(row, 'trips')), created: true }
@@ -366,7 +381,7 @@ export function createTripRepository(db: Conn): TripRepository {
       }
     },
 
-    async finish(id, actorId, at, deviceAt) {
+    async finish(id, actorId, at, deviceAt, deviceDay) {
       // Someone else's trip and a trip that never existed answer the same `null`: telling
       // them apart is how an identifier gets guessed by the difference in the reply.
       //
@@ -378,7 +393,11 @@ export function createTripRepository(db: Conn): TripRepository {
 
       const [row] = await db
         .update(trips)
-        .set({ finishedAt: at ?? sql`clock_timestamp()`, finishedOnDeviceAt: deviceAt ?? null })
+        .set({
+          finishedAt: at ?? sql`clock_timestamp()`,
+          finishedOnDeviceAt: deviceAt ?? null,
+          finishedOn: deviceDay ?? null,
+        })
         .where(and(ownedBy(id, actorId), isNull(trips.finishedAt)))
         .returning()
       if (row) return toTrip(row)
@@ -460,6 +479,7 @@ export function createTripRepository(db: Conn): TripRepository {
                 ? {
                     finishedAt: sql`clock_timestamp()`,
                     finishedOnDeviceAt: finish.deviceAt ?? null,
+                    finishedOn: finish.deviceDay ?? null,
                   }
                 : {}),
             })

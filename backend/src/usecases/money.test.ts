@@ -301,19 +301,31 @@ describe('recordSpending and amendSpending (MOL-73)', () => {
     expect(written).toEqual([{ rate: null }])
   })
 
-  it("refuses tomorrow in Yerevan and a category that is not the owner's", async () => {
+  it("refuses a day that has come nowhere yet and a category that is not the owner's", async () => {
     const { repositories } = repositoriesOf({})
     await expect(
       recordSpending(
         repositories,
         owner,
-        { id: nextId(), ...body({ spentOn: '2026-09-27' }) },
+        { id: nextId(), ...body({ spentOn: '2026-09-28' }) },
         NOW,
       ),
     ).rejects.toMatchObject({ code: ERROR.SPENDING_IN_FUTURE })
     await expect(
       recordSpending(repositories, owner, { id: nextId(), ...body({ categoryId: nextId() }) }, NOW),
     ).rejects.toMatchObject({ code: ERROR.SPENDING_CATEGORY_UNKNOWN })
+  })
+
+  it('takes a day Yerevan has not reached but a phone further east has (MOL-121)', async () => {
+    // 14:00 in Yerevan is midnight at UTC+14: the 27th has come there, the 28th nowhere.
+    const { repositories, written } = repositoriesOf({})
+    await recordSpending(
+      repositories,
+      owner,
+      { id: nextId(), ...body({ amount: cash('500 AMD'), spentOn: '2026-09-27' }) },
+      NOW,
+    )
+    expect(written).toHaveLength(1)
   })
 
   it("answers «not found» for someone else's spending before looking at the body (С-2)", async () => {

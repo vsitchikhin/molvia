@@ -1,6 +1,7 @@
 import { ApiError, createClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { MolviaClient } from '@molvia/client'
+import { localDay } from '@/days'
 
 // Nothing about identity is passed in, and that is the change MOL-53 made: what proves a
 // request is the session cookie, which the browser attaches and no script can read.
@@ -14,6 +15,11 @@ const client = createClient({
   onVersion: (version) => {
     heard?.(version)
   },
+  // The phone's today on every request (MOL-121): the server counts «today» of money by it.
+  today: () => localDay(),
+  // Where the phone's days begin and end (MOL-121, adversarial round 4 У, Ч): by name, as the
+  // system says it — the server knows a named zone's summer time, never an offset's.
+  zone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
 })
 
 /** Told that the session behind this browser is gone. Registered by the actor store. */

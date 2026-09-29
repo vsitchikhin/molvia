@@ -1,7 +1,7 @@
 <template>
   <AppCard as="article" class="card">
     <OperationCardHead
-      :day="dayOf(exchange)"
+      :day="headOf(exchange)"
       :amended="
         exchange.amendedAt ? t('exchange.amended', { date: shortDay(exchange.amendedAt) }) : null
       "
@@ -63,7 +63,7 @@ import type { ExchangeView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import OperationCardHead from '@/components/OperationCardHead.vue'
 import { useExchangeWords } from '@/composables/useExchangeWords'
-import { purchaseDay } from '@/days'
+import { dayWords, purchaseDay } from '@/days'
 import { useAccountsStore } from '@/stores/accounts'
 
 /**
@@ -76,6 +76,8 @@ export default defineComponent({
   components: { AppCard, IconArrow, IconNote, OperationCardHead },
   props: {
     exchange: { type: Object as PropType<ExchangeView>, required: true },
+    /** The phone's today, held by the screen and asked again when it comes back (adversarial Н). */
+    today: { type: String, required: true },
     disabled: { type: Boolean, default: false },
   },
   emits: {
@@ -96,6 +98,8 @@ export default defineComponent({
       receivedName: computed(() => nameOf(props.exchange.receivedAccountId)),
       official: computed(() => words.officialOf(props.exchange)),
       shortDay: (when: Date) => purchaseDay(when, locale.value),
+      // «Сегодня», «Вчера» by the phone's today (MOL-121, В-1); the button and the rate say the date.
+      headOf: (exchange: ExchangeView) => dayWords(exchange.exchangedOn, locale.value, props.today),
     }
   },
 })

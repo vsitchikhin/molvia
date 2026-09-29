@@ -214,23 +214,23 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
 
   function persist(): void {
     if (!actor.id) return
-    ahead = !writeEverywhere(
-      `${KEY}.${actor.id}`,
-      toShelf({
-        page: firstPage,
-        selected: selected.value,
-        local: local.value,
-      }),
-      (past) => {
-        try {
-          const held = cacheCodec.parse(fromShelf(past))
-          held.local = held.local.filter((row) => local.value.some((now) => now.id === row.id))
-          return toShelf(held)
-        } catch {
-          return null
-        }
-      },
-    )
+    let shelf: string
+    try {
+      shelf = toShelf({ page: firstPage, selected: selected.value, local: local.value })
+    } catch {
+      // A moment no ISO date writes — a clock past 9999 — cannot go on the shelf. The cache stays in
+      // memory, and the start or finish it came with is queued all the same (MOL-121, round 3 С).
+      return
+    }
+    ahead = !writeEverywhere(`${KEY}.${actor.id}`, shelf, (past) => {
+      try {
+        const held = cacheCodec.parse(fromShelf(past))
+        held.local = held.local.filter((row) => local.value.some((now) => now.id === row.id))
+        return toShelf(held)
+      } catch {
+        return null
+      }
+    })
   }
 
   function capture(

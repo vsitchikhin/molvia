@@ -11,12 +11,12 @@ import {
   convertSigned,
   heldOn,
   journalOrder,
+  latestDay,
   movementOf,
   newestOperationsFirst,
   operationKeyOf,
   resourceIdOf,
   unassignedOperations,
-  yerevanDate,
 } from '@molvia/model'
 import type {
   AccountCheckBody,
@@ -47,9 +47,11 @@ import { tripViewFor } from './trip-view'
 import type { TripViewDeps } from './trip-view'
 import type { DayRates } from './money-rates'
 import type { TripRepositories } from '@/db/unit-of-work'
+import { todayOf } from './today'
+import type { Today } from './today'
 
 type Repositories = Pick<TripRepositories, 'moneyAccounts' | 'exchanges' | 'incomes' | 'rates'>
-type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
+type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'> & Today
 
 /** Everything an account is counted from, read once for a request. */
 interface Counting {
@@ -100,7 +102,7 @@ export async function accountsCounted(
 }
 
 async function counting(repositories: Repositories, owner: Owner, now: Date): Promise<Counting> {
-  const today = yerevanDate(now)
+  const today = todayOf(owner, now)
   const counted = await accountsCounted(repositories, owner, dayRates(repositories, owner), (all) =>
     all
       .filter((account) => account.currency !== owner.spendCurrency)
@@ -329,7 +331,7 @@ export async function addMoneyAccount(
   body: MoneyAccountBody,
   now: Date = new Date(),
 ): Promise<{ overview: MoneyAccountsResponse; created: boolean }> {
-  if (body.startOn > yerevanDate(now)) throw new DomainError(ERROR.MONEY_ACCOUNT_IN_FUTURE)
+  if (body.startOn > latestDay(now)) throw new DomainError(ERROR.MONEY_ACCOUNT_IN_FUTURE)
   const { created } = await repositories.moneyAccounts.add(owner.id, body)
   return { overview: await moneyAccountsOf(repositories, owner, now), created }
 }
@@ -342,7 +344,7 @@ export async function amendMoneyAccount(
   body: MoneyAccountAmendBody,
   now: Date = new Date(),
 ): Promise<MoneyAccountsResponse> {
-  if (body.startOn > yerevanDate(now)) throw new DomainError(ERROR.MONEY_ACCOUNT_IN_FUTURE)
+  if (body.startOn > latestDay(now)) throw new DomainError(ERROR.MONEY_ACCOUNT_IN_FUTURE)
   await repositories.moneyAccounts.amend(owner.id, id, body)
   return moneyAccountsOf(repositories, owner, now)
 }

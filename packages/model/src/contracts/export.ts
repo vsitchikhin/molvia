@@ -131,6 +131,9 @@ const tripSchema = z.strictObject({
   startedAt: isoDate,
   finishedAt: isoDate.nullable(),
   finishedOnDeviceAt: isoDate.nullable(),
+  // The phone's day of «Начать» and «Завершить» (MOL-121), where the phone named one.
+  startedOn: day.nullable(),
+  finishedOn: day.nullable(),
   accountId: z.uuid().nullable(),
   debited: signedMoneyCodec.nullable(),
   accountSetAt: isoDate.nullable(),
