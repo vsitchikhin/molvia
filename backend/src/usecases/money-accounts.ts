@@ -11,6 +11,7 @@ import {
   convertSigned,
   heldOn,
   journalOrder,
+  latestDay,
   movementOf,
   newestOperationsFirst,
   operationKeyOf,
@@ -329,7 +330,7 @@ export async function addMoneyAccount(
   body: MoneyAccountBody,
   now: Date = new Date(),
 ): Promise<{ overview: MoneyAccountsResponse; created: boolean }> {
-  if (body.startOn > yerevanDate(now)) throw new DomainError(ERROR.MONEY_ACCOUNT_IN_FUTURE)
+  if (body.startOn > latestDay(now)) throw new DomainError(ERROR.MONEY_ACCOUNT_IN_FUTURE)
   const { created } = await repositories.moneyAccounts.add(owner.id, body)
   return { overview: await moneyAccountsOf(repositories, owner, now), created }
 }
@@ -342,7 +343,7 @@ export async function amendMoneyAccount(
   body: MoneyAccountAmendBody,
   now: Date = new Date(),
 ): Promise<MoneyAccountsResponse> {
-  if (body.startOn > yerevanDate(now)) throw new DomainError(ERROR.MONEY_ACCOUNT_IN_FUTURE)
+  if (body.startOn > latestDay(now)) throw new DomainError(ERROR.MONEY_ACCOUNT_IN_FUTURE)
   await repositories.moneyAccounts.amend(owner.id, id, body)
   return moneyAccountsOf(repositories, owner, now)
 }

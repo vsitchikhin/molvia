@@ -13,6 +13,7 @@ import {
   isRateDay,
   isRateFresh,
   isRateJump,
+  latestDay,
   parseRate,
   pickOfficialRate,
   rateCodec,
@@ -154,6 +155,25 @@ describe('yerevanDate and yerevanMidnight', () => {
   it('starts a Yerevan day at 20:00 UTC of the day before', () => {
     expect(yerevanMidnight('2026-09-18').toISOString()).toBe('2026-09-17T20:00:00.000Z')
     expect(yerevanDate(yerevanMidnight('2026-09-18'))).toBe('2026-09-18')
+  })
+})
+
+describe('latestDay', () => {
+  it('turns the day at 10:00 UTC, which is midnight at UTC+14', () => {
+    expect(latestDay(new Date('2026-09-18T09:59:59.999Z'))).toBe('2026-09-18')
+    expect(latestDay(new Date('2026-09-18T10:00:00.000Z'))).toBe('2026-09-19')
+  })
+
+  it('is Yerevan’s tomorrow at most, never the day after', () => {
+    // 23:59 in Yerevan: the latest day is the next, and not one more.
+    const lastMinute = new Date('2026-09-18T19:59:00.000Z')
+    expect(yerevanDate(lastMinute)).toBe('2026-09-18')
+    expect(latestDay(lastMinute)).toBe('2026-09-19')
+    // Before 14:00 in Yerevan the two agree; from 14:00 to its midnight it is tomorrow somewhere.
+    const evening = new Date('2026-09-18T12:00:00.000Z')
+    expect(latestDay(evening)).toBe('2026-09-19')
+    const morning = new Date('2026-09-18T06:00:00.000Z')
+    expect(latestDay(morning)).toBe(yerevanDate(morning))
   })
 })
 

@@ -6,6 +6,7 @@ import {
   heldEstimate,
   isRateFresh,
   lastReceipt,
+  latestDay,
   officialDifference,
   ownRates,
   pickOfficialRate,
@@ -331,9 +332,11 @@ export async function exchangesOverview(
 }
 
 /**
- * «Записать обмен». The day is the person's to name, but not a day that has not come yet in
- * Yerevan: a rate from tomorrow would enter today's trips (the same line «not from the future»
- * draws for an official rate). 201 for a new exchange, and the screen whole either way.
+ * «Записать обмен». The day is the person's to name — their phone's (MOL-121) — but not a day that
+ * has not come yet anywhere (`latestDay`). One Yerevan has not reached waits in the list: the walk
+ * takes no link after Yerevan's today, so a rate from tomorrow never enters today's trips (the same
+ * line «not from the future» draws for an official rate). 201 for a new exchange, and the screen
+ * whole either way.
  */
 /**
  * The screen as it is on opening. A removed exchange is final from here: the screen that offered
@@ -370,7 +373,7 @@ export async function recordExchange(
   body: ExchangeBody,
   now: Date = new Date(),
 ): Promise<{ overview: ExchangesResponse; created: boolean }> {
-  if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
+  if (body.exchangedOn > latestDay(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
   const accounts = await knownAccounts(repositories, owner)
   // Left out stays left out: a repeat from a screen older than accounts is still a repeat (Р-26).
   const sent = {
@@ -400,7 +403,7 @@ export async function amendExchange(
   body: ExchangeAmendBody,
   now: Date = new Date(),
 ): Promise<ExchangesResponse> {
-  if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
+  if (body.exchangedOn > latestDay(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
   await repositories.exchanges.purgeRemoved(owner.id)
   const own = resourceIdOf(id)
   const held = (await repositories.exchanges.list(owner.id)).find((exchange) => exchange.id === own)

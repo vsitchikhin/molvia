@@ -1,4 +1,4 @@
-import { DomainError, ERROR, incomeMonths, resourceIdOf, yerevanDate } from '@molvia/model'
+import { DomainError, ERROR, incomeMonths, latestDay, resourceIdOf } from '@molvia/model'
 import type {
   Actor,
   Income,
@@ -88,8 +88,9 @@ async function dayOfIncome(
 }
 
 /**
- * «Записать доход». Not a day that has not come yet in Yerevan: money from tomorrow would enter
- * today's trips. 201 for a new income, and the screen whole either way.
+ * «Записать доход». Not a day that has not come yet anywhere (`latestDay`, MOL-121): the phone's day
+ * may be ahead of Yerevan's, and the walk leaves it out of today's trips until Yerevan gets there.
+ * 201 for a new income, and the screen whole either way.
  */
 export async function recordIncome(
   repositories: Writing,
@@ -97,7 +98,7 @@ export async function recordIncome(
   body: IncomeBody,
   now: Date = new Date(),
 ): Promise<{ overview: IncomesResponse; created: boolean }> {
-  if (body.receivedOn > yerevanDate(now)) throw new DomainError(ERROR.INCOME_IN_FUTURE)
+  if (body.receivedOn > latestDay(now)) throw new DomainError(ERROR.INCOME_IN_FUTURE)
   const accounts = await knownAccounts(repositories, owner)
   // Left out stays left out: a repeat from a screen older than accounts is still a repeat (Р-26).
   const sent =
@@ -121,7 +122,7 @@ export async function amendIncome(
   body: IncomeAmendBody,
   now: Date = new Date(),
 ): Promise<IncomesResponse> {
-  if (body.receivedOn > yerevanDate(now)) throw new DomainError(ERROR.INCOME_IN_FUTURE)
+  if (body.receivedOn > latestDay(now)) throw new DomainError(ERROR.INCOME_IN_FUTURE)
   await repositories.incomes.purgeRemoved(owner.id)
   const own = resourceIdOf(id)
   const held = (await repositories.incomes.list(owner.id)).find((income) => income.id === own)

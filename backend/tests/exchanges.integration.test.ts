@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { ERROR, exchangesResponseCodec, parseRate, tripViewCodec, yerevanDate } from '@molvia/model'
+import {
+  ERROR,
+  exchangesResponseCodec,
+  latestDay,
+  parseRate,
+  tripViewCodec,
+  yerevanDate,
+} from '@molvia/model'
 import type { CachedRate, ExchangesResponse } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
@@ -185,14 +192,15 @@ describe('«Обмен денег» через API (MOL-40)', () => {
     expect(corrected.json()).toEqual({ code: ERROR.CONFLICT })
   })
 
-  it('завтрашний день — отказ; сегодняшний — можно', async () => {
+  // The day is the phone's (MOL-121): one Yerevan has not reached is taken while it has come
+  // somewhere, and refused only past the latest day on Earth.
+  it('день, который ещё нигде не наступил, — отказ; сегодняшний где-то на Земле — можно', async () => {
     const { cookie } = await owner()
-    const tomorrow = yerevanDate(new Date(Date.now() + 24 * 60 * 60 * 1000))
     const future = await app.inject({
       method: 'POST',
       url: '/exchanges',
       headers: { cookie },
-      payload: payload({ exchangedOn: tomorrow }),
+      payload: payload({ exchangedOn: latestDay(new Date(Date.now() + 24 * 60 * 60 * 1000)) }),
     })
     expect(future.statusCode).toBe(400)
     expect(future.json()).toEqual({ code: ERROR.EXCHANGE_IN_FUTURE })
@@ -204,6 +212,14 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       payload: payload({ exchangedOn: today }),
     })
     expect(now.statusCode).toBe(201)
+
+    const east = await app.inject({
+      method: 'POST',
+      url: '/exchanges',
+      headers: { cookie },
+      payload: payload({ exchangedOn: latestDay(new Date()) }),
+    })
+    expect(east.statusCode).toBe(201)
   })
 
   it('тело чужого формата — 400 до записи', async () => {

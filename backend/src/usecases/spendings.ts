@@ -2,9 +2,9 @@ import {
   DomainError,
   ERROR,
   categoryOrder,
+  latestDay,
   spendingCategoryViewOf,
   spendingIn,
-  yerevanDate,
 } from '@molvia/model'
 import type {
   Actor,
@@ -43,7 +43,8 @@ export function spendingViewOf(spending: Spending): SpendingView {
 }
 
 /**
- * The rules every write of a spending is held to before it is written: not after today in Yerevan,
+ * The rules every write of a spending is held to before it is written: not a day that has not come
+ * yet anywhere — the phone's may be ahead of Yerevan's (`latestDay`, MOL-121) —
  * and a category of the owner's own — a removed one included, because a spending queued offline
  * must not be lost to a category taken out of the choice on another phone meanwhile.
  */
@@ -53,7 +54,7 @@ async function checked(
   body: Pick<SpendingBody, 'spentOn' | 'categoryId'>,
   now: Date,
 ): Promise<void> {
-  if (body.spentOn > yerevanDate(now)) throw new DomainError(ERROR.SPENDING_IN_FUTURE)
+  if (body.spentOn > latestDay(now)) throw new DomainError(ERROR.SPENDING_IN_FUTURE)
   const categories = await repositories.spendingCategories.list(owner.id)
   if (!categories.some((category) => category.id === body.categoryId)) {
     throw new DomainError(ERROR.SPENDING_CATEGORY_UNKNOWN)

@@ -246,6 +246,18 @@ export function yerevanMidnight(date: string): Date {
   return new Date(Date.parse(`${date}T00:00:00.000Z`) - YEREVAN_OFFSET_MS)
 }
 
+const LATEST_OFFSET_MS = 14 * 60 * 60 * 1000
+
+/**
+ * The latest calendar day at `instant` anywhere on Earth — UTC+14. A day a person writes is their
+ * phone's (MOL-121, owner's decision В-3): east of Yerevan after the phone's midnight it is a day
+ * Yerevan has not reached yet, and «not in the future» means not past this one, never past
+ * Yerevan's. At most Yerevan's tomorrow, so nobody in Yerevan writes tomorrow's spending.
+ */
+export function latestDay(instant: Date): string {
+  return new Date(instant.getTime() + LATEST_OFFSET_MS).toISOString().slice(0, 10)
+}
+
 /**
  * A day a rate may be dated by: a real calendar day whose Yerevan midnight the snapshot accepts.
  * `Date.parse('2026-02-31')` is the 3rd of March, not NaN, and `0001-01-01` is what a .NET service

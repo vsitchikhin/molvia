@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {
   ERROR,
+  latestDay,
   SPENDING_PRESETS,
   journalCursorCodec,
   moneyMonthCodec,
@@ -204,8 +205,9 @@ describe('трата вне похода (MOL-73)', () => {
   it('завтрашний день — отказ; категория чужого — отказ; убранная из выбора своя — принимается', async () => {
     const me = await owner()
     const stranger = await owner()
-    const tomorrow = yerevanDate(new Date(Date.now() + 36 * 60 * 60 * 1000))
-    const future = await spend(me, { spentOn: tomorrow })
+    const future = await spend(me, {
+      spentOn: latestDay(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+    })
     expect(future.statusCode).toBe(400)
     expect(future.json()).toMatchObject({ code: ERROR.SPENDING_IN_FUTURE })
 

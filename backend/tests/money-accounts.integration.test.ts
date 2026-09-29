@@ -9,6 +9,7 @@ import {
   accountsHeldCodec,
   exchangesResponseCodec,
   journalCursorCodec,
+  latestDay,
   moneyAccountsCodec,
   parseRate,
   spendingCategoriesResponseCodec,
@@ -175,7 +176,7 @@ describe('счёт: добавить, повтор, имя (MOL-115)', () => {
 
   it('не берёт старт из будущего и старт в чужой валюте', async () => {
     const me = await owner()
-    const future = yerevanDate(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000))
+    const future = latestDay(new Date(Date.now() + 24 * 60 * 60 * 1000))
     const late = await call(me, 'POST', '/money/accounts', {
       id: randomUUID(),
       name: 'Завтра',
