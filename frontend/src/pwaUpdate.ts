@@ -117,6 +117,9 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
       reload()
       return
     }
+    // Taken over after all, past the ten seconds: «close the app» is no longer true, and a reload
+    // is all that is left — offered again, never done under the finger.
+    if (phase.value === 'failed') phase.value = 'none'
     refresh()
     settle()
   })

@@ -324,6 +324,21 @@ describe('a new version taken by the button (MOL-132)', () => {
       expect(marks).toEqual([])
     })
 
+    it('offers the reload again when the version takes over after all, past the ten seconds', async () => {
+      const { update, container, registration, reload } = await installed()
+      registration.arrive()
+      update.apply()
+      vi.advanceTimersByTime(APPLY_TIMEOUT_MS)
+      expect(update.phase.value).toBe('failed')
+
+      container.emit('controllerchange')
+      expect(update.phase.value).toBe('ready')
+      expect(reload).not.toHaveBeenCalled()
+
+      update.apply()
+      expect(reload).toHaveBeenCalledOnce()
+    })
+
     it('stays failed rather than offering the same button again', async () => {
       const { update, registration } = await installed()
       registration.arrive()
