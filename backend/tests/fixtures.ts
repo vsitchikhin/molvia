@@ -8,6 +8,7 @@ import type { PriceQuery } from '@/db/expenses-repository'
 import {
   actors,
   erasures,
+  loginDays,
   events,
   exchanges,
   expenses,
@@ -182,6 +183,7 @@ export async function clearAll(db: Db): Promise<void> {
   await db.delete(places)
   await db.delete(actors)
   await db.delete(erasures)
+  await db.delete(loginDays)
 }
 
 /**

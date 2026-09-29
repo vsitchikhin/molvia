@@ -19,12 +19,20 @@ export class ApiError extends Error {
    * for the server's.
    */
   readonly answered: boolean
+  /**
+   * The status of a reply whose body did not match the contract, when there was one. A portal
+   * answers a redirected request with `200` and a page of its own, and a reply of ours cut off on
+   * its body arrives with our own status — the login tells a start that never reached us from one
+   * whose answer was lost on the way back by exactly this (MOL-68, review Т1).
+   */
+  readonly status: number | undefined
 
-  constructor(code: WireCode, details?: string, answered = true) {
+  constructor(code: WireCode, details?: string, answered = true, status?: number) {
     super(details ? `${code}: ${details}` : code)
     this.name = 'ApiError'
     this.code = code
     this.answered = answered
+    this.status = status
   }
 }
 
@@ -198,7 +206,12 @@ export function createTransport({
     // only way callers are meant to need.
     const parsed = schema.safeParse(body)
     if (parsed.success) return { status: response.status, data: parsed.data }
-    throw new ApiError(ISSUE.RESPONSE_INVALID, parsed.error.issues[0]?.path.join('.'))
+    throw new ApiError(
+      ISSUE.RESPONSE_INVALID,
+      parsed.error.issues[0]?.path.join('.'),
+      true,
+      response.status,
+    )
   }
 
   async function request<T>(
