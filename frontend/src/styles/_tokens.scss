@@ -100,6 +100,9 @@
   /* The sheet takes at most this share of what is visible above the keyboard (BottomSheet). */
   --sheet-height-share: 0.82;
 
+  /* The scanner's viewfinder: most of the sheet, and never so tall that its buttons leave it. */
+  --viewfinder-height: min(52dvh, 26rem);
+
   /* Loading bars: the height of the line they stand in for and of the one under it. */
   --skeleton-line: 0.8125rem; /* 13 */
   --skeleton-sub: 0.5625rem; /* 9 */
@@ -210,6 +213,11 @@
   /* Pinned bars are slightly translucent — a token, not an effect. No blur beyond this. */
   --chrome: rgb(255 250 242 / 88%);
   --scrim: rgb(38 27 16 / 40%);
+
+  /* Over the camera's picture, in both schemes alike: the video is what it is, not our ground. */
+  --viewfinder-ground: #14110f;
+  --viewfinder-ink: #fffaf2;
+  --viewfinder-dim: rgb(0 0 0 / 45%);
 }
 
 @mixin dark-scheme {

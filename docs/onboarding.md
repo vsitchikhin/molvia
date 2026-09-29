@@ -748,6 +748,13 @@ one, and «Поход удалён · Вернуть» for ten seconds on the sc
 trip offers to remove it instead (owner's decision В-2): a finished empty trip was the rubbish in the
 history the task was filed for. The rules are in «Data rules» above.
 
+MOL-98 opened the epic «Штрихкоды» with the scanner itself: a sheet with a live viewfinder that reads
+EAN-13, EAN-8, UPC-A and UPC-E in a worker, takes a code two frames in a row agree on and hands it
+over, and a field for the digits typed by hand as the way out of every refusal of the camera. The
+wasm comes from the app itself and is precached — the scanner is needed at the shelf, where the
+connection drops. It opens only on `/_kit` until MOL-99 puts it on a screen and finds the item. The
+rules are in `.claude/rules/barcodes.md`.
+
 ## Откуда брать работу
 
 Не из головы и не из этого файла — **из Jira, проект MOL**. Релиз 0.1 разложен на семь
