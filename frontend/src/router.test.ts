@@ -159,6 +159,41 @@ describe('scrollBehavior', () => {
     })
   })
 
+  // The category card is the third on «Графики»: a choice that took the page to the top took the
+  // chart away from the person who asked for it (MOL-136).
+  it('keeps the page where it is when only the query of the screen changes', async () => {
+    const charts = await resolveAt('/money/charts')
+    const rent = await resolveAt('/money/charts?category=0b5e2f64-8c39-4a4e-9d0f-6f1c7a2b3c4d')
+    const year = await resolveAt('/money/charts?period=12')
+    const month = await resolveAt('/money?month=2026-08')
+    expect(scrollBehavior(rent, charts, null)).toBe(false)
+    expect(scrollBehavior(year, rent, null)).toBe(false)
+    expect(scrollBehavior(month, await resolveAt('/money'), null)).toBe(false)
+    expect(scrollBehavior(await resolveAt('/money'), month, null)).toBe(false)
+  })
+
+  it('returns to where the person was on back and forward within the screen too', async () => {
+    const month = await resolveAt('/money?month=2026-08')
+    expect(scrollBehavior(month, await resolveAt('/money'), saved)).toEqual(saved)
+  })
+
+  it('must not fire: the same route with other params is another screen', async () => {
+    const one = await resolveAt('/money/accounts/0b5e2f64-8c39-4a4e-9d0f-6f1c7a2b3c4d')
+    const other = await resolveAt('/money/accounts/7d1a9c2e-4b6f-4e3a-8c5d-2f9e1b7a6c3d')
+    expect(scrollBehavior(other, one, null)).toEqual({ top: 0 })
+  })
+
+  it('must not fire: another screen with a query starts at the top', async () => {
+    const month = await resolveAt('/money?month=2026-08')
+    expect(scrollBehavior(await resolveAt('/money/charts'), month, null)).toEqual({ top: 0 })
+    expect(scrollBehavior(month, await resolveAt('/money/charts'), null)).toEqual({ top: 0 })
+  })
+
+  // `START_LOCATION` is at «/»: a trip opened with a query and nothing saved is not a query changed.
+  it('must not fire: the first navigation with a query and nothing saved starts at the top', async () => {
+    expect(scrollBehavior(await resolveAt('/?from=bot'), START_LOCATION, null)).toEqual({ top: 0 })
+  })
+
   // `START_LOCATION` is at «/» too, and the trip is at «/»: read as the same address, a trip loaded
   // again threw away where the person was — and it alone of the screens (adversarial В1).
   it('returns the first navigation to where the person was, on the trip as elsewhere', async () => {

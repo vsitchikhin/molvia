@@ -196,8 +196,8 @@ export const routes = [
 watchBrowserAnimatedBack()
 
 /**
- * Back and forward return to where the person was; any other move starts at the top. The
- * sections keep no scroll of their own — their state lives in stores, not in components.
+ * Back and forward return to where the person was; any other move to another screen starts at the
+ * top. The sections keep no scroll of their own — their state lives in stores, not in components.
  *
  * A move to the same address is not the router's to scroll. It is one of two things. A sheet put
  * away: the sheet puts the page back itself, by the element it was opened from (`putBack` in
@@ -210,9 +210,17 @@ watchBrowserAnimatedBack()
  * is «/»: that is the page loaded again — «back» into the app from another site — and the number
  * the router saved on `pagehide` is where the person was. Read as the same address, the trip, and
  * only the trip, forgot it (adversarial В1).
+ *
+ * A move that changes only the query of the screen — the category and the period of «Графики», the
+ * month of «Деньги», each by `replace` — is the screen's own state, not another screen, and the page
+ * stays where it is: the person chose the category to look at its chart, three cards down, and
+ * the top took it away (MOL-136). The same route with other params is another screen.
  */
-export const scrollBehavior: RouterScrollBehavior = (to, from, saved) =>
-  from !== START_LOCATION && to.fullPath === from.fullPath ? false : (saved ?? { top: 0 })
+export const scrollBehavior: RouterScrollBehavior = (to, from, saved) => {
+  if (from === START_LOCATION) return saved ?? { top: 0 }
+  if (to.fullPath === from.fullPath) return false
+  return saved ?? (to.path === from.path ? false : { top: 0 })
+}
 
 export const router = createRouter({
   history: createWebHistory(),
