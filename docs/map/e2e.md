@@ -16,4 +16,4 @@ that area's map; here are the shell's own specs and what every run stands on.
 ## repository
 
 - `bin/e2e-database.mjs` — Drops and recreates this copy's `_e2e` database before a run; refuses any other name. Run by `playwright.config.ts`.
-- `playwright.config.ts` — Playwright config: the copy's e2e ports and database from `.env`, phone profile, starts its own API and PWA, and a build for the `pwa` project; traces on failure.
+- `playwright.config.ts` — Playwright config: the copy's e2e ports and database from `.env`, phone profile, starts its own API and PWA, and a build for the `pwa` project; an iPhone profile for the sheet alone; traces on failure.
