@@ -1109,3 +1109,255 @@ describe('focus after the sheet', () => {
     expect(document.activeElement).not.toBe(button)
   })
 })
+
+describe('pulled down', () => {
+  const HEIGHT = 400
+
+  async function pulled(options: { rising?: boolean } = {}) {
+    const rendered = await render({ open: true, ...options })
+    const dialog = rendered.dialog()
+    Object.defineProperty(dialog, 'offsetHeight', { value: HEIGHT, configurable: true })
+    return rendered
+  }
+
+  function point(target: Element, x: number, y: number): Touch {
+    return new Touch({ identifier: 0, target, clientX: x, clientY: y })
+  }
+
+  /** One finger on `target`: down at `y`, then through each of `path` — `[y]` or `[y, x]` — `gap` ms apart. */
+  function finger(target: Element, y: number, x = 100) {
+    const events: TouchEvent[] = []
+    const send = (type: string, touches: Touch[], changed: Touch[]) => {
+      const event = new TouchEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        touches,
+        changedTouches: changed,
+      })
+      events.push(event)
+      target.dispatchEvent(event)
+      return event
+    }
+    let last = point(target, x, y)
+    send('touchstart', [last], [last])
+    return {
+      events,
+      to(nextY: number, nextX = x, after = 16) {
+        wait(after)
+        last = point(target, nextX, nextY)
+        return send('touchmove', [last], [last])
+      },
+      second() {
+        const other = new Touch({ identifier: 1, target, clientX: x, clientY: y })
+        return send('touchmove', [last, other], [other])
+      },
+      up() {
+        send('touchend', [], [last])
+      },
+      cancel() {
+        send('touchcancel', [], [last])
+      },
+    }
+  }
+
+  async function frame(): Promise<void> {
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+  }
+
+  // A shut sheet stays on many screens, and the shell holds no touch listener anywhere (MOL-17,
+  // e2e `navigation.spec.ts`). Counted from after the mount: the test wrapper listens to every
+  // native event of the component's root to record what it emits.
+  it('listens for touches only while it is open', async () => {
+    const { open, host, dialog } = await render()
+    const add = vi.spyOn(dialog(), 'addEventListener')
+    const remove = vi.spyOn(dialog(), 'removeEventListener')
+    const touches = (spy: typeof add) =>
+      spy.mock.calls
+        .filter(([type]) => type.startsWith('touch'))
+        .map(([type, listener]) => [type, listener])
+    open.value = true
+    await nextTick()
+    const added = touches(add)
+    expect(added.map(([type]) => type)).toEqual([
+      'touchstart',
+      'touchmove',
+      'touchend',
+      'touchcancel',
+    ])
+    expect(add.mock.calls.find(([type]) => type === 'touchmove')?.[2]).toEqual({ passive: false })
+    wait(1000)
+    await realTime()
+    await host.get('.head button').trigger('click')
+    await nextTick()
+    expect(touches(remove)).toEqual(added)
+  })
+
+  it('follows the finger, and the scrim fades with it', async () => {
+    const { dialog, host } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    const move = drag.to(210)
+    expect(move.defaultPrevented).toBe(true)
+    expect(dialog().style.transform).toBe('translateY(100px)')
+    expect(dialog().style.getPropertyValue('--sheet-drag')).toBe(String(100 / HEIGHT))
+    expect(dialog().classList.contains('dragging')).toBe(false)
+    await nextTick()
+    expect(dialog().classList.contains('dragging')).toBe(true)
+  })
+
+  // A quarter is the owner's line (В-4); slow, so no flick decides it.
+  it('closes through the history once let go past a quarter of its height', async () => {
+    const { host, go, open } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(110 + HEIGHT / 4 + 1, 100, 500)
+    drag.up()
+    await frame()
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+    expect(open.value).toBe(false)
+  })
+
+  it('must not fire: let go exactly at a quarter, slowly — it goes back up', async () => {
+    const { host, go, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(110 + HEIGHT / 4, 100, 500)
+    drag.up()
+    await frame()
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().open).toBe(true)
+    expect(dialog().style.transform).toBe('')
+    expect(dialog().style.getPropertyValue('--sheet-drag')).toBe('')
+  })
+
+  it('closes on a flick short of the quarter', async () => {
+    const { host, go } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(150, 100, 20)
+    drag.up()
+    await frame()
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+  })
+
+  it('must not fire: a short slow pull goes back up', async () => {
+    const { host, go, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(150, 100, 400)
+    drag.up()
+    await frame()
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().style.transform).toBe('')
+  })
+
+  it('must not fire: a finger that moves less than a tap does', async () => {
+    const { host, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    const move = drag.to(103)
+    drag.up()
+    expect(move.defaultPrevented).toBe(false)
+    expect(dialog().style.transform).toBe('')
+  })
+
+  it('must not fire: content scrolled down scrolls back first', async () => {
+    const { host, dialog, go } = await pulled()
+    dialog().scrollTop = 60
+    const drag = finger(host.get('.content').element, 100)
+    const move = drag.to(200)
+    drag.up()
+    await frame()
+    expect(move.defaultPrevented).toBe(false)
+    expect(dialog().style.transform).toBe('')
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  // A finger in a field moves the caret and selects (owner's decision В-6).
+  it('must not fire: a pull that starts in a field', async () => {
+    const { dialog, go } = await pulled()
+    const field = document.createElement('input')
+    dialog().append(field)
+    const drag = finger(field, 100)
+    drag.to(110)
+    const move = drag.to(300)
+    drag.up()
+    await frame()
+    expect(move.defaultPrevented).toBe(false)
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  it('must not fire: a finger that goes sideways first, then down', async () => {
+    const { host, go } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(104, 120)
+    drag.to(300, 120)
+    drag.up()
+    await frame()
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  it('must not fire: a finger that goes up — a scroll', async () => {
+    const { host, go, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 300)
+    const move = drag.to(250)
+    drag.to(400)
+    drag.up()
+    await frame()
+    expect(move.defaultPrevented).toBe(false)
+    expect(dialog().style.transform).toBe('')
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  // The opener's second tap lands on the sheet while it rises (MOL-69); nor may a finger pull it.
+  it('must not fire: a finger that came down while it was still coming up', async () => {
+    const { host, go, dialog } = await pulled({ rising: true })
+    const drag = finger(host.get('.content').element, 100)
+    wait(1000)
+    drag.to(110)
+    drag.to(300)
+    drag.up()
+    await frame()
+    expect(dialog().style.transform).toBe('')
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  it('must not fire: a second finger puts it back', async () => {
+    const { host, go, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(300)
+    drag.second()
+    drag.up()
+    await frame()
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().style.transform).toBe('')
+  })
+
+  it('must not fire: a touch the platform took back puts it back', async () => {
+    const { host, go, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(300)
+    drag.cancel()
+    await frame()
+    expect(go).not.toHaveBeenCalled()
+    expect(dialog().style.transform).toBe('')
+  })
+
+  // Opened again after it was pulled away, it comes up as the stylesheet draws it.
+  it('opens again without the offset it was pulled away with', async () => {
+    const { host, open, dialog } = await pulled()
+    const drag = finger(host.get('.content').element, 100)
+    drag.to(110)
+    drag.to(300)
+    drag.up()
+    await frame()
+    landed()
+    await nextTick()
+    open.value = true
+    await nextTick()
+    expect(dialog().open).toBe(true)
+    expect(dialog().style.transform).toBe('')
+    expect(dialog().style.getPropertyValue('--sheet-drag')).toBe('')
+  })
+})

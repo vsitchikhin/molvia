@@ -2,7 +2,7 @@
   <dialog
     ref="dialog"
     class="sheet"
-    :class="{ over: back }"
+    :class="{ over: back, dragging }"
     :aria-labelledby="titleId"
     @cancel.prevent="close()"
     @close="closedNatively"
@@ -40,6 +40,7 @@ import IconBack from '~icons/mdi/chevron-left'
 import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
+import { useSheetDrag } from '@/composables/useSheetDrag'
 import { pageAnchor, sheetOpener, useSheetHistory } from '@/composables/useSheetHistory'
 
 /** A double tap lands within this — a platform convention, not a design token. */
@@ -50,12 +51,12 @@ const DOUBLE_TAP = 300
  * scrim. A native modal `<dialog>` — the focus trap, the inert page, the backdrop and Esc come
  * from the platform, and focus goes back to whatever opened it when it closes.
  *
- * No grab handle on top: there is no drag gesture, and an element must not promise one.
+ * Six ways to close it, one way it closes. The ×, a tap on the scrim, a pull down (`useSheetDrag`,
+ * MOL-80), Esc, Android's «back» (which Chrome delivers to a modal dialog as `cancel`) and the
+ * browser's «back» or the iOS edge swipe (a pop) — the first five step back off the sheet's entry
+ * in the history, and the pop that follows is what closes it (`useSheetHistory`).
  *
- * Five ways to close it, one way it closes. The ×, a tap on the scrim, Esc, Android's «back»
- * (which Chrome delivers to a modal dialog as `cancel`) and the browser's «back» or the iOS edge
- * swipe (a pop) — the first four step back off the sheet's entry in the history, and the pop that
- * follows is what closes it (`useSheetHistory`). A screen that must close the sheet and itself
+ * No grab handle on top, though the sheet can be pulled down: the owner's decision (MOL-80, В-5). A screen that must close the sheet and itself
  * at once — «Add to trip» over the search — calls `close(2)`.
  *
  * The page under an open sheet does not scroll (main.scss). The sheet is the one place where a
@@ -112,6 +113,14 @@ export default defineComponent({
     // Which showing the sheet is on: the rise of one that was closed must not settle the next.
     let showing = 0
 
+    // Up, as a tap is (MOL-69): a finger that came down while it rose is the opener's second tap.
+    const drag = useSheetDrag(dialog, shown, {
+      canStart: (event) => shown.value && !closing && event.timeStamp >= settledAt,
+      close: () => {
+        close()
+      },
+    })
+
     const history = useSheetHistory(() => {
       if (!shown.value) return
       shown.value = false
@@ -119,6 +128,7 @@ export default defineComponent({
       const again = reopen
       reopen = false
       if (dialog.value?.open) dialog.value.close()
+      drag.reset()
       if (!again && props.open) emit('update:open', false)
       // Read now: the props of a sheet gone by the next tick are still there, but read once.
       const closed = props.onClosed
@@ -144,6 +154,7 @@ export default defineComponent({
       // Measured before the sheet is up, with the page as the person left it.
       const anchor = pageAnchor()
       const from = sheetOpener()
+      drag.reset()
       shown.value = true
       element.showModal()
       settle(element)
@@ -268,6 +279,7 @@ export default defineComponent({
       t,
       dialog,
       titleId,
+      dragging: drag.dragging,
       close,
       holdWhileRising,
       closeOnScrim,
@@ -326,7 +338,8 @@ export default defineComponent({
   }
 
   &[open]::backdrop {
-    opacity: 1;
+    /* Fades as the sheet is pulled down (`useSheetDrag`); the backdrop inherits from the dialog. */
+    opacity: calc(1 - var(--sheet-drag, 0));
 
     @starting-style {
       opacity: 0;
@@ -335,6 +348,12 @@ export default defineComponent({
 
   &.over::backdrop {
     background: transparent;
+  }
+
+  /* Under the finger: no transition, or the sheet would trail behind it. */
+  &.dragging,
+  &.dragging::backdrop {
+    transition: none;
   }
 }
 
