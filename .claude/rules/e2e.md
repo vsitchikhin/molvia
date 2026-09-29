@@ -55,15 +55,17 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   secure context anyway. Chromium only: Safari's worker lives by rules of its own, and that is
   checked on a phone.
 - **The sheet also runs on an iPhone's engine** (`iphone`, `devices['iPhone 14']`, MOL-80), and
-  nothing else runs on WebKit. WebKit shows what Chromium hides: Safari does not focus a tapped button, so a
-  closed `<dialog>` has nothing to give focus back to, and only there does the sheet's own return
-  of focus get tested. The rest of the suite stays on one engine — a second run of everything
-  would double the wait at every push for differences no other screen has. Two kinds of test are
-  left to Chromium, each with its reason in `sheet.spec.ts`: **WebKit keeps no `Secure` cookie on
-  http://127.0.0.1**, so every page load after the first comes in signed out (a reload, a `goto`);
-  and **CDP** — the rise held still, a touch moved — is Chromium's alone. Playwright's WebKit is
-  not an iPhone either: its touches do not go through UIKit, and the scrim bug of MOL-80 did not
-  show in it. CI installs both browsers.
+  nothing else runs on WebKit. WebKit shows what Chromium hides: Safari does not focus a tapped
+  button, so a closed `<dialog>` has nothing to give focus back to, and only there does the sheet's
+  own return of focus get tested. The rest of the suite stays on one engine — a second run of
+  everything would double the wait at every push for differences no other screen has. Two kinds of
+  test are left to Chromium, each with its reason in `sheet.spec.ts`: **WebKit keeps no `Secure`
+  cookie on http://127.0.0.1**, so every page load after the first comes in signed out (a reload, a
+  `goto`); and **CDP** — the rise held still, a touch moved — is Chromium's alone. Playwright's
+  WebKit is not an iPhone either: its touches do not go through UIKit, and the scrim bug of MOL-80
+  did not show in it. CI installs both browsers; a new machine installs them once,
+  `npx playwright install chromium webkit`, or its first push fails on `Executable doesn't exist`
+  (review Р-5).
 - **Outside CI a failed test keeps its trace** (`retain-on-failure`, MOL-67), since there are no
   retries to write one. It is recorded for every test and dropped when it passes, which costs
   12–22 % of a full local run (measured in four pairs); and under an overload that times a test

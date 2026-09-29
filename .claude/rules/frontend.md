@@ -150,8 +150,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   edge swipe and Android «back» belong to the browser, and the history is the one source of
   «back». **One written exception: a sheet pulled down** (MOL-80, the owner's request) — a
   vertical drag inside the sheet, which neither the edge swipe nor «back» is, and which closes
-  it through the history like everything else (below). Only the page scrolls, never an inner container: iOS hides its address bar and the
-  router restores positions only for the window.
+  it through the history like everything else (below). Only the page scrolls, never an inner
+  container: iOS hides its address bar and the router restores positions only for the window.
 - **A screen is built from the kit, not drawn anew** (MOL-18): `AppButton`, `AppField`,
   `SegmentedControl`, `VerdictBadge`, `AppCard`, `BottomSheet` in `components/`, every state of
   them on the development-only page `/_kit`. `AppCard` carries exactly the differences between
@@ -163,20 +163,29 @@ The detail behind the frontend lines of `CLAUDE.md`.
   off that entry, and only the pop closes it, so exactly one entry is ever taken. **A pull down
   closes it** (`useSheetDrag`, MOL-80, owner's decisions В-4…В-6): only once it is up (as a tap,
   MOL-69), only with its content at the very top, only from outside a field — a finger in a field
-  moves the caret and selects — and only down more than sideways, past the tap slop; up or
-  sideways is the browser's scroll. The sheet follows the finger and the scrim fades with it; let
-  go past a quarter of its height or flicked faster than 0.4 px/ms, it slides away and closes,
-  otherwise it goes back up. Touch events, not pointer events: once the browser starts a scroll it
-  takes the pointer back, and only a `touchmove` that is not passive stops the content springing.
-  Listened to only while the sheet is open, on the dialog: a shut sheet stays on many screens, and
-  with no sheet open the shell holds no touch listener at all (`navigation.spec.ts` holds that).
-  **No grab handle** (В-5): the gesture is there, the sign is not. **Focus comes back to what
-  opened it, even where the platform gave it nowhere** (MOL-80): a `<dialog>` returns focus to
-  what was focused when it was shown, and Safari does not focus a tapped button — a screen reader
-  was left at the top of the page. When the pop lands on the same screen and focus is on the body,
-  or still on the closed dialog (WebKit's way), the opener's button takes it, without a scroll;
-  focus the platform put anywhere else is left there, and `close(2)` leaves it to the next
-  screen. No ring appears: a script's focus after a tap is not `:focus-visible` in either engine. **The sheet puts
+  moves the caret and selects — and only down more than sideways, past the tap slop; up or sideways
+  is the browser's scroll. The sheet follows the finger and the scrim fades with it; let go past a
+  quarter of its height, or flicked faster than 0.4 px/ms, it slides away and closes, otherwise it
+  goes back up. **The flick is measured up to the lift**, where the finger lifted included, not up
+  to the last move: a finger at rest sends no `touchmove`, and a fast pull held still and then let
+  go — a change of mind — closed the sheet (adversarial А); a lift comes between two frames, and the
+  way since the last move counts with its time (Г). **A second finger ends the pull and puts it back**: a pinch or a change of
+  grip is not a decision, and the browser tells of the finger by its own `touchstart` first
+  (adversarial Б). A touch that comes up from a sheet inside the sheet is that sheet's to pull. A
+  pull that starts on a button does not press it: a touch that moved past the tap slop makes no
+  click, in Chromium as on iOS, and e2e holds that for the main action. Touch events, not pointer
+  events: once the browser starts a scroll it takes the pointer back, and only a `touchmove` that is
+  not passive stops the content springing. Listened to only while the sheet is open, on the dialog:
+  a shut sheet stays on many screens, and with no sheet open the shell holds no touch listener at
+  all (`navigation.spec.ts` holds that). **No grab handle** (В-5): the gesture is there, the sign is
+  not. **Focus comes back to what opened it, wherever the platform gave it** (MOL-80): a `<dialog>`
+  returns focus to what was focused when it was shown, and Safari does not focus a tapped button — a
+  screen reader was left at the top of the page, or, over a sheet, on whatever the sheet under it
+  held. When the pop lands on the same screen and focus is on the body, still on the closed dialog
+  (WebKit's way), or back on what held it at the opening, the opener's button takes it, without a
+  scroll; on the opener already — Chromium, a keyboard — or anywhere else, it is left there, and
+  `close(2)` leaves it to the next screen. No ring appears: a script's focus after a tap is not
+  `:focus-visible` in either engine. **The sheet puts
   the page back by what it was opened from, never by a number** (MOL-63): it notes the element
   the opening click landed on — a tap, Enter, a screen reader alike, since iOS does not focus a
   tapped button; the click is forgotten once its task is over, and a sheet opened later is measured
