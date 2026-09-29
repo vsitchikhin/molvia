@@ -24,3 +24,7 @@ Rules: `.claude/rules/barcodes.md`. A test beside its source, or mirroring it un
 - `frontend/src/scanner/decode.ts` — Reading one frame: the four retail formats, a code only if it has a barcode's shape; `locateWasm`, the app's own copy of the reader.
 - `frontend/src/scanner/frames.ts` — `cropOf`, the frame on the screen in the camera's pixels through a cover fit; `createReadStreak`, two reads in a row.
 - `frontend/src/scanner/protocol.ts` — The messages between the page and the decoding worker.
+
+## e2e
+
+- `e2e/scanner.spec.ts` — Spec in the `camera` project: the fake camera's barcode read by the worker with the app's own wasm; no permission; no camera, and the digits typed by hand.

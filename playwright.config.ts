@@ -45,8 +45,25 @@ const ci = Boolean(process.env.CI)
 // the spec rewrites is never the one `make prod-build` or a deploy reads.
 const previewPort = String(Number(pwaPort) + 1)
 
+// The scanner's camera is a file (MOL-98): Chromium films the barcode `globalSetup` draws, and a
+// spec that wants the camera grants it — without the grant Chromium refuses, which is the case of
+// «no permission». The full Chromium, not the headless shell every other spec runs in: the shell
+// answers any `getUserMedia` with `NotSupportedError`, fake camera or not (measured 29.09.2026).
+// `playwright install chromium` brings both, here and in CI.
+// In this copy's own cache, not a shared temporary folder: two copies running e2e at once must not
+// rewrite each other's. Handed to `globalSetup` through the environment, which it shares with this.
+const barcodeVideo = fileURLToPath(
+  new URL('./node_modules/.cache/molvia-e2e/barcode.y4m', import.meta.url),
+)
+process.env.MOLVIA_BARCODE_VIDEO = barcodeVideo
+const FAKE_CAMERA = [
+  '--use-fake-device-for-media-stream',
+  `--use-file-for-fake-video-capture=${barcodeVideo}`,
+]
+
 export default defineConfig({
   testDir: './e2e',
+  globalSetup: './e2e/barcode-video.ts',
   fullyParallel: true,
   forbidOnly: ci,
   retries: ci ? 2 : 0,
@@ -59,10 +76,19 @@ export default defineConfig({
   use: { baseURL, trace: ci ? 'on-first-retry' : 'retain-on-failure', locale: 'en-US' },
 
   // A phone, and only a phone: that is the device the product is designed for, so a
-  // desktop-only pass would prove nothing about the screen that matters. The second project
-  // is the same phone against the built app, and holds only what needs a worker.
+  // desktop-only pass would prove nothing about the screen that matters. The other two are the
+  // same phone: with a camera, for the scanner, and against the built app, for what needs a worker.
   projects: [
-    { name: 'phone', use: { ...devices['Pixel 7'] }, testIgnore: /pwa-update\.spec\.ts$/ },
+    {
+      name: 'phone',
+      use: { ...devices['Pixel 7'] },
+      testIgnore: /(pwa-update|scanner)\.spec\.ts$/,
+    },
+    {
+      name: 'camera',
+      use: { ...devices['Pixel 7'], channel: 'chromium', launchOptions: { args: FAKE_CAMERA } },
+      testMatch: /scanner\.spec\.ts$/,
+    },
     {
       name: 'pwa',
       use: { ...devices['Pixel 7'], baseURL: `http://127.0.0.1:${previewPort}` },
