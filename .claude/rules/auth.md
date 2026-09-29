@@ -74,15 +74,23 @@ is in `bot.md`.
   **The row is the day the login began**, in Yerevan, read off the request's own row, so a day
   reads as a funnel of its own; a refusal has no request and counts on its own day. The count is
   **the last statement of its step**, and the cleanup writes its days in order: the row of a day
-  is what every login of that day touches, and taken last it is never held while waiting for
-  anything. **No id, no Telegram id, no code, no device** — not a person's row, so erasure has
+  is what every login of that day touches, and taken last it is held while waiting for nothing —
+  except in a collection, where `signIn` writes the owner and the session after it; no cycle, since
+  the account's lock is already the collection's (review А4), but a step that locks after its
+  count must be checked against it. Logins in flight when the count began were counted by the
+  migration. **No id, no Telegram id, no code, no device** — not a person's row, so erasure has
   nothing here, and «no login writes `events`» still holds.
   **A repeat is the device's word** (owner's decision В-1): `POST /auth/login?again=1` when the
   login record holds `tried` — set once a start is answered `201`, taken away when an owner is
-  claimed — so «Начать заново», or a return after the link ran out, is the same person rather
+  claimed, when a session lands in an owner claimed before (no question, so no claim: review А1),
+  and by «Выйти» with the claim — so «Начать заново», or a return after the link ran out, is the same person rather
   than a loss and a newcomer. Not the cookie of the request: it dies with the five minutes,
   exactly when the commonest repeat happens. The price is named: Safari and an installed PWA are
-  two devices, an old PWA sends no mark, and a forged mark spoils only our own count.
+  two devices, an old PWA sends no mark, and a forged mark spoils only our own count. **The mark
+  has no term** (review А5): someone who gave up a month ago and comes back inside the window is
+  «again» — they got in, and they began before it — so at the window's edge «began» is short by
+  them, not by a unit or two. Kept as the same person on purpose: the question is how many who
+  tried never got in.
 - **The token rides in a cookie, and `backend/src/cookie.ts` is the only module that touches
   one (MOL-53).** `__Host-molvia_session`, with `HttpOnly` so an XSS cannot carry the account
   away and so ITP's seven-day cap — which applies to what a _script_ writes — never reaches it;

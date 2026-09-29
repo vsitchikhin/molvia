@@ -162,12 +162,19 @@ function loginLines({ firstDay, lastDay, days }: LoginsInWindow): string[] {
   const again = total((day) => day.again)
   const began = total((day) => day.started) - again
   const gotIn = total((day) => day.collected)
-  const lost = began - gotIn
+  // Begun and not over yet: a login lives five minutes, and a window reaching until now holds
+  // some that are still on their way to an outcome — not lost, not in (review А2).
+  const open =
+    total((day) => day.started) -
+    gotIn -
+    total((day) => day.declined + day.expiredUnconfirmed + day.expiredConfirmed)
+  const lost = began - gotIn - open
   const span = firstDay === lastDay ? `the day ${firstDay}` : `days ${firstDay} … ${lastDay}`
   const lines = [
     `login ${'how many who began got in?'.padEnd(46)}second way in above ${String(LOGIN_SECOND_WAY_PERCENT)} %`,
     row('began', [String(began), `${span} in Yerevan`]),
     row('got in', share(gotIn, began)),
+    row('still under way', [String(open), 'not counted yet']),
     row(
       'lost',
       lost < 0

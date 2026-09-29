@@ -155,9 +155,12 @@ type LoginStep = 'started' | 'again' | 'confirmed' | 'declined' | 'collected' | 
  * day is the one it began on, to the microsecond Postgres holds, and not a date the driver
  * rounded on its way through JavaScript.
  *
- * Always the last statement of the step it counts, and in its transaction: the row of a day is
- * the one every login of that day writes, and taken last it is never held while waiting for
- * anything else — a refusal rolled back is a count rolled back.
+ * Always the last statement of the step it counts, and in its transaction, so a step rolled back
+ * is a count rolled back. The row of a day is the one every login of that day writes, and taken
+ * last it is held while waiting for nothing — **except in a collection**, where `signIn` still
+ * writes the owner and the session after it (review А4). That holds no cycle today: the account's
+ * lock is the collection's own already, and the day row is the only one any writer takes of this
+ * table. A step that takes a lock after its count has to be checked against that.
  */
 async function tally(
   db: Conn,

@@ -22,7 +22,7 @@ const REPORT: GatesReport = {
         confirmed: 3,
         declined: 0,
         collected: 3,
-        expiredUnconfirmed: 1,
+        expiredUnconfirmed: 2,
         expiredConfirmed: 0,
         refused: 0,
       },
@@ -33,8 +33,8 @@ const REPORT: GatesReport = {
         confirmed: 34,
         declined: 1,
         collected: 30,
-        expiredUnconfirmed: 5,
-        expiredConfirmed: 3,
+        expiredUnconfirmed: 13,
+        expiredConfirmed: 4,
         refused: 2,
       },
     ],
@@ -149,16 +149,17 @@ describe('gates — чтение ворот вручную', () => {
       'login how many who began got in?                    second way in above 25 %',
       '     began                               41         days 2026-10-05 … 2026-11-20 in Yerevan',
       '     got in                              33 of 41    80.4 %',
+      '     still under way                     0          not counted yet',
       '     lost                                8 of 41     19.5 %',
-      '       never confirmed in the bot        6',
-      '       confirmed, did not come back      3',
+      '       never confirmed in the bot        15',
+      '       confirmed, did not come back      4',
       '       «not me» in the bot               1',
       '       refused by the quota              2          starts, not in «began»',
       '     began again on the same device      12         not counted as beginning',
       '',
       '     day            began     again confirmed  declined    got in   expired   refused',
-      '     2026-10-05         3         2         3         0         3         1         0',
-      '     2026-11-20        38        10        34         1        30         8         2',
+      '     2026-10-05         3         2         3         0         3         2         0',
+      '     2026-11-20        38        10        34         1        30        17         2',
     ])
     expect(lines.join('\n')).not.toMatch(/STOP|pass|fail/)
   })
@@ -239,6 +240,7 @@ describe('gates — чтение ворот вручную', () => {
       'login how many who began got in?                    second way in above 25 %',
       '     began                               0          the day 2026-10-05 in Yerevan',
       '     got in                              0 of 0     —',
+      '     still under way                     0          not counted yet',
       '     lost                                0 of 0     —',
       '       never confirmed in the bot        0',
       '       confirmed, did not come back      0',
@@ -253,13 +255,30 @@ describe('gates — чтение ворот вручную', () => {
     const day = REPORT.logins.days[0]!
     const { exit, lines } = run(['--from', '2026-10-05'], {
       ...REPORT,
-      logins: { ...REPORT.logins, days: [{ ...day, started: 2, again: 1, collected: 2 }] },
+      logins: {
+        ...REPORT.logins,
+        days: [{ ...day, started: 2, again: 1, collected: 2, expiredUnconfirmed: 0 }],
+      },
     })
     await exit
     expect(lines).toContain('     got in                              2 of 1     200.0 %')
     expect(lines).toContain(
       '     lost                                -1 of 1    repeats of starts before the window',
     )
+  })
+
+  it('вход, который ещё идёт, не потерян: «still under way», и из «lost» он вычтен (ревью А2)', async () => {
+    const day = REPORT.logins.days[0]!
+    const { exit, lines } = run(['--from', '2026-10-05'], {
+      ...REPORT,
+      logins: {
+        ...REPORT.logins,
+        days: [{ ...day, started: 3, again: 0, collected: 1, expiredUnconfirmed: 0 }],
+      },
+    })
+    await exit
+    expect(lines).toContain('     still under way                     2          not counted yet')
+    expect(lines.find((line) => line.startsWith('     lost'))).toMatch(/ 0 of 3 +0\.0 %$/)
   })
 
   it.each([
@@ -271,7 +290,15 @@ describe('gates — чтение ворот вручную', () => {
       ...REPORT,
       logins: {
         ...REPORT.logins,
-        days: [{ ...day, started: began, again: 0, collected: began - lost }],
+        days: [
+          {
+            ...day,
+            started: began,
+            again: 0,
+            collected: began - lost,
+            expiredUnconfirmed: lost,
+          },
+        ],
       },
     })
     await exit

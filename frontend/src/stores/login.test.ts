@@ -190,6 +190,22 @@ describe('повтор с того же устройства (MOL-68)', () => {
     expect(kept()).toEqual({ claimed: MINE.id })
   })
 
+  it('вход в аккаунт, признанный раньше, тоже снимает метку — вопроса ведь не будет (ревью А1)', async () => {
+    // Сессия истекла, а ящик и `claimed` этого человека на устройстве: дверь откроется без «Да,
+    // это я».
+    localStorage.setItem(KEY, JSON.stringify({ claimed: MINE.id }))
+    localStorage.setItem(OWNER, MINE.id)
+    opened()
+    const { login } = await signedOut()
+    startLogin.mockResolvedValue(REQUEST)
+    await login.begin()
+    pollLogin.mockResolvedValue({ status: 'authenticated', actor: MINE })
+
+    await login.poll()
+
+    expect(kept()).toEqual({ claimed: MINE.id })
+  })
+
   it('метку видит соседнее окно: повтор там — тоже повтор', async () => {
     localStorage.setItem(KEY, JSON.stringify({ tried: true }))
     opened()

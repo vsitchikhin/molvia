@@ -377,6 +377,9 @@ export const useLoginStore = defineStore('login', () => {
     // живёт дальше: он мог быть уже подтверждён, и выбросить его значило бы просить подтвердить
     // заново (замечание раунда 2, без атаки).
     if (request.value?.id === from.id) drop()
+    // Вошли в аккаунт, признанный раньше: вопроса не будет, а с ним и `claim`, который снимает
+    // метку, — снимаем здесь, иначе следующий вход с устройства ушёл бы повтором (MOL-68, ревью А1).
+    if (view.id === claimed.value) keepClaimOnly(false)
     failure.value = null
     refusedOwner.value = null
     // The owner is adopted at once — it is this browser's session now, whosever it is — and what
