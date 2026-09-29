@@ -2,6 +2,7 @@ import { and, desc, eq, gt, inArray, isNull, isNotNull, lte, or, sql } from 'dri
 import {
   DomainError,
   ERROR,
+  INT8_MAX,
   TRIP_HISTORY_PAGE_SIZE,
   TRIP_UNDO_MINUTES,
   tripSchema,
@@ -185,8 +186,8 @@ export function createTripRepository(db: Conn): TripRepository {
    */
   async function purchasesOf(
     tripIds: readonly string[],
-  ): Promise<Map<string, { itemCount: number; total: Money[] }>> {
-    const counted = new Map<string, { itemCount: number; total: Money[] }>()
+  ): Promise<Map<string, { itemCount: number; total: Money[] | null }>> {
+    const counted = new Map<string, { itemCount: number; total: Money[] | null }>()
     if (tripIds.length === 0) return counted
     const rows = await db
       .select({
@@ -203,8 +204,15 @@ export function createTripRepository(db: Conn): TripRepository {
     for (const row of rows) {
       const entry = counted.get(row.tripId) ?? { itemCount: 0, total: [] }
       entry.itemCount += row.items
-      if (row.currency !== null && row.minor !== null)
-        entry.total.push({ minor: BigInt(row.minor), currency: row.currency })
+      if (row.currency !== null && row.minor !== null) {
+        const minor = BigInt(row.minor)
+        // A sum no amount can carry — only an absurd entry makes one — is unknown rather than a
+        // failure of the whole page: the cursor could never walk past it (review, MOL-128).
+        entry.total =
+          entry.total && minor <= INT8_MAX
+            ? [...entry.total, { minor, currency: row.currency }]
+            : null
+      }
       counted.set(row.tripId, entry)
     }
     return counted
@@ -350,7 +358,7 @@ export function createTripRepository(db: Conn): TripRepository {
             finishedAt,
             finishedOnDeviceAt,
             itemCount: counted?.itemCount ?? 0,
-            total: counted?.total ?? [],
+            total: counted ? counted.total : [],
           }
         }),
         nextCursor:

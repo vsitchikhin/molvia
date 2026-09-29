@@ -262,6 +262,31 @@ describe('history of completed trips', () => {
     expect(row(other)).toMatchObject({ itemCount: 1, total: [] })
   })
 
+  it('a sum no amount can carry is unknown, and the page still answers', async () => {
+    const actor = await insertActor(db)
+    const place = await insertPlace(db, { name: `History ${randomUUID()}` })
+    const trip = await insertTrip(db, { actorId: actor, placeId: place })
+    const item = await insertItem(db)
+    for (let n = 0; n < 2; n += 1)
+      await db.insert(expenses).values({
+        id: randomUUID(),
+        tripId: trip,
+        itemId: item,
+        amountMinor: 5_000_000_000_000_000_000n,
+        amountCurrency: 'AMD',
+      })
+    await db.execute(sql`update trips set finished_at = now() where id = ${trip}`)
+    const cookie = await signIn(db, actor)
+
+    const reply = await app.inject({ url: '/trips/history', headers: { cookie } })
+
+    expect(reply.statusCode).toBe(200)
+    expect(tripHistoryCodec.parse(reply.json()).trips[0]).toMatchObject({
+      itemCount: 2,
+      total: null,
+    })
+  })
+
   it('reads an answer of a server that did not count them as unknown, not as zero', () => {
     const [entry] = tripHistoryCodec.parse({
       trips: [

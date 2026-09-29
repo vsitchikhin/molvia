@@ -117,9 +117,23 @@ export async function advice(
 }
 
 /**
+ * How many of the catalogue's candidates the search on «Что брать» looks through for a verdict
+ * (MOL-128, adversarial А). The catalogue ranks every candidate anyway (MOL-14); this only bounds
+ * what comes back. Far above what one word of a shop's shelf finds — «сыр» is 24 names in the seed.
+ */
+export const ADVICE_SEARCH_CANDIDATES = 500
+
+/**
  * The search on «Что брать» (MOL-128, В-1): the catalogue searched as «Что взяли?» searches it,
  * and every item found answered with its row of «Что брать» — built by `describe`, the list's own
  * rules — or `null`, «ещё не оценивали». In the order of the search.
+ *
+ * **What is rated is not cut** (adversarial А): the first `SEARCH_LIMIT` found, as «Что взяли?»
+ * shows them, and past them every near one — each word within one edit — that has a verdict in
+ * sight. Cut at twenty before the verdicts were asked, «сыр» answered twenty cheeses «ещё не
+ * оценивали» and left out the one rated «не брать нигде»: the warning the screen exists for,
+ * gone behind the word on the package. Far ones past the limit stay out: they are the catalogue's
+ * guesses, not what was typed.
  *
  * **It records no visit** (В-2, the owner's decision): `advice` does, and the screen asks for the
  * list whenever it opens and whenever the connection comes back — the field is not shown without
@@ -136,8 +150,11 @@ export async function adviceSearch(
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
   const scope: AdviceScope = hasSharedAccess(actor, new Date()) ? 'shared' : 'own'
 
-  const found = await items.search(query, SEARCH_LIMIT, actorId)
-  const itemIds = found.items.map((item) => item.id)
+  const found = await items.search(query, ADVICE_SEARCH_CANDIDATES, actorId)
+  const close = new Set(found.nearIds)
+  const first = found.items.slice(0, SEARCH_LIMIT)
+  const past = found.items.slice(SEARCH_LIMIT).filter((item) => close.has(item.id))
+  const itemIds = [...first, ...past].map((item) => item.id)
   const rated =
     itemIds.length === 0
       ? []
@@ -154,12 +171,15 @@ export async function adviceSearch(
         ).rows
   const rows = await describe(expenses, actor, scope, rated)
   const byItem = new Map(rows.map((row) => [row.itemId, row]))
+  const answered = [...first, ...past.filter((item) => byItem.has(item.id))]
 
   const answer = {
     scope,
     geography: { country: actor.country, city: actor.city },
-    near: found.near,
-    items: found.items.map((item) => ({
+    // Whether anything shown is close (MOL-46), by the rows themselves: what is shown is not what
+    // the catalogue handed on.
+    near: answered.some((item) => close.has(item.id)),
+    items: answered.map((item) => ({
       itemId: item.id,
       name: item.name,
       advice: byItem.get(item.id) ?? null,

@@ -17,21 +17,21 @@ entry; a data file (`sql`, `json`, fonts, icons) by an entry for a directory abo
 
 ## Areas
 
-| Map                  | What is in it                                                                 |
-| -------------------- | ----------------------------------------------------------------------------- |
-| `search.md`          | catalogue search, the search key, synonyms, remembered picks, the seed        |
-| `advice.md`          | «Что брать», verdicts and «Оценки», the event log, the gates                  |
-| `trips.md`           | «Поход», purchases, the queue on the device, trip history, places, settings   |
-| `money-rates.md`     | official rates and their feeds, exchanges, incomes, the wallet                |
-| `money-spendings.md` | spendings, categories, the month, the «Деньги» screen and its queue           |
-| `money-accounts.md`  | accounts, balances, «Списано со счёта», the check                             |
-| `auth.md`            | sessions, the login request, the cookie, the login screen, «Выйти», devices   |
-| `privacy.md`         | erasure, the privacy page, logs                                               |
-| `bot.md`             | the bot: its half of the login, `/delete`                                     |
-| `frontend.md`        | the app shell and kit: `App.vue`, the screen frame, the sheet, states, styles |
-| `e2e.md`             | end-to-end infrastructure; each spec lives in its area's map                  |
-| `deploy.md`          | images, the production stack, backups, the release workflow                   |
-| `workspace.md`       | the repository root, `bin/`, hooks, CI, module configs, the code-map check    |
+| Map                  | What is in it                                                                  |
+| -------------------- | ------------------------------------------------------------------------------ |
+| `search.md`          | catalogue search, the search key, synonyms, remembered picks, the seed         |
+| `advice.md`          | «Что брать», verdicts and «Оценки», the event log, the gates                   |
+| `trips.md`           | «Покупки», the record typed by hand, the queue on the device, places, settings |
+| `money-rates.md`     | official rates and their feeds, exchanges, incomes, the wallet                 |
+| `money-spendings.md` | spendings, categories, the month, the «Деньги» screen and its queue            |
+| `money-accounts.md`  | accounts, balances, «Списано со счёта», the check                              |
+| `auth.md`            | sessions, the login request, the cookie, the login screen, «Выйти», devices    |
+| `privacy.md`         | erasure, the privacy page, logs                                                |
+| `bot.md`             | the bot: its half of the login, `/delete`                                      |
+| `frontend.md`        | the app shell and kit: `App.vue`, the screen frame, the sheet, states, styles  |
+| `e2e.md`             | end-to-end infrastructure; each spec lives in its area's map                   |
+| `deploy.md`          | images, the production stack, backups, the release workflow                    |
+| `workspace.md`       | the repository root, `bin/`, hooks, CI, module configs, the code-map check     |
 
 Layers inside an area's map come in one order: `packages/model` → `packages/client` → backend routes
 → use cases → db → tests → frontend views → components → composables → stores → `bot` → `e2e`.

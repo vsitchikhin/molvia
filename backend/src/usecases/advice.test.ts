@@ -6,7 +6,7 @@ import type { EventRepository, RecordedEvent } from '@/db/events-repository'
 import type { ExpenseRepository, PlacePrice, PriceMedian } from '@/db/expenses-repository'
 import type { ItemRepository } from '@/db/items-repository'
 import type { AdviceQuery, AdviceVerdictRow, VerdictRepository } from '@/db/verdicts-repository'
-import { advice, adviceSearch } from './advice'
+import { ADVICE_SEARCH_CANDIDATES, advice, adviceSearch } from './advice'
 import { SEARCH_LIMIT } from './search-catalogue'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
@@ -363,7 +363,7 @@ describe('поиск «Что брать» (MOL-128)', () => {
       createUnlessNamed: () => Promise.reject(new Error('createUnlessNamed was not expected')),
       search: (...args) => {
         searched.push(args)
-        return Promise.resolve({ items: found, near })
+        return Promise.resolve({ items: found, near, nearIds: near ? found.map((i) => i.id) : [] })
       },
     }
     const { actors, expenses } = all
@@ -382,7 +382,46 @@ describe('поиск «Что брать» (MOL-128)', () => {
       ['Сыр косичка', null],
       ['Сыр Лори', 'take'],
     ])
-    expect(world.searched).toEqual([['syr', SEARCH_LIMIT, ACTOR]])
+    expect(world.searched).toEqual([['syr', ADVICE_SEARCH_CANDIDATES, ACTOR]])
+  })
+
+  // Adversarial А: «сыр» is 24 names in the seed. Cut at twenty before the verdicts, the one rated
+  // «не брать нигде» was gone and twenty «ещё не оценивали» stood in its place.
+  it('оценённое за пределом поиска не отрезано: первые двадцать и всё близкое с оценкой', async () => {
+    const id = (n: number) => `4d9c3b52-7e0f-4c4a-9b33-${String(n).padStart(12, '0')}`
+    const cheeses = Array.from({ length: SEARCH_LIMIT + 4 }, (_, n) =>
+      item(id(n), `Сыр ${String(n)}`),
+    )
+    const warned = cheeses[SEARCH_LIMIT + 2]
+    const far = cheeses[SEARCH_LIMIT + 3]
+    if (!warned || !far) throw new Error('no cheese')
+    const world = searching(
+      {
+        rows: [
+          rated({ itemId: warned.id, name: warned.name, sum: 1 }),
+          rated({ itemId: far.id, name: far.name, sum: 5 }),
+        ],
+      },
+      cheeses,
+    )
+    // Every one near but the last: a guess of the catalogue's, two edits away.
+    const catalogue = world.deps.items
+    world.deps.items = {
+      ...catalogue,
+      search: async (...args) => ({
+        ...(await catalogue.search(...args)),
+        nearIds: cheeses.slice(0, -1).map((cheese) => cheese.id),
+      }),
+    }
+
+    const answer = await adviceSearch(world.deps, ACTOR, 'сыр')
+
+    expect(answer.items).toHaveLength(SEARCH_LIMIT + 1)
+    expect(answer.items.at(-1)).toMatchObject({ name: warned.name, advice: { level: 'never' } })
+    expect(answer.items.map((found) => found.itemId)).not.toContain(far.id)
+    // Asked about the twenty shown and the near past them — not the far one.
+    expect(world.asked[0]?.itemIds).toHaveLength(SEARCH_LIMIT + 3)
+    expect(answer.near).toBe(true)
   })
 
   it('спрашивает оценки только найденного и не режет их пределом списка', async () => {

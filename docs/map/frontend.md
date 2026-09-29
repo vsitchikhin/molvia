@@ -18,7 +18,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/components/ScreenSkeleton.vue` — Loading state: bars in the geometry the screen gives, announcing «Loading…» through the live region.
 - `frontend/src/components/ScreenState.vue` — Every non-loading screen state (empty, error, offline, attention): icon circle by tone, texts, «Try again» and actions.
 - `frontend/src/components/SegmentedControl.vue` — Kit segmented control: a radio fieldset drawn as segments, for one choice out of up to four (unit, rate).
-- `frontend/src/components/TabBar.vue` — The tab bar of the five sections («Поход», «Что брать», «Оценки», «Деньги», «Настройки»), moving through `useNavigation`.
+- `frontend/src/components/TabBar.vue` — The tab bar of the five sections («Что брать», «Покупки», «Оценки», «Деньги», «Настройки»), moving through `useNavigation`.
 - `frontend/src/components/UndoStrip.vue` — «Удалено · Вернуть» strip: ten seconds to take back a removal, paused under a finger or focus.
 
 ## frontend · composables
@@ -49,9 +49,9 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/i18n/plural-ru.ts` — The Russian plural rule for vue-i18n: form by the last two digits, fractions and unknown counts included.
 - `frontend/src/ids.ts` — `newId`: a lower-case uuid for rows the device names, with a fallback outside a secure context.
 - `frontend/src/main.ts` — The PWA's entry: router, i18n, the update worker and the `401` seam installed, the app mounted, the identity started.
-- `frontend/src/navigation.ts` — Navigation rules: how a tab tap is written into history, where the back chevron leads, cold-start parent laying, guarded step back.
+- `frontend/src/navigation.ts` — Navigation rules: how a tab tap is written into history (home — «Что брать»), where the back chevron leads, up to the parent, cold-start parent laying, guarded step back and `afterStep`.
 - `frontend/src/pwaUpdate.ts` — Service-worker registration and update: a new version is let in only while the app is hidden and no sheet holds typing.
-- `frontend/src/router.ts` — The router: every route with its title key, tab and parent, the dev-only kit route, and the scroll behaviour.
+- `frontend/src/router.ts` — The router: every route with its title key, tab and parent, redirects of old addresses (`/trip*`, `/advice`), the dev-only kit route, and the scroll behaviour.
 - `frontend/src/styles/_fonts.scss` — Font faces: self-hosted Nunito and Onest subsets, and the dram sign's own face.
 - `frontend/src/styles/_mixins.scss` — SCSS mixins injected into every component: touch target, wider-than-phone, pinned bar, visually hidden, focus ring.
 - `frontend/src/styles/_tokens.scss` — Design tokens: every colour, size, radius and duration as custom properties, light and dark schemes.

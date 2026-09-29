@@ -5,7 +5,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 ## packages/model
 
-- `packages/model/src/contracts/advice.ts` — Wire contract of «Что брать»: `scope`, the row as a union on `level`, places with unit prices, limits and the answer.
+- `packages/model/src/contracts/advice.ts` — Wire contract of «Что брать»: `scope`, the row as a union on `level`, places with unit prices, limits, the answer, and the search's answer (an item found with its row or `null`, MOL-128).
 - `packages/model/src/contracts/events.ts` — Contract of the event log: the event types, `advice_viewed` among them, each with the payload tied to its type.
 - `packages/model/src/contracts/verdict.ts` — Wire contract of verdicts: the path by item, the rating and amendment bodies, the verdict card and the pending list.
 - `packages/model/src/entities/catalogue.ts` — Frozen mapping of item kinds and place kinds onto the two halves of the 0.3 gate, product and venue.
@@ -14,12 +14,12 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 ## backend · routes
 
-- `backend/src/routes/advice.ts` — Route `GET /advice`: the whole «Что брать» screen, no parameters, never cached. Tests: `backend/tests/advice.integration.test.ts`.
+- `backend/src/routes/advice.ts` — Routes `GET /advice` (the whole «Что брать» screen, no parameters) and `GET /advice/search?q=` (MOL-128), never cached. Tests: `backend/tests/advice.integration.test.ts`, `backend/tests/advice-search.integration.test.ts`.
 - `backend/src/routes/verdicts.ts` — Routes of verdicts: `PUT`, `PATCH`, `DELETE /verdicts/:itemId` and `GET /verdicts/pending`. Tests: `backend/tests/verdicts.integration.test.ts`.
 
 ## backend · usecases
 
-- `backend/src/usecases/advice.ts` — Use case «Что брать»: rows by verdict with prices, own or shared scope, and the once-a-day `advice_viewed` in shared mode.
+- `backend/src/usecases/advice.ts` — Use cases «Что брать»: rows by verdict with prices, own or shared scope, the once-a-day `advice_viewed` in shared mode; and its search — the catalogue's answer with each item's row by the same rules, rated ones past the limit kept, no visit written.
 - `backend/src/usecases/amend-verdict.ts` — Use case «Изменить оценку»: changes the score or the review of one's own verdict; nothing to change is not found.
 - `backend/src/usecases/pending-verdicts.ts` — Use case «Оценки»: the person's purchases not yet rated, one card per item.
 - `backend/src/usecases/rate-item.ts` — Use case «Поставить оценку»: a first or repeated verdict on any catalogue item, the body checked against the item's kind.
@@ -29,7 +29,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 - `backend/src/db/events-repository.ts` — Repository of the event log: record, record once per day of the person's life, and the 0.3 week-four return. Tests: `backend/tests/events-repository.integration.test.ts`.
 - `backend/src/db/gates-reader.ts` — Reader of both gates over one window in a read-only snapshot, with the erased counted by week. Tests: `backend/tests/gates-reader.integration.test.ts`.
-- `backend/src/db/verdicts-repository.ts` — Repository of verdicts: put, amend, withdraw, the «Что брать» rows and `reachedRatings` for gate 0.2. Tests: `backend/tests/advice-verdicts.integration.test.ts`.
+- `backend/src/db/verdicts-repository.ts` — Repository of verdicts: put, amend, withdraw, the «Что брать» rows (optionally of given items, for the search) and `reachedRatings` for gate 0.2. Tests: `backend/tests/advice-verdicts.integration.test.ts`.
 
 ## backend · other
 
@@ -40,6 +40,8 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 - `backend/tests/advice-prices.integration.test.ts` — Integration test: the price side of «Что брать» — the lower median, three buyers to open a place, city filter and own city first.
 - `backend/tests/advice-verdicts.integration.test.ts` — Integration test: the verdict rows of «Что брать» — own versus shared, three people for an aggregate, order and limit.
+- `backend/tests/advice-search-seed.integration.test.ts` — Integration test: the search on «Что брать» over the real seed — a rated item past the limit of twenty is found, its «не брать нигде» too.
+- `backend/tests/advice-search.integration.test.ts` — Integration test: `GET /advice/search` — transliteration and typos, a row past `ADVICE_LIMIT`, the threshold of three, no price on «не брать нигде», nothing written.
 - `backend/tests/advice.integration.test.ts` — Integration test: `GET /advice` through the server — the three groups, prices, nothing of others without access, the event log.
 - `backend/tests/events-repository.integration.test.ts` — Integration test: the 0.3 week-four return by cohort and access, pending windows, and recording at most once a day.
 - `backend/tests/gates-reader.integration.test.ts` — Integration test: the gates reader reads both gates over one window, counts the erased, inside a read-only transaction.
@@ -49,14 +51,16 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 ## frontend · views
 
-- `frontend/src/views/AdviceView.vue` — «Что брать» screen: three groups by verdict, whose figures they are, a stale strip over the remembered list, the edit sheet.
+- `frontend/src/views/AdviceView.vue` — «Что брать», the home screen (MOL-128): the search over the list, three groups by verdict, whose figures they are, a stale strip over the remembered list, the newcomer's home, the edit sheet.
 - `frontend/src/views/VerdictsView.vue` — «Оценки» screen: bought and not yet rated, one card at a time, saved on the phone and sent by the app.
 
 ## frontend · components
 
 - `frontend/src/components/AdviceCheapRow.vue` — Row of «Только если дёшево»: the rating, then the price threshold or the place where it was bought.
-- `frontend/src/components/AdviceGroup.vue` — Group heading of «Что брать»: the word and badge of «Брать», «Только если дёшево» or «Не брать нигде».
+- `frontend/src/components/AdviceGroup.vue` — Group heading of «Что брать»: the word and badge of «Брать», «Только если дёшево» or «Не брать нигде»; «Ещё не оценивали» for the search.
+- `frontend/src/components/AdviceHomeNew.vue` — «Что брать» of a newcomer (MOL-128): «Запишите первые покупки» or «Осталось оценить», the cycle of three steps, the line about trust.
 - `frontend/src/components/AdviceNeverRow.vue` — Row of «Не брать нигде»: struck-through name, rating and own review, with no price or place.
+- `frontend/src/components/AdviceSearch.vue` — The search on «Что брать»: the field, and what is found laid out by the list's groups and shapes, «Ещё не оценивали» last with «Оценить».
 - `frontend/src/components/AdviceRating.vue` — The «4,3 из 5 · 3 оценки» figure shared by all three row forms; the count is left out in own mode.
 - `frontend/src/components/AdviceTakeCard.vue` — Card of «Брать»: verdict, rating, name, and where it is cheapest at what price per unit.
 - `frontend/src/components/RatingScale.vue` — The 1–5 digit scale used wherever a verdict is given or changed; a second tap takes the choice back.
@@ -69,6 +73,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 ## frontend · composables
 
 - `frontend/src/composables/useAdvice.ts` — Composable: the «Что брать» answer split into groups, remembered on the phone, with stale and city-change states.
+- `frontend/src/composables/useAdviceSearch.ts` — Composable: the search on «Что брать» as it is typed — the server's answer, the rhythm of the catalogue search, the remembered list searched offline.
 - `frontend/src/composables/useVerdictQueue.ts` — Composable: the queue of «Оценки» as the phone sees it — server order, saved drafts hidden, refusals first, «Не сейчас».
 
 ## frontend · stores
@@ -77,7 +82,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 ## e2e
 
-- `e2e/advice.spec.ts` — End-to-end: a rating becomes a «Что брать» row with place and price, a bad one has none, empty, offline, error, amend.
+- `e2e/advice.spec.ts` — End-to-end: a rating becomes a «Что брать» row with place and price, a bad one has none, the newcomer, offline, error, amend, the search.
 - `e2e/verdicts.spec.ts` — End-to-end: «Оценки» rates purchases one by one, puts one off, and sends ratings made offline once the connection is back.
 
 ## repository
