@@ -3,6 +3,11 @@
 Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 `packages/model/tests/`, is covered by the source's entry.
 
+## packages/model
+
+- `packages/model/src/contracts/reminder.ts` — Wire contract of the rating reminder (MOL-101): what a claim hands the bot — the chat, up to three items with place and days ago, the total — and the body of a press of 1–5.
+- `packages/model/src/entities/reminder.ts` — The reminder's ladder (MOL-101): 19:00 to 22:00 of the person's day, three items, steps after 3 and 7 days, a six-month pause, and `planReminder` deciding which step is due.
+
 ## packages/client
 
 - `packages/client/src/bot.ts` — The bot's API client: preview, confirm and decline a login, and erase a person, over the internal channel with the bot secret. Tests: `packages/client/src/auth.test.ts`.

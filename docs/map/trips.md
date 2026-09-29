@@ -10,7 +10,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `packages/model/src/entities/expense.ts` — Entity of a trip purchase: item required, quantity and amount optional; the new-row and patch schemas.
 - `packages/model/src/entities/place.ts` — Entity of a place (shop or venue) with its country and city; the schema a new place is named by.
 - `packages/model/src/entities/trip.ts` — Entity of a trip: rate snapshot and rate choice, `TRIP_UNDO_MINUTES`, the effective rate, staleness, totals and conversion.
-- `packages/model/src/values/geo.ts` — Value schemas of a country code and a city name.
+- `packages/model/src/values/geo.ts` — Value schemas of a country code and a city name, and the time zone a country's day is read in (MOL-101).
 - `packages/model/src/values/place-identity.ts` — When two spellings name one place, the TypeScript twin of the database's place index. Tests: `backend/tests/place-identity.integration.test.ts`.
 
 ## backend · routes
