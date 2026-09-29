@@ -218,12 +218,25 @@ nothing up.
   holding the phone, whatever the hour in Yerevan. **The server takes any day that has come
   somewhere** (`latestDay`, UTC+14) — at most Yerevan's tomorrow, so nobody in Yerevan writes
   tomorrow's spending — **and counts its sums by Yerevan's today**: the wallet walks no link past it,
-  the running month, the balances and the charts are Yerevan's. **The price, named** (Р-5): east of
-  Yerevan, for up to ten hours a day, a day written there is in the wallet, a trip's own rate and the
-  balances only once Yerevan reaches it; west of it the phone's day is never ahead. What the phone
-  shows of the server's running month — the rate of the month kept offline (`useMoneyMonth`), the
-  period «Графики» open on (`CategoryBars`) — stays Yerevan's with it. End-to-end runs the browser in
-  `Asia/Yerevan`, a phone in Armenia; the component tests hold the rest in UTC.
+  the running month and the charts are Yerevan's. **The price, named** (Р-5): east of Yerevan, for up
+  to ten hours a day, a day written there is in the wallet and a trip's own rate only once Yerevan
+  reaches it — «Счета» count it at once, a balance takes every operation after its start. West of it
+  the phone's day is never ahead. What the phone shows of the server's running month — the rate of
+  the month kept offline (`useMoneyMonth`), the period «Графики» open on (`CategoryBars`) — stays
+  Yerevan's with it. **What a sheet asks «сколько было до» by is walked to the phone's day**
+  (`latestDay` in `ownMoney`, adversarial О): the first exchange of a night Yerevan has not reached
+  did give its currency a price, and the second, not asked, lost the answer for good; the wallet
+  still stops at Yerevan's. **A check is dated by the phone's day** it sends (`checkedOn`,
+  money-accounts). «Сегодня» is asked again when the app comes back into view (`useLocalDay`,
+  adversarial Н), and the sheet of a spending lets an amendment keep its own day when it is ahead of
+  the phone's — a correction of a check, a spending typed further east (adversarial Л). **Two more
+  prices, named, both cured only by a zone on the request:** a trip's line in «Деньги» is dated by
+  Yerevan's day of its finish (`finished_at`), so east of Yerevan after the phone's midnight a
+  purchase of the same minute as a spending stands under «Вчера», at a month's edge in the month
+  before (adversarial К); and west of Yerevan in the last hour of a month the phone's running month
+  is closed in Yerevan already — its rate frozen, no «мой курс на сегодня» in the sheet until the
+  phone's midnight (review Т-2). End-to-end runs the browser in `Asia/Yerevan`, a phone in Armenia;
+  the component tests hold the rest in UTC.
 - **The categories are the owner's, not a month's**, so the newest month kept names them for a
   month not read yet: «Трата» stands while the month loads, when it failed and offline on the first
   of a month (review Т-5, Т-6) — and does not, where no category is known at all. «Категории ›»
