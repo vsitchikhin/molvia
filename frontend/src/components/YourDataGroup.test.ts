@@ -175,6 +175,44 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     expect(clicked).toEqual([])
     // The new file is not thrown away: it waits for the sheet to go (adversarial Р2-А).
     expect(view.get('.ready').text()).toContain(en.settings.export.ready)
+
+    // And its button still reaches the browser, which answers for its own open sheet (review 22).
+    share.mockRejectedValueOnce(refusal('InvalidStateError'))
+    await view.get('.ready button').trigger('click')
+    await flushPromises()
+    expect(share).toHaveBeenCalledTimes(3)
+    expect(clicked).toEqual([])
+    expect(view.find('.ready').exists()).toBe(true)
+  })
+
+  it('a sheet that settles late speaks only for its own file, never over a newer one', async () => {
+    const hanging: { settle: (error?: Error) => void } = { settle: () => undefined }
+    share
+      .mockReturnValueOnce(
+        new Promise((resolve, reject) => {
+          hanging.settle = (error) => {
+            if (error) reject(error)
+            else resolve()
+          }
+        }),
+      )
+      .mockRejectedValueOnce(refusal('InvalidStateError'))
+    exportMine
+      .mockResolvedValueOnce({ text: 'first', exportedAt: EXPORTED_AT })
+      .mockResolvedValueOnce({ text: 'second', exportedAt: EXPORTED_AT })
+    const view = await render()
+    await download(view).trigger('click')
+    await flushPromises()
+    await download(view).trigger('click')
+    await flushPromises()
+
+    hanging.settle(refusal('AbortError'))
+    await flushPromises()
+
+    expect(view.find('.ready').exists()).toBe(true)
+    await view.get('.ready button').trigger('click')
+    await flushPromises()
+    expect(await share.mock.calls[2]?.[0].files?.[0]?.text()).toBe('second')
   })
 
   it('leaving the screen while the file is prepared cancels it, and nothing is handed over', async () => {

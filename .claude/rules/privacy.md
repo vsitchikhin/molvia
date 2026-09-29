@@ -104,9 +104,11 @@ The detail behind the privacy lines of `CLAUDE.md`.
   (Android Chrome does not share `.json`). A sheet the person closed is not an error: the file stays
   under «Файл готов»; a second `share` over an open sheet is `InvalidStateError`, never a reason to
   download as well — the file waits under «Файл готов» instead, a new one from the row included, so
-  nothing the server made is thrown away (adversarial Р2-А); the guard counts open sheets and sits
-  only on the second tap, so a sheet whose promise never settles cannot leave the row dead (review
-  14). **Leaving the screen while the file is prepared is changing one's mind**: the
+  nothing the server made is thrown away (adversarial Р2-А). **There is no guard of our own**: over
+  an open sheet the browser refuses by itself, and a flag or a counter of ours, stuck on a sheet
+  whose promise never settled, left first the row and then «Сохранить или отправить» dead (review
+  14, 22). A sheet that settles late speaks only for its own file — the last one handed to a sheet —
+  and never clears or replaces a newer one under «Файл готов» (adversarial Р3-А). **Leaving the screen while the file is prepared is changing one's mind**: the
   request is cancelled and nothing is handed over on another screen (review 13, adversarial В). The row is inactive (`aria-disabled`), never disabled, and the focus goes
   back to it when the button tapped goes. **Limits, named:** a download inside an installed iOS app
   is checked on the phone, not here; and `spendings` has no CHECK on `rate_base` nor on a positive

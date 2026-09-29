@@ -54,32 +54,31 @@ export function useExport(): ExportState {
   // Shallow: a File behind a reactive proxy is not a File to `navigator.share`.
   const ready = shallowRef<File | null>(null)
 
-  // How many sheets are open: a refused call must not take the guard off one still hanging.
-  let sharing = 0
+  // The last file handed to a sheet: a sheet that settles late speaks only for its own file, never
+  // over a newer one under «Файл готов» (adversarial Р3-А).
+  let latest: File | null = null
 
   // Called straight from a tap on the second try: `navigator.share` goes out before any await.
   async function deliver(file: File, retryable: boolean): Promise<void> {
+    latest = file
     if (onTouch() && 'canShare' in navigator && navigator.canShare({ files: [file] })) {
-      sharing += 1
       try {
         await navigator.share({ files: [file] })
-        ready.value = null
+        if (latest === file) ready.value = null
         return
       } catch (error) {
-        // Closed by the person, the sheet of a Mac without «Save» among its places included: the
-        // file stays under «Файл готов» rather than vanish with nothing saved.
-        if (named(error, 'AbortError') || (named(error, 'NotAllowedError') && retryable)) {
+        if (latest !== file) return
+        // Closed by the person — the sheet of a Mac without «Save» among its places included — or
+        // refused because a sheet is still open (`InvalidStateError`, the browser's own guard): the
+        // file stays under «Файл готов», never downloaded over a sheet, never thrown away.
+        if (
+          named(error, 'AbortError') ||
+          named(error, 'InvalidStateError') ||
+          (named(error, 'NotAllowedError') && retryable)
+        ) {
           ready.value = file
           return
         }
-        // A sheet still open from a tap before: no download over it, and the file — a new one when
-        // the row was tapped — waits under «Файл готов» rather than vanish (adversarial Р2-А).
-        if (named(error, 'InvalidStateError')) {
-          ready.value = file
-          return
-        }
-      } finally {
-        sharing -= 1
       }
     }
     ready.value = null
@@ -116,10 +115,10 @@ export function useExport(): ExportState {
     await deliver(file, true)
   }
 
-  // Guarded here and not in `start`: a sheet whose promise never settles must not leave the row
-  // dead, and only a second `share` over an open sheet is refused (`InvalidStateError`).
+  // No guard of our own: over an open sheet the browser answers `InvalidStateError` itself, and a
+  // counter of ours stuck on a sheet that never settled left this button dead (review 22).
   function handOver(): void {
-    if (ready.value && sharing === 0) void deliver(ready.value, false)
+    if (ready.value) void deliver(ready.value, false)
   }
 
   const offline = (): void => {
