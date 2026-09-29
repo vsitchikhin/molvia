@@ -95,6 +95,11 @@ export interface MoneyMonth {
   readonly spent: Money
   /** What had no rate to the spending currency on its day, by currency — never guessed. */
   readonly uncounted: readonly Money[]
+  /**
+   * The categories something of `uncounted` belongs to: only their sums are short (adversarial d9
+   * round 3, В3) — a coffee in dollars leaves «Кафе» of the month incomplete, not «Продукты».
+   */
+  readonly uncountedIn: readonly string[]
   /** What was spent in other currencies, and what it came to in the spending one («Включая 11 $…»). */
   readonly foreign: readonly { readonly amount: Money; readonly counted: Money }[]
   /** `spent` in the income currency by the month's rate — null when there is none. */
@@ -356,16 +361,19 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
   const uncounted = new Map<Currency, bigint>()
   const foreign = new Map<Currency, { amount: bigint; counted: bigint }>()
   const byCategory = new Map<string, bigint>()
+  const uncountedIn = new Set<string>()
   const entries = counted.map((entry): MonthEntry => {
     const amount = amountOf(entry)
     const value = entry.counted
     const held = foreign.get(amount.currency) ?? { amount: 0n, counted: 0n }
+    const categoryId = entry.kind === 'manual' ? entry.spending.categoryId : groceries?.id
     if (
       value === null ||
       spentMinor + value.minor > INT8_MAX ||
       (amount.currency !== spend && held.amount + amount.minor > INT8_MAX)
     ) {
       add(uncounted, amount)
+      if (categoryId !== undefined) uncountedIn.add(categoryId)
       return { ...entry, counted: null }
     }
     spentMinor += value.minor
@@ -375,7 +383,6 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
         counted: held.counted + value.minor,
       })
     }
-    const categoryId = entry.kind === 'manual' ? entry.spending.categoryId : groceries?.id
     if (categoryId !== undefined) {
       byCategory.set(categoryId, (byCategory.get(categoryId) ?? 0n) + value.minor)
     }
@@ -409,8 +416,11 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
   }
 
   const spent: Money = { minor: spentMinor, currency: spend }
+  // Nothing spent is nothing in any currency, with or without a rate (review of MOL-74, С-7): a
+  // month of no spending and no rate was «нет курса» on «Деньгах» and a bar of «not known» on the
+  // charts, taller than any month that had one.
   const spentIncome =
-    spend === incomeCurrency
+    spend === incomeCurrency || spentMinor === 0n
       ? { minor: spentMinor, currency: incomeCurrency }
       : input.rate === null
         ? null
@@ -423,6 +433,7 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
     incomeCurrency,
     spent,
     uncounted: listOf(uncounted),
+    uncountedIn: [...uncountedIn].sort(),
     foreign: [...foreign]
       .map(([currency, sums]) => ({
         amount: { minor: sums.amount, currency },

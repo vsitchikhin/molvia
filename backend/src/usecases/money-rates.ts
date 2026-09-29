@@ -1,5 +1,15 @@
 import { RATE_SCALE, currencySchema, walletCross } from '@molvia/model'
-import type { Actor, AmdRate, CachedRate, Currency, ExchangeRate, Receipt } from '@molvia/model'
+import type {
+  Actor,
+  AmdRate,
+  CachedRate,
+  Currency,
+  Exchange,
+  ExchangeRate,
+  Income,
+  RatePreference,
+  Receipt,
+} from '@molvia/model'
 import { freshOfficialRate, officialRateOf, officialRatesOn, sinceDay } from './exchanges'
 import type { TripRepositories } from '@/db/unit-of-work'
 
@@ -31,6 +41,17 @@ export interface DayRates {
    * never what the money already held cost, which is a price of other money (review Р-2).
    */
   official(one: Currency, other: Currency, day: string): Promise<ExchangeRate | null>
+
+  /**
+   * What the rates were worked out from, read once at the start: a month frozen by them is frozen by
+   * exactly these receipts and this rule, and `settleThaws` holds a later read against them.
+   */
+  readonly basis: {
+    readonly exchanges: readonly Exchange[]
+    readonly incomes: readonly Income[]
+    readonly preference: RatePreference
+    readonly since: Date | null
+  }
 }
 
 export async function dayRates(repositories: Repositories, owner: Owner): Promise<DayRates> {
@@ -70,6 +91,7 @@ export async function dayRates(repositories: Repositories, owner: Owner): Promis
   }
 
   return {
+    basis: { exchanges, incomes, preference, since },
     async between(one, other, day) {
       if (one === other) return null
       const own =

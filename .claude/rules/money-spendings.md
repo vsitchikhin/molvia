@@ -1,21 +1,21 @@
 ---
 paths:
-  - 'packages/model/src/{entities,contracts}/{spending,spending-category,money,money-month}.ts'
-  - 'packages/model/tests/{entities,contracts}/{spending,money,money-month}*.test.ts'
+  - 'packages/model/src/{entities,contracts}/{spending,spending-category,money,money-month,money-charts}.ts'
+  - 'packages/model/tests/{entities,contracts}/{spending,money,money-month,money-charts}*.test.ts'
   - 'backend/src/db/{spendings,spending-categories,money}-repository.ts'
   - 'backend/src/usecases/{spendings,money-month,money-rates,money}*.ts'
   - 'backend/src/routes/spendings.ts'
   - 'backend/tests/spendings*.ts'
-  - 'backend/tests/{salary-shift,month-rest}*.ts'
+  - 'backend/tests/{salary-shift,month-rest,money-charts}*.ts'
   - 'backend/drizzle/*spending*.sql'
   - 'frontend/src/views/Money*'
-  - 'frontend/src/components/{Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*}'
-  - 'frontend/src/composables/useMoneyMonth*'
+  - 'frontend/src/components/{Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*,BarChart*,RateLine*,ExchangeLosses*,charts*}'
+  - 'frontend/src/composables/{useMoneyMonth,useMoneyCharts,useChartPointer}*'
   - 'frontend/src/composables/useSalaryShift*'
   - 'frontend/src/components/SalaryShift*'
   - 'frontend/src/stores/{spendingQueue,queueing}*'
   - 'frontend/src/days*'
-  - 'e2e/money.spec.ts'
+  - 'e2e/money{,-charts}.spec.ts'
 ---
 
 # Money: spendings, the month, and «Деньги» on the phone
@@ -236,5 +236,97 @@ nothing up.
   screen, or to a live one of one's own, is refused there. The colours are tokens — thirteen
   presets and a palette of eight for one's own, none red, olive, ochre or terracotta, each at
   least 3:1 on `--surface`.
-- The charts, a tap on a category and «Графики по месяцам» are MOL-74's (Р-7); accounts are
-  MOL-115's.
+- A tap on a category opens «Графики» on it, and «Графики по месяцам» stands under the bars
+  (MOL-74, below); accounts are MOL-115's.
+
+## «Графики» (MOL-74)
+
+**The months of «Деньги» side by side** (`GET /money/charts?period=6|12`, `/money/charts`): spending
+by month, what came in and went out, a category over time, the rate of the pair by week and the
+exchanges against the central bank. Owner's decisions В-1…В-4 of 29.09.2026, requirements and plan
+in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
+
+- **A bar is the month of «Деньги», never a second count** (requirements 4): every month of the
+  period goes through `countMonth` — the function `GET /money/months/:month` counts one by — with
+  the same rate of the month (`monthRate`), so reading the charts freezes a closed month exactly as
+  opening it does (Р-4), a change of a past exchange lets it go for both, and the salary moves by
+  `budgetMonthOf` in both. An integration test holds every bar equal to its month. The rows of the
+  whole period are read once (`monthRows`, Р-3); the month before the first is counted for «к
+  августу» alone, as on «Деньгах». **A write landing while the months freeze lets them go after**
+  (`settleThaws`, adversarial Ж, Ж2): the exchanges and incomes are read once, by `dayRates`, and the
+  months frozen one by one after, so one written in between found nothing frozen to let go and the
+  month froze without it for good. Once the read has frozen, it holds the receipts and the rule of
+  the rate against **the very rows the rates came from** (`DayRates.basis`) and lets the months go
+  from the day of anything that changed — a snapshot of its own missed a removal and a «Вернуть» both
+  inside the read, the row the same before and after. Run in `finally`, so a read that fails after
+  freezing still settles. `GET /money/months/:month` does the same for a closed month; the race was
+  MOL-73's, the charts widened it.
+- **«Разница», not «Остаток»** (owner's decision В-2): the third figure of «Пришло и ушло» is what
+  came in less what went out in the month, signed; «Остаток» is the money on the accounts
+  (MOL-134) and one word must not mean two things on neighbouring screens. The price, named: the
+  month of the move is deep below zero, since the roubles that bought the dollars were exchanges.
+- **An average is of the closed months from the first with anything in it** (Р-5, Р-15): a person
+  who started in August is not averaged over empty months, and the running month, half spent, is
+  in no average. With no closed month of data there is no average. **A month with anything «не
+  посчитано» has no «Разница» and is not in its average** (adversarial d9 В): a salary in dollars on
+  a day with no dollar made the month «−25 000 ₽» and the average negative. **Its spending is
+  averaged unless the spending itself is short** (review С-8, d9 round 2 В2): an income changes
+  nothing spent. **A category's average leaves out only a month short in that category**
+  (`uncountedIn`, d9 round 3 В3): a coffee in dollars with no rate dropped the month's complete
+  «Продукты» from their «в среднем». A category spent nowhere in the period has no average, not
+  «в среднем 0 ֏». The
+  screen says under «Пришло и ушло» what did not convert, and «Ушло» with no rate of the month is a
+  dashed empty bar, never a bar of nothing spent — **while nothing spent is «ушло 0» with or without
+  a rate** (`moneyMonth`, review С-7), on «Деньгах» too: a newcomer's empty months with no rate were
+  the tallest bars of the card.
+- **Nothing the charts carry can fail the answer** (adversarial d9 А): a category's sum over the
+  period, which may be more than money holds, orders the series and is never sent; a change past 2⁵³
+  per cent — 0,01 ֏ then 10¹⁴ ֏ — is left unsaid. A month «Деньги» can show, the charts can show.
+- **Every height is the server's** (`CHART_LEVEL`, thousandths of the tallest the card shows): the
+  phone divides nothing, it turns a level into a percent of the card.
+- **The exchanges are grouped by exchanger** (owner's decision В-1): «Где и заметка» read as
+  `nameIdentity` reads a name, no note is «Без места»; the percent of a group is weighed by the
+  money (Р-7) — the sheet's mean of percents let ten dollars with friends weigh what eight hundred at
+  the airport did. The reads of the cache for the weeks and the exchanges go eight at a time, as «Обмен денег»'s
+  (`RATE_READS_AT_ONCE`), and the card of exchanges before the line, never beside it (review С-11):
+  53 weeks at once would take the whole pool, and two batches at once took sixteen of its ten. **Measured by the one function
+  «Обмен денег» measures by** (`comparisonOf`), **but
+  only by a rate fresh for the exchange's day** (adversarial Е): `comparisonOf` takes the bank's latest
+  however old, and a cache stopped five weeks ago summed an exchange by a rate the same answer's line
+  called «no rate». «Обмен денег» still sets each exchange beside the latest it has, printed with it —
+  the price, named: an exchange of a week of silence is compared there and named here. And
+  **summed in the spending currency** (Р-6): a difference in another currency — dollars from roubles
+  — by the central bank of that day, since nobody named a price for it; without a comparison or
+  such a rate the exchange is named («Без сравнения с ЦБ РА: N»), never summed. Twelve months
+  whatever the period (handoff 03); nothing measured — no card.
+- **The rate of the pair is the central bank's at the end of each week** (owner's decision В-4,
+  Р-14): `rates.official` of every Sunday of the period and of today, fresh for its day or a gap —
+  a gap is drawn as a break, never as zero. One side for the whole line, the one the newest rate
+  reads at least one on (MOL-81); the person's exchanges of the pair, either way, are dots on their
+  week. No pair — one currency for both — no card. The price, named: a week whose rate came from a
+  fallback provider is not marked; the card says «ЦБ РА» of the whole line.
+- **Drawn by hand, no library** (Р-1): `BarChart` is HTML and tokens, `RateLine` is SVG whose
+  strokes keep their width when stretched (`vector-effect`), a dot is a zero-length round-capped
+  line so it is never an ellipse. The reading stands above the bars, never under the finger; the
+  whole area is the target (`touch-action: pan-y` leaves the page its scroll), a mouse passing over
+  chooses nothing. **The bars are radios and the weeks a native range**, so arrows move the choice
+  and each says its month or week with its figure — **which is why the reading is not a live
+  region**: the control already says it, and a drag would chatter.
+- **A finger chooses on lifting, or once it goes sideways** (`useChartPointer`, review): chosen on
+  touching, every scroll that started on a chart changed the reading under the thumb; a mouse or a pen
+  chooses on press. **A new answer of the same period keeps the bar chosen** — the sources of the
+  watch are compared one by one, since a getter of an array is a new array on every answer.
+- **The period and the category are in the address and move by `replace`**; the category chosen is
+  kept for as long as the app is open, and the first one is the largest of the period (Р-8), not the
+  handoff's «Кафе». **Every live category of the owner is offered**, spent in the period or not, and
+  a row of «Куда ушли» on a month older than six opens twelve (adversarial А, d9 Г): a category
+  tapped there was swapped for the largest, in silence, with its own id still in the address. One
+  the answer still lacks — a removed category, a stale link — is named: «Этой категории на графиках
+  нет — показаны …». Only
+  the person's choice or the address is remembered. **Only the latest read is kept on the phone**
+  (`molvia.charts`, adversarial Б, d9 Д): an earlier one answering late put the charts without the
+  spending just written under a later hour; one whose later read is still on its way or failed is
+  the freshest there is, and is kept (d9 round 2 Е2) — under the strip when that later read failed,
+  since it is older than a write the phone knows landed (review С-10). Offline is a yellow strip with that hour; the four states
+  are `ScreenSkeleton` and `ScreenState`, the empty one with no button (Р-9) — and the rate and the
+  exchanges stand under it, since they do not wait for spending (adversarial В).

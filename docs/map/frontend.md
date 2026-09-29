@@ -11,7 +11,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 
 - `frontend/src/components/AppButton.vue` — Kit button in five variants (primary, secondary, ghost, danger-ghost, icon), with busy, inactive and an icon slot.
 - `frontend/src/components/AppCard.vue` — Kit card: the surface of lists and blocks, with a chosen tag, the green «take» tone and an edge-to-edge list mode.
-- `frontend/src/components/AppField.vue` — Kit field: a native input, textarea, select or date with its label, error code, suffix and the right phone keyboard.
+- `frontend/src/components/AppField.vue` — Kit field: a native input, textarea, select or date with its label (or one only read out), error code, a mark before and a suffix after, and the right phone keyboard.
 - `frontend/src/components/AppScreen.vue` — The frame every screen sits in: pinned row, collapsing large title, back chevron with its label, docked strip, identity notice.
 - `frontend/src/components/BottomSheet.vue` — The sheet: a native modal `<dialog>` rising from the bottom, closed through its history entry; stacks with «‹» instead of ×.
 - `frontend/src/components/FloatingDock.vue` — Floating spot for the main action of a «Деньги» screen («Трата», «Обмен», «Доход») or «Вернуть» after a removal.
