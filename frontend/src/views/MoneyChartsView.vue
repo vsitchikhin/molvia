@@ -122,7 +122,7 @@
               :label="t('spending.sheet.category')"
               :options="categoryOptions"
               hide-label
-              class="select"
+              class="category"
               @update:model-value="chooseCategory"
             >
               <template #lead>
@@ -620,7 +620,8 @@ export default defineComponent({
   }
 }
 
-.select {
+.category {
+  width: 100%;
   margin-top: var(--space-3);
 }
 
