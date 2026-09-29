@@ -91,7 +91,10 @@ The detail behind the privacy lines of `CLAUDE.md`.
   installed app older than the server must not refuse a copy for a field it does not know. It
   rebuilds the text, indented, **so every number in the file is a safe integer and everything else a
   string** — a test walks the codec's JSON Schema for it, and an event's `payload` is a record of
-  strings, as the database's CHECK holds it (review 18). **The file is named by `exportedAt`**, the
+  strings, as the database's CHECK holds it (review 18) — stricter than the rest of the codec, so
+  the fully filled life writes one event of every kind (`PAYLOAD_OF`, a `Record<EventType, …>`): a
+  kind whose payload the file would refuse fails a test before it fails a person's copy (review
+  21). **The file is named by `exportedAt`**, the
   day the server took it, never by the phone's clock after the answer (adversarial Г). On the
   phone (В-1) the file goes to the share sheet — «Сохранить в Файлы», to oneself in Telegram — and
   Safari opens that sheet only close to a tap, with the request in between: refused
@@ -100,8 +103,10 @@ The detail behind the privacy lines of `CLAUDE.md`.
   pointer, since the sheet of a Mac has no «Save» — and so does a browser that cannot share a file
   (Android Chrome does not share `.json`). A sheet the person closed is not an error: the file stays
   under «Файл готов»; a second `share` over an open sheet is `InvalidStateError`, never a reason to
-  download as well — guarded only there, so a sheet whose promise never settles cannot leave the row
-  dead (review 14). **Leaving the screen while the file is prepared is changing one's mind**: the
+  download as well — the file waits under «Файл готов» instead, a new one from the row included, so
+  nothing the server made is thrown away (adversarial Р2-А); the guard counts open sheets and sits
+  only on the second tap, so a sheet whose promise never settles cannot leave the row dead (review
+  14). **Leaving the screen while the file is prepared is changing one's mind**: the
   request is cancelled and nothing is handed over on another screen (review 13, adversarial В). The row is inactive (`aria-disabled`), never disabled, and the focus goes
   back to it when the button tapped goes. **Limits, named:** a download inside an installed iOS app
   is checked on the phone, not here; and `spendings` has no CHECK on `rate_base` nor on a positive
