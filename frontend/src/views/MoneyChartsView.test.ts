@@ -368,6 +368,22 @@ describe('MoneyChartsView: the charts', () => {
     expect(kept['6']?.answer.spentAverage?.amount).toBe('999999.00')
   })
 
+  it('an answer whose later read failed is still shown and kept (d9 round 2 Е2)', async () => {
+    let first: (value: MoneyChartsView) => void = () => undefined
+    moneyCharts
+      .mockReturnValueOnce(new Promise((resolve) => (first = resolve)))
+      .mockRejectedValueOnce(new TypeError('network'))
+    online(false)
+    const view = await render()
+    // A write landed: the second read fails with no connection before the first answers.
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    first(charts())
+    await flushPromises()
+    expect(plain(view.text())).toContain('֏350,000')
+    expect(localStorage.getItem(`molvia.charts.${ACTOR}`)).not.toBeNull()
+  })
+
   it('has no card of exchanges and none of the rate where there is nothing for them', async () => {
     moneyCharts.mockResolvedValue(charts({ exchanges: null, rate: null }))
     const view = await render()

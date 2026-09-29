@@ -78,6 +78,8 @@ export function useMoneyCharts(period: Ref<6 | 12>): MoneyChartsState {
   const failure = ref<'offline' | 'error' | null>(null)
   const confirmed = ref(false)
   let latest = 0
+  /** The latest read of each period that came back with an answer. */
+  const answered = new Map<number, number>()
 
   function adopt(): void {
     const id = actor.id
@@ -94,9 +96,11 @@ export function useMoneyCharts(period: Ref<6 | 12>): MoneyChartsState {
     try {
       const answer = await api.moneyCharts(asked)
       const fetchedAt = new Date()
-      // Only the latest read is kept: an earlier one answering late would put the charts without the
-      // spending just written on the phone, under a later hour (adversarial Б, d9 Д).
-      if (mine !== latest) return
+      // An answer older than one already in is dropped: it would put the charts without the spending
+      // just written on the phone, under a later hour (adversarial Б, d9 Д). One whose later read is
+      // still on its way, or failed, is the freshest there is and is kept (d9 round 2 Е2).
+      if (mine < (answered.get(asked) ?? 0)) return
+      answered.set(asked, mine)
       if (actor.id === id) remember(id, answer, fetchedAt)
       if (actor.id !== id || period.value !== asked) return
       shown.value = { answer, fetchedAt }
