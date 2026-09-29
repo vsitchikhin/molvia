@@ -9,5 +9,5 @@ export type ReaderRequest =
       height: number
     }
 
-/** The worker's answer to one request; a failure carries no message — the page only needs to know. */
+/** The worker's answer to one request. A failure has no message: the page only needs to know. */
 export type ReaderReply = { id: number; ok: true; code: string | null } | { id: number; ok: false }

@@ -97,9 +97,9 @@ Every refusal is drawn by `ScreenState` in the sheet, and every one offers the d
 now (review С-9). The reader's failure has words of its own: «another app holds the camera» sent the
 person to close apps that were not at fault (review С-10).
 
-**The named price of focus** (review С-2): after «Проверить снова» or «Повторить» the state goes, and
-`ScreenState` hands the focus to the screen's title — which under a modal sheet is inert, so it lands
-on the dialog itself. It is `ScreenState`'s behaviour, and the sheet is its first user inside a
+**The named price of focus** (review С-2): after «Проверить снова» or «Повторить» the state goes,
+and `ScreenState` hands the focus to the screen's title — which under a modal sheet is inert, so it
+lands on the dialog itself. It is `ScreenState`'s behaviour, and the sheet is its first user inside a
 `<dialog>`; a task of its own if it gets in the way.
 
 The text of «no permission» names both phones rather than guessing one from the user agent, which
@@ -112,8 +112,9 @@ lies on an iPad (as MOL-132 Р-3).
   same form as a scanned one.
 - **`typedBarcode` in `packages/model` checks it**: spaces and hyphens printed under the bars are
   dropped, and so is whatever draws nothing — `INVISIBLE`, the one list, since a code copied from a
-  message may carry a U+200B that no eye can remove (adversarial Д); 8, 12 or 13 digits, else `error.barcode_shape`; the check digit, else
-  `error.barcode_check_digit`; 12 digits (UPC-A) become 13 with a leading `0`.
+  message may carry a U+200B that no eye can remove (adversarial Д); 8, 12 or 13 digits, else
+  `error.barcode_shape`; the check digit, else `error.barcode_check_digit`; 12 digits (UPC-A)
+  become 13 with a leading `0`.
 - **Eight digits are EAN-8 or UPC-E, and the digits alone do not say which** (Р-11): about one UPC-E
   in ten also checks as EAN-8, the sample `01234565` among them. A leading `0` that checks as UPC-E
   is UPC-E — an EAN-8 starting with `0` is a shop's in-house code, not a product's. **The named

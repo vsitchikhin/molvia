@@ -15,8 +15,9 @@ export interface BarcodeScan {
 
 /**
  * Reads frames while the camera is live and hands over the first code with a barcode's shape two
- * frames in a row agree on (MOL-98). One frame at a time: the next is taken once the reader has answered the last, so a
- * slow phone reads what the camera sees now rather than a queue of what it saw.
+ * frames in a row agree on (MOL-98). One frame at a time: the next is taken once the reader has
+ * answered the last, so a slow phone reads what the camera sees now rather than a queue of what it
+ * saw.
  */
 export function useBarcodeScan(options: {
   live: Ref<boolean>

@@ -84,7 +84,7 @@ test('a reader that will not load says so, and leaves no camera running (adversa
   await open(page, '/_kit')
   await openScanner(page)
 
-  await expect(page.getByRole('heading', { name: 'The scanner did not load' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'The scanner is not responding' })).toBeVisible()
   await expect.poll(() => liveTracks(page)).toBe(0)
 })
 

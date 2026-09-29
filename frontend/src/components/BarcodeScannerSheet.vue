@@ -105,8 +105,10 @@ const REFUSALS = {
   denied: { title: 'scanner.denied_title', body: 'scanner.denied_body' },
   none: { title: 'scanner.none_title', body: 'scanner.none_body' },
   error: { title: 'scanner.error_title', body: 'scanner.error_body' },
-  // The reader, not the camera: its wasm would not load or its worker died. Words of its own — «another
-  // app holds the camera» sent the person to close apps that were not at fault (review С-10).
+  // The reader, not the camera: its wasm would not load, or its worker died — before a frame or in
+  // the middle of reading. Words of its own, true of both: «another app holds the camera» sent the
+  // person to close apps that were not at fault (review С-10), and «did not load» was untrue of a
+  // worker that loaded and then died (round 2).
   reader: { title: 'scanner.reader_title', body: 'scanner.reader_body' },
 } as const
 type Refusal = keyof typeof REFUSALS

@@ -107,7 +107,8 @@ export function useCamera(video: Ref<HTMLVideoElement | null>): Camera {
       kind.value = 'live'
     } catch (error) {
       if (current !== attempt) return
-      // A throw after the camera was given must not leave it running under the error (adversarial Г).
+      // A throw after the camera was given must not leave it running under the error
+      // (adversarial Г).
       release()
       kind.value = kindOf(error)
     }

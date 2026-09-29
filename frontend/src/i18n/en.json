@@ -1276,7 +1276,7 @@
     "none_body": "This device has no camera. Type the code's digits in.",
     "error_title": "The camera did not start",
     "error_body": "Another app may be holding it. Close it and try again.",
-    "reader_title": "The scanner did not load",
+    "reader_title": "The scanner is not responding",
     "reader_body": "Try again — or type the code's digits in."
   }
 }
