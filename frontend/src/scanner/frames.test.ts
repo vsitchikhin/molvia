@@ -34,6 +34,14 @@ describe('cropOf', () => {
     )
     expect(crop).toEqual({ x: 0, y: 0, width: 640, height: 480 })
   })
+
+  it('cuts nothing while the video or the frame has no size yet, never a crop of NaN', () => {
+    const picture = { width: 1280, height: 720 }
+    const none = { x: 0, y: 0, width: 0, height: 0 }
+    const box = { x: 0, y: 0, width: 320, height: 180 }
+    expect(cropOf(picture, none, box)).toEqual(none)
+    expect(cropOf(picture, box, none)).toEqual(none)
+  })
 })
 
 describe('createReadStreak', () => {

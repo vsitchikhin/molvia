@@ -1,4 +1,5 @@
 import { onScopeDispose, ref, watch, type Ref } from 'vue'
+import { barcodeSchema } from '@molvia/model'
 import { createBarcodeReader, type BarcodeReader } from '@/scanner/barcodeReader'
 import type { FrameSource } from '@/scanner/capture'
 import { createReadStreak } from '@/scanner/frames'
@@ -13,8 +14,8 @@ export interface BarcodeScan {
 }
 
 /**
- * Reads frames while the camera is live and hands over the first code two frames in a row agree
- * on (MOL-98). One frame at a time: the next is taken once the reader has answered the last, so a
+ * Reads frames while the camera is live and hands over the first code with a barcode's shape two
+ * frames in a row agree on (MOL-98). One frame at a time: the next is taken once the reader has answered the last, so a
  * slow phone reads what the camera sees now rather than a queue of what it saw.
  */
 export function useBarcodeScan(options: {
@@ -43,19 +44,22 @@ export function useBarcodeScan(options: {
     const streak = createReadStreak()
     const active = readerNow()
     while (current === run) {
-      await source.next()
-      if (current !== run) return
-      const image = source.grab()
-      if (!image) continue
       let code: string | null
+      // A throw anywhere in a step — the frame cut as much as the read — is the reader's error on
+      // the screen, never a loop that died without a word under a live viewfinder (adversarial Е).
       try {
+        await source.next()
+        if (current !== run) return
+        const image = source.grab()
+        if (!image) continue
         code = await active.read(image)
       } catch {
         if (current === run) fail()
         return
       }
       if (current !== run) return
-      const taken = streak(code)
+      // Checked here rather than in the worker, which would carry the whole model for one regex.
+      const taken = streak(code !== null && barcodeSchema.safeParse(code).success ? code : null)
       if (taken !== null) {
         run++
         options.onCode(taken)
@@ -72,11 +76,12 @@ export function useBarcodeScan(options: {
   })
 
   function warm(): void {
-    readerNow()
-      .warm()
-      .catch(() => {
-        fail()
-      })
+    const warming = readerNow()
+    // Only the reader that is still ours fails the scan: one let go by `reset` rejects its warm
+    // as it goes, and that must not mark the next one failed (adversarial Б).
+    warming.warm().catch(() => {
+      if (reader === warming) fail()
+    })
   }
 
   function reset(): void {

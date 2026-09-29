@@ -17,6 +17,11 @@ const MARGIN = 0.15
  * video element. Grown by a margin and kept inside the picture.
  */
 export function cropOf(picture: { width: number; height: number }, element: Box, frame: Box): Box {
+  // A video or a frame not laid out yet has no size: nothing to cut, rather than a crop of NaN that
+  // `getImageData` throws on (adversarial Е).
+  if (!(element.width > 0 && element.height > 0 && frame.width > 0 && frame.height > 0)) {
+    return { x: 0, y: 0, width: 0, height: 0 }
+  }
   const scale = Math.max(element.width / picture.width, element.height / picture.height)
   const offsetX = (element.width - picture.width * scale) / 2
   const offsetY = (element.height - picture.height * scale) / 2

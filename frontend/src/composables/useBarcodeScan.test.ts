@@ -135,6 +135,63 @@ describe('useBarcodeScan', () => {
     expect(scan.failed.value).toBe(true)
   })
 
+  it('draws a frame that could not be cut as the reader’s error, not as silence (adversarial Е)', async () => {
+    let frames = 0
+    const source: FrameSource = {
+      next: () => Promise.resolve(),
+      grab: () => {
+        if (++frames === 2) throw new TypeError('getImageData: Value is not of type long')
+        return image()
+      },
+    }
+    const { reader } = fakeReader([null])
+    const { live, scan } = scanWith(reader, source)
+    live.value = true
+    await settle()
+    expect(scan.failed.value).toBe(true)
+  })
+
+  it('must not take a read of another shape than a barcode’s, however often it agrees', async () => {
+    const { reader } = fakeReader(['12345', '12345', '96385074', '96385074'])
+    const { live, onCode } = scanWith(reader)
+    live.value = true
+    await settle()
+    expect(onCode).toHaveBeenCalledExactlyOnceWith('96385074')
+  })
+
+  it('must not fail the new reader over the warm the reset one gave up (adversarial Б)', async () => {
+    let giveUp: (() => void) | undefined
+    const first: BarcodeReader = {
+      warm: () =>
+        new Promise(
+          (_, reject) =>
+            (giveUp = () => {
+              reject(new ReaderFailed())
+            }),
+        ),
+      read: () => new Promise(() => undefined),
+      dispose: () => giveUp?.(),
+    }
+    const second = fakeReader([])
+    let made = 0
+    const live = ref(false)
+    const scope = effectScope()
+    const scan = scope.run(() =>
+      useBarcodeScan({
+        live,
+        frames: () => frames(),
+        onCode: vi.fn(),
+        createReader: () => (made++ === 0 ? first : second.reader),
+      }),
+    )
+    scan?.warm()
+    // A retry while the first reader still loads: it is let go and its warm rejects.
+    scan?.reset()
+    scan?.warm()
+    await settle()
+    expect(scan?.failed.value).toBe(false)
+  })
+
   it('ends the reader with its scope', () => {
     const { reader, dispose } = fakeReader([])
     const { scope, scan } = scanWith(reader)
