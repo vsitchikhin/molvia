@@ -18,7 +18,9 @@ interface Person {
  * cookie is attached by hand rather than left to `page.request`.
  */
 async function person(page: Page): Promise<Person> {
-  const id = await signedIn(page)
+  // Signed in away from «Что брать»: home is «Что брать» (MOL-128), and a first visit there would
+  // leave its answer in memory — the next visit would show the remembered list, not what it tests.
+  const id = await signedIn(page, '/settings')
   const headers = await asBrowser(page)
 
   return {
@@ -59,6 +61,10 @@ async function ratedPurchase(who: Person, name: string, score: number): Promise<
     amount: { amount: '520', currency: 'AMD' },
   })
   await who.call('PUT', `/verdicts/${entry.id}`, { score })
+  // Finished, so a second purchase can open a trip of its own: one open at a time.
+  await who.call('POST', `/trips/${tripId}/finish`, {
+    finishedOnDeviceAt: new Date().toISOString(),
+  })
 }
 
 /** Waits for the sheet to be up: until it has risen it deliberately takes no tap at all. */
@@ -74,7 +80,7 @@ test('a rated purchase becomes a recommendation with the place and the price per
   const name = `Молоко «Ашхар» ${tag}`
   await ratedPurchase(who, name, 5)
 
-  await page.goto('/advice')
+  await page.goto('/')
 
   await expect(page.getByRole('heading', { name: 'What to buy', exact: true })).toBeVisible()
   await expect(page.getByText('Your own ratings only, for now')).toBeVisible()
@@ -97,7 +103,7 @@ test('a bad verdict carries no price and no place: there is nothing to be cheap 
   const name = `Колбаса «Молочная» ${tag}`
   await ratedPurchase(who, name, 1)
 
-  await page.goto('/advice')
+  await page.goto('/')
 
   const never = page.locator('section.never')
   await expect(never.getByText(name)).toBeVisible()
@@ -108,15 +114,17 @@ test('a bad verdict carries no price and no place: there is nothing to be cheap 
   await expect(never.getByText(name)).toHaveCSS('text-decoration-line', 'line-through')
 })
 
-test('nothing rated yet: the empty state explains the link and leads to «Ratings»', async ({
+test('nothing rated yet: the newcomer is offered to act, and the cycle leads to its tabs (MOL-128)', async ({
   page,
 }) => {
   await person(page)
 
-  await page.goto('/advice')
+  await page.goto('/')
 
-  await expect(page.getByRole('heading', { name: 'Nothing to advise yet' })).toBeVisible()
-  await page.getByRole('button', { name: 'Rate a purchase' }).click()
+  await expect(page.getByRole('heading', { name: 'Record your first purchases' })).toBeVisible()
+  // No search before the first verdict: whatever it found would be «not rated yet».
+  await expect(page.getByRole('searchbox')).toHaveCount(0)
+  await page.getByRole('button', { name: /At home — «Ratings»/ }).click()
 
   await expect(page).toHaveURL(/\/verdicts$/)
 })
@@ -133,7 +141,7 @@ test('a connection lost mid-request is offline, not an error', async ({ page, co
     await held
     await route.abort('internetdisconnected')
   })
-  await page.goto('/advice')
+  await page.goto('/')
   await expect(page.locator('.skeleton')).toBeVisible()
 
   await context.setOffline(true)
@@ -163,13 +171,13 @@ test('the skeleton is there while the answer is on its way, and the region says 
     await route.continue()
   })
   const said = await recordLiveRegion(page)
-  await page.goto('/advice')
+  await page.goto('/')
 
   await expect(page.locator('.skeleton')).toBeVisible()
   await expect.poll(said).toContainEqual(expect.stringContaining('Loading…'))
 
   release()
-  await expect(page.getByRole('heading', { name: 'Nothing to advise yet' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Record your first purchases' })).toBeVisible()
   await expect(page.locator('.skeleton')).toHaveCount(0)
   // «Loading…» leaves the region with the skeleton: left behind, it is read in browse mode
   // under the answer (MOL-19, C3).
@@ -180,14 +188,14 @@ test('the skeleton is there while the answer is on its way, and the region says 
 test('reports a failure instead of an empty screen, and recovers on retry', async ({ page }) => {
   await person(page)
   await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
-  await page.goto('/advice')
+  await page.goto('/')
 
   await expect(page.locator('[role="alert"]')).toContainText('The server did not answer')
 
   await page.unroute('**/api/advice')
   await page.getByRole('button', { name: 'Try again' }).click()
 
-  await expect(page.getByRole('heading', { name: 'Nothing to advise yet' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Record your first purchases' })).toBeVisible()
 })
 
 // Офлайн на устройстве, которое здесь ещё не входило: пускать некуда — ни ящиков, ни ответов
@@ -201,7 +209,7 @@ test('offline without a session: the door says so, and the offer comes back with
     w.__online = false
     Object.defineProperty(Navigator.prototype, 'onLine', { get: () => w.__online })
   })
-  await page.goto('/advice')
+  await page.goto('/')
 
   await expect(page.getByRole('heading', { name: 'No internet, no sign-in' })).toBeVisible()
   await expect(
@@ -218,15 +226,16 @@ test('offline without a session: the door says so, and the offer comes back with
   await expect(page.getByRole('heading', { name: 'Sign in with your Telegram' })).toBeVisible()
 })
 
-test('the action of the empty state is large enough to hit with a thumb', async ({ page }) => {
+test('the newcomer`s action is large enough to hit with a thumb, and in view', async ({ page }) => {
   await person(page)
-  await page.goto('/advice')
+  await page.goto('/')
 
-  const button = page.getByRole('button', { name: 'Rate a purchase' })
+  const button = page.getByRole('button', { name: 'Record purchases' })
+  await expect(button).toBeInViewport({ ratio: 1 })
   await expect(button).toBeVisible()
 
   const box = await button.boundingBox()
-  expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(52)
 })
 
 test('a mis-tapped verdict is amended where it is met, and withdrawn from there too', async ({
@@ -236,7 +245,7 @@ test('a mis-tapped verdict is amended where it is met, and withdrawn from there 
   const name = `Сыр «Чанах» ${tag}`
   await ratedPurchase(who, name, 1)
 
-  await page.goto('/advice')
+  await page.goto('/')
   await expect(page.locator('section.never').getByText(name)).toBeVisible()
 
   // A «1» given by mistake used to stand until the item was bought again: «Ratings» only ever
@@ -256,7 +265,8 @@ test('a mis-tapped verdict is amended where it is met, and withdrawn from there 
   await openSheet(page)
   await page.getByRole('button', { name: 'Withdraw the rating' }).click()
 
-  await expect(page.getByRole('heading', { name: 'Nothing to advise yet' })).toBeVisible()
+  // Nothing rated, and the purchase waits for a verdict again: «Now rate them».
+  await expect(page.getByRole('heading', { name: 'Now rate them' })).toBeVisible()
 })
 
 // Loading breathes, and stands still for whoever asked for less motion. The only place the
@@ -268,7 +278,7 @@ test('the skeleton breathes, and stops for someone who asked for less motion', a
   const bars = page.locator('.skeleton .bars')
   const animation = () => bars.evaluate((element) => getComputedStyle(element).animationName)
 
-  await page.goto('/advice')
+  await page.goto('/')
   // Скелет именно этого экрана: пока личность не осела, свой скелет рисует и экран входа.
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('What to buy')
   await expect(bars).toBeVisible()
@@ -276,4 +286,59 @@ test('the skeleton breathes, and stops for someone who asked for less motion', a
 
   await page.emulateMedia({ reducedMotion: 'reduce' })
   expect(await animation()).toBe('none')
+})
+
+test.describe('the search (MOL-128)', () => {
+  test('finds by transliteration, lays the found out by group, and «not rated» offers «Rate»', async ({
+    page,
+  }) => {
+    const who = await person(page)
+    const good = `Сыр Лори ${tag}`
+    const bad = `Сыр Чанах ${tag}`
+    await ratedPurchase(who, good, 5)
+    await ratedPurchase(who, bad, 1)
+    // In the catalogue and never rated by anyone: found, with no verdict.
+    await who.call('POST', '/catalogue/items', {
+      kind: 'product',
+      name: `Сыр Косичка ${tag}`,
+      defaultUnit: 'kg',
+    })
+
+    await page.goto('/')
+    await expect(page.locator('section.take').getByText(good)).toBeVisible()
+    // Latin for «сыр»: the transliteration is the search's own (MOL-5).
+    await page.getByRole('searchbox', { name: 'Search the catalogue' }).fill('syr')
+
+    await expect(page.locator('section.take').getByText(good)).toBeVisible()
+    await expect(page.locator('section.never').getByText(bad)).toBeVisible()
+    const unrated = page.locator('section.unrated')
+    await expect(unrated.getByText(`Сыр Косичка ${tag}`)).toBeVisible()
+    // «Не брать нигде» has nothing to be cheap with here either: no price, and no place.
+    await expect(page.locator('section.never').getByText('577.78')).toHaveCount(0)
+    await expect(page.locator('section.never').getByText('SAS')).toHaveCount(0)
+    await expect(page.locator('section.take').getByText('SAS')).toBeVisible()
+    await expect(page.getByRole('button', { name: /Propose/ })).toHaveCount(0)
+
+    await unrated.getByRole('button', { name: new RegExp(`Сыр Косичка ${tag}`) }).click()
+    await openSheet(page)
+    await expect(page.locator('dialog[open]')).toContainText(`Сыр Косичка ${tag}`)
+  })
+
+  test('nothing found: says so by the query, and clearing brings the list back', async ({
+    page,
+  }) => {
+    const who = await person(page)
+    const name = `Молоко ${tag}`
+    await ratedPurchase(who, name, 5)
+
+    await page.goto('/')
+    const field = page.getByRole('searchbox', { name: 'Search the catalogue' })
+    await field.fill(`кускус${tag}`)
+    // The empty block's own heading, outside the live region (`e2e.md`): said once, not muted.
+    await expect(page.getByRole('heading', { name: `No «кускус${tag}» found` })).toBeVisible()
+    await expect(page.locator('section.take')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Clear' }).click()
+    await expect(page.locator('section.take').getByText(name)).toBeVisible()
+  })
 })

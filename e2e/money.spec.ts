@@ -321,3 +321,33 @@ test('«зарплата — в следующий месяц»: the salary coun
   await expect(income).toContainText('с зарплатой')
   await expect(income).toContainText('— в следующем месяце')
 })
+
+/**
+ * «Покупки ›» in a new spending (review Р-22): the sheet steps back off its own entry first, and
+ * the tab is opened only once that step has landed — in a real browser the sheet hears it is
+ * closed from inside the router's `popstate`, and a tab tapped there was dropped (Р-11). Checked
+ * with the page's animation and without, since the step lands at a different moment in each.
+ */
+for (const reducedMotion of ['reduce', 'no-preference'] as const) {
+  test.describe(`«Покупки ›» from a new spending, motion: ${reducedMotion}`, () => {
+    test.use({ reducedMotion })
+
+    test('opens «Покупки», and «back» leaves no sheet behind', async ({ page }) => {
+      await openMoney(page)
+      await page.getByRole('button', { name: 'Добавить трату' }).click()
+      const sheet = page.locator('dialog[open]')
+      await expect(sheet).toContainText('Новая трата')
+      await page.waitForTimeout(400)
+      await sheet.getByRole('button', { name: /Покупки ›/ }).click()
+
+      await expect(page).toHaveURL(/\/purchases$/)
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Покупки')
+      await expect(sheet).toBeHidden()
+
+      // A tab replaces a tab (`tabMove`): «back» is home, the sheet's entry is gone with it.
+      await page.goBack()
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Что брать')
+      await expect(page.locator('dialog[open]')).toHaveCount(0)
+    })
+  })
+}

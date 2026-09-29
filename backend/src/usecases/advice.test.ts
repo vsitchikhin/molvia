@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { ERROR, actorSchema, unitPrice } from '@molvia/model'
-import type { Actor, Money, Quantity } from '@molvia/model'
+import { ERROR, actorSchema, itemSchema, unitPrice } from '@molvia/model'
+import type { Actor, Item, Money, Quantity } from '@molvia/model'
 import type { ActorRepository } from '@/db/actors-repository'
 import type { EventRepository, RecordedEvent } from '@/db/events-repository'
 import type { ExpenseRepository, PlacePrice, PriceMedian } from '@/db/expenses-repository'
-import type { AdviceVerdictRow, VerdictRepository } from '@/db/verdicts-repository'
-import { advice } from './advice'
+import type { ItemRepository } from '@/db/items-repository'
+import type { AdviceQuery, AdviceVerdictRow, VerdictRepository } from '@/db/verdicts-repository'
+import { ADVICE_SEARCH_CANDIDATES, advice, adviceSearch } from './advice'
+import { SEARCH_LIMIT } from './search-catalogue'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const BEEF = '0b6f2c4e-8d1a-4f3b-9c7e-5a2d1e0f3b4c'
@@ -322,5 +324,158 @@ describe('личность', () => {
 
   it('пустой список — это пустой список, а не ошибка', async () => {
     expect((await advice(deps({ rows: [] }), ACTOR)).rows).toEqual([])
+  })
+})
+
+describe('поиск «Что брать» (MOL-128)', () => {
+  const BREAD = '4d9c3b52-7e0f-4c4a-9b33-8f5e0a2d6c79'
+
+  function item(id: string, name: string): Item {
+    return itemSchema.parse({
+      id,
+      kind: 'product',
+      name,
+      searchKey: name.toLowerCase(),
+      barcodes: [],
+      note: null,
+      defaultUnit: 'kg',
+      typicalQuantity: null,
+      createdBy: null,
+      createdAt: new Date('2026-09-18T10:00:00.000Z'),
+    })
+  }
+
+  function searching(world: World, found: Item[], near = true) {
+    const all = deps(world)
+    const asked: AdviceQuery[] = []
+    const searched: unknown[][] = []
+    const verdicts: VerdictRepository = {
+      ...all.verdicts,
+      adviceRowsFor: (query) => {
+        asked.push(query)
+        return all.verdicts.adviceRowsFor(query)
+      },
+    }
+    const items: ItemRepository = {
+      create: () => Promise.reject(new Error('create was not expected')),
+      byId: () => Promise.reject(new Error('byId was not expected')),
+      byIds: () => Promise.reject(new Error('byIds was not expected')),
+      createUnlessNamed: () => Promise.reject(new Error('createUnlessNamed was not expected')),
+      search: (...args) => {
+        searched.push(args)
+        return Promise.resolve({ items: found, near, nearIds: near ? found.map((i) => i.id) : [] })
+      },
+    }
+    const { actors, expenses } = all
+    return { deps: { actors, verdicts, expenses, items }, asked, searched }
+  }
+
+  it('отвечает в порядке поиска: у оценённого — его строка, у неоценённого — null', async () => {
+    const world = searching({ rows: [rated({ itemId: CHEESE, name: 'Сыр Лори', sum: 5 })] }, [
+      item(BREAD, 'Сыр косичка'),
+      item(CHEESE, 'Сыр Лори'),
+    ])
+
+    const answer = await adviceSearch(world.deps, ACTOR, 'syr')
+
+    expect(answer.items.map((found) => [found.name, found.advice?.level ?? null])).toEqual([
+      ['Сыр косичка', null],
+      ['Сыр Лори', 'take'],
+    ])
+    expect(world.searched).toEqual([['syr', ADVICE_SEARCH_CANDIDATES, ACTOR]])
+  })
+
+  // Adversarial А: «сыр» is 24 names in the seed. Cut at twenty before the verdicts, the one rated
+  // «не брать нигде» was gone and twenty «ещё не оценивали» stood in its place.
+  it('оценённое за пределом поиска не отрезано: первые двадцать и всё близкое с оценкой', async () => {
+    const id = (n: number) => `4d9c3b52-7e0f-4c4a-9b33-${String(n).padStart(12, '0')}`
+    const cheeses = Array.from({ length: SEARCH_LIMIT + 4 }, (_, n) =>
+      item(id(n), `Сыр ${String(n)}`),
+    )
+    const warned = cheeses[SEARCH_LIMIT + 2]
+    const far = cheeses[SEARCH_LIMIT + 3]
+    if (!warned || !far) throw new Error('no cheese')
+    const world = searching(
+      {
+        rows: [
+          rated({ itemId: warned.id, name: warned.name, sum: 1 }),
+          rated({ itemId: far.id, name: far.name, sum: 5 }),
+        ],
+      },
+      cheeses,
+    )
+    // Every one near but the last: a guess of the catalogue's, two edits away.
+    const catalogue = world.deps.items
+    world.deps.items = {
+      ...catalogue,
+      search: async (...args) => ({
+        ...(await catalogue.search(...args)),
+        nearIds: cheeses.slice(0, -1).map((cheese) => cheese.id),
+      }),
+    }
+
+    const answer = await adviceSearch(world.deps, ACTOR, 'сыр')
+
+    expect(answer.items).toHaveLength(SEARCH_LIMIT + 1)
+    expect(answer.items.at(-1)).toMatchObject({ name: warned.name, advice: { level: 'never' } })
+    expect(answer.items.map((found) => found.itemId)).not.toContain(far.id)
+    // Asked about the twenty shown and the near past them — not the far one.
+    expect(world.asked[0]?.itemIds).toHaveLength(SEARCH_LIMIT + 3)
+    expect(answer.near).toBe(true)
+  })
+
+  it('спрашивает оценки только найденного и не режет их пределом списка', async () => {
+    const world = searching({ rows: [] }, [item(BREAD, 'Хлеб'), item(CHEESE, 'Сыр')])
+
+    await adviceSearch(world.deps, ACTOR, 'х')
+
+    expect(world.asked.map((query) => [query.itemIds, query.limit])).toEqual([[[BREAD, CHEESE], 2]])
+  })
+
+  it('«не брать нигде» и в поиске без цены: о её цене даже не спрашивают', async () => {
+    const pricedItems: string[][] = []
+    const world = searching(
+      {
+        rows: [rated({ itemId: CHEESE, name: 'Сыр Чанах', sum: 2 })],
+        prices: [price({ itemId: CHEESE, scaledMinor: perKilo(2500) })],
+        pricedItems,
+      },
+      [item(CHEESE, 'Сыр Чанах')],
+    )
+
+    const [found] = (await adviceSearch(world.deps, ACTOR, 'сыр')).items
+
+    expect(found?.advice).not.toHaveProperty('places')
+    expect(found?.advice).not.toHaveProperty('threshold')
+    expect(pricedItems).toEqual([[]])
+  })
+
+  it('визита не пишет и в общем режиме: его пишет список (В-2)', async () => {
+    const recorded: RecordedEvent[] = []
+    const world = searching({ actor: actor(new Date(Date.now() + 86_400_000)), recorded }, [
+      item(CHEESE, 'Сыр'),
+    ])
+
+    const answer = await adviceSearch(world.deps, ACTOR, 'сыр')
+
+    expect(answer.scope).toBe('shared')
+    expect(recorded).toEqual([])
+  })
+
+  it('ничего не нашли — оценки не спрашивает, «далеко» передаёт как есть', async () => {
+    const world = searching({}, [], false)
+
+    const answer = await adviceSearch(world.deps, ACTOR, 'кускус')
+
+    expect(answer).toMatchObject({ items: [], near: false, scope: 'own' })
+    expect(world.asked).toEqual([])
+  })
+
+  it('без владельца — «нет такого владельца», не пустой ответ', async () => {
+    const world = searching({ actor: null }, [])
+
+    await expect(adviceSearch(world.deps, ACTOR, 'сыр')).rejects.toThrow(
+      expect.objectContaining({ code: ERROR.NO_ACTOR }),
+    )
   })
 })

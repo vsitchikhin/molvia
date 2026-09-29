@@ -3,7 +3,9 @@
     <h2 class="head">
       <!-- The circle repeats what the word beside it says: named again, a screen reader would
            read every group heading twice. -->
-      <span aria-hidden="true" class="mark"><VerdictBadge :level="level" compact large /></span>
+      <span v-if="level !== 'unrated'" aria-hidden="true" class="mark"
+        ><VerdictBadge :level="level" compact large
+      /></span>
       <span class="caption">{{ t(GROUPS[level].title) }}</span>
     </h2>
     <slot />
@@ -22,11 +24,18 @@ import VerdictBadge from '@/components/VerdictBadge.vue'
  * the level: a key built out of a string is invisible to the linter and to `vue-tsc` alike,
  * and a missing translation then shows on the screen instead of in the build (MOL-16, О-12).
  */
-const GROUPS: Record<VerdictLevel, { title: string; tone: string }> = {
+const GROUPS: Record<GroupLevel, { title: string; tone: string }> = {
   take: { title: 'advice.group_take', tone: 'take' },
   if_cheap: { title: 'advice.group_if_cheap', tone: 'if-cheap' },
   never: { title: 'advice.group_never', tone: 'never' },
+  unrated: { title: 'advice.search.group_unrated', tone: 'unrated' },
 }
+
+/**
+ * The three verdicts, and «Ещё не оценивали» — the search's alone (MOL-128): found in the
+ * catalogue with no verdict in sight. No badge: there is no verdict to show one for.
+ */
+type GroupLevel = VerdictLevel | 'unrated'
 
 /**
  * One of the three groups of «Что брать»: a circle with its icon, the word in caps, and
@@ -45,7 +54,7 @@ export default defineComponent({
   name: 'AdviceGroup',
   components: { VerdictBadge },
   props: {
-    level: { type: String as PropType<VerdictLevel>, required: true },
+    level: { type: String as PropType<GroupLevel>, required: true },
   },
   setup() {
     return { t: useI18n().t, GROUPS }
@@ -58,7 +67,8 @@ export default defineComponent({
   margin-top: var(--space-6);
 }
 
-.never {
+.never,
+.unrated {
   padding-top: var(--space-3);
   border-top: var(--hairline) solid var(--border);
 }
@@ -93,5 +103,9 @@ export default defineComponent({
 
 .never .caption {
   color: var(--bad-ink);
+}
+
+.unrated .caption {
+  color: var(--text-muted);
 }
 </style>

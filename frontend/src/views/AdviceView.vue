@@ -11,10 +11,25 @@
 
     <!-- Without an identity there is nobody to advise; the notice above says why. -->
     <template v-else-if="phase !== 'idle'">
+      <!-- At the top of the list and scrolled with it, never pinned: at a shelf a person starts
+           from the top of the screen (handoff `01`). Only over a list: with none — loading, a
+           failure, a newcomer — there is nothing to say about what is found (question 1). Above
+           the strip of the list's age, as the handoff draws it (review Р-16). -->
+      <AdviceSearch
+        v-if="phase === 'ready'"
+        v-model="query"
+        :remembered="remembered"
+        :fetched-at="fetchedAt"
+        :refreshes="refreshes"
+        @edit="edit"
+        @rate="rate"
+      />
+
       <!-- The rows come from the phone, and the strip says how old they are — while the
            request is still on its way as well, not only once it has failed (А4). Above the
-           branch, so an empty list from memory is dated too (С-4). -->
-      <div v-if="stale && fetchedAt" class="stale">
+           branch, so an empty list from memory is dated too (С-4). Not while something is typed:
+           the list is out of sight then, and the search dates what it searched itself. -->
+      <div v-if="stale && fetchedAt && !searching" class="stale">
         <p class="stale-text">
           <IconCloud v-if="otherCity" aria-hidden="true" />
           {{
@@ -52,22 +67,12 @@
         :body="t('advice.offline.body')"
       />
 
-      <!-- The most important empty state of the product: the screen does not fill itself, and
-           the words have to say «rate one → it shows up here», or the app looks broken. -->
-      <ScreenState
-        v-else-if="phase === 'empty'"
-        kind="empty"
-        tone="accent"
-        :icon="IconStar"
-        :title="t('advice.empty.title')"
-        :body="t('advice.empty.body')"
-      >
-        <template #action>
-          <AppButton block @click="goTab('verdicts')">{{ t('advice.empty.action') }}</AppButton>
-        </template>
-      </ScreenState>
+      <!-- The most important empty state of the product, and only for a list known to be empty —
+           answered now or remembered (MOL-128, handoff `02`): no answer and no memory is offline
+           or a failure above, never a newcomer (MOL-56, MOL-77). -->
+      <AdviceHomeNew v-else-if="phase === 'empty'" />
 
-      <template v-else>
+      <template v-else-if="!searching">
         <AdviceGroup v-if="groups.take.length > 0" level="take">
           <AdviceTakeCard
             v-for="row in groups.take"
@@ -104,6 +109,14 @@
       </template>
     </template>
 
+    <!-- The newcomer's one action, under the thumb (MOL-128, В-5); with receipts (MOL-127) this
+         strip holds «Сфотографировать чек». -->
+    <!-- Kept while a sheet of its own is up: an answer with rows arriving under «Где вы?» took
+         the strip and the sheet with it (review Р-15). -->
+    <template v-if="phase === 'empty' || entering" #docked>
+      <div class="strip"><ManualEntryButton @busy="entering = $event" /></div>
+    </template>
+
     <!-- Mounted on a tap and put away from `onClosed`: each opening starts from the row as the
          server last described it, so a withdrawal and a second thought never share a state. -->
     <VerdictEditSheet
@@ -115,24 +128,27 @@
       :own-score="editing.score"
       :own-review="editing.review"
       :on-closed="putAway"
-      @saved="retry"
+      @saved="saved"
     />
   </AppScreen>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from 'vue'
+import { computed, defineComponent, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { AdviceRow } from '@molvia/model'
+import { drawsNothing } from '@molvia/model'
+import type { AdviceFound, AdviceRow, AdviceScope } from '@molvia/model'
 import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconSync from '~icons/mdi/sync'
-import IconStar from '~icons/mdi/star-outline'
 import AdviceCheapRow from '@/components/AdviceCheapRow.vue'
 import AdviceGroup from '@/components/AdviceGroup.vue'
+import AdviceHomeNew from '@/components/AdviceHomeNew.vue'
 import AdviceNeverRow from '@/components/AdviceNeverRow.vue'
+import AdviceSearch from '@/components/AdviceSearch.vue'
 import AdviceTakeCard from '@/components/AdviceTakeCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
@@ -140,7 +156,6 @@ import { ownScore } from '@/components/adviceRow'
 import type { Score } from '@/components/rating'
 import { useAdvice } from '@/composables/useAdvice'
 import { purchaseDay, timeOfDay } from '@/days'
-import { useNavigation } from '@/navigation'
 
 /**
  * What the strip over a remembered list says, by what became of the request behind it.
@@ -178,10 +193,13 @@ export default defineComponent({
     IconSync,
     AdviceCheapRow,
     AdviceGroup,
+    AdviceHomeNew,
     AdviceNeverRow,
+    AdviceSearch,
     AdviceTakeCard,
     AppButton,
     AppScreen,
+    ManualEntryButton,
     ScreenSkeleton,
     ScreenState,
     VerdictEditSheet,
@@ -189,8 +207,14 @@ export default defineComponent({
   setup() {
     const i18n = useI18n()
     const { t, locale } = i18n
-    const { goTab } = useNavigation()
     const advice = useAdvice()
+    /** What is typed in the search; while it draws anything, the list gives way to what is found. */
+    const query = ref('')
+    const searching = computed(() => !drawsNothing(query.value))
+    /** Raised by a save, so the search asks again for the rows it shows. */
+    const refreshes = ref(0)
+    /** A sheet of «Записать покупки» is up. */
+    const entering = ref(false)
     /** The row whose verdict is being amended, as the last answer described it. */
     const editing = ref<{
       itemId: string
@@ -201,8 +225,13 @@ export default defineComponent({
       review: string | null
     } | null>(null)
 
-    function edit(row: AdviceRow): void {
-      const scope = advice.scope.value ?? 'own'
+    /**
+     * A row found by the search carries the scope of the search's answer, which may not be the
+     * list's — access opened or ran out between the two (review Р-13, adversarial Е): read by the
+     * list's, an average of three was offered pre-chosen as one's own score.
+     */
+    function edit(row: AdviceRow, answered?: AdviceScope): void {
+      const scope = answered ?? advice.scope.value ?? 'own'
       editing.value = {
         itemId: row.itemId,
         name: row.name,
@@ -215,10 +244,29 @@ export default defineComponent({
       }
     }
 
+    /**
+     * «Оценить» on an item nobody has rated in sight — found by the search, with no row of its own.
+     * Without a place, as a verdict from «Оценки» is (MOL-27).
+     */
+    function rate(item: AdviceFound, answered: AdviceScope): void {
+      editing.value = {
+        itemId: item.itemId,
+        name: item.name,
+        mine: false,
+        shared: answered === 'shared',
+        score: null,
+        review: null,
+      }
+    }
+
     return {
       t,
-      IconStar,
       STALE,
+      query,
+      searching,
+      entering,
+      refreshes,
+      remembered: advice.answer,
       phase: advice.phase,
       scope: advice.scope,
       groups: advice.groups,
@@ -232,13 +280,17 @@ export default defineComponent({
         i18n.te(`advice.cities_genitive.${city}`) ? t(`advice.cities_genitive.${city}`) : city,
       editing,
       edit,
+      rate,
+      saved: () => {
+        void advice.retry()
+        refreshes.value += 1
+      },
       putAway: () => {
         editing.value = null
       },
       retry: () => void advice.retry(),
       day: (when: Date) => purchaseDay(when, locale.value),
       time: (when: Date) => timeOfDay(when, locale.value),
-      goTab,
     }
   },
 })
@@ -278,6 +330,10 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-caption);
   font-style: italic;
+}
+
+.strip {
+  padding: var(--space-3) 0;
 }
 
 .foot {

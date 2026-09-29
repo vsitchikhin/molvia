@@ -4,8 +4,8 @@ import SettingsView from '@/views/SettingsView.vue'
 import PrivacyView from '@/views/PrivacyView.vue'
 import AdviceView from '@/views/AdviceView.vue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
-import TripHistoryView from '@/views/TripHistoryView.vue'
 import FinishedTripView from '@/views/FinishedTripView.vue'
+import PurchasesView from '@/views/PurchasesView.vue'
 import TripView from '@/views/TripView.vue'
 import ExchangeView from '@/views/ExchangeView.vue'
 import IncomesView from '@/views/IncomesView.vue'
@@ -18,12 +18,16 @@ import MoneyCategoriesView from '@/views/MoneyCategoriesView.vue'
 import MoneyChartsView from '@/views/MoneyChartsView.vue'
 import { sameScreen, watchBrowserAnimatedBack } from '@/transitions'
 
-/** The five sections of the tab bar. «trip» is home: the main scenario of the product. */
-export type Tab = 'trip' | 'advice' | 'verdicts' | 'money' | 'settings'
+/**
+ * The five sections of the tab bar. «advice» is home (MOL-128): at the shelf a person reads, at
+ * home they write — so the app opens on «Что брать», and «Покупки» is where the writing is.
+ */
+export type Tab = 'advice' | 'purchases' | 'verdicts' | 'money' | 'settings'
 
 export type RouteName =
-  | 'trip'
   | 'advice'
+  | 'purchases'
+  | 'purchase-manual'
   | 'verdicts'
   | 'money'
   | 'money-categories'
@@ -35,8 +39,7 @@ export type RouteName =
   | 'incomes'
   | 'devices'
   | 'item-search'
-  | 'trip-history'
-  | 'finished-trip'
+  | 'purchase'
   | 'finished-search'
   | 'privacy'
   | 'kit'
@@ -85,12 +88,57 @@ export const routes = [
     component: DevicesView,
     meta: { titleKey: 'devices.title', parent: 'settings' },
   },
-  { path: '/', name: 'trip', component: TripView, meta: { titleKey: 'trip.title', tab: 'trip' } },
   {
-    path: '/advice',
+    path: '/',
     name: 'advice',
     component: AdviceView,
     meta: { titleKey: 'advice.title', tab: 'advice' },
+  },
+  // «Что брать» became home and «Поход» became «Покупки» (MOL-128): a bookmark or the history of
+  // an installed app still arrives, for good (MOL-81).
+  { path: '/advice', redirect: { name: 'advice' } },
+  {
+    path: '/purchases',
+    name: 'purchases',
+    component: PurchasesView,
+    meta: { titleKey: 'purchases.title', tab: 'purchases' },
+  },
+  // The record typed by hand, the screen that was «Поход» with a trip going on. Before the
+  // records by id, though a static segment outranks a parameter anyway.
+  {
+    path: '/purchases/manual',
+    name: 'purchase-manual',
+    component: TripView,
+    meta: { titleKey: 'trip.title', parent: 'purchases' },
+  },
+  {
+    path: '/purchases/manual/add',
+    name: 'item-search',
+    component: ItemSearchView,
+    meta: { titleKey: 'item.search_title', parent: 'purchase-manual' },
+  },
+  {
+    path: '/purchases/:tripId',
+    name: 'purchase',
+    component: FinishedTripView,
+    meta: { titleKey: 'trip.history.finished_title', parent: 'purchases', from: ['money'] },
+  },
+  {
+    path: '/purchases/:tripId/add',
+    name: 'finished-search',
+    component: ItemSearchView,
+    meta: { titleKey: 'item.search_title', parent: 'purchase' },
+  },
+  { path: '/trip', redirect: { name: 'purchases' } },
+  { path: '/trip/add', redirect: { name: 'item-search' } },
+  { path: '/trip/history', redirect: { name: 'purchases' } },
+  {
+    path: '/trip/history/:tripId',
+    redirect: (to) => ({ name: 'purchase', params: to.params, query: to.query }),
+  },
+  {
+    path: '/trip/history/:tripId/add',
+    redirect: (to) => ({ name: 'finished-search', params: to.params }),
   },
   {
     path: '/verdicts',
@@ -143,30 +191,6 @@ export const routes = [
     component: AccountView,
     meta: { titleKey: 'accounts.title', parent: 'money-accounts' },
   },
-  {
-    path: '/trip/add',
-    name: 'item-search',
-    component: ItemSearchView,
-    meta: { titleKey: 'item.search_title', parent: 'trip' },
-  },
-  {
-    path: '/trip/history',
-    name: 'trip-history',
-    component: TripHistoryView,
-    meta: { titleKey: 'trip.history.title', parent: 'trip' },
-  },
-  {
-    path: '/trip/history/:tripId',
-    name: 'finished-trip',
-    component: FinishedTripView,
-    meta: { titleKey: 'trip.history.finished_title', parent: 'trip-history', from: ['money'] },
-  },
-  {
-    path: '/trip/history/:tripId/add',
-    name: 'finished-search',
-    component: ItemSearchView,
-    meta: { titleKey: 'item.search_title', parent: 'finished-trip' },
-  },
   // Under the settings, and open without a session: it is read before deciding to sign in (MOL-58).
   {
     path: '/privacy',
@@ -177,14 +201,14 @@ export const routes = [
   // Every piece of the kit in every state, and the sheet in a real history — for the eye in both
   // schemes and for the end-to-end tests, before any screen uses them (MOL-18). Development only:
   // in a production build the condition is false, the chunk is never emitted, and the path falls
-  // through to the trip.
+  // through to home.
   ...(import.meta.env.DEV
     ? [
         {
           path: '/_kit',
           name: 'kit',
           component: () => import('@/views/KitView.vue'),
-          meta: { titleKey: 'dev.kit.title', parent: 'trip' },
+          meta: { titleKey: 'dev.kit.title', parent: 'advice' },
         } satisfies RouteRecordRaw & { name: RouteName },
       ]
     : []),
@@ -208,8 +232,8 @@ watchBrowserAnimatedBack()
  *
  * The first navigation is not one of them, though it comes «from» `START_LOCATION`, whose address
  * is «/»: that is the page loaded again — «back» into the app from another site — and the number
- * the router saved on `pagehide` is where the person was. Read as the same address, the trip, and
- * only the trip, forgot it (adversarial В1).
+ * the router saved on `pagehide` is where the person was. Read as the same address, home, and only
+ * home, forgot it (adversarial В1).
  *
  * A move that changes only the query is the screen's own state (`sameScreen`), and the page stays
  * where it is: the person chose the category to look at its chart, three cards down, and the top

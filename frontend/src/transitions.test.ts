@@ -50,18 +50,14 @@ describe('direction', () => {
   }
 
   it.each([
-    ['/', '/trip/add', 'push'],
-    ['/trip/add', '/', 'pop'],
-    ['/', '/advice', 'tab'],
+    ['/purchases', '/purchases/manual', 'push'],
+    ['/purchases/manual', '/purchases', 'pop'],
+    ['/', '/purchases', 'tab'],
     ['/verdicts', '/', 'tab'],
-    ['/advice', '/verdicts', 'tab'],
-    // A finished trip opened from «Деньги» is pushed from there and popped back (MOL-82, С-3).
-    [
-      '/money?month=2026-08',
-      '/trip/history/aaaaaaaa-0000-4000-8000-000000000012?from=money',
-      'push',
-    ],
-    ['/trip/history/aaaaaaaa-0000-4000-8000-000000000012?from=money', '/money', 'pop'],
+    ['/purchases', '/verdicts', 'tab'],
+    // A recorded row opened from «Деньги» is pushed from there and popped back (MOL-82, С-3).
+    ['/money?month=2026-08', '/purchases/aaaaaaaa-0000-4000-8000-000000000012?from=money', 'push'],
+    ['/purchases/aaaaaaaa-0000-4000-8000-000000000012?from=money', '/money', 'pop'],
   ])('%s → %s is a %s', async (from, to, move) => {
     expect(await between(from, to)).toBe(move)
   })
@@ -86,7 +82,7 @@ describe('direction', () => {
   })
 
   it('must not fire: a section with a query to another section is still a tab', async () => {
-    expect(await between('/money?month=2026-08', '/advice')).toBe('tab')
+    expect(await between('/money?month=2026-08', '/verdicts')).toBe('tab')
   })
 })
 
@@ -98,8 +94,8 @@ describe('installViewTransitions', () => {
   it('moves without an animation where the platform has none', async () => {
     const router = routerAt()
     installViewTransitions(router)
-    await router.push('/')
-    await router.push('/trip/add')
+    await router.push('/purchases/manual')
+    await router.push('/purchases/manual/add')
     expect(router.currentRoute.value.name).toBe('item-search')
     expect(document.documentElement.dataset.nav).toBeUndefined()
   })
@@ -108,14 +104,15 @@ describe('installViewTransitions', () => {
     const { start, calls } = stubViewTransitions()
     const router = routerAt()
     installViewTransitions(router)
-    await router.push('/')
+    await router.push('/purchases/manual')
     expect(start).not.toHaveBeenCalled()
 
-    await router.push('/trip/add')
+    await router.push('/purchases/manual/add')
     expect(router.currentRoute.value.name).toBe('item-search')
-    await router.push('/')
-    await router.push('/advice')
-    expect(calls).toEqual(['push', 'pop', 'tab'])
+    await router.push('/purchases/manual')
+    await router.push('/purchases')
+    await router.push('/verdicts')
+    expect(calls).toEqual(['push', 'pop', 'pop', 'tab'])
     await vi.waitFor(() => {
       expect(document.documentElement.dataset.nav).toBeUndefined()
     })
@@ -140,9 +137,9 @@ describe('installViewTransitions', () => {
 
     const router = routerAt()
     installViewTransitions(router)
-    await router.push('/')
-    await router.push('/trip/add')
-    await router.push('/')
+    await router.push('/purchases/manual')
+    await router.push('/purchases/manual/add')
+    await router.push('/purchases/manual')
     expect(document.documentElement.dataset.nav).toBe('pop')
 
     // The first, skipped, finishes now — the second is still running.
@@ -163,18 +160,18 @@ describe('installViewTransitions', () => {
     const { start } = stubViewTransitions()
     const router = routerAt()
     installViewTransitions(router)
-    await router.push('/')
-    await router.push('/trip/add')
+    await router.push('/purchases/manual')
+    await router.push('/purchases/manual/add')
     start.mockClear()
 
     const event = new PopStateEvent('popstate', { state: null })
     Object.defineProperty(event, 'hasUAVisualTransition', { value: true })
     window.dispatchEvent(event)
-    await router.push('/')
+    await router.push('/purchases/manual')
     expect(start).not.toHaveBeenCalled()
 
     // Only that one move: the next is animated again.
-    await router.push('/trip/add')
+    await router.push('/purchases/manual/add')
     expect(start).toHaveBeenCalledOnce()
   })
 
@@ -183,8 +180,8 @@ describe('installViewTransitions', () => {
     const { start } = stubViewTransitions()
     const router = routerAt()
     installViewTransitions(router)
-    await router.push('/')
-    await router.push('/trip/add')
+    await router.push('/purchases/manual')
+    await router.push('/purchases/manual/add')
     expect(start).not.toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe('item-search')
   })
@@ -205,13 +202,13 @@ describe('installArrival', () => {
 
   it('names the tab after the screen from the start', async () => {
     const { view } = await app()
-    expect(document.title).toBe(`${en.trip.title} · ${en.app.name}`)
+    expect(document.title).toBe(`${en.advice.title} · ${en.app.name}`)
     view.unmount()
   })
 
   it('renames the tab and puts focus on the new heading after a move', async () => {
     const { router, view } = await app()
-    await router.push('/trip/add')
+    await router.push('/purchases/manual/add')
     await vi.waitFor(() => {
       expect(document.activeElement?.tagName).toBe('H1')
     })

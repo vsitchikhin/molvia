@@ -32,8 +32,10 @@ import { useNavigation } from '@/navigation'
 import type { Tab } from '@/router'
 
 const tabs: { name: Tab; icon: object }[] = [
-  { name: 'trip', icon: markRaw(IconCart) },
+  // Home first (MOL-128); the cart stays the cart — «what was bought», beside the wallet's «how
+  // much money» (handoff `07`, question 3).
   { name: 'advice', icon: markRaw(IconLightbulb) },
+  { name: 'purchases', icon: markRaw(IconCart) },
   { name: 'verdicts', icon: markRaw(IconStar) },
   // The personal layer beside the settings, apart from the three «what to buy and where» (MOL-82).
   { name: 'money', icon: markRaw(IconWallet) },

@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
+  <BottomSheet :open="open" :on-closed="onClosed" @update:open="$emit('update:open', $event)">
     <template #title>{{ t('trip.start.title') }}</template>
 
     <ScreenState
@@ -40,6 +40,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch } from 'vue'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { drawsNothing, newPlaceSchema, pastedLine } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
@@ -69,9 +70,27 @@ export default defineComponent({
   components: { AppButton, AppField, BottomSheet, ScreenState },
   props: {
     open: { type: Boolean, required: true },
+    /**
+     * Called once the sheet is away — the moment its opener may move (MOL-128): «Покупки» opens
+     * the record then, since a move under an open sheet closes it and its own step back would land
+     * on the screen just opened.
+     */
+    onClosed: { type: Function as PropType<() => void>, default: undefined },
+    /**
+     * The record open now, to be put away by this very start and not before it (MOL-128, review
+     * Р-2): «Закончить и начать новую» finished it at once, and a «Где вы?» dismissed then left
+     * no record at all. Finished — or removed, with «Вернуть», when nothing is in it: a finished
+     * empty record is a row of nothing in «Записаны» for good (MOL-76, В-2).
+     */
+    replacing: {
+      type: Object as PropType<{ tripId: string; place: string; empty: boolean } | null>,
+      default: null,
+    },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
+    /** A trip went into the queue: the sheet closes with a record to go to. */
+    started: () => true,
   },
   setup(props, { emit }) {
     const { t } = useI18n()
@@ -112,6 +131,11 @@ export default defineComponent({
 
     function start(place: string): void {
       if (drawsNothing(place) || !actor.settings) return
+      // In the queue before the start, so the server sees the one open record end first.
+      const old = props.replacing
+      if (old?.empty) queue.removeTrip(old.tripId, old.place)
+      else if (old)
+        queue.enqueue({ kind: 'finish', tripId: old.tripId, finishedOnDeviceAt: new Date() })
       queue.enqueue({
         kind: 'start',
         context: { ...actor.settings },
@@ -121,6 +145,7 @@ export default defineComponent({
         place: { kind: 'store', name: place },
         startedAt: new Date(),
       })
+      emit('started')
       emit('update:open', false)
     }
 

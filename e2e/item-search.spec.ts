@@ -75,7 +75,7 @@ async function withKvirta(page: Page, options: { recent?: boolean } = {}): Promi
       [`molvia.recent.${actor}`, JSON.stringify([milk])] as const,
     )
   }
-  await page.goto('/trip/add')
+  await page.goto('/purchases/manual/add')
   await expect(field(page)).toBeFocused()
 }
 
@@ -165,7 +165,7 @@ test.describe('from the keyboard', () => {
     for (const sort of [...sorts, ...more]) {
       await propose(page, { name: `Квирта ${sort}`, defaultUnit: 'piece' })
     }
-    await page.goto('/trip/add')
+    await page.goto('/purchases/manual/add')
     await field(page).fill('квирта')
     await expect(options(page)).toHaveCount(20)
 
@@ -204,7 +204,7 @@ test.describe('from the keyboard', () => {
     await field(page).press('Enter')
 
     await expect(field(page)).not.toBeFocused()
-    await expect(page).toHaveURL(/\/trip\/add$/)
+    await expect(page).toHaveURL(/\/purchases\/manual\/add$/)
   })
 })
 
@@ -213,7 +213,7 @@ test.describe('nothing found', () => {
     page,
   }) => {
     await arrive(page)
-    await page.goto('/trip/add')
+    await page.goto('/purchases/manual/add')
     const word = nonsense()
 
     await field(page).fill(word)
@@ -254,7 +254,7 @@ test.describe('nothing found', () => {
       await expect(details).toBeHidden()
     }
     // The sheet stepped back off its own entry each time: the search is where it was.
-    await expect(page).toHaveURL(/\/trip\/add$/)
+    await expect(page).toHaveURL(/\/purchases\/manual\/add$/)
     await expect(field(page)).toHaveValue(word)
   })
 })
@@ -266,7 +266,7 @@ test.describe('nothing close found (MOL-46)', () => {
     await arrive(page)
     const name = nonsense()
     await propose(page, { name, defaultUnit: 'piece' })
-    await page.goto('/trip/add')
+    await page.goto('/purchases/manual/add')
     // Two vowels swapped for another, inside the word: two edits, the budget and only just. Vowels,
     // because each is one letter of the key — a consonant may be two (`ch`, `sh`).
     const other = (vowel: string) => (vowel === 'у' ? 'а' : 'у')

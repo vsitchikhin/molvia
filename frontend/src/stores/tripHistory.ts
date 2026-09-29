@@ -1,7 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { z } from 'zod'
-import { currencySchema, tripHistoryCodec, tripViewCodec } from '@molvia/model'
+import {
+  currencySchema,
+  tripHistoryCodec,
+  tripHistoryEntryCodec,
+  tripViewCodec,
+} from '@molvia/model'
 import type { Currency, TripHistory, TripHistoryEntry, TripView } from '@molvia/model'
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
@@ -36,6 +41,12 @@ const cacheCodec = z.strictObject({
  */
 const NOT_CACHED_YET = new Set(['accountId', 'debited'])
 const TRIP_KEYS = new Set(Object.keys(tripViewCodec.def.shape))
+/**
+ * The same for a row of the history page (MOL-128): «12 позиций · 9 870 ֏» is not kept yet, for
+ * the same reason, and a row read back from the phone says only where and when.
+ */
+const ENTRY_NOT_CACHED_YET = new Set(['itemCount', 'total'])
+const ENTRY_KEYS = new Set(Object.keys(tripHistoryEntryCodec.def.shape))
 
 /** A trip view on the shelf, with only the keys `keep` says — and never anything but a record. */
 function shelved(view: unknown, keep: (key: string) => boolean): unknown {
@@ -43,12 +54,24 @@ function shelved(view: unknown, keep: (key: string) => boolean): unknown {
   return Object.fromEntries(Object.entries(view).filter(([key]) => keep(key)))
 }
 
-/** Every trip view of a cache, rewritten by `keep`: the selected one and each local one's. */
-function everyView(held: unknown, keep: (key: string) => boolean): unknown {
+/**
+ * Every trip view of a cache, rewritten by `keep`: the selected one and each local one's — and
+ * every row of the page, by `keepEntry`.
+ */
+function everyView(
+  held: unknown,
+  keep: (key: string) => boolean,
+  keepEntry: (key: string) => boolean,
+): unknown {
   if (typeof held !== 'object' || held === null) return held
-  const cache = held as { selected?: unknown; local?: unknown }
+  const cache = held as { page?: unknown; selected?: unknown; local?: unknown }
+  const page = cache.page as { trips?: unknown } | null | undefined
   return {
     ...cache,
+    page:
+      typeof page === 'object' && page !== null && Array.isArray(page.trips)
+        ? { ...page, trips: page.trips.map((row: unknown) => shelved(row, keepEntry)) }
+        : cache.page,
     selected: shelved(cache.selected, keep),
     local: Array.isArray(cache.local)
       ? cache.local.map((row: unknown) =>
@@ -62,12 +85,22 @@ function everyView(held: unknown, keep: (key: string) => boolean): unknown {
 
 /** Read by both builds: a field of a later one is dropped rather than failing the whole cache. */
 function fromShelf(raw: string): unknown {
-  return everyView(JSON.parse(raw), (key) => TRIP_KEYS.has(key))
+  return everyView(
+    JSON.parse(raw),
+    (key) => TRIP_KEYS.has(key),
+    (key) => ENTRY_KEYS.has(key),
+  )
 }
 
 /** Written as the previous build reads it. */
 function toShelf(cache: z.output<typeof cacheCodec>): string {
-  return JSON.stringify(everyView(cacheCodec.encode(cache), (key) => !NOT_CACHED_YET.has(key)))
+  return JSON.stringify(
+    everyView(
+      cacheCodec.encode(cache),
+      (key) => !NOT_CACHED_YET.has(key),
+      (key) => !ENTRY_NOT_CACHED_YET.has(key),
+    ),
+  )
 }
 
 const KEY = 'molvia.trip-history'
@@ -224,6 +257,8 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
           startedAt: trip.startedAt,
           finishedAt: trip.finishedAt,
           finishedOnDeviceAt: trip.finishedOnDeviceAt ?? null,
+          itemCount: trip.expenses.length,
+          total: [...trip.total],
         }
       : null
   }
