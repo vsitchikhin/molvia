@@ -52,6 +52,19 @@ describe('the app live region', () => {
     expect(texts()).toEqual(['The server did not answer', 'The server did not answer'])
   })
 
+  // What took them back learns whether they were said: a strip gone within the delay said nothing,
+  // and the next one must (MOL-132, С-13).
+  it('tells, as it takes words back, whether they were ever said', () => {
+    const { announce } = app()
+    const early = announce('Early')
+    vi.advanceTimersByTime(99)
+    expect(early()).toBe(false)
+
+    const late = announce('Late')
+    vi.advanceTimersByTime(100)
+    expect(late()).toBe(true)
+  })
+
   it('takes words back when asked, before or after they were said', () => {
     const { announce, texts } = app()
     const early = announce('Early')

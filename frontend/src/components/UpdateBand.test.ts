@@ -118,6 +118,22 @@ describe('«Вышла новая версия · Обновить» (MOL-132)',
       expect(next.said).toEqual([])
     })
 
+    it('is said by the next screen’s strip when the first went before its words were said (С-13)', async () => {
+      const update = fakeUpdate('ready')
+      const first = render(update)
+      await nextTick()
+      vi.advanceTimersByTime(50)
+      first.view.unmount()
+
+      const next = render(update)
+      await nextTick()
+      vi.advanceTimersByTime(200)
+      await nextTick()
+
+      expect(first.said).toEqual([])
+      expect(next.said).toEqual(['A new version is out'])
+    })
+
     it('says a failure the page came up with, before any strip was there (Д1)', async () => {
       const { said } = render(fakeUpdate('failed'))
       await nextTick()
