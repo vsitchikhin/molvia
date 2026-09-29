@@ -258,7 +258,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   (`answeredEmpty`, MOL-77; the memory of `useAdvice`, MOL-128); a phone-side cache is read by both
   versions. **The record typed by hand goes up to «Покупки» once none is open**, never under a sheet.
 
-### Barcodes: the scanner — `.claude/rules/barcodes.md`
+### Barcodes: the scanner, the item by its code — `.claude/rules/barcodes.md`
 
 - **EAN-13, EAN-8, UPC-A, UPC-E and nothing else**; UPC comes out as thirteen digits, and a code
   typed by hand is brought to that same form by `typedBarcode` — one package, one code (MOL-98).
@@ -267,6 +267,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The wasm comes from the app's own origin and is precached** — never the library's default CDN.
 - **No camera track outlives the scanner**, the reader's error included; every refusal offers the
   digits typed by hand. **A reader is thrown away only when it is the one that failed.**
+- **A code is looked up in the query, never the path** (`GET /catalogue/barcode?code=`, MOL-99): the
+  API logs paths. It is looked up with its twins (`barcodeTwins`), the code as read first; the item
+  found goes to the purchase sheet with no query — a code teaches the search nothing.
 
 ### Identity, sessions, the way in and out — `.claude/rules/auth.md`
 

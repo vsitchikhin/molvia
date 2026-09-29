@@ -752,8 +752,15 @@ MOL-98 opened the epic «Штрихкоды» with the scanner itself: a sheet w
 EAN-13, EAN-8, UPC-A and UPC-E in a worker, takes a code two frames in a row agree on and hands it
 over, and a field for the digits typed by hand as the way out of every refusal of the camera. The
 wasm comes from the app itself and is precached — the scanner is needed at the shelf, where the
-connection drops. It opens only on `/_kit` until MOL-99 puts it on a screen and finds the item. The
-rules are in `.claude/rules/barcodes.md`.
+connection drops. The rules are in `.claude/rules/barcodes.md`.
+
+MOL-99 put the scanner on «Что взяли?» — in the field, and as «Сканировать штрихкод» on the record —
+and finds the item by its code: `GET /catalogue/barcode?code=`, the code in the query because the API
+logs paths, looked up with its twins (`barcodeTwins`: eight digits that check both as EAN-8 and as
+UPC-E are found by either form, which lifted the price MOL-98 named). The item found opens the
+purchase sheet with no query — a code teaches the search nothing; a miss offers «Предложить товар»;
+offline the device finds the items it once found by code. The catalogue holds no code until MOL-100
+lets «Предложить товар» write one, so until then every scan on production is a miss.
 
 ## Откуда брать работу
 

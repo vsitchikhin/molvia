@@ -1,14 +1,15 @@
 ---
 paths:
   - 'packages/model/src/entities/barcode.ts'
+  - 'backend/src/usecases/find-by-barcode.*'
   - 'packages/model/tests/entities/barcode.test.ts'
   - 'frontend/src/scanner/**'
   - 'frontend/src/components/BarcodeScannerSheet.*'
-  - 'frontend/src/composables/{useCamera,useBarcodeScan}.*'
+  - 'frontend/src/composables/{useCamera,useBarcodeScan,useBarcodeLookup}.*'
   - 'e2e/{scanner.spec,barcode-video}.ts'
 ---
 
-# Barcodes: the scanner, a code typed by hand
+# Barcodes: the scanner, a code typed by hand, the item by its code
 
 The detail behind the barcode lines of `CLAUDE.md`. The scanner came in with MOL-98; finding an item
 by its code is MOL-99, a code in «Предложить товар» and bound to an item is MOL-100.
@@ -17,8 +18,7 @@ by its code is MOL-99, a code in «Предложить товар» and bound t
 
 - **A sheet that hands over a code and closes** (`BarcodeScannerSheet`, owner's decision В-4): the
   kit's `BottomSheet` with a live viewfinder, so «back», Esc and × close it as they close any sheet.
-  What the code is for is the opener's. Until MOL-99 it opens only on `/_kit`, which is why the
-  production bundle holds no scanner yet (owner's decision В-2).
+  What the code is for is the opener's: «Что взяли?» finds the item by it (MOL-99, below).
 - **EAN-13, EAN-8, UPC-A and UPC-E, nothing else** (`READER_OPTIONS`). A QR or a Code 128 on the
   same package is not the item's code, and every format read beyond these is one more chance of a
   false read. That the scanner reads EAN and not QR is the reason the Telegram Mini App was dropped.
@@ -140,3 +140,41 @@ lies on an iPad (as MOL-132 Р-3).
   each other's.
 - **Without a grant Chromium refuses the camera**, which is the spec of «no permission»; «no camera»
   replaces `getUserMedia` in an init script.
+
+## The item by its code (MOL-99)
+
+- **Where it opens** (owner's decision В-4): from the field of «Что взяли?», and from «Сканировать
+  штрихкод» on the record beside «Добавить позицию», which opens «Что взяли?» with the scanner already
+  up — one tap less at the shelf; put away, it leaves the search by name. The ask lives in memory
+  (`itemEntry.askToScan`), so a reload of the search is not a tap on «Сканировать».
+- **`GET /catalogue/barcode?code=…`, the code in the query, not the path**: the API logs a request
+  as its path (MOL-58), and a code is what a person bought. The answer is `200 { item | null }`: a
+  miss is an ordinary outcome, and a `404` would read the same as one from a Wi-Fi portal. A code of
+  no barcode's shape is the same `null`, without asking the database. Behind the door like the
+  search; nobody's picks take part.
+- **Looked up with its twins, the code as read first** (`barcodeTwins`, owner's decision В-3, review
+  С-14). Eight digits that check both as EAN-8 and as UPC-E are the one case of two forms: scanned as
+  EAN-8 they stay eight, typed they are thirteen (`typedBarcode`), and the other way round for a UPC-E
+  of number system `1`. The lookup takes both, which lifts both named prices of MOL-98 Р-11 without
+  touching `typedBarcode`. One UPC-A may be reached by two UPC-E forms (`012340000053` by `01234543`
+  and `01234053`); a form that checks as EAN-8 is a twin like any other. **The named price:** a shop's
+  own EAN-8 label and a UPC-E product with the same digits find each other — rare on an Armenian
+  shelf, and the name on the sheet shows it.
+- **The item found goes to the purchase sheet with no query**: a code is not one, so neither a pick
+  nor the person's own word (`admits`) is written. The miss held from before is used up all the
+  same, as by any sheet opened after it (MOL-45). The sheet waits for the scanner to be put away —
+  its close is a step back through history, as «Предложить товар»'s is.
+- **A miss** says «Код … справочнику не знаком» on the screen and out loud, and offers «Предложить
+  товар» — without the code until MOL-100 takes codes there (owner's decision В-1). An error is red
+  with «Повторить»; typing gives the search back and drops a lookup still out.
+- **Offline, the device knows the codes it found items by** (owner's decision В-2): an item found by
+  a code and added to a record keeps that code beside «Часто берёте», under
+  `molvia.recent-codes.<owner>` — beside the list, not in its rows, so a row an older version wrote
+  stays readable — and only while the item is on the list. Looked up with the twins, as the server
+  does. A server that fails is asked of the device too before the screen says «error». The price:
+  an item only ever taken by its name is not found by its code without a network.
+- **The reader lives with the screen, not the sheet** (review С-12а): a second scan on the same
+  screen is warm, and leaving the screen — which a found item always does — lets it go. So the sheet
+  stays mounted closed, and **a closed scanner draws nothing**: its skeleton kept «Загрузка…» in the
+  app's live region over the search's answer.
+- **Not yet:** a code by its item on «Что брать» (its own search, MOL-128), writing a code — MOL-100.
