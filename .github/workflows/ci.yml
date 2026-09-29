@@ -89,9 +89,11 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          # The browsers are in the key: saved only on a miss, a cache from before WebKit (MOL-80)
+          # would have had it downloaded again on every run.
+          key: playwright-chromium-webkit-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
 
       - if: failure()

@@ -58,9 +58,12 @@ export default defineConfig({
   // still lose it: it is saved while the context is torn down, which shares the test's timeout.
   use: { baseURL, trace: ci ? 'on-first-retry' : 'retain-on-failure', locale: 'en-US' },
 
-  // A phone, and only a phone: that is the device the product is designed for, so a
-  // desktop-only pass would prove nothing about the screen that matters. The second project
-  // is the same phone against the built app, and holds only what needs a worker.
+  // A phone: that is the device the product is designed for, so a desktop-only pass would prove
+  // nothing about the screen that matters. The second project is the same phone against the built
+  // app, and holds only what needs a worker. The sheet runs on an iPhone's engine as well (MOL-80):
+  // Safari does not focus a tapped button, and only WebKit shows what the sheet gives focus back
+  // to. The rest of the suite stays on one engine — a second run of everything would double the
+  // wait at every push for differences no other screen has.
   projects: [
     { name: 'phone', use: { ...devices['Pixel 7'] }, testIgnore: /pwa-update\.spec\.ts$/ },
     {
@@ -68,6 +71,7 @@ export default defineConfig({
       use: { ...devices['Pixel 7'], baseURL: `http://127.0.0.1:${previewPort}` },
       testMatch: /pwa-update\.spec\.ts$/,
     },
+    { name: 'iphone', use: { ...devices['iPhone 14'] }, testMatch: 'sheet.spec.ts' },
   ],
 
   webServer: [
