@@ -78,6 +78,17 @@ function emptyEverywhere(rows: readonly unknown[], prefix = ''): string[] {
   })
 }
 
+/** Every `…Id` of the file with its value, wherever it sits — a new one is found without a list. */
+function referencesIn(value: unknown): { key: string; id: string }[] {
+  if (Array.isArray(value)) return value.flatMap(referencesIn)
+  if (value === null || typeof value !== 'object') return []
+  return Object.entries(value).flatMap(([key, inner]) =>
+    key.endsWith('Id') && key !== 'telegramUserId' && typeof inner === 'string'
+      ? [{ key, id: inner }]
+      : referencesIn(inner),
+  )
+}
+
 /** A person with every column the file names filled in some row of theirs. */
 async function aFullLife(actorId: string, telegramUserId: number) {
   const at = (minute: number) => new Date(Date.UTC(2026, 8, 20, 10, minute))
@@ -273,7 +284,7 @@ describe('состав экспорта — один источник правд
     expect(ERASED_TABLES.filter((table) => !(table in EXPORT_COLUMNS))).toEqual([])
   })
 
-  it('и каждая таблица, что ведёт к actors через другую, — тоже (ревизии, покупки, штрихкоды)', async () => {
+  it('и каждая таблица, что уходит с человеком через другую, — тоже (ревизии, покупки)', async () => {
     const edges = await db.execute<{ child: string; parent: string }>(sql`
       select distinct kcu.table_name as child, ccu.table_name as parent
       from information_schema.referential_constraints rc
@@ -282,7 +293,10 @@ describe('состав экспорта — один источник правд
       join information_schema.constraint_column_usage ccu
         on ccu.constraint_name = rc.unique_constraint_name
        and ccu.constraint_schema = rc.unique_constraint_schema
-      where kcu.constraint_schema = 'public'`)
+      where kcu.constraint_schema = 'public'
+        -- A key that lets go of the row (\`items.created_by\`) does not take it along: the item is
+        -- the catalogue's, and neither are the tables under it the person's.
+        and rc.delete_rule <> 'SET NULL'`)
     const reaching = new Set(['actors'])
     for (let grown = true; grown;) {
       grown = false
@@ -295,6 +309,9 @@ describe('состав экспорта — один источник правд
     }
 
     expect([...reaching].filter((table) => !(table in EXPORT_COLUMNS)).sort()).toEqual([])
+    expect(reaching).toContain('exchange_revisions')
+    expect(reaching).toContain('expenses')
+    expect(reaching).not.toContain('items')
   })
 
   it('каждая колонка этих таблиц — в файле или в пропущенных с причиной', async () => {
@@ -341,6 +358,28 @@ describe('состав экспорта — один источник правд
       fact: { amount: '9000.00', currency: 'AMD' },
       counted: { amount: '9500.00', currency: 'AMD' },
     })
+  })
+
+  it('каждая ссылка файла находит свою строку в самом файле — справочник полон', async () => {
+    const { tg, actorId } = await someone()
+    await aFullLife(actorId, tg)
+
+    const { wire } = await fileOf(actorId)
+
+    const ids = (rows: readonly { id: string }[]) => new Set(rows.map((row) => row.id))
+    const accounts = ids(wire.moneyAccounts)
+    const within: Record<string, Set<string>> = {
+      itemId: new Set([...ids(wire.catalogue.items), ...ids(wire.proposedItems)]),
+      placeId: ids(wire.catalogue.places),
+      tripId: ids(wire.trips),
+      categoryId: ids(wire.spendingCategories),
+      accountId: accounts,
+      givenAccountId: accounts,
+      receivedAccountId: accounts,
+    }
+    const references = referencesIn(wire)
+    expect(new Set(references.map(({ key }) => key))).toEqual(new Set(Object.keys(within)))
+    expect(references.filter(({ key, id }) => !within[key]?.has(id))).toEqual([])
   })
 
   it('строк в каждом разделе столько же, сколько насчитает сухой прогон стирания', async () => {

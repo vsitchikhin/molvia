@@ -298,7 +298,11 @@ function cash(minor: bigint | null, currency: Currency | null): Money | null {
 
 function grouped<T>(rows: readonly T[], keyOf: (row: T) => string): Map<string, T[]> {
   const groups = new Map<string, T[]>()
-  for (const row of rows) groups.set(keyOf(row), [...(groups.get(keyOf(row)) ?? []), row])
+  for (const row of rows) {
+    const group = groups.get(keyOf(row))
+    if (group) group.push(row)
+    else groups.set(keyOf(row), [row])
+  }
   return groups
 }
 
@@ -470,10 +474,7 @@ export function createExportRepository(db: Db): ExportRepository {
             incomeVersions.map((row) => row.income_revisions),
             (version) => version.incomeId,
           )
-          const barcodesOf = new Map<string, string[]>()
-          for (const { itemId, code } of barcodeRows) {
-            barcodesOf.set(itemId, [...(barcodesOf.get(itemId) ?? []), code])
-          }
+          const barcodesOf = grouped(barcodeRows, (barcode) => barcode.itemId)
 
           return {
             account: {
@@ -701,7 +702,7 @@ export function createExportRepository(db: Db): ExportRepository {
                 row.typicalQtyMilli === null || row.typicalQtyUnit === null
                   ? null
                   : { milli: row.typicalQtyMilli, unit: row.typicalQtyUnit },
-              barcodes: barcodesOf.get(row.id) ?? [],
+              barcodes: (barcodesOf.get(row.id) ?? []).map((barcode) => barcode.code),
               createdAt: row.createdAt,
             })),
             catalogue: { items: namedItems, places: namedPlaces },
