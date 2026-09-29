@@ -80,12 +80,17 @@ The detail behind the frontend lines of `CLAUDE.md`.
   build `/health` names, encoded (`encodeURIComponent`: Node refuses a header outside latin1, and a
   tag in Cyrillic failed every answer, adversarial Д4), heard by the client before it reads the body,
   since the answer it can no longer read is the one that says most; `dev` is not compared. **It looks
-  again on every such answer, at most every thirty seconds, until a version is found** (review С-8):
-  the API may come out a moment before the static files, and the first look finds the old worker.
+  again on every such answer, at most every thirty seconds, until a version is found — and for five
+  minutes at most** (review С-8, adversarial Е2): the API may come out a moment before the static
+  files, and the first look finds the old worker; but a merge that touches no frontend ships the same
+  `sw.js`, and looking for the page's whole life found nothing a hundred and twenty times an hour —
+  past five minutes the quarter-hour look is enough, and the next build the server names starts over.
   The build alone offers nothing: only a worker has a version to let in. **A first visit is
-  controlled by nothing to its end** (no `clientsClaim`), and a version come out meanwhile does not
-  wait but becomes the active worker at once: the worker the page came up with is its own, and any
-  other that becomes active is a version owed to it (adversarial Д2) — after a hard reload the offer
+  controlled by nothing to its end** (no `clientsClaim`), and a version come out meanwhile becomes
+  the active worker at once when no other window uses the registration (adversarial Д2), and waits
+  when one does (Е1): the worker the page came up with is its own, and any other — waiting or become
+  active — is a version for it; with no takeover to hear, its «Обновить» reloads when the version it
+  let in becomes the active worker — after a hard reload the offer
   may be a reload onto what the page already runs, a harmless price. **`phase` is one state for the app** (`none` / `ready` / `applying` /
   `failed`), provided from `main.ts` and read through `usePwaUpdate`; without a worker — the dev
   server, the tests — it is `none`. **The strip is the top row of `AppScreen`'s pinned strip over the
@@ -100,7 +105,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the app is put away without a sheet. **It is said out loud once for the version, not once for each
   strip** (adversarial Д1): every screen draws its own strip, born with the version already waiting,
   so what was said — `ready`, `failed` — is kept by the version's state (a `WeakMap` over the one
-  `PwaUpdate`), and a strip drawn anew on the next screen says nothing. **An error while a version waits offers
+  `PwaUpdate`), and a strip drawn anew on the next screen says nothing — unless the strip that was
+  to say it went before its words reached the region (the announcer tells, review С-13). **An error while a version waits offers
   «Обновить» first and «Повторить» second, whatever the error was** (В-2): which answer the old code
   could not read is not always known — a new server's unknown code arrives as `response_invalid`, a
   proxy's 502 during the rollout as `internal` — and the reload loses nothing: the queues hold both
