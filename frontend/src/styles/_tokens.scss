@@ -131,6 +131,10 @@
      field is open over it — `useKeyboardInset` sets it on that sheet. */
   --keyboard-inset: 0px;
 
+  /* How tall the screen's pinned strip over the tab bar is. Zero until a screen has one —
+     `AppScreen` sets it — and what floats over the list rises above it (MOL-132). */
+  --dock-height: 0px;
+
   /* ── Motion ───────────────────────────────────────────────────────────── */
   --dur-fast: 120ms; /* state change on a control */
   --dur: 220ms; /* sheet, push, tab */

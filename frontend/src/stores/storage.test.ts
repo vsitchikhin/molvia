@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { writeEverywhere } from '@/stores/storage'
+import { read, writeEverywhere, writeOwn } from '@/stores/storage'
 
 /**
  * A localStorage that is full: it reads what it holds, removes freely — removing needs no quota —
@@ -74,5 +74,15 @@ describe('writeEverywhere', () => {
     fill()
     writeEverywhere('k', 'waiting,new', (past) => past.split(',')[1] ?? null)
     expect(localStorage.getItem('k')).toBe('waiting')
+  })
+})
+
+describe('writeOwn (MOL-132)', () => {
+  it('keeps the note on this window’s shelf, where `read` finds it, and nowhere shared', () => {
+    writeOwn('molvia.update-applied', '1790000000000')
+
+    expect(sessionStorage.getItem('molvia.update-applied')).toBe('1790000000000')
+    expect(localStorage.getItem('molvia.update-applied')).toBeNull()
+    expect(read('molvia.update-applied', true)).toBe('1790000000000')
   })
 })

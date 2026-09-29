@@ -82,7 +82,7 @@ support types, the shared integration tests, the migrations.
 - `backend/src/env.ts` — The API's environment: loads the copy's `.env`, validates ports, database, rate refresh, build version and login configuration.
 - `backend/src/index.ts` — The API process's entry: migrations at boot, the scheduled official-rate refresh, then listening.
 - `backend/src/parse.ts` — The parse seam for body, query and path, shared by routes and use cases; `InvalidBody` and the resource-id parse.
-- `backend/src/server.ts` — `buildServer`, the API's composition point: the request log of method and path, the central error handler, `no-store` on auth paths, all routes and timers wired.
+- `backend/src/server.ts` — `buildServer`, the API's composition point: the request log of method and path, the central error handler, `no-store` on auth paths, the build on every answer, all routes and timers wired.
 
 ### backend · tests
 
@@ -90,6 +90,7 @@ support types, the shared integration tests, the migrations.
 - `backend/tests/corners.integration.test.ts` — Integration test: repository corners — a second price for one pair, a third currency in a trip, barcodes, dangling refs, bad rows.
 - `backend/tests/db.ts` — Test support: the test database's URL and short-lived connections to it, raw and through drizzle.
 - `backend/tests/error-handler.integration.test.ts` — Integration test: a body that did not parse is a 400 naming the field, and a unique clash is a conflict, not a 500.
+- `backend/tests/version-header.integration.test.ts` — Integration test: every answer names its build in `X-Molvia-Version` — refusals, missing routes and framework errors too.
 - `backend/tests/fixtures.ts` — Test support: minimal rows a foreign key demands (actor, item, place, trip, session, login request), sign-in and clearing.
 - `backend/tests/hardening.integration.test.ts` — Integration test: fixes from an adversarial pass — write order in a transaction, limits, malformed ids, reviews, conflicts, empty patch.
 - `backend/tests/listings.integration.test.ts` — Integration test: repository reads — empty lists, order and limit, purchases awaiting a rating, where it is cheaper, ratings.

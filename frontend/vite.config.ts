@@ -17,8 +17,10 @@ const src = fileURLToPath(new URL('./src', import.meta.url))
 const certDir = fileURLToPath(new URL('./certs', import.meta.url))
 const key = `${certDir}/dev-key.pem`
 const cert = `${certDir}/dev-cert.pem`
+// The end-to-end run of the built app asks for plain http (MOL-132): `preview` takes the dev
+// server's certificate by default, and that run reaches it over the loopback.
 const https =
-  existsSync(key) && existsSync(cert)
+  process.env.PWA_PLAIN_HTTP !== '1' && existsSync(key) && existsSync(cert)
     ? { key: readFileSync(key), cert: readFileSync(cert) }
     : undefined
 
