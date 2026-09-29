@@ -131,6 +131,8 @@ function withoutClaimOf(owner: string, value: string): string | null {
     if (typeof parsed !== 'object' || parsed === null) return null
     const { claimed, ...rest } = parsed as Record<string, unknown>
     if (claimed !== owner) return value
+    // The next person at this device begins a login rather than repeats one (MOL-68, review А1).
+    delete rest.tried
     return Object.keys(rest).length > 0 ? JSON.stringify(rest) : null
   } catch {
     return null

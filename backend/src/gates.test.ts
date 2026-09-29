@@ -11,6 +11,34 @@ const REPORT: GatesReport = {
   products: { cohortSize: 5, returned: 1, pending: 3, withoutAccess: 8 },
   venues: { cohortSize: 5, returned: 0, pending: 3, withoutAccess: 8 },
   erased: { count: 2, firstWeek: '2026-10-05', lastWeek: '2026-11-16' },
+  logins: {
+    firstDay: '2026-10-05',
+    lastDay: '2026-11-20',
+    days: [
+      {
+        day: '2026-10-05',
+        started: 5,
+        again: 2,
+        confirmed: 3,
+        declined: 0,
+        collected: 3,
+        expiredUnconfirmed: 2,
+        expiredConfirmed: 0,
+        refused: 0,
+      },
+      {
+        day: '2026-11-20',
+        started: 48,
+        again: 10,
+        confirmed: 34,
+        declined: 1,
+        collected: 30,
+        expiredUnconfirmed: 13,
+        expiredConfirmed: 4,
+        refused: 2,
+      },
+    ],
+  },
 }
 
 function run(argv: string[], report: GatesReport | Error = REPORT) {
@@ -117,6 +145,21 @@ describe('gates — чтение ворот вручную', () => {
       '     no access in week 4                 8          not in the cohort',
       '',
       '     erased                              2          appeared the weeks of 2026-10-05 … 2026-11-16, in neither half',
+      '',
+      'login how many who began got in?                    second way in above 25 %',
+      '     began                               41         days 2026-10-05 … 2026-11-20 in Yerevan',
+      '     got in                              33 of 41    80.4 %',
+      '     still under way                     0          not counted yet, or erased mid-login',
+      '     lost                                8 of 41     19.6 %',
+      '       never confirmed in the bot        15',
+      '       confirmed, did not come back      4',
+      '       «not me» in the bot               1',
+      '       refused by the quota              2          starts, not in «began»',
+      '     began again on the same device      12         not counted as beginning',
+      '',
+      '     day            began     again confirmed  declined    got in   expired   refused',
+      '     2026-10-05         3         2         3         0         3         2         0',
+      '     2026-11-20        38        10        34         1        30        17         2',
     ])
     expect(lines.join('\n')).not.toMatch(/STOP|pass|fail/)
   })
@@ -127,7 +170,7 @@ describe('gates — чтение ворот вручную', () => {
       erased: { count: 0, firstWeek: '2026-10-05', lastWeek: '2026-10-05' },
     })
     await exit
-    expect(lines.at(-1)).toBe(
+    expect(lines).toContain(
       '     erased                              0          appeared the week of 2026-10-05, in neither half',
     )
   })
@@ -185,6 +228,124 @@ describe('gates — чтение ворот вручную', () => {
     expect(line).toContain(`${String(part)} of ${String(whole)}`)
     expect(line.endsWith(percent)).toBe(true)
   })
+
+  it('вход без единого запроса в окне — нули и «—», без таблицы по дням (MOL-68)', async () => {
+    const { exit, lines } = run(['--from', '2026-10-05', '--to', '2026-10-05'], {
+      ...REPORT,
+      logins: { firstDay: '2026-10-05', lastDay: '2026-10-05', days: [] },
+    })
+    await exit
+    const login = lines.slice(lines.findIndex((line) => line.startsWith('login ')))
+    expect(login).toEqual([
+      'login how many who began got in?                    second way in above 25 %',
+      '     began                               0          the day 2026-10-05 in Yerevan',
+      '     got in                              0 of 0     —',
+      '     still under way                     0          not counted yet, or erased mid-login',
+      '     lost                                0 of 0     —',
+      '       never confirmed in the bot        0',
+      '       confirmed, did not come back      0',
+      '       «not me» in the bot               0',
+      '       refused by the quota              0          starts, not in «began»',
+      '     began again on the same device      0          not counted as beginning',
+    ])
+    expect(lines.join('\n')).not.toMatch(/NaN/)
+  })
+
+  it('повтор в окне старта до окна — «lost» ниже нуля печатается как есть, с причиной', async () => {
+    const day = REPORT.logins.days[0]!
+    const { exit, lines } = run(['--from', '2026-10-05'], {
+      ...REPORT,
+      logins: {
+        ...REPORT.logins,
+        days: [{ ...day, started: 2, again: 1, collected: 2, expiredUnconfirmed: 0 }],
+      },
+    })
+    await exit
+    expect(lines).toContain('     got in                              2 of 1     200.0 %')
+    expect(lines).toContain(
+      '     lost                                -1 of 1    repeats of starts before the window',
+    )
+  })
+
+  it('вход, который ещё идёт, не потерян: «still under way», и из «lost» он вычтен (ревью А2)', async () => {
+    const day = REPORT.logins.days[0]!
+    const { exit, lines } = run(['--from', '2026-10-05'], {
+      ...REPORT,
+      logins: {
+        ...REPORT.logins,
+        days: [{ ...day, started: 3, again: 0, collected: 1, expiredUnconfirmed: 0 }],
+      },
+    })
+    await exit
+    expect(lines).toContain(
+      '     still under way                     2          not counted yet, or erased mid-login',
+    )
+    expect(lines.find((line) => line.startsWith('     lost'))).toMatch(/ 0 of 3 +0\.0 %$/)
+  })
+
+  it('исход без начала — старый образ после отката — «ещё в пути» ниже нуля, с причиной (ревью Г)', async () => {
+    const day = REPORT.logins.days[0]!
+    const { exit, lines } = run(['--from', '2026-10-05'], {
+      ...REPORT,
+      logins: {
+        ...REPORT.logins,
+        days: [{ ...day, started: 0, again: 0, confirmed: 1, collected: 1, expiredUnconfirmed: 0 }],
+      },
+    })
+    await exit
+    expect(lines).toContain(
+      '     still under way                     -1         outcomes of starts never counted',
+    )
+  })
+
+  it('исходы без начала не прибавляются к «lost»: один потерянный — «1 of 1» (раунд 2, Р5)', async () => {
+    const day = REPORT.logins.days[0]!
+    const { exit, lines } = run(['--from', '2026-10-05'], {
+      ...REPORT,
+      logins: {
+        ...REPORT.logins,
+        // Один настоящий старт, истёкший, и один запрос старого образа, тоже истёкший.
+        days: [{ ...day, started: 1, again: 0, confirmed: 0, collected: 0, expiredUnconfirmed: 2 }],
+      },
+    })
+    await exit
+    expect(lines).toContain(
+      '     still under way                     -1         outcomes of starts never counted',
+    )
+    expect(lines.find((line) => line.startsWith('     lost'))).toMatch(/ 1 of 1 +100\.0 %$/)
+  })
+
+  it.each([
+    [1, 4, '25.0 %'],
+    [63, 251, '25.1 %'],
+    [1001, 4000, '25.1 %'],
+    [2999, 10_000, '30.0 %'],
+    [1, 3, '33.4 %'],
+  ])(
+    'потеряно %i из %i — %s: вверх до десятой, над линией «above» не садится на неё (ревью Б)',
+    async (lost, began, percent) => {
+      const day = REPORT.logins.days[0]!
+      const { exit, lines } = run(['--from', '2026-10-05'], {
+        ...REPORT,
+        logins: {
+          ...REPORT.logins,
+          days: [
+            {
+              ...day,
+              started: began,
+              again: 0,
+              collected: began - lost,
+              expiredUnconfirmed: lost,
+            },
+          ],
+        },
+      })
+      await exit
+      const line = lines.find((text) => text.startsWith('     lost')) ?? ''
+      expect(line).toContain(`${String(lost)} of ${String(began)}`)
+      expect(line.endsWith(percent)).toBe(true)
+    },
+  )
 
   it('сбой базы — код 1, код сбоя и ни слова из его сообщения', async () => {
     const failure = new Error('Failed query: select … from actors\nparams: 2026-10-04T20:00…', {

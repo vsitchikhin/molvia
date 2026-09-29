@@ -116,6 +116,12 @@ describe('«Выйти» стирает ящик владельца (MOL-57)', (
     expect(localStorage.getItem('molvia.leaving')).toBeNull()
   })
 
+  it('с одобрением уходит и метка «уже начинали» — следующий вход здесь начало (MOL-68, А1)', () => {
+    localStorage.setItem('molvia.login', JSON.stringify({ claimed: OWNER, tried: Date.now() }))
+    forgetOwner(OWNER)
+    expect(localStorage.getItem('molvia.login')).toBeNull()
+  })
+
   it('чужое одобрение не трогает', () => {
     localStorage.setItem('molvia.login', JSON.stringify({ claimed: OTHER }))
     forgetOwner(OWNER)

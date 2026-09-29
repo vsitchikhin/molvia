@@ -4,8 +4,9 @@ import type { CohortReturn } from './events-repository'
 import type { Conn, Db } from './index'
 import type { CohortReached } from './verdicts-repository'
 import { createEventRepository } from './events-repository'
+import { loginDays } from './schema'
 import { createVerdictRepository } from './verdicts-repository'
-import { yerevanWeek } from './yerevan-week'
+import { yerevanDay, yerevanWeek } from './yerevan-week'
 
 /** People who appeared in `[from, to)` — the one window both gates are read over (MOL-91, Р-1). */
 export interface GatesWindow {
@@ -20,6 +21,7 @@ export interface GatesReport {
   readonly products: CohortReturn
   readonly venues: CohortReturn
   readonly erased: ErasedInWindow
+  readonly logins: LoginsInWindow
 }
 
 /**
@@ -31,6 +33,31 @@ export interface ErasedInWindow {
   readonly count: number
   readonly firstWeek: string
   readonly lastWeek: string
+}
+
+/** One row of `login_days` (MOL-68): the logins begun that day, and where each of them ended. */
+export interface LoginDay {
+  readonly day: string
+  readonly started: number
+  readonly again: number
+  readonly confirmed: number
+  readonly declined: number
+  readonly collected: number
+  readonly expiredUnconfirmed: number
+  readonly expiredConfirmed: number
+  readonly refused: number
+}
+
+/**
+ * The login's funnel over the days the window touches, in Yerevan — whole days, since that is all
+ * `login_days` keeps. Not people who appeared, as both gates are: the logins begun on those days,
+ * which is where the people who never appeared are.
+ */
+export interface LoginsInWindow {
+  readonly firstDay: string
+  readonly lastDay: string
+  /** The days that counted anything, in order. */
+  readonly days: readonly LoginDay[]
 }
 
 export interface GatesReader {
@@ -64,6 +91,7 @@ export function createGatesReader(db: Db): GatesReader {
             products: await events.weekFourReturn('product', from, to),
             venues: await events.weekFourReturn('venue', from, to),
             erased: await erasedIn(tx, from, to),
+            logins: await loginsIn(tx, from, to),
           }
         },
         { isolationLevel: 'repeatable read', accessMode: 'read only' },
@@ -94,4 +122,20 @@ async function erasedIn(tx: Conn, from: Date, to: Date): Promise<ErasedInWindow>
     firstWeek: row?.first_week ?? '',
     lastWeek: row?.last_week ?? '',
   }
+}
+
+async function loginsIn(tx: Conn, from: Date, to: Date): Promise<LoginsInWindow> {
+  // As `erasedIn` does with weeks: the last day is the one holding the window's last millisecond.
+  const [bounds] = await tx.execute<{ first_day: string; last_day: string }>(sql`
+    select
+      to_char(${yerevanDay(sql`${from.toISOString()}::timestamptz`)}, 'YYYY-MM-DD') as first_day,
+      to_char(${yerevanDay(sql`${to.toISOString()}::timestamptz - interval '1 millisecond'`)}, 'YYYY-MM-DD') as last_day`)
+  const firstDay = bounds?.first_day ?? ''
+  const lastDay = bounds?.last_day ?? ''
+  const rows = await tx
+    .select()
+    .from(loginDays)
+    .where(sql`${loginDays.day} between ${firstDay}::date and ${lastDay}::date`)
+    .orderBy(loginDays.day)
+  return { firstDay, lastDay, days: rows }
 }

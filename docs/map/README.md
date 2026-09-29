@@ -60,7 +60,7 @@ support types, the shared integration tests, the migrations.
 ### packages/client
 
 - `packages/client/src/index.ts` — The typed API client: one method per route of the API, every answer parsed with the model's codecs; re-exports the bot client.
-- `packages/client/src/transport.ts` — Client transport: fetch with a timeout and `ApiError` with `answered`; only the API's own error body may say `error.no_actor`, never a bare 401.
+- `packages/client/src/transport.ts` — Client transport: fetch with a timeout and `ApiError` with `answered` and, for a reply off the contract, its `status`; only the API's own error body may say `error.no_actor`, never a bare 401.
 
 ### backend · routes
 
@@ -75,7 +75,7 @@ support types, the shared integration tests, the migrations.
 - `backend/src/db/rows.ts` — Row helpers: `theRow` for a write that must return one, `idOrNull` for a malformed id, `rowLimit`.
 - `backend/src/db/schema.ts` — The Drizzle schema of every table with its checks and indexes — what the migrations are generated from. Tests: `backend/tests/schema.integration.test.ts`.
 - `backend/src/db/unit-of-work.ts` — Unit of work: the repositories a trip or money use case reaches, bound to one connection, and `transactOn` for one transaction.
-- `backend/src/db/yerevan-week.ts` — SQL fragment: the Monday in Yerevan of the week an instant falls in, shared by erasure and the gates.
+- `backend/src/db/yerevan-week.ts` — SQL fragments: the Monday in Yerevan of the week an instant falls in, shared by erasure and the gates, and the day in Yerevan, the key of `login_days`.
 
 ### backend · other
 
