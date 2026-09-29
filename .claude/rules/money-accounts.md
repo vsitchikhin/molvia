@@ -174,10 +174,10 @@ balance, total and difference is the server's.
   something waits is muted** and «Записать разницу» with it, until it lands: a trip being removed is
   hidden from the reasons while the server still counts it, and the difference had no reason on
   screen (review 33); the muted difference says «пересчитаем». **Not waited on: a trip's write the
-  queue will not send by itself** — behind a start standing on a question of «Поход», or of a trip
+  queue will not send by itself** — behind a start standing on a question of «Покупки», or of a trip
   the server refused: waited on, it held every check of every account with nothing to say why
-  (adversarial round 3, Н4). The check counts without it and says the trip waits for an answer on
-  «Поход». **But «Записать разницу» stays shut while any such write waits**: the difference it explains became
+  (adversarial round 3, Н4). The check counts without it and says the trip waits for an answer in
+  «Покупки». **But «Записать разницу» stays shut while any such write waits**: the difference it explains became
   «Прочее», and the trip's own money followed once the person answered — twice (review 36,
   adversarial round 4, Н5). Any trip's, not only this account's: a payment names the account it moves
   the trip to, never the one it takes it off, and a removal names none (review 37, round 5, Н6). Once

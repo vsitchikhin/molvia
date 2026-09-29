@@ -27,7 +27,7 @@ The detail behind the spending and «Деньги» lines of `CLAUDE.md`.
 **A spending is money spent outside a trip (MOL-73)** — the barber, the rent, the domain: a day, an
 amount in its currency, one of the owner's categories, «что это» and «где» as free text
 (`spendings`). The personal accounting layer of MOL-72, private as an income. It makes no item,
-feeds no price and no verdict: a purchase at a shop is still entered in «Поход», and the sheet says
+feeds no price and no verdict: a purchase at a shop is still entered in «Покупки», and the sheet says
 so (В-2) — the boundary is held by the hint, not by a ban, because the owner's own sheet is full of
 «кола, молоко, несквик… · ереван сити».
 

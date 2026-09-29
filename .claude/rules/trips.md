@@ -95,7 +95,7 @@ The detail behind the trip lines of `CLAUDE.md`.
   by an older window does not send it to the head (adversarial Л). **The price, named** (review 30):
   a `payment` waits behind a start held for an answer — another trip open, a missing context — with
   no timer; a check does not wait for it — it counts without it and says the trip waits for an
-  answer on «Поход» (adversarial round 3, Н4). **The price, named:** removing a trip dated before a check that
+  answer in «Покупки» (adversarial round 3, Н4). **The price, named:** removing a trip dated before a check that
   came out even moves the balance with no reason the check can name, as a removed spending does.
 
 ## The settings, and the geography a trip names (MOL-65)
@@ -144,12 +144,18 @@ up to «Покупки»** — finished here or on another device, removed, or r
 never under an open sheet. «Записать покупки» (`ManualEntryButton`) stands in the strip of
 «Покупки» and of the newcomer's «Что брать»: with no record open it asks «Где вы?» and opens the
 record once the sheet is away; with one open it asks «Продолжить» or «Закончить и начать новую» —
-the rule «one open at a time» unchanged. With receipts (MOL-127) it becomes «Записать вручную».
+the rule «one open at a time» unchanged. **«Закончить и начать новую» puts the open record away only
+with the new start** (review Р-2), in the queue before it: finished at once, a «Где вы?» dismissed
+left no record at all — and an empty one is removed with «Вернуть» rather than finished into a row
+of nothing (MOL-76, В-2). **Every sheet over the record asks it to leave once it is away** — the
+purchase's, the queue's notices' (review Р-7): the record may end under any of them. With receipts (MOL-127) it becomes «Записать вручную».
 
 **What the queue says about any record is said on both screens** (`TripNotices`): purchases the
 server refused, a record already open elsewhere, purchases not sent for a record that is over, a
 city to name. «Поход» said them in every phase, its home without a trip included; with the record
-a nested screen, «Покупки» without one would have said none of it.
+a nested screen, «Покупки» without one would have said none of it. «N ещё не отправлено» waits
+until the record going on is known — before that its own waiting purchases would be counted
+(review Р-18).
 
 **No circle over an action anywhere** (MOL-77): the empty state's «+» read as a button and was the
 thing the owner tapped, so `ScreenState` draws an empty state without a circle when it is given no

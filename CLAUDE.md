@@ -189,7 +189,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 ### Money: rates, exchanges, incomes — `.claude/rules/money-rates.md`
 
-- **«Начать поход» never goes to the network**: a trip snapshots the official rate from the cache,
+- **Starting a record never goes to the network** (the old «Начать поход»): a trip snapshots the official rate from the cache,
   which the API refreshes hourly; the cache holds one currency against the dram per day.
 - **The CBA first, then the Bank of Russia, then open.er-api.com**; a pair is never built from two
   providers; a jump is flagged, not refused; an answer that is not strict is not written; an empty
@@ -208,7 +208,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
 ### Money: spendings and «Деньги» — `.claude/rules/money-spendings.md`
 
 - **A spending makes no item, feeds no price and no verdict** (MOL-73); a purchase at a shop is
-  still entered in «Поход».
+  still entered in «Покупки».
 - **A category is removed by archiving**, never erased; a spending in another currency keeps the
   rate of its own day, written with it and never recomputed.
 - **The month is counted by the server**; a closed month is frozen at the rate of its last day,

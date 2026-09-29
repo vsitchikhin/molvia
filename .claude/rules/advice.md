@@ -197,6 +197,16 @@ only ever answer «not rated yet», and would teach that it is useless).
   so the mode, the threshold of three and «no price on „не брать нигде“» cannot drift between the
   list and the search. An item nobody may be shown a verdict for — a stranger's lone one below the
   threshold — is `null`, «ещё не оценивали», as the list leaves it out.
+- **What is rated is not cut by the limit of the search** (adversarial А): the first `SEARCH_LIMIT`
+  found, as «Что взяли?» shows them, and past them every near one — each word within one edit
+  (`nearIds`) — with a verdict in sight. «Сыр» is 24 names in the seed; cut at twenty before the
+  verdicts were asked, the cheese rated «не брать нигде» went missing and twenty «Оценить» stood in
+  its place. Far ones past the limit stay out: they are the catalogue's guesses.
+- **A row found carries the scope of the search's answer**, and the verdict sheet opened from it
+  reads that one, not the list's (adversarial Е): access may open or run out between the two, and
+  an average of three was offered pre-chosen as one's own score.
+- **After a save the search is asked again quietly** — the answer stays, dimmed — and the field
+  that comes back over a list asked again searches what it holds (adversarial Г, Д).
 - **It writes nothing** (В-2): no `advice_viewed` — the one writer stays `GET /advice`, which the
   screen asks for whenever it opens and whenever the connection comes back, and the field is not
   shown without a list; the one visit missed (the list failed, the search then worked) errs towards
@@ -207,8 +217,9 @@ only ever answer «not rated yet», and would teach that it is useless).
   tail «Цены нет намеренно». No «Предложить товар»: nothing was bought. «Оценить» on an item not
   rated opens the verdict sheet without a place (MOL-27).
 - **Offline it searches the remembered list on the phone** (В-3, `searchRemembered`): every word
-  typed must start a word of the name, both by the domain's `toSearchKey` — so transliteration and
-  the key's own folds hold, and typos and synonyms, which are Postgres's, do not. The strip says the
+  typed must start a word of the name, as typed or by the domain's `toSearchKey` with «ц» spelt
+  out — so transliteration holds, «дет» starts «Детское» (`deцkoe`) and «mat» starts «Мацун», and
+  typos and synonyms, which are Postgres's, do not (review Р-9). The strip says the
   search is the list's only, as of its age.
 
 ## A withdrawn verdict

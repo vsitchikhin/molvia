@@ -76,14 +76,18 @@ The detail behind the frontend lines of `CLAUDE.md`.
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and
   gets the chevron, labelled with the title of where it leads, never the word «Back». **At rest
   the label has the row; once the small title comes in it gives way first** (MOL-75): whole, else
-  «Back», else the chevron alone — never a fragment, which «Trip…» would be — and the title yields
+  «Back», else the chevron alone — never a fragment, which «Покуп…» would be — and the title yields
   last, only when it alone does not fit between two chevrons. The width is read in fractions, as the
   label is drawn: rounded, a word 0.4px too wide passed as whole and was drawn «Наз…» (review А1).
-  **The name does not follow the ladder** — «Back Trip» on every step, the word shown first
+  **The name does not follow the ladder** — «Back Purchases» on every step, the word shown first
   (owner's decision on review). **It
   leads to the screen underneath when that screen is any ancestor** — the step the system
   button takes — and otherwise replaces onto the parent (`backTarget`, MOL-77): the search of a
-  record with «Покупки» right underneath says «‹ Покупки», and both «back»s go there.
+  record opened cold, with the record and «Покупки» laid underneath, says «‹ Запись»; with
+  «Покупки» right underneath and no record, «‹ Покупки» — and both «back»s go there. A tab
+  tapped on a nested screen is tapped from its section: up the chain the way «back» goes while an
+  ancestor is underneath, then the tab from there (MOL-128, adversarial Б) — read as «from no
+  section», every round of the shop left two more entries before «back» left the app.
   Tabs and the chevron move through `useNavigation`: **«Что брать» is home** (MOL-128; «Поход»
   was, MOL-17) — at the shelf a person reads, at home they write — leaving it pushes, moving
   between the other sections replaces, returning is a step back — so the system «back» never
