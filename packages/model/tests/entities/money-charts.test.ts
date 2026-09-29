@@ -184,7 +184,7 @@ describe('moneyCharts', () => {
         month('2026-07', { spent: 100_000, income: 30_000, spentIncome: 25_000 }),
         // The salary came in dollars on a day with no dollar: «Пришло» 0 is not the month.
         month('2026-08', {
-          spent: 100_000,
+          spent: 200_000,
           income: 0,
           spentIncome: 25_000,
           incomeUncounted: [money(30_000n, 'USD')],
@@ -197,7 +197,8 @@ describe('moneyCharts', () => {
     )
     expect(charts.months.map((one) => one.difference)).toEqual([rub(5_000), null, null, rub(0)])
     expect(charts.differenceAverage).toEqual(rub(5_000))
-    expect(charts.spentAverage).toEqual(amd(100_000))
+    // The income did not change what was spent: August is in the average of spending (review С-8).
+    expect(charts.spentAverage).toEqual(amd(150_000))
   })
 
   it('must not fire: a change past what a number holds is left unsaid, not a failed answer (adversarial d9 А)', () => {
@@ -240,6 +241,9 @@ describe('moneyCharts', () => {
     const clothes = charts.categories[2]
     expect(clothes?.points.map((point) => point.amount)).toEqual([amd(0), amd(0)])
     expect(clothes?.points.map((point) => point.level)).toEqual([0, 0])
+    // Nothing spent in the period has no average, not «в среднем 0 ֏».
+    expect(clothes?.average).toBeNull()
+    expect(clothes?.averageLevel).toBeNull()
   })
 
   it('draws each category over the period, largest first, with its own scale', () => {

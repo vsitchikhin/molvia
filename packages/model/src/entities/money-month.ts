@@ -409,8 +409,11 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
   }
 
   const spent: Money = { minor: spentMinor, currency: spend }
+  // Nothing spent is nothing in any currency, with or without a rate (review of MOL-74, С-7): a
+  // month of no spending and no rate was «нет курса» on «Деньгах» and a bar of «not known» on the
+  // charts, taller than any month that had one.
   const spentIncome =
-    spend === incomeCurrency
+    spend === incomeCurrency || spentMinor === 0n
       ? { minor: spentMinor, currency: incomeCurrency }
       : input.rate === null
         ? null

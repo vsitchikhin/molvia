@@ -257,6 +257,19 @@ describe('the month of «Деньги»', () => {
     expect(result.spentIncome).toBeNull()
   })
 
+  it('is «0» in the income currency with nothing spent, rate or none (review of MOL-74, С-7)', () => {
+    const empty = month({ rate: null, incomes: [income('50000 RUB', '2026-09-10')] })
+    expect(empty.spentIncome).toEqual(toMoney('0 RUB'))
+    // A month spent only in what did not convert: nothing counted, nothing to convert.
+    const unconverted = month({
+      rate: null,
+      spendings: [spending('10 EUR', '2026-09-20')],
+      inSpend: () => null,
+    })
+    expect(unconverted.spent).toEqual(toMoney('0 AMD'))
+    expect(unconverted.spentIncome).toEqual(toMoney('0 RUB'))
+  })
+
   it('needs no rate when both currencies are one', () => {
     const result = month({
       spendCurrency: 'RUB',

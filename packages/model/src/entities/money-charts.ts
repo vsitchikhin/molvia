@@ -104,9 +104,14 @@ function changeOf(current: Money, previous: Money): number | null {
   return change !== null && Number.isSafeInteger(change) ? change : null
 }
 
-/** Nothing of the month is «не посчитано»: a sum of it is the whole month, and may be averaged. */
+/** Nothing spent in the month is «не посчитано»: its spending, and each category's, may be averaged. */
+function spentWhole(month: MoneyMonth): boolean {
+  return month.uncounted.length === 0
+}
+
+/** Nothing of the month is «не посчитано»: «Разница» of it is the whole month's. */
 function whole(month: MoneyMonth): boolean {
-  return month.uncounted.length === 0 && month.incomeUncounted.length === 0
+  return spentWhole(month) && month.incomeUncounted.length === 0
 }
 
 /**
@@ -117,9 +122,10 @@ function whole(month: MoneyMonth): boolean {
  * **An average is of the closed months from the first with anything in it** (Р-5, Р-15): a person
  * who started in August is not averaged over four empty months, and the running month, half spent,
  * is not an average's month. With no closed month to average there is no average. **A month with
- * anything «не посчитано» is in no average and has no «Разница»** (adversarial d9 В): its sums are
- * short by what did not convert, and a salary in dollars on a day with no dollar made the month
- * «−25 000 ₽» and dragged the average under zero.
+ * anything «не посчитано» has no «Разница» and is not in its average** (adversarial d9 В): a salary in
+ * dollars on a day with no dollar made the month «−25 000 ₽» and dragged the average under zero. **Its
+ * spending is averaged unless the spending itself is short** (review С-8, d9 round 2 В2): an income
+ * does not change what was spent. A category spent nowhere in the period has no average.
  *
  * `categories` are the owner's to offer besides those spent in the period (adversarial А, d9 Г): a
  * category tapped on an older month of «Деньги» is drawn as its months of nothing, never swapped for
@@ -140,6 +146,7 @@ export function moneyCharts(
   const since = sinceIndex === -1 ? null : (months[sinceIndex]?.month ?? null)
   // The running month is the last of a period; the ones before it are closed.
   const closed = sinceIndex === -1 ? [] : months.slice(sinceIndex, -1)
+  const spentAveraged = closed.filter(spentWhole)
   const averaged = closed.filter(whole)
 
   const spentTallest = tallestOf(months.map((month) => month.spent.minor))
@@ -186,10 +193,13 @@ export function moneyCharts(
   const series = categoryIds
     .map((categoryId): CategorySeries => {
       const amounts = months.map((month) => amountIn(month, categoryId))
-      const average = meanOf(
-        averaged.map((month) => amountIn(month, categoryId).minor),
-        spend,
-      )
+      const spent = amounts.some(({ minor }) => minor > 0n)
+      const average = spent
+        ? meanOf(
+            spentAveraged.map((month) => amountIn(month, categoryId).minor),
+            spend,
+          )
+        : null
       const tallest = tallestOf([...amounts.map(({ minor }) => minor), average?.minor ?? 0n])
       return {
         categoryId,
@@ -224,7 +234,7 @@ export function moneyCharts(
     months: chartMonthsOf,
     since,
     spentAverage: meanOf(
-      averaged.map((month) => month.spent.minor),
+      spentAveraged.map((month) => month.spent.minor),
       spend,
     ),
     // A month with anything not converted leaves the average rather than counting as nothing.
