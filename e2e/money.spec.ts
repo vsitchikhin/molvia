@@ -351,3 +351,101 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     })
   })
 }
+
+/**
+ * Stands in for the iOS keyboard, which no Playwright browser has: the visual viewport is replaced
+ * before the app loads, and `keyboard(covered, pan)` moves it as iOS does — the keys cover the
+ * bottom `covered` px of the window, and what is visible has been scrolled `pan` px down it.
+ */
+async function fakeKeyboard(page: Page): Promise<(covered: number, pan: number) => Promise<void>> {
+  await page.addInitScript(() => {
+    const events = new EventTarget()
+    const state = { covered: 0, pan: 0 }
+    const viewport = {
+      get height() {
+        return window.innerHeight - state.covered - state.pan
+      },
+      get width() {
+        return window.innerWidth
+      },
+      get offsetTop() {
+        return state.pan
+      },
+      get pageTop() {
+        return window.scrollY + state.pan
+      },
+      offsetLeft: 0,
+      pageLeft: 0,
+      scale: 1,
+      addEventListener: events.addEventListener.bind(events),
+      removeEventListener: events.removeEventListener.bind(events),
+    }
+    Object.defineProperty(window, 'visualViewport', { get: () => viewport, configurable: true })
+    Object.assign(window, {
+      keyboard(covered: number, pan: number) {
+        state.covered = covered
+        state.pan = pan
+        events.dispatchEvent(new Event('resize'))
+        events.dispatchEvent(new Event('scroll'))
+      },
+    })
+  })
+  return async (covered, pan) => {
+    await page.evaluate(
+      ({ c, p }) => {
+        ;(window as unknown as { keyboard: (c: number, p: number) => void }).keyboard(c, p)
+      },
+      { c: covered, p: pan },
+    )
+  }
+}
+
+/** Where a locator stands against what the fake keyboard leaves visible. */
+async function within(page: Page, selector: string, covered: number, pan: number) {
+  return page.evaluate(
+    ({ css, c, p }) => {
+      const element = document.querySelector(css)
+      if (!element) throw new Error(`nothing at ${css}`)
+      const box = element.getBoundingClientRect()
+      return { top: box.top >= p, bottom: box.bottom <= innerHeight - c }
+    },
+    { css: selector, c: covered, p: pan },
+  )
+}
+
+// The sum is focused while the sheet still rises — below the screen — and iOS scrolls what is
+// visible down the window by the keyboard's height before the keys are up. The sheet counted as
+// visible what was scrolled past, and its top went off the screen with the sum (MOL-135).
+test('the spending sheet stays in sight over a keyboard iOS scrolled to (MOL-135)', async ({
+  page,
+}) => {
+  const keyboard = await fakeKeyboard(page)
+  await openMoney(page)
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  const sheet = page.locator('dialog[open]')
+  await expect(sheet).toContainText('Новая трата')
+  await page.waitForTimeout(400)
+  await expect(sheet.getByLabel('Сумма')).toBeFocused()
+
+  await keyboard(0, 300)
+  expect(await within(page, 'dialog[open]', 0, 300)).toEqual({ top: true, bottom: true })
+  expect(await within(page, 'dialog[open] input[inputmode="decimal"]', 0, 300)).toEqual({
+    top: true,
+    bottom: true,
+  })
+
+  // A field near the end of the sheet, focused with the keys up, is brought into sight inside it.
+  const note = sheet.getByLabel(/Что это/)
+  await note.focus()
+  const place = await note.evaluate((field) => {
+    const box = field.closest('dialog')!.getBoundingClientRect()
+    const own = field.getBoundingClientRect()
+    return {
+      inside: own.top >= box.top && own.bottom <= box.bottom,
+      scrolled: field.closest('dialog')!.scrollTop,
+    }
+  })
+  expect(place.inside).toBe(true)
+  expect(place.scrolled).toBeGreaterThan(0)
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+})

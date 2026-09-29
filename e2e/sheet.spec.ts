@@ -592,18 +592,19 @@ test.describe('the sheet', () => {
     await expect(field).toHaveValue('1.5')
   })
 
-  // The share is of what is visible above the keyboard (review Р-2).
+  // The share is of what is visible above the keyboard (review Р-2): the visual viewport's height,
+  // whatever the platform did to the window for the keyboard (MOL-135).
   test('takes its share of what the keyboard leaves visible', async ({ page }) => {
     await openSheet(page)
-    const { maxHeight, expected } = await page.evaluate(() => {
+    const { maxHeight, whole } = await page.evaluate(() => {
       const dialog = document.querySelector('dialog')!
-      dialog.style.setProperty('--keyboard-inset', '300px')
-      return {
-        maxHeight: Number.parseFloat(getComputedStyle(dialog).maxHeight),
-        expected: (window.innerHeight - 300) * 0.82,
-      }
+      const whole = Number.parseFloat(getComputedStyle(dialog).maxHeight)
+      dialog.style.setProperty('--viewport-height', '395px')
+      return { maxHeight: Number.parseFloat(getComputedStyle(dialog).maxHeight), whole }
     })
-    expect(maxHeight).toBeCloseTo(expected, 0)
+    expect(maxHeight).toBeCloseTo(395 * 0.82, 0)
+    // Opened with no keyboard, the share is of the whole screen.
+    expect(whole).toBeCloseTo(page.viewportSize()!.height * 0.82, 0)
   })
 })
 
