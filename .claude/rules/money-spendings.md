@@ -253,11 +253,14 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   `budgetMonthOf` in both. An integration test holds every bar equal to its month. The rows of the
   whole period are read once (`monthRows`, Р-3); the month before the first is counted for «к
   августу» alone, as on «Деньгах». **A write landing while the months freeze lets them go after**
-  (`watchThaws`, adversarial Ж): the exchanges and incomes are read at the start and the months frozen
-  one by one after, so one written in between found nothing frozen to let go and the month froze
-  without it for good — the read notes the receipts and the rule of the rate first and, once it has
-  frozen, lets the months go from the day of anything that changed meanwhile. `GET
-/money/months/:month` does the same for a closed month; the race was MOL-73's, the charts widened it.
+  (`settleThaws`, adversarial Ж, Ж2): the exchanges and incomes are read once, by `dayRates`, and the
+  months frozen one by one after, so one written in between found nothing frozen to let go and the
+  month froze without it for good. Once the read has frozen, it holds the receipts and the rule of
+  the rate against **the very rows the rates came from** (`DayRates.basis`) and lets the months go
+  from the day of anything that changed — a snapshot of its own missed a removal and a «Вернуть» both
+  inside the read, the row the same before and after. Run in `finally`, so a read that fails after
+  freezing still settles. `GET /money/months/:month` does the same for a closed month; the race was
+  MOL-73's, the charts widened it.
 - **«Разница», not «Остаток»** (owner's decision В-2): the third figure of «Пришло и ушло» is what
   came in less what went out in the month, signed; «Остаток» is the money on the accounts
   (MOL-134) and one word must not mean two things on neighbouring screens. The price, named: the
@@ -265,10 +268,14 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
 - **An average is of the closed months from the first with anything in it** (Р-5, Р-15): a person
   who started in August is not averaged over empty months, and the running month, half spent, is
   in no average. With no closed month of data there is no average. **A month with anything «не
-  посчитано» has no «Разница» and is in no average** (adversarial d9 В): a salary in dollars on a day
-  with no dollar made the month «−25 000 ₽» and the average negative; the screen says under «Пришло и
-  ушло» what did not convert, and «Ушло» with no rate of the month is a dashed empty bar, never a bar
-  of nothing spent.
+  посчитано» has no «Разница» and is not in its average** (adversarial d9 В): a salary in dollars on
+  a day with no dollar made the month «−25 000 ₽» and the average negative. **Its spending is
+  averaged unless the spending itself is short** (review С-8, d9 round 2 В2): an income changes
+  nothing spent. A category spent nowhere in the period has no average, not «в среднем 0 ֏». The
+  screen says under «Пришло и ушло» what did not convert, and «Ушло» with no rate of the month is a
+  dashed empty bar, never a bar of nothing spent — **while nothing spent is «ушло 0» with or without
+  a rate** (`moneyMonth`, review С-7), on «Деньгах» too: a newcomer's empty months with no rate were
+  the tallest bars of the card.
 - **Nothing the charts carry can fail the answer** (adversarial d9 А): a category's sum over the
   period, which may be more than money holds, orders the series and is never sent; a change past 2⁵³
   per cent — 0,01 ֏ then 10¹⁴ ֏ — is left unsaid. A month «Деньги» can show, the charts can show.
@@ -277,7 +284,9 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
 - **The exchanges are grouped by exchanger** (owner's decision В-1): «Где и заметка» read as
   `nameIdentity` reads a name, no note is «Без места»; the percent of a group is weighed by the
   money (Р-7) — the sheet's mean of percents let ten dollars with friends weigh what eight hundred at
-  the airport did. **Measured by the one function «Обмен денег» measures by** (`comparisonOf`), **but
+  the airport did. The reads of the cache for the weeks and the exchanges go eight at a time, as «Обмен денег»'s
+  (`RATE_READS_AT_ONCE`): 53 weeks at once would take the whole pool. **Measured by the one function
+  «Обмен денег» measures by** (`comparisonOf`), **but
   only by a rate fresh for the exchange's day** (adversarial Е): `comparisonOf` takes the bank's latest
   however old, and a cache stopped five weeks ago summed an exchange by a rate the same answer's line
   called «no rate». «Обмен денег» still sets each exchange beside the latest it has, printed with it —
@@ -312,6 +321,7 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   нет — показаны …». Only
   the person's choice or the address is remembered. **Only the latest read is kept on the phone**
   (`molvia.charts`, adversarial Б, d9 Д): an earlier one answering late put the charts without the
-  spending just written under a later hour. Offline is a yellow strip with that hour; the four states
+  spending just written under a later hour; one whose later read is still on its way or failed is
+  the freshest there is, and is kept (d9 round 2 Е2). Offline is a yellow strip with that hour; the four states
   are `ScreenSkeleton` and `ScreenState`, the empty one with no button (Р-9) — and the rate and the
   exchanges stand under it, since they do not wait for spending (adversarial В).
