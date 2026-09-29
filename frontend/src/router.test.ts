@@ -24,8 +24,8 @@ const named = routes.flatMap((route) =>
 
 describe('routes', () => {
   it.each([
-    ['/', 'trip', 'trip'],
-    ['/advice', 'advice', 'advice'],
+    ['/', 'advice', 'advice'],
+    ['/purchases', 'purchases', 'purchases'],
     ['/verdicts', 'verdicts', 'verdicts'],
     ['/money', 'money', 'money'],
     ['/settings', 'settings', 'settings'],
@@ -50,11 +50,41 @@ describe('routes', () => {
     ])
   })
 
-  it('the catalogue search is nested under the trip and is not a section', async () => {
-    const route = await resolveAt('/trip/add')
-    expect(route.name).toBe('item-search')
-    expect(route.meta.parent).toBe('trip')
+  it.each([
+    ['/purchases/manual', 'purchase-manual', 'purchases'],
+    ['/purchases/manual/add', 'item-search', 'purchase-manual'],
+    ['/purchases/aaaaaaaa-0000-4000-8000-000000000012', 'purchase', 'purchases'],
+    ['/purchases/aaaaaaaa-0000-4000-8000-000000000012/add', 'finished-search', 'purchase'],
+  ])('%s is %s, nested under %s and not a section (MOL-128)', async (path, name, parent) => {
+    const route = await resolveAt(path)
+    expect(route.name).toBe(name)
+    expect(route.meta.parent).toBe(parent)
     expect(route.meta.tab).toBeUndefined()
+  })
+
+  // «Что брать» became home and «Поход» became «Покупки» (MOL-128): a bookmark or the history of
+  // an installed app still arrives, and the old address is not left in the history of its own.
+  it.each([
+    ['/advice', '/'],
+    ['/trip', '/purchases'],
+    ['/trip/add', '/purchases/manual/add'],
+    ['/trip/history', '/purchases'],
+    [
+      '/trip/history/aaaaaaaa-0000-4000-8000-000000000012?from=money',
+      '/purchases/aaaaaaaa-0000-4000-8000-000000000012?from=money',
+    ],
+    [
+      '/trip/history/aaaaaaaa-0000-4000-8000-000000000012/add',
+      '/purchases/aaaaaaaa-0000-4000-8000-000000000012/add',
+    ],
+  ])('the old address %s leads to %s', async (old, path) => {
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/money')
+    await router.push(old)
+    expect(router.currentRoute.value.fullPath).toBe(path)
+    router.back()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(router.currentRoute.value.name).toBe('money')
   })
 
   it.each([
@@ -86,12 +116,12 @@ describe('routes', () => {
     },
   )
 
-  // A mistyped link or a stale bookmark lands on the main scenario, not on a blank page.
-  it.each(['/nowhere', '/trip/add/extra', '/advice/extra'])(
+  // A mistyped link or a stale bookmark lands home, not on a blank page.
+  it.each(['/nowhere', '/trip/add/extra', '/advice/extra', '/purchases/manual/add/extra'])(
     'an unknown path %s leads home',
     async (path) => {
       const route = await resolveAt(path)
-      expect(route.name).toBe('trip')
+      expect(route.name).toBe('advice')
       expect(route.fullPath).toBe('/')
     },
   )
@@ -121,10 +151,10 @@ describe('the kit page', () => {
     vi.resetModules()
   })
 
-  it('is there in development, nested under the trip', async () => {
+  it('is there in development, nested under home', async () => {
     const route = await resolveAt('/_kit')
     expect(route.name).toBe('kit')
-    expect(route.meta.parent).toBe('trip')
+    expect(route.meta.parent).toBe('advice')
   })
 
   it('must not fire: a production build has no such page', async () => {

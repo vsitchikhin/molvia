@@ -20,15 +20,15 @@ describe('TabBar', () => {
     const view = await render('/')
     expect(view.get('nav').attributes('aria-label')).toBe(en.nav.label)
     expect(view.findAll('a').map((link) => link.text())).toEqual([
-      en.nav.trip,
       en.nav.advice,
+      en.nav.purchases,
       en.nav.verdicts,
       en.nav.money,
       en.nav.settings,
     ])
     expect(view.findAll('a').map((link) => link.attributes('href'))).toEqual([
       '/',
-      '/advice',
+      '/purchases',
       '/verdicts',
       '/money',
       '/settings',
@@ -38,8 +38,8 @@ describe('TabBar', () => {
   it('speaks Russian from the same dictionary', async () => {
     const view = await render('/', 'ru')
     expect(view.findAll('a').map((link) => link.text())).toEqual([
-      ru.nav.trip,
       ru.nav.advice,
+      ru.nav.purchases,
       ru.nav.verdicts,
       ru.nav.money,
       ru.nav.settings,
@@ -48,7 +48,7 @@ describe('TabBar', () => {
 
   it.each([
     ['/', 0],
-    ['/advice', 1],
+    ['/purchases', 1],
     ['/verdicts', 2],
     ['/money', 3],
     ['/settings', 4],
@@ -58,10 +58,10 @@ describe('TabBar', () => {
     expect(current).toEqual([0, 1, 2, 3, 4].map((i) => (i === index ? 'page' : undefined)))
   })
 
-  // The trip tab must not claim the nested search as «the current page»: the search is a step
-  // inside the trip, and the tab bar is not shown there anyway.
+  // «Покупки» must not claim the record typed by hand as «the current page»: it is a step inside
+  // «Покупки», and the tab bar is not shown there anyway.
   it('marks no tab as current on a nested screen', async () => {
-    const view = await render('/trip/add')
+    const view = await render('/purchases/manual')
     expect(view.findAll('[aria-current]')).toHaveLength(0)
   })
 

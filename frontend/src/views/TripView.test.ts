@@ -1,7 +1,8 @@
 import { flushPromises, mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { defineComponent, h } from 'vue'
+import { RouterView, createMemoryHistory, createRouter, createWebHistory } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE, parseMoney, parseQuantity, tripViewCodec } from '@molvia/model'
 import type {
@@ -17,7 +18,7 @@ import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
-import TripView from '@/views/TripView.vue'
+import TripNotices from '@/components/TripNotices.vue'
 
 const currentTrip = vi.fn<() => Promise<TripViewModel | null>>()
 const recentPlaces = vi.fn<() => Promise<{ id: string; kind: 'store'; name: string }[]>>()
@@ -171,9 +172,16 @@ async function render({ memory = null as TripViewModel | null, settings = true }
   const trips = useTripStore()
   const queue = useTripQueueStore()
   if (memory) trips.apply(memory)
-  const router = createRouter({ history: createMemoryHistory(), routes })
-  await router.push('/')
-  const view = mount(TripView, {
+  // The record as it is reached: «Покупки» underneath, so going up is the step back it is in the
+  // app. With no record open the screen leaves for «Покупки» (MOL-128), and the app — a router
+  // view, not the screen alone — shows what the person then sees.
+  // A web history, as in the app: a sheet closes by a step back, and only the web history says
+  // when that step has landed (`popstate`) — the record leaves after it, never under it.
+  window.history.replaceState(null, '', '/purchases')
+  const router = createRouter({ history: createWebHistory(), routes })
+  await router.push('/purchases')
+  await router.push('/purchases/manual')
+  const view = mount(App, {
     global: { plugins: [router, pinia, createAppI18n('ru')] },
     attachTo: document.body,
   })
@@ -181,6 +189,9 @@ async function render({ memory = null as TripViewModel | null, settings = true }
   await flushPromises()
   return { view, router, trips, queue }
 }
+
+/** The app as far as screens go: whichever the router is on. */
+const App = defineComponent(() => () => h(RouterView))
 
 describe('TripView', () => {
   beforeEach(() => {
@@ -216,31 +227,25 @@ describe('TripView', () => {
 
   it('без похода предлагает начать, а не показывает пустой список', async () => {
     const { view } = await render()
-    expect(view.text()).toContain(ru.trip.home.intro.title)
-    expect(view.get('.dock').text()).toContain(ru.trip.none.action)
+    expect(view.text()).toContain(ru.purchases.empty.title)
+    expect(view.get('.dock').text()).toContain(ru.purchases.manual)
   })
 
-  describe('главная без похода (MOL-77)', () => {
+  describe('без открытой записи — «Покупки» (MOL-77, MOL-128)', () => {
     it('«Начать поход» — в полосе над таб-баром, и кругов с «+» на экране нет', async () => {
       const { view } = await render()
-      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
       expect(view.find('.circle').exists()).toBe(false)
       // Призрачную «Историю походов» заменяет «Вся история» главной.
       expect(view.findAll('button').some((b) => b.text() === ru.trip.history.title)).toBe(false)
-    })
-
-    it('в загрузке без похода полоса уже держит «Начать поход», а не пустой итог', async () => {
-      currentTrip.mockReturnValue(new Promise(() => undefined))
-      const { view } = await render()
-      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
     })
 
     it('«Начать поход» открывает шторку и при ошибке похода, и при ошибке истории', async () => {
       currentTrip.mockRejectedValue(new Error('HTTP 500'))
       tripHistory.mockRejectedValue(new Error('HTTP 500'))
       const { view } = await render()
-      expect(view.text()).toContain(ru.trip.error.title)
-      expect(view.text()).toContain(ru.trip.home.error.title)
+      // No record known, so the screen is «Покупки», and its one red block says what failed.
+      expect(view.text()).toContain(ru.purchases.error.title)
       await view.get('.dock button').trigger('click')
       await flushPromises()
       expect(document.body.querySelector('dialog[open]')?.textContent).toContain(
@@ -253,24 +258,22 @@ describe('TripView', () => {
       tripHistory.mockRejectedValue(new Error('HTTP 500'))
       const { view } = await render()
       expect(view.findAll('button').filter((b) => b.text() === ru.state.retry)).toHaveLength(1)
-      // Похода нет — и «позиции остались на телефоне» было бы неправдой.
-      expect(view.text()).toContain(ru.trip.error.body_none)
+      // Записи нет — и «позиции остались на телефоне» было бы неправдой.
+      expect(view.text()).toContain(ru.purchases.error.title)
       expect(view.text()).not.toContain(ru.trip.error.body)
 
       currentTrip.mockResolvedValue(null)
       tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
       await button(view, ru.state.retry).trigger('click')
       await flushPromises()
-      expect(view.text()).not.toContain(ru.trip.error.title)
-      expect(view.text()).not.toContain(ru.trip.home.error.title)
-      expect(view.text()).toContain(ru.trip.home.intro.title)
+      expect(view.text()).not.toContain(ru.purchases.error.title)
+      expect(view.text()).toContain(ru.purchases.empty.title)
     })
 
     it('при открытом походе в полосе — итог, а «Начать поход» нет', async () => {
       currentTrip.mockResolvedValue(trip(handoff()))
       const { view } = await render()
-      expect(view.get('.dock').text()).not.toContain(ru.trip.none.action)
-      expect(button(view, ru.trip.history.title).exists()).toBe(true)
+      expect(view.get('.dock').text()).not.toContain(ru.purchases.manual)
     })
   })
 
@@ -293,15 +296,27 @@ describe('TripView', () => {
     const pinia = createPinia()
     setActivePinia(pinia)
     const router = createRouter({ history: createMemoryHistory(), routes })
-    await router.push('/')
-    const view = mount(TripView, {
+    await router.push('/purchases')
+    await router.push('/purchases/manual')
+    const view = mount(App, {
       global: { plugins: [router, pinia, createAppI18n('ru')] },
       attachTo: document.body,
     })
     mounted.push(view)
 
     expect(view.findAll('.bar')).not.toHaveLength(0)
-    expect(view.text()).not.toContain(ru.trip.home.intro.title)
+    // Not left for «Покупки» either: until the server is asked, «no record» is not known.
+    expect(router.currentRoute.value.name).toBe('purchase-manual')
+  })
+
+  // Review Р-18: before the record going on is known, its own waiting purchases are not «не
+  // отправлено» — they are its rows the moment the server answers.
+  it('пока запись не известна, её ждущие покупки не названы неотправленными', async () => {
+    currentTrip.mockReturnValue(new Promise(() => undefined))
+    const { view, queue } = await render()
+    queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000081'))
+    await flushPromises()
+    expect(view.text()).not.toContain('ещё не отправлена')
   })
 
   it('весь смысл продукта в двух числах: 520 ֏ за 0,9 л дороже 570 ֏ за литр', async () => {
@@ -325,7 +340,8 @@ describe('TripView', () => {
   it('место и день в строке над заголовком', async () => {
     currentTrip.mockResolvedValue(trip(handoff()))
     const { view } = await render()
-    expect(view.text()).toContain('Ереван Сити · сегодня')
+    expect(view.get('h1').text()).toBe('Ереван Сити')
+    expect(view.text()).toContain('Записываете вручную · сегодня, с')
   })
 
   it('тап по строке открывает шторку той же позиции', async () => {
@@ -337,6 +353,57 @@ describe('TripView', () => {
     const sheet = document.body.querySelector('dialog[open]')
     expect(sheet?.textContent).toContain('Молоко «Марианна»')
     expect(sheet?.textContent).toContain(ru.item.save_edit)
+  })
+
+  // Review Р-7: the record may end under a sheet — finished on another phone — and nothing else
+  // would take the screen up once the sheet is away.
+  describe('запись закончилась под шторкой (Р-7)', () => {
+    const closeSheet = async () => {
+      document.body
+        .querySelector<HTMLButtonElement>(`dialog[open] button[aria-label="${ru.sheet.close}"]`)
+        ?.click()
+      await vi.waitFor(() => {
+        expect(document.body.querySelector('dialog[open]')).toBeNull()
+      })
+    }
+
+    it('под шторкой покупки экран стоит, а без неё уходит на «Покупки»', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      const { view, router, trips } = await render()
+      await view.findAll('.row')[1]?.trigger('click')
+      await flushPromises()
+      clock += 1000
+
+      trips.closed(TRIP)
+      await flushPromises()
+      expect(router.currentRoute.value.name).toBe('purchase-manual')
+
+      await closeSheet()
+      await vi.waitFor(() => {
+        expect(router.currentRoute.value.name).toBe('purchases')
+      })
+    })
+
+    it('и под шторкой «Поправить» из того, что говорит очередь', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      addExpense.mockRejectedValue(new ApiError(ERROR.INVALID_AMOUNT, undefined, true))
+      const { view, router, trips, queue } = await render()
+      queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000003'))
+      await queue.flush()
+      await flushPromises()
+      await button(view, ru.trip.rejected.fix).trigger('click')
+      await flushPromises()
+      clock += 1000
+
+      trips.closed(TRIP)
+      await flushPromises()
+      expect(router.currentRoute.value.name).toBe('purchase-manual')
+
+      await closeSheet()
+      await vi.waitFor(() => {
+        expect(router.currentRoute.value.name).toBe('purchases')
+      })
+    })
   })
 
   describe('очередь на экране', () => {
@@ -503,7 +570,7 @@ describe('TripView', () => {
       inside(document.body.querySelector('dialog[open]'), ru.trip.finish_confirm.ok).click()
       await flushPromises()
 
-      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
       // На iOS фонового обмена нет: молчание здесь — это покупка, о которой никто не узнает.
       expect(view.text()).toContain('1 покупка ещё не отправлена')
     })
@@ -549,7 +616,7 @@ describe('TripView', () => {
       })
       await flushPromises()
 
-      expect(view.text()).toContain('Уже открыт поход в «SAS»')
+      expect(view.text()).toContain('Уже открыта запись в «SAS»')
       // The shops differ, so moving the purchases across is said in words (Р-2, З-4).
       expect(view.text()).toContain('цены одного магазина нельзя записывать другому')
       await button(view, ru.trip.elsewhere.choose).trigger('click')
@@ -578,7 +645,7 @@ describe('TripView', () => {
       })
       await flushPromises()
 
-      expect(view.text()).toContain(`Уже открыт поход в «${open.place.name}»`)
+      expect(view.text()).toContain(`Уже открыта запись в «${open.place.name}»`)
       expect(view.text()).not.toContain('цены одного магазина нельзя записывать другому')
     })
 
@@ -587,7 +654,9 @@ describe('TripView', () => {
       // обещает порчу данных, которой не будет (В3).
       currentTrip.mockResolvedValue(null)
       const { view, queue } = await render()
-      const body = (view.vm as unknown as { elsewhereBody: (a: unknown) => string }).elsewhereBody
+      const body = (
+        view.findComponent(TripNotices).vm as unknown as { elsewhereBody: (a: unknown) => string }
+      ).elsewhereBody
       const warning = 'цены одного магазина нельзя записывать другому'
 
       expect(body({ tripId: TRIP, place: 'Ереван Сити ', mine: 'ереван сити' })).not.toContain(
@@ -782,7 +851,7 @@ describe('TripView', () => {
       await flushPromises()
 
       // Поход закончился, а покупка так и не записана — спрятать её значит потерять.
-      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
       expect(view.text()).toContain(ru.trip.rejected.drop)
       expect(queue.rejected).toHaveLength(1)
     })
@@ -840,10 +909,10 @@ describe('TripView', () => {
       vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
       const { view } = await render()
 
-      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
       // Иначе поход, который сервер держит, но о котором не спросили, читается как «похода нет».
       // Своими словами главной: начать можно и без сети — и одно уведомление, а не два.
-      expect(view.text()).toContain(ru.trip.home.offline.title)
+      expect(view.text()).toContain(ru.trip.history.offline_title)
       expect(view.text()).not.toContain(ru.trip.offline.title)
     })
 
@@ -882,7 +951,8 @@ describe('TripView', () => {
       expect(start?.place.name).toBe('Рынок')
       expect(start?.tripId).toMatch(/^[0-9a-f-]+$/)
       // Поход виден с местом и днём, хотя сервер о нём ещё не знает.
-      expect(view.text()).toContain('Рынок · сегодня')
+      expect(view.get('h1').text()).toBe('Рынок')
+      expect(view.text()).toContain('Записываете вручную · сегодня')
     })
 
     it('недавнее место начинает поход одним тапом', async () => {
@@ -923,7 +993,7 @@ describe('TripView', () => {
       await flushPromises()
 
       expect(queue.pending.some((write) => write.kind === 'finish')).toBe(true)
-      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
       expect(view.findAll('.row')).toHaveLength(0)
     })
   })
@@ -948,14 +1018,14 @@ describe('TripView', () => {
 
       expect(openSheet()).toBeNull()
       expect(queue.pending).toEqual([{ kind: 'delete', tripId: TRIP }])
-      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
-      expect(view.get('.dock').text()).toContain('Поход удалён: Ереван Сити')
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).toContain('Запись удалена: Ереван Сити')
 
       await button(view, ru.trip.remove.restore).trigger('click')
       await flushPromises()
-      // Удаление ещё не ушло: «Вернуть» снимает его, и поход снова на экране.
+      // Удаление ещё не ушло: «Вернуть» снимает его, и запись снова первой строкой «Покупок».
       expect(queue.pending.some((write) => write.kind === 'delete')).toBe(false)
-      expect(view.text()).toContain(ru.trip.empty.title)
+      expect(view.text()).toContain(ru.purchases.continue)
     })
 
     it('с покупками — сначала вопрос: место, день и число позиций, ждущие тоже', async () => {
@@ -978,7 +1048,7 @@ describe('TripView', () => {
       inside(sheet, ru.trip.remove.action).click()
       await flushPromises()
       expect(queue.pending).toEqual([{ kind: 'delete', tripId: TRIP }])
-      expect(view.get('.dock').text()).toContain(ru.trip.none.action)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
     })
 
     it('«Завершить» у пустого похода предлагает удалить, а завершить — вторым (В-2)', async () => {
@@ -1018,7 +1088,7 @@ describe('TripView', () => {
         },
       ]
       await flushPromises()
-      expect(view.text()).toContain('Поход не вернулся: Ереван Сити')
+      expect(view.text()).toContain('Запись не вернулась: Ереван Сити')
       expect(view.text()).toContain(ru.trip.remove.not_restored_open)
     })
 
@@ -1037,7 +1107,7 @@ describe('TripView', () => {
       })
       await flushPromises()
       expect(queue.lastRemoved).toBeNull()
-      expect(view.text()).not.toContain('Поход удалён')
+      expect(view.text()).not.toContain('Запись удалена')
     })
   })
   describe('удалить поход: замечания ревью (MOL-76)', () => {
@@ -1050,6 +1120,8 @@ describe('TripView', () => {
           startedAt: new Date('2026-09-26T10:00:00Z'),
           finishedAt: new Date('2026-09-26T10:30:00Z'),
           finishedOnDeviceAt: null,
+          itemCount: null,
+          total: null,
         },
       ],
       nextCursor: null,
@@ -1058,7 +1130,7 @@ describe('TripView', () => {
     it('удалён единственный поход истории — главная встречает знакомством, а не скелетом (А5)', async () => {
       tripHistory.mockResolvedValueOnce(single)
       const { view, queue } = await render()
-      expect(view.findAll('.history-row')).toHaveLength(1)
+      expect(view.findAll('.purchase-row')).toHaveLength(1)
 
       tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
       removeTrip.mockResolvedValue(undefined)
@@ -1066,8 +1138,8 @@ describe('TripView', () => {
       await flushPromises()
 
       expect(tripHistory).toHaveBeenCalledTimes(2)
-      expect(view.find('.home .skeleton').exists()).toBe(false)
-      expect(view.text()).toContain(ru.trip.home.intro.title)
+      expect(view.find('.skeleton').exists()).toBe(false)
+      expect(view.text()).toContain(ru.purchases.empty.title)
     })
 
     it('полоска считает десять секунд от удаления, а не от экрана (Р-1)', async () => {
@@ -1093,7 +1165,7 @@ describe('TripView', () => {
         stamp: Date.now() - 11_000,
       }
       await flushPromises()
-      expect(view.text()).not.toContain('Поход удалён')
+      expect(view.text()).not.toContain('Запись удалена')
       expect(queue.lastRemoved).toBeNull()
     })
 
@@ -1112,8 +1184,8 @@ describe('TripView', () => {
       queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000071'))
       queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000072'))
       await flushPromises()
-      expect(view.text()).toContain('Поход не вернулся: Ереван Сити')
-      expect(view.text()).toContain('в нём 2 покупки')
+      expect(view.text()).toContain('Запись не вернулась: Ереван Сити')
+      expect(view.text()).toContain('в ней 2 покупки')
       expect(view.text()).not.toContain('ещё не отправлен')
       expect(addExpense).not.toHaveBeenCalled()
     })
@@ -1121,7 +1193,7 @@ describe('TripView', () => {
     it('отказ «Вернуть» единственного похода истории — главная перечитывает историю (раунд 2, Б2)', async () => {
       tripHistory.mockResolvedValueOnce(single)
       const { view, queue } = await render()
-      expect(view.findAll('.history-row')).toHaveLength(1)
+      expect(view.findAll('.purchase-row')).toHaveLength(1)
 
       let land: () => void = () => undefined
       removeTrip.mockReturnValueOnce(
@@ -1141,8 +1213,8 @@ describe('TripView', () => {
 
       expect(queue.rejected.map((item) => item.write.kind)).toEqual(['restore'])
       expect(tripHistory).toHaveBeenCalledTimes(2)
-      expect(view.find('.home .skeleton').exists()).toBe(false)
-      expect(view.text()).toContain(ru.trip.home.intro.title)
+      expect(view.find('.skeleton').exists()).toBe(false)
+      expect(view.text()).toContain(ru.purchases.empty.title)
     })
 
     it('единственная строка ждёт удаления — «Завершить» тоже зовёт поход пустым (Р-5)', async () => {

@@ -19,15 +19,18 @@ interface Words {
   /**
    * A screen where the whole label must survive the scroll at 320px — room for it with 6–8px to
    * spare, which no difference of font rasterising closes: the ladder must not step down where it
-   * need not (review Р-3). «Поход» 52 in ~60 over «Что взяли?»; «Settings» 68 in ~74 over
-   * «Devices».
+   * need not (review Р-3). «Деньги» 59 in ~74 over «Доходы»; «Settings» 68 in ~74 over
+   * «Devices». Not «Запись» over «Что взяли?», which took «Поход»'s place (MOL-128): 59.4 in 60.2 on
+   * macOS, and on Linux it steps to «Назад» — the ladder is right, the margin is not there.
    */
   kept: string
   back: string
   settings: string
   money: string
-  trip: string
-  history: string
+  /** The record typed by hand, over its search. */
+  entry: string
+  purchases: string
+  /** The longest label: «Записанные покупки» over «Что взяли?». */
   finished: string
 }
 
@@ -35,13 +38,13 @@ const LANGUAGES: [string, Words][] = [
   [
     'ru-RU',
     {
-      kept: '/trip/add',
+      kept: '/money/incomes',
       back: 'Назад',
       settings: 'Настройки',
       money: 'Деньги',
-      trip: 'Поход',
-      history: 'История походов',
-      finished: 'Завершённый поход',
+      entry: 'Запись',
+      purchases: 'Покупки',
+      finished: 'Записанные покупки',
     },
   ],
   [
@@ -51,9 +54,9 @@ const LANGUAGES: [string, Words][] = [
       back: 'Back',
       settings: 'Settings',
       money: 'Money',
-      trip: 'Trip',
-      history: 'Trip history',
-      finished: 'Completed trip',
+      entry: 'Entry',
+      purchases: 'Purchases',
+      finished: 'Recorded purchases',
     },
   ],
 ]
@@ -66,15 +69,14 @@ function screens(trip: string, words: Words): [string, string][] {
     ['/settings/devices', words.settings],
     ['/privacy', words.settings],
     ['/money/categories', words.money],
-    ['/trip/add', words.trip],
-    ['/trip/history', words.trip],
-    // The longest labels: «История походов» over the trip's place, «Завершённый поход» over «Что взяли?».
-    [`/trip/history/${trip}`, words.history],
-    [`/trip/history/${trip}/add`, words.finished],
+    ['/purchases/manual/add', words.entry],
+    [`/purchases/${trip}`, words.purchases],
+    // The longest label: «Записанные покупки» over «Что взяли?».
+    [`/purchases/${trip}/add`, words.finished],
   ]
 }
 
-/** A finished trip, so the two screens under the history have something to open. */
+/** A finished record, so the two screens under «Покупки» have something to open. */
 async function finishedTrip(page: Page): Promise<string> {
   const headers = await asBrowser(page)
   const context = settingsOf(
@@ -99,6 +101,30 @@ interface Box {
   right: number
   top: number
   bottom: number
+}
+
+/**
+ * Waits until the row has settled after the scroll: the class comes first, and the column narrows
+ * under the small title a frame or two later, the label following it by the observer. Read in
+ * between, the label of the wide column was caught and gone by the next read.
+ */
+async function settled(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        const width = () => document.querySelector('.leading')?.getBoundingClientRect().width
+        let last = width()
+        let still = 0
+        const frame = () => {
+          const now = width()
+          still = now === last ? still + 1 : 0
+          last = now
+          if (still >= 3) done()
+          else requestAnimationFrame(frame)
+        }
+        requestAnimationFrame(frame)
+      }),
+  )
 }
 
 /** The button, the small title and the page's width, read in one frame. */
@@ -192,6 +218,7 @@ for (const [locale, words] of LANGUAGES) {
             window.scrollTo(0, 400)
           })
           await expect(page.locator('.screen')).toHaveClass(/collapsed/)
+          await settled(page)
 
           const { back, small, label, page: width } = await row(page)
           expect(back.left).toBeGreaterThanOrEqual(0)

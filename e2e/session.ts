@@ -129,8 +129,8 @@ export async function open(page: Page, path = '/'): Promise<void> {
 }
 
 /** Открывает приложение, входит и отдаёт id владельца. */
-export async function signedIn(page: Page): Promise<string> {
-  await open(page)
+export async function signedIn(page: Page, path = '/'): Promise<string> {
+  await open(page, path)
   const owner = () => page.evaluate((key) => localStorage.getItem(key) ?? '', OWNER_KEY)
   // Вход случается после первой отрисовки, поэтому владелец появляется мгновением позже.
   await expect.poll(owner).toMatch(UUID)

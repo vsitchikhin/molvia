@@ -23,6 +23,8 @@ function entry(id: string, finishedOnDeviceAt = '2026-09-01T10:30:00Z'): TripHis
     startedAt: new Date('2026-09-01T10:00:00Z'),
     finishedAt: new Date('2026-09-01T11:00:00Z'),
     finishedOnDeviceAt: new Date(finishedOnDeviceAt),
+    itemCount: null,
+    total: null,
   }
 }
 const cursor = (id: string) => ({ at: '2026-09-01T00:00:00.123456Z', id })
@@ -143,6 +145,30 @@ describe('whether the server has answered an empty history (MOL-77)', () => {
     if (row) row.view.fromLaterBuild = true
     localStorage.setItem(`molvia.trip-history.${OWNER}`, JSON.stringify(cached))
     expect(restart().local.map(({ id }) => id)).toEqual([A])
+  })
+
+  it('keeps no count or total of a row the previous build cannot read, and reads a row of a later one (MOL-128)', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({
+      trips: [{ ...entry(A), itemCount: 3, total: [{ minor: 410_000n, currency: 'AMD' }] }],
+      nextCursor: null,
+    })
+    await store.load()
+
+    expect(store.page.trips[0]).toMatchObject({ itemCount: 3 })
+    const cached = JSON.parse(localStorage.getItem(`molvia.trip-history.${OWNER}`) ?? '{}') as {
+      page: { trips: Record<string, unknown>[] }
+    }
+    expect(Object.keys(cached.page.trips[0] ?? {})).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/^(itemCount|total)$/)]),
+    )
+    // Read back, they are unknown — not «0 позиций».
+    expect(restart().page.trips[0]).toMatchObject({ id: A, itemCount: null, total: null })
+
+    const [row] = cached.page.trips
+    if (row) row.fromLaterBuild = true
+    localStorage.setItem(`molvia.trip-history.${OWNER}`, JSON.stringify(cached))
+    expect(restart().page.trips.map(({ id }) => id)).toEqual([A])
   })
 
   it('another owner’s answer is not this owner’s', async () => {

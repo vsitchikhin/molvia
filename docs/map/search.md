@@ -7,7 +7,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 
 - `packages/model/src/contracts/catalogue.ts` — Wire contract of the catalogue: the search query and its bound, the entry allowlist, the answer with `near`, the «Предложить товар» body.
 - `packages/model/src/entities/item.ts` — Entity: a catalogue item — kind, name, search key, barcodes, unit — and the schema of a new item.
-- `packages/model/src/support/search-key.ts` — `toSearchKey`, the frozen alphabet that folds any spelling of a name to one key, and `nameIdentity` for duplicates.
+- `packages/model/src/support/search-key.ts` — `toSearchKey`, the frozen alphabet that folds any spelling of a name to one key, `unfinishedFoldSpellings` for a word typed halfway through a fold, and `nameIdentity` for duplicates.
 - `packages/model/src/support/synonyms.ts` — The synonym dictionary (`synonymKeys`) and the word-of-the-kind rules: adjective and noun patterns, `WORD_BREAK`, `kindKey`.
 - `packages/model/src/support/text.ts` — Visible-text rules shared by every name: `INVISIBLE`, `visibleLine`/`visibleText`, `pastedLine` for what a paste brings along.
 

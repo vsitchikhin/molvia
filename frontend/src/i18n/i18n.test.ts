@@ -104,12 +104,18 @@ describe('словарь: повторяющиеся тексты', () => {
     expect(duplicates(RU)).toEqual({
       // Один глагол у двух шторок: закончить с балансом счёта и с цифрами штрихкода (MOL-98).
       Готово: ['accounts.done', 'scanner.done'],
-      // Подпись таба и заголовок экрана — разные роли одного слова, живут отдельно осознанно.
-      Поход: ['nav.trip', 'trip.title'],
+      // Подпись таба и заголовок экрана — разные роли одного слова, живут отдельно осознанно; у
+      // «Покупок» — ещё шеврон записанных покупок и строка приватности о том же (MOL-128).
+      Покупки: [
+        'nav.purchases',
+        'privacy.stored.purchases.term',
+        'purchases.title',
+        'trip.history.title',
+      ],
       'Что брать': ['advice.title', 'nav.advice'],
       Оценки: ['nav.verdicts', 'verdict.title'],
       Настройки: ['nav.settings', 'settings.title'],
-      // Таб и его экран — разные роли одного слова, как у «Поход».
+      // Таб и его экран — разные роли одного слова, как у «Покупки».
       Деньги: ['nav.money', 'settings.group_money', 'spending.title'],
       // The settings handoff names its own save action, independently of purchase editing.
       Сохранить: ['accounts.sheet.save', 'item.save_edit', 'settings.save'],
@@ -125,9 +131,8 @@ describe('словарь: повторяющиеся тексты', () => {
         'spending.categories.offline.title',
         'spending.offline.title',
       ],
-      // Один глагол, два предмета: поход и вход на устройстве. Предмет называет контекст —
-      // шторка похода и строка устройства (MOL-57).
-      Завершить: ['devices.end', 'trip.finish_confirm.ok'],
+      // Кнопка в шапке записи и главное действие её шторки — один глагол (MOL-128).
+      Закончить: ['trip.finish', 'trip.finish_confirm.ok'],
       // Одно правило часов у обмена и у дохода, два кода — у каждого своя шторка (MOL-66).
       'Этот день ещё не наступил': [
         'error.exchange_in_future',
@@ -192,7 +197,13 @@ describe('словарь: повторяющиеся тексты', () => {
     expect(duplicates(EN)).toEqual({
       // One verb for two sheets, as in Russian: an account's balance, a barcode's digits (MOL-98).
       Done: ['accounts.done', 'scanner.done'],
-      Trip: ['nav.trip', 'trip.title'],
+      Purchases: [
+        'nav.purchases',
+        'privacy.stored.purchases.term',
+        'purchases.title',
+        'trip.history.title',
+      ],
+      Finish: ['trip.finish', 'trip.finish_confirm.ok'],
       // The strip of a trip removed is the strip of a spending removed (MOL-76).
       Undo: ['spending.restore', 'trip.remove.restore'],
       'What to buy': ['advice.title', 'nav.advice'],
@@ -382,6 +393,15 @@ describe('словарь: реестр ошибок', () => {
 })
 
 describe('словарь: чего в нём нет намеренно', () => {
+  // «Поход» ушёл из интерфейса целиком (MOL-128, П-10, В-6): открытая — «запись», законченная —
+  // «покупки». Девять ключей хендоффа закрывали не всё — «Деньги», «Счета», ошибки, вход и
+  // приватность говорили «поход» ещё в шестидесяти трёх строках. Ключи с `trip` остаются: это имена
+  // кода, их никто не читает.
+  it('ни одна строка не говорит «поход», по-английски — «trip»', () => {
+    expect(Object.entries(RU).filter(([, text]) => /поход/iu.test(text))).toEqual([])
+    expect(Object.entries(EN).filter(([, text]) => /\btrips?\b/iu.test(text))).toEqual([])
+  })
+
   it('нет ключа под свёрнутую группу «не брать»', () => {
     // Сворачивание отвергнуто в решениях дизайна: «свернули читается как спрятали, а
     // пользователю иногда нужно вспомнить именно то, что брать не надо». Ключ из выжимки
@@ -391,7 +411,7 @@ describe('словарь: чего в нём нет намеренно', () => {
   })
 
   it('нет слова «Назад» подписью кнопки возврата', () => {
-    // Подпись — название предыдущего экрана («‹ Поход»), это прямо записано в макете.
+    // Подпись — название предыдущего экрана («‹ Покупки»), это прямо записано в макете.
     // Остаётся только nav.back_label — слово для скринридера, которому нужен глагол, а не
     // заголовок соседнего экрана.
     for (const dictionary of [RU, EN]) {
