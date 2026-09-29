@@ -287,6 +287,7 @@ export const useLoginStore = defineStore('login', () => {
    * a start that never left, on a phone with bars and no internet, fails the way one whose answer
    * was lost does, and is marked too (round 4, Г1) — settled towards a repeat, away from the line,
    * for В-1's reason: a retry read as a loss pushes towards the dearer decision, a second way in.
+   * Such a person who never gets in is in neither «began» nor «lost».
    */
   function mayHaveStarted(error: unknown): boolean {
     if (!(error instanceof ApiError)) return true

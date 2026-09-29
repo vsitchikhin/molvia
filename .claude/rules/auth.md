@@ -94,7 +94,8 @@ is in `bot.md`.
   and a break is ambiguous — a start that never left, on a phone with bars and no internet, fails
   the way one whose answer was lost does, and is marked too (round 4, Г1). Settled towards a repeat,
   away from the line, for В-1's own reason: a retry read as a loss pushes towards the dearer
-  decision. **The term is the phone's clock**: a clock set back by more than a day between a start
+  decision. What it can hide is a whole person, not a unit of «began»: one marked so who then never
+  gets in is in neither «began» nor «lost» (adversarial round 4). **The term is the phone's clock**: a clock set back by more than a day between a start
   and its retry — a phone waking in the past and caught up by the network — breaks that one repeat
   into a loss and a beginning (adversarial round 3, Т2); measuring it by the server's clock would
   need the server to know the device, which is what the mark avoids. **Taken away by any session collected here**,
