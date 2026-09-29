@@ -57,7 +57,12 @@ async function owner(patch: Parameters<typeof insertActor>[1] = {}): Promise<Own
   return { id, cookie: await signIn(db, id) }
 }
 
-async function call(me: Owner | null, method: 'GET' | 'POST' | 'PUT', url: string, body?: unknown) {
+async function call(
+  me: Owner | null,
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  url: string,
+  body?: unknown,
+) {
   return app.inject({
     method,
     url,
