@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import type { TripRowView } from '@/components/tripRow'
-import { useNavigation } from '@/navigation'
+import { upTarget, useNavigation } from '@/navigation'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import type { RetryPurchase } from './useItemDetails'
 import { useSelectedTrip } from './useSelectedTrip'
@@ -43,7 +43,16 @@ export function useFinishedTrip(): FinishedTrip {
   const router = useRouter()
   const { t, locale } = useI18n()
   const queue = useTripQueueStore()
-  const { goBack } = useNavigation()
+  const { goBack, goUp } = useNavigation()
+  /**
+   * To «Покупки», where the refusals stand and the list is: up, when it is this screen's parent —
+   * a push laid a second «Покупки» over the first and «back» met it again (review Р-17); opened
+   * from «Деньги», «Покупки» is somewhere else, and pushed.
+   */
+  function toPurchases(): void {
+    if (upTarget(router, route)?.location.name === 'purchases') void goUp()
+    else void router.push({ name: 'purchases' })
+  }
   const selected = useSelectedTrip(() =>
     typeof route.params.tripId === 'string' ? route.params.tripId : null,
   )
@@ -123,11 +132,7 @@ export function useFinishedTrip(): FinishedTrip {
    * way back is then the chevron's.
    */
   function afterRemoveSheet(): void {
-    if (
-      route.name === 'finished-trip' &&
-      selected.id.value &&
-      queue.removing.has(selected.id.value)
-    )
+    if (route.name === 'purchase' && selected.id.value && queue.removing.has(selected.id.value))
       void goBack()
   }
   return {
@@ -148,13 +153,13 @@ export function useFinishedTrip(): FinishedTrip {
     rejected: computed(() =>
       queue.rejected.some((item) => item.write.tripId === selected.id.value),
     ),
-    review: () => void router.push({ name: 'trip' }),
+    review: toPurchases,
     close: () => {
       opened.value = null
     },
     find: () =>
       void router.push({ name: 'finished-search', params: { tripId: selected.id.value } }),
-    history: () => void router.replace({ name: 'trip-history' }),
+    history: toPurchases,
     load: () => void selected.load(),
   }
 }

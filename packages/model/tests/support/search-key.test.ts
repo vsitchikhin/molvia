@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SEARCH_KEY_TABLES, toSearchKey } from '#model/support/search-key'
+import { SEARCH_KEY_TABLES, toSearchKey, unfinishedFoldSpellings } from '#model/support/search-key'
 import { INVISIBLE, visibleLine } from '#model/support/text'
 
 describe('toSearchKey', () => {
@@ -429,5 +429,32 @@ describe('пределы, записанные явно', () => {
   it('не переходит границу слова', () => {
     // Typing a name without the space is ordinary on a phone, and the key keeps the space.
     expect(toSearchKey('кокакола')).not.toBe(toSearchKey('Кока-кола'))
+  })
+})
+
+// Review Р-23, Р-26 (MOL-128): a Latin tail that may still fold is spelt out, never cut off.
+describe('unfinishedFoldSpellings', () => {
+  it('spells the start of a fold out into what it folds into', () => {
+    expect(unfinishedFoldSpellings('k')).toEqual(['h'])
+    expect(unfinishedFoldSpellings('bors')).toEqual(['borsh'])
+    expect(unfinishedFoldSpellings('shc')).toEqual(expect.arrayContaining(['sh']))
+    expect(unfinishedFoldSpellings('Z')).toEqual(['j'])
+    expect(unfinishedFoldSpellings('p')).toEqual(['f'])
+    expect(unfinishedFoldSpellings('c')).toEqual(expect.arrayContaining(['ц', 'ch']))
+  })
+
+  it('must not fire: a fold finished, a letter that folds alone, Cyrillic, nothing', () => {
+    expect(unfinishedFoldSpellings('kh')).toEqual([])
+    expect(unfinishedFoldSpellings('x')).toEqual([])
+    expect(unfinishedFoldSpellings('сыр')).toEqual([])
+    expect(unfinishedFoldSpellings('')).toEqual([])
+  })
+
+  it('every start of every fold is one, so a fold added is held too', () => {
+    for (const [from, to] of SEARCH_KEY_TABLES.latinFolds) {
+      for (let size = 1; size < from.length; size += 1) {
+        expect(unfinishedFoldSpellings(from.slice(0, size))).toContain(to)
+      }
+    }
   })
 })

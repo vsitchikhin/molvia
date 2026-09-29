@@ -57,7 +57,7 @@ async function comeBack(page: Page): Promise<void> {
 test('вход целиком, и человек оказывается там, куда шёл', async ({ page, request }) => {
   await withoutTelegram(page)
   // Ссылка из бота ведёт в раздел, а не на главную: адрес обязан пережить вход.
-  await page.goto('/advice')
+  await page.goto('/purchases')
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in')
   const code = await start(page)
@@ -71,8 +71,8 @@ test('вход целиком, и человек оказывается там, 
   await expect(page.getByRole('navigation', { name: 'Sections' })).toBeHidden()
   await page.getByRole('button', { name: 'Yes, that is me' }).click()
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What to buy')
-  await expect(page).toHaveURL('/advice')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Purchases')
+  await expect(page).toHaveURL('/purchases')
   expect((await page.context().cookies()).some((one) => one.name === SESSION_COOKIE)).toBe(true)
 })
 
@@ -110,19 +110,19 @@ test('погашенная ссылка предлагает начать зан
 })
 
 test('сессия, которой не стало, поднимает экран входа с любого экрана', async ({ page }) => {
-  // Шов на `error.no_actor` живёт в одном месте, и проверить его можно только так: у экрана
-  // «Что брать» своего разбора отказа нет, и до MOL-56 он показывал «что-то пошло не так».
+  // Шов на `error.no_actor` живёт в одном месте, и проверить его можно только так: у экранов
+  // своего разбора этого отказа нет, и до MOL-56 «Что брать» показывала «что-то пошло не так».
   await page.goto('/')
-  // The home screen without a trip asks for the history and the verdict queue by itself
-  // (MOL-77). Answered after the session is gone, either one raises the door before «What to
-  // buy» is pressed — right, but not the path this test is about — so both are let in first.
+  // Home asks for the list and, for a newcomer, the verdict queue by itself (MOL-128). Answered
+  // after the session is gone, either one raises the door before «Purchases» is pressed — right,
+  // but not the path this test is about — so both are let in first.
   const home = Promise.all(
-    ['/api/trips/history', '/api/verdicts/pending'].map((path) =>
+    ['/api/advice', '/api/verdicts/pending'].map((path) =>
       page.waitForResponse((response) => response.url().includes(path)),
     ),
   )
   await page.getByRole('button', { name: 'Sign in for development' }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trip')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What to buy')
   await home
 
   // Ждём, пока cookie сессии окажется в банке: под нагрузкой чтение банки успевает опередить
@@ -134,9 +134,9 @@ test('сессия, которой не стало, поднимает экра�
   // Ждём именно отказа, а не «когда-нибудь»: экран сменится после него, и ждать наугад значит
   // мерить скорость машины, а не поведение приложения.
   const refused = page.waitForResponse(
-    (response) => response.url().includes('/api/advice') && response.status() === 401,
+    (response) => response.url().includes('/api/trips/') && response.status() === 401,
   )
-  await page.getByRole('link', { name: 'What to buy' }).click()
+  await page.getByRole('link', { name: 'Purchases' }).click()
   await refused
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in')

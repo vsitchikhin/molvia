@@ -281,6 +281,43 @@ export function toSearchKey(text: string): string {
 }
 
 /**
+ * What a Latin tail may still become: every proper start of a fold, with the letter that fold
+ * gives — `k` may be the `h` of `kh`, `shc` the `sh` of `shch`, `p` the `f` of `ph` — and `c`, which
+ * the letter after it decides, the `ц` of a soft one or the `ch` of «ч».
+ */
+const UNFINISHED_FOLDS: ReadonlyMap<string, readonly string[]> = (() => {
+  const ends = new Map<string, string[]>()
+  const add = (start: string, key: string): void => {
+    ends.set(start, [...(ends.get(start) ?? []), key])
+  }
+  for (const [from, to] of LATIN_FOLDS) {
+    for (let size = 1; size < from.length; size += 1) add(from.slice(0, size), to)
+  }
+  add('c', 'ц')
+  add('c', 'ch')
+  return ends
+})()
+
+/**
+ * The other spellings a word typed so far may be the start of, when it ends halfway through a
+ * Latin fold: `k` is also `h`, since «Хачапури» is `hachapuri` and `k` is not its start until `kh`
+ * is typed (MOL-128, review Р-23). The tail is spelt out into what it may still fold into, never cut
+ * off: cut, «k» was the start of every name and «sok» of «Соль» (review Р-26, adversarial Н). Empty
+ * when nothing at the end is unfinished. For the start of a word searched on the phone only; the
+ * key itself is `toSearchKey`'s.
+ */
+export function unfinishedFoldSpellings(word: string): string[] {
+  const lower = word.toLocaleLowerCase()
+  const spellings = new Set<string>()
+  for (const [start, keys] of UNFINISHED_FOLDS) {
+    if (!lower.endsWith(start)) continue
+    const before = lower.slice(0, -start.length)
+    for (const key of keys) spellings.add(before + key)
+  }
+  return [...spellings]
+}
+
+/**
  * Exported for exactly one reason: the tables are frozen, so an edit to them is a migration
  * with a recompute, and the test that holds them has to walk the real keys instead of a list
  * copied beside it. With a copied list a row *added* to the source is invisible — only a

@@ -133,19 +133,33 @@ The detail behind the frontend lines of `CLAUDE.md`.
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and
   gets the chevron, labelled with the title of where it leads, never the word «Back». **At rest
   the label has the row; once the small title comes in it gives way first** (MOL-75): whole, else
-  «Back», else the chevron alone — never a fragment, which «Trip…» would be — and the title yields
+  «Back», else the chevron alone — never a fragment, which «Покуп…» would be — and the title yields
   last, only when it alone does not fit between two chevrons. The width is read in fractions, as the
   label is drawn: rounded, a word 0.4px too wide passed as whole and was drawn «Наз…» (review А1).
-  **The name does not follow the ladder** — «Back Trip» on every step, the word shown first
+  **The name does not follow the ladder** — «Back Purchases» on every step, the word shown first
   (owner's decision on review). **It
   leads to the screen underneath when that screen is any ancestor** — the step the system
-  button takes — and otherwise replaces onto the parent (`backTarget`, MOL-77): a finished trip
-  opened from the home screen says «‹ Поход» and both «back»s go home. Tabs and the
-  chevron move through `useNavigation`: «Trip» is home — leaving it pushes, moving between
-  the other sections replaces, returning is a step back — so the system «back» never walks
-  through tab taps, and a nested screen opened cold gets its parent laid underneath. A
-  section opened cold — a link from the bot — is its own home: «back» leaves the app, the trip
-  is not laid under it, because a push without a gesture is what Chrome may skip. **No
+  button takes — and otherwise replaces onto the parent (`backTarget`, MOL-77): the search of a
+  record opened cold, with the record and «Покупки» laid underneath, says «‹ Запись»; with
+  «Покупки» right underneath and no record, «‹ Покупки» — and both «back»s go there. A tab
+  asked for on a nested screen — never tapped there, the bar is shown only on a section's root, but
+  a screen may send a person to a tab when it is done — goes from its section: up the chain the way
+  «back» goes while an ancestor is underneath, then the tab from there (MOL-128, adversarial Б) —
+  read as «from no section», every such move would leave two more entries before «back» left the
+  app. The tab follows only the router's move off that screen, and only once the step has landed
+  (review Р-24): a pop a sheet's guard ate must not leave it to fire on a later move.
+  Tabs and the chevron move through `useNavigation`: **«Что брать» is home** (MOL-128; «Поход»
+  was, MOL-17) — at the shelf a person reads, at home they write — leaving it pushes, moving
+  between the other sections replaces, returning is a step back — so the system «back» never
+  walks through tab taps, and a nested screen opened cold gets its parents laid underneath. A
+  section opened cold — a link from the bot — is its own home: «back» leaves the app, home is
+  not laid under it, because a push without a gesture is what Chrome may skip. **The addresses
+  of «Поход» redirect for good** (MOL-81): `/trip*` to «Покупки», `/advice` to `/`. A screen that
+  has nothing left to show — the record typed by hand once it is finished or removed — goes up to
+  its parent (`goUp`), and never under an open sheet: the sheet's `onClosed` asks again, **through
+  `afterStep`** — a sheet is told it is closed from inside the pop that closed it, before that step
+  has landed, and a move made there was taken for a second tap and dropped (MOL-128, seen only in a
+  real browser: happy-dom dispatches `popstate` inside `go`). **No
   gesture is intercepted**: no touch listener, no `overscroll-behavior` on the root — the
   edge swipe and Android «back» belong to the browser, and the history is the one source of
   «back». **One written exception: a sheet pulled down** (MOL-80, the owner's request) — a

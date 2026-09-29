@@ -120,8 +120,8 @@ export default defineComponent({
     const dock = ref<HTMLElement | null>(null)
     const sentinel = ref<HTMLElement | null>(null)
 
-    // Named by where it leads (`backTarget`): a finished trip opened from the home screen goes
-    // back there, and says «Поход» (MOL-77).
+    // Named by where it leads (`backTarget`): a screen opened from further up than its parent goes
+    // back there, and says so (MOL-77) — the search of a record over «Покупки» says «Покупки».
     const parentTitleKey = computed(() => backTarget(router, route)?.location.meta.titleKey)
 
     const column = ref<HTMLElement | null>(null)

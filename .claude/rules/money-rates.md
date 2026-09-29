@@ -22,7 +22,7 @@ The detail behind the rate, exchange and income lines of `CLAUDE.md`.
 ## How the official rate reaches a trip
 
 **How the official rate reaches a trip (MOL-39).** A trip snapshots it when it starts, from a
-cache in the database — **«Начать поход» never goes to the network**: a trip at the shelf does
+cache in the database — **starting a record never goes to the network** (the old «Начать поход»): a trip at the shelf does
 not wait for a central bank. The API refreshes the cache itself, hourly, and at boot unless
 the cache was written less than an hour ago — in development, unless it holds anything at all:
 `make dev` restarts on every save

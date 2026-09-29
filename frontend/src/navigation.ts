@@ -5,20 +5,23 @@ import type { RouteName, Tab } from '@/router'
 /**
  * How a tap on a tab is written into the history.
  *
- * The trip is home — it is the main scenario. Leaving it pushes, moving between the other
- * sections replaces, and coming back to it is a step back. So the system «back» on Android
- * walks «Ratings → Trip → out of the app» however many tabs were tapped in between, which is
- * what Android apps do, and an iPhone, with no such button, sees no difference.
+ * «Что брать» is home (MOL-128; «Поход» was, MOL-17). Leaving it pushes, moving between the other
+ * sections replaces, and coming back to it is a step back. So the system «back» on Android walks
+ * «Оценки → Что брать → out of the app» however many tabs were tapped in between, which is what
+ * Android apps do, and an iPhone, with no such button, sees no difference.
  *
  * `top` is a tap on the section already open: iOS scrolls it to the top, and nothing in a
  * browser stands in the way of doing the same.
  */
 export type TabMove = 'push' | 'replace' | 'back' | 'top'
 
+/** The section the app opens on and «back» ends at. */
+export const HOME = 'advice' satisfies Tab
+
 export function tabMove(from: Tab | undefined, to: Tab, below: RouteName | undefined): TabMove {
   if (from === to) return 'top'
-  if (to === 'trip') return below === 'trip' ? 'back' : 'replace'
-  return from === 'trip' ? 'push' : 'replace'
+  if (to === HOME) return below === HOME ? 'back' : 'replace'
+  return from === HOME ? 'push' : 'replace'
 }
 
 /**
@@ -27,9 +30,9 @@ export function tabMove(from: Tab | undefined, to: Tab, below: RouteName | undef
  * takes, so the two never disagree — and otherwise a replace onto the parent, so the chevron
  * never leads out of the app.
  *
- * Any ancestor, not only the parent (MOL-77, owner's decision): a finished trip is opened from
- * the history and from the home screen as well, and from there «back» is the home screen it was
- * opened from — «‹ Поход», not «‹ История походов» over a system button that goes home anyway.
+ * Any ancestor, not only the parent (MOL-77, owner's decision): a screen opened from further up
+ * than its parent leads back to where it was opened from, not to a parent the system button
+ * would walk past anyway.
  * Opened cold, the chain is laid underneath (`settleColdStart`) and the parent is below it.
  */
 export interface BackTarget {
@@ -64,15 +67,23 @@ export function upTarget(router: Router, route: Routed): BackTarget | null {
 
 /**
  * Which screen the entry underneath the current one is — by route, never by address. The
- * history records the address whole, and `/?utm_source=telegram` or `/#top` is the trip as
- * much as `/` is; a string compared with `'/'` took them for somewhere else, and «back» from
- * the trip then led to the trip again.
+ * history records the address whole, and `/?utm_source=telegram` or `/#top` is home as much as
+ * `/` is; a string compared with `'/'` took them for somewhere else, and «back» from home then
+ * led home again.
  */
 function entryBelow(router: Router): RouteName | undefined {
   const back: unknown = router.options.history.state.back
   if (typeof back !== 'string') return undefined
   const name = router.resolve(back).name
   return typeof name === 'string' ? (name as RouteName) : undefined
+}
+
+/** The section a screen belongs to: its own tab, or the nearest ancestor's. */
+function sectionOf(router: Router, route: Routed & { meta: { tab?: Tab } }): Tab | undefined {
+  if (route.meta.tab) return route.meta.tab
+  for (let up = parentOf(router, route); up; up = parentOf(router, up))
+    if (up.meta.tab) return up.meta.tab
+  return undefined
 }
 
 /**
@@ -152,7 +163,7 @@ function prefersReducedMotion(): boolean {
  * never lands.
  *
  * Exported for the sheet (MOL-18): closing it takes its own entry away, and closing it together
- * with the screen under it — «Add to trip» on the search — takes two in one move.
+ * with the screen under it — «Записать» on the search — takes two in one move.
  *
  * The block is a token rather than a flag. The sheet's guard steps over a dead entry from inside
  * the pop of a step already in flight — the chevron's — and takes the block over with `force`: the
@@ -160,6 +171,8 @@ function prefersReducedMotion(): boolean {
  * tap on the chevron slipped through between the two pops (adversarial В-3).
  */
 let stepping: object | null = null
+/** Moves asked for while a step was in flight, made once it has landed (`afterStep`). */
+let waiting: (() => void)[] = []
 
 /** Moves `steps` entries back — or forward, if negative — once no other step is in flight. */
 export function stepBack(router: Router, steps = 1, force = false): void {
@@ -167,13 +180,28 @@ export function stepBack(router: Router, steps = 1, force = false): void {
   const token = {}
   stepping = token
   const landed = (): void => {
-    if (stepping === token) stepping = null
     window.clearTimeout(timer)
     window.removeEventListener('popstate', landed)
+    if (stepping !== token) return
+    stepping = null
+    const due = waiting
+    waiting = []
+    for (const run of due) run()
   }
   const timer = window.setTimeout(landed, 1000)
   window.addEventListener('popstate', landed)
   router.go(-steps)
+}
+
+/**
+ * Runs `run` once no step is in flight — at once when none is (MOL-128). A sheet is told it is
+ * closed from inside the pop that closed it, before the step that pop answers has landed: a move
+ * made there — the record typed by hand going up once it is finished — was ignored as a second
+ * tap. So a move that follows a sheet waits here for the step, not for a clock.
+ */
+export function afterStep(run: () => void): void {
+  if (stepping) waiting.push(run)
+  else run()
 }
 
 export function useNavigation(): {
@@ -186,8 +214,32 @@ export function useNavigation(): {
 
   async function goTab(to: Tab): Promise<void> {
     if (stepping) return
-    const move = tabMove(route.meta.tab, to, entryBelow(router))
-    if (move === 'top') {
+    // On a nested screen the tab is tapped from its section, not from nowhere (adversarial Б): up
+    // the chain the way «back» goes while an ancestor is underneath, then the tab from there. Read
+    // as «from no section», a tab replaced the nested screen and left its section underneath —
+    // every round of the shop, «Покупки → запись → Что брать», two more entries before «back»
+    // left the app.
+    //
+    // The tab follows the router's move off this screen, and only that move (review Р-24): a pop
+    // eaten by a sheet's guard, or a step that never lands, must not leave it to fire on a later,
+    // unrelated move. Without a view transition the router finishes inside its own `popstate`,
+    // before the step is counted as landed — so the tab waits for that too (`afterStep`).
+    if (!route.meta.tab && backTarget(router, route)?.step) {
+      const leaving = route.fullPath
+      const stop = router.afterEach((_to, from, failure) => {
+        if (from.fullPath !== leaving) return
+        stop()
+        if (!failure) afterStep(() => void goTab(to))
+      })
+      stepBack(router)
+      afterStep(() => window.setTimeout(stop, 1000))
+      return
+    }
+    const nested = !route.meta.tab
+    const move = tabMove(sectionOf(router, route), to, entryBelow(router))
+    if (move === 'top' && nested) {
+      await router.replace({ name: to })
+    } else if (move === 'top') {
       window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
     } else if (move === 'back') {
       stepBack(router)
