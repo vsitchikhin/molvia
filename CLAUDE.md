@@ -304,14 +304,17 @@ that are easiest to break; the file holds every rule of the area and the reason 
   **or by «Обновить»** (MOL-132): never reloaded without the tap; the strip is the top row over the
   tab bar, and an error while a version waits offers it first.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17); no gesture
-  is intercepted; only the page scrolls, except a sheet.
+  is intercepted but the sheet's own pull down (MOL-80); only the page scrolls, except a sheet.
 - **A screen is built from the kit** (MOL-18); the sheet is a native `<dialog>` with an entry in the
-  history, and puts the page back by what it was opened from (MOL-63).
+  history, and puts the page back — and focus, where the platform left it nowhere — by what it was
+  opened from (MOL-63, MOL-80). **Its press is heard on the document**: iOS hands a tap on the
+  scrim only to a listener there (MOL-80).
 
 ### End-to-end — `.claude/rules/e2e.md`
 
 - **End-to-end has a database and ports of its own**, and the database is dropped before every run.
 - **Every spec comes in through `open()` in `e2e/session.ts`.**
+- **The sheet alone also runs on WebKit** (`iphone`, MOL-80); a test it cannot run says why.
 - **Words said out loud are taken by a locator outside the live region**, never muted with
   `.first()`.
 
@@ -602,7 +605,8 @@ database access. In a product about data integrity, two write paths will silentl
 | End-to-end  | `e2e/**/*.spec.ts`                 | the whole stack through a browser         | Playwright starts api and pwa itself     |
 
 **End-to-end runs in a phone profile only.** The product is designed for a phone at a
-shelf, so a desktop-only pass would prove nothing about the screen that matters.
+shelf, so a desktop-only pass would prove nothing about the screen that matters. The sheet runs
+on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
 
 - **Catalogue search is tested only against a real Postgres.** `pg_trgm`, `unaccent` and
   `fuzzystrmatch` cannot be faked, and they are exactly what breaks. Integration tests run against a
