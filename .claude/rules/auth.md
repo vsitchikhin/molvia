@@ -81,16 +81,19 @@ is in `bot.md`.
   migration. **No id, no Telegram id, no code, no device** — not a person's row, so erasure has
   nothing here, and «no login writes `events`» still holds.
   **A repeat is the device's word** (owner's decision В-1): `POST /auth/login?again=1` when the
-  login record holds `tried` — set once a start is answered `201`, taken away when an owner is
-  claimed, when a session lands in an owner claimed before (no question, so no claim: review А1),
-  and by «Выйти» with the claim — so «Начать заново», or a return after the link ran out, is the same person rather
-  than a loss and a newcomer. Not the cookie of the request: it dies with the five minutes,
-  exactly when the commonest repeat happens. The price is named: Safari and an installed PWA are
-  two devices, an old PWA sends no mark, and a forged mark spoils only our own count. **The mark
-  has no term** (review А5): someone who gave up a month ago and comes back inside the window is
-  «again» — they got in, and they began before it — so at the window's edge «began» is short by
-  them, not by a unit or two. Kept as the same person on purpose: the question is how many who
-  tried never got in.
+  login record holds `tried`, the moment of this device's last start, **less than a day ago** — so
+  «Начать заново», or a return after the link ran out, is the same person rather than a loss and a
+  newcomer. Not the cookie of the request: it dies with the five minutes, exactly when the commonest
+  repeat happens. **Set when the server took a start, or may have** — an answer lost on its way back
+  left the request and its count behind (review Д); a refusal of the API's own, a captive portal's
+  page and a start with no connection made none. **Taken away by any session collected here**,
+  whosever: the attempt ended in it — an owner claimed before comes in with no question (review А1),
+  and after a stranger's session «Это не я» begins anew (review Г3) — by «Да, это я», and by «Выйти»
+  with the claim. **The day's term** (review Е): without one, a person who gave up in October and
+  came back in December was «again» in December — in, and begun nowhere — while October's loss
+  stood alone; with it each window holds its own. The price is named: Safari and an installed PWA
+  are two devices, an old PWA sends no mark, and a forged mark spoils only our own count — as do
+  starts forged by hand, since the start's guard is a header `curl` sends as easily as a browser.
 - **The token rides in a cookie, and `backend/src/cookie.ts` is the only module that touches
   one (MOL-53).** `__Host-molvia_session`, with `HttpOnly` so an XSS cannot carry the account
   away and so ITP's seven-day cap — which applies to what a _script_ writes — never reaches it;

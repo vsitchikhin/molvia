@@ -174,12 +174,19 @@ function loginLines({ firstDay, lastDay, days }: LoginsInWindow): string[] {
     `login ${'how many who began got in?'.padEnd(46)}second way in above ${String(LOGIN_SECOND_WAY_PERCENT)} %`,
     row('began', [String(began), `${span} in Yerevan`]),
     row('got in', share(gotIn, began)),
-    row('still under way', [String(open), 'not counted yet']),
+    // Below zero only with outcomes whose start was never counted: a request an older image made
+    // after a rollback, which puts the image back and not the schema (review Г).
+    row(
+      'still under way',
+      open < 0
+        ? [String(open), 'outcomes of starts never counted']
+        : [String(open), 'not counted yet'],
+    ),
     row(
       'lost',
       lost < 0
         ? [`${String(lost)} of ${String(began)}`, 'repeats of starts before the window']
-        : share(lost, began),
+        : share(lost, began, 'up'),
     ),
     row('  never confirmed in the bot', [String(total((day) => day.expiredUnconfirmed)), '']),
     row('  confirmed, did not come back', [String(total((day) => day.expiredConfirmed)), '']),
@@ -228,12 +235,15 @@ function row(label: string, [count, note]: readonly [string, string]): string {
 }
 
 /**
- * `k of n` and the share, in tenths, rounded down (Р-5): 19.96 % is «19.9 %», never a «20.0 %»
- * standing over a line that stops below 20. An empty cohort has no share at all.
+ * `k of n` and the share, in tenths, rounded **towards the line's own side** (Р-5): down beside a
+ * line that stops below — 19.96 % is «19.9 %», never a «20.0 %» standing over «stop below 20» —
+ * and up beside the login's line, which fires above (MOL-68, review Б): 25.09 % is «25.1 %», never a
+ * «25.0 %» sitting on «above 25». Either way a share past its line is never printed on it. An empty
+ * cohort has no share at all.
  */
-function share(part: number, whole: number): [string, string] {
+function share(part: number, whole: number, round: 'down' | 'up' = 'down'): [string, string] {
   if (whole === 0) return [`${String(part)} of 0`, '—']
-  const tenths = Math.floor((part * 1000) / whole)
+  const tenths = (round === 'up' ? Math.ceil : Math.floor)((part * 1000) / whole)
   const percent = `${String(Math.floor(tenths / 10))}.${String(tenths % 10)} %`
   return [`${String(part)} of ${String(whole)}`, percent.padStart(7)]
 }

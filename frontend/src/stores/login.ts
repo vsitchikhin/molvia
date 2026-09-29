@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { ApiError } from '@molvia/client'
-import { ERROR } from '@molvia/model'
+import { ERROR, ISSUE } from '@molvia/model'
 import type { ActorView } from '@molvia/model'
 import { api } from '@/api'
 import { forget, read, write } from '@/stores/storage'
@@ -9,7 +9,7 @@ import { LOGIN_KEY } from '@/stores/identity'
 import { useActorStore } from '@/stores/actor'
 
 /**
- * The login as the device remembers it — and the device remembers exactly two things.
+ * The login as the device remembers it — and the device remembers exactly three things.
  *
  * **The started request**, because the way in leads out of the app: on iOS a `t.me` link opens
  * Telegram, and the PWA behind it may be unloaded by the time the person comes back. Without
@@ -36,6 +36,14 @@ import { useActorStore } from '@/stores/actor'
  * Kept as «claimed», the question cannot be missed: whoever the server says we are is compared
  * with whoever the person approved, and anything else is a question — however the session got
  * here.
+ *
+ * **When this device last began a login that nobody has come in by since** (`tried`, MOL-68),
+ * because the funnel of the gates asks how many who began got in, and «Начать заново» or a return
+ * after the link ran out is the same person trying again, not a loss and a newcomer. The next start
+ * within a day says so — `again=1`. Set when the server took a start, or may have (an answer lost
+ * on the way back); taken away by any session collected here — whosever, since the attempt ended
+ * in one — by «Да, это я» and by «Выйти». Not a secret and not about anyone: all it can change is
+ * our own count.
  */
 const KEY = LOGIN_KEY
 
@@ -55,13 +63,20 @@ interface Kept {
   readonly request?: Request
   readonly claimed?: string
   /**
-   * This device began a login that the server took, and nobody has come in since (MOL-68). The
-   * next start says so — `again=1` — and the funnel counts «Начать заново», or a return after the
-   * link ran out, as the same person rather than a new one. Of the device, not of a window: set
-   * by whichever window's start was answered, taken away by whichever window's owner is claimed.
+   * When this device last began a login nobody has come in by since, in the device's
+   * milliseconds (MOL-68) — see the header. Of the device, not of a window: set by whichever
+   * window's start the server took, taken away by whichever window's session arrives.
    */
-  readonly tried?: true
+  readonly tried?: number
 }
+
+/**
+ * How long a start counts as the same sitting (review Е): a day. Without a term, a person who gave
+ * up in October and came back in December was «again» in December's window — they got in, and
+ * began nowhere — and October's loss stood alone. Each window now holds its own: a loss where it
+ * happened, a beginning where it came back.
+ */
+const TRIED_TERM_MS = 24 * 60 * 60 * 1000
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -92,7 +107,7 @@ function recall(): Kept {
     return {
       ...(isRequest(request) ? { request } : {}),
       ...(typeof claimed === 'string' && UUID.test(claimed) ? { claimed } : {}),
-      ...(tried === true ? { tried } : {}),
+      ...(typeof tried === 'number' && Number.isFinite(tried) ? { tried } : {}),
     }
   } catch {
     return {}
@@ -149,8 +164,9 @@ export const useLoginStore = defineStore('login', () => {
    * stored, because a new start replaces the secret and kills whatever was there; only removal
    * and rewriting are checked against ownership.
    */
-  function store(held: Request | null, tried = recall().tried === true): void {
-    if (!held && !claimed.value && !tried) {
+  /** `tried`: the moment to keep, `null` to take the mark away; left out, what is stored stays. */
+  function store(held: Request | null, tried: number | null = recall().tried ?? null): void {
+    if (!held && !claimed.value && tried === null) {
       forget(KEY)
       return
     }
@@ -159,7 +175,7 @@ export const useLoginStore = defineStore('login', () => {
       JSON.stringify({
         ...(held ? { request: held } : {}),
         ...(claimed.value ? { claimed: claimed.value } : {}),
-        ...(tried ? { tried: true } : {}),
+        ...(tried === null ? {} : { tried }),
       }),
     )
   }
@@ -169,7 +185,7 @@ export const useLoginStore = defineStore('login', () => {
    * окно без своего запроса записывало `{claimed}` поверх чужого — ровно то, что закрывало
    * правило А3 (саморевью Р3-2).
    */
-  function keepClaimOnly(tried?: boolean): void {
+  function keepClaimOnly(tried?: number | null): void {
     store(recall().request ?? null, tried)
   }
 
@@ -260,6 +276,18 @@ export const useLoginStore = defineStore('login', () => {
     window.open(url, '_blank', 'noopener')
   }
 
+  /**
+   * Whether a failed start may still have made a request. The API's own refusal made none — its
+   * transaction rolled back or never began; nor did a page from something in front of it (a
+   * captive portal), which means the request never reached us. A dropped connection, a deadline,
+   * a bare 5xx or a reply off the contract are unknown.
+   */
+  function mayHaveStarted(error: unknown): boolean {
+    if (!(error instanceof ApiError)) return true
+    if (error.answered) return error.code === ISSUE.RESPONSE_INVALID
+    return error.code === ERROR.INTERNAL
+  }
+
   function refused(error: unknown): LoginFailure {
     if (error instanceof ApiError) {
       if (error.code === ERROR.LOGIN_RATE_LIMITED) return 'rate_limited'
@@ -280,16 +308,22 @@ export const useLoginStore = defineStore('login', () => {
     if (request.value || starting.value) return
     failure.value = null
     starting.value = true
+    const tried = recall().tried
+    const again = tried !== undefined && Date.now() - tried < TRIED_TERM_MS
     try {
-      const started = await api.startLogin({ again: recall().tried === true })
+      const started = await api.startLogin({ again })
       request.value = { id: started.id, url: started.url }
-      // Only once the server took it: a start that never arrived made no request, and the next
-      // one — the first the server sees — would otherwise leave as a repeat and be nobody's
-      // beginning (MOL-68).
-      store(request.value, true)
+      store(request.value, Date.now())
       open(started.url)
     } catch (error) {
       failure.value = refused(error)
+      // Marked only when the server took the start, or may have: a start that never arrived made
+      // no request, and the next one — the first the server sees — would leave as a repeat and be
+      // nobody's beginning. But an answer lost on its way back is not «never arrived» (review Д):
+      // the request and its count are there, the cookie is not, and unmarked the retry made one
+      // person who got in a loss and a newcomer — at a shelf with a weak signal, which is where
+      // the product is used.
+      if (failure.value === 'error' && mayHaveStarted(error)) keepClaimOnly(Date.now())
     } finally {
       starting.value = false
     }
@@ -324,7 +358,7 @@ export const useLoginStore = defineStore('login', () => {
   }
 
   /** Takes this window's request off the device, leaving a neighbour's alone. */
-  function drop(tried?: boolean): void {
+  function drop(tried?: number | null): void {
     const previous = request.value
     request.value = null
     const stored = recall().request ?? null
@@ -376,10 +410,11 @@ export const useLoginStore = defineStore('login', () => {
     // Снимается тот запрос, который это и принёс. Тот, что человек успел начать после него,
     // живёт дальше: он мог быть уже подтверждён, и выбросить его значило бы просить подтвердить
     // заново (замечание раунда 2, без атаки).
-    if (request.value?.id === from.id) drop()
-    // Вошли в аккаунт, признанный раньше: вопроса не будет, а с ним и `claim`, который снимает
-    // метку, — снимаем здесь, иначе следующий вход с устройства ушёл бы повтором (MOL-68, ревью А1).
-    if (view.id === claimed.value) keepClaimOnly(false)
+    // Любой собранный вход кончает попытку, и метка снимается (MOL-68): вход в аккаунт,
+    // признанный раньше, проходит без вопроса и без `claim` (ревью А1), а чужой по утёкшей
+    // ссылке — исход той попытки, и «Это не я» после него — новое начало (ревью Г3).
+    if (request.value?.id === from.id) drop(null)
+    else keepClaimOnly(null)
     failure.value = null
     refusedOwner.value = null
     // The owner is adopted at once — it is this browser's session now, whosever it is — and what
@@ -397,8 +432,8 @@ export const useLoginStore = defineStore('login', () => {
     refusedOwner.value = null
     // Свой запрос после признания аккаунта смысла не имеет и снимается; чужой остаётся (Р3-2).
     // Человек вошёл — следующий вход с устройства снова начало, а не повтор (MOL-68).
-    if (request.value) drop(false)
-    else keepClaimOnly(false)
+    if (request.value) drop(null)
+    else keepClaimOnly(null)
   }
 
   /**

@@ -150,7 +150,7 @@ describe('gates — чтение ворот вручную', () => {
       '     began                               41         days 2026-10-05 … 2026-11-20 in Yerevan',
       '     got in                              33 of 41    80.4 %',
       '     still under way                     0          not counted yet',
-      '     lost                                8 of 41     19.5 %',
+      '     lost                                8 of 41     19.6 %',
       '       never confirmed in the bot        15',
       '       confirmed, did not come back      4',
       '       «not me» in the bot               1',
@@ -281,31 +281,52 @@ describe('gates — чтение ворот вручную', () => {
     expect(lines.find((line) => line.startsWith('     lost'))).toMatch(/ 0 of 3 +0\.0 %$/)
   })
 
-  it.each([
-    [1, 4, '25.0 %'],
-    [2999, 10_000, '29.9 %'],
-  ])('потеряно %i из %i — %s, вниз до десятой, как у ворот', async (lost, began, percent) => {
+  it('исход без начала — старый образ после отката — «ещё в пути» ниже нуля, с причиной (ревью Г)', async () => {
     const day = REPORT.logins.days[0]!
     const { exit, lines } = run(['--from', '2026-10-05'], {
       ...REPORT,
       logins: {
         ...REPORT.logins,
-        days: [
-          {
-            ...day,
-            started: began,
-            again: 0,
-            collected: began - lost,
-            expiredUnconfirmed: lost,
-          },
-        ],
+        days: [{ ...day, started: 0, again: 0, confirmed: 1, collected: 1, expiredUnconfirmed: 0 }],
       },
     })
     await exit
-    const line = lines.find((text) => text.startsWith('     lost')) ?? ''
-    expect(line).toContain(`${String(lost)} of ${String(began)}`)
-    expect(line.endsWith(percent)).toBe(true)
+    expect(lines).toContain(
+      '     still under way                     -1         outcomes of starts never counted',
+    )
   })
+
+  it.each([
+    [1, 4, '25.0 %'],
+    [63, 251, '25.1 %'],
+    [1001, 4000, '25.1 %'],
+    [2999, 10_000, '30.0 %'],
+    [1, 3, '33.4 %'],
+  ])(
+    'потеряно %i из %i — %s: вверх до десятой, над линией «above» не садится на неё (ревью Б)',
+    async (lost, began, percent) => {
+      const day = REPORT.logins.days[0]!
+      const { exit, lines } = run(['--from', '2026-10-05'], {
+        ...REPORT,
+        logins: {
+          ...REPORT.logins,
+          days: [
+            {
+              ...day,
+              started: began,
+              again: 0,
+              collected: began - lost,
+              expiredUnconfirmed: lost,
+            },
+          ],
+        },
+      })
+      await exit
+      const line = lines.find((text) => text.startsWith('     lost')) ?? ''
+      expect(line).toContain(`${String(lost)} of ${String(began)}`)
+      expect(line.endsWith(percent)).toBe(true)
+    },
+  )
 
   it('сбой базы — код 1, код сбоя и ни слова из его сообщения', async () => {
     const failure = new Error('Failed query: select … from actors\nparams: 2026-10-04T20:00…', {
