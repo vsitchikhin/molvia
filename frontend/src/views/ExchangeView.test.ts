@@ -791,6 +791,14 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
         view.unmount()
       }
       expect(heads).toEqual(['Today', 'Yesterday', 'Sep 29'])
+
+      // Back in view after the phone's midnight, with nothing read again (adversarial Н).
+      exchanges.mockResolvedValue(overview({ exchanges: [row({ exchangedOn: '2026-09-28' })] }))
+      const view = await render()
+      vi.setSystemTime(new Date('2026-09-29T00:20:00Z'))
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+      expect(view.get('article .day').text()).toBe('Yesterday')
     } finally {
       vi.useRealTimers()
     }

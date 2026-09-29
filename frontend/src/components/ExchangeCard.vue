@@ -76,6 +76,8 @@ export default defineComponent({
   components: { AppCard, IconArrow, IconNote, OperationCardHead },
   props: {
     exchange: { type: Object as PropType<ExchangeView>, required: true },
+    /** The phone's today, held by the screen and asked again when it comes back (adversarial Н). */
+    today: { type: String, required: true },
     disabled: { type: Boolean, default: false },
   },
   emits: {
@@ -97,7 +99,7 @@ export default defineComponent({
       official: computed(() => words.officialOf(props.exchange)),
       shortDay: (when: Date) => purchaseDay(when, locale.value),
       // «Сегодня», «Вчера» by the phone's today (MOL-121, В-1); the button and the rate say the date.
-      headOf: (exchange: ExchangeView) => dayWords(exchange.exchangedOn, locale.value),
+      headOf: (exchange: ExchangeView) => dayWords(exchange.exchangedOn, locale.value, props.today),
     }
   },
 })

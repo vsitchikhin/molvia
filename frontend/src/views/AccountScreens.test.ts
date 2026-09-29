@@ -432,3 +432,58 @@ describe('a check and the operations of its reasons', () => {
     expect(second).toBe(first)
   })
 })
+
+// The phone's today (MOL-121): at 20:30 UTC, the zone the tests run in, it is the 28th here and the
+// 29th in Yerevan — where the two part, and where a day of Yerevan would show.
+describe('the phone’s day on the accounts (MOL-121)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-28T20:30:00Z'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('a check goes with the phone’s day, the one its difference is written on (adversarial М)', async () => {
+    const pinia = session()
+    useAccountsStore(pinia).accept(page([cash()]))
+    checkAccount.mockResolvedValueOnce(answer('10000', '10000'))
+    const view = await open(ReconcileSheet, '/money/accounts', pinia, {
+      open: true,
+      account: cash(),
+      categories,
+      nameOf: () => 'Other',
+      accountName: () => null,
+    })
+    await view.get('input').setValue('10000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await settle()
+    expect(checkAccount.mock.calls[0]?.[1].checkedOn).toBe('2026-09-28')
+  })
+
+  it('a new account starts on the phone’s today, and no later (Т-3)', async () => {
+    const view = await open(AccountSheet, '/money/accounts', session(), {
+      open: true,
+      spendCurrency: 'AMD',
+    })
+    await settle()
+    const day = view.get('input[type="date"]').element as HTMLInputElement
+    expect(day.value).toBe('2026-09-28')
+    expect(day.max).toBe('2026-09-28')
+  })
+
+  it('the journal says «Today» of the phone’s day, and «Yesterday» once its midnight is past (Т-3, adversarial Н)', async () => {
+    moneyAccounts.mockResolvedValue(page([cash()]))
+    accountJournal.mockResolvedValue(
+      journal(cash(), [{ ...spendingRow(TAXI, '-1200', CASH), day: '2026-09-28' }]),
+    )
+    const view = await open(AccountView, `/money/accounts/${CASH}`, session())
+    await settle()
+    expect(view.text()).toContain('Today · September 28')
+
+    vi.setSystemTime(new Date('2026-09-29T00:20:00Z'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await settle()
+    expect(view.text()).toContain('Yesterday · September 28')
+  })
+})

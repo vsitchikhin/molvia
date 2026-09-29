@@ -234,6 +234,12 @@ describe('IncomesView: the months (В-2)', () => {
       const view = await render()
       expect(view.get('article .day').text()).toBe('Today')
       expect(view.get('button.body').text()).toMatch(/^Amend income of Sep 28:/)
+      // Back in view after the phone's midnight, with nothing read again (adversarial Н).
+      vi.setSystemTime(new Date('2026-09-29T00:20:00Z'))
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+      expect(incomes).toHaveBeenCalledTimes(1)
+      expect(view.get('article .day').text()).toBe('Yesterday')
     } finally {
       vi.useRealTimers()
     }

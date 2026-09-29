@@ -208,6 +208,7 @@ import type { Removed } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import type { IncomeDraft } from '@/composables/useIncomes'
 import { useReconnect } from '@/composables/useReconnect'
+import { localDay } from '@/days'
 import { newId } from '@/ids'
 import { useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -215,6 +216,12 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 import type { QueuedWrite } from '@/stores/tripQueue'
 
 type Reason = AccountCheckResponse['reasons'][number]
+/** A check as this sheet sends it, dated by the phone's today (MOL-121, adversarial М). */
+interface Check {
+  readonly id: string
+  readonly fact: Money
+  readonly checkedOn: string
+}
 
 /**
  * «Сверка» (MOL-123, handoff 05): the check looks for the reason before it offers to close the
@@ -281,10 +288,13 @@ export default defineComponent({
     const recountPending = ref(false)
     const writing = ref(false)
     const written = ref(false)
-    /** The check as sent: the same fact goes under the same name, another under a new one (Р-19). */
-    let sent: { id: string; fact: Money } | null = null
+    /**
+     * The check as sent: the same fact goes under the same name, another under a new one (Р-19) —
+     * dated by the phone's today it was first counted on (MOL-121, adversarial М).
+     */
+    let sent: Check | null = null
     /** The check last asked — its answer may be lost after the server wrote it (review 6). */
-    let tried: { id: string; fact: Money } | null = null
+    let tried: Check | null = null
     /** Which answer is awaited: a recount landing late must not take the sheet back (review 3). */
     let asking = 0
     /** The name of «Прочее · сверка» for this difference: a second tap writes the same one. */
@@ -317,7 +327,7 @@ export default defineComponent({
     const shortDay = (day: string) => dayOf(day, locale.value)
     const matched = computed(() => result.value?.difference.minor === 0n)
 
-    async function ask(check: { id: string; fact: Money }): Promise<boolean> {
+    async function ask(check: Check): Promise<boolean> {
       failure.value = null
       const mine = ++asking
       try {
@@ -359,7 +369,9 @@ export default defineComponent({
         return
       }
       const earlier = [sent, tried].find((one) => one?.fact.minor === value.minor)
-      tried = { id: earlier?.id ?? newId(), fact: value }
+      tried = earlier
+        ? { id: earlier.id, fact: value, checkedOn: earlier.checkedOn }
+        : { id: newId(), fact: value, checkedOn: localDay() }
       sending.value = true
       const answered = await ask(tried)
       sending.value = false

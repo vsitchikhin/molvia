@@ -123,7 +123,7 @@
         :label="t('spending.sheet.date')"
         kind="date"
         min="2000-01-02"
-        :max="today"
+        :max="latest"
         :display="dayWords"
         :error-text="dayBad ? t('spending.sheet.bad_day') : null"
         @update:model-value="dayBad = false"
@@ -320,6 +320,16 @@ export default defineComponent({
     const categoryId = ref<string | null>(null)
     const today = ref(localDay())
     const day = ref(today.value)
+    /**
+     * The latest day the sheet lets through: the phone's today, or the day of the spending being
+     * amended when that is later — a correction of a check or a spending from a phone further east
+     * is dated by a day this one has not reached, and its note must still be amendable (MOL-121,
+     * adversarial Л). The server takes up to `latestDay`.
+     */
+    const kept = ref<string | null>(null)
+    const latest = computed(() =>
+      kept.value !== null && kept.value > today.value ? kept.value : today.value,
+    )
     const note = ref('')
     const place = ref('')
     const amountBad = ref(false)
@@ -388,6 +398,7 @@ export default defineComponent({
         if (!open) return
         after = null
         today.value = localDay()
+        kept.value = manual.value?.spending.spentOn ?? null
         // A refused write opens on what the person typed, not on what the server holds: their
         // correction is the thing to fix and send again (requirement 15). The categories and the
         // revision stay the row's.
@@ -532,8 +543,8 @@ export default defineComponent({
       })),
     )
 
-    /** A day the server takes: a calendar day from 2000 on and not after the phone's today. */
-    const dayGood = computed(() => isRateDay(day.value) && day.value <= today.value)
+    /** A day the server takes: a calendar day from 2000 on, and not after `latest`. */
+    const dayGood = computed(() => isRateDay(day.value) && day.value <= latest.value)
 
     // A cleared field — «Сбросить» of the iOS picker — is no day to name, and a date nobody can
     // print must not take the sheet down with it (adversarial Д2).
@@ -790,6 +801,7 @@ export default defineComponent({
       categoryId,
       day,
       today,
+      latest,
       note,
       place,
       amountBad,

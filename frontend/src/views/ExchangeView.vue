@@ -130,6 +130,7 @@
             <li v-for="exchange in overview.exchanges" :key="exchange.id">
               <ExchangeCard
                 :exchange="exchange"
+                :today="today"
                 :disabled="!online || busy"
                 @edit="edit"
                 @remove="ask"
@@ -206,6 +207,7 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExchangeWords } from '@/composables/useExchangeWords'
 import { useExchanges } from '@/composables/useExchanges'
 import type { AmendOutcome } from '@/composables/useExchanges'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 
 /**
@@ -236,6 +238,8 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const exchanges = useExchanges()
     const { rateOf, day, amountsOf, rateLineOf } = useExchangeWords()
+    // «Сегодня» of the cards, asked again when the app comes back into view (MOL-121, adversarial Н).
+    const today = useLocalDay()
     const sheetOpen = ref(false)
     // The exchange the sheet amends, or null when it records a new one.
     const editing = ref<Row | null>(null)
@@ -383,6 +387,7 @@ export default defineComponent({
     return {
       t,
       ...exchanges,
+      today,
       sheetOpen,
       editing,
       compose,
