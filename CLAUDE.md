@@ -186,7 +186,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The limit never cuts one's own rows or the warnings** (Р-23, Р-25:
   `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
 - **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, **every other reader
-  filters `deleted_at IS NULL`**.
+  filters `deleted_at IS NULL`**; the reminder skips a purchase made before the withdrawal (MOL-101).
 - **The search on «Что брать» is answered by the server** (`GET /advice/search`, MOL-128): the
   list's own statement and rules for what is found, never glued on the phone; it writes no visit and
   no pick; offline — the remembered list by the start of words.
@@ -294,6 +294,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Updates of different people at once, of one person in order** (`@grammyjs/runner` with
   `sequentialize`).
 - **An outcome is written into the message; a refusal is only shown over it, and written nowhere.**
+- **The rating reminder: the API decides and marks the step as it hands it out, the bot only
+  sends** (MOL-101) — at most once; 19:00 of the person's day, then 3 and 7 days, then six months
+  of silence, and any own verdict starts over; a press is the verdict of `ctx.from.id` and keeps
+  the scale.
 - **Telegram updates are never logged whole.**
 
 ### Frontend — `.claude/rules/frontend.md`

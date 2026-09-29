@@ -985,7 +985,7 @@
   },
   "privacy": {
     "title": "Data and privacy",
-    "revised": "Revised 28 September 2026",
+    "revised": "Revised 29 September 2026",
     "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
@@ -1020,6 +1020,10 @@
       "ratings": {
         "term": "Ratings and reviews",
         "text": "Only you see your review. Others see a rating only inside an average of three people."
+      },
+      "reminders": {
+        "term": "Rating reminders",
+        "text": "When the bot last reminded you to rate your purchases, and which reminder in a row it was — so that it writes less often if you do not answer. The message itself carries the item and the shop to Telegram: otherwise the question would not say what it is about."
       },
       "search": {
         "term": "Search picks",

@@ -36,6 +36,7 @@ const STORED = [
   'accounts',
   'places',
   'ratings',
+  'reminders',
   'search',
   'visits',
   'devices',
