@@ -3,6 +3,7 @@ import {
   APPLY_TIMEOUT_MS,
   CHECK_EVERY_MS,
   LOOK_AGAIN_MS,
+  LOOK_FOR_MS,
   holdsTyping,
   installPwaUpdate,
 } from '@/pwaUpdate'
@@ -39,6 +40,15 @@ class Registration extends Target {
     this.waiting = worker
     worker.emit('statechange')
     return worker
+  }
+
+  /** The waiting worker let in — here, or by another window. */
+  activate(): void {
+    const worker = this.waiting
+    if (!worker) throw new Error('nothing waits')
+    this.waiting = null
+    this.active = worker
+    worker.emit('statechange')
   }
 
   /**
@@ -506,6 +516,42 @@ describe('a new version taken by the button (MOL-132)', () => {
       expect(update.phase.value).toBe('none')
     })
 
+    it('is offered a version that waits, with another window of the app open (adversarial Е1)', async () => {
+      const { update, registration, reload } = await installed({ controlled: false, active: true })
+
+      const next = registration.arrive()
+      expect(update.phase.value).toBe('ready')
+
+      // «Обновить»: let in here — and nothing controls this page, so no takeover comes; the page
+      // goes when the version becomes the active worker.
+      update.apply()
+      expect(next.postMessage).toHaveBeenCalledExactlyOnceWith({ type: 'SKIP_WAITING' })
+      expect(reload).not.toHaveBeenCalled()
+      registration.activate()
+      expect(reload).toHaveBeenCalledOnce()
+    })
+
+    it('knows of it when another window lets it in first', async () => {
+      const { update, registration, reload } = await installed({ controlled: false, active: true })
+      registration.arrive()
+
+      registration.activate()
+
+      expect(update.phase.value).toBe('ready')
+      expect(reload).not.toHaveBeenCalled()
+    })
+
+    it('lets a waiting version in quietly once put away, and reloads as it becomes active', async () => {
+      const { registration, reload } = await installed({ controlled: false, active: true })
+      const next = registration.arrive()
+
+      show('hidden')
+      expect(next.postMessage).toHaveBeenCalledExactlyOnceWith({ type: 'SKIP_WAITING' })
+      registration.activate()
+
+      expect(reload).toHaveBeenCalledOnce()
+    })
+
     it('takes the worker already active as it came up for its own, as a fast first install leaves it', async () => {
       const { update, registration } = await installed({ controlled: false, active: true })
       expect(update.phase.value).toBe('none')
@@ -535,6 +581,33 @@ describe('a new version taken by the button (MOL-132)', () => {
       registration.arrive()
       clock += LOOK_AGAIN_MS
       update.serverVersion('v0.1.4-2-g9f00000')
+      expect(registration.update).toHaveBeenCalledTimes(2)
+    })
+
+    it('stops looking five minutes after the build first differed: a rollout without the frontend has no version (Е2)', async () => {
+      const { update, registration } = await installed()
+      update.serverVersion('v0.2.0-1-g1a00000')
+
+      // Answers every ten seconds for an hour, the same `sw.js` all along.
+      for (let second = 10; second <= 3600; second += 10) {
+        clock += 10_000
+        update.serverVersion('v0.2.0-2-g2b00000')
+      }
+
+      // One as it first differs, then one every half a minute for five minutes — and none after.
+      expect(registration.update).toHaveBeenCalledTimes(LOOK_FOR_MS / LOOK_AGAIN_MS + 1)
+    })
+
+    it('looks again for the next build the server names after that', async () => {
+      const { update, registration } = await installed()
+      update.serverVersion('v0.2.0-1-g1a00000')
+      update.serverVersion('v0.2.0-2-g2b00000')
+      clock += LOOK_FOR_MS + 1
+      update.serverVersion('v0.2.0-2-g2b00000')
+      expect(registration.update).toHaveBeenCalledOnce()
+
+      update.serverVersion('v0.2.0-3-g3c00000')
+
       expect(registration.update).toHaveBeenCalledTimes(2)
     })
 

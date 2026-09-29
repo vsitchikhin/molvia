@@ -85,3 +85,34 @@ test('a first visit learns of a version too, and «Update» brings it up on it',
     .toBe(true)
   await expect(update).toHaveCount(0)
 })
+
+// With another window of the app open, the registration has a client, and a version waits rather
+// than becoming active at once: the first visit showed nothing (adversarial Е1).
+test('a first visit beside another window of the app is offered the waiting version too', async ({
+  page,
+  context,
+}) => {
+  await page.goto('/privacy')
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready
+  })
+  expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull()
+
+  const other = await context.newPage()
+  await other.goto('/privacy')
+  await expect
+    .poll(() => other.evaluate(() => navigator.serviceWorker.controller !== null))
+    .toBe(true)
+
+  writeFileSync(WORKER, `${built}\n// ${String(Date.now())}\n`)
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+
+  const update = page.getByRole('button', { name: 'Update', exact: true })
+  await expect(update).toBeVisible()
+  await Promise.all([page.waitForEvent('load'), update.click()])
+
+  await expect
+    .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))
+    .toBe(true)
+  await expect(update).toHaveCount(0)
+})

@@ -49,6 +49,13 @@ const MARK_LIFETIME_MS = 60 * 1000
  * (review С-8).
  */
 export const LOOK_AGAIN_MS = 30 * 1000
+/**
+ * For how long after a build first differs it is looked again. The gap it covers is the rollout's —
+ * seconds; a merge that touches no frontend ships the same `sw.js`, and a look every thirty seconds
+ * for the page's whole life found nothing a hundred and twenty times an hour (adversarial Е2). Past
+ * this, the quarter-hour look is enough.
+ */
+export const LOOK_FOR_MS = 5 * 60 * 1000
 
 /** Provided by the app once the worker is registered; read by the band and the error state. */
 export const pwaUpdateKey: InjectionKey<PwaUpdate> = Symbol('pwa-update')
@@ -113,16 +120,19 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
   const controlled = serviceWorker.controller !== null
   /**
    * A first visit runs what it fetched, and nothing controls it to the end: the build has no
-   * `clientsClaim`. A version come out meanwhile does not wait — no page uses the registration —
-   * but becomes the active worker at once, and this page is left on the old code with nothing to
-   * take (adversarial Д2). So on a first visit the worker of the page's own build is noted, and
-   * any other that becomes active is a version owed to this page. The same holds for a page a hard
+   * `clientsClaim`. A version come out meanwhile becomes the active worker at once when no other
+   * window uses the registration (adversarial Д2), and waits when one does (Е1): either way this
+   * page is left on the old code. So on a first visit the worker of the page's own build is noted,
+   * and any other — waiting, or become active — is a version for this page. The same holds for a page a hard
    * reload left uncontrolled, where the worker it met may be older than its code: then the offer is
    * a reload onto what it already runs — harmless, and not worth telling the two apart.
    */
   let own: ServiceWorker | null = null
-  // The first build this page met, and when the server naming another last sent a look.
+  // The first build this page met; the other one the server now names, since when, and when it
+  // last sent a look.
   let build: string | undefined
+  let other: string | undefined
+  let otherSince = 0
   let lookedAt: number | undefined
   let looking: ReturnType<typeof setInterval> | undefined
   let giveUp: ReturnType<typeof setTimeout> | undefined
@@ -130,17 +140,7 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
   serviceWorker.addEventListener('controllerchange', () => {
     if (!controlled) return
     owed = true
-    if (phase.value === 'applying') {
-      clearTimeout(giveUp)
-      // A sheet opened after the tap holds what is typed in memory: the tap was a consent to a
-      // reload then, not to losing that (adversarial Д3). The button comes back; the quiet way
-      // still takes it once the app is put away without a sheet.
-      if (!environment.holdsTyping()) {
-        reload()
-        return
-      }
-      phase.value = 'none'
-    }
+    if (phase.value === 'applying' && tookOver()) return
     // Taken over after all, past the ten seconds: «close the app» is no longer true, and a reload
     // is all that is left — offered again, never done under the finger.
     if (phase.value === 'failed') phase.value = 'none'
@@ -158,14 +158,40 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
   }
 
   /**
+   * The version «Обновить» let in has taken over: the page is reloaded onto it — unless a sheet was
+   * opened after the tap, which holds what is typed in memory: the tap was a consent to a reload
+   * then, not to losing that (adversarial Д3). The button comes back; the quiet way still takes it
+   * once the app is put away without a sheet. Says whether the page is going.
+   */
+  function tookOver(): boolean {
+    clearTimeout(giveUp)
+    if (environment.holdsTyping()) {
+      phase.value = 'none'
+      return false
+    }
+    reload()
+    return true
+  }
+
+  /**
    * Whether a version waits: a worker installed behind the one this page runs on, or one already
    * let in by another window while this page still runs the old code (`owed`). A page nothing
    * controls runs what it fetched and has nothing to take.
    */
   function refresh(): void {
     if (phase.value === 'applying' || phase.value === 'failed') return
-    const waits = owed || (controlled && Boolean(registration?.waiting))
-    phase.value = waits ? 'ready' : 'none'
+    phase.value = owed || waiting() !== null ? 'ready' : 'none'
+  }
+
+  /**
+   * The worker of a version waiting to be let in, if any. On a first visit that is any waiting worker
+   * but the page's own: with another window of the app open the registration has a client, and a
+   * version waits there rather than becoming active at once (adversarial Е1).
+   */
+  function waiting(): ServiceWorker | null {
+    const worker = registration?.waiting ?? null
+    if (worker === null || (!controlled && worker === own)) return null
+    return worker
   }
 
   function settle(): void {
@@ -175,7 +201,7 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
       environment.reload()
       return
     }
-    registration?.waiting?.postMessage({ type: 'SKIP_WAITING' })
+    waiting()?.postMessage({ type: 'SKIP_WAITING' })
   }
 
   // A check fails offline and says nothing worth hearing: the next return asks again.
@@ -202,7 +228,7 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
       reload()
       return
     }
-    registration?.waiting?.postMessage({ type: 'SKIP_WAITING' })
+    waiting()?.postMessage({ type: 'SKIP_WAITING' })
     giveUp = setTimeout(() => {
       phase.value = 'failed'
     }, APPLY_TIMEOUT_MS)
@@ -213,16 +239,27 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
     build ??= version
     if (version === build || phase.value !== 'none') return
     const at = environment.now()
+    if (version !== other) {
+      other = version
+      otherSince = at
+      lookedAt = undefined
+    }
+    if (at - otherSince > LOOK_FOR_MS) return
     if (lookedAt !== undefined && at - lookedAt < LOOK_AGAIN_MS) return
     lookedAt = at
     check()
   }
 
-  /** A worker this first visit did not come with has become the active one (Д2). */
+  /**
+   * A worker this first visit did not come with has become the active one (Д2): let in by another
+   * window, or by «Обновить» here — a page nothing controls hears no `controllerchange`, so this is
+   * where its reload comes from (Е1).
+   */
   function arrived(worker: ServiceWorker | null): void {
     if (controlled || worker === null || worker === own) return
     if (registration?.active !== worker) return
     owed = true
+    if (phase.value === 'applying' && tookOver()) return
     refresh()
     settle()
   }
