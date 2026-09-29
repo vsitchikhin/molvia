@@ -201,6 +201,30 @@ describe('useCamera', () => {
     expect(torch.value).toBe(false)
   })
 
+  it('runs a camera whose track cannot say what it has, with no torch (adversarial Г)', async () => {
+    const { stream, track } = fakeStream()
+    Reflect.deleteProperty(track, 'getCapabilities')
+    getUserMedia.mockResolvedValue(stream)
+    const { kind, torch, start } = camera()
+    await start()
+    expect(kind.value).toBe('live')
+    expect(torch.value).toBeNull()
+    expect(track.stop).not.toHaveBeenCalled()
+  })
+
+  it('stops a camera it was given when what follows throws', async () => {
+    const { stream, track } = fakeStream()
+    getUserMedia.mockResolvedValue(stream)
+    const { kind, start, video } = camera()
+    vi.spyOn(video.value, 'play').mockImplementation(() => {
+      throw new Error('play exploded')
+    })
+    await start()
+    expect(kind.value).toBe('error')
+    expect(track.stop).toHaveBeenCalled()
+    expect(video.value.srcObject).toBeNull()
+  })
+
   it('stops the camera with its scope', async () => {
     const { stream, track } = fakeStream()
     getUserMedia.mockResolvedValue(stream)

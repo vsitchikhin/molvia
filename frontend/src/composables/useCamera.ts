@@ -32,6 +32,15 @@ function kindOf(error: unknown): CameraKind {
   return 'error'
 }
 
+// Whether the camera can light a torch. Asked of the track only where it can answer: a track with
+// no `getCapabilities` (Firefox before 132) is a camera without a torch, never a camera that failed
+// (adversarial Г).
+function hasTorch(stream: MediaStream): boolean {
+  const [track] = stream.getVideoTracks()
+  if (!track || typeof track.getCapabilities !== 'function') return false
+  return 'torch' in track.getCapabilities()
+}
+
 export interface Camera {
   kind: Ref<CameraKind>
   /** Whether the torch is on; null while the camera cannot light one. */
@@ -94,11 +103,13 @@ export function useCamera(video: Ref<HTMLVideoElement | null>): Camera {
         await element.play().catch(() => undefined)
       }
       if (current !== attempt) return
-      const [track] = got.getVideoTracks()
-      torch.value = track && 'torch' in track.getCapabilities() ? false : null
+      torch.value = hasTorch(got) ? false : null
       kind.value = 'live'
     } catch (error) {
-      if (current === attempt) kind.value = kindOf(error)
+      if (current !== attempt) return
+      // A throw after the camera was given must not leave it running under the error (adversarial Г).
+      release()
+      kind.value = kindOf(error)
     }
   }
 
