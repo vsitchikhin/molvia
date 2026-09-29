@@ -1241,6 +1241,28 @@ describe('«Деньги» (MOL-82)', () => {
     expect(new URL(calls[1]?.url ?? '').searchParams.get('cursor')).toBe(monthWire.cursor)
   })
 
+  it('reads «Графики» (MOL-74) for the period asked, and refuses an answer off the contract', async () => {
+    const chartsWire = {
+      period: 12,
+      spendCurrency: 'AMD',
+      incomeCurrency: 'RUB',
+      since: null,
+      months: [],
+      spentAverage: null,
+      differenceAverage: null,
+      categories: [],
+      exchanges: null,
+      rate: null,
+    }
+    const { client, calls } = clientReplying(200, chartsWire)
+    expect((await client.moneyCharts(12)).period).toBe(12)
+    const url = new URL(calls[0]?.url ?? '')
+    expect([url.pathname, url.searchParams.get('period')]).toEqual(['/money/charts', '12'])
+
+    const { client: late } = clientReplying(200, { ...chartsWire, boost: 1 })
+    await expect(late.moneyCharts(6)).rejects.toThrow()
+  })
+
   it('reads and saves «зарплата с … числа» (MOL-134) at its own address, off as null', async () => {
     const { client, calls } = clientReplying(200, { day: 25 })
     expect(await client.salaryShift()).toEqual({ day: 25 })

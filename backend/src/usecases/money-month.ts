@@ -16,13 +16,16 @@ import type {
   ConvertOn,
   Currency,
   ExchangeRate,
+  Income,
   JournalKey,
   Money,
   MoneyMonth,
   MoneyMonthView,
   MonthHeld,
   SalaryShift,
+  Spending,
   SpendingCategory,
+  TripLine,
 } from '@molvia/model'
 import { accountsCounted } from './money-accounts'
 import { dayRates } from './money-rates'
@@ -57,24 +60,45 @@ async function converter(
   }
 }
 
-async function count(
-  repositories: Repositories,
+/** What months are counted from: the spendings and trip lines of a span of days, and every income. */
+export interface MonthRows {
+  readonly spendings: readonly Spending[]
+  readonly trips: readonly TripLine[]
+  readonly incomes: readonly Income[]
+}
+
+/** The rows of the months `first` to `last`, read once however many months are counted of them. */
+export async function monthRows(
+  repositories: Pick<Repositories, 'spendings' | 'money' | 'incomes'>,
+  owner: Pick<Owner, 'id'>,
+  first: string,
+  last: string,
+): Promise<MonthRows> {
+  const from = `${first}-01`
+  const to = lastDayOf(last)
+  const [spendings, trips, incomes] = await Promise.all([
+    repositories.spendings.between(owner.id, from, to),
+    repositories.money.tripLines(owner.id, from, to),
+    repositories.incomes.list(owner.id),
+  ])
+  return { spendings, trips, incomes }
+}
+
+/** One month counted from rows already read — `moneyMonth` with the rates it asks for looked up. */
+export async function countMonth(
   owner: Owner,
   rates: DayRates,
   month: string,
+  rows: MonthRows,
   categories: readonly SpendingCategory[],
   rate: ExchangeRate | null,
   rateKind: 'live' | 'frozen',
   salaryShiftDay: number | null,
   held?: MonthHeld,
 ): Promise<MoneyMonth> {
-  const from = `${month}-01`
-  const to = lastDayOf(month)
-  const [spendings, trips, incomes] = await Promise.all([
-    repositories.spendings.between(owner.id, from, to),
-    repositories.money.tripLines(owner.id, from, to),
-    repositories.incomes.list(owner.id),
-  ])
+  const spendings = rows.spendings.filter((spending) => monthOf(spending.spentOn) === month)
+  const trips = rows.trips.filter((trip) => monthOf(trip.finishedOn) === month)
+  const { incomes } = rows
   const ofMonth = incomes.filter((income) => budgetMonthOf(income, salaryShiftDay) === month)
   const [inSpend, incomeInIncome] = await Promise.all([
     converter((one, other, day) => rates.between(one, other, day), owner.spendCurrency, [
@@ -116,6 +140,21 @@ async function count(
  * last day, or today for the running month, when nothing later is known. Not frozen itself (Р-3):
  * an amended spending of August moves August's rest as it moves its «Потрачено».
  */
+async function count(
+  repositories: Repositories,
+  owner: Owner,
+  rates: DayRates,
+  month: string,
+  categories: readonly SpendingCategory[],
+  rate: ExchangeRate | null,
+  rateKind: 'live' | 'frozen',
+  salaryShiftDay: number | null,
+  held?: MonthHeld,
+): Promise<MoneyMonth> {
+  const rows = await monthRows(repositories, owner, month, month)
+  return countMonth(owner, rates, month, rows, categories, rate, rateKind, salaryShiftDay, held)
+}
+
 async function heldAt(
   repositories: Repositories,
   owner: Owner,
@@ -164,7 +203,7 @@ async function heldAt(
  * (owner's decision В-6). Nothing known that day, and nothing is frozen: the next read tries again
  * rather than locking an empty answer in.
  */
-async function monthRate(
+export async function monthRate(
   repositories: Pick<Repositories, 'money'>,
   owner: Owner,
   rates: DayRates,

@@ -30,6 +30,7 @@ import {
   moneyAccountsCodec,
   tripPaymentBodySchema,
   unassignedOperationsCodec,
+  moneyChartsCodec,
   moneyMonthCodec,
   monthSchema,
   salaryShiftSchema,
@@ -84,6 +85,7 @@ import type {
   MoneyAccountsResponse,
   TripPaymentBody,
   UnassignedOperationsResponse,
+  MoneyChartsView,
   MoneyMonthView,
   SalaryShift,
   SpendingAmendBody,
@@ -245,6 +247,8 @@ export interface MolviaClient {
    * A page after `cursor` carries no «Остаток» (MOL-134): take it from the first page.
    */
   moneyMonth(month: string, cursor?: JournalKey): Promise<MoneyMonthView>
+  /** «Графики» (MOL-74): the last six or twelve months side by side, counted by the server. */
+  moneyCharts(period: 6 | 12): Promise<MoneyChartsView>
   /** «Зарплата с … числа — в следующий месяц» (MOL-134): `day` null is off. */
   salaryShift(): Promise<SalaryShift>
   /** Saved on the tap, whole each time: safe to repeat. */
@@ -569,6 +573,8 @@ export function createClient(options: ClientOptions): MolviaClient {
         : ''
       return request(`/money/months/${month}${query}`, moneyMonthCodec)
     },
+
+    moneyCharts: (period) => request(`/money/charts?period=${String(period)}`, moneyChartsCodec),
 
     salaryShift: () => request('/actors/me/salary-shift', salaryShiftSchema),
 
