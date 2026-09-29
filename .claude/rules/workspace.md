@@ -7,6 +7,8 @@ paths:
   - '**/vite.config.ts'
   - '.prettierrc.json'
   - '.editorconfig'
+  - 'bin/check-code-map.mjs'
+  - 'docs/map/**'
 ---
 
 # The stack's rejected alternatives, and what stays at the root
@@ -58,3 +60,26 @@ modules' configs as projects rather than defining suites itself.
 | `.env` (development)                    | the three must agree on ports here — the frontend proxies to the backend's port and the bot calls it. In production nothing is shared: each container gets its own environment |
 | `Makefile`                              | the entry point to the repository                                                                                                                                              |
 | `playwright.config.ts`                  | end-to-end spans the whole stack and belongs to no single application                                                                                                          |
+
+## The code map
+
+**`docs/map/` answers «which file», before any search (MOL-133).** Every task used to open with
+reconnaissance — grep, find, reading files in a row — repeated by every session and every subagent.
+The map is one file per area, named as the area's rules file, so the name is already known from
+«Rules by area»; `docs/map/README.md` holds the conventions and the skeleton that belongs to no area.
+An entry says what a file is and what it is for, never how it works and never a rule.
+
+**It is not in `.claude/rules/`, though the task first proposed that.** A rules file reaches the
+context only after a file in its `paths:` is read — measured on MOL-130 with `claude -p`: no file
+read, no rules — which is after the search the map is meant to replace. Loaded whole in every
+session it would cost what MOL-130 took out of the core.
+
+**The check is in `npm run lint`, not in a test**, so the pre-commit hook refuses a commit that adds,
+moves or removes a file without the map. `bin/check-code-map.mjs` reads only entries — list items
+that start with a path in backticks — so prose may name `x.test.ts` freely. Code is named file by
+file; a test beside or mirroring its source is covered by the source's entry; only data (`sql`,
+`json`, fonts, icons) may be covered by a directory, or the map would decay to «`backend/src/` —
+the backend» and still pass. A file with two homes is refused: the map gives one. A path an entry
+points at after its own (`Tests: …`) must exist too, unless it is outside the repository's
+directories — a route or a build output. What it cannot check is meaning: an entry describing old
+behaviour passes, and that is left to review.
