@@ -14,6 +14,8 @@ endif
 
 REQUIRE_ENV = @test -f .env || { echo "no .env in this copy — run: make setup"; exit 1; }
 NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json is missing) — this target goes live once the workspaces land"; exit 1; }
+# The heavy checks of every copy on this machine take turns, the push's among them (MOL-139).
+ONE_AT_A_TIME = ./bin/one-at-a-time.sh "make $@"
 
 .PHONY: help setup hooks up down reup ps logs psql migrate forget seed gates db-reset dev format lint typecheck test e2e check prod-build certs icons ports
 
@@ -101,25 +103,30 @@ dev: ## Run api, pwa and bot for this copy
 
 format: ## Autofix formatting and lint (MUTATES FILES)
 	$(NEED_SCAFFOLD)
-	npm run format
+	$(ONE_AT_A_TIME) npm run format
 
 lint: ## Check lint, including import boundaries (read-only)
 	$(NEED_SCAFFOLD)
-	npm run lint
+	$(ONE_AT_A_TIME) npm run lint
 
 typecheck: ## Check types across the workspaces
 	$(NEED_SCAFFOLD)
-	npm run typecheck
+	$(ONE_AT_A_TIME) npm run typecheck
 
 test: ## Run the tests
 	$(NEED_SCAFFOLD)
-	npm run test
+	$(ONE_AT_A_TIME) npm run test
 
 e2e: ## Run the end-to-end tests in a phone-sized browser
 	$(NEED_SCAFFOLD)
-	npm run test:e2e
+	$(ONE_AT_A_TIME) npm run test:e2e
 
-check: format lint typecheck test ## Definition of Done, in order
+# One turn for the whole run, not one per step: between the steps another copy would slip in. A
+# check that leaves the tree clean spares the push the same two steps (bin/green.sh).
+check: ## Definition of Done, in order: format, lint, typecheck, test
+	$(NEED_SCAFFOLD)
+	$(ONE_AT_A_TIME) $(MAKE) --no-print-directory format lint typecheck test
+	@./bin/green.sh record typecheck test
 
 ## --- misc ----------------------------------------------------------------
 
