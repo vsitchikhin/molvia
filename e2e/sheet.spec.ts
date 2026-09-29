@@ -153,8 +153,8 @@ test.describe('the sheet', () => {
   })
 
   /**
-   * A finger pulling the sheet down from `from` by `by` px in `steps` moves `gap` ms apart — through
-   * CDP, the one way to move a touch in Playwright (MOL-80).
+   * A finger pulling the sheet down from `from` by `by` px in `steps` moves `gap` ms apart —
+   * through CDP, the one way to move a touch in Playwright (MOL-80).
    */
   async function pull(
     page: Page,
@@ -202,7 +202,29 @@ test.describe('the sheet', () => {
     expect(await sheet(page).evaluate((dialog) => getComputedStyle(dialog).transform)).toBe('none')
   })
 
-  // A finger in a field moves the caret and selects, and what is typed stays (owner's decision В-6).
+  // A pull that starts on the main action closes the sheet and does not press the action: a touch
+  // that moved past the tap slop makes no click, in Chromium as on iOS (review Р-4).
+  test('a pull that starts on the main action does not press it', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', CDP_ONLY)
+    const { top } = await openSheet(page)
+    const action = sheet(page).locator('.footer button').first()
+    await action.evaluate((button) => {
+      const counted = window as unknown as { pressed: number }
+      counted.pressed = 0
+      button.addEventListener('click', () => (counted.pressed += 1))
+    })
+    const box = await action.boundingBox()
+    if (!box) throw new Error('no action')
+    const height = await sheet(page).evaluate((dialog) => dialog.getBoundingClientRect().height)
+    await pull(page, { x: box.x + box.width / 2, y: box.y + box.height / 2 }, height / 3, {
+      steps: 12,
+      gap: 40,
+    })
+    await expectPutAway(page, top)
+    expect(await page.evaluate(() => (window as unknown as { pressed: number }).pressed)).toBe(0)
+  })
+
+  // A finger in a field moves the caret and selects, and what is typed stays (owner's В-6).
   test('a pull that starts in a field keeps the sheet and what was typed', async ({
     page,
     browserName,
