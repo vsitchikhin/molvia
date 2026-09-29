@@ -3,7 +3,10 @@
     <h2 :id="headingId" class="caption">{{ t('spending.categories_title') }}</h2>
     <ul class="rows">
       <li v-for="row in rows" :key="row.id">
-        <RouterLink class="row" :to="{ name: 'money-charts', query: { category: row.id } }">
+        <RouterLink
+          class="row"
+          :to="{ name: 'money-charts', query: { ...period, category: row.id } }"
+        >
           <span class="line">
             <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
             <span class="name">{{ row.name }}</span>
@@ -38,7 +41,7 @@ import { useI18n } from 'vue-i18n'
 import IconChart from '~icons/mdi/chart-bar'
 import IconChevron from '~icons/mdi/chevron-right'
 import IconShape from '~icons/mdi/shape-outline'
-import { formatEstimate, shareOf } from '@molvia/model'
+import { chartMonths, formatEstimate, monthOf, shareOf, yerevanDate } from '@molvia/model'
 import type { MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import { categoryColour } from '@/components/spending'
@@ -62,6 +65,15 @@ export default defineComponent({
   setup(props) {
     const { t, locale } = useI18n()
     const headingId = useId()
+    /**
+     * A month older than the six the charts open on opens them on twelve, so the category tapped is
+     * seen in the month it was tapped on (adversarial А); older still, it is drawn as months of nothing.
+     */
+    const period = computed(() =>
+      chartMonths(monthOf(yerevanDate(new Date())), 6).includes(props.month.month)
+        ? {}
+        : { period: '12' },
+    )
     const rows = computed(() =>
       props.month.byCategory.flatMap(({ categoryId, amount }) => {
         const category = props.month.categories.find((one) => one.id === categoryId)
@@ -84,7 +96,7 @@ export default defineComponent({
         ]
       }),
     )
-    return { t, rows, headingId }
+    return { t, rows, period, headingId }
   },
 })
 </script>

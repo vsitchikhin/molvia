@@ -94,8 +94,11 @@ export function useMoneyCharts(period: Ref<6 | 12>): MoneyChartsState {
     try {
       const answer = await api.moneyCharts(asked)
       const fetchedAt = new Date()
+      // Only the latest read is kept: an earlier one answering late would put the charts without the
+      // spending just written on the phone, under a later hour (adversarial Б, d9 Д).
+      if (mine !== latest) return
       if (actor.id === id) remember(id, answer, fetchedAt)
-      if (actor.id !== id || period.value !== asked || mine !== latest) return
+      if (actor.id !== id || period.value !== asked) return
       shown.value = { answer, fetchedAt }
       failure.value = null
       confirmed.value = true

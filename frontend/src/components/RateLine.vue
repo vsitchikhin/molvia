@@ -1,7 +1,14 @@
 <template>
   <div class="rate-line">
     <div class="reading"><slot /></div>
-    <div ref="area" class="area" @pointerdown="pick" @pointermove="drag">
+    <div
+      ref="area"
+      class="area"
+      @pointerdown="pointer.down"
+      @pointermove="pointer.move"
+      @pointerup="pointer.up"
+      @pointercancel="pointer.cancel"
+    >
       <svg class="plot" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true">
         <line
           class="cursor"
@@ -72,6 +79,7 @@
 import { computed, defineComponent, ref } from 'vue'
 import type { PropType } from 'vue'
 import { CHART_LEVEL } from '@molvia/model'
+import { useChartPointer } from '@/composables/useChartPointer'
 
 export interface RatePoint {
   /** Its height in thousandths between the lowest and the highest — the server's; null is a gap. */
@@ -145,29 +153,17 @@ export default defineComponent({
       if (index !== props.modelValue) emit('update:modelValue', index)
     }
 
-    /** The week nearest the finger. */
-    function at(event: PointerEvent): void {
-      const box = area.value?.getBoundingClientRect()
+    /** The week nearest the pointer. */
+    const pointer = useChartPointer(area, (fraction) => {
       const n = props.points.length
-      if (!box || box.width <= 0 || n === 0) return
-      const index = Math.round(((event.clientX - box.left) / box.width) * (n - 1))
-      choose(Math.min(n - 1, Math.max(0, index)))
-    }
-
-    function pick(event: PointerEvent): void {
-      at(event)
-    }
-
-    function drag(event: PointerEvent): void {
-      if (event.pointerType === 'mouse' && event.buttons === 0) return
-      at(event)
-    }
+      if (n > 0) choose(Math.round(fraction * (n - 1)))
+    })
 
     function typed(event: Event): void {
       choose(Number((event.target as HTMLInputElement).value))
     }
 
-    return { area, xOf, yOf, runs, lone, chosenLevel, pick, drag, typed }
+    return { area, xOf, yOf, runs, lone, chosenLevel, pointer, typed }
   },
 })
 </script>

@@ -83,31 +83,34 @@
               :legend="t('spending.charts.income_title')"
               paired
             >
-              <div v-if="flowMonth" class="columns">
-                <p class="column">
-                  <span class="label">{{ t('spending.income') }}</span>
-                  <span class="value">{{ whole(flowMonth.income) }}</span>
-                </p>
-                <p class="column">
-                  <span class="label">{{ t('spending.charts.spent_legend') }}</span>
-                  <span class="value">{{ approx(flowMonth.spentIncome) }}</span>
-                </p>
-                <p class="column">
-                  <span class="label">
-                    {{
-                      t('spending.charts.difference', {
-                        month: shortMonth(flowMonth.month, locale),
-                      })
-                    }}
-                  </span>
-                  <span
-                    class="value"
-                    :class="{ negative: (flowMonth.difference?.minor ?? 0n) < 0n }"
-                  >
-                    {{ differenceText(flowMonth.difference) }}
-                  </span>
-                </p>
-              </div>
+              <template v-if="flowMonth">
+                <div class="columns">
+                  <p class="column">
+                    <span class="label">{{ t('spending.income') }}</span>
+                    <span class="value">{{ whole(flowMonth.income) }}</span>
+                  </p>
+                  <p class="column">
+                    <span class="label">{{ t('spending.charts.spent_legend') }}</span>
+                    <span class="value">{{ approx(flowMonth.spentIncome) }}</span>
+                  </p>
+                  <p class="column">
+                    <span class="label">
+                      {{
+                        t('spending.charts.difference', {
+                          month: shortMonth(flowMonth.month, locale),
+                        })
+                      }}
+                    </span>
+                    <span
+                      class="value"
+                      :class="{ negative: (flowMonth.difference?.minor ?? 0n) < 0n }"
+                    >
+                      {{ differenceOf(flowMonth) }}
+                    </span>
+                  </p>
+                </div>
+                <p v-for="line in flowUncounted" :key="line" class="detail">{{ line }}</p>
+              </template>
             </BarChart>
             <p class="hint">{{ flowNote }}</p>
           </AppCard>
@@ -147,35 +150,36 @@
             </BarChart>
             <p class="hint">{{ t('spending.charts.category_hint') }}</p>
           </AppCard>
-
-          <AppCard v-if="rate" as="section" class="card" :aria-labelledby="`${id}-rate`">
-            <h2 :id="`${id}-rate`" class="caption">{{ rateTitle }}</h2>
-            <RateLine
-              v-model="rateAt"
-              :points="ratePoints"
-              :marks="rateMarks"
-              :legend="rateTitle"
-              :first="rateEnds.first"
-              :last="rateEnds.last"
-            >
-              <template v-if="ratePoint">
-                <p class="month">
-                  {{ t('spending.charts.rate_week', { day: day(ratePoint.day) }) }}
-                </p>
-                <p class="figure small">
-                  {{
-                    ratePoint.rate
-                      ? rateWords(ratePoint.rate, locale, t)
-                      : t('spending.charts.rate_none')
-                  }}
-                </p>
-                <p v-for="mine in rateMine" :key="mine" class="detail">{{ mine }}</p>
-              </template>
-            </RateLine>
-            <p class="hint">{{ t('spending.charts.rate_hint') }}</p>
-          </AppCard>
         </template>
 
+        <!-- The rate and the exchanges stand without spendings too: the first thing an emigrant
+             does is change money (adversarial В). -->
+        <AppCard v-if="rate" as="section" class="card" :aria-labelledby="`${id}-rate`">
+          <h2 :id="`${id}-rate`" class="caption">{{ rateTitle }}</h2>
+          <RateLine
+            v-model="rateAt"
+            :points="ratePoints"
+            :marks="rateMarks"
+            :legend="rateTitle"
+            :first="rateEnds.first"
+            :last="rateEnds.last"
+          >
+            <template v-if="ratePoint">
+              <p class="month">
+                {{ t('spending.charts.rate_week', { day: day(ratePoint.day) }) }}
+              </p>
+              <p class="figure small">
+                {{
+                  ratePoint.rate
+                    ? rateWords(ratePoint.rate, locale, t)
+                    : t('spending.charts.rate_none')
+                }}
+              </p>
+              <p v-for="mine in rateMine" :key="mine" class="detail">{{ mine }}</p>
+            </template>
+          </RateLine>
+          <p class="hint">{{ t('spending.charts.rate_hint') }}</p>
+        </AppCard>
         <ExchangeLosses v-if="charts.exchanges" :losses="charts.exchanges" />
       </template>
     </div>
@@ -251,10 +255,15 @@ export default defineComponent({
     const whole = (value: Money) => formatEstimate(value, locale.value)
     const approx = (value: Money | null) =>
       value ? `≈ ${whole(value)}` : t('spending.charts.no_rate')
-    const differenceText = (value: Money | null) =>
-      value
-        ? `≈ ${signedAmount(value, locale.value, { plus: true, estimate: true })}`
-        : t('spending.charts.no_rate')
+    const signedApprox = (value: Money) =>
+      `≈ ${signedAmount(value, locale.value, { plus: true, estimate: true })}`
+    /** «Разница» of a month, or why there is none: no rate of the month, or something not counted. */
+    const differenceOf = (month: MoneyChartsView['months'][number]) =>
+      month.difference
+        ? signedApprox(month.difference)
+        : month.spentIncome === null
+          ? t('spending.charts.no_rate')
+          : t('spending.charts.difference_uncounted')
     const when = (at: Date) => countedWhen(at, locale.value)
     const day = (value: string) => calendarDay(value, locale.value)
 
@@ -278,8 +287,10 @@ export default defineComponent({
     const flowAt = ref(0)
     const categoryAt = ref(0)
     const rateAt = ref(0)
+    // Sources apart, compared one by one: a getter of an array is a new array on every answer, and
+    // every answer — a write landed, the connection back — threw the choice to the last month (review).
     watch(
-      () => [charts.value?.period, lastIndex.value, charts.value?.rate?.points.length],
+      [() => charts.value?.period, lastIndex, () => charts.value?.rate?.points.length],
       () => {
         spentAt.value = lastIndex.value
         flowAt.value = lastIndex.value
@@ -327,18 +338,32 @@ export default defineComponent({
           income: whole(month.income),
           spent: approx(month.spentIncome),
         }),
-        level: month.spentIncomeLevel ?? 0,
-        second: month.incomeLevel,
+        level: month.spentIncomeLevel,
+        outline: month.incomeLevel,
       })),
     )
     const flowMonth = computed(() => months.value[flowAt.value] ?? null)
+    /** What of the month did not convert, said under the figures it is missing from (adversarial d9 В). */
+    const flowUncounted = computed(() => {
+      const month = flowMonth.value
+      if (!month) return []
+      const list = (amounts: readonly Money[]) => amounts.map((amount) => whole(amount)).join(', ')
+      return [
+        ...(month.incomeUncounted.length > 0
+          ? [t('spending.charts.income_uncounted', { amounts: list(month.incomeUncounted) })]
+          : []),
+        ...(month.uncounted.length > 0
+          ? [t('spending.charts.spent_uncounted', { amounts: list(month.uncounted) })]
+          : []),
+      ]
+    })
     const flowNote = computed(() => {
       const currency = charts.value?.incomeCurrency ?? 'RUB'
       const words = t(`spending.charts.currency_in.${currency}`)
       const average = charts.value?.differenceAverage
       return average
         ? t('spending.charts.income_note', {
-            amount: differenceText(average),
+            amount: signedApprox(average),
             currency: words,
           })
         : t('spending.charts.income_only', { currency: words })
@@ -353,6 +378,12 @@ export default defineComponent({
         label: nameOf(one.category),
       })),
     )
+    /**
+     * The category asked for — in the address, else the last one chosen — or the largest. The server
+     * offers every category of the owner, spent in the period or not, so one tapped on an older month
+     * is drawn as its months of nothing rather than swapped for another (adversarial А); only a choice
+     * of the person's, or the address, is remembered.
+     */
     const series = computed(() => {
       const all = charts.value?.categories ?? []
       const wanted = typeof route.query.category === 'string' ? route.query.category : lastCategory
@@ -363,9 +394,9 @@ export default defineComponent({
       void router.replace({ query: { ...route.query, category: id } })
     }
     watch(
-      () => series.value?.category.id,
+      () => route.query.category,
       (id) => {
-        if (id) lastCategory = id
+        if (typeof id === 'string') lastCategory = id
       },
       { immediate: true },
     )
@@ -454,7 +485,8 @@ export default defineComponent({
       day,
       whole,
       approx,
-      differenceText,
+      differenceOf,
+      flowUncounted,
       longMonth,
       shortMonth,
       categoryColour,

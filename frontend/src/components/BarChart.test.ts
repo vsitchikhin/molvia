@@ -9,7 +9,7 @@ const bars: ChartBar[] = ['2026-07', '2026-08', '2026-09'].map((key, index) => (
   label: ['июл', 'авг', 'сен'][index] ?? '',
   spoken: `${key}, ${String(index)}`,
   level: [500, 1000, 250][index] ?? 0,
-  second: [1000, 900, 0][index] ?? 0,
+  outline: [1000, 900, 0][index] ?? 0,
 }))
 
 /** A chart 300 px wide from x = 0: a column of 100 px a bar. */
@@ -46,17 +46,48 @@ describe('BarChart (MOL-74)', () => {
     expect((radios[2]?.element as HTMLInputElement).checked).toBe(true)
   })
 
-  it('chooses the bar under the finger anywhere on the chart, and follows the finger', () => {
+  it('a finger chooses the bar it lifts from, anywhere on the chart', () => {
     const view = chart()
-    view.find('.area').element.dispatchEvent(pointer('pointerdown', 150, { pointerType: 'touch' }))
+    const area = view.find('.area').element
+    area.dispatchEvent(pointer('pointerdown', 150, { pointerType: 'touch', clientY: 50 }))
+    expect(view.emitted('update:modelValue')).toBeUndefined()
+    area.dispatchEvent(pointer('pointerup', 150, { pointerType: 'touch', clientY: 50 }))
     expect(view.emitted('update:modelValue')?.at(-1)).toEqual([1])
-    view
-      .find('.area')
-      .element.dispatchEvent(pointer('pointermove', 20, { pointerType: 'touch', buttons: 1 }))
+  })
+
+  it('a finger going sideways follows along the bars, past the edge the first', () => {
+    const view = chart()
+    const area = view.find('.area').element
+    area.dispatchEvent(pointer('pointerdown', 250, { pointerType: 'touch', clientY: 50 }))
+    area.dispatchEvent(pointer('pointermove', 150, { pointerType: 'touch', clientY: 52 }))
+    expect(view.emitted('update:modelValue')?.at(-1)).toEqual([1])
+    area.dispatchEvent(pointer('pointermove', -40, { pointerType: 'touch', clientY: 55 }))
     expect(view.emitted('update:modelValue')?.at(-1)).toEqual([0])
-    // Past the edges: the first or the last, never outside.
-    view.find('.area').element.dispatchEvent(pointer('pointerdown', 999, { pointerType: 'touch' }))
-    expect(view.emitted('update:modelValue')).toHaveLength(2)
+  })
+
+  it('must not fire: a scroll that starts on the chart chooses nothing (review)', () => {
+    const view = chart()
+    const area = view.find('.area').element
+    area.dispatchEvent(pointer('pointerdown', 20, { pointerType: 'touch', clientY: 50 }))
+    area.dispatchEvent(pointer('pointermove', 24, { pointerType: 'touch', clientY: 120 }))
+    area.dispatchEvent(new PointerEvent('pointercancel', { pointerType: 'touch' }))
+    area.dispatchEvent(pointer('pointerup', 24, { pointerType: 'touch', clientY: 120 }))
+    expect(view.emitted('update:modelValue')).toBeUndefined()
+  })
+
+  it('a mouse chooses on press and while pressed', () => {
+    const view = chart()
+    const area = view.find('.area').element
+    area.dispatchEvent(pointer('pointerdown', 150, { pointerType: 'mouse', buttons: 1 }))
+    expect(view.emitted('update:modelValue')?.at(-1)).toEqual([1])
+    area.dispatchEvent(pointer('pointermove', 20, { pointerType: 'mouse', buttons: 1 }))
+    expect(view.emitted('update:modelValue')?.at(-1)).toEqual([0])
+  })
+
+  it('draws a bar not known as a dashed empty one, not a bar of nothing', () => {
+    const view = chart({ bars: [{ ...bars[0], level: null }, bars[1]] })
+    expect(view.findAll('.fill')[0]?.classes()).toContain('unknown')
+    expect(view.findAll('.fill')[1]?.classes()).not.toContain('unknown')
   })
 
   it('must not fire: a mouse passing over chooses nothing', () => {
@@ -132,7 +163,7 @@ describe('RateLine (MOL-74, Р-14)', () => {
     const view = line()
     view
       .find('.area')
-      .element.dispatchEvent(new PointerEvent('pointerdown', { clientX: 90, pointerType: 'touch' }))
+      .element.dispatchEvent(new PointerEvent('pointerdown', { clientX: 90, pointerType: 'mouse' }))
     expect(view.emitted('update:modelValue')?.at(-1)).toEqual([1])
     const range = view.find('input[type="range"]')
     expect(range.attributes('aria-valuetext')).toBe('d')

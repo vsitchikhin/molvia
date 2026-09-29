@@ -53,14 +53,12 @@ function charts(patch: Partial<MoneyChartsView> = {}): MoneyChartsView {
     categories: [
       {
         category: { id: GROCERIES, preset: 'groceries', name: null, colour: null, archived: false },
-        total: amd('400000'),
         average: amd('65600'),
         averageLevel: 900,
         points: MONTHS.map((month) => ({ month, amount: amd('71200'), change: 3, level: 1000 })),
       },
       {
         category: { id: CAFE, preset: 'cafe', name: null, colour: null, archived: false },
-        total: amd('200000'),
         average: amd('34500'),
         averageLevel: 800,
         points: MONTHS.map((month) => ({ month, amount: amd('38420'), change: -9, level: 900 })),
@@ -279,6 +277,85 @@ describe('MoneyChartsView: the charts', () => {
     expect(card).toContain('+0.27%')
     expect(card).toContain('Not compared with the CBA: 1 exchange')
     expect(view.find('.losses a').attributes('href')).toBe('/money/exchange')
+  })
+
+  it('keeps the bar a person chose when a new answer of the same period comes (review)', async () => {
+    moneyCharts.mockResolvedValue(charts())
+    const view = await render()
+    const [spent] = view.findAll('fieldset.chart')
+    await spent?.findAll('input[type="radio"]')[1]?.setValue(true)
+    expect(plain(spent?.text() ?? '')).toContain('May 2026')
+    // A write landed, the connection came back: the same period answered again.
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(moneyCharts).toHaveBeenCalledTimes(2)
+    expect(plain(view.findAll('fieldset.chart')[0]?.text() ?? '')).toContain('May 2026')
+  })
+
+  it('says what did not convert under «Пришло и ушло», and has no «Разница» for it (adversarial d9 В)', async () => {
+    const base = charts()
+    const months = base.months.map((month, index) =>
+      index === 5
+        ? {
+            ...month,
+            income: rub('0'),
+            incomeUncounted: [parseMoney('300', 'USD')],
+            difference: null,
+          }
+        : month,
+    )
+    moneyCharts.mockResolvedValue({ ...base, months })
+    const view = await render()
+    const flow = plain(view.findAll('fieldset.chart')[1]?.text() ?? '')
+    expect(flow).toContain('In, not counted: $300')
+    expect(flow).toContain(en.spending.charts.difference_uncounted)
+  })
+
+  it('draws «Ушло» of a month with no rate as not known, never as nothing spent (review)', async () => {
+    const base = charts()
+    const months = base.months.map((month, index) =>
+      index === 0
+        ? { ...month, spentIncome: null, spentIncomeLevel: null, difference: null }
+        : month,
+    )
+    moneyCharts.mockResolvedValue({ ...base, months })
+    const view = await render()
+    const flow = view.findAll('fieldset.chart')[1]
+    expect(flow?.findAll('.bar')[0]?.find('.fill.unknown').exists()).toBe(true)
+    expect(flow?.findAll('.bar')[1]?.find('.fill.unknown').exists()).toBe(false)
+    expect(flow?.findAll('input')[0]?.attributes('aria-label')).toContain(
+      en.spending.charts.no_rate,
+    )
+  })
+
+  it('shows the rate and the exchanges before the first spending (adversarial В)', async () => {
+    moneyCharts.mockResolvedValue(charts({ since: null, categories: [] }))
+    const view = await render()
+    expect(view.text()).toContain(en.spending.charts.empty.title)
+    expect(view.find('.rate-line').exists()).toBe(true)
+    expect(view.find('.losses').exists()).toBe(true)
+  })
+
+  it('must not fire: an answer that lost the race is not what the phone keeps (adversarial Б, d9 Д)', async () => {
+    let first: (value: MoneyChartsView) => void = () => undefined
+    moneyCharts
+      .mockReturnValueOnce(new Promise((resolve) => (first = resolve)))
+      .mockResolvedValueOnce(charts({ spentAverage: amd('999999') }))
+    const view = await render()
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    first(charts())
+    await flushPromises()
+    view.unmount()
+    online(false)
+    moneyCharts.mockRejectedValue(new TypeError('network'))
+    const again = await render()
+    expect(again.find('.strip').exists()).toBe(true)
+    const kept = JSON.parse(localStorage.getItem(`molvia.charts.${ACTOR}`) ?? '{}') as Record<
+      string,
+      { answer: { spentAverage: { amount: string } | null } }
+    >
+    expect(kept['6']?.answer.spentAverage?.amount).toBe('999999.00')
   })
 
   it('has no card of exchanges and none of the rate where there is nothing for them', async () => {

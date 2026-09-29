@@ -6,7 +6,15 @@
   >
     <legend class="unseen">{{ legend }}</legend>
     <div class="reading"><slot /></div>
-    <div ref="area" class="area" :class="{ short }" @pointerdown="pick" @pointermove="drag">
+    <div
+      ref="area"
+      class="area"
+      :class="{ short }"
+      @pointerdown="pointer.down"
+      @pointermove="pointer.move"
+      @pointerup="pointer.up"
+      @pointercancel="pointer.cancel"
+    >
       <span
         v-if="average !== null"
         class="average"
@@ -31,10 +39,15 @@
         <span
           v-if="paired"
           class="fill outline"
-          :style="{ height: heightOf(bar.second ?? 0) }"
+          :style="{ height: heightOf(bar.outline ?? 0) }"
           aria-hidden="true"
         ></span>
-        <span class="fill" :style="{ height: heightOf(bar.level) }" aria-hidden="true"></span>
+        <span
+          class="fill"
+          :class="{ unknown: bar.level === null }"
+          :style="{ height: bar.level === null ? '100%' : heightOf(bar.level) }"
+          aria-hidden="true"
+        ></span>
       </label>
     </div>
     <div class="labels" aria-hidden="true">
@@ -54,6 +67,7 @@
 import { defineComponent, ref, useId } from 'vue'
 import type { PropType } from 'vue'
 import { CHART_LEVEL } from '@molvia/model'
+import { useChartPointer } from '@/composables/useChartPointer'
 
 export interface ChartBar {
   /** The month, `YYYY-MM`. */
@@ -62,10 +76,13 @@ export interface ChartBar {
   readonly label: string
   /** What the bar says to a screen reader: «Август 2026, 345 620 ֏». */
   readonly spoken: string
-  /** Its height in thousandths of the tallest — the server's (`CHART_LEVEL`). */
-  readonly level: number
-  /** The first of a pair, drawn as an outline — «Пришло» beside «Ушло». */
-  readonly second?: number | null
+  /**
+   * Its height in thousandths of the tallest — the server's (`CHART_LEVEL`). Null is «not known» —
+   * «Ушло» of a month with no rate — drawn as a dashed empty bar, never as nothing spent (review).
+   */
+  readonly level: number | null
+  /** The bar before it in a pair, drawn as an outline — «Пришло» beside «Ушло». */
+  readonly outline?: number | null
 }
 
 /** Six bars and fewer stand apart; twelve stand close (handoff 03). */
@@ -74,7 +91,8 @@ const FEW = 6
 /**
  * The bars of «Графики» (MOL-74, handoff 03) — one component for the three bar charts: a reading
  * above the bars instead of a tip under the finger, and the whole area as the target, so a finger
- * picks the bar it is over and drags along them (`touch-action: pan-y` leaves the page its scroll).
+ * picks the bar it is over and drags along them (`useChartPointer`; `touch-action: pan-y` leaves the
+ * page its scroll).
  * The bars are radios: arrows move the choice and every bar is read by its month and amount — which
  * is why the reading is not a live region: the radio already says it, and a drag would chatter.
  * HTML and tokens, no library (Р-1): the scheme changes by itself and the words are text.
@@ -85,7 +103,7 @@ export default defineComponent({
     bars: { type: Array as PropType<readonly ChartBar[]>, required: true },
     modelValue: { type: Number, required: true },
     legend: { type: String, required: true },
-    /** Bars in pairs: `second` outlined, `level` filled. */
+    /** Bars in pairs: `outline` outlined, `level` filled. */
     paired: { type: Boolean, default: false },
     /** One colour for every bar, the chosen one full — a category's (handoff 03). */
     colour: { type: String as PropType<string | null>, default: null },
@@ -104,27 +122,15 @@ export default defineComponent({
       if (index !== props.modelValue) emit('update:modelValue', index)
     }
 
-    /** The bar under the finger: the area is cut into as many columns as there are bars. */
-    function at(event: PointerEvent): void {
-      const box = area.value?.getBoundingClientRect()
-      if (!box || box.width <= 0 || props.bars.length === 0) return
-      const index = Math.floor(((event.clientX - box.left) / box.width) * props.bars.length)
-      choose(Math.min(props.bars.length - 1, Math.max(0, index)))
-    }
-
-    function pick(event: PointerEvent): void {
-      at(event)
-    }
-
-    /** A mouse moving over the chart chooses nothing; a finger or a pressed button does. */
-    function drag(event: PointerEvent): void {
-      if (event.pointerType === 'mouse' && event.buttons === 0) return
-      at(event)
-    }
+    /** The bar under the pointer: the area is cut into as many columns as there are bars. */
+    const pointer = useChartPointer(area, (fraction) => {
+      const n = props.bars.length
+      if (n > 0) choose(Math.min(n - 1, Math.floor(fraction * n)))
+    })
 
     const heightOf = (level: number) => `${String((level * 100) / CHART_LEVEL)}%`
 
-    return { FEW, area, name: useId(), choose, pick, drag, heightOf }
+    return { FEW, area, name: useId(), choose, pointer, heightOf }
   },
 })
 </script>
@@ -213,6 +219,14 @@ export default defineComponent({
   .coloured .chosen & {
     opacity: 1;
   }
+}
+
+.fill.unknown {
+  background: none;
+  box-shadow: none;
+  outline: 1.5px dashed var(--border-strong);
+  outline-offset: -1.5px;
+  opacity: 1;
 }
 
 .paired .fill {
