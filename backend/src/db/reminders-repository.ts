@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm'
+import { PENDING_VERDICTS_LIMIT } from '@molvia/model'
 import type { PendingVerdict, ReminderLadder, ReminderPlan, ReminderStep } from '@molvia/model'
 import { createExpenseRepository } from './expenses-repository'
 import type { Conn } from './index'
@@ -13,11 +14,13 @@ export interface ReminderCandidate {
   /** A live verdict of theirs written after their last reminder — the ladder starts over (Л-1). */
   readonly ratedSince: boolean
   /**
-   * When their latest purchase was entered. A purchase's day is never after its entry, so a person
-   * whose latest entry is older than step 1's day has nothing to be asked about — and is not
-   * claimed, rather than claimed empty every minute of every evening.
+   * When their latest purchase of a product they have no live verdict on was entered. A purchase's
+   * day is never after its entry, so a person whose latest such entry is older than step 1's day
+   * has nothing to be asked about — and is not claimed, rather than claimed empty every minute of
+   * every evening. Unrated products only (adversarial В): whoever rated yesterday's milk at once,
+   * or bought only a dish, has nothing to be asked either — the diligent, whom it is all for.
    */
-  readonly lastEnteredAt: Date | null
+  readonly lastUnratedAt: Date | null
 }
 
 export interface ClaimRequest {
@@ -49,8 +52,18 @@ export interface ReminderRepository {
    *
    * `null` too when there is nothing to ask about. A step 2 or 3 with nothing left ends the ladder
    * (Л-2); a step 1 with nothing leaves it as it was.
+   *
+   * **Only what `sendable` accepts is asked about, and it is decided before anything is marked**
+   * (adversarial А). A name stored before today's rule of visible text would fail the contract the
+   * bot reads, and checked after the claims of a whole minute were committed it made the answer a
+   * 500 — every person of that minute marked and none reminded. Such an item stays in «Оценки»;
+   * the reminder skips it, the others of the day go.
    */
-  claim(request: ClaimRequest, limit: number): Promise<ClaimedReminder | null>
+  claim(
+    request: ClaimRequest,
+    limit: number,
+    sendable: (item: PendingVerdict) => boolean,
+  ): Promise<ClaimedReminder | null>
   /** One more verdict given by a press under a reminder, on today's row of `reminder_days`. */
   countRated(): Promise<void>
 }
@@ -72,7 +85,7 @@ export function createReminderRepository(db: Conn): ReminderRepository {
         reminded_on: string | null
         window_from: string | null
         rated_since: boolean
-        last_entered_at: string | null
+        last_unrated_at: string | null
       }>(sql`
         select
           a.id as actor_id,
@@ -89,8 +102,13 @@ export function createReminderRepository(db: Conn): ReminderRepository {
           (
             select max(e.created_at)::text from expenses e
             join trips t on t.id = e.trip_id
+            join items i on i.id = e.item_id and i.kind = 'product'
             where t.actor_id = a.id and t.deleted_at is null
-          ) as last_entered_at
+              and not exists (
+                select 1 from verdicts v
+                where v.actor_id = a.id and v.item_id = e.item_id and v.deleted_at is null
+              )
+          ) as last_unrated_at
         from actors a
         left join rating_reminders r on r.actor_id = a.id
         order by a.id
@@ -104,11 +122,11 @@ export function createReminderRepository(db: Conn): ReminderRepository {
             ? { step: row.step, remindedOn: row.reminded_on, windowFrom: row.window_from }
             : null,
         ratedSince: row.rated_since,
-        lastEnteredAt: row.last_entered_at === null ? null : new Date(row.last_entered_at),
+        lastUnratedAt: row.last_unrated_at === null ? null : new Date(row.last_unrated_at),
       }))
     },
 
-    async claim({ actorId, timeZone, plan, today, previous, now }, limit) {
+    async claim({ actorId, timeZone, plan, today, previous, now }, limit, sendable) {
       return db.transaction(async (tx) => {
         // The owner first, as erasure takes it (privacy.md): an erasure under way is waited for,
         // and then the owner is gone and there is no one to remind.
@@ -123,12 +141,16 @@ export function createReminderRepository(db: Conn): ReminderRepository {
             ((${plan.from}::date)::timestamp at time zone ${timeZone})::text as from_at,
             ((${plan.to}::date + 1)::timestamp at time zone ${timeZone})::text as to_at`)
         if (!bounds) return null
-        const pending = await createExpenseRepository(tx).pendingVerdictsFor(actorId, limit, {
-          from: new Date(bounds.from_at),
-          to: new Date(bounds.to_at),
-        })
+        // A page of the screen's size, then the ones that can be sent: an item skipped must not
+        // take the place of one behind it.
+        const pending = await createExpenseRepository(tx).pendingVerdictsFor(
+          actorId,
+          PENDING_VERDICTS_LIMIT,
+          { from: new Date(bounds.from_at), to: new Date(bounds.to_at) },
+        )
+        const items = pending.items.filter(sendable).slice(0, limit)
 
-        if (pending.items.length === 0) {
+        if (items.length === 0) {
           if (plan.step > 1 && previous !== null) {
             await tx.execute(sql`
               delete from rating_reminders
@@ -158,11 +180,11 @@ export function createReminderRepository(db: Conn): ReminderRepository {
         const column = sql.raw(STEP_COLUMN[plan.step])
         await tx.execute(sql`
           insert into reminder_days (day, ${column}, items)
-          values (${yerevanDay(sql`${now.toISOString()}::timestamptz`)}, 1, ${pending.items.length})
+          values (${yerevanDay(sql`${now.toISOString()}::timestamptz`)}, 1, ${items.length})
           on conflict (day) do update set
             ${column} = reminder_days.${column} + 1,
             items = reminder_days.items + excluded.items`)
-        return pending
+        return { items, total: pending.total }
       })
     },
 

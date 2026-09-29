@@ -9,10 +9,11 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ERROR, ISSUE, REMINDERS_PER_CLAIM, dueRemindersSchema } from '@molvia/model'
 import type { DueReminders } from '@molvia/model'
 import { createReminderRepository } from '@/db/reminders-repository'
+import type { ReminderRepository } from '@/db/reminders-repository'
 import { expenses, ratingReminders, reminderDays, trips, verdicts } from '@/db/schema'
 import { buildServer } from '@/server'
 import { remindRatings } from '@/usecases/remind-ratings'
@@ -37,9 +38,20 @@ function yerevan(day: string, time: string): Date {
   return new Date(`${day}T${time}:00.000+04:00`)
 }
 
+/** Failures of a single person's claim, as the server would log them; none are expected here. */
+let failures: unknown[] = []
+beforeEach(() => {
+  failures = []
+})
+
 /** The evening's claim at 19:00 of `day`, read through the contract the bot parses. */
-async function evening(day: string, time = '19:00'): Promise<DueReminders> {
-  return dueRemindersSchema.parse(await remindRatings(reminders, yerevan(day, time)))
+async function evening(
+  day: string,
+  time = '19:00',
+  repository: ReminderRepository = reminders,
+): Promise<DueReminders> {
+  const due = await remindRatings(repository, yerevan(day, time), (error) => failures.push(error))
+  return dueRemindersSchema.parse(due)
 }
 
 /** What each person was asked about: Telegram id → item names, freshest first. */
@@ -480,5 +492,224 @@ describe('счётчики напоминаний (В-4)', () => {
       { day: '2026-07-13', firstSteps: 2, secondSteps: 0, thirdSteps: 0, items: 3, rated: 0 },
       { day: '2026-07-16', firstSteps: 0, secondSteps: 2, thirdSteps: 0, items: 3, rated: 0 },
     ])
+  })
+})
+
+// A name today's `visibleLine` refuses and the database keeps (`items.name` is a bare varchar):
+// U+202E, the override a pasted name brings — built from its code, never invisible in this file.
+const LEGACY_NAME = `Сыр ${String.fromCodePoint(0x202e)}Лори`
+
+describe('одна выдача не роняет другие (адверсариальный А)', () => {
+  function claim() {
+    return app.inject({
+      method: 'POST',
+      url: '/internal/reminders/claim',
+      headers: { authorization: `Bearer ${botSecret}` },
+    })
+  }
+
+  it('позицию с именем старше правила пропускает, остальных — и её владельца — не теряет', async () => {
+    const anna = await person()
+    const boris = await person()
+    await bought(anna, await item('Молоко'), yerevan('2026-07-13', '10:00'))
+    await bought(
+      boris,
+      await insertItem(db, { name: LEGACY_NAME, searchKey: 'sir lori' }),
+      yerevan('2026-07-13', '11:00'),
+    )
+    await bought(boris, await item('Хлеб'), yerevan('2026-07-13', '12:00'))
+
+    expect(asked(await evening('2026-07-14'))).toEqual({
+      [anna.tg]: ['Молоко'],
+      [boris.tg]: ['Хлеб'],
+    })
+    const [day] = await db.select().from(reminderDays)
+    expect(day).toMatchObject({ firstSteps: 2, items: 2 })
+  })
+
+  it('у кого все позиции с такими именами — не помечен и не посчитан, ответ ручки — 200', async () => {
+    const anna = await person()
+    const boris = await person()
+    await bought(anna, await item('Молоко'), yerevan('2026-07-13', '10:00'))
+    await bought(
+      boris,
+      await insertItem(db, { name: LEGACY_NAME, searchKey: 'sir lori' }),
+      yerevan('2026-07-13', '11:00'),
+    )
+
+    vi.useFakeTimers({ toFake: ['Date'], now: yerevan('2026-07-14', '19:00') })
+    let response
+    try {
+      response = await claim()
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(response.statusCode).toBe(200)
+    expect(asked(dueRemindersSchema.parse(response.json()))).toEqual({ [anna.tg]: ['Молоко'] })
+    expect(await ladderOf(boris)).toBeNull()
+  })
+
+  it('сбой выдачи одного человека уходит в журнал, остальные этой минуты получают своё', async () => {
+    const anna = await person()
+    const boris = await person()
+    await bought(anna, await item('Молоко'), yerevan('2026-07-13', '10:00'))
+    await bought(boris, await item('Хлеб'), yerevan('2026-07-13', '11:00'))
+    let calls = 0
+    const flaky: ReminderRepository = {
+      ...reminders,
+      claim: async (request, limit, sendable) => {
+        calls += 1
+        if (calls === 1) throw Object.assign(new Error('connection reset'), { code: '08006' })
+        return reminders.claim(request, limit, sendable)
+      },
+    }
+
+    const first = await evening('2026-07-14', '19:00', flaky)
+    expect(first.reminders).toHaveLength(1)
+    expect(failures).toHaveLength(1)
+    failures = []
+    // The one who failed was not marked: the next minute is theirs.
+    const second = await evening('2026-07-14', '19:01')
+    expect(second.reminders).toHaveLength(1)
+    expect(second.reminders[0]?.telegramUserId).not.toBe(first.reminders[0]?.telegramUserId)
+  })
+})
+
+describe('лишних выдач нет (адверсариальный В, ревью Т-5)', () => {
+  function counting(): {
+    repository: ReminderRepository
+    claims: () => number
+    reads: () => number
+  } {
+    let claims = 0
+    let reads = 0
+    return {
+      repository: {
+        ...reminders,
+        candidates: async () => {
+          reads += 1
+          return reminders.candidates()
+        },
+        claim: async (request, limit, sendable) => {
+          claims += 1
+          return reminders.claim(request, limit, sendable)
+        },
+      },
+      claims: () => claims,
+      reads: () => reads,
+    }
+  }
+
+  it('оценила вчерашнее сама — ни одной выдачи за вечер', async () => {
+    const anna = await person()
+    const milk = await item('Молоко')
+    await bought(anna, milk, yerevan('2026-07-13', '10:00'))
+    await verdict(anna, milk, yerevan('2026-07-13', '20:00'))
+    const { repository, claims } = counting()
+
+    for (const time of ['19:00', '19:01', '20:30', '21:59']) {
+      expect(asked(await evening('2026-07-14', time, repository))).toEqual({})
+    }
+    expect(claims()).toBe(0)
+  })
+
+  it('вчера — только блюдо: ни одной выдачи', async () => {
+    const anna = await person()
+    await bought(anna, await item('Хаш', 'dish'), yerevan('2026-07-13', '10:00'))
+    const { repository, claims } = counting()
+
+    await evening('2026-07-14', '19:00', repository)
+    expect(claims()).toBe(0)
+  })
+
+  it('вне вечера база не спрашивается вовсе', async () => {
+    const anna = await person()
+    await bought(anna, await item('Молоко'), yerevan('2026-07-13', '10:00'))
+    const { repository, reads } = counting()
+
+    for (const time of ['00:00', '12:00', '18:59', '22:00']) {
+      expect(asked(await evening('2026-07-14', time, repository))).toEqual({})
+    }
+    expect(reads()).toBe(0)
+  })
+})
+
+describe('две выдачи одной минуты разом (ревью Т-6: «даже при двух процессах бота»)', () => {
+  // A second connection, as a second bot's claim would come to the API: on the file's one
+  // connection the two claims would simply take turns.
+  const second = connectDrizzle()
+  afterAll(() => second.close())
+
+  /**
+   * Two claims of one minute, each on its own connection, both past `candidates()` before either
+   * claims — the race the conditional write exists for, forced rather than hoped for.
+   */
+  async function race(day: string): Promise<number> {
+    let arrived = 0
+    let release: () => void = () => undefined
+    const bothRead = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const racing = (repository: ReminderRepository): ReminderRepository => ({
+      ...repository,
+      candidates: async () => {
+        const found = await repository.candidates()
+        arrived += 1
+        if (arrived === 2) release()
+        await bothRead
+        return found
+      },
+    })
+    const results = await Promise.all([
+      evening(day, '19:00', racing(reminders)),
+      evening(day, '19:00', racing(createReminderRepository(second.db))),
+    ])
+    return results.reduce((sum, one) => sum + one.reminders.length, 0)
+  }
+
+  it('на пустой лестнице — одно напоминание и один счёт', async () => {
+    const anna = await person()
+    await bought(anna, await item('Молоко'), yerevan('2026-07-13', '10:00'))
+
+    expect(await race('2026-07-14')).toBe(1)
+    const rows = await db.select().from(reminderDays)
+    expect(rows.map((row) => row.firstSteps)).toEqual([1])
+    expect(failures).toEqual([])
+  })
+
+  it('на ступени 2 — одно напоминание, ступень сдвинута один раз', async () => {
+    const anna = await person()
+    await bought(anna, await item('Молоко'), yerevan('2026-07-12', '10:00'))
+    await evening('2026-07-13')
+
+    expect(await race('2026-07-16')).toBe(1)
+    expect(await ladderOf(anna)).toMatchObject({ step: 2, remindedOn: '2026-07-16' })
+    const [day] = await db.select().from(reminderDays).where(eq(reminderDays.day, '2026-07-16'))
+    expect(day?.secondSteps).toBe(1)
+    expect(failures).toEqual([])
+  })
+})
+
+describe('счётчик оценок из бота (адверсариальный Б)', () => {
+  it('оценка после снятия не считается второй раз', async () => {
+    const anna = await person()
+    const milk = await item('Молоко')
+    const press = (score: number) =>
+      app.inject({
+        method: 'PUT',
+        url: `/internal/verdicts/${milk}`,
+        headers: { authorization: `Bearer ${botSecret}` },
+        payload: { telegramUserId: anna.tg, score },
+      })
+
+    expect((await press(4)).statusCode).toBe(204)
+    await db
+      .update(verdicts)
+      .set({ deletedAt: new Date(), review: null })
+      .where(eq(verdicts.actorId, anna.id))
+    expect((await press(4)).statusCode).toBe(204)
+
+    const rows = await db.select().from(reminderDays)
+    expect(rows.map((row) => row.rated)).toEqual([1])
   })
 })

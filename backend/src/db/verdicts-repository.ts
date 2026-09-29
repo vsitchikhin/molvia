@@ -14,6 +14,12 @@ export interface RatedVerdict {
    * rating again after taking it back is a new opinion to them, whatever the row says.
    */
   readonly created: boolean
+  /**
+   * `true` only for the very first verdict on the item — no row before, not a withdrawn one given
+   * again. The reminder's lever counts these (MOL-101, adversarial Б): counted by `created`, one
+   * item asked about gave «2 of 1 — 200 %» once a verdict was withdrawn and pressed again.
+   */
+  readonly first: boolean
 }
 
 export interface VerdictRepository {
@@ -302,7 +308,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
       // first, so reaching the database with it is a defect in this server).
       if (!row) throw new DomainError(ERROR.NOT_FOUND)
       const { inserted, ...verdict } = row
-      return { verdict: toVerdict(verdict), created: inserted || withdrawn }
+      return { verdict: toVerdict(verdict), created: inserted || withdrawn, first: inserted }
     },
 
     async amend(actorId, itemId, patch) {

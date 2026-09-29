@@ -171,7 +171,17 @@ function reminderLines(reminders: RemindersInWindow): string[] {
     row('second step, 3 days on', [String(reminders.secondSteps), '']),
     row('third step, then the pause', [String(reminders.thirdSteps), 'silent after it: 6 months']),
     row('items asked about', [String(reminders.items), '']),
-    row('rated by a press in the bot', share(reminders.rated, reminders.items)),
+    row(
+      'rated by a press in the bot',
+      // More presses than items is only the window's edge: items asked before it, pressed inside.
+      // Printed as it is, with the reason, never as a share above a hundred (adversarial Б).
+      reminders.rated > reminders.items
+        ? [
+            `${String(reminders.rated)} of ${String(reminders.items)}`,
+            'presses of items asked before the window',
+          ]
+        : share(reminders.rated, reminders.items),
+    ),
   ]
 }
 

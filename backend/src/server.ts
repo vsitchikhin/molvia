@@ -166,8 +166,25 @@ function isBodyFault(error: FastifyError): boolean {
  * or a URL refused before routing — the decoded path stands in for it.
  */
 function isAuthRequest(request: FastifyRequest): boolean {
-  const path = request.routeOptions.url ?? decodedPath(request.url)
+  const path = routePath(request)
   return path.startsWith('/auth/') || path.startsWith('/internal/')
+}
+
+/**
+ * What a failure is called in the log. The bot's channel carries more than the login since MOL-101
+ * — the reminder's claim and a press of 1–5 — and «authentication failed» over a failed reminder
+ * sent whoever read the log to look at the login, which was fine (adversarial Г).
+ */
+function failureMessage(request: FastifyRequest): string {
+  const path = routePath(request)
+  if (path.startsWith('/auth/') || path.startsWith('/internal/auth/')) {
+    return 'authentication failed'
+  }
+  return path.startsWith('/internal/') ? 'bot request failed' : 'request failed'
+}
+
+function routePath(request: FastifyRequest): string {
+  return request.routeOptions.url ?? decodedPath(request.url)
 }
 
 function decodedPath(url: string): string {
@@ -304,10 +321,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     // the query with its parameters, so a failed search wrote what was searched for and who
     // asked, and a dropped connection wrote the hash of every session token in flight — into a
     // log the privacy page promises holds neither.
-    app.log.error(
-      describeFailure(error),
-      isAuthRequest(request) ? 'authentication failed' : 'request failed',
-    )
+    app.log.error(describeFailure(error), failureMessage(request))
     return reply.status(error.statusCode ?? 500).send({ code: ERROR.INTERNAL })
   })
 
@@ -418,7 +432,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       confirm: (code, telegramId) => confirmLogin(loginRequests, code, telegramId),
       decline: (code) => declineLogin(loginRequests, code),
       erase: (telegramUserId) => eraseMe(createErasureRepository(db), telegramUserId),
-      claimReminders: () => remindRatings(reminders, new Date()),
+      // One person's claim that fails is logged by its kind and the others of the minute go on.
+      claimReminders: () =>
+        remindRatings(reminders, new Date(), (error) => {
+          instance.log.error(describeFailure(error), 'rating reminder failed')
+        }),
       rateFromBot: (itemId, body) =>
         rateFromBot({ actors, items, verdicts, reminders }, itemId, body),
     })

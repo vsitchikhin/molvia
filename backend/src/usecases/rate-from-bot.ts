@@ -16,9 +16,9 @@ export interface RateFromBotDeps extends RateItemDeps {
  * from `ctx.from.id` and never from the button. An account with no owner — erased since the
  * reminder came — is not found, the same answer as an item that is not there.
  *
- * Only a score arrives, so the review stays as it was (MOL-27). A verdict that is new, or given
- * again after a withdrawal, is counted for the reminder's lever (В-4); a second press correcting the
- * first is not a second verdict.
+ * Only a score arrives, so the review stays as it was (MOL-27). Only the first verdict on the item
+ * is counted for the reminder's lever (В-4): a second press correcting the first is not a second
+ * verdict, and neither is one given again after a withdrawal (adversarial Б).
  */
 export async function rateFromBot(
   deps: RateFromBotDeps,
@@ -27,6 +27,6 @@ export async function rateFromBot(
 ): Promise<void> {
   const actor = await deps.actors.byTelegramUserId(telegramUserId)
   if (!actor) throw new DomainError(ERROR.NOT_FOUND)
-  const { created } = await rateItem(deps, actor.id, itemId, { score })
-  if (created) await deps.reminders.countRated()
+  const { first } = await rateItem(deps, actor.id, itemId, { score })
+  if (first) await deps.reminders.countRated()
 }
