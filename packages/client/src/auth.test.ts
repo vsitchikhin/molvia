@@ -26,6 +26,25 @@ describe('login clients', () => {
     }
   })
 
+  it('a start says again=1 only when asked to, and nothing else in its query (MOL-68)', async () => {
+    const started = (): Response =>
+      new Response(JSON.stringify({ id, url: 'https://t.me/molvia_bot?start=x', expiresAt }), {
+        status: 201,
+      })
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(started())
+      .mockResolvedValueOnce(started())
+      .mockResolvedValueOnce(started())
+    const client = createClient({ baseUrl: '/api', fetch })
+    await client.startLogin()
+    await client.startLogin({ again: false })
+    await client.startLogin({ again: true })
+    expect(
+      fetch.mock.calls.map(([url]) => (url instanceof Request ? url.url : url.toString())),
+    ).toEqual(['/api/auth/login', '/api/auth/login', '/api/auth/login?again=1'])
+  })
+
   it('bot credentials only travel to its four internal methods and never follow a redirect', async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()

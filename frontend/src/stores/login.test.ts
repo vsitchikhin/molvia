@@ -6,13 +6,13 @@ import type { ActorView, LoginPoll, LoginStarted } from '@molvia/model'
 import { sessionEnded, useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
 
-const startLogin = vi.fn<() => Promise<LoginStarted>>()
+const startLogin = vi.fn<(options?: { readonly again?: boolean }) => Promise<LoginStarted>>()
 const pollLogin = vi.fn<(id: string) => Promise<LoginPoll>>()
 const logout = vi.fn<() => Promise<void>>()
 const me = vi.fn<() => Promise<ActorView>>()
 vi.mock('@/api', () => ({
   api: {
-    startLogin: () => startLogin(),
+    startLogin: (options?: { readonly again?: boolean }) => startLogin(options),
     pollLogin: (id: string) => pollLogin(id),
     logout: () => logout(),
     me: () => me(),
@@ -96,16 +96,17 @@ describe('начать вход', () => {
     expect(login.phase).toBe('waiting')
   })
 
-  it('кладёт на устройство ссылку и номер запроса — и ничего больше', async () => {
+  it('кладёт на устройство ссылку, номер запроса и метку «уже начинали» — и ничего больше', async () => {
     // Секрет живёт в `__Host-molvia_login`, которую скрипт не видит. Если бы он оказался здесь,
-    // это была бы ровно та ошибка, ради снятия которой эпик и затевался.
+    // это была бы ровно та ошибка, ради снятия которой эпик и затевался. Метка — не секрет: она
+    // говорит только, что с этого устройства вход уже начинали (MOL-68).
     opened()
     const { login } = await signedOut()
     startLogin.mockResolvedValue(REQUEST)
 
     await login.begin()
 
-    expect(kept()).toEqual({ request: { id: REQUEST.id, url: REQUEST.url } })
+    expect(kept()).toEqual({ request: { id: REQUEST.id, url: REQUEST.url }, tried: true })
   })
 
   it('«Открыть Telegram» ещё раз не заводит второго запроса', async () => {
@@ -132,6 +133,83 @@ describe('начать вход', () => {
     await login.restart()
 
     expect(startLogin).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('повтор с того же устройства (MOL-68)', () => {
+  it('первый вход — начало, «Начать заново» — повтор', async () => {
+    opened()
+    const { login } = await signedOut()
+    startLogin.mockResolvedValue(REQUEST)
+
+    await login.begin()
+    await login.restart()
+
+    expect(startLogin.mock.calls.map(([options]) => options?.again)).toEqual([false, true])
+  })
+
+  it('старт, не дошедший до сервера, не делает следующий повтором', async () => {
+    // Запроса нет — и первый, который сервер увидит, должен попасть в «начали».
+    opened()
+    const { login } = await signedOut()
+    startLogin.mockRejectedValueOnce(new ApiError(ERROR.LOGIN_RATE_LIMITED))
+    await login.begin()
+    expect(kept()).toBeNull()
+    startLogin.mockResolvedValueOnce(REQUEST)
+
+    await login.begin()
+
+    expect(startLogin.mock.calls.map(([options]) => options?.again)).toEqual([false, false])
+  })
+
+  it('метка переживает перезапуск и истёкшую ссылку', async () => {
+    // Самый частый сбой на iOS: вернулся через шесть минут, ссылка мертва, «Начать заново».
+    opened()
+    const first = await signedOut()
+    startLogin.mockResolvedValue(REQUEST)
+    await first.login.begin()
+    pollLogin.mockRejectedValue(new ApiError(ERROR.LOGIN_UNAVAILABLE))
+    await first.login.poll()
+
+    const { login } = await signedOut()
+    await login.begin()
+
+    expect(startLogin.mock.calls.map(([options]) => options?.again)).toEqual([false, true])
+  })
+
+  it('признанный аккаунт снимает метку, а чужой запрос соседнего окна остаётся', async () => {
+    opened()
+    const { login } = await signedOut()
+    startLogin.mockResolvedValue(REQUEST)
+    await login.begin()
+    pollLogin.mockResolvedValue({ status: 'authenticated', actor: MINE })
+    await login.poll()
+
+    login.confirm()
+
+    expect(kept()).toEqual({ claimed: MINE.id })
+  })
+
+  it('метку видит соседнее окно: повтор там — тоже повтор', async () => {
+    localStorage.setItem(KEY, JSON.stringify({ tried: true }))
+    opened()
+    const { login } = await signedOut()
+    startLogin.mockResolvedValue(REQUEST)
+
+    await login.begin()
+
+    expect(startLogin).toHaveBeenCalledWith({ again: true })
+  })
+
+  it('мусор вместо метки — как будто её нет', async () => {
+    localStorage.setItem(KEY, JSON.stringify({ tried: 'yes' }))
+    opened()
+    const { login } = await signedOut()
+    startLogin.mockResolvedValue(REQUEST)
+
+    await login.begin()
+
+    expect(startLogin).toHaveBeenCalledWith({ again: false })
   })
 })
 
@@ -302,7 +380,7 @@ describe('в чей аккаунт вошли', () => {
     )
     expect(login.closed).toBe(true)
     expect(login.phase).toBe('waiting')
-    expect(kept()).toEqual({ request: { id: next.id, url: next.url } })
+    expect(kept()).toEqual({ request: { id: next.id, url: next.url }, tried: true })
   })
 
   it('«Это не я» не спорит со своей сессией, пришедшей, пока выход в пути (adversarial Г1)', async () => {
@@ -387,7 +465,7 @@ describe('в чей аккаунт вошли', () => {
     await login.refuse()
 
     expect(login.closed).toBe(true)
-    expect(kept()).toEqual({ request: { id: next.id, url: next.url } })
+    expect(kept()).toEqual({ request: { id: next.id, url: next.url }, tried: true })
   })
 
   it('чужой вход в соседнем окне закрывает дверь здесь — и показывает того, кто пришёл', async () => {
@@ -513,7 +591,8 @@ describe('отказы', () => {
     await login.poll()
 
     expect(login.phase).toBe('unavailable')
-    expect(kept()).toBeNull()
+    // Запрос забыт, а метка остаётся: следующий вход — повтор этого же человека (MOL-68).
+    expect(kept()).toEqual({ tried: true })
   })
 
   it('квота и ненастроенный вход названы по-своему', async () => {
@@ -550,7 +629,7 @@ describe('отказы', () => {
 
     expect(login.phase).toBe('offline')
     // Запрос остаётся: человек мог уже нажать «Войти», и выбрасывать подтверждение нельзя.
-    expect(kept()).toEqual({ request: { id: REQUEST.id, url: REQUEST.url } })
+    expect(kept()).toEqual({ request: { id: REQUEST.id, url: REQUEST.url }, tried: true })
   })
 
   it('связь вернулась — опрос продолжается сам', async () => {

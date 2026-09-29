@@ -372,9 +372,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     healthRoutes(instance, { databaseIsReachable })
     const login = options.login === undefined ? loginConfig : options.login
     authRoutes(instance, {
-      start: (name) => {
+      start: (name, again) => {
         if (!login) throw new DomainError(ERROR.LOGIN_DISABLED)
-        return startLogin(loginRequests, login.username, name)
+        return startLogin(loginRequests, login.username, name, again)
       },
       poll: (id, secret) => completeLogin(authTransactOn(db), id, secret),
       logout: (token) => logout(sessions, token),

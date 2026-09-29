@@ -14,7 +14,7 @@ import {
 } from '@molvia/model'
 import { buildServer } from '@/server'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
-import { actors, events, loginRequests, sessions } from '@/db/schema'
+import { actors, events, loginDays, loginRequests, sessions } from '@/db/schema'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertPlace, insertTrip, telegramId } from './fixtures'
 
@@ -284,12 +284,25 @@ describe('Telegram login over HTTP', () => {
       expect(response.statusCode).toBe(400)
       expect(response.headers['set-cookie']).toBeUndefined()
     }
-    expect(
-      (await app.inject({ method: 'POST', url: '/auth/login?actorId=x', headers: browserHeaders }))
-        .statusCode,
-    ).toBe(400)
+    // The one parameter a start takes is `again=1` (MOL-68); any other value of it is a refusal.
+    for (const query of ['actorId=x', 'again=0', 'again=true', 'again=1&again=1', 'again=1&x=1']) {
+      expect(
+        (await app.inject({ method: 'POST', url: `/auth/login?${query}`, headers: browserHeaders }))
+          .statusCode,
+      ).toBe(400)
+    }
     expect((await app.inject({ method: 'POST', url: '/auth/login' })).statusCode).toBe(403)
     expect(await db.select().from(loginRequests)).toHaveLength(0)
+  })
+
+  it('counts a start with again=1 as a repeat of the same device, and one without as a beginning', async () => {
+    for (const url of ['/auth/login', '/auth/login?again=1']) {
+      expect((await app.inject({ method: 'POST', url, headers: browserHeaders })).statusCode).toBe(
+        201,
+      )
+    }
+    const [day] = await db.select().from(loginDays)
+    expect(day).toMatchObject({ started: 2, again: 1 })
   })
 
   it('an unconfigured development server has no real login door', async () => {

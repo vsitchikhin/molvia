@@ -54,6 +54,13 @@ interface Request {
 interface Kept {
   readonly request?: Request
   readonly claimed?: string
+  /**
+   * This device began a login that the server took, and nobody has come in since (MOL-68). The
+   * next start says so — `again=1` — and the funnel counts «Начать заново», or a return after the
+   * link ran out, as the same person rather than a new one. Of the device, not of a window: set
+   * by whichever window's start was answered, taken away by whichever window's owner is claimed.
+   */
+  readonly tried?: true
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -81,10 +88,11 @@ function recall(): Kept {
   try {
     const parsed: unknown = JSON.parse(raw)
     if (typeof parsed !== 'object' || parsed === null) return {}
-    const { request, claimed } = parsed as Record<string, unknown>
+    const { request, claimed, tried } = parsed as Record<string, unknown>
     return {
       ...(isRequest(request) ? { request } : {}),
       ...(typeof claimed === 'string' && UUID.test(claimed) ? { claimed } : {}),
+      ...(tried === true ? { tried } : {}),
     }
   } catch {
     return {}
@@ -141,8 +149,8 @@ export const useLoginStore = defineStore('login', () => {
    * stored, because a new start replaces the secret and kills whatever was there; only removal
    * and rewriting are checked against ownership.
    */
-  function store(held: Request | null): void {
-    if (!held && !claimed.value) {
+  function store(held: Request | null, tried = recall().tried === true): void {
+    if (!held && !claimed.value && !tried) {
       forget(KEY)
       return
     }
@@ -151,13 +159,9 @@ export const useLoginStore = defineStore('login', () => {
       JSON.stringify({
         ...(held ? { request: held } : {}),
         ...(claimed.value ? { claimed: claimed.value } : {}),
+        ...(tried ? { tried: true } : {}),
       }),
     )
-  }
-
-  /** Пишет запись целиком: свой запрос и признанного владельца. */
-  function keep(): void {
-    store(request.value)
   }
 
   /**
@@ -165,8 +169,8 @@ export const useLoginStore = defineStore('login', () => {
    * окно без своего запроса записывало `{claimed}` поверх чужого — ровно то, что закрывало
    * правило А3 (саморевью Р3-2).
    */
-  function keepClaimOnly(): void {
-    store(recall().request ?? null)
+  function keepClaimOnly(tried?: boolean): void {
+    store(recall().request ?? null, tried)
   }
 
   /** Who the server last said this browser is, or — with nothing to ask — the drawer's name. */
@@ -277,9 +281,12 @@ export const useLoginStore = defineStore('login', () => {
     failure.value = null
     starting.value = true
     try {
-      const started = await api.startLogin()
+      const started = await api.startLogin({ again: recall().tried === true })
       request.value = { id: started.id, url: started.url }
-      keep()
+      // Only once the server took it: a start that never arrived made no request, and the next
+      // one — the first the server sees — would otherwise leave as a repeat and be nobody's
+      // beginning (MOL-68).
+      store(request.value, true)
       open(started.url)
     } catch (error) {
       failure.value = refused(error)
@@ -317,11 +324,11 @@ export const useLoginStore = defineStore('login', () => {
   }
 
   /** Takes this window's request off the device, leaving a neighbour's alone. */
-  function drop(): void {
+  function drop(tried?: boolean): void {
     const previous = request.value
     request.value = null
     const stored = recall().request ?? null
-    store(stored?.id === previous?.id ? null : stored)
+    store(stored?.id === previous?.id ? null : stored, tried)
   }
 
   /**
@@ -386,8 +393,9 @@ export const useLoginStore = defineStore('login', () => {
     claimed.value = owner
     refusedOwner.value = null
     // Свой запрос после признания аккаунта смысла не имеет и снимается; чужой остаётся (Р3-2).
-    if (request.value) drop()
-    else keepClaimOnly()
+    // Человек вошёл — следующий вход с устройства снова начало, а не повтор (MOL-68).
+    if (request.value) drop(false)
+    else keepClaimOnly(false)
   }
 
   /**

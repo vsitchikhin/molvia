@@ -26,6 +26,13 @@ const dateCodec = z.codec(z.iso.datetime(), z.date(), {
   encode: (value) => value.toISOString(),
 })
 
+/**
+ * The query of a login's start (MOL-68): `again=1` when this device began a login before and has
+ * not come in since, so the funnel counts «Начать заново» as the same person rather than a new
+ * one. The device's word, and all it can change is our own count — it opens nothing.
+ */
+export const loginStartQuerySchema = z.strictObject({ again: z.literal('1').optional() })
+
 export const loginStartedCodec = z.strictObject({
   id: z.uuid(),
   url: z.url({ protocol: /^https$/ }).refine((value) => new URL(value).hostname === 't.me'),
