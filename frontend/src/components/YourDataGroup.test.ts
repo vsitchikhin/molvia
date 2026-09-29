@@ -9,10 +9,16 @@ import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
 
-const exportMine = vi.fn<() => Promise<string>>()
-vi.mock('@/api', () => ({ api: { exportMine: () => exportMine() } }))
+const exportMine =
+  vi.fn<(options?: { signal?: AbortSignal }) => Promise<{ text: string; exportedAt: Date }>>()
+vi.mock('@/api', () => ({
+  api: { exportMine: (options?: { signal?: AbortSignal }) => exportMine(options) },
+}))
 
 const FILE_TEXT = '{\n  "format": "molvia-export",\n  "version": 1\n}'
+// 23:59:58 in Yerevan on the 28th: the file is named by that day, whatever the phone's clock says.
+const EXPORTED_AT = new Date('2026-09-28T19:59:58Z')
+const ANSWER = { text: FILE_TEXT, exportedAt: EXPORTED_AT }
 const share = vi.fn<(data: ShareData) => Promise<void>>()
 const canShare = vi.fn<(data: ShareData) => boolean>()
 const views: VueWrapper[] = []
@@ -52,7 +58,7 @@ function pointer(coarse: boolean): void {
 
 beforeEach(() => {
   vi.restoreAllMocks()
-  exportMine.mockReset().mockResolvedValue(FILE_TEXT)
+  exportMine.mockReset().mockResolvedValue(ANSWER)
   share.mockReset().mockResolvedValue(undefined)
   canShare.mockReset()
   shareable(true)
@@ -83,7 +89,7 @@ describe('«Скачать мои данные» (MOL-93)', () => {
 
     expect(exportMine).toHaveBeenCalledOnce()
     const file = share.mock.calls[0]?.[0].files?.[0]
-    expect(file?.name).toMatch(/^molvia-\d{4}-\d{2}-\d{2}\.json$/)
+    expect(file?.name).toBe('molvia-2026-09-28.json')
     expect(file?.type).toBe('application/json')
     expect(await file?.text()).toBe(FILE_TEXT)
     expect(view.find('.ready').exists()).toBe(false)
@@ -153,8 +159,10 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     expect(share).toHaveBeenCalledTimes(2)
   })
 
-  it('a tap while a sheet is still open neither downloads nor asks again', async () => {
-    share.mockReturnValueOnce(new Promise(() => undefined))
+  it('a row tapped while a sheet hangs still answers, and never downloads over the sheet', async () => {
+    share
+      .mockReturnValueOnce(new Promise(() => undefined))
+      .mockRejectedValueOnce(refusal('InvalidStateError'))
     const view = await render()
 
     await download(view).trigger('click')
@@ -162,8 +170,27 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     ;(download(view).element as HTMLButtonElement).click()
     await flushPromises()
 
-    expect(exportMine).toHaveBeenCalledOnce()
-    expect(share).toHaveBeenCalledOnce()
+    expect(exportMine).toHaveBeenCalledTimes(2)
+    expect(share).toHaveBeenCalledTimes(2)
+    expect(clicked).toEqual([])
+  })
+
+  it('leaving the screen while the file is prepared cancels it, and nothing is handed over', async () => {
+    let answer: (value: typeof ANSWER) => void = () => undefined
+    let signal: AbortSignal | undefined
+    exportMine.mockImplementation((options) => {
+      signal = options?.signal
+      return new Promise((resolve) => (answer = resolve))
+    })
+    const view = await render()
+
+    await download(view).trigger('click')
+    view.unmount()
+    answer(ANSWER)
+    await flushPromises()
+
+    expect(signal?.aborted).toBe(true)
+    expect(share).not.toHaveBeenCalled()
     expect(clicked).toEqual([])
   })
 
@@ -179,7 +206,7 @@ describe('«Скачать мои данные» (MOL-93)', () => {
   })
 
   it('says it is preparing the file while the server answers, and takes no second tap', async () => {
-    let answer: (text: string) => void = () => undefined
+    let answer: (value: typeof ANSWER) => void = () => undefined
     exportMine.mockReturnValue(new Promise((resolve) => (answer = resolve)))
     const view = await render()
 
@@ -187,7 +214,7 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     expect(download(view).text()).toContain(en.settings.export.busy)
     expect(download(view).attributes('aria-busy')).toBe('true')
     ;(download(view).element as HTMLButtonElement).click()
-    answer(FILE_TEXT)
+    answer(ANSWER)
     await flushPromises()
 
     expect(exportMine).toHaveBeenCalledOnce()

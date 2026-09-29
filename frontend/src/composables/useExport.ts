@@ -81,27 +81,38 @@ export function useExport(): ExportState {
     download(file)
   }
 
+  // Leaving the screen is changing one's mind (review 13, adversarial В): the request is cancelled
+  // and nothing is handed over on another screen — a sheet there would be refused anyway.
+  let leaving: AbortController | null = null
+
   async function start(): Promise<void> {
-    if (busy.value || sharing || !online.value) return
+    if (busy.value || !online.value) return
     busy.value = true
     failure.value = null
     ready.value = null
+    const mine = new AbortController()
+    leaving = mine
     let file: File
     try {
-      const text = await api.exportMine()
-      file = new File([text], `molvia-${yerevanDate(new Date())}.json`, {
+      const { text, exportedAt } = await api.exportMine({ signal: mine.signal })
+      // Named by the day the server took it, not by the phone's clock after the answer.
+      file = new File([text], `molvia-${yerevanDate(exportedAt)}.json`, {
         type: 'application/json',
       })
     } catch {
+      if (mine.signal.aborted) return
       online.value = navigator.onLine
       failure.value = online.value ? 'error' : 'offline'
       return
     } finally {
       busy.value = false
     }
+    if (mine.signal.aborted) return
     await deliver(file, true)
   }
 
+  // Guarded here and not in `start`: a sheet whose promise never settles must not leave the row
+  // dead, and only a second `share` over an open sheet is refused (`InvalidStateError`).
   function handOver(): void {
     if (ready.value && !sharing) void deliver(ready.value, false)
   }
@@ -113,6 +124,7 @@ export function useExport(): ExportState {
     window.addEventListener('offline', offline)
   })
   onUnmounted(() => {
+    leaving?.abort()
     window.removeEventListener('offline', offline)
   })
   useReconnect(() => {
