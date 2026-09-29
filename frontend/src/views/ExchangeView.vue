@@ -91,7 +91,7 @@
             {{
               t('exchange.base_since', {
                 base: pairSigns(overview.pair).base,
-                date: dayOf(midnightOf(overview.baseSince)),
+                date: day(overview.baseSince),
               })
             }}
           </p>
@@ -177,7 +177,7 @@
 <script lang="ts">
 import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { currencySign, yerevanDate, yerevanMidnight } from '@molvia/model'
+import { currencySign, yerevanDate } from '@molvia/model'
 import type {
   Currency,
   CurrencyCost,
@@ -322,7 +322,6 @@ export default defineComponent({
 
     // The day a rate is dated by, as a calendar day of Yerevan (adversarial Ж).
     const dayOf = (when: Date): string => day(yerevanDate(when))
-    const midnightOf = (day: string): Date => yerevanMidnight(day)
     const pairSigns = (pair: { base: Currency; quote: Currency }) => ({
       base: currencySign(pair.base, locale.value),
       quote: currencySign(pair.quote, locale.value),
@@ -339,7 +338,7 @@ export default defineComponent({
       unknown: NonNullable<ExchangesResponse['walletUnknown']>,
       pair: NonNullable<ExchangesResponse['pair']>,
     ): string {
-      const words = { ...pairSigns(pair), date: dayOf(midnightOf(unknown.on)) }
+      const words = { ...pairSigns(pair), date: day(unknown.on) }
       const old = unknown.reason === 'oldReckoning'
       if (unknown.given === null) {
         return t(
@@ -399,7 +398,7 @@ export default defineComponent({
       preferenceOptions,
       rateOf,
       dayOf,
-      midnightOf,
+      day,
       currencySignOf: (currency: Currency) => currencySign(currency, locale.value),
       pairSigns,
       costLineOf,

@@ -774,6 +774,38 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     expect(view.get('button.body').text()).toMatch(/^Amend the exchange of Sep 15:/)
   })
 
+  // The same for every day the card of the wallet names (MOL-121): the texts were checked up to
+  // the date, and a day printed as its midnight in the phone's zone stayed green.
+  it('names the days of the wallet as the days they were, west of Yerevan too', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        wallet: { rate: rate('4.3', '2026-09-20'), basis: 'last', estimated: false },
+        baseSince: '2026-09-18',
+        costs: [
+          {
+            rate: { ...rate('80', '2026-09-20'), base: 'USD', quote: 'RUB' },
+            basis: 'income',
+            estimated: false,
+          },
+        ],
+      }),
+    )
+    const known = await render()
+    expect(known.text()).toContain('by the last exchange · since Sep 20')
+    expect(known.text()).toContain('Counting in ₽ since Sep 18 —')
+    expect(known.get('.costs').text()).toContain('by the last income · since Sep 20')
+    known.unmount()
+
+    exchanges.mockResolvedValue(
+      overview({
+        wallet: null,
+        walletUnknown: { on: '2026-08-25', given: 'USD', reason: 'noRate' },
+      }),
+    )
+    const lost = await render()
+    expect(lost.text()).toContain('Rate unknown: the $ → ֏ exchange of Aug 25 has')
+  })
+
   it('the row is named by its words, the rate and the comparison included (С-3)', async () => {
     exchanges.mockResolvedValue(overview())
     const view = await render()
