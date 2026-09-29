@@ -254,6 +254,15 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The introduction on «Поход» is only for a history known to be empty** (`answeredEmpty`, MOL-77),
   kept under a key of its own; a phone-side cache is read by both versions.
 
+### Barcodes: the scanner — `.claude/rules/barcodes.md`
+
+- **EAN-13, EAN-8, UPC-A, UPC-E and nothing else**; UPC comes out as thirteen digits, and a code
+  typed by hand is brought to that same form by `typedBarcode` — one package, one code (MOL-98).
+- **A code is taken after two frames in a row read it**; decoding is in a worker, one frame at a
+  time, only what lies under the frame on the screen.
+- **The wasm comes from the app's own origin and is precached** — never the library's default CDN.
+- **No camera track outlives the scanner**; every refusal offers the digits typed by hand.
+
 ### Identity, sessions, the way in and out — `.claude/rules/auth.md`
 
 - **Identity is proved by a session; `actors.id` proves only ownership** (MOL-52, MOL-53). The
