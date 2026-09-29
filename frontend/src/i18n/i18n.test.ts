@@ -288,6 +288,8 @@ describe('словарь: плюральные формы', () => {
       'verdict.pending_count',
       'spending.unsent',
       'spending.rest_operations',
+      'spending.charts.fx_count',
+      'spending.charts.fx_uncounted',
       'spending.trip_row_meta',
       'spending.more',
       'spending.sheet.trip_meta',
