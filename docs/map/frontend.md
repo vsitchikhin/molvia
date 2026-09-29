@@ -44,7 +44,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/public/` — Static assets served as is: `favicon.svg` (the icon source), the rasterised app icons and the self-hosted font files.
 - `frontend/src/App.vue` — The app's root: the login screen in place of any non-public route, the live region, and the occasions on which the queues send.
 - `frontend/src/api.ts` — The PWA's one API client, wrapped so that any `error.no_actor` raises the login screen.
-- `frontend/src/days.ts` — Day words for the screen: «сегодня»/«вчера» of a purchase, a month's name, `calendarDay` for Yerevan dates, `shiftDay`.
+- `frontend/src/days.ts` — Day words for the screen: «сегодня»/«вчера» of a purchase, a month's name, `calendarDay` for calendar days, `shiftDay`, `localDay` — the phone's today — and `dayWords` for a card's head (MOL-121).
 - `frontend/src/i18n.ts` — The i18n factory for the app and tests alike: locale from the model, Russian plural rule, English fallback, the document's `lang`.
 - `frontend/src/i18n/` — The dictionaries, `ru.json` and `en.json`: every text of the PWA by key, error-registry codes included.
 - `frontend/src/i18n/i18n.test.ts` — Test: both dictionaries mirror each other, compile, pluralise right and translate every error code; Russian plural forms; `lang`.

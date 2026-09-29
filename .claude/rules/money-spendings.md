@@ -207,15 +207,28 @@ nothing up.
   made while it was open was undone by the step back that closes it. It checks the day — a cleared
   picker or a day before 2000 would fall over in the queue's codec — and that the category is one of
   the chips shown, since one the server called unknown stands on none (adversarial Д, Ж).
-- **Days of Yerevan are printed as calendar days, never as moments** (`calendarDay` in `days.ts`,
-  review Т-1): `yerevanMidnight(day)` is the evening before anywhere west of UTC+4, and every date
-  of the screen came out a day early on a phone in Moscow. The frontend's tests run in UTC on every
+- **A day is printed as a calendar day, never as a moment** (`calendarDay` in `days.ts`, review
+  Т-1): `yerevanMidnight(day)` is the evening before anywhere west of UTC+4, and every date of the
+  screen came out a day early on a phone in Moscow. The frontend's tests run in UTC on every
   machine (`TZ` in its vitest config), where such a slip shows.
+- **«Сегодня» is the phone's day** (`localDay`, MOL-121, owner's decision В-3): the day a sheet
+  offers and allows, «Сегодня · …» over the journal, the month «Деньги» opens on and the head of an
+  exchange's or an income's card («Сегодня», «Вчера», `dayWords` — day against day, never a moment;
+  the button and the rate keep the date, В-1). At 23:30 in Moscow it is still the 28th for the person
+  holding the phone, whatever the hour in Yerevan. **The server takes any day that has come
+  somewhere** (`latestDay`, UTC+14) — at most Yerevan's tomorrow, so nobody in Yerevan writes
+  tomorrow's spending — **and counts its sums by Yerevan's today**: the wallet walks no link past it,
+  the running month, the balances and the charts are Yerevan's. **The price, named** (Р-5): east of
+  Yerevan, for up to ten hours a day, a day written there is in the wallet, a trip's own rate and the
+  balances only once Yerevan reaches it; west of it the phone's day is never ahead. What the phone
+  shows of the server's running month — the rate of the month kept offline (`useMoneyMonth`), the
+  period «Графики» open on (`CategoryBars`) — stays Yerevan's with it. End-to-end runs the browser in
+  `Asia/Yerevan`, a phone in Armenia; the component tests hold the rest in UTC.
 - **The categories are the owner's, not a month's**, so the newest month kept names them for a
   month not read yet: «Трата» stands while the month loads, when it failed and offline on the first
   of a month (review Т-5, Т-6) — and does not, where no category is known at all. «Категории ›»
-  stands without bars too (Т-7). This month in Yerevan is looked at again whenever the app comes
-  back into view (adversarial З).
+  stands without bars too (Т-7). This month on the phone (MOL-121) is looked at again whenever the app
+  comes back into view (adversarial З).
 - **«Пусто» is read off the answer** (Р-6): the running month empty, no income, nothing the month
   before and nothing waiting. The server does not say «no history», and an empty August after a
   full July is «В этом месяце трат нет», not a newcomer.
