@@ -9,6 +9,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 
 ## backend · usecases
 
+- `backend/src/usecases/export-mine.ts` — Use case of «Скачать мои данные» (MOL-93): the owner's own snapshot, dated with the file's format and version; an owner erased meanwhile is «no owner».
 - `backend/src/usecases/erase-me.ts` — Use case of the bot's `/delete`: erase the owner behind a Telegram id; nobody to erase is not an error. Tests: `backend/tests/erase-route.integration.test.ts`.
 
 ## backend · db
@@ -27,6 +28,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 - `backend/tests/compose-logging.integration.test.ts` — Integration test: every service of `docker-compose.prod.yml` logs to the journal, and Postgres keeps row values out of its own log.
 - `backend/tests/erase-route.integration.test.ts` — Integration test: `POST /internal/actors/erase` erases the owner with their sessions, answers a repeat and a stranger with the same 204, needs the bot secret.
 - `backend/tests/erasure.integration.test.ts` — Integration test: erasure leaves no row of the person anywhere, keeps items and places, counts the week, and orders its locks against a login.
+- `backend/tests/export-route.integration.test.ts` — Integration test: `GET /actors/me/export` answers the owner's own file with `no-store` and `attachment`, refuses a named owner, and needs a session.
 - `backend/tests/export.integration.test.ts` — Integration test: the export covers every key to `actors` and every column, counts what a dry run of erasure counts, leaks nobody else's row and no secret, keeps the removed marked.
 - `backend/tests/forget-bundle.integration.test.ts` — Integration test: the bundled `dist/forget.js` runs from the bundle alone, and `make forget` erases only with `YES=1` on the command line.
 - `backend/tests/life.ts` — Test support: `aLife`, a person touching every table erasure removes — the one life both the erasure and the export tests read.

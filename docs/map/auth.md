@@ -17,7 +17,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 ## backend · routes
 
 - `backend/src/routes/actor.ts` — `withActor`: the hook of the guarded scope that turns the session cookie into `actorId`, `actor` and `sessionId`, and re-sets a slid cookie. Tests: `backend/tests/sessions-auth.integration.test.ts`.
-- `backend/src/routes/actors.ts` — Route `GET /actors/me` («who am I»), and `answerWithActor`, the one way an owner leaves the server. Tests: `backend/tests/actors.integration.test.ts`.
+- `backend/src/routes/actors.ts` — Route `GET /actors/me` («who am I»), and `answerWithActor`, the one way an owner leaves the server; `GET /actors/me/export`, «Скачать мои данные» (MOL-93, `export-route.integration.test.ts`). Tests: `backend/tests/actors.integration.test.ts`.
 - `backend/src/routes/auth.ts` — Routes of the browser's login: start `POST /auth/login` (with `?again=1` from a device repeating a login), poll `GET /auth/login/:id`, and the way out `POST /auth/logout`. Tests: `backend/tests/login.integration.test.ts`.
 - `backend/src/routes/dev-login.ts` — Route `POST /dev/login`: the development sign-in seam with no Telegram, absent from the production bundle. Tests: `backend/tests/identity-hardening.integration.test.ts`.
 - `backend/src/routes/internal-auth.ts` — The bot's internal routes behind `BOT_API_SECRET`: preview, confirm and decline a login, and `POST /internal/actors/erase`. Tests: `backend/tests/login.integration.test.ts`.
