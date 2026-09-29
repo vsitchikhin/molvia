@@ -88,7 +88,7 @@ describe('the app live region', () => {
   })
 
   it('is not there outside the app, so a block speaks for itself', () => {
-    let announce: ReturnType<typeof useAnnouncer> = () => () => undefined
+    let announce: ReturnType<typeof useAnnouncer> = () => () => false
     mount({
       setup() {
         announce = useAnnouncer()
