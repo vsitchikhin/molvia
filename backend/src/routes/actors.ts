@@ -1,7 +1,8 @@
 import { z } from 'zod'
-import { DomainError, ERROR, actorCodec } from '@molvia/model'
-import type { Actor } from '@molvia/model'
+import { DomainError, ERROR, actorCodec, exportFileCodec, yerevanDate } from '@molvia/model'
+import type { Actor, ExportFile } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
+import { parseQuery } from '@/parse'
 
 /**
  * The entity leaves through its codec rather than as the object the repository built: in the
@@ -38,5 +39,27 @@ export function actorMeRoute(app: FastifyInstance): void {
     if (!actor) throw new DomainError(ERROR.NO_ACTOR)
 
     return answerWithActor(reply, actor)
+  })
+}
+
+/**
+ * «Скачать мои данные» (MOL-93): a path with no owner in it, so IDOR is impossible by its shape.
+ * `no-store` because the reply is everything the server holds of one person, and `attachment`
+ * so a browser that navigates here saves it rather than showing it.
+ */
+export function actorExportRoute(
+  app: FastifyInstance,
+  exportMine: (actorId: string, sessionId: string) => Promise<ExportFile>,
+): void {
+  app.get('/actors/me/export', { exposeHeadRoute: false }, async (request, reply) => {
+    parseQuery(z.strictObject({}), request.query)
+    const file = await exportMine(request.actorId, request.sessionId)
+    return reply
+      .header('cache-control', 'no-store')
+      .header(
+        'content-disposition',
+        `attachment; filename="molvia-${yerevanDate(file.exportedAt)}.json"`,
+      )
+      .send(z.encode(exportFileCodec, file))
   })
 }

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { ZodType } from 'zod'
 import {
   ERROR,
+  EXPORT_FORMAT,
   LOGIN_HEADER,
   loginStartedCodec,
   sessionsResponseCodec,
@@ -140,6 +141,14 @@ export interface MolviaClient {
   me(): Promise<ActorView>
   /** «Устройства» (MOL-57): the owner's live sessions, this one first and marked. */
   sessions(): Promise<SessionsResponse>
+  /**
+   * «Скачать мои данные» (MOL-93): the file's text and the moment the server took it. Only its
+   * envelope is checked — an installed app older than the server must still hand over a copy
+   * holding a field it does not know. Cancelled through `signal` when the screen goes.
+   */
+  exportMine(options?: {
+    readonly signal?: AbortSignal
+  }): Promise<{ readonly text: string; readonly exportedAt: Date }>
   /**
    * Ends one of the owner's sessions. `error.not_found` is the answer for one that is already
    * gone, someone else's and one that never was — a screen reads it as done.
@@ -337,6 +346,15 @@ export interface MolviaClient {
   ): Promise<AdviceSearchResponse>
 }
 
+const exportEnvelopeSchema = z.looseObject({
+  format: z.literal(EXPORT_FORMAT),
+  version: z.int().min(1),
+  exportedAt: z.iso.datetime(),
+})
+
+/** Everything a person has is read in one snapshot; a year of it is not a search. */
+const EXPORT_TIMEOUT_MS = 60_000
+
 /**
  * The PWA and the bot both talk to the API through this, and both validate what comes
  * back against the same schemas the API answers with.
@@ -421,6 +439,13 @@ export function createClient(options: ClientOptions): MolviaClient {
 
     me: () => request('/actors/me', actorCodec),
     sessions: async () => request('/sessions', sessionsResponseCodec),
+    exportMine: async (options = {}) => {
+      const file = await request('/actors/me/export', exportEnvelopeSchema, {
+        timeout: EXPORT_TIMEOUT_MS,
+        ...(options.signal === undefined ? {} : { signal: options.signal }),
+      })
+      return { text: JSON.stringify(file, null, 2), exportedAt: new Date(file.exportedAt) }
+    },
     endSession: async (id) => {
       noContent(await exchange(`/sessions/${segment(id)}`, z.undefined(), { method: 'DELETE' }))
     },

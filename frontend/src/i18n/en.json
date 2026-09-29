@@ -976,6 +976,17 @@
     },
     "group_account": "Account",
     "sign_out": "Sign out",
+    "group_data": "Your data",
+    "export": {
+      "label": "Download my data",
+      "hint": "Your records, ratings and settings, in one file",
+      "offline": "You can download it once you are back online",
+      "busy": "Preparing the file…",
+      "failed": "Could not prepare the file",
+      "lost": "The connection dropped — try again once it is back",
+      "ready": "The file is ready",
+      "hand_over": "Save or send"
+    },
     "group_money": "Money",
     "salary_shift": {
       "label": "Salary counts in the next month",
@@ -989,7 +1000,7 @@
   },
   "privacy": {
     "title": "Data and privacy",
-    "revised": "Revised 28 September 2026",
+    "revised": "Revised 29 September 2026",
     "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
@@ -1053,6 +1064,10 @@
     "storage": {
       "title": "Cookies and the phone's memory",
       "text": "Two cookies: the sign-in, and one more for five minutes while you sign in. The phone keeps what you saw last and what has not reached the server yet. All of it is needed for the app to work, so there is no banner. Signing out in Settings erases all of it from the phone."
+    },
+    "copy": {
+      "title": "A copy of your data",
+      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected and the items you added to the shared catalogue. A rating you withdrew is there too: without its review it stays with us, so the count of ratings given stays honest. What you removed and can still bring back is there as well, marked. The file holds no login keys."
     },
     "erase": {
       "title": "Delete everything",

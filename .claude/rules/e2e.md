@@ -77,10 +77,11 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   out, the trace may still be lost: it is saved while the context is torn down, and that teardown
   shares the test's timeout.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
-  (MOL-64). The app has one polite region, in `App.vue` above the router, and **six things write
+  (MOL-64). The app has one polite region, in `App.vue` above the router, and **seven things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
   count of an answer, and an empty answer's own words), `ItemDetailsSheet` (the price per unit),
-  `VerdictCard` («Pick a rating») and `useSettings` (the form's notice). Whatever any of them
+  `VerdictCard` («Pick a rating»), `useSettings` (the form's notice) and `YourDataGroup` («Файл
+  готов», MOL-93). Whatever any of them
   says is on the screen twice, so a plain `getByText` matches two nodes and playwright's strict
   mode refuses — a failure the machine's speed decides: measured, one match at once and two from
   200 ms onwards. Strict mode is right, and it is answered with a locator, never muted with

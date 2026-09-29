@@ -83,9 +83,7 @@
         </li>
       </AppCard>
     </section>
-    <AppButton class="privacy" variant="ghost" block @click="privacy">{{
-      t('privacy.title')
-    }}</AppButton>
+    <YourDataGroup />
     <SignOutSheet
       v-model:open="leaveOpen"
       :unsent="unsent"
@@ -142,7 +140,6 @@
 <script lang="ts">
 import { computed, defineComponent, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import type { ActorSettings } from '@molvia/model'
 import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconPencil from '~icons/mdi/pencil-outline'
@@ -160,6 +157,7 @@ import SettingsFields from '@/components/SettingsFields.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SignOutSheet from '@/components/SignOutSheet.vue'
+import YourDataGroup from '@/components/YourDataGroup.vue'
 import { useSettings } from '@/composables/useSettings'
 import { useSignOutStore } from '@/stores/signOut'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -176,6 +174,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SignOutSheet,
+    YourDataGroup,
     IconCloud,
     IconPencil,
     IconCheck,
@@ -187,7 +186,6 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18n()
-    const router = useRouter()
     /**
      * The same words the form beside it uses: the notice printed `AM` and `AMD` where the
      * fields say «Армения» and «Армянский драм · AMD», and it is the line a person decides by.
@@ -233,7 +231,6 @@ export default defineComponent({
       t,
       saidIn,
       id: useId(),
-      privacy: () => void router.push({ name: 'privacy' }),
       ...settings,
       leaveOpen,
       signOut,
@@ -244,10 +241,6 @@ export default defineComponent({
 })
 </script>
 <style scoped lang="scss">
-.privacy {
-  margin-top: var(--space-6);
-}
-
 .form,
 .actions {
   display: grid;
