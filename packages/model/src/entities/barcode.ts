@@ -1,3 +1,4 @@
+import { barcodeSchema } from '#model/entities/item'
 import { ERROR, type ErrorCode } from '#model/support/errors'
 import { INVISIBLE } from '#model/support/text'
 
@@ -29,6 +30,41 @@ function expandUpcE(code: string): string {
           ? `${data.slice(0, 4)}00000${data.slice(4, 5)}`
           : `${data.slice(0, 5)}0000${last}`
   return `${code.slice(0, 1)}${middle}${code.slice(7)}`
+}
+
+// The way back: the UPC-E forms that `expandUpcE` turns into this UPC-A, one per rule of the four.
+function compressUpcA(upcA: string): string[] {
+  if (!/^[01]/.test(upcA)) return []
+  const data = [
+    `${upcA.slice(1, 3)}${upcA.slice(8, 11)}${upcA.slice(3, 4)}`,
+    `${upcA.slice(1, 4)}${upcA.slice(9, 11)}3`,
+    `${upcA.slice(1, 5)}${upcA.slice(10, 11)}4`,
+    `${upcA.slice(1, 6)}${upcA.slice(10, 11)}`,
+  ]
+  const forms = data.map((middle) => `${upcA.slice(0, 1)}${middle}${upcA.slice(11)}`)
+  return [...new Set(forms)].filter((upcE) => expandUpcE(upcE) === upcA)
+}
+
+/**
+ * Every form the code of one package may have been taken in, the code itself first (MOL-99,
+ * review С-14); nothing for a code of no barcode's shape.
+ *
+ * Eight digits that check both as EAN-8 and as UPC-E are the one case two forms exist: scanned
+ * as EAN-8 they stay eight digits, typed they are the UPC-E expanded to thirteen (`typedBarcode`),
+ * and the other way round for a UPC-E of number system `1`. A lookup by both finds what the
+ * other way in found. The price: a shop's own EAN-8 label and a UPC-E product with the same
+ * digits find each other.
+ */
+export function barcodeTwins(code: string): string[] {
+  if (!barcodeSchema.safeParse(code).success) return []
+  if (code.length === 8) {
+    const upcA = /^[01]/.test(code) ? expandUpcE(code) : null
+    return upcA !== null && checks(code) && checks(upcA) ? [code, `0${upcA}`] : [code]
+  }
+  if (code.length === 13 && code.startsWith('0') && checks(code)) {
+    return [code, ...compressUpcA(code.slice(1)).filter(checks)]
+  }
+  return [code]
 }
 
 /**
