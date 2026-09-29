@@ -13,7 +13,8 @@ import { useRoute } from 'vue-router'
  * «Трата», «Обмен», «Доход» (MOL-72, MOL-81). A place and not a button: on the month the same spot
  * holds «Вернуть» after a removal, and the screen decides which of the two stands there. Only what
  * it holds takes taps; the rest of its row lets them through to the list underneath. Over the tab
- * bar on a section, at the bottom edge on a nested screen, which has none (MOL-17).
+ * bar on a section, at the bottom edge on a nested screen, which has none (MOL-17) — and above the
+ * screen's pinned strip, by its height, when a new version waits there (MOL-132).
  */
 export default defineComponent({
   name: 'FloatingDock',
@@ -27,7 +28,9 @@ export default defineComponent({
 .dock {
   position: fixed;
   right: calc(var(--space-4) + var(--safe-right));
-  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + var(--space-4));
+
+  // Above the screen's pinned strip, when it has one — a new version waiting (MOL-132).
+  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + var(--dock-height) + var(--space-4));
   left: calc(var(--space-4) + var(--safe-left));
   z-index: 1;
   display: flex;
@@ -35,7 +38,7 @@ export default defineComponent({
   pointer-events: none;
 
   &.bare {
-    bottom: calc(var(--safe-bottom) + var(--space-4));
+    bottom: calc(var(--safe-bottom) + var(--dock-height) + var(--space-4));
   }
 
   > :slotted(*) {

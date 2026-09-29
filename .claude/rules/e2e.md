@@ -41,6 +41,19 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   answer to the door is one synchronous chain and one render, so a failure there is the login
   (`verify()`, `claimed`, MOL-56), not the machine, and its message says so. Measured over 284
   logins under load: late, never «not at all».
+- **A worker needs a build, so one spec runs against one** (MOL-132): the project `pwa` is the same
+  phone against `vite build` + `vite preview` in `frontend/dist-e2e`, on the next port of the band
+  (`E2E_PWA_PORT + 1`, derived, so no `.env` has to be made again), and holds only
+  `pwa-update.spec.ts`, serially, since its specs rewrite the one built worker: a page on the screen,
+  a first visit, which nothing controls — the fake of the unit tests had its version waiting, and
+  Chromium showed it becomes active at once (adversarial Д2) — and a first visit beside another
+  window of the app, where it does wait (Е1); `phone` ignores it. The build is a web server of the run, so every `make e2e`
+  pays for it — some twenty seconds. The spec comes in by `page.goto('/privacy')`, **the one spec
+  not through `open()`**: the development seam is not in a build, and that page is open without a
+  session. A new version is a byte appended to the built `sw.js`, put back after the spec; `preview`
+  keeps plain http even in a copy with certificates (`PWA_PLAIN_HTTP`), since the loopback is a
+  secure context anyway. Chromium only: Safari's worker lives by rules of its own, and that is
+  checked on a phone.
 - **Outside CI a failed test keeps its trace** (`retain-on-failure`, MOL-67), since there are no
   retries to write one. It is recorded for every test and dropped when it passes, which costs
   12–22 % of a full local run (measured in four pairs); and under an overload that times a test

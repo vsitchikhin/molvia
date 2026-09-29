@@ -27,3 +27,12 @@ export const GATE_RATINGS_WINDOW_HOURS = 14 * 24
  */
 export const GATE_RATINGS_STOP_PERCENT = 20
 export const GATE_RETURN_STOP_PERCENT = 15
+
+/**
+ * The login's line (MOL-68, owner's decision В-2, 29.09.2026): when this share of the people who
+ * began a login through the bot never came in, a second way in is filed — an e-mail code typed in
+ * the same window, beside the bot and never instead of it. A trigger rather than a stop: the plan's
+ * risk «Вход только через Telegram» leaves the number to MOL-68, and the gates print it the same way,
+ * beside its `n` and with no verdict.
+ */
+export const LOGIN_SECOND_WAY_PERCENT = 25

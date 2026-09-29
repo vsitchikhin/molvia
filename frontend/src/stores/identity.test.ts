@@ -116,6 +116,12 @@ describe('«Выйти» стирает ящик владельца (MOL-57)', (
     expect(localStorage.getItem('molvia.leaving')).toBeNull()
   })
 
+  it('с одобрением уходит и метка «уже начинали» — следующий вход здесь начало (MOL-68, А1)', () => {
+    localStorage.setItem('molvia.login', JSON.stringify({ claimed: OWNER, tried: Date.now() }))
+    forgetOwner(OWNER)
+    expect(localStorage.getItem('molvia.login')).toBeNull()
+  })
+
   it('чужое одобрение не трогает', () => {
     localStorage.setItem('molvia.login', JSON.stringify({ claimed: OTHER }))
     forgetOwner(OWNER)
@@ -201,6 +207,9 @@ describe('какие ключи приложение пишет на устро�
       // Пробная запись: пишется и тут же удаляется, чтобы узнать, работает ли общая полка.
       'molvia.probe',
       'molvia.total-flipped',
+      // Момент, когда «Обновить» перезагрузило страницу: живёт до её регистрации воркера, и
+      // говорит о версии, а не о человеке (MOL-132).
+      'molvia.update-applied',
     ]
     // По владельцу — `molvia.<что>.<владелец>`, всё это уходит с `forgetOwner`.
     const perOwner = [

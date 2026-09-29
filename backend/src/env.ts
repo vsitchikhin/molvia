@@ -1,6 +1,7 @@
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
+import { UNNAMED_BUILD } from '@molvia/model'
 import { loginConfiguration } from './login-config'
 
 // One .env at the repository root holds this working copy's ports and database,
@@ -27,7 +28,7 @@ const envSchema = z.object({
    * `v0.1.1-3-g1a2b3c4`, or the tag alone on a tagged commit. The image carries it; outside one it
    * is `dev`. What the deploy compares with to know the new containers are the ones answering.
    */
-  APP_VERSION: z.string().min(1).default('dev'),
+  APP_VERSION: z.string().min(1).default(UNNAMED_BUILD),
 })
 
 export const env = envSchema.parse(process.env)

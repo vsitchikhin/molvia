@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ERROR, ISSUE } from '@molvia/model'
+import { ERROR, ISSUE, VERSION_HEADER } from '@molvia/model'
 import { ApiError, createClient } from '#client/index'
 
 function clientAnswering(status: number, body: unknown) {
@@ -196,6 +196,55 @@ describe('everything the client throws is an ApiError', () => {
       version: '1.0.0',
       database: 'up',
     })
+  })
+})
+
+describe('the build an answer names (MOL-132)', () => {
+  function clientHearing(body: BodyInit | null, init: ResponseInit) {
+    const heard: string[] = []
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: () => Promise.resolve(new Response(body, init)),
+      onVersion: (version) => heard.push(version),
+    })
+    return { client, heard }
+  }
+
+  const json = { 'content-type': 'application/json', [VERSION_HEADER]: 'v0.1.4-2-g9f00000' }
+
+  it('is heard on an answer that reads', async () => {
+    const { client, heard } = clientHearing(JSON.stringify(actorWire), {
+      status: 200,
+      headers: json,
+    })
+    await client.me()
+    expect(heard).toEqual(['v0.1.4-2-g9f00000'])
+  })
+
+  it('is heard on an answer this code can no longer read, before it is refused', async () => {
+    // The whole point: a server rolled out under an open page answers in a shape the old code
+    // refuses, and that very answer is what tells the page to look for its new version.
+    const { client, heard } = clientHearing(JSON.stringify({ ...actorWire, id: 7 }), {
+      status: 200,
+      headers: json,
+    })
+    expect(await codeOf(client.me())).toBe(ISSUE.RESPONSE_INVALID)
+    expect(heard).toEqual(['v0.1.4-2-g9f00000'])
+  })
+
+  it('is heard on a refusal in the API’s own words', async () => {
+    const { client, heard } = clientHearing(JSON.stringify({ code: ERROR.NOT_FOUND }), {
+      status: 404,
+      headers: json,
+    })
+    expect(await codeOf(client.me())).toBe(ERROR.NOT_FOUND)
+    expect(heard).toEqual(['v0.1.4-2-g9f00000'])
+  })
+
+  it('says nothing for an answer that names no build — a proxy’s 502 during a rollout', async () => {
+    const { client, heard } = clientHearing('<html>502 Bad Gateway</html>', { status: 502 })
+    expect(await codeOf(client.health())).toBe(ERROR.INTERNAL)
+    expect(heard).toEqual([])
   })
 })
 

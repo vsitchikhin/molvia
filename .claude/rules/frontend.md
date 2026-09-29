@@ -71,6 +71,63 @@ The detail behind the frontend lines of `CLAUDE.md`.
   once leaves the old page on a precache that is no longer its own — and a new version is looked
   for whenever the app is looked at again or the network comes back. The other half is the
   contract's: a field is added so the old server's answer still reads.
+- **A page that stays on the screen takes its version by the person's hand: «Вышла новая версия ·
+  Обновить»** (`UpdateBand`, MOL-132). The quiet way waits for the background, and an app open all
+  day on the table never gets there — while a server rolled out under it (a merge is a deploy,
+  MOL-90) answers in a shape the old code refuses. So a new version is also looked for every
+  fifteen minutes while the app is looked at and online, and **at once when an answer names another
+  build than the first this page met** — every answer of the API carries `X-Molvia-Version`, the
+  build `/health` names, encoded (`encodeURIComponent`: Node refuses a header outside latin1, and a
+  tag in Cyrillic failed every answer, adversarial Д4), heard by the client before it reads the body,
+  since the answer it can no longer read is the one that says most; `dev` is not compared. **It looks
+  again on every such answer, at most every thirty seconds, until a version is found — and for five
+  minutes at most** (review С-8, adversarial Е2): the API may come out a moment before the static
+  files, and the first look finds the old worker; but a merge that touches no frontend ships the same
+  `sw.js`, and looking for the page's whole life found nothing a hundred and twenty times an hour —
+  past five minutes the quarter-hour look is enough, and the next build the server names starts
+  over — so does the same build rolled out again after the server named the page's own in between, a
+  rollback (adversarial Ж1).
+  The build alone offers nothing: only a worker has a version to let in. **A first visit is
+  controlled by nothing to its end** (no `clientsClaim`), and a version come out meanwhile becomes
+  the active worker at once when no other window uses the registration (adversarial Д2), and waits
+  when one does (Е1): the worker the page came up with is its own, and any other — waiting or become
+  active — is a version for it; with no takeover to hear, its «Обновить» reloads when the version it
+  let in becomes the active worker; a worker already installing or waiting as the page came up is followed too (review С-14), or the
+  version taken would be called failed — after a hard reload the offer
+  may be a reload onto what the page already runs, a harmless price. **`phase` is one state for the app** (`none` / `ready` / `applying` /
+  `failed`), provided from `main.ts` and read through `usePwaUpdate`; without a worker — the dev
+  server, the tests — it is `none`. **The strip is the top row of `AppScreen`'s pinned strip over the
+  tab bar** (owner's decision В-1, Р-6): the screen's own main action — «Начать поход», the trip's
+  total, «Сохранить» — stays under it, nearer the thumb, the room for the list is the strip's as
+  ever, and what floats over the list (`FloatingDock`) rises by `--dock-height`, a token like
+  `--keyboard-inset` that `AppScreen` sets. On the login screen, its own frame, it stands under the
+  screen's action. «Обновить» lets the waiting worker in and reloads when it takes over; a version
+  another window already let in (`owed`) is a reload alone. **A sheet opened between the tap and
+  the takeover holds the reload** (adversarial Д3): the tap consented to a reload then, not to losing
+  what is typed in the sheet — the button comes back, and the quiet way still takes the version once
+  the app is put away without a sheet. **It is said out loud once for the version, not once for each
+  strip** (adversarial Д1): every screen draws its own strip, born with the version already waiting,
+  so what was said — `ready`, `failed` — is kept by the version's state (a `WeakMap` over the one
+  `PwaUpdate`), and a strip drawn anew on the next screen says nothing. **Words still true are not taken back when
+  the strip goes with its screen** (review С-13, adversarial Ж2): taken back, they were gone before a
+  screen reader read them — or before they reached the region at all — and the next strip, silent,
+  never said them; only words that stopped being true are taken back. **An error while a version waits offers
+  «Обновить» first and «Повторить» second, whatever the error was** (В-2): which answer the old code
+  could not read is not always known — a new server's unknown code arrives as `response_invalid`, a
+  proxy's 502 during the rollout as `internal` — and the reload loses nothing: the queues hold both
+  (`HOLDS`), the drafts are on the device. **It never reloads without the tap**, and under an open
+  sheet it cannot be tapped: a modal `<dialog>` leaves the page inert, so nothing extra keeps the
+  reload from under the finger. **A version that did not take is said, not retried**: no takeover in
+  ten seconds, or the page «Обновить» brought up still has one waiting (`molvia.update-applied`, the
+  moment of the reload on this window's own shelf — `writeOwn`, so another window cannot take it,
+  review С-9 — trusted for a minute) — then the strip asks for the app to be closed all the
+  way, in the words of both phones, since a guess from the user agent is wrong on an iPad. No «×»:
+  it is quiet, and it goes with the version. Nothing is cleared for it — the cache and the storage
+  hold the queue of purchases made offline. **The price of the first rollout:** a page on the code
+  before this learns of it only the quiet way. **The price of a rollout rolled back** (review С-11,
+  accepted): in the health window of a failed deploy an open page hears the new build and installs
+  its worker, and «Обновить» then brings up a build the server no longer runs — the next rollout
+  puts it right; holding the look until `/health` names the build twice would cost more than it saves.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and

@@ -79,6 +79,10 @@ The log's writer, the cohort and both gate queries are pinned in `.claude/rules/
 - **Both gates are read by `dist/gates.js`** (MOL-91), `make gates FROM=…` in a copy: `n` beside
   every share, the stop line printed and no verdict; gate 0.3 closes its window as 0.2 does; the
   erased leave one number, by week of arrival, in `erasures`.
+- **The login's funnel is `login_days`** (MOL-68): counted in each step's own transaction, by the
+  day the login began, with no id at all; a device's repeat says `again=1`, so «began» is people
+  rather than taps; a second way in is filed above `LOGIN_SECOND_WAY_PERCENT` (25 %) lost, read as
+  the third block of `make gates`.
 
 ## Money
 
@@ -296,7 +300,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   failure; polite states speak through the one live region in `App.vue`.
 - **Native HTML first, then Reka UI, never a styled kit**; the catalogue combobox is our own.
   Interface icons come from MDI through `unplugin-icons`.
-- **An installed app takes a new version only when hidden and holding no typing** (`pwaUpdate.ts`).
+- **An installed app takes a new version only when hidden and holding no typing** (`pwaUpdate.ts`),
+  **or by «Обновить»** (MOL-132): never reloaded without the tap; the strip is the top row over the
+  tab bar, and an error while a version waits offers it first.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17); no gesture
   is intercepted; only the page scrolls, except a sheet.
 - **A screen is built from the kit** (MOL-18); the sheet is a native `<dialog>` with an entry in the

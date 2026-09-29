@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick, ref, watch, type VNodeArrayChildren } from 'vue'
+import { defineComponent, h, nextTick, ref, shallowRef, watch, type VNodeArrayChildren } from 'vue'
 import IconPlus from '~icons/mdi/plus'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
@@ -10,6 +10,7 @@ import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import ScreenState from '@/components/ScreenState.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
+import { pwaUpdateKey, type UpdatePhase } from '@/pwaUpdate'
 
 type Props = Record<string, unknown>
 
@@ -361,6 +362,53 @@ describe('ScreenState', () => {
     )
     const order = [...view.element.children].map((child) => child.className)
     expect(order.slice(-2)).toEqual(['extra', 'action'])
+  })
+
+  describe('an error while a new version waits (MOL-132, В-2)', () => {
+    function waiting(phase: UpdatePhase, props: Props = { kind: 'error' }) {
+      const update = { phase: shallowRef(phase), apply: vi.fn(), serverVersion: vi.fn() }
+      const view = mount(ScreenState, {
+        props: { title: 'Title', ...props } as never,
+        global: {
+          plugins: [createAppI18n('ru')],
+          provide: { [pwaUpdateKey as symbol]: update },
+        },
+      })
+      return { view, update }
+    }
+
+    it('offers «Обновить» first and «Повторить» second, whatever the error was', async () => {
+      const { view, update } = waiting('ready')
+      const [first, second] = view.findAll('.action button')
+
+      expect(first?.text()).toBe('Обновить')
+      expect(second?.text()).toBe('Повторить')
+      expect(second?.classes()).toContain('secondary')
+
+      await first?.trigger('click')
+      expect(update.apply).toHaveBeenCalledOnce()
+      await second?.trigger('click')
+      expect(view.emitted('retry')).toHaveLength(1)
+    })
+
+    it('holds «Обновить» busy while the version is let in', () => {
+      const { view } = waiting('applying')
+      expect(view.findAll('.action button')[0]?.attributes('aria-busy')).toBe('true')
+    })
+
+    it.each(['none', 'failed'] as const)(
+      'must not offer it when the version is %s — «Повторить» alone, as ever',
+      (phase) => {
+        const buttons = waiting(phase).view.findAll('.action button')
+        expect(buttons.map((button) => button.text())).toEqual(['Повторить'])
+        expect(buttons[0]?.classes()).toContain('primary')
+      },
+    )
+
+    it('must not offer it anywhere but an error', () => {
+      const { view } = waiting('ready', { kind: 'offline', tone: 'warn' })
+      expect(view.find('.action').exists()).toBe(false)
+    })
   })
 
   it('takes the free height unless it is asked to stay inline', () => {

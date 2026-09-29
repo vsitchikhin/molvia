@@ -1,5 +1,5 @@
 import type { ZodType } from 'zod'
-import { ERROR, ISSUE, errorResponseSchema } from '@molvia/model'
+import { ERROR, ISSUE, VERSION_HEADER, errorResponseSchema } from '@molvia/model'
 import type { WireCode } from '@molvia/model'
 
 /**
@@ -19,12 +19,20 @@ export class ApiError extends Error {
    * for the server's.
    */
   readonly answered: boolean
+  /**
+   * The status of a reply whose body did not match the contract, when there was one. A portal
+   * answers a redirected request with `200` and a page of its own, and a reply of ours cut off on
+   * its body arrives with our own status — the login tells a start that never reached us from one
+   * whose answer was lost on the way back by exactly this (MOL-68, review Т1).
+   */
+  readonly status: number | undefined
 
-  constructor(code: WireCode, details?: string, answered = true) {
+  constructor(code: WireCode, details?: string, answered = true, status?: number) {
     super(details ? `${code}: ${details}` : code)
     this.name = 'ApiError'
     this.code = code
     this.answered = answered
+    this.status = status
   }
 }
 
@@ -66,6 +74,12 @@ export interface ClientOptions {
    * to — a constant here would make every suite that covers the timeout wait for it.
    */
   readonly timeoutMs?: number
+  /**
+   * Told the build every answer names (`VERSION_HEADER`, MOL-132), as soon as its headers are in —
+   * before the body is read, since an answer this code can no longer read is the one that says
+   * most. An answer without it (a proxy's 502 during a rollout) tells nothing.
+   */
+  readonly onVersion?: (version: string) => void
 }
 
 interface RequestOptions {
@@ -93,6 +107,7 @@ export function createTransport({
   fetch = globalThis.fetch,
   credentials = 'same-origin',
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  onVersion,
   botSecret,
 }: ClientOptions & { readonly botSecret?: string }): Transport {
   async function exchange<T>(
@@ -151,6 +166,9 @@ export function createTransport({
         )
       }
 
+      const version = response.headers.get(VERSION_HEADER)
+      if (version !== null) onVersion?.(version)
+
       // A proxy page, an empty body, a reply cut off mid-flight: `.json()` throws, and every
       // line below — including the one that tells a dead identity from a broken server — used
       // to be skipped entirely.
@@ -188,7 +206,12 @@ export function createTransport({
     // only way callers are meant to need.
     const parsed = schema.safeParse(body)
     if (parsed.success) return { status: response.status, data: parsed.data }
-    throw new ApiError(ISSUE.RESPONSE_INVALID, parsed.error.issues[0]?.path.join('.'))
+    throw new ApiError(
+      ISSUE.RESPONSE_INVALID,
+      parsed.error.issues[0]?.path.join('.'),
+      true,
+      response.status,
+    )
   }
 
   async function request<T>(

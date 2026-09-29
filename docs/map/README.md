@@ -60,7 +60,7 @@ support types, the shared integration tests, the migrations.
 ### packages/client
 
 - `packages/client/src/index.ts` — The typed API client: one method per route of the API, every answer parsed with the model's codecs; re-exports the bot client.
-- `packages/client/src/transport.ts` — Client transport: fetch with a timeout and `ApiError` with `answered`; only the API's own error body may say `error.no_actor`, never a bare 401.
+- `packages/client/src/transport.ts` — Client transport: fetch with a timeout and `ApiError` with `answered` and, for a reply off the contract, its `status`; only the API's own error body may say `error.no_actor`, never a bare 401.
 
 ### backend · routes
 
@@ -75,14 +75,14 @@ support types, the shared integration tests, the migrations.
 - `backend/src/db/rows.ts` — Row helpers: `theRow` for a write that must return one, `idOrNull` for a malformed id, `rowLimit`.
 - `backend/src/db/schema.ts` — The Drizzle schema of every table with its checks and indexes — what the migrations are generated from. Tests: `backend/tests/schema.integration.test.ts`.
 - `backend/src/db/unit-of-work.ts` — Unit of work: the repositories a trip or money use case reaches, bound to one connection, and `transactOn` for one transaction.
-- `backend/src/db/yerevan-week.ts` — SQL fragment: the Monday in Yerevan of the week an instant falls in, shared by erasure and the gates.
+- `backend/src/db/yerevan-week.ts` — SQL fragments: the Monday in Yerevan of the week an instant falls in, shared by erasure and the gates, and the day in Yerevan, the key of `login_days`.
 
 ### backend · other
 
 - `backend/src/env.ts` — The API's environment: loads the copy's `.env`, validates ports, database, rate refresh, build version and login configuration.
 - `backend/src/index.ts` — The API process's entry: migrations at boot, the scheduled official-rate refresh, then listening.
 - `backend/src/parse.ts` — The parse seam for body, query and path, shared by routes and use cases; `InvalidBody` and the resource-id parse.
-- `backend/src/server.ts` — `buildServer`, the API's composition point: the request log of method and path, the central error handler, `no-store` on auth paths, all routes and timers wired.
+- `backend/src/server.ts` — `buildServer`, the API's composition point: the request log of method and path, the central error handler, `no-store` on auth paths, the build on every answer, all routes and timers wired.
 
 ### backend · tests
 
@@ -90,6 +90,7 @@ support types, the shared integration tests, the migrations.
 - `backend/tests/corners.integration.test.ts` — Integration test: repository corners — a second price for one pair, a third currency in a trip, barcodes, dangling refs, bad rows.
 - `backend/tests/db.ts` — Test support: the test database's URL and short-lived connections to it, raw and through drizzle.
 - `backend/tests/error-handler.integration.test.ts` — Integration test: a body that did not parse is a 400 naming the field, and a unique clash is a conflict, not a 500.
+- `backend/tests/version-header.integration.test.ts` — Integration test: every answer names its build in `X-Molvia-Version` — refusals, missing routes and framework errors too.
 - `backend/tests/fixtures.ts` — Test support: minimal rows a foreign key demands (actor, item, place, trip, session, login request), sign-in and clearing.
 - `backend/tests/hardening.integration.test.ts` — Integration test: fixes from an adversarial pass — write order in a transaction, limits, malformed ids, reviews, conflicts, empty patch.
 - `backend/tests/listings.integration.test.ts` — Integration test: repository reads — empty lists, order and limit, purchases awaiting a rating, where it is cheaper, ratings.

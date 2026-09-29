@@ -3,10 +3,11 @@ import {
   GATE_RATINGS_STOP_PERCENT,
   GATE_RATINGS_WINDOW_HOURS,
   GATE_RETURN_STOP_PERCENT,
+  LOGIN_SECOND_WAY_PERCENT,
   yerevanDate,
   yerevanMidnight,
 } from '@molvia/model'
-import type { GatesReader, GatesReport, GatesWindow } from '@/db/gates-reader'
+import type { GatesReader, GatesReport, GatesWindow, LoginsInWindow } from '@/db/gates-reader'
 import { describeFailure } from '@/db/failure'
 
 export const GATES_USAGE =
@@ -141,8 +142,86 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
     row('no access in week 4', [String(products.withoutAccess), 'not in the cohort']),
     '',
     row('erased', [String(report.erased.count), erasedWeeks(report.erased)]),
+    '',
+    ...loginLines(report.logins),
   ]
 }
+
+/**
+ * The login's funnel (MOL-68) under the gates: how many who began a login came in. «Began» is the
+ * starts less those a device said were its own again — «Начать заново», or a return after the link
+ * ran out — so a person who needed two tries is one who began and one who got in.
+ *
+ * Where they were lost is counted in requests, not people, so those lines need not add up to
+ * «lost». And «lost» is not held at zero: a repeat inside the window of a start before it can make
+ * more come in than began, and printed as it is, that edge stays in sight.
+ */
+function loginLines({ firstDay, lastDay, days }: LoginsInWindow): string[] {
+  const total = (pick: (day: LoginsInWindow['days'][number]) => number): number =>
+    days.reduce((sum, day) => sum + pick(day), 0)
+  const again = total((day) => day.again)
+  const began = total((day) => day.started) - again
+  const gotIn = total((day) => day.collected)
+  // Begun and not over yet: a login lives five minutes, and a window reaching until now holds
+  // some that are still on their way to an outcome — not lost, not in (review А2).
+  const open =
+    total((day) => day.started) -
+    gotIn -
+    total((day) => day.declined + day.expiredUnconfirmed + day.expiredConfirmed)
+  // Only what is still on its way comes off «lost»: below zero, «under way» is outcomes whose start
+  // was never counted, and subtracted it would add them to the losses (round 2, Р5).
+  const lost = began - gotIn - Math.max(open, 0)
+  const span = firstDay === lastDay ? `the day ${firstDay}` : `days ${firstDay} … ${lastDay}`
+  const lines = [
+    `login ${'how many who began got in?'.padEnd(46)}second way in above ${String(LOGIN_SECOND_WAY_PERCENT)} %`,
+    row('began', [String(began), `${span} in Yerevan`]),
+    row('got in', share(gotIn, began)),
+    // Below zero only with outcomes whose start was never counted: a request an older image made
+    // after a rollback, which puts the image back and not the schema (review Г).
+    row(
+      'still under way',
+      open < 0
+        ? [String(open), 'outcomes of starts never counted']
+        : // A request erased mid-login (MOL-58) ends in no outcome at all and stays here for
+          // good; named on the line so a window long closed does not read «too early» (round 2, Р4).
+          [String(open), 'not counted yet, or erased mid-login'],
+    ),
+    row(
+      'lost',
+      lost < 0
+        ? [`${String(lost)} of ${String(began)}`, 'repeats of starts before the window']
+        : share(lost, began, 'up'),
+    ),
+    row('  never confirmed in the bot', [String(total((day) => day.expiredUnconfirmed)), '']),
+    row('  confirmed, did not come back', [String(total((day) => day.expiredConfirmed)), '']),
+    row('  «not me» in the bot', [String(total((day) => day.declined)), '']),
+    row('  refused by the quota', [String(total((day) => day.refused)), 'starts, not in «began»']),
+    row('began again on the same device', [String(again), 'not counted as beginning']),
+  ]
+  if (days.length === 0) return lines
+  return [
+    ...lines,
+    '',
+    `     ${['day'.padEnd(10), ...DAY_COLUMNS.map((name) => name.padStart(10))].join('')}`,
+    ...days.map(
+      (day) =>
+        `     ${[
+          day.day.padEnd(10),
+          ...[
+            day.started - day.again,
+            day.again,
+            day.confirmed,
+            day.declined,
+            day.collected,
+            day.expiredUnconfirmed + day.expiredConfirmed,
+            day.refused,
+          ].map((count) => String(count).padStart(10)),
+        ].join('')}`,
+    ),
+  ]
+}
+
+const DAY_COLUMNS = ['began', 'again', 'confirmed', 'declined', 'got in', 'expired', 'refused']
 
 /** Whole weeks, and named, so the approximation of `erasures` is in sight (Р-11). */
 function erasedWeeks({ firstWeek, lastWeek }: GatesReport['erased']): string {
@@ -160,12 +239,15 @@ function row(label: string, [count, note]: readonly [string, string]): string {
 }
 
 /**
- * `k of n` and the share, in tenths, rounded down (Р-5): 19.96 % is «19.9 %», never a «20.0 %»
- * standing over a line that stops below 20. An empty cohort has no share at all.
+ * `k of n` and the share, in tenths, rounded **towards the line's own side** (Р-5): down beside a
+ * line that stops below — 19.96 % is «19.9 %», never a «20.0 %» standing over «stop below 20» —
+ * and up beside the login's line, which fires above (MOL-68, review Б): 25.09 % is «25.1 %», never a
+ * «25.0 %» sitting on «above 25». Either way a share past its line is never printed on it. An empty
+ * cohort has no share at all.
  */
-function share(part: number, whole: number): [string, string] {
+function share(part: number, whole: number, round: 'down' | 'up' = 'down'): [string, string] {
   if (whole === 0) return [`${String(part)} of 0`, '—']
-  const tenths = Math.floor((part * 1000) / whole)
+  const tenths = (round === 'up' ? Math.ceil : Math.floor)((part * 1000) / whole)
   const percent = `${String(Math.floor(tenths / 10))}.${String(tenths % 10)} %`
   return [`${String(part)} of ${String(whole)}`, percent.padStart(7)]
 }

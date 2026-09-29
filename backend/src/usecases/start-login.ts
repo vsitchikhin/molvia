@@ -11,10 +11,11 @@ export async function startLogin(
   requests: LoginRequestRepository,
   username: string,
   deviceName: string | null,
+  again = false,
 ): Promise<StartedLogin> {
   const code = randomBytes(32).toString('base64url')
   const secret = randomBytes(32).toString('base64url')
-  const request = await requests.createLimited(randomUUID(), code, secret, deviceName)
+  const request = await requests.createLimited(randomUUID(), code, secret, deviceName, again)
   return {
     view: {
       id: request.id,

@@ -118,7 +118,11 @@ export { createBotClient } from './bot'
 export type { MolviaBotClient, BotClientOptions } from './bot'
 
 export interface MolviaClient {
-  startLogin(options?: { readonly signal?: AbortSignal }): Promise<LoginStarted>
+  /** `again`: this device began a login before and has not come in since (MOL-68). */
+  startLogin(options?: {
+    readonly again?: boolean
+    readonly signal?: AbortSignal
+  }): Promise<LoginStarted>
   pollLogin(id: string, options?: { readonly signal?: AbortSignal }): Promise<LoginPoll>
   health(): Promise<HealthResponse>
   /**
@@ -380,8 +384,8 @@ export function createClient(options: ClientOptions): MolviaClient {
   const segment = encodeURIComponent
 
   return {
-    startLogin: (options = {}) =>
-      request('/auth/login', loginStartedCodec, {
+    startLogin: ({ again = false, ...options } = {}) =>
+      request(again ? '/auth/login?again=1' : '/auth/login', loginStartedCodec, {
         method: 'POST',
         headers: new Headers({ [LOGIN_HEADER]: '1' }),
         ...options,
