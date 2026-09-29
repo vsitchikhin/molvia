@@ -51,6 +51,14 @@ describe('typedBarcode', () => {
     expect(code(' 0-12345-67890-5\n')).toBe('0012345678905')
   })
 
+  it('drops what draws nothing, as a code copied from a message carries it (adversarial Д)', () => {
+    for (const unseen of [0x200b, 0x2060, 0xad, 0xfeff]) {
+      const invisible = String.fromCodePoint(unseen)
+      expect(code(`4850000000007${invisible}`), unseen.toString(16)).toBe('4850000000007')
+      expect(code(`485${invisible}0000000007`), unseen.toString(16)).toBe('4850000000007')
+    }
+  })
+
   it('refuses a length the scanner never reads', () => {
     // 7, 9, 11 and 14 digits: ITF-14 is a carton, not a package on a shelf.
     for (const input of ['1234567', '123456789', '12345678901', '04850000000007']) {

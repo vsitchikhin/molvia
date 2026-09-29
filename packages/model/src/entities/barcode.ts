@@ -1,4 +1,9 @@
 import { ERROR, type ErrorCode } from '#model/support/errors'
+import { INVISIBLE } from '#model/support/text'
+
+// What a person copying a code does not see: the spaces and hyphens printed under the bars, and
+// whatever draws nothing — the one list, `INVISIBLE` (adversarial Д).
+const DROPPED = new RegExp(`[\\s\\-${INVISIBLE}]`, 'gu')
 
 export type TypedBarcode = { ok: true; code: string } | { ok: false; error: ErrorCode }
 
@@ -30,7 +35,7 @@ function expandUpcE(code: string): string {
  * A code typed by hand, in the form the scanner gives the same package (MOL-98): zxing reads
  * UPC-A and UPC-E as thirteen digits, so a code typed from either comes out the same way, and
  * one package is one code whichever way it came in. Spaces and hyphens, as printed under the
- * bars, are dropped.
+ * bars, are dropped, and so is whatever draws nothing.
  *
  * Eight digits are EAN-8 or UPC-E, and the digits alone do not say which: about one UPC-E in
  * ten also checks as EAN-8. A leading `0` settles it for UPC-E — an EAN-8 starting with `0` is a
@@ -38,7 +43,7 @@ function expandUpcE(code: string): string {
  * case left, a UPC-E of number system `1` that also checks as EAN-8, is read as EAN-8.
  */
 export function typedBarcode(input: string): TypedBarcode {
-  const digits = input.replace(/[\s-]/g, '')
+  const digits = input.replace(DROPPED, '')
   if (!/^(\d{8}|\d{12,13})$/.test(digits)) return { ok: false, error: ERROR.BARCODE_SHAPE }
   if (digits.length === 8) {
     const upcE = /^[01]/.test(digits) ? expandUpcE(digits) : null
