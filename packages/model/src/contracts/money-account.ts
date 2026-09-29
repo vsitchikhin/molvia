@@ -197,6 +197,9 @@ export type UnassignedOperationsResponse = z.output<typeof unassignedOperationsC
 export const accountCheckBodySchema = z.strictObject({
   id: deviceIdSchema,
   fact: signedMoneyCodec,
+  // The phone's today, the day the check and the difference written for it are dated by (MOL-121,
+  // adversarial М). Absent from a page older than that: then Yerevan's.
+  checkedOn: exchangeDaySchema.optional(),
 })
 export type AccountCheckBody = z.infer<typeof accountCheckBodySchema>
 

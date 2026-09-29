@@ -7,6 +7,7 @@ import {
   OFFICIAL_RATE_FRESH_DAYS,
   RATE_SCALE,
   decimalFromRate,
+  earliestDay,
   exchangeRateSchema,
   formatRate,
   formatRateBeside,
@@ -174,6 +175,17 @@ describe('latestDay', () => {
     expect(latestDay(evening)).toBe('2026-09-19')
     const morning = new Date('2026-09-18T06:00:00.000Z')
     expect(latestDay(morning)).toBe(yerevanDate(morning))
+  })
+})
+
+describe('earliestDay', () => {
+  it('turns the day at 12:00 UTC, which is midnight at UTC−12 — Yerevan’s yesterday at most', () => {
+    expect(earliestDay(new Date('2026-09-18T11:59:59.999Z'))).toBe('2026-09-17')
+    expect(earliestDay(new Date('2026-09-18T12:00:00.000Z'))).toBe('2026-09-18')
+    // 23:59 in Yerevan on the 18th: the earliest day is its own, the latest the next.
+    const lastMinute = new Date('2026-09-18T19:59:00.000Z')
+    expect(earliestDay(lastMinute)).toBe('2026-09-18')
+    expect(latestDay(lastMinute)).toBe('2026-09-19')
   })
 })
 

@@ -11,6 +11,7 @@ import {
   convertSigned,
   heldOn,
   journalOrder,
+  earliestDay,
   latestDay,
   movementOf,
   newestOperationsFirst,
@@ -279,7 +280,7 @@ export async function checkAccount(
   const saved = await repositories.moneyAccounts.saveCheck(owner.id, {
     id: body.id,
     accountId: account.id,
-    checkedOn: counted.today,
+    checkedOn: checkDay(body.checkedOn, now),
     fact: body.fact,
     counted: result.counted,
   })
@@ -302,6 +303,22 @@ export async function checkAccount(
       ),
     })),
   }
+}
+
+/**
+ * The day a check is dated by — and the difference written for it: the phone's today it came with
+ * (MOL-121, adversarial М), as every day a person writes is. Dated by Yerevan's, a check at 23:30 in
+ * Moscow was of tomorrow and the next month, and one east of Yerevan left what was typed before it
+ * «after» it, so an even check did not close the window (adversarial И). Held to the days that are
+ * today somewhere now: a check is «counted just now», and a phone with a wrong clock is brought to
+ * the nearest such day rather than lose the count. A page older than the field sends none — Yerevan's.
+ */
+function checkDay(sent: string | undefined, now: Date): string {
+  if (sent === undefined) return yerevanDate(now)
+  const earliest = earliestDay(now)
+  const latest = latestDay(now)
+  if (sent < earliest) return earliest
+  return sent > latest ? latest : sent
 }
 
 /** The hint of «сколько было до обмена» from the accounts (Р-20): a suggestion, never a fact. */

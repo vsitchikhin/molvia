@@ -7,11 +7,13 @@ import {
   accountCheckCodec,
   accountJournalCodec,
   accountsHeldCodec,
+  earliestDay,
   exchangesResponseCodec,
   journalCursorCodec,
   latestDay,
   moneyAccountsCodec,
   parseRate,
+  spendingBodySchema,
   spendingCategoriesResponseCodec,
   spendingViewCodec,
   tripViewCodec,
@@ -23,8 +25,11 @@ import type { CachedRate, MoneyAccountsResponse } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createMoneyAccountRepository } from '@/db/money-accounts-repository'
 import { createRateRepository } from '@/db/rates-repository'
-import { expenses, moneyAccounts, moneyMonthRates, spendings } from '@/db/schema'
+import { actors, expenses, moneyAccounts, moneyMonthRates, spendings } from '@/db/schema'
+import { tripRepositories } from '@/db/unit-of-work'
 import { buildServer } from '@/server'
+import { checkAccount } from '@/usecases/money-accounts'
+import { recordSpending } from '@/usecases/spendings'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
@@ -1031,5 +1036,65 @@ describe('третий проход (Ж1, Ж2)', () => {
       balance: { minor: 9_405_000n, currency: 'AMD' },
       approximate: true,
     })
+  })
+})
+
+// The phone's day (MOL-121, adversarial М, И): a check is dated by the day the phone sent, as every
+// day a person writes is. 16:00 UTC is 20:00 on the 10th in Yerevan and 01:00 on the 11th in Tokyo.
+describe('день сверки — день телефона (MOL-121)', () => {
+  const instant = new Date('2026-09-10T16:00:00Z')
+
+  async function actorOf(me: Owner) {
+    const [actor] = await db.select().from(actors).where(eq(actors.id, me.id))
+    if (!actor) throw new Error('no actor')
+    return actor
+  }
+
+  async function checkAt(me: Owner, account: string, fact: string, checkedOn?: string) {
+    return checkAccount(
+      tripRepositories(db),
+      await actorOf(me),
+      account,
+      {
+        id: randomUUID(),
+        fact: { minor: BigInt(fact) * 100n, currency: 'AMD' },
+        ...(checkedOn === undefined ? {} : { checkedOn }),
+      },
+      instant,
+    )
+  }
+
+  it('берёт присланный день; без него — день Еревана; вне окна — ближайший, который где-то сегодня', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me, { startOn: '2026-09-01' })
+    expect((await checkAt(me, id, '100000', '2026-09-11')).checkedOn).toBe('2026-09-11')
+    expect((await checkAt(me, id, '100000')).checkedOn).toBe(yerevanDate(instant))
+    expect((await checkAt(me, id, '100000', '2020-01-01')).checkedOn).toBe(earliestDay(instant))
+    expect((await checkAt(me, id, '100000', '2099-12-31')).checkedOn).toBe(latestDay(instant))
+  })
+
+  it('ровная сверка днём телефона закрывает окно и для того, что записано этим днём до неё (И)', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me, { startOn: '2026-09-01' })
+    const taxi = randomUUID()
+    await recordSpending(
+      tripRepositories(db),
+      await actorOf(me),
+      spendingBodySchema.parse({
+        id: taxi,
+        spentOn: '2026-09-11',
+        amount: amd('5000'),
+        categoryId: await categoryId(me),
+      }),
+      instant,
+    )
+    const even = await checkAt(me, id, '100000', '2026-09-11')
+    expect(even.difference.minor).toBe(0n)
+    expect(even.reasons.map(({ operation }) => operation.id)).toEqual([taxi])
+    const unassigned = unassignedOperationsCodec.parse(
+      (await call(me, 'GET', '/money/accounts/unassigned')).json(),
+    ).rows
+    expect(unassigned).toEqual([])
+    expect((await checkAt(me, id, '99000', '2026-09-11')).reasons).toEqual([])
   })
 })

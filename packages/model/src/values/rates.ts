@@ -258,6 +258,16 @@ export function latestDay(instant: Date): string {
   return new Date(instant.getTime() + LATEST_OFFSET_MS).toISOString().slice(0, 10)
 }
 
+const EARLIEST_OFFSET_MS = 12 * 60 * 60 * 1000
+
+/**
+ * The earliest calendar day at `instant` anywhere on Earth — UTC−12. With `latestDay`, the days a
+ * phone's today can be right now: at most Yerevan's yesterday.
+ */
+export function earliestDay(instant: Date): string {
+  return new Date(instant.getTime() - EARLIEST_OFFSET_MS).toISOString().slice(0, 10)
+}
+
 /**
  * A day a rate may be dated by: a real calendar day whose Yerevan midnight the snapshot accepts.
  * `Date.parse('2026-02-31')` is the 3rd of March, not NaN, and `0001-01-01` is what a .NET service

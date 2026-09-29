@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto'
+import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   ERROR,
+  exchangeBodySchema,
   exchangesResponseCodec,
   latestDay,
   parseRate,
@@ -11,8 +13,10 @@ import {
 import type { CachedRate, ExchangesResponse } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
-import { exchangeRevisions, exchanges, expenses } from '@/db/schema'
+import { actors, exchangeRevisions, exchanges, expenses } from '@/db/schema'
+import { tripRepositories } from '@/db/unit-of-work'
 import { buildServer } from '@/server'
+import { exchangesOverview, recordExchange } from '@/usecases/exchanges'
 import { connectDrizzle } from './db'
 import {
   clearAll,
@@ -1147,5 +1151,53 @@ describe('правка обмена с историей (MOL-42)', () => {
       payload: { ...body, note: 'обменник' },
     })
     expect(other.statusCode).toBe(409)
+  })
+})
+
+// The phone's day (MOL-121, adversarial О): 16:00 UTC is 20:00 on the 10th in Yerevan and 01:00 on
+// the 11th in Tokyo. The wallet stops at Yerevan's today; what a sheet asks «сколько было до» by
+// does not, or the second exchange of the night is never asked and its answer is lost for good.
+describe('обмен дня, до которого Ереван не дошёл (MOL-121)', () => {
+  const instant = new Date('2026-09-10T16:00:00Z')
+  const later = new Date('2026-09-12T08:00:00Z')
+
+  async function actorOf(id: string) {
+    const [actor] = await db.select().from(actors).where(eq(actors.id, id))
+    if (!actor) throw new Error('no actor')
+    return actor
+  }
+
+  async function exchangeAt(
+    me: string,
+    exchangedOn: string,
+    received: string,
+    at: Date,
+    held?: string,
+  ) {
+    const body = exchangeBodySchema.parse({
+      id: randomUUID(),
+      given: { amount: '10000', currency: 'RUB' },
+      received: { amount: received, currency: 'AMD' },
+      exchangedOn,
+      ...(held === undefined ? {} : { heldBefore: { amount: held, currency: 'AMD' } }),
+    })
+    const { created } = await recordExchange(tripRepositories(db), await actorOf(me), body, at)
+    expect(created).toBe(true)
+  }
+
+  it('первый обмен ночи уже дал цену — второй спрашивают, и кошелёк взвешен', async () => {
+    const me = await insertActor(db)
+    await exchangeAt(me, '2026-09-05', '43000', new Date('2026-09-05T08:00:00Z'))
+    await exchangeAt(me, '2026-09-11', '45000', instant, '20000')
+
+    const onScreen = await exchangesOverview(tripRepositories(db), await actorOf(me), instant)
+    expect(onScreen.receipts.find((receipt) => receipt.on === '2026-09-11')?.priced).toBe(true)
+    // The wallet itself is Yerevan's: the 11th is not in it yet.
+    expect(onScreen.wallet?.rate.scaled).toBe(parseRate('4.3'))
+
+    await exchangeAt(me, '2026-09-11', '46000', instant, '65000')
+    const settled = await exchangesOverview(tripRepositories(db), await actorOf(me), later)
+    expect(settled.wallet?.basis).toBe('weighted')
+    expect(settled.wallet?.rate.scaled).not.toBe(parseRate('4.6'))
   })
 })

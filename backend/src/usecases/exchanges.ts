@@ -268,6 +268,15 @@ export async function ownMoney(
   const receipts: Receipt[] = [...list, ...received]
   const baseSince = sinceDay(since)
   const rates = ownRates(receipts, base, quote, today, officialRateOf(cached, base), baseSince)
+  // What a sheet asks by is walked to the phone's day, not Yerevan's (MOL-121, adversarial О): the
+  // wallet stops at Yerevan's today so tomorrow's money enters no trip, but an exchange of a day
+  // Yerevan has not reached did give its currency a price, and a second one that night must be asked
+  // «сколько было до» — an answer not asked is lost for good. The same day starts the hint.
+  const latest = latestDay(now)
+  const ahead = receipts.some((receipt) => receiptDay(receipt) > today)
+  const asked = ahead
+    ? ownRates(receipts, base, quote, latest, officialRateOf(cached, base), baseSince)
+    : rates
 
   const currencies = [
     ...new Set(
@@ -278,7 +287,7 @@ export async function ownMoney(
   ].filter((currency) => currency !== base)
   const heldEstimates = await Promise.all(
     currencies.map(async (currency) => {
-      const last = lastReceipt(receipts, currency, today)
+      const last = lastReceipt(receipts, currency, latest)
       if (!last) return null
       const spent = await exchanges.spentSince(owner.id, currency, spentFrom(last))
       const estimate = heldEstimate(receipts, last, spent)
@@ -298,7 +307,7 @@ export async function ownMoney(
     cached,
     rates,
     heldEstimates: heldEstimates.filter((estimate) => estimate !== null),
-    receipts: receiptsOf(receipts, rates.priced),
+    receipts: receiptsOf(receipts, asked.priced),
   }
 }
 
@@ -332,13 +341,6 @@ export async function exchangesOverview(
 }
 
 /**
- * «Записать обмен». The day is the person's to name — their phone's (MOL-121) — but not a day that
- * has not come yet anywhere (`latestDay`). One Yerevan has not reached waits in the list: the walk
- * takes no link after Yerevan's today, so a rate from tomorrow never enters today's trips (the same
- * line «not from the future» draws for an official rate). 201 for a new exchange, and the screen
- * whole either way.
- */
-/**
  * The screen as it is on opening. A removed exchange is final from here: the screen that offered
  * it back is gone (В-5).
  */
@@ -367,6 +369,13 @@ export function earlier(one: string | null, other: string): string {
   return one !== null && one < other ? one : other
 }
 
+/**
+ * «Записать обмен». The day is the person's to name — their phone's (MOL-121) — but not a day that
+ * has not come yet anywhere (`latestDay`). One Yerevan has not reached waits in the list: the walk
+ * takes no link after Yerevan's today, so a rate from tomorrow never enters today's trips (the same
+ * line «not from the future» draws for an official rate). 201 for a new exchange, and the screen
+ * whole either way.
+ */
 export async function recordExchange(
   repositories: Writing,
   owner: Owner,
