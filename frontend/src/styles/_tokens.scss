@@ -134,6 +134,10 @@
      field is open over it — `useKeyboardInset` sets it on that sheet. */
   --keyboard-inset: 0px;
 
+  /* How tall the visible part of the page is — above the keyboard, whatever the platform did to
+     the window for it. The whole screen until a sheet is open — `useKeyboardInset` sets it there. */
+  --viewport-height: 100dvh;
+
   /* How tall the screen's pinned strip over the tab bar is. Zero until a screen has one —
      `AppScreen` sets it — and what floats over the list rises above it (MOL-132). */
   --dock-height: 0px;
