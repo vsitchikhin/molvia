@@ -422,6 +422,11 @@ boundary, and it should be visible in the tree rather than only in the docs.
 Packages export their TypeScript source (`"exports": "./src/index.ts"`), so there is no
 build step between a change in the domain and the app that uses it.
 
+**Before searching the repository, open the code map** (MOL-133): `docs/map/<area>.md`, named as
+the area's rules file, or `docs/map/README.md` for the skeleton and for which area a thing belongs
+to. A file added, moved or removed changes the map in the same commit; `make lint` refuses a map
+that lies.
+
 ### Three applications that happen to share a repository
 
 `frontend`, `backend` and `bot` are treated as separate applications — as if they were
