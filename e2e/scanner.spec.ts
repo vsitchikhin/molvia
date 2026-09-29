@@ -8,8 +8,8 @@ import { open } from './session'
 /**
  * The scanner in a real Chromium with a camera that films a barcode (MOL-98) — what the
  * component tests cannot show: the stream on the video, the frame cut from it, the worker and its
- * wasm reading it, and the wasm coming from the app itself. On the kit page, until a screen opens
- * the scanner (MOL-99).
+ * wasm reading it, and the wasm coming from the app itself. On the kit page, and on «What did you
+ * pick up?», where MOL-99 put it.
  */
 
 /**
@@ -144,5 +144,55 @@ test.describe('with no camera', () => {
 
     await expect(scanner(page).getByText("The digits don't add up — check the code")).toBeVisible()
     await expect(scanner(page)).toBeVisible()
+  })
+})
+
+/**
+ * «What did you pick up?» (MOL-99). No code can be written to the catalogue yet — «Suggest an item»
+ * takes codes with MOL-100 — so here a code is found by nobody; the item found is held by the
+ * integration and component tests until the API can write one.
+ */
+test.describe('on «What did you pick up?»', () => {
+  // The block on the screen, not the app's live region, which says the same words (MOL-19).
+  const missing = (page: Page) =>
+    page
+      .locator('.not-found')
+      .getByText(`The catalogue does not know the code ${BARCODE}`, { exact: true })
+
+  test('a code the camera read and nobody holds offers «Suggest an item»', async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(READ * 2)
+    await context.grantPermissions(['camera'])
+    await open(page, '/purchases/manual/add')
+
+    await openScanner(page)
+
+    await expect(missing(page)).toBeVisible({ timeout: READ })
+    await expect(page.locator('.announcer')).toContainText(
+      `The catalogue does not know the code ${BARCODE}`,
+    )
+    await expect(scanner(page)).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Suggest an item' })).toBeVisible()
+  })
+
+  test('a code typed by hand is looked up the same way, and typing gives the search back', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      navigator.mediaDevices.getUserMedia = () =>
+        Promise.reject(new DOMException('no camera', 'NotFoundError'))
+    })
+    await open(page, '/purchases/manual/add')
+    await openScanner(page)
+    await scanner(page).getByRole('button', { name: 'Type it in' }).click()
+    await scanner(page).getByLabel('Digits under the barcode').fill(BARCODE)
+    await scanner(page).getByRole('button', { name: 'Done' }).click()
+
+    await expect(missing(page)).toBeVisible()
+
+    await page.getByRole('combobox', { name: 'What did you pick up?' }).fill('молоко')
+    await expect(missing(page)).toBeHidden()
   })
 })
