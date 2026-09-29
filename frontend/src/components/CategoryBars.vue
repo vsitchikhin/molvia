@@ -2,20 +2,27 @@
   <AppCard as="section" list class="bars" :aria-labelledby="headingId">
     <h2 :id="headingId" class="caption">{{ t('spending.categories_title') }}</h2>
     <ul class="rows">
-      <li v-for="row in rows" :key="row.id" class="row">
-        <span class="line">
-          <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
-          <span class="name">{{ row.name }}</span>
-          <span class="amount">{{ row.amount }}</span>
-        </span>
-        <span class="line">
-          <span class="track" aria-hidden="true">
-            <span class="fill" :style="{ width: row.width, background: row.colour }"></span>
+      <li v-for="row in rows" :key="row.id">
+        <RouterLink class="row" :to="{ name: 'money-charts', query: { category: row.id } }">
+          <span class="line">
+            <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
+            <span class="name">{{ row.name }}</span>
+            <span class="amount">{{ row.amount }}</span>
           </span>
-          <span class="share">{{ row.share }}</span>
-        </span>
+          <span class="line">
+            <span class="track" aria-hidden="true">
+              <span class="fill" :style="{ width: row.width, background: row.colour }"></span>
+            </span>
+            <span class="share">{{ row.share }}</span>
+          </span>
+        </RouterLink>
       </li>
     </ul>
+    <RouterLink class="link" :to="{ name: 'money-charts' }">
+      <IconChart class="icon" aria-hidden="true" />
+      <span class="label">{{ t('spending.charts_link') }}</span>
+      <IconChevron class="chevron" aria-hidden="true" />
+    </RouterLink>
     <RouterLink class="link" :to="{ name: 'money-categories' }">
       <IconShape class="icon" aria-hidden="true" />
       <span class="label">{{ t('spending.categories_link') }}</span>
@@ -28,6 +35,7 @@
 import { computed, defineComponent, useId } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconChart from '~icons/mdi/chart-bar'
 import IconChevron from '~icons/mdi/chevron-right'
 import IconShape from '~icons/mdi/shape-outline'
 import { formatEstimate, shareOf } from '@molvia/model'
@@ -38,12 +46,12 @@ import { categoryColour } from '@/components/spending'
 /**
  * «Куда ушли» (MOL-82, handoff 01): a bar per category, largest first — the server's order and its
  * sums; the share is the model's arithmetic over them. Bars rather than a ring: ten names with
- * their sums read as one column. The rows are not buttons until the charts exist (MOL-74, Р-7);
- * the last line leads to the categories themselves (В-1).
+ * their sums read as one column. A row opens «Графики» on its category (MOL-74, handoff 01); under
+ * them «Графики по месяцам», and last the categories themselves (В-1).
  */
 export default defineComponent({
   name: 'CategoryBars',
-  components: { AppCard, IconChevron, IconShape },
+  components: { AppCard, IconChart, IconChevron, IconShape },
   props: {
     month: { type: Object as PropType<MoneyMonthView>, required: true },
     nameOf: {
@@ -103,6 +111,13 @@ export default defineComponent({
   gap: var(--space-1);
   min-height: 3.25rem;
   padding: var(--space-2) var(--space-4);
+  color: var(--text);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+
+  &:focus-visible {
+    @include focus-ring(-2px);
+  }
 }
 
 .line {
