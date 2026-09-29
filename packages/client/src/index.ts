@@ -142,10 +142,13 @@ export interface MolviaClient {
   /** «Устройства» (MOL-57): the owner's live sessions, this one first and marked. */
   sessions(): Promise<SessionsResponse>
   /**
-   * «Скачать мои данные» (MOL-93): the file's text. Only its envelope is checked — an installed
-   * app older than the server must still hand over a copy holding a field it does not know.
+   * «Скачать мои данные» (MOL-93): the file's text and the moment the server took it. Only its
+   * envelope is checked — an installed app older than the server must still hand over a copy
+   * holding a field it does not know. Cancelled through `signal` when the screen goes.
    */
-  exportMine(): Promise<string>
+  exportMine(options?: {
+    readonly signal?: AbortSignal
+  }): Promise<{ readonly text: string; readonly exportedAt: Date }>
   /**
    * Ends one of the owner's sessions. `error.not_found` is the answer for one that is already
    * gone, someone else's and one that never was — a screen reads it as done.
@@ -436,12 +439,13 @@ export function createClient(options: ClientOptions): MolviaClient {
 
     me: () => request('/actors/me', actorCodec),
     sessions: async () => request('/sessions', sessionsResponseCodec),
-    exportMine: async () =>
-      JSON.stringify(
-        await request('/actors/me/export', exportEnvelopeSchema, { timeout: EXPORT_TIMEOUT_MS }),
-        null,
-        2,
-      ),
+    exportMine: async (options = {}) => {
+      const file = await request('/actors/me/export', exportEnvelopeSchema, {
+        timeout: EXPORT_TIMEOUT_MS,
+        ...(options.signal === undefined ? {} : { signal: options.signal }),
+      })
+      return { text: JSON.stringify(file, null, 2), exportedAt: new Date(file.exportedAt) }
+    },
     endSession: async (id) => {
       noContent(await exchange(`/sessions/${segment(id)}`, z.undefined(), { method: 'DELETE' }))
     },

@@ -165,12 +165,13 @@ const searchPickSchema = z.strictObject({
 })
 
 // The type is a string, not the enum of today: rows of types since withdrawn are still the
-// person's (`catalogue_viewed`, `session_started`).
+// person's (`catalogue_viewed`, `session_started`). The payload is strings only, as the
+// database's CHECK holds it — the phone rebuilds the file, and a number could come back rounded.
 const eventSchema = z.strictObject({
   id: z.string().regex(/^\d+$/),
   occurredAt: isoDate,
   type: z.string(),
-  payload: z.json(),
+  payload: z.record(z.string(), z.string()),
 })
 
 const exchangeFields = {

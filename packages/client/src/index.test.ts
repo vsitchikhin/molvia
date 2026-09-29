@@ -1603,10 +1603,11 @@ describe('«Скачать мои данные» (MOL-93)', () => {
   }
 
   it('hands over the file whole, a field this build does not know included', async () => {
-    const text = await clientAnswering(200, file).exportMine()
+    const { text, exportedAt } = await clientAnswering(200, file).exportMine()
 
     expect(JSON.parse(text)).toEqual(file)
     expect(text).toContain('\n  "format": "molvia-export"')
+    expect(exportedAt).toEqual(new Date('2026-10-12T08:14:03.000Z'))
   })
 
   it('refuses a page that is not the file — a portal answering 200 is not a copy', async () => {

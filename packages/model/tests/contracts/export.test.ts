@@ -242,7 +242,9 @@ describe('exportFileCodec', () => {
   it('keeps what a stored row predates: a withdrawn event type, a rate outside today’s band', () => {
     const odd = {
       ...file,
-      events: [{ id: '1', occurredAt: at, type: 'catalogue_viewed', payload: { q: 1 } }],
+      events: [
+        { id: '1', occurredAt: at, type: 'catalogue_viewed', payload: { subject: 'venue' } },
+      ],
       monthRates: [{ month: '2026-01', rate: { ...rate, scaled: 1n } }],
     }
     expect(z.encode(exportFileCodec, odd).monthRates[0]?.rate.rate).toBe('0.000001')
@@ -250,5 +252,36 @@ describe('exportFileCodec', () => {
 
   it('refuses a version it was not written for', () => {
     expect(exportFileCodec.safeParse({ ...wire, version: 2 }).success).toBe(false)
+  })
+})
+
+/** Every schema node that holds a number, wherever it sits in the file's JSON Schema. */
+function numbersIn(
+  node: unknown,
+  path = '$',
+): { path: string; maximum: unknown; fixed: unknown }[] {
+  if (Array.isArray(node))
+    return node.flatMap((inner, index) => numbersIn(inner, `${path}[${String(index)}]`))
+  if (node === null || typeof node !== 'object') return []
+  const own = node as Record<string, unknown>
+  const here =
+    own.type === 'number' || own.type === 'integer'
+      ? [{ path, maximum: own.maximum, fixed: own.const }]
+      : []
+  return [
+    ...here,
+    ...Object.entries(own).flatMap(([key, inner]) => numbersIn(inner, `${path}.${key}`)),
+  ]
+}
+
+describe('what the phone may rebuild', () => {
+  it('holds no number a JSON parser could round: every one is a safe integer, the rest are strings', () => {
+    const schema = z.toJSONSchema(exportFileCodec, { io: 'input', unrepresentable: 'any' })
+    const unsafe = numbersIn(schema).filter(
+      ({ maximum, fixed }) =>
+        fixed === undefined && (typeof maximum !== 'number' || maximum > Number.MAX_SAFE_INTEGER),
+    )
+    expect(numbersIn(schema).length).toBeGreaterThan(0)
+    expect(unsafe).toEqual([])
   })
 })
