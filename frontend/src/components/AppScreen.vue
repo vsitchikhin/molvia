@@ -1,5 +1,5 @@
 <template>
-  <div class="screen" :class="{ collapsed, docked, tabbed }">
+  <div class="screen" :class="{ collapsed, docked, tabbed }" :style="dockStyle">
     <header ref="bar" class="bar">
       <div ref="column" class="leading">
         <template v-if="parentTitleKey">
@@ -53,7 +53,7 @@
       <!-- The room the strip below takes, kept inside the scroll: the last row of a list has to
            be reachable, and the strip is over the page, not in it. -->
       <div
-        v-if="$slots.docked"
+        v-if="$slots.docked || updating"
         class="dock-room"
         :style="{ height: room }"
         aria-hidden="true"
@@ -61,8 +61,10 @@
     </div>
 
     <!-- Pinned above the tab bar, and the room for it is the frame's to keep: a screen that
-         drew its own would part ways with the padding on the first change of its height. -->
-    <div v-if="$slots.docked" ref="dock" class="dock">
+         drew its own would part ways with the padding on the first change of its height. A new
+         version waiting is its top row, over the screen's own main action (MOL-132, В-1). -->
+    <div v-if="$slots.docked || updating" ref="dock" class="dock">
+      <UpdateBand v-if="updating" :class="{ over: $slots.docked }" />
       <slot name="docked" />
     </div>
   </div>
@@ -75,9 +77,11 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconChevronLeft from '~icons/mdi/chevron-left'
 import IdentityNotice from '@/components/IdentityNotice.vue'
+import UpdateBand from '@/components/UpdateBand.vue'
 import { useBackLabel } from '@/composables/useBackLabel'
 import { useCollapsed, useHeight } from '@/composables/useCollapsed'
 import { backTarget, useNavigation } from '@/navigation'
+import { usePwaUpdate } from '@/pwaUpdate'
 
 /**
  * The frame every screen of 0.1 sits in: a pinned row, the large title, the room under the tab
@@ -103,7 +107,7 @@ import { backTarget, useNavigation } from '@/navigation'
  */
 export default defineComponent({
   name: 'AppScreen',
-  components: { IconChevronLeft, IdentityNotice },
+  components: { IconChevronLeft, IdentityNotice, UpdateBand },
   props: {
     title: { type: String, required: true },
   },
@@ -158,6 +162,12 @@ export default defineComponent({
     const room = computed(() =>
       dockHeight.value > 0 ? `calc(${String(dockHeight.value)}px + var(--space-4))` : undefined,
     )
+    // What floats over the list (`FloatingDock`) rises above the strip by its height.
+    const dockStyle = computed(() =>
+      dockHeight.value > 0 ? { '--dock-height': `${String(dockHeight.value)}px` } : undefined,
+    )
+    const update = usePwaUpdate()
+    const updating = computed(() => update.phase.value !== 'none')
 
     const { goBack } = useNavigation()
 
@@ -180,6 +190,8 @@ export default defineComponent({
       docked,
       tabbed,
       room,
+      dockStyle,
+      updating,
       goBack,
     }
   },
@@ -417,6 +429,11 @@ export default defineComponent({
 .tabbed .dock {
   bottom: calc(var(--tabbar-height) + var(--safe-bottom));
   padding-bottom: 0;
+}
+
+/* Parted from the screen's own row under it by the strip's own hairline. */
+.over {
+  border-bottom: var(--hairline) solid var(--border);
 }
 
 /* The notice keeps its own margins; this only keeps it out from under a notch held sideways. */

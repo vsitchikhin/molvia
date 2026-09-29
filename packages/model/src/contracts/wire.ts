@@ -20,6 +20,16 @@ export const healthResponseSchema = healthFields.refine(
 export type HealthResponse = z.infer<typeof healthResponseSchema>
 
 /**
+ * The header every answer of the API names its build in — the `version` above, on every route
+ * (MOL-132). An open page that meets a build other than the first it met was rolled out under,
+ * and looks for its new version then rather than on its next return.
+ */
+export const VERSION_HEADER = 'X-Molvia-Version'
+
+/** The build a copy that was not built by the release runs as: nothing to compare. */
+export const UNNAMED_BUILD = 'dev'
+
+/**
  * A failure crossing the wire carries a registry code, never a prose message — and both
  * registries cross it. A malformed body is the most common failure an API has, and a
  * response that can only name domain errors leaves it nothing to be reported as.

@@ -39,6 +39,12 @@ if (!apiPort || !pwaPort || !databaseUrl) {
 const baseURL = `http://127.0.0.1:${pwaPort}`
 const ci = Boolean(process.env.CI)
 
+// A service worker exists only in a build, so one spec runs against the built app (MOL-132): on
+// the next port of the copy's band — ten wide, the run takes +1 and +2 — derived rather than a
+// variable of its own, so no copy's .env has to be made again for it. Its own folder, so a build
+// the spec rewrites is never the one `make prod-build` or a deploy reads.
+const previewPort = String(Number(pwaPort) + 1)
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -52,9 +58,17 @@ export default defineConfig({
   // still lose it: it is saved while the context is torn down, which shares the test's timeout.
   use: { baseURL, trace: ci ? 'on-first-retry' : 'retain-on-failure', locale: 'en-US' },
 
-  // One project, and it is a phone: that is the device the product is designed for,
-  // so a desktop-only pass would prove nothing about the screen that matters.
-  projects: [{ name: 'phone', use: { ...devices['Pixel 7'] } }],
+  // A phone, and only a phone: that is the device the product is designed for, so a
+  // desktop-only pass would prove nothing about the screen that matters. The second project
+  // is the same phone against the built app, and holds only what needs a worker.
+  projects: [
+    { name: 'phone', use: { ...devices['Pixel 7'] }, testIgnore: /pwa-update\.spec\.ts$/ },
+    {
+      name: 'pwa',
+      use: { ...devices['Pixel 7'], baseURL: `http://127.0.0.1:${previewPort}` },
+      testMatch: /pwa-update\.spec\.ts$/,
+    },
+  ],
 
   webServer: [
     {
@@ -84,6 +98,20 @@ export default defineConfig({
       env: { PWA_PORT: pwaPort, API_PORT: apiPort },
       reuseExistingServer: false,
       stdout: 'pipe',
+    },
+    {
+      // `preview` proxies `/api` as the dev server does, to the run's API.
+      command:
+        `npm run build -w @molvia/frontend -- --outDir dist-e2e --emptyOutDir && ` +
+        `npm run preview -w @molvia/frontend -- --outDir dist-e2e --host 127.0.0.1 ` +
+        `--port ${previewPort} --strictPort`,
+      url: `http://127.0.0.1:${previewPort}`,
+      // Plain http, certificates or not: the loopback is a secure context for a worker anyway.
+      env: { API_PORT: apiPort, PWA_PLAIN_HTTP: '1' },
+      reuseExistingServer: false,
+      stdout: 'pipe',
+      // A build first: a minute is not unusual on a busy machine.
+      timeout: 180_000,
     },
   ],
 })

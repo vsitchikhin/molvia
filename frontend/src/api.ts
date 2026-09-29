@@ -8,10 +8,23 @@ import type { MolviaClient } from '@molvia/client'
 // it is now load-bearing, and a silent change to `omit` would log everybody out.
 //
 // Vite proxies /api to this copy's API port, so the origin is never hardcoded.
-const client = createClient({ baseUrl: '/api', credentials: 'same-origin' })
+const client = createClient({
+  baseUrl: '/api',
+  credentials: 'same-origin',
+  onVersion: (version) => {
+    heard?.(version)
+  },
+})
 
 /** Told that the session behind this browser is gone. Registered by the actor store. */
 let missing: (() => void) | undefined
+
+/** Told the build each answer names (MOL-132). Registered by the worker's update. */
+let heard: ((version: string) => void) | undefined
+
+export function onServerVersion(told: (version: string) => void): void {
+  heard = told
+}
 
 export function onMissingActor(told: () => void): void {
   missing = told

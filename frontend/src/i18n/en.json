@@ -1175,5 +1175,13 @@
     "card_to": "to “{name}”",
     "card_name": "“{name}”",
     "stale_error": "Couldn’t refresh — balances as of {time}"
+  },
+  "update": {
+    "ready": "A new version is out",
+    "apply": "Update",
+    "failed": {
+      "title": "The update did not take",
+      "body": "Close Molvia completely and open it again. iPhone: swipe it up in the app switcher. Android: Recents — swipe Molvia away."
+    }
   }
 }

@@ -113,6 +113,10 @@
       />
     </div>
 
+    <!-- Под действием экрана, как над таб-баром в приложении: старый код входа против нового API
+         ломается так же, как любой экран (MOL-132, В-1). -->
+    <UpdateBand class="update" />
+
     <!-- What is kept and how to have it erased is read before signing in (MOL-58). -->
     <RouterLink class="privacy" :to="{ name: 'privacy' }">{{ t('privacy.title') }}</RouterLink>
   </div>
@@ -126,6 +130,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import UpdateBand from '@/components/UpdateBand.vue'
 import { useReconnect } from '@/composables/useReconnect'
 import { purchaseDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
@@ -146,7 +151,7 @@ import { POLL_INTERVAL_MS, useLoginStore } from '@/stores/login'
  */
 export default defineComponent({
   name: 'LoginView',
-  components: { AppButton, AppCard, ScreenSkeleton, ScreenState },
+  components: { AppButton, AppCard, ScreenSkeleton, ScreenState, UpdateBand },
   setup() {
     const { t, locale } = useI18n()
     const login = useLoginStore()
@@ -276,6 +281,11 @@ export default defineComponent({
   margin: var(--space-3) 0 0;
   color: var(--warn-ink);
   font-size: var(--text-footnote);
+}
+
+.update {
+  margin: 0 calc(var(--space-4) + var(--safe-right)) 0 calc(var(--space-4) + var(--safe-left));
+  border-top: var(--hairline) solid var(--border);
 }
 
 .privacy {
