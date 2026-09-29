@@ -10,24 +10,15 @@ import process from 'node:process'
  */
 export const BARCODE = '4850000000007'
 
-const L = ['0001101', '0011001', '0010011', '0111101', '0100011'].concat([
-  '0110001',
-  '0101111',
-  '0111011',
-  '0110111',
-  '0001011',
-])
+// The set-A digits, 0 to 9.
+// prettier-ignore
+const L = ['0001101', '0011001', '0010011', '0111101', '0100011', '0110001', '0101111', '0111011', '0110111', '0001011']
 // R is L inverted; G is R read backwards.
 const R = L.map((code) => Array.from(code, (bit) => (bit === '0' ? '1' : '0')).join(''))
 const G = R.map((code) => Array.from(code).reverse().join(''))
 // Which of the left six digits are G, by the first digit, which is written by that choice alone.
-const PARITY = ['LLLLLL', 'LLGLGG', 'LLGGLG', 'LLGGGL', 'LGLLGG'].concat([
-  'LGGLLG',
-  'LGGGLL',
-  'LGLGLG',
-  'LGLGGL',
-  'LGGLGL',
-])
+// prettier-ignore
+const PARITY = ['LLLLLL', 'LLGLGG', 'LLGGLG', 'LLGGGL', 'LGLLGG', 'LGGLLG', 'LGGGLL', 'LGLGLG', 'LGLGGL', 'LGGLGL']
 
 /** The 95 modules of an EAN-13, `1` for a bar. */
 export function ean13Modules(code: string): string {
