@@ -10,7 +10,7 @@ paths:
   - 'backend/drizzle/*spending*.sql'
   - 'frontend/src/views/Money*'
   - 'frontend/src/components/{Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*,BarChart*,RateLine*,ExchangeLosses*,charts*}'
-  - 'frontend/src/composables/{useMoneyMonth,useMoneyCharts}*'
+  - 'frontend/src/composables/{useMoneyMonth,useMoneyCharts,useChartPointer}*'
   - 'frontend/src/composables/useSalaryShift*'
   - 'frontend/src/components/SalaryShift*'
   - 'frontend/src/stores/{spendingQueue,queueing}*'
@@ -252,21 +252,36 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   opening it does (Р-4), a change of a past exchange lets it go for both, and the salary moves by
   `budgetMonthOf` in both. An integration test holds every bar equal to its month. The rows of the
   whole period are read once (`monthRows`, Р-3); the month before the first is counted for «к
-  августу» alone, as on «Деньгах».
+  августу» alone, as on «Деньгах». **A write landing while the months freeze lets them go after**
+  (`watchThaws`, adversarial Ж): the exchanges and incomes are read at the start and the months frozen
+  one by one after, so one written in between found nothing frozen to let go and the month froze
+  without it for good — the read notes the receipts and the rule of the rate first and, once it has
+  frozen, lets the months go from the day of anything that changed meanwhile. `GET
+/money/months/:month` does the same for a closed month; the race was MOL-73's, the charts widened it.
 - **«Разница», not «Остаток»** (owner's decision В-2): the third figure of «Пришло и ушло» is what
   came in less what went out in the month, signed; «Остаток» is the money on the accounts
   (MOL-134) and one word must not mean two things on neighbouring screens. The price, named: the
   month of the move is deep below zero, since the roubles that bought the dollars were exchanges.
 - **An average is of the closed months from the first with anything in it** (Р-5, Р-15): a person
   who started in August is not averaged over empty months, and the running month, half spent, is
-  in no average. With no closed month of data there is no average; a month nothing converts leaves
-  the average of «Разница» rather than counting as nothing.
+  in no average. With no closed month of data there is no average. **A month with anything «не
+  посчитано» has no «Разница» and is in no average** (adversarial d9 В): a salary in dollars on a day
+  with no dollar made the month «−25 000 ₽» and the average negative; the screen says under «Пришло и
+  ушло» what did not convert, and «Ушло» with no rate of the month is a dashed empty bar, never a bar
+  of nothing spent.
+- **Nothing the charts carry can fail the answer** (adversarial d9 А): a category's sum over the
+  period, which may be more than money holds, orders the series and is never sent; a change past 2⁵³
+  per cent — 0,01 ֏ then 10¹⁴ ֏ — is left unsaid. A month «Деньги» can show, the charts can show.
 - **Every height is the server's** (`CHART_LEVEL`, thousandths of the tallest the card shows): the
   phone divides nothing, it turns a level into a percent of the card.
 - **The exchanges are grouped by exchanger** (owner's decision В-1): «Где и заметка» read as
   `nameIdentity` reads a name, no note is «Без места»; the percent of a group is weighed by the
   money (Р-7) — the sheet's mean of percents let ten dollars with friends weigh what eight hundred at
-  the airport did. **Measured by the one function «Обмен денег» measures by** (`comparisonOf`), and
+  the airport did. **Measured by the one function «Обмен денег» measures by** (`comparisonOf`), **but
+  only by a rate fresh for the exchange's day** (adversarial Е): `comparisonOf` takes the bank's latest
+  however old, and a cache stopped five weeks ago summed an exchange by a rate the same answer's line
+  called «no rate». «Обмен денег» still sets each exchange beside the latest it has, printed with it —
+  the price, named: an exchange of a week of silence is compared there and named here. And
   **summed in the spending currency** (Р-6): a difference in another currency — dollars from roubles
   — by the central bank of that day, since nobody named a price for it; without a comparison or
   such a rate the exchange is named («Без сравнения с ЦБ РА: N»), never summed. Twelve months
@@ -284,9 +299,17 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   chooses nothing. **The bars are radios and the weeks a native range**, so arrows move the choice
   and each says its month or week with its figure — **which is why the reading is not a live
   region**: the control already says it, and a drag would chatter.
+- **A finger chooses on lifting, or once it goes sideways** (`useChartPointer`, review): chosen on
+  touching, every scroll that started on a chart changed the reading under the thumb; a mouse or a pen
+  chooses on press. **A new answer of the same period keeps the bar chosen** — the sources of the
+  watch are compared one by one, since a getter of an array is a new array on every answer.
 - **The period and the category are in the address and move by `replace`**; the category chosen is
   kept for as long as the app is open, and the first one is the largest of the period (Р-8), not the
-  handoff's «Кафе». The last answer of each period is kept per owner (`molvia.charts`), so offline
-  is a yellow strip with its hour over it; the four states are `ScreenSkeleton` and `ScreenState`,
-  the empty one with no button (Р-9): the way in stands under «Куда ушли», which has no bars
-  without spending.
+  handoff's «Кафе». **Every live category of the owner is offered**, spent in the period or not, and
+  a row of «Куда ушли» on a month older than six opens twelve (adversarial А, d9 Г): a category
+  tapped there was swapped for the largest, in silence, with its own id still in the address. Only
+  the person's choice or the address is remembered. **Only the latest read is kept on the phone**
+  (`molvia.charts`, adversarial Б, d9 Д): an earlier one answering late put the charts without the
+  spending just written under a later hour. Offline is a yellow strip with that hour; the four states
+  are `ScreenSkeleton` and `ScreenState`, the empty one with no button (Р-9) — and the rate and the
+  exchanges stand under it, since they do not wait for spending (adversarial В).
