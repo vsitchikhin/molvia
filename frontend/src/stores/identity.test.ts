@@ -222,6 +222,8 @@ describe('какие ключи приложение пишет на устро�
       'molvia.money',
       'molvia.places',
       'molvia.recent',
+      // Коды, по которым найдены недавние позиции, — поиск по коду офлайн (MOL-99).
+      'molvia.recent-codes',
       // Набранный поиск и промах — пережить перезагрузку этого окна (MOL-46).
       'molvia.search-draft',
       'molvia.settings',
