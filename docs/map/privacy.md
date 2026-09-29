@@ -48,6 +48,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 
 ## e2e
 
+- `e2e/export.spec.ts` — End-to-end: «Скачать мои данные» downloads the file of one's own where no sheet can take it, and hands it over on a second tap where the phone refused the first.
 - `e2e/privacy.spec.ts` — End-to-end: «Данные и приватность» opens by its address without a session, from the login screen and from the settings.
 
 ## repository
