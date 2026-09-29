@@ -104,7 +104,7 @@ export async function startTrip(
  */
 async function personalRateFor(
   repositories: Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>,
-  actor: Pick<Actor, 'id' | 'incomeCurrency'>,
+  actor: Pick<Actor, 'id' | 'incomeCurrency'> & Today,
   pair: Pick<Actor, 'incomeCurrency' | 'spendCurrency'>,
   today: string,
 ): Promise<TripSnapshot | null> {
@@ -133,7 +133,7 @@ async function personalRateFor(
     quote,
     today,
     officialRateOf(cached, base),
-    base === actor.incomeCurrency ? sinceDay(since) : null,
+    base === actor.incomeCurrency ? sinceDay(since, actor) : null,
   )
   return wallet ? { rate: wallet.rate, provider: null, jumped: false, previous: null } : null
 }

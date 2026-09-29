@@ -895,7 +895,13 @@ describe('trip queue', () => {
         finishedOnDeviceAt: new Date('2026-09-19T11:00:00Z'),
       })
       await queue.flush()
-      expect(fresh().pending[0]).toEqual({ kind: 'finish', tripId: TRIP, finishedOnDeviceAt: at })
+      // The day of the tap is kept with it, taken at the tap (adversarial round 4 Ф).
+      expect(fresh().pending[0]).toEqual({
+        kind: 'finish',
+        tripId: TRIP,
+        finishedOnDeviceAt: at,
+        tapDay: '2026-09-19',
+      })
       expect(useTripHistoryStore().local[0]?.completedAt).toEqual(at)
       // With the phone's day of the tap (MOL-121) — the tests run in UTC.
       expect(finishTrip).toHaveBeenLastCalledWith(TRIP, at, '2026-09-19')
@@ -920,6 +926,63 @@ describe('trip queue', () => {
       await queue.flush()
       expect(finishTrip).toHaveBeenLastCalledWith(TRIP, undefined, undefined)
       expect(queue.rejected).toEqual([])
+    })
+
+    // The day of a tap is the day it was tapped on, wherever the queue is sent from (adversarial
+    // round 4 Ф): tapped at 23:30 in Yerevan — 19:30 UTC, the zone the tests run in — and sent after
+    // a flight to Tokyo, it is still the 30th.
+    it('keeps the day of a tap it took at the tap, whatever zone it is sent from', async () => {
+      startTrip.mockRejectedValue(offline())
+      finishTrip.mockRejectedValue(offline())
+      const tapped = new Date('2026-09-30T19:30:00.000Z')
+      const queue = fresh()
+      queue.enqueue({ ...started(), startedAt: tapped })
+      queue.enqueue({ kind: 'finish', tripId: TRIP, finishedOnDeviceAt: tapped })
+      await queue.flush()
+      const zone = process.env.TZ
+      process.env.TZ = 'Asia/Tokyo'
+      try {
+        startTrip.mockResolvedValue({ trip: answer('0.00'), created: true })
+        finishTrip.mockResolvedValue(undefined)
+        await fresh().flush()
+      } finally {
+        process.env.TZ = zone
+      }
+      expect(startTrip).toHaveBeenLastCalledWith(
+        expect.objectContaining({ startedOn: '2026-09-30' }),
+      )
+      expect(finishTrip).toHaveBeenLastCalledWith(TRIP, tapped, '2026-09-30')
+    })
+
+    // An API rolled back to a build before MOL-121 reads its bodies strictly and refuses the day of a
+    // tap (adversarial round 4 Х): the write goes again without it, never set aside for good.
+    it('sends a start and a finish again without the day an older server refused', async () => {
+      const old = (field: string) => new ApiError(ISSUE.BODY_INVALID, field)
+      startTrip
+        .mockRejectedValueOnce(old('startedOn'))
+        .mockResolvedValue({ trip: answer('0.00'), created: true })
+      finishTrip.mockRejectedValueOnce(old('finishedOn')).mockResolvedValue(undefined)
+      const at = new Date('2026-09-19T10:00:00.000Z')
+      const queue = fresh()
+      queue.enqueue(started())
+      queue.enqueue({ kind: 'finish', tripId: TRIP, finishedOnDeviceAt: at })
+      await queue.flush()
+      expect(startTrip).toHaveBeenCalledTimes(2)
+      expect(startTrip.mock.calls[1]?.[0]).not.toHaveProperty('startedOn')
+      expect(finishTrip).toHaveBeenLastCalledWith(TRIP, at, undefined)
+      expect(queue.rejected).toEqual([])
+      expect(queue.pending).toEqual([])
+    })
+
+    // A refusal of anything else is still a refusal — the fallback is for the day alone.
+    it('sets aside a start refused for another field, as ever', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      startTrip.mockRejectedValue(new ApiError(ISSUE.BODY_INVALID, 'place'))
+      const queue = fresh()
+      queue.enqueue(started())
+      await queue.flush()
+      expect(startTrip).toHaveBeenCalledTimes(1)
+      expect(queue.rejected).toHaveLength(1)
     })
 
     it('does not leave a refused completion in local history', async () => {
@@ -950,7 +1013,7 @@ describe('trip queue', () => {
         startedOn: '2026-09-19',
       })
       expect(addExpense).toHaveBeenCalledTimes(1)
-      expect(finishTrip).toHaveBeenCalledWith(TRIP, undefined, undefined)
+      expect(finishTrip).toHaveBeenCalledWith(TRIP, undefined, expect.any(String))
       expect(queue.pending).toEqual([])
     })
 
@@ -962,7 +1025,7 @@ describe('trip queue', () => {
       expect(queue.pending).toHaveLength(1)
 
       const again = fresh()
-      expect(again.pending[0]).toEqual(started())
+      expect(again.pending[0]).toEqual({ ...started(), tapDay: '2026-09-19' })
     })
 
     it('поправленная покупка занимает место прежней, а не встаёт второй', async () => {
@@ -1985,6 +2048,7 @@ describe('trip queue', () => {
         tripId: TRIP,
         name: 'Ереван Сити',
         finish: { finishedOnDeviceAt: at },
+        finishDay: '2026-09-19',
       })
       // Kept on the device as it is sent.
       expect(fresh().pending[0]).toEqual(queue.pending[0])

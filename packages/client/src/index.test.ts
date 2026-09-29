@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ERROR, ISSUE, TODAY_HEADER, VERSION_HEADER } from '@molvia/model'
+import { ERROR, ISSUE, TODAY_HEADER, VERSION_HEADER, ZONE_HEADER } from '@molvia/model'
 import { ApiError, createClient } from '#client/index'
 
 function clientAnswering(status: number, body: unknown) {
@@ -277,10 +277,26 @@ describe('the phone’s today on every request (MOL-121)', () => {
     ])
   })
 
+  it('names the phone’s zone beside its day, where one was given', async () => {
+    const sent: Headers[] = []
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: (_url, init) => {
+        sent.push(new Headers(init?.headers))
+        return Promise.resolve(new Response(null, { status: 204 }))
+      },
+      today: () => '2026-09-28',
+      zone: () => 'Europe/Moscow',
+    })
+    await client.finishTrip('0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d')
+    expect(sent[0]?.get(ZONE_HEADER)).toBe('Europe/Moscow')
+  })
+
   it('names none where no day was given — the bot', async () => {
     const { client, sent } = clientWith()
     await client.finishTrip('0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d')
     expect(sent[0]?.headers.has(TODAY_HEADER)).toBe(false)
+    expect(sent[0]?.headers.has(ZONE_HEADER)).toBe(false)
   })
 
   it('a finish carries the day of its tap beside the moment', async () => {

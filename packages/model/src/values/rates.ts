@@ -270,6 +270,67 @@ export function earliestDay(instant: Date): string {
   return new Date(instant.getTime() - EARLIEST_OFFSET_MS).toISOString().slice(0, 10)
 }
 
+/** Whether `zone` is a time zone this runtime knows by name — `Europe/Moscow`, never an offset. */
+export function isTimeZone(zone: string): boolean {
+  if (!/^[A-Za-z][A-Za-z0-9_+\-/]{0,63}$/.test(zone)) return false
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The calendar day at `instant` in the phone's zone (`ZONE_HEADER`, MOL-121, adversarial round 4 У, Ч)
+ * — and Yerevan's where the phone named none. What a moment the server stamped — a record written, a
+ * setting changed — is a day of, beside the days the phone names.
+ */
+export function dayIn(instant: Date, zone?: string): string {
+  if (zone === undefined) return yerevanDate(instant)
+  const parts = wallClock(instant, zone)
+  const pad = (value: number, width = 2) => String(value).padStart(width, '0')
+  return `${pad(parts.year, 4)}-${pad(parts.month)}-${pad(parts.day)}`
+}
+
+/** The instant `day` begins in `zone` — Yerevan's midnight without one. Summer time included. */
+export function midnightIn(day: string, zone?: string): Date {
+  if (zone === undefined) return yerevanMidnight(day)
+  const wall = Date.parse(`${day}T00:00:00.000Z`)
+  // Twice: the offset at the first guess may be the other side of a change of the clocks.
+  const first = wall - offsetOf(new Date(wall), zone)
+  return new Date(wall - offsetOf(new Date(first), zone))
+}
+
+function wallClock(instant: Date, zone: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: zone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+  }).formatToParts(instant)
+  const part = (type: string) => Number(parts.find((one) => one.type === type)?.value ?? 0)
+  return {
+    year: part('year'),
+    month: part('month'),
+    day: part('day'),
+    hour: part('hour'),
+    minute: part('minute'),
+    second: part('second'),
+  }
+}
+
+/** How far the clocks of `zone` stand ahead of UTC at `instant`, in milliseconds. */
+function offsetOf(instant: Date, zone: string): number {
+  const at = wallClock(instant, zone)
+  const wall = Date.UTC(at.year, at.month - 1, at.day, at.hour, at.minute, at.second)
+  return wall - (instant.getTime() - instant.getUTCMilliseconds())
+}
+
 /**
  * Today as a request names it (`TODAY_HEADER`, MOL-121): the phone's day, held to the days that are
  * today somewhere at `instant` — a phone with a wrong clock is brought to the nearest of them, since

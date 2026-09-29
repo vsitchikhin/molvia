@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { ApiError } from '@molvia/client'
 import {
   ERROR,
+  ISSUE,
   addExpenseBodySchema,
   catalogueEntryCodec,
   expensePatchSchema,
@@ -51,8 +52,20 @@ export type QueuedWrite =
        * «Ереван Сити · сегодня» while the trip is still only on the phone.
        */
       readonly startedAt: Date
+      /**
+       * The phone's day of the tap, taken at the tap (MOL-121, adversarial round 4 Ф): worked out
+       * when sent, a start tapped at 23:30 in Yerevan and sent after a flight east was the next day.
+       * Absent from a write queued by an earlier build — then worked out from `startedAt`.
+       */
+      readonly tapDay?: string
     }
-  | { readonly kind: 'finish'; readonly tripId: string; readonly finishedOnDeviceAt?: Date }
+  | {
+      readonly kind: 'finish'
+      readonly tripId: string
+      readonly finishedOnDeviceAt?: Date
+      /** The phone's day of the tap, as `start` keeps it. */
+      readonly tapDay?: string
+    }
   | {
       readonly kind: 'add'
       readonly tripId: string
@@ -86,6 +99,8 @@ export type QueuedWrite =
        * or, open on the server under the next trip, it could not come back at all (round 3, В1).
        */
       readonly finish?: FinishTripBody
+      /** The day of that «Завершить», kept beside the body an earlier build reads strictly. */
+      readonly finishDay?: string
     }
   /**
    * The account of a trip and «списано», from its summary in «Деньги» (MOL-123, Р-3): whole each
@@ -176,6 +191,7 @@ function encode(entry: QueuedWrite): Loose {
         place: { ...entry.place },
         ...(entry.context ? { context: entry.context } : {}),
         startedAt: entry.startedAt.toISOString(),
+        ...(entry.tapDay ? { tapDay: entry.tapDay } : {}),
       }
     case 'finish':
       return {
@@ -219,8 +235,16 @@ function encode(entry: QueuedWrite): Loose {
                 : {},
             }
           : {}),
+        ...(entry.finishDay ? { finishDay: entry.finishDay } : {}),
       }
   }
+}
+
+/** A kept day of a tap, read back only when it is one — anything else is worked out anew. */
+function dayField<K extends string>(key: K, raw: unknown): Partial<Record<K, string>> {
+  return typeof raw === 'string' && isCalendarDay(raw)
+    ? ({ [key]: raw } as Partial<Record<K, string>>)
+    : {}
 }
 
 function decode(raw: unknown): QueuedWrite | null {
@@ -244,12 +268,16 @@ function decode(raw: unknown): QueuedWrite | null {
       place: body.data.place,
       startedAt,
       ...(body.data.context ? { context: body.data.context } : {}),
+      ...dayField('tapDay', raw.tapDay),
     }
   }
   if (kind === 'finish') {
-    if (raw.finishedOnDeviceAt === undefined) return { kind, tripId }
+    const day = dayField('tapDay', raw.tapDay)
+    if (raw.finishedOnDeviceAt === undefined) return { kind, tripId, ...day }
     const at = typeof raw.finishedOnDeviceAt === 'string' ? new Date(raw.finishedOnDeviceAt) : null
-    return at && Number.isFinite(at.getTime()) ? { kind, tripId, finishedOnDeviceAt: at } : null
+    return at && Number.isFinite(at.getTime())
+      ? { kind, tripId, finishedOnDeviceAt: at, ...day }
+      : null
   }
   if (kind === 'delete') return { kind, tripId }
   if (kind === 'payment') {
@@ -260,7 +288,9 @@ function decode(raw: unknown): QueuedWrite | null {
     const name = typeof raw.name === 'string' ? raw.name : ''
     if (raw.finish === undefined) return { kind, tripId, name }
     const finish = finishTripBodySchema.safeParse(raw.finish)
-    return finish.success ? { kind, tripId, name, finish: finish.data } : null
+    return finish.success
+      ? { kind, tripId, name, finish: finish.data, ...dayField('finishDay', raw.finishDay) }
+      : null
   }
   if (kind === 'add') {
     const body = addExpenseBodySchema.safeParse(knownFields(raw.body, BODY_FIELDS))
@@ -453,11 +483,34 @@ function tapOf(at: Date | undefined): { at?: Date; day?: string } {
   return isCalendarDay(day) ? { at, day } : { at }
 }
 
+/** The day of a tap, taken as it happens — nothing when the wire could not carry it. */
+function dayOfTap(at: Date): { tapDay?: string } {
+  const { day } = tapOf(at)
+  return day ? { tapDay: day } : {}
+}
+
 /** A finish taken back with «Вернуть», with the phone's day of its tap (MOL-121). */
-function finishWithDay(finish: FinishTripBody | undefined): FinishTripBody | undefined {
+function finishWithDay(
+  finish: FinishTripBody | undefined,
+  kept: string | undefined,
+): FinishTripBody | undefined {
   if (!finish) return finish
   const { at, day } = tapOf(finish.finishedOnDeviceAt)
-  return { ...(at ? { finishedOnDeviceAt: at } : {}), ...(day ? { finishedOn: day } : {}) }
+  const named = kept ?? day
+  return { ...(at ? { finishedOnDeviceAt: at } : {}), ...(named ? { finishedOn: named } : {}) }
+}
+
+/**
+ * A start or a finish sent again without the day of its tap, when the server refused that very
+ * field (adversarial round 4 Х): an API rolled back to a build older than MOL-121 reads its bodies
+ * strictly, and a refusal sets the write aside for good. The day is the one thing lost.
+ */
+function refusedDay(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.code === ISSUE.BODY_INVALID &&
+    /\b(startedOn|finishedOn|finish)\b/.test(error.message)
+  )
 }
 
 /**
@@ -469,25 +522,39 @@ function finishWithDay(finish: FinishTripBody | undefined): FinishTripBody | und
  * purchase can be corrected on the phone after its first `add` has gone, and sent again it would
  * be answered «yes» while the new price quietly went nowhere.
  */
+/** «Начать» as sent: with the day of its tap, unless the server refused that field. */
+function startBody(entry: Extract<QueuedWrite, { kind: 'start' }>, withDay: boolean) {
+  const day = entry.tapDay ?? tapOf(entry.startedAt).day
+  return {
+    id: entry.tripId,
+    place: entry.place,
+    ...(entry.context ? { context: entry.context } : {}),
+    ...(withDay && day ? { startedOn: day } : {}),
+  }
+}
+
+/** «Завершить» as sent: the moment and the day of its tap, as far as the wire carries them. */
+function finishOf(entry: Extract<QueuedWrite, { kind: 'finish' }>, withDay: boolean) {
+  const { at, day } = tapOf(entry.finishedOnDeviceAt)
+  return api.finishTrip(entry.tripId, at, withDay ? (entry.tapDay ?? day) : undefined)
+}
+
 function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
   switch (entry.kind) {
     case 'start':
       return api
-        .startTrip({
-          id: entry.tripId,
-          place: entry.place,
-          ...(entry.context ? { context: entry.context } : {}),
-          // The phone's day of the tap, by its own calendar (MOL-121): the queue may send it tomorrow.
-          ...(tapOf(entry.startedAt).day ? { startedOn: tapOf(entry.startedAt).day } : {}),
+        .startTrip(startBody(entry, true))
+        .catch((error: unknown) => {
+          if (refusedDay(error)) return api.startTrip(startBody(entry, false))
+          throw error
         })
         .then(({ trip }) => trip)
     case 'finish':
-      return api
-        .finishTrip(
-          entry.tripId,
-          tapOf(entry.finishedOnDeviceAt).at,
-          tapOf(entry.finishedOnDeviceAt).day,
-        )
+      return finishOf(entry, true)
+        .catch((error: unknown) => {
+          if (refusedDay(error)) return finishOf(entry, false)
+          throw error
+        })
         .then(() => null)
     case 'add':
       return written
@@ -503,7 +570,13 @@ function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
     case 'delete':
       return api.removeTrip(entry.tripId).then(() => null)
     case 'restore':
-      return api.restoreTrip(entry.tripId, finishWithDay(entry.finish))
+      return api
+        .restoreTrip(entry.tripId, finishWithDay(entry.finish, entry.finishDay))
+        .catch((error: unknown) => {
+          if (!refusedDay(error) || !entry.finish) throw error
+          const { at } = tapOf(entry.finish.finishedOnDeviceAt)
+          return api.restoreTrip(entry.tripId, at ? { finishedOnDeviceAt: at } : {})
+        })
     case 'payment':
       return api.payTrip(entry.tripId, entry.body)
   }
@@ -1097,12 +1170,19 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
   function enqueue(entry: QueuedWrite): void {
     const id = actor.id
     sync(id)
-    if (entry.kind === 'start') lastRemoved.value = null
+    if (entry.kind === 'start') {
+      lastRemoved.value = null
+      // The day of the tap, now, by the calendar the phone holds now (adversarial round 4 Ф).
+      if (!entry.tapDay) entry = { ...entry, ...dayOfTap(entry.startedAt) }
+    }
     if (entry.kind === 'finish') {
       const earlier = kept.find((item) => sameWrite(item.write, entry))?.write
       if (earlier?.kind === 'finish' && earlier.finishedOnDeviceAt) {
         entry = { ...entry, finishedOnDeviceAt: earlier.finishedOnDeviceAt }
       }
+      if (earlier?.kind === 'finish' && earlier.tapDay) entry = { ...entry, tapDay: earlier.tapDay }
+      else if (!entry.tapDay)
+        entry = { ...entry, ...dayOfTap(entry.finishedOnDeviceAt ?? new Date()) }
       const at = entry.finishedOnDeviceAt ?? new Date()
       const start = kept.find(
         (item) => item.write.kind === 'start' && item.write.tripId === entry.tripId,
@@ -1323,6 +1403,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
                   : {},
               }
             : {}),
+          ...(finished?.kind === 'finish' && finished.tapDay ? { finishDay: finished.tapDay } : {}),
         },
       },
       ...undo.writes.map((write) => ({ key: newKey(), write })),

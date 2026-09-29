@@ -1,5 +1,12 @@
 import type { ZodType } from 'zod'
-import { ERROR, ISSUE, TODAY_HEADER, VERSION_HEADER, errorResponseSchema } from '@molvia/model'
+import {
+  ERROR,
+  ISSUE,
+  TODAY_HEADER,
+  VERSION_HEADER,
+  ZONE_HEADER,
+  errorResponseSchema,
+} from '@molvia/model'
 import type { WireCode } from '@molvia/model'
 
 /**
@@ -86,6 +93,11 @@ export interface ClientOptions {
    * The bot names none, and the server takes Yerevan's.
    */
   readonly today?: () => string
+  /**
+   * The phone's time zone by name, named on every request (`ZONE_HEADER`, MOL-121): where its days
+   * begin and end, for a moment the server stamped itself. The bot names none.
+   */
+  readonly zone?: () => string
 }
 
 interface RequestOptions {
@@ -115,6 +127,7 @@ export function createTransport({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   onVersion,
   today,
+  zone,
   botSecret,
 }: ClientOptions & { readonly botSecret?: string }): Transport {
   async function exchange<T>(
@@ -125,6 +138,7 @@ export function createTransport({
     const headers = new Headers(options.headers)
     if (botSecret) headers.set('authorization', `Bearer ${botSecret}`)
     if (today) headers.set(TODAY_HEADER, today())
+    if (zone) headers.set(ZONE_HEADER, zone())
     if (options.body !== undefined) headers.set('content-type', 'application/json')
 
     // `AbortController` and a timer rather than `AbortSignal.timeout`, which Safari only

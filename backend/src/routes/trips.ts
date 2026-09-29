@@ -83,7 +83,12 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
     const actor = request.actor
     if (!actor) throw new DomainError(ERROR.NO_ACTOR)
 
-    const { trip, created } = await api.start({ ...actor, today: request.today }, body)
+    const asking = {
+      ...actor,
+      today: request.today,
+      ...(request.zone ? { zone: request.zone } : {}),
+    }
+    const { trip, created } = await api.start(asking, body)
     return answer(reply.code(created ? 201 : 200), trip)
   })
 

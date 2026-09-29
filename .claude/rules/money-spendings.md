@@ -222,7 +222,14 @@ nothing up.
   adversarial О), a trip's own and official rate at its start, the running month (its rate, what is
   frozen, «Остаток»), the charts, the balances and the day of a check (adversarial М, И). The hook
   holds it to the days that are today somewhere now (`todayFrom`: `earliestDay…latestDay`) and takes
-  Yerevan's where none is named — the bot, a page older than the header. **A write is refused as «in
+  Yerevan's where none is named — the bot, a page older than the header. **Beside it the phone
+  names its zone** (`ZONE_HEADER`, an IANA name, `isTimeZone`): a moment the server stamped itself
+  is a day in it — the end of the day an exchange counts purchases from (`spentFrom`), the day the
+  currency of conversion changed (`sinceDay`) — summer time included (`dayIn`, `midnightIn`); by
+  Yerevan's, a purchase before a Moscow exchange at 23:30 was taken off its money twice, and a
+  salary right after a change of the currency was «the old reckoning» (adversarial round 4 У, Ч).
+  The zone of the request, not of the record: a person who flew since writing is judged where they
+  are now. **A write is refused as «in
   the future» only past `latestDay`**: a queued write may leave a day later, and its day is judged
   against the latest day on Earth, never against the request's today. **A trip keeps the phone's day
   of its taps** (`started_on`, `finished_on`, adversarial К): the queue sends a start and a finish

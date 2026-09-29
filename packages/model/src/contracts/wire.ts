@@ -34,6 +34,14 @@ export const VERSION_HEADER = 'X-Molvia-Version'
  */
 export const TODAY_HEADER = 'X-Molvia-Today'
 
+/**
+ * The header every request of the phone names its time zone in, `Europe/Moscow` (MOL-121, adversarial
+ * round 4 У, Ч): where the phone's days begin and end, for a moment the server stamped itself — a
+ * record written, a setting changed — to be a day beside the days the phone names. A name the server
+ * does not know, or none, and it is Yerevan's.
+ */
+export const ZONE_HEADER = 'X-Molvia-Zone'
+
 /** The build a copy that was not built by the release runs as: nothing to compare. */
 export const UNNAMED_BUILD = 'dev'
 

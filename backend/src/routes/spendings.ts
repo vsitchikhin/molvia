@@ -56,7 +56,7 @@ function privately(reply: FastifyReply) {
 function ownerOf(request: FastifyRequest): Asking {
   const actor = request.actor
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
-  return { ...actor, today: request.today }
+  return { ...actor, today: request.today, ...(request.zone ? { zone: request.zone } : {}) }
 }
 
 /**

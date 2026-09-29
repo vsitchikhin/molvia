@@ -1,4 +1,12 @@
-import { DomainError, ERROR, SESSION_COOKIE, TODAY_HEADER, todayFrom } from '@molvia/model'
+import {
+  DomainError,
+  ERROR,
+  SESSION_COOKIE,
+  TODAY_HEADER,
+  ZONE_HEADER,
+  isTimeZone,
+  todayFrom,
+} from '@molvia/model'
 import type { Actor } from '@molvia/model'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { clearSessionCookie, readCookieValues, setSessionCookie } from '@/cookie'
@@ -23,11 +31,13 @@ declare module 'fastify' {
      * today somewhere — or Yerevan's, where it named none. What «today» of money is counted by.
      */
     today: string
+    /** The phone's time zone the request named (`ZONE_HEADER`), or none: Yerevan's then. */
+    zone: string | undefined
   }
 }
 
 /** The owner as a use case of money takes it: with the phone's today of the request (MOL-121). */
-export type Asking = Actor & { readonly today: string }
+export type Asking = Actor & { readonly today: string; readonly zone?: string }
 
 /**
  * The one place a request is turned into an owner. A hook over a whole scope rather than a
@@ -50,6 +60,7 @@ export function withActor(app: FastifyInstance, lookup: SessionLookup): void {
   app.decorateRequest('actor', null)
   app.decorateRequest('sessionId', '')
   app.decorateRequest('today', '')
+  app.decorateRequest('zone', undefined)
 
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
     const sent = readCookieValues(request.headers.cookie, SESSION_COOKIE)
@@ -96,6 +107,8 @@ export function withActor(app: FastifyInstance, lookup: SessionLookup): void {
     // One value or none: a header sent twice is no day to believe, and Yerevan's is taken.
     const named = request.headers[TODAY_HEADER.toLowerCase()]
     request.today = todayFrom(typeof named === 'string' ? named : undefined, new Date())
+    const zone = request.headers[ZONE_HEADER.toLowerCase()]
+    request.zone = typeof zone === 'string' && isTimeZone(zone) ? zone : undefined
 
     // The sliding term, and it is set here rather than by the use case because a use case knows
     // nothing about HTTP. `setSessionCookie` sends `no-store` with it, so whichever handle this

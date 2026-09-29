@@ -17,6 +17,9 @@ const client = createClient({
   },
   // The phone's today on every request (MOL-121): the server counts «today» of money by it.
   today: () => localDay(),
+  // Where the phone's days begin and end (MOL-121, adversarial round 4 У, Ч): by name, as the
+  // system says it — the server knows a named zone's summer time, never an offset's.
+  zone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
 })
 
 /** Told that the session behind this browser is gone. Registered by the actor store. */

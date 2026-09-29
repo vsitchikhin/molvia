@@ -6,6 +6,7 @@ import { money } from '#model/values/money'
 import {
   OFFICIAL_RATE_FRESH_DAYS,
   RATE_SCALE,
+  dayIn,
   decimalFromRate,
   earliestDay,
   exchangeRateSchema,
@@ -14,7 +15,9 @@ import {
   isRateDay,
   isRateFresh,
   isRateJump,
+  isTimeZone,
   latestDay,
+  midnightIn,
   parseRate,
   pickOfficialRate,
   rateCodec,
@@ -597,5 +600,40 @@ describe('formatRate', () => {
 
   it('лишние знаки снимка на экран не выносит', () => {
     expect(formatRate(of('4.821234')).replaceAll('\u00a0', ' ')).toBe('4,82 ֏/₽')
+  })
+})
+
+describe('dayIn and midnightIn (MOL-121, adversarial round 4)', () => {
+  it('names the day of a moment in the phone’s zone, Yerevan’s without one', () => {
+    const at = new Date('2026-08-31T20:30:00Z')
+    expect(dayIn(at, 'Europe/Moscow')).toBe('2026-08-31')
+    expect(dayIn(at, 'Asia/Tokyo')).toBe('2026-09-01')
+    expect(dayIn(at)).toBe('2026-09-01')
+  })
+
+  it('finds where a day begins, summer time included', () => {
+    expect(midnightIn('2026-08-31', 'Europe/Moscow').toISOString()).toBe('2026-08-30T21:00:00.000Z')
+    expect(midnightIn('2026-09-11', 'Asia/Tokyo').toISOString()).toBe('2026-09-10T15:00:00.000Z')
+    expect(midnightIn('2026-09-11').toISOString()).toBe('2026-09-10T20:00:00.000Z')
+    // New York: summer time ends on 1 November 2026 at 02:00 — that day begins at −4, the next at −5.
+    expect(midnightIn('2026-11-01', 'America/New_York').toISOString()).toBe(
+      '2026-11-01T04:00:00.000Z',
+    )
+    expect(midnightIn('2026-11-02', 'America/New_York').toISOString()).toBe(
+      '2026-11-02T05:00:00.000Z',
+    )
+    expect(midnightIn('2026-03-08', 'America/New_York').toISOString()).toBe(
+      '2026-03-08T05:00:00.000Z',
+    )
+    expect(midnightIn('2026-03-09', 'America/New_York').toISOString()).toBe(
+      '2026-03-09T04:00:00.000Z',
+    )
+  })
+
+  it('knows a zone by its name only', () => {
+    expect(isTimeZone('Europe/Moscow')).toBe(true)
+    for (const zone of ['', 'Mars/Olympus', '+03:00', 'Europe/Moscow'.repeat(8)]) {
+      expect(isTimeZone(zone)).toBe(false)
+    }
   })
 })
