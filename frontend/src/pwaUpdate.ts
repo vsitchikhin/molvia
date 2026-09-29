@@ -237,6 +237,9 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
   function serverVersion(version: string): void {
     if (version === UNNAMED_BUILD) return
     build ??= version
+    // Back on the page's own build — a rollout rolled back: the same other build rolled out again
+    // later is a new rollout, and gets its own window of looks (adversarial Ж1).
+    if (version === build) other = undefined
     if (version === build || phase.value !== 'none') return
     const at = environment.now()
     if (version !== other) {
@@ -248,6 +251,14 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
     if (lookedAt !== undefined && at - lookedAt < LOOK_AGAIN_MS) return
     lookedAt = at
     check()
+  }
+
+  function follow(worker: ServiceWorker | null): void {
+    worker?.addEventListener('statechange', () => {
+      arrived(worker)
+      refresh()
+      settle()
+    })
   }
 
   /**
@@ -271,15 +282,14 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
       own = found.active ?? found.waiting ?? found.installing
       // A worker installed while the page was not looking waits for the same moment.
       found.addEventListener('updatefound', () => {
-        const worker = found.installing
         // The first install may begin only after the registration is handed over.
-        own ??= worker
-        worker?.addEventListener('statechange', () => {
-          arrived(worker)
-          refresh()
-          settle()
-        })
+        own ??= found.installing
+        follow(found.installing)
       })
+      // And one already there as the page came up — installing, or waiting behind another window:
+      // unheard, it became active and nothing reloaded, the version taken and called failed (С-14).
+      follow(found.installing)
+      follow(found.waiting)
       // Brought up by «Обновить», and a version still waits: it was never taken (Т-7).
       const marked = environment.takeMark()
       const retried = marked !== null && environment.now() - marked < MARK_LIFETIME_MS

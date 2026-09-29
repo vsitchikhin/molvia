@@ -270,6 +270,31 @@ describe('a new version taken by the button (MOL-132)', () => {
     expect(update.phase.value).toBe('ready')
   })
 
+  it('offers a version that was still installing when the page came up, once it waits (С-14)', async () => {
+    const container = new Container({})
+    container.registration.active = new Worker()
+    const installing = new Worker()
+    container.registration.installing = installing
+    const update = installPwaUpdate({
+      serviceWorker: container as unknown as ServiceWorkerContainer,
+      script: '/sw.js',
+      scope: '/',
+      holdsTyping: () => sheet,
+      reload: vi.fn(),
+      mark: (at) => marks.push(at),
+      takeMark: () => null,
+      now: () => clock,
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(update.phase.value).toBe('none')
+
+    container.registration.installing = null
+    container.registration.waiting = installing
+    installing.emit('statechange')
+
+    expect(update.phase.value).toBe('ready')
+  })
+
   it('offers a version that was already waiting when the page came up', async () => {
     const { update } = await installed({ waiting: true })
     expect(update.phase.value).toBe('ready')
@@ -552,6 +577,22 @@ describe('a new version taken by the button (MOL-132)', () => {
       expect(reload).toHaveBeenCalledOnce()
     })
 
+    it('reloads onto a version that was already waiting as it came up, rather than calling it failed (С-14)', async () => {
+      const { update, registration, reload } = await installed({
+        controlled: false,
+        active: true,
+        waiting: true,
+      })
+      expect(update.phase.value).toBe('ready')
+
+      update.apply()
+      registration.activate()
+
+      expect(reload).toHaveBeenCalledOnce()
+      vi.advanceTimersByTime(APPLY_TIMEOUT_MS)
+      expect(update.phase.value).not.toBe('failed')
+    })
+
     it('takes the worker already active as it came up for its own, as a fast first install leaves it', async () => {
       const { update, registration } = await installed({ controlled: false, active: true })
       expect(update.phase.value).toBe('none')
@@ -596,6 +637,21 @@ describe('a new version taken by the button (MOL-132)', () => {
 
       // One as it first differs, then one every half a minute for five minutes — and none after.
       expect(registration.update).toHaveBeenCalledTimes(LOOK_FOR_MS / LOOK_AGAIN_MS + 1)
+    })
+
+    it('looks again at once for the same build rolled out again after a rollback (Ж1)', async () => {
+      const { update, registration } = await installed()
+      update.serverVersion('v0.2.0-1-g1a00000')
+      update.serverVersion('v0.2.0-2-g2b00000')
+      expect(registration.update).toHaveBeenCalledOnce()
+
+      // B failed its health check and was rolled back: ten minutes of A.
+      clock += 10 * 60 * 1000
+      update.serverVersion('v0.2.0-1-g1a00000')
+      // The same B out again — its frontend with it this time.
+      update.serverVersion('v0.2.0-2-g2b00000')
+
+      expect(registration.update).toHaveBeenCalledTimes(2)
     })
 
     it('looks again for the next build the server names after that', async () => {
