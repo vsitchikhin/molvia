@@ -16,7 +16,7 @@ import AccountView from '@/views/AccountView.vue'
 import AccountsView from '@/views/AccountsView.vue'
 import MoneyCategoriesView from '@/views/MoneyCategoriesView.vue'
 import MoneyChartsView from '@/views/MoneyChartsView.vue'
-import { watchBrowserAnimatedBack } from '@/transitions'
+import { sameScreen, watchBrowserAnimatedBack } from '@/transitions'
 
 /** The five sections of the tab bar. «trip» is home: the main scenario of the product. */
 export type Tab = 'trip' | 'advice' | 'verdicts' | 'money' | 'settings'
@@ -211,15 +211,14 @@ watchBrowserAnimatedBack()
  * the router saved on `pagehide` is where the person was. Read as the same address, the trip, and
  * only the trip, forgot it (adversarial В1).
  *
- * A move that changes only the query of the screen — the category and the period of «Графики», the
- * month of «Деньги», each by `replace` — is the screen's own state, not another screen, and the page
- * stays where it is: the person chose the category to look at its chart, three cards down, and
- * the top took it away (MOL-136). The same route with other params is another screen.
+ * A move that changes only the query is the screen's own state (`sameScreen`), and the page stays
+ * where it is: the person chose the category to look at its chart, three cards down, and the top
+ * took it away (MOL-136). The same route with other params is another screen.
  */
 export const scrollBehavior: RouterScrollBehavior = (to, from, saved) => {
   if (from === START_LOCATION) return saved ?? { top: 0 }
   if (to.fullPath === from.fullPath) return false
-  return saved ?? (to.path === from.path ? false : { top: 0 })
+  return saved ?? (sameScreen(from, to) ? false : { top: 0 })
 }
 
 export const router = createRouter({

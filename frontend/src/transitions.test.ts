@@ -74,6 +74,20 @@ describe('direction', () => {
   it('does not animate staying in place', async () => {
     expect(await between('/advice', '/advice')).toBeNull()
   })
+
+  // A month, a period, a category: the screen's own state. The month of «Деньги» cross-faded as a
+  // move between tabs, and the second quick tap on «‹» went into the transition (MOL-136, Д).
+  it.each([
+    ['/money', '/money?month=2026-08'],
+    ['/money?month=2026-08', '/money?month=2026-07'],
+    ['/money/charts', '/money/charts?period=12'],
+  ])('does not animate a change of the query alone: %s → %s', async (from, to) => {
+    expect(await between(from, to)).toBeNull()
+  })
+
+  it('must not fire: a section with a query to another section is still a tab', async () => {
+    expect(await between('/money?month=2026-08', '/advice')).toBe('tab')
+  })
 })
 
 describe('installViewTransitions', () => {
@@ -228,6 +242,27 @@ describe('installArrival', () => {
     expect(document.activeElement).toBe(opener)
     expect(document.title).toBe('untouched')
     opener.remove()
+    view.unmount()
+  })
+
+  // The arrow of the month keeps the focus: taken to the heading, the second Enter on «‹» went into
+  // the title and the month moved once (MOL-136, adversarial Ф).
+  it('leaves focus and the title alone when only the query changes', async () => {
+    const { router, view } = await app()
+    const arrow = document.createElement('button')
+    document.body.append(arrow)
+    arrow.focus()
+    document.title = 'untouched'
+
+    await router.replace({ query: { month: '2026-08' } })
+    await nextTick()
+    await router.replace({ query: { month: '2026-07' } })
+    await nextTick()
+
+    expect(router.currentRoute.value.fullPath).toBe('/?month=2026-07')
+    expect(document.activeElement).toBe(arrow)
+    expect(document.title).toBe('untouched')
+    arrow.remove()
     view.unmount()
   })
 })
