@@ -14,6 +14,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 ## backend · db
 
 - `backend/src/db/erasure-repository.ts` — Repository of erasure: everything about one Telegram id in one transaction, a dry run rolled back; `ACTOR_REFERENCES` names every key to `actors`. Tests: `backend/tests/erasure.integration.test.ts`.
+- `backend/src/db/export-repository.ts` — Repository of «Скачать мои данные» (MOL-93): everything of one owner as one read-only snapshot; `EXPORT_SECTION_OF` ties each erased table to its section, `EXPORT_COLUMNS` names every column as exported or left out and why. Tests: `backend/tests/export.integration.test.ts`.
 - `backend/src/db/failure.ts` — Postgres failures: foreign-key and unique violations turned into domain errors, and `describeFailure`, a failure logged by its kind without its message.
 
 ## backend · other
@@ -26,7 +27,9 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 - `backend/tests/compose-logging.integration.test.ts` — Integration test: every service of `docker-compose.prod.yml` logs to the journal, and Postgres keeps row values out of its own log.
 - `backend/tests/erase-route.integration.test.ts` — Integration test: `POST /internal/actors/erase` erases the owner with their sessions, answers a repeat and a stranger with the same 204, needs the bot secret.
 - `backend/tests/erasure.integration.test.ts` — Integration test: erasure leaves no row of the person anywhere, keeps items and places, counts the week, and orders its locks against a login.
+- `backend/tests/export.integration.test.ts` — Integration test: the export covers every key to `actors` and every column, counts what a dry run of erasure counts, leaks nobody else's row and no secret, keeps the removed marked.
 - `backend/tests/forget-bundle.integration.test.ts` — Integration test: the bundled `dist/forget.js` runs from the bundle alone, and `make forget` erases only with `YES=1` on the command line.
+- `backend/tests/life.ts` — Test support: `aLife`, a person touching every table erasure removes — the one life both the erasure and the export tests read.
 - `backend/tests/request-log.integration.test.ts` — Integration test: a request is logged as method and path without the search query; an unknown address is neither logged with its query nor echoed.
 
 ## frontend · views
