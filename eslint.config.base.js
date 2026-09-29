@@ -13,6 +13,7 @@ export function base({ tsconfigRootDir, browser = false }) {
       ignores: [
         '**/dist/**',
         '**/dev-dist/**',
+        '**/dist-e2e/**',
         '**/node_modules/**',
         '**/playwright-report/**',
         '**/test-results/**',

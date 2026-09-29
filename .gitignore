@@ -15,6 +15,8 @@
 # deps and build output
 node_modules/
 dist/
+# The build the end-to-end run serves to a real worker (MOL-132).
+dist-e2e/
 coverage/
 certs/
 *.pem
