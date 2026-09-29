@@ -8,8 +8,9 @@ import { installArrival, installViewTransitions } from '@/transitions'
 import { installSheetEntryGuard } from '@/composables/useSheetHistory'
 import { sessionEnded, useActorStore } from '@/stores/actor'
 import { forgetTheInviteDoor } from '@/stores/identity'
-import { onMissingActor } from '@/api'
-import { holdsTyping, installPwaUpdate } from '@/pwaUpdate'
+import { onMissingActor, onServerVersion } from '@/api'
+import { forget, read, write } from '@/stores/storage'
+import { NO_UPDATE, holdsTyping, installPwaUpdate, pwaUpdateKey } from '@/pwaUpdate'
 import '@/styles/main.scss'
 
 // Before the router reads the address: the door of MOL-8 is gone, and this clears what it left
@@ -17,18 +18,33 @@ import '@/styles/main.scss'
 forgetTheInviteDoor()
 
 // A new version waits for the app to be put away holding no typing, and is looked for when it
-// comes back (MOL-46). Production only: the dev server builds no worker.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  installPwaUpdate({
-    serviceWorker: navigator.serviceWorker,
-    script: `${import.meta.env.BASE_URL}sw.js`,
-    scope: import.meta.env.BASE_URL,
-    holdsTyping: () => holdsTyping(document),
-    reload: () => {
-      window.location.reload()
-    },
-  })
-}
+// comes back (MOL-46) — or, on a page that stays on the screen, is taken by «Обновить» (MOL-132).
+// Production only: the dev server builds no worker.
+const UPDATE_MARK = 'molvia.update-applied'
+const update =
+  import.meta.env.PROD && 'serviceWorker' in navigator
+    ? installPwaUpdate({
+        serviceWorker: navigator.serviceWorker,
+        script: `${import.meta.env.BASE_URL}sw.js`,
+        scope: import.meta.env.BASE_URL,
+        holdsTyping: () => holdsTyping(document),
+        reload: () => {
+          window.location.reload()
+        },
+        mark: (at) => {
+          write(UPDATE_MARK, String(at))
+        },
+        takeMark: () => {
+          const at = Number(read(UPDATE_MARK, true))
+          forget(UPDATE_MARK)
+          return Number.isFinite(at) && at > 0 ? at : null
+        },
+        now: () => Date.now(),
+      })
+    : NO_UPDATE
+onServerVersion((version) => {
+  update.serverVersion(version)
+})
 
 const app = createApp(App)
 
@@ -45,6 +61,7 @@ app.config.errorHandler = (error, _instance, info) => {
 }
 
 app.use(createPinia()).use(router).use(i18n)
+app.provide(pwaUpdateKey, update)
 
 // Одна дверь на все отказы «этого браузера мы больше не знаем», с какого бы запроса отказ ни
 // пришёл: экран входа, а не «что-то пошло не так» на пятнадцати экранах (MOL-56).

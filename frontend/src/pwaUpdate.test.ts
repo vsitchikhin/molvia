@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { holdsTyping, installPwaUpdate } from '@/pwaUpdate'
+import { APPLY_TIMEOUT_MS, CHECK_EVERY_MS, holdsTyping, installPwaUpdate } from '@/pwaUpdate'
 
 type Handler = () => void
 
@@ -45,38 +45,47 @@ class Container extends Target {
 
 let hidden = false
 let sheet = false
+/** The notes «Обновить» leaves for the page it brings up — the moments they were written at. */
+let marks: number[] = []
+const now = Date.parse('2026-09-29T10:00:00Z')
 
 function show(state: 'visible' | 'hidden'): void {
   hidden = state === 'hidden'
   document.dispatchEvent(new Event('visibilitychange'))
 }
 
-async function installed(options: { controlled?: boolean } = {}) {
+async function installed(options: { controlled?: boolean; waiting?: boolean } = {}) {
   const container = new Container(options.controlled === false ? null : {})
+  if (options.waiting) container.registration.waiting = new Worker()
   const reload = vi.fn()
-  installPwaUpdate({
+  const update = installPwaUpdate({
     serviceWorker: container as unknown as ServiceWorkerContainer,
     script: '/sw.js',
     scope: '/',
     holdsTyping: () => sheet,
     reload,
+    mark: (at) => marks.push(at),
+    takeMark: () => marks.splice(0).at(-1) ?? null,
+    now: () => now,
   })
-  await vi.waitFor(() => {
-    expect(container.register).toHaveBeenCalled()
-  })
-  await Promise.resolve()
-  return { container, registration: container.registration, reload }
+  expect(container.register).toHaveBeenCalled()
+  // The registration settles on the microtask queue; the clock stays where it is.
+  await vi.advanceTimersByTimeAsync(0)
+  return { container, registration: container.registration, reload, update }
 }
 
 beforeEach(() => {
+  vi.useFakeTimers()
   hidden = false
   sheet = false
+  marks = []
   vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() =>
     hidden ? 'hidden' : 'visible',
   )
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
 })
 
@@ -211,6 +220,185 @@ describe('an installed app taking a new version (MOL-46)', () => {
     await Promise.resolve()
 
     expect(registration.update).toHaveBeenCalledOnce()
+  })
+})
+
+describe('a new version taken by the button (MOL-132)', () => {
+  it('has nothing to offer until a version waits', async () => {
+    const { update, registration } = await installed()
+    expect(update.phase.value).toBe('none')
+
+    registration.arrive()
+
+    expect(update.phase.value).toBe('ready')
+  })
+
+  it('offers a version that was already waiting when the page came up', async () => {
+    const { update } = await installed({ waiting: true })
+    expect(update.phase.value).toBe('ready')
+  })
+
+  it('must not offer the first install: a page nothing controls runs what it fetched', async () => {
+    const { update, registration } = await installed({ controlled: false })
+    registration.arrive()
+    expect(update.phase.value).toBe('none')
+  })
+
+  it('lets the version in on «Обновить», once for a double tap, and reloads when it takes over', async () => {
+    const { update, container, registration, reload } = await installed()
+    const worker = registration.arrive()
+
+    update.apply()
+    update.apply()
+
+    expect(worker.postMessage).toHaveBeenCalledExactlyOnceWith({ type: 'SKIP_WAITING' })
+    expect(update.phase.value).toBe('applying')
+    expect(reload).not.toHaveBeenCalled()
+
+    container.emit('controllerchange')
+
+    expect(reload).toHaveBeenCalledOnce()
+    expect(marks).toHaveLength(1)
+  })
+
+  it('reloads at once where another window already let the version in (Р-5)', async () => {
+    const { update, container, registration, reload } = await installed()
+    const worker = registration.arrive()
+    container.emit('controllerchange')
+    expect(update.phase.value).toBe('ready')
+    expect(reload).not.toHaveBeenCalled()
+
+    update.apply()
+
+    expect(reload).toHaveBeenCalledOnce()
+    expect(worker.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('must not do anything by itself while the app is looked at', async () => {
+    const { update, container, registration, reload } = await installed()
+    const worker = registration.arrive()
+    vi.advanceTimersByTime(APPLY_TIMEOUT_MS * 10)
+
+    expect(update.phase.value).toBe('ready')
+    expect(worker.postMessage).not.toHaveBeenCalled()
+    container.emit('controllerchange')
+    expect(reload).not.toHaveBeenCalled()
+  })
+
+  it('must not act when nothing waits', async () => {
+    const { update, reload } = await installed()
+    update.apply()
+    expect(update.phase.value).toBe('none')
+    expect(reload).not.toHaveBeenCalled()
+  })
+
+  describe('a version that did not take (Т-7)', () => {
+    it('fails when the worker has not taken over in ten seconds — and not a moment sooner', async () => {
+      const { update, registration } = await installed()
+      registration.arrive()
+      update.apply()
+
+      vi.advanceTimersByTime(APPLY_TIMEOUT_MS - 1)
+      expect(update.phase.value).toBe('applying')
+      vi.advanceTimersByTime(1)
+      expect(update.phase.value).toBe('failed')
+    })
+
+    it('fails when the page «Обновить» brought up still has a version waiting', async () => {
+      marks.push(now)
+      const { update } = await installed({ waiting: true })
+      expect(update.phase.value).toBe('failed')
+      expect(marks).toEqual([])
+    })
+
+    it('offers the version as usual when the note is from another time', async () => {
+      marks.push(now - 60_000)
+      const { update } = await installed({ waiting: true })
+      expect(update.phase.value).toBe('ready')
+    })
+
+    it('takes the note away when the version did take', async () => {
+      marks.push(now)
+      const { update } = await installed()
+      expect(update.phase.value).toBe('none')
+      expect(marks).toEqual([])
+    })
+
+    it('stays failed rather than offering the same button again', async () => {
+      const { update, registration } = await installed()
+      registration.arrive()
+      update.apply()
+      vi.advanceTimersByTime(APPLY_TIMEOUT_MS)
+
+      registration.arrive()
+      update.apply()
+
+      expect(update.phase.value).toBe('failed')
+    })
+  })
+
+  describe('looking for a version while the app stays on the screen', () => {
+    it('looks every quarter of an hour while it is looked at', async () => {
+      const { registration } = await installed()
+
+      vi.advanceTimersByTime(CHECK_EVERY_MS - 1)
+      expect(registration.update).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1)
+      expect(registration.update).toHaveBeenCalledOnce()
+    })
+
+    it('must not look while hidden', async () => {
+      const { registration } = await installed()
+      show('hidden')
+      vi.advanceTimersByTime(CHECK_EVERY_MS * 3)
+      expect(registration.update).not.toHaveBeenCalled()
+    })
+
+    it('must not look offline', async () => {
+      const { registration } = await installed()
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      vi.advanceTimersByTime(CHECK_EVERY_MS)
+      expect(registration.update).not.toHaveBeenCalled()
+    })
+
+    it('starts over when the app is looked at again, rather than keeping two clocks', async () => {
+      const { registration } = await installed()
+      show('hidden')
+      show('visible')
+      registration.update.mockClear()
+
+      vi.advanceTimersByTime(CHECK_EVERY_MS)
+      expect(registration.update).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('the build an answer names (Т-3)', () => {
+    it('looks at once when the server names another build than it did', async () => {
+      const { update, registration } = await installed()
+      update.serverVersion('v0.1.4-1-g3a00000')
+      update.serverVersion('v0.1.4-1-g3a00000')
+      expect(registration.update).not.toHaveBeenCalled()
+
+      update.serverVersion('v0.1.4-2-g9f00000')
+      update.serverVersion('v0.1.4-2-g9f00000')
+
+      expect(registration.update).toHaveBeenCalledOnce()
+    })
+
+    it('must not offer a version on the build alone: only a worker has one to let in', async () => {
+      const { update } = await installed()
+      update.serverVersion('v0.1.4-1-g3a00000')
+      update.serverVersion('v0.1.4-2-g9f00000')
+      expect(update.phase.value).toBe('none')
+    })
+
+    it('must not compare a build nobody named', async () => {
+      const { update, registration } = await installed()
+      update.serverVersion('dev')
+      update.serverVersion('v0.1.4-2-g9f00000')
+      update.serverVersion('dev')
+      expect(registration.update).not.toHaveBeenCalled()
+    })
   })
 })
 
