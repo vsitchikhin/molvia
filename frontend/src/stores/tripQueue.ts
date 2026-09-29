@@ -7,6 +7,7 @@ import {
   catalogueEntryCodec,
   expensePatchSchema,
   finishTripBodySchema,
+  isCalendarDay,
   isWireCode,
   startTripBodySchema,
   tripPaymentBodySchema,
@@ -439,10 +440,24 @@ function recallRejected(key: string): { items: RejectedWrite[]; named: boolean }
   return { items, named }
 }
 
+/**
+ * The moment of a tap and its day by the phone's calendar, as far as the wire can carry them (Р-33,
+ * adversarial round 3 С): a clock past 9999 has a moment no ISO date writes, and one in year 1 east
+ * of UTC a day of five digits — sent, either would be refused by the body's own codec before it left
+ * the phone, and a refusal sets the write aside for good. The server times such a tap by its own
+ * clock, as it does a moment it cannot believe.
+ */
+function tapOf(at: Date | undefined): { at?: Date; day?: string } {
+  if (!at || !/^\d{4}-/.test(at.toISOString())) return {}
+  const day = localDay(at)
+  return isCalendarDay(day) ? { at, day } : { at }
+}
+
 /** A finish taken back with «Вернуть», with the phone's day of its tap (MOL-121). */
 function finishWithDay(finish: FinishTripBody | undefined): FinishTripBody | undefined {
-  const at = finish?.finishedOnDeviceAt
-  return finish && at ? { ...finish, finishedOn: localDay(at) } : finish
+  if (!finish) return finish
+  const { at, day } = tapOf(finish.finishedOnDeviceAt)
+  return { ...(at ? { finishedOnDeviceAt: at } : {}), ...(day ? { finishedOn: day } : {}) }
 }
 
 /**
@@ -463,15 +478,15 @@ function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
           place: entry.place,
           ...(entry.context ? { context: entry.context } : {}),
           // The phone's day of the tap, by its own calendar (MOL-121): the queue may send it tomorrow.
-          startedOn: localDay(entry.startedAt),
+          ...(tapOf(entry.startedAt).day ? { startedOn: tapOf(entry.startedAt).day } : {}),
         })
         .then(({ trip }) => trip)
     case 'finish':
       return api
         .finishTrip(
           entry.tripId,
-          entry.finishedOnDeviceAt,
-          entry.finishedOnDeviceAt ? localDay(entry.finishedOnDeviceAt) : undefined,
+          tapOf(entry.finishedOnDeviceAt).at,
+          tapOf(entry.finishedOnDeviceAt).day,
         )
         .then(() => null)
     case 'add':

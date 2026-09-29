@@ -1039,6 +1039,18 @@ describe('день телефона у похода (MOL-121)', () => {
     })
     expect(finished.status).toBe(204)
     expect(await days(id)).toEqual({ startedOn: null, finishedOn: null })
+    // Year 1 written short, a day past 9999 — no calendar day at all: dropped the same (round 3 С).
+    for (const finishedOn of ['1-01-01', '10000-01-01']) {
+      const odd = randomUUID()
+      await call('POST', '/trips', actor, {
+        context: await tripContext(db, actor),
+        id: odd,
+        startedOn: finishedOn,
+        place: { kind: 'store', name: `Лавка ${finishedOn}` },
+      })
+      expect((await call('POST', `/trips/${odd}/finish`, actor, { finishedOn })).status).toBe(204)
+      expect(await days(odd)).toEqual({ startedOn: null, finishedOn: null })
+    }
 
     const other = randomUUID()
     await call('POST', '/trips', actor, {

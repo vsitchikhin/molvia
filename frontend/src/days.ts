@@ -96,7 +96,8 @@ export function shiftDay(day: string, by: number): string {
 export function localDay(now = new Date()): string {
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const date = String(now.getDate()).padStart(2, '0')
-  return `${String(now.getFullYear())}-${month}-${date}`
+  // Four digits of year, as the wire writes a day: year 1 is `0001`, not `1` (adversarial round 3 С).
+  return `${String(now.getFullYear()).padStart(4, '0')}-${month}-${date}`
 }
 
 /**

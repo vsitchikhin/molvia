@@ -901,6 +901,27 @@ describe('trip queue', () => {
       expect(finishTrip).toHaveBeenLastCalledWith(TRIP, at, '2026-09-19')
     })
 
+    // A broken clock never gets a write refused on the phone (Р-33, adversarial round 3 С): what the
+    // wire can carry goes, and the server drops what it cannot believe.
+    it('sends what the wire can carry of a tap from a broken clock, and nothing it cannot', async () => {
+      finishTrip.mockResolvedValue(undefined)
+      startTrip.mockResolvedValue({ trip: answer('0.00'), created: true })
+      const yearOne = new Date('0001-01-01T00:00:00.000Z')
+      const beyond = new Date('+010000-01-01T00:00:00.000Z')
+      const queue = fresh()
+      queue.enqueue({ ...started(), startedAt: beyond })
+      queue.enqueue({ kind: 'finish', tripId: TRIP, finishedOnDeviceAt: yearOne })
+      await queue.flush()
+      expect(startTrip.mock.calls[0]?.[0]).not.toHaveProperty('startedOn')
+      expect(finishTrip).toHaveBeenLastCalledWith(TRIP, yearOne, '0001-01-01')
+      expect(queue.rejected).toEqual([])
+
+      queue.enqueue({ kind: 'finish', tripId: TRIP, finishedOnDeviceAt: beyond })
+      await queue.flush()
+      expect(finishTrip).toHaveBeenLastCalledWith(TRIP, undefined, undefined)
+      expect(queue.rejected).toEqual([])
+    })
+
     it('does not leave a refused completion in local history', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => undefined)
       finishTrip.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))

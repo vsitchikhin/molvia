@@ -55,9 +55,12 @@ The detail behind the trip lines of `CLAUDE.md`.
   `finishedOnDeviceAt`) by the phone's calendar — so a write queued before this, and sent after,
   has its day too, and the queue's shape did not change. The server keeps the first, as it keeps
   the first moment, and **drops a day it cannot believe rather than refuse it** — before 2000 or past
-  the latest on Earth (`isDeviceDay`): the body takes any calendar day, since a clock at 1970 — a dead
-  battery — sends 1970's day beside its moment, and a refused start or finish is set aside for good
-  (Р-33, adversarial round 2 П). **A trip's rate is snapshotted on the day it is dated by** — the tap
+  the latest on Earth, or no calendar day at all (`isDeviceDay`): the body takes any short string,
+  since a clock at 1970 — a dead battery — sends 1970's day beside its moment, one in year 1 or past
+  9999 a day no calendar check passes, and a refused start or finish is set aside for good (Р-33,
+  adversarial rounds 2 П and 3 С). The phone sends nothing the wire cannot carry — a moment past
+  9999, a day of five digits — and the history on the phone keeps such a trip in memory rather than
+  fail the write it came with. **A trip's rate is snapshotted on the day it is dated by** — the tap
   of «Начать», within a day of the server's (Ж1), else the request's today (review Т-7): a start
   the queue sent after midnight takes the wallet of the evening it was tapped in.
 - **A removed trip is marked, by the money rule (MOL-76).** `DELETE /trips/:id` sets

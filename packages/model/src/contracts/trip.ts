@@ -17,7 +17,7 @@ import type { Trip } from '#model/entities/trip'
 import { INT8_MAX } from '#model/support/decimal'
 import { currencySchema, moneyCodec } from '#model/values/money'
 import type { Money } from '#model/values/money'
-import { latestDay, rateCodec, rateProviderSchema } from '#model/values/rates'
+import { isCalendarDay, latestDay, rateCodec, rateProviderSchema } from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
 import { quantityCodec, unitPrice, unitPriceCodec } from '#model/values/units'
 
@@ -30,19 +30,13 @@ import { quantityCodec, unitPrice, unitPriceCodec } from '#model/values/units'
 export const deviceIdSchema = z.uuid().regex(/^[0-9a-f-]+$/)
 
 /**
- * A day a phone named at a tap (MOL-121): any real calendar day, whatever the year. Whether it is
- * one the phone could have lived through is the use case's — `isDeviceDay` — which drops it rather
- * than refuse: a clock reset to 1970 is the one a dead battery leaves, and a refusal of a start or a
- * finish is set aside by the queue for good (Р-33, adversarial round 2 П).
+ * A day a phone named at a tap (MOL-121): taken as it comes, and judged by the use case —
+ * `isDeviceDay` — which drops what it cannot believe rather than refuse it. A clock at 1970, in year
+ * 1 or past 9999 writes a day no calendar check passes, and a refused start or finish is set aside by
+ * the queue for good: the one outcome Р-33 exists to prevent (adversarial rounds 2 П and 3 С). Only
+ * the length is held, so the field carries no essay.
  */
-export const deviceDaySchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine((day) => {
-    // `Date.parse('2026-02-31')` is the 3rd of March, and a month 13 is no date at all.
-    const at = Date.parse(`${day}T00:00:00.000Z`)
-    return Number.isFinite(at) && new Date(at).toISOString().slice(0, 10) === day
-  })
+export const deviceDaySchema = z.string().max(32)
 
 /**
  * The body of «Начать поход».
@@ -307,11 +301,15 @@ export function isDeviceTime(at: Date, now: Date): boolean {
 
 /**
  * Whether a day a phone named at a tap — `startedOn`, `finishedOn` (MOL-121) — is one it could have
- * lived through: from 2000 on, as a device time is, and not past the latest day on Earth. A day
- * that fails this is dropped, not refused (Р-33).
+ * lived through: a calendar day, from 2000 on as a device time is, and not past the latest day on
+ * Earth. A day that fails this is dropped, not refused (Р-33).
  */
 export function isDeviceDay(day: string, now: Date): boolean {
-  return day >= DEVICE_TIME_EPOCH.toISOString().slice(0, 10) && day <= latestDay(now)
+  return (
+    isCalendarDay(day) &&
+    day >= DEVICE_TIME_EPOCH.toISOString().slice(0, 10) &&
+    day <= latestDay(now)
+  )
 }
 
 /** Old queued finishes have no device time; retries preserve whichever time first arrived. */

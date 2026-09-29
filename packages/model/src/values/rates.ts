@@ -277,7 +277,7 @@ export function earliestDay(instant: Date): string {
  * Yerevan's: the bot, a page older than the header.
  */
 export function todayFrom(sent: string | undefined, instant: Date): string {
-  if (sent === undefined || !/^\d{4}-\d{2}-\d{2}$/.test(sent) || !isRateDay(sent)) {
+  if (sent === undefined || !isRateDay(sent)) {
     return yerevanDate(instant)
   }
   const earliest = earliestDay(instant)
@@ -293,10 +293,18 @@ export function todayFrom(sent: string | undefined, instant: Date): string {
  * holds what no trip could take.
  */
 export function isRateDay(date: string): boolean {
+  return isCalendarDay(date) && yerevanMidnight(date) >= RATE_EPOCH
+}
+
+/**
+ * `2026-09-28` and a day that exists: four digits of year, and `2026-02-31` — which `Date.parse`
+ * reads as the 3rd of March — is not one. The one check of «a calendar day», for a rate's day, a
+ * phone's today and the day of a tap alike (MOL-121, review Т-8).
+ */
+export function isCalendarDay(date: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
-  const parsed = new Date(`${date}T00:00:00.000Z`)
-  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return false
-  return yerevanMidnight(date) >= RATE_EPOCH
+  const parsed = Date.parse(`${date}T00:00:00.000Z`)
+  return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === date
 }
 
 /**

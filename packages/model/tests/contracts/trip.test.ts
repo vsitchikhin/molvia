@@ -425,18 +425,24 @@ describe('a moment a phone names for itself (Б1)', () => {
     expect(isDeviceTime(new Date('2000-01-01T00:00:00.000Z'), now)).toBe(true)
   })
 
-  // The day of a tap (MOL-121, adversarial round 2 П): a clock at 1970 leaves 1970's day beside its
-  // moment, and the body takes it — the use case drops it, as it drops the moment.
-  it('takes the day of a tap of any year, and judges it where the clock is', () => {
-    for (const finishedOn of ['1970-01-01', '1999-12-31', '2026-09-23', '9999-12-31']) {
+  // The day of a tap (MOL-121, adversarial rounds 2 П and 3 С): whatever a broken clock writes — 1970,
+  // year 1 in five characters or four, past 9999 — the body takes it and the use case drops it.
+  it('takes any day of a tap, and judges it where the clock is', () => {
+    for (const finishedOn of ['1970-01-01', '0001-01-01', '1-01-01', '10000-01-01', '2026-02-31']) {
       expect(finishTripBodySchema.safeParse({ finishedOn }).success).toBe(true)
     }
-    for (const finishedOn of ['2026-02-31', '2026-13-01', '26-09-23', 'вчера']) {
-      expect(finishTripBodySchema.safeParse({ finishedOn }).success).toBe(false)
-    }
+    expect(finishTripBodySchema.safeParse({ finishedOn: 'x'.repeat(33) }).success).toBe(false)
     const now = new Date('2026-09-23T12:00:00.000Z')
-    expect(isDeviceDay('1970-01-01', now)).toBe(false)
-    expect(isDeviceDay('1999-12-31', now)).toBe(false)
+    for (const day of [
+      '1970-01-01',
+      '1999-12-31',
+      '1-01-01',
+      '10000-01-01',
+      '2026-02-31',
+      'вчера',
+    ]) {
+      expect(isDeviceDay(day, now)).toBe(false)
+    }
     expect(isDeviceDay('2000-01-01', now)).toBe(true)
     // 12:00 UTC: past midnight at UTC+14 — the 24th has come there, the 25th nowhere.
     expect(isDeviceDay('2026-09-24', now)).toBe(true)

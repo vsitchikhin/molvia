@@ -80,6 +80,10 @@ describe('localDay (MOL-121)', () => {
   it('reads the calendar of the phone to the last minute, month and day in two digits', () => {
     expect(localDay(new Date(2026, 8, 30, 23, 59))).toBe('2026-09-30')
     expect(localDay(new Date(2027, 0, 1, 0, 0))).toBe('2027-01-01')
+    // Four digits of year, as the wire writes a day (adversarial round 3 С).
+    const yearOne = new Date(0)
+    yearOne.setFullYear(1, 0, 1)
+    expect(localDay(yearOne)).toBe('0001-01-01')
   })
 })
 
