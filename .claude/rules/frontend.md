@@ -165,7 +165,33 @@ The detail behind the frontend lines of `CLAUDE.md`.
   «back». **One written exception: a sheet pulled down** (MOL-80, the owner's request) — a
   vertical drag inside the sheet, which neither the edge swipe nor «back» is, and which closes
   it through the history like everything else (below). Only the page scrolls, never an inner
-  container: iOS hides its address bar and the router restores positions only for the window.
+  container: iOS hides its address bar and the router restores positions only for the window. **A move that changes only the query of the
+  screen is the screen's own state, not another screen** (`sameScreen` in `transitions.ts`,
+  MOL-136): the category and the period of «Графики», the month of «Деньги» live in the address and
+  change by `replace`. **It is not scrolled, not animated and not an arrival** — three readers of
+  one move, and all three go by the one definition. Read as a new screen, it took the page to the
+  top — the category card is the third, and the chart the person chose it for was gone; it took the
+  focus to the heading, so the second Enter on «‹» went into the title and the arrows of the period
+  worked once (adversarial Ф); and the month cross-faded as a move between tabs, whose overlay took
+  the second quick tap (Д). One rule rather than a flag on the screen: a flag has to be remembered
+  by every screen that keeps its state in the address, and the one that forgets it is this bug
+  again; no screen wants the top on a change of its query — one that does scrolls itself after its
+  `replace`. Back and forward still return to what was saved, and the same route with other params
+  (`/money/accounts/a` → `/b`) is another screen, from the top. What the rule cannot hold is the
+  height of the page: a shorter version of the screen brings the scroll up to its new end — a month
+  or a period read for the first time on the phone, under the skeleton, and at the very bottom of
+  «Графики» a category card a line shorter (MOL-138). So e2e takes «the page stayed» on a month or a
+  period the phone already keeps, by where the control stands on the screen (`e2e/scroll.ts`), off
+  the bottom of the page.
+- **A scroll the eye follows is smooth; a scroll that sets a screen in place is instant**
+  (owner's remark on MOL-136). Smooth: the tab of the section one is in, back to the top
+  (`goTab`), and a spending just saved brought to the middle (`toShow` in «Деньги») — each
+  instant under «reduce motion». Instant: a new screen at the top and a screen back where it was
+  — it slides in already there, and a smooth scroll would show the old page travelling under the
+  transition; the sheet putting the page back (MOL-63), a compensation the eye must not see at
+  all; the arrows in the catalogue list, which a smooth scroll lags behind. **Never
+  `scroll-behavior: smooth` in the CSS** — Stylelint refuses it: a scroll with `behavior: 'auto'`
+  takes it from the CSS, and the sheet's compensation would slide; a smooth scroll says so itself.
 - **A screen is built from the kit, not drawn anew** (MOL-18): `AppButton`, `AppField`,
   `SegmentedControl`, `VerdictBadge`, `AppCard`, `BottomSheet` in `components/`, every state of
   them on the development-only page `/_kit`. `AppCard` carries exactly the differences between

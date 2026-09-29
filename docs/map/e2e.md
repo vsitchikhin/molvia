@@ -10,6 +10,7 @@ that area's map; here are the shell's own specs and what every run stands on.
 - `e2e/live-region.ts` — Helper: records every announcement added to the app's live region, and reads what it holds now.
 - `e2e/navigation.spec.ts` — Spec: the shell in a phone browser — tabs and system «back», the nested chevron, collapsing title, safe areas, moves and focus.
 - `e2e/pwa-update.spec.ts` — Spec in the `pwa` project, against the built app: a new `sw.js` brings «Update», the tap reloads onto it, nothing reloads by itself; a first visit too, alone and beside another window.
+- `e2e/scroll.ts` — Helper: stands a control a given distance below the top of the window and reads where it stands, for «the page stayed».
 - `e2e/session.ts` — Helper every spec comes in through but the worker's: `open()`, `signedIn()` by the dev seam, and `asBrowser()` headers carrying this browser's cookie.
 - `e2e/sheet.spec.ts` — Spec: the sheet on the kit page — one history entry, every way to close, focus trap, page kept in place, taps while it rises.
 

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -124,6 +125,58 @@ test('changing the month writes nothing into the history', async ({ page }) => {
   await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
   await expect(page).toHaveURL(/month=\d{4}-\d{2}/)
   expect(await page.evaluate(() => window.history.length)).toBe(before)
+})
+
+/** The middle of last month in Yerevan: a day any month has. */
+function lastMonthDay(): string {
+  const day = new Date(`${yerevanDay().slice(0, 7)}-15T12:00:00Z`)
+  day.setUTCMonth(day.getUTCMonth() - 1)
+  return day.toISOString().slice(0, 10)
+}
+
+// The switcher is under the accounts card: taken to the top, it went down by the card, and the next
+// tap on the arrow missed it (MOL-136). Where it stands on the screen is what the thumb finds.
+test('changing the month keeps the switcher where it was on the screen', async ({ page }) => {
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const { categories } = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string }[] }
+  for (const spentOn of [yerevanDay(), lastMonthDay()])
+    for (let n = 1; n <= 12; n += 1) {
+      const response = await page.request.post('/api/spendings', {
+        headers,
+        data: {
+          id: randomUUID(),
+          spentOn,
+          amount: { amount: String(n * 100), currency: 'AMD' },
+          categoryId: categories[0]?.id,
+        },
+      })
+      expect(response.status(), await response.text()).toBe(201)
+    }
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  const rows = page.getByRole('button', { name: /Открыть трату/ })
+  await expect(rows).toHaveCount(12)
+
+  // A month read for the first time on the phone comes under the skeleton, a shorter page, and the
+  // browser brings the scroll up to its end — the height of the page, not the router. Back to this
+  // month, the one the phone keeps is drawn at once.
+  await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
+  await expect(page).toHaveURL(/month=\d{4}-\d{2}/)
+  await expect(rows).toHaveCount(12)
+
+  const next = page.getByRole('button', { name: 'Следующий месяц' })
+  await standAt(next, 120)
+  const scrolled = await page.evaluate(() => window.scrollY)
+  expect(scrolled).toBeGreaterThan(0)
+  const before = await topOf(next)
+
+  await next.click()
+  await expect(page).not.toHaveURL(/month=/)
+  await expect(rows).toHaveCount(12)
+  expect(await topOf(next)).toBe(before)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
 })
 
 test('a category of one’s own is made from the sheet, and a preset’s name is refused', async ({
