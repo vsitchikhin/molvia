@@ -22,6 +22,7 @@ import {
   moneyAccounts,
   moneyMonthRates,
   places,
+  ratingReminders,
   searchPicks,
   spendingCategories,
   spendings,
@@ -84,6 +85,14 @@ async function aLife(
     },
   ])
   await db.insert(searchPicks).values({ actorId, queryKey: 'moloko', itemId: shared.itemId })
+  // Where they stood on the ladder of reminders (MOL-101).
+  await db.insert(ratingReminders).values({
+    actorId,
+    step: 2,
+    remindedOn: '2026-10-16',
+    remindedAt: new Date('2026-10-16T15:00:00Z'),
+    windowFrom: '2026-10-12',
+  })
   await db
     .insert(events)
     .values({ actorId, type: 'advice_viewed', payload: { subject: 'product' } })
@@ -241,6 +250,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
       erased: {
         sessions: 1,
         search_picks: 1,
+        rating_reminders: 1,
         verdicts: 2,
         events: 1,
         expenses: 2,
