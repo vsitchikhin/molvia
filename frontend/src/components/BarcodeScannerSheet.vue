@@ -66,13 +66,13 @@
     </ScreenState>
 
     <template v-if="typing || viewing" #footer>
-      <template v-if="typing">
+      <div v-if="typing" class="actions">
         <AppButton size="large" block @click="submitTyped">{{ t('scanner.done') }}</AppButton>
         <AppButton v-if="cameraMayWork" variant="secondary" block @click="toCamera">
           <template #icon><IconScan /></template>
           {{ t('scanner.scan') }}
         </AppButton>
-      </template>
+      </div>
       <AppButton v-else variant="secondary" block @click="toTyping">
         <template #icon><IconKeyboard /></template>
         {{ t('scanner.manual') }}
@@ -300,7 +300,9 @@ export default defineComponent({
   right: var(--space-3);
 }
 
-.typed {
+.typed,
+.actions {
   display: grid;
+  gap: var(--space-2);
 }
 </style>
