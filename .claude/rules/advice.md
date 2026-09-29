@@ -118,7 +118,9 @@ mirror of the gates' rounding down: that line fires _above_, and 25.09 % printed
 (review Б) — each share leans towards its own line's side. Where they were lost is counted in
 requests, so it need not add up to «lost»; logins still inside their five minutes are «still under
 way», a line of their own and not in «lost» — below zero only with outcomes whose start was never
-counted, a request an older image made after a rollback. **Both edges of the window cut a repeat
+counted, a request an older image made after a rollback, and then it adds nothing to «lost»
+(round 2, Р5); above zero it also holds for good a request erased mid-login, which ends in no
+outcome at all, and the line says so (Р4). **Both edges of the window cut a repeat
 from its beginning**: begun before `--from` and in after it, «lost» may go below zero; begun on
 the last day and in on the next, it is a loss inside the window (review В2). Printed as they are.
 Then a row per day that counted anything.

@@ -149,7 +149,7 @@ describe('gates — чтение ворот вручную', () => {
       'login how many who began got in?                    second way in above 25 %',
       '     began                               41         days 2026-10-05 … 2026-11-20 in Yerevan',
       '     got in                              33 of 41    80.4 %',
-      '     still under way                     0          not counted yet',
+      '     still under way                     0          not counted yet, or erased mid-login',
       '     lost                                8 of 41     19.6 %',
       '       never confirmed in the bot        15',
       '       confirmed, did not come back      4',
@@ -240,7 +240,7 @@ describe('gates — чтение ворот вручную', () => {
       'login how many who began got in?                    second way in above 25 %',
       '     began                               0          the day 2026-10-05 in Yerevan',
       '     got in                              0 of 0     —',
-      '     still under way                     0          not counted yet',
+      '     still under way                     0          not counted yet, or erased mid-login',
       '     lost                                0 of 0     —',
       '       never confirmed in the bot        0',
       '       confirmed, did not come back      0',
@@ -277,7 +277,9 @@ describe('gates — чтение ворот вручную', () => {
       },
     })
     await exit
-    expect(lines).toContain('     still under way                     2          not counted yet')
+    expect(lines).toContain(
+      '     still under way                     2          not counted yet, or erased mid-login',
+    )
     expect(lines.find((line) => line.startsWith('     lost'))).toMatch(/ 0 of 3 +0\.0 %$/)
   })
 
@@ -294,6 +296,23 @@ describe('gates — чтение ворот вручную', () => {
     expect(lines).toContain(
       '     still under way                     -1         outcomes of starts never counted',
     )
+  })
+
+  it('исходы без начала не прибавляются к «lost»: один потерянный — «1 of 1» (раунд 2, Р5)', async () => {
+    const day = REPORT.logins.days[0]!
+    const { exit, lines } = run(['--from', '2026-10-05'], {
+      ...REPORT,
+      logins: {
+        ...REPORT.logins,
+        // Один настоящий старт, истёкший, и один запрос старого образа, тоже истёкший.
+        days: [{ ...day, started: 1, again: 0, confirmed: 0, collected: 0, expiredUnconfirmed: 2 }],
+      },
+    })
+    await exit
+    expect(lines).toContain(
+      '     still under way                     -1         outcomes of starts never counted',
+    )
+    expect(lines.find((line) => line.startsWith('     lost'))).toMatch(/ 1 of 1 +100\.0 %$/)
   })
 
   it.each([

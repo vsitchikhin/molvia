@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { ApiError } from '@molvia/client'
-import { ERROR, ISSUE } from '@molvia/model'
+import { ERROR } from '@molvia/model'
 import type { ActorView } from '@molvia/model'
 import { api } from '@/api'
 import { forget, read, write } from '@/stores/storage'
@@ -277,15 +277,17 @@ export const useLoginStore = defineStore('login', () => {
   }
 
   /**
-   * Whether a failed start may still have made a request. The API's own refusal made none — its
-   * transaction rolled back or never began; nor did a page from something in front of it (a
-   * captive portal), which means the request never reached us. A dropped connection, a deadline,
-   * a bare 5xx or a reply off the contract are unknown.
+   * Whether a failed start may still have made a request. Only when nothing answered at all — a
+   * dropped connection, a deadline, a bare 5xx. Whatever did answer made none: the API's own
+   * refusal (its transaction rolled back or never began), and a captive portal's page, which
+   * means the request never reached us — with `200` that page reads as a reply off the contract
+   * (review В1), so an off-contract reply is taken for a portal's. The price, named: the API's own
+   * `201` off the contract — a deploy half done — leaves the retry unmarked; and a portal
+   * answering `511`, a bare 5xx, marks one.
    */
   function mayHaveStarted(error: unknown): boolean {
     if (!(error instanceof ApiError)) return true
-    if (error.answered) return error.code === ISSUE.RESPONSE_INVALID
-    return error.code === ERROR.INTERNAL
+    return !error.answered && error.code === ERROR.INTERNAL
   }
 
   function refused(error: unknown): LoginFailure {
@@ -309,7 +311,14 @@ export const useLoginStore = defineStore('login', () => {
     failure.value = null
     starting.value = true
     const tried = recall().tried
-    const again = tried !== undefined && Date.now() - tried < TRIED_TERM_MS
+    // Not before the mark (round 2, Р3): a clock that ran ahead and came back left a mark from
+    // the future, and «less than a day» held for as long as that future lasted.
+    const since = tried === undefined ? Number.NaN : Date.now() - tried
+    const again = since >= 0 && since < TRIED_TERM_MS
+    // Whether the start could leave at all, read before it does (round 2, Р1): after the failure
+    // `onLine` says whether there is a connection now, and an answer lost with the connection is
+    // the commonest break there is — the start arrived, its answer did not.
+    const leaving = navigator.onLine
     try {
       const started = await api.startLogin({ again })
       request.value = { id: started.id, url: started.url }
@@ -322,8 +331,8 @@ export const useLoginStore = defineStore('login', () => {
       // nobody's beginning. But an answer lost on its way back is not «never arrived» (review Д):
       // the request and its count are there, the cookie is not, and unmarked the retry made one
       // person who got in a loss and a newcomer — at a shelf with a weak signal, which is where
-      // the product is used.
-      if (failure.value === 'error' && mayHaveStarted(error)) keepClaimOnly(Date.now())
+      // the product is used, and where the phone goes offline with the answer (round 2, Р1).
+      if (leaving && mayHaveStarted(error)) keepClaimOnly(Date.now())
     } finally {
       starting.value = false
     }

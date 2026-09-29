@@ -85,11 +85,16 @@ is in `bot.md`.
   «Начать заново», or a return after the link ran out, is the same person rather than a loss and a
   newcomer. Not the cookie of the request: it dies with the five minutes, exactly when the commonest
   repeat happens. **Set when the server took a start, or may have** — an answer lost on its way back
-  left the request and its count behind (review Д); a refusal of the API's own, a captive portal's
-  page and a start with no connection made none. **Taken away by any session collected here**,
+  left the request and its count behind (review Д), and the phone that lost it is often offline by
+  then, so whether a start could leave is `onLine` read **before** it does (round 2, Р1). Whatever
+  did answer made none: the API's own refusal, and a captive portal's page — with `200` it reads as
+  a reply off the contract, so such a reply counts as a portal's (review В1); a start with no
+  connection made none either. The price, named: the API's own `201` off the contract — a deploy
+  half done — leaves the retry unmarked, and a portal answering `511`, a bare 5xx, marks one. **Taken away by any session collected here**,
   whosever: the attempt ended in it — an owner claimed before comes in with no question (review А1),
   and after a stranger's session «Это не я» begins anew (review Г3) — by «Да, это я», and by «Выйти»
-  with the claim. **The day's term** (review Е): without one, a person who gave up in October and
+  with the claim. **The day's term** (review Е), measured forwards only — a mark from the future,
+  left by a clock that ran ahead, is no repeat (round 2, Р3): without one, a person who gave up in October and
   came back in December was «again» in December — in, and begun nowhere — while October's loss
   stood alone; with it each window holds its own. The price is named: Safari and an installed PWA
   are two devices, an old PWA sends no mark, and a forged mark spoils only our own count — as do

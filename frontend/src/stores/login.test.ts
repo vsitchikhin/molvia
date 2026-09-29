@@ -233,7 +233,7 @@ describe('повтор с того же устройства (MOL-68)', () => {
 
   it.each([
     ['обрыв связи', new ApiError(ERROR.INTERNAL, 'Failed to fetch', false)],
-    ['ответ не по контракту', new ApiError(ISSUE.RESPONSE_INVALID, 'id')],
+    ['голый 5xx', new ApiError(ERROR.INTERNAL, 'HTTP 502', false)],
   ])('%s при старте — исход неизвестен, и повтор идёт с меткой (ревью Д)', async (_, error) => {
     opened()
     const { login } = await signedOut()
@@ -248,7 +248,9 @@ describe('повтор с того же устройства (MOL-68)', () => {
 
   it.each([
     ['собственный отказ сервера', new ApiError(ERROR.INTERNAL), true],
-    ['страница портала', new ApiError(ISSUE.RESPONSE_INVALID, 'HTTP 404', false), true],
+    ['страница портала с 404', new ApiError(ISSUE.RESPONSE_INVALID, 'HTTP 404', false), true],
+    // `302 → 200` со своей страницей: транспорт читает её как ответ не по контракту (ревью В1).
+    ['страница портала с 200', new ApiError(ISSUE.RESPONSE_INVALID), true],
     ['без сети', new ApiError(ERROR.INTERNAL, 'Failed to fetch', false), false],
   ])('%s — запроса нет, повтор не метится', async (_, error, onLine) => {
     opened()
@@ -262,6 +264,34 @@ describe('повтор с того же устройства (MOL-68)', () => {
     await login.begin()
 
     expect(startLogin.mock.calls.map(([options]) => options?.again)).toEqual([false, false])
+  })
+
+  it('связь пропала вместе с ответом — старт уходил онлайн, и повтор идёт с меткой (раунд 2, Р1)', async () => {
+    opened()
+    const { login } = await signedOut()
+    startLogin.mockImplementationOnce(() => {
+      online(false)
+      return Promise.reject(new ApiError(ERROR.INTERNAL, 'Load failed', false))
+    })
+    await login.begin()
+    expect(login.phase).toBe('offline')
+    online(true)
+    startLogin.mockResolvedValueOnce(REQUEST)
+
+    await login.begin()
+
+    expect(startLogin.mock.calls.map(([options]) => options?.again)).toEqual([false, true])
+  })
+
+  it('метка из будущего — часы убегали и вернулись — не повтор (раунд 2, Р3)', async () => {
+    localStorage.setItem(KEY, JSON.stringify({ tried: Date.now() + 30 * 24 * 60 * 60 * 1000 }))
+    opened()
+    const { login } = await signedOut()
+    startLogin.mockResolvedValue(REQUEST)
+
+    await login.begin()
+
+    expect(startLogin).toHaveBeenCalledWith({ again: false })
   })
 
   it('чужой собранный вход кончает попытку: «Это не я» начинает заново как начало (ревью Г3)', async () => {

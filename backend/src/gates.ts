@@ -168,7 +168,9 @@ function loginLines({ firstDay, lastDay, days }: LoginsInWindow): string[] {
     total((day) => day.started) -
     gotIn -
     total((day) => day.declined + day.expiredUnconfirmed + day.expiredConfirmed)
-  const lost = began - gotIn - open
+  // Only what is still on its way comes off «lost»: below zero, «under way» is outcomes whose start
+  // was never counted, and subtracted it would add them to the losses (round 2, Р5).
+  const lost = began - gotIn - Math.max(open, 0)
   const span = firstDay === lastDay ? `the day ${firstDay}` : `days ${firstDay} … ${lastDay}`
   const lines = [
     `login ${'how many who began got in?'.padEnd(46)}second way in above ${String(LOGIN_SECOND_WAY_PERCENT)} %`,
@@ -180,7 +182,9 @@ function loginLines({ firstDay, lastDay, days }: LoginsInWindow): string[] {
       'still under way',
       open < 0
         ? [String(open), 'outcomes of starts never counted']
-        : [String(open), 'not counted yet'],
+        : // A request erased mid-login (MOL-58) ends in no outcome at all and stays here for
+          // good; named on the line so a window long closed does not read «too early» (round 2, Р4).
+          [String(open), 'not counted yet, or erased mid-login'],
     ),
     row(
       'lost',
