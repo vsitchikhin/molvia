@@ -1368,8 +1368,12 @@ export const loginDays = pgTable(
  * Where a person stands on the ladder of rating reminders (MOL-101): the last step sent, the day
  * of their own it went out, the moment — a rating after it resets the ladder (Л-1) — and the
  * first day whose purchases the ladder asks about. One row a person, rewritten by each reminder;
- * no row is «no ladder». A table rather than columns on `actors`, so that the switch of MOL-103
- * lands here too and the owner's row is not rewritten every evening.
+ * no row is «no ladder». A table rather than columns on `actors`, so the owner's row is not
+ * rewritten every evening.
+ *
+ * **The switch of MOL-103 cannot simply be a column here** (review Т-3): a ladder that ends with
+ * nothing to ask about deletes its row (Л-2), and a switch in it would go with it. MOL-103 either
+ * ends a ladder by clearing it — a nullable `step` — or keeps the switch elsewhere.
  *
  * The pause after step 3 is not a column: it is step 3 and its day, and `planReminder` knows how
  * long it lasts.

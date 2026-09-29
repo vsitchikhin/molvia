@@ -146,6 +146,17 @@ The lever of gate 0.2: the day after a purchase the bot asks «вчера · Е�
 - **At most once, not at least once** (Р-2). The step is marked on handing out, not on sending: a
   bot that dies in between loses that evening's reminder, and nothing sends it twice. A message too
   many is what gets a bot blocked, and a blocked bot cannot deliver a login either.
+- **So a person is claimed alone and fails alone** (adversarial А). Each claim commits by itself;
+  one that throws goes to the log as `rating reminder failed` and the rest of the minute go on — the
+  whole answer thrown away had every person of the minute marked and none reminded. **What can be
+  sent is decided before anything is marked:** an item whose name or place predates today's rule of
+  visible text would fail the contract the bot reads, so the claim skips it (it stays in «Оценки»)
+  and marks only for what it hands over. **The claim has its own timeout, thirty seconds**, not the
+  press's five: no finger waits for it, and a claim given up on early is a minute marked and lost.
+- **Nothing is asked of the database it cannot answer** (adversarial В, review Т-5): outside every
+  zone's evening the use case returns at once, and a person is claimed for step 1 only if they
+  entered a purchase of a product they have no live verdict on since the day asked about — whoever
+  rated yesterday's milk at once, or bought only a dish, is not claimed empty every minute.
 - **The ladder is the owner's** (29.09.2026), and it lives in the domain (`planReminder`): step 1 at
   19:00 of the day after a purchase; nothing rated since — step 2 three days later, step 3 a week
   after that, then **six calendar months of silence**, and after it only what was bought after the
@@ -181,6 +192,19 @@ The lever of gate 0.2: the day after a purchase the bot asks «вчера · Е�
   Telegram's copy of the message is the only memory there is.
 - **A failure to send is logged by its code, never the chat** (the privacy page). A 403 — the bot
   was blocked — ends that person's messages of the evening; turning their reminders off is MOL-103.
+  **A 429 is waited out once** (review Т-4), by Telegram's `retry_after` and at most ten seconds:
+  at 19:00 all of Armenia is one batch. The bot's container has thirty seconds to stop
+  (`stop_grace_period`), so a deploy at 19:00 finishes the minute's messages instead of losing them.
+- **A failure in the bot's channel outside the login is logged as `bot request failed`**
+  (adversarial Г): «authentication failed» over a failed reminder sent whoever read it to the login.
 - **The lever is counted** (В-4): `reminder_days`, by Yerevan day and with no id, holds how many
-  people got each step, how many items were asked about and how many verdicts a press gave; `make
-gates` prints it as its fourth block, the share beside its n and no verdict.
+  people got each step, how many items were asked about and how many verdicts a press gave;
+  `make gates` prints it as its fourth block, the share beside its n and no verdict. **A press
+  counts only the first verdict on the item** (adversarial Б) — a withdrawn one given again is not a
+  second, or one item asked about read «2 of 1 — 200 %»; more presses than items is then only the
+  window's edge, printed as it is with its reason. **Counted after the verdict, in a transaction of
+  its own** (review Т-7): a failure in between leaves the verdict written and the press uncounted —
+  the lever errs towards «not pressed», a named price.
+- **The ladder is in the person's copy** (MOL-93, Л-5): `ratingReminders` of the file, version 2.
+  **MOL-103's switch cannot be a plain column of `rating_reminders`** (review Т-3): a ladder with
+  nothing to ask about deletes its row, and the switch would go with it.
