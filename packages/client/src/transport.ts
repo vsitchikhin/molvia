@@ -1,5 +1,5 @@
 import type { ZodType } from 'zod'
-import { ERROR, ISSUE, errorResponseSchema } from '@molvia/model'
+import { ERROR, ISSUE, VERSION_HEADER, errorResponseSchema } from '@molvia/model'
 import type { WireCode } from '@molvia/model'
 
 /**
@@ -66,6 +66,12 @@ export interface ClientOptions {
    * to — a constant here would make every suite that covers the timeout wait for it.
    */
   readonly timeoutMs?: number
+  /**
+   * Told the build every answer names (`VERSION_HEADER`, MOL-132), as soon as its headers are in —
+   * before the body is read, since an answer this code can no longer read is the one that says
+   * most. An answer without it (a proxy's 502 during a rollout) tells nothing.
+   */
+  readonly onVersion?: (version: string) => void
 }
 
 interface RequestOptions {
@@ -93,6 +99,7 @@ export function createTransport({
   fetch = globalThis.fetch,
   credentials = 'same-origin',
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  onVersion,
   botSecret,
 }: ClientOptions & { readonly botSecret?: string }): Transport {
   async function exchange<T>(
@@ -150,6 +157,9 @@ export function createTransport({
           false,
         )
       }
+
+      const version = response.headers.get(VERSION_HEADER)
+      if (version !== null) onVersion?.(version)
 
       // A proxy page, an empty body, a reply cut off mid-flight: `.json()` throws, and every
       // line below — including the one that tells a dead identity from a broken server — used

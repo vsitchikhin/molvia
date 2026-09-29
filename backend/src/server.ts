@@ -1,9 +1,16 @@
 import Fastify from 'fastify'
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import { DomainError, ERROR, ISSUE, errorResponseSchema, isWireCode } from '@molvia/model'
+import {
+  DomainError,
+  ERROR,
+  ISSUE,
+  VERSION_HEADER,
+  errorResponseSchema,
+  isWireCode,
+} from '@molvia/model'
 import type { ErrorCode, ErrorResponse } from '@molvia/model'
 import { InvalidBody } from '@/parse'
-import { loginConfig } from '@/env'
+import { VERSION, loginConfig } from '@/env'
 import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
 import { healthRoutes } from '@/routes/health'
@@ -209,6 +216,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     // built here, in the API's own shape and — under the auth paths — `no-store` like the rest.
     frameworkErrors: (error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
       if (isAuthRequest(request)) void reply.header('cache-control', 'no-store')
+      // No hook runs for these, the one below included.
+      void reply.header(VERSION_HEADER, VERSION)
       // Both are the caller's: a path that does not decode, and one past a raised header limit.
       if (error.code === 'FST_ERR_BAD_URL' || error.code === 'FST_ERR_MAX_PARAM_LENGTH') {
         void reply
@@ -228,6 +237,15 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   app.addHook('onRequest', (request, reply, next) => {
     if (isAuthRequest(request)) void reply.header('cache-control', 'no-store')
     next()
+  })
+
+  // Every answer names the build that gave it, a refusal and a missing route included: an open
+  // page that meets another build than the one it first met knows the server was rolled out
+  // under it, and looks for its own new version at once — on the very answer it may no longer
+  // read (MOL-132). `onSend`, not `onRequest`: a reply the error handler builds anew keeps it.
+  app.addHook('onSend', (_request, reply, payload, next) => {
+    void reply.header(VERSION_HEADER, VERSION)
+    next(null, payload)
   })
 
   // Fastify's own 404 writes `Route GET:/path?q=… not found` into the log and into the body,
