@@ -178,6 +178,70 @@ describe('moneyCharts', () => {
     expect(charts.differenceAverage).toEqual(rub(200))
   })
 
+  it('has no «Разница» for a month with anything not counted, and leaves it out of every average (adversarial d9 В)', () => {
+    const charts = moneyCharts(
+      [
+        month('2026-07', { spent: 100_000, income: 30_000, spentIncome: 25_000 }),
+        // The salary came in dollars on a day with no dollar: «Пришло» 0 is not the month.
+        month('2026-08', {
+          spent: 100_000,
+          income: 0,
+          spentIncome: 25_000,
+          incomeUncounted: [money(30_000n, 'USD')],
+        }),
+        // Something spent in euros had no rate: «Ушло» is short.
+        month('2026-09', { spent: 50_000, uncounted: [money(1_000n, 'EUR')] }),
+        month('2026-10'),
+      ],
+      month('2026-06'),
+    )
+    expect(charts.months.map((one) => one.difference)).toEqual([rub(5_000), null, null, rub(0)])
+    expect(charts.differenceAverage).toEqual(rub(5_000))
+    expect(charts.spentAverage).toEqual(amd(100_000))
+  })
+
+  it('must not fire: a change past what a number holds is left unsaid, not a failed answer (adversarial d9 А)', () => {
+    // 0,01 ֏ in August and 10¹⁴ ֏ in September: ten thousand billion per cent, past 2⁵³.
+    const august = {
+      ...month('2026-08'),
+      spent: money(1n, 'AMD'),
+      byCategory: [{ categoryId: 'cafe', amount: money(1n, 'AMD') }],
+    }
+    const september = month('2026-09', {
+      spent: 100_000_000_000_000,
+      byCategory: { cafe: 100_000_000_000_000 },
+    })
+    const huge = moneyCharts([august, september], month('2026-07'))
+    expect(huge.months[1]?.change).toBeNull()
+    expect(huge.categories[0]?.points[1]?.change).toBeNull()
+
+    // A large change a number still holds is said.
+    const big = moneyCharts(
+      [
+        { ...month('2026-08'), spent: money(100n, 'AMD') },
+        month('2026-09', { spent: 100_000_000 }),
+      ],
+      month('2026-07'),
+    )
+    expect(big.months[1]?.change).toBe(9_999_999_900)
+  })
+
+  it('offers the owner’s categories spent nowhere in the period as months of nothing, after the spent ones (adversarial А)', () => {
+    const charts = moneyCharts(
+      [month('2026-08', { spent: 1, byCategory: { cafe: 500 } }), month('2026-09')],
+      month('2026-07'),
+      ['groceries', 'cafe', 'clothes'],
+    )
+    expect(charts.categories.map((series) => series.categoryId)).toEqual([
+      'cafe',
+      'groceries',
+      'clothes',
+    ])
+    const clothes = charts.categories[2]
+    expect(clothes?.points.map((point) => point.amount)).toEqual([amd(0), amd(0)])
+    expect(clothes?.points.map((point) => point.level)).toEqual([0, 0])
+  })
+
   it('draws each category over the period, largest first, with its own scale', () => {
     const charts = moneyCharts(
       [

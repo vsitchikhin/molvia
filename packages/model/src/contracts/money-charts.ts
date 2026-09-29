@@ -50,7 +50,6 @@ export const moneyChartsCodec = z.strictObject({
   categories: z.array(
     z.strictObject({
       category: spendingCategoryViewCodec,
-      total: moneyCodec,
       average: moneyCodec.nullable(),
       averageLevel: level.nullable(),
       points: z.array(
@@ -130,7 +129,6 @@ export function moneyChartsViewOf(
         ? [
             {
               category: spendingCategoryViewOf(category),
-              total: series.total,
               average: series.average,
               averageLevel: series.averageLevel,
               points: series.points.map((point) => ({ ...point })),

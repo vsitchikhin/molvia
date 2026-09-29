@@ -56,9 +56,12 @@ export interface ChartMonth {
   readonly spentIncome: Money | null
   readonly income: Money
   readonly incomeUncounted: readonly Money[]
-  /** «Разница» (owner's decision В-2): what came in less what went out, both in the income currency. */
+  /**
+   * «Разница» (owner's decision В-2): what came in less what went out, both in the income currency;
+   * null when either side is not whole — no rate of the month, or anything «не посчитано».
+   */
   readonly difference: Money | null
-  /** «−8 % к августу»: null when the month before spent nothing. */
+  /** «−8 % к августу»: null when the month before spent nothing, or past what a number holds. */
   readonly change: number | null
   readonly spentLevel: number
   readonly incomeLevel: number
@@ -67,7 +70,6 @@ export interface ChartMonth {
 
 export interface CategorySeries {
   readonly categoryId: string
-  readonly total: Money
   readonly average: Money | null
   readonly averageLevel: number | null
   readonly points: readonly {
@@ -93,15 +95,41 @@ export interface MoneyCharts {
 }
 
 /**
+ * A change as the wire can carry it (adversarial d9 А): `percentChange` is a whole number of any
+ * size — 0,01 ֏ in August and 10¹⁴ ֏ in September is ten thousand billion per cent — and one past
+ * 2⁵³ took the whole screen down. Such a figure says nothing a person can use; it is left unsaid.
+ */
+function changeOf(current: Money, previous: Money): number | null {
+  const change = percentChange(current, previous)
+  return change !== null && Number.isSafeInteger(change) ? change : null
+}
+
+/** Nothing of the month is «не посчитано»: a sum of it is the whole month, and may be averaged. */
+function whole(month: MoneyMonth): boolean {
+  return month.uncounted.length === 0 && month.incomeUncounted.length === 0
+}
+
+/**
  * The months of «Графики» side by side (MOL-74), from months already counted by `moneyMonth` — the
  * very figures «Деньги» shows for each (requirements 4): nothing here is converted or counted anew,
  * only laid out. `before` is the month before the first, there only for the first bar's «к августу».
  *
  * **An average is of the closed months from the first with anything in it** (Р-5, Р-15): a person
  * who started in August is not averaged over four empty months, and the running month, half spent,
- * is not an average's month. With no closed month to average there is no average.
+ * is not an average's month. With no closed month to average there is no average. **A month with
+ * anything «не посчитано» is in no average and has no «Разница»** (adversarial d9 В): its sums are
+ * short by what did not convert, and a salary in dollars on a day with no dollar made the month
+ * «−25 000 ₽» and dragged the average under zero.
+ *
+ * `categories` are the owner's to offer besides those spent in the period (adversarial А, d9 Г): a
+ * category tapped on an older month of «Деньги» is drawn as its months of nothing, never swapped for
+ * another. Spent ones come first, largest first; the rest in the order given.
  */
-export function moneyCharts(months: readonly MoneyMonth[], before: MoneyMonth): MoneyCharts {
+export function moneyCharts(
+  months: readonly MoneyMonth[],
+  before: MoneyMonth,
+  categories: readonly string[] = [],
+): MoneyCharts {
   const first = months[0]
   const last = months.at(-1)
   if (!first || !last) throw new Error('moneyCharts needs at least one month')
@@ -111,14 +139,15 @@ export function moneyCharts(months: readonly MoneyMonth[], before: MoneyMonth): 
   const sinceIndex = months.findIndex(holdsData)
   const since = sinceIndex === -1 ? null : (months[sinceIndex]?.month ?? null)
   // The running month is the last of a period; the ones before it are closed.
-  const averaged = sinceIndex === -1 ? [] : months.slice(sinceIndex, -1)
+  const closed = sinceIndex === -1 ? [] : months.slice(sinceIndex, -1)
+  const averaged = closed.filter(whole)
 
   const spentTallest = tallestOf(months.map((month) => month.spent.minor))
   const flowTallest = tallestOf(
     months.flatMap((month) => [month.income.minor, month.spentIncome?.minor ?? 0n]),
   )
   const differenceOf = (month: MoneyMonth): Money | null =>
-    month.spentIncome === null
+    month.spentIncome === null || !whole(month)
       ? null
       : { minor: month.income.minor - month.spentIncome.minor, currency: income }
 
@@ -132,7 +161,7 @@ export function moneyCharts(months: readonly MoneyMonth[], before: MoneyMonth): 
       income: month.income,
       incomeUncounted: month.incomeUncounted,
       difference: differenceOf(month),
-      change: previous ? percentChange(month.spent, previous.spent) : null,
+      change: previous ? changeOf(month.spent, previous.spent) : null,
       spentLevel: levelOf(month.spent.minor, spentTallest),
       incomeLevel: levelOf(month.income.minor, flowTallest),
       spentIncomeLevel:
@@ -144,10 +173,17 @@ export function moneyCharts(months: readonly MoneyMonth[], before: MoneyMonth): 
     minor: month?.byCategory.find((row) => row.categoryId === categoryId)?.amount.minor ?? 0n,
     currency: spend,
   })
-  const categoryIds = [
-    ...new Set(months.flatMap((month) => month.byCategory.map((row) => row.categoryId))),
-  ]
-  const categories = categoryIds
+  const spentIds = new Set(months.flatMap((month) => month.byCategory.map((row) => row.categoryId)))
+  const categoryIds = [...new Set([...spentIds, ...categories])]
+  // The sum of a category over the period orders the series and goes nowhere else: bigint, since
+  // twelve months of one category may be more than money holds (adversarial d9 А).
+  const totalOf = (categoryId: string) =>
+    months.reduce((sum, month) => sum + amountIn(month, categoryId).minor, 0n)
+  const orderOf = (categoryId: string) => {
+    const given = categories.indexOf(categoryId)
+    return given === -1 ? categories.length : given
+  }
+  const series = categoryIds
     .map((categoryId): CategorySeries => {
       const amounts = months.map((month) => amountIn(month, categoryId))
       const average = meanOf(
@@ -157,32 +193,29 @@ export function moneyCharts(months: readonly MoneyMonth[], before: MoneyMonth): 
       const tallest = tallestOf([...amounts.map(({ minor }) => minor), average?.minor ?? 0n])
       return {
         categoryId,
-        total: {
-          minor: amounts.reduce((sum, { minor }) => sum + minor, 0n),
-          currency: spend,
-        },
         average,
         averageLevel: average === null ? null : levelOf(average.minor, tallest),
         points: amounts.map((amount, index) => ({
           month: months[index]?.month ?? '',
           amount,
-          change: percentChange(
-            amount,
-            amountIn(index === 0 ? before : months[index - 1], categoryId),
-          ),
+          change: changeOf(amount, amountIn(index === 0 ? before : months[index - 1], categoryId)),
           level: levelOf(amount.minor, tallest),
         })),
       }
     })
+    .map((one) => ({ one, total: totalOf(one.categoryId), order: orderOf(one.categoryId) }))
     .sort((a, b) =>
-      a.total.minor === b.total.minor
-        ? a.categoryId < b.categoryId
+      a.total !== b.total
+        ? a.total > b.total
           ? -1
           : 1
-        : a.total.minor > b.total.minor
-          ? -1
-          : 1,
+        : a.order !== b.order
+          ? a.order - b.order
+          : a.one.categoryId < b.one.categoryId
+            ? -1
+            : 1,
     )
+    .map(({ one }) => one)
 
   const differences = averaged.map(differenceOf)
   return {
@@ -194,12 +227,12 @@ export function moneyCharts(months: readonly MoneyMonth[], before: MoneyMonth): 
       averaged.map((month) => month.spent.minor),
       spend,
     ),
-    // A month nothing converts leaves the average rather than counting as nothing.
+    // A month with anything not converted leaves the average rather than counting as nothing.
     differenceAverage: meanOf(
       differences.filter((difference) => difference !== null).map(({ minor }) => minor),
       income,
     ),
-    categories,
+    categories: series,
   }
 }
 
