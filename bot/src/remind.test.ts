@@ -7,7 +7,14 @@ import type { MolviaBotClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { Reminder } from '@molvia/model'
 import { t } from './i18n'
-import { SCALE_DATA, remindDue, reminderText, scale, startReminders } from './remind'
+import {
+  RETRY_AFTER_CAP_SECONDS,
+  SCALE_DATA,
+  remindDue,
+  reminderText,
+  scale,
+  startReminders,
+} from './remind'
 
 const APP = 'https://molvia.test'
 const MILK = '5b0e7c0e-6d3e-4a53-9c4a-1f1f0b7e2a11'
@@ -23,13 +30,26 @@ interface Call {
   readonly payload: Record<string, unknown>
 }
 
-/** Telegram, faked: every call recorded, the chats in `blocked` answering 403. */
-function telegram(blocked: readonly number[] = []) {
+/**
+ * Telegram, faked: every call recorded, the chats in `blocked` answering 403, and the first
+ * `throttled` calls answering 429 with `retry_after`.
+ */
+function telegram(blocked: readonly number[] = [], throttled = 0, retryAfter = 3) {
   const calls: Call[] = []
+  let limited = throttled
   const bot = new Bot('42:TEST', { botInfo: { id: 42 } as UserFromGetMe })
   const transformer: Transformer = (_prev, method, payload) => {
     calls.push({ method, payload })
     const chat = (payload as { readonly chat_id?: number }).chat_id ?? 0
+    if (limited > 0) {
+      limited -= 1
+      return Promise.resolve({
+        ok: false,
+        error_code: 429,
+        description: 'Too Many Requests: retry after 3',
+        parameters: { retry_after: retryAfter },
+      }) as never
+    }
     if (blocked.includes(chat)) {
       return Promise.resolve({
         ok: false,
@@ -125,6 +145,49 @@ describe('рассылка (MOL-101)', () => {
     // The code, never the chat.
     expect(error.mock.calls.flat().join(' ')).not.toContain('777')
     expect(error.mock.calls.flat().join(' ')).toContain('403')
+  })
+
+  it('429: ждёт, сколько сказал Telegram, и повторяет один раз', async () => {
+    const { api, calls } = telegram([], 1, 3)
+    const waited: number[] = []
+    const wait = (ms: number) => {
+      waited.push(ms)
+      return Promise.resolve()
+    }
+
+    await remindDue(
+      claiming([{ telegramUserId: 777, items: [item('Кефир')], total: 1 }]) as MolviaBotClient,
+      api,
+      APP,
+      wait,
+    )
+
+    expect(waited).toEqual([3000])
+    expect(calls.map((call) => call.payload.chat_id)).toEqual([777, 777])
+  })
+
+  it('429 с долгим ожиданием — не дольше потолка; второй 429 — сообщение отдано', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api, calls } = telegram([], 2, 600)
+    const waited: number[] = []
+    const wait = (ms: number) => {
+      waited.push(ms)
+      return Promise.resolve()
+    }
+
+    await remindDue(
+      claiming([
+        { telegramUserId: 777, items: [item('Кефир')], total: 1 },
+        { telegramUserId: 888, items: [item('Хлеб')], total: 1 },
+      ]) as MolviaBotClient,
+      api,
+      APP,
+      wait,
+    )
+
+    expect(waited).toEqual([RETRY_AFTER_CAP_SECONDS * 1000])
+    expect(calls.map((call) => call.payload.chat_id)).toEqual([777, 777, 888])
+    expect(error.mock.calls.flat().join(' ')).toContain('429')
   })
 
   it('API не ответил — ничего не отправлено, процесс жив', async () => {

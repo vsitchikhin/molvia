@@ -54,6 +54,14 @@ if (!environment.secret) {
  */
 const API_TIMEOUT_MS = 5_000
 
+/**
+ * How long a claim of reminders is waited for — not the press's five seconds (MOL-101,
+ * adversarial А). No finger is on a button here, and the API marks everybody it hands over as it
+ * goes: a claim given up on early is a minute of reminders marked and never sent. Up to fifty
+ * people, each claimed in a transaction of their own, fit in it with room to spare.
+ */
+const CLAIM_TIMEOUT_MS = 30_000
+
 const api = createBotClient({
   baseUrl: environment.apiBaseUrl,
   secret: environment.secret,
@@ -62,7 +70,15 @@ const api = createBotClient({
 const bot = assembleBot(botToken, { api, appUrl: environment.appBaseUrl })
 const runner = startBot(bot)
 // The rating reminders (MOL-101): every minute the API is asked who is due, and they are sent.
-const stopReminders = startReminders(api, bot.api, environment.appBaseUrl)
+const stopReminders = startReminders(
+  createBotClient({
+    baseUrl: environment.apiBaseUrl,
+    secret: environment.secret,
+    timeoutMs: CLAIM_TIMEOUT_MS,
+  }),
+  bot.api,
+  environment.appBaseUrl,
+)
 
 // The runner keeps fetching updates until it is told to stop, and a kill without this leaves
 // whatever it is holding half-handled. Compose sends SIGTERM on every deploy.

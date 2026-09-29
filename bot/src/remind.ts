@@ -48,23 +48,45 @@ export function reminderText(item: ReminderItem, more: number, appUrl: string): 
 }
 
 /**
+ * The longest a 429 is waited out (review Т-4). Telegram names the wait in `retry_after`; beyond this
+ * the message is given up — a stop on deploy has thirty seconds (`stop_grace_period`), and the rest
+ * of the evening's messages are still to go.
+ */
+export const RETRY_AFTER_CAP_SECONDS = 10
+
+/**
  * One reminder: a message an item, the freshest first (В-1). Only the first one rings; the others
  * arrive silently, so an evening of three questions is one notification.
  *
  * A failure is logged by its code and nothing else — no chat, no name (the privacy page). The
- * reminder is already marked as sent by the API (Р-2): what failed here is not tried again.
- * Blocked (403) ends this person's messages: the next ones would fail the same way. Turning the
- * reminders off for them is MOL-103.
+ * reminder is already marked as sent by the API (Р-2), so what fails here is not claimed again:
+ * **Too Many Requests (429) is waited out once**, as Telegram asks, since at 19:00 everybody in
+ * Armenia is one batch; anything else is given up. Blocked (403) ends this person's messages: the
+ * next ones would fail the same way. Turning the reminders off for them is MOL-103.
  */
-async function send(telegram: Api, reminder: Reminder, appUrl: string): Promise<void> {
+async function send(
+  telegram: Api,
+  reminder: Reminder,
+  appUrl: string,
+  wait: (ms: number) => Promise<void>,
+): Promise<void> {
   const { telegramUserId, items, total } = reminder
   for (const [index, item] of items.entries()) {
     const more = index === items.length - 1 ? total - items.length : 0
-    try {
-      await telegram.sendMessage(telegramUserId, reminderText(item, more, appUrl), {
+    const message = async () =>
+      telegram.sendMessage(telegramUserId, reminderText(item, more, appUrl), {
         reply_markup: scale(item.itemId),
         disable_notification: index > 0,
       })
+    try {
+      try {
+        await message()
+      } catch (error) {
+        if (!(error instanceof GrammyError) || error.error_code !== 429) throw error
+        const seconds = Math.min(error.parameters.retry_after ?? 1, RETRY_AFTER_CAP_SECONDS)
+        await wait(seconds * 1000)
+        await message()
+      }
     } catch (error) {
       const code = error instanceof GrammyError ? String(error.error_code) : 'unexpected failure'
       console.error(`[molvia] remind: ${code}`)
@@ -78,6 +100,7 @@ export async function remindDue(
   api: MolviaBotClient,
   telegram: Api,
   appUrl: string,
+  wait: (ms: number) => Promise<void> = sleep,
 ): Promise<void> {
   let due: Reminder[]
   try {
@@ -88,7 +111,11 @@ export async function remindDue(
     )
     return
   }
-  for (const reminder of due) await send(telegram, reminder, appUrl)
+  for (const reminder of due) await send(telegram, reminder, appUrl, wait)
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 /** How often the bot asks: the API decides whose evening it is, to the minute. */

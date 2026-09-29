@@ -69,6 +69,10 @@ services:
     # on-failure, not unless-stopped: with no token the bot exits 0 on purpose, and it
     # should then stay down instead of being restarted forever.
     restart: on-failure
+    # Time to finish an evening's messages on a deploy (MOL-101, review Т-4): the reminders a claim
+    # handed over are already marked sent, and a stop in the middle of them loses the rest for good.
+    # The default ten seconds is shorter than a full minute of 19:00 at Telegram's pace.
+    stop_grace_period: 30s
     environment:
       NODE_ENV: production
       API_PORT: 3300
