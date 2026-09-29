@@ -275,12 +275,27 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `100dvh` less the lift was 573px of 395 visible, and the top went 178px off the screen with the sum
   being typed; what showed was the categories. A formula of the window less the lift less the scroll
   gave 395 too, only because a negative lift is clamped to zero — which is why it is the viewport's
-  height, whatever the platform did to the window. **The field being typed in is kept in sight by the
-  sheet's own scroll**, just far enough and only when it is out of sight — never by the window's:
-  `scrollIntoView` moves the page too. Nothing holds the window against the platform — a `scrollTo`
-  back is a fight iOS wins on the next frame — and the focus is not put off until the rise ends, since
-  iOS raises no keyboard for a focus outside a tap. Pinched in, the height is not set and the sheet
-  keeps its share of the screen; with no keyboard, and on Android where `resizes-content` shrinks the
-  window and `dvh` together, it is the height it was. Playwright has no iOS keyboard: e2e replaces
-  `visualViewport` before the app loads (`fakeKeyboard` in `money.spec.ts`), and the phone itself is
-  checked by hand.
+  height, whatever the platform did to the window. The clamp itself stays and is right for the lift:
+  a negative one is Safari reporting the viewport scrolled down a window it has already shrunk, and
+  the keys cover nothing of that window. **The field being typed in is kept in sight by the sheet's
+  own scroll** (`reveal`), and only in three conditions (review С-1, adversarial А). **Only when the
+  lift or the height changed**: a focus the browser brings into sight itself, and heard on `focusin`
+  the sheet moved first and the browser's own scroll found nothing left; an event of the viewport
+  that moved nothing is no reason to take the sheet from under the finger. **Only a field typed
+  in** — an input, a textarea, a select: the result of a check is focused for a screen reader and read
+  from its top, and scrolled to its end it put the difference above the sheet. **Just far enough, its
+  top first, in whole pixels rounded outwards**: done again it moves nothing — two answers for one
+  field flipped the sheet on every event — and a fraction left under the edge is a field half-hidden.
+  A field taller than the sheet is left where it is; the browser keeps its caret in sight as it is
+  typed. Never the window's scroll: `scrollIntoView` moves the page too. Nothing holds the window
+  against the platform — a `scrollTo` back is a fight iOS wins on the next frame — and the focus is not
+  put off until the rise ends, since iOS raises no keyboard for a focus outside a tap. Pinched in, the
+  height is not set and the sheet keeps its share of the screen — **the price**: with the keys up in
+  Safari that is the share of `100dvh` again, the top off the screen, until the pinch is let go;
+  Safari does not zoom in on a focus here (no field is under 16px), so it takes a pinch by hand while
+  typing. With no keyboard, and on Android where `resizes-content` shrinks the window and `dvh`
+  together, the height is what it was. Playwright has no iOS keyboard: e2e replaces `visualViewport`
+  before the app loads (`fakeKeyboard` in `money.spec.ts`) — a scroll down an unshrunk window, another
+  geometry with the same fault, since a Chromium window cannot shrink without its `dvh`; the numbers
+  measured on the iPhone are held by a unit test. On the device the spending sheet was checked; the
+  other sheets are held by the shared component and the tests.
