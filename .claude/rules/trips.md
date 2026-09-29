@@ -50,6 +50,11 @@ The detail behind the trip lines of `CLAUDE.md`.
 
 ## Removing a trip
 
+- **A start and a finish carry the phone's day of their tap** (MOL-121): `startedOn` and `finishedOn`,
+  worked out when they are sent from the moment the queue already keeps (`startedAt`,
+  `finishedOnDeviceAt`) by the phone's calendar — so a write queued before this, and sent after,
+  has its day too, and the queue's shape did not change. The server keeps the first, as it keeps
+  the first moment, and drops a day past the latest on Earth rather than refuse it.
 - **A removed trip is marked, by the money rule (MOL-76).** `DELETE /trips/:id` sets
   `trips.deleted_at`; «Вернуть» (`POST /trips/:id/restore`) is there for ten minutes
   (`TRIP_UNDO_MINUTES`), and then the minute timer deletes the trip with its purchases. A trip is

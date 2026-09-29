@@ -211,32 +211,28 @@ nothing up.
   Т-1): `yerevanMidnight(day)` is the evening before anywhere west of UTC+4, and every date of the
   screen came out a day early on a phone in Moscow. The frontend's tests run in UTC on every
   machine (`TZ` in its vitest config), where such a slip shows.
-- **«Сегодня» is the phone's day** (`localDay`, MOL-121, owner's decision В-3): the day a sheet
-  offers and allows, «Сегодня · …» over the journal, the month «Деньги» opens on and the head of an
-  exchange's or an income's card («Сегодня», «Вчера», `dayWords` — day against day, never a moment;
-  the button and the rate keep the date, В-1). At 23:30 in Moscow it is still the 28th for the person
-  holding the phone, whatever the hour in Yerevan. **The server takes any day that has come
-  somewhere** (`latestDay`, UTC+14) — at most Yerevan's tomorrow, so nobody in Yerevan writes
-  tomorrow's spending — **and counts its sums by Yerevan's today**: the wallet walks no link past it,
-  the running month and the charts are Yerevan's. **The price, named** (Р-5): east of Yerevan, for up
-  to ten hours a day, a day written there is in the wallet and a trip's own rate only once Yerevan
-  reaches it — «Счета» count it at once, a balance takes every operation after its start. West of it
-  the phone's day is never ahead. What the phone shows of the server's running month — the rate of
-  the month kept offline (`useMoneyMonth`), the period «Графики» open on (`CategoryBars`) — stays
-  Yerevan's with it. **What a sheet asks «сколько было до» by is walked to the phone's day**
-  (`latestDay` in `ownMoney`, adversarial О): the first exchange of a night Yerevan has not reached
-  did give its currency a price, and the second, not asked, lost the answer for good; the wallet
-  still stops at Yerevan's. **A check is dated by the phone's day** it sends (`checkedOn`,
-  money-accounts). «Сегодня» is asked again when the app comes back into view (`useLocalDay`,
-  adversarial Н), and the sheet of a spending lets an amendment keep its own day when it is ahead of
-  the phone's — a correction of a check, a spending typed further east (adversarial Л). **Two more
-  prices, named, both cured only by a zone on the request:** a trip's line in «Деньги» is dated by
-  Yerevan's day of its finish (`finished_at`), so east of Yerevan after the phone's midnight a
-  purchase of the same minute as a spending stands under «Вчера», at a month's edge in the month
-  before (adversarial К); and west of Yerevan in the last hour of a month the phone's running month
-  is closed in Yerevan already — its rate frozen, no «мой курс на сегодня» in the sheet until the
-  phone's midnight (review Т-2). End-to-end runs the browser in `Asia/Yerevan`, a phone in Armenia;
-  the component tests hold the rest in UTC.
+- **«Сегодня» is the phone's day, on the phone and on the server** (MOL-121, owner's decisions В-3
+  and «делаем все в 121»). On the phone it is `localDay`: the day a sheet offers and allows, «Сегодня
+  · …» over the journal, the month «Деньги» opens on and the head of an exchange's or an income's card
+  («Сегодня», «Вчера», `dayWords` — day against day, never a moment; the button and the rate keep the
+  date, В-1), asked again when the app comes back into view (`useLocalDay`, adversarial Н). At 23:30
+  in Moscow it is still the 28th for the person holding the phone, whatever the hour in Yerevan.
+  **The server hears it on every request** (`TODAY_HEADER`, set by the client's `today`) and counts
+  every «today» of money by it — the wallet and what a sheet asks «сколько было до» by (`ownMoney`,
+  adversarial О), a trip's own and official rate at its start, the running month (its rate, what is
+  frozen, «Остаток»), the charts, the balances and the day of a check (adversarial М, И). The hook
+  holds it to the days that are today somewhere now (`todayFrom`: `earliestDay…latestDay`) and takes
+  Yerevan's where none is named — the bot, a page older than the header. **A write is refused as «in
+  the future» only past `latestDay`**: a queued write may leave a day later, and its day is judged
+  against the latest day on Earth, never against the request's today. **A trip keeps the phone's day
+  of its taps** (`started_on`, `finished_on`, adversarial К): the queue sends a start and a finish
+  when it can, so the day comes in the body, worked out from the moment of the tap by the phone's
+  calendar; «Деньги» file the trip under the day «Завершить» was tapped, beside the spendings that
+  phone dated, and an account under the day «Начать» was — not more than a day before the server's
+  (Ж1). A trip from an old queue has neither and keeps the server's day of the moment. The sheet of a
+  spending lets an amendment keep its own day when it is ahead of the phone's — a spending typed on a
+  phone further east (adversarial Л). End-to-end runs the browser in `Asia/Yerevan`, a phone in
+  Armenia; the component tests run in UTC and hold the phone's day where it is not Yerevan's.
 - **The categories are the owner's, not a month's**, so the newest month kept names them for a
   month not read yet: «Трата» stands while the month loads, when it failed and offline on the first
   of a month (review Т-5, Т-6) — and does not, where no category is known at all. «Категории ›»
