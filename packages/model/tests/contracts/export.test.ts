@@ -1,0 +1,254 @@
+import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
+import { EXPORT_FORMAT, EXPORT_VERSION, exportFileCodec } from '#model/contracts/export'
+import type { ExportFile } from '#model/contracts/export'
+import { money } from '#model/values/money'
+
+const at = new Date('2026-09-20T10:00:00.000Z')
+const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+const rate = {
+  base: 'RUB',
+  quote: 'AMD',
+  scaled: 4_812_345n,
+  source: 'official',
+  asOf: at,
+} as const
+
+const file: ExportFile = {
+  format: EXPORT_FORMAT,
+  version: EXPORT_VERSION,
+  exportedAt: at,
+  account: {
+    id: id(1),
+    telegramUserId: 510_000_001,
+    country: 'AM',
+    city: 'Гюмри',
+    spendCurrency: 'AMD',
+    incomeCurrency: 'RUB',
+    incomeCurrencySince: null,
+    ratePreference: 'personal',
+    salaryShiftDay: 25,
+    sharedUntil: null,
+    createdAt: at,
+    updatedAt: at,
+  },
+  sessions: [
+    {
+      id: id(2),
+      deviceName: 'iPhone',
+      current: true,
+      createdAt: at,
+      lastSeenAt: at,
+      expiresAt: at,
+    },
+  ],
+  loginRequests: [{ id: id(3), deviceName: null, createdAt: at, expiresAt: at, consumedAt: at }],
+  trips: [
+    {
+      id: id(4),
+      placeId: id(5),
+      currency: 'AMD',
+      rate,
+      rateProvider: 'cba',
+      rateJumped: true,
+      ratePrevious: { scaled: 4_700_000n, asOf: at },
+      rateManual: null,
+      rateChoice: 'previous',
+      startedAt: at,
+      finishedAt: null,
+      finishedOnDeviceAt: null,
+      accountId: id(6),
+      debited: money(520_000n, 'AMD'),
+      accountSetAt: at,
+      removedAt: at,
+    },
+  ],
+  expenses: [
+    {
+      id: id(7),
+      tripId: id(4),
+      itemId: id(8),
+      quantity: { milli: 900n, unit: 'l' },
+      amount: money(52_000n, 'AMD'),
+      createdAt: at,
+    },
+    { id: id(9), tripId: id(4), itemId: id(8), quantity: null, amount: null, createdAt: at },
+  ],
+  verdicts: [
+    {
+      id: id(10),
+      itemId: id(8),
+      itemKind: 'product',
+      placeId: null,
+      score: 1,
+      review: null,
+      ratedAt: at,
+      updatedAt: at,
+      withdrawnAt: at,
+    },
+  ],
+  searchPicks: [{ queryKey: 'moloko', itemId: id(8), picks: 3, lastPickedAt: at, admits: false }],
+  events: [
+    { id: '41', occurredAt: at, type: 'advice_viewed', payload: { subject: 'product' } },
+    { id: '7', occurredAt: at, type: 'session_started', payload: {} },
+  ],
+  exchanges: [
+    {
+      id: id(11),
+      given: money(1_000_000n, 'RUB'),
+      received: money(4_700_000n, 'AMD'),
+      exchangedOn: '2026-09-20',
+      heldBefore: money(11_500_000n, 'AMD'),
+      note: 'Рате, Абовяна',
+      givenAccountId: null,
+      receivedAccountId: id(6),
+      accountSetAt: at,
+      revision: 2,
+      createdAt: at,
+      amendedAt: at,
+      removedAt: null,
+      earlierVersions: [
+        {
+          revision: 1,
+          given: money(1_000_000n, 'RUB'),
+          received: money(4_600_000n, 'AMD'),
+          exchangedOn: '2026-09-19',
+          heldBefore: null,
+          note: null,
+          replacedAt: at,
+        },
+      ],
+    },
+  ],
+  incomes: [
+    {
+      id: id(12),
+      amount: money(9_961_500n, 'RUB'),
+      receivedOn: '2026-09-15',
+      heldBefore: null,
+      source: 'salary',
+      note: null,
+      accountId: null,
+      accountSetAt: null,
+      revision: 1,
+      createdAt: at,
+      amendedAt: null,
+      removedAt: null,
+      earlierVersions: [],
+    },
+  ],
+  spendings: [
+    {
+      id: id(13),
+      spentOn: '2026-09-20',
+      amount: money(500_000n, 'RUB'),
+      categoryId: id(14),
+      note: 'барбер',
+      place: null,
+      rate,
+      accountId: null,
+      debited: null,
+      accountSetAt: null,
+      revision: 1,
+      createdAt: at,
+      amendedAt: null,
+      removedAt: null,
+    },
+  ],
+  spendingCategories: [
+    { id: id(14), preset: null, name: 'Такси', colour: 0, archivedAt: null, createdAt: at },
+  ],
+  monthRates: [{ month: '2026-08', rate: { ...rate, source: 'personal' } }],
+  moneyAccounts: [
+    {
+      id: id(6),
+      name: 'Наличные ֏',
+      currency: 'AMD',
+      savings: false,
+      start: money(24_153_000n, 'AMD'),
+      startOn: '2026-09-16',
+      revision: 1,
+      createdAt: at,
+      archivedAt: null,
+      removedAt: null,
+    },
+  ],
+  accountChecks: [
+    {
+      id: id(15),
+      accountId: id(6),
+      checkedOn: '2026-09-26',
+      fact: money(18_500_000n, 'AMD'),
+      counted: money(19_013_200n, 'AMD'),
+      createdAt: at,
+    },
+  ],
+  proposedItems: [
+    {
+      id: id(16),
+      kind: 'product',
+      name: 'Рынок-сыр',
+      note: null,
+      defaultUnit: 'kg',
+      typicalQuantity: { milli: 500n, unit: 'kg' },
+      barcodes: [],
+      createdAt: at,
+    },
+  ],
+  catalogue: {
+    items: [{ id: id(8), kind: 'product', name: 'Молоко Ашхар 1 л' }],
+    places: [{ id: id(5), kind: 'store', name: 'Ереван Сити', country: 'AM', city: 'Гюмри' }],
+  },
+}
+
+const wire = z.encode(exportFileCodec, file)
+
+function keysOf(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(keysOf)
+  if (value === null || typeof value !== 'object') return []
+  return Object.entries(value).flatMap(([key, inner]) => [key, ...keysOf(inner)])
+}
+
+describe('exportFileCodec', () => {
+  it('writes money, quantity and rates as the wire does — decimal strings beside their unit', () => {
+    expect(wire.exchanges[0]?.received).toEqual({ amount: '47000.00', currency: 'AMD' })
+    expect(wire.expenses[0]?.quantity).toEqual({ value: '0.900', unit: 'l' })
+    expect(wire.trips[0]?.rate?.rate).toBe('4.812345')
+    expect(wire.trips[0]?.ratePrevious).toEqual({
+      rate: '4.700000',
+      asOf: '2026-09-20T10:00:00.000Z',
+    })
+    expect(wire.format).toBe('molvia-export')
+    expect(wire.version).toBe(1)
+  })
+
+  it('reads its own file back into the same values', () => {
+    expect(exportFileCodec.parse(JSON.parse(JSON.stringify(wire)))).toEqual(file)
+  })
+
+  it('names no secret: no token, no hash, no login code anywhere in the file', () => {
+    expect(keysOf(wire).filter((key) => /token|hash|secret|^code$/i.test(key))).toEqual([])
+  })
+
+  it('names the person once, in the account — no row repeats whose it is', () => {
+    expect(keysOf(wire).filter((key) => key === 'actorId' || key === 'createdBy')).toEqual([])
+  })
+
+  it('refuses a field it does not know, so a new column cannot slip in unnamed', () => {
+    const extra = { ...wire, spendings: [{ ...wire.spendings[0], tokenHash: 'x' }] }
+    expect(exportFileCodec.safeParse(extra).success).toBe(false)
+  })
+
+  it('keeps what a stored row predates: a withdrawn event type, a rate outside today’s band', () => {
+    const odd = {
+      ...file,
+      events: [{ id: '1', occurredAt: at, type: 'catalogue_viewed', payload: { q: 1 } }],
+      monthRates: [{ month: '2026-01', rate: { ...rate, scaled: 1n } }],
+    }
+    expect(z.encode(exportFileCodec, odd).monthRates[0]?.rate.rate).toBe('0.000001')
+  })
+
+  it('refuses a version it was not written for', () => {
+    expect(exportFileCodec.safeParse({ ...wire, version: 2 }).success).toBe(false)
+  })
+})

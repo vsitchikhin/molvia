@@ -3,6 +3,10 @@
 Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it under
 `packages/model/tests/`, is covered by the source's entry.
 
+## packages/model
+
+- `packages/model/src/contracts/export.ts` — Contract of «Скачать мои данные» (MOL-93): the file whole — header, version and a section for everything erasure removes — with money, quantity and rates as decimal strings and no enum or band a stored row may predate.
+
 ## backend · usecases
 
 - `backend/src/usecases/erase-me.ts` — Use case of the bot's `/delete`: erase the owner behind a Telegram id; nobody to erase is not an error. Tests: `backend/tests/erase-route.integration.test.ts`.
