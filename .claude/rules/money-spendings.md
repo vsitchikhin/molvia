@@ -307,7 +307,9 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   kept for as long as the app is open, and the first one is the largest of the period (Р-8), not the
   handoff's «Кафе». **Every live category of the owner is offered**, spent in the period or not, and
   a row of «Куда ушли» on a month older than six opens twelve (adversarial А, d9 Г): a category
-  tapped there was swapped for the largest, in silence, with its own id still in the address. Only
+  tapped there was swapped for the largest, in silence, with its own id still in the address. One
+  the answer still lacks — a removed category, a stale link — is named: «Этой категории на графиках
+  нет — показаны …». Only
   the person's choice or the address is remembered. **Only the latest read is kept on the phone**
   (`molvia.charts`, adversarial Б, d9 Д): an earlier one answering late put the charts without the
   spending just written under a later hour. Offline is a yellow strip with that hour; the four states

@@ -433,6 +433,7 @@
       "category_title": "Category over time",
       "category_average": "{amount} on average",
       "category_no_previous": "nothing the month before",
+      "category_missing": "That category is not on the charts — showing «{name}»",
       "category_hint": "Dashed line: the average for the period",
       "rate_title": "{one} and {other} rate",
       "rate_week": "Week to {day}",

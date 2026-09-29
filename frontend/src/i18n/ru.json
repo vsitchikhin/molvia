@@ -433,6 +433,7 @@
       "category_title": "Категория во времени",
       "category_average": "в среднем {amount}",
       "category_no_previous": "нет трат месяцем раньше",
+      "category_missing": "Этой категории на графиках нет — показаны «{name}»",
       "category_hint": "Пунктир — в среднем за период",
       "rate_title": "Курс {one} и {other}",
       "rate_week": "Неделя по {day}",

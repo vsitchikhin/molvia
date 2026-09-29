@@ -258,6 +258,16 @@ describe('MoneyChartsView: the charts', () => {
     expect(plain(view.text())).toContain('−9% vs August · ֏34,500 on average')
   })
 
+  it('says so when the address names a category the charts do not have, rather than swap in silence (adversarial А)', async () => {
+    moneyCharts.mockResolvedValue(charts())
+    const view = await render('/money/charts?category=ffffffff-0000-4000-8000-000000000099')
+    expect((view.find('select').element as HTMLSelectElement).value).toBe(GROCERIES)
+    expect(plain(view.text())).toContain('That category is not on the charts — showing «Groceries»')
+
+    const own = await render(`/money/charts?category=${CAFE}`)
+    expect(own.find('.missing').exists()).toBe(false)
+  })
+
   it('a category chosen goes into the address', async () => {
     moneyCharts.mockResolvedValue(charts())
     const view = await render()

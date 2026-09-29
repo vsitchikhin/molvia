@@ -119,6 +119,9 @@
             <h2 :id="`${id}-category`" class="caption">
               {{ t('spending.charts.category_title') }}
             </h2>
+            <p v-if="categoryMissing" class="detail missing">
+              {{ t('spending.charts.category_missing', { name: nameOf(series.category) }) }}
+            </p>
             <AppField
               :model-value="series.category.id"
               kind="select"
@@ -389,6 +392,13 @@ export default defineComponent({
       const wanted = typeof route.query.category === 'string' ? route.query.category : lastCategory
       return all.find((one) => one.category.id === wanted) ?? all[0] ?? null
     })
+    /** The address names a category the charts do not have — a removed one, say: said, not hidden. */
+    const categoryMissing = computed(() => {
+      const wanted = route.query.category
+      return (
+        typeof wanted === 'string' && series.value !== null && series.value.category.id !== wanted
+      )
+    })
     function chooseCategory(id: string): void {
       lastCategory = id
       void router.replace({ query: { ...route.query, category: id } })
@@ -504,6 +514,8 @@ export default defineComponent({
       series,
       categoryOptions,
       chooseCategory,
+      categoryMissing,
+      nameOf,
       categoryBars,
       categoryPoint,
       categoryDetail,
@@ -650,6 +662,10 @@ export default defineComponent({
   &.negative {
     color: var(--bad-ink);
   }
+}
+
+.missing {
+  margin-top: var(--space-2);
 }
 
 .category {
