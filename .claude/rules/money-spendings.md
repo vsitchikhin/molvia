@@ -271,7 +271,10 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   посчитано» has no «Разница» and is not in its average** (adversarial d9 В): a salary in dollars on
   a day with no dollar made the month «−25 000 ₽» and the average negative. **Its spending is
   averaged unless the spending itself is short** (review С-8, d9 round 2 В2): an income changes
-  nothing spent. A category spent nowhere in the period has no average, not «в среднем 0 ֏». The
+  nothing spent. **A category's average leaves out only a month short in that category**
+  (`uncountedIn`, d9 round 3 В3): a coffee in dollars with no rate dropped the month's complete
+  «Продукты» from their «в среднем». A category spent nowhere in the period has no average, not
+  «в среднем 0 ֏». The
   screen says under «Пришло и ушло» what did not convert, and «Ушло» with no rate of the month is a
   dashed empty bar, never a bar of nothing spent — **while nothing spent is «ушло 0» with or without
   a rate** (`moneyMonth`, review С-7), on «Деньгах» too: a newcomer's empty months with no rate were
@@ -285,7 +288,8 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   `nameIdentity` reads a name, no note is «Без места»; the percent of a group is weighed by the
   money (Р-7) — the sheet's mean of percents let ten dollars with friends weigh what eight hundred at
   the airport did. The reads of the cache for the weeks and the exchanges go eight at a time, as «Обмен денег»'s
-  (`RATE_READS_AT_ONCE`): 53 weeks at once would take the whole pool. **Measured by the one function
+  (`RATE_READS_AT_ONCE`), and the card of exchanges before the line, never beside it (review С-11):
+  53 weeks at once would take the whole pool, and two batches at once took sixteen of its ten. **Measured by the one function
   «Обмен денег» measures by** (`comparisonOf`), **but
   only by a rate fresh for the exchange's day** (adversarial Е): `comparisonOf` takes the bank's latest
   however old, and a cache stopped five weeks ago summed an exchange by a rate the same answer's line
@@ -322,6 +326,7 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   the person's choice or the address is remembered. **Only the latest read is kept on the phone**
   (`molvia.charts`, adversarial Б, d9 Д): an earlier one answering late put the charts without the
   spending just written under a later hour; one whose later read is still on its way or failed is
-  the freshest there is, and is kept (d9 round 2 Е2). Offline is a yellow strip with that hour; the four states
+  the freshest there is, and is kept (d9 round 2 Е2) — under the strip when that later read failed,
+  since it is older than a write the phone knows landed (review С-10). Offline is a yellow strip with that hour; the four states
   are `ScreenSkeleton` and `ScreenState`, the empty one with no button (Р-9) — and the rate and the
   exchanges stand under it, since they do not wait for spending (adversarial В).
