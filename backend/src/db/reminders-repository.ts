@@ -14,11 +14,12 @@ export interface ReminderCandidate {
   /** A live verdict of theirs written after their last reminder — the ladder starts over (Л-1). */
   readonly ratedSince: boolean
   /**
-   * When their latest purchase of a product they have no live verdict on was entered. A purchase's
-   * day is never after its entry, so a person whose latest such entry is older than step 1's day
-   * has nothing to be asked about — and is not claimed, rather than claimed empty every minute of
-   * every evening. Unrated products only (adversarial В): whoever rated yesterday's milk at once,
-   * or bought only a dish, has nothing to be asked either — the diligent, whom it is all for.
+   * When their latest purchase of a product they have no live verdict on was made — the purchase's
+   * moment as the reminder reads it, `least(entered, trip finished)`, not the entry (adversarial Е:
+   * a purchase written into a trip closed the day before belongs to that day). A person whose latest
+   * such purchase is older than step 1's day has nothing to be asked about and is not claimed,
+   * rather than claimed empty every minute of every evening. Unrated products only (adversarial В):
+   * whoever rated yesterday's milk at once, or bought only a dish, has nothing to be asked either.
    */
   readonly lastUnratedAt: Date | null
 }
@@ -100,7 +101,7 @@ export function createReminderRepository(db: Conn): ReminderRepository {
             where v.actor_id = a.id and v.deleted_at is null and v.updated_at > r.reminded_at
           ), false) as rated_since,
           (
-            select max(e.created_at)::text from expenses e
+            select max(least(e.created_at, t.finished_at))::text from expenses e
             join trips t on t.id = e.trip_id
             join items i on i.id = e.item_id and i.kind = 'product'
             where t.actor_id = a.id and t.deleted_at is null

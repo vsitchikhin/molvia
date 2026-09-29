@@ -17,6 +17,7 @@ import type { ReminderRepository } from '@/db/reminders-repository'
 import { expenses, ratingReminders, reminderDays, trips, verdicts } from '@/db/schema'
 import { buildServer } from '@/server'
 import { remindRatings } from '@/usecases/remind-ratings'
+import type { QuietToday } from '@/usecases/remind-ratings'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, telegramId } from './fixtures'
 
@@ -44,13 +45,21 @@ beforeEach(() => {
   failures = []
 })
 
-/** The evening's claim at 19:00 of `day`, read through the contract the bot parses. */
+/**
+ * The evening's claim at 19:00 of `day`, read through the contract the bot parses. Each call with
+ * a memory of its own, as a freshly started API has — `wholeEvening` below keeps one throughout.
+ */
 async function evening(
   day: string,
   time = '19:00',
   repository: ReminderRepository = reminders,
 ): Promise<DueReminders> {
-  const due = await remindRatings(repository, yerevan(day, time), (error) => failures.push(error))
+  const due = await remindRatings(
+    repository,
+    yerevan(day, time),
+    (error) => failures.push(error),
+    new Map(),
+  )
   return dueRemindersSchema.parse(due)
 }
 
@@ -620,6 +629,61 @@ describe('лишних выдач нет (адверсариальный В, р�
 
     await evening('2026-07-14', '19:00', repository)
     expect(claims()).toBe(0)
+  })
+
+  /** The minutes of one evening as the API sees them: one memory of settled evenings throughout. */
+  async function wholeEvening(day: string, repository: ReminderRepository): Promise<number> {
+    const quiet: QuietToday = new Map()
+    let sent = 0
+    for (const time of ['19:00', '19:01', '19:02', '20:30', '21:59']) {
+      const due = await remindRatings(
+        repository,
+        yerevan(day, time),
+        (e) => failures.push(e),
+        quiet,
+      )
+      sent += due.reminders.length
+    }
+    return sent
+  }
+
+  it('покупка, внесённая в поход, закрытый днём раньше, — ни одной выдачи (адверсариальный Е1)', async () => {
+    const anna = await person()
+    const tripId = await insertTrip(db, {
+      actorId: anna.id,
+      placeId: shop,
+      startedAt: yerevan('2026-07-12', '10:00'),
+      finishedAt: yerevan('2026-07-12', '11:00'),
+    })
+    await db.insert(expenses).values({
+      id: randomUUID(),
+      tripId,
+      itemId: await item('Молоко'),
+      createdAt: yerevan('2026-07-13', '09:00'),
+    })
+    const { repository, claims } = counting()
+
+    expect(await wholeEvening('2026-07-14', repository)).toBe(0)
+    expect(claims()).toBe(0)
+  })
+
+  it('вчера — только позиция со старым именем: одна пустая выдача, не каждую минуту (Е2)', async () => {
+    const anna = await person()
+    const legacy = await insertItem(db, { name: LEGACY_NAME, searchKey: 'sir lori' })
+    await bought(anna, legacy, yerevan('2026-07-13', '10:00'))
+    const { repository, claims } = counting()
+
+    expect(await wholeEvening('2026-07-14', repository)).toBe(0)
+    expect(claims()).toBe(1)
+  })
+
+  it('кому напоминание ушло, того вечер больше не открывает', async () => {
+    const anna = await person()
+    await bought(anna, await item('Молоко'), yerevan('2026-07-13', '10:00'))
+    const { repository, claims } = counting()
+
+    expect(await wholeEvening('2026-07-14', repository)).toBe(1)
+    expect(claims()).toBe(1)
   })
 
   it('вне вечера база не спрашивается вовсе', async () => {

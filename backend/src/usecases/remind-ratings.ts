@@ -20,6 +20,16 @@ function sendable(item: PendingVerdict): boolean {
 }
 
 /**
+ * Whose evening is already settled, and on which of their days: an owner's id and the day a claim
+ * found nothing to send (adversarial Е). Kept by the API's one process between the bot's minutes —
+ * a claim that finds nothing writes nothing, so without it the same empty claim was opened every
+ * minute of the evening: a purchase only with a name the bot cannot be handed, or one the filter
+ * could not rule out. One entry a person, overwritten the next day; a restart forgets it, and the
+ * cost is one more empty claim each.
+ */
+export type QuietToday = Map<string, string>
+
+/**
  * «Напомнить об оценке» (MOL-101): the reminders due now, handed to the bot and marked as sent.
  *
  * The bot asks every minute and keeps nothing; who is reminded, when and about what is decided
@@ -37,6 +47,7 @@ export async function remindRatings(
   reminders: ReminderRepository,
   now: Date,
   failed: (error: unknown) => void,
+  quiet: QuietToday,
 ): Promise<DueReminders> {
   // Outside every evening there is nothing to ask the database (review Т-5): 21 hours of 24.
   const open = Object.values(COUNTRY_TIME_ZONES).some((zone) =>
@@ -57,6 +68,7 @@ export async function remindRatings(
       today: clock.day,
     })
     if (plan === null) continue
+    if (quiet.get(candidate.actorId) === clock.day) continue
     // Only step 1 is skipped this way: a later step with nothing to ask about has to reach the
     // claim, which ends the ladder (Л-2).
     if (
@@ -85,7 +97,11 @@ export async function remindRatings(
       failed(error)
       continue
     }
-    if (claimed === null) continue
+    if (claimed === null) {
+      // Nothing to send today, or somebody else sent it: either way the evening is done for them.
+      quiet.set(candidate.actorId, clock.day)
+      continue
+    }
     due.push({
       telegramUserId: candidate.telegramUserId,
       items: claimed.items.map(({ itemId, name, placeName, boughtAt }) => ({

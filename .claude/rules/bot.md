@@ -155,8 +155,11 @@ The lever of gate 0.2: the day after a purchase the bot asks «вчера · Е�
   press's five: no finger waits for it, and a claim given up on early is a minute marked and lost.
 - **Nothing is asked of the database it cannot answer** (adversarial В, review Т-5): outside every
   zone's evening the use case returns at once, and a person is claimed for step 1 only if they
-  entered a purchase of a product they have no live verdict on since the day asked about — whoever
-  rated yesterday's milk at once, or bought only a dish, is not claimed empty every minute.
+  bought a product they have no live verdict on since the day asked about — by the purchase's day,
+  `least(entered, trip finished)`, as the claim reads it, not by the entry (adversarial Е). **A
+  claim that found nothing settles the evening** (`QuietToday`, the API's memory of one entry a
+  person): an item only with a name the bot cannot be handed passes the filter and would otherwise
+  open an empty claim every minute. A restart forgets it; the cost is one more empty claim.
 - **The ladder is the owner's** (29.09.2026), and it lives in the domain (`planReminder`): step 1 at
   19:00 of the day after a purchase; nothing rated since — step 2 three days later, step 3 a week
   after that, then **six calendar months of silence**, and after it only what was bought after the
@@ -192,17 +195,25 @@ The lever of gate 0.2: the day after a purchase the bot asks «вчера · Е�
   Telegram's copy of the message is the only memory there is.
 - **A failure to send is logged by its code, never the chat** (the privacy page). A 403 — the bot
   was blocked — ends that person's messages of the evening; turning their reminders off is MOL-103.
-  **A 429 is waited out once** (review Т-4), by Telegram's `retry_after` and at most ten seconds:
-  at 19:00 all of Armenia is one batch. The bot's container has thirty seconds to stop
-  (`stop_grace_period`), so a deploy at 19:00 finishes the minute's messages instead of losing them.
+  **A 429 is waited out once** (review Т-4), by Telegram's `retry_after`: at 19:00 all of Armenia
+  is one batch. **Asked to wait longer than ten seconds, the bot gives the rest of the run up at
+  once** (adversarial З) — that is flood control over the whole bot, a retry before it ends is
+  refused for certain, and waiting the cap on every message spent minutes to send nothing. The
+  bot's container has thirty seconds to stop (`stop_grace_period`); **a stop cuts every wait
+  short**, the messages left go without pauses, and the runner stops beside the reminders rather
+  than after them.
 - **A failure in the bot's channel outside the login is logged as `bot request failed`**
   (adversarial Г): «authentication failed» over a failed reminder sent whoever read it to the login.
+  Erasure (`/internal/actors/erase`) is logged so too since — it is not a login (review Т-9).
 - **The lever is counted** (В-4): `reminder_days`, by Yerevan day and with no id, holds how many
   people got each step, how many items were asked about and how many verdicts a press gave;
   `make gates` prints it as its fourth block, the share beside its n and no verdict. **A press
   counts only the first verdict on the item** (adversarial Б) — a withdrawn one given again is not a
-  second, or one item asked about read «2 of 1 — 200 %»; more presses than items is then only the
-  window's edge, printed as it is with its reason. **Counted after the verdict, in a transaction of
+  second, or one item asked about read «2 of 1 — 200 %». More presses than items is then a message
+  forwarded and pressed by somebody else too, or the window's edge — printed as it is with both
+  reasons (adversarial Ж). **The price** (review Т-8): an item asked about after its verdict was
+  withdrawn (В-3) is counted among the items, and its press is never «first» — the lever errs
+  towards «not pressed» there too. **Counted after the verdict, in a transaction of
   its own** (review Т-7): a failure in between leaves the verdict written and the press uncounted —
   the lever errs towards «not pressed», a named price.
 - **The ladder is in the person's copy** (MOL-93, Л-5): `ratingReminders` of the file, version 2.

@@ -48,11 +48,18 @@ export function reminderText(item: ReminderItem, more: number, appUrl: string): 
 }
 
 /**
- * The longest a 429 is waited out (review Т-4). Telegram names the wait in `retry_after`; beyond this
- * the message is given up — a stop on deploy has thirty seconds (`stop_grace_period`), and the rest
- * of the evening's messages are still to go.
+ * The longest a 429 is waited out (review Т-4). Telegram names the wait in `retry_after`; a wait
+ * longer than this is flood control over the whole bot, and a retry before it ends is refused for
+ * certain — so the run stops there instead (adversarial З). A stop on deploy has thirty seconds
+ * (`stop_grace_period`), and the rest of the evening's messages are still to go.
  */
 export const RETRY_AFTER_CAP_SECONDS = 10
+
+/** Waits `ms`; `false` when a stop cut the wait short. */
+export type Wait = (ms: number) => Promise<boolean>
+
+/** Telegram asked for longer than we wait: every message after this one would be refused too. */
+class Flooded extends Error {}
 
 /**
  * One reminder: a message an item, the freshest first (В-1). Only the first one rings; the others
@@ -61,15 +68,12 @@ export const RETRY_AFTER_CAP_SECONDS = 10
  * A failure is logged by its code and nothing else — no chat, no name (the privacy page). The
  * reminder is already marked as sent by the API (Р-2), so what fails here is not claimed again:
  * **Too Many Requests (429) is waited out once**, as Telegram asks, since at 19:00 everybody in
- * Armenia is one batch; anything else is given up. Blocked (403) ends this person's messages: the
- * next ones would fail the same way. Turning the reminders off for them is MOL-103.
+ * Armenia is one batch — unless it asks for longer than `RETRY_AFTER_CAP_SECONDS`, which ends the
+ * run (`Flooded`), or a stop cuts the wait short, which gives that message up. Anything else is
+ * given up. Blocked (403) ends this person's messages: the next ones would fail the same way.
+ * Turning the reminders off for them is MOL-103.
  */
-async function send(
-  telegram: Api,
-  reminder: Reminder,
-  appUrl: string,
-  wait: (ms: number) => Promise<void>,
-): Promise<void> {
+async function send(telegram: Api, reminder: Reminder, appUrl: string, wait: Wait): Promise<void> {
   const { telegramUserId, items, total } = reminder
   for (const [index, item] of items.entries()) {
     const more = index === items.length - 1 ? total - items.length : 0
@@ -83,11 +87,13 @@ async function send(
         await message()
       } catch (error) {
         if (!(error instanceof GrammyError) || error.error_code !== 429) throw error
-        const seconds = Math.min(error.parameters.retry_after ?? 1, RETRY_AFTER_CAP_SECONDS)
-        await wait(seconds * 1000)
+        const seconds = error.parameters.retry_after ?? 1
+        if (seconds > RETRY_AFTER_CAP_SECONDS) throw new Flooded()
+        if (!(await wait(seconds * 1000))) throw error
         await message()
       }
     } catch (error) {
+      if (error instanceof Flooded) throw error
       const code = error instanceof GrammyError ? String(error.error_code) : 'unexpected failure'
       console.error(`[molvia] remind: ${code}`)
       if (error instanceof GrammyError && error.error_code === 403) return
@@ -100,7 +106,7 @@ export async function remindDue(
   api: MolviaBotClient,
   telegram: Api,
   appUrl: string,
-  wait: (ms: number) => Promise<void> = sleep,
+  wait: Wait = async (ms) => sleep(ms),
 ): Promise<void> {
   let due: Reminder[]
   try {
@@ -111,11 +117,32 @@ export async function remindDue(
     )
     return
   }
-  for (const reminder of due) await send(telegram, reminder, appUrl, wait)
+  for (const [index, reminder] of due.entries()) {
+    try {
+      await send(telegram, reminder, appUrl, wait)
+    } catch (error) {
+      if (!(error instanceof Flooded)) throw error
+      // The rest of the run would be refused the same way: given up at once, and said how many.
+      console.error(`[molvia] remind: 429 flood, ${String(due.length - index)} people given up`)
+      return
+    }
+  }
 }
 
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms))
+/** Waits `ms`, or less if `signal` aborts first: `true` for the whole wait, `false` for a cut. */
+async function sleep(ms: number, signal?: AbortSignal): Promise<boolean> {
+  if (signal?.aborted) return false
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', cut)
+      resolve(true)
+    }, ms)
+    const cut = (): void => {
+      clearTimeout(timer)
+      resolve(false)
+    }
+    signal?.addEventListener('abort', cut, { once: true })
+  })
 }
 
 /** How often the bot asks: the API decides whose evening it is, to the minute. */
@@ -125,7 +152,7 @@ export const REMIND_EVERY_MS = 60_000
  * The bot's only timer, and it keeps nothing (MOL-101): every minute it asks the API, which has
  * already decided and marked who is due. A run still going when the next is due is not doubled.
  * Unreferenced, so it never keeps a process alive that is otherwise done; the returned function
- * stops it and waits for a run in progress.
+ * stops it, cuts the run's waits short and waits for the rest of it.
  */
 export function startReminders(
   api: MolviaBotClient,
@@ -134,17 +161,23 @@ export function startReminders(
   everyMs = REMIND_EVERY_MS,
 ): () => Promise<void> {
   let running: Promise<void> | undefined
+  // A stop cuts every wait short (adversarial З): the messages left are sent at once, without the
+  // pauses, and the process stops inside its `stop_grace_period` instead of being killed in one.
+  const stopping = new AbortController()
   const tick = (): void => {
     if (running) return
-    running = remindDue(api, telegram, appUrl).finally(() => {
-      running = undefined
-    })
+    running = remindDue(api, telegram, appUrl, async (ms) => sleep(ms, stopping.signal)).finally(
+      () => {
+        running = undefined
+      },
+    )
   }
   tick()
   const timer = setInterval(tick, everyMs)
   timer.unref()
   return async () => {
     clearInterval(timer)
+    stopping.abort()
     await running
   }
 }

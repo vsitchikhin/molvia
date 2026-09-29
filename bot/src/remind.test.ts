@@ -152,7 +152,7 @@ describe('рассылка (MOL-101)', () => {
     const waited: number[] = []
     const wait = (ms: number) => {
       waited.push(ms)
-      return Promise.resolve()
+      return Promise.resolve(true)
     }
 
     await remindDue(
@@ -166,13 +166,37 @@ describe('рассылка (MOL-101)', () => {
     expect(calls.map((call) => call.payload.chat_id)).toEqual([777, 777])
   })
 
-  it('429 с долгим ожиданием — не дольше потолка; второй 429 — сообщение отдано', async () => {
+  it('429 дольше потолка — остаток прогона бросается сразу, без ожиданий (адверсариальный З)', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const { api, calls } = telegram([], 2, 600)
+    const { api, calls } = telegram([], 100, RETRY_AFTER_CAP_SECONDS + 50)
     const waited: number[] = []
     const wait = (ms: number) => {
       waited.push(ms)
-      return Promise.resolve()
+      return Promise.resolve(true)
+    }
+
+    await remindDue(
+      claiming([
+        { telegramUserId: 777, items: [item('Кефир'), item('Сыр')], total: 2 },
+        { telegramUserId: 888, items: [item('Хлеб')], total: 1 },
+      ]) as MolviaBotClient,
+      api,
+      APP,
+      wait,
+    )
+
+    expect(waited).toEqual([])
+    expect(calls.map((call) => call.payload.chat_id)).toEqual([777])
+    expect(error.mock.calls.flat().join(' ')).toContain('429 flood, 2 people given up')
+  })
+
+  it('второй 429 после ожидания — сообщение отдано, следующий человек получает своё', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api, calls } = telegram([], 2, 3)
+    const waited: number[] = []
+    const wait = (ms: number) => {
+      waited.push(ms)
+      return Promise.resolve(true)
     }
 
     await remindDue(
@@ -185,9 +209,31 @@ describe('рассылка (MOL-101)', () => {
       wait,
     )
 
-    expect(waited).toEqual([RETRY_AFTER_CAP_SECONDS * 1000])
+    expect(waited).toEqual([3000])
     expect(calls.map((call) => call.payload.chat_id)).toEqual([777, 777, 888])
     expect(error.mock.calls.flat().join(' ')).toContain('429')
+  })
+
+  it('остановка прерывает ожидание: остаток уходит сразу, стоп — в пределах секунд', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.useFakeTimers()
+    const { api, calls } = telegram([], 1, RETRY_AFTER_CAP_SECONDS)
+    const reminders = [
+      { telegramUserId: 777, items: [item('Кефир')], total: 1 },
+      { telegramUserId: 888, items: [item('Хлеб')], total: 1 },
+    ]
+
+    const stop = startReminders(claiming(reminders) as MolviaBotClient, api, APP, 60_000)
+    await vi.advanceTimersByTimeAsync(0)
+    let stopped = false
+    void stop().then(() => {
+      stopped = true
+    })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(stopped).toBe(true)
+    // The first message's wait was cut and it was given up; the next person was still sent to.
+    expect(calls.map((call) => call.payload.chat_id)).toEqual([777, 888])
   })
 
   it('API не ответил — ничего не отправлено, процесс жив', async () => {

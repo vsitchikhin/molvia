@@ -73,7 +73,7 @@ describe('gates — чтение ворот вручную', () => {
     await exit
     const rated = lines.find((line) => line.includes('rated by a press in the bot'))
     expect(rated).toContain('2 of 1')
-    expect(rated).toContain('presses of items asked before the window')
+    expect(rated).toContain('forwarded, or asked before the window')
     expect(rated).not.toMatch(/%/)
   })
 

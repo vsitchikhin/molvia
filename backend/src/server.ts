@@ -38,6 +38,7 @@ import { recentPlaces } from '@/usecases/recent-places'
 import { rateFromBot } from '@/usecases/rate-from-bot'
 import { rateItem } from '@/usecases/rate-item'
 import { remindRatings } from '@/usecases/remind-ratings'
+import type { QuietToday } from '@/usecases/remind-ratings'
 import { amendVerdict } from '@/usecases/amend-verdict'
 import { withdrawVerdict } from '@/usecases/withdraw-verdict'
 import { pendingVerdicts } from '@/usecases/pending-verdicts'
@@ -415,6 +416,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const sessions = createSessionRepository(db)
     const verdicts = createVerdictRepository(db)
     const reminders = createReminderRepository(db)
+    const quietToday: QuietToday = new Map()
 
     healthRoutes(instance, { databaseIsReachable })
     const login = options.login === undefined ? loginConfig : options.login
@@ -434,9 +436,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       erase: (telegramUserId) => eraseMe(createErasureRepository(db), telegramUserId),
       // One person's claim that fails is logged by its kind and the others of the minute go on.
       claimReminders: () =>
-        remindRatings(reminders, new Date(), (error) => {
-          instance.log.error(describeFailure(error), 'rating reminder failed')
-        }),
+        remindRatings(
+          reminders,
+          new Date(),
+          (error) => {
+            instance.log.error(describeFailure(error), 'rating reminder failed')
+          },
+          quietToday,
+        ),
       rateFromBot: (itemId, body) =>
         rateFromBot({ actors, items, verdicts, reminders }, itemId, body),
     })

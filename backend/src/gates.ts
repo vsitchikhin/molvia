@@ -173,12 +173,13 @@ function reminderLines(reminders: RemindersInWindow): string[] {
     row('items asked about', [String(reminders.items), '']),
     row(
       'rated by a press in the bot',
-      // More presses than items is only the window's edge: items asked before it, pressed inside.
-      // Printed as it is, with the reason, never as a share above a hundred (adversarial Б).
+      // More presses than items: a message forwarded and pressed by somebody else too, or items
+      // asked before the window and pressed inside. Printed as it is, with both reasons, never as
+      // a share above a hundred (adversarial Б, Ж).
       reminders.rated > reminders.items
         ? [
             `${String(reminders.rated)} of ${String(reminders.items)}`,
-            'presses of items asked before the window',
+            'forwarded, or asked before the window',
           ]
         : share(reminders.rated, reminders.items),
     ),

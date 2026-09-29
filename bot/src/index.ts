@@ -84,7 +84,9 @@ const stopReminders = startReminders(
 // whatever it is holding half-handled. Compose sends SIGTERM on every deploy.
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
-    void stopReminders().finally(() => runner.stop())
+    // Side by side, not one after the other (adversarial З): the runner stops taking updates while
+    // the evening's last messages go out, and neither waits for the other inside the grace period.
+    void Promise.all([stopReminders(), runner.stop()])
   })
 }
 
