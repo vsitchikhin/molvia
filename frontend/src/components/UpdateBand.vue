@@ -52,7 +52,7 @@ export default defineComponent({
     // draws its own, born with the version already waiting, and a strip that spoke only of what it
     // saw change said nothing at all (adversarial Д1). What was said is kept by the version's own
     // state, the one object every strip reads.
-    let unsay: (() => boolean) | undefined
+    let unsay: (() => void) | undefined
     let saying: UpdatePhase | undefined
     watch(
       phase,
@@ -66,10 +66,12 @@ export default defineComponent({
       },
       { immediate: true },
     )
-    // Gone before its words reached the region — the screen changed as the version came: they
-    // were never said, and the strip the next screen draws says them (review С-13).
+    // Words still true stay when the strip goes with its screen: the next screen draws the same
+    // strip and says nothing, and taken back they were gone before a screen reader read them —
+    // a millisecond after they came, or before they came at all (review С-13, adversarial Ж2).
+    // Only words that stopped being true are taken back.
     onBeforeUnmount(() => {
-      if (unsay?.() === false && said.get(update) === saying) said.delete(update)
+      if (update.phase.value !== saying) unsay?.()
     })
 
     return {

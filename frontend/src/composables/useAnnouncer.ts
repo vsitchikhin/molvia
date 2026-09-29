@@ -1,10 +1,7 @@
 import { inject, provide, ref, type InjectionKey, type Ref } from 'vue'
 
-/**
- * Says the words; the returned function takes them back before their time, and tells whether they
- * were said at all — taken back within the delay below, they never reached the region (MOL-132, С-13).
- */
-type Announce = (text: string) => () => boolean
+/** Says the words; the returned function takes them back before their time. */
+type Announce = (text: string) => () => void
 
 interface Announcement {
   id: number
@@ -39,17 +36,14 @@ export function provideAnnouncer(): Ref<Announcement[]> {
   provide(announcerKey, (text) => {
     const id = next++
     let lingering: ReturnType<typeof setTimeout> | undefined
-    let said = false
 
-    function remove(): boolean {
+    function remove(): void {
       clearTimeout(adding)
       clearTimeout(lingering)
       announcements.value = announcements.value.filter((announcement) => announcement.id !== id)
-      return said
     }
 
     const adding = setTimeout(() => {
-      said = true
       announcements.value = [...announcements.value, { id, text }]
       lingering = setTimeout(remove, LINGER_MS)
     }, DELAY_MS)

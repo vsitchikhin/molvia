@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick, shallowRef, watch } from 'vue'
+import { defineComponent, h, nextTick, ref, shallowRef, watch } from 'vue'
 import type { AppLocale } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
 import UpdateBand from '@/components/UpdateBand.vue'
@@ -118,20 +118,57 @@ describe('«Вышла новая версия · Обновить» (MOL-132)',
       expect(next.said).toEqual([])
     })
 
-    it('is said by the next screen’s strip when the first went before its words were said (С-13)', async () => {
-      const update = fakeUpdate('ready')
-      const first = render(update)
-      await nextTick()
-      vi.advanceTimersByTime(50)
-      first.view.unmount()
+    // One app, one live region, and a strip drawn anew for each screen — as `AppScreen` draws it.
+    function screens(update: ReturnType<typeof fakeUpdate>) {
+      const said: string[] = []
+      const region: string[][] = []
+      const screen = ref(0)
+      const App = {
+        setup() {
+          const announcements = provideAnnouncer()
+          watch(announcements, (now, before) => {
+            for (const added of now.filter((a) => !before.some((b) => b.id === a.id))) {
+              said.push(added.text)
+            }
+            region.push(now.map((a) => a.text))
+          })
+          return () => (update.phase.value === 'none' ? null : h(UpdateBand, { key: screen.value }))
+        },
+      }
+      mount(App, {
+        global: { plugins: [createAppI18n('en')], provide: { [pwaUpdateKey as symbol]: update } },
+      })
+      return { said, region, screen }
+    }
 
-      const next = render(update)
+    it.each([
+      ['before its words reached the region (С-13)', 50],
+      ['a moment after they did (Ж2)', 101],
+    ])('is said once, and stays said, when the screen changes %s', async (_when, after) => {
+      const { said, region, screen } = screens(fakeUpdate('ready'))
+      await nextTick()
+      vi.advanceTimersByTime(after)
+      await nextTick()
+      screen.value++
+      await nextTick()
+      vi.advanceTimersByTime(1000)
+      await nextTick()
+
+      expect(said).toEqual(['A new version is out'])
+      expect(region.at(-1)).toEqual(['A new version is out'])
+    })
+
+    it('takes the words back once they stop being true', async () => {
+      const update = fakeUpdate('ready')
+      const { region } = screens(update)
       await nextTick()
       vi.advanceTimersByTime(200)
       await nextTick()
 
-      expect(first.said).toEqual([])
-      expect(next.said).toEqual(['A new version is out'])
+      update.phase.value = 'none'
+      await nextTick()
+
+      expect(region.at(-1)).toEqual([])
     })
 
     it('says a failure the page came up with, before any strip was there (Д1)', async () => {
