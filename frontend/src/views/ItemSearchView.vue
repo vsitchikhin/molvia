@@ -35,8 +35,46 @@
       :hint="t('item.search_hint')"
       @pick="pick"
     >
+      <template #trailing>
+        <AppButton variant="icon" :label="t('item.barcode.scan')" @click="scanning = true">
+          <IconBarcode />
+        </AppButton>
+      </template>
+
       <template #before>
-        <div v-if="phase === 'loading'" class="loading">
+        <!-- A code looked up (MOL-99) stands in for the search until something is typed. -->
+        <div v-if="barcode === 'loading'" class="loading">
+          <ScreenSkeleton :groups="[62]" />
+        </div>
+
+        <div v-else-if="barcode === 'missing'" class="not-found">
+          <p class="not-found-text">{{ t('item.barcode.missing', { code: barcodeCode }) }}</p>
+          <AppButton @click="proposing = true">
+            <template #icon><IconPlus /></template>
+            {{ t('item.empty.action') }}
+          </AppButton>
+          <p class="not-found-text">{{ t('item.barcode.missing_hint') }}</p>
+        </div>
+
+        <ScreenState
+          v-else-if="barcode === 'error'"
+          kind="error"
+          inline
+          :title="t('item.barcode.error_title')"
+          :body="t('item.barcode.error_body', { code: barcodeCode })"
+          @retry="lookup.retry"
+        />
+
+        <ScreenState
+          v-else-if="barcode === 'offline'"
+          kind="offline"
+          tone="warn"
+          inline
+          :title="t('item.offline.title')"
+          :body="t('item.barcode.offline_body')"
+        />
+
+        <div v-else-if="phase === 'loading'" class="loading">
           <ScreenSkeleton :groups="[62, 62, 62]" />
         </div>
 
@@ -78,7 +116,7 @@
       <!-- The answer is not empty, and still not the thing: «сметана» finds the crisps «со
            сметаной», and without this the sour cream could never be added (В-3). Quiet, so it
            does not invite a duplicate of what is listed right above it. -->
-      <template v-if="phase === 'ready'" #after>
+      <template v-if="phase === 'ready' && barcode === 'idle'" #after>
         <AppButton variant="ghost" block @click="proposing = true">
           {{ t('item.not_listed') }}
         </AppButton>
@@ -88,7 +126,7 @@
            so «не нашли» stands here with the button that adds the item. Under the rows, in place
            of the quiet line: the answer flips near and far while a word is typed, and a block
            above would move every row under the finger as it came and went (owner's decision). -->
-      <template v-else-if="phase === 'far'" #after>
+      <template v-else-if="phase === 'far' && barcode === 'idle'" #after>
         <div class="not-found" :class="{ stale }">
           <p class="not-found-text">{{ t('item.empty.body', { query: answered }) }}</p>
           <AppButton @click="proposing = true">
@@ -98,6 +136,8 @@
         </div>
       </template>
     </CatalogueCombobox>
+
+    <BarcodeScannerSheet v-model:open="scanning" :on-closed="afterScanning" @read="lookup.lookUp" />
 
     <ProposeItemSheet
       v-model:open="proposing"
@@ -131,15 +171,18 @@ import { useSelectedTrip } from '@/composables/useSelectedTrip'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import type { CatalogueEntry } from '@molvia/model'
+import IconBarcode from '~icons/mdi/barcode-scan'
 import IconPlus from '~icons/mdi/plus'
 import AppButton from '@/components/AppButton.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import CatalogueCombobox from '@/components/CatalogueCombobox.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ProposeItemSheet from '@/components/ProposeItemSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useBarcodeLookup } from '@/composables/useBarcodeLookup'
 import { useCatalogueSearch } from '@/composables/useCatalogueSearch'
 import { currentIdentity } from '@/stores/identity'
 import { useItemEntryStore } from '@/stores/itemEntry'
@@ -163,7 +206,9 @@ export default defineComponent({
   components: {
     AppButton,
     AppScreen,
+    BarcodeScannerSheet,
     CatalogueCombobox,
+    IconBarcode,
     IconPlus,
     ItemDetailsSheet,
     ProposeItemSheet,
@@ -202,16 +247,73 @@ export default defineComponent({
       if (next !== 'error') fallback.value = false
     })
 
+    /**
+     * The scanner (MOL-99). A code read looks up its item at once, but the purchase sheet waits for
+     * the scanner to be put away: its close is a step back through history, and a sheet opened
+     * before that step lands would be the one the step took (as «Предложить товар», MOL-24).
+     */
+    const scanning = ref(false)
+    let scannerAway = true
+    let foundByCode: { entry: CatalogueEntry; code: string } | null = null
+    /** The code the item now on the purchase sheet was found by, for the recent items (В-2). */
+    let pickedByCode: { itemId: string; code: string } | null = null
+
+    const lookup = useBarcodeLookup({
+      found: (item, code) => {
+        foundByCode = { entry: item, code }
+        takeFoundByCode()
+      },
+      local: (code) => recent.byCode(code),
+    })
+    const barcode = lookup.phase
+
+    watch(scanning, (open) => {
+      if (open) scannerAway = false
+    })
+
+    function afterScanning(): void {
+      scannerAway = true
+      takeFoundByCode()
+    }
+
+    // Taken without a query: a code is not one, and the search learns nothing from it — neither a
+    // pick nor the person's own word (MOL-99, Р-3). The miss held from before is used up all the
+    // same, as by any sheet opened after it (MOL-45).
+    function takeFoundByCode(): void {
+      if (!scannerAway || foundByCode === null) return
+      const { entry: chosen, code } = foundByCode
+      foundByCode = null
+      opened.value += 1
+      takeMissed('')
+      pickedByCode = { itemId: chosen.id, code }
+      entry.pick({ entry: chosen, query: '' })
+    }
+
+    // Typing is the other way to find it: the answer to the code gives way to the search.
+    watch(query, () => {
+      lookup.clear()
+    })
+
+    // Arrived by «Сканировать» on the record (В-4): the scanner is up over the screen at once, and
+    // put away it leaves the search by name.
+    onMounted(() => {
+      if (entry.takeScan()) scanning.value = true
+    })
+
+    // Under a code looked up with no network too: those are what the device can still find.
     const showsRecent = computed(
       () =>
-        phase.value === 'idle' ||
-        phase.value === 'offline' ||
-        (phase.value === 'error' && fallback.value),
+        barcode.value === 'offline' ||
+        (barcode.value === 'idle' &&
+          (phase.value === 'idle' ||
+            phase.value === 'offline' ||
+            (phase.value === 'error' && fallback.value))),
     )
 
     // Under an error as offline: the server does not answer either way, and «хлеб» typed before
     // it fell should not show twenty rows instead of one (Р-12).
     const rows = computed<CatalogueEntry[]>(() => {
+      if (barcode.value !== 'idle' && barcode.value !== 'offline') return []
       if (phase.value === 'ready' || phase.value === 'far') return results.value
       if (showsRecent.value) return recent.filter(query.value)
       return []
@@ -249,6 +351,20 @@ export default defineComponent({
       )
     })
 
+    // «Код … не знаком» out loud, as an empty answer is: the block says nothing of itself. The
+    // search's words go the moment a code is looked up — they describe what is no longer shown.
+    let withdrawCode: (() => void) | undefined
+    watch(barcode, (next) => {
+      withdrawCode?.()
+      withdrawCode = undefined
+      if (next === 'idle') return
+      withdraw?.()
+      withdraw = undefined
+      if (next === 'missing') {
+        withdrawCode = announce?.(t('item.barcode.missing', { code: lookup.code.value }))
+      }
+    })
+
     const { picked } = storeToRefs(entry)
     /** Which opening of the sheet this is: the same item picked twice is two purchases. */
     const opened = ref(0)
@@ -263,6 +379,7 @@ export default defineComponent({
     // proposed — neither was found by another word — and every pick uses the miss up.
     function pick(chosen: CatalogueEntry, learns = true): void {
       opened.value += 1
+      pickedByCode = null
       const found = phase.value === 'ready' || phase.value === 'far'
       const text = found ? answered.value : query.value
       const missed = takeMissed(text)
@@ -273,7 +390,7 @@ export default defineComponent({
     // Into the recent items only once it went into the trip, as the server's memory of picks
     // does (MOL-11): a pick the sheet cancelled is a changed mind.
     function added(item: CatalogueEntry): void {
-      recent.remember(item)
+      recent.remember(item, pickedByCode?.itemId === item.id ? pickedByCode.code : undefined)
     }
 
     function putAway(): void {
@@ -304,6 +421,7 @@ export default defineComponent({
     })
     onUnmounted(() => {
       withdraw?.()
+      withdrawCode?.()
       dropSearchDraft(owner)
     })
 
@@ -334,6 +452,11 @@ export default defineComponent({
       proposing,
       proposed,
       afterProposing,
+      scanning,
+      afterScanning,
+      lookup,
+      barcode,
+      barcodeCode: lookup.code,
     }
   },
 })

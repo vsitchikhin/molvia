@@ -402,6 +402,22 @@ describe('BarcodeScannerSheet', () => {
     })
   })
 
+  // MOL-99: the screen keeps the sheet mounted for a warm reader, and a closed sheet that still held
+  // its skeleton or its refusal kept their words in the app's live region — «Loading…» over the
+  // search results.
+  it('draws nothing while closed: no skeleton, no refusal, nothing to say', async () => {
+    getUserMedia.mockRejectedValue(named('NotAllowedError'))
+    const sheet = await render()
+    expect(heading(sheet)).toBe(en.scanner.denied_title)
+
+    await sheet.setProps({ open: false })
+
+    expect(sheet.find('.state').exists()).toBe(false)
+    expect(sheet.find('video').exists()).toBe(false)
+    expect(sheet.text()).not.toContain(en.state.loading)
+    expect(sheet.text()).not.toContain(en.scanner.manual)
+  })
+
   it('stops the camera when the sheet closes', async () => {
     const { stream, track } = fakeStream()
     getUserMedia.mockResolvedValue(stream)

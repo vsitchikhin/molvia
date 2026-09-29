@@ -1,3 +1,4 @@
+/* eslint-disable vue/one-component-per-file -- the scanner's stub and the harness, not components of the app */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref } from 'vue'
 import { mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
@@ -31,8 +32,10 @@ const proposeItem =
   vi.fn<(input: ProposedItem) => Promise<{ entry: CatalogueEntry; created: boolean }>>()
 const addExpense = vi.fn<(tripId: string, body: AddExpenseBody) => Promise<unknown>>()
 const currentTrip = vi.fn<() => Promise<unknown>>(() => Promise.resolve(null))
+const catalogueByBarcode = vi.fn<(code: string) => Promise<CatalogueEntry | null>>()
 vi.mock('@/api', () => ({
   api: {
+    catalogueByBarcode: (code: string) => catalogueByBarcode(code),
     searchCatalogue: async (query: string) => {
       const answer = await searchCatalogue(query)
       return Array.isArray(answer) ? { items: answer, near: answer.length > 0 } : answer
@@ -64,6 +67,22 @@ function online(value: boolean): void {
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(value)
 }
 
+/**
+ * The scanner as the screen sees it: open, a code read, put away (MOL-99). The camera and its
+ * worker are MOL-98's and happy-dom has neither; what the screen does with a code is this task's.
+ */
+const ScannerStub = defineComponent({
+  name: 'BarcodeScannerSheet',
+  props: {
+    open: { type: Boolean, required: true },
+    onClosed: { type: Function, default: undefined },
+  },
+  emits: ['update:open', 'read'],
+  setup(props) {
+    return () => (props.open ? h('div', { class: 'scanner' }) : null)
+  },
+})
+
 const mounted: VueWrapper[] = []
 let pinia: Pinia
 
@@ -91,7 +110,13 @@ async function render(shown = ref(true)) {
           ])
       },
     }),
-    { attachTo: document.body, global: { plugins: [router, pinia, createAppI18n('en')] } },
+    {
+      attachTo: document.body,
+      global: {
+        plugins: [router, pinia, createAppI18n('en')],
+        stubs: { BarcodeScannerSheet: ScannerStub },
+      },
+    },
   )
   mounted.push(wrapper)
   return wrapper
@@ -119,6 +144,7 @@ beforeEach(() => {
   setActivePinia(pinia)
   searchCatalogue.mockReset()
   proposeItem.mockReset()
+  catalogueByBarcode.mockReset()
   online(true)
 })
 
@@ -687,6 +713,177 @@ describe('«What did you pick up?»', () => {
     })
   })
 
+  describe('a code scanned (MOL-99)', () => {
+    const CODE = '4850000000007'
+
+    function scanner(view: VueWrapper) {
+      return view.findComponent(ScannerStub)
+    }
+
+    /** The scanner opened from the field, a code read, and — unless held — the scanner put away. */
+    async function scan(view: VueWrapper, code: string, away = true): Promise<void> {
+      await view.get(`button[aria-label="${en.item.barcode.scan}"]`).trigger('click')
+      expect(scanner(view).props('open')).toBe(true)
+      scanner(view).vm.$emit('read', code)
+      scanner(view).vm.$emit('update:open', false)
+      await nextTick()
+      if (away) putAway(view)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+
+    /** What the sheet calls once its step back has landed. */
+    function putAway(view: VueWrapper): void {
+      ;(scanner(view).props('onClosed') as () => void)()
+    }
+
+    it('is offered in the field, and opens over the screen', async () => {
+      const view = await render()
+      expect(view.find('.scanner').exists()).toBe(false)
+
+      await view.get(`button[aria-label="${en.item.barcode.scan}"]`).trigger('click')
+
+      expect(view.find('.scanner').exists()).toBe(true)
+    })
+
+    it('takes the item found to the purchase sheet with no query — a code is not one', async () => {
+      catalogueByBarcode.mockResolvedValue(milk)
+      const view = await render()
+
+      await scan(view, CODE)
+
+      expect(catalogueByBarcode).toHaveBeenCalledWith(CODE)
+      await vi.waitFor(() => {
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: '' })
+      })
+      expect(searchCatalogue).not.toHaveBeenCalled()
+    })
+
+    it('waits for the scanner to be put away before the purchase sheet comes up', async () => {
+      catalogueByBarcode.mockResolvedValue(milk)
+      const view = await render()
+
+      await scan(view, CODE, false)
+      expect(useItemEntryStore(pinia).picked).toBeNull()
+
+      putAway(view)
+
+      expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: '' })
+    })
+
+    it('uses up the miss held before it, and teaches it nothing (MOL-45)', async () => {
+      searchCatalogue.mockImplementation((query) =>
+        Promise.resolve(query === 'молоко' ? [milk] : []),
+      )
+      catalogueByBarcode.mockResolvedValue(marianna)
+      const view = await render()
+      await field(view).setValue('бахчевые')
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledWith('бахчевые')
+      })
+
+      await scan(view, CODE)
+      expect(useItemEntryStore(pinia).picked).toEqual({ entry: marianna, query: '' })
+
+      useItemEntryStore(pinia).clear()
+      await field(view).setValue('молоко')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([milk.name])
+      })
+      await view.get('[role="option"]').trigger('click')
+      expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: 'молоко' })
+    })
+
+    it('names a code nobody holds, offers «Suggest an item», and says so out loud', async () => {
+      remembered(bread)
+      catalogueByBarcode.mockResolvedValue(null)
+      const view = await render()
+
+      await scan(view, CODE)
+
+      const missing = en.item.barcode.missing.replace('{code}', CODE)
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(missing)
+      })
+      expect(names(view)).toEqual([])
+      expect(button(view, en.item.empty.action).exists()).toBe(true)
+      await vi.waitFor(() => {
+        expect(view.get('.live').text()).toBe(missing)
+      })
+      expect(useItemEntryStore(pinia).picked).toBeNull()
+    })
+
+    it('gives the search back once something is typed, and takes its words back', async () => {
+      catalogueByBarcode.mockResolvedValue(null)
+      searchCatalogue.mockResolvedValue([milk])
+      const view = await render()
+      await scan(view, CODE)
+      const missing = en.item.barcode.missing.replace('{code}', CODE)
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(missing)
+      })
+
+      await field(view).setValue('мол')
+
+      expect(view.text()).not.toContain(missing)
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([milk.name])
+      })
+      expect(view.get('.live').text()).not.toContain(missing)
+    })
+
+    it('is red when the server does not answer, and «Try again» asks for the same code', async () => {
+      catalogueByBarcode.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+      catalogueByBarcode.mockResolvedValueOnce(milk)
+      const view = await render()
+
+      await scan(view, CODE)
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.item.barcode.error_title)
+      })
+      await button(view, en.state.retry).trigger('click')
+
+      await vi.waitFor(() => {
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: '' })
+      })
+      expect(catalogueByBarcode).toHaveBeenCalledTimes(2)
+    })
+
+    it('offline, finds an item among the recent by the code it was found by (В-2)', async () => {
+      useRecentItemsStore(pinia).remember(milk, CODE)
+      online(false)
+      const view = await render()
+
+      await scan(view, CODE)
+
+      expect(catalogueByBarcode).not.toHaveBeenCalled()
+      expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: '' })
+    })
+
+    it('offline, says the recent items do not know the code, and shows them', async () => {
+      remembered(bread)
+      online(false)
+      const view = await render()
+
+      await scan(view, CODE)
+
+      expect(view.text()).toContain(en.item.barcode.offline_body)
+      expect(names(view)).toEqual([bread.name])
+      expect(useItemEntryStore(pinia).picked).toBeNull()
+    })
+
+    it('opens the scanner at once when the screen was asked to scan — once', async () => {
+      useItemEntryStore(pinia).askToScan()
+
+      const first = await render()
+      await nextTick()
+      expect(first.find('.scanner').exists()).toBe(true)
+
+      const second = await render()
+      await nextTick()
+      expect(second.find('.scanner').exists()).toBe(false)
+    })
+  })
+
   describe('«Suggest an item»', () => {
     // The sheet takes no tap while it rises (MOL-18): its clock is held by the test and moved
     // past that moment, and a few real milliseconds pass so Vue does not drop the tap.
@@ -842,6 +1039,33 @@ describe('«What did you pick up?»', () => {
       expect(write).toMatchObject({ kind: 'add', tripId: TRIP, entry: milk })
       if (write?.kind === 'add') expect(write.body.query).toBe('мол')
       expect(useRecentItemsStore(pinia).items).toEqual([milk])
+    })
+
+    it('remembers the code an item was found by once it went into the trip — offline it finds it (MOL-99)', async () => {
+      catalogueByBarcode.mockResolvedValue(milk)
+      const view = await render()
+      await view.get(`button[aria-label="${en.item.barcode.scan}"]`).trigger('click')
+      const scanner = view.findComponent(ScannerStub)
+      scanner.vm.$emit('read', '00408295')
+      scanner.vm.$emit('update:open', false)
+      await nextTick()
+      ;(scanner.props('onClosed') as () => void)()
+      await vi.waitFor(() => {
+        expect(useItemEntryStore(pinia).picked?.entry).toEqual(milk)
+      })
+      await nextTick()
+      expect(useRecentItemsStore(pinia).byCode('00408295')).toBeNull()
+      vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+
+      const add = view.findAll('dialog[open] button').find((b) => b.text() === en.item.save)
+      await add?.trigger('click')
+
+      const [write] = useTripQueueStore(pinia).pending
+      expect(write).toMatchObject({ kind: 'add', entry: milk })
+      if (write?.kind === 'add') expect(write.body.query).toBeUndefined()
+      // Typed from the label it is thirteen digits, and finds it all the same (С-14).
+      expect(useRecentItemsStore(pinia).byCode('0004082000095')).toEqual(milk)
     })
 
     it('lets only the first sheet after a miss take it along: put back, the miss is gone (review И)', async () => {

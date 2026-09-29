@@ -231,6 +231,14 @@
     "offline": {
       "title": "No connection",
       "body": "Searching your recent items only. The full catalogue is back once you are online"
+    },
+    "barcode": {
+      "scan": "Scan a barcode",
+      "missing": "The catalogue does not know the code {code}",
+      "missing_hint": "Suggest the item — or find it by name",
+      "error_title": "The server did not answer",
+      "error_body": "Could not check the code {code}. Try again — or find the item by name",
+      "offline_body": "None of your recent items has this code. Find the item by name — or scan it once you are online"
     }
   },
   "sheet": {

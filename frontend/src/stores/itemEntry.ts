@@ -21,6 +21,11 @@ export interface Pick {
 
 export const useItemEntryStore = defineStore('itemEntry', () => {
   const picked = shallowRef<Pick | null>(null)
+  /**
+   * «Сканировать» on the record (MOL-99, В-4): the search screen opens with the scanner up. In
+   * memory only — a reload of the search screen is not a tap on «Сканировать».
+   */
+  let scan = false
 
   function pick(next: Pick): void {
     picked.value = next
@@ -30,5 +35,16 @@ export const useItemEntryStore = defineStore('itemEntry', () => {
     picked.value = null
   }
 
-  return { picked, pick, clear }
+  function askToScan(): void {
+    scan = true
+  }
+
+  /** Whether the screen arrived to scan — asked once, and forgotten by asking. */
+  function takeScan(): boolean {
+    const asked = scan
+    scan = false
+    return asked
+  }
+
+  return { picked, pick, clear, askToScan, takeScan }
 })

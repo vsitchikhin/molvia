@@ -2,7 +2,9 @@
   <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
     <template #title>{{ t('scanner.title') }}</template>
 
-    <form v-if="typing" ref="form" class="typed" novalidate @submit.prevent="submitTyped">
+    <!-- Nothing while closed: a sheet kept mounted for a warm reader (MOL-99) would otherwise keep
+         its skeleton or its refusal in the page — and their words in the app's live region. -->
+    <form v-if="open && typing" ref="form" class="typed" novalidate @submit.prevent="submitTyped">
       <AppField
         v-model="typed"
         kind="digits"
@@ -14,7 +16,7 @@
       />
     </form>
 
-    <div v-else-if="viewing" class="viewfinder">
+    <div v-else-if="open && viewing" class="viewfinder">
       <!-- The picture is for the eye alone: what it says, the hint below says in words. -->
       <video
         ref="video"
@@ -44,7 +46,7 @@
     </div>
 
     <ScreenState
-      v-else-if="refusal"
+      v-else-if="open && refusal"
       :kind="refusal === 'error' || refusal === 'reader' ? 'error' : 'attention'"
       :title="t(REFUSALS[refusal].title)"
       :body="t(REFUSALS[refusal].body)"
@@ -65,7 +67,7 @@
       </template>
     </ScreenState>
 
-    <template v-if="typing || viewing" #footer>
+    <template v-if="open && (typing || viewing)" #footer>
       <div v-if="typing" class="actions">
         <AppButton size="large" block @click="submitTyped">{{ t('scanner.done') }}</AppButton>
         <AppButton v-if="cameraMayWork" variant="secondary" block @click="toCamera">
