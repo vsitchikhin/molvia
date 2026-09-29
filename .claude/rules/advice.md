@@ -110,6 +110,12 @@ fourth week is not over is waiting, with access or without — it can still be g
 access in week 4» is said only of a week that is over (adversarial А: judged by today's access, a
 newcomer read «no access» eighteen days early). Those waiting, those without access and the erased
 of the weeks the window touches are each a line of their own, in neither fraction.
+**The login's funnel is the third block** (MOL-68, rules in `auth.md`): the logins begun on the days
+the window touches — not the people who appeared, since those lost at the door never appear — with
+«began» (starts less a device's repeats), «got in» and «lost» beside their `n`, the line
+`LOGIN_SECOND_WAY_PERCENT` (25 %) printed and no verdict; where they were lost is counted in
+requests, so it need not add up to «lost», and «lost» below zero at the window's edge is printed
+as it is. Then a row per day that counted anything.
 
 ## What «Что брать» shows, and what it refuses to (MOL-31)
 

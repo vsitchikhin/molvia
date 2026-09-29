@@ -5,7 +5,7 @@ paths:
   - 'backend/src/usecases/{authenticate,sign-in,start-login,complete-login,bot-login,sessions,create-actor}*.ts'
   - 'backend/src/routes/{auth,internal-auth,sessions,dev-login,actor,actors}.ts'
   - 'backend/tests/{login,session,sessions,identity,idor,actors,devices}*.ts'
-  - 'backend/drizzle/*{telegram,sessions,actors}*.sql'
+  - 'backend/drizzle/*{telegram,sessions,actors,login}*.sql'
   - 'packages/model/src/{entities,contracts}/{auth,session,actor}.ts'
   - 'packages/model/tests/{entities,contracts}/{auth,session,actor}.test.ts'
   - 'packages/client/src/**'
@@ -64,6 +64,25 @@ is in `bot.md`.
   **Thirty starts in a rolling minute, across the database**, including consumed requests:
   the quota is serialized with an advisory lock. Its shared denial-of-service price is accepted.
   Expired requests are removed at start, at boot and every minute; no login writes `events`.
+- **What became of every login is counted as it happens, into `login_days` (MOL-68).** Nothing is
+  left to count afterwards: «Это не я» and a collected session only put a request out, and the
+  minute timer deletes it. So each step adds one inside its own transaction — the start, the
+  **first** «Войти» (the same account again is a lost answer repeated, MOL-55's О-2), «Это не я»,
+  the collection, and the cleanup, which counts in the statement that deletes what ran out with no
+  outcome, confirmed or not: never reached the bot, or never came back from it. A rolled-back step
+  is a rolled-back count, and a refusal by the quota counts too, thrown only after the commit.
+  **The row is the day the login began**, in Yerevan, read off the request's own row, so a day
+  reads as a funnel of its own; a refusal has no request and counts on its own day. The count is
+  **the last statement of its step**, and the cleanup writes its days in order: the row of a day
+  is what every login of that day touches, and taken last it is never held while waiting for
+  anything. **No id, no Telegram id, no code, no device** — not a person's row, so erasure has
+  nothing here, and «no login writes `events`» still holds.
+  **A repeat is the device's word** (owner's decision В-1): `POST /auth/login?again=1` when the
+  login record holds `tried` — set once a start is answered `201`, taken away when an owner is
+  claimed — so «Начать заново», or a return after the link ran out, is the same person rather
+  than a loss and a newcomer. Not the cookie of the request: it dies with the five minutes,
+  exactly when the commonest repeat happens. The price is named: Safari and an installed PWA are
+  two devices, an old PWA sends no mark, and a forged mark spoils only our own count.
 - **The token rides in a cookie, and `backend/src/cookie.ts` is the only module that touches
   one (MOL-53).** `__Host-molvia_session`, with `HttpOnly` so an XSS cannot carry the account
   away and so ITP's seven-day cap — which applies to what a _script_ writes — never reaches it;

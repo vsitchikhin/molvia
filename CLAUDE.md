@@ -79,6 +79,10 @@ The log's writer, the cohort and both gate queries are pinned in `.claude/rules/
 - **Both gates are read by `dist/gates.js`** (MOL-91), `make gates FROM=…` in a copy: `n` beside
   every share, the stop line printed and no verdict; gate 0.3 closes its window as 0.2 does; the
   erased leave one number, by week of arrival, in `erasures`.
+- **The login's funnel is `login_days`** (MOL-68): counted in each step's own transaction, by the
+  day the login began, with no id at all; a device's repeat says `again=1`, so «began» is people
+  rather than taps; a second way in is filed above `LOGIN_SECOND_WAY_PERCENT` (25 %) lost, read as
+  the third block of `make gates`.
 
 ## Money
 
