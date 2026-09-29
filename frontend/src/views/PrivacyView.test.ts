@@ -28,8 +28,15 @@ it('says what is kept, how long the logs live and how to erase everything', asyn
     ru.privacy.logs.title,
     ru.privacy.backups.title,
     ru.privacy.storage.title,
+    ru.privacy.copy.title,
     ru.privacy.erase.title,
   ])
+})
+
+it('names the copy by the words of the settings row that makes it (MOL-93)', async () => {
+  const text = (await render()).text()
+  expect(text).toContain(ru.privacy.copy.text)
+  expect(ru.privacy.copy.text).toContain(`«${ru.settings.export.label}»`)
 })
 
 it('asks nothing of the server: no skeleton and no state, whatever the connection', async () => {
