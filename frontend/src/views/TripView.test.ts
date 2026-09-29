@@ -16,6 +16,7 @@ import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
+import { useItemEntryStore } from '@/stores/itemEntry'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import TripNotices from '@/components/TripNotices.vue'
@@ -1006,6 +1007,28 @@ describe('TripView', () => {
 
     expect(router.currentRoute.value.name).toBe('item-search')
   })
+
+  it('«Сканировать штрихкод» ведёт на поиск и просит поднять сканер сразу (MOL-99, В-4)', async () => {
+    currentTrip.mockResolvedValue(trip(handoff()))
+    const { view, router } = await render()
+    const asked = vi.spyOn(useItemEntryStore(), 'askToScan')
+    await button(view, ru.item.barcode.scan).trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('item-search')
+    expect(asked).toHaveBeenCalledOnce()
+  })
+
+  it('«Добавить позицию» сканер не просит', async () => {
+    currentTrip.mockResolvedValue(trip(handoff()))
+    const { view } = await render()
+    const asked = vi.spyOn(useItemEntryStore(), 'askToScan')
+    await button(view, ru.trip.add_item).trigger('click')
+    await flushPromises()
+
+    expect(asked).not.toHaveBeenCalled()
+  })
+
   describe('удалить поход (MOL-76)', () => {
     const openSheet = () => document.body.querySelector('dialog[open]')
 

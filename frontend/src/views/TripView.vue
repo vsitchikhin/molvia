@@ -49,6 +49,10 @@
       >
         <template #action>
           <AppButton size="large" block @click="find">{{ t('trip.empty.action') }}</AppButton>
+          <AppButton variant="secondary" block @click="scan">
+            <template #icon><IconBarcode /></template>
+            {{ t('item.barcode.scan') }}
+          </AppButton>
         </template>
       </ScreenState>
 
@@ -58,6 +62,10 @@
           <button class="add" type="button" @click="find">
             <IconPlus class="add-icon" aria-hidden="true" />
             {{ t('trip.add_item') }}
+          </button>
+          <button class="add" type="button" @click="scan">
+            <IconBarcode class="add-icon" aria-hidden="true" />
+            {{ t('item.barcode.scan') }}
           </button>
         </AppCard>
         <p class="footnote">{{ t('trip.footnote') }}</p>
@@ -134,6 +142,7 @@
 import { computed, defineComponent, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import IconBarcode from '~icons/mdi/barcode-scan'
 import IconPlus from '~icons/mdi/plus'
 import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
@@ -156,6 +165,7 @@ import { useReconnect } from '@/composables/useReconnect'
 import { purchaseDay, timeOfDay } from '@/days'
 import { afterStep, useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
+import { useItemEntryStore } from '@/stores/itemEntry'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -194,6 +204,7 @@ export default defineComponent({
     AppCard,
     AppScreen,
     BottomSheet,
+    IconBarcode,
     IconPlus,
     ItemDetailsSheet,
     ScreenSkeleton,
@@ -207,6 +218,7 @@ export default defineComponent({
   setup() {
     const { t, locale } = useI18n()
     const router = useRouter()
+    const itemEntry = useItemEntryStore()
     const { goUp } = useNavigation()
     const actor = useActorStore()
     const trips = useTripStore()
@@ -379,6 +391,12 @@ export default defineComponent({
       void router.push({ name: 'item-search' })
     }
 
+    /** «Сканировать» (MOL-99, В-4): the same screen, with the scanner up over it at once. */
+    function scan(): void {
+      itemEntry.askToScan()
+      find()
+    }
+
     useReconnect(() => {
       if (trouble.value) void load()
     })
@@ -428,6 +446,7 @@ export default defineComponent({
         leaveIfOver()
       },
       find,
+      scan,
     }
   },
 })
