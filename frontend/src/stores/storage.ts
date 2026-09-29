@@ -63,6 +63,19 @@ export function write(key: string, value: string): boolean {
 }
 
 /**
+ * Writes to this window's shelf alone, for a note about this window only: another window of the app
+ * must not find it — the moment «Обновить» reloaded this one is not the other's (MOL-132, review
+ * С-9). `read(key, true)` finds it first; nothing is written where it would be shared.
+ */
+export function writeOwn(key: string, value: string): void {
+  try {
+    window.sessionStorage.setItem(key, value)
+  } catch {
+    // Nothing to keep it in: the page brought up by the reload simply finds no note.
+  }
+}
+
+/**
  * Writes to every shelf, and says whether **every** one took it. `write` is content with any
  * shelf — right for a value that only has to outlive the tab. It is wrong for one that is read
  * back to decide what to do: `read` prefers the first shelf, and a `localStorage` that refused

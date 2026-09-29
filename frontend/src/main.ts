@@ -9,7 +9,7 @@ import { installSheetEntryGuard } from '@/composables/useSheetHistory'
 import { sessionEnded, useActorStore } from '@/stores/actor'
 import { forgetTheInviteDoor } from '@/stores/identity'
 import { onMissingActor, onServerVersion } from '@/api'
-import { forget, read, write } from '@/stores/storage'
+import { forget, read, writeOwn } from '@/stores/storage'
 import { NO_UPDATE, holdsTyping, installPwaUpdate, pwaUpdateKey } from '@/pwaUpdate'
 import '@/styles/main.scss'
 
@@ -32,7 +32,7 @@ const update =
           window.location.reload()
         },
         mark: (at) => {
-          write(UPDATE_MARK, String(at))
+          writeOwn(UPDATE_MARK, String(at))
         },
         takeMark: () => {
           const at = Number(read(UPDATE_MARK, true))
