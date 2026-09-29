@@ -1,19 +1,21 @@
 ---
 paths:
-  - 'backend/src/db/{erasure-repository,failure,schema}.ts'
+  - 'backend/src/db/{erasure-repository,export-repository,failure,schema}.ts'
   - 'backend/src/{forget,forget-cli,server,index}*.ts'
-  - 'backend/src/usecases/erase-me.ts'
+  - 'backend/src/usecases/{erase-me,export-mine}.ts'
   - 'backend/drizzle/*.sql'
-  - 'backend/tests/{erasure,erase-route,forget-bundle,request-log,login-log,compose-logging}*.ts'
+  - 'backend/tests/{erasure,erase-route,export,export-route,life,forget-bundle,request-log,login-log,compose-logging}*.ts'
+  - 'packages/model/src/contracts/export.ts'
+  - 'frontend/src/{components/YourDataGroup,composables/useExport}*'
   - 'bin/forget-actor.sh'
   - 'bot/src/erase*.ts'
   - 'frontend/src/views/PrivacyView*'
-  - 'e2e/privacy.spec.ts'
+  - 'e2e/{privacy,export}.spec.ts'
   - 'deploy/Caddyfile'
   - 'docker-compose.prod.yml'
 ---
 
-# Erasure, trackers and logs
+# Erasure, the copy, trackers and logs
 
 The detail behind the privacy lines of `CLAUDE.md`.
 
@@ -52,6 +54,42 @@ The detail behind the privacy lines of `CLAUDE.md`.
   `erasures` —
   and say that copies on the phone are out of the server's reach: nothing clears a device's
   storage for an owner the server no longer knows, since a 401 there is also an expired session.
+- **A person can take a copy of everything, and the copy is what erasure takes** (MOL-93,
+  «Скачать мои данные» in the settings' group «Ваши данные»): `GET /actors/me/export`, a path with
+  no owner in it, `no-store`, `attachment; filename="molvia-<day in Yerevan>.json"`. **One source
+  of truth for what goes in:** every table erasure removes has a section (`EXPORT_SECTION_OF`, a
+  `Record<ErasedTable, …>` — a table added to `ERASED_TABLES` does not compile without one), a test
+  counts each section against a dry run of erasure for the same person, and every key to `actors`
+  must be exported as it must be erased. **And every column** — beyond the ticket: `EXPORT_COLUMNS`
+  names each column of those tables as exported or left out with its reason, and a test compares
+  it with `information_schema.columns`; a key alone would have let a new note on an exchange miss
+  the copy in silence. **A new table or column that is a person's joins erasure and the copy in the
+  same commit.** Besides them: the catalogue items the person added (erasure keeps them, their
+  author is still this person), with barcodes, and — as a reference, not their data — the names of
+  the items and places their rows point at, so the file reads; nobody else's author is in it.
+  What was decided (owner's approval 29.09.2026, Р-1…Р-7): **what is stored, never what is
+  counted** — no unit price, total, balance or chain rate, since those are our arithmetic over the
+  data and would go stale with the first fix of a rule; **the removed and the withdrawn are in it,
+  marked** (`removedAt`, `withdrawnAt`) — a withdrawn verdict stays a row for the gate, and a removal
+  lives its ten minutes of «Вернуть», and both are ours to hand over while we hold them; **no
+  secret** — no `token_hash`, no login `code` or `secret_hash` (a session's id is not one: it opens
+  only one's own); `actor_id` is said once, in `account`, and `search_key` is left out, made from
+  the name. The format is the wire's: English keys, money and quantity as decimal strings beside
+  their currency and unit, rates to six digits, days `YYYY-MM-DD`, moments in UTC, and a header
+  `format: "molvia-export"`, `version: 1` — a change of what goes in is a new version. Its codec
+  is looser than a screen's on purpose: a copy of what is stored is never refused by a rule a
+  stored row predates — an event type since withdrawn, a rate outside today's band. **One
+  snapshot:** one transaction, `repeatable read, read only`; it writes nothing, not even the log.
+  **The phone hands over the server's file, checking only its envelope** (`format`, `version`): an
+  installed app older than the server must not refuse a copy for a field it does not know. On the
+  phone (В-1) the file goes to the share sheet — «Сохранить в Файлы», to oneself in Telegram — and
+  Safari opens that sheet only close to a tap, with the request in between: refused
+  (`NotAllowedError`), the file waits under «Файл готов» for a second tap on «Сохранить или
+  отправить», and where no sheet takes a file — a computer — it is downloaded; a sheet the person
+  closed is not an error. Measured: 10 000 spendings, 2 000 purchases and 500 events read in about
+  0.13 s and weigh 4 MB (5.9 MB as the phone writes it, indented); the client waits up to a minute.
+  `/privacy` says what the copy holds — the removed and the withdrawn included — under «Копия ваших
+  данных», and names the row by its words.
 - **No third-party trackers or analytics, and so no cookie banner** (MOL-58). There are two
   cookies, both strictly necessary: the session and the five-minute one of a login in progress
   (MOL-54); what the phone keeps in its storage is the queue and the drafts the app needs to work.
