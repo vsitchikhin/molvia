@@ -44,7 +44,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 
 ## frontend · composables
 
-- `frontend/src/composables/useExport.ts` — «Скачать мои данные» (MOL-93, В-1): the file from the server, then the share sheet, a second tap when the phone refused it that late, a download where no sheet can take a file; offline or error decided after the failure.
+- `frontend/src/composables/useExport.ts` — «Скачать мои данные» (MOL-93, В-1): the file from the server, then the share sheet, a second tap when the phone refused it that late or it was closed, a download on a computer or where no sheet can take a file; offline or error decided after the failure.
 
 ## e2e
 

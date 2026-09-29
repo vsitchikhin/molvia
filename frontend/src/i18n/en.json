@@ -975,7 +975,7 @@
     "group_data": "Your data",
     "export": {
       "label": "Download my data",
-      "hint": "Everything we keep about you, in one file",
+      "hint": "Your records, ratings and settings, in one file",
       "offline": "You can download it once you are back online",
       "busy": "Preparing the file…",
       "failed": "Could not prepare the file",
@@ -1063,7 +1063,7 @@
     },
     "copy": {
       "title": "A copy of your data",
-      "text": "In the settings — «Download my data»: a file with everything we keep about you, including the earlier versions of exchanges and incomes you corrected and the items you added to the shared catalogue. A rating you withdrew is there too: without its review it stays with us, so the count of ratings given stays honest. What you removed and can still bring back is there as well, marked. The file holds no login keys."
+      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected and the items you added to the shared catalogue. A rating you withdrew is there too: without its review it stays with us, so the count of ratings given stays honest. What you removed and can still bring back is there as well, marked. The file holds no login keys."
     },
     "erase": {
       "title": "Delete everything",

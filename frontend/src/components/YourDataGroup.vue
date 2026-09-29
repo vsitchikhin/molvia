@@ -3,10 +3,12 @@
     <h2 class="caption">{{ t('settings.group_data') }}</h2>
     <AppCard as="ul" list>
       <li>
+        <!-- Inactive rather than disabled, as «Сохранить» is: it keeps its focus and its hint. -->
         <button
+          ref="row"
           class="entry"
           type="button"
-          :disabled="!online || busy"
+          :aria-disabled="!online || busy ? true : undefined"
           :aria-busy="busy"
           :aria-describedby="`${id}-hint`"
           @click="start"
@@ -24,14 +26,16 @@
         <p v-if="failure === 'error' && online" class="failed" role="alert">
           <IconAlert aria-hidden="true" />
           <span>{{ t('settings.export.failed') }}</span>
-          <AppButton variant="ghost" @click="start">{{ t('state.retry') }}</AppButton>
+          <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
         </p>
         <p v-else-if="failure === 'offline'" class="quiet">
           <IconCloud aria-hidden="true" />{{ t('settings.export.lost') }}
         </p>
         <div v-if="ready" class="ready">
           <p class="ready-title">{{ t('settings.export.ready') }}</p>
-          <AppButton block @click="handOver">{{ t('settings.export.hand_over') }}</AppButton>
+          <AppButton block @click="handOverFromCard">{{
+            t('settings.export.hand_over')
+          }}</AppButton>
         </div>
       </li>
       <li>
@@ -46,7 +50,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onUnmounted, useId, watch } from 'vue'
+import { defineComponent, onUnmounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconChevron from '~icons/mdi/chevron-right'
@@ -77,13 +81,27 @@ export default defineComponent({
     const { t } = useI18n()
     const exporting = useExport()
     const announce = useAnnouncer()
+    const row = ref<HTMLButtonElement | null>(null)
     let withdraw: (() => void) | undefined
-    watch(exporting.ready, (file) => {
+    watch([exporting.ready, exporting.failure], ([file, failure]) => {
       withdraw?.()
-      withdraw = file ? announce?.(t('settings.export.ready')) : undefined
+      withdraw = file
+        ? announce?.(t('settings.export.ready'))
+        : failure === 'offline'
+          ? announce?.(t('settings.export.lost'))
+          : undefined
     })
     onUnmounted(() => withdraw?.())
-    return { t, id: useId(), ...exporting }
+    // The button tapped goes with its block: the focus goes back to the row, not to the page.
+    async function retry(): Promise<void> {
+      row.value?.focus()
+      await exporting.start()
+    }
+    function handOverFromCard(): void {
+      exporting.handOver()
+      row.value?.focus()
+    }
+    return { t, id: useId(), row, ...exporting, retry, handOverFromCard }
   },
 })
 </script>
@@ -113,7 +131,7 @@ export default defineComponent({
   text-decoration: none;
   cursor: pointer;
 
-  &:disabled {
+  &[aria-disabled='true'] {
     cursor: default;
   }
 
@@ -140,7 +158,7 @@ export default defineComponent({
   flex: 1;
 }
 
-.entry:disabled .entry-label {
+.entry[aria-disabled='true'] .entry-label {
   color: var(--text-muted);
 }
 

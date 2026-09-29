@@ -19,6 +19,14 @@ function named(error: unknown, name: string): boolean {
   return error instanceof DOMException && error.name === name
 }
 
+/**
+ * A phone, and not a computer: the share sheet of a Mac has no «Save» among its places, and a
+ * download is what a person with a mouse expects.
+ */
+function onTouch(): boolean {
+  return window.matchMedia('(pointer: coarse)').matches
+}
+
 function download(file: File): void {
   const url = URL.createObjectURL(file)
   const link = document.createElement('a')
@@ -35,8 +43,8 @@ function download(file: File): void {
 
 /**
  * «Скачать мои данные» (MOL-93, В-1): the file is asked of the server, then offered on the share
- * sheet — «Сохранить в Файлы», to oneself in Telegram — where the phone can share a file, and
- * downloaded where it cannot. Safari opens the sheet only close to a tap, and the request stands
+ * sheet — «Сохранить в Файлы», to oneself in Telegram — where a phone can share a file, and
+ * downloaded where it cannot or on a computer. Safari opens the sheet only close to a tap, and the request stands
  * between the two: refused, the file waits for a second tap on «Сохранить или отправить».
  */
 export function useExport(): ExportState {
@@ -46,23 +54,27 @@ export function useExport(): ExportState {
   // Shallow: a File behind a reactive proxy is not a File to `navigator.share`.
   const ready = shallowRef<File | null>(null)
 
+  let sharing = false
+
   // Called straight from a tap on the second try: `navigator.share` goes out before any await.
   async function deliver(file: File, retryable: boolean): Promise<void> {
-    // Firefox on a computer has no `canShare` at all, whatever the DOM types say.
-    if ('canShare' in navigator && navigator.canShare({ files: [file] })) {
+    if (onTouch() && 'canShare' in navigator && navigator.canShare({ files: [file] })) {
+      sharing = true
       try {
         await navigator.share({ files: [file] })
         ready.value = null
         return
       } catch (error) {
-        if (named(error, 'AbortError')) {
-          ready.value = null
-          return
-        }
-        if (named(error, 'NotAllowedError') && retryable) {
+        // Closed by the person, the sheet of a Mac without «Save» among its places included: the
+        // file stays under «Файл готов» rather than vanish with nothing saved.
+        if (named(error, 'AbortError') || (named(error, 'NotAllowedError') && retryable)) {
           ready.value = file
           return
         }
+        // A sheet still open from the tap before: it is that sheet's file, not a download too.
+        if (named(error, 'InvalidStateError')) return
+      } finally {
+        sharing = false
       }
     }
     ready.value = null
@@ -70,7 +82,7 @@ export function useExport(): ExportState {
   }
 
   async function start(): Promise<void> {
-    if (busy.value || !online.value) return
+    if (busy.value || sharing || !online.value) return
     busy.value = true
     failure.value = null
     ready.value = null
@@ -91,7 +103,7 @@ export function useExport(): ExportState {
   }
 
   function handOver(): void {
-    if (ready.value) void deliver(ready.value, false)
+    if (ready.value && !sharing) void deliver(ready.value, false)
   }
 
   const offline = (): void => {

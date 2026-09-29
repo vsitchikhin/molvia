@@ -44,12 +44,19 @@ function shareable(on: boolean): void {
 
 let clicked: string[] = []
 
+function pointer(coarse: boolean): void {
+  window.matchMedia = vi.fn((query: string) => ({
+    matches: query === '(pointer: coarse)' ? coarse : false,
+  })) as unknown as typeof window.matchMedia
+}
+
 beforeEach(() => {
   vi.restoreAllMocks()
   exportMine.mockReset().mockResolvedValue(FILE_TEXT)
   share.mockReset().mockResolvedValue(undefined)
   canShare.mockReset()
   shareable(true)
+  pointer(true)
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
   clicked = []
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
@@ -112,15 +119,51 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     expect(view.find('.ready').exists()).toBe(false)
   })
 
-  it('a sheet closed by the person is not an error and leaves nothing behind', async () => {
+  it('a sheet closed by the person is not an error, and the file stays ready to hand over', async () => {
     share.mockRejectedValueOnce(refusal('AbortError'))
     const view = await render()
 
     await download(view).trigger('click')
     await flushPromises()
 
-    expect(view.find('.ready').exists()).toBe(false)
+    expect(view.get('.ready').text()).toContain(en.settings.export.ready)
     expect(view.find('[role="alert"]').exists()).toBe(false)
+    expect(clicked).toEqual([])
+  })
+
+  it('on a computer the file is downloaded, never offered on a sheet without «Save»', async () => {
+    pointer(false)
+    const view = await render()
+
+    await download(view).trigger('click')
+    await flushPromises()
+
+    expect(share).not.toHaveBeenCalled()
+    expect(clicked).toEqual([expect.stringMatching(/^molvia-.*\.json$/)])
+  })
+
+  it('the second tap reaches the sheet within the tap itself, before anything is awaited', async () => {
+    share.mockRejectedValueOnce(refusal('NotAllowedError'))
+    const view = await render()
+    await download(view).trigger('click')
+    await flushPromises()
+
+    ;(view.get('.ready button').element as HTMLButtonElement).click()
+
+    expect(share).toHaveBeenCalledTimes(2)
+  })
+
+  it('a tap while a sheet is still open neither downloads nor asks again', async () => {
+    share.mockReturnValueOnce(new Promise(() => undefined))
+    const view = await render()
+
+    await download(view).trigger('click')
+    await flushPromises()
+    ;(download(view).element as HTMLButtonElement).click()
+    await flushPromises()
+
+    expect(exportMine).toHaveBeenCalledOnce()
+    expect(share).toHaveBeenCalledOnce()
     expect(clicked).toEqual([])
   })
 
@@ -143,7 +186,7 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     await download(view).trigger('click')
     expect(download(view).text()).toContain(en.settings.export.busy)
     expect(download(view).attributes('aria-busy')).toBe('true')
-    await download(view).trigger('click')
+    ;(download(view).element as HTMLButtonElement).click()
     answer(FILE_TEXT)
     await flushPromises()
 
@@ -155,9 +198,11 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
     const view = await render()
 
-    expect(download(view).attributes('disabled')).toBeDefined()
+    expect(download(view).attributes('aria-disabled')).toBe('true')
+    expect(download(view).attributes('disabled')).toBeUndefined()
     expect(download(view).text()).toContain(en.settings.export.offline)
-    await download(view).trigger('click')
+    ;(download(view).element as HTMLButtonElement).click()
+    await flushPromises()
 
     expect(exportMine).not.toHaveBeenCalled()
   })
