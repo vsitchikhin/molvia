@@ -1,6 +1,7 @@
 import process from 'node:process'
 import { createBotClient } from '@molvia/client'
 import { assembleBot, startBot } from './assemble'
+import { startReminders } from './remind'
 import { botToken, readEnvironment, refusedNames } from './env'
 import type { BotEnvironment } from './env'
 
@@ -53,22 +54,21 @@ if (!environment.secret) {
  */
 const API_TIMEOUT_MS = 5_000
 
-const runner = startBot(
-  assembleBot(botToken, {
-    api: createBotClient({
-      baseUrl: environment.apiBaseUrl,
-      secret: environment.secret,
-      timeoutMs: API_TIMEOUT_MS,
-    }),
-    appUrl: environment.appBaseUrl,
-  }),
-)
+const api = createBotClient({
+  baseUrl: environment.apiBaseUrl,
+  secret: environment.secret,
+  timeoutMs: API_TIMEOUT_MS,
+})
+const bot = assembleBot(botToken, { api, appUrl: environment.appBaseUrl })
+const runner = startBot(bot)
+// The rating reminders (MOL-101): every minute the API is asked who is due, and they are sent.
+const stopReminders = startReminders(api, bot.api, environment.appBaseUrl)
 
 // The runner keeps fetching updates until it is told to stop, and a kill without this leaves
 // whatever it is holding half-handled. Compose sends SIGTERM on every deploy.
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
-    void runner.stop()
+    void stopReminders().finally(() => runner.stop())
   })
 }
 

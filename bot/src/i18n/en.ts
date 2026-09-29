@@ -52,4 +52,12 @@ export const en: Dictionary = {
     'The buttons are gone. If “Delete for good” was already pressed, it cannot be undone.',
   'erase.expired': 'This button has expired. Send /delete again.',
   'erase.failed': 'No answer came back. Please try again in a minute.',
+  'remind.yesterday': 'Yesterday',
+  'remind.dayBefore': 'The day before yesterday',
+  'remind.daysAgo': '{n} days ago',
+  'remind.question': '{when} · {place}\n{name} — how was it?\n1 — bad, 5 — excellent',
+  'remind.more': '{n} more wait in «Ratings»: {url}',
+  'rate.done': 'Saved: {score} out of 5. Pressed the wrong one? Press another.',
+  'rate.failed': 'No answer came back. Please press again in a minute.',
+  'rate.gone': 'This rating can no longer be given: the account or the item is gone.',
 }

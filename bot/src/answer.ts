@@ -1,5 +1,5 @@
 import { GrammyError } from 'grammy'
-import type { Context } from 'grammy'
+import type { Context, InlineKeyboard } from 'grammy'
 import { t } from './i18n'
 import type { MessageKey } from './i18n'
 
@@ -31,6 +31,31 @@ export async function settle(ctx: Context, key: MessageKey): Promise<void> {
     }
     // Too old to edit, or the message is gone — the answer still has to arrive.
     await ctx.reply(text)
+  }
+}
+
+/**
+ * An outcome written into the message **with its buttons kept** (MOL-101). The scale of a rating
+ * reminder stays under the answer, the pressed digit marked, so that a slip of the finger is one
+ * more press rather than a trip to the app: every press is the same idempotent verdict, and
+ * `sequentialize` keeps them in order, so the last press is the verdict and the message says so.
+ *
+ * `fallback` is what arrives when the message cannot be edited — the outcome alone, as a reply.
+ */
+export async function settleKeeping(
+  ctx: Context,
+  text: string,
+  keyboard: InlineKeyboard,
+  fallback: string,
+): Promise<void> {
+  try {
+    await ctx.editMessageText(text, { reply_markup: keyboard })
+  } catch (error) {
+    // The same digit pressed twice: this very answer is already on screen (see `settle`).
+    if (error instanceof GrammyError && error.description.includes('message is not modified')) {
+      return
+    }
+    await ctx.reply(fallback)
   }
 }
 
