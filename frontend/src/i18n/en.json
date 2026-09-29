@@ -4,7 +4,6 @@
   },
   "nav": {
     "label": "Sections",
-    "trip": "Trip",
     "advice": "What to buy",
     "verdicts": "Ratings",
     "back_label": "Back",
@@ -17,56 +16,54 @@
     "retry": "Try again"
   },
   "trip": {
-    "title": "Trip",
-    "at_place": "{place} · {when}",
+    "title": "Entry",
     "add_item": "Add an item",
     "add_price": "Add a price",
     "total": "Total",
     "unit_price": "{amount} per {unit}",
     "items_count": "{n} item | {n} items",
-    "footnote": "Only the item is required. The price and the amount can be filled in later — the trip is never blocked",
-    "finish": "Finish the trip",
+    "footnote": "Only the item is required. The price and the amount can be filled in later — the entry is never blocked",
+    "finish": "Finish",
     "finish_confirm": {
-      "title": "Finish this trip?",
-      "body": "The items stay recorded. Anything forgotten can still be added later",
+      "title": "Finish this entry?",
+      "body": "The items stay recorded. Anything forgotten can be added later",
       "ok": "Finish",
       "cancel": "Cancel"
     },
     "remove": {
-      "action": "Delete the trip",
+      "action": "Delete the entry",
       "sheet": {
-        "title": "Delete this trip?",
+        "title": "Delete this entry?",
         "body": "The purchases and prices go, from “Money” and the accounts too. The ratings stay"
       },
       "empty": {
-        "title": "Nothing in this trip",
+        "title": "Nothing in this entry",
         "body": "Delete it, so no empty row is left in the history?",
         "finish": "Finish anyway"
       },
-      "removed": "Trip deleted: {name}",
-      "removed_announced": "Trip deleted: {name}. Undo — 10 seconds",
+      "removed": "Entry deleted: {name}",
+      "removed_announced": "Entry deleted: {name}. Undo — 10 seconds",
       "restore": "Undo",
-      "restored": "The trip is back",
-      "not_restored": "The trip did not come back: {name}",
-      "not_restored_open": "Another trip was started meanwhile, and only one can be open",
-      "not_restored_gone": "More than ten minutes have passed — the trip is deleted for good"
+      "restored": "The entry is back",
+      "not_restored": "The entry did not come back: {name}",
+      "not_restored_open": "Another entry was started meanwhile, and only one can be open",
+      "not_restored_gone": "More than ten minutes have passed — the entry is deleted for good"
     },
     "empty": {
-      "title": "The trip has started",
+      "title": "The entry has started",
       "body": "Add the first item — the rest can be filled in later",
       "action": "Find an item"
     },
     "error": {
       "title": "The server did not answer",
-      "body": "Your items are still on the phone, nothing is lost",
-      "body_none": "Could not check whether a trip is going on. You can start a new one anyway"
+      "body": "Your items are still on the phone, nothing is lost"
     },
     "offline": {
       "title": "No connection — no matter",
-      "body": "The items are saved on the phone and will be sent on their own. The trip goes on"
+      "body": "The items are saved on the phone and will be sent on their own. The entry goes on"
     },
     "none": {
-      "action": "Start a trip"
+      "action": "Start the entry"
     },
     "home": {
       "pending": {
@@ -89,7 +86,7 @@
       "fix": "Correct it",
       "drop": "Dismiss",
       "orphaned": "it holds {n} purchase, and it is waiting | it holds {n} purchases, and they are waiting",
-      "drop_trip": "Drop the trip and its purchases"
+      "drop_trip": "Drop the entry and its purchases"
     },
     "rate_line": "rate {rate} · {date}",
     "rate_line_mine": "my rate {rate} · {date}",
@@ -97,7 +94,7 @@
     "caveat": {
       "pending": "+ {n} item not sent yet | + {n} items not sent yet",
       "partial": "converted from {currency} only",
-      "local": "the trip has not been sent — the total comes after it has"
+      "local": "the entry has not been sent — the total comes after it has"
     },
     "rate": {
       "source_cba": "the Central Bank of Armenia",
@@ -128,36 +125,32 @@
       "body": "They are on the phone. They go out when there is a connection and the app is open"
     },
     "elsewhere": {
-      "title": "A trip in «{place}» is already open",
-      "body": "Continue the open trip, or finish it and start a new one in «{mine}»? Purchases for the new trip are saved on this device and will wait for your choice.",
-      "body_other": "Purchases for the new trip («{mine}») are saved on this device. Added to the open trip, they are recorded against «{place}» — prices of one shop must not be written down against another, they are what the comparison rests on.",
-      "join": "Add them to that trip",
-      "finish": "Finish that trip",
-      "choose": "Choose trip"
+      "title": "An entry in «{place}» is already open",
+      "body": "Continue the open entry, or finish it and start a new one in «{mine}»? Purchases for the new entry are saved on this device and will wait for your choice.",
+      "body_other": "Purchases for the new entry («{mine}») are saved on this device. Added to the open entry, they are recorded against «{place}» — prices of one shop must not be written down against another, they are what the comparison rests on.",
+      "join": "Add them to that entry",
+      "finish": "Finish that entry",
+      "choose": "Choose the entry"
     },
     "history": {
-      "title": "Trip history",
-      "finished_title": "Completed trip",
-      "empty_title": "Your trips will appear here",
-      "empty_body": "Finish a trip to add forgotten purchases or correct them here.",
-      "error_title": "Could not load trips",
+      "title": "Purchases",
+      "finished_title": "Recorded purchases",
+      "error_title": "Could not load purchases",
       "error_body": "Saved data is still on this device. Try again.",
-      "offline_title": "Offline — saved trips",
+      "offline_title": "Offline — saved purchases",
       "offline_body": "Only data saved on this device is available. The rest will load when connected.",
       "cached": "Showing data saved on this device.",
       "local_finish": "Finished on this device — not sent yet",
       "more": "Show more",
       "finished_at": "Finished · {when}",
-      "when": "{day}, {time}",
-      "missing_title": "Trip unavailable",
-      "missing_body": "This trip could not be found in your account. Return to history.",
+      "missing_title": "Purchases unavailable",
+      "missing_body": "These purchases could not be found in your account. Return to Purchases.",
       "pending": "Changes are on this device. We will send them when connected.",
-      "no_purchases": "No purchases in this trip yet. Add anything you forgot.",
-      "go_trip": "Go to trip",
+      "no_purchases": "No purchases here yet. Add anything you forgot.",
       "rejected_title": "A change was not accepted",
-      "rejected_body": "Purchases remain on this device. The Trip screen shows the reason and lets you correct the entry.",
+      "rejected_body": "Purchases remain on this device. Purchases shows the reason and lets you correct the entry.",
       "review": "Review the refusal",
-      "unfinished": "This trip is still open"
+      "unfinished": "This entry is still open"
     },
     "manual_meta": "Recording by hand · {when}",
     "manual_since": "{day}, since {time}"
@@ -206,14 +199,14 @@
     "unit_price_pending": "Worked out for you — nothing to type",
     "unit_price_value": "{amount}/{unit}",
     "unit_price_announced": "Per unit: {value}",
-    "save": "Add to the trip",
+    "save": "Record",
     "save_edit": "Save",
     "delete": "Remove the item",
     "cancel": "Cancel",
     "offline_note": "Saved on the phone, sent once you are back online",
     "no_trip": {
-      "body": "Start a trip first: a purchase needs a shop",
-      "action": "To the trip"
+      "body": "Start an entry first: a purchase needs a place",
+      "action": "To Purchases"
     },
     "empty": {
       "body": "Nothing found for «{query}». We will add it to the catalogue — tell us what the price tag calls it",
@@ -376,7 +369,7 @@
     "converted_package": "≈ {amount} per pack",
     "converted_note": "the conversion is approximate, we always compare by the price on the tag",
     "rate_official": "rate {rate} · CBA",
-    "rate_frozen": "The rate is saved with the trip. Last month does not change with today's rate",
+    "rate_frozen": "The rate is saved with the purchases. Last month does not change with today’s rate",
     "rate_label": "1 {currency} =",
     "source_mine": "mine",
     "source_official": "official",
@@ -430,8 +423,8 @@
     "day_today": "Today · {date}",
     "day_yesterday": "Yesterday · {date}",
     "row_open": "Open spending:",
-    "row_open_trip": "Open trip:",
-    "trip_row_title": "Trip to “{place}”",
+    "row_open_trip": "Open purchases:",
+    "trip_row_title": "Purchases at “{place}”",
     "trip_row_meta": "{category} · {n} item | {category} · {n} items",
     "uncounted_row": "not counted",
     "more": "And {n} more spending over {range} | And {n} more spendings over {range}",
@@ -448,9 +441,9 @@
     "saved_offline": "Spending saved on the phone, we will send it later",
     "empty": {
       "title": "Add your first spending",
-      "body": "Barber, rent, café, taxi — anything that is not a shop. Purchases from “Trip” land here by themselves",
+      "body": "Barber, rent, café, taxi — anything that is not a shop. Purchases from “Purchases” land here by themselves",
       "action": "Add a spending",
-      "trip": "Start a trip to the shop"
+      "trip": "Record purchases at a shop"
     },
     "load_error": {
       "title": "Could not load spending",
@@ -508,8 +501,8 @@
       "place_placeholder": "Café, service, website",
       "optional": "· optional",
       "shop_title": "A purchase in a shop?",
-      "shop_body": "Add it to a trip — the item goes into the catalogue and ratings, and the spending lands here by itself",
-      "shop_action": "Trip ›",
+      "shop_body": "Record it in Purchases — the item goes into the catalogue and ratings, and the spending lands here by itself",
+      "shop_action": "Purchases ›",
       "bad_amount": "Enter an amount above zero",
       "bad_category": "Choose a category",
       "bad_day": "Choose a day no later than today",
@@ -521,8 +514,8 @@
       "dismiss": "Discard",
       "remove": "Delete the spending",
       "trip_meta": "{date} · {n} item | {date} · {n} items",
-      "trip_note": "This spending came from a trip and is changed there — with the prices and ratings of the items",
-      "trip_open": "Open in the trip",
+      "trip_note": "This spending came from Purchases and is changed there — with the prices and ratings of the items",
+      "trip_open": "Open in Purchases",
       "trip_items_offline": "The items will appear when the connection is back",
       "trip_items_error": "Could not load the items"
     },
@@ -565,16 +558,16 @@
     "base_since": "Counting in {base} since {date} — earlier exchanges in another currency are not in the rate and stay as they were",
     "cost_line": "{rate} · {basis}",
     "cost_line_estimated": "{rate} · {basis} · part at the Central Bank of Armenia rate",
-    "no_wallet": "No {quote} has come in yet, by exchange or income — new trips count by the Central Bank of Armenia rate",
-    "wallet_out_of_band": "Your exchanges put the rate of {quote} per {base} beyond what a trip can keep — check their amounts. New trips count by the Central Bank of Armenia rate",
-    "wallet_unknown": "Rate unknown: the {given} → {quote} exchange of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New trips count by the Central Bank of Armenia rate until you record an exchange of a known price or an income on a day with a fresh Central Bank of Armenia rate",
-    "wallet_old_reckoning": "Rate unknown: the {quote} bought on {date} with {given} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New trips count by the Central Bank of Armenia rate until you record an exchange paid in {base} or an income in {quote} after the change, on a day with a fresh Central Bank of Armenia rate",
-    "wallet_unknown_income": "Rate unknown: the {quote} income of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New trips count by the Central Bank of Armenia rate until you record an exchange of a known price or an income on a day with a fresh Central Bank of Armenia rate",
-    "wallet_old_reckoning_income": "Rate unknown: the {quote} received on {date} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New trips count by the Central Bank of Armenia rate until you record an exchange paid in {base} or an income in {quote} after the change, on a day with a fresh Central Bank of Armenia rate",
-    "preference_legend": "New trips count",
+    "no_wallet": "No {quote} has come in yet, by exchange or income — new purchases count by the Central Bank of Armenia rate",
+    "wallet_out_of_band": "Your exchanges put the rate of {quote} per {base} beyond what an entry can keep — check their amounts. New purchases count by the Central Bank of Armenia rate",
+    "wallet_unknown": "Rate unknown: the {given} → {quote} exchange of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New purchases count by the Central Bank of Armenia rate until you record an exchange of a known price or an income on a day with a fresh Central Bank of Armenia rate",
+    "wallet_old_reckoning": "Rate unknown: the {quote} bought on {date} with {given} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New purchases count by the Central Bank of Armenia rate until you record an exchange paid in {base} or an income in {quote} after the change, on a day with a fresh Central Bank of Armenia rate",
+    "wallet_unknown_income": "Rate unknown: the {quote} income of {date} has nothing to be valued by — there is no recent Central Bank of Armenia rate for that day. New purchases count by the Central Bank of Armenia rate until you record an exchange of a known price or an income on a day with a fresh Central Bank of Armenia rate",
+    "wallet_old_reckoning_income": "Rate unknown: the {quote} received on {date} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New purchases count by the Central Bank of Armenia rate until you record an exchange paid in {base} or an income in {quote} after the change, on a day with a fresh Central Bank of Armenia rate",
+    "preference_legend": "New purchases count",
     "preference_personal": "by my rate",
     "preference_official": "by the central bank rate",
-    "preference_hint": "My rate comes from exchanges and incomes; until there is one, a trip takes the central bank rate anyway",
+    "preference_hint": "My rate comes from exchanges and incomes; until there is one, purchases take the central bank rate anyway",
     "record": "Record an exchange",
     "list_title": "Exchanges",
     "row_amounts": "{given} → {received}",
@@ -585,7 +578,7 @@
     "vanished": "This exchange is gone — it was removed. The list is up to date",
     "remove_sheet": {
       "title": "Delete the exchange?",
-      "body": "A deleted exchange no longer counts in the rate of new trips. Past trips do not change",
+      "body": "A deleted exchange no longer counts in the rate of new purchases. Past purchases do not change",
       "confirm": "Delete"
     },
     "removed": "Exchange deleted: {amounts}",
@@ -595,7 +588,7 @@
     "conflict": "This exchange is already recorded — the list shows it as it stands now. If the amounts are wrong, tap it in the list and amend it",
     "empty": {
       "title": "No exchanges yet",
-      "body": "Record what you gave and what you got — the rate is worked out for you. Until you have a rate of your own, trips count by the central bank rate"
+      "body": "Record what you gave and what you got — the rate is worked out for you. Until you have a rate of your own, purchases count by the central bank rate"
     },
     "offline": {
       "title": "No connection",
@@ -661,7 +654,7 @@
     "remove": "Remove income {amount}",
     "remove_sheet": {
       "title": "Remove this income?",
-      "body": "Past trips do not change. If this income was part of your rate, new trips will work it out without it",
+      "body": "Past purchases do not change. If this income was part of your rate, new purchases will be counted without it",
       "confirm": "Remove income"
     },
     "removed": "Income removed: {amount}",
@@ -673,7 +666,7 @@
     "vanished": "This income is gone — it was removed. The list is up to date",
     "empty": {
       "title": "No income yet",
-      "body": "Record how much came in and when — we will add up each month. Income is optional: trips and ratings work without it"
+      "body": "Record how much came in and when — we will add up each month. Income is optional: purchases and ratings work without it"
     },
     "offline": {
       "title": "No connection",
@@ -778,7 +771,7 @@
     "title": "Sign in",
     "offer": {
       "title": "Sign in with your Telegram",
-      "body": "Your trips and ratings then survive a change of phone. We store neither your name nor your phone number."
+      "body": "Your purchases and ratings then survive a change of phone. We store neither your name nor your phone number."
     },
     "start": "Sign in with Telegram",
     "waiting": {
@@ -840,9 +833,9 @@
     "not_found": "Not found",
     "conflict": "That is already taken",
     "no_actor": "This device is no longer recognised",
-    "trip_open": "Another trip is still open",
+    "trip_open": "Another entry is still open",
     "internal": "Something went wrong",
-    "trip_context_required": "Set the trip’s city and currencies before sending",
+    "trip_context_required": "Set the entry’s city and currencies before sending",
     "login_unavailable": "This login request is no longer available. Start again",
     "login_forbidden": "Open sign-in from the app",
     "login_rate_limited": "Too many login requests. Try again in a minute",
@@ -872,7 +865,7 @@
       "EUR": "Euro · EUR"
     },
     "conversion_hint": "Shows what your purchases cost in this currency. This is not an income record.",
-    "scope": "New settings apply to future trips. Trips already started keep their currency and rate.",
+    "scope": "New settings apply to future entries. Entries already started keep their currency and rate.",
     "saved": "Settings saved",
     "save": "Save",
     "saving": "Saving…",
@@ -889,18 +882,18 @@
       "body": "Saved now: {country}, {city}; purchases — {spendCurrency}, conversion — {incomeCurrency}. Your edits are below. Apply them or discard to use saved settings."
     },
     "legacy": {
-      "title": "Confirm this trip’s city and currencies",
-      "body": "This trip started in an earlier version. Check where and in which currency you shopped. All items are waiting on this phone.",
-      "action": "Review trip settings",
+      "title": "Confirm this entry’s city and currencies",
+      "body": "This entry started in an earlier version. Check where and in which currency you shopped. All items are waiting on this phone.",
+      "action": "Review the entry’s settings",
       "confirm": "Confirm and send"
     },
     "group_place": "Where you live",
     "group_currencies": "Currencies",
-    "city_hint": "Used for new trips and prices near you",
+    "city_hint": "Used for new entries and prices near you",
     "city_current": "Now: {city}",
     "city_not_listed": "This city is not in the list — keep it or choose an available one",
     "city_changed": "What to buy will show prices for the new city. Your previous purchases will stay.",
-    "spend_hint": "The default for new trips. Each purchase can use a different currency.",
+    "spend_hint": "The default for new entries. Each purchase can use a different currency.",
     "same_currencies": "The currencies match — no conversion needed",
     "changed": "changed",
     "changed_announced": "changed, not saved",
@@ -957,16 +950,16 @@
         "text": "How much came in, in which currency, when and from where, and the note if you write one — your rate is worked out from these too. When you amend an income, the earlier version is kept beside it for as long as the income exists. Only you see it."
       },
       "spendings": {
-        "term": "Spending outside trips",
+        "term": "Spending outside shop purchases",
         "text": "How much, in what, when, in which category, and «what» and «where» if you write them — and your own categories. Spending in another currency keeps the rate of its day, and a past month the rate of its last day, worked out from your exchanges. Only you see it."
       },
       "accounts": {
         "term": "Accounts",
-        "text": "An account's name, its currency, the «savings» mark, the balance on its start day and your checks against the fact — what you counted and what the app counted; for spending, income, exchanges and trips — which account and how much was charged. The balance is not stored but worked out. Only you see it."
+        "text": "An account’s name, its currency, the «savings» mark, the balance on its start day and your checks against the fact — what you counted and what the app counted; for spending, income, exchanges and purchases — which account and how much was charged. The balance is not stored but worked out. Only you see it."
       },
       "places": {
         "term": "Shops",
-        "text": "The names of the shops you give on a trip — in the shared catalogue, without your name."
+        "text": "The names of the shops you give with your purchases — in the shared catalogue, without your name."
       },
       "ratings": {
         "term": "Ratings and reviews",
@@ -1051,7 +1044,7 @@
       "archived_done": "“{name}” put away — find it under “Put away”",
       "offline": "Offline. Balances as of {time} — they'll update when you're back online. Accounts and checks wait for a connection",
       "empty": {
-        "body": "Add cash and cards — balances will follow your spending, income, exchanges and trips"
+        "body": "Add cash and cards — balances will follow your spending, income, exchanges and purchases"
       },
       "error": {
         "title": "Couldn't load accounts"
@@ -1079,7 +1072,7 @@
       "reconcile_out": "spending from a check",
       "reconcile_in": "income from a check",
       "empty": {
-        "body": "Spending, income, exchanges and trips on this account will show up here. For now the balance is the start"
+        "body": "Spending, income, exchanges and purchases on this account will show up here. For now the balance is the start"
       },
       "reconcile": "Check against reality",
       "not_found": "No such account",
@@ -1139,7 +1132,7 @@
       "cause_no_account_exchange": "Exchange {amount} with no account",
       "cause_no_charged": "{title} in {sign} with no “charged”",
       "cause_no_charged_meta": "{amount} · {date} · counted at the day's rate",
-      "cause_trip_unpriced": "Trip on {date} with no total",
+      "cause_trip_unpriced": "Purchases on {date} with no total",
       "cause_trip_unpriced_meta": "{place} · {n} item without a price | {place} · {n} items without a price",
       "no_causes_title": "Looks like some spending wasn't recorded",
       "no_causes_body": "Since {date} every entry {currency} has an account, amounts and “charged” are in place. Think of what you might have paid outside the app",
@@ -1147,13 +1140,13 @@
       "write_out_note": "We'll record spending of {amount} on “{name}”",
       "write_in_note": "We'll record income of {amount} “Other” on “{name}”",
       "recounting": "We will count again once the corrections reach the server",
-      "trips_held": "A trip is waiting for your answer on the Trip tab — record the difference after it: until then the server counts without it",
+      "trips_held": "An entry is waiting for your answer in Purchases — record the difference after it: until then the server counts without it",
       "recounted": "Saved — difference updated",
       "written": "Recorded “Other · check”: {amount}",
       "saved_match": "Check saved",
       "saved_mismatch": "Check saved, a difference remains",
       "note": "check",
-      "cause_no_account_trip": "Trip {amount} with no account",
+      "cause_no_account_trip": "Purchases {amount} with no account",
       "cause_uncounted": "{title} — no rate to count it by",
       "no_other": "The categories did not load — the difference needs “Other” to be recorded",
       "failed": "Couldn’t check the account — try again"
@@ -1163,7 +1156,7 @@
       "row_income": "To account",
       "row_given": "Paid from",
       "row_received": "Received to",
-      "row_trip": "Trip account",
+      "row_trip": "Purchases account",
       "row_open": "Choose account:",
       "none": "No account",
       "none_hint": "Doesn't move any balance",
@@ -1173,8 +1166,8 @@
       "note_loose": "An account in another currency adds a “Charged to account” field",
       "note_strict": "Only accounts {currency}: money comes and goes in the account's currency",
       "note_strict_none": "No accounts {currency} — the entry will have no account",
-      "trip_saved": "Trip account: {name}",
-      "trip_saved_none": "Trip account: none"
+      "trip_saved": "Purchases account: {name}",
+      "trip_saved_none": "Purchases account: none"
     },
     "charged": {
       "label": "Charged to account, {sign}",
@@ -1182,7 +1175,7 @@
       "hint_filled": "“{name}” goes down by exactly {amount}",
       "hint_empty_plain": "Empty — it will be counted at the rate of the day"
     },
-    "trip_hint": "Items without a price don't reduce the balance. Prices are edited in the trip, the account here — the choice saves right away",
+    "trip_hint": "Items without a price don’t reduce the balance. Prices are edited in Purchases, the account here — the choice saves right away",
     "trip_unpriced": "no price",
     "currency_in": {
       "AMD": "in drams",

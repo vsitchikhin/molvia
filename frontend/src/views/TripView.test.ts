@@ -555,7 +555,7 @@ describe('TripView', () => {
       })
       await flushPromises()
 
-      expect(view.text()).toContain('Уже открыт поход в «SAS»')
+      expect(view.text()).toContain('Уже открыта запись в «SAS»')
       // The shops differ, so moving the purchases across is said in words (Р-2, З-4).
       expect(view.text()).toContain('цены одного магазина нельзя записывать другому')
       await button(view, ru.trip.elsewhere.choose).trigger('click')
@@ -584,7 +584,7 @@ describe('TripView', () => {
       })
       await flushPromises()
 
-      expect(view.text()).toContain(`Уже открыт поход в «${open.place.name}»`)
+      expect(view.text()).toContain(`Уже открыта запись в «${open.place.name}»`)
       expect(view.text()).not.toContain('цены одного магазина нельзя записывать другому')
     })
 
@@ -958,7 +958,7 @@ describe('TripView', () => {
       expect(openSheet()).toBeNull()
       expect(queue.pending).toEqual([{ kind: 'delete', tripId: TRIP }])
       expect(view.get('.dock').text()).toContain(ru.purchases.manual)
-      expect(view.get('.dock').text()).toContain('Поход удалён: Ереван Сити')
+      expect(view.get('.dock').text()).toContain('Запись удалена: Ереван Сити')
 
       await button(view, ru.trip.remove.restore).trigger('click')
       await flushPromises()
@@ -1027,7 +1027,7 @@ describe('TripView', () => {
         },
       ]
       await flushPromises()
-      expect(view.text()).toContain('Поход не вернулся: Ереван Сити')
+      expect(view.text()).toContain('Запись не вернулась: Ереван Сити')
       expect(view.text()).toContain(ru.trip.remove.not_restored_open)
     })
 
@@ -1046,7 +1046,7 @@ describe('TripView', () => {
       })
       await flushPromises()
       expect(queue.lastRemoved).toBeNull()
-      expect(view.text()).not.toContain('Поход удалён')
+      expect(view.text()).not.toContain('Запись удалена')
     })
   })
   describe('удалить поход: замечания ревью (MOL-76)', () => {
@@ -1104,7 +1104,7 @@ describe('TripView', () => {
         stamp: Date.now() - 11_000,
       }
       await flushPromises()
-      expect(view.text()).not.toContain('Поход удалён')
+      expect(view.text()).not.toContain('Запись удалена')
       expect(queue.lastRemoved).toBeNull()
     })
 
@@ -1123,7 +1123,7 @@ describe('TripView', () => {
       queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000071'))
       queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000072'))
       await flushPromises()
-      expect(view.text()).toContain('Поход не вернулся: Ереван Сити')
+      expect(view.text()).toContain('Запись не вернулась: Ереван Сити')
       expect(view.text()).toContain('в нём 2 покупки')
       expect(view.text()).not.toContain('ещё не отправлен')
       expect(addExpense).not.toHaveBeenCalled()
