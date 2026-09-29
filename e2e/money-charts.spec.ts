@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import type { Locator, Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -86,17 +87,6 @@ test('the period moves by replace: «назад» from twelve months is «Ден
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
 })
 
-/** Scrolls the page so that the top of the element stands this far below the top of the window. */
-async function standAt(element: Locator, below: number): Promise<void> {
-  await element.evaluate((node, offset) => {
-    window.scrollBy({ top: node.getBoundingClientRect().top - offset, behavior: 'instant' })
-  }, below)
-}
-
-async function topOf(element: Locator): Promise<number> {
-  return element.evaluate((node) => Math.round(node.getBoundingClientRect().top))
-}
-
 // The category card is the third: a choice that took the page to the top took the chart away from
 // the person who asked for it (MOL-136). Where the card stands on the screen is what the eye sees.
 test('a category chosen further down keeps the page where it is, and so does the period', async ({
@@ -109,8 +99,9 @@ test('a category chosen further down keeps the page where it is, and so does the
   const choice = page.getByRole('combobox', { name: 'Категория' })
   await expect(choice.locator('option:checked')).toHaveText('Аренда жилья')
 
-  // The card is the last on the page and cannot reach the top; it stands off the bottom of the page,
-  // so that another category a few pixels shorter does not bring the end of the page up under it.
+  // The card is the last on the page and cannot reach the top; it stands off the bottom of the page.
+  // At the very bottom a shorter card brings the end of the page up under it — 2 px between two
+  // categories, a line where a missing one was named: the height of the page, MOL-138, not the router.
   await standAt(card, 480)
   const scrolled = await page.evaluate(() => window.scrollY)
   expect(scrolled).toBeGreaterThan(0)

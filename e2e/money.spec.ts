@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -166,17 +167,15 @@ test('changing the month keeps the switcher where it was on the screen', async (
   await expect(rows).toHaveCount(12)
 
   const next = page.getByRole('button', { name: 'Следующий месяц' })
-  await next.evaluate((node) => {
-    window.scrollBy({ top: node.getBoundingClientRect().top - 120, behavior: 'instant' })
-  })
+  await standAt(next, 120)
   const scrolled = await page.evaluate(() => window.scrollY)
   expect(scrolled).toBeGreaterThan(0)
-  const before = await next.evaluate((node) => Math.round(node.getBoundingClientRect().top))
+  const before = await topOf(next)
 
   await next.click()
   await expect(page).not.toHaveURL(/month=/)
   await expect(rows).toHaveCount(12)
-  expect(await next.evaluate((node) => Math.round(node.getBoundingClientRect().top))).toBe(before)
+  expect(await topOf(next)).toBe(before)
   expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
 })
 
