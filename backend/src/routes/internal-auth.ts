@@ -4,12 +4,14 @@ import {
   DomainError,
   ERROR,
   confirmLoginSchema,
+  dueRemindersSchema,
   eraseMeSchema,
   loginPreviewCodec,
+  rateFromBotSchema,
 } from '@molvia/model'
-import type { LoginPreview, TelegramUserId } from '@molvia/model'
+import type { DueReminders, LoginPreview, RateFromBot, TelegramUserId } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { parseBody, parseQuery } from '@/parse'
+import { parseBody, parseQuery, resourceId } from '@/parse'
 import { refuseAnyBody } from './empty-body'
 
 export function internalAuthRoutes(
@@ -20,6 +22,8 @@ export function internalAuthRoutes(
     confirm(code: string, telegramUserId: TelegramUserId): Promise<void>
     decline(code: string): Promise<void>
     erase(telegramUserId: TelegramUserId): Promise<void>
+    claimReminders(): Promise<DueReminders>
+    rateFromBot(itemId: string, body: RateFromBot): Promise<void>
   },
 ): void {
   const digest = (value: string): Buffer => createHash('sha256').update(value).digest()
@@ -66,6 +70,21 @@ export function internalAuthRoutes(
       await api.erase(body.telegramUserId)
       return reply.code(204).send()
     })
+    // The rating reminder (MOL-101): the bot asks for what is due and sends it, and a press of
+    // 1–5 under it rates for the account that pressed — the same caller, the same secret.
+    scope.post('/internal/reminders/claim', { onRequest: refuseAnyBody }, async (request) => {
+      parseQuery(z.strictObject({}), request.query)
+      return dueRemindersSchema.parse(await api.claimReminders())
+    })
+    scope.put<{ Params: { itemId: string } }>(
+      '/internal/verdicts/:itemId',
+      async (request, reply) => {
+        parseQuery(z.strictObject({}), request.query)
+        const itemId = resourceId(request.params.itemId)
+        await api.rateFromBot(itemId, parseBody(rateFromBotSchema, request.body))
+        return reply.code(204).send()
+      },
+    )
     done()
   })
 }

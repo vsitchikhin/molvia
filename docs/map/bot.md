@@ -8,6 +8,13 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 - `packages/model/src/contracts/reminder.ts` — Wire contract of the rating reminder (MOL-101): what a claim hands the bot — the chat, up to three items with place and days ago, the total — and the body of a press of 1–5.
 - `packages/model/src/entities/reminder.ts` — The reminder's ladder (MOL-101): 19:00 to 22:00 of the person's day, three items, steps after 3 and 7 days, a six-month pause, and `planReminder` deciding which step is due.
 
+## backend
+
+- `backend/src/db/reminders-repository.ts` — Repository of the rating reminder (MOL-101): everyone with their ladder, the claim that moves the ladder only if it still stands where it was found, and the counters of `reminder_days`.
+- `backend/src/usecases/rate-from-bot.ts` — Use case of a press of 1–5 under a reminder: the owner by the Telegram account that pressed, then `rateItem`; a new verdict is counted.
+- `backend/src/usecases/remind-ratings.ts` — Use case «Напомнить об оценке»: whose evening it is in their zone, which step `planReminder` says, and what the claim hands the bot.
+- `backend/tests/reminders.integration.test.ts` — Integration test: the evening's hour and day, the ladder with the owner's example, MOL-29, the counters, and the bot's two internal routes.
+
 ## packages/client
 
 - `packages/client/src/bot.ts` — The bot's API client: preview, confirm and decline a login, and erase a person, over the internal channel with the bot secret. Tests: `packages/client/src/auth.test.ts`.

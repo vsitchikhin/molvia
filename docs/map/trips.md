@@ -32,7 +32,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 
 ## backend · db
 
-- `backend/src/db/expenses-repository.ts` — Repository of purchases: rows of a trip, unrated ones, and the price queries (cheapest, median) «Что брать» reads.
+- `backend/src/db/expenses-repository.ts` — Repository of purchases: rows of a trip, unrated ones — for the reminder, by days and not before a withdrawal (MOL-101) — and the price queries (cheapest, median) «Что брать» reads.
 - `backend/src/db/places-repository.ts` — Repository of places: `ensure` one shop per name, reads by id, and the person's recent places.
 - `backend/src/db/settings-repository.ts` — Repository of the settings: one conditional `UPDATE` of the actor row against the form's base. Tests: `backend/tests/settings.integration.test.ts`.
 - `backend/src/db/trips-repository.ts` — Repository of trips: start, lock, current, history page with each row's count and sums, finish, rate choice, mark, restore, purge. Tests: `backend/tests/trip-rules.integration.test.ts`.

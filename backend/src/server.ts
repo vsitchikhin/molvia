@@ -34,7 +34,9 @@ import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
 import { recentPlaces } from '@/usecases/recent-places'
+import { rateFromBot } from '@/usecases/rate-from-bot'
 import { rateItem } from '@/usecases/rate-item'
+import { remindRatings } from '@/usecases/remind-ratings'
 import { amendVerdict } from '@/usecases/amend-verdict'
 import { withdrawVerdict } from '@/usecases/withdraw-verdict'
 import { pendingVerdicts } from '@/usecases/pending-verdicts'
@@ -101,6 +103,7 @@ import { createItemRepository } from '@/db/items-repository'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
+import { createReminderRepository } from '@/db/reminders-repository'
 import { describeFailure } from '@/db/failure'
 import { authTransactOn } from '@/db/auth-unit-of-work'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
@@ -395,6 +398,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const transact = transactOn(db)
     const sessions = createSessionRepository(db)
     const verdicts = createVerdictRepository(db)
+    const reminders = createReminderRepository(db)
 
     healthRoutes(instance, { databaseIsReachable })
     const login = options.login === undefined ? loginConfig : options.login
@@ -412,6 +416,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       confirm: (code, telegramId) => confirmLogin(loginRequests, code, telegramId),
       decline: (code) => declineLogin(loginRequests, code),
       erase: (telegramUserId) => eraseMe(createErasureRepository(db), telegramUserId),
+      claimReminders: () => remindRatings(reminders, new Date()),
+      rateFromBot: (itemId, body) =>
+        rateFromBot({ actors, items, verdicts, reminders }, itemId, body),
     })
 
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).
