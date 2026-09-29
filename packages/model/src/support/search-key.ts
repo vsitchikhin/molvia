@@ -281,6 +281,32 @@ export function toSearchKey(text: string): string {
 }
 
 /**
+ * Proper starts of the Latin folds, and `c`, which the letter after it decides: a word typed up to
+ * one of them has not said yet which letter it is — `k` may be `kh`, `shc` may be `shch`.
+ */
+const UNFINISHED_FOLDS: ReadonlySet<string> = new Set([
+  ...LATIN_FOLDS.flatMap(([from]) =>
+    Array.from({ length: from.length - 1 }, (_, n) => from.slice(0, n + 1)),
+  ),
+  'c',
+])
+const LONGEST_UNFINISHED = Math.max(...[...UNFINISHED_FOLDS].map((start) => start.length))
+
+/**
+ * A word as typed so far, without a Latin tail the next keystroke may still fold into another
+ * letter — `hachapuri` is the key of «Хачапури», and `k` is not its start until `kh` is typed
+ * (MOL-128, review Р-23). Null when nothing at the end is unfinished. For the start of a word
+ * searched on the phone only; the key itself is `toSearchKey`'s.
+ */
+export function withoutUnfinishedFold(word: string): string | null {
+  const lower = word.toLocaleLowerCase()
+  for (let size = Math.min(LONGEST_UNFINISHED, lower.length); size > 0; size -= 1) {
+    if (UNFINISHED_FOLDS.has(lower.slice(-size))) return lower.slice(0, -size)
+  }
+  return null
+}
+
+/**
  * Exported for exactly one reason: the tables are frozen, so an edit to them is a migration
  * with a recompute, and the test that holds them has to walk the real keys instead of a list
  * copied beside it. With a copied list a row *added* to the source is invisible — only a

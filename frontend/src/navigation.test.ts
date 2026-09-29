@@ -309,6 +309,28 @@ describe('a tab tapped on a nested screen', () => {
     expect(router.currentRoute.value.fullPath).toBe('/purchases')
     expect(router.options.history.state.back).toBe('/')
   })
+
+  // Review Р-24: a step that never landed — its pop eaten by a sheet's guard — left the tab
+  // waiting for any later move off the record, and the tab then opened by itself.
+  it('a step that never moved leaves nothing to fire on a later move', async () => {
+    const router = await fresh('/')
+    const tap = bar(router)
+    await tap(PURCHASES)
+    await router.push('/purchases/manual')
+    const go = vi.spyOn(router, 'go').mockImplementation(() => undefined)
+
+    const tabs = mount(TabBar, {
+      global: { plugins: [router, createPinia(), createAppI18n('en')] },
+    })
+    await tabs.findAll('.tab')[HOME]?.trigger('click', { button: 0 })
+    // The step's own timer, then the tab's deadline.
+    await new Promise((resolve) => setTimeout(resolve, 2100))
+    go.mockRestore()
+
+    await router.push('/purchases/manual/add')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(router.currentRoute.value.name).toBe('item-search')
+  })
 })
 
 describe('the tab bar walks the history as В-2 decided', () => {

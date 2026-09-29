@@ -219,12 +219,20 @@ export function useNavigation(): {
     // as «from no section», a tab replaced the nested screen and left its section underneath —
     // every round of the shop, «Покупки → запись → Что брать», two more entries before «back»
     // left the app.
+    //
+    // The tab follows the router's move off this screen, and only that move (review Р-24): a pop
+    // eaten by a sheet's guard, or a step that never lands, must not leave it to fire on a later,
+    // unrelated move. Without a view transition the router finishes inside its own `popstate`,
+    // before the step is counted as landed — so the tab waits for that too (`afterStep`).
     if (!route.meta.tab && backTarget(router, route)?.step) {
-      const stop = router.afterEach(() => {
+      const leaving = route.fullPath
+      const stop = router.afterEach((_to, from, failure) => {
+        if (from.fullPath !== leaving) return
         stop()
-        void goTab(to)
+        if (!failure) afterStep(() => void goTab(to))
       })
       stepBack(router)
+      afterStep(() => window.setTimeout(stop, 1000))
       return
     }
     const nested = !route.meta.tab

@@ -355,6 +355,57 @@ describe('TripView', () => {
     expect(sheet?.textContent).toContain(ru.item.save_edit)
   })
 
+  // Review Р-7: the record may end under a sheet — finished on another phone — and nothing else
+  // would take the screen up once the sheet is away.
+  describe('запись закончилась под шторкой (Р-7)', () => {
+    const closeSheet = async () => {
+      document.body
+        .querySelector<HTMLButtonElement>(`dialog[open] button[aria-label="${ru.sheet.close}"]`)
+        ?.click()
+      await vi.waitFor(() => {
+        expect(document.body.querySelector('dialog[open]')).toBeNull()
+      })
+    }
+
+    it('под шторкой покупки экран стоит, а без неё уходит на «Покупки»', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      const { view, router, trips } = await render()
+      await view.findAll('.row')[1]?.trigger('click')
+      await flushPromises()
+      clock += 1000
+
+      trips.closed(TRIP)
+      await flushPromises()
+      expect(router.currentRoute.value.name).toBe('purchase-manual')
+
+      await closeSheet()
+      await vi.waitFor(() => {
+        expect(router.currentRoute.value.name).toBe('purchases')
+      })
+    })
+
+    it('и под шторкой «Поправить» из того, что говорит очередь', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      addExpense.mockRejectedValue(new ApiError(ERROR.INVALID_AMOUNT, undefined, true))
+      const { view, router, trips, queue } = await render()
+      queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000003'))
+      await queue.flush()
+      await flushPromises()
+      await button(view, ru.trip.rejected.fix).trigger('click')
+      await flushPromises()
+      clock += 1000
+
+      trips.closed(TRIP)
+      await flushPromises()
+      expect(router.currentRoute.value.name).toBe('purchase-manual')
+
+      await closeSheet()
+      await vi.waitFor(() => {
+        expect(router.currentRoute.value.name).toBe('purchases')
+      })
+    })
+  })
+
   describe('очередь на экране', () => {
     it('правка ещё не ушедшей покупки заменяет её, а не добавляет вторую', async () => {
       currentTrip.mockResolvedValue(trip())

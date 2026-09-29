@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { RouterView, createRouter, createWebHistory } from 'vue-router'
-import { parseMoney, tripViewCodec } from '@molvia/model'
+import { currentTripResponseSchema, parseMoney, tripViewCodec } from '@molvia/model'
 import type {
+  AdviceResponse,
   PendingVerdicts,
   TripHistory,
   TripHistoryEntry,
@@ -20,14 +21,17 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 const tripHistory = vi.fn<() => Promise<TripHistory>>()
 const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
 const currentTrip = vi.fn<() => Promise<TripViewModel | null>>()
+const advice = vi.fn<() => Promise<AdviceResponse>>()
 vi.mock('@/api', () => ({
   api: {
+    advice: () => advice(),
     tripHistory: () => tripHistory(),
     pendingVerdicts: () => pendingVerdicts(),
     currentTrip: () => currentTrip(),
     recentPlaces: () => Promise.resolve([]),
     startTrip: () => new Promise(() => undefined),
     finishTrip: () => new Promise(() => undefined),
+    removeTrip: () => new Promise(() => undefined),
     addExpense: () => new Promise(() => undefined),
   },
 }))
@@ -49,7 +53,8 @@ function trip(n: number, name = 'Ереван Сити'): TripHistoryEntry {
   }
 }
 
-function openTrip(): TripViewModel {
+/** The record at «Рынок», with `bought` purchases in it. */
+function openTrip(bought = 0): TripViewModel {
   return tripViewCodec.parse({
     id: OPEN,
     startedAt: new Date().toISOString(),
@@ -60,8 +65,22 @@ function openTrip(): TripViewModel {
     rateJump: null,
     rateStale: false,
     place: { id: PLACE, kind: 'store', name: 'Рынок' },
-    expenses: [],
-    total: [],
+    expenses: Array.from({ length: bought }, (_, n) => ({
+      id: `eeeeeeee-0000-4000-8000-00000000000${String(n)}`,
+      createdAt: new Date().toISOString(),
+      item: {
+        id: `dddddddd-0000-4000-8000-00000000000${String(n)}`,
+        kind: 'product',
+        name: `Товар ${String(n)}`,
+        note: null,
+        defaultUnit: 'piece',
+        typicalQuantity: null,
+      },
+      quantity: null,
+      amount: { amount: '500.00', currency: 'AMD' },
+      unitPrice: null,
+    })),
+    total: bought > 0 ? [{ amount: `${String(bought * 500)}.00`, currency: 'AMD' }] : [],
     converted: null,
   })
 }
@@ -96,7 +115,10 @@ const mounted: VueWrapper[] = []
 /** The app as far as screens go: whichever the router is on. */
 const App = defineComponent(() => () => h(RouterView))
 
-async function render({ before }: { before?: () => void } = {}) {
+async function render({
+  before,
+  path = '/purchases',
+}: { before?: () => void; path?: string } = {}) {
   localStorage.setItem('molvia.actor', ME)
   localStorage.setItem(
     `molvia.settings.${ME}`,
@@ -108,7 +130,7 @@ async function render({ before }: { before?: () => void } = {}) {
   before?.()
   window.history.replaceState(null, '', '/')
   const router = createRouter({ history: createWebHistory(), routes })
-  await router.push('/purchases')
+  await router.push(path)
   const view = mount(App, {
     global: { plugins: [router, pinia, createAppI18n('ru')] },
     attachTo: document.body,
@@ -161,6 +183,13 @@ describe('PurchasesView (MOL-128)', () => {
     pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
     currentTrip.mockReset()
     currentTrip.mockResolvedValue(null)
+    advice.mockReset()
+    advice.mockResolvedValue({
+      geography: { country: 'AM', city: 'Гюмри' },
+      scope: 'own',
+      rows: [],
+      total: 0,
+    })
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     clock = 0
     vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -592,6 +621,80 @@ describe('PurchasesView (MOL-128)', () => {
 
       expect(queue.pending).toEqual([])
       expect(view.get('.open').text()).toContain('Рынок')
+    })
+
+    /** «Записать покупки» → «Закончить и начать новую» → «Где вы?» at `place`. */
+    async function replaceWith(view: VueWrapper, place: string, asked?: () => void): Promise<void> {
+      await view.get('.dock button').trigger('click')
+      await flushPromises()
+      clock += 1000
+      expect(openSheet()?.textContent).toContain('Уже записываете «Рынок»')
+      inside(openSheet(), ru.purchases.manual_ask.finish).click()
+      await vi.waitFor(() => {
+        expect(openSheet()?.textContent).toContain(ru.trip.start.title)
+      })
+      await flushPromises()
+      asked?.()
+      const sheet = openSheet()
+      const field = sheet?.querySelector('input')
+      if (!field) throw new Error('нет поля места')
+      field.value = place
+      field.dispatchEvent(new Event('input'))
+      await flushPromises()
+      clock += 1000
+      inside(sheet, ru.trip.none.action).click()
+      await flushPromises()
+    }
+
+    it('a record with purchases is finished, before the start (Р-25)', async () => {
+      currentTrip.mockResolvedValue(openTrip(3))
+      const { view, queue } = await render()
+      await replaceWith(view, 'SAS')
+      expect(queue.pending.map((write) => write.kind)).toEqual(['finish', 'start'])
+    })
+
+    // The phone saw the record empty; three purchases went in from another phone. «Что брать»
+    // never asks for the record, so «empty» is asked of the server at the choice (Р-21).
+    it('on «Что брать» a record remembered empty is asked for, and finished (Р-21)', async () => {
+      currentTrip.mockResolvedValue(openTrip(3))
+      const { view, queue } = await render({
+        path: '/',
+        before: () => {
+          localStorage.setItem(
+            `molvia.trip.${ME}`,
+            JSON.stringify(currentTripResponseSchema.encode({ trip: openTrip() })),
+          )
+        },
+      })
+      expect(currentTrip).not.toHaveBeenCalled()
+      await replaceWith(view, 'SAS', () => {
+        expect(currentTrip).toHaveBeenCalledTimes(1)
+      })
+      expect(queue.pending.map((write) => write.kind)).toEqual(['finish', 'start'])
+    })
+
+    it('with no answer at the choice an empty record is finished, not removed (Р-21)', async () => {
+      currentTrip.mockResolvedValueOnce(openTrip())
+      currentTrip.mockRejectedValue(new TypeError('Failed to fetch'))
+      const { view, queue } = await render()
+      await replaceWith(view, 'SAS')
+      expect(queue.pending.map((write) => write.kind)).toEqual(['finish', 'start'])
+    })
+
+    it('a record started here and not yet sent needs no answer to be removed', async () => {
+      const { view, queue } = await render()
+      queue.enqueue({
+        kind: 'start',
+        tripId: OPEN,
+        place: { kind: 'store', name: 'Рынок' },
+        startedAt: new Date(),
+      })
+      await flushPromises()
+      currentTrip.mockClear()
+      await replaceWith(view, 'SAS', () => {
+        expect(currentTrip).not.toHaveBeenCalled()
+      })
+      expect(queue.pending.map((write) => write.kind)).toEqual(['delete', 'start'])
     })
   })
 

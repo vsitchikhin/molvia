@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SEARCH_KEY_TABLES, toSearchKey } from '#model/support/search-key'
+import { SEARCH_KEY_TABLES, toSearchKey, withoutUnfinishedFold } from '#model/support/search-key'
 import { INVISIBLE, visibleLine } from '#model/support/text'
 
 describe('toSearchKey', () => {
@@ -429,5 +429,33 @@ describe('пределы, записанные явно', () => {
   it('не переходит границу слова', () => {
     // Typing a name without the space is ordinary on a phone, and the key keeps the space.
     expect(toSearchKey('кокакола')).not.toBe(toSearchKey('Кока-кола'))
+  })
+})
+
+// Review Р-23 (MOL-128): the phone's offline filter keeps a word whose Latin tail may still fold.
+describe('withoutUnfinishedFold', () => {
+  it('cuts the start of a fold, the longest first', () => {
+    expect(withoutUnfinishedFold('k')).toBe('')
+    expect(withoutUnfinishedFold('bors')).toBe('bor')
+    expect(withoutUnfinishedFold('shc')).toBe('')
+    expect(withoutUnfinishedFold('Z')).toBe('')
+    expect(withoutUnfinishedFold('p')).toBe('')
+    expect(withoutUnfinishedFold('c')).toBe('')
+  })
+
+  it('must not fire: a fold finished, a letter that folds alone, Cyrillic', () => {
+    expect(withoutUnfinishedFold('kh')).toBeNull()
+    expect(withoutUnfinishedFold('shch')).toBeNull()
+    expect(withoutUnfinishedFold('x')).toBeNull()
+    expect(withoutUnfinishedFold('сыр')).toBeNull()
+    expect(withoutUnfinishedFold('')).toBeNull()
+  })
+
+  it('every start of every fold is one, so a fold added is held too', () => {
+    for (const [from] of SEARCH_KEY_TABLES.latinFolds) {
+      for (let size = 1; size < from.length; size += 1) {
+        expect(withoutUnfinishedFold(from.slice(0, size))).toBe('')
+      }
+    }
   })
 })

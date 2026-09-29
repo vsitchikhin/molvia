@@ -1,6 +1,6 @@
 import { onUnmounted, ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
-import { drawsNothing, toSearchKey } from '@molvia/model'
+import { drawsNothing, toSearchKey, withoutUnfinishedFold } from '@molvia/model'
 import type { AdviceFound, AdviceResponse, AdviceScope } from '@molvia/model'
 import { api } from '@/api'
 import { SEARCH_DEBOUNCE_MS } from '@/composables/useCatalogueSearch'
@@ -73,11 +73,20 @@ function starts(part: string, word: string): boolean {
  */
 export function searchRemembered(rows: AdviceResponse['rows'], text: string): AdviceFound[] {
   const asked = words(text)
-  if (asked.length === 0) return []
+  const last = asked.at(-1)
+  if (last === undefined) return []
+  // The word still being typed may end halfway through a Latin fold — «k» of «kh» — and is held to
+  // what was typed before it, or a row went missing for one keystroke (review Р-23).
+  const held = /\S$/u.test(text) ? withoutUnfinishedFold(last) : null
   return rows
     .filter((row) => {
       const name = words(row.name)
-      return asked.every((word) => name.some((part) => starts(part, word)))
+      return asked.every((word, n) =>
+        name.some(
+          (part) =>
+            starts(part, word) || (n === asked.length - 1 && held !== null && starts(part, held)),
+        ),
+      )
     })
     .map((row) => ({ itemId: row.itemId, name: row.name, advice: row }))
 }
@@ -183,7 +192,7 @@ export function useAdviceSearch(
 
   function refresh(): void {
     if (drawsNothing(query.value)) return
-    if (phase.value === 'ready' || phase.value === 'far' || phase.value === 'empty') {
+    if (['ready', 'far', 'empty', 'memory'].includes(phase.value)) {
       stale.value = true
       void run(query.value)
     } else retry()

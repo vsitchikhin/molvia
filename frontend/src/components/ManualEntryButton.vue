@@ -42,6 +42,7 @@ import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useTripRows } from '@/composables/useTripRows'
 import { purchaseDay, timeOfDay } from '@/days'
 import { afterStep } from '@/navigation'
+import { useTripStore } from '@/stores/trip'
 
 /**
  * «Записать покупки» (MOL-128, В-5): the one way into a record typed by hand, on «Покупки» and on
@@ -62,6 +63,7 @@ export default defineComponent({
   setup(_props, { emit }) {
     const { t, locale } = useI18n()
     const router = useRouter()
+    const trips = useTripStore()
     const { trip, local, tripId } = useCurrentTrip()
     const { rows } = useTripRows(tripId, trip, () => '')
     /** The record «Закончить и начать новую» puts away — only once the new one starts (Р-2). */
@@ -109,15 +111,35 @@ export default defineComponent({
       // «Закончить и начать новую» puts nothing away yet: «Где вы?» may still be dismissed, and
       // then the open record stays as it was. The start itself ends it (Р-2).
       const id = tripId.value
+      // A record started on this phone and not yet sent has nothing anywhere else to hold.
+      const unsent = local.value?.id === id
       replacing.value =
         choice === 'anew' && id !== null
-          ? {
-              tripId: id,
-              place: open.value?.place ?? '',
-              empty: rows.value.every((row) => row.mark === 'removing'),
-            }
+          ? { tripId: id, place: open.value?.place ?? '', empty: unsent && isEmpty() }
           : null
+      if (replacing.value && !unsent) void emptyAsked(replacing.value.tripId)
       asking.value = false
+    }
+
+    /**
+     * «Empty, so remove» is decided by the server's answer, asked now (review Р-21): the phone's
+     * memory of the record may be older than purchases added on another device, and «Что брать»
+     * never asks for it. Until the answer comes, or with none, the record is finished — a finished
+     * empty record is a row of nothing, a removed full one loses its purchases.
+     */
+    async function emptyAsked(id: string): Promise<void> {
+      try {
+        await trips.load()
+      } catch {
+        return
+      }
+      const old = replacing.value
+      if (old?.tripId !== id || trips.current?.id !== id) return
+      replacing.value = { ...old, empty: isEmpty() }
+    }
+
+    function isEmpty(): boolean {
+      return rows.value.every((row) => row.mark === 'removing')
     }
 
     // Every move follows the step back of the sheet that asked for it (`afterStep`): the sheet is

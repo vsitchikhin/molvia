@@ -66,6 +66,32 @@ describe('searchRemembered — the list on the phone, searched with no connectio
     expect(find('matsun')).toEqual(['Мацун'])
   })
 
+  // Review Р-23: a Latin letter that may still fold — «k» of «kh», «shc» of «shch» — keeps
+  // what was found before it, rather than losing a row for one keystroke.
+  it('a word typed halfway through a Latin fold keeps the rows it had', () => {
+    const more = [
+      row('cccccccc-0000-4000-8000-000000000008', 'Хачапури'),
+      row('cccccccc-0000-4000-8000-000000000009', 'Щи'),
+      row('cccccccc-0000-4000-8000-00000000000a', 'Жижиг'),
+      row('cccccccc-0000-4000-8000-00000000000b', 'Цахтон'),
+      row('cccccccc-0000-4000-8000-00000000000c', 'Сыр Чечил'),
+    ]
+    const find = (text: string) => searchRemembered(more, text).map((found) => found.name)
+    expect(find('k')).toContain('Хачапури')
+    expect(find('kh')).toEqual(['Хачапури'])
+    expect(find('shc')).toContain('Щи')
+    expect(find('z')).toContain('Жижиг')
+    expect(find('c')).toEqual(expect.arrayContaining(['Цахтон', 'Сыр Чечил']))
+    expect(find('сыр c')).toEqual(['Сыр Чечил'])
+  })
+
+  it('must not fire: a word finished with a space, or one not the last', () => {
+    const more = [row('cccccccc-0000-4000-8000-000000000008', 'Хачапури')]
+    const find = (text: string) => searchRemembered(more, text).map((found) => found.name)
+    expect(find('k ')).toEqual([])
+    expect(find('k хач')).toEqual([])
+  })
+
   it('nothing typed that draws finds nothing, not everything', () => {
     expect(names('   ')).toEqual([])
   })
@@ -192,5 +218,29 @@ describe('useAdviceSearch — the rhythm', () => {
     await vi.waitFor(() => {
       expect(search.found.value[0]?.name).toBe('from the server')
     })
+  })
+
+  // Review, second pass: a verdict saved from a row the phone found asked again through `retry`,
+  // and the skeleton stood in for the rows a moment.
+  it('asked again over the phone`s answer, the rows stay, dimmed, until the server`s', async () => {
+    online(false)
+    const out = held<AdviceSearchResponse>()
+    adviceSearch.mockReturnValueOnce(out.promise)
+    const { query, search } = harness()
+    query.value = 'сыр'
+    await flushPromises()
+    expect(search.phase.value).toBe('memory')
+
+    online(true)
+    search.refresh()
+    expect(search.phase.value).toBe('memory')
+    expect(search.stale.value).toBe(true)
+    expect(search.found.value.map((found) => found.name)).toEqual(['Сыр Лори'])
+
+    out.resolve(answer('from the server'))
+    await vi.waitFor(() => {
+      expect(search.found.value[0]?.name).toBe('from the server')
+    })
+    expect(search.stale.value).toBe(false)
   })
 })
