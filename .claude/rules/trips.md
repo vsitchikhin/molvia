@@ -151,7 +151,9 @@ of nothing (MOL-76, В-2). **«Empty» is the server's answer, asked at the choi
 phone's memory may predate purchases added on another device, and «Что брать» never asks for the
 record; until the answer comes, or with none, the record is finished — a finished empty record is a
 row of nothing, a removed full one loses its purchases once «Вернуть» is over. A record started here
-and not yet sent has nothing elsewhere and needs no answer. **Every sheet over the record asks it to leave once it is away** — the
+and not yet sent has nothing elsewhere and needs no answer. **A purchase the server refused is a
+purchase** (adversarial М): it waits on «Покупки» to be put right, a removal would take it along, so
+a record holding one is finished. **Every sheet over the record asks it to leave once it is away** — the
 purchase's, the queue's notices' (review Р-7): the record may end under any of them. With receipts (MOL-127) it becomes «Записать вручную».
 
 **What the queue says about any record is said on both screens** (`TripNotices`): purchases the

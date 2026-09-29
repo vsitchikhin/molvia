@@ -238,9 +238,11 @@ only ever answer «not rated yet», and would teach that it is useless).
   out — so transliteration holds, «дет» starts «Детское» (`deцkoe`) and «mat» starts «Мацун», and
   typos and synonyms, which are Postgres's, do not (review Р-9). The word still being typed may
   end halfway through a Latin fold — «k» of «kh», «shc» of «shch», «c» the next letter decides — and
-  is held to what came before that tail (`withoutUnfinishedFold`, review Р-23): «Хачапури» is
-  `hachapuri`, and «k» dropped it for one keystroke. The tails are read from the key's own table,
-  never copied. «yo» against «Ёжик» (`ejik`) is the key's rule, not the filter's. The strip says the
+  is also the start of what that tail may still become (`unfinishedFoldSpellings`, review Р-23):
+  «Хачапури» is `hachapuri`, and «k» dropped it for one keystroke. The tail is spelt out, never cut
+  off: cut, «k» started every name and «sok» found «Соль» (review Р-26, adversarial Н). The tails are
+  read from the key's own table, never copied. «yo» against «Ёжик» (`ejik`) is the key's rule, not
+  the filter's. The strip says the
   search is the list's only, as of its age.
 
 ## A withdrawn verdict
