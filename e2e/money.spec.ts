@@ -354,8 +354,12 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
 
 /**
  * Stands in for the iOS keyboard, which no Playwright browser has: the visual viewport is replaced
- * before the app loads, and `keyboard(covered, pan)` moves it as iOS does — the keys cover the
- * bottom `covered` px of the window, and what is visible has been scrolled `pan` px down it.
+ * before the app loads, and `keyboard(covered, pan)` moves it — the keys cover the bottom `covered`
+ * px of the window, and what is visible has been scrolled `pan` px down it. Not what Safari was
+ * measured doing (MOL-135): it shrinks the window to the visible part and leaves `dvh` — which a
+ * Chromium window cannot, since its `dvh` shrinks along. A scroll down an unshrunk window is
+ * another geometry with the same fault: a sheet sized from `dvh` is taller than what is visible.
+ * The measured numbers are held by «takes what Safari leaves visible…» in `useKeyboardInset.test`.
  */
 async function fakeKeyboard(page: Page): Promise<(covered: number, pan: number) => Promise<void>> {
   await page.addInitScript(() => {
@@ -413,10 +417,9 @@ async function within(page: Page, selector: string, covered: number, pan: number
   )
 }
 
-// The sum is focused while the sheet still rises — below the screen — and iOS scrolls what is
-// visible down the window by the keyboard's height before the keys are up. The sheet counted as
-// visible what was scrolled past, and its top went off the screen with the sum (MOL-135).
-test('the spending sheet stays in sight over a keyboard iOS scrolled to (MOL-135)', async ({
+// The sheet's height was a share of `dvh`, which the keyboard does not change: with what is visible
+// scrolled down the window, the top went off the screen with the sum (MOL-135).
+test('the spending sheet stays in what is visible over the keyboard (MOL-135)', async ({
   page,
 }) => {
   const keyboard = await fakeKeyboard(page)
@@ -433,19 +436,46 @@ test('the spending sheet stays in sight over a keyboard iOS scrolled to (MOL-135
     top: true,
     bottom: true,
   })
+})
 
-  // A field near the end of the sheet, focused with the keys up, is brought into sight inside it.
+// A field focused with the keys down is in sight at the bottom of the tall sheet; the keys come up,
+// the sheet is made lower from the top down, and the field is left under its edge — the sheet
+// scrolls to it, not the window. The browser's own focus has done its part before, so only the
+// sheet's scroll can pass this (review С-2).
+test('the field typed in stays in sight as the keyboard makes the sheet lower (MOL-135)', async ({
+  page,
+}) => {
+  const keyboard = await fakeKeyboard(page)
+  await openMoney(page)
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  const sheet = page.locator('dialog[open]')
+  await expect(sheet).toContainText('Новая трата')
+  await page.waitForTimeout(400)
+
+  // Focused where a person left it: at the very bottom of the tall sheet, as a tap there leaves it.
+  // Not by `focus()` alone — Chromium would centre it, and the lower sheet would still show it.
   const note = sheet.getByLabel(/Что это/)
-  await note.focus()
-  const place = await note.evaluate((field) => {
-    const box = field.closest('dialog')!.getBoundingClientRect()
-    const own = field.getBoundingClientRect()
-    return {
-      inside: own.top >= box.top && own.bottom <= box.bottom,
-      scrolled: field.closest('dialog')!.scrollTop,
-    }
+  await note.evaluate((field) => {
+    field.focus({ preventScroll: true })
+    const dialog = field.closest('dialog')
+    if (!dialog) throw new Error('the field is not in a sheet')
+    dialog.scrollTop +=
+      field.getBoundingClientRect().bottom - dialog.getBoundingClientRect().bottom + 8
   })
-  expect(place.inside).toBe(true)
-  expect(place.scrolled).toBeGreaterThan(0)
+  const place = () =>
+    note.evaluate((field) => {
+      const dialog = field.closest('dialog')
+      if (!dialog) throw new Error('the field is not in a sheet')
+      const box = dialog.getBoundingClientRect()
+      const own = field.getBoundingClientRect()
+      return { inside: own.top >= box.top && own.bottom <= box.bottom, scrolled: dialog.scrollTop }
+    })
+  const before = await place()
+  expect(before.inside).toBe(true)
+
+  await keyboard(0, 300)
+  const after = await place()
+  expect(after.inside).toBe(true)
+  expect(after.scrolled).toBeGreaterThan(before.scrolled)
   expect(await page.evaluate(() => window.scrollY)).toBe(0)
 })
