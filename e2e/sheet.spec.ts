@@ -83,7 +83,14 @@ async function openSheet(page: Page): Promise<{ top: number; length: number }> {
   const length = await historyLength(page)
   await opener(page).click()
   await expect(sheet(page)).toBeVisible()
-  // Until it has come up the sheet takes no tap — the second of a double tap (Б-5).
+  // Until it has come up the sheet takes no tap — the second of a double tap (Б-5) — and «up» is
+  // the end of its rise, not a clock (MOL-69). Headless WebKit on Linux draws some twenty frames
+  // a second, and the 220 ms rise ended there after 800: a tap on the scrim at a fixed 400 ms was
+  // held as the opener's second tap (MOL-80, CI). The wait past it stands for the double tap's
+  // floor.
+  await sheet(page).evaluate(async (dialog) => {
+    await Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished))
+  })
   await page.waitForTimeout(400)
   return { top, length }
 }
