@@ -32,7 +32,11 @@ function host(active = false) {
   const view = mount(
     defineComponent(() => {
       useKeyboardInset(target, on)
-      return () => h('div', { ref: target }, [h('input', { 'data-field': '' })])
+      return () =>
+        h('div', { ref: target }, [
+          h('input', { 'data-field': '' }),
+          h('div', { 'data-block': '', tabindex: -1 }),
+        ])
     }),
     { attachTo: document.body },
   )
@@ -43,10 +47,15 @@ function host(active = false) {
 }
 
 /** The sheet's box and a field in it, as the layout would place them at a scroll of 100. */
-function placed(view: ReturnType<typeof host>['view'], box: Box, field: Box) {
+function placed(
+  view: ReturnType<typeof host>['view'],
+  box: Box,
+  field: Box,
+  which = '[data-field]',
+) {
   const sheet = view.element as HTMLElement
-  const input = sheet.querySelector<HTMLElement>('[data-field]')
-  if (!input) throw new Error('no field in the sheet')
+  const input = sheet.querySelector<HTMLElement>(which)
+  if (!input) throw new Error(`no ${which} in the sheet`)
   sheet.scrollTop = 100
   sheet.getBoundingClientRect = () => rect(box)
   // The field moves up as the sheet's content scrolls down.
@@ -219,6 +228,12 @@ describe('useKeyboardInset keeps the focused field in sight', () => {
     expect(sheet.scrollTop).toBe(101)
   })
 
+  // A scroll lands on whole pixels: 21.4 scrolled as 21 left the field 0.4px under the edge.
+  it('scrolls a fraction under the edge by the whole pixel above it', async () => {
+    const { sheet } = await typing({ top: 481.4, bottom: 521.4 })
+    expect(sheet.scrollTop).toBe(122)
+  })
+
   it('must not fire: a field whose end is the sheet’s edge', async () => {
     const { sheet } = await typing({ top: 460, bottom: 500 })
     expect(sheet.scrollTop).toBe(100)
@@ -234,16 +249,66 @@ describe('useKeyboardInset keeps the focused field in sight', () => {
     expect(sheet.scrollTop).toBe(70)
   })
 
-  it('reveals a field as it takes the focus, the keyboard already up', async () => {
-    const viewport = fakeViewport(500)
+  // Its top first: the label and where typing starts, not the end of a field lower than the sheet.
+  it('brings the top of a field under the edge to the sheet’s top, and no further', async () => {
+    const { sheet } = await typing({ top: 330, bottom: 560 })
+    expect(sheet.scrollTop).toBe(130)
+  })
+
+  // The browser keeps the caret of a field taller than the sheet in sight as it is typed.
+  it('must not fire: a field over both edges of the sheet', async () => {
+    const { sheet } = await typing({ top: 250, bottom: 560 })
+    expect(sheet.scrollTop).toBe(100)
+  })
+
+  // Done once more, it moves nothing: two answers for one field flipped the sheet between them
+  // on every event of the viewport (adversarial А3).
+  it('must not fire: the sheet moved again with the field already in sight', async () => {
+    const { sheet, viewport } = await typing({ top: 481, bottom: 521 })
+    expect(sheet.scrollTop).toBe(121)
+    viewport.height = 499
+    viewport.fire('resize')
+    expect(sheet.scrollTop).toBe(121)
+  })
+
+  // What the person scrolled to is theirs: an event that changed neither the lift nor the height
+  // is no reason to take the sheet from under the finger (review С-1).
+  it('must not fire: an event of the viewport that moved nothing', async () => {
+    const { sheet, viewport } = await typing({ top: 481, bottom: 521 })
+    sheet.scrollTop = 400
+    viewport.fire('resize')
+    viewport.fire('scroll')
+    expect(sheet.scrollTop).toBe(400)
+  })
+
+  // A focus the browser brings into sight itself; heard on `focusin`, the sheet moved first and
+  // the browser's own scroll found nothing left to do (adversarial А).
+  it('must not fire: a focus alone, the keyboard already up', async () => {
+    fakeViewport(500)
     const view = host()
     const { sheet, input } = placed(view.view, { top: 300, bottom: 500 }, { top: 510, bottom: 550 })
     view.on.value = true
     await nextTick()
-    expect(sheet.scrollTop).toBe(100)
     input.focus()
-    expect(sheet.scrollTop).toBe(150)
-    expect(viewport.count()).toBe(2)
+    expect(sheet.scrollTop).toBe(100)
+  })
+
+  // The result of a check is focused for a screen reader, and read from its top (adversarial А).
+  it('must not fire: a block focused to be read, not typed in', async () => {
+    const viewport = fakeViewport(800)
+    const view = host()
+    const { sheet, input: block } = placed(
+      view.view,
+      { top: 300, bottom: 500 },
+      { top: 510, bottom: 550 },
+      '[data-block]',
+    )
+    view.on.value = true
+    await nextTick()
+    block.focus()
+    viewport.height = 500
+    viewport.fire('resize')
+    expect(sheet.scrollTop).toBe(100)
   })
 
   it('must not fire: the focus outside the sheet', async () => {
@@ -260,6 +325,7 @@ describe('useKeyboardInset keeps the focused field in sight', () => {
     expect(sheet.scrollTop).toBe(100)
   })
 
+  // A pinch is not a keyboard, by either way into the sheet (review С-3, adversarial В).
   it('must not fire: pinched in', async () => {
     const viewport = fakeViewport(800)
     const view = host()
@@ -268,9 +334,13 @@ describe('useKeyboardInset keeps the focused field in sight', () => {
     await nextTick()
     viewport.scale = 2
     input.focus()
-    sheet.scrollTop = 100
+    viewport.height = 400
     viewport.fire('resize')
     expect(sheet.scrollTop).toBe(100)
+    viewport.scale = 1
+    viewport.height = 500
+    viewport.fire('resize')
+    expect(sheet.scrollTop).toBe(150)
   })
 
   it('must not fire: the sheet shut', async () => {
