@@ -13,6 +13,9 @@ import { open } from './session'
 
 const opener = (page: Page) => page.getByRole('button', { name: 'Open the sheet' })
 const sheet = (page: Page) => page.getByRole('dialog', { name: 'Milk «Ashkhar»' })
+// The same sheet as an element, whether it is open or not: its animations are read while it is
+// still rising. By its text, since the kit holds the scanner's sheet too (MOL-98).
+const sheetElement = (page: Page) => page.locator('dialog', { hasText: 'Milk «Ashkhar»' })
 const heading = (page: Page) => page.getByRole('heading', { level: 1 })
 
 async function expectOn(page: Page, path: string, title: string): Promise<void> {
@@ -358,7 +361,7 @@ test.describe('the sheet', () => {
     await page.touchscreen.tap(x, y)
     await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 })
     // Asked once the rise is over: closed by the tap, the rise is cut short and the sheet is shut.
-    const openWhenUp = await page.locator('dialog').evaluate(async (dialog: HTMLDialogElement) => {
+    const openWhenUp = await sheetElement(page).evaluate(async (dialog: HTMLDialogElement) => {
       await Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished))
       return dialog.open
     })
@@ -401,7 +404,7 @@ test.describe('the sheet', () => {
     await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 })
     // The rise is finished at once rather than waited out: a finger resting past a long press
     // makes no click, and a slow machine stretched the wait towards it (review Р-4).
-    await page.locator('dialog').evaluate(async (dialog: HTMLDialogElement) => {
+    await sheetElement(page).evaluate(async (dialog: HTMLDialogElement) => {
       const rising = dialog.getAnimations()
       for (const animation of rising) animation.finish()
       await Promise.allSettled(rising.map((animation) => animation.finished))
@@ -434,7 +437,7 @@ test.describe('the sheet', () => {
     page,
   }) => {
     const through = await restingFinger(page, (current) =>
-      current.locator('dialog').evaluate((dialog: HTMLDialogElement) => {
+      sheetElement(current).evaluate((dialog: HTMLDialogElement) => {
         const below = new DOMMatrix(getComputedStyle(dialog).transform).m42
         const box = dialog.querySelector('.footer button')!.getBoundingClientRect()
         // Where the action will stand once the sheet is up; with the rise held, the scrim.
