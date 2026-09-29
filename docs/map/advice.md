@@ -28,13 +28,13 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 ## backend · db
 
 - `backend/src/db/events-repository.ts` — Repository of the event log: record, record once per day of the person's life, and the 0.3 week-four return. Tests: `backend/tests/events-repository.integration.test.ts`.
-- `backend/src/db/gates-reader.ts` — Reader of both gates over one window in a read-only snapshot, with the erased counted by week and the login funnel (`login_days`) by day. Tests: `backend/tests/gates-reader.integration.test.ts`.
+- `backend/src/db/gates-reader.ts` — Reader of both gates over one window in a read-only snapshot, with the erased counted by week, the login funnel (`login_days`) by day and the reminder counters (`reminder_days`, MOL-101). Tests: `backend/tests/gates-reader.integration.test.ts`.
 - `backend/src/db/verdicts-repository.ts` — Repository of verdicts: put, amend, withdraw, the «Что брать» rows (optionally of given items, for the search) and `reachedRatings` for gate 0.2. Tests: `backend/tests/advice-verdicts.integration.test.ts`.
 
 ## backend · other
 
 - `backend/src/gates-cli.ts` — Entry point of `dist/gates.js`: connects to the database and runs the gates command.
-- `backend/src/gates.ts` — The gates command behind `make gates`: parses the window, reads gates 0.2 and 0.3 and the login funnel, prints counts and dates only.
+- `backend/src/gates.ts` — The gates command behind `make gates`: parses the window, reads gates 0.2 and 0.3, the login funnel and the reminder's lever, prints counts and dates only.
 
 ## backend · tests
 

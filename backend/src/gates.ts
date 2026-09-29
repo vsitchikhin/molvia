@@ -7,7 +7,13 @@ import {
   yerevanDate,
   yerevanMidnight,
 } from '@molvia/model'
-import type { GatesReader, GatesReport, GatesWindow, LoginsInWindow } from '@/db/gates-reader'
+import type {
+  GatesReader,
+  GatesReport,
+  GatesWindow,
+  LoginsInWindow,
+  RemindersInWindow,
+} from '@/db/gates-reader'
 import { describeFailure } from '@/db/failure'
 
 export const GATES_USAGE =
@@ -144,6 +150,28 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
     row('erased', [String(report.erased.count), erasedWeeks(report.erased)]),
     '',
     ...loginLines(report.logins),
+    '',
+    ...reminderLines(report.reminders),
+  ]
+}
+
+/**
+ * The rating reminder's lever (MOL-101, В-4) under the login: if gate 0.2 says stop, whether the
+ * reminders did not go out, went out and were not pressed, or were pressed and there was little to
+ * ask about. No line of its own to cross, so no verdict — only the counts and the share with its n.
+ * A press is counted on its own day, so the share of a window is of the items asked in it and the
+ * presses made in it; at its edges the two need not be the same days.
+ */
+function reminderLines(reminders: RemindersInWindow): string[] {
+  const { firstDay, lastDay } = reminders
+  const span = firstDay === lastDay ? `the day ${firstDay}` : `days ${firstDay} … ${lastDay}`
+  return [
+    `remind ${'do reminders bring ratings?'.padEnd(45)}read beside 0.2`,
+    row('first step, the next day', [String(reminders.firstSteps), `${span} in Yerevan`]),
+    row('second step, 3 days on', [String(reminders.secondSteps), '']),
+    row('third step, then the pause', [String(reminders.thirdSteps), 'silent after it: 6 months']),
+    row('items asked about', [String(reminders.items), '']),
+    row('rated by a press in the bot', share(reminders.rated, reminders.items)),
   ]
 }
 
