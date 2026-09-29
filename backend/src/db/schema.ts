@@ -1322,3 +1322,44 @@ export const erasures = pgTable(
     check('erasures_week_monday', sql`extract(isodow from ${table.appearedWeek}) = 1`),
   ],
 )
+
+/**
+ * The login's funnel, counted by the day a login began (MOL-68): how many were started, confirmed
+ * in the bot, declined there, collected into a session, and how many ran out — and nothing else.
+ *
+ * Counted when each step happens, in the transaction of the step itself, because nothing is left
+ * to count afterwards: a refusal and a collection only put a request out, and the minute timer
+ * deletes it. Not the event log — that keeps a person's return and nothing more — and not a row
+ * per person: no id, no Telegram id, no code, no device, so erasure has nothing here to reach.
+ *
+ * The day is the one the request was **started** on, in Yerevan, not the day of the step: a
+ * confirmation at 23:59 and a collection at 00:01 land in the row of the day it began, so a row
+ * reads as a funnel of its own. `refused` is the exception — a start the quota turned away makes
+ * no request, and it counts on the day it was refused.
+ */
+export const loginDays = pgTable(
+  'login_days',
+  {
+    day: date('day').primaryKey(),
+    started: integer('started').notNull().default(0),
+    /** Of `started`, those begun by a device that had begun one before and not yet come in. */
+    again: integer('again').notNull().default(0),
+    /** The first «Войти» only: the same account pressing it again changes nothing (MOL-55). */
+    confirmed: integer('confirmed').notNull().default(0),
+    declined: integer('declined').notNull().default(0),
+    collected: integer('collected').notNull().default(0),
+    /** Ran out never confirmed: the person did not reach the bot, or did not press. */
+    expiredUnconfirmed: integer('expired_unconfirmed').notNull().default(0),
+    /** Ran out confirmed: the bot said yes and the person never came back to the app. */
+    expiredConfirmed: integer('expired_confirmed').notNull().default(0),
+    refused: integer('refused').notNull().default(0),
+  },
+  (table) => [
+    check(
+      'login_days_counts_non_negative',
+      sql`least(${table.started}, ${table.again}, ${table.confirmed}, ${table.declined}, ${table.collected}, ${table.expiredUnconfirmed}, ${table.expiredConfirmed}, ${table.refused}) >= 0`,
+    ),
+    // Written by the same statement as `started`, so this one holds by construction.
+    check('login_days_again_within_started', sql`${table.again} <= ${table.started}`),
+  ],
+)

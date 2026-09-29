@@ -1,4 +1,5 @@
 import { and, eq, isNull, or, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import {
   DomainError,
   ERROR,
@@ -17,18 +18,25 @@ import { secretOrNull } from '@/secret'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
-import { loginRequests } from './schema'
+import { loginDays, loginRequests } from './schema'
 import { lockTelegramAccount } from './telegram-lock'
+import { yerevanDay } from './yerevan-week'
 
 export interface LoginRequestRepository {
   /** Lock before checking time: waiting for another write must not extend a login. */
   lock(id: string, secret: string): Promise<void>
+  /**
+   * A start under the quota. `again` is the device's word that it began a login before and has
+   * not come in since (MOL-68): counted apart, so «Начать заново» is not a second person.
+   */
   createLimited(
     id: string,
     code: string,
     secret: string,
     deviceName: string | null,
+    again?: boolean,
   ): Promise<LoginRequest>
+  /** Deletes what ran out, and counts in `login_days` those that ran out with no outcome. */
   removeExpired(): Promise<void>
 
   /**
@@ -139,6 +147,48 @@ async function insert(
   })
 }
 
+/** A step of the login's funnel that is counted where it happens (MOL-68). */
+type LoginStep = 'started' | 'again' | 'confirmed' | 'declined' | 'collected' | 'refused'
+
+/**
+ * Adds one to each step in the row of `day`, read from `source` — the request's own row, so the
+ * day is the one it began on, to the microsecond Postgres holds, and not a date the driver
+ * rounded on its way through JavaScript.
+ *
+ * Always the last statement of the step it counts, and in its transaction: the row of a day is
+ * the one every login of that day writes, and taken last it is never held while waiting for
+ * anything else — a refusal rolled back is a count rolled back.
+ */
+async function tally(
+  db: Conn,
+  steps: readonly LoginStep[],
+  day: SQL,
+  source: SQL = sql``,
+): Promise<void> {
+  const columns = steps.map((step) => loginDays[step])
+  // Bare names: a column list and a conflict target take no table before the column.
+  const names = columns.map((column) => sql.identifier(column.name))
+  const key = sql.identifier(loginDays.day.name)
+  await db.execute(sql`
+    insert into ${loginDays} (${key}, ${sql.join(names, sql`, `)})
+    select ${day}, ${sql.join(
+      steps.map(() => sql`1`),
+      sql`, `,
+    )} ${source}
+    on conflict (${key}) do update set ${sql.join(
+      names.map((name) => sql`${name} = ${loginDays}.${name} + 1`),
+      sql`, `,
+    )}`)
+}
+
+/** The day a request began, read off its row — `tally`'s `source`. */
+function ofRequest(id: string): [SQL, SQL] {
+  return [
+    yerevanDay(loginRequests.createdAt),
+    sql`from ${loginRequests} where ${loginRequests.id} = ${id}`,
+  ]
+}
+
 export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
   /**
    * Alive: not spent, not put out, not run out. Every read below starts here, which is what
@@ -157,16 +207,35 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
       // Erasure holds every request of the person it erases, expired ones too, and this runs
       // under the one quota lock every start of a login takes — waiting here closed the door to
       // everybody for as long as one erasure, or one dry run of it, took.
-      await db.delete(loginRequests).where(
-        sql`${loginRequests.id} in (
-          select ${loginRequests.id} from ${loginRequests}
-          where ${loginRequests.expiresAt} <= clock_timestamp()
-          for update skip locked)`,
-      )
+      //
+      // One statement with the count (MOL-68): a request put out by «Это не я» or by a session
+      // already counted its outcome, so only the ones that ran out with none are added here —
+      // confirmed or not, which is where the person was lost. Days in order, the order every
+      // other writer of `login_days` keeps by taking a single row.
+      await db.execute(sql`
+        with gone as (
+          delete from ${loginRequests}
+          where ${loginRequests.id} in (
+            select ${loginRequests.id} from ${loginRequests}
+            where ${loginRequests.expiresAt} <= clock_timestamp()
+            for update skip locked)
+          returning ${loginRequests.createdAt} as began, ${loginRequests.telegramUserId} as confirmed_by,
+            ${loginRequests.consumedAt} as put_out)
+        insert into ${loginDays} (day, expired_unconfirmed, expired_confirmed)
+        select ${yerevanDay(sql`began`)} as day,
+          (count(*) filter (where confirmed_by is null))::int,
+          (count(*) filter (where confirmed_by is not null))::int
+        from gone
+        where put_out is null
+        group by 1
+        order by 1
+        on conflict (day) do update set
+          expired_unconfirmed = ${loginDays}.expired_unconfirmed + excluded.expired_unconfirmed,
+          expired_confirmed = ${loginDays}.expired_confirmed + excluded.expired_confirmed`)
     },
 
-    async createLimited(id, code, secret, deviceName) {
-      return db.transaction(async (tx) => {
+    async createLimited(id, code, secret, deviceName, again = false) {
+      const started = await db.transaction(async (tx) => {
         // One quota for this database, including concurrent starts and process restarts.
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended('molvia:login-quota', 0))`,
@@ -179,21 +248,29 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
           .where(
             sql`${loginRequests.createdAt} > clock_timestamp() - make_interval(secs => ${LOGIN_WINDOW_SECONDS})`,
           )
-        if ((count?.value ?? 0) >= LOGIN_WINDOW_LIMIT)
-          throw new DomainError(ERROR.LOGIN_RATE_LIMITED)
+        if ((count?.value ?? 0) >= LOGIN_WINDOW_LIMIT) {
+          // A start turned away makes no request, so it counts on the day it was refused.
+          await tally(tx, ['refused'], yerevanDay(sql`clock_timestamp()`))
+          return null
+        }
         // Read the clock after the quota lock, not at the transaction's earlier start, and
         // write it in the same statement: the quota above counts by this very column.
         const [clock] = await tx.execute<{ at: string }>(sql`select clock_timestamp()::text as at`)
         if (!clock) throw new Error('database returned no login clock')
         const createdAt = new Date(clock.at)
-        return insert(tx, secret, {
+        const request = await insert(tx, secret, {
           id,
           code,
           deviceName,
           createdAt,
           expiresAt: new Date(createdAt.getTime() + LOGIN_LIFETIME_SECONDS * 1000),
         })
+        await tally(tx, again ? ['started', 'again'] : ['started'], ...ofRequest(request.id))
+        return request
       })
+      // Thrown after the commit: thrown inside, the count of the refusal went with the rollback.
+      if (!started) throw new DomainError(ERROR.LOGIN_RATE_LIMITED)
+      return started
     },
 
     async lock(id, secret) {
@@ -236,7 +313,14 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
       // the confirmation comes after it rather than making an owner it has already looked for.
       const [row] = await db.transaction(async (tx) => {
         await tx.execute(lockTelegramAccount(telegramUserId))
-        return tx
+        // Whether this is the first «Войти», read under the row's lock: only the first is counted
+        // (MOL-68), since the second is the same person again after an answer that got lost.
+        const [before] = await tx
+          .select({ telegramUserId: loginRequests.telegramUserId })
+          .from(loginRequests)
+          .where(and(eq(loginRequests.code, code), live))
+          .for('update')
+        const confirmed = await tx
           .update(loginRequests)
           .set({ telegramUserId })
           .where(
@@ -250,6 +334,11 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
             ),
           )
           .returning()
+        const [first] = confirmed
+        if (first && before?.telegramUserId === null) {
+          await tally(tx, ['confirmed'], ...ofRequest(first.id))
+        }
+        return confirmed
       })
       return row ? toLoginRequest(row) : null
     },
@@ -259,12 +348,16 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
 
       // Put out by the same column that a spent login sets, and deliberately so: a refusal
       // and a collected session have one reader and one answer — «there is no such request».
-      const [row] = await db
-        .update(loginRequests)
-        .set({ consumedAt: sql`now()` })
-        .where(and(eq(loginRequests.code, code), live))
-        .returning()
-      return row ? toLoginRequest(row) : null
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(loginRequests)
+          .set({ consumedAt: sql`now()` })
+          .where(and(eq(loginRequests.code, code), live))
+          .returning()
+        if (!row) return null
+        await tally(tx, ['declined'], ...ofRequest(row.id))
+        return toLoginRequest(row)
+      })
     },
 
     async byIdAndSecret(id, secret) {
@@ -285,21 +378,26 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
     async consume(id, secret) {
       if (idOrNull(id) === null || secretOrNull(secret) === null) return null
 
-      const [row] = await db
-        .update(loginRequests)
-        .set({ consumedAt: sql`now()` })
-        .where(
-          and(
-            eq(loginRequests.id, id),
-            eq(loginRequests.secretHash, sha256Hex(secret)),
-            live,
-            // Confirmed, or there is no session to hand over yet. The browser polls while the
-            // person is still in the bot, and those polls must leave the request alone.
-            sql`${loginRequests.telegramUserId} is not null`,
-          ),
-        )
-        .returning()
-      return row ? toLoginRequest(row) : null
+      // Inside the collection's own transaction, so a session that is not written is not counted.
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(loginRequests)
+          .set({ consumedAt: sql`now()` })
+          .where(
+            and(
+              eq(loginRequests.id, id),
+              eq(loginRequests.secretHash, sha256Hex(secret)),
+              live,
+              // Confirmed, or there is no session to hand over yet. The browser polls while the
+              // person is still in the bot, and those polls must leave the request alone.
+              sql`${loginRequests.telegramUserId} is not null`,
+            ),
+          )
+          .returning()
+        if (!row) return null
+        await tally(tx, ['collected'], ...ofRequest(row.id))
+        return toLoginRequest(row)
+      })
     },
   }
 }
