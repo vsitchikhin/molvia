@@ -38,6 +38,14 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 
 - `frontend/src/views/PrivacyView.vue` — «Данные и приватность» screen: a static page of what is kept, why, for how long and how to erase it; opens without a session.
 
+## frontend · components
+
+- `frontend/src/components/YourDataGroup.vue` — «Ваши данные» on the settings (MOL-93, В-2): «Скачать мои данные» with its states and «Сохранить или отправить» for a second tap, and the link to «Данные и приватность».
+
+## frontend · composables
+
+- `frontend/src/composables/useExport.ts` — «Скачать мои данные» (MOL-93, В-1): the file from the server, then the share sheet, a second tap when the phone refused it that late, a download where no sheet can take a file; offline or error decided after the failure.
+
 ## e2e
 
 - `e2e/privacy.spec.ts` — End-to-end: «Данные и приватность» opens by its address without a session, from the login screen and from the settings.

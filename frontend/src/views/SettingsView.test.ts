@@ -172,7 +172,7 @@ it.each([
 ])('leads to «Data and privacy» %s (MOL-58)', async (_name, cached, online) => {
   if (!online) me.mockRejectedValue(new TypeError('network'))
   const view = await render(cached, online)
-  const link = view.findAll('button').find((button) => button.text() === en.privacy.title)
+  const link = view.findAll('a').find((one) => one.text() === en.privacy.title)
   expect(link).toBeDefined()
   await link?.trigger('click')
   await flushPromises()
