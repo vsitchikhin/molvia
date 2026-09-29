@@ -556,3 +556,36 @@ describe('«Графики» — второй заход ревью PR #77', () 
     expect((await month(me, m2)).spentIncome).toEqual({ minor: 0n, currency: 'RUB' })
   })
 })
+
+describe('«Графики» — третий заход ревью PR #77', () => {
+  async function twoMonths(withDollar: boolean): Promise<MoneyChartsView['categories'][number]> {
+    if (withDollar) await cacheRates()
+    else await cacheRoubles()
+    const me = await owner()
+    await spend(me, '100000', 'AMD', `${m2}-10`, 'groceries')
+    await spend(me, '300000', 'AMD', `${m1}-10`, 'groceries')
+    // A coffee in dollars, on a day the bank has no dollar for — or has one.
+    await spend(me, '5', 'USD', `${m1}-12`, 'cafe')
+    const groceries = await presetId(me, 'groceries')
+    const view = await charts(me)
+    const series = view.categories.find((one) => one.category.id === groceries)
+    if (!series) throw new Error('no series of groceries')
+    return series
+  }
+
+  it(
+    'a coffee not counted leaves out of «в среднем» only «Кафе», not the whole «Продукты» (adversarial d9 round 3, В3)',
+    async () => {
+      expect((await twoMonths(false)).average).toEqual({ minor: 20_000_000n, currency: 'AMD' })
+    },
+    MONTH_BY_MONTH_MS,
+  )
+
+  it(
+    'control: the dollar known that day — the same average',
+    async () => {
+      expect((await twoMonths(true)).average).toEqual({ minor: 20_000_000n, currency: 'AMD' })
+    },
+    MONTH_BY_MONTH_MS,
+  )
+})

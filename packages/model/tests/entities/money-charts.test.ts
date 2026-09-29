@@ -24,6 +24,7 @@ interface MonthOf {
   byCategory?: Record<string, number>
   days?: number
   uncounted?: Money[]
+  uncountedIn?: string[]
   incomeUncounted?: Money[]
 }
 
@@ -37,6 +38,7 @@ function month(name: string, of: MonthOf = {}): MoneyMonth {
     incomeCurrency: 'RUB',
     spent: amd(spent),
     uncounted: of.uncounted ?? [],
+    uncountedIn: of.uncountedIn ?? [],
     foreign: [],
     spentIncome: of.spentIncome === null ? null : rub(of.spentIncome ?? Math.round(spent / 4)),
     income: rub(of.income ?? 0),
@@ -199,6 +201,48 @@ describe('moneyCharts', () => {
     expect(charts.differenceAverage).toEqual(rub(5_000))
     // The income did not change what was spent: August is in the average of spending (review С-8).
     expect(charts.spentAverage).toEqual(amd(150_000))
+  })
+
+  it('leaves a month out of the average of only the category short in it (adversarial d9 round 3, В3)', () => {
+    const charts = moneyCharts(
+      [
+        month('2026-07', { spent: 100_000, byCategory: { groceries: 100_000 } }),
+        // A coffee in dollars with no rate: «Кафе» of August is short, «Продукты» are whole.
+        month('2026-08', {
+          spent: 300_000,
+          byCategory: { groceries: 300_000 },
+          uncounted: [money(500n, 'USD')],
+          uncountedIn: ['cafe'],
+        }),
+        month('2026-09'),
+      ],
+      month('2026-06'),
+      ['groceries', 'cafe'],
+    )
+    const averageOf = (id: string) =>
+      charts.categories.find((one) => one.categoryId === id)?.average
+    expect(averageOf('groceries')).toEqual(amd(200_000))
+    // «Кафе» spent nothing counted in the period: no average, not «0 ֏».
+    expect(averageOf('cafe')).toBeNull()
+    // The month's spending is short, so it leaves the average of spending.
+    expect(charts.spentAverage).toEqual(amd(100_000))
+  })
+
+  it('leaves the short month out of that category’s average', () => {
+    const charts = moneyCharts(
+      [
+        month('2026-07', { spent: 100_000, byCategory: { cafe: 100_000 } }),
+        month('2026-08', {
+          spent: 20_000,
+          byCategory: { cafe: 20_000 },
+          uncounted: [money(500n, 'USD')],
+          uncountedIn: ['cafe'],
+        }),
+        month('2026-09'),
+      ],
+      month('2026-06'),
+    )
+    expect(charts.categories[0]?.average).toEqual(amd(100_000))
   })
 
   it('must not fire: a change past what a number holds is left unsaid, not a failed answer (adversarial d9 А)', () => {

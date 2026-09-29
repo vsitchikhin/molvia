@@ -198,6 +198,20 @@ describe('the month of «Деньги»', () => {
     ])
   })
 
+  it('names the categories whose sums are short: a spending and a trip with no rate (d9 round 3, В3)', () => {
+    const result = month({
+      spendings: [
+        spending('5 USD', '2026-09-12', 'cafe'),
+        spending('900 AMD', '2026-09-12', 'clothes'),
+      ],
+      trips: [trip('20 EUR', '2026-09-14')],
+    })
+    expect(result.uncountedIn).toEqual([categoryId('cafe'), categoryId('groceries')].sort())
+    expect(month({ spendings: [spending('900 AMD', '2026-09-12', 'cafe')] }).uncountedIn).toEqual(
+      [],
+    )
+  })
+
   it('takes a finished trip into the groceries, one line per currency', () => {
     const result = month({
       trips: [trip('8940 AMD', '2026-09-24')],

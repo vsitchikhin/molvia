@@ -33,6 +33,7 @@ function month(name: string, spent: bigint, byCategory: [string, bigint][] = [])
     incomeCurrency: 'RUB',
     spent: money(spent, 'AMD'),
     uncounted: [],
+    uncountedIn: [],
     foreign: [],
     spentIncome: money(spent / 4n, 'RUB'),
     income: money(10_000_00n, 'RUB'),
