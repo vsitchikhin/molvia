@@ -132,14 +132,7 @@ export async function countMonth(
   })
 }
 
-/**
- * «Остаток» (MOL-134): what every live account held on the evening of the month's last day — the
- * running month's too, since an operation may be dated tomorrow and «Потрачено» already counts it
- * (Н-3) — in the income currency. The spending currency comes by the month's own rate, the one
- * «≈ потрачено» is counted by, frozen for a closed month; any other by the rule of «Деньги» on the
- * last day, or today for the running month, when nothing later is known. Not frozen itself (Р-3):
- * an amended spending of August moves August's rest as it moves its «Потрачено».
- */
+/** One month read and counted — what `moneyMonthOf` asks of this month and the one before. */
 async function count(
   repositories: Repositories,
   owner: Owner,
@@ -155,6 +148,14 @@ async function count(
   return countMonth(owner, rates, month, rows, categories, rate, rateKind, salaryShiftDay, held)
 }
 
+/**
+ * «Остаток» (MOL-134): what every live account held on the evening of the month's last day — the
+ * running month's too, since an operation may be dated tomorrow and «Потрачено» already counts it
+ * (Н-3) — in the income currency. The spending currency comes by the month's own rate, the one
+ * «≈ потрачено» is counted by, frozen for a closed month; any other by the rule of «Деньги» on the
+ * last day, or today for the running month, when nothing later is known. Not frozen itself (Р-3):
+ * an amended spending of August moves August's rest as it moves its «Потрачено».
+ */
 async function heldAt(
   repositories: Repositories,
   owner: Owner,
@@ -223,6 +224,49 @@ export async function monthRate(
   return { rate: await repositories.money.freeze(owner.id, month, closing), kind: 'frozen' }
 }
 
+/**
+ * What a read freezes its months by, taken before it and looked at again after (adversarial Ж): the
+ * exchanges and incomes are read once at the start, and the months are frozen one by one after. A
+ * write landing between the two lets go of nothing — nothing is frozen yet — and the month froze
+ * without it, for good. So the owner's receipts and the rule of the rate are noted first, and once
+ * the read has frozen what it froze, anything written, amended, removed or brought back meanwhile
+ * lets the months go from its day, as the write itself would have; a changed rule lets go of all.
+ * A write that lands later still lets go by itself.
+ */
+export async function watchThaws(
+  repositories: Pick<Repositories, 'exchanges' | 'incomes' | 'money'>,
+  owner: Pick<Owner, 'id'>,
+): Promise<() => Promise<void>> {
+  const note = async () => {
+    const [exchanges, incomes, rule] = await Promise.all([
+      repositories.exchanges.list(owner.id),
+      repositories.incomes.list(owner.id),
+      repositories.exchanges.rateSettings(owner.id),
+    ])
+    const days = new Map<string, { revision: number; day: string }>()
+    for (const one of exchanges) days.set(one.id, { revision: one.revision, day: one.exchangedOn })
+    for (const one of incomes) days.set(one.id, { revision: one.revision, day: one.receivedOn })
+    return { days, rule: `${rule.preference}:${String(rule.since?.getTime() ?? null)}` }
+  }
+  const before = await note()
+  return async () => {
+    const after = await note()
+    if (after.rule !== before.rule) {
+      await repositories.money.thaw(owner.id)
+      return
+    }
+    const moved: string[] = []
+    for (const [id, was] of before.days) {
+      const now = after.days.get(id)
+      if (!now) moved.push(was.day)
+      else if (now.revision !== was.revision) moved.push(was.day, now.day)
+    }
+    for (const [id, now] of after.days) if (!before.days.has(id)) moved.push(now.day)
+    const from = moved.sort()[0]
+    if (from !== undefined) await repositories.money.thaw(owner.id, from)
+  }
+}
+
 /** `GET /money/months/:month` (MOL-73): the month counted, a page of its journal after `cursor`. */
 export async function moneyMonthOf(
   repositories: Repositories,
@@ -232,6 +276,9 @@ export async function moneyMonthOf(
   now: Date = new Date(),
 ): Promise<MoneyMonthView> {
   const today = yerevanDate(now)
+  // Only a closed month is frozen by a read, so only it needs watching — before its rates are read.
+  const settle =
+    month < monthOf(today) ? await watchThaws(repositories, owner) : () => Promise.resolve()
   const [rates, categories, salaryShiftDay] = await Promise.all([
     dayRates(repositories, owner),
     repositories.spendingCategories.list(owner.id),
@@ -252,6 +299,7 @@ export async function moneyMonthOf(
   ])
   // «−8 % к августу» needs an August: a month with nothing in it is no month to compare with.
   const previousSpent = before.days.length > 0 ? before.spent : null
+  await settle()
   return moneyMonthViewOf(counted, previousSpent, categories, cursor)
 }
 

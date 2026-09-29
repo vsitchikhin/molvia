@@ -13,7 +13,9 @@ import type { CachedRate, MoneyChartsView, MoneyMonthView } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
 import { moneyMonthRates } from '@/db/schema'
+import { tripRepositories } from '@/db/unit-of-work'
 import { buildServer } from '@/server'
+import { moneyChartsOf } from '@/usecases/money-charts'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
 
@@ -261,7 +263,10 @@ describe('«Графики» (MOL-74)', () => {
     expect(year.period).toBe(12)
     expect(year.months).toHaveLength(12)
     expect(year.since).toBeNull()
-    expect(year.categories).toEqual([])
+    // Every category of the owner is offered, as twelve months of nothing.
+    expect(year.categories.every((one) => one.points.every((point) => point.level === 0))).toBe(
+      true,
+    )
     expect(year.exchanges).toBeNull()
     expect(year.rate).toBeNull()
     expect(year.spentAverage).toBeNull()
@@ -294,4 +299,122 @@ describe('«Графики» (MOL-74)', () => {
     // m3, m2, m1: 400 000 over three closed months; the running one is not averaged.
     expect(view.spentAverage).toEqual({ minor: 13_333_333n, currency: 'AMD' })
   })
+})
+
+/** The rouble alone, every day of the last two hundred: a dollar income has no rate of its day. */
+async function cacheRoubles() {
+  const rows: CachedRate[] = []
+  for (let days = 200; days >= 0; days -= 1) {
+    rows.push({
+      provider: 'cba',
+      currency: 'RUB',
+      date: daysAgo(days),
+      scaled: parseRate('4.0'),
+      jump: false,
+    })
+  }
+  await rates.upsert(rows)
+}
+
+describe('«Графики» — по ревью PR #77', () => {
+  it('months each fine on «Деньгах» are fine on the charts too, however much a category adds up to (adversarial d9 А)', async () => {
+    await cacheRates()
+    const me = await owner()
+    // 5·10¹⁶ ֏ twice: each under what money holds, together over it.
+    await spend(me, '50000000000000000', 'AMD', `${m1}-10`, 'groceries')
+    await spend(me, '50000000000000000', 'AMD', today, 'groceries')
+    const view = await charts(me)
+    expect(view.categories[0]?.points.at(-1)?.amount.minor).toBe(5_000_000_000_000_000_000n)
+  })
+
+  it('«к августу» past what a number holds is left unsaid, not a 500 (adversarial d9 А)', async () => {
+    await cacheRates()
+    const me = await owner()
+    await spend(me, '0.01', 'AMD', `${m1}-10`, 'groceries')
+    await spend(me, '100000000000000', 'AMD', today, 'groceries')
+    expect((await charts(me)).months.at(-1)?.change).toBeNull()
+  })
+
+  it('a salary in dollars on a day with no dollar: no «Разница» for the month, and the average stands on the counted one (adversarial d9 В)', async () => {
+    await cacheRoubles()
+    const me = await owner()
+    await spend(me, '100000', 'AMD', `${m2}-10`, 'groceries')
+    await receive(me, '30000', `${m2}-05`)
+    await spend(me, '100000', 'AMD', `${m1}-10`, 'groceries')
+    const salary = await call(me, 'POST', '/incomes', {
+      id: randomUUID(),
+      amount: { amount: '300', currency: 'USD' },
+      receivedOn: `${m1}-05`,
+      source: 'salary',
+    })
+    expect(salary.statusCode).toBe(201)
+    const view = await charts(me)
+    const august = view.months.find((one) => one.month === m1)
+    expect(august?.incomeUncounted).toEqual([{ minor: 30_000n, currency: 'USD' }])
+    expect(august?.difference).toBeNull()
+    expect(view.differenceAverage).toEqual({ minor: 500_000n, currency: 'RUB' })
+  })
+
+  it('a category spent only before the period is offered as months of nothing, not swapped for another (adversarial А, d9 Г)', async () => {
+    await cacheRates()
+    const me = await owner()
+    const old = previousMonth(previousMonth(previousMonth(previousMonth(m3))))
+    await spend(me, '25000', 'AMD', `${old}-12`, 'clothes')
+    await spend(me, '10000', 'AMD', today, 'groceries')
+    const clothes = await presetId(me, 'clothes')
+    const view = await charts(me)
+    expect(view.categories[0]?.category.preset).toBe('groceries')
+    const series = view.categories.find((one) => one.category.id === clothes)
+    expect(series?.points.every((point) => point.amount.minor === 0n)).toBe(true)
+  })
+
+  it('an exchange the bank has no rate of its day for is named, never measured by an old one (adversarial Е)', async () => {
+    await cacheRates(200, 40)
+    const me = await owner()
+    await exchange(me, ['10000', 'RUB'], ['38000', 'AMD'], daysAgo(5), 'Рынок')
+    await exchange(me, ['10000', 'RUB'], ['38000', 'AMD'], daysAgo(60), 'Рынок')
+    const losses = (await charts(me)).exchanges
+    expect(losses?.uncounted).toBe(1)
+    expect(losses?.groups).toMatchObject([{ place: 'Рынок', count: 1 }])
+  })
+
+  it(
+    'an exchange written while the months are being frozen still moves them after (adversarial Ж)',
+    async () => {
+      await cacheRates()
+      const me = await owner()
+      await spend(me, '100000', 'AMD', `${m1}-10`, 'cafe')
+      await exchange(me, ['10000', 'RUB'], ['40000', 'AMD'], daysAgo(150))
+      const repositories = tripRepositories(db)
+      const freeze = repositories.money.freeze.bind(repositories.money)
+      let written = false
+      const racing = {
+        ...repositories,
+        money: {
+          ...repositories.money,
+          async freeze(...args: Parameters<typeof freeze>) {
+            if (!written) {
+              written = true
+              // Amended back to the first of last month, while this read is freezing.
+              await exchange(me, ['10000', 'RUB'], ['30000', 'AMD'], `${m1}-01`)
+            }
+            return freeze(...args)
+          },
+        },
+      }
+      const read = await moneyChartsOf(
+        racing,
+        { id: me.id, incomeCurrency: 'RUB', spendCurrency: 'AMD' },
+        6,
+      )
+      expect(written).toBe(true)
+      const stale = read.months.find((one) => one.month === m1)?.spentIncome
+      const after = await month(me, m1)
+      expect(after.spentIncome).not.toEqual(stale)
+      expect((await charts(me)).months.find((one) => one.month === m1)?.spentIncome).toEqual(
+        after.spentIncome,
+      )
+    },
+    MONTH_BY_MONTH_MS,
+  )
 })
