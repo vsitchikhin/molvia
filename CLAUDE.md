@@ -261,6 +261,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **«Покупки» is empty, and «Что брать» greets a newcomer, only for an answer known to be empty**
   (`answeredEmpty`, MOL-77; the memory of `useAdvice`, MOL-128); a phone-side cache is read by both
   versions. **The record typed by hand goes up to «Покупки» once none is open**, never under a sheet.
+- **A trip's money is one rule** (MOL-78): the receipt's sum whole when typed, else the prices —
+  `tripMoney` in the domain, `tripMoneyRows` in SQL, for every reader; **a price is never worked out
+  of the sum**, and a change of the sum takes «списано» off.
 
 ### Barcodes: the scanner, the item by its code — `.claude/rules/barcodes.md`
 

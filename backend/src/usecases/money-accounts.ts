@@ -16,6 +16,7 @@ import {
   newestOperationsFirst,
   operationKeyOf,
   resourceIdOf,
+  tripMoney,
   unassignedOperations,
 } from '@molvia/model'
 import type {
@@ -391,13 +392,14 @@ export async function payTrip(
 ): Promise<TripView> {
   const trip = await repositories.trips.byId(tripId, owner.id)
   if (!trip) throw new DomainError(ERROR.NOT_FOUND)
-  // «Списано» stands for the trip whole: its own currency and every purchase's (adversarial Д2).
+  // «Списано» stands for the trip whole: its own currency and every currency of its money
+  // (adversarial Д2) — the receipt's alone when there is one (MOL-78), since it is the trip's money.
   const purchases = await repositories.expenses.forTrip(trip.id, owner.id)
   const { accountId, debited } = paymentOf(
     await knownAccounts(repositories, owner),
     null,
     { accountId: body.accountId, debited: body.debited ?? null },
-    [trip.currency, ...purchases.flatMap(({ amount }) => (amount ? [amount.currency] : []))],
+    [trip.currency, ...tripMoney(trip.receipt, purchases).map(({ currency }) => currency)],
   )
   await repositories.moneyAccounts.setTripPayment(owner.id, trip.id, accountId, debited)
   return tripViewFor(repositories, { ...trip, accountId, debited })

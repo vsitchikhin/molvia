@@ -32,7 +32,7 @@ import type { Transact, TripRepositories } from '@/db/unit-of-work'
 import { currentTrip } from './current-trip'
 import { RECENT_PLACES, recentPlaces } from './recent-places'
 import { startTrip } from './start-trip'
-import { addExpense, finishTrip, removeExpense, updateExpense } from './trip-expenses'
+import { addExpense, finishTrip, removeExpense, setReceipt, updateExpense } from './trip-expenses'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const TRIP = 'd2f1a3b4-5c6d-4e7f-8a9b-0c1d2e3f4a5b'
@@ -91,6 +91,7 @@ const trip: Trip = {
   finishedAt: null,
   accountId: null,
   debited: null,
+  receipt: null,
 }
 
 const milkBought: Expense = {
@@ -128,6 +129,7 @@ function fakeRepositories(
       history: unexpected('trips.history'),
       finish: unexpected('trips.finish'),
       chooseRate: unexpected('trips.chooseRate'),
+      setReceipt: unexpected('trips.setReceipt'),
       remove: unexpected('trips.remove'),
       restore: unexpected('trips.restore'),
       purgeStale: unexpected('trips.purgeStale'),
@@ -906,6 +908,78 @@ describe('updateExpense and removeExpense', () => {
     await expect(
       removeExpense(transactWith(repositories), ACTOR, TRIP, milkBought.id),
     ).rejects.toThrow(ERROR.NOT_FOUND)
+  })
+})
+
+describe('setReceipt (MOL-78)', () => {
+  const RECEIPT = { minor: 1_240_000n, currency: 'AMD' as const }
+  const paid: Trip = {
+    ...trip,
+    accountId: 'ee11bb22-cc33-4d44-8e55-ff6677889900',
+    debited: { minor: 3_000n, currency: 'USD' },
+  }
+
+  function world(held: Trip) {
+    const calls: string[] = []
+    const repositories = fakeRepositories({
+      ...viewReads,
+      trips: {
+        lock: () => {
+          calls.push('lock')
+          return Promise.resolve(held)
+        },
+        setReceipt: (id, actorId, receipt) => {
+          calls.push(`set ${id} ${actorId} ${receipt ? String(receipt.minor) : 'null'}`)
+          return Promise.resolve({ ...held, receipt })
+        },
+      },
+    })
+    repositories.moneyAccounts.dropTripDebited = (id) => {
+      calls.push(`drop ${id}`)
+      return Promise.resolve()
+    }
+    return { repositories, calls }
+  }
+
+  it('кладёт сумму под замком записи, снимает «списано» и отвечает записью с суммой как итогом', async () => {
+    const { repositories, calls } = world(paid)
+    const view = await setReceipt(transactWith(repositories), ACTOR, TRIP, RECEIPT)
+    expect(calls).toEqual(['lock', `set ${TRIP} ${ACTOR} 1240000`, `drop ${TRIP}`])
+    expect(view.receipt).toEqual(RECEIPT)
+    expect(view.total).toEqual([RECEIPT])
+    expect(view.prices).toEqual([milkBought.amount])
+    expect(view.debited).toBeNull()
+  })
+
+  it('«не должно сработать»: та же сумма ещё раз — повтор из очереди, ни записи, ни снятия «списано»', async () => {
+    const { repositories, calls } = world({ ...paid, receipt: RECEIPT })
+    const view = await setReceipt(transactWith(repositories), ACTOR, TRIP, { ...RECEIPT })
+    expect(calls).toEqual(['lock'])
+    expect(view.debited).toEqual(paid.debited)
+  })
+
+  it('«Убрать сумму» — тоже смена денег: итог снова по ценам, «списано» снято', async () => {
+    const { repositories, calls } = world({ ...paid, receipt: RECEIPT })
+    const view = await setReceipt(transactWith(repositories), ACTOR, TRIP, null)
+    expect(calls).toEqual(['lock', `set ${TRIP} ${ACTOR} null`, `drop ${TRIP}`])
+    expect(view.receipt).toBeNull()
+    expect(view.total).toEqual([milkBought.amount])
+  })
+
+  it('та же сумма в другой валюте — другая сумма', async () => {
+    const { repositories, calls } = world({ ...paid, receipt: RECEIPT })
+    await setReceipt(transactWith(repositories), ACTOR, TRIP, {
+      minor: RECEIPT.minor,
+      currency: 'RUB',
+    })
+    expect(calls).toContain(`drop ${TRIP}`)
+  })
+
+  it('IDOR: чужая, удалённая или несуществующая запись — NOT_FOUND, ничего не пишется', async () => {
+    const repositories = fakeRepositories({ trips: { lock: () => Promise.resolve(null) } })
+    await expect(setReceipt(transactWith(repositories), ACTOR, TRIP, RECEIPT)).rejects.toThrow(
+      ERROR.NOT_FOUND,
+    )
   })
 })
 

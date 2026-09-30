@@ -21,6 +21,8 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
 import { exchanges, incomes, moneyAccountChecks, moneyAccounts, spendings, trips } from './schema'
+import { tripMoneyRows } from './trip-money'
+import type { TripMoneyRow } from './trip-money'
 
 /**
  * The owner's accounts (MOL-115) and everything an account is counted from: the operations of all
@@ -217,12 +219,6 @@ interface TripRow extends Record<string, unknown> {
   debited_currency: Currency | null
   items: string | number
   unpriced: string | number
-}
-
-interface TripSumRow extends Record<string, unknown> {
-  trip_id: string
-  currency: Currency
-  amount_minor: string | bigint
 }
 
 interface CheckRow extends Record<string, unknown> {
@@ -437,24 +433,24 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
                          end,
                          'YYYY-MM-DD') as started_on,
                  coalesce(t.finished_on_device_at, t.finished_at) as finished_at,
-                 greatest(t.started_at, t.finished_at, t.account_set_at,
+                 greatest(t.started_at, t.finished_at, t.account_set_at, t.receipt_set_at,
                           (select max(e.created_at) from expenses e where e.trip_id = t.id))
                    as seen_at,
                  t.account_id, t.debited_minor, t.debited_currency,
                  (select count(*) from expenses e where e.trip_id = t.id) as items,
-                 (select count(*) from expenses e
-                   where e.trip_id = t.id and e.amount_minor is null) as unpriced
+                 -- A receipt's sum is the trip's money whole (MOL-78): nothing is missing from it.
+                 case when t.receipt_minor is not null then 0
+                      else (select count(*) from expenses e
+                             where e.trip_id = t.id and e.amount_minor is null)
+                 end as unpriced
             from trips t
             join places p on p.id = t.place_id
            where t.actor_id = ${actorId} and t.deleted_at is null
         `),
-        db.execute<TripSumRow>(sql`
-          select e.trip_id, e.amount_currency as currency, sum(e.amount_minor) as amount_minor
-            from expenses e
-            join trips t on t.id = e.trip_id
-           where t.actor_id = ${actorId} and t.deleted_at is null and e.amount_minor is not null
-           group by e.trip_id, e.amount_currency
-           order by e.trip_id, e.amount_currency
+        db.execute<TripMoneyRow>(sql`
+          select m.trip_id, m.currency, m.minor
+            from (${tripMoneyRows(sql`t.actor_id = ${actorId} and t.deleted_at is null`)}) m
+           order by m.trip_id, m.currency
         `),
       ])
 
@@ -541,7 +537,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
       const sums = new Map<string, Money[]>()
       for (const row of tripSums) {
         const list = sums.get(row.trip_id) ?? []
-        list.push({ minor: -BigInt(row.amount_minor), currency: row.currency })
+        list.push({ minor: -BigInt(row.minor), currency: row.currency })
         sums.set(row.trip_id, list)
       }
       for (const row of tripRows) {

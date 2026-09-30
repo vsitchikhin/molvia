@@ -55,7 +55,8 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   **It counts only while it applies** (`debitedOn`): a trip whose dollar purchase was corrected to
   drams is counted exactly by its sums (adversarial Е3). **And any change of a trip's money takes
   its «списано» off** (Р-32, adversarial Ж2) — a priced purchase added, a price changed, a priced one
-  removed: the figure was what left the account for the trip as it was, and kept, it counted a
+  removed, a receipt's sum typed, changed or taken off; under a receipt's sum a price is not the
+  trip's money and takes nothing off (MOL-78, review 1): the figure was what left the account for the trip as it was, and kept, it counted a
   purchase it never covered the day a dollar one was added; the check names the trip until it is
   entered anew. **A spending's is kept through a change of its amount** (MOL-123, by the letter of the
   requirement — only a change of account clears it): it stands under the sum in the same sheet, where
@@ -98,7 +99,8 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   so the person does not fit the number; the answer is the difference and what could have made it
   since the last check, or the start: an operation of the account's currency with no account — a
   trip with nothing priced yet included, by its own currency (Д6) — one on it in another currency
-  without «списано», a trip on it with purchases that have no price, one no rate counts. «Since» is
+  without «списано», a trip on it with purchases that have no price and no receipt's sum (MOL-78:
+  with one the trip's money is known whole), one no rate counts. «Since» is
   dated after the check's day **or learnt by the server after the check** (`seenAt`): written,
   amended, given or taken an account, a trip received as finished or given a purchase — never the
   phone's clock, or a trip finished offline and delivered after a check hid behind it (Д1, Д1б).
