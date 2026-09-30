@@ -29,8 +29,11 @@ import {
   catalogueSubjectSchema,
   currencySchema,
   eventTypeSchema,
+  exchangeChannelSchema,
   incomeSourceSchema,
   itemKindSchema,
+  marketChannelSchema,
+  marketSideSchema,
   placeKindSchema,
   rateChoiceSchema,
   rateProviderSchema,
@@ -44,8 +47,11 @@ import type {
   BaseUnit,
   Currency,
   EventPayload,
+  ExchangeChannel,
   IncomeSource,
   ItemKind,
+  MarketChannel,
+  MarketSide,
   PlaceKind,
   AmdRate,
   RateChoice,
@@ -874,6 +880,38 @@ export const officialRates = pgTable(
 )
 
 /**
+ * The market the central bank's statistics describe (MOL-137): weighted averages of a day's deals
+ * with clients — banks with people in cash and not, banks with every client, exchange offices — on
+ * each side of the counter, one currency against the dram. A mirror of the files, rewritten by
+ * them, and never a rate anything counts by: an exchange is only set beside it. Kept apart from
+ * `official_rates`, whose rows trips take and whose rules (jumps, fallbacks) are not this row's.
+ */
+export const marketRates = pgTable(
+  'market_rates',
+  {
+    channel: text('channel').$type<MarketChannel>().notNull(),
+    currency: char('currency', { length: 3 }).$type<AmdRate['currency']>().notNull(),
+    rateDate: date('rate_date').notNull(),
+    // The bank's side, in the words of the files: `bankBuys` is where the person sells (Р-1).
+    side: text('side').$type<MarketSide>().notNull(),
+    // Drams per one unit, at RATE_SCALE, as the official cache keeps them.
+    scaled: bigint('scaled', { mode: 'bigint' }).notNull(),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Also the index «each channel's latest row not after this day» walks.
+    primaryKey({ columns: [table.channel, table.currency, table.side, table.rateDate] }),
+    check('market_rates_channel_known', oneOf(table.channel, marketChannelSchema.options)),
+    check('market_rates_side_known', oneOf(table.side, marketSideSchema.options)),
+    check(
+      'market_rates_currency_foreign',
+      sql`${oneOf(table.currency, currencySchema.options)} and ${table.currency} <> 'AMD'`,
+    ),
+    check('market_rates_positive', sql`${table.scaled} > 0`),
+  ],
+)
+
+/**
  * Money changed from one currency into another (MOL-40): the amounts given and received and the
  * day, as the person names them. The rate is not a column — it is what the two amounts say, and
  * the person's own rate is computed from these rows when a trip starts, never stored beside them.
@@ -909,6 +947,8 @@ export const exchanges = pgTable(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     // «Где и заметка» (MOL-42, В-4): one line, private as the exchange itself.
     note: text('note'),
+    // «Как меняли» (MOL-137, В-1): bank in cash, bank not in cash, exchange office — or not said.
+    channel: text('channel').$type<ExchangeChannel>(),
     // Which version of the exchange this is (MOL-42, В-3): an amendment names the one it was made
     // over, so two devices cannot both amend the same old version. Each earlier one is a row of
     // `exchange_revisions`.
@@ -936,6 +976,10 @@ export const exchanges = pgTable(
     ),
     check('exchanges_currencies_differ', sql`${table.givenCurrency} <> ${table.receivedCurrency}`),
     check('exchanges_revision_positive', sql`${table.revision} > 0`),
+    check(
+      'exchanges_channel_known',
+      sql`${table.channel} is null or ${oneOf(table.channel, exchangeChannelSchema.options)}`,
+    ),
     foreignKey({
       name: 'exchanges_given_account_is_owners',
       columns: [table.givenAccountId, table.actorId, table.givenCurrency],
@@ -969,6 +1013,7 @@ export const exchangeRevisions = pgTable(
     exchangedOn: date('exchanged_on').notNull(),
     heldBeforeMinor: bigint('held_before_minor', { mode: 'bigint' }),
     note: text('note'),
+    channel: text('channel').$type<ExchangeChannel>(),
     // When this version stopped being the exchange.
     replacedAt: timestamp('replaced_at', { withTimezone: true })
       .notNull()
@@ -985,6 +1030,10 @@ export const exchangeRevisions = pgTable(
     check(
       'exchange_revisions_received_currency_known',
       oneOf(table.receivedCurrency, currencySchema.options),
+    ),
+    check(
+      'exchange_revisions_channel_known',
+      sql`${table.channel} is null or ${oneOf(table.channel, exchangeChannelSchema.options)}`,
     ),
   ],
 )

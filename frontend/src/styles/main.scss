@@ -20,6 +20,12 @@ body {
   box-sizing: border-box;
 }
 
+// A block, not a column: the hold is empty room under the screen, never a screen stretched — a
+// state that takes the free height would carry its action down with it (MOL-138).
+#app {
+  min-height: var(--page-hold);
+}
+
 // A modal <dialog> makes the page inert but not still — `:modal`, not `[open]`, so a dialog shown
 // in place does not freeze the page: on iOS it slides under a finger on the
 // scrim. The sheet scrolls on its own; the page under it waits.

@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest'
 import type { AmdRate, CachedRate, RateProvider } from '@molvia/model'
 import type { PastRate } from '@/db/rates-repository'
 import type { Published, RateFeed } from '@/rates/feed'
-import { FALLBACK_AFTER_FAILURES, officialRatesRefresh } from './refresh-official-rates'
+import {
+  FALLBACK_AFTER_FAILURES,
+  HISTORY_EVERY_MS,
+  HISTORY_RETRY_MS,
+  OFFICIAL_HISTORY_FROM,
+  missingDays,
+  officialRatesRefresh,
+} from './refresh-official-rates'
 
 // Saturday 19.09.2026, noon in Yerevan; the central bank's latest is Friday's.
 const NOW = new Date('2026-09-19T08:00:00.000Z')
@@ -400,5 +407,130 @@ describe('Р-25: ответ из будущего', () => {
     const h = harness({ cba: false, cbrDate: '2026-09-20' })
     for (let index = 0; index <= FALLBACK_AFTER_FAILURES; index += 1) await h.run()
     expect(h.written).toEqual([['cbr']])
+  })
+})
+
+describe('the history of the central bank (MOL-137)', () => {
+  const day = (date: string, scaled: bigint): AmdRate => ({
+    provider: 'cba',
+    currency: 'RUB',
+    date,
+    scaled,
+  })
+  const kept = (date: string, scaled: bigint, jump = false): CachedRate => ({
+    ...day(date, scaled),
+    jump,
+  })
+
+  it('writes only the days the cache does not have, and leaves a kept one as it is', () => {
+    const archive = [day('2026-09-14', 4_300_000n), day('2026-09-15', 4_310_000n)]
+    expect(missingDays(archive, [kept('2026-09-14', 4_299_000n, true)])).toEqual([
+      { ...day('2026-09-15', 4_310_000n), jump: false },
+    ])
+  })
+
+  it('judges a jump by the days before it, kept and new together, in the order of the days', () => {
+    const archive = [
+      day('2026-09-01', 4_300_000n),
+      day('2026-09-02', 4_300_000n),
+      day('2026-09-04', 430_000_000n),
+      day('2026-09-07', 4_300_000n),
+    ]
+    const missing = missingDays(archive, [kept('2026-09-03', 4_300_000n)])
+    expect(missing.map((rate) => [rate.date, rate.jump])).toEqual([
+      ['2026-09-01', false],
+      ['2026-09-02', false],
+      // Three before it: the first two new and the one kept between them.
+      ['2026-09-04', true],
+      // The ×100 day is one of four before it, and the lower median holds.
+      ['2026-09-07', false],
+    ])
+  })
+
+  function historyHarness(fails: (boolean | 'future')[]) {
+    let clock = NOW.getTime()
+    const asked: [string, string][] = []
+    const inserted: CachedRate[][] = []
+    const warnings: string[] = []
+    const run = officialRatesRefresh({
+      primary: feed('cba').feed,
+      fallbacks: [],
+      rates: {
+        upsert: () => Promise.resolve(),
+        latestOnOrBefore: () => Promise.resolve([]),
+        history: () => Promise.resolve(new Map()),
+      },
+      log: {
+        warn: (_details, message) => {
+          warnings.push(message)
+        },
+      },
+      now: () => new Date(clock),
+      history: {
+        feed: {
+          fetchRange: (from, to) => {
+            asked.push([from, to])
+            const outcome = fails.shift()
+            if (outcome === 'future') return Promise.resolve([day('2026-09-21', 4_312_300n)])
+            return outcome
+              ? Promise.reject(new Error('down'))
+              : Promise.resolve([day(FRIDAY, 4_312_300n)])
+          },
+        },
+        rates: {
+          between: () => Promise.resolve([]),
+          insertMissing: (rates) => {
+            inserted.push([...rates])
+            return Promise.resolve(rates.length)
+          },
+        },
+      },
+    })
+    return {
+      run,
+      asked,
+      inserted,
+      warnings,
+      pass: (ms: number) => {
+        clock += ms
+      },
+    }
+  }
+
+  it('asks for the whole archive since 2022 once a day', async () => {
+    const history = historyHarness([false])
+    await history.run()
+    history.pass(HISTORY_EVERY_MS - 1)
+    await history.run()
+    expect(history.asked).toEqual([[OFFICIAL_HISTORY_FROM, '2026-09-19']])
+    expect(history.inserted).toEqual([[{ ...day(FRIDAY, 4_312_300n), jump: false }]])
+    history.pass(1)
+    await history.run()
+    expect(history.asked).toHaveLength(2)
+  })
+
+  it('refuses an archive with a day past tomorrow, writes none of it, asks again in six hours', async () => {
+    const history = historyHarness(['future', false])
+    await history.run()
+    expect(history.inserted).toEqual([])
+    expect(history.warnings).toEqual(['official history failed'])
+    history.pass(60 * 60 * 1000)
+    await history.run()
+    expect(history.asked).toHaveLength(1)
+    history.pass(HISTORY_RETRY_MS)
+    await history.run()
+    expect(history.inserted).toHaveLength(1)
+  })
+
+  it('asks again six hours after a failure, not every hour', async () => {
+    const history = historyHarness([true, false])
+    await history.run()
+    expect(history.warnings).toEqual(['official history failed'])
+    history.pass(HISTORY_RETRY_MS - 1)
+    await history.run()
+    expect(history.asked).toHaveLength(1)
+    history.pass(1)
+    await history.run()
+    expect(history.inserted).toHaveLength(1)
   })
 })

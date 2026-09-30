@@ -118,6 +118,7 @@ function columnsOf(input: Omit<ExchangeBody, 'id'>) {
     exchangedOn: input.exchangedOn,
     heldBeforeMinor: input.heldBefore?.minor ?? null,
     note: input.note ?? null,
+    channel: input.channel ?? null,
   }
 }
 
@@ -134,6 +135,14 @@ function saysFact(row: Row, input: Omit<ExchangeBody, 'id'>): boolean {
   return (Object.keys(columns) as (keyof typeof columns)[]).every(
     (column) => row[column] === columns[column],
   )
+}
+
+/**
+ * The channel left out — a screen older than it (MOL-137) — is the row's own: kept by an amendment
+ * and matching anything in a repeat, as an account left out is (Р-26).
+ */
+function withChannelOf<Input extends Omit<ExchangeBody, 'id'>>(row: Row, input: Input): Input {
+  return input.channel === undefined ? { ...input, channel: row.channel } : input
 }
 
 /**
@@ -174,6 +183,7 @@ function toExchange(row: Row): Exchange {
         ? null
         : { minor: row.heldBeforeMinor, currency: row.receivedCurrency },
     note: row.note,
+    channel: row.channel,
     givenAccountId: row.givenAccountId,
     receivedAccountId: row.receivedAccountId,
     revision: row.revision,
@@ -198,12 +208,12 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
         const held = theRow(same, 'exchanges')
         // A removed exchange still holds its name until it is final; «Вернуть» brings it back.
         if (held.deletedAt !== null) throw new DomainError(ERROR.CONFLICT)
-        if (!saysAsSent(held, input)) throw new DomainError(ERROR.CONFLICT)
+        if (!saysAsSent(held, withChannelOf(held, input))) throw new DomainError(ERROR.CONFLICT)
         return { exchange: toExchange(held), created: false }
       })
     },
 
-    async amend(actorId, id, input) {
+    async amend(actorId, id, sent) {
       const own = idOrNull(id)
       if (own === null) throw new DomainError(ERROR.NOT_FOUND)
       return translateFailures(() =>
@@ -222,6 +232,7 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
             )
             .for('update')
           if (!row) throw new DomainError(ERROR.NOT_FOUND)
+          const input = withChannelOf(row, sent)
           if (says(row, input)) {
             return { exchange: toExchange(row), amended: false, accountsOnly: false }
           }
@@ -253,6 +264,7 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
             exchangedOn: row.exchangedOn,
             heldBeforeMinor: row.heldBeforeMinor,
             note: row.note,
+            channel: row.channel,
             // One moment for both: the version stopped being the exchange when the amendment
             // was made. `now()` is the transaction's own, the same in both statements.
             replacedAt: sql`now()`,
@@ -300,6 +312,7 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
               ? null
               : { minor: row.heldBeforeMinor, currency: row.receivedCurrency },
           note: row.note,
+          channel: row.channel,
           replacedAt: row.replacedAt,
         })
         byExchange.set(row.exchangeId, versions)

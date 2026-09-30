@@ -142,6 +142,11 @@
      `AppScreen` sets it — and what floats over the list rises above it (MOL-132). */
   --dock-height: 0px;
 
+  /* How tall the page is held while a change of the query redraws the screen: down to the bottom of
+     the window, so that a shorter version does not bring the scroll up (MOL-138). Zero until such a
+     move — `installHeightHold` in transitions.ts sets it and takes it away. */
+  --page-hold: 0px;
+
   /* ── Motion ───────────────────────────────────────────────────────────── */
   --dur-fast: 120ms; /* state change on a control */
   --dur: 220ms; /* sheet, push, tab */

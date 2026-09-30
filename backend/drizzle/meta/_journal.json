@@ -236,8 +236,15 @@
     {
       "idx": 33,
       "version": "7",
-      "when": 1790782752998,
-      "tag": "0033_barcode_authors",
+      "when": 1790783351974,
+      "tag": "0033_market_rates",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1790787580585,
+      "tag": "0034_barcode_authors",
       "breakpoints": true
     }
   ]

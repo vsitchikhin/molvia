@@ -68,6 +68,7 @@ function exchange(given: string, received: string, on: string): Exchange {
     exchangedOn: on,
     heldBefore: null,
     note: null,
+    channel: null,
     givenAccountId: null,
     receivedAccountId: null,
     revision: 1,
