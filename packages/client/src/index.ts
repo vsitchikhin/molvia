@@ -202,7 +202,7 @@ export interface MolviaClient {
   updateExpense(tripId: string, expenseId: string, patch: ExpensePatch): Promise<TripView>
   removeExpense(tripId: string, expenseId: string): Promise<TripView>
   /** «Завершить». Finishing twice is not an error. */
-  finishTrip(tripId: string, finishedOnDeviceAt?: Date): Promise<void>
+  finishTrip(tripId: string, finishedOnDeviceAt?: Date, finishedOn?: string): Promise<void>
   /**
    * «Считать по новому курсу / по прежнему / по своему» when the rate the trip took jumped
    * (`rateJump`). Safe to repeat; a trip with nothing to choose between rejects with
@@ -734,12 +734,14 @@ export function createClient(options: ClientOptions): MolviaClient {
       }),
 
     // 204 has no body, and nothing else is a success here.
-    finishTrip: async (tripId, finishedOnDeviceAt) => {
+    finishTrip: async (tripId, finishedOnDeviceAt, finishedOn) => {
+      const body = {
+        ...(finishedOnDeviceAt ? { finishedOnDeviceAt } : {}),
+        ...(finishedOn ? { finishedOn } : {}),
+      }
       await request(`/trips/${segment(tripId)}/finish`, z.undefined(), {
         method: 'POST',
-        ...(finishedOnDeviceAt
-          ? { body: encode(finishTripBodySchema, { finishedOnDeviceAt }) }
-          : {}),
+        ...(Object.keys(body).length > 0 ? { body: encode(finishTripBodySchema, body) } : {}),
       })
     },
     rateItem: async (itemId, rating) => {

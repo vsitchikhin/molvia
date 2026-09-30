@@ -27,7 +27,8 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/composables/useAnnouncer.ts` — Composable: the app's one polite live region — provided in `App.vue`, used by blocks to say and take back words.
 - `frontend/src/composables/useBackLabel.ts` — Composable: which back label fits the row (parent's title, «Back», or the chevron alone), measured by a resize observer.
 - `frontend/src/composables/useCollapsed.ts` — Composable: whether the large title has scrolled past the pinned row (sentinel observer), and an element's live height.
-- `frontend/src/composables/useKeyboardInset.ts` — Composable: lifts an open sheet above the iOS on-screen keyboard through `--keyboard-inset`.
+- `frontend/src/composables/useKeyboardInset.ts` — Composable: lifts an open sheet above the iOS on-screen keyboard and sizes it by the visual viewport (`--keyboard-inset`, `--viewport-height`); scrolls the sheet to the field typed in when the sheet moves.
+- `frontend/src/composables/useLocalDay.ts` — Composable: the phone's today as a screen holds it, asked again when the app comes back into view or online (MOL-121).
 - `frontend/src/composables/useReconnect.ts` — Composable: calls a screen's retry when the connection may be back — `online` or the app coming into view.
 - `frontend/src/composables/useSheetDrag.ts` — Composable: a sheet pulled down from the top of its content follows the finger and closes past a quarter or on a flick.
 - `frontend/src/composables/useSheetHistory.ts` — Composable: the history entry an open sheet holds, closing on pop, putting the page back and focus on its opener; the stale-entry guard.
@@ -44,7 +45,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/public/` — Static assets served as is: `favicon.svg` (the icon source), the rasterised app icons and the self-hosted font files.
 - `frontend/src/App.vue` — The app's root: the login screen in place of any non-public route, the live region, and the occasions on which the queues send.
 - `frontend/src/api.ts` — The PWA's one API client, wrapped so that any `error.no_actor` raises the login screen.
-- `frontend/src/days.ts` — Day words for the screen: «сегодня»/«вчера» of a purchase, a month's name, `calendarDay` for Yerevan dates, `shiftDay`.
+- `frontend/src/days.ts` — Day words for the screen: «сегодня»/«вчера» of a purchase, a month's name, `calendarDay` for calendar days, `shiftDay`, `localDay` — the phone's today — and `dayWords` for a card's head (MOL-121).
 - `frontend/src/i18n.ts` — The i18n factory for the app and tests alike: locale from the model, Russian plural rule, English fallback, the document's `lang`.
 - `frontend/src/i18n/` — The dictionaries, `ru.json` and `en.json`: every text of the PWA by key, error-registry codes included.
 - `frontend/src/i18n/i18n.test.ts` — Test: both dictionaries mirror each other, compile, pluralise right and translate every error code; Russian plural forms; `lang`.

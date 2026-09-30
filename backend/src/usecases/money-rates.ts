@@ -11,10 +11,11 @@ import type {
   Receipt,
 } from '@molvia/model'
 import { freshOfficialRate, officialRateOf, officialRatesOn, sinceDay } from './exchanges'
+import type { Today } from './today'
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
-type Owner = Pick<Actor, 'id' | 'incomeCurrency'>
+type Owner = Pick<Actor, 'id' | 'incomeCurrency'> & Today
 
 const FOREIGN = currencySchema.options.filter(
   (currency): currency is AmdRate['currency'] => currency !== 'AMD',
@@ -72,7 +73,7 @@ export async function dayRates(repositories: Repositories, owner: Owner): Promis
     ]),
     conversion,
   )
-  const cut = sinceDay(since)
+  const cut = sinceDay(since, owner)
   const cache = new Map<string, Promise<readonly CachedRate[]>>()
   const officialRows = (day: string) => {
     const held = cache.get(day)

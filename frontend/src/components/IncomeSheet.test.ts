@@ -105,6 +105,20 @@ async function save(view: VueWrapper, label = en.income.sheet.save): Promise<voi
 }
 
 describe('IncomeSheet', () => {
+  // The phone's today (MOL-121, Т-3): at 20:30 UTC it is the 28th here and the 29th in Yerevan.
+  it('starts on the phone’s today, and allows no later', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-28T20:30:00Z'))
+    try {
+      const view = await render()
+      const day = field(view, en.income.sheet.day).get('input').element as HTMLInputElement
+      expect(day.value).toBe('2026-09-28')
+      expect(day.max).toBe('2026-09-28')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('records the amount in the currency of conversion by default, with its source', async () => {
     record.mockResolvedValue(undefined)
     const view = await render()

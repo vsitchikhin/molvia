@@ -1,6 +1,7 @@
 import process from 'node:process'
 import { createBotClient } from '@molvia/client'
 import { assembleBot, startBot } from './assemble'
+import { startReminders } from './remind'
 import { botToken, readEnvironment, refusedNames } from './env'
 import type { BotEnvironment } from './env'
 
@@ -53,22 +54,39 @@ if (!environment.secret) {
  */
 const API_TIMEOUT_MS = 5_000
 
-const runner = startBot(
-  assembleBot(botToken, {
-    api: createBotClient({
-      baseUrl: environment.apiBaseUrl,
-      secret: environment.secret,
-      timeoutMs: API_TIMEOUT_MS,
-    }),
-    appUrl: environment.appBaseUrl,
+/**
+ * How long a claim of reminders is waited for — not the press's five seconds (MOL-101,
+ * adversarial А). No finger is on a button here, and the API marks everybody it hands over as it
+ * goes: a claim given up on early is a minute of reminders marked and never sent. Up to fifty
+ * people, each claimed in a transaction of their own, fit in it with room to spare.
+ */
+const CLAIM_TIMEOUT_MS = 30_000
+
+const api = createBotClient({
+  baseUrl: environment.apiBaseUrl,
+  secret: environment.secret,
+  timeoutMs: API_TIMEOUT_MS,
+})
+const bot = assembleBot(botToken, { api, appUrl: environment.appBaseUrl })
+const runner = startBot(bot)
+// The rating reminders (MOL-101): every minute the API is asked who is due, and they are sent.
+const stopReminders = startReminders(
+  createBotClient({
+    baseUrl: environment.apiBaseUrl,
+    secret: environment.secret,
+    timeoutMs: CLAIM_TIMEOUT_MS,
   }),
+  bot.api,
+  environment.appBaseUrl,
 )
 
 // The runner keeps fetching updates until it is told to stop, and a kill without this leaves
 // whatever it is holding half-handled. Compose sends SIGTERM on every deploy.
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
-    void runner.stop()
+    // Side by side, not one after the other (adversarial З): the runner stops taking updates while
+    // the evening's last messages go out, and neither waits for the other inside the grace period.
+    void Promise.all([stopReminders(), runner.stop()])
   })
 }
 

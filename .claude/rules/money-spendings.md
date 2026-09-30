@@ -207,15 +207,44 @@ nothing up.
   made while it was open was undone by the step back that closes it. It checks the day — a cleared
   picker or a day before 2000 would fall over in the queue's codec — and that the category is one of
   the chips shown, since one the server called unknown stands on none (adversarial Д, Ж).
-- **Days of Yerevan are printed as calendar days, never as moments** (`calendarDay` in `days.ts`,
-  review Т-1): `yerevanMidnight(day)` is the evening before anywhere west of UTC+4, and every date
-  of the screen came out a day early on a phone in Moscow. The frontend's tests run in UTC on every
+- **A day is printed as a calendar day, never as a moment** (`calendarDay` in `days.ts`, review
+  Т-1): `yerevanMidnight(day)` is the evening before anywhere west of UTC+4, and every date of the
+  screen came out a day early on a phone in Moscow. The frontend's tests run in UTC on every
   machine (`TZ` in its vitest config), where such a slip shows.
+- **«Сегодня» is the phone's day, on the phone and on the server** (MOL-121, owner's decisions В-3
+  and «делаем все в 121»). On the phone it is `localDay`: the day a sheet offers and allows, «Сегодня
+  · …» over the journal, the month «Деньги» opens on and the head of an exchange's or an income's card
+  («Сегодня», «Вчера», `dayWords` — day against day, never a moment; the button and the rate keep the
+  date, В-1), asked again when the app comes back into view (`useLocalDay`, adversarial Н). At 23:30
+  in Moscow it is still the 28th for the person holding the phone, whatever the hour in Yerevan.
+  **The server hears it on every request** (`TODAY_HEADER`, set by the client's `today`) and counts
+  every «today» of money by it — the wallet and what a sheet asks «сколько было до» by (`ownMoney`,
+  adversarial О), a trip's own and official rate at its start, the running month (its rate, what is
+  frozen, «Остаток»), the charts, the balances and the day of a check (adversarial М, И). The hook
+  holds it to the days that are today somewhere now (`todayFrom`: `earliestDay…latestDay`) and takes
+  Yerevan's where none is named — the bot, a page older than the header. **Beside it the phone
+  names its zone** (`ZONE_HEADER`, an IANA name, `isTimeZone`): a moment the server stamped itself
+  is a day in it — the end of the day an exchange counts purchases from (`spentFrom`), the day the
+  currency of conversion changed (`sinceDay`) — summer time included (`dayIn`, `midnightIn`); by
+  Yerevan's, a purchase before a Moscow exchange at 23:30 was taken off its money twice, and a
+  salary right after a change of the currency was «the old reckoning» (adversarial round 4 У, Ч).
+  The zone of the request, not of the record: a person who flew since writing is judged where they
+  are now. **A write is refused as «in
+  the future» only past `latestDay`**: a queued write may leave a day later, and its day is judged
+  against the latest day on Earth, never against the request's today. **A trip keeps the phone's day
+  of its taps** (`started_on`, `finished_on`, adversarial К): the queue sends a start and a finish
+  when it can, so the day comes in the body, worked out from the moment of the tap by the phone's
+  calendar; «Деньги» file the trip under the day «Завершить» was tapped, beside the spendings that
+  phone dated, and an account under the day «Начать» was — not more than a day before the server's
+  (Ж1). A trip from an old queue has neither and keeps the server's day of the moment. The sheet of a
+  spending lets an amendment keep its own day when it is ahead of the phone's — a spending typed on a
+  phone further east (adversarial Л). End-to-end runs the browser in `Asia/Yerevan`, a phone in
+  Armenia; the component tests run in UTC and hold the phone's day where it is not Yerevan's.
 - **The categories are the owner's, not a month's**, so the newest month kept names them for a
   month not read yet: «Трата» stands while the month loads, when it failed and offline on the first
   of a month (review Т-5, Т-6) — and does not, where no category is known at all. «Категории ›»
-  stands without bars too (Т-7). This month in Yerevan is looked at again whenever the app comes
-  back into view (adversarial З).
+  stands without bars too (Т-7). This month on the phone (MOL-121) is looked at again whenever the app
+  comes back into view (adversarial З).
 - **«Пусто» is read off the answer** (Р-6): the running month empty, no income, nothing the month
   before and nothing waiting. The server does not say «no history», and an empty August after a
   full July is «В этом месяце трат нет», not a newcomer.

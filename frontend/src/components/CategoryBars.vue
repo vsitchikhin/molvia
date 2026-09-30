@@ -41,10 +41,11 @@ import { useI18n } from 'vue-i18n'
 import IconChart from '~icons/mdi/chart-bar'
 import IconChevron from '~icons/mdi/chevron-right'
 import IconShape from '~icons/mdi/shape-outline'
-import { chartMonths, formatEstimate, monthOf, shareOf, yerevanDate } from '@molvia/model'
+import { chartMonths, formatEstimate, monthOf, shareOf } from '@molvia/model'
 import type { MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import { categoryColour } from '@/components/spending'
+import { localDay } from '@/days'
 
 /**
  * «Куда ушли» (MOL-82, handoff 01): a bar per category, largest first — the server's order and its
@@ -70,9 +71,7 @@ export default defineComponent({
      * seen in the month it was tapped on (adversarial А); older still, it is drawn as months of nothing.
      */
     const period = computed(() =>
-      chartMonths(monthOf(yerevanDate(new Date())), 6).includes(props.month.month)
-        ? {}
-        : { period: '12' },
+      chartMonths(monthOf(localDay()), 6).includes(props.month.month) ? {} : { period: '12' },
     )
     const rows = computed(() =>
       props.month.byCategory.flatMap(({ categoryId, amount }) => {

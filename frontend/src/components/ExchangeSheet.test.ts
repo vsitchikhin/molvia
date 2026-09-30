@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
-import { ERROR, parseRate, yerevanDate, yerevanMidnight } from '@molvia/model'
+import { ERROR, parseRate, yerevanMidnight } from '@molvia/model'
 import type {
   ExchangeAmendBody,
   ExchangeBody,
@@ -126,15 +126,23 @@ async function save(view: VueWrapper): Promise<void> {
 }
 
 describe('ExchangeSheet', () => {
-  it('starts in the pair the trips convert by, dated today in Yerevan', async () => {
-    const view = await render()
-    const selects = view
-      .findAll('select')
-      .map((select) => (select.element as HTMLSelectElement).value)
-    expect(selects).toEqual(['RUB', 'AMD'])
-    expect(
-      (field(view, en.exchange.sheet.day).get('input').element as HTMLInputElement).value,
-    ).toBe(yerevanDate(new Date()))
+  // Dated by the phone's calendar (MOL-121, В-3): at 20:30 UTC, the zone the tests run in, it is
+  // still the 28th here while Yerevan is on the 29th.
+  it('starts in the pair the trips convert by, dated today on the phone', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-28T20:30:00Z'))
+    try {
+      const view = await render()
+      const selects = view
+        .findAll('select')
+        .map((select) => (select.element as HTMLSelectElement).value)
+      expect(selects).toEqual(['RUB', 'AMD'])
+      const input = field(view, en.exchange.sheet.day).get('input').element as HTMLInputElement
+      expect(input.value).toBe('2026-09-28')
+      expect(input.max).toBe('2026-09-28')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('sends the amounts as the person typed them, with what was held when given', async () => {

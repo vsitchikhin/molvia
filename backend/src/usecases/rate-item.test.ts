@@ -45,7 +45,7 @@ function deps(found: Item | null, puts: [string, NewVerdict][] = []) {
   const verdicts = {
     put: (actorId: string, input: NewVerdict) => {
       puts.push([actorId, input])
-      return Promise.resolve({ verdict: verdictFrom(input), created: true })
+      return Promise.resolve({ verdict: verdictFrom(input), created: true, first: true })
     },
   } as Pick<VerdictRepository, 'put'> as VerdictRepository
   return { items, verdicts }

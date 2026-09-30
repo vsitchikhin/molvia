@@ -15,7 +15,6 @@ import {
   spendingViewCodec,
 } from '@molvia/model'
 import type {
-  Actor,
   ChartPeriod,
   JournalKey,
   MoneyChartsView,
@@ -28,24 +27,25 @@ import type {
   SpendingView,
 } from '@molvia/model'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { Asking } from './actor'
 import { parseBody, parseQuery } from '@/parse'
 
 export interface SpendingsApi {
   /** The use cases, already bound to their repositories by the composition point. */
-  record(actor: Actor, body: SpendingBody): Promise<{ spending: SpendingView; created: boolean }>
-  amend(actor: Actor, id: string, body: SpendingAmendBody): Promise<SpendingView>
-  remove(actor: Actor, id: string): Promise<void>
-  restore(actor: Actor, id: string): Promise<SpendingView>
-  categories(actor: Actor): Promise<SpendingCategoriesResponse>
+  record(actor: Asking, body: SpendingBody): Promise<{ spending: SpendingView; created: boolean }>
+  amend(actor: Asking, id: string, body: SpendingAmendBody): Promise<SpendingView>
+  remove(actor: Asking, id: string): Promise<void>
+  restore(actor: Asking, id: string): Promise<SpendingView>
+  categories(actor: Asking): Promise<SpendingCategoriesResponse>
   addCategory(
-    actor: Actor,
+    actor: Asking,
     body: SpendingCategoryBody,
   ): Promise<{ list: SpendingCategoriesResponse; created: boolean }>
-  archiveCategory(actor: Actor, id: string, archived: boolean): Promise<SpendingCategoriesResponse>
-  month(actor: Actor, month: string, cursor?: JournalKey): Promise<MoneyMonthView>
-  charts(actor: Actor, period: ChartPeriod): Promise<MoneyChartsView>
-  salaryShift(actor: Actor): Promise<SalaryShift>
-  setSalaryShift(actor: Actor, body: SalaryShift): Promise<SalaryShift>
+  archiveCategory(actor: Asking, id: string, archived: boolean): Promise<SpendingCategoriesResponse>
+  month(actor: Asking, month: string, cursor?: JournalKey): Promise<MoneyMonthView>
+  charts(actor: Asking, period: ChartPeriod): Promise<MoneyChartsView>
+  salaryShift(actor: Asking): Promise<SalaryShift>
+  setSalaryShift(actor: Asking, body: SalaryShift): Promise<SalaryShift>
 }
 
 /** Spendings are the person's own money: private always, never in a shared cache. */
@@ -53,10 +53,10 @@ function privately(reply: FastifyReply) {
   return reply.header('cache-control', 'no-store')
 }
 
-function ownerOf(request: FastifyRequest): Actor {
+function ownerOf(request: FastifyRequest): Asking {
   const actor = request.actor
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
-  return actor
+  return { ...actor, today: request.today, ...(request.zone ? { zone: request.zone } : {}) }
 }
 
 /**

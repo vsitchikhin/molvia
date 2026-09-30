@@ -246,6 +246,107 @@ export function yerevanMidnight(date: string): Date {
   return new Date(Date.parse(`${date}T00:00:00.000Z`) - YEREVAN_OFFSET_MS)
 }
 
+const LATEST_OFFSET_MS = 14 * 60 * 60 * 1000
+
+/**
+ * The latest calendar day at `instant` anywhere on Earth — UTC+14. A day a person writes is their
+ * phone's (MOL-121, owner's decision В-3): east of Yerevan after the phone's midnight it is a day
+ * Yerevan has not reached yet, and «not in the future» means not past this one, never past
+ * Yerevan's. At most Yerevan's tomorrow — and from 14:00 in Yerevan it is that tomorrow already, so
+ * the server alone lets a person in Yerevan write tomorrow's spending: the sheet's `max`, the
+ * phone's today, is what keeps them to today (review Т-5).
+ */
+export function latestDay(instant: Date): string {
+  return new Date(instant.getTime() + LATEST_OFFSET_MS).toISOString().slice(0, 10)
+}
+
+const EARLIEST_OFFSET_MS = 12 * 60 * 60 * 1000
+
+/**
+ * The earliest calendar day at `instant` anywhere on Earth — UTC−12. With `latestDay`, the days a
+ * phone's today can be right now: at most Yerevan's yesterday.
+ */
+export function earliestDay(instant: Date): string {
+  return new Date(instant.getTime() - EARLIEST_OFFSET_MS).toISOString().slice(0, 10)
+}
+
+/** Whether `zone` is a time zone this runtime knows by name — `Europe/Moscow`, never an offset. */
+export function isTimeZone(zone: string): boolean {
+  if (!/^[A-Za-z][A-Za-z0-9_+\-/]{0,63}$/.test(zone)) return false
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The calendar day at `instant` in the phone's zone (`ZONE_HEADER`, MOL-121, adversarial round 4 У, Ч)
+ * — and Yerevan's where the phone named none. What a moment the server stamped — a record written, a
+ * setting changed — is a day of, beside the days the phone names.
+ */
+export function dayIn(instant: Date, zone?: string): string {
+  if (zone === undefined) return yerevanDate(instant)
+  const parts = wallClock(instant, zone)
+  const pad = (value: number, width = 2) => String(value).padStart(width, '0')
+  return `${pad(parts.year, 4)}-${pad(parts.month)}-${pad(parts.day)}`
+}
+
+/** The instant `day` begins in `zone` — Yerevan's midnight without one. Summer time included. */
+export function midnightIn(day: string, zone?: string): Date {
+  if (zone === undefined) return yerevanMidnight(day)
+  const wall = Date.parse(`${day}T00:00:00.000Z`)
+  // Twice: the offset at the first guess may be the other side of a change of the clocks.
+  const first = wall - offsetOf(new Date(wall), zone)
+  return new Date(wall - offsetOf(new Date(first), zone))
+}
+
+function wallClock(instant: Date, zone: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: zone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+  }).formatToParts(instant)
+  const part = (type: string) => Number(parts.find((one) => one.type === type)?.value ?? 0)
+  return {
+    year: part('year'),
+    month: part('month'),
+    day: part('day'),
+    hour: part('hour'),
+    minute: part('minute'),
+    second: part('second'),
+  }
+}
+
+/** How far the clocks of `zone` stand ahead of UTC at `instant`, in milliseconds. */
+function offsetOf(instant: Date, zone: string): number {
+  const at = wallClock(instant, zone)
+  const wall = Date.UTC(at.year, at.month - 1, at.day, at.hour, at.minute, at.second)
+  return wall - (instant.getTime() - instant.getUTCMilliseconds())
+}
+
+/**
+ * Today as a request names it (`TODAY_HEADER`, MOL-121): the phone's day, held to the days that are
+ * today somewhere at `instant` — a phone with a wrong clock is brought to the nearest of them, since
+ * «today» is the person's now and not a fact they typed. Nothing sent, or not a day, and it is
+ * Yerevan's: the bot, a page older than the header.
+ */
+export function todayFrom(sent: string | undefined, instant: Date): string {
+  if (sent === undefined || !isRateDay(sent)) {
+    return yerevanDate(instant)
+  }
+  const earliest = earliestDay(instant)
+  const latest = latestDay(instant)
+  if (sent < earliest) return earliest
+  return sent > latest ? latest : sent
+}
+
 /**
  * A day a rate may be dated by: a real calendar day whose Yerevan midnight the snapshot accepts.
  * `Date.parse('2026-02-31')` is the 3rd of March, not NaN, and `0001-01-01` is what a .NET service
@@ -253,10 +354,18 @@ export function yerevanMidnight(date: string): Date {
  * holds what no trip could take.
  */
 export function isRateDay(date: string): boolean {
+  return isCalendarDay(date) && yerevanMidnight(date) >= RATE_EPOCH
+}
+
+/**
+ * `2026-09-28` and a day that exists: four digits of year, and `2026-02-31` — which `Date.parse`
+ * reads as the 3rd of March — is not one. The one check of «a calendar day», for a rate's day, a
+ * phone's today and the day of a tap alike (MOL-121, review Т-8).
+ */
+export function isCalendarDay(date: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
-  const parsed = new Date(`${date}T00:00:00.000Z`)
-  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return false
-  return yerevanMidnight(date) >= RATE_EPOCH
+  const parsed = Date.parse(`${date}T00:00:00.000Z`)
+  return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === date
 }
 
 /**

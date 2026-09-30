@@ -6,17 +6,18 @@ import {
   incomeBodySchema,
   incomesResponseCodec,
 } from '@molvia/model'
-import type { Actor, IncomeAmendBody, IncomeBody, IncomesResponse } from '@molvia/model'
+import type { IncomeAmendBody, IncomeBody, IncomesResponse } from '@molvia/model'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { Asking } from './actor'
 import { parseBody } from '@/parse'
 
 export interface IncomesApi {
   /** The use cases, already bound to their repositories by the composition point. */
-  overview(actor: Actor): Promise<IncomesResponse>
-  record(actor: Actor, body: IncomeBody): Promise<{ overview: IncomesResponse; created: boolean }>
-  amend(actor: Actor, id: string, body: IncomeAmendBody): Promise<IncomesResponse>
-  remove(actor: Actor, id: string): Promise<IncomesResponse>
-  restore(actor: Actor, id: string): Promise<IncomesResponse>
+  overview(actor: Asking): Promise<IncomesResponse>
+  record(actor: Asking, body: IncomeBody): Promise<{ overview: IncomesResponse; created: boolean }>
+  amend(actor: Asking, id: string, body: IncomeAmendBody): Promise<IncomesResponse>
+  remove(actor: Asking, id: string): Promise<IncomesResponse>
+  restore(actor: Asking, id: string): Promise<IncomesResponse>
 }
 
 /** Incomes are the person's own money: private always, never in a shared cache. */
@@ -25,10 +26,10 @@ function answer(reply: FastifyReply, overview: IncomesResponse) {
 }
 
 /** The hook guarantees it; checked rather than asserted, so a reader need not know that. */
-function ownerOf(request: FastifyRequest): Actor {
+function ownerOf(request: FastifyRequest): Asking {
   const actor = request.actor
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
-  return actor
+  return { ...actor, today: request.today, ...(request.zone ? { zone: request.zone } : {}) }
 }
 
 /**

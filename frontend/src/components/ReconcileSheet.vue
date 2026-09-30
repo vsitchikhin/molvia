@@ -215,6 +215,11 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 import type { QueuedWrite } from '@/stores/tripQueue'
 
 type Reason = AccountCheckResponse['reasons'][number]
+/** A check as this sheet sends it: the day is the request's (MOL-121). */
+interface Check {
+  readonly id: string
+  readonly fact: Money
+}
 
 /**
  * «Сверка» (MOL-123, handoff 05): the check looks for the reason before it offers to close the
@@ -282,9 +287,9 @@ export default defineComponent({
     const writing = ref(false)
     const written = ref(false)
     /** The check as sent: the same fact goes under the same name, another under a new one (Р-19). */
-    let sent: { id: string; fact: Money } | null = null
+    let sent: Check | null = null
     /** The check last asked — its answer may be lost after the server wrote it (review 6). */
-    let tried: { id: string; fact: Money } | null = null
+    let tried: Check | null = null
     /** Which answer is awaited: a recount landing late must not take the sheet back (review 3). */
     let asking = 0
     /** The name of «Прочее · сверка» for this difference: a second tap writes the same one. */
@@ -317,7 +322,7 @@ export default defineComponent({
     const shortDay = (day: string) => dayOf(day, locale.value)
     const matched = computed(() => result.value?.difference.minor === 0n)
 
-    async function ask(check: { id: string; fact: Money }): Promise<boolean> {
+    async function ask(check: Check): Promise<boolean> {
       failure.value = null
       const mine = ++asking
       try {

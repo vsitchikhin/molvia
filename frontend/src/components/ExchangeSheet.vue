@@ -132,7 +132,6 @@ import {
   isPlausibleExchange,
   isRateDay,
   parseMoney,
-  yerevanDate,
 } from '@molvia/model'
 import type {
   Currency,
@@ -152,7 +151,7 @@ import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
 import { useAccountChoice } from '@/composables/useAccountChoice'
 import { useAccountsStore } from '@/stores/accounts'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, purchaseDay } from '@/days'
+import { calendarDay, localDay, purchaseDay } from '@/days'
 import { newId } from '@/ids'
 
 type Side = 'given' | 'received'
@@ -209,7 +208,7 @@ export default defineComponent({
     const amounts = reactive<Record<Side, string>>({ given: '', received: '' })
     const currencies = reactive<Record<Side, Currency>>({ given: 'RUB', received: 'AMD' })
     const amountErrors = reactive<Record<Side, ErrorCode | null>>({ given: null, received: null })
-    const today = ref(yerevanDate(new Date()))
+    const today = ref(localDay())
     const day = ref(today.value)
     const held = ref('')
     const note = ref('')
@@ -259,7 +258,7 @@ export default defineComponent({
         currencies.received = editing?.received.currency ?? pair?.quote ?? 'AMD'
         amountErrors.given = null
         amountErrors.received = null
-        today.value = yerevanDate(new Date())
+        today.value = localDay()
         day.value = editing?.exchangedOn ?? today.value
         held.value = editing?.heldBefore ? typed(editing.heldBefore) : ''
         note.value = editing?.note ?? ''

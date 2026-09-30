@@ -1,4 +1,4 @@
-import { DomainError, ERROR, incomeMonths, resourceIdOf, yerevanDate } from '@molvia/model'
+import { DomainError, ERROR, incomeMonths, latestDay, resourceIdOf } from '@molvia/model'
 import type {
   Actor,
   Income,
@@ -11,11 +11,12 @@ import type {
 import { keptSide, knownAccounts, sideOf } from './account-of'
 import { earlier, ownMoney } from './exchanges'
 import type { TripRepositories } from '@/db/unit-of-work'
+import type { Today } from './today'
 
 type Repositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
 /** A write also lets go of the months frozen without it (MOL-73, В-6); it names an account too. */
 type Writing = Repositories & Pick<TripRepositories, 'money' | 'moneyAccounts'>
-type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
+type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'> & Today
 
 function viewOf(income: Income, history: readonly IncomeRevision[]): IncomeView {
   return {
@@ -88,8 +89,9 @@ async function dayOfIncome(
 }
 
 /**
- * «Записать доход». Not a day that has not come yet in Yerevan: money from tomorrow would enter
- * today's trips. 201 for a new income, and the screen whole either way.
+ * «Записать доход». Not a day that has not come yet anywhere (`latestDay`, MOL-121): the phone's day
+ * may be ahead of Yerevan's, and the walk leaves an income past the request's today out of the trips
+ * that request starts. 201 for a new income, and the screen whole either way.
  */
 export async function recordIncome(
   repositories: Writing,
@@ -97,7 +99,7 @@ export async function recordIncome(
   body: IncomeBody,
   now: Date = new Date(),
 ): Promise<{ overview: IncomesResponse; created: boolean }> {
-  if (body.receivedOn > yerevanDate(now)) throw new DomainError(ERROR.INCOME_IN_FUTURE)
+  if (body.receivedOn > latestDay(now)) throw new DomainError(ERROR.INCOME_IN_FUTURE)
   const accounts = await knownAccounts(repositories, owner)
   // Left out stays left out: a repeat from a screen older than accounts is still a repeat (Р-26).
   const sent =
@@ -121,7 +123,7 @@ export async function amendIncome(
   body: IncomeAmendBody,
   now: Date = new Date(),
 ): Promise<IncomesResponse> {
-  if (body.receivedOn > yerevanDate(now)) throw new DomainError(ERROR.INCOME_IN_FUTURE)
+  if (body.receivedOn > latestDay(now)) throw new DomainError(ERROR.INCOME_IN_FUTURE)
   await repositories.incomes.purgeRemoved(owner.id)
   const own = resourceIdOf(id)
   const held = (await repositories.incomes.list(owner.id)).find((income) => income.id === own)

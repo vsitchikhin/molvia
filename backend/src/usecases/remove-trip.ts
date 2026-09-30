@@ -1,4 +1,4 @@
-import { DomainError, ERROR, isDeviceTime } from '@molvia/model'
+import { DomainError, ERROR, isDeviceDay, isDeviceTime } from '@molvia/model'
 import type { RestoreTripBody, TripView } from '@molvia/model'
 import type { TripRepository } from '@/db/trips-repository'
 import type { CurrentTripDeps } from './current-trip'
@@ -31,8 +31,12 @@ export async function restoreTrip(
   now: Date = new Date(),
 ): Promise<TripView> {
   const at = body.finish?.finishedOnDeviceAt
+  const day = body.finish?.finishedOn
   const finish = body.finish
-    ? { ...(at && isDeviceTime(at, now) ? { deviceAt: at } : {}) }
+    ? {
+        ...(at && isDeviceTime(at, now) ? { deviceAt: at } : {}),
+        ...(day && isDeviceDay(day, now) ? { deviceDay: day } : {}),
+      }
     : undefined
   const trip = await deps.trips.restore(tripId, actorId, finish)
   if (!trip) throw new DomainError(ERROR.NOT_FOUND)
