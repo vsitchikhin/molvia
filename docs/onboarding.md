@@ -799,7 +799,10 @@ sheet (owner's decisions 30.09.2026: В-2 the question on the screen, В-3 for a
 included, naming who will see it). Anyone may write a code to any item and anyone may let it go — «Код
 … — не этот товар?» on the sheet of an item that came by a code (В-1); merging items stays MOL-106's.
 A write checks the digit (`writtenBarcode`), holds one package to one item with its twins under a lock
-per form, and a code another item holds writes nothing and answers `409` naming it. Who wrote a code is
+per form, and a code another item holds writes nothing and answers `409` naming it. The review of the PR
+and an adversarial pass added two owner's decisions: a shop's own code — a scale's label, an in-store
+EAN-8 — is never written and the screen says «этикетка магазина» (В-4), and a name already there takes
+no code silently but is asked about (В-5). Who wrote a code is
 `item_barcodes.added_by`: erasure nulls it, the copy lists one's own codes (version 3). Requirements
 and plan — `.scratch/tasks/{requirements,plans}/MOL-100.md`; the rules — `.claude/rules/barcodes.md`,
 «Writing a code».

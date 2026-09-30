@@ -127,7 +127,10 @@ lies on an iPad (as MOL-132 Р-3).
   another code than the one scanned; and so does an EAN-8 led by `0` that also checks as UPC-E —
   about one in ten of them, `00408295` among them: scanned it is eight digits, typed it is
   `0004082000095` (adversarial А). Such a code is a shop's own label, and a lookup by a code typed
-  from it (MOL-99) will not find what its scan found.
+  from it (MOL-99) will not find what its scan found. **Except two shops' labels in one UPC-A**
+  (MOL-100, Р-14): eight led by `0` that check both ways and whose UPC-A folds back into more than one
+  EAN-8 (`00000055`, `00000505`) stay eight when typed, as the scanner reads them — expanded, two labels
+  were written as one code. A real UPC-E with such digits, typed, is then found only by its scan.
 - **`barcodeSchema` was not made stricter** (Р-10): `itemSchema` reads with it, and a dozen fixtures
   carry codes whose check digit does not hold. The write checks the digit instead — `writtenBarcode`
   (MOL-100, below).
@@ -232,8 +235,11 @@ codes too, and a wrong one needs a way out (В-1, below).
 - **Two ways in, one rule.** «Предложить товар» takes the codes read from the package, up to
   `ITEM_BARCODES_MAX` (`proposedItemSchema`), written with the item or not at all; «привязать код к
   ней?» writes one to an item found by name (`POST /catalogue/items/:itemId/barcodes`, the code in the
-  body — the API logs paths, MOL-58). **A name the catalogue already holds takes the code** (Р-4): the
-  name typed is the person's «this is it», and a code dropped in silence is what the task forbids.
+  body — the API logs paths, MOL-58). **A name the catalogue already holds takes no code** (owner's
+  decision В-5, in place of Р-4): the answer is that item with nothing written (`200`), and the screen
+  asks about it the question any item found by name gets. Written silently, it was the way round В-3:
+  «Это другой товар — предложить» after declining «Молоко» opened with the name typed, «молоко», and the
+  code went to the very «Молоко» just declined (adversarial А).
 - **The code must check** (`writtenBarcode`, Р-1): a code written is written for everyone for good, and
   one whose last digit does not hold is on no package. Twelve digits and a GTIN-14 led by `0` are
   written as the thirteen the scanner reads; eight that check as EAN-8 as they came — the scanner reads
@@ -241,7 +247,20 @@ codes too, and a wrong one needs a way out (В-1, below).
   that check only as UPC-E are written as the thirteen** the scanner reads that UPC-E as (review А):
   `barcodeTwins` pairs no eight that fail as EAN-8, so kept as eight they were found by nothing — not
   by a scan, not by the digits typed — and the same package could be written to another item as its
-  thirteen. Repeats in one list are judged by the written forms, for the same reason.
+  thirteen. Repeats in one list are judged by the written forms, for the same reason. **A GTIN-14 of a
+  case** (led by `1`–`8`) is refused as `error.barcode_shape` (Р-12): no scan and no typing gives one,
+  and it would hold one of the twenty places for good.
+- **A shop's own code is never written** (`inStoreBarcode`, `error.barcode_in_store`, owner's decision
+  В-4). GS1 leaves «restricted circulation» to the shop: EAN-13 led by `020`–`029`, `040`–`049` and
+  `200`–`299` — UPC-A of number systems `2` and `4` among them — and EAN-8 led by `0` or `2`. The scales
+  print one on each package of loose goods — the item's number in that shop and its weight or price —
+  so another package is another code, twenty packages closed the item to codes for good, and the same
+  digits in another shop are another item (review Е, adversarial Б). **The screen does not ask**:
+  scanned or typed, such a code is «Код … — этикетка магазина», said out loud, with no request and no
+  code waiting — «найдите товар по названию». Loose goods are found by name, as they always were.
+  **The named prices**: a packaged item the shop labels with its own code is not found by a scan; and
+  the digits of an EAN-8 label led by `0` typed by hand are read as the UPC-E they also check as
+  (MOL-98 Р-11) — written so, they are found by typing, and the label's scan says «этикетка магазина».
 - **One package, one item — with its twins** (Р-2). The key of `item_barcodes` holds one string, and
   `00408295` at one item beside `0004082000095` at another would find one or the other by whether it was
   scanned or typed. So a write asks every form of every code (`barcodeTwins`) and takes a lock per form
@@ -252,8 +271,9 @@ codes too, and a wrong one needs a way out (В-1, below).
 - **A code held by another item is an answer, not an error** (Р-3): nothing is written — not the code,
   not the new item, which is most likely a duplicate of the holder — and a `409` carries the holder
   whole (`barcodeTakenSchema`), since the registry of errors has no room for an item. The client reads
-  that one body under that status as an answer (`answers: [409]` of the transport); a `409` with a code
-  of the registry is still the failure it was. The screen offers the holder: the package in the hand is
+  each status by its own schema (`answers: { 409: … }` of the transport, review И): «taken» only under
+  the `409`, the entry only under a `2xx`; a `409` with a code of the registry is still the failure it
+  was. The screen offers the holder: the package in the hand is
   what the catalogue knows it as. **The same code on the same item is success** (`200`) — a repeat after
   a lost answer — and keeps who wrote it first. **Twenty is the ceiling** (`error.barcodes_full`, `409`),
   counted under the item's lock: the database has no trigger for it.
@@ -264,7 +284,11 @@ codes too, and a wrong one needs a way out (В-1, below).
 - **«Не этот товар?» lets a code go, and anyone may** (owner's decision В-1): a quiet line on the
   purchase sheet of an item that came by a code — found, linked or proposed with it — whoever holds the
   package says it is not this one (`DELETE /catalogue/items/:itemId/barcodes?code=`, the code in the
-  query as the lookup's; `204` whether it was held or not). The item lets go of the code and whichever
+  query as the lookup's; `204` whether it was held or not). **Under the form, and asked first** (Р-9,
+  review Ж): «Отвязать код … от „…“? Его перестанут находить все» — «Отвязать» / «Отменить»; in the
+  footer under «Записать» a finger took it at the shelf, and it goes for everyone with no «Вернуть».
+  **In the form a write gives it** (Р-11, review К): `04252614` is written as `0042100005264`, and asked
+  by its eight a `204` let go of nothing; a code of no barcode's form is refused. The item lets go of the code and whichever
   twin it holds, never another item's; the device forgets it (`recentItems.forgetCode`) — in the sheet, which an answer still reaches after it was swiped away, when an emit to the screen no longer would (review Г); the sheet goes
   one step back, and the code is looked up again — nobody holds it, so it waits for its item. **The
   named price**: whoever wants to spoil a code can unbind it, accepted for 0.2's circle; `added_by` shows
@@ -280,10 +304,13 @@ codes too, and a wrong one needs a way out (В-1, below).
 - **A pick while a code waits asks first** — «Привязать код … к „…“?» — in a block where the code's
   block stood, not in a sheet (В-2): «taken», «no network» or an error is then said where the person
   is, and the purchase sheet comes only after the answer, one sheet at a time. The rows go while the
-  question stands, the focus goes to its first answer and the question is said out loud. **While the code is on its way the other answers wait** (review Б): «без кода» then would be written with the code anyway, and «другой товар» would meet it at the very item it was said not to be. **Three
+  question stands, the focus goes to its first answer and the question is said out loud. **An answer
+  «written» that lands after typing went on** opens no sheet, but the code no longer waits: the server
+  holds it (Р-13, adversarial Д). **While the code is on its way the other answers wait** (review Б): «без кода» then would be written with the code anyway, and «другой товар» would meet it at the very item it was said not to be. **Three
   answers**: «Привязать и записать»; «Записать без кода» — the code is let go; «Это другой товар —
   предложить» — the item found by name is not the package, and the code goes with the one proposed,
-  whose name starts from what was typed. **The question names who will see it** — «все, кто
+  whose name starts from what was typed — and if that name is one the catalogue holds, it is asked about
+  that item in turn (В-5). **The question names who will see it** — «все, кто
   отсканирует этот код, увидят эту позицию» — **and is asked for any item** (В-3), the seed's common
   «Молоко» included: the seed has no mark of its own (`created_by` is null for the erased as well), and
   the person with the package decides, the last answer at hand. Typing drops the question, and the code

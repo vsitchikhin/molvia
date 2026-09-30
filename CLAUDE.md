@@ -278,6 +278,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   (`writtenBarcode`); one package is one item with its twins, under a lock per form after the item's;
   a code another item holds writes nothing and answers `409` with the holder; `added_by` is erased
   and copied like an item's author; a pick while a code waits asks «привязать?» before the sheet.
+  **A shop's own code is never written** (`inStoreBarcode`, В-4), and a name already there takes no
+  code silently — it is asked about (В-5).
 
 ### Identity, sessions, the way in and out — `.claude/rules/auth.md`
 
