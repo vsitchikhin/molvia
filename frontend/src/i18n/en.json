@@ -472,7 +472,13 @@
     "rate_none": "No rate to convert by yet",
     "rate_value": "{amount} per 1 {sign}",
     "categories_title": "Where it went",
-    "charts_link": "Charts by month",
+    "summary": {
+      "charts": "Charts",
+      "donut_more": "{n} more slice in Charts | {n} more slices in Charts",
+      "donut_label": "Where it went: {list}. Open charts",
+      "donut_later": "Shares appear once the month is refreshed",
+      "donut_uncounted": "Shares appear once the spending has a rate"
+    },
     "charts": {
       "title": "Charts",
       "range": "{from} — {to}",
@@ -526,7 +532,8 @@
       "offline": {
         "strip": "No connection. Charts as of {when} — they update when the internet is back",
         "body": "Charts appear when the internet is back"
-      }
+      },
+      "rest": "Others"
     },
     "share_tiny": "<1 %",
     "categories_link": "Categories",

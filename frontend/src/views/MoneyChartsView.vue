@@ -222,8 +222,11 @@ import { useMoneyCharts } from '@/composables/useMoneyCharts'
 import { calendarDay, monthOf } from '@/days'
 
 /**
- * The category last chosen, for as long as the app is open (handoff 03, «в памяти вкладки»): the
- * charts opened again from «Графики по месяцам» come back to it.
+ * The category last chosen, for as long as the app is open (handoff 03, «в памяти вкладки»), for a
+ * way in that names none — the card of «Куда ушли» with no ring: an empty month, a month kept before
+ * the ring, one nothing was counted in by a rate. A category in the
+ * address comes first: the ring names its largest, the one just seen (MOL-156, owner's decision on
+ * adversarial round 2, Д), and so a tap on it leaves the one chosen here behind.
  */
 let lastCategory: string | null = null
 

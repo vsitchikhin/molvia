@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { spendingCategoryViewCodec, spendingCategoryViewOf, spendingViewCodec } from './spending'
 import { exchangeDaySchema } from '#model/entities/exchange'
+import { CHART_LEVEL, donutSlices } from '#model/entities/money-charts'
 import { journalKeyOf, journalOrder, lastDayOf } from '#model/entities/money-month'
 import type { JournalKey, MoneyMonth, MonthEntry } from '#model/entities/money-month'
 import type { Spending } from '#model/entities/spending'
@@ -120,6 +121,22 @@ export const moneyMonthCodec = z.strictObject({
   rateKind: z.enum(['live', 'frozen']),
   previousSpent: moneyCodec.nullable(),
   byCategory: z.array(z.strictObject({ categoryId: z.uuid(), amount: moneyCodec })),
+  /**
+   * The ring of «Куда ушли» (MOL-156): `donutSlices` of `byCategory` — six categories at most, the
+   * rest one «Остальные» (`categoryId` null) — with the levels the phone turns into angles. Defaulted
+   * so that a month the phone kept before the ring still reads through this strict codec, as a month
+   * with no ring until it is read again: the phone does not work one out (review 9 of MOL-156).
+   */
+  slices: z
+    .array(
+      z.strictObject({
+        categoryId: z.uuid().nullable(),
+        amount: moneyCodec,
+        count: z.int().min(1),
+        level: z.int().min(0).max(CHART_LEVEL),
+      }),
+    )
+    .default([]),
   categories: z.array(spendingCategoryViewCodec),
   days: z.array(
     z.strictObject({
@@ -213,6 +230,7 @@ export function moneyMonthViewOf(
     shiftedIn: [...month.shiftedIn],
     shiftedOut: [...month.shiftedOut],
     byCategory: [...month.byCategory],
+    slices: donutSlices(month.byCategory),
     previousSpent,
     categories: categoryOrder(categories).map(spendingCategoryViewOf),
     days,

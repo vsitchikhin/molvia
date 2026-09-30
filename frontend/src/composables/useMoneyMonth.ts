@@ -39,7 +39,9 @@ export interface MoneyMonth {
 /**
  * The last months read, per owner — the first page of each, the one the screen opens on. Three:
  * this month, the one before, and one more looked at; offline is a strip over them, not an empty
- * screen (handoff 04). Read back through the strict codec — a change of the contract empties it.
+ * screen (handoff 04). Read back through the strict codec — a change of the contract empties it,
+ * but for a field added with a default, which reads as the default: a month kept before the ring
+ * (MOL-156) has none until it is read again, and «Куда ушли» says so — the phone adds nothing up.
  */
 const KEY = 'molvia.money'
 const KEPT_MONTHS = 3
