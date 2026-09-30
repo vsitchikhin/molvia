@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   CHART_LEVEL,
   chartMonths,
+  DONUT_SECTORS,
+  donutSlices,
   exchangeLosses,
   moneyCharts,
   rateLine,
@@ -75,6 +77,66 @@ describe('chartMonths', () => {
     ])
     expect(chartMonths('2026-09', 12)).toHaveLength(12)
     expect(chartMonths('2026-09', 1)).toEqual(['2026-09'])
+  })
+})
+
+/** The categories of a month as `moneyMonth` orders them, largest first, in drams. */
+function categories(...amounts: number[]): { categoryId: string; amount: Money }[] {
+  return amounts.map((amount, index) => ({
+    categoryId: `c${String(index + 1)}`,
+    amount: amd(amount),
+  }))
+}
+
+describe('donutSlices', () => {
+  it('draws nothing for a month with nothing in a category', () => {
+    expect(donutSlices([])).toEqual([])
+  })
+
+  it('gives one category the whole ring', () => {
+    expect(donutSlices(categories(5_000))).toEqual([
+      { categoryId: 'c1', amount: amd(5_000), count: 1, level: CHART_LEVEL },
+    ])
+  })
+
+  it('names all seven: an «Остальные» of one would hide a name for nothing', () => {
+    const slices = donutSlices(categories(70, 60, 50, 40, 30, 20, 10))
+    expect(slices).toHaveLength(DONUT_SECTORS + 1)
+    expect(slices.every((slice) => slice.categoryId !== null && slice.count === 1)).toBe(true)
+  })
+
+  it('puts everything past six into «Остальные», last, with how many it holds', () => {
+    const slices = donutSlices(categories(80, 70, 60, 50, 40, 30, 20, 10))
+    expect(slices.map((slice) => slice.categoryId)).toEqual([
+      'c1',
+      'c2',
+      'c3',
+      'c4',
+      'c5',
+      'c6',
+      null,
+    ])
+    expect(slices.at(-1)).toMatchObject({ amount: amd(30), count: 2 })
+  })
+
+  it('keeps the sum of the month and closes the ring exactly (handoff MOL-157 figures)', () => {
+    const month = categories(68_076, 60_318, 51_294, 43_728, 20_390, 17_917, 6_500, 3_600, 2_700)
+    const slices = donutSlices(month)
+    expect(slices.reduce((sum, slice) => sum + slice.amount.minor, 0n)).toBe(amd(274_523).minor)
+    expect(slices.reduce((sum, slice) => sum + slice.level, 0)).toBe(CHART_LEVEL)
+    expect(slices.at(-1)).toMatchObject({ categoryId: null, amount: amd(12_800), count: 3 })
+    expect(slices[0]?.level).toBe(248)
+  })
+
+  it('shares the rounding out by the largest remainder, the earlier first on a tie', () => {
+    expect(donutSlices(categories(1, 1, 1)).map((slice) => slice.level)).toEqual([334, 333, 333])
+    expect(donutSlices(categories(2, 1)).map((slice) => slice.level)).toEqual([667, 333])
+  })
+
+  it('leaves a sector a level of nothing rather than none, when it is a crumb of the month', () => {
+    const slices = donutSlices(categories(1_000_000, 1))
+    expect(slices.map((slice) => slice.level)).toEqual([CHART_LEVEL, 0])
+    expect(slices).toHaveLength(2)
   })
 })
 

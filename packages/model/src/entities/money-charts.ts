@@ -19,6 +19,75 @@ export const EXCHANGE_LOSS_MONTHS = 12
  */
 export const CHART_LEVEL = 1000
 
+/**
+ * How many categories a ring names at most (MOL-156, handoff MOL-157 03): past them the rest are one
+ * sector, «Остальные». Seven names are all seven — an «Остальные» of one is a name hidden for nothing.
+ */
+export const DONUT_SECTORS = 6
+
+/**
+ * A sector of the ring: a category, or «Остальные» (`categoryId` null) with how many categories are
+ * in it. `level` is thousandths of the whole ring, and the levels of a ring add up to exactly
+ * `CHART_LEVEL`, so the phone turns them into angles and the ring closes.
+ */
+export interface DonutSlice {
+  readonly categoryId: string | null
+  readonly amount: Money
+  readonly count: number
+  readonly level: number
+}
+
+/**
+ * The ring of a month's categories, in the order of `byCategory` — largest first, «Остальные» last.
+ * The levels are shared out by the largest remainder, so no rounding opens a gap or overlaps.
+ */
+export function donutSlices(
+  byCategory: readonly { readonly categoryId: string; readonly amount: Money }[],
+): DonutSlice[] {
+  const named =
+    byCategory.length > DONUT_SECTORS + 1 ? byCategory.slice(0, DONUT_SECTORS) : byCategory
+  const rest = byCategory.slice(named.length)
+  const [first] = byCategory
+  if (!first) return []
+  const sectors: { categoryId: string | null; minor: bigint; count: number }[] = named.map(
+    ({ categoryId, amount }) => ({ categoryId, minor: amount.minor, count: 1 }),
+  )
+  if (rest.length > 0) {
+    const minor = rest.reduce((sum, { amount }) => sum + amount.minor, 0n)
+    sectors.push({ categoryId: null, minor, count: rest.length })
+  }
+  const whole = sectors.reduce((sum, { minor }) => sum + minor, 0n)
+  if (whole <= 0n) return sectors.map((sector) => sliceOf(sector, first.amount.currency, 0))
+
+  const scaled = sectors.map(({ minor }) => minor * BigInt(CHART_LEVEL))
+  const levels = scaled.map((value) => Number(value / whole))
+  let left = CHART_LEVEL - levels.reduce((sum, level) => sum + level, 0)
+  const byRemainder = scaled
+    .map((value, index) => ({ index, remainder: value % whole }))
+    .sort((a, b) =>
+      a.remainder === b.remainder ? a.index - b.index : a.remainder > b.remainder ? -1 : 1,
+    )
+  for (const { index } of byRemainder) {
+    if (left <= 0) break
+    levels[index] = (levels[index] ?? 0) + 1
+    left -= 1
+  }
+  return sectors.map((sector, index) => sliceOf(sector, first.amount.currency, levels[index] ?? 0))
+}
+
+function sliceOf(
+  sector: { categoryId: string | null; minor: bigint; count: number },
+  currency: Currency,
+  level: number,
+): DonutSlice {
+  return {
+    categoryId: sector.categoryId,
+    amount: { minor: sector.minor, currency },
+    count: sector.count,
+    level,
+  }
+}
+
 /** The months of a period, oldest first, ending with `current`. */
 export function chartMonths(current: Month, count: number): Month[] {
   const months = [current]
