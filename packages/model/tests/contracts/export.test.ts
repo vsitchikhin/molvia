@@ -105,6 +105,7 @@ const file: ExportFile = {
       exchangedOn: '2026-09-20',
       heldBefore: money(11_500_000n, 'AMD'),
       note: 'Рате, Абовяна',
+      channel: 'exchanger',
       givenAccountId: null,
       receivedAccountId: id(6),
       accountSetAt: at,
@@ -120,6 +121,7 @@ const file: ExportFile = {
           exchangedOn: '2026-09-19',
           heldBefore: null,
           note: null,
+          channel: null,
           replacedAt: at,
         },
       ],
@@ -224,7 +226,7 @@ describe('exportFileCodec', () => {
       asOf: '2026-09-20T10:00:00.000Z',
     })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(2)
+    expect(wire.version).toBe(3)
   })
 
   it('reads its own file back into the same values', () => {

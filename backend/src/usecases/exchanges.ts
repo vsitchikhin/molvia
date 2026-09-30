@@ -1,12 +1,18 @@
 import {
   DomainError,
   ERROR,
+  OFFICIAL_RATE_FRESH_DAYS,
+  bestQuote,
   currencySchema,
   exchangeRateOf,
+  exchangersPending,
   heldEstimate,
   isRateFresh,
   lastReceipt,
   latestDay,
+  marketQuotesOn,
+  marketRateOf,
+  marketSideOf,
   officialDifference,
   ownRates,
   pickOfficialRate,
@@ -28,6 +34,9 @@ import type {
   ExchangeView,
   ExchangesResponse,
   Income,
+  MarketQuote,
+  MarketRate,
+  MarketToday,
   Money,
   OfficialRate,
   OfficialRateOf,
@@ -41,7 +50,9 @@ import { dayOfMoment, endOfDay, todayOf } from './today'
 import type { Today } from './today'
 import type { TripRepositories } from '@/db/unit-of-work'
 
-type Repositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
+/** What the person's own money is walked from — «Доходы» reads it too. */
+type OwnMoneyRepositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
+type Repositories = OwnMoneyRepositories & Pick<TripRepositories, 'marketRates'>
 /** A write also lets go of the months frozen without it (MOL-73, В-6). */
 type Writing = Repositories & Pick<TripRepositories, 'money' | 'moneyAccounts'>
 type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'> & Today
@@ -66,6 +77,110 @@ export async function officialRatesOn(
     batch.forEach((day, index) => cached.set(day, read[index] ?? []))
   }
   return cached
+}
+
+const DAY_MS_RATES = 24 * 60 * 60 * 1000
+
+/** The day `days` before `day`, both `YYYY-MM-DD`. */
+function daysBefore(day: string, days: number): string {
+  return new Date(Date.parse(day) - days * DAY_MS_RATES).toISOString().slice(0, 10)
+}
+
+/**
+ * The market rows of the week before each of `days` (MOL-137): one query a day, a few at a time,
+ * as the official cache is read.
+ */
+async function marketRatesOn(
+  { marketRates }: Pick<Repositories, 'marketRates'>,
+  days: Iterable<string>,
+): Promise<ReadonlyMap<string, readonly MarketRate[]>> {
+  const distinct = [...new Set(days)]
+  const read = new Map<string, readonly MarketRate[]>()
+  for (let start = 0; start < distinct.length; start += RATE_READS_AT_ONCE) {
+    const batch = distinct.slice(start, start + RATE_READS_AT_ONCE)
+    const rows = await Promise.all(
+      batch.map((day) =>
+        marketRates.between(FOREIGN, daysBefore(day, OFFICIAL_RATE_FRESH_DAYS), day),
+      ),
+    )
+    batch.forEach((day, index) => read.set(day, rows[index] ?? []))
+  }
+  return read
+}
+
+/**
+ * An exchange set beside the market of its day (MOL-137): the best figure for the person among
+ * the channels they could have used (owner's decision В-1), and their own channel when they named
+ * it and it was not the best. Each is measured as the official comparison is — on the side the
+ * exchange's own rate is printed by, the difference in the received currency. Null for a pair
+ * without the dram (В-4) and for a day without a single figure.
+ */
+export function marketComparisonOf(
+  exchange: Exchange,
+  rows: readonly MarketRate[],
+  exchangersThrough: string | null,
+): ExchangeView['market'] {
+  const side = marketSideOf(exchange.given.currency, exchange.received.currency)
+  if (!side) return null
+  const quotes = marketQuotesOn(rows, side.currency, side.side, exchange.exchangedOn)
+  const measured = (quote: MarketQuote | null) => {
+    const rate = quote ? marketRateOf(quote, side.currency) : null
+    const difference = rate ? officialDifference(exchange, rate) : null
+    return quote && rate && difference
+      ? { channel: quote.channel, basis: quote.basis, rate, difference }
+      : null
+  }
+  const bestOne = bestQuote(quotes, side.side)
+  const best = measured(bestOne)
+  if (!best) return null
+  const ownOne = quotes.find((quote) => quote.channel === exchange.channel) ?? null
+  return {
+    best,
+    own: ownOne && ownOne.channel !== bestOne?.channel ? measured(ownOne) : null,
+    exchangersPending: exchangersPending(quotes, exchangersThrough, exchange.exchangedOn),
+  }
+}
+
+/**
+ * «Курсы по данным ЦБ РА» (MOL-137, В-1): for each currency, the official rate of today and each
+ * channel's latest figures, each dated by its own day. The best for the person is marked among the
+ * figures still fresh today — an exchange office of two weeks ago is shown with its date, but it is
+ * not today's best.
+ */
+export function marketTodayOf(
+  latest: readonly MarketRate[],
+  official: readonly CachedRate[],
+  today: string,
+): MarketToday[] {
+  return FOREIGN.map((currency): MarketToday => {
+    const buys = marketQuotesOn(latest, currency, 'bankBuys', null)
+    const sells = marketQuotesOn(latest, currency, 'bankSells', null)
+    const fresh = (quotes: readonly MarketQuote[]) =>
+      quotes.filter((quote) => isRateFresh(quote.date, today))
+    const bestBuys = bestQuote(fresh(buys), 'bankBuys')
+    const bestSells = bestQuote(fresh(sells), 'bankSells')
+    const channels = [...new Set([...buys, ...sells].map((quote) => quote.channel))]
+    return {
+      currency,
+      official: freshOfficialRate(currency, 'AMD', official, today),
+      quotes: channels.flatMap((channel) => {
+        const buy = buys.find((quote) => quote.channel === channel) ?? null
+        const sell = sells.find((quote) => quote.channel === channel) ?? null
+        const basis = buy?.basis ?? sell?.basis
+        if (basis === undefined) return []
+        return [
+          {
+            channel,
+            basis,
+            buys: buy ? marketRateOf(buy, currency) : null,
+            sells: sell ? marketRateOf(sell, currency) : null,
+            bestBuys: bestBuys?.channel === channel,
+            bestSells: bestSells?.channel === channel,
+          },
+        ]
+      }),
+    }
+  })
 }
 
 /**
@@ -150,6 +265,8 @@ function viewsOf(
   exchanges: readonly Exchange[],
   cached: ReadonlyMap<string, readonly CachedRate[]>,
   history: ReadonlyMap<string, readonly ExchangeRevision[]>,
+  market: ReadonlyMap<string, readonly MarketRate[]>,
+  exchangersThrough: string | null,
 ): ExchangeView[] {
   return [...exchanges].reverse().map((exchange): ExchangeView => {
     const { given, received, exchangedOn } = exchange
@@ -164,17 +281,19 @@ function viewsOf(
       received,
       heldBefore: exchange.heldBefore,
       note: exchange.note,
+      channel: exchange.channel,
       givenAccountId: exchange.givenAccountId,
       receivedAccountId: exchange.receivedAccountId,
       revision: exchange.revision,
       amendedAt: exchange.amendedAt,
       history: (history.get(exchange.id) ?? []).map(
-        ({ given, received, exchangedOn, heldBefore, note, replacedAt }) => ({
+        ({ given, received, exchangedOn, heldBefore, note, channel, replacedAt }) => ({
           given,
           received,
           exchangedOn,
           heldBefore,
           note,
+          channel,
           replacedAt,
         }),
       ),
@@ -184,6 +303,7 @@ function viewsOf(
           ? { rate: measure, provider: official.provider, difference }
           : null,
       officialDoubtful: !!official?.jumped && !measure,
+      market: marketComparisonOf(exchange, market.get(exchangedOn) ?? [], exchangersThrough),
     }
   })
 }
@@ -250,7 +370,7 @@ interface OwnMoney {
  * whose cost nobody named.
  */
 export async function ownMoney(
-  repositories: Repositories,
+  repositories: OwnMoneyRepositories,
   owner: Owner,
   now: Date = new Date(),
 ): Promise<OwnMoney> {
@@ -321,10 +441,21 @@ export async function exchangesOverview(
   owner: Owner,
   now: Date = new Date(),
 ): Promise<ExchangesResponse> {
-  const [money, history] = await Promise.all([
+  // The day of the phone, as the rest of the screen counts it (MOL-121).
+  const today = todayOf(owner, now)
+  const [money, history, latest, exchangersThrough, official] = await Promise.all([
     ownMoney(repositories, owner, now),
     repositories.exchanges.history(owner.id),
+    repositories.marketRates.latest(),
+    repositories.marketRates.through('exchanger'),
+    repositories.rates.latestOnOrBefore(FOREIGN, today),
   ])
+  const market = await marketRatesOn(
+    repositories,
+    money.exchanges
+      .filter((exchange) => marketSideOf(exchange.given.currency, exchange.received.currency))
+      .map((exchange) => exchange.exchangedOn),
+  )
   const { base, quote, rates } = money
   return {
     preference: money.preference,
@@ -334,8 +465,9 @@ export async function exchangesOverview(
     walletUnknown: rates.unknownAt,
     heldEstimates: money.heldEstimates,
     baseSince: money.baseSince,
-    exchanges: viewsOf(money.exchanges, money.cached, history),
+    exchanges: viewsOf(money.exchanges, money.cached, history, market, exchangersThrough),
     receipts: [...money.receipts],
+    marketToday: marketTodayOf(latest, official, today),
   }
 }
 

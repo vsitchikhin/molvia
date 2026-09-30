@@ -16,6 +16,8 @@ import {
   yerevanMidnight,
 } from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
+import { exchangeChannelSchema } from '#model/values/market-rates'
+import type { ExchangeChannel } from '#model/values/market-rates'
 
 const positiveMoneySchema = priceSchema.refine((value) => value.minor > 0n, {
   error: ERROR.INVALID_AMOUNT,
@@ -53,6 +55,8 @@ export const exchangeSchema = z
     exchangedOn: exchangeDaySchema,
     heldBefore: priceSchema.nullable(),
     note: exchangeNoteSchema.nullable(),
+    /** How the money was changed — bank in cash, bank not in cash, exchange office — or null (MOL-137). */
+    channel: exchangeChannelSchema.nullable(),
     /** The accounts each side left and landed on, each in its side's currency, or null (MOL-115). */
     givenAccountId: z.uuid().nullable(),
     receivedAccountId: z.uuid().nullable(),
@@ -80,6 +84,7 @@ export interface ExchangeRevision {
   readonly exchangedOn: string
   readonly heldBefore: Money | null
   readonly note: string | null
+  readonly channel: ExchangeChannel | null
   readonly replacedAt: Date
 }
 

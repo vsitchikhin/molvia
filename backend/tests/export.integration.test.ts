@@ -225,6 +225,7 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     exchangedOn: '2026-09-20',
     heldBeforeMinor: 100_000n,
     note: 'Абовяна',
+    channel: 'exchanger',
   } as const
   await db.insert(exchanges).values({
     id: exchangeId,

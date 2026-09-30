@@ -19,7 +19,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 
 ## backend · usecases
 
-- `backend/src/usecases/exchanges.ts` — Use cases of «Обмен денег»: the overview with wallet and official comparison, write/amend/remove/restore, rate preference. Tests: `backend/tests/exchanges.integration.test.ts`.
+- `backend/src/usecases/exchanges.ts` — Use cases of «Обмен денег»: the overview with wallet, official and market comparison (MOL-137), the block of today's rates, write/amend/remove/restore, rate preference. Tests: `backend/tests/exchanges.integration.test.ts`.
 - `backend/src/usecases/incomes.ts` — Use cases of «Доходы»: the overview by month, record, amend, remove and restore an income. Tests: `backend/tests/incomes.integration.test.ts`.
 - `backend/src/usecases/refresh-market-rates.ts` — Use case: the hourly refresh of the market (MOL-137) — each central-bank file on its own, asked by its tag, refused whole outside ±15 % of the official rate or dated ahead. Tests beside it.
 - `backend/src/usecases/money-rates.ts` — Use case helper: the rates of one day between two currencies that «Деньги» counts spendings and incomes by.
@@ -29,7 +29,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 
 - `backend/src/db/exchanges-repository.ts` — Repository of exchanges: add with repeat/conflict, amend with revisions, mark-remove and restore, the held-before hint, rate preference. Tests: `backend/tests/exchanges-repository.integration.test.ts`.
 - `backend/src/db/incomes-repository.ts` — Repository of incomes: add with repeat/conflict, amend with revisions, mark-remove, restore and final erase. Tests: `backend/tests/incomes-repository.integration.test.ts`.
-- `backend/src/db/market-rates-repository.ts` — Repository of the market (MOL-137): a file written whole, each channel's latest within a week before a day, the latest of all, how far a channel reached.
+- `backend/src/db/market-rates-repository.ts` — Repository of the market (MOL-137): a file written whole, each channel's latest within a week before a day, the latest of all, how far a channel reached. Tests: `backend/tests/market-rates.integration.test.ts`.
 - `backend/src/db/rates-repository.ts` — Repository of the official-rate cache: whole-answer upsert, latest on or before a day, jump history, last fetch time. Tests: `backend/tests/rates-repository.integration.test.ts`.
 
 ## backend · rates
@@ -53,6 +53,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 - `backend/tests/fixtures/rates/cba-runtime-error.html` — Fixture: the CBA's «Runtime Error» page its GET form returns, which the parser must refuse.
 - `backend/tests/incomes-repository.integration.test.ts` — Integration test: incomes are written, amended with history, refused on conflict, removed, restored and erased with the owner.
 - `backend/tests/incomes.integration.test.ts` — Integration test: «Доходы» over HTTP — months and sums, amend and undo, and how an income prices the wallet and a trip's rate.
+- `backend/tests/market-rates.integration.test.ts` — Integration test: the market table and its constraints, the official history filling holes only, and «Обмен денег» against the market over HTTP — sides, best and own channel, stand-ins, the block of today, the channel in repeats and amendments.
 - `backend/tests/rates-hardening.integration.test.ts` — Integration test: the adversarial cases of the rate cache — stale CBA, ×100 jumps, impossible dates, DB failure — stay held.
 - `backend/tests/rates-repository.integration.test.ts` — Integration test: the official-rate cache and its constraints, jump marks and history, and the trip snapshot columns.
 
