@@ -242,6 +242,9 @@ describe('какие ключи приложение пишет на устро�
       'molvia.trip-payments',
       'molvia.trip-payments-rejected',
       'molvia.trip-queue',
+      // «Сумма по чеку», своим ключом по той же причине (MOL-78).
+      'molvia.trip-receipts',
+      'molvia.trip-receipts-rejected',
       'molvia.trip-rejected',
       'molvia.verdict-confirmed',
       'molvia.verdict-drafts',

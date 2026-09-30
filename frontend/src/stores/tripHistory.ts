@@ -39,7 +39,7 @@ const cacheCodec = z.strictObject({
  * filled with what their absence means on the way out; they go in with the next release, once no
  * build without them is left.
  */
-const NOT_CACHED_YET = new Set(['accountId', 'debited'])
+const NOT_CACHED_YET = new Set(['accountId', 'debited', 'receipt', 'prices', 'gap'])
 const TRIP_KEYS = new Set(Object.keys(tripViewCodec.def.shape))
 /**
  * The same for a row of the history page (MOL-128): «12 позиций · 9 870 ֏» is not kept yet, for
