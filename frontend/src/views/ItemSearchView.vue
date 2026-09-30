@@ -26,6 +26,7 @@
     />
     <CatalogueCombobox
       v-if="!selectedId || selectedAvailable"
+      ref="combobox"
       v-model="query"
       :items="rows"
       :heading="heading"
@@ -403,8 +404,13 @@ export default defineComponent({
       if (next === 'missing') pendingCode.value = lookup.code.value
     })
 
-    function dropPending(): void {
+    // The strip goes with its ✕, which held the focus: the field takes it back — what the person
+    // does next is type (adversarial О).
+    const combobox = ref<{ $el?: HTMLElement } | null>(null)
+    async function dropPending(): Promise<void> {
       pendingCode.value = null
+      await nextTick()
+      combobox.value?.$el?.querySelector<HTMLInputElement>('input')?.focus()
     }
 
     /**
@@ -857,6 +863,7 @@ export default defineComponent({
       takenOnProposal,
       pendingCode,
       dropPending,
+      combobox,
       bind,
       bindFirst,
       attach,

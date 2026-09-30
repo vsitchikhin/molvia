@@ -551,6 +551,8 @@ describe('«не этот товар?» (MOL-100)', () => {
     expect(detachBarcode).not.toHaveBeenCalled()
     expect(view.text()).not.toContain('Отвязать код')
     expect(view.text()).toContain('Код 4850001234562 — не этот товар?')
+    // Back on the line that asked, inside the sheet — not the body (adversarial О).
+    expect(document.activeElement?.textContent.trim()).toBe('Код 4850001234562 — не этот товар?')
   })
 
   it('asks with «Отменить» in focus, and «Отвязать» is not the filled button (review Л)', async () => {

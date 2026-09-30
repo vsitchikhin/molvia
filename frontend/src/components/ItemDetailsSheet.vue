@@ -76,7 +76,7 @@
             {{ t('item.barcode.not_this_failed') }}
           </p>
         </div>
-        <AppButton v-else variant="ghost" block @click="askDetach">
+        <AppButton v-else ref="notThisButton" variant="ghost" block @click="askDetach">
           {{ t('item.barcode.not_this', { code }) }}
         </AppButton>
       </template>
@@ -406,10 +406,15 @@ export default defineComponent({
       detachCancel.value?.$el?.focus()
     }
 
-    function keepCode(): void {
+    // The question goes with the button that held the focus: it comes back to the line that asked,
+    // or it would fall to the body, outside the modal sheet (adversarial О).
+    const notThisButton = ref<{ $el?: HTMLElement } | null>(null)
+    async function keepCode(): Promise<void> {
       if (detaching.value) return
       confirming.value = false
       detachFailed.value = false
+      await nextTick()
+      notThisButton.value?.$el?.focus()
     }
 
     // One step back, to the search under the sheet: the code is to be given to its item there.
@@ -459,6 +464,7 @@ export default defineComponent({
       detachCancel,
       askDetach,
       keepCode,
+      notThisButton,
       detaching,
       detachFailed,
       notThis,
