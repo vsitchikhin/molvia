@@ -31,6 +31,7 @@
       :items="rows"
       :heading="heading"
       :stale="stale"
+      :readonly="bind?.phase === 'sending'"
       :label="t('item.search_title')"
       :placeholder="t('item.search_placeholder')"
       :hint="t('item.search_hint')"
@@ -174,7 +175,7 @@
         <!-- Found by a retry nobody tapped for (adversarial Ж′): the sheet opens from this tap. -->
         <div v-else-if="barcode === 'found' && barcodeItem" class="not-found">
           <p class="not-found-text">{{ t('item.barcode.found', { code: barcodeCode }) }}</p>
-          <AppButton @click="lookup.take">{{ barcodeItem.name }}</AppButton>
+          <AppButton @click="takeFound">{{ barcodeItem.name }}</AppButton>
         </div>
 
         <ScreenState
@@ -268,6 +269,7 @@
       :on-closed="afterProposing"
       @proposed="proposed"
       @taken="takenOnProposal"
+      @written-late="writtenLate"
     />
 
     <!-- Mounted on a pick and put away from `onClosed`: each opening is its own purchase. Two
@@ -407,9 +409,6 @@ export default defineComponent({
     // Kept in the draft with the query (adversarial Р5-Г): a new version reloads the page with only
     // the strip up, and the code, lost, made the next pick ask nothing.
     const pendingCode = ref<string | null>(draft?.code ?? null)
-    watch([query, missed, pendingCode], ([text, miss, code]) => {
-      keepSearchDraft(owner, { query: text, missed: miss, code })
-    })
     watch(barcode, (next) => {
       if (next === 'missing') pendingCode.value = lookup.code.value
     })
@@ -436,6 +435,8 @@ export default defineComponent({
     interface PickedAt {
       readonly found: boolean
       readonly text: string
+      /** The miss held at the pick — not one typed while the answer was on its way (Р6-А). */
+      readonly missed: string | null
     }
 
     interface Bind {
@@ -450,6 +451,12 @@ export default defineComponent({
     }
     const bind = ref<Bind | null>(null)
     const bindFirst = ref<{ $el?: HTMLElement } | null>(null)
+
+    // Not while it is on its way: its answer dies with the page, and a code brought back as waiting
+    // may have been written meanwhile — scanned again, it says what it is (adversarial Р6-Б).
+    watch([query, missed, pendingCode, () => bind.value?.phase], ([text, miss, code, stage]) => {
+      keepSearchDraft(owner, { query: text, missed: miss, code: stage === 'sending' ? null : code })
+    })
     const bindState = ref<{ $el?: HTMLElement } | null>(null)
 
     /*
@@ -469,10 +476,12 @@ export default defineComponent({
         if (next === undefined || next === before) return
         if (next === 'sending' && before !== 'error' && before !== 'offline') return
         await nextTick()
+        // An answer that landed after the wait takes the focus only where its holder went with the
+        // block — the person may have gone to the field meanwhile (adversarial Р6-В).
+        const nowhere = document.activeElement === null || document.activeElement === document.body
+        if (before === 'sending' && !nowhere) return
         if (next === 'error' || next === 'offline') {
-          const nowhere =
-            document.activeElement === null || document.activeElement === document.body
-          if (nowhere) bindState.value?.$el?.querySelector<HTMLElement>('button')?.focus()
+          bindState.value?.$el?.querySelector<HTMLElement>('button')?.focus()
           return
         }
         bindFirst.value?.$el?.focus()
@@ -494,12 +503,9 @@ export default defineComponent({
         // The screen was left meanwhile (adversarial Р5-А): the pick is nobody's now, and written into
         // the store it opened a sheet by itself on the next visit.
         if (!alive) return
-        if (!stillAsked(asked)) {
-          // Typing went on while it was on its way (adversarial Д): the sheet is not opened, but a
-          // code the server wrote no longer waits for its item.
-          if (!('taken' in written) && pendingCode.value === asked.code) pendingCode.value = null
-          return
-        }
+        // Nothing takes the question away while it is on its way — the field is read-only, the scanner
+        // inert, the other answers wait (adversarial Р5-Б, Р6-А); a guard all the same.
+        if (!stillAsked(asked)) return
         if ('taken' in written) {
           bind.value = { ...asked, phase: 'taken', holder: written.taken }
           return
@@ -597,6 +603,35 @@ export default defineComponent({
       takeMissed('')
       pickedByCode.value = null
       entry.pick({ entry: chosen, query: '' })
+    }
+
+    // «По коду … нашлось» by a retry nobody tapped for: its block goes with the tap that takes the
+    // item, and the title holds the focus for the sheet to give back (adversarial Ф′).
+    function takeFound(): void {
+      focusScreenTitle()
+      lookup.take()
+    }
+
+    /**
+     * A code the screen believes waits may have been written by an answer the screen never saw — a
+     * reload while «Привязать» was on its way, a «Предложить товар» put away mid-send (adversarial
+     * Р6-Б). Asked again quietly; held by some item, it waits no longer.
+     */
+    async function verifyPending(): Promise<void> {
+      const code = pendingCode.value
+      if (code === null || !navigator.onLine) return
+      try {
+        const held = await api.catalogueByBarcode(code)
+        if (alive && held !== null && pendingCode.value === code) pendingCode.value = null
+      } catch {
+        // No answer is no news: the code keeps waiting, as before.
+      }
+    }
+
+    // The answer to a proposal put away while it was on its way: the item was written with its code
+    // (the sheet picks nothing, MOL-24 A1), so the code no longer waits.
+    function writtenLate(code: string): void {
+      if (pendingCode.value === code) pendingCode.value = null
     }
 
     // Typing is the other way to find it: the answer to the code gives way to the search — and a
@@ -759,7 +794,7 @@ export default defineComponent({
 
     function pickedAt(): PickedAt {
       const found = phase.value === 'ready' || phase.value === 'far'
-      return { found, text: found ? answered.value : query.value }
+      return { found, text: found ? answered.value : query.value, missed: missed.value }
     }
 
     function take(chosen: CatalogueEntry, learns: boolean, at: PickedAt = pickedAt()): void {
@@ -770,8 +805,8 @@ export default defineComponent({
       foundByCode = null
       lookup.clear()
       const { found, text } = at
-      const missed = takeMissed(text)
-      const word = learns && found ? missed : null
+      const miss = takeMissed(text, at.missed)
+      const word = learns && found ? miss : null
       entry.pick({ entry: chosen, query: text, ...(word === null ? {} : { missedQuery: word }) })
     }
 
@@ -875,8 +910,10 @@ export default defineComponent({
         return
       }
       if (item && byCode) {
-        // Proposed, the code's question is answered: its block goes with it (review С-5).
+        // Proposed, the code's question is answered: its block goes with it (review С-5) — and with it
+        // the button the sheet would give the focus back to: the title holds it (adversarial Ф′).
         lookup.clear()
+        focusScreenTitle()
         pickWithoutQuery(item)
       } else if (item) take(item, false)
       if (item && code !== null) pickedByCode.value = { itemId: item.id, code }
@@ -884,6 +921,8 @@ export default defineComponent({
 
     onMounted(() => {
       recent.sync()
+      // Brought back from the draft: the answer it waited for may have come while the page was gone.
+      void verifyPending()
     })
     onUnmounted(() => {
       alive = false
@@ -929,6 +968,8 @@ export default defineComponent({
       takenOnProposal,
       pendingCode,
       dropPending,
+      takeFound,
+      writtenLate,
       combobox,
       bind,
       bindFirst,

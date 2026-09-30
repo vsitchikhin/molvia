@@ -311,18 +311,23 @@ codes too, and a wrong one needs a way out (В-1, below).
   longer drops it: a strip «Код … ждёт позицию» stands over the search, and × lets it go. Proposed with
   «Предложить товар» from anywhere on the screen while it waits, the code goes with the item. **It is kept
   in the search draft** with the query (adversarial Р5-Г): a new version reloads the page with only the
-  strip up, and the code, lost, made the next pick ask nothing.
+  strip up, and the code, lost, made the next pick ask nothing. **Not while its write is on its way**,
+  and **asked again quietly when brought back** (adversarial Р6-Б): an answer that died with the page, or
+  came to a «Предложить товар» put away, may have written it — held, it waits no more.
 - **A pick while a code waits asks first** — «Привязать код … к „…“?» — in a block where the code's
   block stood, not in a sheet (В-2): «taken», «no network» or an error is then said where the person
   is, and the purchase sheet comes only after the answer, one sheet at a time. The rows go while the
   question stands, the focus goes to its first answer and the question is said out loud. **While the
-  code is on its way nothing takes the question away** (review Б, adversarial Р5-Б): the other answers
-  wait, typing leaves the question standing, and the scanner reads nothing — dropped, a question asked
+  code is on its way nothing takes the question away** (review Б, adversarial Р5-Б, Р6-А): the other
+  answers wait, the field is read-only, and the scanner reads nothing — a miss typed meanwhile rode
+  along as the person's own word for the row picked before it — dropped, a question asked
   again over the same code had live answers the landing then overruled: «без кода» written with the code,
   «другой товар» met at the very item it was said not to be. The answer goes on with the query the row
   was picked on, not what was typed since. **An answer that lands after the screen was left is nobody's**
   (adversarial Р5-А): written into the store, it opened a purchase sheet by itself on the next visit.
-  **An answer that opens a sheet puts the focus on the screen's title first** (adversarial Ф): the block
+  **An answer that lands after the wait takes the focus only where its holder went** (adversarial Р6-В).
+  **An answer that opens a sheet puts the focus on the screen's title first** (adversarial Ф, Ф′ — the
+  question's answers, «Предложить товар» sent from the code's block, «По коду … нашлось»): the block
   that held it goes with the answer, and the sheet, closed, gives the focus back to what held it when it
   opened — the title rather than nothing; not the field, whose focus would raise a keyboard under the
   sheet. **Three

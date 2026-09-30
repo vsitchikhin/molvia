@@ -116,6 +116,8 @@ export default defineComponent({
       typeof entry.id === 'string' && typeof created === 'boolean',
     /** The item that holds the code already, chosen instead (MOL-100). */
     taken: (entry: CatalogueEntry) => typeof entry.id === 'string',
+    /** A new item written with this code after the sheet was put away (adversarial Р6-Б). */
+    writtenLate: (code: string) => typeof code === 'string',
   },
   setup(props, { emit }) {
     const { t } = useI18n()
@@ -229,11 +231,19 @@ export default defineComponent({
       const parsed = input.value
       if (!ready.value || !parsed.success) return
       const mine = opening
+      const sentCode = props.code
       sending.value = true
       failed.value = false
       try {
         const written = await api.proposeItem(parsed.data)
-        if (mine !== opening) return
+        if (mine !== opening) {
+          // Put away meanwhile: nothing is picked (A1), but a new item was written with the code, and
+          // the screen must not go on asking about it (adversarial Р6-Б).
+          if (!('taken' in written) && written.created && sentCode !== null) {
+            emit('writtenLate', sentCode)
+          }
+          return
+        }
         if ('taken' in written) {
           holder.value = written.taken
           // «Добавить» goes with the answer: the focus goes to what took its place, inside the sheet

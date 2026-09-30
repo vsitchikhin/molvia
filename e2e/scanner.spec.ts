@@ -494,6 +494,33 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       await expect.poll(async () => (await focused(page)).body).toBe(false)
     })
 
+    test('«Suggest an item» under «does not know the code», sent: the purchase sheet closed leaves the focus on the page (Ф′)', async ({
+      page,
+    }) => {
+      const code = freshCode()
+      const name = `Варенец ${tag} ф6`
+      await open(page, '/purchases/manual/add')
+      await typeCode(page, code)
+      await expect(missingOf(page, code)).toBeVisible()
+      await page.getByRole('button', { name: 'Suggest an item' }).click()
+      const form = page.getByRole('dialog', { name: 'New item' })
+      await expect(form).toBeVisible()
+      await page.waitForTimeout(400)
+      await form.getByLabel('As the price tag says').fill(name)
+      const kilo = form.getByRole('radio', { name: 'kg', exact: true })
+      await expect(async () => {
+        await form.getByText('kg', { exact: true }).click()
+        await expect(kilo).toBeChecked({ timeout: 200 })
+      }).toPass({ timeout: 5000 })
+      await form.getByRole('button', { name: 'Add to the catalogue' }).click()
+
+      const sheet = await sheetOf(page, name)
+      await page.keyboard.press('Escape')
+
+      await expect(sheet).toBeHidden()
+      await expect.poll(async () => (await focused(page)).body).toBe(false)
+    })
+
     test('«Unlink?»: the focus on «Cancel», back on «not this item?», and after the unlink never the body', async ({
       page,
     }) => {

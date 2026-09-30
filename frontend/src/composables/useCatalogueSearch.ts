@@ -51,7 +51,7 @@ export interface CatalogueSearch {
    * None when one of the two queries starts the other: «сыр» after «сыр косичка» is the same
    * query cut short, not another word for it (review Р-1), and «Кефир» is «кефир » (Е).
    */
-  readonly takeMissed: (text: string) => string | null
+  readonly takeMissed: (text: string, held?: string | null) => string | null
   readonly retry: () => void
 }
 
@@ -130,8 +130,9 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
     return typed(held).startsWith(typed(text)) || toSearchKey(held).startsWith(toSearchKey(text))
   }
 
-  function takeMissed(text: string): string | null {
-    const held = missed.value
+  // `held` — a miss read earlier, at the moment of a pick whose sheet comes only later (MOL-100):
+  // the miss held now may have been typed after that pick.
+  function takeMissed(text: string, held: string | null = missed.value): string | null {
     missed.value = null
     if (held === null || startsHeld(held, text) || startsHeld(text, held)) return null
     return held

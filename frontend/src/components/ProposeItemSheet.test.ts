@@ -457,6 +457,35 @@ describe('«Suggest an item»', () => {
       expect(sheet.emitted('taken')).toEqual([[kefir]])
     })
 
+    it('tells of a new item written with the code after the sheet was put away (Р6-Б)', async () => {
+      let land!: (written: CatalogueWrite) => void
+      proposeItem.mockReturnValue(new Promise((resolve) => (land = resolve)))
+      const sheet = await render('Тан', '4850001234562')
+      await chooseUnit(sheet, en.item.unit_l)
+      await submitButton(sheet).trigger('click')
+
+      await sheet.setProps({ open: false })
+      land({ entry: tan, created: true })
+      await flushPromises()
+
+      expect(sheet.emitted('proposed')).toBeUndefined()
+      expect(sheet.emitted('writtenLate')).toEqual([['4850001234562']])
+    })
+
+    it('must not tell of a late answer that wrote no code — a name already there (Р6-Б, control)', async () => {
+      let land!: (written: CatalogueWrite) => void
+      proposeItem.mockReturnValue(new Promise((resolve) => (land = resolve)))
+      const sheet = await render('Тан', '4850001234562')
+      await chooseUnit(sheet, en.item.unit_l)
+      await submitButton(sheet).trigger('click')
+
+      await sheet.setProps({ open: false })
+      land({ entry: tan, created: false })
+      await flushPromises()
+
+      expect(sheet.emitted('writtenLate')).toBeUndefined()
+    })
+
     it('must not show a code line when the item is proposed by its name', async () => {
       const sheet = await render()
 
