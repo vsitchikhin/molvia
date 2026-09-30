@@ -11,10 +11,13 @@ import {
   effectiveRate,
   isTripRateStale,
   rateChoiceSchema,
+  receiptGap,
+  tripMoney,
   tripTotal,
 } from '#model/entities/trip'
 import type { Trip } from '#model/entities/trip'
 import { INT8_MAX } from '#model/support/decimal'
+import { ERROR } from '#model/support/errors'
 import { currencySchema, moneyCodec } from '#model/values/money'
 import type { Money } from '#model/values/money'
 import { isCalendarDay, latestDay, rateCodec, rateProviderSchema } from '#model/values/rates'
@@ -106,6 +109,12 @@ const tripExpenseCodec = z.strictObject({
 })
 export type TripExpenseView = z.output<typeof tripExpenseCodec>
 
+/** What the prices say beside a receipt's sum (MOL-78, `receiptGap`): what the screen names under it. */
+const receiptGapCodec = z.strictObject({
+  kind: z.enum(['unpriced', 'over', 'under']),
+  amount: moneyCodec,
+})
+
 /**
  * A trip as the screen shows it, and the answer of every route that changes one: the list, the
  * price per unit of each row and the total are all the server's, so the phone adds nothing up
@@ -156,8 +165,19 @@ export const tripViewCodec = z.strictObject({
   rateStale: z.boolean(),
   place: tripPlaceSchema.strict(),
   expenses: z.array(tripExpenseCodec),
-  /** One per currency, and empty rather than zero when nothing is priced yet. */
+  /**
+   * What the trip came to (`tripMoney`, MOL-78): the receipt's sum when there is one, else one sum
+   * of prices per currency — empty rather than zero when nothing is priced yet.
+   */
   total: z.array(moneyCodec),
+  /**
+   * The receipt's sum, typed whole (MOL-78); the prices beside it, one per currency; and what the
+   * two say about each other, null when they agree or cannot be set side by side. Defaults read an
+   * older server, whose `total` is the prices.
+   */
+  receipt: moneyCodec.nullable().default(null),
+  prices: z.array(moneyCodec).default([]),
+  gap: receiptGapCodec.nullable().default(null),
   /**
    * The total in the trip's currency, converted by the rate the trip counts by. An estimate
    * for display, never a fact — null without a rate: an empty cache, or one currency (MOL-39).
@@ -227,7 +247,8 @@ export function tripViewOf(
     }
   })
 
-  const total = tripTotal(expenses)
+  const prices = tripTotal(expenses)
+  const total = tripMoney(trip.receipt, expenses)
   const inTripCurrency = total.find((money) => money.currency === trip.currency)
   const rate = effectiveRate(trip)
 
@@ -252,11 +273,25 @@ export function tripViewOf(
     place: tripPlaceOf(place),
     expenses: rows,
     total: [...total],
+    receipt: trip.receipt,
+    prices: [...prices],
+    gap: trip.receipt ? receiptGap(trip.receipt, expenses) : null,
     converted: rate && inTripCurrency ? estimate(inTripCurrency, rate) : null,
     accountId: trip.accountId,
     debited: trip.debited,
   }
 }
+
+/**
+ * «Сумма по чеку» (MOL-78): the receipt's sum whole, or `null` to take it off. Sent whole each time
+ * through the trip's queue, so a repeat is the same write.
+ */
+export const tripReceiptBodySchema = z.strictObject({
+  receipt: moneyCodec
+    .refine((value) => value.minor > 0n, { error: ERROR.INVALID_AMOUNT })
+    .nullable(),
+})
+export type TripReceiptBody = z.output<typeof tripReceiptBodySchema>
 
 /**
  * «Считать по новому курсу / по прежнему / по своему» (MOL-39, Р-19, Р-21). Repeatable: the same

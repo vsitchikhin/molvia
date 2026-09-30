@@ -10,6 +10,8 @@ import {
   isTripRateStale,
   manualRateFor,
   newTripSchema,
+  receiptGap,
+  tripMoney,
   tripSchema,
   tripTotal,
 } from '#model/entities/trip'
@@ -289,5 +291,71 @@ describe('скачок курса в походе (MOL-39, Р-19, Р-21)', () =>
     expect(isTripRateStale(tripSchema.parse({ ...trip, rate: old }))).toBe(true)
     const week = { ...rate('4.82'), asOf: new Date('2026-08-31T20:00:00Z') }
     expect(isTripRateStale(tripSchema.parse({ ...trip, rate: week }))).toBe(false)
+  })
+})
+
+describe('tripMoney (MOL-78)', () => {
+  const milk = expense(parseMoney('570', 'AMD'))
+  const card = expense(money(50000n, 'RUB'))
+
+  it('без суммы — суммы цен по валютам, как tripTotal', () => {
+    expect(tripMoney(null, [milk, expense(null), card])).toEqual(tripTotal([milk, card]))
+    expect(tripMoney(null, [])).toEqual([])
+  })
+
+  it('сумма чека заменяет итог целиком, во всех валютах', () => {
+    expect(tripMoney(parseMoney('12400', 'AMD'), [milk, expense(null), card])).toEqual([
+      { minor: 1_240_000n, currency: 'AMD' },
+    ])
+  })
+
+  it('сумма чека есть и у записи без единой покупки — сервер её не запрещает (В-1)', () => {
+    expect(tripMoney(parseMoney('100', 'AMD'), [])).toEqual([{ minor: 10_000n, currency: 'AMD' }])
+  })
+})
+
+describe('receiptGap (MOL-78, В-2)', () => {
+  const receipt = parseMoney('12400', 'AMD')
+
+  it('часть без цены: остаток — на них', () => {
+    expect(receiptGap(receipt, [expense(parseMoney('8300', 'AMD')), expense(null)])).toEqual({
+      kind: 'unpriced',
+      amount: { minor: 410_000n, currency: 'AMD' },
+    })
+  })
+
+  it('цены больше чека — «over», даже если часть без цены', () => {
+    expect(receiptGap(receipt, [expense(parseMoney('12700', 'AMD')), expense(null)])).toEqual({
+      kind: 'over',
+      amount: { minor: 30_000n, currency: 'AMD' },
+    })
+  })
+
+  it('все с ценой и чек больше — «under»; ровно — ничего', () => {
+    expect(receiptGap(receipt, [expense(parseMoney('12000', 'AMD'))])).toEqual({
+      kind: 'under',
+      amount: { minor: 40_000n, currency: 'AMD' },
+    })
+    expect(receiptGap(receipt, [expense(parseMoney('12400', 'AMD'))])).toBeNull()
+  })
+
+  it('цена в другой валюте — ничего: две валюты не вычитаются', () => {
+    expect(receiptGap(receipt, [expense(money(100n, 'USD')), expense(null)])).toBeNull()
+  })
+
+  it('цены в валюте чека, но сам чек в другой — ничего', () => {
+    expect(receiptGap(money(3000n, 'USD'), [expense(parseMoney('570', 'AMD'))])).toBeNull()
+  })
+})
+
+describe('tripSchema: сумма по чеку (MOL-78)', () => {
+  it('принимает сумму больше нуля и отказывает нулю', () => {
+    expect(tripSchema.parse({ ...trip, receipt: money(1n, 'AMD') }).receipt).toEqual(
+      money(1n, 'AMD'),
+    )
+    expect(tripSchema.parse(trip).receipt).toBeNull()
+    expect(
+      tripSchema.safeParse({ ...trip, receipt: money(0n, 'AMD') }).error?.issues[0]?.message,
+    ).toBe(ERROR.INVALID_AMOUNT)
   })
 })

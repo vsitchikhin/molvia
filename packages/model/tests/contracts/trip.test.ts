@@ -8,6 +8,7 @@ import {
   isDeviceDay,
   isDeviceTime,
   startTripBodySchema,
+  tripReceiptBodySchema,
   tripViewCodec,
   tripViewOf,
 } from '#model/contracts/trip'
@@ -67,6 +68,7 @@ const trip: Trip = {
   finishedAt: null,
   accountId: null,
   debited: null,
+  receipt: null,
 }
 
 let row = 0
@@ -451,5 +453,126 @@ describe('a moment a phone names for itself (Б1)', () => {
 
   it('has nothing to say about a body that names no time at all', () => {
     expect(finishTripBodySchema.parse({})).toEqual({})
+  })
+})
+
+describe('сумма по чеку (MOL-78)', () => {
+  const items = [ashkhar, marianna, beef, bread]
+  const cheque = (amount: string, currency: 'AMD' | 'USD' = 'AMD'): Trip => ({
+    ...trip,
+    receipt: parseMoney(amount, currency),
+  })
+
+  it('без суммы — итог по ценам, как было, и разбора нет', () => {
+    const view = tripViewOf(trip, place, [...handoff(), expense(bread, null, null)], items)
+    expect(view.receipt).toBeNull()
+    expect(view.total).toEqual([{ minor: 649_312n, currency: 'AMD' }])
+    expect(view.prices).toEqual(view.total)
+    expect(view.gap).toBeNull()
+  })
+
+  it('частичные цены: итог — сумма чека, цены рядом, без цены — остаток (В-2)', () => {
+    const view = tripViewOf(
+      cheque('8000'),
+      place,
+      [...handoff(), expense(bread, null, null)],
+      items,
+    )
+    expect(view.total).toEqual([{ minor: 800_000n, currency: 'AMD' }])
+    expect(view.prices).toEqual([{ minor: 649_312n, currency: 'AMD' }])
+    expect(view.gap).toEqual({ kind: 'unpriced', amount: { minor: 150_688n, currency: 'AMD' } })
+  })
+
+  it('ни одной цены: вся сумма — на покупки без цены', () => {
+    const view = tripViewOf(cheque('1200'), place, [expense(bread, null, null)], items)
+    expect(view.total).toEqual([{ minor: 120_000n, currency: 'AMD' }])
+    expect(view.prices).toEqual([])
+    expect(view.gap).toEqual({ kind: 'unpriced', amount: { minor: 120_000n, currency: 'AMD' } })
+  })
+
+  it('цены больше чека — не отказ, а «больше на …»; на копейку больше, ровно и на копейку меньше', () => {
+    const rows = handoff()
+    expect(tripViewOf(cheque('6493.11'), place, rows, items).gap).toEqual({
+      kind: 'over',
+      amount: { minor: 1n, currency: 'AMD' },
+    })
+    expect(tripViewOf(cheque('6493.12'), place, rows, items).gap).toBeNull()
+    expect(tripViewOf(cheque('6493.13'), place, rows, items).gap).toEqual({
+      kind: 'under',
+      amount: { minor: 1n, currency: 'AMD' },
+    })
+  })
+
+  it('сумма совпала с ценами, но у части покупок цены нет — разбора нет', () => {
+    const view = tripViewOf(
+      cheque('6493.12'),
+      place,
+      [...handoff(), expense(bread, null, null)],
+      items,
+    )
+    expect(view.gap).toBeNull()
+  })
+
+  it('цены в другой валюте — сумма чека стоит за всеми, вычитать не из чего (В-3)', () => {
+    const rows = [expense(ashkhar, '570', ['1', 'l']), expense(bread, '2', null, 'USD')]
+    const view = tripViewOf(cheque('1400'), place, rows, items)
+    expect(view.total).toEqual([{ minor: 140_000n, currency: 'AMD' }])
+    expect(view.prices).toEqual([
+      { minor: 57_000n, currency: 'AMD' },
+      { minor: 200n, currency: 'USD' },
+    ])
+    expect(view.gap).toBeNull()
+  })
+
+  it('пересчитывает сумму чека в валюте записи по курсу снимка, в другой валюте — нет (Р-8)', () => {
+    const rate = {
+      base: 'RUB' as const,
+      quote: 'AMD' as const,
+      scaled: parseRate('4.33'),
+      source: 'official' as const,
+      asOf: new Date('2026-09-19T08:00:00.000Z'),
+    }
+    const inDrams = tripViewOf(
+      { ...cheque('12400'), rate, rateProvider: 'cba' },
+      place,
+      handoff(),
+      items,
+    )
+    expect(inDrams.converted).toEqual({ minor: 286_374n, currency: 'RUB' })
+    const inDollars = tripViewOf(
+      { ...cheque('30', 'USD'), rate, rateProvider: 'cba' },
+      place,
+      handoff(),
+      items,
+    )
+    expect(inDollars.total).toEqual([{ minor: 3000n, currency: 'USD' }])
+    expect(inDollars.converted).toBeNull()
+  })
+
+  it('проходит провод туда и обратно, а ответ старого сервера читается без новых полей', () => {
+    const original = tripViewOf(cheque('8000'), place, handoff(), items)
+    const wire = JSON.parse(JSON.stringify(z.encode(tripViewCodec, original))) as unknown
+    expect(tripViewCodec.parse(wire)).toEqual(original)
+    const current: Record<string, unknown> = z.encode(
+      tripViewCodec,
+      tripViewOf(trip, place, handoff(), items),
+    )
+    const older = Object.fromEntries(
+      Object.entries(current).filter(([key]) => !['receipt', 'prices', 'gap'].includes(key)),
+    )
+    const read = tripViewCodec.parse(older)
+    expect([read.receipt, read.prices, read.gap]).toEqual([null, [], null])
+  })
+
+  it('тело: сумма больше нуля или null, ничего лишнего', () => {
+    expect(tripReceiptBodySchema.parse({ receipt: { amount: '0.01', currency: 'AMD' } })).toEqual({
+      receipt: { minor: 1n, currency: 'AMD' },
+    })
+    expect(tripReceiptBodySchema.parse({ receipt: null })).toEqual({ receipt: null })
+    expect(
+      tripReceiptBodySchema.safeParse({ receipt: { amount: '0', currency: 'AMD' } }).success,
+    ).toBe(false)
+    expect(tripReceiptBodySchema.safeParse({}).success).toBe(false)
+    expect(tripReceiptBodySchema.safeParse({ receipt: null, tripId: TRIP }).success).toBe(false)
   })
 })
