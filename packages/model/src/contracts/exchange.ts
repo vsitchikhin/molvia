@@ -11,6 +11,7 @@ import { ERROR, ISSUE } from '#model/support/errors'
 import { currencySchema, moneyCodec, signedMoneyCodec } from '#model/values/money'
 import type { Money } from '#model/values/money'
 import { rateCodec, rateProviderSchema } from '#model/values/rates'
+import { exchangeChannelSchema, marketChannelSchema } from '#model/values/market-rates'
 
 /**
  * Which rate a new trip takes (MOL-40, В-3): `personal` — the person's own when they have an
@@ -34,6 +35,11 @@ const exchangeFields = {
   exchangedOn: exchangeDaySchema,
   heldBefore: moneyCodec.optional(),
   note: exchangeNoteSchema.optional(),
+  /**
+   * How the money was changed (MOL-137, В-1); null says «not said». Left out — a screen older than
+   * the field — it is kept by an amendment and matches anything in a repeat, as an account is.
+   */
+  channel: exchangeChannelSchema.nullable().optional(),
   /** The accounts each side left and landed on (MOL-115); left out of an amendment, kept (Р-26). */
   givenAccountId: z
     .uuid()
@@ -91,6 +97,40 @@ export const exchangeAmendBodySchema = withExchangeRules(
 export type ExchangeAmendBody = z.infer<typeof exchangeAmendBodySchema>
 
 /**
+ * One channel's market figure beside an exchange: the rate as the currency in drams on its own day,
+ * the row it came from (`basis`, В-2), and how much more — below zero, less — the exchange gave in
+ * the received currency than that figure would have.
+ */
+const marketQuoteCodec = z.strictObject({
+  channel: exchangeChannelSchema,
+  basis: marketChannelSchema,
+  rate: rateCodec,
+  difference: signedMoneyCodec,
+})
+
+/**
+ * One currency of «Курсы по данным ЦБ РА» (MOL-137, В-1): the official rate against the dram, and
+ * each channel's latest figures on both sides, each dated by its own rate — the exchange offices
+ * come a week or two late. `best…` marks the best of the fresh ones for the person, so the phone
+ * compares nothing.
+ */
+export const marketTodayCodec = z.strictObject({
+  currency: currencySchema,
+  official: rateCodec.nullable(),
+  quotes: z.array(
+    z.strictObject({
+      channel: exchangeChannelSchema,
+      basis: marketChannelSchema,
+      buys: rateCodec.nullable(),
+      sells: rateCodec.nullable(),
+      bestBuys: z.boolean(),
+      bestSells: z.boolean(),
+    }),
+  ),
+})
+export type MarketToday = z.output<typeof marketTodayCodec>
+
+/**
  * One exchange as the screen lists it. Its own rate and the comparison with the central bank are
  * the server's: the phone divides nothing (CLAUDE.md, «No business logic on the frontend»).
  */
@@ -101,6 +141,7 @@ export const exchangeViewCodec = z.strictObject({
   received: moneyCodec,
   heldBefore: moneyCodec.nullable(),
   note: z.string().nullable(),
+  channel: exchangeChannelSchema.nullable().default(null),
   givenAccountId: z.uuid().nullable().default(null),
   receivedAccountId: z.uuid().nullable().default(null),
   /** The version an amendment names, so one made elsewhere in between is a conflict. */
@@ -115,6 +156,7 @@ export const exchangeViewCodec = z.strictObject({
       exchangedOn: exchangeDaySchema,
       heldBefore: moneyCodec.nullable(),
       note: z.string().nullable(),
+      channel: exchangeChannelSchema.nullable().default(null),
       replacedAt: isoDate,
     }),
   ),
@@ -137,6 +179,20 @@ export const exchangeViewCodec = z.strictObject({
    * comparison, and the screen says the bank's number of that day is in doubt (review С-5).
    */
   officialDoubtful: z.boolean(),
+  /**
+   * The market of the exchange's day (MOL-137): the best figure of the channels a person can name,
+   * on the side the exchange was (`bestQuote`), and the exchange's own channel when it was named and
+   * is not the best. `exchangersPending`: the exchange offices of that day are still to come (В-3).
+   * Null for a pair without the dram (В-4) and for a day with no market figure at all.
+   */
+  market: z
+    .strictObject({
+      best: marketQuoteCodec,
+      own: marketQuoteCodec.nullable(),
+      exchangersPending: z.boolean(),
+    })
+    .nullable()
+    .default(null),
 })
 export type ExchangeView = z.output<typeof exchangeViewCodec>
 
@@ -222,5 +278,7 @@ export const exchangesResponseCodec = z.strictObject({
   exchanges: z.array(exchangeViewCodec),
   /** Every exchange and income, for the sheet's «сколько было до обмена» (see `receiptCodec`). */
   receipts: z.array(receiptCodec),
+  /** «Курсы по данным ЦБ РА» — the dollar, the euro and the rouble (MOL-137, В-1). */
+  marketToday: z.array(marketTodayCodec).default([]),
 })
 export type ExchangesResponse = z.output<typeof exchangesResponseCodec>

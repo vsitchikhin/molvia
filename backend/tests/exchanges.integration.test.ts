@@ -94,6 +94,11 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       walletUnknown: null,
       exchanges: [],
       receipts: [],
+      marketToday: [
+        { currency: 'RUB', official: null, quotes: [] },
+        { currency: 'USD', official: null, quotes: [] },
+        { currency: 'EUR', official: null, quotes: [] },
+      ],
     })
   })
 
@@ -1070,6 +1075,7 @@ describe('правка обмена с историей (MOL-42)', () => {
         exchangedOn: daysAgo(10),
         heldBefore: null,
         note: 'ВТБ банкомат',
+        channel: null,
         replacedAt: row?.amendedAt,
       },
     ])

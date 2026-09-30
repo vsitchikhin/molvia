@@ -32,6 +32,7 @@ function exchange(given: string, received: string, on: string, held: string | nu
     exchangedOn: on,
     heldBefore: held === null ? null : toMoney(held),
     note: null,
+    channel: null,
     givenAccountId: null,
     receivedAccountId: null,
     revision: 1,

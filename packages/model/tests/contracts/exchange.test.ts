@@ -146,6 +146,7 @@ describe('exchangesResponseCodec', () => {
         received: money(9_500_000n, 'AMD'),
         heldBefore: money(2_000_000n, 'AMD'),
         note: 'ВТБ банкомат',
+        channel: null,
         givenAccountId: null,
         receivedAccountId: null,
         revision: 2,
@@ -157,6 +158,7 @@ describe('exchangesResponseCodec', () => {
             exchangedOn: '2026-09-14',
             heldBefore: null,
             note: null,
+            channel: null,
             replacedAt: new Date('2026-09-25T10:00:00.000Z'),
           },
         ],
@@ -167,15 +169,60 @@ describe('exchangesResponseCodec', () => {
           difference: money(875_400n, 'AMD'),
         },
         officialDoubtful: false,
+        market: {
+          best: {
+            channel: 'exchanger',
+            basis: 'exchanger',
+            rate: { ...rate, scaled: 4_157_339n, source: 'official' },
+            difference: money(1_185_322n, 'AMD'),
+          },
+          own: {
+            channel: 'bankNoncash',
+            basis: 'banksAll',
+            rate: { ...rate, scaled: 4_224_000n, source: 'official' },
+            difference: money(52_000n, 'AMD'),
+          },
+          exchangersPending: false,
+        },
       },
     ],
     receipts: [{ id: body.id, currency: 'AMD', on: '2026-09-15', priced: true }],
+    marketToday: [
+      {
+        currency: 'RUB',
+        official: { ...rate, scaled: 4_318_700n, source: 'official' },
+        quotes: [
+          {
+            channel: 'bankCash',
+            basis: 'bankCash',
+            buys: { ...rate, scaled: 4_110_180n, source: 'official' },
+            sells: null,
+            bestBuys: false,
+            bestSells: false,
+          },
+        ],
+      },
+    ],
   }
 
   it('crosses the wire and comes back the same', () => {
     const wire = z.encode(exchangesResponseCodec, response)
     expect(wire.wallet?.rate.rate).toBe('4.791667')
     expect(z.decode(exchangesResponseCodec, wire)).toEqual(response)
+  })
+
+  it('reads an answer of a server older than the market as having none (MOL-137)', () => {
+    const wire: Record<string, unknown> = { ...z.encode(exchangesResponseCodec, response) }
+    delete wire.marketToday
+    const [first] = z.encode(exchangesResponseCodec, response).exchanges
+    if (!first) throw new Error('no exchange')
+    const exchange: Record<string, unknown> = { ...first }
+    delete exchange.market
+    delete exchange.channel
+    const decoded = exchangesResponseCodec.parse({ ...wire, exchanges: [exchange] })
+    expect(decoded.marketToday).toEqual([])
+    expect(decoded.exchanges[0]?.market).toBeNull()
+    expect(decoded.exchanges[0]?.channel).toBeNull()
   })
 
   it('is strict: a field the screen never reads fails rather than travelling past it', () => {

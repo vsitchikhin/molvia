@@ -45,6 +45,7 @@ function exchange(
     exchangedOn,
     heldBefore: heldBefore === null ? null : toMoney(heldBefore),
     note: null,
+    channel: null,
     givenAccountId: null,
     receivedAccountId: null,
     revision: 1,

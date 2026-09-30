@@ -167,7 +167,9 @@ test.describe('on «What did you pick up?»', () => {
     await context.grantPermissions(['camera'])
     await open(page, '/purchases/manual/add')
 
-    await openScanner(page)
+    // Nothing is tapped in the sheet, so its rise is not waited for: a camera that reads at once
+    // closed the sheet before the rise was over, and the wait for an open dialog never ended.
+    await page.getByRole('button', { name: 'Scan a barcode' }).click()
 
     await expect(missing(page)).toBeVisible({ timeout: READ })
     await expect(page.locator('.announcer')).toContainText(

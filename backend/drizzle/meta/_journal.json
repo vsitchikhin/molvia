@@ -232,6 +232,13 @@
       "when": 1790764483504,
       "tag": "0032_trip_receipt_first",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790783351974,
+      "tag": "0033_market_rates",
+      "breakpoints": true
     }
   ]
 }

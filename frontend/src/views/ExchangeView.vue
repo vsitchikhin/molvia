@@ -122,6 +122,8 @@
 
         <p class="frozen"><IconCheck aria-hidden="true" />{{ t('money.rate_frozen') }}</p>
 
+        <MarketRatesCard :rows="overview.marketToday" />
+
         <!-- Incomes alone can make the rate (MOL-66): then there is the card, and no list. -->
         <section v-if="overview.exchanges.length > 0" class="list">
           <h2 class="caption">{{ t('exchange.list_title') }}</h2>
@@ -196,6 +198,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ExchangeCard from '@/components/ExchangeCard.vue'
+import MarketRatesCard from '@/components/MarketRatesCard.vue'
 import ExchangeRemoveSheet from '@/components/ExchangeRemoveSheet.vue'
 import ExchangeSheet from '@/components/ExchangeSheet.vue'
 import FloatingDock from '@/components/FloatingDock.vue'
@@ -223,6 +226,7 @@ export default defineComponent({
     AppCard,
     AppScreen,
     ExchangeCard,
+    MarketRatesCard,
     ExchangeRemoveSheet,
     ExchangeSheet,
     FloatingDock,

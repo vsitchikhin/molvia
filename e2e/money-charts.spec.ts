@@ -94,7 +94,17 @@ test('the period moves by replace: «назад» from twelve months is «Ден
 
 // The category card is the third: a choice that took the page to the top took the chart away from
 // the person who asked for it (MOL-136). Where the card stands on the screen is what the eye sees.
-test('a category chosen further down keeps the page where it is, and so does the period', async ({
+/** Scrolls to the very end of the page, where the category card stands when it is the last one. */
+async function toTheEnd(page: Page): Promise<number> {
+  await page.evaluate(() => {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })
+  })
+  const scrolled = await page.evaluate(() => window.scrollY)
+  expect(scrolled).toBeGreaterThan(0)
+  return scrolled
+}
+
+test('a category chosen at the end of the page stays under the thumb, and so does the period', async ({
   page,
 }) => {
   await seed(page)
@@ -104,37 +114,102 @@ test('a category chosen further down keeps the page where it is, and so does the
   const choice = page.getByRole('combobox', { name: 'Категория' })
   await expect(choice.locator('option:checked')).toHaveText('Аренда жилья')
 
-  // The card is the last on the page and cannot reach the top; it stands off the bottom of the page.
-  // At the very bottom a shorter card brings the end of the page up under it — 2 px between two
-  // categories, a line where a missing one was named: the height of the page, MOL-138, not the router.
-  await standAt(card, 480)
-  const scrolled = await page.evaluate(() => window.scrollY)
-  expect(scrolled).toBeGreaterThan(0)
-  const before = await topOf(card)
-
+  // The card is the last on the page, and «Кафе и рестораны» draws it 2 px shorter under the choice
+  // than «Аренда жилья»: the page is held, not brought up under it (MOL-138).
+  const scrolled = await toTheEnd(page)
+  const before = await topOf(choice)
   await choice.selectOption({ label: 'Кафе и рестораны' })
   await expect(page).toHaveURL(/category=/)
   await expect(card).toContainText(/30\s000\s֏/)
-  expect(await topOf(card)).toBe(before)
+  expect(await topOf(choice)).toBe(before)
   expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
 
-  // The first twelve months on a phone are read under the skeleton, a page one screen tall, and the
-  // browser brings any scroll up to it — the height of the page, not the router. Back to six, the
-  // period the phone keeps is drawn at once, and the page is only a little down: the period is at
-  // the top, and a little is enough to tell it from the top.
-  await page.getByText('12 месяцев', { exact: true }).click()
-  const bars = page.locator('fieldset.chart').first().locator('label.bar')
-  await expect(bars).toHaveCount(12)
+  // Twelve months are read for the first time on this phone, and the answer is held back: under
+  // the skeleton the page is one window tall, and the period stays where it was.
+  let answer: () => void = () => undefined
+  const answered = new Promise<void>((resolve) => (answer = resolve))
+  await page.route('**/api/money/charts?period=12', async (route) => {
+    await answered
+    await route.continue()
+  })
   const periods = page.getByRole('group', { name: 'Период' })
   await standAt(periods, 60)
   const down = await page.evaluate(() => window.scrollY)
   expect(down).toBeGreaterThan(0)
   const period = await topOf(periods)
+
+  await page.getByText('12 месяцев', { exact: true }).click()
+  await expect(page).toHaveURL(/period=12/)
+  await expect(page.locator('.skeleton')).toBeVisible()
+  expect(await topOf(periods)).toBe(period)
+  expect(await page.evaluate(() => window.scrollY)).toBe(down)
+
+  answer()
+  const bars = page.locator('fieldset.chart').first().locator('label.bar')
+  await expect(bars).toHaveCount(12)
+  expect(await topOf(periods)).toBe(period)
+
+  // Back to six, the period the phone keeps.
   await page.getByText('6 месяцев', { exact: true }).click()
   await expect(page).not.toHaveURL(/period=/)
   await expect(bars).toHaveCount(6)
   expect(await topOf(periods)).toBe(period)
   expect(await page.evaluate(() => window.scrollY)).toBe(down)
+})
+
+test('a line gone under the category keeps the choice and the page where they were', async ({
+  page,
+}) => {
+  await seed(page)
+  // An address that names a category the charts do not have: said on the card, under the choice
+  // (MOL-74, MOL-138 В-2). Chosen another, the line goes and the card is shorter at the very end of
+  // the page: held, not brought up.
+  await page.goto(`/money/charts?category=${randomUUID()}`)
+  const card = page.getByRole('region', { name: 'Категория во времени' })
+  const choice = page.getByRole('combobox', { name: 'Категория' })
+  await expect(card).toContainText('Этой категории на графиках нет')
+
+  const scrolled = await toTheEnd(page)
+  const before = await topOf(choice)
+  await choice.selectOption({ label: 'Кафе и рестораны' })
+  await expect(card).not.toContainText('Этой категории на графиках нет')
+  await expect(card).toContainText(/30\s000\s֏/)
+  expect(await topOf(choice)).toBe(before)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
+})
+
+// The strip belongs to the charts of the period and stands under the period: neither its going with
+// a period not read nor its coming back over one the phone keeps moves the period (MOL-138, В-2;
+// adversarial Б2, round 2 Д1).
+test('offline, the period stays where it was, whether the phone keeps the period or not', async ({
+  page,
+  context,
+}) => {
+  await seed(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: /Открыть графики/ }).click()
+  const bars = page.locator('fieldset.chart').first().locator('label.bar')
+  await expect(bars).toHaveCount(6)
+  await page.goBack()
+  await context.setOffline(true)
+  await page.getByRole('link', { name: /Открыть графики/ }).click()
+  const strip = page.getByText(/Нет связи. Графики на/)
+  await expect(strip).toBeVisible()
+
+  const periods = page.getByRole('group', { name: 'Период' })
+  await standAt(periods, 60)
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+  await page.getByText('12 месяцев', { exact: true }).click()
+  await expect(page).toHaveURL(/period=12/)
+  await expect(strip).toBeHidden()
+  expect(await topOf(periods)).toBe(60)
+
+  // Back to six, kept on the phone: the strip goes with the move, back with the failed read.
+  await page.getByText('6 месяцев', { exact: true }).click()
+  await expect(page).not.toHaveURL(/period=/)
+  await expect(bars).toHaveCount(6)
+  await expect(strip).toBeVisible()
+  expect(await topOf(periods)).toBe(60)
 })
 
 test('with no connection the charts are the last ones read, under a strip that is not red', async ({

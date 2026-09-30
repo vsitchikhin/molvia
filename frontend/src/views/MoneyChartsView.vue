@@ -1,8 +1,23 @@
 <template>
   <AppScreen :title="t('spending.charts.title')">
-    <template v-if="range" #subtitle>{{ range }}</template>
+    <!-- The line stands in every state, empty until a range is known: gone under the skeleton, it
+         took the period below it up by its height, and back with the answer, down (MOL-138). An
+         error or «offline» with nothing read keeps it empty rather than move the period again. -->
+    <template #subtitle
+      ><span class="range">{{ range }}</span></template
+    >
 
     <div class="content">
+      <SegmentedControl
+        :model-value="String(period)"
+        :options="periods"
+        :legend="t('spending.charts.period')"
+        hide-legend
+        @update:model-value="choosePeriod"
+      />
+
+      <!-- Under the period: they are about the charts of the one chosen, and over it they came
+           and went with its answer and took it from under the thumb (MOL-138, owner's В-2). -->
       <p v-if="stale === 'offline' && fetchedAt" class="strip">
         <IconCloudOff class="strip-icon" aria-hidden="true" />
         {{ t('spending.charts.offline.strip', { when: when(fetchedAt) }) }}
@@ -14,14 +29,6 @@
         :title="t('spending.charts.load_error.title')"
         :body="t('spending.charts.load_error.body')"
         @retry="retry"
-      />
-
-      <SegmentedControl
-        :model-value="String(period)"
-        :options="periods"
-        :legend="t('spending.charts.period')"
-        hide-legend
-        @update:model-value="choosePeriod"
       />
 
       <ScreenSkeleton v-if="phase === 'loading'" :groups="[40, 28, 90, 40, 28, 90, 40, 28, 70]" />
@@ -119,9 +126,6 @@
             <h2 :id="`${id}-category`" class="caption">
               {{ t('spending.charts.category_title') }}
             </h2>
-            <p v-if="categoryMissing" class="detail missing">
-              {{ t('spending.charts.category_missing', { name: nameOf(series.category) }) }}
-            </p>
             <AppField
               :model-value="series.category.id"
               kind="select"
@@ -135,6 +139,10 @@
                 <span class="dot" :style="{ background: categoryColour(series.category) }"></span>
               </template>
             </AppField>
+            <!-- Under the choice it explains: choosing another does not move the choice. -->
+            <p v-if="categoryMissing" class="detail missing">
+              {{ t('spending.charts.category_missing', { name: nameOf(series.category) }) }}
+            </p>
             <BarChart
               v-model="categoryAt"
               :bars="categoryBars"
@@ -532,6 +540,11 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.range {
+  display: block;
+  min-height: 1lh;
+}
+
 .content {
   display: flex;
   flex-direction: column;
