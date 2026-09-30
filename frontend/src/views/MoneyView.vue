@@ -292,6 +292,8 @@ import { useMoneyMonth } from '@/composables/useMoneyMonth'
 import { calendarDay, localDay, purchaseDay, shiftDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
+import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
+import type { SpendingPrefill } from '@/stores/spendingHandoff'
 import { spendingOf, useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -569,10 +571,14 @@ export default defineComponent({
     const target = ref<SpendingTarget>({ kind: 'add' })
 
     function compose(): void {
+      composeFrom()
+    }
+
+    function composeFrom(prefill?: SpendingPrefill): void {
       lookAtToday()
       toShow.value = null
       made.value = null
-      target.value = { kind: 'add' }
+      target.value = prefill ? { kind: 'add', prefill } : { kind: 'add' }
       sheetOpen.value = true
     }
 
@@ -585,6 +591,21 @@ export default defineComponent({
 
     /** The spending just saved, until its row is on screen and brought into view (review С-2). */
     const toShow = ref<string | null>(null)
+
+    /**
+     * A record with no purchases handed over from «Покупки» (MOL-78, В-1): the sheet opens on it
+     * once, as soon as this screen is there.
+     */
+    const handoff = useSpendingHandoffStore()
+    watch(
+      () => handoff.handed,
+      (handed) => {
+        if (!handed) return
+        const prefill = handoff.take()
+        if (prefill) composeFrom(prefill)
+      },
+      { immediate: true },
+    )
 
     function saved({ id, spentOn }: { id: string; spentOn: string }): void {
       lookAtToday()

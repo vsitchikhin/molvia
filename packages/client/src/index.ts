@@ -32,6 +32,7 @@ import {
   moneyAccountBodySchema,
   moneyAccountsCodec,
   tripPaymentBodySchema,
+  tripReceiptBodySchema,
   unassignedOperationsCodec,
   moneyChartsCodec,
   moneyMonthCodec,
@@ -88,6 +89,7 @@ import type {
   MoneyAccountBody,
   MoneyAccountsResponse,
   TripPaymentBody,
+  TripReceiptBody,
   UnassignedOperationsResponse,
   MoneyChartsView,
   MoneyMonthView,
@@ -209,6 +211,11 @@ export interface MolviaClient {
    * `error.conflict`, an own rate that is not a rate with `error.invalid_rate`.
    */
   chooseTripRate(tripId: string, body: RateChoiceBody): Promise<TripView>
+  /**
+   * «Сумма по чеку» (MOL-78): the receipt's sum whole, or `null` to take it off — safe for the queue
+   * to send twice. `error.not_found` for a trip the server does not hold.
+   */
+  setTripReceipt(tripId: string, body: TripReceiptBody): Promise<TripView>
   /**
    * «Удалить поход» (MOL-76): marked on the server, safe to send again. `error.not_found` for a
    * trip the server does not hold — never sent, someone else's, or final — which the queue reads
@@ -559,6 +566,12 @@ export function createClient(options: ClientOptions): MolviaClient {
       request(`/trips/${segment(tripId)}/rate-choice`, tripViewCodec, {
         method: 'PUT',
         body: encode(rateChoiceBodySchema, body),
+      }),
+
+    setTripReceipt: async (tripId, body) =>
+      request(`/trips/${segment(tripId)}/receipt`, tripViewCodec, {
+        method: 'PUT',
+        body: encode(tripReceiptBodySchema, body),
       }),
 
     // A portal's page answering a redirected DELETE with 200 is not the removal (MOL-57, round 4).

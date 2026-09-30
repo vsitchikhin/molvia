@@ -23,6 +23,7 @@ import {
   formatMoney,
   formatRate,
   nextCategoryColour,
+  TRIP_CATEGORY,
 } from '@molvia/model'
 import type {
   ExchangeRate,
@@ -34,6 +35,7 @@ import type {
 } from '@molvia/model'
 import type { RejectedSpendingWrite, SpendingUndo, SpendingWrite } from '@/stores/spendingQueue'
 import { spendingOf } from '@/stores/spendingQueue'
+import type { SpendingPrefill } from '@/stores/spendingHandoff'
 
 /**
  * What the screen of «Деньги» draws, put together from the server's month and the phone's queue
@@ -358,9 +360,21 @@ export function unsentIn(month: MoneyMonthView, pending: readonly SpendingWrite[
   return ids.size
 }
 
+/**
+ * «Продукты» of the owner, where a record with no purchases lands as a spending (MOL-78, В-1) —
+ * none once removed from the choice: the sheet takes only a category it shows.
+ */
+export function groceriesOf(categories: readonly SpendingCategoryView[]): string | null {
+  return (
+    categories.find((category) => category.preset === TRIP_CATEGORY && !category.archived)?.id ??
+    null
+  )
+}
+
 /** What the sheet of a spending is opened on: a new one, one of one's own, or a trip's line. */
 export type SpendingTarget =
-  | { readonly kind: 'add' }
+  /** `prefill`: a record with no purchases handed over as a spending (MOL-78, В-1). */
+  | { readonly kind: 'add'; readonly prefill?: SpendingPrefill }
   | { readonly kind: 'manual'; readonly row: Extract<JournalRow, { kind: 'manual' }> }
   | {
       readonly kind: 'trip'
