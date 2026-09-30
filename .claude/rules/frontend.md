@@ -342,11 +342,27 @@ The detail behind the frontend lines of `CLAUDE.md`.
   (`hotfix-bottom-menu-probe.jsonl`, MOL-135's log too) put the sheet's end where the keyboard
   begins. A script has no reading of `dvh`: a hidden fixed box of `100dvh` is read instead, and
   where nothing is laid out (the component tests) the window's height stands in.
-- **The sheet goes on below its bottom edge in its own colour** (hotfix-bottom-menu): on iOS 26 and
-  later the keys and the bar of «∧ ∨ ✓» over them are glass, with clear room between the bar and
-  the keys, and the sheet stands on the top of that frame, not of the keys. What lay under it — the
-  spendings of the month — showed in a band between the sheet and the keys (the owner's screenshot,
-  the installed app). Measuring closer does not help: the room is the keyboard's own. A shadow of
-  `--surface`, spread and offset alike so it starts under the rounded corners, first in the list so
-  the sheet's own shadow does not darken it; not a taller box, since the box is what the lift, the
-  height and `reveal` measure.
+- **Under the keys, nothing of the page shows** (hotfix-bottom-menu). On iOS 26 and later the keys,
+  the bar of «∧ ∨ ✓» over them and Safari's address bar floating above them are glass with clear
+  room between them, and the sheet stands on the top of that frame, not of the keys: what lay under
+  it — the spendings of the month — showed in a band between the sheet and the keys (the owner's
+  screenshots, Safari and the installed app). Two layers close it, since neither closes both:
+  - **The sheet goes on below its edge in its own colour**, a shadow of `--surface`, spread and
+    offset alike so it starts under the rounded corners, first in the list so the sheet's own shadow
+    does not darken it; not a taller box, since the box is what the lift, the height and `reveal`
+    measure. That covers the installed app, where the window goes on below the keyboard's top.
+  - **The page is hidden while the keys are up under a sheet** (`data-under-keys` on the root, set
+    by `useKeyboardInset` once the visible part is `KEYBOARD` = 150px shorter than `100dvh` — less
+    than any keyboard, more than a browser's own bars), and the canvas takes `--surface`. In Safari
+    the window — and everything fixed, the sheet and its scrim with it — ends at the top of the
+    keyboard, and below it only the page itself is drawn: the shadow was not, and the band stayed.
+    `visibility`, so nothing is laid out anew and nothing scrolls; the open sheets and the live
+    region stay. The page under a modal sheet takes nothing anyway; above the sheet the scrim now
+    dims the sheet's colour instead of the screen — the price.
+- **`interactive-widget=resizes-content` is Android's alone** (hotfix-bottom-menu): set by a script
+  in the head of `index.html` for an Android user agent, before the page is laid out. iOS ignored it
+  until Safari 27, which began to honour it: the window shrank to the part left visible under the
+  keyboard (`innerHeight` 699 → 395 with it, 699 kept without it, the same phone and state). The tab
+  bar that stood mid-screen in the installed app on production is taken for the bottom of such a
+  window not given back — a reading, not a measurement: the probe never caught it, and it went away
+  by itself after a relaunch. `useKeyboardInset` lifts the sheet on iOS, as it did before.

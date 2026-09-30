@@ -49,11 +49,14 @@ export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<bo
     if (viewport.scale > 1) {
       element.style.setProperty('--keyboard-inset', '0px')
       element.style.removeProperty('--viewport-height')
+      underKeys(false)
       placed = ''
       return
     }
+    const whole = windowHeight()
+    underKeys(whole - viewport.height > KEYBOARD)
     // Never below zero: a visual viewport past the end of the window is nothing the keys cover.
-    const covered = pixels(windowHeight() - viewport.height - viewport.offsetTop)
+    const covered = pixels(whole - viewport.height - viewport.offsetTop)
     const height = pixels(viewport.height)
     element.style.setProperty('--keyboard-inset', covered)
     element.style.setProperty('--viewport-height', height)
@@ -73,6 +76,7 @@ export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<bo
     window.visualViewport?.removeEventListener('scroll', measure)
     target.value?.style.removeProperty('--keyboard-inset')
     target.value?.style.removeProperty('--viewport-height')
+    underKeys(false)
     placed = ''
   }
 
@@ -127,6 +131,27 @@ function reveal(sheet: HTMLElement): void {
   // the edge — and rounded so that the field's top never goes past the sheet's.
   if (above > 0) sheet.scrollTop -= Math.ceil(above)
   else if (below > 0) sheet.scrollTop += Math.min(Math.ceil(below), Math.floor(-above))
+}
+
+/**
+ * Less than any on-screen keyboard and more than a browser's own bars coming and going: the
+ * visible part this much shorter than the window is a keyboard.
+ */
+const KEYBOARD = 150
+
+/**
+ * Tells the page the keys are up under an open sheet (`data-under-keys` on the root; main.scss).
+ * Safari ends everything fixed — the sheet, its scrim — at the top of the keyboard, and on iOS 26
+ * and later its bar of «∧ ∨ ✓», the address bar floating over the keys and the keys themselves are
+ * glass with clear room between them: what shows through is the page itself, and a fixed layer
+ * cannot be drawn there to cover it. The page under a modal sheet takes nothing anyway, so it is
+ * hidden instead, and the canvas takes the sheet's colour (hotfix-bottom-menu, the owner's
+ * screenshots, Safari and the installed app).
+ */
+function underKeys(on: boolean): void {
+  const root = document.documentElement
+  if (on) root.dataset.underKeys = ''
+  else delete root.dataset.underKeys
 }
 
 // A box as tall as `100dvh`, read by its height: a length in `dvh` has no reading of its own in a

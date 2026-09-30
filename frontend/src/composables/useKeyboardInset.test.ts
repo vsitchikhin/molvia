@@ -88,6 +88,7 @@ function fakeDvh(height: number) {
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
+  delete document.documentElement.dataset.underKeys
   document.body.innerHTML = ''
 })
 
@@ -174,6 +175,44 @@ describe('useKeyboardInset', () => {
     expect(inset()).toBe('100px')
   })
 
+  // Safari draws nothing fixed below the top of the keys, and through their glass the page showed
+  // between the sheet and the keyboard (hotfix-bottom-menu): the page is hidden while they are up.
+  it('tells the page the keys are up under the sheet, and takes it back', async () => {
+    const viewport = fakeViewport(699)
+    fakeDvh(699)
+    vi.stubGlobal('innerHeight', 699)
+    const under = () => document.documentElement.dataset.underKeys
+    const { on } = host()
+    on.value = true
+    await nextTick()
+    expect(under()).toBeUndefined()
+    viewport.height = 395
+    viewport.offsetTop = 304
+    viewport.fire('resize')
+    expect(under()).toBe('')
+    viewport.height = 699
+    viewport.offsetTop = 0
+    viewport.fire('resize')
+    expect(under()).toBeUndefined()
+    viewport.height = 395
+    viewport.fire('resize')
+    on.value = false
+    await nextTick()
+    expect(under()).toBeUndefined()
+  })
+
+  // A browser's own bars come and go by less than a keyboard: that is no keyboard.
+  it('must not fire: the visible part a bar shorter than the window', async () => {
+    const viewport = fakeViewport(739)
+    fakeDvh(739)
+    const { on } = host()
+    on.value = true
+    await nextTick()
+    viewport.height = 739 - 150
+    viewport.fire('resize')
+    expect(document.documentElement.dataset.underKeys).toBeUndefined()
+  })
+
   it('must not fire: with no keyboard the sheet takes its share of the whole screen', async () => {
     fakeViewport(800)
     const { on, inset, height } = host()
@@ -241,6 +280,7 @@ describe('useKeyboardInset', () => {
     on.value = true
     await nextTick()
     expect(inset()).toBe('0px')
+    expect(document.documentElement.dataset.underKeys).toBeUndefined()
     // Not the pinched viewport's height: the sheet keeps its share of the screen.
     expect(height()).toBe('')
     viewport.scale = 1
