@@ -1139,6 +1139,9 @@ describe('«What did you pick up?»', () => {
         })
         await view.get(`button[aria-label="${en.item.barcode.pending_drop}"]`).trigger('click')
         expect(view.text()).not.toContain(pending)
+        // The ✕ goes with the strip: the field takes the focus back (adversarial О).
+        await nextTick()
+        expect(document.activeElement).toBe(field(view).element)
       })
 
       it('asks before the purchase sheet whether the code is the row’s, and says so out loud', async () => {
