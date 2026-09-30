@@ -142,6 +142,9 @@ afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount()
   vi.restoreAllMocks()
   document.body.innerHTML = ''
+  // A close holds «a step in flight» until the pop lands, and a memory history sends none: held
+  // into the next test, it takes that test's pop (as in ItemSearchView.test.ts).
+  window.dispatchEvent(new PopStateEvent('popstate'))
 })
 
 describe('BarcodeScannerSheet', () => {
@@ -402,20 +405,36 @@ describe('BarcodeScannerSheet', () => {
     })
   })
 
-  // MOL-99: the screen keeps the sheet mounted for a warm reader, and a closed sheet that still held
-  // its skeleton or its refusal kept their words in the app's live region — «Loading…» over the
-  // search results.
-  it('draws nothing while closed: no skeleton, no refusal, nothing to say', async () => {
+  // MOL-99: the screen keeps the sheet mounted for a warm reader. Put away, the sheet draws nothing
+  // — its refusal kept its words in the app's live region — but only once it is put away: emptied
+  // at `open: false`, it slid down as a bare title (adversarial Е).
+  it('keeps its content while it slides down, and draws nothing once put away', async () => {
     getUserMedia.mockRejectedValue(named('NotAllowedError'))
+    const closed = vi.fn()
     const sheet = await render()
+    await sheet.setProps({ onClosed: closed })
     expect(heading(sheet)).toBe(en.scanner.denied_title)
 
     await sheet.setProps({ open: false })
+    expect(heading(sheet)).toBe(en.scanner.denied_title)
 
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await settle()
+
+    expect(closed).toHaveBeenCalledOnce()
     expect(sheet.find('.state').exists()).toBe(false)
     expect(sheet.find('video').exists()).toBe(false)
-    expect(sheet.text()).not.toContain(en.state.loading)
     expect(sheet.text()).not.toContain(en.scanner.manual)
+  })
+
+  it('says «Loading…» only while open: a camera stopped by the close brings no skeleton', async () => {
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const sheet = await render()
+    expect(sheet.find('video').exists()).toBe(true)
+
+    await sheet.setProps({ open: false })
+
+    expect(sheet.text()).not.toContain(en.state.loading)
   })
 
   it('stops the camera when the sheet closes', async () => {

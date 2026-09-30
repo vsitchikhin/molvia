@@ -2,6 +2,7 @@ import { onUnmounted, ref } from 'vue'
 import type { Ref } from 'vue'
 import type { CatalogueEntry } from '@molvia/model'
 import { api } from '@/api'
+import { useReconnect } from '@/composables/useReconnect'
 
 // Asked afresh each time, as the search asks it: the answer before the request says nothing about
 // the connection by the time the request has failed.
@@ -67,7 +68,8 @@ export function useBarcodeLookup(options: BarcodeLookupOptions): BarcodeLookup {
     return entry !== null
   }
 
-  async function run(read: string): Promise<void> {
+  /** `quiet` keeps what is on screen until the answer replaces it — a retry nobody asked for. */
+  async function run(read: string, quiet = false): Promise<void> {
     drop()
     const mine = latest
     code.value = read
@@ -77,7 +79,7 @@ export function useBarcodeLookup(options: BarcodeLookupOptions): BarcodeLookup {
       return
     }
 
-    phase.value = 'loading'
+    if (!quiet) phase.value = 'loading'
     const controller = new AbortController()
     inFlight = controller
     try {
@@ -106,6 +108,15 @@ export function useBarcodeLookup(options: BarcodeLookupOptions): BarcodeLookup {
     phase.value = 'idle'
     code.value = null
   }
+
+  // The connection may be back, or the app is looked at again — which the search hears too: «Нет
+  // сети» must not outlive the network (adversarial Ж). Quietly, as the search does: the block stays
+  // until the answer replaces it.
+  useReconnect(() => {
+    if ((phase.value === 'offline' || phase.value === 'error') && code.value !== null) {
+      void run(code.value, true)
+    }
+  })
 
   onUnmounted(drop)
 

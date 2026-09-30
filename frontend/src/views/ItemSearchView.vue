@@ -49,7 +49,7 @@
 
         <div v-else-if="barcode === 'missing'" class="not-found">
           <p class="not-found-text">{{ t('item.barcode.missing', { code: barcodeCode }) }}</p>
-          <AppButton @click="proposing = true">
+          <AppButton @click="proposeByCode">
             <template #icon><IconPlus /></template>
             {{ t('item.empty.action') }}
           </AppButton>
@@ -137,11 +137,11 @@
       </template>
     </CatalogueCombobox>
 
-    <BarcodeScannerSheet v-model:open="scanning" :on-closed="afterScanning" @read="lookup.lookUp" />
+    <BarcodeScannerSheet v-model:open="scanning" :on-closed="afterScanning" @read="read" />
 
     <ProposeItemSheet
       v-model:open="proposing"
-      :query="query"
+      :query="proposingByCode ? '' : query"
       :on-closed="afterProposing"
       @proposed="proposed"
     />
@@ -271,6 +271,13 @@ export default defineComponent({
       if (open) scannerAway = false
     })
 
+    // A new code is a new question: a find still held for the scanner to go belongs to the code
+    // before it, and would come up over «Код … не знаком» of this one (adversarial А).
+    function read(code: string): void {
+      foundByCode = null
+      lookup.lookUp(code)
+    }
+
     function afterScanning(): void {
       scannerAway = true
       takeFoundByCode()
@@ -283,14 +290,20 @@ export default defineComponent({
       if (!scannerAway || foundByCode === null) return
       const { entry: chosen, code } = foundByCode
       foundByCode = null
+      pickWithoutQuery(chosen)
+      pickedByCode = { itemId: chosen.id, code }
+    }
+
+    function pickWithoutQuery(chosen: CatalogueEntry): void {
       opened.value += 1
       takeMissed('')
-      pickedByCode = { itemId: chosen.id, code }
+      pickedByCode = null
       entry.pick({ entry: chosen, query: '' })
     }
 
     // Typing is the other way to find it: the answer to the code gives way to the search.
     watch(query, () => {
+      foundByCode = null
       lookup.clear()
     })
 
@@ -340,6 +353,9 @@ export default defineComponent({
       withdraw?.()
       withdraw = undefined
       if ((next !== 'ready' && next !== 'far' && next !== 'empty') || dimmed) return
+      // Under the answer to a code the rows are not shown, so an answer to the search that lands
+      // then is not said either — «found two» over «Код … не знаком» (adversarial Б).
+      if (barcode.value !== 'idle') return
       // A far answer is «не нашли» out loud too: «found one» for «Чай зелёный» on «пельмени»
       // would be the very claim the screen stopped making (MOL-46).
       withdraw = announce?.(
@@ -400,6 +416,16 @@ export default defineComponent({
     /** «Предложить товар» — the whole form, the only way the catalogue grows in 0.1. */
     const proposing = ref(false)
     let proposedItem: CatalogueEntry | null = null
+    /**
+     * «Предложить товар» under «Код … не знаком» (adversarial Д): it was looked for by the code, not by
+     * what the field held before the scan — so the name starts empty, and the pick teaches no word.
+     */
+    const proposingByCode = ref(false)
+
+    function proposeByCode(): void {
+      proposingByCode.value = true
+      proposing.value = true
+    }
 
     // Picked like any other, with the query it was looked for by: the next search for it then
     // puts it first (MOL-11). New or already there — the same, the item is the catalogue's.
@@ -412,7 +438,14 @@ export default defineComponent({
     }
 
     function afterProposing(): void {
-      if (proposedItem) pick(proposedItem, false)
+      const byCode = proposingByCode.value
+      proposingByCode.value = false
+      if (proposedItem && byCode) {
+        // Proposed, the code's question is answered: its block goes with it (review С-5). The code
+        // itself is written with the item from MOL-100.
+        lookup.clear()
+        pickWithoutQuery(proposedItem)
+      } else if (proposedItem) pick(proposedItem, false)
       proposedItem = null
     }
 
@@ -453,7 +486,10 @@ export default defineComponent({
       proposed,
       afterProposing,
       scanning,
+      read,
       afterScanning,
+      proposingByCode,
+      proposeByCode,
       lookup,
       barcode,
       barcodeCode: lookup.code,

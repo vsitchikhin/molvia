@@ -1,10 +1,11 @@
 <template>
-  <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
+  <BottomSheet :open="open" :on-closed="putAway" @update:open="$emit('update:open', $event)">
     <template #title>{{ t('scanner.title') }}</template>
 
-    <!-- Nothing while closed: a sheet kept mounted for a warm reader (MOL-99) would otherwise keep
-         its skeleton or its refusal in the page — and their words in the app's live region. -->
-    <form v-if="open && typing" ref="form" class="typed" novalidate @submit.prevent="submitTyped">
+    <!-- Nothing once put away: a sheet kept mounted for a warm reader (MOL-99) would otherwise keep
+         its refusal in the page — and its words in the app's live region. Not by `open`: the sheet
+         still slides down after that, and emptied it went as a bare title (adversarial Е). -->
+    <form v-if="shown && typing" ref="form" class="typed" novalidate @submit.prevent="submitTyped">
       <AppField
         v-model="typed"
         kind="digits"
@@ -16,7 +17,7 @@
       />
     </form>
 
-    <div v-else-if="open && viewing" class="viewfinder">
+    <div v-else-if="shown && viewing" class="viewfinder">
       <!-- The picture is for the eye alone: what it says, the hint below says in words. -->
       <video
         ref="video"
@@ -30,7 +31,9 @@
       <div class="overlay" aria-hidden="true">
         <div ref="frame" class="frame"></div>
       </div>
-      <ScreenSkeleton v-if="kind !== 'live'" class="loading" :groups="[40]" />
+      <!-- Only while open: the camera stopped by the close would bring it up as the sheet slides
+           down, and say «Loading…» for nothing. -->
+      <ScreenSkeleton v-if="open && kind !== 'live'" class="loading" :groups="[40]" />
       <p class="hint">{{ t('scanner.hint') }}</p>
       <AppButton
         v-if="torch !== null"
@@ -46,7 +49,7 @@
     </div>
 
     <ScreenState
-      v-else-if="open && refusal"
+      v-else-if="shown && refusal"
       :kind="refusal === 'error' || refusal === 'reader' ? 'error' : 'attention'"
       :title="t(REFUSALS[refusal].title)"
       :body="t(REFUSALS[refusal].body)"
@@ -67,7 +70,7 @@
       </template>
     </ScreenState>
 
-    <template v-if="open && (typing || viewing)" #footer>
+    <template v-if="shown && (typing || viewing)" #footer>
       <div v-if="typing" class="actions">
         <AppButton size="large" block @click="submitTyped">{{ t('scanner.done') }}</AppButton>
         <AppButton v-if="cameraMayWork" variant="secondary" block @click="toCamera">
@@ -85,6 +88,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, nextTick, ref, watch } from 'vue'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { typedBarcode, type ErrorCode } from '@molvia/model'
 import IconScan from '~icons/mdi/barcode-scan'
@@ -139,6 +143,8 @@ export default defineComponent({
   },
   props: {
     open: { type: Boolean, required: true },
+    /** The sheet's `onClosed`, passed on once this sheet has let its content go. */
+    onClosed: { type: Function as PropType<() => void>, default: undefined },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
@@ -150,6 +156,8 @@ export default defineComponent({
     const frame = ref<HTMLElement | null>(null)
     const form = ref<HTMLFormElement | null>(null)
     const typing = ref(false)
+    // Up from the opening until the sheet is put away — its slide down included (adversarial Е).
+    const shown = ref(props.open)
     const typed = ref('')
     const typedError = ref<ErrorCode | null>(null)
     // Once the camera is known to be missing — no secure context, no camera — «Сканировать» is not
@@ -174,13 +182,24 @@ export default defineComponent({
       },
     })
 
-    const refusal = computed<Refusal | null>(() => {
+    const current = computed<Refusal | null>(() => {
       if (scan.failed.value) return 'reader'
       const kind = camera.kind.value
       return kind === 'insecure' || kind === 'denied' || kind === 'none' || kind === 'error'
         ? kind
         : null
     })
+    // What the sheet slides down with is what it showed: the close stops the camera, and the
+    // refusal read from it would give way to a black viewfinder on the way down (adversarial Е).
+    const shownRefusal = ref<Refusal | null>(null)
+    watch(
+      current,
+      (next) => {
+        if (props.open) shownRefusal.value = next
+      },
+      { immediate: true },
+    )
+    const refusal = computed(() => (props.open ? current.value : shownRefusal.value))
     const viewing = computed(() => !typing.value && refusal.value === null)
 
     watch(camera.kind, (kind) => {
@@ -207,6 +226,7 @@ export default defineComponent({
       () => props.open,
       (open) => {
         if (open) {
+          shown.value = true
           typing.value = false
           typed.value = ''
           typedError.value = null
@@ -241,9 +261,17 @@ export default defineComponent({
       else typedError.value = result.error
     }
 
+    // A sheet asked for again while it slid down is still up: its `onClosed` comes all the same.
+    function putAway(): void {
+      shown.value = props.open
+      props.onClosed?.()
+    }
+
     return {
       t,
       REFUSALS,
+      shown,
+      putAway,
       video,
       frame,
       form,

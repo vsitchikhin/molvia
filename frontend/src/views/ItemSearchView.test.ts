@@ -871,6 +871,177 @@ describe('«What did you pick up?»', () => {
       expect(useItemEntryStore(pinia).picked).toBeNull()
     })
 
+    describe('the adversarial pass (MOL-99)', () => {
+      const OTHER = '4850000000014'
+      const missingOf = (code: string) => en.item.barcode.missing.replace('{code}', code)
+
+      function deferred<T>() {
+        let resolve!: (value: T) => void
+        const promise = new Promise<T>((settle) => (resolve = settle))
+        return { promise, resolve }
+      }
+
+      /** The first code's answer lands while the scanner is up again, then the second is read. */
+      async function scanTwice(view: VueWrapper, landFirst: () => void): Promise<void> {
+        await scan(view, CODE)
+        await view.get(`button[aria-label="${en.item.barcode.scan}"]`).trigger('click')
+        landFirst()
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        scanner(view).vm.$emit('read', OTHER)
+        scanner(view).vm.$emit('update:open', false)
+        await nextTick()
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        putAway(view)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+
+      it('drops a find held for the scanner once the next code is read — nobody holds it (А)', async () => {
+        const first = deferred<CatalogueEntry | null>()
+        catalogueByBarcode.mockImplementation((code) =>
+          code === CODE ? first.promise : Promise.resolve(null),
+        )
+        const view = await render()
+
+        await scanTwice(view, () => {
+          first.resolve(milk)
+        })
+
+        expect(view.text()).toContain(missingOf(OTHER))
+        expect(useItemEntryStore(pinia).picked).toBeNull()
+      })
+
+      it('drops it too when the next code fails (А)', async () => {
+        const first = deferred<CatalogueEntry | null>()
+        catalogueByBarcode.mockImplementation((code) =>
+          code === CODE ? first.promise : Promise.reject(new Error('Failed to fetch')),
+        )
+        const view = await render()
+
+        await scanTwice(view, () => {
+          first.resolve(milk)
+        })
+
+        expect(view.text()).toContain(en.item.barcode.error_body.replace('{code}', OTHER))
+        expect(useItemEntryStore(pinia).picked).toBeNull()
+      })
+
+      it('takes the next code’s item when that one is found (А, control)', async () => {
+        const first = deferred<CatalogueEntry | null>()
+        catalogueByBarcode.mockImplementation((code) =>
+          code === CODE ? first.promise : Promise.resolve(marianna),
+        )
+        const view = await render()
+
+        await scanTwice(view, () => {
+          first.resolve(milk)
+        })
+
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: marianna, query: '' })
+      })
+
+      it('does not read out a search that answers under the code’s block (Б)', async () => {
+        const answer = deferred<CatalogueEntry[]>()
+        searchCatalogue.mockReturnValue(answer.promise)
+        catalogueByBarcode.mockResolvedValue(null)
+        const view = await render()
+        await field(view).setValue('хлеб')
+        await vi.waitFor(() => {
+          expect(searchCatalogue).toHaveBeenCalledWith('хлеб')
+        })
+        await scan(view, CODE)
+        await vi.waitFor(() => {
+          expect(view.get('.live').text()).toBe(missingOf(CODE))
+        })
+
+        answer.resolve([bread, milk])
+        await new Promise((resolve) => setTimeout(resolve, 50))
+
+        expect(view.get('.live').text()).toBe(missingOf(CODE))
+        expect(names(view)).toEqual([])
+      })
+
+      it('asks for the code again once the connection is back, quietly (Ж)', async () => {
+        online(false)
+        catalogueByBarcode.mockResolvedValue(milk)
+        const view = await render()
+        await scan(view, CODE)
+        expect(view.text()).toContain(en.item.barcode.offline_body)
+
+        online(true)
+        window.dispatchEvent(new Event('online'))
+
+        await vi.waitFor(() => {
+          expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: '' })
+        })
+        expect(catalogueByBarcode).toHaveBeenCalledWith(CODE)
+      })
+
+      describe('«Suggest an item» under an unknown code (Д)', () => {
+        const cheese = entry(9, 'Сыр чечил')
+
+        async function proposeCheese(view: VueWrapper): Promise<void> {
+          await button(view, en.item.empty.action).trigger('click')
+          vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+          await new Promise((resolve) => setTimeout(resolve, 5))
+          const name = view.get<HTMLInputElement>('dialog input[type="text"]')
+          expect(name.element.value).toBe('')
+          await name.setValue('Сыр чечил')
+          const litre = view
+            .findAll('dialog label')
+            .find((label) => label.text() === en.item.unit_l)
+            ?.find('input')
+          await litre?.setValue(true)
+          await button(view, en.item.propose.submit).trigger('click')
+        }
+
+        it('starts with no name and teaches the search no word typed before the scan', async () => {
+          searchCatalogue.mockResolvedValue([bread])
+          catalogueByBarcode.mockResolvedValue(null)
+          proposeItem.mockResolvedValue({ entry: cheese, created: true })
+          vi.spyOn(performance, 'now').mockReturnValue(0)
+          const view = await render()
+          await field(view).setValue('хлеб')
+          await vi.waitFor(() => {
+            expect(names(view)).toEqual([bread.name])
+          })
+          await scan(view, CODE)
+          await vi.waitFor(() => {
+            expect(view.text()).toContain(missingOf(CODE))
+          })
+
+          await proposeCheese(view)
+
+          await vi.waitFor(() => {
+            expect(useItemEntryStore(pinia).picked).toEqual({ entry: cheese, query: '' })
+          })
+          // Proposed, the code's question is answered: its block goes (review С-5).
+          expect(view.text()).not.toContain(missingOf(CODE))
+        })
+
+        it('still takes the field’s word when proposed from the search’s own «not found» (control)', async () => {
+          searchCatalogue.mockResolvedValue([])
+          proposeItem.mockResolvedValue({ entry: cheese, created: true })
+          vi.spyOn(performance, 'now').mockReturnValue(0)
+          const view = await render()
+          await field(view).setValue('чечил')
+          await vi.waitFor(() => {
+            expect(searchCatalogue).toHaveBeenCalledWith('чечил')
+          })
+          await vi.waitFor(() => {
+            expect(view.text()).toContain(en.item.empty.action)
+          })
+
+          await button(view, en.item.empty.action).trigger('click')
+          vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+          await new Promise((resolve) => setTimeout(resolve, 5))
+
+          expect(view.get<HTMLInputElement>('dialog input[type="text"]').element.value).toBe(
+            'чечил',
+          )
+        })
+      })
+    })
+
     it('opens the scanner at once when the screen was asked to scan — once', async () => {
       useItemEntryStore(pinia).askToScan()
 

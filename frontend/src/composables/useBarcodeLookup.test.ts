@@ -223,6 +223,47 @@ describe('the item a code belongs to (MOL-99)', () => {
     })
   })
 
+  describe('back online (adversarial Ж)', () => {
+    it('asks for a code it could not ask about, keeping the block until the answer', async () => {
+      online(false)
+      const { lookup, found } = harness()
+      lookup.lookUp('4850000000007')
+      expect(lookup.phase.value).toBe('offline')
+
+      online(true)
+      window.dispatchEvent(new Event('online'))
+      expect(lookup.phase.value).toBe('offline')
+      calls[0]?.answer(milk)
+      await settle()
+
+      expect(found).toEqual([[milk, '4850000000007']])
+    })
+
+    it('asks again after an error, too', async () => {
+      const { lookup } = harness()
+      lookup.lookUp('4850000000007')
+      calls[0]?.fail()
+      await settle()
+
+      window.dispatchEvent(new Event('online'))
+
+      expect(calls.map((call) => call.code)).toEqual(['4850000000007', '4850000000007'])
+    })
+
+    it('must not ask again for a code answered, missing or not asked at all', async () => {
+      const { lookup } = harness()
+      window.dispatchEvent(new Event('online'))
+      lookup.lookUp('4850000000014')
+      calls[0]?.answer(null)
+      await settle()
+
+      window.dispatchEvent(new Event('online'))
+
+      expect(calls).toHaveLength(1)
+      expect(lookup.phase.value).toBe('missing')
+    })
+  })
+
   it('retries nothing when no code was looked up', () => {
     const { lookup } = harness()
 
