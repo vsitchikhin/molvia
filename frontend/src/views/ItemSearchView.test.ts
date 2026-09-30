@@ -1173,7 +1173,7 @@ describe('«What did you pick up?»', () => {
         await vi.waitFor(() => {
           expect(view.text()).toContain(taken)
         })
-        await button(view, en.item.barcode.take.replace('{name}', kefir.name)).trigger('click')
+        await button(view, en.item.propose.take.replace('{name}', kefir.name)).trigger('click')
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: kefir, query: '' })
       })
 
@@ -1188,9 +1188,96 @@ describe('«What did you pick up?»', () => {
         await vi.waitFor(() => {
           expect(view.text()).toContain(en.item.barcode.bind_offline_body)
         })
-        expect(button(view, en.item.barcode.retry).exists()).toBe(true)
+        expect(button(view, en.state.retry).exists()).toBe(true)
         await button(view, en.item.barcode.without_code).trigger('click')
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
+      })
+
+      it('must not act on the other answers while the code is on its way (review Б)', async () => {
+        let land!: (written: CatalogueWrite) => void
+        attachBarcode.mockReturnValue(new Promise((resolve) => (land = resolve)))
+        const view = await render()
+        await pickAfterMiss(view)
+
+        await button(view, en.item.barcode.bind).trigger('click')
+        await button(view, en.item.barcode.without_code).trigger('click')
+        await button(view, en.item.barcode.propose_other).trigger('click')
+
+        expect(useItemEntryStore(pinia).picked).toBeNull()
+        expect(view.find('dialog[open]').exists()).toBe(false)
+        land({ entry: cream, created: true })
+        await vi.waitFor(() => {
+          expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
+        })
+      })
+
+      it('drops an answer that lands after typing went on, and the code still waits', async () => {
+        let land!: (written: CatalogueWrite) => void
+        attachBarcode.mockReturnValue(new Promise((resolve) => (land = resolve)))
+        const view = await render()
+        await pickAfterMiss(view)
+        await button(view, en.item.barcode.bind).trigger('click')
+
+        await field(view).setValue('сметана ашх')
+        land({ taken: kefir })
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(view.text()).not.toContain(kefir.name)
+        expect(view.text()).toContain(pending)
+        expect(useItemEntryStore(pinia).picked).toBeNull()
+      })
+
+      it('says an item full of codes in its own words, and records without the code (review В)', async () => {
+        attachBarcode.mockRejectedValue(new ApiError(ERROR.BARCODES_FULL))
+        const view = await render()
+        await pickAfterMiss(view)
+
+        await button(view, en.item.barcode.bind).trigger('click')
+
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(en.error.barcodes_full)
+        })
+        expect(view.findAll('button').some((b) => b.text() === en.state.retry)).toBe(false)
+        await button(
+          view,
+          en.item.barcode.without_code_named.replace('{name}', cream.name),
+        ).trigger('click')
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
+      })
+
+      it('is red on an error, and «Try again» asks again with the same code', async () => {
+        attachBarcode
+          .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'HTTP 502', false))
+          .mockResolvedValue({ entry: cream, created: true })
+        const view = await render()
+        await pickAfterMiss(view)
+
+        await button(view, en.item.barcode.bind).trigger('click')
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(en.item.barcode.bind_error_body.replace('{code}', CODE))
+        })
+        await button(view, en.state.retry).trigger('click')
+
+        expect(attachBarcode).toHaveBeenLastCalledWith(cream.id, CODE)
+        await vi.waitFor(() => {
+          expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
+        })
+      })
+
+      it('carries the code into the item proposed as «a different item», named as typed', async () => {
+        proposeItem.mockResolvedValue({ entry: kefir, created: true })
+        vi.spyOn(performance, 'now').mockReturnValue(0)
+        const view = await render()
+        await pickAfterMiss(view)
+
+        await button(view, en.item.barcode.propose_other).trigger('click')
+        vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+
+        expect(view.get<HTMLInputElement>('dialog input[type="text"]').element.value).toBe(
+          'сметана',
+        )
+        expect(view.text()).toContain(en.item.propose.code.replace('{code}', CODE))
       })
 
       it('drops the question when typing goes on, and the code still waits', async () => {

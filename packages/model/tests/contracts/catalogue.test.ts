@@ -191,6 +191,8 @@ describe('proposedItemSchema', () => {
     expect(repeated(['012345678905', '0012345678905'])).toBe(ISSUE.BARCODE_DUPLICATED)
     // A shop's EAN-8 label and the UPC-A it expands to as UPC-E.
     expect(repeated(['00408295', '0004082000095'])).toBe(ISSUE.BARCODE_DUPLICATED)
+    // A UPC-E that checks only so, and the thirteen it is written as (review А).
+    expect(repeated(['04252614', '0042100005264'])).toBe(ISSUE.BARCODE_DUPLICATED)
     expect(repeated(['4850001234567', '96385074'])).toBeNull()
   })
 

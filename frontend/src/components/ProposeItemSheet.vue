@@ -23,7 +23,7 @@
            what it says is often not read at all (MOL-19; review Р-18). -->
       <p class="line" :class="{ failed: textRefused }" role="status">{{ status }}</p>
       <p v-if="connected && failed" class="line failed" role="alert">
-        {{ t('item.propose.failed') }}
+        {{ t(full ? 'error.barcodes_full' : 'item.propose.failed') }}
       </p>
       <!-- Another item holds the code (MOL-100, Р-3): nothing was written, and that item is offered
            — the package in the hand is what the catalogue already knows it as. -->
@@ -54,6 +54,8 @@ import {
   proposedItemSchema,
 } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
+import { ApiError } from '@molvia/client'
+import { ERROR } from '@molvia/model'
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
@@ -109,6 +111,8 @@ export default defineComponent({
     const failed = ref(false)
     const connected = ref(navigator.onLine)
     const holder = shallowRef<CatalogueEntry | null>(null)
+    /** The item of this name holds as many codes as one may (MOL-100, review В). */
+    const full = ref(false)
 
     const units = computed(() => [
       { value: 'kg', label: t('item.unit_kg') },
@@ -144,6 +148,7 @@ export default defineComponent({
         unit.value = ''
         note.value = ''
         failed.value = false
+        full.value = false
         holder.value = null
       },
       { immediate: true },
@@ -218,10 +223,11 @@ export default defineComponent({
         if (mine !== opening) return
         if ('taken' in written) holder.value = written.taken
         else emit('proposed', written.entry)
-      } catch {
+      } catch (error) {
         if (mine !== opening) return
         connected.value = navigator.onLine
         failed.value = connected.value
+        full.value = error instanceof ApiError && error.code === ERROR.BARCODES_FULL
       } finally {
         if (mine === opening) sending.value = false
       }
@@ -247,6 +253,7 @@ export default defineComponent({
       units,
       connected,
       failed,
+      full,
       holder,
       ready,
       textRefused,

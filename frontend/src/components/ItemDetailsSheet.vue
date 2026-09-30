@@ -103,6 +103,7 @@ import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useItemDetails } from '@/composables/useItemDetails'
 import type { DetailsField, RetryPurchase } from '@/composables/useItemDetails'
+import { useRecentItemsStore } from '@/stores/recentItems'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -368,6 +369,7 @@ export default defineComponent({
       close(props.closeSteps)
     }
 
+    const recent = useRecentItemsStore()
     const detaching = ref(false)
     const detachFailed = ref(false)
 
@@ -379,6 +381,9 @@ export default defineComponent({
       detachFailed.value = false
       try {
         await api.detachBarcode(props.entry.id, code)
+        // Here and not in the screen: a sheet put away while the answer was on its way emits to
+        // nobody, and the device would go on finding the item by a code it no longer holds.
+        recent.forgetCode(code)
         done = true
         emit('detached', code)
         close(1)

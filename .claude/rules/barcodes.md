@@ -236,8 +236,12 @@ codes too, and a wrong one needs a way out (В-1, below).
   name typed is the person's «this is it», and a code dropped in silence is what the task forbids.
 - **The code must check** (`writtenBarcode`, Р-1): a code written is written for everyone for good, and
   one whose last digit does not hold is on no package. Twelve digits and a GTIN-14 led by `0` are
-  written as the thirteen the scanner reads; eight digits as they came — EAN-8 or UPC-E, the digits do
-  not say (Р-11), so they pass if they check either way, and `barcodeTwins` finds the other form.
+  written as the thirteen the scanner reads; eight that check as EAN-8 as they came — the scanner reads
+  an EAN-8 so, and one that checks as UPC-E too is found by its thirteen through `barcodeTwins`. **Eight
+  that check only as UPC-E are written as the thirteen** the scanner reads that UPC-E as (review А):
+  `barcodeTwins` pairs no eight that fail as EAN-8, so kept as eight they were found by nothing — not
+  by a scan, not by the digits typed — and the same package could be written to another item as its
+  thirteen. Repeats in one list are judged by the written forms, for the same reason.
 - **One package, one item — with its twins** (Р-2). The key of `item_barcodes` holds one string, and
   `00408295` at one item beside `0004082000095` at another would find one or the other by whether it was
   scanned or typed. So a write asks every form of every code (`barcodeTwins`) and takes a lock per form
@@ -261,7 +265,7 @@ codes too, and a wrong one needs a way out (В-1, below).
   purchase sheet of an item that came by a code — found, linked or proposed with it — whoever holds the
   package says it is not this one (`DELETE /catalogue/items/:itemId/barcodes?code=`, the code in the
   query as the lookup's; `204` whether it was held or not). The item lets go of the code and whichever
-  twin it holds, never another item's; the device forgets it (`recentItems.forgetCode`); the sheet goes
+  twin it holds, never another item's; the device forgets it (`recentItems.forgetCode`) — in the sheet, which an answer still reaches after it was swiped away, when an emit to the screen no longer would (review Г); the sheet goes
   one step back, and the code is looked up again — nobody holds it, so it waits for its item. **The
   named price**: whoever wants to spoil a code can unbind it, accepted for 0.2's circle; `added_by` shows
   who wrote what. **Merging two items is not this** (Р-6): it moves ratings, purchases and picks, and is
@@ -276,7 +280,7 @@ codes too, and a wrong one needs a way out (В-1, below).
 - **A pick while a code waits asks first** — «Привязать код … к „…“?» — in a block where the code's
   block stood, not in a sheet (В-2): «taken», «no network» or an error is then said where the person
   is, and the purchase sheet comes only after the answer, one sheet at a time. The rows go while the
-  question stands, the focus goes to its first answer and the question is said out loud. **Three
+  question stands, the focus goes to its first answer and the question is said out loud. **While the code is on its way the other answers wait** (review Б): «без кода» then would be written with the code anyway, and «другой товар» would meet it at the very item it was said not to be. **Three
   answers**: «Привязать и записать»; «Записать без кода» — the code is let go; «Это другой товар —
   предложить» — the item found by name is not the package, and the code goes with the one proposed,
   whose name starts from what was typed. **The question names who will see it** — «все, кто
@@ -287,7 +291,7 @@ codes too, and a wrong one needs a way out (В-1, below).
 - **Taken** — «Код … уже у „…“»: «Взять „…“» takes the holder as found by the code, with no query;
   «Записать „…“ без кода» goes on with the row picked. **No network** is an offline state with
   «Повторить» and «Записать без кода» — the catalogue has no queue, as «Предложить товар» has none; an
-  error is red with «Повторить» and the same way out. A retry of a write waits for a tap: nothing is
+  error is red with «Повторить» and the same way out. **An item holding twenty codes** is said in the words of `error.barcodes_full`, with no «Повторить» — asking again changes nothing (review В); so is it on «Предложить товар» by a name already there. A retry of a write waits for a tap: nothing is
   sent by itself.
 - **A code written is remembered for offline** as one found is: the item it went to goes into «Часто
   берёте» with it once it is added to a record.

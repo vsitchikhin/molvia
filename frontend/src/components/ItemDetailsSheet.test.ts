@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
@@ -18,6 +18,7 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 const offline = vi.hoisted(() => () => Promise.reject(new Error('Failed to fetch')))
 const currentTrip = vi.hoisted(() => vi.fn<() => Promise<unknown>>())
 const readTrip = vi.hoisted(() => vi.fn<(id: string) => Promise<unknown>>())
+const detachBarcode = vi.hoisted(() => vi.fn<(itemId: string, code: string) => Promise<void>>())
 vi.mock('@/api', async () => {
   const { ApiError } = await import('@molvia/client')
   const { ERROR } = await import('@molvia/model')
@@ -30,6 +31,7 @@ vi.mock('@/api', async () => {
       addExpense: fail,
       updateExpense: fail,
       removeExpense: fail,
+      detachBarcode,
       currentTrip,
       trip: (id: string) => readTrip(id),
     },
@@ -109,6 +111,7 @@ interface Options {
   readonly server?: TripView | null | 'down'
   readonly locale?: 'ru' | 'en'
   readonly selected?: TripView
+  readonly code?: string
 }
 
 async function router() {
@@ -137,6 +140,7 @@ async function render(options: Options = {}) {
       query: options.query ?? null,
       expense: options.expense ?? null,
       closeSteps: options.closeSteps ?? 1,
+      code: options.code ?? null,
     },
     attachTo: document.body,
     global: { plugins: [made, pinia, createAppI18n(options.locale ?? 'ru')] },
@@ -490,5 +494,21 @@ describe('«не этот товар?» (MOL-100)', () => {
 
     expect(view.text()).toContain('Молоко «Ашхар»')
     expect(view.text()).not.toMatch(/не этот товар/)
+  })
+
+  it('keeps the sheet and says so when the code could not be let go', async () => {
+    detachBarcode.mockRejectedValue(new Error('Failed to fetch'))
+    const { view } = await render({ code: '4850001234562' })
+
+    const line = view
+      .findAll('button')
+      .find((button) => button.text() === 'Код 4850001234562 — не этот товар?')
+    await line?.trigger('click')
+    await flushPromises()
+
+    expect(detachBarcode).toHaveBeenCalledWith(milk.id, '4850001234562')
+    expect(view.text()).toContain('Не получилось отвязать код — проверьте связь')
+    expect(view.get('dialog').element.open).toBe(true)
+    expect(view.emitted('detached')).toBeUndefined()
   })
 })

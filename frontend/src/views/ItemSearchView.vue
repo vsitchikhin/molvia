@@ -62,10 +62,22 @@
             <AppButton ref="bindFirst" block :busy="bind.phase === 'sending'" @click="attach">
               {{ t('item.barcode.bind') }}
             </AppButton>
-            <AppButton variant="secondary" block @click="withoutCode">
+            <!-- Inactive while the code is on its way: «без кода» then would be written with it,
+                 and «другой товар» would meet it at the very item it was said not to be (review Б). -->
+            <AppButton
+              variant="secondary"
+              block
+              :inactive="bind.phase === 'sending'"
+              @click="withoutCode"
+            >
               {{ t('item.barcode.without_code') }}
             </AppButton>
-            <AppButton variant="ghost" block @click="proposeOther">
+            <AppButton
+              variant="ghost"
+              block
+              :inactive="bind.phase === 'sending'"
+              @click="proposeOther"
+            >
               {{ t('item.barcode.propose_other') }}
             </AppButton>
           </div>
@@ -77,9 +89,19 @@
           </p>
           <div class="bind-actions">
             <AppButton ref="bindFirst" block @click="takeHolder">
-              {{ t('item.barcode.take', { name: bind.holder.name }) }}
+              {{ t('item.propose.take', { name: bind.holder.name }) }}
             </AppButton>
             <AppButton variant="secondary" block @click="withoutCode">
+              {{ t('item.barcode.without_code_named', { name: bind.entry.name }) }}
+            </AppButton>
+          </div>
+        </div>
+
+        <!-- The item holds as many codes as one may (review В): asking again changes nothing. -->
+        <div v-else-if="bind && bind.phase === 'full'" class="not-found">
+          <p class="bind-question">{{ t('error.barcodes_full') }}</p>
+          <div class="bind-actions">
+            <AppButton ref="bindFirst" block @click="withoutCode">
               {{ t('item.barcode.without_code_named', { name: bind.entry.name }) }}
             </AppButton>
           </div>
@@ -109,7 +131,7 @@
           :body="t('item.barcode.bind_offline_body')"
         >
           <template #action>
-            <AppButton block @click="attach">{{ t('item.barcode.retry') }}</AppButton>
+            <AppButton block @click="attach">{{ t('state.retry') }}</AppButton>
             <AppButton variant="ghost" block @click="withoutCode">
               {{ t('item.barcode.without_code') }}
             </AppButton>
@@ -254,6 +276,8 @@ import { useRoute } from 'vue-router'
 import { useSelectedTrip } from '@/composables/useSelectedTrip'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
+import { ApiError } from '@molvia/client'
+import { ERROR } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import IconBarcode from '~icons/mdi/barcode-scan'
 import IconClose from '~icons/mdi/close'
@@ -379,7 +403,7 @@ export default defineComponent({
       readonly entry: CatalogueEntry
       readonly code: string
       readonly learns: boolean
-      readonly phase: 'ask' | 'sending' | 'taken' | 'offline' | 'error'
+      readonly phase: 'ask' | 'sending' | 'taken' | 'full' | 'offline' | 'error'
       readonly holder: CatalogueEntry | null
     }
     const bind = ref<Bind | null>(null)
@@ -390,7 +414,7 @@ export default defineComponent({
     watch(
       () => bind.value?.phase,
       async (next, before) => {
-        if (next !== 'ask' && next !== 'taken') return
+        if (next !== 'ask' && next !== 'taken' && next !== 'full') return
         if (next === before) return
         await nextTick()
         bindFirst.value?.$el?.focus()
@@ -418,16 +442,17 @@ export default defineComponent({
         pendingCode.value = null
         take(asked.entry, asked.learns)
         pickedByCode.value = { itemId: asked.entry.id, code: asked.code }
-      } catch {
+      } catch (error) {
         if (!stillAsked(asked)) return
+        const full = error instanceof ApiError && error.code === ERROR.BARCODES_FULL
         // Offline or error is decided after the failure (MOL-19).
-        bind.value = { ...asked, phase: navigator.onLine ? 'error' : 'offline' }
+        bind.value = { ...asked, phase: full ? 'full' : navigator.onLine ? 'error' : 'offline' }
       }
     }
 
     function withoutCode(): void {
       const asked = bind.value
-      if (asked === null) return
+      if (asked === null || asked.phase === 'sending') return
       bind.value = null
       pendingCode.value = null
       take(asked.entry, asked.learns)
@@ -446,6 +471,7 @@ export default defineComponent({
     // «Это другой товар — предложить» (В-3): the item found by name is not the package; the code
     // goes with the one proposed, whose name starts from what was typed.
     function proposeOther(): void {
+      if (bind.value?.phase === 'sending') return
       bind.value = null
       proposing.value = true
     }
@@ -648,12 +674,12 @@ export default defineComponent({
     }
 
     /**
-     * «Код … — не этот товар?» let the code go (MOL-100, В-1): the device forgets it too, and once
-     * the sheet is away the code is asked again — nobody holds it now, so it waits for its item.
+     * «Код … — не этот товар?» let the code go (MOL-100, В-1): once the sheet is away the code is
+     * asked again — nobody holds it now, so it waits for its item. The device forgets it in the sheet
+     * itself, which an answer landing after the sheet was put away still reaches (review Г).
      */
     let askAgain: string | null = null
     function detached(code: string): void {
-      recent.forgetCode(code)
       pickedByCode.value = null
       askAgain = code
     }

@@ -251,11 +251,9 @@
       "without_code": "Record without the code",
       "propose_other": "It's a different item — suggest it",
       "taken": "Code {code} already belongs to «{name}»",
-      "take": "Take «{name}»",
       "without_code_named": "Record «{name}» without the code",
       "bind_offline_body": "The code is not linked. Try again with a connection — or record without the code",
       "bind_error_body": "Could not link code {code}. Try again — or record without the code",
-      "retry": "Try again",
       "not_this": "Code {code} — not this item?",
       "not_this_failed": "Could not unlink the code — check the connection"
     }

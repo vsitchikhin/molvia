@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { ISSUE } from '#model/support/errors'
-import { hasRepeatedBarcode } from '#model/entities/barcode'
+import { hasRepeatedBarcode, writtenBarcode } from '#model/entities/barcode'
 import { barcodeSchema, itemSchema, newItemSchema } from '#model/entities/item'
 import type { Item } from '#model/entities/item'
 import { quantityCodec } from '#model/values/units'
@@ -114,9 +114,17 @@ export type CatalogueBarcodeResponse = z.infer<typeof catalogueBarcodeResponseSc
  * package — one a twin of the other — are a repeat, as two equal codes are (Р-7). Whether each
  * checks is `writtenBarcode`'s, called by the server.
  */
+/** A code as it would be written, or as it came when it would be refused — the refusal is the server's. */
+function writtenForm(code: string): string {
+  const written = writtenBarcode(code)
+  return written.ok ? written.code : code
+}
+
 export const proposedItemSchema = newItemSchema
   .extend({ kind: z.literal('product') })
-  .refine((input) => !hasRepeatedBarcode(input.barcodes), {
+  // By the form each is written in: `04252614` is written as `0042100005264`, and the two sent
+  // together are one package (review А).
+  .refine((input) => !hasRepeatedBarcode(input.barcodes.map(writtenForm)), {
     error: ISSUE.BARCODE_DUPLICATED,
     path: ['barcodes'],
   })

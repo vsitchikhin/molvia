@@ -94,16 +94,20 @@ export function barcodeTwins(code: string): string[] {
  * A code as it is written to the shared catalogue (MOL-100, Р-1): its last digit must check —
  * a code with one that does not cannot be printed on a package, and a code written is written for
  * everyone for good. Twelve digits (UPC-A) and fourteen led by `0` (GTIN-14 of the same package)
- * are written as the thirteen the scanner reads them as. Eight digits are written as they came:
- * whether they are EAN-8 or UPC-E the digits alone do not say (MOL-98 Р-11), so they pass if they
- * check either way, and `barcodeTwins` finds the other form on the way back.
+ * are written as the thirteen the scanner reads them as. Eight digits that check as EAN-8 are
+ * written as they came — the scanner reads an EAN-8 so, and one that checks as UPC-E too is found
+ * by its thirteen through `barcodeTwins`. Eight that check **only** as UPC-E are no EAN-8 the
+ * scanner could have read: they are written as the thirteen it reads that UPC-E as, since
+ * `barcodeTwins` pairs no eight that fail as EAN-8, and kept as eight they would be found by
+ * nothing and let the same package onto another item (review А).
  */
 export function writtenBarcode(code: string): TypedBarcode {
   if (!barcodeSchema.safeParse(code).success) return { ok: false, error: ERROR.BARCODE_SHAPE }
   if (code.length === 8) {
-    const upcE = /^[01]/.test(code) && checks(expandUpcE(code))
-    return checks(code) || upcE
-      ? { ok: true, code }
+    if (checks(code)) return { ok: true, code }
+    const upcA = /^[01]/.test(code) ? expandUpcE(code) : null
+    return upcA !== null && checks(upcA)
+      ? { ok: true, code: `0${upcA}` }
       : { ok: false, error: ERROR.BARCODE_CHECK_DIGIT }
   }
   if (!checks(code)) return { ok: false, error: ERROR.BARCODE_CHECK_DIGIT }

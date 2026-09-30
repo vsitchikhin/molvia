@@ -189,9 +189,12 @@ describe('writtenBarcode', () => {
     expect(written('14850000000004')).toBe('14850000000004')
   })
 
-  it('keeps eight digits as they came, whichever way they check', () => {
+  it('keeps eight digits that check as EAN-8 as they came', () => {
     expect(written('96385074')).toBe('96385074') // EAN-8 only
-    expect(written('04252614')).toBe('04252614') // UPC-E only — not expanded
+    // UPC-E only: no EAN-8 the scanner reads, so written as the thirteen it reads the UPC-E as —
+    // kept as eight, nothing would find it (review А).
+    expect(written('04252614')).toBe('0042100005264')
+    expect(barcodeTwins('0042100005264')).toEqual(['0042100005264'])
     expect(written('01234565')).toBe('01234565') // both
     expect(written('96385075')).toBe(ERROR.BARCODE_CHECK_DIGIT)
     // Led by neither 0 nor 1, eight digits are no UPC-E: only EAN-8 can pass them.

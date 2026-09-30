@@ -819,6 +819,72 @@ describe('POST /catalogue/items — with the codes read from the package (MOL-10
   })
 })
 
+describe('POST /catalogue/items — codes, the review (MOL-100)', () => {
+  const withDigit = (body: string) => {
+    let sum = 0
+    for (let i = body.length - 1, weight = 3; i >= 0; i--, weight = 4 - weight) {
+      sum += Number(body[i]) * weight
+    }
+    return `${body}${String((10 - (sum % 10)) % 10)}`
+  }
+
+  it('writes one package to one of two new items proposed at once, even through a twin', async () => {
+    const actor = await insertActor(db)
+    const other = connectDrizzle()
+    const second = buildServer({ db: other.db })
+    await second.ready()
+    try {
+      const cookie = await signIn(db, actor)
+      const inject = (server: FastifyInstance, name: string, code: string) =>
+        server.inject({
+          method: 'POST',
+          url: '/catalogue/items',
+          headers: { cookie },
+          payload: { kind: 'product', name, defaultUnit: 'kg', barcodes: [code] },
+        })
+      // Two names — two locks of the name — and one package, as its label and as its thirteen.
+      const replies = await Promise.all([
+        inject(app, 'Сыр чечил', '00408295'),
+        inject(second, 'Сыр косичка', '0004082000095'),
+      ])
+
+      expect(replies.map((reply) => reply.statusCode).sort()).toEqual([201, 409])
+      expect(await db.select().from(itemBarcodes)).toHaveLength(1)
+      expect(await db.select().from(items)).toHaveLength(1)
+    } finally {
+      await second.close()
+      await other.close()
+    }
+  })
+
+  it('reaches twenty codes by a name already there, and refuses the twenty-first (Р-4, boundary)', async () => {
+    const actor = await insertActor(db)
+    const bodies = Array.from({ length: 19 }, (_, i) => `4852000000${String(i).padStart(2, '0')}`)
+    const cream = await add({ name: 'Сметана', defaultUnit: 'kg', barcodes: bodies.map(withDigit) })
+    const body = { kind: 'product', name: 'Сметана', defaultUnit: 'kg' }
+
+    const two = await propose(actor, { ...body, barcodes: [SOUR_CREAM, KEFIR] })
+    expect(two.status).toBe(409)
+    expect(two.body).toEqual({ code: ERROR.BARCODES_FULL })
+    expect(await codesOf(cream.id)).toHaveLength(19)
+
+    const one = await propose(actor, { ...body, barcodes: [SOUR_CREAM] })
+    expect(one.status).toBe(200)
+    expect(await codesOf(cream.id)).toHaveLength(20)
+  })
+
+  it('writes eight digits that check only as UPC-E as the thirteen the scanner reads (review А)', async () => {
+    const actor = await insertActor(db)
+    const cream = await add({ name: 'Сметана' })
+
+    const reply = await attach(actor, cream.id, { code: '04252614' })
+
+    expect(reply.status).toBe(201)
+    expect((await codesOf(cream.id)).map((row) => row.code)).toEqual(['0042100005264'])
+    expect(held(await byCode(actor, code('0042100005264')))?.id).toBe(cream.id)
+  })
+})
+
 describe('POST /catalogue/items/:itemId/barcodes — «привязать код к ней?» (MOL-100)', () => {
   it('writes the code to anyone’s item, in the name of who wrote it', async () => {
     const author = await insertActor(db)
