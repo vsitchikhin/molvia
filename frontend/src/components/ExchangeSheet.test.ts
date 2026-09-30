@@ -39,6 +39,7 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
       received: { minor: 10_000_000n, currency: 'AMD' },
       heldBefore: null,
       note: null,
+      channel: null,
       givenAccountId: null,
       receivedAccountId: null,
       revision: 1,
@@ -47,6 +48,7 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
       rate: null,
       official: null,
       officialDoubtful: false,
+      market: null,
     },
   ]
   return {
@@ -70,6 +72,7 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
     baseSince: null,
     walletUnknown: null,
     receipts: receiptsOf(exchanges),
+    marketToday: [],
     ...patch,
     exchanges,
   }
@@ -386,6 +389,7 @@ describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
         exchangedOn: '2026-09-01',
         heldBefore: null,
         note: null,
+        channel: null,
         replacedAt: new Date('2026-09-25T09:00:00.000Z'),
       },
     ],
@@ -422,6 +426,7 @@ describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
       received: { minor: 9_600_000n, currency: 'AMD' },
       exchangedOn: '2026-09-01',
       note: 'VTB',
+      channel: null,
     })
     expect(view.emitted('update:open')?.at(-1)).toEqual([false])
   })
@@ -474,5 +479,54 @@ describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
     const view = await render(overview({ exchanges: [theirs] }), theirs)
     await saveAmendment(view)
     expect(view.get('.current').text()).toContain('held before ֏30,000.00')
+  })
+})
+
+describe('ExchangeSheet: how the money was changed (MOL-137, В-1)', () => {
+  const checked = (view: VueWrapper) =>
+    view
+      .findAll('fieldset input[type="radio"]')
+      .find((radio) => (radio.element as HTMLInputElement).checked)
+      ?.attributes('value')
+
+  it('starts a new exchange from the way the last one was made, and sends it', async () => {
+    record.mockResolvedValue(undefined)
+    const [last] = overview().exchanges
+    if (!last) throw new Error('the fixture has an exchange')
+    const view = await render(overview({ exchanges: [{ ...last, channel: 'exchanger' }] }))
+    expect(checked(view)).toBe('exchanger')
+    await fill(view, '20000', '83200')
+    await save(view)
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({ channel: 'exchanger' }))
+  })
+
+  it('«—» is «not said», and goes as null', async () => {
+    record.mockResolvedValue(undefined)
+    const view = await render()
+    expect(checked(view)).toBe('')
+    await view.get('fieldset').get('input[value="bankNoncash"]').setValue(true)
+    await view.get('fieldset').get('input[value=""]').setValue(true)
+    await fill(view, '20000', '83200')
+    await save(view)
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({ channel: null }))
+  })
+
+  it('reads «—» aloud as «not said», not as a dash', async () => {
+    const view = await render()
+    expect(view.get('fieldset').text()).toContain(en.exchange.sheet.channel_none)
+    expect(view.get('fieldset legend').text()).toBe(en.exchange.sheet.channel)
+  })
+
+  it('opens an amendment on the exchange’s own channel, not the last one’s', async () => {
+    const [base] = overview().exchanges
+    if (!base) throw new Error('the fixture has an exchange')
+    const state = overview({
+      exchanges: [
+        { ...base, id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c60', channel: 'exchanger' },
+        { ...base, channel: 'bankCash' },
+      ],
+    })
+    const view = await render(state, state.exchanges[1] ?? null)
+    expect(checked(view)).toBe('bankCash')
   })
 })

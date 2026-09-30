@@ -13,6 +13,22 @@ export interface OfficialWords {
   readonly difference: string
 }
 
+/** One market figure beside an exchange (MOL-137): whose it is and the day, the rate, the difference. */
+export interface MarketLineWords {
+  readonly label: string
+  readonly rate: string
+  readonly difference: string
+}
+
+/** The market lines of a card: the best of the day, the person's own channel, what is to come. */
+export interface MarketWords {
+  readonly best: MarketLineWords
+  readonly own: MarketLineWords | null
+  readonly pending: string | null
+}
+
+type MarketQuoteView = NonNullable<ExchangeView['market']>['best']
+
 export interface ExchangeWords {
   readonly rateOf: (rate: ExchangeRate) => string
   readonly day: (date: string) => string
@@ -22,6 +38,7 @@ export interface ExchangeWords {
   readonly rateLineOf: (exchange: ExchangeView) => string
   readonly officialOf: (exchange: ExchangeView) => OfficialWords | null
   readonly noOfficialOf: (exchange: ExchangeView) => string
+  readonly marketOf: (exchange: ExchangeView) => MarketWords | null
 }
 
 /**
@@ -83,5 +100,51 @@ export function useExchangeWords(): ExchangeWords {
     return t(exchange.officialDoubtful ? 'exchange.card_doubtful' : 'exchange.card_no_official')
   }
 
-  return { rateOf, day, dayOf, moneyOf, amountsOf, rateLineOf, officialOf, noOfficialOf }
+  /**
+   * A market figure in words: the row it came from — «все клиенты банков» where that stood in for
+   * non-cash (В-2) — its day, the rate on the side of the exchange's own, and the difference.
+   */
+  function marketLineOf(
+    exchange: ExchangeView,
+    quote: MarketQuoteView,
+    key: 'best' | 'own',
+  ): MarketLineWords {
+    const minor = quote.difference.minor
+    const amount = moneyOf({ ...quote.difference, minor: minor < 0n ? -minor : minor })
+    const where = t(`exchange.market.where_${quote.basis}`)
+    const sign = minor > 0n ? 'more' : minor < 0n ? 'less' : 'equal'
+    return {
+      label: t(`exchange.market.${key}`, {
+        channel: t(`exchange.channel.${quote.basis}`),
+        date: day(yerevanDate(quote.rate.asOf)),
+      }),
+      rate: exchange.rate
+        ? formatRateBeside(quote.rate, exchange.rate, locale.value)
+        : rateOf(quote.rate),
+      difference: t(`exchange.market.${sign}`, { amount, where }),
+    }
+  }
+
+  /** The exchange against the market of its day (MOL-137, В-1) — null where there is none (В-4). */
+  function marketOf(exchange: ExchangeView): MarketWords | null {
+    const market = exchange.market
+    if (!market) return null
+    return {
+      best: marketLineOf(exchange, market.best, 'best'),
+      own: market.own ? marketLineOf(exchange, market.own, 'own') : null,
+      pending: market.exchangersPending ? t('exchange.market.pending') : null,
+    }
+  }
+
+  return {
+    rateOf,
+    day,
+    dayOf,
+    moneyOf,
+    amountsOf,
+    rateLineOf,
+    officialOf,
+    noOfficialOf,
+    marketOf,
+  }
 }

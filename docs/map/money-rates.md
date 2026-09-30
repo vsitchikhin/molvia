@@ -64,12 +64,13 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 
 ## frontend · components
 
-- `frontend/src/components/ExchangeCard.vue` — Card of one exchange: the day, what was given and received, the rate plate against the central bank, the note.
+- `frontend/src/components/ExchangeCard.vue` — Card of one exchange: the day, what was given and received, the rate plate against the market of its day and the central bank, the note.
 - `frontend/src/components/ExchangeRemoveSheet.vue` — «Удалить обмен?» sheet: the exchange's amounts and day, and what removing does to the rate of new trips.
-- `frontend/src/components/ExchangeSheet.vue` — «Записать обмен» sheet: given, received, day, «сколько было до» where it weighs; also amends an exchange with its versions.
+- `frontend/src/components/ExchangeSheet.vue` — «Записать обмен» sheet: given, received, day, how it was changed, «сколько было до» where it weighs; also amends an exchange with its versions.
 - `frontend/src/components/IncomeCard.vue` — Card of one income: the day, the source and amount, the note on a plate below.
 - `frontend/src/components/IncomeRemoveSheet.vue` — «Удалить доход?» sheet: the income's amount, source and day, and what removing may do to the rate.
 - `frontend/src/components/IncomeSheet.vue` — «Записать доход» sheet: amount, currency, source, day, «сколько было до» where it weighs; also amends an income.
+- `frontend/src/components/MarketRatesCard.vue` — «Курсы по данным ЦБ РА» on «Обмен денег» (MOL-137): per currency the official rate and each channel's latest figures to sell and to buy, dated, the best starred and said.
 - `frontend/src/components/OperationCardHead.vue` — Head of an exchange or income card: the day, «исправлен …» and the bin, kept outside the card's button.
 - `frontend/src/components/OperationSkeleton.vue` — Loading placeholder of exchange or income cards, drawn in `ScreenSkeleton`'s slot so the list does not jump.
 

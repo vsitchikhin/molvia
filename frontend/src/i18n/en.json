@@ -682,7 +682,12 @@
       "current": "Now recorded: {details}",
       "current_held": "held before {amount}",
       "saving": "Saving the exchange…",
-      "bad_day": "Choose the day of the exchange"
+      "bad_day": "Choose the day of the exchange",
+      "channel": "How it was changed",
+      "channel_none": "Not said",
+      "channel_bankCash": "Bank, cash",
+      "channel_bankNoncash": "Non-cash",
+      "channel_exchanger": "Exchange office"
     },
     "fab": "Exchange",
     "edit_on": "Amend the exchange of {date}:",
@@ -700,7 +705,33 @@
     "card_less_other": "{amount} less than the {source} rate",
     "card_equal_other": "Exactly the {source} rate",
     "card_no_official": "No central bank rate for this day — nothing to compare with",
-    "card_doubtful": "The central bank rate of that day is in doubt — no comparison"
+    "card_doubtful": "The central bank rate of that day is in doubt — no comparison",
+    "channel": {
+      "bankCash": "Banks, cash",
+      "bankNoncash": "Banks, non-cash",
+      "banksAll": "Banks, all clients",
+      "exchanger": "Exchange offices"
+    },
+    "market": {
+      "title": "Rates from the Central Bank of Armenia",
+      "hint": "Average rates of the day's deals of banks and exchange offices with people. The best for you is starred",
+      "official": "Central bank on {date}: {rate}",
+      "sell": "Sell",
+      "buy": "Buy",
+      "where": "Where to change",
+      "best_mark": "best",
+      "row_date": "on {date}",
+      "best": "Best rate on {date}: {channel}",
+      "own": "{channel} on {date}",
+      "more": "{amount} more than {where}",
+      "less": "{amount} less than {where}",
+      "equal": "Exactly as {where}",
+      "where_bankCash": "at banks for cash",
+      "where_bankNoncash": "at banks non-cash",
+      "where_banksAll": "at banks (all clients)",
+      "where_exchanger": "at exchange offices",
+      "pending": "The central bank publishes exchange offices of this day later — the line will update itself"
+    }
   },
   "income": {
     "title": "Income",

@@ -36,14 +36,28 @@
           <span class="label">{{ t('exchange.card_rate') }}</span>
           <span class="value own">{{ rateOf(exchange.rate) }}</span>
         </span>
-        <template v-if="official">
-          <span class="line">
-            <span class="label">{{ official.label }}</span>
-            <span class="value">{{ official.rate }}</span>
-          </span>
-          <span class="difference">{{ official.difference }}</span>
+        <!-- The market first — what one could have got at a counter that day — and the central
+             bank under it, quieter: nobody changes at its rate (MOL-137, Р-5). -->
+        <template v-if="market">
+          <template v-for="line in marketLines" :key="line.label">
+            <span class="line">
+              <span class="label">{{ line.label }}</span>
+              <span class="value">{{ line.rate }}</span>
+            </span>
+            <span class="difference">{{ line.difference }}</span>
+          </template>
+          <span v-if="market.pending" class="missing">{{ market.pending }}</span>
         </template>
-        <span v-else class="missing">{{ noOfficialOf(exchange) }}</span>
+        <span :class="{ quiet: market }" class="official">
+          <template v-if="official">
+            <span class="line">
+              <span class="label">{{ official.label }}</span>
+              <span class="value">{{ official.rate }}</span>
+            </span>
+            <span class="difference">{{ official.difference }}</span>
+          </template>
+          <span v-else class="missing">{{ noOfficialOf(exchange) }}</span>
+        </span>
       </span>
       <span v-if="exchange.note" class="note">
         <IconNote class="note-icon" aria-hidden="true" />
@@ -91,12 +105,17 @@ export default defineComponent({
     // Where the money lay, by the name the account has now (MOL-81 Р-6, MOL-123).
     const nameOf = (id: string | null) =>
       id ? (accounts.accounts.find((account) => account.id === id)?.name ?? null) : null
+    const market = computed(() => words.marketOf(props.exchange))
     return {
       t,
       ...words,
       givenName: computed(() => nameOf(props.exchange.givenAccountId)),
       receivedName: computed(() => nameOf(props.exchange.receivedAccountId)),
       official: computed(() => words.officialOf(props.exchange)),
+      market,
+      marketLines: computed(() =>
+        market.value ? [market.value.best, ...(market.value.own ? [market.value.own] : [])] : [],
+      ),
       shortDay: (when: Date) => purchaseDay(when, locale.value),
       // «Сегодня», «Вчера» by the phone's today (MOL-121, В-1); the button and the rate say the date.
       headOf: (exchange: ExchangeView) => dayWords(exchange.exchangedOn, locale.value, props.today),
@@ -244,6 +263,25 @@ export default defineComponent({
 
 .own {
   font-weight: var(--weight-bold);
+}
+
+// The official comparison under the market's: the same lines, a step quieter.
+.official {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.quiet {
+  padding-top: var(--space-2);
+  border-top: var(--hairline) solid var(--border);
+  color: var(--text-muted);
+
+  .difference {
+    padding-top: 0;
+    border-top: 0;
+    font-weight: var(--weight-regular);
+  }
 }
 
 // Neutral, always: a good exchanger beats the bank, and the difference says nothing about why
