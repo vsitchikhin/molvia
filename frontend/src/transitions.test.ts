@@ -8,7 +8,13 @@ import type { Router } from 'vue-router'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
-import { direction, installArrival, installHeightHold, installViewTransitions } from '@/transitions'
+import {
+  direction,
+  installArrival,
+  installHeightHold,
+  installViewTransitions,
+  releaseHeightHold,
+} from '@/transitions'
 
 vi.mock('@/api', () => ({ api: { health: () => new Promise(() => undefined) } }))
 
@@ -296,8 +302,10 @@ describe('installHeightHold', () => {
   })
 
   afterEach(() => {
+    // Takes the scroll listener of this test's hold away with it: left, it answered the next test's
+    // scrolls for a router already gone (review С-4).
+    releaseHeightHold()
     document.getElementById('app')?.remove()
-    document.documentElement.style.removeProperty('--page-hold')
   })
 
   it('holds the page down to the bottom of the window when only the query changes', async () => {
@@ -354,6 +362,91 @@ describe('installHeightHold', () => {
     geometry(401, 800, 2400)
     window.dispatchEvent(new Event('scroll'))
     expect(hold()).toBe('')
+  })
+
+  it('goes when the login takes the screen, with no move of the router', async () => {
+    const router = await held()
+    await router.replace({ query: { month: '2026-08' } })
+    releaseHeightHold()
+    expect(hold()).toBe('')
+    geometry(400, 800, 900)
+    window.dispatchEvent(new Event('scroll'))
+    expect(hold()).toBe('')
+  })
+
+  describe('the control the move was made with', () => {
+    /** An arrow at `top` on the screen that moves the month when clicked, then is drawn at `after`. */
+    function arrow(router: Router, top: number, after: number) {
+      const button = document.createElement('button')
+      let at = top
+      button.getBoundingClientRect = () => ({ top: at }) as DOMRect
+      button.getClientRects = () => [{}] as unknown as DOMRectList
+      button.addEventListener('click', () => {
+        void router.replace({ query: { month: '2026-08' } })
+      })
+      // Redrawn with the route, as the screen is: after the guards, before the next tick.
+      router.afterEach(() => {
+        at = after
+      })
+      screen.append(button)
+      return button
+    }
+
+    it('stays where it stood when what was above it went', async () => {
+      const router = await held()
+      const scrollBy = vi.fn()
+      vi.stubGlobal('scrollBy', scrollBy)
+      // «Нет связи» over the month kept on the phone: gone with the month read for the first time.
+      arrow(router, 120, 46).click()
+      await vi.waitFor(() => {
+        expect(scrollBy).toHaveBeenCalledWith({ top: -74, behavior: 'instant' })
+      })
+    })
+
+    it('holds the page for the scroll down when something came above it', async () => {
+      const router = await held()
+      const scrollBy = vi.fn()
+      vi.stubGlobal('scrollBy', scrollBy)
+      arrow(router, 120, 150).click()
+      await vi.waitFor(() => {
+        expect(scrollBy).toHaveBeenCalledWith({ top: 30, behavior: 'instant' })
+      })
+      expect(hold()).toBe('1230px')
+    })
+
+    it('is not moved when it stayed', async () => {
+      const router = await held()
+      const scrollBy = vi.fn()
+      vi.stubGlobal('scrollBy', scrollBy)
+      arrow(router, 120, 120).click()
+      await vi.waitFor(() => {
+        expect(router.currentRoute.value.query.month).toBe('2026-08')
+      })
+      await nextTick()
+      expect(scrollBy).not.toHaveBeenCalled()
+    })
+
+    // A spending saved into another month moves the month by the code, and `toShow` brings its row
+    // into view; a click of some task before is not what the move was made with.
+    it('is none for a move made by the code, a task after the click', async () => {
+      const router = await held()
+      const scrollBy = vi.fn()
+      vi.stubGlobal('scrollBy', scrollBy)
+      const button = document.createElement('button')
+      let at = 120
+      button.getBoundingClientRect = () => ({ top: at }) as DOMRect
+      button.getClientRects = () => [{}] as unknown as DOMRectList
+      screen.append(button)
+      button.click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      router.afterEach(() => {
+        at = 46
+      })
+      await router.replace({ query: { month: '2026-08' } })
+      await nextTick()
+      expect(scrollBy).not.toHaveBeenCalled()
+      expect(hold()).toBe('1200px')
+    })
   })
 
   it('goes with a move to another screen, and stays when that move failed', async () => {

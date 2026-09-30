@@ -1,7 +1,8 @@
 <template>
   <AppScreen :title="t('spending.charts.title')">
-    <!-- The line stands while a period is on its way: gone under the skeleton, it took the controls
-         below it up by its height (MOL-138). -->
+    <!-- The line stands in every state, empty until a range is known: gone under the skeleton, it
+         took the period below it up by its height, and back with the answer, down (MOL-138). An
+         error or «offline» with nothing read keeps it empty rather than move the period once more. -->
     <template #subtitle
       ><span class="range">{{ range }}</span></template
     >
