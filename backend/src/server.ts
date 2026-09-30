@@ -42,6 +42,7 @@ import type { QuietToday } from '@/usecases/remind-ratings'
 import { amendVerdict } from '@/usecases/amend-verdict'
 import { withdrawVerdict } from '@/usecases/withdraw-verdict'
 import { pendingVerdicts } from '@/usecases/pending-verdicts'
+import { findByBarcode } from '@/usecases/find-by-barcode'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { signIn } from '@/usecases/sign-in'
 import { endSession, listSessions, logout } from '@/usecases/sessions'
@@ -484,6 +485,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items }, actorId, query),
         propose: (actorId, input) => proposeItem(items, actorId, input),
+        byBarcode: (code) => findByBarcode(items, code),
       })
       placeRoutes(guarded, {
         recent: (actorId, geography) => recentPlaces(tripData.places, actorId, geography),

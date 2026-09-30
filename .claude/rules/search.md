@@ -23,6 +23,10 @@ paths:
 The detail behind the search lines of `CLAUDE.md`: what was measured, what each rule costs,
 and why the thresholds stand where they do.
 
+**A code scanned on «Что взяли?» is not a query** (MOL-99): the item found by it is picked with no
+query, and the codes the device found items by are kept beside «Часто берёте», not in its rows. The
+rules are in `.claude/rules/barcodes.md`, «The item by its code».
+
 ## How catalogue search works, and why
 
 Measured, not assumed — the numbers below come from a probe against a real database.

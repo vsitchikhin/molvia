@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { typedBarcode } from '#model/entities/barcode'
+import { barcodeTwins, typedBarcode } from '#model/entities/barcode'
 import { ERROR } from '#model/support/errors'
 
 const code = (input: string) => {
@@ -69,6 +69,94 @@ describe('typedBarcode', () => {
   it('must not take letters or nothing at all', () => {
     for (const input of ['', '   ', 'abcdefgh', '485000000000x', '4850000.000007']) {
       expect(code(input), input).toBe(ERROR.BARCODE_SHAPE)
+    }
+  })
+})
+
+describe('barcodeTwins', () => {
+  it('pairs eight digits that check both ways with the UPC-E expanded, both ways round', () => {
+    // A shop's EAN-8 led by 0: scanned it is eight digits, typed it is thirteen (MOL-98 Р-11).
+    expect(barcodeTwins('00408295')).toEqual(['00408295', '0004082000095'])
+    expect(barcodeTwins('0004082000095')).toEqual(['0004082000095', '00408295'])
+    expect(barcodeTwins('01234565')).toEqual(['01234565', '0012345000065'])
+    expect(barcodeTwins('0012345000065')).toEqual(['0012345000065', '01234565'])
+  })
+
+  it('pairs a system-1 code that checks both ways — the price typedBarcode names', () => {
+    // Typed it is EAN-8; scanned as UPC-E it is thirteen digits.
+    expect(barcodeTwins('10000007')).toEqual(['10000007', '0100000000007'])
+    expect(barcodeTwins('0100000000007')).toEqual(['0100000000007', '10000007'])
+  })
+
+  it('pairs thirteen digits only with a UPC-E form that checks as EAN-8', () => {
+    // UPC-E alone: their eight digits never check as EAN-8, so no eight digits of them are taken.
+    for (const expanded of ['0042100005264', '0012300000451', '0065100004327']) {
+      expect(barcodeTwins(expanded), expanded).toEqual([expanded])
+    }
+    // Two UPC-E forms reach this UPC-A: 01234543 by the rule of 4, 01234053 by the rule of 5–9 —
+    // and the second checks as EAN-8 too, so it is a twin like any other.
+    expect(barcodeTwins('0012340000053')).toEqual(['0012340000053', '01234053'])
+    expect(barcodeTwins('01234053')).toEqual(['01234053', '0012340000053'])
+  })
+
+  it('must not pair a code with one form only', () => {
+    expect(barcodeTwins('96385074')).toEqual(['96385074']) // EAN-8 led by neither 0 nor 1
+    expect(barcodeTwins('04252614')).toEqual(['04252614']) // UPC-E, not an EAN-8
+    expect(barcodeTwins('4850000000007')).toEqual(['4850000000007'])
+    expect(barcodeTwins('0012345678905')).toEqual(['0012345678905']) // UPC-A with no zeros to leave out
+  })
+
+  it('looks up twelve digits and a GTIN-14 led by 0 as the thirteen the scanner gives (adversarial З)', () => {
+    expect(barcodeTwins('012345678905')).toEqual(['012345678905', '0012345678905'])
+    expect(barcodeTwins('04850000000007')).toEqual(['04850000000007', '4850000000007'])
+    // And on to the eight digits the thirteen pair with.
+    expect(barcodeTwins('004082000095')).toEqual(['004082000095', '0004082000095', '00408295'])
+    // A GTIN-14 of a carton (not led by 0) is a code of its own.
+    expect(barcodeTwins('14850000000004')).toEqual(['14850000000004'])
+  })
+
+  it('does not guess between two shop labels that fold into one thirteen (adversarial Г)', () => {
+    // 00000055 and 00000505 both check as EAN-8 and as UPC-E, and both expand to 000000000055:
+    // neither way is the pair told apart, so there is none (adversarial Г, Г′, review С-7).
+    expect(barcodeTwins('00000055')).toEqual(['00000055'])
+    expect(barcodeTwins('00000505')).toEqual(['00000505'])
+    expect(barcodeTwins('0000000000055')).toEqual(['0000000000055'])
+  })
+
+  it('must not pair thirteen digits whose check digit fails', () => {
+    expect(barcodeTwins('0004082000096')).toEqual(['0004082000096'])
+  })
+
+  it('is symmetric over a sweep of eight digits led by 0 or 1: a twin always lists the code back', () => {
+    // Every 101st prefix with each last digit — the whole range was swept once by hand (С-7).
+    const broken: string[] = []
+    for (let n = 0; n < 2_000_000; n += 101) {
+      for (let digit = 0; digit < 10; digit++) {
+        const eight = `${String(n).padStart(7, '0')}${String(digit)}`
+        for (const twin of barcodeTwins(eight).slice(1)) {
+          if (!barcodeTwins(twin).includes(eight)) broken.push(`${eight} → ${twin}`)
+        }
+      }
+    }
+    expect(broken).toEqual([])
+  })
+
+  it('is symmetric: every twin lists the code back', () => {
+    for (const code of [
+      '00408295',
+      '01234565',
+      '10000007',
+      '01234053',
+      '0004082000095',
+      '0100000000007',
+    ]) {
+      for (const twin of barcodeTwins(code)) expect(barcodeTwins(twin), twin).toContain(code)
+    }
+  })
+
+  it('gives nothing for a code of no barcode shape', () => {
+    for (const input of ['', '1234567', '123456789', 'abcdefgh', '00408295 ', '004082950000000']) {
+      expect(barcodeTwins(input), input).toEqual([])
     }
   })
 })

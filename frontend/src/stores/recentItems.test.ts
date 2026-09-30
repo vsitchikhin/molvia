@@ -30,6 +30,24 @@ const milk = entry(1, {
 const bread = entry(2, { name: 'Хлеб «Гюмри»', note: 'формовой' })
 const matsun = entry(3, { name: 'Matsun «Marianna»' })
 
+/**
+ * A shelf that refuses every write, until the test is over. An own property, as `actor.test.ts`
+ * does it: happy-dom keeps `setItem` there, and `restoreAllMocks` never took a `vi.spyOn` off it —
+ * every later test of this file wrote nowhere, and a relaunch read nothing back.
+ */
+const refusals: (() => void)[] = []
+function refusing(shelf: Storage, error: Error): void {
+  const working = shelf.setItem.bind(shelf)
+  const define = (value: Storage['setItem']) =>
+    Object.defineProperty(shelf, 'setItem', { configurable: true, writable: true, value })
+  define(() => {
+    throw error
+  })
+  refusals.push(() => {
+    define(working)
+  })
+}
+
 /** A fresh store over whatever storage holds — what the next launch of the app sees. */
 function relaunched() {
   setActivePinia(createPinia())
@@ -46,6 +64,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  for (const restore of refusals.splice(0)) restore()
 })
 
 describe('recent items', () => {
@@ -160,9 +179,7 @@ describe('recent items', () => {
   it('keeps what it wrote when a full localStorage refuses it and sessionStorage takes it', () => {
     const store = relaunched()
     store.remember(bread)
-    vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
-      throw new DOMException('quota', 'QuotaExceededError')
-    })
+    refusing(localStorage, new DOMException('quota', 'QuotaExceededError'))
 
     store.remember(milk)
     store.sync()
@@ -172,12 +189,8 @@ describe('recent items', () => {
 
   it('remembers for the session when storage refuses every write', () => {
     const store = relaunched()
-    vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
-      throw new Error('QuotaExceededError')
-    })
-    vi.spyOn(sessionStorage, 'setItem').mockImplementation(() => {
-      throw new Error('QuotaExceededError')
-    })
+    refusing(localStorage, new Error('QuotaExceededError'))
+    refusing(sessionStorage, new Error('QuotaExceededError'))
 
     store.remember(milk)
     store.sync()
@@ -283,5 +296,75 @@ describe('recent items', () => {
           .map((item) => item.id),
       ).toEqual([bread.id])
     })
+  })
+})
+
+describe('the codes recent items were found by (MOL-99)', () => {
+  it('finds an item by the code it was found by, after a relaunch', () => {
+    relaunched().remember(milk, '4850000000007')
+
+    const again = relaunched()
+
+    expect(again.byCode('4850000000007')).toEqual(milk)
+    expect(again.byCode('4850000000014')).toBeNull()
+  })
+
+  it('finds it by the other form of an ambiguous code, as the server looks it up (С-14)', () => {
+    const store = relaunched()
+    store.remember(bread, '00408295')
+
+    // Scanned from the shop label it was eight digits; typed from it, thirteen.
+    expect(store.byCode('0004082000095')).toEqual(bread)
+  })
+
+  it('keeps the code of an item taken again without one', () => {
+    const store = relaunched()
+    store.remember(milk, '4850000000007')
+    store.remember(milk)
+
+    expect(relaunched().byCode('4850000000007')).toEqual(milk)
+  })
+
+  it('forgets the code once its item falls off the list', () => {
+    const store = relaunched()
+    store.remember(milk, '4850000000007')
+    for (let n = 10; n < 10 + RECENT_LIMIT; n++) store.remember(entry(n))
+
+    const again = relaunched()
+
+    expect(again.byCode('4850000000007')).toBeNull()
+    expect(JSON.parse(localStorage.getItem(`molvia.recent-codes.${FIRST}`) ?? '')).toEqual({})
+  })
+
+  it('must not find an item by a code of no barcode shape', () => {
+    const store = relaunched()
+    store.remember(milk, '4850000000007')
+
+    expect(store.byCode('')).toBeNull()
+    expect(store.byCode('485000000000')).toBeNull()
+  })
+
+  it('belongs to the identity, as the list does', () => {
+    relaunched().remember(milk, '4850000000007')
+    identity = SECOND
+
+    expect(relaunched().byCode('4850000000007')).toBeNull()
+  })
+
+  it('leaves the rows of the list as an older version reads them', () => {
+    relaunched().remember(matsun, '4850000000007')
+
+    const rows = JSON.parse(localStorage.getItem(`molvia.recent.${FIRST}`) ?? '') as object[]
+    expect(rows.map((row) => Object.keys(row).sort())).toEqual([
+      ['defaultUnit', 'id', 'kind', 'name', 'note', 'typicalQuantity'],
+    ])
+  })
+
+  it('reads stored codes it cannot understand as none, not as a crash', () => {
+    relaunched().remember(milk, '4850000000007')
+    for (const garbage of ['{', '[]', '"x"', '{"4850000000007":5}']) {
+      localStorage.setItem(`molvia.recent-codes.${FIRST}`, garbage)
+      expect(relaunched().byCode('4850000000007'), garbage).toBeNull()
+    }
   })
 })

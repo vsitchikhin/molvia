@@ -1,6 +1,6 @@
 <template>
   <div class="combobox">
-    <div class="well">
+    <div class="well" :class="{ trailed: $slots.trailing }">
       <IconMagnify class="glyph" aria-hidden="true" />
       <input
         ref="input"
@@ -23,6 +23,8 @@
         @input="update"
         @keydown="onKeydown"
       />
+      <!-- An action beside the text — the scanner (MOL-99) — inside the well, outside the input. -->
+      <slot name="trailing" />
     </div>
     <p :id="`${id}-hint`" class="hint">{{ hint }}</p>
 
@@ -214,6 +216,11 @@ export default defineComponent({
   &:focus-within {
     border-color: var(--accent);
     outline: 2px solid var(--accent-tint);
+  }
+
+  /* The trailing button is a touch target of its own: it sits at the pill's end, not inset. */
+  &.trailed {
+    padding-right: 0;
   }
 }
 

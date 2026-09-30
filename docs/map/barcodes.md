@@ -7,12 +7,17 @@ Rules: `.claude/rules/barcodes.md`. A test beside its source, or mirroring it un
 
 - `packages/model/src/entities/barcode.ts` — `typedBarcode`: a code typed by hand checked by its last digit and given in the scanner's form — UPC-A and UPC-E as thirteen digits.
 
+## backend · usecases
+
+- `backend/src/usecases/find-by-barcode.ts` — Use case: the item a scanned or typed code belongs to, looked up with its twins, the code as read first; writes nothing. Route `GET /catalogue/barcode` in `routes/catalogue.ts`; tests: `backend/tests/catalogue.integration.test.ts`.
+
 ## frontend · components
 
 - `frontend/src/components/BarcodeScannerSheet.vue` — The scanner sheet: live viewfinder with its frame and torch, the camera's refusals, the digits typed by hand; emits the code and closes.
 
 ## frontend · composables
 
+- `frontend/src/composables/useBarcodeLookup.ts` — Composable: the item a scanned code belongs to on «Что взяли?» — the server, else the codes the device found items by; found, missing, offline, error.
 - `frontend/src/composables/useBarcodeScan.ts` — Composable: reads frames while the camera is live, one at a time, and hands over the first code of a barcode's shape two frames agree on.
 - `frontend/src/composables/useCamera.ts` — Composable: the back camera for the viewfinder — its refusals sorted into states, stopped when closed or hidden, the torch.
 
