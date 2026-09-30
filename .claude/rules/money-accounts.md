@@ -98,7 +98,8 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   so the person does not fit the number; the answer is the difference and what could have made it
   since the last check, or the start: an operation of the account's currency with no account — a
   trip with nothing priced yet included, by its own currency (Д6) — one on it in another currency
-  without «списано», a trip on it with purchases that have no price, one no rate counts. «Since» is
+  without «списано», a trip on it with purchases that have no price and no receipt's sum (MOL-78:
+  with one the trip's money is known whole), one no rate counts. «Since» is
   dated after the check's day **or learnt by the server after the check** (`seenAt`): written,
   amended, given or taken an account, a trip received as finished or given a purchase — never the
   phone's clock, or a trip finished offline and delivered after a check hid behind it (Д1, Д1б).
