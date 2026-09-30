@@ -1104,6 +1104,7 @@ describe('«What did you pick up?»', () => {
       const question = en.item.barcode.bind_question
         .replace('{code}', CODE)
         .replace('{name}', cream.name)
+      const named = en.item.barcode.bind_named.replace('{code}', CODE).replace('{name}', cream.name)
 
       /** A miss, then «сметана» typed and its row tapped. */
       async function pickAfterMiss(view: VueWrapper): Promise<void> {
@@ -1336,10 +1337,79 @@ describe('«What did you pick up?»', () => {
         window.dispatchEvent(new PopStateEvent('popstate'))
 
         await vi.waitFor(() => {
-          expect(view.text()).toContain(question)
+          expect(view.text()).toContain(named)
         })
         expect(useItemEntryStore(pinia).picked).toBeNull()
         expect(attachBarcode).not.toHaveBeenCalled()
+      })
+
+      /** A miss with «хлеб» typed before the scan, then «Предложить товар» named as an item there. */
+      async function proposeExistingFromMiss(view: VueWrapper): Promise<void> {
+        await field(view).setValue('хлеб')
+        await vi.waitFor(() => {
+          expect(searchCatalogue).toHaveBeenCalledWith('хлеб')
+        })
+        await scan(view, CODE)
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(missing)
+        })
+        await button(view, en.item.empty.action).trigger('click')
+        vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        await view.get<HTMLInputElement>('dialog input[type="text"]').setValue(cream.name)
+        const litre = view
+          .findAll('dialog label')
+          .find((label) => label.text() === en.item.unit_l)
+          ?.find('input')
+        await litre?.setValue(true)
+        await button(view, en.item.propose.submit).trigger('click')
+        await flushPromises()
+        window.dispatchEvent(new PopStateEvent('popstate'))
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(named)
+        })
+      }
+
+      it('takes the item asked about from the code’s block with no query — the word before the scan is nobody’s (adversarial М)', async () => {
+        proposeItem.mockResolvedValue({ entry: cream, created: false })
+        attachBarcode.mockResolvedValue({ entry: cream, created: true })
+        vi.spyOn(performance, 'now').mockReturnValue(0)
+        const view = await render()
+        await proposeExistingFromMiss(view)
+
+        await button(view, en.item.barcode.bind).trigger('click')
+
+        await vi.waitFor(() => {
+          expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: '' })
+        })
+      })
+
+      it('opens «другой товар» empty, saying the name is taken — no circle (adversarial М, Н)', async () => {
+        proposeItem.mockResolvedValue({ entry: cream, created: false })
+        vi.spyOn(performance, 'now').mockReturnValue(0)
+        const view = await render()
+        await proposeExistingFromMiss(view)
+
+        await button(view, en.item.barcode.propose_other).trigger('click')
+        await new Promise((resolve) => setTimeout(resolve, 5))
+
+        expect(view.get<HTMLInputElement>('dialog input[type="text"]').element.value).toBe('')
+        expect(view.text()).toContain(en.item.propose.name_taken.replace('{name}', cream.name))
+      })
+
+      it('keeps the word typed for «другой товар» of a row picked by name (control)', async () => {
+        vi.spyOn(performance, 'now').mockReturnValue(0)
+        const view = await render()
+        await pickAfterMiss(view)
+
+        await button(view, en.item.barcode.propose_other).trigger('click')
+        vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+
+        expect(view.get<HTMLInputElement>('dialog input[type="text"]').element.value).toBe(
+          'сметана',
+        )
+        expect(view.text()).not.toContain(en.item.propose.name_taken.replace('{name}', cream.name))
       })
 
       it('drops the question when typing goes on, and the code still waits', async () => {

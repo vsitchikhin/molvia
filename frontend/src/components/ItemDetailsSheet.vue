@@ -58,10 +58,18 @@
             {{ t('item.barcode.detach_question', { code, name: entry.name }) }}
           </p>
           <p class="caption">{{ t('item.barcode.detach_hint') }}</p>
-          <AppButton ref="detachFirst" block :busy="detaching" @click="notThis">
+          <!-- Destructive for everyone and with no «Вернуть»: not the filled button, and the focus
+               waits on «Отменить» (review Л). -->
+          <AppButton variant="danger-ghost" block :busy="detaching" @click="notThis">
             {{ t('item.barcode.detach') }}
           </AppButton>
-          <AppButton variant="ghost" block :inactive="detaching" @click="keepCode">
+          <AppButton
+            ref="detachCancel"
+            variant="ghost"
+            block
+            :inactive="detaching"
+            @click="keepCode"
+          >
             {{ t('item.cancel') }}
           </AppButton>
           <p v-if="detachFailed" class="caption offline" role="alert">
@@ -387,7 +395,7 @@ export default defineComponent({
 
     const recent = useRecentItemsStore()
     const confirming = ref(false)
-    const detachFirst = ref<{ $el?: HTMLElement } | null>(null)
+    const detachCancel = ref<{ $el?: HTMLElement } | null>(null)
     const detaching = ref(false)
     const detachFailed = ref(false)
 
@@ -395,7 +403,7 @@ export default defineComponent({
       confirming.value = true
       detachFailed.value = false
       await nextTick()
-      detachFirst.value?.$el?.focus()
+      detachCancel.value?.$el?.focus()
     }
 
     function keepCode(): void {
@@ -448,7 +456,7 @@ export default defineComponent({
       remove,
       leave,
       confirming,
-      detachFirst,
+      detachCancel,
       askDetach,
       keepCode,
       detaching,

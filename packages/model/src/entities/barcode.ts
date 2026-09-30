@@ -176,31 +176,22 @@ export function hasRepeatedBarcode(codes: readonly string[]): boolean {
  * bars, are dropped, and so is whatever draws nothing.
  *
  * Eight digits are EAN-8 or UPC-E, and the digits alone do not say which: about one UPC-E in
- * ten also checks as EAN-8. A leading `0` settles it for UPC-E — an EAN-8 starting with `0` is a
- * shop's in-house code, not a product's — and anything else checking as EAN-8 is EAN-8. The one
- * case left, a UPC-E of number system `1` that also checks as EAN-8, is read as EAN-8.
- *
- * Except where the thirteen would not say which eight they came from (MOL-100, Р-14): eight led by
- * `0` that check both ways and whose UPC-A folds back into more than one EAN-8 — `00000055` and
- * `00000505` are two shops' labels and one UPC-A. Such digits stay eight, as the scanner reads the
- * label: expanded, two labels were written as one code. The price: a real UPC-E with such digits,
- * typed, is found only by its scan.
+ * ten also checks as EAN-8. **Eight that check as EAN-8 are read as EAN-8** — as the scanner reads a
+ * label printed so — and only eight that check as UPC-E alone are expanded to its thirteen (MOL-100,
+ * owner's decision В-7). MOL-98 read a leading `0` as UPC-E; typed so, a shop's own EAN-8 label
+ * (`00408295`) became thirteen written for everyone, and the same label of another shop, typed, found
+ * that shop's item. Read as EAN-8 it is what the scanner says it is: a shop's label, never written.
+ * The price: a real UPC-E whose digits also check as EAN-8, typed by hand, is found only by its scan
+ * — American packaging, rare on an Armenian shelf, where a shop's labels are not.
  */
 export function typedBarcode(input: string): TypedBarcode {
   const digits = input.replace(DROPPED, '')
   if (!/^(\d{8}|\d{12,13})$/.test(digits)) return { ok: false, error: ERROR.BARCODE_SHAPE }
   if (digits.length === 8) {
+    if (checks(digits)) return { ok: true, code: digits }
     const upcE = /^[01]/.test(digits) ? expandUpcE(digits) : null
-    const isUpcE = upcE !== null && checks(upcE)
-    const label =
-      upcE !== null && digits.startsWith('0') && checks(digits) && isUpcE
-        ? compressUpcA(upcE).filter(checks).length > 1
-        : false
-    if (isUpcE && !label && (digits.startsWith('0') || !checks(digits))) {
-      return { ok: true, code: `0${upcE}` }
-    }
-    return checks(digits)
-      ? { ok: true, code: digits }
+    return upcE !== null && checks(upcE)
+      ? { ok: true, code: `0${upcE}` }
       : { ok: false, error: ERROR.BARCODE_CHECK_DIGIT }
   }
   if (!checks(digits)) return { ok: false, error: ERROR.BARCODE_CHECK_DIGIT }

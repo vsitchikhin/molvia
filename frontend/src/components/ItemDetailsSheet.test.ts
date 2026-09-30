@@ -552,4 +552,19 @@ describe('«не этот товар?» (MOL-100)', () => {
     expect(view.text()).not.toContain('Отвязать код')
     expect(view.text()).toContain('Код 4850001234562 — не этот товар?')
   })
+
+  it('asks with «Отменить» in focus, and «Отвязать» is not the filled button (review Л)', async () => {
+    const { view } = await render({ code: '4850001234562' })
+
+    await view
+      .findAll('button')
+      .find((button) => button.text() === 'Код 4850001234562 — не этот товар?')
+      ?.trigger('click')
+    await nextTick()
+    await nextTick()
+
+    expect(document.activeElement?.textContent.trim()).toBe('Отменить')
+    const detach = view.findAll('button').find((button) => button.text() === 'Отвязать')
+    expect(detach?.classes()).toContain('danger-ghost')
+  })
 })

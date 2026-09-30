@@ -16,6 +16,7 @@
       :maxlength="noteMax"
       enterkeyhint="done"
     />
+    <p v-if="nameTaken" class="code">{{ t('item.propose.name_taken', { name: nameTaken }) }}</p>
     <p v-if="code" class="code">{{ t('item.propose.code', { code }) }}</p>
 
     <template #footer>
@@ -95,6 +96,11 @@ export default defineComponent({
     query: { type: String, required: true },
     /** The code the item is proposed for, read from its package (MOL-100); none from the name. */
     code: { type: String as PropType<string | null>, default: null },
+    /**
+     * The name of the item just declined as «другой товар» (MOL-100, adversarial Н): the name typed
+     * is that item's, and proposed again it would be asked about again.
+     */
+    nameTaken: { type: String as PropType<string | null>, default: null },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',

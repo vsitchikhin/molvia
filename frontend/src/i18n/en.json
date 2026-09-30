@@ -247,7 +247,8 @@
       "failed": "Could not add it. Please try again",
       "code": "Code {code} will be saved with the item",
       "taken": "This code already belongs to «{name}»",
-      "take": "Take «{name}»"
+      "take": "Take «{name}»",
+      "name_taken": "«{name}» is already there — name the item differently, with its brand for instance"
     },
     "error": {
       "title": "The server did not answer",
@@ -283,7 +284,8 @@
       "in_store_body": "The scales or the shop print it: another package gets another code. Find the item by its name",
       "detach_question": "Unlink code {code} from «{name}»?",
       "detach_hint": "Nobody will find it by this code any more",
-      "detach": "Unlink"
+      "detach": "Unlink",
+      "bind_named": "«{name}» is already in the catalogue. Link code {code} to it?"
     }
   },
   "sheet": {

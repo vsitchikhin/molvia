@@ -38,9 +38,10 @@ describe('typedBarcode', () => {
     expect(code('06543217')).toBe('0065100004327') // 5–9
   })
 
-  it('reads eight digits led by 0 that check both ways as UPC-E', () => {
-    // 01234565 checks as EAN-8 too; zxing reads the printed UPC-E as 0012345000065.
-    expect(code('01234565')).toBe('0012345000065')
+  it('reads eight digits that check both ways as EAN-8, as the scanner reads such a label (В-7)', () => {
+    // 01234565 checks as UPC-E too, but typed it is the shop's label the scanner would read — the
+    // UPC-E print is found by its scan (0012345000065).
+    expect(code('01234565')).toBe('01234565')
   })
 
   it('reads a system-1 code that checks both ways as EAN-8 — the named price', () => {
@@ -279,8 +280,7 @@ describe('typedBarcode — two shops’ labels that fold into one UPC-A (MOL-100
     expect(code('00000505')).toBe('00000505')
   })
 
-  it('still expands a label whose UPC-A folds back into it alone (control)', () => {
-    expect(code('00408295')).toBe('0004082000095')
-    expect(code('01234565')).toBe('0012345000065')
+  it('keeps the unambiguous both-ways label eight too — the price of MOL-100 В-7', () => {
+    expect(code('00408295')).toBe('00408295')
   })
 })

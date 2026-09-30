@@ -55,7 +55,12 @@
              «taken» or «no network» is said where the person is; the purchase sheet comes after. -->
         <div v-if="bind && (bind.phase === 'ask' || bind.phase === 'sending')" class="not-found">
           <p class="bind-question">
-            {{ t('item.barcode.bind_question', { code: bind.code, name: bind.entry.name }) }}
+            {{
+              t(bind.origin === 'pick' ? 'item.barcode.bind_question' : 'item.barcode.bind_named', {
+                code: bind.code,
+                name: bind.entry.name,
+              })
+            }}
           </p>
           <p class="not-found-text">{{ t('item.barcode.bind_hint') }}</p>
           <div class="bind-actions">
@@ -249,8 +254,9 @@
 
     <ProposeItemSheet
       v-model:open="proposing"
-      :query="proposingByCode ? '' : query"
+      :query="proposingByCode || nameTaken ? '' : query"
       :code="pendingCode"
+      :name-taken="nameTaken"
       :on-closed="afterProposing"
       @proposed="proposed"
       @taken="takenOnProposal"
@@ -404,11 +410,15 @@ export default defineComponent({
     /**
      * «Привязать код к ней?» over a row picked while a code waits (MOL-100, В-2): asked here, and the
      * purchase sheet comes once it is answered. `learns` is the pick's own, kept for when it goes on.
+     * `origin` — a row picked; an item whose name a proposal met (`proposed`, В-5); the same from the
+     * code's own block (`proposedByCode`), where the item was looked for by the code and what the
+     * field held before the scan is nobody's word for it (MOL-99 Д, adversarial М).
      */
     interface Bind {
       readonly entry: CatalogueEntry
       readonly code: string
       readonly learns: boolean
+      readonly origin: 'pick' | 'proposed' | 'proposedByCode'
       readonly phase: 'ask' | 'sending' | 'taken' | 'full' | 'offline' | 'error'
       readonly holder: CatalogueEntry | null
     }
@@ -451,7 +461,7 @@ export default defineComponent({
         }
         bind.value = null
         pendingCode.value = null
-        take(asked.entry, asked.learns)
+        goOn(asked)
         pickedByCode.value = { itemId: asked.entry.id, code: asked.code }
       } catch (error) {
         if (!stillAsked(asked)) return
@@ -466,7 +476,13 @@ export default defineComponent({
       if (asked === null || asked.phase === 'sending') return
       bind.value = null
       pendingCode.value = null
-      take(asked.entry, asked.learns)
+      goOn(asked)
+    }
+
+    // The purchase sheet of the item asked about — with no query where the code brought it.
+    function goOn(asked: Bind): void {
+      if (asked.origin === 'proposedByCode') pickWithoutQuery(asked.entry)
+      else take(asked.entry, asked.learns)
     }
 
     // The package in the hand is the item the catalogue holds the code for: taken as found by it.
@@ -480,10 +496,17 @@ export default defineComponent({
     }
 
     // «Это другой товар — предложить» (В-3): the item found by name is not the package; the code
-    // goes with the one proposed, whose name starts from what was typed.
+    // goes with the one proposed, whose name starts from what was typed. Asked about an item whose
+    // name a proposal met (В-5), the name typed is that item's: the sheet starts empty and says the
+    // name is taken, or «другой товар» went round in a circle (adversarial Н).
     function proposeOther(): void {
-      if (bind.value?.phase === 'sending') return
+      const asked = bind.value
+      if (asked === null || asked.phase === 'sending') return
       bind.value = null
+      if (asked.origin !== 'pick') {
+        nameTaken.value = asked.entry.name
+        proposingByCode.value = asked.origin === 'proposedByCode'
+      }
       proposing.value = true
     }
 
@@ -632,7 +655,10 @@ export default defineComponent({
         withdraw = undefined
         if (next === 'ask') {
           withdrawBind = announce?.(
-            t('item.barcode.bind_question', { code: asked.code, name: asked.entry.name }),
+            t(asked.origin === 'pick' ? 'item.barcode.bind_question' : 'item.barcode.bind_named', {
+              code: asked.code,
+              name: asked.entry.name,
+            }),
           )
         } else if (next === 'taken' && asked.holder) {
           withdrawBind = announce?.(
@@ -659,7 +685,7 @@ export default defineComponent({
     function pick(chosen: CatalogueEntry, learns = true): void {
       const code = pendingCode.value
       if (code !== null) {
-        bind.value = { entry: chosen, code, learns, phase: 'ask', holder: null }
+        bind.value = { entry: chosen, code, learns, origin: 'pick', phase: 'ask', holder: null }
         return
       }
       take(chosen, learns)
@@ -711,6 +737,8 @@ export default defineComponent({
      * «Предложить товар» under «Код … не знаком» (adversarial Д): it was looked for by the code, not by
      * what the field held before the scan — so the name starts empty, and the pick teaches no word.
      */
+    /** The name a proposal met, when «другой товар» was said about that very item (adversarial Н). */
+    const nameTaken = ref<string | null>(null)
     const proposingByCode = ref(false)
 
     function proposeByCode(): void {
@@ -751,8 +779,10 @@ export default defineComponent({
     let proposedCode: string | null = null
 
     function afterProposing(): void {
-      const byCode = proposingByCode.value || takenHolder
+      const fromCode = proposingByCode.value
+      const byCode = fromCode || takenHolder
       proposingByCode.value = false
+      nameTaken.value = null
       takenHolder = false
       const item = proposedItem
       const code = proposedCode
@@ -763,7 +793,14 @@ export default defineComponent({
       const waiting = pendingCode.value
       if (item && ask && waiting !== null) {
         lookup.clear()
-        bind.value = { entry: item, code: waiting, learns: false, phase: 'ask', holder: null }
+        bind.value = {
+          entry: item,
+          code: waiting,
+          learns: false,
+          origin: fromCode ? 'proposedByCode' : 'proposed',
+          phase: 'ask',
+          holder: null,
+        }
         return
       }
       if (item && byCode) {
@@ -815,6 +852,7 @@ export default defineComponent({
       read,
       afterScanning,
       proposingByCode,
+      nameTaken,
       proposeByCode,
       takenOnProposal,
       pendingCode,
