@@ -189,7 +189,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   scroll into. `#app` is a block, so the hold is room under the screen and never the screen
   stretched: a state that takes the free height would carry «Повторить» down with it. **Above the
   control, nothing that belongs to the answer stands**: the strips «Нет связи» and «Сервер не
-  ответил», the card of a failed refresh, the line «Этой категории на графиках нет» are drawn under
+  ответил», the card of a failed refresh, the card of a refusal of the queue (a row of its own
+  month, a card on any other — adversarial round 3, Ж), the line «Этой категории на графиках нет» are drawn under
   the control that chooses the answer — the owner's decision В-2, against handoff 04, which put the
   strip over the month. Each comes and goes with the answer: over the switcher, its going took the
   switcher up by 74 px, and a strip of a month the phone keeps went with the move and came back a
