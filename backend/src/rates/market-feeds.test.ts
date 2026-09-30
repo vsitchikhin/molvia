@@ -169,6 +169,20 @@ describe('all clients of banks (FOREX ENG_Daily)', () => {
     expect(() => readDaily(changed(DAILY, { Z6: 'EUR' }))).toThrow('Z6 is not "RUB"')
   })
 
+  it('is refused whole when a row carries rates and no day (adversarial review, round 4, Д)', () => {
+    expect(() => readDaily(changed(DAILY, { A1202: null }))).toThrow(
+      'FOREX ENG_Daily.xlsx: row 1202 has no day',
+    )
+    expect(() => readDaily(changed(DAILY, { A600: null }))).toThrow('row 600 has no day')
+  })
+
+  it('passes over an empty row between two days', () => {
+    const cells = new Map(recorded(DAILY).cells)
+    for (const ref of [...cells.keys()]) if (/^[A-Z]+600$/.test(ref)) cells.delete(ref)
+    const rates = readDaily(sheetOf(recorded(DAILY).file, cells, recorded(DAILY).rows))
+    expect(rates).toHaveLength(1195 * 6)
+  })
+
   it('is refused whole when the days are out of order', () => {
     const eighth = recorded(DAILY).value('A8')
     expect(() => readDaily(changed(DAILY, { A9: eighth }))).toThrow('A9 is not after the row above')

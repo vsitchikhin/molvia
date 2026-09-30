@@ -203,8 +203,10 @@ rate exactly as before.
   nobody does; `FOREX ENG_Daily.xlsx` — banks with every client, people and companies, every working
   day since January 2022, the row of D the same day; `FOREX ENG.xlsx`, sheet 6.18 — exchange
   offices, one week at a time about ten days late, each row dated by its own text, the reporting
-  period above the table not trusted (on 30.09 it named 20–27 September over rows of 14–20). An empty row is passed over, never read as the end of the table: a blank line between two days made the rest of the week vanish in silence (adversarial review, round 3, Г). The
-  directory's index answers 401: the names are written in the code.
+  period above the table not trusted (on 30.09 it named 20–27 September over rows of 14–20). An
+  empty row is passed over, never read as the end of the table: a blank line between two days made
+  the rest of the week vanish in silence (adversarial review, round 3, Г). The directory's index
+  answers 401: the names are written in the code.
 - **A file is downloaded only if it changed — by its `HEAD`, not by `If-None-Match`.** The bank's
   server ignores the conditional headers and answers 200 with the whole file (measured 30.09.2026,
   adversarial review Б): asked by its tag, the daily history came a megabyte and an exceljs parse
@@ -215,22 +217,23 @@ rate exactly as before.
   with no length is read in chunks and cut off at the ceiling.
 - **Strict or nothing, as the official feeds** (Р-7): a header cell not where it was, the sheet
   renamed, a rate zero, missing or a text, a day that is not one, a day after today, days out of
-  order, a currency twice or missing from a day, a row with a currency or a rate and no day — and **a figure over a factor of two from the
-  official rate of its day** (`isMarketPlausible`, `MARKET_BAND_FACTOR`) — refuse the whole file.
-  **Fifteen percent was the first bound, and the central bank's own file refuted it** (adversarial
-  review А): on 3 March 2022 banks sold roubles 27.5 % above the official rate, and with the history
-  since 2022 in the cache — written by the same hour, just before the market — the daily file was
-  refused every hour for good, and non-cash never had its stand-in (В-2). A market in a crisis stays
-  within a factor of two; what the bound is for does not — a volume or a sum in drams read for a
-  rate is thousands of times away, a rate per ten or a hundred units ten or a hundred. **What no band
-  catches, this one or fifteen percent, is the column next door** (review П-7): the euro read for the
-  dollar is 13 % off, a side or cash for non-cash one or two — those are held by the header cell over
-  every rate column (`expect`), and the band must never be narrowed on the hope of catching them. The measure
-  is a rate the bank did not jump on (review А′): held against a comma in the wrong place, the right
-  file of that day was refused, and a day of people in banks has no archive. A day the official
-  history does not reach is vouched for by the header alone. The two files meet in a test of their
-  own (`market-history.integration.test.ts`) — nothing smaller shows it. Logged as the feed's
-  own words, which name a cell of a public file; anything else by its kind (`describeFailure`).
+  order, a currency twice or missing from a day, a row with a currency or a rate and no day — and
+  **a figure over a factor of two from the official rate of its day** (`isMarketPlausible`,
+  `MARKET_BAND_FACTOR`) — refuse the whole file. **Fifteen percent was the first bound, and the
+  central bank's own file refuted it** (adversarial review А): on 3 March 2022 banks sold roubles
+  27.5 % above the official rate, and with the history since 2022 in the cache — written by the same
+  hour, just before the market — the daily file was refused every hour for good, and non-cash never
+  had its stand-in (В-2). A market in a crisis stays within a factor of two; what the bound is for
+  does not — a volume or a sum in drams read for a rate is thousands of times away, a rate per ten
+  or a hundred units ten or a hundred. **What no band catches, this one or fifteen percent, is the
+  column next door** (review П-7): the euro read for the dollar is 13 % off, a side or cash for
+  non-cash one or two — those are held by the header cell over every rate column (`expect`), and the
+  band must never be narrowed on the hope of catching them. The measure is a rate the bank did not
+  jump on (review А′): held against a comma in the wrong place, the right file of that day was
+  refused, and a day of people in banks has no archive. A day the official history does not reach is
+  vouched for by the header alone. The two files meet in a test of their own
+  (`market-history.integration.test.ts`) — nothing smaller shows it. Logged as the feed's own words,
+  which name a cell of a public file; anything else by its kind (`describeFailure`).
 - **Read through exceljs** (owner's decision В-7, against the narrow reader recommended): the price
   is 2,2 MB of bundle, some 185 packages and two moderate advisories through `uuid`, and a load of
   one to five seconds — asynchronous, the longest block of the event loop measured at 126 ms. The
@@ -247,20 +250,20 @@ rate exactly as before.
   bought it; given drams for a currency, the bank sold it. **A pair without the dram has no market**
   (В-4): the files know every currency against the dram only, and roubles into dollars may have been
   changed in Russia, where the Armenian market says nothing.
-- **An exchange is set beside the best figure of its day for the person** (owner's decision В-1,
-  the comment over the option ticked): the highest when the bank bought, the lowest when it sold,
-  among the channels a person can name — bank in cash, bank non-cash, exchange office — each by its
-  row of that day or the latest within the week (Р-2, the official rule); **the exchange offices by
-  their row of that very day only**: they publish every day, and the week before is exactly what
-  their late file holds — taken as the day's, it became the best over the banks' same-day figures
-  and hid «still to come» (review, major 1). **And beside its own
-  channel, when the person named it and it is not the best.** The channel is optional («Как меняли»,
-  `exchanges.channel`, null is «not said»), a fact of the exchange: part of a repeat, kept in the
-  versions, amended like the note; left out by a screen older than it, kept by an amendment and
-  matching anything in a repeat, as an account is. A new exchange starts from the channel of the
-  latest-dated one. The sheet names the channel in the versions and in «Сейчас записано»: changed
-  alone, it read as «nothing changed» (review, major 2, as М2 for the remainder). A channel-only
-  amendment is an amendment like the note's — a version and a thaw from its day — a named price.
+- **An exchange is set beside the best figure of its day for the person** (owner's decision В-1, the
+  comment over the option ticked): the highest when the bank bought, the lowest when it sold, among
+  the channels a person can name — bank in cash, bank non-cash, exchange office — each by its row of
+  that day or the latest within the week (Р-2, the official rule); **the exchange offices by their
+  row of that very day only**: they publish every day, and the week before is exactly what their
+  late file holds — taken as the day's, it became the best over the banks' same-day figures and hid
+  «still to come» (review, major 1). **And beside its own channel, when the person named it and it
+  is not the best.** The channel is optional («Как меняли», `exchanges.channel`, null is «not
+  said»), a fact of the exchange: part of a repeat, kept in the versions, amended like the note;
+  left out by a screen older than it, kept by an amendment and matching anything in a repeat, as an
+  account is. A new exchange starts from the channel of the latest-dated one. The sheet names the
+  channel in the versions and in «Сейчас записано»: changed alone, it read as «nothing changed»
+  (review, major 2, as М2 for the remainder). A channel-only amendment is an amendment like the
+  note's — a version and a thaw from its day — a named price.
 - **Non-cash before its collection is all bank clients; nothing else stands in** (В-2): that row runs
   within a tenth of a percent of people's non-cash, and two and a half percent off their cash for the
   rouble — standing in for cash, it would make every cash exchange of roubles look worse than it was.

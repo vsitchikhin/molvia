@@ -143,7 +143,16 @@ export function readDaily(sheet: Sheet): MarketRate[] {
   const rates: MarketRate[] = []
   let previous = ''
   for (let row = 7; row <= sheet.rows; row += 1) {
-    if (sheet.value(`A${String(row)}`) === null) continue
+    if (sheet.value(`A${String(row)}`) === null) {
+      // As for the exchange offices (round 3, Г; round 4, Д): an empty row is passed over, a row
+      // with a rate and no day is the sheet rebuilt — passed over, its day would drop out in silence.
+      const rated = FOREIGN.some((currency) => {
+        const { buys, sells } = DAILY_COLUMNS[currency]
+        return [buys, sells].some((column) => sheet.value(`${column}${String(row)}`) !== null)
+      })
+      if (rated) throw refuse(DAILY, `row ${String(row)} has no day`)
+      continue
+    }
     const date = sheet.day(`A${String(row)}`)
     if (date <= previous) throw refuse(DAILY, `A${String(row)} is not after the row above`)
     previous = date
