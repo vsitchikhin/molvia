@@ -965,6 +965,24 @@ describe('the trip', () => {
     expect(calls).toHaveLength(2)
   })
 
+  it('кладёт сумму по чеку целиком и снимает её null; ноль не уходит (MOL-78)', async () => {
+    const { client, calls } = clientReplying(200, tripWire)
+
+    await client.setTripReceipt(TRIP, { receipt: { minor: 1_240_000n, currency: 'AMD' } })
+    await client.setTripReceipt(TRIP, { receipt: null })
+    expect(calls[0]).toMatchObject({
+      method: 'PUT',
+      body: { receipt: { amount: '12400.00', currency: 'AMD' } },
+    })
+    expect(calls[1]?.body).toEqual({ receipt: null })
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/trips/${TRIP}/receipt`)
+
+    expect(
+      await codeOf(client.setTripReceipt(TRIP, { receipt: { minor: 0n, currency: 'AMD' } })),
+    ).toBe(ERROR.INVALID_AMOUNT)
+    expect(calls).toHaveLength(2)
+  })
+
   it('keeps an identifier inside its own path segment', async () => {
     const { client, calls } = clientReplying(404, { code: ERROR.NOT_FOUND })
 

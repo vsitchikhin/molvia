@@ -128,6 +128,12 @@ export interface TripRepository {
     manual: ExchangeRate | null,
   ): Promise<Trip | null>
   /**
+   * «Сумма по чеку» (MOL-78): the receipt's sum whole, or none, and the moment it changed — what a
+   * check and the hint of an exchange date it by. Whether it changed at all is the use case's to
+   * decide under `lock`: a repeat must move neither the moment nor «списано».
+   */
+  setReceipt(id: string, actorId: string, receipt: Money | null): Promise<Trip | null>
+  /**
    * «Удалить поход» (MOL-76): marked, and from then on no reader but erasure and the minute timer
    * sees it. `false` when it is not the owner's — a stranger's, a missing one, one already final.
    * Marking a marked one again is `true` and moves nothing: a repeat from the queue.
@@ -171,6 +177,10 @@ function toTrip(row: TripRow): Trip {
       row.debitedMinor === null || row.debitedCurrency === null
         ? null
         : { minor: row.debitedMinor, currency: row.debitedCurrency },
+    receipt:
+      row.receiptMinor === null || row.receiptCurrency === null
+        ? null
+        : { minor: row.receiptMinor, currency: row.receiptCurrency },
   })
 }
 
@@ -413,6 +423,20 @@ export function createTripRepository(db: Conn): TripRepository {
         .set({
           rateChoice: choice,
           ...(manual ? { rateManualScaled: manual.scaled, rateManualAsOf: manual.asOf } : {}),
+        })
+        .where(ownedBy(id, actorId))
+        .returning()
+      return row ? toTrip(row) : null
+    },
+
+    async setReceipt(id, actorId, receipt) {
+      if (idOrNull(id) === null || idOrNull(actorId) === null) return null
+      const [row] = await db
+        .update(trips)
+        .set({
+          receiptMinor: receipt?.minor ?? null,
+          receiptCurrency: receipt?.currency ?? null,
+          receiptSetAt: sql`clock_timestamp()`,
         })
         .where(ownedBy(id, actorId))
         .returning()

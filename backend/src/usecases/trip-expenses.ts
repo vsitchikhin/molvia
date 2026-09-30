@@ -137,6 +137,28 @@ export async function removeExpense(
 }
 
 /**
+ * «Сумма по чеку» (MOL-78): the receipt's sum whole, or none. A change is a change of the trip's
+ * money and takes its «списано» off (Р-32 MOL-115), as a price does; the same sum again is a repeat
+ * from the queue and moves nothing — neither «списано» nor the moment a check dates it by. The
+ * server does not refuse a sum on a trip with no purchases (В-1): the screen does not offer one,
+ * and a trip whose purchases were all removed after it keeps its money.
+ */
+export async function setReceipt(
+  transact: Transact,
+  actorId: string,
+  tripId: string,
+  receipt: Money | null,
+): Promise<TripView> {
+  return transact(async (repositories) => {
+    const trip = await lockedTrip(repositories.trips, tripId, actorId)
+    if (sameMoney(trip.receipt, receipt)) return tripViewFor(repositories, trip)
+    const changed = await repositories.trips.setReceipt(trip.id, actorId, receipt)
+    if (!changed) throw new DomainError(ERROR.NOT_FOUND)
+    return tripViewFor(repositories, await moneyMoved(repositories, changed))
+  })
+}
+
+/**
  * «Завершить». The trip stops being current and stops holding back «Начать поход»; nothing
  * else about it changes — it still takes what was forgotten (В-8). Finishing again is not an
  * error and moves nothing.

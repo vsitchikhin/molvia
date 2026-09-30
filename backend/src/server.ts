@@ -97,7 +97,13 @@ import { settingsRoute } from '@/routes/settings'
 import { startTrip } from '@/usecases/start-trip'
 import { removeTrip, restoreTrip } from '@/usecases/remove-trip'
 import { startLogin } from '@/usecases/start-login'
-import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
+import {
+  addExpense,
+  finishTrip,
+  removeExpense,
+  setReceipt,
+  updateExpense,
+} from '@/usecases/trip-expenses'
 import { createActorRepository } from '@/db/actors-repository'
 import { createExchangeRepository } from '@/db/exchanges-repository'
 import { createEventRepository } from '@/db/events-repository'
@@ -500,6 +506,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         finish: (actorId, tripId, deviceAt, deviceDay) =>
           finishTrip(tripData.trips, actorId, tripId, deviceAt, deviceDay),
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
+        setReceipt: (actorId, tripId, receipt) => setReceipt(transact, actorId, tripId, receipt),
         removeTrip: (actorId, tripId) => removeTrip(tripData.trips, actorId, tripId),
         restoreTrip: (actorId, tripId, body) => restoreTrip(tripData, actorId, tripId, body),
       })
