@@ -17,6 +17,7 @@
 import { computed, defineComponent, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import TabBar from '@/components/TabBar.vue'
+import { releaseHeightHold } from '@/transitions'
 import LoginView from '@/views/LoginView.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
@@ -39,6 +40,12 @@ export default defineComponent({
     // Whether the app is shown at all, or the login screen instead. The rule lives in the login
     // store, where it can be read and tested without mounting the app (MOL-56).
     const closed = computed(() => login.closed)
+    // The login takes the router's place without a move, so no move takes the page's hold away:
+    // held, the login was drawn scrolled off the window, all of it above it on an iPhone (MOL-138,
+    // adversarial А).
+    watch(closed, (now) => {
+      if (now) releaseHeightHold()
+    })
 
     // The app, not a screen, sends what waits on the phone, whichever screen is open when the
     // connection is back: purchases written at the shelf (MOL-24), saved ratings (MOL-28) and

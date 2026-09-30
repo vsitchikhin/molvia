@@ -4,7 +4,7 @@ import App from '@/App.vue'
 import { applyDocumentLang, i18n } from '@/i18n'
 import { settleColdStart } from '@/navigation'
 import { router } from '@/router'
-import { installArrival, installViewTransitions } from '@/transitions'
+import { installArrival, installHeightHold, installViewTransitions } from '@/transitions'
 import { installSheetEntryGuard } from '@/composables/useSheetHistory'
 import { sessionEnded, useActorStore } from '@/stores/actor'
 import { forgetTheInviteDoor } from '@/stores/identity'
@@ -80,6 +80,7 @@ void settleColdStart(router)
   .finally(() => {
     installViewTransitions(router)
     installArrival(router, (key) => i18n.global.t(key))
+    installHeightHold(router)
     installSheetEntryGuard(router)
     app.mount('#app')
 

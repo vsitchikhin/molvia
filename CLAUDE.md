@@ -337,7 +337,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17); no gesture
   is intercepted but the sheet's own pull down (MOL-80); only the page scrolls, except a sheet.
   **«Что брать» is home** (MOL-128): the `tabMove` of «back»; old addresses of «Поход» redirect for
-  good.
+  good. **A change of a screen's own query is not another screen** (MOL-136): no scroll, no
+  animation, no arrival, and the page is held as tall as the window (MOL-138); **nothing of the
+  answer stands above the control that chooses it** — a strip, a refusal, a note go under it.
 - **A screen is built from the kit** (MOL-18); the sheet is a native `<dialog>` with an entry in the
   history, and puts the page back — and focus, wherever the platform gave it — by what it was
   opened from (MOL-63, MOL-80). **Its press is heard on the document**: iOS hands a tap on the
