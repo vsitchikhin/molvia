@@ -118,7 +118,12 @@ describe('словарь: повторяющиеся тексты', () => {
       // Таб и его экран — разные роли одного слова, как у «Покупки».
       Деньги: ['nav.money', 'settings.group_money', 'spending.title'],
       // The settings handoff names its own save action, independently of purchase editing.
-      Сохранить: ['accounts.sheet.save', 'item.save_edit', 'settings.save'],
+      Сохранить: [
+        'accounts.sheet.save',
+        'item.save_edit',
+        'settings.save',
+        'trip.receipt.sheet.save',
+      ],
       // Цена Р-2: одно состояние, написанное для трёх экранов.
       'Сервер не ответил': ['advice.error.title', 'item.error.title', 'trip.error.title'],
       // Та же цена у офлайна: у настроек, у обменов, у доходов и у устройств своё состояние
@@ -166,7 +171,7 @@ describe('словарь: повторяющиеся тексты', () => {
       Категории: ['spending.categories.title', 'spending.categories_link'],
       Трата: ['spending.add', 'spending.sheet.title_edit'],
       Прочее: ['income.source.other', 'spending.category.other'],
-      Сумма: ['income.sheet.amount', 'spending.sheet.amount'],
+      Сумма: ['income.sheet.amount', 'spending.sheet.amount', 'trip.receipt.sheet.label'],
       // Название экрана и пункт страницы приватности о том же (MOL-58, MOL-66).
       Доходы: ['income.title', 'privacy.stored.incomes.term'],
       // Плавающая кнопка и заголовок её шторки, как «Трата» (MOL-81); подписи сумм карточки и
@@ -210,7 +215,7 @@ describe('словарь: повторяющиеся тексты', () => {
       Ratings: ['nav.verdicts', 'verdict.title'],
       Settings: ['nav.settings', 'settings.title'],
       Money: ['nav.money', 'settings.group_money', 'spending.title'],
-      Save: ['accounts.sheet.save', 'item.save_edit', 'settings.save'],
+      Save: ['accounts.sheet.save', 'item.save_edit', 'settings.save', 'trip.receipt.sheet.save'],
       'No connection': [
         'devices.offline.title',
         'exchange.offline.title',
@@ -237,7 +242,7 @@ describe('словарь: повторяющиеся тексты', () => {
       Categories: ['spending.categories.title', 'spending.categories_link'],
       Spending: ['spending.add', 'spending.sheet.title_edit'],
       Other: ['income.source.other', 'spending.category.other'],
-      Amount: ['income.sheet.amount', 'spending.sheet.amount'],
+      Amount: ['income.sheet.amount', 'spending.sheet.amount', 'trip.receipt.sheet.label'],
       // English has one word where Russian says «было до обмена» and «было до поступления».
       'held before {amount}': ['exchange.sheet.current_held', 'income.sheet.current_held'],
       // One English word for the screen, its sheet and the privacy entry; Russian has «Доход».

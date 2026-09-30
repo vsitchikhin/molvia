@@ -3,12 +3,15 @@ import type { ComputedRef, Ref } from 'vue'
 import type { SelectedTrip } from './useSelectedTrip'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
+import { currencySchema } from '@molvia/model'
+import type { CatalogueEntry, Currency, Money, TripExpenseView } from '@molvia/model'
 import type { TripRowView } from '@/components/tripRow'
 import { upTarget, useNavigation } from '@/navigation'
+import { useActorStore } from '@/stores/actor'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import type { RetryPurchase } from './useItemDetails'
 import { useSelectedTrip } from './useSelectedTrip'
+import { useTripReceipt } from './useTripReceipt'
 import { useTripRows } from './useTripRows'
 
 interface OpenedPurchase {
@@ -23,6 +26,13 @@ interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
   meta: ComputedRef<string>
   rows: ComputedRef<TripRowView[]>
   waiting: ComputedRef<number>
+  /** «Сумма по чеку» of this record (MOL-78). */
+  receiptOpen: Ref<boolean>
+  receiptWaiting: ComputedRef<{ readonly receipt: Money | null } | null>
+  receiptCurrent: ComputedRef<Money | null>
+  offerReceipt: ComputedRef<boolean>
+  /** What a new sum starts in: the record's currency, as the purchase sheet takes it. */
+  receiptCurrency: ComputedRef<Currency>
   opened: Ref<OpenedPurchase | null>
   pending: ComputedRef<boolean>
   rejected: ComputedRef<boolean>
@@ -57,6 +67,19 @@ export function useFinishedTrip(): FinishedTrip {
     typeof route.params.tripId === 'string' ? route.params.tripId : null,
   )
   const { rows, waiting } = useTripRows(selected.id, selected.trip, () => t('trip.queued.unnamed'))
+  const { receiptOpen, receiptWaiting, receiptCurrent, offerReceipt } = useTripReceipt(
+    selected.id,
+    selected.trip,
+    rows,
+  )
+  const actor = useActorStore()
+  const receiptCurrency = computed<Currency>(
+    () =>
+      selected.trip.value?.currency ??
+      selected.local.value?.currency ??
+      actor.settings?.spendCurrency ??
+      currencySchema.enum.AMD,
+  )
   const name = computed(() => selected.trip.value?.place.name ?? selected.local.value?.name ?? '')
   const finished = computed(
     () =>
@@ -142,6 +165,11 @@ export function useFinishedTrip(): FinishedTrip {
     meta,
     rows,
     waiting,
+    receiptOpen,
+    receiptWaiting,
+    receiptCurrent,
+    offerReceipt,
+    receiptCurrency,
     opened,
     amend,
     pending,
