@@ -274,8 +274,8 @@ nothing up.
   largest are named beside it with the model's `shareOf`, the rest counted («Ещё N») — **only the
   sectors the ring draws**: one of no level, a bus ride beside the rent, is on no ring (adversarial
   Б). **The whole card is one way into «Графики», on the largest category of the ring** (review 3,
-  owner's choice «а»): opened on the period's largest, a card that named «Кафе» led to rent; with
-  «Остальные» first, which names none, the charts choose as they do. A month older than six opens
+  owner's choice «а»): opened on the period's largest, a card that named «Кафе» led to rent. The
+  first sector always names one — «Остальные» are only ever last. A month older than six opens
   twelve (adversarial А of MOL-74). A tap on another category no longer opens it, the price of one
   link: it is one choice away. **An empty month keeps the card**, with no ring — still the way into
   «Графики», where the year is (handoff 01, adversarial Г). Its «В этом месяце трат нет» is said

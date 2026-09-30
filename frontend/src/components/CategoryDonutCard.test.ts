@@ -160,7 +160,7 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
       global: { plugins: [router, createAppI18n('ru')] },
     })
     expect(wrapper.find('.ring').exists()).toBe(false)
-    expect(wrapper.find('.rest').text()).toBe('Доли появятся, когда месяц обновится')
+    expect(wrapper.find('.why').text()).toBe('Доли появятся, когда месяц обновится')
     expect(wrapper.find('a').attributes('href')).toBe('/money/charts')
   })
 
@@ -175,7 +175,7 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
       props: { month: coffee, nameOf: () => '' },
       global: { plugins: [router, createAppI18n('ru')] },
     })
-    expect(wrapper.find('.rest').text()).toBe('Доли появятся, когда у трат будет курс')
+    expect(wrapper.find('.why').text()).toBe('Доли появятся, когда у трат будет курс')
   })
 
   it('stays a way into «Графики» on an empty month, with no ring (handoff 01, adversarial Г)', () => {
@@ -188,6 +188,7 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
     expect(wrapper.find('a').attributes('href')).toBe('/money/charts')
     expect(wrapper.find('.ring').exists()).toBe(false)
     // «В этом месяце трат нет» is the journal's to say, once, while the journal is on «Деньги».
+    expect(wrapper.find('.why').exists()).toBe(false)
     expect(wrapper.find('.rest').exists()).toBe(false)
   })
 })

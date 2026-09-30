@@ -22,10 +22,10 @@
           </span>
         </span>
       </span>
-      <span v-else-if="waiting === 'read'" class="rest">{{
+      <span v-else-if="waiting === 'read'" class="why">{{
         t('spending.summary.donut_later')
       }}</span>
-      <span v-else-if="waiting === 'rate'" class="rest">
+      <span v-else-if="waiting === 'rate'" class="why">
         {{ t('spending.summary.donut_uncounted') }}
       </span>
       <span v-if="hidden > 0" class="rest">
@@ -121,7 +121,7 @@ export default defineComponent({
     /**
      * The charts open on the largest category of the ring, the one seen first (review 3, owner's
      * choice «а»): opened on the period's largest, the card named «Кафе» and «Графики» showed rent.
-     * «Остальные» names no category, and then the charts choose as they do.
+     * The first sector always names one — «Остальные» are only ever last (`donutSlices`).
      */
     const query = computed(() => {
       const first = rows.value[0]?.id
@@ -243,7 +243,8 @@ export default defineComponent({
   font-variant-numeric: tabular-nums;
 }
 
-.rest {
+.rest,
+.why {
   color: var(--text-muted);
   font-size: var(--text-footnote);
 }
