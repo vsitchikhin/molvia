@@ -128,8 +128,11 @@ another currency than the receipt's is «списано со счёта», not a
 
 - **One rule, five readers.** `tripMoney` in the domain — the receipt's sum, else the sums of prices
   per currency — and `tripMoneyRows` in `src/db`, the one SQL fragment «Записаны», the month of
-  «Деньги» and the accounts read; the hint of «сколько было до обмена» counts the receipt by
-  `receipt_set_at` as a purchase by its own moment, and the purchases of such a trip not at all.
+  «Деньги» and the accounts read — the month hands it only the trips of its days, since a join does
+  not reach inside its union (review 3); the hint of «сколько было до обмена» counts the receipt by
+  `receipt_first_at`, when this sum was first typed, as a purchase by the moment it was written — a
+  typo fixed after the exchange moves neither (review 2) — and the purchases of such a trip not at
+  all.
   `trip-receipt.integration.test.ts` holds all five saying one thing before, with and after a sum —
   a sixth reader of a trip's money goes through the rule, never through `expenses` alone.
 - **What the prices say beside it is the server's** (`prices`, `gap`, `receiptGap`): what the
@@ -137,8 +140,11 @@ another currency than the receipt's is «списано со счёта», not a
   line of warning, never a refusal (the receipt's discount, or a price typed wrong). Two currencies do
   not subtract, and then nothing is said.
 - **A change of the sum is a change of the trip's money**: it takes «списано» off (Р-32 MOL-115) and
-  moves `receipt_set_at`, taken off included; the same sum again is a repeat from the queue and moves
-  neither. `payTrip` decides whether «списано» applies by the currencies of the trip's money — the
+  moves `receipt_set_at`, taken off included — what a check's window is measured by; the same sum
+  again is a repeat from the queue and moves neither. **Under a sum a price is not the trip's money**
+  (review 1): a price typed at home into a trip already paid for, a purchase added with one or a
+  priced one removed leaves «списано» where it is — the money is the receipt, and taking it off moved
+  the account by money that never moved. `payTrip` decides whether «списано» applies by the currencies of the trip's money — the
   receipt's alone when there is one.
 - **Through the queue, whole** (`receipt`, `PUT /trips/:id/receipt`, `null` to take it off): last, and
   the earlier one still waiting leaves, as the account of a trip does — a price changed before it and
@@ -149,8 +155,14 @@ another currency than the receipt's is «списано со счёта», not a
 - **Offered only on a record with purchases** (В-1): money with no purchases is a spending, and
   «Закончить» on an empty record offers «Записать тратой в «Деньгах»» — the record goes with
   «Вернуть», «Деньги» open the sheet of a spending on its shop and day in «Продукты»
-  (`stores/spendingHandoff`). The server does not refuse a sum on a trip without purchases: one whose
-  purchases were all removed after it keeps its money.
+  (`stores/spendingHandoff`), a shop's name cut to the 80 characters «Где» holds (review В). The
+  server does not refuse a sum on a trip without purchases: one whose purchases were all removed
+  after it keeps its money, and nothing is said under it about prices it does not have (review 5).
+- **Over a finished record read from the phone's cache the sum is not offered** (review 4): that
+  cache does not keep `receipt`, `prices`, `gap` yet — the previous build reads it strictly — so its
+  total may be a receipt with nothing saying so, and «+ Сумма по чеку» there opened an empty sheet over
+  a sum that is there. Offered again once the server answers; the fields go into the cache with the
+  next release.
 - **«Закончить» asks «Сколько вышло по чеку?» only while some purchase has no price and no sum is
   there yet** (В-4): with every price in, the total is already known. Empty is fine; a sum that is
   not money is said at the field and nothing is sent. «Закончить и начать новую» asks nothing — the

@@ -55,7 +55,8 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   **It counts only while it applies** (`debitedOn`): a trip whose dollar purchase was corrected to
   drams is counted exactly by its sums (adversarial Е3). **And any change of a trip's money takes
   its «списано» off** (Р-32, adversarial Ж2) — a priced purchase added, a price changed, a priced one
-  removed: the figure was what left the account for the trip as it was, and kept, it counted a
+  removed, a receipt's sum typed, changed or taken off; under a receipt's sum a price is not the
+  trip's money and takes nothing off (MOL-78, review 1): the figure was what left the account for the trip as it was, and kept, it counted a
   purchase it never covered the day a dollar one was added; the check names the trip until it is
   entered anew. **A spending's is kept through a change of its amount** (MOL-123, by the letter of the
   requirement — only a change of account clears it): it stands under the sum in the same sheet, where
