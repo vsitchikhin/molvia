@@ -119,6 +119,25 @@ export const ru = {
   /** A prompt answered long after it was sent is not the «yes» it was asking for. */
   'erase.expired': 'Эта кнопка устарела. Отправьте /delete ещё раз.',
   'erase.failed': 'Не дождался ответа. Попробуйте ещё раз через минуту.',
+  /**
+   * The rating reminder (MOL-101). Sent without an update, so without the person's language: it
+   * is always Russian (Р-7) — the answer to a press already speaks the presser's.
+   *
+   * The first line is the context the card of «Оценки» has — when and where — because the person
+   * is asked about a purchase of a day or more ago and has to remember what it was.
+   */
+  'remind.yesterday': 'Вчера',
+  'remind.dayBefore': 'Позавчера',
+  /** Three days and more: an abbreviation, so one form fits every number. */
+  'remind.daysAgo': '{n} дн. назад',
+  'remind.question': '{when} · {place}\n{name} — как вам?\n1 — плохо, 5 — отлично',
+  /** Under the last message of the day, when more items wait than the three asked about. */
+  'remind.more': 'Ещё {n} ждут в «Оценках»: {url}',
+  /** Written under the question after a press; the scale stays, so a slip is one more press. */
+  'rate.done': 'Записали: {score} из 5. Промахнулись — нажмите другую цифру.',
+  'rate.failed': 'Не дождался ответа. Нажмите ещё раз через минуту.',
+  /** An erased account, or an item gone from the catalogue: nothing a second press could fix. */
+  'rate.gone': 'Эту оценку уже не поставить: аккаунта или товара больше нет.',
 } as const
 
 /**

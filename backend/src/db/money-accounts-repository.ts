@@ -93,8 +93,8 @@ export interface MoneyAccountRepository {
   ): Promise<MoneyAccountCheck | null>
 
   /**
-   * «Сверить»: written, or counted again under the same name. The same name with another account or
-   * another fact is `CONFLICT` — another fact is another check.
+   * «Сверить»: written, or counted again under the same name — on the day it was first written. The
+   * same name with another account or another fact is `CONFLICT` — another fact is another check.
    */
   saveCheck(
     actorId: string,
@@ -427,9 +427,14 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
                  -- offline in the evening and delivered after midnight (review Р2-3, В-6).
                  -- Unless it is more than a day before the server's start: an evening offline is
                  -- hours, and a clock days behind is a wrong clock, not a shelf (Ж1).
-                 to_char(case when t.finished_on_device_at >= t.started_at - interval '1 day'
-                              then least(t.started_at, t.finished_on_device_at)
-                              else t.started_at end at time zone 'Asia/Yerevan',
+                 -- The phone's day of «Начать» where it named one (MOL-121) — held by the same
+                 -- measure: a day more than one before the server's is a wrong clock.
+                 to_char(case when t.started_on >= (t.started_at at time zone 'Asia/Yerevan')::date - 1
+                              then t.started_on
+                              else (case when t.finished_on_device_at >= t.started_at - interval '1 day'
+                                         then least(t.started_at, t.finished_on_device_at)
+                                         else t.started_at end at time zone 'Asia/Yerevan')::date
+                         end,
                          'YYYY-MM-DD') as started_on,
                  coalesce(t.finished_on_device_at, t.finished_at) as finished_at,
                  greatest(t.started_at, t.finished_at, t.account_set_at,
@@ -593,7 +598,10 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           (
             await db
               .update(moneyAccountChecks)
-              .set({ checkedOn: values.checkedOn, countedMinor: values.countedMinor })
+              // The day stays the first one's (MOL-121, adversarial round 2 Р): «Записать разницу»
+              // sends the same check again once its correction lands — after midnight, perhaps —
+              // and the check was made on the day it was made, beside that correction.
+              .set({ countedMinor: values.countedMinor })
               .where(
                 and(
                   eq(moneyAccountChecks.id, check.id),

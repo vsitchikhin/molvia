@@ -9,7 +9,6 @@ import {
   moneyMonthViewOf,
   previousMonth,
   spendingIn,
-  yerevanDate,
 } from '@molvia/model'
 import type {
   Actor,
@@ -32,12 +31,14 @@ import { accountsCounted } from './money-accounts'
 import { dayRates } from './money-rates'
 import type { DayRates } from './money-rates'
 import type { TripRepositories } from '@/db/unit-of-work'
+import { todayOf } from './today'
+import type { Today } from './today'
 
 type Repositories = Pick<
   TripRepositories,
   'spendings' | 'spendingCategories' | 'money' | 'exchanges' | 'incomes' | 'rates' | 'moneyAccounts'
 >
-type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
+type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'> & Today
 
 /**
  * The rates a month needs, read before it is counted: the pure function asks synchronously, so every
@@ -282,7 +283,7 @@ export async function moneyMonthOf(
   cursor?: JournalKey,
   now: Date = new Date(),
 ): Promise<MoneyMonthView> {
-  const today = yerevanDate(now)
+  const today = todayOf(owner, now)
   const [rates, categories, salaryShiftDay] = await Promise.all([
     dayRates(repositories, owner),
     repositories.spendingCategories.list(owner.id),

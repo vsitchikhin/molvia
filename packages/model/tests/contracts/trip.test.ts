@@ -5,6 +5,7 @@ import {
   addExpenseBodySchema,
   currentTripResponseSchema,
   finishTripBodySchema,
+  isDeviceDay,
   isDeviceTime,
   startTripBodySchema,
   tripViewCodec,
@@ -422,6 +423,30 @@ describe('a moment a phone names for itself (Б1)', () => {
     expect(isDeviceTime(new Date('1970-01-01T00:00:00.000Z'), now)).toBe(false)
     expect(isDeviceTime(new Date('1999-12-31T23:59:59.999Z'), now)).toBe(false)
     expect(isDeviceTime(new Date('2000-01-01T00:00:00.000Z'), now)).toBe(true)
+  })
+
+  // The day of a tap (MOL-121, adversarial rounds 2 П and 3 С): whatever a broken clock writes — 1970,
+  // year 1 in five characters or four, past 9999 — the body takes it and the use case drops it.
+  it('takes any day of a tap, and judges it where the clock is', () => {
+    for (const finishedOn of ['1970-01-01', '0001-01-01', '1-01-01', '10000-01-01', '2026-02-31']) {
+      expect(finishTripBodySchema.safeParse({ finishedOn }).success).toBe(true)
+    }
+    expect(finishTripBodySchema.safeParse({ finishedOn: 'x'.repeat(33) }).success).toBe(false)
+    const now = new Date('2026-09-23T12:00:00.000Z')
+    for (const day of [
+      '1970-01-01',
+      '1999-12-31',
+      '1-01-01',
+      '10000-01-01',
+      '2026-02-31',
+      'вчера',
+    ]) {
+      expect(isDeviceDay(day, now)).toBe(false)
+    }
+    expect(isDeviceDay('2000-01-01', now)).toBe(true)
+    // 12:00 UTC: past midnight at UTC+14 — the 24th has come there, the 25th nowhere.
+    expect(isDeviceDay('2026-09-24', now)).toBe(true)
+    expect(isDeviceDay('2026-09-25', now)).toBe(false)
   })
 
   it('has nothing to say about a body that names no time at all', () => {

@@ -1036,6 +1036,10 @@
         "term": "Ratings and reviews",
         "text": "Only you see your review. Others see a rating only inside an average of three people."
       },
+      "reminders": {
+        "term": "Rating reminders",
+        "text": "When the bot last reminded you to rate your purchases, and which reminder in a row it was — so that it writes less often if you do not answer. The message itself carries the item and the shop to Telegram: otherwise the question would not say what it is about."
+      },
       "search": {
         "term": "Search picks",
         "text": "What you took for which query, so that next time it comes first. And a query that found nothing, if you then found the item by another word — so that next time your word finds it. Only you see this."

@@ -60,8 +60,18 @@ export interface ExpenseRepository {
    *
    * Products only — a dish is rated where it was served, and until 0.3 the verdict path
    * refuses a place, so a dish here would be a question with no way to answer it.
+   *
+   * With `bought`, the same question asked by the rating reminder (MOL-101): only purchases whose
+   * day falls in `[from, to)`, and none made before the person withdrew their verdict on the item —
+   * the answer to MOL-29 (В-3): a purchase after the withdrawal is a new experience and is asked
+   * about, one before it the person has already had their say on and taken back. The screen asks
+   * without it and is unchanged.
    */
-  pendingVerdictsFor(actorId: string, limit: number): Promise<PendingVerdicts>
+  pendingVerdictsFor(
+    actorId: string,
+    limit: number,
+    bought?: { readonly from: Date; readonly to: Date },
+  ): Promise<PendingVerdicts>
   /**
    * Where it was cheaper: one row per place, currency and unit.
    *
@@ -493,13 +503,31 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
       return rows.map((row) => toExpense(row.expense))
     },
 
-    async pendingVerdictsFor(actorId, limit) {
+    async pendingVerdictsFor(actorId, limit, bought) {
       if (idOrNull(actorId) === null) return { items: [], total: 0 }
 
       // `least` passes over a null: an open trip has no end, and the entry stands.
       const boughtAt = sql<Date>`least(${expenses.createdAt}, ${trips.finishedAt})`.mapWith(
         expenses.createdAt,
       )
+      const inWindow = bought
+        ? and(
+            sql`${boughtAt} >= ${bought.from.toISOString()}::timestamptz`,
+            sql`${boughtAt} < ${bought.to.toISOString()}::timestamptz`,
+            notExists(
+              db
+                .select({ one: sql`1` })
+                .from(verdicts)
+                .where(
+                  and(
+                    eq(verdicts.actorId, actorId),
+                    eq(verdicts.itemId, expenses.itemId),
+                    sql`${verdicts.deletedAt} > ${boughtAt}`,
+                  ),
+                ),
+            ),
+          )
+        : undefined
       const latest = db
         .selectDistinctOn([expenses.itemId], {
           itemId: expenses.itemId,
@@ -517,7 +545,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
         )
         .innerJoin(items, and(eq(items.id, expenses.itemId), eq(items.kind, 'product')))
         .innerJoin(places, eq(places.id, trips.placeId))
-        .where(noLiveVerdict(actorId))
+        .where(and(noLiveVerdict(actorId), inWindow))
         .orderBy(expenses.itemId, desc(boughtAt), desc(expenses.createdAt), desc(expenses.id))
         .as('latest')
 

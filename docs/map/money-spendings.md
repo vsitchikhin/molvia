@@ -22,6 +22,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `backend/src/usecases/money-month.ts` — Use case: the month of «Деньги» with its rates read first and a closed month frozen, and the salary-shift setting. Tests: `backend/tests/spendings.integration.test.ts`.
 - `backend/src/usecases/money-charts.ts` — Use case: `GET /money/charts` — the period's months by the month's own count and rate, the losses on exchanges, the rate of the pair by week. Tests: `backend/tests/money-charts.integration.test.ts`.
 - `backend/src/usecases/money.test.ts` — Use-case test: day rates, a spending's rate snapshot on record and amend, and month freezing hold on fake repositories.
+- `backend/src/usecases/today.ts` — `todayOf`: «today» of money for a request — the phone's day it named (`TODAY_HEADER`, MOL-121), or Yerevan's. Tests: `backend/tests/money-accounts.integration.test.ts`.
 - `backend/src/usecases/spendings.ts` — Use cases of spendings and categories: record, amend, remove, restore a spending; list, add and archive a category.
 
 ## backend · db

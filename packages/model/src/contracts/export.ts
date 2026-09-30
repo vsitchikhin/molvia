@@ -19,7 +19,9 @@ import { baseUnitSchema } from '#model/values/units'
  * withdrawn.
  */
 export const EXPORT_FORMAT = 'molvia-export'
-export const EXPORT_VERSION = 1
+// 2: `ratingReminders`, where the person stands on the ladder of rating reminders (MOL-101) — a
+// change of what goes in is a new version (privacy.md).
+export const EXPORT_VERSION = 2
 
 const day = z.iso.date()
 
@@ -129,6 +131,9 @@ const tripSchema = z.strictObject({
   startedAt: isoDate,
   finishedAt: isoDate.nullable(),
   finishedOnDeviceAt: isoDate.nullable(),
+  // The phone's day of «Начать» and «Завершить» (MOL-121), where the phone named one.
+  startedOn: day.nullable(),
+  finishedOn: day.nullable(),
   accountId: z.uuid().nullable(),
   debited: signedMoneyCodec.nullable(),
   accountSetAt: isoDate.nullable(),
@@ -154,6 +159,14 @@ const verdictSchema = z.strictObject({
   ratedAt: isoDate,
   updatedAt: isoDate,
   withdrawnAt: isoDate.nullable(),
+})
+
+/** Where the person stands on the ladder of rating reminders (MOL-101): at most one row. */
+const ratingReminderSchema = z.strictObject({
+  step: z.int(),
+  remindedOn: day,
+  remindedAt: isoDate,
+  windowFrom: day,
 })
 
 const searchPickSchema = z.strictObject({
@@ -306,6 +319,7 @@ export const exportContentCodec = z.strictObject({
   expenses: z.array(expenseSchema),
   verdicts: z.array(verdictSchema),
   searchPicks: z.array(searchPickSchema),
+  ratingReminders: z.array(ratingReminderSchema),
   events: z.array(eventSchema),
   exchanges: z.array(exchangeSchema),
   incomes: z.array(incomeSchema),

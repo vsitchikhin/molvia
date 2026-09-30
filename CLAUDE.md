@@ -186,7 +186,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The limit never cuts one's own rows or the warnings** (Р-23, Р-25:
   `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
 - **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, **every other reader
-  filters `deleted_at IS NULL`**.
+  filters `deleted_at IS NULL`**; the reminder skips a purchase made before the withdrawal (MOL-101).
 - **The search on «Что брать» is answered by the server** (`GET /advice/search`, MOL-128): the
   list's own statement and rules for what is found, never glued on the phone; it writes no visit and
   no pick; offline — the remembered list by the start of words.
@@ -226,7 +226,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Removal is a mark, «Вернуть», final after ten minutes by the minute timer.**
 - **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`); a write a send
   has begun on is never folded into; a spending in the queue is a row, never a figure.
-- **Days of Yerevan are printed as calendar days** (`calendarDay`); the frontend's tests run in UTC.
+- **A day is printed as a calendar day** (`calendarDay`), and **«сегодня» is the phone's**
+  (`localDay`, MOL-121), on the server too: every request names it (`TODAY_HEADER`) and its zone
+  (`ZONE_HEADER`), and every «today» of money and every day of a moment the server stamped is
+  counted by them; a write is «in the future» only past `latestDay`; a trip keeps
+  the phone's day of its taps. The frontend's tests run in UTC.
 - **A bar of «Графики» is the month of «Деньги»** (MOL-74): `countMonth` with `monthRate`, never a
   second count; its third figure is «Разница», since «Остаток» is the money on the accounts.
 
@@ -307,6 +311,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Updates of different people at once, of one person in order** (`@grammyjs/runner` with
   `sequentialize`).
 - **An outcome is written into the message; a refusal is only shown over it, and written nowhere.**
+- **The rating reminder: the API decides and marks the step as it hands it out, the bot only
+  sends** (MOL-101) — at most once; 19:00 of the person's day, then 3 and 7 days, then six months
+  of silence, and any own verdict starts over; a press is the verdict of `ctx.from.id` and keeps
+  the scale.
 - **Telegram updates are never logged whole.**
 
 ### Frontend — `.claude/rules/frontend.md`

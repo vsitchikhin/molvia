@@ -11,6 +11,7 @@ import {
   moneyAccountChecks,
   moneyAccounts,
   moneyMonthRates,
+  ratingReminders,
   searchPicks,
   spendingCategories,
   spendings,
@@ -63,6 +64,14 @@ export async function aLife(
     },
   ])
   await db.insert(searchPicks).values({ actorId, queryKey: 'moloko', itemId: shared.itemId })
+  // Where they stand on the ladder of reminders (MOL-101).
+  await db.insert(ratingReminders).values({
+    actorId,
+    step: 2,
+    remindedOn: '2026-07-17',
+    remindedAt: new Date('2026-07-17T15:00:00Z'),
+    windowFrom: '2026-07-13',
+  })
   await db
     .insert(events)
     .values({ actorId, type: 'advice_viewed', payload: { subject: 'product' } })

@@ -255,3 +255,9 @@ only ever answer «not rated yet», and would teach that it is useless).
   unrated purchases and every aggregate of 0.3. A reader that forgets the filter puts a
   withdrawn opinion back on screen, silently. Rating again brings the same row back and keeps
   `rated_at`, so withdrawing and re-rating cannot move anyone in the gate.
+- **The rating reminder asks about a withdrawn item only for a purchase after the withdrawal**
+  (MOL-101, В-3 — the answer MOL-29 left for the bot). The queue of «Оценки» shows every purchase
+  without a live verdict, as it did; the bot, which writes to the person unasked, skips a purchase
+  made before the verdict on that item was withdrawn — the person had their say on it and took it
+  back — and asks about one made after, a new experience. The reminder's own rules are in
+  `bot.md`.

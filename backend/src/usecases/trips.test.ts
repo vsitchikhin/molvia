@@ -287,7 +287,9 @@ describe('startTrip', () => {
 
     expect(ensured).toEqual([{ kind: 'store', name: 'Ереван Сити', country: 'AM', city: 'Gyumri' }])
     // An empty cache: nothing to snapshot.
-    expect(started).toEqual([[ACTOR, { id: TRIP, placeId: place.id }, 'AMD', null]])
+    expect(started).toEqual([
+      [ACTOR, { id: TRIP, placeId: place.id, startedOn: null }, 'AMD', null],
+    ])
     expect(created).toBe(true)
     expect(view.place.name).toBe('Ереван Сити')
   })

@@ -70,7 +70,13 @@
           </h2>
           <ul class="cards">
             <li v-for="income in month.incomes" :key="income.id">
-              <IncomeCard :income="income" :disabled="!online || busy" @edit="edit" @remove="ask" />
+              <IncomeCard
+                :income="income"
+                :today="today"
+                :disabled="!online || busy"
+                @edit="edit"
+                @remove="ask"
+              />
             </li>
           </ul>
         </section>
@@ -131,6 +137,7 @@ import ScreenState from '@/components/ScreenState.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { incomesOf, useIncomes } from '@/composables/useIncomes'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { calendarDay, monthOf } from '@/days'
 import { useAccountsStore } from '@/stores/accounts'
 
@@ -157,6 +164,8 @@ export default defineComponent({
   setup() {
     const { t, locale } = useI18n()
     const incomes = useIncomes()
+    // «Сегодня» of the cards, asked again when the app comes back into view (MOL-121, adversarial Н).
+    const today = useLocalDay()
     const sheetOpen = ref(false)
     // The income the sheet amends, or null when it records a new one.
     const editing = ref<Row | null>(null)
@@ -240,6 +249,7 @@ export default defineComponent({
       sums.map((sum) => asTyped(sum, locale.value)).join(' · ')
 
     return {
+      today,
       t,
       ...incomes,
       sheetOpen,

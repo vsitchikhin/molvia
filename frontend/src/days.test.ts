@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { dayOfAnyYear, monthOf, purchaseDay, timeOfDay } from '@/days'
+import { yerevanDate } from '@molvia/model'
+import { dayOfAnyYear, dayWords, localDay, monthOf, purchaseDay, timeOfDay } from '@/days'
 
 // Built from local parts: the phone's calendar is what counts, whatever zone the test runs in.
 const at = (day: number, hour: number, minute = 0) => new Date(2026, 8, day, hour, minute)
@@ -65,5 +66,47 @@ describe('monthOf (MOL-66)', () => {
     // The first and the last month: the number is a month, not an index.
     expect(monthOf('2027-01', 'ru')).toBe('январь 2027')
     expect(monthOf('2026-12', 'en')).toBe('December 2026')
+  })
+})
+
+describe('localDay (MOL-121)', () => {
+  it('is the phone’s day, not Yerevan’s: at 20:30 UTC it is still the 28th here', () => {
+    // The tests run in UTC, west of Yerevan, where its midnight has already passed.
+    const evening = new Date('2026-09-28T20:30:00Z')
+    expect(yerevanDate(evening)).toBe('2026-09-29')
+    expect(localDay(evening)).toBe('2026-09-28')
+  })
+
+  it('reads the calendar of the phone to the last minute, month and day in two digits', () => {
+    expect(localDay(new Date(2026, 8, 30, 23, 59))).toBe('2026-09-30')
+    expect(localDay(new Date(2027, 0, 1, 0, 0))).toBe('2027-01-01')
+    // Four digits of year, as the wire writes a day (adversarial round 3 С).
+    const yearOne = new Date(0)
+    yearOne.setFullYear(1, 0, 1)
+    expect(localDay(yearOne)).toBe('0001-01-01')
+  })
+})
+
+describe('dayWords (MOL-121, В-1)', () => {
+  it('names the phone’s today and yesterday in words, other days by the date', () => {
+    expect(dayWords('2026-09-28', 'ru', '2026-09-28')).toBe('Сегодня')
+    expect(dayWords('2026-09-27', 'ru', '2026-09-28')).toBe('Вчера')
+    expect(dayWords('2026-09-27', 'en', '2026-09-28')).toBe('Yesterday')
+    expect(dayWords('2026-09-26', 'ru', '2026-09-28')).toBe('26 сент.')
+  })
+
+  it('counts day against day across a month and a year', () => {
+    expect(dayWords('2026-09-30', 'ru', '2026-10-01')).toBe('Вчера')
+    expect(dayWords('2026-12-31', 'ru', '2027-01-01')).toBe('Вчера')
+  })
+
+  it('a day the phone has not reached — written further east — is a date, never «Сегодня»', () => {
+    expect(dayWords('2026-09-29', 'ru', '2026-09-28')).toBe('29 сент.')
+  })
+
+  it('says «today» of the phone’s day while Yerevan is already on the next one', () => {
+    const evening = new Date('2026-09-28T20:30:00Z')
+    expect(dayWords('2026-09-28', 'en', localDay(evening))).toBe('Today')
+    expect(dayWords('2026-09-29', 'en', localDay(evening))).toBe('Sep 29')
   })
 })

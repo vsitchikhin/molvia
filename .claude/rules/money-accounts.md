@@ -113,6 +113,14 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   comes out even and moves the window; without that repeat the window of such an account stays at
   its start. Closing the difference is an ordinary «Прочее» spending or income with the note
   «сверка», written by the person's own tap through the ordinary routes with the server's sum.
+- **A check is dated by the phone's today** (MOL-121, adversarial М, И) — the request's
+  (`TODAY_HEADER`), as every «today» of money is — and «Записать разницу» with it. Dated by Yerevan's,
+  a check at 23:30 in Moscow was of tomorrow and the next month, and east of Yerevan what was typed
+  on the phone's day before an even check stayed «after» it, so the window did not close. A trip is
+  dated by the phone's day of «Начать» (`started_on`), not more than a day before the server's —
+  the rule of Ж1 above. **A check sent again under its name keeps the day it was first written**
+  (adversarial round 2 Р): «Записать разницу» repeats it once the correction lands, maybe after
+  midnight, and the check stays beside its correction.
 - **«Не попали в остатки» is per account, not per currency** (Р-16): an operation with no account
   that could still explain a difference of some live account of its currency — after its start and
   its last check that came out even. A fresh check of the card does not hide last week's cash; a currency with no

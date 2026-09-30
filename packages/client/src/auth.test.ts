@@ -62,7 +62,7 @@ describe('login clients', () => {
     ).toEqual(['/api/auth/login', '/api/auth/login', '/api/auth/login?again=1'])
   })
 
-  it('bot credentials only travel to its four internal methods and never follow a redirect', async () => {
+  it('bot credentials only travel to its internal methods and never follow a redirect', async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(
@@ -92,6 +92,55 @@ describe('login clients', () => {
     }
   })
 
+  it('the reminder: a claim, and a press addressed by the item in lower case (MOL-101)', async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            reminders: [
+              {
+                telegramUserId: 123,
+                items: [{ itemId: id, name: 'Молоко', placeName: 'SAS', daysAgo: 1 }],
+                total: 1,
+              },
+            ],
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    const bot = createBotClient({ baseUrl: 'http://backend', fetch, secret })
+    expect((await bot.claimReminders()).reminders[0]?.items[0]?.daysAgo).toBe(1)
+    await bot.rateFromBot(123, id.toUpperCase(), 4)
+    expect(fetch.mock.calls.map(([url, options]) => [url, options?.method])).toEqual([
+      ['http://backend/internal/reminders/claim', 'POST'],
+      [`http://backend/internal/verdicts/${id}`, 'PUT'],
+    ])
+    expect(fetch.mock.calls[1]?.[1]?.body).toBe(JSON.stringify({ telegramUserId: 123, score: 4 }))
+    for (const [, options] of fetch.mock.calls) {
+      expect(new Headers(options?.headers).get('authorization')).toBe(`Bearer ${secret}`)
+    }
+  })
+
+  it('a claim that grew a field about the person is refused (MOL-101)', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          reminders: [
+            {
+              telegramUserId: 123,
+              actorId: id,
+              items: [{ itemId: id, name: 'Молоко', placeName: 'SAS', daysAgo: 1 }],
+              total: 1,
+            },
+          ],
+        }),
+      ),
+    )
+    const bot = createBotClient({ baseUrl: 'http://backend', fetch, secret })
+    await expect(bot.claimReminders()).rejects.toMatchObject({ code: ISSUE.RESPONSE_INVALID })
+  })
+
   it('bad paths and malformed confirmation are refused before sending the bot secret', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>()
     const bot = createBotClient({ baseUrl: 'http://backend', fetch, secret })
@@ -99,6 +148,11 @@ describe('login clients', () => {
     await expect(bot.confirmLogin('code', 0)).rejects.toMatchObject({ code: ISSUE.BODY_INVALID })
     await expect(bot.eraseMe(0)).rejects.toMatchObject({ code: ISSUE.BODY_INVALID })
     await expect(bot.eraseMe(1.5)).rejects.toMatchObject({ code: ISSUE.BODY_INVALID })
+    await expect(bot.rateFromBot(123, '../health', 4)).rejects.toMatchObject({
+      code: ISSUE.PATH_INVALID,
+    })
+    await expect(bot.rateFromBot(123, id, 6)).rejects.toMatchObject({ code: ISSUE.BODY_INVALID })
+    await expect(bot.rateFromBot(0, id, 4)).rejects.toMatchObject({ code: ISSUE.BODY_INVALID })
     expect(fetch).not.toHaveBeenCalled()
     expect(() => createBotClient({ baseUrl: 'http://backend', secret: '' })).toThrow()
   })

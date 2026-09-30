@@ -114,7 +114,6 @@ import {
   decimalFromMinor,
   moneyAccountNameSchema,
   nameIdentity,
-  yerevanDate,
 } from '@molvia/model'
 import type { Currency, MoneyAccountView, MoneyAccountsResponse } from '@molvia/model'
 import { api } from '@/api'
@@ -124,7 +123,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { parseSigned, shortDay, signedAmount } from '@/components/accounts'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, shiftDay } from '@/days'
+import { calendarDay, localDay, shiftDay } from '@/days'
 import { newId } from '@/ids'
 import { useAccountsStore } from '@/stores/accounts'
 
@@ -178,7 +177,7 @@ export default defineComponent({
     const currency = ref<Currency>('AMD')
     const kind = ref<Kind>('spending')
     const start = ref('')
-    const today = ref(yerevanDate(new Date()))
+    const today = ref(localDay())
     const startOn = ref(today.value)
     const nameProblem = ref<string | null>(null)
     const startBad = ref(false)
@@ -207,7 +206,7 @@ export default defineComponent({
       (open) => {
         if (!open) return
         const account = props.account
-        today.value = yerevanDate(new Date())
+        today.value = localDay()
         name.value = account?.name ?? ''
         currency.value = account?.currency ?? props.spendCurrency
         kind.value = account?.savings ? 'savings' : 'spending'

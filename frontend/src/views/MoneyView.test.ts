@@ -637,13 +637,23 @@ describe('MoneyView: what the review found (MOL-82)', () => {
     expect(plain(view.findAll('.body').at(0)?.text() ?? '')).toContain('֏500')
   })
 
+  // The month is the phone's (MOL-121): at 20:10 UTC Yerevan is in October and the phone, in the
+  // zone the tests run in, still in September; its own midnight is what opens October.
   it('З: back in view after midnight at the end of the month, the new month is not «the future»', async () => {
     moneyMonth.mockResolvedValue(month())
     const view = await render()
+    const next = () => view.find(`button[aria-label="${en.spending.month_next}"]`)
     vi.setSystemTime(new Date('2026-09-30T20:10:00Z'))
     document.dispatchEvent(new Event('visibilitychange'))
     await flushPromises()
-    await view.find(`button[aria-label="${en.spending.month_next}"]`).trigger('click')
+    await next().trigger('click')
+    await flushPromises()
+    expect(moneyMonth).not.toHaveBeenCalledWith('2026-10', undefined)
+
+    vi.setSystemTime(new Date('2026-10-01T00:10:00Z'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    await next().trigger('click')
     await flushPromises()
     expect(moneyMonth).toHaveBeenLastCalledWith('2026-10', undefined)
   })

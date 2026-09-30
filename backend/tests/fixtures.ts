@@ -9,6 +9,7 @@ import {
   actors,
   erasures,
   loginDays,
+  reminderDays,
   events,
   exchanges,
   expenses,
@@ -184,6 +185,7 @@ export async function clearAll(db: Db): Promise<void> {
   await db.delete(actors)
   await db.delete(erasures)
   await db.delete(loginDays)
+  await db.delete(reminderDays)
 }
 
 /**

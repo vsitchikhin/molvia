@@ -6,6 +6,7 @@ import {
   heldEstimate,
   isRateFresh,
   lastReceipt,
+  latestDay,
   officialDifference,
   ownRates,
   pickOfficialRate,
@@ -13,7 +14,6 @@ import {
   resourceIdOf,
   uprightOf,
   yerevanDate,
-  yerevanMidnight,
 } from '@molvia/model'
 import type {
   Actor,
@@ -37,12 +37,14 @@ import type {
   ReceiptView,
 } from '@molvia/model'
 import { keptSide, knownAccounts, sideOf } from './account-of'
+import { dayOfMoment, endOfDay, todayOf } from './today'
+import type { Today } from './today'
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>
 /** A write also lets go of the months frozen without it (MOL-73, В-6). */
 type Writing = Repositories & Pick<TripRepositories, 'money' | 'moneyAccounts'>
-type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'>
+type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'> & Today
 
 const FOREIGN = currencySchema.options.filter(
   (currency): currency is AmdRate['currency'] => currency !== 'AMD',
@@ -100,9 +102,14 @@ export function freshOfficialRate(
   return rate && isRateFresh(yerevanDate(rate.asOf), day) ? rate : null
 }
 
-/** The Yerevan day the currency of conversion changed on, or null when it never did. */
-export function sinceDay(since: Date | null): string | null {
-  return since ? yerevanDate(since) : null
+/**
+ * The day the currency of conversion changed on, or null when it never did — in the phone's zone
+ * (adversarial round 4 Ч): the change is a moment the server stamped, and «before it» is compared
+ * with days the phone names. By Yerevan's, a salary typed at 23:40 in Moscow right after the change
+ * was «the old reckoning».
+ */
+export function sinceDay(since: Date | null, owner: Today = {}): string | null {
+  return since ? dayOfMoment(owner, since) : null
 }
 
 /**
@@ -205,8 +212,6 @@ export function receiptsOf(
     }))
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000
-
 /**
  * From when the purchases count against the money of an exchange. From the moment it was written
  * when that was on its own day: a purchase that morning was paid with the money held before, which
@@ -215,9 +220,10 @@ const DAY_MS = 24 * 60 * 60 * 1000
  * and counting only from the record lost all of it (round 2, В3). What was bought later on the day
  * of such an exchange is lost instead: the day has no hours to tell before from after.
  */
-function spentFrom(receipt: Receipt): Date {
-  const endOfDay = new Date(yerevanMidnight(receiptDay(receipt)).getTime() + DAY_MS)
-  return receipt.createdAt < endOfDay ? receipt.createdAt : endOfDay
+function spentFrom(receipt: Receipt, owner: Today): Date {
+  // The end of the phone's day (adversarial round 4 У): the day is the phone's, so is its midnight.
+  const end = endOfDay(owner, receiptDay(receipt))
+  return receipt.createdAt < end ? receipt.createdAt : end
 }
 
 /** What «Обмен денег» and «Доходы» are both built from — see `ownMoney`. */
@@ -249,7 +255,7 @@ export async function ownMoney(
   now: Date = new Date(),
 ): Promise<OwnMoney> {
   const { exchanges, incomes } = repositories
-  const today = yerevanDate(now)
+  const today = todayOf(owner, now)
   const base = owner.incomeCurrency
   const quote = owner.spendCurrency
   const [{ preference, since }, list, received] = await Promise.all([
@@ -265,7 +271,10 @@ export async function ownMoney(
   ])
 
   const receipts: Receipt[] = [...list, ...received]
-  const baseSince = sinceDay(since)
+  const baseSince = sinceDay(since, owner)
+  // Walked to the phone's today (MOL-121): an exchange of a day Yerevan has not reached did give its
+  // currency a price, and a second one that night must be asked «сколько было до» — an answer not
+  // asked is lost for good (adversarial О).
   const rates = ownRates(receipts, base, quote, today, officialRateOf(cached, base), baseSince)
 
   const currencies = [
@@ -279,7 +288,7 @@ export async function ownMoney(
     currencies.map(async (currency) => {
       const last = lastReceipt(receipts, currency, today)
       if (!last) return null
-      const spent = await exchanges.spentSince(owner.id, currency, spentFrom(last))
+      const spent = await exchanges.spentSince(owner.id, currency, spentFrom(last, owner))
       const estimate = heldEstimate(receipts, last, spent)
       if (!estimate) return null
       const from: 'exchange' | 'income' = 'given' in last ? 'exchange' : 'income'
@@ -331,11 +340,6 @@ export async function exchangesOverview(
 }
 
 /**
- * «Записать обмен». The day is the person's to name, but not a day that has not come yet in
- * Yerevan: a rate from tomorrow would enter today's trips (the same line «not from the future»
- * draws for an official rate). 201 for a new exchange, and the screen whole either way.
- */
-/**
  * The screen as it is on opening. A removed exchange is final from here: the screen that offered
  * it back is gone (В-5).
  */
@@ -364,13 +368,19 @@ export function earlier(one: string | null, other: string): string {
   return one !== null && one < other ? one : other
 }
 
+/**
+ * «Записать обмен». The day is the person's to name — their phone's (MOL-121) — but not a day that
+ * has not come yet anywhere (`latestDay`). The walk takes no link after the request's today, so an
+ * exchange of a day the phone has not reached enters no trip it starts (the same line «not from the
+ * future» draws for an official rate). 201 for a new exchange, and the screen whole either way.
+ */
 export async function recordExchange(
   repositories: Writing,
   owner: Owner,
   body: ExchangeBody,
   now: Date = new Date(),
 ): Promise<{ overview: ExchangesResponse; created: boolean }> {
-  if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
+  if (body.exchangedOn > latestDay(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
   const accounts = await knownAccounts(repositories, owner)
   // Left out stays left out: a repeat from a screen older than accounts is still a repeat (Р-26).
   const sent = {
@@ -400,7 +410,7 @@ export async function amendExchange(
   body: ExchangeAmendBody,
   now: Date = new Date(),
 ): Promise<ExchangesResponse> {
-  if (body.exchangedOn > yerevanDate(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
+  if (body.exchangedOn > latestDay(now)) throw new DomainError(ERROR.EXCHANGE_IN_FUTURE)
   await repositories.exchanges.purgeRemoved(owner.id)
   const own = resourceIdOf(id)
   const held = (await repositories.exchanges.list(owner.id)).find((exchange) => exchange.id === own)

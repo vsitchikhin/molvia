@@ -18,6 +18,7 @@ export const ACTOR_REFERENCES = [
   'money_account_checks.actor_id',
   'money_accounts.actor_id',
   'money_month_rates.actor_id',
+  'rating_reminders.actor_id',
   'search_picks.actor_id',
   'sessions.actor_id',
   'spending_categories.actor_id',
@@ -30,6 +31,7 @@ export const ACTOR_REFERENCES = [
 export const ERASED_TABLES = [
   'sessions',
   'search_picks',
+  'rating_reminders',
   'verdicts',
   'events',
   'expenses',
@@ -120,6 +122,7 @@ export function createErasureRepository(db: Db): ErasureRepository {
           const erased: Record<ErasedTable, number> = {
             sessions: 0,
             search_picks: 0,
+            rating_reminders: 0,
             verdicts: 0,
             events: 0,
             expenses: 0,
@@ -146,6 +149,11 @@ export function createErasureRepository(db: Db): ErasureRepository {
             )
             erased.search_picks = await count(
               sql`delete from search_picks where actor_id = ${actorId} returning 1`,
+            )
+            // Where the person stood on the ladder of reminders (MOL-101): the day of their last
+            // reminder, nothing more — but it is theirs, and it points at the owner.
+            erased.rating_reminders = await count(
+              sql`delete from rating_reminders where actor_id = ${actorId} returning 1`,
             )
             // Withdrawn verdicts too: a row kept for the 0.2 gate is still this person's opinion.
             erased.verdicts = await count(
