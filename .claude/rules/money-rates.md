@@ -222,7 +222,10 @@ rate exactly as before.
   since 2022 in the cache — written by the same hour, just before the market — the daily file was
   refused every hour for good, and non-cash never had its stand-in (В-2). A market in a crisis stays
   within a factor of two; what the bound is for does not — a volume or a sum in drams read for a
-  rate is thousands of times away, a rate per ten or a hundred units ten or a hundred. The measure
+  rate is thousands of times away, a rate per ten or a hundred units ten or a hundred. **What no band
+  catches, this one or fifteen percent, is the column next door** (review П-7): the euro read for the
+  dollar is 13 % off, a side or cash for non-cash one or two — those are held by the header cell over
+  every rate column (`expect`), and the band must never be narrowed on the hope of catching them. The measure
   is a rate the bank did not jump on (review А′): held against a comma in the wrong place, the right
   file of that day was refused, and a day of people in banks has no archive. A day the official
   history does not reach is vouched for by the header alone. The two files meet in a test of their

@@ -18,6 +18,12 @@ function bytes(name: string): ArrayBuffer {
   return file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength)
 }
 
+/**
+ * How long a test that opens a real workbook may take: exceljs spends one to five seconds on one,
+ * and on a machine the other copies load the default five ran out (adversarial review, round 2).
+ */
+const EXCELJS_MS = 60_000
+
 const BYBRANCH = 'cba-fx-bybranch-2026-09-30.xlsx'
 const DAILY = 'cba-forex-daily-2026-09-30.xlsx'
 const EXCHANGERS = 'cba-forex-2026-09-30.xlsx'
@@ -34,7 +40,7 @@ beforeAll(async () => {
   for (const [fixture, file] of pairs) {
     sheets.set(fixture, await readSheet(bytes(fixture), file, MARKET_SHEETS[file].sheet))
   }
-}, 60_000)
+}, EXCELJS_MS)
 
 function recorded(fixture: string): Sheet {
   const sheet = sheets.get(fixture)
@@ -112,14 +118,18 @@ describe('people in banks, cash and not (FX_bybranch)', () => {
     }
   })
 
-  it('is refused whole when the sheet was renamed or the file is not a workbook', async () => {
-    await expect(readSheet(bytes(BYBRANCH), 'FX_bybranch_ENG.xlsx', '6.16')).rejects.toThrow(
-      'no sheet "6.16"',
-    )
-    await expect(
-      parseMarketFile('FX_bybranch_ENG.xlsx', new TextEncoder().encode('<html>').buffer),
-    ).rejects.toThrow('FX_bybranch_ENG.xlsx: not a workbook')
-  })
+  it(
+    'is refused whole when the sheet was renamed or the file is not a workbook',
+    async () => {
+      await expect(readSheet(bytes(BYBRANCH), 'FX_bybranch_ENG.xlsx', '6.16')).rejects.toThrow(
+        'no sheet "6.16"',
+      )
+      await expect(
+        parseMarketFile('FX_bybranch_ENG.xlsx', new TextEncoder().encode('<html>').buffer),
+      ).rejects.toThrow('FX_bybranch_ENG.xlsx: not a workbook')
+    },
+    EXCELJS_MS,
+  )
 })
 
 describe('all clients of banks (FOREX ENG_Daily)', () => {
@@ -262,25 +272,33 @@ describe('asking for a file', () => {
     return { exchangers, fetch, gets, version }
   }
 
-  it('downloads a file once, and after that asks its HEAD: the bank ignores If-None-Match', async () => {
-    const { exchangers, fetch, gets } = bank()
-    const first = await exchangers.fetch(null)
-    if (first === 'unchanged') throw new Error('the first read is the file')
-    expect(first.rates).toHaveLength(42)
-    expect(await exchangers.fetch(first.version)).toBe('unchanged')
-    expect(await exchangers.fetch(first.version)).toBe('unchanged')
-    expect(gets).toHaveLength(1)
-    expect(fetch.mock.calls[0]?.[0]).toBe('https://example.test/FOREX%20ENG.xlsx')
-  })
+  it(
+    'downloads a file once, and after that asks its HEAD: the bank ignores If-None-Match',
+    async () => {
+      const { exchangers, fetch, gets } = bank()
+      const first = await exchangers.fetch(null)
+      if (first === 'unchanged') throw new Error('the first read is the file')
+      expect(first.rates).toHaveLength(42)
+      expect(await exchangers.fetch(first.version)).toBe('unchanged')
+      expect(await exchangers.fetch(first.version)).toBe('unchanged')
+      expect(gets).toHaveLength(1)
+      expect(fetch.mock.calls[0]?.[0]).toBe('https://example.test/FOREX%20ENG.xlsx')
+    },
+    EXCELJS_MS,
+  )
 
-  it('downloads it again once the bank changed it', async () => {
-    const { exchangers, gets, version } = bank()
-    const first = await exchangers.fetch(null)
-    if (first === 'unchanged') throw new Error('the first read is the file')
-    version.etag = '"{1924EE06},512"'
-    expect(await exchangers.fetch(first.version)).not.toBe('unchanged')
-    expect(gets).toHaveLength(2)
-  })
+  it(
+    'downloads it again once the bank changed it',
+    async () => {
+      const { exchangers, gets, version } = bank()
+      const first = await exchangers.fetch(null)
+      if (first === 'unchanged') throw new Error('the first read is the file')
+      version.etag = '"{1924EE06},512"'
+      expect(await exchangers.fetch(first.version)).not.toBe('unchanged')
+      expect(gets).toHaveLength(2)
+    },
+    EXCELJS_MS,
+  )
 
   it('reads anything but 200 as the bank being down', async () => {
     vi.stubGlobal('fetch', () => Promise.resolve(new Response('no', { status: 401 })))
