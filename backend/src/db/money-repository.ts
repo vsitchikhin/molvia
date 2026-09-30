@@ -3,6 +3,7 @@ import { exchangeRateSchema, monthOf } from '@molvia/model'
 import type { Currency, ExchangeRate, TripLine } from '@molvia/model'
 import type { Conn } from './index'
 import { actors, moneyMonthRates } from './schema'
+import { tripMoneyRows } from './trip-money'
 
 /**
  * What «Деньги» reads beside the spendings (MOL-73): the finished trips of a month, as lines of the
@@ -12,8 +13,9 @@ export interface MoneyRepository {
   /**
    * The owner's trips finished on a day from `from` to `to` — the phone's day of the tap of
    * «Завершить» (`finished_on`, MOL-121), and for a trip from an old queue Yerevan's day of the
-   * device's moment of finishing, or the server's (MOL-25) — one line per currency their purchases
-   * were paid in. Summed from the purchases each time: nothing is copied, so amending one moves the month.
+   * device's moment of finishing, or the server's (MOL-25) — one line per currency of the trip's
+   * money (`tripMoneyRows`): the receipt's sum when there is one (MOL-78), else the purchases of each
+   * currency. Read each time: nothing is copied, so amending a purchase or the receipt moves the month.
    */
   tripLines(actorId: string, from: string, to: string): Promise<readonly TripLine[]>
 
@@ -96,15 +98,14 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
            where t.actor_id = ${actorId}
              and t.finished_at is not null
              and t.deleted_at is null
-        )
+        ),
+        money as (${tripMoneyRows(sql`t.actor_id = ${actorId} and t.finished_at is not null and t.deleted_at is null`)})
         select f.id as trip_id, f.place_name, f.finished_at,
                to_char(f.finished_day, 'YYYY-MM-DD') as finished_on,
-               e.amount_currency as currency, sum(e.amount_minor) as amount_minor,
-               count(*) as items
+               m.currency, m.minor as amount_minor, m.items
           from finished f
-          join expenses e on e.trip_id = f.id and e.amount_minor is not null
+          join money m on m.trip_id = f.id
          where f.finished_day between ${from}::date and ${to}::date
-         group by f.id, f.place_name, f.finished_at, f.finished_day, e.amount_currency
       `)
       return rows.map((row) => ({
         tripId: row.trip_id,

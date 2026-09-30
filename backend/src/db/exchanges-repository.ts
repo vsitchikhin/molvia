@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, isNotNull, isNull, lte, ne, or, sql, sum } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm'
 import { DomainError, ERROR, EXCHANGE_UNDO_MINUTES, exchangeSchema } from '@molvia/model'
 import type {
   Currency,
@@ -11,7 +11,7 @@ import type {
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
-import { actors, exchangeRevisions, exchanges, expenses, trips } from './schema'
+import { actors, exchangeRevisions, exchanges } from './schema'
 
 export interface ExchangeRepository {
   /**
@@ -86,7 +86,9 @@ export interface ExchangeRepository {
    * What the owner spent in `currency` after `since`, in minor units: the priced expenses written
    * after it, in trips that were still open at that moment. The hint of «сколько было до обмена»
    * (Р-7) — purchases without a price and money spent outside a trip are not in it, and the screen
-   * says so.
+   * says so. A trip with a receipt's sum counts by the sum alone (MOL-78, Р-6), dated by when the
+   * server took it as a purchase is by when it was written — its purchases too would count the
+   * milk twice.
    *
    * A purchase added to a trip finished before `since` — the sauce found at home, written into
    * last week's trip — was paid with the money held before; counting it would take it away twice
@@ -363,19 +365,23 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
     },
 
     async spentSince(actorId, currency, since) {
-      const [row] = await db
-        .select({ spent: sum(expenses.amountMinor) })
-        .from(expenses)
-        .innerJoin(trips, eq(trips.id, expenses.tripId))
-        .where(
-          and(
-            eq(trips.actorId, actorId),
-            isNull(trips.deletedAt),
-            eq(expenses.amountCurrency, currency),
-            gt(expenses.createdAt, since),
-            or(isNull(trips.finishedAt), gt(trips.finishedAt, since)),
-          ),
-        )
+      const at = since.toISOString()
+      const [row] = await db.execute<{ spent: string | null }>(sql`
+        select sum(spent)::text as spent from (
+          select e.amount_minor as spent
+            from expenses e
+            join trips t on t.id = e.trip_id
+           where t.actor_id = ${actorId} and t.deleted_at is null and t.receipt_minor is null
+             and e.amount_currency = ${currency} and e.created_at > ${at}::timestamptz
+             and (t.finished_at is null or t.finished_at > ${at}::timestamptz)
+          union all
+          select t.receipt_minor
+            from trips t
+           where t.actor_id = ${actorId} and t.deleted_at is null
+             and t.receipt_currency = ${currency} and t.receipt_set_at > ${at}::timestamptz
+             and (t.finished_at is null or t.finished_at > ${at}::timestamptz)
+        ) spent
+      `)
       // `sum` of a bigint is a numeric, and the driver hands it back as text — or null for none.
       return BigInt(row?.spent ?? '0')
     },
