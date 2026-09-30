@@ -3,13 +3,6 @@
     <template #subtitle>{{ t('spending.subtitle') }}</template>
 
     <div class="content" :class="{ roomy: phase === 'ready' }">
-      <p v-if="phase === 'ready' && !online" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('spending.offline.strip') }}
-      </p>
-      <p v-else-if="phase === 'ready' && stale === 'error' && fetchedAt" class="strip">
-        {{ t('spending.error_strip', { when: whenOf(fetchedAt) }) }}
-      </p>
-
       <ScreenState
         v-for="item in otherRefusals"
         :key="item.key"
@@ -30,6 +23,16 @@
              (MOL-123, handoff 01). -->
         <AccountsCard :online="online" :spend-currency="spendCurrency" />
         <MonthSwitcher :month="selected" :current="currentMonth" @change="goMonth" />
+
+        <!-- Under the switcher, not over it as handoff 04 drew them: they belong to the month's
+             answer and come and go with it, and over the switcher they took it from under the thumb
+             (MOL-138, owner's decision В-2). -->
+        <p v-if="phase === 'ready' && !online" class="strip">
+          <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('spending.offline.strip') }}
+        </p>
+        <p v-else-if="phase === 'ready' && stale === 'error' && fetchedAt" class="strip">
+          {{ t('spending.error_strip', { when: whenOf(fetchedAt) }) }}
+        </p>
 
         <ScreenSkeleton v-if="phase === 'loading'" :groups="[44, 70, 34, 60, 80, 48, 66]" />
 
