@@ -3,21 +3,6 @@
     <template #subtitle>{{ t('spending.subtitle') }}</template>
 
     <div class="content" :class="{ roomy: phase === 'ready' }">
-      <ScreenState
-        v-for="item in otherRefusals"
-        :key="item.key"
-        kind="attention"
-        inline
-        :title="t('spending.rejected_other.title')"
-        :body="reasonOf(item.code)"
-      >
-        <template #action>
-          <AppButton variant="ghost" @click="queue.dismiss(item)">
-            {{ t('spending.sheet.dismiss') }}
-          </AppButton>
-        </template>
-      </ScreenState>
-
       <template v-if="phase !== 'idle'">
         <!-- Balances are «now», not the month's: above the switcher, and the same on every month
              (MOL-123, handoff 01). -->
@@ -26,13 +11,28 @@
 
         <!-- Under the switcher, not over it as handoff 04 drew them: they belong to the month's
              answer and come and go with it, and over the switcher they took it from under the thumb
-             (MOL-138, owner's decision В-2). -->
+             (MOL-138, owner's decision В-2). A refusal of the queue too: it is a card here only
+             while no row of the month on screen carries it (adversarial round 3, Ж). -->
         <p v-if="phase === 'ready' && !online" class="strip">
           <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('spending.offline.strip') }}
         </p>
         <p v-else-if="phase === 'ready' && stale === 'error' && fetchedAt" class="strip">
           {{ t('spending.error_strip', { when: whenOf(fetchedAt) }) }}
         </p>
+        <ScreenState
+          v-for="item in otherRefusals"
+          :key="item.key"
+          kind="attention"
+          inline
+          :title="t('spending.rejected_other.title')"
+          :body="reasonOf(item.code)"
+        >
+          <template #action>
+            <AppButton variant="ghost" @click="queue.dismiss(item)">
+              {{ t('spending.sheet.dismiss') }}
+            </AppButton>
+          </template>
+        </ScreenState>
 
         <ScreenSkeleton v-if="phase === 'loading'" :groups="[44, 70, 34, 60, 80, 48, 66]" />
 
@@ -534,7 +534,7 @@ export default defineComponent({
 
     const whenOf = (at: Date) => `${purchaseDay(at, locale.value)}, ${timeOfDay(at, locale.value)}`
 
-    /** Refusals no row of this month carries — «Вернуть» too late, a category — said above. */
+    /** Refusals no row of this month carries — «Вернуть» too late, a category — said under the switcher. */
     const otherRefusals = computed(() =>
       queue.rejected.filter(
         (item) =>
