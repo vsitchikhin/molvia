@@ -190,22 +190,29 @@ describe('BottomSheet', () => {
   }
 
   // Safari has no `overlay`: a dialog closed at once left the top layer at once, and the × and the
-  // scrim made the sheet vanish instead of sliding down. It slides open and is closed at the end.
-  it('slides down open, and closes the dialog when the slide ends', async () => {
+  // scrim made the sheet vanish instead of sliding down. The dialog is closed at once — every reader
+  // of `dialog[open]` has it shut — and `data-leaving` keeps it drawn until the slide ends.
+  it('closes the dialog at once, and keeps it drawn sliding down until the slide ends', async () => {
     const { host, open, closed, go, dialog } = await render({ open: true })
     const sliding = slide()
     await host.get('.head button').trigger('click')
     expect(go).toHaveBeenCalledExactlyOnceWith(-1)
-    // The screen is told at once; only the dialog waits for the slide.
     expect(open.value).toBe(false)
     await vi.waitFor(() => {
       expect(closed).toHaveBeenCalledOnce()
     })
-    expect(dialog().open).toBe(true)
+    expect(dialog().open).toBe(false)
     expect(dialog().hasAttribute('data-leaving')).toBe(true)
 
     await sliding.finish()
+    expect(dialog().hasAttribute('data-leaving')).toBe(false)
+  })
+
+  it('must not fire: with no slide to play, nothing is left drawn', async () => {
+    const { host, dialog } = await render({ open: true })
+    await host.get('.head button').trigger('click')
     expect(dialog().open).toBe(false)
+    expect(dialog().hasAttribute('data-leaving')).toBe(false)
   })
 
   it('must not fire: a tap on the scrim while the sheet slides down takes no second step', async () => {
@@ -218,11 +225,10 @@ describe('BottomSheet', () => {
     expect(go).toHaveBeenCalledOnce()
   })
 
-  // «Save and next» while the last showing still slides down: it comes back up, still modal, and
-  // the end of the slide cut short does not close it.
-  it('opened again while it slides down, it comes back up and stays open', async () => {
+  // «Save and next» while the last showing still slides down: it comes back up, and the end of the
+  // slide cut short takes nothing off the sheet shown again.
+  it('opened again while it slides down, it comes back up and stays up', async () => {
     const { host, open, push, dialog } = await render({ open: true })
-    const showModal = vi.spyOn(HTMLDialogElement.prototype, 'showModal')
     const sliding = slide()
     await host.get('.head button').trigger('click')
     landed()
@@ -230,11 +236,11 @@ describe('BottomSheet', () => {
     await nextTick()
     expect(dialog().open).toBe(true)
     expect(dialog().hasAttribute('data-leaving')).toBe(false)
-    expect(showModal).not.toHaveBeenCalled()
     expect(push).toHaveBeenCalledTimes(2)
 
     await sliding.finish()
     expect(dialog().open).toBe(true)
+    expect(dialog().hasAttribute('data-leaving')).toBe(false)
   })
 
   // A text selection that began in a field and overshot is clicked on the dialog — the common
@@ -1118,30 +1124,6 @@ describe('focus after the sheet', () => {
     router.back()
     expect(dialog().open).toBe(false)
     expect(document.activeElement).toBe(button)
-  })
-
-  // While it slides down the sheet is still modal and the page takes no focus: given before the
-  // dialog closed, the focus was lost, and the dialog then gave it to nothing.
-  it('goes back to the button once the slide down has ended and the dialog is closed', async () => {
-    const { button, icon } = opener()
-    const { router, dialog } = await openFrom(icon)
-    leftNowhere()
-    let finish = (): void => undefined
-    const finished = new Promise<void>((resolve) => {
-      finish = resolve
-    })
-    vi.spyOn(HTMLDialogElement.prototype, 'getAnimations').mockReturnValueOnce([
-      { finished } as unknown as Animation,
-    ])
-    router.back()
-    expect(dialog().open).toBe(true)
-    expect(document.activeElement).not.toBe(button)
-
-    finish()
-    await vi.waitFor(() => {
-      expect(document.activeElement).toBe(button)
-    })
-    expect(dialog().open).toBe(false)
   })
 
   // WebKit still names the closed dialog as focused — a tap on no control in it focused the dialog.

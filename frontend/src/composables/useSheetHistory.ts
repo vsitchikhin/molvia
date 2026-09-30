@@ -32,11 +32,8 @@ export interface SheetAnchor {
   top: number
 }
 
-/** A sheet put away: the end of its slide down, when it plays one — see `giveFocusBack`. */
-type Left = () => Promise<void> | undefined
-
 interface Holder {
-  left: Left
+  left: () => void
   /** The address the sheet was laid at, as the history spells it. */
   at: string
   anchor: SheetAnchor | null
@@ -176,21 +173,14 @@ function stackOf(router: Router): Holder[] {
       // happen: laying its entry cut the forward history away.
       const count = Math.min(delta < 0 ? -delta : delta === 0 ? 1 : 0, created.length)
       const gone = created.splice(created.length - count, count).reverse()
-      const exits = gone.map((holder) => holder.left()).filter((exit) => exit !== undefined)
+      for (const holder of gone) holder.left()
       // Landed on the screen the lowest of them was opened over: that screen stays, and stands
       // where it stood. Here and not in the router's `scrollBehavior`, which comes a tick later —
       // after a sheet opened again at once («save and next») has taken its measure.
       const lowest = gone.at(-1)
       if (to === lowest?.at) {
         putBack(lowest.anchor)
-        // A sheet still sliding down is still modal: the page under it takes no focus until the
-        // slide ends and the dialog is closed.
-        const from = lowest.from
-        if (exits.length === 0) giveFocusBack(from)
-        else
-          void Promise.allSettled(exits).then(() => {
-            giveFocusBack(from)
-          })
+        giveFocusBack(lowest.from)
       }
     })
     stack = created
@@ -198,7 +188,7 @@ function stackOf(router: Router): Holder[] {
   return stack
 }
 
-export function useSheetHistory(onLeft: Left): {
+export function useSheetHistory(onLeft: () => void): {
   lay: (anchor?: SheetAnchor | null, from?: SheetOpener | null) => void
   leave: (steps?: number) => void
   laid: () => boolean
@@ -239,7 +229,7 @@ export function useSheetHistory(onLeft: Left): {
     const own: Holder = {
       left: () => {
         forget()
-        return onLeft()
+        onLeft()
       },
       at: where,
       anchor,
@@ -261,7 +251,7 @@ export function useSheetHistory(onLeft: Left): {
       if (failure || to.fullPath === at) return
       forget()
       unmark()
-      void onLeft()
+      onLeft()
     })
   }
 
@@ -277,7 +267,7 @@ export function useSheetHistory(onLeft: Left): {
    */
   function leave(steps = 1): void {
     if (!holder) {
-      void onLeft()
+      onLeft()
       return
     }
     const over = stack.length - stack.indexOf(holder)
@@ -290,7 +280,7 @@ export function useSheetHistory(onLeft: Left): {
   onBeforeUnmount(() => {
     if (!holder) return
     forget()
-    void onLeft()
+    onLeft()
   })
 
   return { lay, leave, laid: () => holder !== undefined }

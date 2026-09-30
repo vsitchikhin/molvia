@@ -124,13 +124,14 @@ export default defineComponent({
     })
 
     const history = useSheetHistory(() => {
-      if (!shown.value) return undefined
+      if (!shown.value) return
       shown.value = false
       closing = false
       const again = reopen
       reopen = false
-      const exit = dialog.value?.open ? leave(dialog.value) : undefined
+      // Before the slide down: it starts from where a pull left the sheet.
       drag.reset()
+      if (dialog.value?.open) leave(dialog.value)
       if (!again && props.open) emit('update:open', false)
       // Read now: the props of a sheet gone by the next tick are still there, but read once.
       const closed = props.onClosed
@@ -141,29 +142,30 @@ export default defineComponent({
       // guessed from the prop still being true a tick later: that reopened the sheet under a screen
       // that only wrote its false late, after an `await` (adversarial Г-1).
       if (again) void nextTick(show)
-      return exit
     })
 
-    // The slide down is played while the dialog is still open, and the dialog is closed at its end.
-    // Left to the stylesheet it needs `overlay` in the transition, to hold a closed dialog in the
-    // top layer while it slides: Safari has no `overlay`, and there the × and the scrim made the
-    // sheet vanish on the spot — only the pull down, which slides it itself, went down. The screen
-    // is told at once, as ever; only the dialog waits. `data-leaving` stays until the next showing:
-    // the dialog closed with it leaves the top layer at once, the slide being over.
-    function leave(element: HTMLDialogElement): Promise<void> | undefined {
+    // The dialog is closed at once — the page, the focus and every reader of `dialog[open]` have it
+    // shut, as ever — and `data-leaving` keeps it drawn while it slides down, taken off at the end.
+    // Left to the stylesheet, a closed dialog is held in the top layer by a transition of
+    // `overlay`: Safari has not got it, and there the × and the scrim made the sheet vanish on the
+    // spot — only the pull down, which slides it itself, went down (hotfix-bottom-menu). Played
+    // open instead, the sheet was still `[open]` for the length of the slide, and «Закончить» did
+    // not go up to «Покупки»: a sheet was up.
+    function leave(element: HTMLDialogElement): void {
       const current = ++leaving
       element.dataset.leaving = ''
-      // The style is read now, so the transition starts from where the sheet stands this frame.
+      element.close()
+      // Read now, so the slide starts this frame and is there to be waited for.
       getComputedStyle(element).getPropertyValue('transform')
       const sliding = element
         .getAnimations()
         .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
       if (sliding.length === 0) {
-        element.close()
-        return undefined
+        delete element.dataset.leaving
+        return
       }
-      return Promise.allSettled(sliding.map((animation) => animation.finished)).then(() => {
-        if (current === leaving && element.open) element.close()
+      void Promise.allSettled(sliding.map((animation) => animation.finished)).then(() => {
+        if (current === leaving) delete element.dataset.leaving
       })
     }
 
@@ -182,11 +184,11 @@ export default defineComponent({
       const from = sheetOpener()
       drag.reset()
       // Opened again while the last showing still slid down («save and next»): the slide stops
-      // where it is and the sheet comes back up from there, still modal — no second `showModal`.
+      // where it is and the sheet comes back up from there.
       leaving += 1
       delete element.dataset.leaving
       shown.value = true
-      if (!element.open) element.showModal()
+      element.showModal()
       settle(element)
       history.lay(anchor, from)
     }
@@ -355,9 +357,9 @@ export default defineComponent({
     var(--shadow-lg);
   color: var(--text);
 
-  /* Out from under the bottom edge and back. The way down is played open (`data-leaving`, see
-     `leave`); these discrete transitions only cover a close the browser makes itself, a second
-     Esc, where the browser can animate `display` and the top layer. */
+  /* Out from under the bottom edge and back. The way down is `data-leaving` (see `leave`); these
+     discrete transitions only cover a close the browser makes itself, a second Esc, where the
+     browser can animate `display` and the top layer. */
   transform: translateY(100%);
   transition:
     transform var(--dur) var(--ease),
@@ -394,18 +396,17 @@ export default defineComponent({
     background: transparent;
   }
 
-  /* Sliding down, still open: nothing in it or on the scrim takes a tap, and no discrete
-     transition is left to hold the dialog in the top layer once it is closed at the end. */
+  /* Sliding down, closed: out of the top layer, so drawn by hand where the modal sheet stood, over
+     the tab bar, taking no tap. No discrete transition is left to hold it there. */
   &[data-leaving] {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 2;
+    display: block;
+    margin: 0;
     transform: translateY(100%);
     pointer-events: none;
     transition-property: transform;
-  }
-
-  &[data-leaving]::backdrop {
-    opacity: 0;
-    pointer-events: none;
-    transition-property: opacity;
   }
 
   /* Under the finger: no transition, or the sheet would trail behind it. */
