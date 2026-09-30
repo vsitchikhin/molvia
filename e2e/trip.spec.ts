@@ -527,6 +527,8 @@ test.describe('the receipt total (MOL-78)', () => {
   test('asked at «Finish» while some price is missing, then amended and removed on the finished record', async ({
     page,
   }) => {
+    // One walk through the record, «Записаны», «Деньги» and back into the finished record.
+    test.setTimeout(60_000)
     const setting = await device(page)
     const headers = await asBrowser(page)
     await startTrip(page, 'Ереван Сити')
@@ -548,6 +550,14 @@ test.describe('the receipt total (MOL-78)', () => {
       trips: { total: { amount: string }[] | null }[]
     }
     expect(history.trips[0]?.total).toEqual([{ amount: '1400.00', currency: 'AMD' }])
+
+    // «Деньги» file the record by its receipt, every purchase behind it (Р-4).
+    await page.getByRole('link', { name: 'Money', exact: true }).click()
+    const line = page.locator('.row, li, button').filter({ hasText: 'Purchases at “Ереван Сити”' })
+    await expect(line.first()).toContainText('1,400', { timeout: 15_000 })
+    await expect(line.first()).toContainText('2 items')
+    await page.getByRole('link', { name: 'Purchases', exact: true }).click()
+    await expect(page).toHaveURL(/\/purchases$/)
 
     await recorded(page, 'Ереван Сити').click()
     await expect(page.locator('.caption')).toHaveText('Total by receipt')
