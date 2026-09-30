@@ -343,6 +343,10 @@ describe('receiptGap (MOL-78, В-2)', () => {
     expect(receiptGap(receipt, [expense(money(100n, 'USD')), expense(null)])).toBeNull()
   })
 
+  it('«не должно сработать»: покупок нет вовсе — ничего, а не «чек больше цен» (ревью 5)', () => {
+    expect(receiptGap(receipt, [])).toBeNull()
+  })
+
   it('цены в валюте чека, но сам чек в другой — ничего', () => {
     expect(receiptGap(money(3000n, 'USD'), [expense(parseMoney('570', 'AMD'))])).toBeNull()
   })

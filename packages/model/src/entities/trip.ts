@@ -216,7 +216,9 @@ export function tripMoney(
  * - `under`: every purchase is priced and the receipt is still more.
  *
  * Nothing when the prices meet the receipt, and nothing when some price is in another currency: two
- * currencies do not subtract, and a rate here would be a guess.
+ * currencies do not subtract, and a rate here would be a guess. Nothing for a trip with no purchases
+ * either — its purchases all removed after the sum — since «the receipt is more than the prices»
+ * about no prices at all says what is not so (review 5).
  */
 export type ReceiptGap =
   | { readonly kind: 'unpriced'; readonly amount: Money }
@@ -227,6 +229,7 @@ export function receiptGap(
   receipt: Money,
   expenses: readonly Pick<Expense, 'amount'>[],
 ): ReceiptGap | null {
+  if (expenses.length === 0) return null
   const prices = tripTotal(expenses)
   if (prices.some((money) => money.currency !== receipt.currency)) return null
   const priced = prices[0]?.minor ?? 0n

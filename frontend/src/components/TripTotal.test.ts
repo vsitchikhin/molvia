@@ -240,6 +240,16 @@ describe('TripTotal', () => {
       expect(render({ trip: partial() }).get('.receipt').text()).toBe(ru.trip.receipt.edit)
     })
 
+    it('запись из памяти телефона — суммы не знает: ни «+», ни «Изменить» (ревью 4)', () => {
+      const cached = render({
+        trip: trip({ total: [amd('1400')] }),
+        offerReceipt: true,
+        receiptKnown: false,
+      })
+      expect(cached.find('.receipt').exists()).toBe(false)
+      expect(cached.find('.split').exists()).toBe(false)
+    })
+
     it('сумма в очереди — строка «отправляется», итог остаётся серверным (Р-7)', () => {
       const typed = render({ receiptWaiting: { receipt: { minor: 1_240_000n, currency: 'AMD' } } })
       expect(plain(typed.get('.sum'))).toBe('6 493,12 ֏')

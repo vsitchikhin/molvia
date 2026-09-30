@@ -99,6 +99,13 @@ export default defineComponent({
     },
     /** Whether «+ Сумма по чеку» is offered: a record with purchases (В-1). */
     offerReceipt: { type: Boolean, default: false },
+    /**
+     * Whether the trip is the server's answer, which knows the receipt. A finished record read back
+     * from the phone's cache does not keep it yet (the previous build reads that cache strictly), so
+     * its total may be a receipt with nothing saying so: neither «+» nor «Изменить» is offered over
+     * it — the sheet would open empty over a sum that is there (review 4).
+     */
+    receiptKnown: { type: Boolean, default: true },
   },
   emits: {
     receipt: () => true,
@@ -239,6 +246,7 @@ export default defineComponent({
     })
 
     const receiptAction = computed(() => {
+      if (!props.receiptKnown) return null
       if (props.trip?.receipt || props.receiptWaiting?.receipt) return t('trip.receipt.edit')
       return props.offerReceipt ? t('trip.receipt.add') : null
     })
