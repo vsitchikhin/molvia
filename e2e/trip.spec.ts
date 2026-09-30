@@ -114,6 +114,18 @@ async function addItem(page: Page, word: string, price: string): Promise<void> {
   expect(new URL(page.url()).pathname).toBe('/purchases/manual')
 }
 
+/** A purchase with no price: the item and how much, the price left for later (or never). */
+async function addUnpriced(page: Page, word: string): Promise<void> {
+  await page.getByRole('button', { name: /Add an item|Find an item/ }).click()
+  await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(word)
+  await page.getByRole('option').first().click()
+  await expect(sheet(page)).toContainText(word)
+  await page.waitForTimeout(400)
+  await sheet(page).getByLabel('How much').fill('1')
+  await sheet(page).getByRole('button', { name: 'Record' }).click()
+  expect(new URL(page.url()).pathname).toBe('/purchases/manual')
+}
+
 test.describe('the trip', () => {
   test('is started, filled, corrected and finished', async ({ page }) => {
     const setting = await device(page)
@@ -504,5 +516,97 @@ test.describe('the newcomer`s «Что брать» (MOL-77, MOL-128)', () => {
       return range.getBoundingClientRect().right <= card.right
     })
     expect(inside).toBe(true)
+  })
+})
+
+/**
+ * «Сумма по чеку» (MOL-78): the receipt typed whole when not every price was — at «Закончить» and
+ * any time after — and the record's money everywhere, the prices untouched.
+ */
+test.describe('the receipt total (MOL-78)', () => {
+  test('asked at «Finish» while some price is missing, then amended and removed on the finished record', async ({
+    page,
+  }) => {
+    const setting = await device(page)
+    const headers = await asBrowser(page)
+    await startTrip(page, 'Ереван Сити')
+    await addItem(page, setting.word, '570')
+    await addUnpriced(page, setting.word)
+    await expect(row(page)).toHaveCount(2)
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(2)
+
+    await page.getByRole('button', { name: 'Finish', exact: true }).click()
+    await expect(sheet(page)).toContainText('1 of 2 have no price')
+    await page.waitForTimeout(400)
+    await sheet(page).getByLabel('What did the receipt come to?').fill('1400')
+    await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+    await expect(page).toHaveURL(/\/purchases$/)
+
+    // The receipt went before the finish, and «Записаны» shows it as the record's money.
+    await expect(recorded(page, 'Ереван Сити')).toContainText('1,400.00', { timeout: 15_000 })
+    const history = (await (await page.request.get('/api/trips/history', { headers })).json()) as {
+      trips: { total: { amount: string }[] | null }[]
+    }
+    expect(history.trips[0]?.total).toEqual([{ amount: '1400.00', currency: 'AMD' }])
+
+    await recorded(page, 'Ереван Сити').click()
+    await expect(page.locator('.caption')).toHaveText('Total by receipt')
+    await expect(page.locator('.sum')).toContainText('1,400.00')
+    await expect(page.locator('.split')).toContainText('With a price — 1 of 2')
+    await expect(page.locator('.split')).toContainText('570.00')
+    await expect(page.locator('.split')).toContainText('Without a price — 1')
+    await expect(page.locator('.split')).toContainText('830.00')
+    // The price of the milk stayed what it was: nothing is worked out of the sum.
+    await expect(row(page).first()).toContainText('570.00')
+
+    await page.getByRole('button', { name: 'Change the receipt total' }).click()
+    await page.waitForTimeout(400)
+    await expect(sheet(page).getByLabel('Amount')).toHaveValue('1400')
+    await sheet(page).getByRole('button', { name: 'Remove the total' }).click()
+    await expect(page.locator('.caption')).toHaveText('Total')
+    await expect(page.locator('.sum')).toContainText('570.00')
+  })
+
+  test('typed with no connection goes when it comes back, and the total says it is on its way', async ({
+    page,
+    context,
+  }) => {
+    const setting = await device(page)
+    await startTrip(page, 'SAS')
+    await addUnpriced(page, setting.word)
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+
+    await context.setOffline(true)
+    await page.getByRole('button', { name: '+ Receipt total' }).click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByLabel('Amount').fill('2500')
+    await sheet(page).getByRole('button', { name: 'Save' }).click()
+    await expect(page.locator('.waiting')).toContainText('Receipt total')
+    await expect(page.locator('.waiting')).toContainText('sending')
+
+    await context.setOffline(false)
+    await page.evaluate(() => window.dispatchEvent(new Event('online')))
+    await expect(page.locator('.caption')).toHaveText('Total by receipt', { timeout: 15_000 })
+    await expect(page.locator('.sum')).toContainText('2,500.00')
+    await expect(page.locator('.waiting')).toHaveCount(0)
+  })
+
+  test('an empty record offers no sum, and «Finish» hands it to «Money» as a spending (В-1)', async ({
+    page,
+  }) => {
+    const setting = await device(page)
+    await startTrip(page, 'Рынок')
+    await expect(page.getByRole('button', { name: '+ Receipt total' })).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Finish', exact: true }).click()
+    await expect(sheet(page)).toContainText('Nothing in this entry')
+    await page.waitForTimeout(400)
+    await sheet(page).getByRole('button', { name: 'Record as a spending in “Money”' }).click()
+
+    await expect(page).toHaveURL(/\/money/)
+    await expect(sheet(page)).toContainText('New spending')
+    await expect(sheet(page).getByLabel('Where')).toHaveValue('Рынок')
+    await expect(sheet(page).getByRole('radio', { name: 'Groceries' })).toBeChecked()
+    await expect.poll(setting.current).toBeNull()
   })
 })
