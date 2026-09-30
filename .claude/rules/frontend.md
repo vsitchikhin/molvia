@@ -289,7 +289,16 @@ The detail behind the frontend lines of `CLAUDE.md`.
   carries the moment the finger lifted and one resting across the end of the rise closed the sheet
   or pressed the action that slid under it (adversarial А1); a click from the keyboard, by its
   own time, and it leaves the touch alone (Б1). Open a
-  sheet from a tap only: Chrome skips on «back» an entry laid without a gesture. **The sheet is the one exception to «only the
+  sheet from a tap only: Chrome skips on «back» an entry laid without a gesture. **The way down is
+  played open, and the dialog is closed at its end** (`data-leaving`, hotfix-bottom-menu): left to
+  the stylesheet, a closed dialog is held in the top layer by a transition of `overlay`, which
+  Safari has not got — on an iPhone the × and the scrim made the sheet vanish on the spot, and only
+  the pull down, which slides it itself, went down. The screen is told at once, as before (`update:open`,
+  `onClosed`); only the dialog waits. While it slides it takes no tap, it and its scrim both, so a
+  second close has nothing to press; opened again meanwhile («save and next») it comes back up from
+  where it is, still modal, with no second `showModal`. The focus goes back to the opener once the
+  dialog is closed, not with the pop: a page under a modal dialog takes none. The stylesheet's
+  discrete transitions stay for a close the browser makes itself — a second Esc. **The sheet is the one exception to «only the
   page scrolls»**: a panel over the screen has no window of its own, so it scrolls itself and
   the page under it is held still.
 - **Over the iOS keyboard the sheet's height is a share of the visual viewport's own height**
