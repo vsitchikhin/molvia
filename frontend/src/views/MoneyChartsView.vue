@@ -2,7 +2,7 @@
   <AppScreen :title="t('spending.charts.title')">
     <!-- The line stands in every state, empty until a range is known: gone under the skeleton, it
          took the period below it up by its height, and back with the answer, down (MOL-138). An
-         error or «offline» with nothing read keeps it empty rather than move the period once more. -->
+         error or «offline» with nothing read keeps it empty rather than move the period again. -->
     <template #subtitle
       ><span class="range">{{ range }}</span></template
     >
@@ -16,8 +16,8 @@
         @update:model-value="choosePeriod"
       />
 
-      <!-- Under the period: they are about the charts of the one chosen, and over it they came and
-           went with its answer and took it from under the thumb (MOL-138, owner's decision В-2). -->
+      <!-- Under the period: they are about the charts of the one chosen, and over it they came
+           and went with its answer and took it from under the thumb (MOL-138, owner's В-2). -->
       <p v-if="stale === 'offline' && fetchedAt" class="strip">
         <IconCloudOff class="strip-icon" aria-hidden="true" />
         {{ t('spending.charts.offline.strip', { when: when(fetchedAt) }) }}
@@ -139,7 +139,7 @@
                 <span class="dot" :style="{ background: categoryColour(series.category) }"></span>
               </template>
             </AppField>
-            <!-- Under the choice it explains, so that choosing another does not move the choice. -->
+            <!-- Under the choice it explains: choosing another does not move the choice. -->
             <p v-if="categoryMissing" class="detail missing">
               {{ t('spending.charts.category_missing', { name: nameOf(series.category) }) }}
             </p>

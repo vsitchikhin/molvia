@@ -274,7 +274,7 @@ describe('installHeightHold', () => {
   const hold = () => document.documentElement.style.getPropertyValue('--page-hold')
   let screen: HTMLElement
 
-  /** The window at `scrollY` and `innerHeight`, over a screen whose bottom is `bottom` on the page. */
+  /** The window at `scrollY` and `innerHeight`, over a screen ending at `bottom` on the page. */
   function geometry(scrollY: number, innerHeight: number, bottom: number): void {
     vi.stubGlobal('scrollY', scrollY)
     vi.stubGlobal('innerHeight', innerHeight)

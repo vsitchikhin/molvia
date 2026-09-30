@@ -199,7 +199,7 @@ test('offline, the period stays where it was, whether the phone keeps the period
   await expect(strip).toBeHidden()
   expect(await topOf(periods)).toBe(60)
 
-  // Back to six, kept on the phone: the strip goes with the move and comes back with the failed read.
+  // Back to six, kept on the phone: the strip goes with the move, back with the failed read.
   await page.getByText('6 месяцев', { exact: true }).click()
   await expect(page).not.toHaveURL(/period=/)
   await expect(bars).toHaveCount(6)

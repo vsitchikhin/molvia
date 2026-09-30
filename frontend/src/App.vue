@@ -40,8 +40,9 @@ export default defineComponent({
     // Whether the app is shown at all, or the login screen instead. The rule lives in the login
     // store, where it can be read and tested without mounting the app (MOL-56).
     const closed = computed(() => login.closed)
-    // The login takes the router's place without a move, so no move takes the page's hold away: held,
-    // the login was drawn scrolled off the window, all of it above it on an iPhone (MOL-138, adversarial А).
+    // The login takes the router's place without a move, so no move takes the page's hold away:
+    // held, the login was drawn scrolled off the window, all of it above it on an iPhone (MOL-138,
+    // adversarial А).
     watch(closed, (now) => {
       if (now) releaseHeightHold()
     })

@@ -20,8 +20,8 @@ body {
   box-sizing: border-box;
 }
 
-// A block, not a column: the hold is empty room under the screen, never a screen stretched — a state
-// that takes the free height would carry its action down with it (MOL-138).
+// A block, not a column: the hold is empty room under the screen, never a screen stretched — a
+// state that takes the free height would carry its action down with it (MOL-138).
 #app {
   min-height: var(--page-hold);
 }

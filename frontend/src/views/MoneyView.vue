@@ -534,7 +534,10 @@ export default defineComponent({
 
     const whenOf = (at: Date) => `${purchaseDay(at, locale.value)}, ${timeOfDay(at, locale.value)}`
 
-    /** Refusals no row of this month carries — «Вернуть» too late, a category — said under the switcher. */
+    /**
+     * Refusals no row of this month carries — «Вернуть» too late, a category — said under the
+     * switcher.
+     */
     const otherRefusals = computed(() =>
       queue.rejected.filter(
         (item) =>

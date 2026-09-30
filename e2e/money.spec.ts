@@ -248,9 +248,9 @@ test('offline, a month not read keeps the switcher where it was, at the top of t
 })
 
 // Both months kept on the phone: each is drawn at once, and «Нет связи» stands through the move —
-// under the switcher, where it is checked to be. The strip that does go and come back a moment later,
-// «Сервер не ответил» (review С-7, adversarial round 2, Д2), is held by the same place, not by a test
-// of its own (review С-10).
+// under the switcher, where it is checked to be. The strip that does go and come back a moment
+// later, «Сервер не ответил» (review С-7, adversarial round 2, Д2), is held by the same place, not
+// by a test of its own (review С-10).
 test('offline, between two months the phone keeps, the switcher stays over the strip', async ({
   page,
   context,
