@@ -15,6 +15,8 @@
 export interface SearchDraft {
   readonly query: string
   readonly missed: string | null
+  /** A code nobody holds, waiting for its item (MOL-100) — lost to a reload, the next pick asked nothing. */
+  readonly code?: string | null
 }
 
 const keyOf = (owner: string): string => `molvia.search-draft.${owner}`
@@ -32,9 +34,13 @@ export function recallSearchDraft(owner: string | null): SearchDraft | null {
   try {
     const value: unknown = JSON.parse(shelf()?.getItem(keyOf(owner)) ?? 'null')
     if (!value || typeof value !== 'object') return null
-    const { query, missed } = value as { query?: unknown; missed?: unknown }
+    const { query, missed, code } = value as { query?: unknown; missed?: unknown; code?: unknown }
     if (typeof query !== 'string') return null
-    return { query, missed: typeof missed === 'string' ? missed : null }
+    return {
+      query,
+      missed: typeof missed === 'string' ? missed : null,
+      code: typeof code === 'string' ? code : null,
+    }
   } catch {
     return null
   }
@@ -43,8 +49,9 @@ export function recallSearchDraft(owner: string | null): SearchDraft | null {
 export function keepSearchDraft(owner: string | null, draft: SearchDraft): void {
   if (owner === null) return
   try {
-    if (draft.query === '' && draft.missed === null) shelf()?.removeItem(keyOf(owner))
-    else shelf()?.setItem(keyOf(owner), JSON.stringify(draft))
+    if (draft.query === '' && draft.missed === null && (draft.code ?? null) === null) {
+      shelf()?.removeItem(keyOf(owner))
+    } else shelf()?.setItem(keyOf(owner), JSON.stringify(draft))
   } catch {
     // A shelf that refuses leaves the search as it was before: in memory only.
   }

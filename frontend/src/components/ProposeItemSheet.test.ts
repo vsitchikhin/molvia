@@ -457,18 +457,6 @@ describe('«Suggest an item»', () => {
       expect(sheet.emitted('taken')).toEqual([[kefir]])
     })
 
-    it('says an item full of codes in its own words, not «try again» (review В)', async () => {
-      proposeItem.mockRejectedValue(new ApiError(ERROR.BARCODES_FULL))
-      const sheet = await render('Тан', '4850001234562')
-      await chooseUnit(sheet, en.item.unit_l)
-
-      await submitButton(sheet).trigger('click')
-      await flushPromises()
-
-      expect(sheet.text()).toContain(en.error.barcodes_full)
-      expect(sheet.text()).not.toContain(en.item.propose.failed)
-    })
-
     it('must not show a code line when the item is proposed by its name', async () => {
       const sheet = await render()
 

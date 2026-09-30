@@ -37,7 +37,12 @@
       @pick="pick"
     >
       <template #trailing>
-        <AppButton variant="icon" :label="t('item.barcode.scan')" @click="scanning = true">
+        <AppButton
+          variant="icon"
+          :label="t('item.barcode.scan')"
+          :inactive="bind?.phase === 'sending'"
+          @click="scanning = true"
+        >
           <IconBarcode />
         </AppButton>
       </template>
@@ -313,6 +318,7 @@ import { currentIdentity } from '@/stores/identity'
 import { useItemEntryStore } from '@/stores/itemEntry'
 import { useRecentItemsStore } from '@/stores/recentItems'
 import { dropSearchDraft, keepSearchDraft, recallSearchDraft } from '@/stores/searchDraft'
+import { focusScreenTitle } from '@/transitions'
 
 /**
  * «Что взяли?» — entering an item is a lookup in the catalogue, not a text field: free text
@@ -360,9 +366,6 @@ export default defineComponent({
       query.value = draft.query
       missed.value = draft.missed
     }
-    watch([query, missed], ([text, miss]) => {
-      keepSearchDraft(owner, { query: text, missed: miss })
-    })
     const recent = useRecentItemsStore()
     const entry = useItemEntryStore()
     const announce = useAnnouncer()
@@ -401,7 +404,12 @@ export default defineComponent({
      * with it, or found by name and asked about. Set when the server says nobody holds it — only
      * then: a code not looked up for want of a network may well be held.
      */
-    const pendingCode = ref<string | null>(null)
+    // Kept in the draft with the query (adversarial Р5-Г): a new version reloads the page with only
+    // the strip up, and the code, lost, made the next pick ask nothing.
+    const pendingCode = ref<string | null>(draft?.code ?? null)
+    watch([query, missed, pendingCode], ([text, miss, code]) => {
+      keepSearchDraft(owner, { query: text, missed: miss, code })
+    })
     watch(barcode, (next) => {
       if (next === 'missing') pendingCode.value = lookup.code.value
     })
@@ -422,11 +430,21 @@ export default defineComponent({
      * code's own block (`proposedByCode`), where the item was looked for by the code and what the
      * field held before the scan is nobody's word for it (MOL-99 Д, adversarial М).
      */
+    /** Whether the screen is still there: an answer landing after it was left is nobody's. */
+    let alive = true
+
+    interface PickedAt {
+      readonly found: boolean
+      readonly text: string
+    }
+
     interface Bind {
       readonly entry: CatalogueEntry
       readonly code: string
       readonly learns: boolean
       readonly origin: 'pick' | 'proposed' | 'proposedByCode'
+      /** The query the pick was made on, as the search answered it then — not as typed since. */
+      readonly at: PickedAt
       readonly phase: 'ask' | 'sending' | 'taken' | 'full' | 'offline' | 'error'
       readonly holder: CatalogueEntry | null
     }
@@ -473,6 +491,9 @@ export default defineComponent({
       bind.value = { ...asked, phase: 'sending' }
       try {
         const written = await api.attachBarcode(asked.entry.id, asked.code)
+        // The screen was left meanwhile (adversarial Р5-А): the pick is nobody's now, and written into
+        // the store it opened a sheet by itself on the next visit.
+        if (!alive) return
         if (!stillAsked(asked)) {
           // Typing went on while it was on its way (adversarial Д): the sheet is not opened, but a
           // code the server wrote no longer waits for its item.
@@ -488,7 +509,7 @@ export default defineComponent({
         goOn(asked)
         pickedByCode.value = { itemId: asked.entry.id, code: asked.code }
       } catch (error) {
-        if (!stillAsked(asked)) return
+        if (!alive || !stillAsked(asked)) return
         const full = error instanceof ApiError && error.code === ERROR.BARCODES_FULL
         // Offline or error is decided after the failure (MOL-19).
         bind.value = { ...asked, phase: full ? 'full' : navigator.onLine ? 'error' : 'offline' }
@@ -503,10 +524,13 @@ export default defineComponent({
       goOn(asked)
     }
 
-    // The purchase sheet of the item asked about — with no query where the code brought it.
+    // The purchase sheet of the item asked about — with no query where the code brought it. The
+    // block that held the focus goes with the answer: the title holds it while the sheet is up, so the
+    // sheet gives it back there — gone with its opener, it fell to the body (adversarial Ф).
     function goOn(asked: Bind): void {
+      focusScreenTitle()
       if (asked.origin === 'proposedByCode') pickWithoutQuery(asked.entry)
-      else take(asked.entry, asked.learns)
+      else take(asked.entry, asked.learns, asked.at)
     }
 
     // The package in the hand is the item the catalogue holds the code for: taken as found by it.
@@ -515,6 +539,7 @@ export default defineComponent({
       if (asked?.holder == null) return
       bind.value = null
       pendingCode.value = null
+      focusScreenTitle()
       pickWithoutQuery(asked.holder)
       pickedByCode.value = { itemId: asked.holder.id, code: asked.code }
     }
@@ -531,6 +556,7 @@ export default defineComponent({
         nameTaken.value = asked.entry.name
         proposingByCode.value = asked.origin === 'proposedByCode'
       }
+      focusScreenTitle()
       proposing.value = true
     }
 
@@ -541,6 +567,9 @@ export default defineComponent({
     // A new code is a new question: a find still held for the scanner to go belongs to the code
     // before it, and would come up over «Код … не знаком» of this one (adversarial А).
     function read(code: string): void {
+      // A code on its way to an item is not dropped by another scan (adversarial Р5-Б): the answer
+      // would land with the question gone, the code written where «без кода» was said.
+      if (bind.value?.phase === 'sending') return
       foundByCode = null
       pendingCode.value = null
       bind.value = null
@@ -576,7 +605,9 @@ export default defineComponent({
     watch(query, () => {
       foundByCode = null
       lookup.clear()
-      bind.value = null
+      // Typing while the code is on its way keeps the question until it lands (adversarial Р5-Б):
+      // dropped, a new question over the same code had live answers the landing then overruled.
+      if (bind.value?.phase !== 'sending') bind.value = null
     })
 
     // Arrived by «Сканировать» on the record (В-4): the scanner is up over the screen at once, and
@@ -712,21 +743,33 @@ export default defineComponent({
     function pick(chosen: CatalogueEntry, learns = true): void {
       const code = pendingCode.value
       if (code !== null) {
-        bind.value = { entry: chosen, code, learns, origin: 'pick', phase: 'ask', holder: null }
+        bind.value = {
+          entry: chosen,
+          code,
+          learns,
+          origin: 'pick',
+          at: pickedAt(),
+          phase: 'ask',
+          holder: null,
+        }
         return
       }
       take(chosen, learns)
     }
 
-    function take(chosen: CatalogueEntry, learns: boolean): void {
+    function pickedAt(): PickedAt {
+      const found = phase.value === 'ready' || phase.value === 'far'
+      return { found, text: found ? answered.value : query.value }
+    }
+
+    function take(chosen: CatalogueEntry, learns: boolean, at: PickedAt = pickedAt()): void {
       opened.value += 1
       pickedByCode.value = null
       // Something else taken answers the code's question too: a retry of it must not come over the
       // sheet now opening (adversarial Ж′).
       foundByCode = null
       lookup.clear()
-      const found = phase.value === 'ready' || phase.value === 'far'
-      const text = found ? answered.value : query.value
+      const { found, text } = at
       const missed = takeMissed(text)
       const word = learns && found ? missed : null
       entry.pick({ entry: chosen, query: text, ...(word === null ? {} : { missedQuery: word }) })
@@ -825,6 +868,7 @@ export default defineComponent({
           code: waiting,
           learns: false,
           origin: fromCode ? 'proposedByCode' : 'proposed',
+          at: pickedAt(),
           phase: 'ask',
           holder: null,
         }
@@ -842,6 +886,7 @@ export default defineComponent({
       recent.sync()
     })
     onUnmounted(() => {
+      alive = false
       withdraw?.()
       withdrawCode?.()
       withdrawBind?.()

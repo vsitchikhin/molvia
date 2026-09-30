@@ -13,7 +13,7 @@ beforeEach(() => {
 describe('the search typed, across a reload (MOL-46)', () => {
   it('gives back the query and the miss it was handed', () => {
     keepSearchDraft(OWNER, { query: 'мацони', missed: 'кефир' })
-    expect(recallSearchDraft(OWNER)).toEqual({ query: 'мацони', missed: 'кефир' })
+    expect(recallSearchDraft(OWNER)).toEqual({ query: 'мацони', missed: 'кефир', code: null })
   })
 
   it('keeps it on this window’s shelf only — another window must not come up with it', () => {
@@ -35,7 +35,7 @@ describe('the search typed, across a reload (MOL-46)', () => {
 
   it('keeps a miss through an erased field — the next pick still learns from it', () => {
     keepSearchDraft(OWNER, { query: '', missed: 'кефир' })
-    expect(recallSearchDraft(OWNER)).toEqual({ query: '', missed: 'кефир' })
+    expect(recallSearchDraft(OWNER)).toEqual({ query: '', missed: 'кефир', code: null })
   })
 
   it('reads a shelf it cannot parse as nothing', () => {
@@ -53,5 +53,11 @@ describe('the search typed, across a reload (MOL-46)', () => {
     keepSearchDraft(OWNER, { query: 'кефир', missed: null })
     forgetOwner(OWNER)
     expect(recallSearchDraft(OWNER)).toBeNull()
+  })
+
+  it('keeps a code waiting for its item, alone as much as beside a query (MOL-100, Р5-Г)', () => {
+    keepSearchDraft(OWNER, { query: '', missed: null, code: '4850001234562' })
+
+    expect(recallSearchDraft(OWNER)).toEqual({ query: '', missed: null, code: '4850001234562' })
   })
 })

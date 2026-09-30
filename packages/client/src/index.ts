@@ -194,8 +194,9 @@ export interface MolviaClient {
   ): Promise<CatalogueSearchResponse>
   /**
    * «Предложить товар». `created` is `false` when the catalogue already held an item of this
-   * kind by the same name — the entry is then that item, and the fields sent were not applied; the
-   * codes sent were written to it all the same (MOL-100). `taken` when another item holds a code.
+   * kind by the same name — the entry is then that item, and neither the fields nor the codes sent
+   * were written (MOL-100, В-5): the screen asks whether the code is its. `taken` when another item
+   * holds a code.
    */
   proposeItem(input: ProposedItem): Promise<CatalogueWrite>
   /**

@@ -479,6 +479,21 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
         })
     })
 
+    test('an answer that opens the purchase sheet: closed, the sheet leaves the focus on the page, never the body (Ф)', async ({
+      page,
+    }) => {
+      const code = freshCode()
+      const name = `Кефир ${tag} ф5`
+      await asked(page, name, code)
+
+      await page.getByRole('button', { name: 'Record without the code' }).click()
+      const sheet = await sheetOf(page, name)
+      await page.keyboard.press('Escape')
+
+      await expect(sheet).toBeHidden()
+      await expect.poll(async () => (await focused(page)).body).toBe(false)
+    })
+
     test('«Unlink?»: the focus on «Cancel», back on «not this item?», and after the unlink never the body', async ({
       page,
     }) => {

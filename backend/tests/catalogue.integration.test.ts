@@ -895,6 +895,9 @@ describe('writing a code — the second round of review (MOL-100)', () => {
     await attach(actor, cream.id, { code: '04252614' })
     expect((await codesOf(cream.id)).map((row) => row.code)).toEqual(['0042100005264'])
 
+    // Found by the eight it was written from too (adversarial Р5-В), then let go by them.
+    expect(held(await byCode(actor, code('04252614')))?.id).toBe(cream.id)
+
     const reply = await detach(actor, cream.id, code('04252614'))
 
     expect(reply.statusCode).toBe(204)

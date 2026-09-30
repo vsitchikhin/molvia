@@ -1232,7 +1232,7 @@ describe('«What did you pick up?»', () => {
         })
       })
 
-      it('drops an answer that lands after typing went on, and the code still waits', async () => {
+      it('keeps the question while the code is on its way, typing or not, and says «taken» when it lands (Р5-Б)', async () => {
         let land!: (written: CatalogueWrite) => void
         attachBarcode.mockReturnValue(new Promise((resolve) => (land = resolve)))
         const view = await render()
@@ -1240,12 +1240,61 @@ describe('«What did you pick up?»', () => {
         await button(view, en.item.barcode.bind).trigger('click')
 
         await field(view).setValue('сметана ашх')
+        expect(view.text()).toContain(question)
+        expect(view.text()).not.toContain(pending)
         land({ taken: kefir })
+
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(
+            en.item.barcode.taken.replace('{code}', CODE).replace('{name}', kefir.name),
+          )
+        })
+        expect(useItemEntryStore(pinia).picked).toBeNull()
+      })
+
+      it('must not read another code while one is on its way (Р5-Б)', async () => {
+        attachBarcode.mockReturnValue(new Promise(() => undefined))
+        const view = await render()
+        await pickAfterMiss(view)
+        await button(view, en.item.barcode.bind).trigger('click')
+        catalogueByBarcode.mockClear()
+
+        const scan = view.get(`button[aria-label="${en.item.barcode.scan}"]`)
+        expect(scan.attributes('aria-disabled')).toBe('true')
+        view.findComponent(ScannerStub).vm.$emit('read', '4850000000014')
+        await nextTick()
+
+        expect(catalogueByBarcode).not.toHaveBeenCalled()
+        expect(view.text()).toContain(question)
+      })
+
+      it('writes nothing into the store when the answer lands after the screen was left (Р5-А)', async () => {
+        let land!: (written: CatalogueWrite) => void
+        attachBarcode.mockReturnValue(new Promise((resolve) => (land = resolve)))
+        const shown = ref(true)
+        const view = await render(shown)
+        await pickAfterMiss(view)
+        await button(view, en.item.barcode.bind).trigger('click')
+
+        shown.value = false
+        await nextTick()
+        land({ entry: cream, created: true })
         await new Promise((resolve) => setTimeout(resolve, 0))
 
-        expect(view.text()).not.toContain(kefir.name)
-        expect(view.text()).toContain(pending)
         expect(useItemEntryStore(pinia).picked).toBeNull()
+      })
+
+      it('keeps the waiting code across a reload of the window (Р5-Г)', async () => {
+        const first = await render()
+        await scan(first, CODE)
+        await vi.waitFor(() => {
+          expect(first.text()).toContain(missing)
+        })
+        await field(first).setValue('сметана')
+        // A reload tears the page down without unmounting anything: the shelf is what is left.
+        const view = await render()
+
+        expect(view.text()).toContain(pending)
       })
 
       it('says an item full of codes in its own words, and records without the code (review В)', async () => {
@@ -1301,7 +1350,7 @@ describe('«What did you pick up?»', () => {
         expect(view.text()).toContain(en.item.propose.code.replace('{code}', CODE))
       })
 
-      it('lets the code go when «linked» lands after typing — the server holds it now (adversarial Д)', async () => {
+      it('goes on with the query the row was picked on when «linked» lands after typing (Р5-Б)', async () => {
         let land!: (written: CatalogueWrite) => void
         attachBarcode.mockReturnValue(new Promise((resolve) => (land = resolve)))
         const view = await render()
@@ -1310,10 +1359,11 @@ describe('«What did you pick up?»', () => {
 
         await field(view).setValue('сметана ашх')
         land({ entry: cream, created: true })
-        await new Promise((resolve) => setTimeout(resolve, 0))
 
+        await vi.waitFor(() => {
+          expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
+        })
         expect(view.text()).not.toContain(pending)
-        expect(useItemEntryStore(pinia).picked).toBeNull()
       })
 
       it('asks about the item the catalogue already holds under the name proposed (В-5)', async () => {

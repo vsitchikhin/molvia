@@ -176,6 +176,8 @@ lies on an iPad (as MOL-132 Р-3).
   only what was taken in the same form — scanned what was scanned, typed what was typed; MOL-98 Р-11
   named it for typing, and it now holds for scanning as well. Symmetric everywhere, swept over all
   twenty million eight digits led by `0` or `1`.
+- **Eight that check only as UPC-E are looked up as the thirteen they are written as** (MOL-100,
+  adversarial Р5-В): the lookup asks the twins of the written form too (`barcodeWriteForm`).
 - **Twelve digits and a GTIN-14 led by `0` are looked up as the thirteen too** (adversarial З): the
   API is the one write path and keeps the rule, and a client that does not repeat the phone's — the
   bot repeats none — still finds the package.
@@ -307,13 +309,23 @@ codes too, and a wrong one needs a way out (В-1, below).
 - **A code nobody holds waits for its item.** Once the server says «не знаком» the code is kept
   (`pendingCode`) — only then: a code not asked about for want of a network may well be held. Typing no
   longer drops it: a strip «Код … ждёт позицию» stands over the search, and × lets it go. Proposed with
-  «Предложить товар» from anywhere on the screen while it waits, the code goes with the item.
+  «Предложить товар» from anywhere on the screen while it waits, the code goes with the item. **It is kept
+  in the search draft** with the query (adversarial Р5-Г): a new version reloads the page with only the
+  strip up, and the code, lost, made the next pick ask nothing.
 - **A pick while a code waits asks first** — «Привязать код … к „…“?» — in a block where the code's
   block stood, not in a sheet (В-2): «taken», «no network» or an error is then said where the person
   is, and the purchase sheet comes only after the answer, one sheet at a time. The rows go while the
-  question stands, the focus goes to its first answer and the question is said out loud. **An answer
-  «written» that lands after typing went on** opens no sheet, but the code no longer waits: the server
-  holds it (Р-13, adversarial Д). **While the code is on its way the other answers wait** (review Б): «без кода» then would be written with the code anyway, and «другой товар» would meet it at the very item it was said not to be. **Three
+  question stands, the focus goes to its first answer and the question is said out loud. **While the
+  code is on its way nothing takes the question away** (review Б, adversarial Р5-Б): the other answers
+  wait, typing leaves the question standing, and the scanner reads nothing — dropped, a question asked
+  again over the same code had live answers the landing then overruled: «без кода» written with the code,
+  «другой товар» met at the very item it was said not to be. The answer goes on with the query the row
+  was picked on, not what was typed since. **An answer that lands after the screen was left is nobody's**
+  (adversarial Р5-А): written into the store, it opened a purchase sheet by itself on the next visit.
+  **An answer that opens a sheet puts the focus on the screen's title first** (adversarial Ф): the block
+  that held it goes with the answer, and the sheet, closed, gives the focus back to what held it when it
+  opened — the title rather than nothing; not the field, whose focus would raise a keyboard under the
+  sheet. **Three
   answers**: «Привязать и записать»; «Записать без кода» — the code is let go; «Это другой товар —
   предложить» — the item found by name is not the package, and the code goes with the one proposed,
   whose name starts from what was typed — and if that name is one the catalogue holds, it is asked about
@@ -324,12 +336,12 @@ codes too, and a wrong one needs a way out (В-1, below).
   query, and «другой товар» starts empty — the word in the field before the scan is nobody's word for it. **The question names who will see it** — «все, кто
   отсканирует этот код, увидят эту позицию» — **and is asked for any item** (В-3), the seed's common
   «Молоко» included: the seed has no mark of its own (`created_by` is null for the erased as well), and
-  the person with the package decides, the last answer at hand. Typing drops the question, and the code
-  still waits.
+  the person with the package decides, the last answer at hand. Typing drops a question not yet
+  answered, and the code still waits.
 - **Taken** — «Код … уже у „…“»: «Взять „…“» takes the holder as found by the code, with no query;
   «Записать „…“ без кода» goes on with the row picked. **No network** is an offline state with
   «Повторить» and «Записать без кода» — the catalogue has no queue, as «Предложить товар» has none; an
-  error is red with «Повторить» and the same way out. **An item holding twenty codes** is said in the words of `error.barcodes_full`, with no «Повторить» — asking again changes nothing (review В); so is it on «Предложить товар» by a name already there. A retry of a write waits for a tap: nothing is
+  error is red with «Повторить» and the same way out. **An item holding twenty codes** is said in the words of `error.barcodes_full`, with no «Повторить» — asking again changes nothing (review В). A retry of a write waits for a tap: nothing is
   sent by itself.
 - **A code written is remembered for offline** as one found is: the item it went to goes into «Часто
   берёте» with it once it is added to a record.
