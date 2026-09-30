@@ -1,14 +1,20 @@
 ---
 paths:
   - 'packages/model/src/entities/barcode.ts'
+  - 'backend/src/usecases/find-by-barcode.*'
   - 'packages/model/tests/entities/barcode.test.ts'
   - 'frontend/src/scanner/**'
   - 'frontend/src/components/BarcodeScannerSheet.*'
-  - 'frontend/src/composables/{useCamera,useBarcodeScan}.*'
+  - 'frontend/src/composables/{useCamera,useBarcodeScan,useBarcodeLookup}.*'
   - 'e2e/{scanner.spec,barcode-video}.ts'
+  - 'backend/src/routes/catalogue.ts'
+  - 'backend/tests/catalogue.integration.test.ts'
+  - 'frontend/src/views/{ItemSearchView,TripView}*'
+  - 'frontend/src/components/CatalogueCombobox*'
+  - 'frontend/src/stores/{itemEntry,recentItems}*'
 ---
 
-# Barcodes: the scanner, a code typed by hand
+# Barcodes: the scanner, a code typed by hand, the item by its code
 
 The detail behind the barcode lines of `CLAUDE.md`. The scanner came in with MOL-98; finding an item
 by its code is MOL-99, a code in «Предложить товар» and bound to an item is MOL-100.
@@ -17,8 +23,7 @@ by its code is MOL-99, a code in «Предложить товар» and bound t
 
 - **A sheet that hands over a code and closes** (`BarcodeScannerSheet`, owner's decision В-4): the
   kit's `BottomSheet` with a live viewfinder, so «back», Esc and × close it as they close any sheet.
-  What the code is for is the opener's. Until MOL-99 it opens only on `/_kit`, which is why the
-  production bundle holds no scanner yet (owner's decision В-2).
+  What the code is for is the opener's: «Что взяли?» finds the item by it (MOL-99, below).
 - **EAN-13, EAN-8, UPC-A and UPC-E, nothing else** (`READER_OPTIONS`). A QR or a Code 128 on the
   same package is not the item's code, and every format read beyond these is one more chance of a
   false read. That the scanner reads EAN and not QR is the reason the Telegram Mini App was dropped.
@@ -140,3 +145,79 @@ lies on an iPad (as MOL-132 Р-3).
   each other's.
 - **Without a grant Chromium refuses the camera**, which is the spec of «no permission»; «no camera»
   replaces `getUserMedia` in an init script.
+
+## The item by its code (MOL-99)
+
+- **Where it opens** (owner's decision В-4): from the field of «Что взяли?», and from «Сканировать
+  штрихкод» on the record beside «Добавить позицию», which opens «Что взяли?» with the scanner already
+  up — one tap less at the shelf; put away, it leaves the search by name. The ask lives in memory
+  (`itemEntry.askToScan`), so a reload of the search is not a tap on «Сканировать».
+- **`GET /catalogue/barcode?code=…`, the code in the query, not the path**: the API logs a request
+  as its path (MOL-58), and a code is what a person bought. The answer is `200 { item | null }`: a
+  miss is an ordinary outcome, and a `404` would read the same as one from a Wi-Fi portal. A code of
+  no barcode's shape is the same `null`, without asking the database. Behind the door like the
+  search; nobody's picks take part.
+- **Looked up with its twins, the code as read first** (`barcodeTwins`, owner's decision В-3, review
+  С-14). Eight digits that check both as EAN-8 and as UPC-E are the one case of two forms: scanned as
+  EAN-8 they stay eight, typed they are thirteen (`typedBarcode`), and the other way round for a UPC-E
+  of number system `1`. The lookup takes both, which lifts both named prices of MOL-98 Р-11 without
+  touching `typedBarcode`. One UPC-A may be reached by two UPC-E forms (`012340000053` by `01234543`
+  and `01234053`); a form that checks as EAN-8 is a twin like any other. **The named price:** a shop's
+  own EAN-8 label and a UPC-E product with the same digits find each other — rare on an Armenian
+  shelf, and the name on the sheet shows it.
+- **The pair holds only where it is one both ways: one EAN-8 folds into the thirteen** (adversarial Г,
+  Г′, review С-7). Two shop labels with different digits may expand to one UPC-A — `00000055` and
+  `00000505` both to `000000000055`, some one in five of the eight digits that check both ways — and
+  the thirteen no longer say which label they came from. Guessing put the other shop's item on the
+  sheet, silently: from the thirteen typed, and from the eight scanned when the other label had been
+  typed. So such a label and its thirteen are each only themselves. **The price:** such a label finds
+  only what was taken in the same form — scanned what was scanned, typed what was typed; MOL-98 Р-11
+  named it for typing, and it now holds for scanning as well. Symmetric everywhere, swept over all
+  twenty million eight digits led by `0` or `1`.
+- **Twelve digits and a GTIN-14 led by `0` are looked up as the thirteen too** (adversarial З): the
+  API is the one write path and keeps the rule, and a client that does not repeat the phone's — the
+  bot repeats none — still finds the package.
+- **No HEAD twin**, as no GET of the API has one (adversarial В): Fastify runs the whole handler for
+  it, and the length of a bodiless answer tells found from not.
+- **The item found goes to the purchase sheet with no query**: a code is not one, so neither a pick
+  nor the person's own word (`admits`) is written. The miss held from before is used up all the
+  same, as by any sheet opened after it (MOL-45). The sheet waits for the scanner to be put away —
+  its close is a step back through history, as «Предложить товар»'s is. **A find held for that
+  belongs to its code**: the next code read, or typing, drops it (adversarial А) — a second scan while
+  the first answer is on its way is exactly what a person does when nothing seems to happen, and the
+  first item came up over «Код … не знаком» of the second.
+- **A miss** says «Код … справочнику не знаком» on the screen and out loud, and offers «Предложить
+  товар» — without the code until MOL-100 takes codes there (owner's decision В-1). **Proposed from
+  there, the item was looked for by the code**: the name starts empty, whatever the field held before
+  the scan, the pick carries no query, and the block goes once the item is proposed (adversarial Д,
+  review С-5). An error is red with «Повторить»; typing gives the search back and drops a lookup
+  still out. **Under the code's answer the search says nothing**: its rows are not shown, and an
+  answer landing then read «найдено два» over «не знаком» (adversarial Б).
+- **Offline and error ask again once the connection is back**, quietly — the block stays until the
+  answer replaces it — as the search does (`useReconnect`, adversarial Ж). **What that retry finds
+  does not open a sheet**: it says «По коду … нашлось» with the item as a button, and the sheet comes
+  from the tap (adversarial Ж′, review С-8). The retry comes with a phone unlocked, over whatever the
+  person opened meanwhile — it took a purchase sheet with its price typed away — and a sheet laid
+  without a tap is one Chrome skips on «back». **Taking another item answers the code's question
+  too**: a pick drops the lookup, so nothing is asked again under the sheet it opened.
+- **Offline, the device knows the codes it found items by** (owner's decision В-2): an item found by
+  a code and added to a record keeps that code beside «Часто берёте», under
+  `molvia.recent-codes.<owner>` — beside the list, not in its rows, so a row an older version wrote
+  stays readable — and only while the item is on the list. Looked up with the twins, as the server
+  does. A server that fails is asked of the device too before the screen says «error». The price:
+  an item only ever taken by its name is not found by its code without a network.
+- **The reader lives with the screen, not the sheet** (review С-12а): a second scan on the same
+  screen is warm, and leaving the screen — which a found item always does — lets it go. So the sheet
+  stays mounted closed, and **a scanner put away draws nothing**: its skeleton kept «Загрузка…» in
+  the app's live region over the search's answer. **Put away means after the slide down**, not at
+  `open: false` and not at `onClosed`, which comes as the dialog closes — when the slide starts:
+  emptied then, every scan and every × slid down as a bare title, 92 px of 249 (adversarial Е,
+  measured frame by frame in Chromium). The refusal it slides down with is the one it showed, not
+  what the stopped camera says, and **the viewfinder slides down with its last frame, drawn**: the
+  close copies the live frame onto a canvas over the video (`holdStill`), then stops every track —
+  the indicator goes out at once, as it must. Keeping the stream on the video instead held nothing:
+  a stopped track is black in Chromium, stream on it or not (adversarial Е′, Е″, measured on the
+  screen, not on `srcObject` — a test of the stream passed while the eye got black). The frame goes
+  when the sheet is put away. The skeleton alone goes at `open: false`: brought up by the stopped
+  camera, it would say «Загрузка…» for nothing.
+- **Not yet:** a code by its item on «Что брать» (its own search, MOL-128), writing a code — MOL-100.

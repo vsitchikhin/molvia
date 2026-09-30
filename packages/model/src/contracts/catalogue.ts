@@ -79,6 +79,27 @@ export const catalogueSearchResponseSchema = z.strictObject({
 export type CatalogueSearchResponse = z.infer<typeof catalogueSearchResponseSchema>
 
 /**
+ * The query string of `GET /catalogue/barcode` (MOL-99). The code travels in the query, not in
+ * the path: the API logs a request as its path (MOL-58), and a code is what a person bought.
+ * Strict, as the search's is. The code's shape is not checked here: a code of no barcode's shape
+ * is answered as a code nobody holds, one answer for both.
+ */
+export const catalogueBarcodeQuerySchema = z.strictObject(
+  { code: z.string({ error: ISSUE.QUERY_INVALID }) },
+  { error: ISSUE.QUERY_INVALID },
+)
+export type CatalogueBarcodeQuery = z.infer<typeof catalogueBarcodeQuerySchema>
+
+/**
+ * The item holding a code, or `null` — nothing holding it is an ordinary outcome of the screen,
+ * not an error: a `404` would read the same as one from a Wi-Fi portal. Strict, as the search's.
+ */
+export const catalogueBarcodeResponseSchema = z.strictObject({
+  item: catalogueEntryCodec.nullable(),
+})
+export type CatalogueBarcodeResponse = z.infer<typeof catalogueBarcodeResponseSchema>
+
+/**
  * The body of «Предложить товар» in 0.1: products only, and no barcodes.
  *
  * Venues and dishes arrive with 0.3, and until then the search records every visit on the
