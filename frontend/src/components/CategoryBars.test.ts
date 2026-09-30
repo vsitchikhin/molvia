@@ -14,6 +14,7 @@ function month(value: string): MoneyMonthView {
     month: value,
     spent: parseMoney('25000', 'AMD'),
     byCategory: [{ categoryId: CLOTHES, amount: parseMoney('25000', 'AMD') }],
+    slices: [{ categoryId: CLOTHES, amount: parseMoney('25000', 'AMD'), count: 1, level: 1000 }],
     categories: [{ id: CLOTHES, preset: 'clothes', name: null, colour: null, archived: false }],
   } as MoneyMonthView
 }

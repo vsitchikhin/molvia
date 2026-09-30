@@ -58,6 +58,7 @@ function page(days: [string, ReturnType<typeof entry>[]][], cursor: JournalKey |
     rateKind: 'live',
     previousSpent: null,
     byCategory: [],
+    slices: [],
     categories: [{ id: BEAUTY, preset: 'beauty', name: null, colour: null, archived: false }],
     days: days.map(([day, entries]) => ({ day, total: amd('1000'), estimated: false, entries })),
     cursor,

@@ -75,6 +75,7 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     rateKind: 'live',
     previousSpent: amd('345620'),
     byCategory: [{ categoryId: BEAUTY, amount: amd('5000') }],
+    slices: [{ categoryId: BEAUTY, amount: amd('5000'), count: 1, level: 1000 }],
     categories: [{ id: BEAUTY, preset: 'beauty', name: null, colour: null, archived: false }],
     days: [
       {
@@ -121,6 +122,7 @@ const empty = () =>
     accountsRemoved: false,
     previousSpent: null,
     byCategory: [],
+    slices: [],
     days: [],
   })
 
