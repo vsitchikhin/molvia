@@ -1,7 +1,7 @@
 /* eslint-disable vue/one-component-per-file -- the scanner's stub and the harness, not components of the app */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref } from 'vue'
-import { mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
+import { flushPromises, mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import type { Pinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -1079,6 +1079,23 @@ describe('«What did you pick up?»', () => {
       })
     })
 
+    it('says a shop’s own label is one, asks nothing and keeps no code waiting (MOL-100, В-4)', async () => {
+      const view = await render()
+
+      await scan(view, '20000011')
+
+      const label = en.item.barcode.in_store.replace('{code}', '20000011')
+      expect(view.text()).toContain(label)
+      expect(view.text()).toContain(en.item.barcode.in_store_body)
+      expect(catalogueByBarcode).not.toHaveBeenCalled()
+      expect(view.findAll('button').some((b) => b.text() === en.item.empty.action)).toBe(false)
+      await vi.waitFor(() => {
+        expect(view.get('.live').text()).toBe(label)
+      })
+      await field(view).setValue('сыр')
+      expect(view.text()).not.toContain(en.item.barcode.pending.replace('{code}', '20000011'))
+    })
+
     describe('a code nobody holds waits for its item (MOL-100)', () => {
       const cream = entry(11, 'Сметана Ашхар 20%')
       const kefir = entry(12, 'Кефир 1%')
@@ -1280,6 +1297,51 @@ describe('«What did you pick up?»', () => {
         expect(view.text()).toContain(en.item.propose.code.replace('{code}', CODE))
       })
 
+      it('lets the code go when «linked» lands after typing — the server holds it now (adversarial Д)', async () => {
+        let land!: (written: CatalogueWrite) => void
+        attachBarcode.mockReturnValue(new Promise((resolve) => (land = resolve)))
+        const view = await render()
+        await pickAfterMiss(view)
+        await button(view, en.item.barcode.bind).trigger('click')
+
+        await field(view).setValue('сметана ашх')
+        land({ entry: cream, created: true })
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(view.text()).not.toContain(pending)
+        expect(useItemEntryStore(pinia).picked).toBeNull()
+      })
+
+      it('asks about the item the catalogue already holds under the name proposed (В-5)', async () => {
+        searchCatalogue.mockResolvedValue([])
+        proposeItem.mockResolvedValue({ entry: cream, created: false })
+        vi.spyOn(performance, 'now').mockReturnValue(0)
+        const view = await render()
+        await scan(view, CODE)
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(missing)
+        })
+
+        await button(view, en.item.empty.action).trigger('click')
+        vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        await view.get<HTMLInputElement>('dialog input[type="text"]').setValue(cream.name)
+        const litre = view
+          .findAll('dialog label')
+          .find((label) => label.text() === en.item.unit_l)
+          ?.find('input')
+        await litre?.setValue(true)
+        await button(view, en.item.propose.submit).trigger('click')
+        await flushPromises()
+        window.dispatchEvent(new PopStateEvent('popstate'))
+
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(question)
+        })
+        expect(useItemEntryStore(pinia).picked).toBeNull()
+        expect(attachBarcode).not.toHaveBeenCalled()
+      })
+
       it('drops the question when typing goes on, and the code still waits', async () => {
         const view = await render()
         await pickAfterMiss(view)
@@ -1359,6 +1421,8 @@ describe('«What did you pick up?»', () => {
         await new Promise((resolve) => setTimeout(resolve, 5))
 
         await button(view, en.item.barcode.not_this.replace('{code}', CODE)).trigger('click')
+        await nextTick()
+        await button(view, en.item.barcode.detach).trigger('click')
 
         expect(detachBarcode).toHaveBeenCalledWith(kefir.id, CODE)
         window.dispatchEvent(new PopStateEvent('popstate'))
@@ -1546,7 +1610,7 @@ describe('«What did you pick up?»', () => {
       const view = await render()
       await view.get(`button[aria-label="${en.item.barcode.scan}"]`).trigger('click')
       const scanner = view.findComponent(ScannerStub)
-      scanner.vm.$emit('read', '00408295')
+      scanner.vm.$emit('read', '10000076')
       scanner.vm.$emit('update:open', false)
       await nextTick()
       ;(scanner.props('onClosed') as () => void)()
@@ -1554,7 +1618,7 @@ describe('«What did you pick up?»', () => {
         expect(useItemEntryStore(pinia).picked?.entry).toEqual(milk)
       })
       await nextTick()
-      expect(useRecentItemsStore(pinia).byCode('00408295')).toBeNull()
+      expect(useRecentItemsStore(pinia).byCode('10000076')).toBeNull()
       vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
       await new Promise((resolve) => setTimeout(resolve, 5))
 
@@ -1565,7 +1629,7 @@ describe('«What did you pick up?»', () => {
       expect(write).toMatchObject({ kind: 'add', entry: milk })
       if (write?.kind === 'add') expect(write.body.query).toBeUndefined()
       // Typed from the label it is thirteen digits, and finds it all the same (С-14).
-      expect(useRecentItemsStore(pinia).byCode('0004082000095')).toEqual(milk)
+      expect(useRecentItemsStore(pinia).byCode('0100000000076')).toEqual(milk)
     })
 
     it('lets only the first sheet after a miss take it along: put back, the miss is gone (review И)', async () => {

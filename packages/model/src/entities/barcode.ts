@@ -100,8 +100,23 @@ export function barcodeTwins(code: string): string[] {
  * scanner could have read: they are written as the thirteen it reads that UPC-E as, since
  * `barcodeTwins` pairs no eight that fail as EAN-8, and kept as eight they would be found by
  * nothing and let the same package onto another item (review А).
+ *
+ * A GTIN-14 of a case (led by `1`–`8`) is refused as no barcode's shape the phone knows: the scanner
+ * does not read ITF-14 and the digits typed take no fourteen, so it would be found by nothing and
+ * hold one of the twenty places for good (Р-12). A shop's own code is refused too (`inStoreBarcode`,
+ * owner's decision В-4).
  */
 export function writtenBarcode(code: string): TypedBarcode {
+  const form = barcodeWriteForm(code)
+  if (!form.ok) return form
+  return inStoreBarcode(form.code) ? { ok: false, error: ERROR.BARCODE_IN_STORE } : form
+}
+
+/**
+ * The form `writtenBarcode` writes a code in, whoever's code it is — for letting a code go (review
+ * К), which must find the row whatever form the code came in, and for judging repeats in one list.
+ */
+export function barcodeWriteForm(code: string): TypedBarcode {
   if (!barcodeSchema.safeParse(code).success) return { ok: false, error: ERROR.BARCODE_SHAPE }
   if (code.length === 8) {
     if (checks(code)) return { ok: true, code }
@@ -110,10 +125,33 @@ export function writtenBarcode(code: string): TypedBarcode {
       ? { ok: true, code: `0${upcA}` }
       : { ok: false, error: ERROR.BARCODE_CHECK_DIGIT }
   }
+  if (code.length === 14 && !code.startsWith('0')) return { ok: false, error: ERROR.BARCODE_SHAPE }
   if (!checks(code)) return { ok: false, error: ERROR.BARCODE_CHECK_DIGIT }
   if (code.length === 12) return { ok: true, code: `0${code}` }
-  if (code.length === 14 && code.startsWith('0')) return { ok: true, code: code.slice(1) }
+  if (code.length === 14) return { ok: true, code: code.slice(1) }
   return { ok: true, code }
+}
+
+/**
+ * A shop's own code, not a product's (MOL-100, owner's decision В-4): GS1 leaves numbers of
+ * «restricted circulation» to the shop — EAN-13 led by `020`–`029`, `040`–`049` and `200`–`299`
+ * (UPC-A of number systems `2` and `4` among them), EAN-8 led by `0` or `2`. The scales print one
+ * on every package of loose goods, the item's number in that shop and its weight or price: another
+ * package is another code, and the same digits in another shop are another item. So such a code is
+ * never written to the shared catalogue, and the screen says what it is instead of asking to link it.
+ *
+ * Eight digits are an EAN-8 here — the scanner reads a UPC-E as thirteen, and `typedBarcode` keeps
+ * eight only where they are no UPC-E it can tell.
+ */
+export function inStoreBarcode(code: string): boolean {
+  const thirteen =
+    code.length === 12
+      ? `0${code}`
+      : code.length === 14 && code.startsWith('0')
+        ? code.slice(1)
+        : code
+  if (thirteen.length === 8) return /^[02]/.test(thirteen)
+  return thirteen.length === 13 && /^(02|04|2)/.test(thirteen)
 }
 
 /**
@@ -141,6 +179,12 @@ export function hasRepeatedBarcode(codes: readonly string[]): boolean {
  * ten also checks as EAN-8. A leading `0` settles it for UPC-E — an EAN-8 starting with `0` is a
  * shop's in-house code, not a product's — and anything else checking as EAN-8 is EAN-8. The one
  * case left, a UPC-E of number system `1` that also checks as EAN-8, is read as EAN-8.
+ *
+ * Except where the thirteen would not say which eight they came from (MOL-100, Р-14): eight led by
+ * `0` that check both ways and whose UPC-A folds back into more than one EAN-8 — `00000055` and
+ * `00000505` are two shops' labels and one UPC-A. Such digits stay eight, as the scanner reads the
+ * label: expanded, two labels were written as one code. The price: a real UPC-E with such digits,
+ * typed, is found only by its scan.
  */
 export function typedBarcode(input: string): TypedBarcode {
   const digits = input.replace(DROPPED, '')
@@ -148,7 +192,13 @@ export function typedBarcode(input: string): TypedBarcode {
   if (digits.length === 8) {
     const upcE = /^[01]/.test(digits) ? expandUpcE(digits) : null
     const isUpcE = upcE !== null && checks(upcE)
-    if (isUpcE && (digits.startsWith('0') || !checks(digits))) return { ok: true, code: `0${upcE}` }
+    const label =
+      upcE !== null && digits.startsWith('0') && checks(digits) && isUpcE
+        ? compressUpcA(upcE).filter(checks).length > 1
+        : false
+    if (isUpcE && !label && (digits.startsWith('0') || !checks(digits))) {
+      return { ok: true, code: `0${upcE}` }
+    }
     return checks(digits)
       ? { ok: true, code: digits }
       : { ok: false, error: ERROR.BARCODE_CHECK_DIGIT }

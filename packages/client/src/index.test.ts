@@ -662,6 +662,18 @@ describe('the catalogue', () => {
     })
   })
 
+  it('reads each status by its own schema: «taken» only with 409, the entry only with 2xx (review И)', async () => {
+    const takenUnder200 = clientReplying(200, { taken: entryWire })
+    const entryUnder409 = clientReplying(409, entryWire)
+
+    await expect(
+      takenUnder200.client.attachBarcode(entryWire.id, '4850001234562'),
+    ).rejects.toMatchObject({ code: ISSUE.RESPONSE_INVALID })
+    await expect(
+      entryUnder409.client.attachBarcode(entryWire.id, '4850001234562'),
+    ).rejects.toBeInstanceOf(ApiError)
+  })
+
   it('writes a code to an item with the code in the body, never the path (MOL-100)', async () => {
     const { client, calls } = clientReplying(201, entryWire)
 

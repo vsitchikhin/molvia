@@ -130,9 +130,13 @@ export type { MolviaBotClient, BotClientOptions } from './bot'
 export type CatalogueWrite =
   { readonly entry: CatalogueEntry; readonly created: boolean } | { readonly taken: CatalogueEntry }
 
-const catalogueWriteSchema = z.union([catalogueEntryCodec, barcodeTakenSchema])
+/** «Занят» comes with a 409 and is read only there; a 2xx is read only as the entry (review И). */
+const TAKEN = { 409: barcodeTakenSchema } as const
 
-function writeOf(status: number, data: z.output<typeof catalogueWriteSchema>): CatalogueWrite {
+function writeOf(
+  status: number,
+  data: CatalogueEntry | z.output<typeof barcodeTakenSchema>,
+): CatalogueWrite {
   return 'taken' in data ? { taken: data.taken } : { entry: data, created: status === 201 }
 }
 
@@ -521,10 +525,10 @@ export function createClient(options: ClientOptions): MolviaClient {
     proposeItem: async (input) => {
       // An ordinary timeout, unlike the first visit: an abort may leave the item written, and
       // a retry is still safe — the server answers an exact repeat with the item already there.
-      const { status, data } = await exchange('/catalogue/items', catalogueWriteSchema, {
+      const { status, data } = await exchange('/catalogue/items', catalogueEntryCodec, {
         method: 'POST',
         body: encode(proposedItemSchema, input),
-        answers: [409],
+        answers: TAKEN,
       })
       return writeOf(status, data)
     },
@@ -532,8 +536,8 @@ export function createClient(options: ClientOptions): MolviaClient {
     attachBarcode: async (itemId, code) => {
       const { status, data } = await exchange(
         `/catalogue/items/${segment(itemId.toLowerCase())}/barcodes`,
-        catalogueWriteSchema,
-        { method: 'POST', body: encode(attachBarcodeBodySchema, { code }), answers: [409] },
+        catalogueEntryCodec,
+        { method: 'POST', body: encode(attachBarcodeBodySchema, { code }), answers: TAKEN },
       )
       return writeOf(status, data)
     },

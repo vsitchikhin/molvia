@@ -98,7 +98,9 @@ export default defineComponent({
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
-    proposed: (entry: CatalogueEntry) => typeof entry.id === 'string',
+    /** `created: false` — the catalogue held the name; codes sent with it were not written (В-5). */
+    proposed: (entry: CatalogueEntry, created: boolean) =>
+      typeof entry.id === 'string' && typeof created === 'boolean',
     /** The item that holds the code already, chosen instead (MOL-100). */
     taken: (entry: CatalogueEntry) => typeof entry.id === 'string',
   },
@@ -222,7 +224,7 @@ export default defineComponent({
         const written = await api.proposeItem(parsed.data)
         if (mine !== opening) return
         if ('taken' in written) holder.value = written.taken
-        else emit('proposed', written.entry)
+        else emit('proposed', written.entry, written.created)
       } catch (error) {
         if (mine !== opening) return
         connected.value = navigator.onLine

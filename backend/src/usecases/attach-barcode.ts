@@ -1,4 +1,4 @@
-import { DomainError, ERROR, writtenBarcode } from '@molvia/model'
+import { DomainError, ERROR, barcodeWriteForm, writtenBarcode } from '@molvia/model'
 import type { Attached, ItemRepository } from '@/db/items-repository'
 
 export type { Attached }
@@ -28,11 +28,16 @@ export async function attachBarcode(
  * «Код … — не этот товар?» (MOL-100, В-1): the code let go of by the item it was wrongly written to.
  * Anyone may, as anyone may write one: the person who says so holds the package, and the code is
  * free for the item it belongs to. A code the item does not hold is let go of already.
+ *
+ * In the form a write would have given it (review К): `04252614` was written as `0042100005264`, and
+ * asked by its eight a `204` let go of nothing. A code of no barcode's form is refused, as by a write.
  */
 export async function detachBarcode(
   items: ItemRepository,
   itemId: string,
   code: string,
 ): Promise<void> {
-  if (!(await items.detachBarcode(itemId, code))) throw new DomainError(ERROR.NOT_FOUND)
+  const form = barcodeWriteForm(code)
+  if (!form.ok) throw new DomainError(form.error)
+  if (!(await items.detachBarcode(itemId, form.code))) throw new DomainError(ERROR.NOT_FOUND)
 }

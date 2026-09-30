@@ -48,6 +48,30 @@
         <span>{{ t('money.converted_package', { amount: converted }) }}</span>
         <span class="note">{{ t('money.converted_note') }}</span>
       </p>
+
+      <!-- The item came by its code (MOL-100, В-1): whoever holds the package may say it is not
+           this one. Under the form, not beside «Записать», and asked before it is done (review Ж):
+           the code goes for everyone, with no «Вернуть». -->
+      <template v-if="code">
+        <div v-if="confirming" class="detach">
+          <p class="detach-question">
+            {{ t('item.barcode.detach_question', { code, name: entry.name }) }}
+          </p>
+          <p class="caption">{{ t('item.barcode.detach_hint') }}</p>
+          <AppButton ref="detachFirst" block :busy="detaching" @click="notThis">
+            {{ t('item.barcode.detach') }}
+          </AppButton>
+          <AppButton variant="ghost" block :inactive="detaching" @click="keepCode">
+            {{ t('item.cancel') }}
+          </AppButton>
+          <p v-if="detachFailed" class="caption offline" role="alert">
+            {{ t('item.barcode.not_this_failed') }}
+          </p>
+        </div>
+        <AppButton v-else variant="ghost" block @click="askDetach">
+          {{ t('item.barcode.not_this', { code }) }}
+        </AppButton>
+      </template>
     </div>
 
     <template #footer>
@@ -64,23 +88,12 @@
         <p class="no-trip">{{ t('item.no_trip.body') }}</p>
         <AppButton size="large" block @click="leave">{{ t('item.no_trip.action') }}</AppButton>
       </template>
-      <!-- The item came by its code (MOL-100, В-1): whoever holds the package may say it is not
-           this one, and the code is let go of for the item it belongs to. Quiet — the sheet is
-           about the purchase. -->
-      <template v-if="code">
-        <AppButton variant="ghost" block :busy="detaching" @click="notThis">
-          {{ t('item.barcode.not_this', { code }) }}
-        </AppButton>
-        <p v-if="detachFailed" class="caption offline" role="alert">
-          {{ t('item.barcode.not_this_failed') }}
-        </p>
-      </template>
     </template>
   </BottomSheet>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconMenuDown from '~icons/mdi/menu-down'
@@ -370,8 +383,23 @@ export default defineComponent({
     }
 
     const recent = useRecentItemsStore()
+    const confirming = ref(false)
+    const detachFirst = ref<{ $el?: HTMLElement } | null>(null)
     const detaching = ref(false)
     const detachFailed = ref(false)
+
+    async function askDetach(): Promise<void> {
+      confirming.value = true
+      detachFailed.value = false
+      await nextTick()
+      detachFirst.value?.$el?.focus()
+    }
+
+    function keepCode(): void {
+      if (detaching.value) return
+      confirming.value = false
+      detachFailed.value = false
+    }
 
     // One step back, to the search under the sheet: the code is to be given to its item there.
     async function notThis(): Promise<void> {
@@ -416,6 +444,10 @@ export default defineComponent({
       submit,
       remove,
       leave,
+      confirming,
+      detachFirst,
+      askDetach,
+      keepCode,
       detaching,
       detachFailed,
       notThis,
@@ -506,6 +538,21 @@ export default defineComponent({
   margin: 0;
   text-align: center;
   font-size: var(--text-footnote);
+}
+
+.detach {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.detach-question {
+  margin: 0;
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
 }
 
 .no-trip {

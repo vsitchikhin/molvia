@@ -255,7 +255,12 @@
       "bind_offline_body": "The code is not linked. Try again with a connection — or record without the code",
       "bind_error_body": "Could not link code {code}. Try again — or record without the code",
       "not_this": "Code {code} — not this item?",
-      "not_this_failed": "Could not unlink the code — check the connection"
+      "not_this_failed": "Could not unlink the code — check the connection",
+      "in_store": "Code {code} is a shop's own label",
+      "in_store_body": "The scales or the shop print it: another package gets another code. Find the item by its name",
+      "detach_question": "Unlink code {code} from «{name}»?",
+      "detach_hint": "Nobody will find it by this code any more",
+      "detach": "Unlink"
     }
   },
   "sheet": {
@@ -934,7 +939,8 @@
     "money_account_currency_locked": "This account already has operations, so its currency cannot change. Add a new account for another currency",
     "barcode_shape": "A barcode has 8, 12 or 13 digits",
     "barcode_check_digit": "The digits don't add up — check the code",
-    "barcodes_full": "This item already holds twenty codes — no more can be added"
+    "barcodes_full": "This item already holds twenty codes — no more can be added",
+    "barcode_in_store": "This is a shop's own label — such a code is not saved to the catalogue"
   },
   "settings": {
     "title": "Settings",

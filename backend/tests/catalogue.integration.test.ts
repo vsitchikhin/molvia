@@ -752,7 +752,7 @@ describe('POST /catalogue/items — with the codes read from the package (MOL-10
     expect(await db.select().from(items)).toHaveLength(0)
   })
 
-  it('writes the code to the item already there under the same name (Р-4)', async () => {
+  it('writes no code beside a name already there, and answers that item (В-5)', async () => {
     const author = await insertActor(db)
     const scanner = await insertActor(db)
     const first = catalogueEntryCodec.parse((await propose(author, sourCream)).body)
@@ -765,8 +765,21 @@ describe('POST /catalogue/items — with the codes read from the package (MOL-10
 
     expect(again.status).toBe(200)
     expect(catalogueEntryCodec.parse(again.body).id).toBe(first.id)
-    expect(await codesOf(first.id)).toEqual([{ code: SOUR_CREAM, addedBy: scanner }])
+    // The screen asks whether the code is this item's, as it asks of any item found by name.
+    expect(await codesOf(first.id)).toEqual([])
     expect(await db.select().from(items)).toHaveLength(1)
+  })
+
+  it('refuses a shop’s own code and writes no item either (В-4)', async () => {
+    const actor = await insertActor(db)
+
+    const label = await propose(actor, { ...sourCream, barcodes: ['20000011'] })
+    const scale = await propose(actor, { ...sourCream, barcodes: ['2000000000008'] })
+
+    expect(label.status).toBe(400)
+    expect(label.body).toEqual({ code: ERROR.BARCODE_IN_STORE })
+    expect(scale.body).toEqual({ code: ERROR.BARCODE_IN_STORE })
+    expect(await db.select().from(items)).toHaveLength(0)
   })
 
   it('answers the same code on the same item as there already — a repeat after a lost answer', async () => {
@@ -820,14 +833,6 @@ describe('POST /catalogue/items — with the codes read from the package (MOL-10
 })
 
 describe('POST /catalogue/items — codes, the review (MOL-100)', () => {
-  const withDigit = (body: string) => {
-    let sum = 0
-    for (let i = body.length - 1, weight = 3; i >= 0; i--, weight = 4 - weight) {
-      sum += Number(body[i]) * weight
-    }
-    return `${body}${String((10 - (sum % 10)) % 10)}`
-  }
-
   it('writes one package to one of two new items proposed at once, even through a twin', async () => {
     const actor = await insertActor(db)
     const other = connectDrizzle()
@@ -842,10 +847,10 @@ describe('POST /catalogue/items — codes, the review (MOL-100)', () => {
           headers: { cookie },
           payload: { kind: 'product', name, defaultUnit: 'kg', barcodes: [code] },
         })
-      // Two names — two locks of the name — and one package, as its label and as its thirteen.
+      // Two names — two locks of the name — and one package, as its EAN-8 and as its thirteen.
       const replies = await Promise.all([
-        inject(app, 'Сыр чечил', '00408295'),
-        inject(second, 'Сыр косичка', '0004082000095'),
+        inject(app, 'Сыр чечил', '10000076'),
+        inject(second, 'Сыр косичка', '0100000000076'),
       ])
 
       expect(replies.map((reply) => reply.statusCode).sort()).toEqual([201, 409])
@@ -857,22 +862,6 @@ describe('POST /catalogue/items — codes, the review (MOL-100)', () => {
     }
   })
 
-  it('reaches twenty codes by a name already there, and refuses the twenty-first (Р-4, boundary)', async () => {
-    const actor = await insertActor(db)
-    const bodies = Array.from({ length: 19 }, (_, i) => `4852000000${String(i).padStart(2, '0')}`)
-    const cream = await add({ name: 'Сметана', defaultUnit: 'kg', barcodes: bodies.map(withDigit) })
-    const body = { kind: 'product', name: 'Сметана', defaultUnit: 'kg' }
-
-    const two = await propose(actor, { ...body, barcodes: [SOUR_CREAM, KEFIR] })
-    expect(two.status).toBe(409)
-    expect(two.body).toEqual({ code: ERROR.BARCODES_FULL })
-    expect(await codesOf(cream.id)).toHaveLength(19)
-
-    const one = await propose(actor, { ...body, barcodes: [SOUR_CREAM] })
-    expect(one.status).toBe(200)
-    expect(await codesOf(cream.id)).toHaveLength(20)
-  })
-
   it('writes eight digits that check only as UPC-E as the thirteen the scanner reads (review А)', async () => {
     const actor = await insertActor(db)
     const cream = await add({ name: 'Сметана' })
@@ -882,6 +871,44 @@ describe('POST /catalogue/items — codes, the review (MOL-100)', () => {
     expect(reply.status).toBe(201)
     expect((await codesOf(cream.id)).map((row) => row.code)).toEqual(['0042100005264'])
     expect(held(await byCode(actor, code('0042100005264')))?.id).toBe(cream.id)
+  })
+})
+
+describe('writing a code — the second round of review (MOL-100)', () => {
+  it('refuses to link a shop’s own code and a GTIN-14 of a case, and writes nothing', async () => {
+    const actor = await insertActor(db)
+    const cheese = await add({ name: 'Сыр лори', defaultUnit: 'kg' })
+
+    const label = await attach(actor, cheese.id, { code: '00000017' })
+    const upcA = await attach(actor, cheese.id, { code: '200000000004' })
+    const gtin = await attach(actor, cheese.id, { code: '14850000000004' })
+
+    expect(label.body).toEqual({ code: ERROR.BARCODE_IN_STORE })
+    expect(upcA.body).toEqual({ code: ERROR.BARCODE_IN_STORE })
+    expect(gtin.body).toEqual({ code: ERROR.BARCODE_SHAPE })
+    expect(await codesOf(cheese.id)).toEqual([])
+  })
+
+  it('lets a code go asked by the eight digits it was written from (review К)', async () => {
+    const actor = await insertActor(db)
+    const cream = await add({ name: 'Сметана' })
+    await attach(actor, cream.id, { code: '04252614' })
+    expect((await codesOf(cream.id)).map((row) => row.code)).toEqual(['0042100005264'])
+
+    const reply = await detach(actor, cream.id, code('04252614'))
+
+    expect(reply.statusCode).toBe(204)
+    expect(await codesOf(cream.id)).toEqual([])
+  })
+
+  it('refuses to let go a code of no barcode shape', async () => {
+    const actor = await insertActor(db)
+    const cream = await add({ name: 'Сметана', barcodes: [SOUR_CREAM] })
+
+    const reply = await detach(actor, cream.id, code('48500'))
+
+    expect(reply.statusCode).toBe(400)
+    expect(await codesOf(cream.id)).toHaveLength(1)
   })
 })
 
@@ -1000,8 +1027,8 @@ describe('POST /catalogue/items/:itemId/barcodes — «привязать код
           payload: { code },
         })
       const replies = await Promise.all([
-        inject(app, cheese.id, '00408295'),
-        inject(second, salad.id, '0004082000095'),
+        inject(app, cheese.id, '10000076'),
+        inject(second, salad.id, '0100000000076'),
       ])
 
       expect(replies.map((reply) => reply.statusCode).sort()).toEqual([201, 409])

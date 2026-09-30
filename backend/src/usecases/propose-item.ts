@@ -13,9 +13,10 @@ export type { Proposal }
  * wins whole — the note and unit sent now are not applied to it. The check and the insert are
  * one step in the repository, under a lock: a double tap is two requests at once.
  *
- * The codes read from the package go with it (MOL-100): each must check, in the form it is written
- * (`writtenBarcode`, Р-1); beside a name already there they go to that item (Р-4); and when another
- * item holds one of them, nothing is written and the answer names that item (Р-3).
+ * The codes read from the package go with it (MOL-100): each must check, in the form it is written,
+ * and none may be a shop's own (`writtenBarcode`, Р-1, В-4); beside a name already there they are
+ * not written — the screen asks about that item (В-5); and when another item holds one of them,
+ * nothing is written and the answer names that item (Р-3).
  *
  * The owner comes from the caller, never from the input, so an item cannot be added in someone
  * else's name, and neither can a code.

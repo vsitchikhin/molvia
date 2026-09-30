@@ -1,5 +1,6 @@
 import { onUnmounted, ref, shallowRef } from 'vue'
 import type { Ref } from 'vue'
+import { inStoreBarcode } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
@@ -15,9 +16,11 @@ function connected(): boolean {
  * `missing` — the catalogue holds no item with it. `offline` — no connection, and the device knows
  * no item by it either. `error` — the server did not answer; «Повторить» asks again. `found` — an
  * item found by a retry nobody tapped for, waiting for a tap (`take`) rather than opening a sheet by
- * itself (adversarial Ж′).
+ * itself (adversarial Ж′). `label` — a shop's own code, a scale's label (MOL-100, В-4): the catalogue
+ * never holds one, so nobody is asked.
  */
-export type BarcodeLookupPhase = 'idle' | 'loading' | 'missing' | 'offline' | 'error' | 'found'
+export type BarcodeLookupPhase =
+  'idle' | 'loading' | 'missing' | 'offline' | 'error' | 'found' | 'label'
 
 export interface BarcodeLookup {
   readonly phase: Ref<BarcodeLookupPhase>
@@ -89,6 +92,11 @@ export function useBarcodeLookup(options: BarcodeLookupOptions): BarcodeLookup {
     const mine = latest
     code.value = read
     item.value = null
+
+    if (inStoreBarcode(read)) {
+      phase.value = 'label'
+      return
+    }
 
     if (!connected()) {
       if (!fromDevice(read, quiet)) phase.value = 'offline'

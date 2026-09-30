@@ -151,7 +151,7 @@ describe('«Suggest an item»', () => {
     await submitButton(sheet).trigger('click')
 
     await vi.waitFor(() => {
-      expect(sheet.emitted('proposed')).toEqual([[tan]])
+      expect(sheet.emitted('proposed')).toEqual([[tan, true]])
     })
   })
 
@@ -163,7 +163,7 @@ describe('«Suggest an item»', () => {
     await submitButton(sheet).trigger('click')
 
     await vi.waitFor(() => {
-      expect(sheet.emitted('proposed')).toEqual([[tan]])
+      expect(sheet.emitted('proposed')).toEqual([[tan, false]])
     })
     expect(sheet.find('[role="alert"]').exists()).toBe(false)
   })
@@ -436,7 +436,7 @@ describe('«Suggest an item»', () => {
       expect(proposeItem).toHaveBeenCalledWith(
         expect.objectContaining({ barcodes: ['4850001234562'] }),
       )
-      expect(sheet.emitted('proposed')).toEqual([[tan]])
+      expect(sheet.emitted('proposed')).toEqual([[tan, true]])
     })
 
     it('names the item that holds the code and offers it instead of the button', async () => {

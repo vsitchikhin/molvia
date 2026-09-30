@@ -70,9 +70,9 @@ export interface ItemRepository {
 }
 
 /**
- * What «Предложить товар» came to: the item, new or the one of the same name — with the codes sent,
- * written — or, when another item holds one of those codes or its twin, that item and nothing
- * written (MOL-100, Р-3).
+ * What «Предложить товар» came to: a new item with the codes sent, written; the one of the same name,
+ * with nothing written (`created: false`, owner's decision В-5); or, when another item holds one of
+ * those codes or its twin, that item and nothing written (MOL-100, Р-3).
  */
 export type Proposal = { readonly item: Item; readonly created: boolean } | { readonly taken: Item }
 
@@ -919,13 +919,12 @@ export function createItemRepository(db: Conn): ItemRepository {
 
           const same = rows.find((row) => nameIdentity(row.name) === wanted)
           if (same) {
-            // Beside a name the catalogue already holds, the codes go to that item (MOL-100, Р-4):
-            // the name typed is the person's «this is it». Its row is locked first, as «привязать»
-            // locks it, so the two count the codes one after the other.
-            await tx.select({ id: items.id }).from(items).where(eq(items.id, same.id)).for('update')
+            // Beside a name the catalogue already holds, the codes are not written (MOL-100, owner's
+            // decision В-5): the screen asks whether the code is this item's, as it asks of any item
+            // found by name — written here, «Молоко» of the seed took a brand's code from a person
+            // who had just said it was another item. Another item holding one is still named.
             const claimed = await claim(tx, input.barcodes, same.id)
             if ('taken' in claimed) return holder(tx, claimed.taken)
-            await bind(tx, same.id, claimed.free, createdBy)
             const [item] = await load([same.id], tx)
             if (item) return { item, created: false }
           }

@@ -504,11 +504,37 @@ describe('«не этот товар?» (MOL-100)', () => {
       .findAll('button')
       .find((button) => button.text() === 'Код 4850001234562 — не этот товар?')
     await line?.trigger('click')
+    await nextTick()
+    // Asked before it is done (review Ж): the question, then «Отвязать».
+    expect(view.text()).toContain('Отвязать код 4850001234562 от «Молоко «Ашхар»»?')
+    await view
+      .findAll('button')
+      .find((button) => button.text() === 'Отвязать')
+      ?.trigger('click')
     await flushPromises()
 
     expect(detachBarcode).toHaveBeenCalledWith(milk.id, '4850001234562')
     expect(view.text()).toContain('Не получилось отвязать код — проверьте связь')
     expect(view.get('dialog').element.open).toBe(true)
     expect(view.emitted('detached')).toBeUndefined()
+  })
+
+  it('lets nothing go on the first tap, and «Отменить» takes the question back', async () => {
+    const { view } = await render({ code: '4850001234562' })
+
+    await view
+      .findAll('button')
+      .find((button) => button.text() === 'Код 4850001234562 — не этот товар?')
+      ?.trigger('click')
+    await nextTick()
+    await view
+      .findAll('button')
+      .find((button) => button.text() === 'Отменить')
+      ?.trigger('click')
+    await nextTick()
+
+    expect(detachBarcode).not.toHaveBeenCalled()
+    expect(view.text()).not.toContain('Отвязать код')
+    expect(view.text()).toContain('Код 4850001234562 — не этот товар?')
   })
 })

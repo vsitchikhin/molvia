@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { ISSUE } from '#model/support/errors'
-import { hasRepeatedBarcode, writtenBarcode } from '#model/entities/barcode'
+import { barcodeWriteForm, hasRepeatedBarcode } from '#model/entities/barcode'
 import { barcodeSchema, itemSchema, newItemSchema } from '#model/entities/item'
 import type { Item } from '#model/entities/item'
 import { quantityCodec } from '#model/values/units'
@@ -109,15 +109,16 @@ export type CatalogueBarcodeResponse = z.infer<typeof catalogueBarcodeResponseSc
  * log nothing may correct. So a dish is refused rather than half-handled, and lifts with the
  * release that needs it.
  *
- * Codes arrived with the scanner in 0.2 (MOL-100): written with the item, or, beside a name the
- * catalogue already holds, written to that item — never dropped in silence. Two codes of one
+ * Codes arrived with the scanner in 0.2 (MOL-100): written with a new item. Beside a name the
+ * catalogue already holds they are not written at all — the answer is that item, and the screen asks
+ * whether the code is its, as it asks of any item found by name (owner's decision В-5). Two codes of one
  * package — one a twin of the other — are a repeat, as two equal codes are (Р-7). Whether each
  * checks is `writtenBarcode`'s, called by the server.
  */
 /** A code as it would be written, or as it came when it would be refused — the refusal is the server's. */
 function writtenForm(code: string): string {
-  const written = writtenBarcode(code)
-  return written.ok ? written.code : code
+  const form = barcodeWriteForm(code)
+  return form.ok ? form.code : code
 }
 
 export const proposedItemSchema = newItemSchema

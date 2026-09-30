@@ -143,6 +143,12 @@
           <ScreenSkeleton :groups="[62]" />
         </div>
 
+        <!-- A shop's own code (MOL-100, В-4): nobody holds it, and nobody is asked to link it. -->
+        <div v-else-if="barcode === 'label'" class="not-found">
+          <p class="bind-question">{{ t('item.barcode.in_store', { code: barcodeCode }) }}</p>
+          <p class="not-found-text">{{ t('item.barcode.in_store_body') }}</p>
+        </div>
+
         <div v-else-if="barcode === 'missing'" class="not-found">
           <p class="not-found-text">{{ t('item.barcode.missing', { code: barcodeCode }) }}</p>
           <AppButton @click="proposeByCode">
@@ -433,7 +439,12 @@ export default defineComponent({
       bind.value = { ...asked, phase: 'sending' }
       try {
         const written = await api.attachBarcode(asked.entry.id, asked.code)
-        if (!stillAsked(asked)) return
+        if (!stillAsked(asked)) {
+          // Typing went on while it was on its way (adversarial Д): the sheet is not opened, but a
+          // code the server wrote no longer waits for its item.
+          if (!('taken' in written) && pendingCode.value === asked.code) pendingCode.value = null
+          return
+        }
         if ('taken' in written) {
           bind.value = { ...asked, phase: 'taken', holder: written.taken }
           return
@@ -592,7 +603,9 @@ export default defineComponent({
       if (next === 'idle') return
       withdraw?.()
       withdraw = undefined
-      if (next === 'missing') {
+      if (next === 'label') {
+        withdrawCode = announce?.(t('item.barcode.in_store', { code: lookup.code.value }))
+      } else if (next === 'missing') {
         withdrawCode = announce?.(t('item.barcode.missing', { code: lookup.code.value }))
       } else if (next === 'found') {
         withdrawCode = announce?.(
@@ -710,10 +723,20 @@ export default defineComponent({
     //
     // Once its sheet is put away, not at once: its close is a step back through history, and a
     // sheet laying its entry before that step lands would be the one the step took (MOL-24).
-    function proposed(item: CatalogueEntry): void {
+    /**
+     * Proposed with a code under a name the catalogue already holds, nothing was written (owner's
+     * decision В-5): the item is asked about once the sheet is away, as one found by name is — by
+     * the same question, «все увидят» and «это другой товар» included.
+     */
+    let askAboutProposed = false
+
+    function proposed(item: CatalogueEntry, created: boolean): void {
       proposedItem = item
-      proposedCode = pendingCode.value
-      pendingCode.value = null
+      askAboutProposed = !created && pendingCode.value !== null
+      if (!askAboutProposed) {
+        proposedCode = pendingCode.value
+        pendingCode.value = null
+      }
       proposing.value = false
     }
 
@@ -721,7 +744,7 @@ export default defineComponent({
     let takenHolder = false
     function takenOnProposal(holder: CatalogueEntry): void {
       takenHolder = true
-      proposed(holder)
+      proposed(holder, true)
     }
 
     /** The code the item just proposed was written with, or the one its holder was taken by. */
@@ -733,8 +756,16 @@ export default defineComponent({
       takenHolder = false
       const item = proposedItem
       const code = proposedCode
+      const ask = askAboutProposed
       proposedItem = null
       proposedCode = null
+      askAboutProposed = false
+      const waiting = pendingCode.value
+      if (item && ask && waiting !== null) {
+        lookup.clear()
+        bind.value = { entry: item, code: waiting, learns: false, phase: 'ask', holder: null }
+        return
+      }
       if (item && byCode) {
         // Proposed, the code's question is answered: its block goes with it (review С-5).
         lookup.clear()
