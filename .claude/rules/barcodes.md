@@ -165,13 +165,15 @@ lies on an iPad (as MOL-132 Р-3).
   and `01234053`); a form that checks as EAN-8 is a twin like any other. **The named price:** a shop's
   own EAN-8 label and a UPC-E product with the same digits find each other — rare on an Armenian
   shelf, and the name on the sheet shows it.
-- **Thirteen digits pair with eight only when one EAN-8 folds into them** (adversarial Г). Two shop
-  labels with different digits may expand to one UPC-A — `00000055` and `00000505` both to
-  `000000000055`, some one in five of the eight digits that check both ways — and thirteen typed
-  from either no longer say which: guessing put the other shop's item on the sheet, silently. So such
-  thirteen are only themselves. **The price:** a label of that kind typed by hand finds nothing,
-  which is the price MOL-98 Р-11 named for it — the scan still finds it. The pairing is symmetric
-  where it holds, and not transitive: eight digits still list their thirteen.
+- **The pair holds only where it is one both ways: one EAN-8 folds into the thirteen** (adversarial Г,
+  Г′, review С-7). Two shop labels with different digits may expand to one UPC-A — `00000055` and
+  `00000505` both to `000000000055`, some one in five of the eight digits that check both ways — and
+  the thirteen no longer say which label they came from. Guessing put the other shop's item on the
+  sheet, silently: from the thirteen typed, and from the eight scanned when the other label had been
+  typed. So such a label and its thirteen are each only themselves. **The price:** such a label finds
+  only what was taken in the same form — scanned what was scanned, typed what was typed; MOL-98 Р-11
+  named it for typing, and it now holds for scanning as well. Symmetric everywhere, swept over all
+  twenty million eight digits led by `0` or `1`.
 - **Twelve digits and a GTIN-14 led by `0` are looked up as the thirteen too** (adversarial З): the
   API is the one write path and keeps the rule, and a client that does not repeat the phone's — the
   bot repeats none — still finds the package.
@@ -192,7 +194,12 @@ lies on an iPad (as MOL-132 Р-3).
   still out. **Under the code's answer the search says nothing**: its rows are not shown, and an
   answer landing then read «найдено два» over «не знаком» (adversarial Б).
 - **Offline and error ask again once the connection is back**, quietly — the block stays until the
-  answer replaces it — as the search does (`useReconnect`, adversarial Ж).
+  answer replaces it — as the search does (`useReconnect`, adversarial Ж). **What that retry finds
+  does not open a sheet**: it says «По коду … нашлось» with the item as a button, and the sheet comes
+  from the tap (adversarial Ж′, review С-8). The retry comes with a phone unlocked, over whatever the
+  person opened meanwhile — it took a purchase sheet with its price typed away — and a sheet laid
+  without a tap is one Chrome skips on «back». **Taking another item answers the code's question
+  too**: a pick drops the lookup, so nothing is asked again under the sheet it opened.
 - **Offline, the device knows the codes it found items by** (owner's decision В-2): an item found by
   a code and added to a record keeps that code beside «Часто берёте», under
   `molvia.recent-codes.<owner>` — beside the list, not in its rows, so a row an older version wrote
@@ -206,6 +213,9 @@ lies on an iPad (as MOL-132 Р-3).
   `open: false` and not at `onClosed`, which comes as the dialog closes — when the slide starts:
   emptied then, every scan and every × slid down as a bare title, 92 px of 249 (adversarial Е,
   measured frame by frame in Chromium). The refusal it slides down with is the one it showed, not
-  what the stopped camera says. The skeleton alone goes at `open: false`: brought up by the stopped
-  camera, it would say «Загрузка…» for nothing.
+  what the stopped camera says, and **the viewfinder slides down with its last frame**: every track
+  stops at the close — the indicator goes out — but the stream leaves the video only once the sheet
+  is put away (`stop(true)`, `letPictureGo`; adversarial Е′), or the scan slid away black. The
+  skeleton alone goes at `open: false`: brought up by the stopped camera, it would say «Загрузка…» for
+  nothing.
 - **Not yet:** a code by its item on «Что брать» (its own search, MOL-128), writing a code — MOL-100.
