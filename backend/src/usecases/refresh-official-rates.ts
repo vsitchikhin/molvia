@@ -7,7 +7,8 @@ import {
 } from '@molvia/model'
 import type { AmdRate, CachedRate } from '@molvia/model'
 import type { PastRate, RateRepository } from '@/db/rates-repository'
-import { FOREIGN } from '@/rates/feed'
+import { describeFailure } from '@/db/failure'
+import { FOREIGN, FeedError } from '@/rates/feed'
 import type { Published, RateFeed } from '@/rates/feed'
 
 /**
@@ -26,6 +27,12 @@ export const OFFICIAL_HISTORY_FROM = '2022-01-01'
 
 /** How often the history is asked again: the holes a failure leaves are closed within a day. */
 export const HISTORY_EVERY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * After a failed history, how long until it is asked again: not the next hour — a refusal of the
+ * archive's content stays a refusal, and the whole archive is half a megabyte (review, minor 3).
+ */
+export const HISTORY_RETRY_MS = 6 * 60 * 60 * 1000
 
 export interface RefreshLog {
   warn(details: object, message: string): void
@@ -140,7 +147,17 @@ export function officialRatesRefresh({
       await history.rates.insertMissing(missing)
       historyAt = now().getTime()
     } catch (error) {
-      log.warn({ provider: 'cba', err: error }, 'official history failed')
+      // Asked again in six hours rather than the next: see HISTORY_RETRY_MS.
+      historyAt = now().getTime() - HISTORY_EVERY_MS + HISTORY_RETRY_MS
+      // The feed's own words name a day of a public archive; a failure of the database is told by
+      // its kind only (privacy.md).
+      log.warn(
+        {
+          provider: 'cba',
+          ...(error instanceof FeedError ? { reason: error.message } : describeFailure(error)),
+        },
+        'official history failed',
+      )
     }
   }
 

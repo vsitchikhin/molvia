@@ -5,6 +5,7 @@ import type { Published, RateFeed } from '@/rates/feed'
 import {
   FALLBACK_AFTER_FAILURES,
   HISTORY_EVERY_MS,
+  HISTORY_RETRY_MS,
   OFFICIAL_HISTORY_FROM,
   missingDays,
   officialRatesRefresh,
@@ -506,11 +507,14 @@ describe('the history of the central bank (MOL-137)', () => {
     expect(history.asked).toHaveLength(2)
   })
 
-  it('asks again the next hour after a failure', async () => {
+  it('asks again six hours after a failure, not every hour', async () => {
     const history = historyHarness([true, false])
     await history.run()
     expect(history.warnings).toEqual(['official history failed'])
-    history.pass(60 * 60 * 1000)
+    history.pass(HISTORY_RETRY_MS - 1)
+    await history.run()
+    expect(history.asked).toHaveLength(1)
+    history.pass(1)
     await history.run()
     expect(history.inserted).toHaveLength(1)
   })

@@ -11,6 +11,7 @@ import {
   lastReceipt,
   latestDay,
   marketQuotesOn,
+  marketQuotesToday,
   marketRateOf,
   marketSideOf,
   officialDifference,
@@ -119,6 +120,7 @@ export function marketComparisonOf(
   exchange: Exchange,
   rows: readonly MarketRate[],
   exchangersThrough: string | null,
+  today: string,
 ): ExchangeView['market'] {
   const side = marketSideOf(exchange.given.currency, exchange.received.currency)
   if (!side) return null
@@ -137,7 +139,7 @@ export function marketComparisonOf(
   return {
     best,
     own: ownOne && ownOne.channel !== bestOne?.channel ? measured(ownOne) : null,
-    exchangersPending: exchangersPending(quotes, exchangersThrough, exchange.exchangedOn),
+    exchangersPending: exchangersPending(quotes, exchangersThrough, exchange.exchangedOn, today),
   }
 }
 
@@ -153,8 +155,8 @@ export function marketTodayOf(
   today: string,
 ): MarketToday[] {
   return FOREIGN.map((currency): MarketToday => {
-    const buys = marketQuotesOn(latest, currency, 'bankBuys', null)
-    const sells = marketQuotesOn(latest, currency, 'bankSells', null)
+    const buys = marketQuotesToday(latest, currency, 'bankBuys', today)
+    const sells = marketQuotesToday(latest, currency, 'bankSells', today)
     const fresh = (quotes: readonly MarketQuote[]) =>
       quotes.filter((quote) => isRateFresh(quote.date, today))
     const bestBuys = bestQuote(fresh(buys), 'bankBuys')
@@ -267,6 +269,7 @@ function viewsOf(
   history: ReadonlyMap<string, readonly ExchangeRevision[]>,
   market: ReadonlyMap<string, readonly MarketRate[]>,
   exchangersThrough: string | null,
+  today: string,
 ): ExchangeView[] {
   return [...exchanges].reverse().map((exchange): ExchangeView => {
     const { given, received, exchangedOn } = exchange
@@ -303,7 +306,7 @@ function viewsOf(
           ? { rate: measure, provider: official.provider, difference }
           : null,
       officialDoubtful: !!official?.jumped && !measure,
-      market: marketComparisonOf(exchange, market.get(exchangedOn) ?? [], exchangersThrough),
+      market: marketComparisonOf(exchange, market.get(exchangedOn) ?? [], exchangersThrough, today),
     }
   })
 }
@@ -465,7 +468,7 @@ export async function exchangesOverview(
     walletUnknown: rates.unknownAt,
     heldEstimates: money.heldEstimates,
     baseSince: money.baseSince,
-    exchanges: viewsOf(money.exchanges, money.cached, history, market, exchangersThrough),
+    exchanges: viewsOf(money.exchanges, money.cached, history, market, exchangersThrough, today),
     receipts: [...money.receipts],
     marketToday: marketTodayOf(latest, official, today),
   }

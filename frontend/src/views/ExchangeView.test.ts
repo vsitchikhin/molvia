@@ -936,6 +936,25 @@ describe('ExchangeView: against the market of the day (MOL-137)', () => {
     expect(view.find('article .plate > .missing').exists()).toBe(false)
   })
 
+  it('with a market and no bank rate that day, does not say there is nothing to compare with', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [
+          row({
+            official: null,
+            market: {
+              best: quote('4.110180', 99_640n, 'bankCash'),
+              own: null,
+              exchangersPending: false,
+            },
+          }),
+        ],
+      }),
+    )
+    const view = await render()
+    expect(view.get('article .official .missing').text()).toBe(en.exchange.card_no_official_short)
+  })
+
   it('without a market the central bank stands as it did', async () => {
     exchanges.mockResolvedValue(overview())
     const view = await render()

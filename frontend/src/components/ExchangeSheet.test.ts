@@ -530,3 +530,29 @@ describe('ExchangeSheet: how the money was changed (MOL-137, В-1)', () => {
     expect(checked(view)).toBe('bankCash')
   })
 })
+
+describe('ExchangeSheet: the channel in the versions (MOL-137, review)', () => {
+  it('names the channel of a version and of the exchange as written now', async () => {
+    const [base] = overview().exchanges
+    if (!base) throw new Error('the fixture has an exchange')
+    const amended: ExchangeView = {
+      ...base,
+      channel: null,
+      revision: 2,
+      amendedAt: new Date('2026-09-25T09:00:00.000Z'),
+      history: [
+        {
+          given: base.given,
+          received: base.received,
+          exchangedOn: base.exchangedOn,
+          heldBefore: null,
+          note: null,
+          channel: 'exchanger',
+          replacedAt: new Date('2026-09-25T09:00:00.000Z'),
+        },
+      ],
+    }
+    const view = await render(overview({ exchanges: [amended] }), amended)
+    expect(view.get('.versions li').text()).toContain(en.exchange.sheet.channel_exchanger)
+  })
+})

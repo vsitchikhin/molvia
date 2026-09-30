@@ -705,6 +705,7 @@
     "card_less_other": "{amount} less than the {source} rate",
     "card_equal_other": "Exactly the {source} rate",
     "card_no_official": "No central bank rate for this day — nothing to compare with",
+    "card_no_official_short": "No central bank rate for this day",
     "card_doubtful": "The central bank rate of that day is in doubt — no comparison",
     "channel": {
       "bankCash": "Banks, cash",

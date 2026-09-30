@@ -56,7 +56,12 @@
             </span>
             <span class="difference">{{ official.difference }}</span>
           </template>
-          <span v-else class="missing">{{ noOfficialOf(exchange) }}</span>
+          <!-- Under a market comparison «nothing to compare with» would be untrue (review). -->
+          <span v-else class="missing">{{
+            market && !exchange.officialDoubtful
+              ? t('exchange.card_no_official_short')
+              : noOfficialOf(exchange)
+          }}</span>
         </span>
       </span>
       <span v-if="exchange.note" class="note">

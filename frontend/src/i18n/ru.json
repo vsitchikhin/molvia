@@ -705,6 +705,7 @@
     "card_less_other": "На {amount} меньше, чем по курсу {source}",
     "card_equal_other": "Ровно как по курсу {source}",
     "card_no_official": "Курса ЦБ РА на этот день нет — сравнить не с чем",
+    "card_no_official_short": "Курса ЦБ РА на этот день нет",
     "card_doubtful": "Курс ЦБ РА в тот день под сомнением — сравнивать не будем",
     "channel": {
       "bankCash": "Банки, наличные",

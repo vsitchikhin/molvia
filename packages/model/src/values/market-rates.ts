@@ -73,13 +73,17 @@ function latestRow(
   return rows.reduce<MarketRate | null>((latest, row) => {
     if (row.channel !== channel || row.currency !== currency || row.side !== side) return latest
     if (day !== null && (row.date > day || !isRateFresh(row.date, day))) return latest
+    // Exchange offices publish every day, weekends too: a row of another day is not that day's
+    // market, and the week before is exactly what the late file holds (review, major 1).
+    if (day !== null && channel === 'exchanger' && row.date !== day) return latest
     return latest === null || row.date > latest.date ? row : latest
   }, null)
 }
 
 /**
  * What each channel a person can name gave on `day`, or on the latest day before it within the week
- * a rate stays fresh (Р-2) — the rule of the official rate, so the two stand under one date. With
+ * a rate stays fresh (Р-2) — the rule of the official rate, so the two stand under one date; the
+ * exchange offices, which publish every day, only on that day itself. With
  * `day` null, simply each channel's latest, of any age — what the block of today's rates shows,
  * with the date beside each. The non-cash row missing — every day before its collection began — is
  * taken from the row of all bank clients, which runs within a tenth of a percent of it; the cash
@@ -101,6 +105,33 @@ export function marketQuotesOn(
 }
 
 /**
+ * Each channel's latest figures for the block of today (MOL-137, В-1): of any age, dated — but a
+ * non-cash row over a week old gives way to all bank clients fresh today, as a day's comparison
+ * would (review, minor 4).
+ */
+export function marketQuotesToday(
+  rows: readonly MarketRate[],
+  currency: ForeignCurrency,
+  side: MarketSide,
+  today: string,
+): MarketQuote[] {
+  const standIn = latestRow(rows, 'banksAll', currency, side, today)
+  return marketQuotesOn(rows, currency, side, null).map((quote) =>
+    quote.channel === 'bankNoncash' && !isRateFresh(quote.date, today) && standIn
+      ? {
+          channel: quote.channel,
+          basis: standIn.channel,
+          date: standIn.date,
+          scaled: standIn.scaled,
+        }
+      : quote,
+  )
+}
+
+/** How far back the exchange offices can still come: the file runs some ten days late. */
+export const EXCHANGERS_LAG_DAYS = 21
+
+/**
  * The best figure for the person (owner's decision В-1): the highest when the bank buys — more
  * drams for what was sold — and the lowest when it sells — fewer drams for what was bought. A tie
  * goes to the channel named first.
@@ -115,16 +146,19 @@ export function bestQuote(quotes: readonly MarketQuote[], side: MarketSide): Mar
 
 /**
  * Whether the exchange offices of `day` are still to come: they reach the central bank's file about
- * ten days late, a week at a time (В-3). Not the case once the file has passed that day — the day
- * then simply has no row — nor before the first week was ever read.
+ * ten days late, a week at a time (В-3). Not once the file has passed that day — the day then simply
+ * has no row — and, before the first week was ever read, only for a day recent enough to be in a
+ * file still to come: the file never carries old weeks (review, minor 8).
  */
 export function exchangersPending(
   quotes: readonly MarketQuote[],
   exchangersThrough: string | null,
   day: string,
+  today: string,
 ): boolean {
   if (quotes.some((quote) => quote.channel === 'exchanger')) return false
-  return exchangersThrough === null || exchangersThrough < day
+  if (exchangersThrough !== null) return exchangersThrough < day
+  return Date.parse(today) - Date.parse(day) <= EXCHANGERS_LAG_DAYS * 24 * 60 * 60 * 1000
 }
 
 /**

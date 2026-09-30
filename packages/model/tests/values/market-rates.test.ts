@@ -4,6 +4,7 @@ import {
   exchangersPending,
   isMarketPlausible,
   marketQuotesOn,
+  marketQuotesToday,
   marketRateOf,
   marketSideOf,
 } from '#model/values/market-rates'
@@ -27,7 +28,7 @@ const rouble = [
   row('banksAll', '2026-09-29', 4_217_687n),
   row('bankCash', '2026-09-29', 4_347_948n, 'bankSells'),
   row('bankNoncash', '2026-09-29', 4_361_759n, 'bankSells'),
-  row('exchanger', '2026-09-25', 4_157_339n),
+  row('exchanger', '2026-09-29', 4_157_339n),
 ]
 
 describe('marketSideOf', () => {
@@ -50,7 +51,7 @@ describe('marketQuotesOn', () => {
     expect(marketQuotesOn(rouble, 'RUB', 'bankBuys', '2026-09-29')).toEqual([
       { channel: 'bankCash', basis: 'bankCash', date: '2026-09-29', scaled: 4_110_180n },
       { channel: 'bankNoncash', basis: 'bankNoncash', date: '2026-09-29', scaled: 4_221_606n },
-      { channel: 'exchanger', basis: 'exchanger', date: '2026-09-25', scaled: 4_157_339n },
+      { channel: 'exchanger', basis: 'exchanger', date: '2026-09-29', scaled: 4_157_339n },
     ])
     expect(marketQuotesOn(rouble, 'RUB', 'bankSells', '2026-09-29').map((q) => q.channel)).toEqual([
       'bankCash',
@@ -68,7 +69,7 @@ describe('marketQuotesOn', () => {
     expect(marketQuotesOn(rouble, 'RUB', 'bankBuys', '2026-10-07')).toEqual([])
   })
 
-  it('leaves out exchange offices over a week older than the day: they are still to come', () => {
+  it('takes exchange offices of that very day only: they publish every day (review, major 1)', () => {
     const late = [
       row('bankCash', '2026-09-29', 4_110_180n),
       row('exchanger', '2026-09-20', 4_076_782n),
@@ -79,9 +80,7 @@ describe('marketQuotesOn', () => {
   })
 
   it('never takes a figure from after the day', () => {
-    expect(marketQuotesOn(rouble, 'RUB', 'bankBuys', '2026-09-28')).toEqual([
-      { channel: 'exchanger', basis: 'exchanger', date: '2026-09-25', scaled: 4_157_339n },
-    ])
+    expect(marketQuotesOn(rouble, 'RUB', 'bankBuys', '2026-09-28')).toEqual([])
   })
 
   it('puts all bank clients in for non-cash only, on a day before non-cash was collected (В-2)', () => {
@@ -143,20 +142,58 @@ describe('exchangersPending', () => {
   )
 
   it('waits for a day the exchange offices have not reached yet (В-3)', () => {
-    expect(exchangersPending(banks, '2026-09-25', '2026-09-29')).toBe(true)
+    expect(exchangersPending(banks, '2026-09-25', '2026-09-29', '2026-09-30')).toBe(true)
   })
 
   it('does not wait for a day the file has passed: that day simply has no row', () => {
-    expect(exchangersPending(banks, '2026-09-25', '2026-09-12')).toBe(false)
+    expect(exchangersPending(banks, '2026-09-25', '2026-09-12', '2026-09-30')).toBe(false)
   })
 
   it('does not wait once the day has its exchange offices', () => {
     const all = marketQuotesOn(rouble, 'RUB', 'bankBuys', '2026-09-29')
-    expect(exchangersPending(all, '2026-09-25', '2026-09-29')).toBe(false)
+    expect(exchangersPending(all, '2026-09-25', '2026-09-29', '2026-09-30')).toBe(false)
   })
 
-  it('waits while nothing of theirs was ever read', () => {
-    expect(exchangersPending(banks, null, '2026-09-29')).toBe(true)
+  it('waits while nothing of theirs was ever read — for a recent day only (review, minor 8)', () => {
+    expect(exchangersPending(banks, null, '2026-09-29', '2026-09-30')).toBe(true)
+    expect(exchangersPending(banks, null, '2026-09-09', '2026-09-30')).toBe(true)
+    expect(exchangersPending(banks, null, '2026-09-08', '2026-09-30')).toBe(false)
+    expect(exchangersPending(banks, null, '2022-03-01', '2026-09-30')).toBe(false)
+  })
+
+  it('a week of the file behind the day is not that day: the banks, and «still to come»', () => {
+    const late = [
+      row('bankCash', '2026-09-25', 4_110_180n),
+      row('exchanger', '2026-09-20', 4_076_782n),
+    ]
+    const quotes = marketQuotesOn(late, 'RUB', 'bankBuys', '2026-09-25')
+    expect(quotes.map((quote) => quote.channel)).toEqual(['bankCash'])
+    expect(exchangersPending(quotes, '2026-09-20', '2026-09-25', '2026-09-30')).toBe(true)
+  })
+})
+
+describe('marketQuotesToday', () => {
+  it('keeps each channel’s latest of any age, dated — the exchange offices a week late', () => {
+    expect(
+      marketQuotesToday(rouble, 'RUB', 'bankBuys', '2026-09-30').map((q) => [q.channel, q.basis]),
+    ).toEqual([
+      ['bankCash', 'bankCash'],
+      ['bankNoncash', 'bankNoncash'],
+      ['exchanger', 'exchanger'],
+    ])
+  })
+
+  it('puts all bank clients fresh today in place of a non-cash row over a week old', () => {
+    const stale = [
+      row('bankNoncash', '2026-09-10', 4_221_606n),
+      row('banksAll', '2026-09-29', 4_217_687n),
+    ]
+    expect(marketQuotesToday(stale, 'RUB', 'bankBuys', '2026-09-30')).toEqual([
+      { channel: 'bankNoncash', basis: 'banksAll', date: '2026-09-29', scaled: 4_217_687n },
+    ])
+    expect(marketQuotesToday(stale.slice(0, 1), 'RUB', 'bankBuys', '2026-09-30')).toEqual([
+      { channel: 'bankNoncash', basis: 'bankNoncash', date: '2026-09-10', scaled: 4_221_606n },
+    ])
   })
 })
 

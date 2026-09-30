@@ -394,8 +394,13 @@ export default defineComponent({
         }),
         date: calendarDay(version.exchangedOn, locale.value, { day: 'numeric', month: 'short' }),
       }
-      return version.note
-        ? t('exchange.sheet.version_note', { ...words, note: version.note })
+      // The channel too: changed alone, it made a version that read as the one after it (review).
+      const note = [
+        ...(version.channel ? [t(`exchange.sheet.channel_${version.channel}`)] : []),
+        ...(version.note ? [version.note] : []),
+      ].join(' · ')
+      return note
+        ? t('exchange.sheet.version_note', { ...words, note })
         : t('exchange.sheet.version', words)
     }
 
@@ -418,6 +423,7 @@ export default defineComponent({
               }),
             ]
           : []),
+        ...(exchange.channel ? [t(`exchange.sheet.channel_${exchange.channel}`)] : []),
         ...(exchange.note ? [exchange.note] : []),
       ]
       return t('exchange.sheet.current', { details: details.join(' · ') })
