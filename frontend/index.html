@@ -2,12 +2,19 @@
 <html lang="ru">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <!-- `interactive-widget`: Chrome on Android shrinks the page when the keyboard opens, so the
-         sheet stays above it (MOL-18). iOS ignores it; useKeyboardInset lifts the sheet there. -->
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
-    />
+         sheet stays above it (MOL-18). Android only: Safari 27 began to honour it and shrank the
+         window under the keyboard to the part left visible — the likeliest reason the tab bar
+         stood mid-screen in the installed app, a window not given back (hotfix-bottom-menu). On
+         iOS useKeyboardInset lifts the sheet. Here, before the page is laid out, not later from a
+         module: the viewport is read as the head is parsed. -->
+    <script>
+      if (/Android/.test(navigator.userAgent)) {
+        const viewport = document.querySelector('meta[name="viewport"]')
+        viewport.content += ', interactive-widget=resizes-content'
+      }
+    </script>
     <!-- The status bar of the installed app is painted with this. It is --surface of each
          scheme, so the bar runs into the header without a seam; theme-color.test.ts holds
          both values to _tokens.scss. -->
