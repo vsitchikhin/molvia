@@ -208,6 +208,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **An income is a link of the same walk** at the official rate of its day (MOL-66); money bought
   with the currency of conversion is an exchange, not an income.
 - **A rate is printed on the side whose number is at least one** (`formatRate`, MOL-81).
+- **The market is only what an exchange is set beside, never a rate anything counts by** (MOL-137):
+  the best of the central bank's figures of its day for the person, and their own channel if named;
+  the side is the bank's (`marketSideOf`), a pair without the dram has none; a file is written whole
+  or refused. **The official cache holds the bank's history since 2022**, only missing days written.
 
 ### Money: spendings and «Деньги» — `.claude/rules/money-spendings.md`
 
