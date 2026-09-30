@@ -164,8 +164,13 @@ another currency than the receipt's is «списано со счёта», not a
   a sum that is there. **Decided by the object, not by the request** (`tripHistory.answered`, review
   Е): the store remembers which trips came as the server's answer, and another window writing the
   shelf puts a read-back trip on the screen with no request of this window's — a flag of «the server
-  has answered» said it was still the answer. Offered again once the server answers; the fields go
-  into the cache with the next release.
+  has answered» said it was still the answer. **And the answer is not given up for a poorer copy**
+  (review Е2): another window writing the same trip to the shelf, saying nothing more than the answer
+  on screen — the fields the shelf does not keep left out — leaves the answer there with its sum; a
+  copy that says more (another purchase, another total) is fresher and taken as it is. The server is
+  not asked from the listener: two windows on one trip would ask each other in a circle; coming back
+  into view asks anyway. Offered again once the server answers; the fields go into the cache with the
+  next release.
 - **«Закончить» asks «Сколько вышло по чеку?» only while some purchase has no price and no sum is
   there yet** (В-4): with every price in, the total is already known. Empty is fine; a sum that is
   not money is said at the field and nothing is sent. «Закончить и начать новую» asks nothing — the

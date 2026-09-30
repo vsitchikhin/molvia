@@ -110,21 +110,46 @@ describe('FinishedTripView: «Сумма по чеку» (MOL-78)', () => {
     expect(view.text()).not.toContain(ru.trip.receipt.edit)
   })
 
-  it('соседнее окно записало кэш той же записи — сумма снова неизвестна, ни «+», ни «Изменить» (ревью Е)', async () => {
+  /** Another window — its own pinia, the same phone storage — wrote this record to the shelf. */
+  async function otherWindowWrites(written: TripView): Promise<void> {
+    const here = getActivePinia()
+    setActivePinia(createPinia())
+    useActorStore().id = ME
+    useTripHistoryStore().apply(written)
+    if (here) setActivePinia(here)
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${ME}` }))
+    await flushPromises()
+  }
+
+  it('соседнее окно записало ту же запись — ответ на экране остаётся, с суммой и разбором (ревью Е, Е2)', async () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     trip.mockResolvedValue(finished)
     const view = await render()
     expect(view.text()).toContain(ru.trip.receipt.edit)
 
-    // Its own pinia, the same phone storage: it read the record and wrote the cache.
-    const here = getActivePinia()
-    setActivePinia(createPinia())
-    useActorStore().id = ME
-    useTripHistoryStore().apply(finished)
-    if (here) setActivePinia(here)
-    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${ME}` }))
-    await flushPromises()
+    await otherWindowWrites(finished)
 
+    expect(view.text()).toContain(ru.trip.receipt.total)
+    expect(view.text()).toContain('Без цены — 1')
+    expect(view.text()).toContain(ru.trip.receipt.edit)
+    expect(view.text()).not.toContain(ru.trip.receipt.add)
+    // Nothing was asked again from here: two windows on one trip would ask each other in a circle.
+    expect(trip).toHaveBeenCalledTimes(1)
+  })
+
+  it('соседнее окно записало запись новее — она на экране, а сумма не предлагается: полка её не знает', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockResolvedValue(finished)
+    const view = await render()
+
+    // The other window added a purchase and got the answer; the shelf keeps it without the receipt.
+    const fresher = tripViewCodec.parse({
+      ...tripViewCodec.encode(finished),
+      expenses: [...tripViewCodec.encode(finished).expenses, row(null, 3)],
+    })
+    await otherWindowWrites(fresher)
+
+    expect(view.text()).toContain('Товар 3')
     expect(view.text()).not.toContain(ru.trip.receipt.add)
     expect(view.text()).not.toContain(ru.trip.receipt.edit)
   })

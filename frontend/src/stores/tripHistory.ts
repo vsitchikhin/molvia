@@ -103,6 +103,15 @@ function toShelf(cache: z.output<typeof cacheCodec>): string {
   )
 }
 
+/**
+ * A trip as the shelf keeps it: what two copies are compared by when another window writes the
+ * shelf. The fields the shelf does not keep yet are left out, so an answer and its own shelf copy
+ * say the same (MOL-78, review Е2).
+ */
+function asShelved(trip: TripView): string {
+  return JSON.stringify(shelved(tripViewCodec.encode(trip), (key) => !NOT_CACHED_YET.has(key)))
+}
+
 const KEY = 'molvia.trip-history'
 /**
  * Whether the server's last first page for this owner was empty — now or on an earlier launch.
@@ -219,6 +228,17 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     // A different window selecting B does not replace A on this window's screen.
     if (viewing && selected.value?.id !== viewing.id) {
       selected.value = local.value.find((row) => row.id === viewing.id)?.view ?? viewing
+    } else if (
+      viewing &&
+      selected.value &&
+      answered(viewing) &&
+      asShelved(selected.value) === asShelved(viewing)
+    ) {
+      // The same trip, and the shelf says nothing the answer on screen does not: the answer stays,
+      // with the receipt's sum the shelf does not keep yet (MOL-78, review Е2). A copy that says
+      // more — another purchase, another total — is fresher, and taken as it is. The server is not
+      // asked again from here: two windows on one trip would ask each other in a circle.
+      selected.value = viewing
     }
   })
 
