@@ -267,8 +267,16 @@ nothing up.
   screen, or to a live one of one's own, is refused there. The colours are tokens — thirteen
   presets and a palette of eight for one's own, none red, olive, ochre or terracotta, each at
   least 3:1 on `--surface`.
-- A tap on a category opens «Графики» on it, and «Графики по месяцам» stands under the bars
-  (MOL-74, below); accounts are MOL-115's.
+- **«Куда ушли» is a ring** (MOL-156, owner's decision В-2, handoff MOL-157 01): the month's
+  `slices` — `donutSlices` over `byCategory` on the server, six categories and the rest one
+  «Остальные» (seven are all seven), each with its level in thousandths of the ring, shared out by
+  the largest remainder so the levels add up to exactly `CHART_LEVEL` and the ring closes. The three
+  largest are named beside it with the model's `shareOf`, the rest counted («Ещё N»); the whole card
+  is one way into «Графики» — opened on the largest category of the period, and on twelve months for
+  a month older than six (adversarial А of MOL-74). A tap on one category no longer opens it, the
+  price of one link: «Категория во времени» is one choice away. «Категории ›» stands under the ring
+  always. `slices` defaults to empty, so a server older than the ring still reads — a month drawn
+  without its card. Accounts are MOL-115's.
 
 ## «Графики» (MOL-74)
 
@@ -336,7 +344,17 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   reads at least one on (MOL-81); the person's exchanges of the pair, either way, are dots on their
   week. No pair — one currency for both — no card. The price, named: a week whose rate came from a
   fallback provider is not marked; the card says «ЦБ РА» of the whole line.
-- **Drawn by hand, no library** (Р-1): `BarChart` is HTML and tokens, `RateLine` is SVG whose
+- **The geometry is d3-shape's, the components are ours, and there is no charting library**
+  (MOL-156, owner's decision В-1, in place of Р-1 of MOL-74 «drawn by hand»). Measured by a build
+  of one probe — a ring, twelve bars, a line: `d3-shape` added 3 KB gzip against a whole app of 267;
+  chart.js 54 on a canvas that reads no token and gives a screen reader nothing, unovis 64 with 184
+  packages behind it and a ring that kept its colour when the scheme changed, vue-data-ui 200
+  turning every colour into hex, ECharts 185, ApexCharts 395 on a licence that charges a product
+  used by other people. Every library brought its own touch, tooltips and accessibility, which
+  the rules below already settle, and its own scales, which the server counts. The arcs and the
+  curves are the one thing hard to write by hand, and d3-shape draws them from the server's levels.
+  `BarChart` is HTML and tokens, `DonutRing` is d3-shape's arcs with a gap between sectors (none
+  on one too narrow for it), `RateLine` is SVG whose
   strokes keep their width when stretched (`vector-effect`), a dot is a zero-length round-capped
   line so it is never an ellipse. The reading stands above the bars, never under the finger; the
   whole area is the target (`touch-action: pan-y` leaves the page its scroll), a mouse passing over
