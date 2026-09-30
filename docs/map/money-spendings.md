@@ -76,4 +76,4 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 ## e2e
 
 - `e2e/money.spec.ts` — End-to-end: a spending lands in the month through the queue, offline too; «Вернуть», own categories, «Остаток» and the salary shift.
-- `e2e/money-charts.spec.ts` — End-to-end: «Графики» from a category and from «Графики по месяцам», a bar by a tap, the period without history, offline.
+- `e2e/money-charts.spec.ts` — End-to-end: «Графики» from the ring of «Куда ушли», a bar by a tap, the period without history, offline.

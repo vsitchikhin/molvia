@@ -1,13 +1,17 @@
 <template>
   <AppCard class="donut">
-    <RouterLink class="open" :to="{ name: 'money-charts', query: period }" :aria-label="label">
+    <RouterLink
+      class="open"
+      :to="{ name: 'money-charts', query }"
+      :aria-label="top.length > 0 ? label : undefined"
+    >
       <span class="heading">
         <span class="caption">{{ t('spending.categories_title') }}</span>
         <span class="charts-link">
           {{ t('spending.summary.charts') }}<IconChevron class="chevron" aria-hidden="true" />
         </span>
       </span>
-      <span class="figure">
+      <span v-if="top.length > 0" class="figure">
         <DonutRing class="ring" :sectors="sectors" :thickness="16" />
         <span class="named">
           <span v-for="row in top" :key="row.key" class="sector">
@@ -43,8 +47,10 @@ const NAMED = 3
 
 /**
  * «Куда ушли» on «Деньги» (MOL-156, handoff MOL-157 01): the month's ring and its three largest
- * sectors, the whole card one way into «Графики». The sectors and their levels are the server's
- * (`slices`); the share printed is the model's `shareOf`, as the bars before it printed.
+ * sectors, the whole card one way into «Графики» — an empty month's too, with no ring: «В этом месяце
+ * трат нет» is said once, by the journal under it, until MOL-159 takes the journal to «Траты». The
+ * sectors and their levels are the server's (`slices`); the share printed is the model's `shareOf`,
+ * as the bars before it printed.
  */
 export default defineComponent({
   name: 'CategoryDonutCard',
@@ -66,14 +72,18 @@ export default defineComponent({
       chartMonths(monthOf(localDay()), 6).includes(props.month.month) ? {} : { period: '12' },
     )
     const rows = computed(() =>
-      props.month.slices.map((slice, index) => {
+      props.month.slices.flatMap((slice) => {
         const category =
           slice.categoryId === null
-            ? undefined
+            ? null
             : props.month.categories.find((one) => one.id === slice.categoryId)
+        // A category the month does not name is left out, as the bars left it: drawn in grey and
+        // called «Остальные», it passed for a second «Остальные» (review 7).
+        if (category === undefined) return []
         const share = shareOf(slice.amount, props.month.spent)
         return {
-          key: slice.categoryId ?? `rest-${String(index)}`,
+          key: category?.id ?? 'rest',
+          id: category?.id ?? null,
           name: category ? props.nameOf(category) : t('spending.charts.rest'),
           colour: category ? categoryColour(category) : 'var(--border-strong)',
           level: slice.level,
@@ -90,13 +100,23 @@ export default defineComponent({
       rows.value.map(({ key, colour, level }) => ({ key, colour, level })),
     )
     const top = computed(() => rows.value.slice(0, NAMED))
-    const hidden = computed(() => Math.max(rows.value.length - NAMED, 0))
+    /** Sectors past the three that the ring draws: one of no level is on no ring (adversarial Б). */
+    const hidden = computed(() => rows.value.slice(NAMED).filter((row) => row.level > 0).length)
+    /**
+     * The charts open on the largest category of the ring, the one seen first (review 3, owner's
+     * choice «а»): opened on the period's largest, the card named «Кафе» and «Графики» showed rent.
+     * «Остальные» names no category, and then the charts choose as they do.
+     */
+    const query = computed(() => {
+      const first = rows.value[0]?.id
+      return first ? { ...period.value, category: first } : period.value
+    })
     const label = computed(() =>
       t('spending.summary.donut_label', {
         list: top.value.map((row) => `${row.name} ${row.share}`).join(', '),
       }),
     )
-    return { t, period, sectors, top, hidden, label }
+    return { t, query, sectors, top, hidden, label }
   },
 })
 </script>

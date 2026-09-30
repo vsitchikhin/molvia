@@ -111,8 +111,49 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
     expect(card('2026-09').findAll('a')).toHaveLength(1)
   })
 
-  it('opens the charts, on twelve months for a month older than six (adversarial А of MOL-74)', () => {
-    expect(card('2026-04').find('a').attributes('href')).toBe('/money/charts')
-    expect(card('2026-03').find('a').attributes('href')).toBe('/money/charts?period=12')
+  it('opens the charts on the largest category of the ring, twelve months for an older month', () => {
+    // The category seen first, not the period's largest (review 3, owner's choice «а»).
+    expect(card('2026-04').find('a').attributes('href')).toBe(`/money/charts?category=${TELECOM}`)
+    expect(card('2026-03').find('a').attributes('href')).toBe(
+      `/money/charts?period=12&category=${TELECOM}`,
+    )
+  })
+
+  it('counts past the three only the sectors the ring draws (adversarial Б)', () => {
+    const slices = (level: number): MoneyMonthView['slices'] => [
+      { categoryId: TELECOM, amount: amd('250000'), count: 1, level: 735 },
+      { categoryId: GROCERIES, amount: amd('60000'), count: 1, level: 177 },
+      { categoryId: OTHER, amount: amd('30000'), count: 1, level: 88 - level },
+      { categoryId: HOME, amount: amd('100'), count: 1, level },
+    ]
+    expect(card('2026-09', slices(0)).find('.rest').exists()).toBe(false)
+    expect(card('2026-09', slices(1)).find('.rest').text()).toBe('Ещё 1 сектор — в «Графиках»')
+  })
+
+  it('leaves out a category the month does not name, rather than calling it «Остальные» (review 7)', () => {
+    const wrapper = card('2026-09', [
+      { categoryId: TELECOM, amount: amd('3000'), count: 1, level: 600 },
+      {
+        categoryId: 'ffffffff-0000-4000-8000-0000000000ff',
+        amount: amd('2000'),
+        count: 1,
+        level: 400,
+      },
+    ])
+    expect(wrapper.findAll('.sector-name').map((name) => name.text())).toEqual(['Связь и интернет'])
+    expect(wrapper.findAll('.ring path')).toHaveLength(1)
+  })
+
+  it('stays a way into «Графики» on an empty month, with no ring (handoff 01, adversarial Г)', () => {
+    const empty = { ...month('2026-09', []), days: [], remaining: 0 }
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    const wrapper = mount(CategoryDonutCard, {
+      props: { month: empty, nameOf: () => '' },
+      global: { plugins: [router, createAppI18n('ru')] },
+    })
+    expect(wrapper.find('a').attributes('href')).toBe('/money/charts')
+    expect(wrapper.find('.ring').exists()).toBe(false)
+    // «В этом месяце трат нет» is the journal's to say, once, while the journal is on «Деньги».
+    expect(wrapper.find('.rest').exists()).toBe(false)
   })
 })

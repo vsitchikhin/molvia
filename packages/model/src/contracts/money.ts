@@ -123,8 +123,9 @@ export const moneyMonthCodec = z.strictObject({
   byCategory: z.array(z.strictObject({ categoryId: z.uuid(), amount: moneyCodec })),
   /**
    * The ring of «Куда ушли» (MOL-156): `donutSlices` of `byCategory` — six categories at most, the
-   * rest one «Остальные» (`categoryId` null) — with the levels the phone turns into angles. Defaulted,
-   * so an answer of a server older than the ring still reads, as an empty ring.
+   * rest one «Остальные» (`categoryId` null) — with the levels the phone turns into angles. Defaulted
+   * so that a month the phone kept before the ring still reads through this strict codec: the phone
+   * fills its ring in by the same function (`useMoneyMonth`), rather than lose every month kept.
    */
   slices: z
     .array(

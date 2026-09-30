@@ -153,7 +153,8 @@
 
           <MoneyEntries :rate="liveRate" />
 
-          <CategoryDonutCard v-if="month.slices.length > 0" :month="month" :name-of="nameOf" />
+          <!-- An empty month keeps the card too: the way into «Графики» is there, the year is (Г). -->
+          <CategoryDonutCard :month="month" :name-of="nameOf" />
           <!-- The way to one's categories, with the ring or before anything is spent (review Т-7). -->
           <AppCard list>
             <RouterLink class="categories-link" :to="{ name: 'money-categories' }">

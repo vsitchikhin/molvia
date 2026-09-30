@@ -37,15 +37,18 @@ export default defineComponent({
   },
   setup(props) {
     const arcs = computed(() => {
-      const shape = arc<{ startAngle: number; endAngle: number; padAngle: number }>()
+      const shape = arc<{ startAngle: number; endAngle: number }>()
         .innerRadius(50 - props.thickness)
         .outerRadius(50)
       const drawn = props.sectors.filter((sector) => sector.level > 0)
       let start = 0
       return drawn.map((sector) => {
         const sweep = (sector.level / CHART_LEVEL) * TURN
-        const padAngle = drawn.length > 1 && sweep >= GAPLESS_BELOW * GAP ? GAP : 0
-        const d = shape({ startAngle: start, endAngle: start + sweep, padAngle }) ?? ''
+        // Half the gap off each end, as the handoff's prototype cuts it: the same angle at every
+        // radius. d3's `padAngle` keeps a gap of the same width instead, measured further out than
+        // the ring, and it came out 0,054 outside and 0,080 inside (adversarial В).
+        const trim = drawn.length > 1 && sweep >= GAPLESS_BELOW * GAP ? GAP / 2 : 0
+        const d = shape({ startAngle: start + trim, endAngle: start + sweep - trim }) ?? ''
         start += sweep
         return { key: sector.key, colour: sector.colour, d }
       })

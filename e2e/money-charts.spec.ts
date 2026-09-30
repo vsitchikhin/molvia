@@ -58,10 +58,11 @@ test('the ring of «Куда ушли» opens the charts, a bar is chosen by a t
   await ring.click()
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Графики')
-  // Opened from the ring, the charts show the largest category of the period (Р-8 of MOL-74).
+  // Opened from the ring, the charts show the category the ring named first, not the period's
+  // largest, rent (review 3 of MOL-156, owner's choice «а»).
   await expect(
     page.getByRole('combobox', { name: 'Категория' }).locator('option:checked'),
-  ).toHaveText('Аренда жилья')
+  ).toHaveText('Кафе и рестораны')
 
   // The running month is read first; a tap on the bar before it reads that one.
   const spent = page.locator('fieldset.chart').first()
@@ -112,6 +113,9 @@ test('a category chosen at the end of the page stays under the thumb, and so doe
   await page.getByRole('link', { name: /Открыть графики/ }).click()
   const card = page.getByRole('region', { name: 'Категория во времени' })
   const choice = page.getByRole('combobox', { name: 'Категория' })
+  // The ring opens the charts on this month's café; rent first, for the move under test.
+  await expect(choice.locator('option:checked')).toHaveText('Кафе и рестораны')
+  await choice.selectOption({ label: 'Аренда жилья' })
   await expect(choice.locator('option:checked')).toHaveText('Аренда жилья')
 
   // The card is the last on the page, and «Кафе и рестораны» draws it 2 px shorter under the choice

@@ -1,6 +1,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
-import { monthOf, moneyMonthCodec } from '@molvia/model'
+import { donutSlices, monthOf, moneyMonthCodec } from '@molvia/model'
 import type { MoneyMonthView } from '@molvia/model'
 import { api } from '@/api'
 import { mergePages } from '@/components/spending'
@@ -39,7 +39,8 @@ export interface MoneyMonth {
 /**
  * The last months read, per owner — the first page of each, the one the screen opens on. Three:
  * this month, the one before, and one more looked at; offline is a strip over them, not an empty
- * screen (handoff 04). Read back through the strict codec — a change of the contract empties it.
+ * screen (handoff 04). Read back through the strict codec — a change of the contract empties it,
+ * but for a field added with a default, which reads as the default; `slices` is filled in (MOL-156).
  */
 const KEY = 'molvia.money'
 const KEPT_MONTHS = 3
@@ -66,7 +67,14 @@ function recall(owner: string, month: string): Remembered | null {
   const answer = moneyMonthCodec.safeParse(kept.answer)
   const fetchedAt = typeof kept.fetchedAt === 'string' ? new Date(kept.fetchedAt) : null
   if (!answer.success || !fetchedAt || Number.isNaN(fetchedAt.getTime())) return null
-  return { answer: answer.data, fetchedAt }
+  // A month kept before the ring (MOL-156) reads with no `slices`: its ring is the one the server
+  // would have sent, by the same function of the model — else «Куда ушли» and the way into «Графики»
+  // went missing offline, until the month was read again (adversarial А).
+  const before = isRecord(kept.answer) && !('slices' in kept.answer)
+  const data = before
+    ? { ...answer.data, slices: donutSlices(answer.data.byCategory) }
+    : answer.data
+  return { answer: data, fetchedAt }
 }
 
 /** The categories of the newest month kept for the owner — any month names all of them. */

@@ -271,12 +271,21 @@ nothing up.
   `slices` — `donutSlices` over `byCategory` on the server, six categories and the rest one
   «Остальные» (seven are all seven), each with its level in thousandths of the ring, shared out by
   the largest remainder so the levels add up to exactly `CHART_LEVEL` and the ring closes. The three
-  largest are named beside it with the model's `shareOf`, the rest counted («Ещё N»); the whole card
-  is one way into «Графики» — opened on the largest category of the period, and on twelve months for
-  a month older than six (adversarial А of MOL-74). A tap on one category no longer opens it, the
-  price of one link: «Категория во времени» is one choice away. «Категории ›» stands under the ring
-  always. `slices` defaults to empty, so a server older than the ring still reads — a month drawn
-  without its card. Accounts are MOL-115's.
+  largest are named beside it with the model's `shareOf`, the rest counted («Ещё N») — **only the
+  sectors the ring draws**: one of no level, a bus ride beside the rent, is on no ring (adversarial
+  Б). **The whole card is one way into «Графики», on the largest category of the ring** (review 3,
+  owner's choice «а»): opened on the period's largest, a card that named «Кафе» led to rent; with
+  «Остальные» first, which names none, the charts choose as they do. A month older than six opens
+  twelve (adversarial А of MOL-74). A tap on another category no longer opens it, the price of one
+  link: it is one choice away. **An empty month keeps the card**, with no ring — still the way into
+  «Графики», where the year is (handoff 01, adversarial Г). Its «В этом месяце трат нет» is said
+  once, by the journal under it, until MOL-159 takes the journal to «Траты»: said twice, it was two
+  of the same line on one screen. A category the month
+  does not name is left out, never drawn as a second «Остальные» (review 7). «Категории ›» stands
+  under the card always. **`slices` defaults to empty so that a month kept on the phone before the
+  ring still reads through the strict codec** (review 6, adversarial А): `useMoneyMonth` fills its
+  ring in by `donutSlices`, the server's own function — without it, offline at the shelf the card
+  and the way into «Графики» were gone until the month was read again. Accounts are MOL-115's.
 
 ## «Графики» (MOL-74)
 
@@ -368,8 +377,8 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
 - **The period and the category are in the address and move by `replace`**; the category chosen is
   kept for as long as the app is open, and the first one is the largest of the period (Р-8), not the
   handoff's «Кафе». **Every live category of the owner is offered**, spent in the period or not, and
-  a row of «Куда ушли» on a month older than six opens twelve (adversarial А, d9 Г): a category
-  tapped there was swapped for the largest, in silence, with its own id still in the address. One
+  the ring of «Куда ушли» on a month older than six opens twelve (adversarial А, d9 Г): a category
+  sent from there was swapped for the largest, in silence, with its own id still in the address. One
   the answer still lacks — a removed category, a stale link — is named: «Этой категории на графиках
   нет — показаны …». Only
   the person's choice or the address is remembered. **Only the latest read is kept on the phone**
