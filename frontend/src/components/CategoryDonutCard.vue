@@ -22,6 +22,12 @@
           </span>
         </span>
       </span>
+      <span v-else-if="waiting === 'read'" class="rest">{{
+        t('spending.summary.donut_later')
+      }}</span>
+      <span v-else-if="waiting === 'rate'" class="rest">
+        {{ t('spending.summary.donut_uncounted') }}
+      </span>
       <span v-if="hidden > 0" class="rest">
         {{ t('spending.summary.donut_more', { n: hidden }, hidden) }}
       </span>
@@ -48,9 +54,10 @@ const NAMED = 3
 /**
  * «Куда ушли» on «Деньги» (MOL-156, handoff MOL-157 01): the month's ring and its three largest
  * sectors, the whole card one way into «Графики» — an empty month's too, with no ring: «В этом месяце
- * трат нет» is said once, by the journal under it, until MOL-159 takes the journal to «Траты». The
- * sectors and their levels are the server's (`slices`); the share printed is the model's `shareOf`,
- * as the bars before it printed.
+ * трат нет» is said once, by the journal under it, until MOL-159 takes the journal to «Траты». A
+ * month spent in with no ring says why in the ring's place. The sectors and their levels are the
+ * server's (`slices`) — the phone adds nothing up, not even for a month kept before the ring; the
+ * share printed is the model's `shareOf`, as the bars before it printed.
  */
 export default defineComponent({
   name: 'CategoryDonutCard',
@@ -71,21 +78,29 @@ export default defineComponent({
     const period = computed(() =>
       chartMonths(monthOf(localDay()), 6).includes(props.month.month) ? {} : { period: '12' },
     )
-    const rows = computed(() =>
-      props.month.slices.flatMap((slice) => {
+    /**
+     * Every sector of the ring. One of a category the month does not name stays on the ring, so it
+     * closes, but in `--border` and with no name: called «Остальные», it passed for a second one
+     * (review 7). Never happens while the month names every category, archived ones too.
+     */
+    const all = computed(() =>
+      props.month.slices.map((slice) => {
         const category =
           slice.categoryId === null
             ? null
             : props.month.categories.find((one) => one.id === slice.categoryId)
-        // A category the month does not name is left out, as the bars left it: drawn in grey and
-        // called «Остальные», it passed for a second «Остальные» (review 7).
-        if (category === undefined) return []
         const share = shareOf(slice.amount, props.month.spent)
         return {
-          key: category?.id ?? 'rest',
+          key: slice.categoryId ?? 'rest',
           id: category?.id ?? null,
+          named: category !== undefined,
           name: category ? props.nameOf(category) : t('spending.charts.rest'),
-          colour: category ? categoryColour(category) : 'var(--border-strong)',
+          colour:
+            category === undefined
+              ? 'var(--border)'
+              : category
+                ? categoryColour(category)
+                : 'var(--border-strong)',
           level: slice.level,
           amount: formatEstimate(slice.amount, locale.value),
           share: share?.tiny
@@ -96,8 +111,9 @@ export default defineComponent({
         }
       }),
     )
+    const rows = computed(() => all.value.filter((row) => row.named))
     const sectors = computed<RingSector[]>(() =>
-      rows.value.map(({ key, colour, level }) => ({ key, colour, level })),
+      all.value.map(({ key, colour, level }) => ({ key, colour, level })),
     )
     const top = computed(() => rows.value.slice(0, NAMED))
     /** Sectors past the three that the ring draws: one of no level is on no ring (adversarial Б). */
@@ -116,7 +132,18 @@ export default defineComponent({
         list: top.value.map((row) => `${row.name} ${row.share}`).join(', '),
       }),
     )
-    return { t, query, sectors, top, hidden, label }
+    /**
+     * No ring, and yet the month was spent in: said in the ring's place, never left a caption over
+     * nothing (adversarial round 2, Е, Ж). Categories and no sectors — a month kept before the ring,
+     * or an answer of a server older than it — waits for the next read; nothing a rate counted —
+     * everything in a currency with no rate — waits for a rate. An empty month says nothing here.
+     */
+    const waiting = computed<'read' | 'rate' | null>(() => {
+      if (props.month.slices.length > 0) return null
+      if (props.month.byCategory.length > 0) return 'read'
+      return props.month.uncounted.length > 0 ? 'rate' : null
+    })
+    return { t, query, sectors, top, hidden, label, waiting }
   },
 })
 </script>

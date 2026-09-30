@@ -283,9 +283,14 @@ nothing up.
   of the same line on one screen. A category the month
   does not name is left out, never drawn as a second «Остальные» (review 7). «Категории ›» stands
   under the card always. **`slices` defaults to empty so that a month kept on the phone before the
-  ring still reads through the strict codec** (review 6, adversarial А): `useMoneyMonth` fills its
-  ring in by `donutSlices`, the server's own function — without it, offline at the shelf the card
-  and the way into «Графики» were gone until the month was read again. Accounts are MOL-115's.
+  ring still reads through the strict codec** (review 6): lost, every month kept went with it
+  offline. **The phone does not work the ring out for it** (review 9, owner's decision «а»): that
+  would be a second exception to «the phone adds nothing up», for three months and one read. **A
+  card with no ring says why, in the ring's place** (adversarial round 2, Е, Ж): categories and no
+  sectors — a month kept before the ring, an answer of a server older than it — «Доли появятся,
+  когда месяц обновится»; nothing a rate counted — «Доли появятся, когда у трат будет курс»; an
+  empty month says nothing there. The price, named: offline, a month kept before the update has no
+  ring until it is read again. Accounts are MOL-115's.
 
 ## «Графики» (MOL-74)
 
@@ -375,8 +380,10 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   chooses on press. **A new answer of the same period keeps the bar chosen** — the sources of the
   watch are compared one by one, since a getter of an array is a new array on every answer.
 - **The period and the category are in the address and move by `replace`**; the category chosen is
-  kept for as long as the app is open, and the first one is the largest of the period (Р-8), not the
-  handoff's «Кафе». **Every live category of the owner is offered**, spent in the period or not, and
+  kept for as long as the app is open, for a way in that names none, and the first one is the
+  largest of the period (Р-8), not the handoff's «Кафе». **A category in the address comes first**:
+  the ring of «Куда ушли» names its largest (MOL-156, owner's decision on adversarial round 2, Д), so
+  a tap on it leaves the one chosen before behind — the ring shows one, and the charts open on it. **Every live category of the owner is offered**, spent in the period or not, and
   the ring of «Куда ушли» on a month older than six opens twelve (adversarial А, d9 Г): a category
   sent from there was swapped for the largest, in silence, with its own id still in the address. One
   the answer still lacks — a removed category, a stale link — is named: «Этой категории на графиках

@@ -452,7 +452,9 @@
     "summary": {
       "charts": "Charts",
       "donut_more": "{n} more slice in Charts | {n} more slices in Charts",
-      "donut_label": "Where it went: {list}. Open charts"
+      "donut_label": "Where it went: {list}. Open charts",
+      "donut_later": "Shares appear once the month is refreshed",
+      "donut_uncounted": "Shares appear once the spending has a rate"
     },
     "charts": {
       "title": "Charts",

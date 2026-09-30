@@ -130,7 +130,7 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
     expect(card('2026-09', slices(1)).find('.rest').text()).toBe('Ещё 1 сектор — в «Графиках»')
   })
 
-  it('leaves out a category the month does not name, rather than calling it «Остальные» (review 7)', () => {
+  it('names no category the month does not name, but keeps its sector so the ring closes (review 7)', () => {
     const wrapper = card('2026-09', [
       { categoryId: TELECOM, amount: amd('3000'), count: 1, level: 600 },
       {
@@ -141,11 +141,45 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
       },
     ])
     expect(wrapper.findAll('.sector-name').map((name) => name.text())).toEqual(['Связь и интернет'])
-    expect(wrapper.findAll('.ring path')).toHaveLength(1)
+    expect(wrapper.findAll('.ring path').map((path) => path.attributes('fill'))).toEqual([
+      'var(--cat-telecom)',
+      'var(--border)',
+    ])
+  })
+
+  it('says why there is no ring when the month has categories and no sectors (round 2, Е)', () => {
+    // A month kept before the ring, or an answer of a server older than it: the phone adds nothing up.
+    const kept = {
+      ...month('2026-09', []),
+      byCategory: [{ categoryId: TELECOM, amount: amd('3000') }],
+      uncounted: [],
+    } as MoneyMonthView
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    const wrapper = mount(CategoryDonutCard, {
+      props: { month: kept, nameOf: () => '' },
+      global: { plugins: [router, createAppI18n('ru')] },
+    })
+    expect(wrapper.find('.ring').exists()).toBe(false)
+    expect(wrapper.find('.rest').text()).toBe('Доли появятся, когда месяц обновится')
+    expect(wrapper.find('a').attributes('href')).toBe('/money/charts')
+  })
+
+  it('says why there is no ring when nothing spent was counted by a rate (round 2, Ж)', () => {
+    const coffee = {
+      ...month('2026-09', []),
+      byCategory: [],
+      uncounted: [parseMoney('11', 'USD')],
+    } as MoneyMonthView
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    const wrapper = mount(CategoryDonutCard, {
+      props: { month: coffee, nameOf: () => '' },
+      global: { plugins: [router, createAppI18n('ru')] },
+    })
+    expect(wrapper.find('.rest').text()).toBe('Доли появятся, когда у трат будет курс')
   })
 
   it('stays a way into «Графики» on an empty month, with no ring (handoff 01, adversarial Г)', () => {
-    const empty = { ...month('2026-09', []), days: [], remaining: 0 }
+    const empty = { ...month('2026-09', []), byCategory: [], uncounted: [], days: [], remaining: 0 }
     const router = createRouter({ history: createMemoryHistory(), routes })
     const wrapper = mount(CategoryDonutCard, {
       props: { month: empty, nameOf: () => '' },

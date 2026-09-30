@@ -124,8 +124,8 @@ export const moneyMonthCodec = z.strictObject({
   /**
    * The ring of «Куда ушли» (MOL-156): `donutSlices` of `byCategory` — six categories at most, the
    * rest one «Остальные» (`categoryId` null) — with the levels the phone turns into angles. Defaulted
-   * so that a month the phone kept before the ring still reads through this strict codec: the phone
-   * fills its ring in by the same function (`useMoneyMonth`), rather than lose every month kept.
+   * so that a month the phone kept before the ring still reads through this strict codec, as a month
+   * with no ring until it is read again: the phone does not work one out (review 9 of MOL-156).
    */
   slices: z
     .array(

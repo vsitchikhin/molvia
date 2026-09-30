@@ -153,7 +153,7 @@ describe('useMoneyMonth', () => {
     expect(other.knownCategories.value.map((one) => one.id)).toEqual([BEAUTY])
   })
 
-  it('a month kept before the ring reads offline with its ring, by the model’s function (MOL-156, А)', async () => {
+  it('a month kept before the ring reads offline, its categories whole and no ring (MOL-156, review 9)', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
     useActorStore().id = ACTOR
@@ -173,7 +173,9 @@ describe('useMoneyMonth', () => {
     moneyMonth.mockRejectedValue(new TypeError('network'))
     const offline = host(pinia)
     await flushPromises()
-    expect(offline.month.value?.slices).toEqual(donutSlices(byCategory))
+    // The phone adds nothing up (CLAUDE.md): the ring waits for the next read, and the card says so.
+    expect(offline.month.value?.slices).toEqual([])
+    expect(offline.month.value?.byCategory).toEqual(byCategory)
   })
 
   it('С-5: another month on screen still knows today’s rate, from the running month kept', async () => {
