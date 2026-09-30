@@ -11,6 +11,7 @@ import {
   rateChoiceBodySchema,
   restoreTripBodySchema,
   startTripBodySchema,
+  tripReceiptBodySchema,
   tripViewCodec,
 } from '@molvia/model'
 import type {
@@ -19,6 +20,7 @@ import type {
   AddExpenseBody,
   ExpensePatch,
   RateChoiceBody,
+  Money,
   RestoreTripBody,
   StartTripBody,
   TripView,
@@ -42,6 +44,7 @@ export interface TripsApi {
   remove(actorId: string, tripId: string, expenseId: string): Promise<TripView>
   finish(actorId: string, tripId: string, deviceAt?: Date, deviceDay?: string): Promise<void>
   chooseRate(actorId: string, tripId: string, body: RateChoiceBody): Promise<TripView>
+  setReceipt(actorId: string, tripId: string, receipt: Money | null): Promise<TripView>
   removeTrip(actorId: string, tripId: string): Promise<void>
   restoreTrip(actorId: string, tripId: string, body: RestoreTripBody): Promise<TripView>
 }
@@ -174,6 +177,19 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
     return answer(
       reply,
       await api.restoreTrip(request.actorId, resourceId(request.params.tripId), body),
+    )
+  })
+
+  /**
+   * «Сумма по чеку» (MOL-78): the receipt's sum whole, or `null` to take it off; the trip whole in
+   * answer. PUT: the queue sends it again after a lost reply, and the same sum is the same state.
+   * A stranger's, a missing and a removed trip are one 404.
+   */
+  app.put<{ Params: TripParams }>('/trips/:tripId/receipt', async (request, reply) => {
+    const body = parseBody(tripReceiptBodySchema, request.body)
+    return answer(
+      reply,
+      await api.setReceipt(request.actorId, resourceId(request.params.tripId), body.receipt),
     )
   })
 

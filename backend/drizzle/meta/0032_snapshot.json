@@ -1,6 +1,6 @@
 {
-  "id": "0b8e5469-bbb8-4484-b1a0-479f1c6186b1",
-  "prevId": "260f2897-8b8b-47a4-ab9b-b3fe6ffc3360",
+  "id": "ae7a26be-7e5f-4f94-8e93-180a55d9c5e8",
+  "prevId": "0b8e5469-bbb8-4484-b1a0-479f1c6186b1",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2679,6 +2679,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "receipt_first_at": {
+          "name": "receipt_first_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -2873,6 +2879,10 @@
         "trips_receipt_currency_known": {
           "name": "trips_receipt_currency_known",
           "value": "\"trips\".\"receipt_currency\" is null or \"trips\".\"receipt_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+        },
+        "trips_receipt_first_with_sum": {
+          "name": "trips_receipt_first_with_sum",
+          "value": "(\"trips\".\"receipt_minor\" is null) = (\"trips\".\"receipt_first_at\" is null)"
         },
         "trips_debited_whole": {
           "name": "trips_debited_whole",

@@ -400,6 +400,21 @@ describe('ItemDetailsSheet', () => {
     expect(second.queue.pending).toHaveLength(1)
   })
 
+  it('with a receipt sum, a price must fit beside the prices, not beside the receipt (MOL-78, A9)', async () => {
+    const withReceipt = (prices: string): TripView => ({
+      ...trip(),
+      total: [parseMoney('100', 'AMD')],
+      receipt: parseMoney('100', 'AMD'),
+      prices: [parseMoney(prices, 'AMD')],
+    })
+    // The receipt is small, the prices are near what money holds: the prices are what it adds to.
+    const full = await render({ trip: withReceipt('90 000 000 000 000 000') })
+    await type(full.view, 'amount', '5 000 000 000 000 000')
+    await button(full.view, 'Записать').trigger('click')
+    expect(full.view.text()).toContain('Это не похоже на сумму')
+    expect(full.queue.pending).toHaveLength(0)
+  })
+
   describe('the estimate in roubles (В-7)', () => {
     it('shows the package in the income currency by the rate of the trip', async () => {
       const { view } = await render({ trip: trip('4.82') })

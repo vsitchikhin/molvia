@@ -69,6 +69,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 
 ## frontend · stores
 
+- `frontend/src/stores/spendingHandoff.ts` — Store: a record with no purchases handed over to «Деньги» as a spending (MOL-78, В-1), taken once by the sheet.
 - `frontend/src/stores/spendingQueue.ts` — Store: the on-device queue of every spending and category write, folded while waiting, sent one window at a time.
 
 ## e2e

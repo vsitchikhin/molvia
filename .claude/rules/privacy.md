@@ -87,7 +87,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   the name. The format is the wire's: English keys, money and quantity as decimal strings beside
   their currency and unit, rates to six digits, days `YYYY-MM-DD`, moments in UTC, and a header
   `format: "molvia-export"`, `version` — a change of what goes in is a new version: 2 since the
-  ladder of rating reminders joined it (MOL-101), 3 since the codes a person wrote did (MOL-100). Its codec
+  ladder of rating reminders joined it (MOL-101), 3 since a trip's receipt did (MOL-78), 4 since the codes a person wrote did (MOL-100). Its codec
   is looser than a screen's on purpose: a copy of what is stored is never refused by a rule a
   stored row predates — an event type since withdrawn, a rate outside today's band. **One
   snapshot:** one transaction, `repeatable read, read only`; it writes nothing, not even the log.

@@ -73,6 +73,15 @@ const tripFields = z.object({
     .refine((value) => value.minor > 0n, { error: ERROR.INVALID_AMOUNT })
     .nullable()
     .default(null),
+  /**
+   * What the receipt said, typed whole (MOL-78): one sum in one currency, and when there is one it
+   * is the trip's money in every currency — the purchases' prices stay as they are and are never
+   * worked out of it (`tripMoney`).
+   */
+  receipt: priceSchema
+    .refine((value) => value.minor > 0n, { error: ERROR.INVALID_AMOUNT })
+    .nullable()
+    .default(null),
 })
 
 export const tripSchema = tripFields
@@ -170,7 +179,7 @@ export function isTripRateStale(trip: Trip): boolean {
  * One total per currency: an expense carries its own, and paying for one thing by card in
  * another is an ordinary afternoon. Nothing priced gives an empty list, not a zero.
  */
-export function tripTotal(expenses: readonly Expense[]): readonly Money[] {
+export function tripTotal(expenses: readonly Pick<Expense, 'amount'>[]): readonly Money[] {
   const byCurrency = new Map<Currency, bigint>()
   for (const { amount } of expenses) {
     if (amount === null) continue
@@ -181,6 +190,58 @@ export function tripTotal(expenses: readonly Expense[]): readonly Money[] {
   return [...byCurrency]
     .map(([currency, minor]) => ({ minor, currency }))
     .sort((a, b) => (a.currency === b.currency ? 0 : a.currency < b.currency ? -1 : 1))
+}
+
+/**
+ * What a trip came to (MOL-78): the receipt's sum whole when the person typed one, else one sum of
+ * prices per currency. One rule for every reader of a trip's money — the screen, «Записаны», the
+ * month of «Деньги», the accounts and the hint of an exchange — which the SQL of `src/db` repeats
+ * and an integration test holds equal. A receipt in drams stands for a purchase priced in dollars
+ * too: the receipt is the whole trip, so adding it to the prices would count that purchase twice.
+ */
+export function tripMoney(
+  receipt: Money | null,
+  expenses: readonly Pick<Expense, 'amount'>[],
+): readonly Money[] {
+  return receipt ? [receipt] : tripTotal(expenses)
+}
+
+/**
+ * What the screen says under a receipt's sum about the prices (MOL-78, В-2): what the purchases
+ * without a price came to, or by how much the prices miss the receipt. Never a price — the rest is
+ * named, not spread over the purchases, since a price made up here would reach «где дешевле».
+ *
+ * - `unpriced`: some purchases have no price, and the receipt is more than the priced ones;
+ * - `over`: the prices are more than the receipt — a discount, or a price typed wrong;
+ * - `under`: every purchase is priced and the receipt is still more.
+ *
+ * Nothing when the prices meet the receipt, and nothing when some price is in another currency: two
+ * currencies do not subtract, and a rate here would be a guess. Nothing for a trip with no purchases
+ * either — its purchases all removed after the sum — since «the receipt is more than the prices»
+ * about no prices at all says what is not so (review 5).
+ */
+export type ReceiptGap =
+  | { readonly kind: 'unpriced'; readonly amount: Money }
+  | { readonly kind: 'over'; readonly amount: Money }
+  | { readonly kind: 'under'; readonly amount: Money }
+
+export function receiptGap(
+  receipt: Money,
+  expenses: readonly Pick<Expense, 'amount'>[],
+): ReceiptGap | null {
+  if (expenses.length === 0) return null
+  const prices = tripTotal(expenses)
+  if (prices.some((money) => money.currency !== receipt.currency)) return null
+  const priced = prices[0]?.minor ?? 0n
+  const unpriced = expenses.some(({ amount }) => amount === null)
+  const currency = receipt.currency
+  if (priced > receipt.minor)
+    return { kind: 'over', amount: { minor: priced - receipt.minor, currency } }
+  if (priced === receipt.minor) return null
+  return {
+    kind: unpriced ? 'unpriced' : 'under',
+    amount: { minor: receipt.minor - priced, currency },
+  }
 }
 
 /** The converted amount in the base's minor units, unbounded — the caller decides what does not fit. */

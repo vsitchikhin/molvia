@@ -1,6 +1,6 @@
 {
-  "id": "0b8e5469-bbb8-4484-b1a0-479f1c6186b1",
-  "prevId": "260f2897-8b8b-47a4-ab9b-b3fe6ffc3360",
+  "id": "5f592d82-5028-4dd5-9356-bb51c4eb3722",
+  "prevId": "ae7a26be-7e5f-4f94-8e93-180a55d9c5e8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1004,6 +1004,19 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "added_by": {
+          "name": "added_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "added_at": {
+          "name": "added_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
@@ -1031,6 +1044,15 @@
           "columnsFrom": ["item_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "item_barcodes_added_by_actors_id_fk": {
+          "name": "item_barcodes_added_by_actors_id_fk",
+          "tableFrom": "item_barcodes",
+          "tableTo": "actors",
+          "columnsFrom": ["added_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -2679,6 +2701,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "receipt_first_at": {
+          "name": "receipt_first_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -2873,6 +2901,10 @@
         "trips_receipt_currency_known": {
           "name": "trips_receipt_currency_known",
           "value": "\"trips\".\"receipt_currency\" is null or \"trips\".\"receipt_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+        },
+        "trips_receipt_first_with_sum": {
+          "name": "trips_receipt_first_with_sum",
+          "value": "(\"trips\".\"receipt_minor\" is null) = (\"trips\".\"receipt_first_at\" is null)"
         },
         "trips_debited_whole": {
           "name": "trips_debited_whole",

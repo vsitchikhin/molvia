@@ -279,7 +279,7 @@ codes too, and a wrong one needs a way out (В-1, below).
   counted under the item's lock: the database has no trigger for it.
 - **Who wrote it is kept** (`item_barcodes.added_by`, `added_at`, Р-5): a code written says the person
   held the package — theirs, as an item's author is. Erasure nulls it and the code stays; the copy of
-  one's data lists the codes one wrote (`addedBarcodes`, version 3), `privacy.md`. The screens show it to
+  one's data lists the codes one wrote (`addedBarcodes`, version 4), `privacy.md`. The screens show it to
   nobody.
 - **«Не этот товар?» lets a code go, and anyone may** (owner's decision В-1): a quiet line on the
   purchase sheet of an item that came by a code — found, linked or proposed with it — whoever holds the

@@ -14,6 +14,8 @@ import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
+import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
+import type { SpendingPrefill } from '@/stores/spendingHandoff'
 import MoneyView from '@/views/MoneyView.vue'
 
 const moneyMonth = vi.fn<(month: string, cursor?: JournalKey) => Promise<MoneyMonthView>>()
@@ -99,12 +101,13 @@ function month(spentOn: string): MoneyMonthView {
 const views: VueWrapper[] = []
 let clock = 0
 
-async function render(): Promise<VueWrapper> {
+async function render(handed?: SpendingPrefill): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
   const actor = useActorStore()
   actor.id = ACTOR
   actor.state = 'ready'
+  if (handed) useSpendingHandoffStore().hand(handed)
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/money')
   const view = mount(MoneyView, {
@@ -235,5 +238,50 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
     document.dispatchEvent(new Event('visibilitychange'))
     await flushPromises()
     expect(view.text()).toContain('Yesterday · September 28')
+  })
+})
+
+describe('SpendingSheet: a record with no purchases handed over (MOL-78, В-1)', () => {
+  const GROCERIES = 'ffffffff-0000-4000-8000-000000000002'
+  const withGroceries = (archived: boolean): MoneyMonthView => {
+    const base = month('2026-09-28')
+    return {
+      ...base,
+      categories: [
+        ...base.categories,
+        { id: GROCERIES, preset: 'groceries', name: null, colour: null, archived },
+      ],
+    }
+  }
+
+  it('«Деньги» open the sheet on the shop and the day of the record, in «Продукты»', async () => {
+    moneyMonth.mockResolvedValue(withGroceries(false))
+    await render({ place: 'Ереван Сити', day: '2026-09-27' })
+    await risen()
+    const dialog = document.querySelector<HTMLDialogElement>('dialog[open]')
+    expect(dialog).not.toBeNull()
+    expect(dayField().value).toBe('2026-09-27')
+    const place = dialog?.querySelector<HTMLInputElement>(
+      `input[placeholder="${en.spending.sheet.place_placeholder}"]`,
+    )
+    expect(place?.value).toBe('Ереван Сити')
+    const chosen = dialog?.querySelector<HTMLInputElement>('.chips-field input:checked')
+    expect(chosen?.value ?? chosen?.id ?? '').not.toBe('')
+    expect(chosen?.closest('label')?.textContent).toContain(en.spending.category.groceries)
+    expect(useSpendingHandoffStore().handed).toBeNull()
+  })
+
+  it('must not fire: «Продукты» removed from the choice is not chosen', async () => {
+    moneyMonth.mockResolvedValue(withGroceries(true))
+    await render({ place: 'SAS', day: '2026-09-27' })
+    await risen()
+    expect(document.querySelector('dialog[open] .chips-field input:checked')).toBeNull()
+  })
+
+  it('must not fire: «Деньги» opened by hand open no sheet', async () => {
+    moneyMonth.mockResolvedValue(withGroceries(false))
+    await render()
+    await risen()
+    expect(document.querySelector('dialog[open]')).toBeNull()
   })
 })

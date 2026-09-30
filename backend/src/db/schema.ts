@@ -527,6 +527,17 @@ export const trips = pgTable(
     debitedCurrency: char('debited_currency', { length: 3 }).$type<Currency>(),
     // When they last changed: a check's window is the server's moment, not the phone's (Д1б).
     accountSetAt: timestamp('account_set_at', { withTimezone: true }),
+    // «Сумма по чеку» (MOL-78): typed whole, and when there is one it is the trip's money in every
+    // reader — the prices stay as they are. `receipt_set_at` is when the server last saw it change,
+    // taking it off included: what a check's window and «сколько было до обмена» date the receipt
+    // by, as a purchase by its own moment.
+    receiptMinor: bigint('receipt_minor', { mode: 'bigint' }),
+    receiptCurrency: char('receipt_currency', { length: 3 }).$type<Currency>(),
+    receiptSetAt: timestamp('receipt_set_at', { withTimezone: true }),
+    // When this sum was first typed — an amendment keeps it, taking the sum off clears it: what the
+    // hint of «сколько было до обмена» dates the receipt by, as a purchase by the moment it was
+    // written, so a typo fixed after an exchange does not move the whole receipt past it (review 2).
+    receiptFirstAt: timestamp('receipt_first_at', { withTimezone: true }),
     // «Удалить поход» (MOL-76): marked, not deleted, by the money rule — «Вернуть» for ten
     // minutes, then the minute timer, and every reader but erasure and that timer filters it
     // out. A mark also keeps a start sent again from the queue from writing the trip anew.
@@ -621,6 +632,17 @@ export const trips = pgTable(
     check(
       'trips_finished_after_start',
       sql`${table.finishedAt} is null or ${table.finishedAt} >= ${table.startedAt}`,
+    ),
+    // A sum with no currency reads as money and converts by nothing; zero is not a receipt.
+    check(
+      'trips_receipt_whole',
+      sql`num_nonnulls(${table.receiptMinor}, ${table.receiptCurrency}) in (0, 2)
+        and (${table.receiptMinor} is null or (${table.receiptMinor} > 0 and ${table.receiptSetAt} is not null))`,
+    ),
+    check('trips_receipt_currency_known', currencyKnownOrNull(table.receiptCurrency)),
+    check(
+      'trips_receipt_first_with_sum',
+      sql`(${table.receiptMinor} is null) = (${table.receiptFirstAt} is null)`,
     ),
     ...paidFrom('trips', table),
   ],

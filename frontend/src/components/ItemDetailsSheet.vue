@@ -211,13 +211,16 @@ export default defineComponent({
     const removable = computed(() => props.expense !== null || props.retry !== null)
 
     /**
-     * The trip's total and what is still queued for it: a price must fit beside both (A9). The
-     * purchase of this sheet is not counted — once queued it would be counted twice.
+     * The trip's prices and what is still queued for it: a price must fit beside both (A9). The
+     * purchase of this sheet is not counted — once queued it would be counted twice. The prices,
+     * not the total: with a receipt's sum the total is the receipt (MOL-78), and the prices are
+     * what the server adds this one to.
      */
     function occupied(): Money[] {
       const id = writeInto.value
       if (!id) return []
-      const held: Money[] = [...(trip.value?.total ?? [])]
+      const shown = trip.value
+      const held: Money[] = [...(shown?.receipt ? shown.prices : (shown?.total ?? []))]
       for (const write of queue.pending) {
         if (write.kind !== 'add' || write.tripId !== id || !write.body.amount) continue
         if (write.body.id === details.expenseId) continue

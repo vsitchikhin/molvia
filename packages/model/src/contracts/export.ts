@@ -20,9 +20,10 @@ import { baseUnitSchema } from '#model/values/units'
  */
 export const EXPORT_FORMAT = 'molvia-export'
 // 2: `ratingReminders`, where the person stands on the ladder of rating reminders (MOL-101) — a
-// change of what goes in is a new version (privacy.md).
-// 3: `addedBarcodes`, the codes the person wrote to items of the catalogue (MOL-100).
-export const EXPORT_VERSION = 3
+// change of what goes in is a new version (privacy.md). 3: a trip's `receipt` and `receiptSetAt`,
+// the sum typed from the receipt, when it last changed and when it was first typed (MOL-78).
+// 4: `addedBarcodes`, the codes the person wrote to items of the catalogue (MOL-100).
+export const EXPORT_VERSION = 4
 
 const day = z.iso.date()
 
@@ -138,6 +139,11 @@ const tripSchema = z.strictObject({
   accountId: z.uuid().nullable(),
   debited: signedMoneyCodec.nullable(),
   accountSetAt: isoDate.nullable(),
+  // «Сумма по чеку» (MOL-78) as typed, when it last changed — taken off, the moment stays — and
+  // when this sum was first typed.
+  receipt: signedMoneyCodec.nullable(),
+  receiptSetAt: isoDate.nullable(),
+  receiptFirstAt: isoDate.nullable(),
   removedAt: isoDate.nullable(),
 })
 

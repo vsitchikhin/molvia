@@ -60,8 +60,22 @@
       </template>
     </template>
     <template v-if="available" #docked
-      ><TripTotal :trip="trip" :pending="waiting" :local="trip === null"
+      ><TripTotal
+        :trip="trip"
+        :pending="waiting"
+        :local="trip === null"
+        :receipt-waiting="receiptWaiting"
+        :offer-receipt="offerReceipt"
+        :receipt-known="receiptKnown"
+        @receipt="receiptOpen = true"
     /></template>
+    <ReceiptSheet
+      v-if="id"
+      v-model:open="receiptOpen"
+      :trip-id="id"
+      :trip-currency="receiptCurrency"
+      :current="receiptCurrent"
+    />
     <TripRemoveSheet
       v-model:open="removing"
       :place="removal.place"
@@ -98,6 +112,7 @@ import TripRow from '@/components/TripRow.vue'
 import TripTotal from '@/components/TripTotal.vue'
 import TripRateNotes from '@/components/TripRateNotes.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
+import ReceiptSheet from '@/components/ReceiptSheet.vue'
 import { useFinishedTrip } from '@/composables/useFinishedTrip'
 export default defineComponent({
   name: 'FinishedTripView',
@@ -112,6 +127,7 @@ export default defineComponent({
     TripTotal,
     TripRateNotes,
     ItemDetailsSheet,
+    ReceiptSheet,
   },
   setup: useFinishedTrip,
 })
