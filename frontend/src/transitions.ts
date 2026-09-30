@@ -14,8 +14,8 @@ type Place = Pick<RouteLocation, 'matched' | 'fullPath' | 'path' | 'meta' | 'nam
 /**
  * A move that leaves the path as it was is the screen's own state, not another screen: the same
  * address — a sheet put away — or only the query — the category and the period of «Графики», the
- * month of «Деньги», each by `replace` (MOL-136). It is not scrolled to the top, not animated and not
- * an arrival. The first navigation is always another screen: it comes from `START_LOCATION`, at «/».
+ * month of «Деньги», each by `replace` (MOL-136). It is not scrolled to the top, not animated, not
+ * an arrival, and it does not make the page shorter under the window (MOL-138). The first navigation is always another screen: it comes from `START_LOCATION`, at «/».
  */
 export function sameScreen(
   from: Pick<RouteLocation, 'matched' | 'path'>,
@@ -152,5 +152,64 @@ export function installArrival(router: Router, t: (key: string) => string): void
     if (from.matched.length === 0) return
     await nextTick()
     focusScreenTitle()
+  })
+}
+
+/**
+ * A change of the query holds the page as tall as the bottom of the window (MOL-138). The new
+ * version of the screen may be shorter — a month read for the first time comes under the skeleton,
+ * a category card loses a line at the very end of the page — and the browser brings the scroll up
+ * to the new end in the very layout that made it shorter: the switcher leaves the thumb, and when
+ * the answer comes the scroll does not come back. Seen after the fact it is already too late — a
+ * scroll put back is a jump there and back — so the height is held before the router lets the
+ * screen redraw.
+ *
+ * Only as far as the bottom of the window, not the old height of the page: that much keeps the
+ * scroll where it is, and more would be empty room to scroll into. At the top of the page it is the
+ * window, which the screen's `100dvh` already fills. The hold is on `#app`, a block: empty room under
+ * the screen, never the screen stretched (main.scss).
+ *
+ * It goes when it no longer holds anything in view — the bottom of the window within the screen
+ * again, scrolled up or reached by a longer answer — and with a move to another screen: after the
+ * view transition has taken its picture of the old one, before the new one is scrolled.
+ */
+export function installHeightHold(router: Router): void {
+  const root = document.documentElement
+  let held = false
+
+  /** Where the screen ends without the hold: what flows in `#app`, not what floats over it. */
+  function contentBottom(): number {
+    let bottom = 0
+    for (const child of document.getElementById('app')?.children ?? []) {
+      const { position } = getComputedStyle(child)
+      if (position === 'fixed' || position === 'absolute') continue
+      bottom = Math.max(bottom, child.getBoundingClientRect().bottom)
+    }
+    return Math.ceil(bottom + window.scrollY)
+  }
+
+  function release(): void {
+    if (!held) return
+    held = false
+    root.style.removeProperty('--page-hold')
+    window.removeEventListener('scroll', settle)
+  }
+
+  function settle(): void {
+    if (window.scrollY + window.innerHeight <= contentBottom()) release()
+  }
+
+  router.beforeEach((to, from) => {
+    if (to.fullPath === from.fullPath || !sameScreen(from, to)) return
+    const bottom = Math.ceil(window.scrollY + window.innerHeight)
+    root.style.setProperty('--page-hold', `${String(bottom)}px`)
+    if (held) return
+    held = true
+    window.addEventListener('scroll', settle, { passive: true })
+  })
+
+  // A move that failed left the screen as it was, and the hold with it.
+  router.afterEach((to, from, failure) => {
+    if (!failure && !sameScreen(from, to)) release()
   })
 }

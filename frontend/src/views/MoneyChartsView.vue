@@ -1,6 +1,10 @@
 <template>
   <AppScreen :title="t('spending.charts.title')">
-    <template v-if="range" #subtitle>{{ range }}</template>
+    <!-- The line stands while a period is on its way: gone under the skeleton, it took the controls
+         below it up by its height (MOL-138). -->
+    <template #subtitle
+      ><span class="range">{{ range }}</span></template
+    >
 
     <div class="content">
       <p v-if="stale === 'offline' && fetchedAt" class="strip">
@@ -532,6 +536,11 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.range {
+  display: block;
+  min-height: 1lh;
+}
+
 .content {
   display: flex;
   flex-direction: column;
