@@ -75,6 +75,7 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     rateKind: 'live',
     previousSpent: amd('345620'),
     byCategory: [{ categoryId: BEAUTY, amount: amd('5000') }],
+    slices: [{ categoryId: BEAUTY, amount: amd('5000'), count: 1, level: 1000 }],
     categories: [{ id: BEAUTY, preset: 'beauty', name: null, colour: null, archived: false }],
     days: [
       {
@@ -121,6 +122,7 @@ const empty = () =>
     accountsRemoved: false,
     previousSpent: null,
     byCategory: [],
+    slices: [],
     days: [],
   })
 
@@ -661,6 +663,14 @@ describe('MoneyView: what the review found (MOL-82)', () => {
   it('Т-7: the way to one’s categories is there before anything is spent', async () => {
     moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('100') })
     const view = await render()
+    expect(view.find('a.categories-link').attributes('href')).toBe('/money/categories')
+  })
+
+  it('«Куда ушли» is the ring, one way into «Графики», with the categories still under it (MOL-156)', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    expect(view.find('.donut a').attributes('href')).toMatch(/^\/money\/charts/)
+    expect(view.findAll('.donut .ring path')).toHaveLength(1)
     expect(view.find('a.categories-link').attributes('href')).toBe('/money/categories')
   })
 })

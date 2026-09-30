@@ -9,7 +9,7 @@ paths:
   - 'backend/tests/{salary-shift,month-rest,money-charts}*.ts'
   - 'backend/drizzle/*spending*.sql'
   - 'frontend/src/views/Money*'
-  - 'frontend/src/components/{Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*,BarChart*,RateLine*,ExchangeLosses*,charts*}'
+  - 'frontend/src/components/{Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*,BarChart*,DonutRing*,RateLine*,ExchangeLosses*,charts*}'
   - 'frontend/src/composables/{useMoneyMonth,useMoneyCharts,useChartPointer}*'
   - 'frontend/src/composables/useSalaryShift*'
   - 'frontend/src/components/SalaryShift*'
@@ -267,8 +267,30 @@ nothing up.
   screen, or to a live one of one's own, is refused there. The colours are tokens — thirteen
   presets and a palette of eight for one's own, none red, olive, ochre or terracotta, each at
   least 3:1 on `--surface`.
-- A tap on a category opens «Графики» on it, and «Графики по месяцам» stands under the bars
-  (MOL-74, below); accounts are MOL-115's.
+- **«Куда ушли» is a ring** (MOL-156, owner's decision В-2, handoff MOL-157 01): the month's
+  `slices` — `donutSlices` over `byCategory` on the server, six categories and the rest one
+  «Остальные» (seven are all seven), each with its level in thousandths of the ring, shared out by
+  the largest remainder so the levels add up to exactly `CHART_LEVEL` and the ring closes. The three
+  largest are named beside it with the model's `shareOf`, the rest counted («Ещё N») — **only the
+  sectors the ring draws**: one of no level, a bus ride beside the rent, is on no ring (adversarial
+  Б). **The whole card is one way into «Графики», on the largest category of the ring** (review 3,
+  owner's choice «а»): opened on the period's largest, a card that named «Кафе» led to rent. The
+  first sector always names one — «Остальные» are only ever last. A month older than six opens
+  twelve (adversarial А of MOL-74). A tap on another category no longer opens it, the price of one
+  link: it is one choice away. **An empty month keeps the card**, with no ring — still the way into
+  «Графики», where the year is (handoff 01, adversarial Г). Its «В этом месяце трат нет» is said
+  once, by the journal under it, until MOL-159 takes the journal to «Траты»: said twice, it was two
+  of the same line on one screen. A category the month
+  does not name is left out, never drawn as a second «Остальные» (review 7). «Категории ›» stands
+  under the card always. **`slices` defaults to empty so that a month kept on the phone before the
+  ring still reads through the strict codec** (review 6): lost, every month kept went with it
+  offline. **The phone does not work the ring out for it** (review 9, owner's decision «а»): that
+  would be a second exception to «the phone adds nothing up», for three months and one read. **A
+  card with no ring says why, in the ring's place** (adversarial round 2, Е, Ж): categories and no
+  sectors — a month kept before the ring, an answer of a server older than it — «Доли появятся,
+  когда месяц обновится»; nothing a rate counted — «Доли появятся, когда у трат будет курс»; an
+  empty month says nothing there. The price, named: offline, a month kept before the update has no
+  ring until it is read again. Accounts are MOL-115's.
 
 ## «Графики» (MOL-74)
 
@@ -336,7 +358,17 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   reads at least one on (MOL-81); the person's exchanges of the pair, either way, are dots on their
   week. No pair — one currency for both — no card. The price, named: a week whose rate came from a
   fallback provider is not marked; the card says «ЦБ РА» of the whole line.
-- **Drawn by hand, no library** (Р-1): `BarChart` is HTML and tokens, `RateLine` is SVG whose
+- **The geometry is d3-shape's, the components are ours, and there is no charting library**
+  (MOL-156, owner's decision В-1, in place of Р-1 of MOL-74 «drawn by hand»). Measured by a build
+  of one probe — a ring, twelve bars, a line: `d3-shape` added 3 KB gzip against a whole app of 267;
+  chart.js 54 on a canvas that reads no token and gives a screen reader nothing, unovis 64 with 184
+  packages behind it and a ring that kept its colour when the scheme changed, vue-data-ui 200
+  turning every colour into hex, ECharts 185, ApexCharts 395 on a licence that charges a product
+  used by other people. Every library brought its own touch, tooltips and accessibility, which
+  the rules below already settle, and its own scales, which the server counts. The arcs and the
+  curves are the one thing hard to write by hand, and d3-shape draws them from the server's levels.
+  `BarChart` is HTML and tokens, `DonutRing` is d3-shape's arcs with a gap between sectors (none
+  on one too narrow for it), `RateLine` is SVG whose
   strokes keep their width when stretched (`vector-effect`), a dot is a zero-length round-capped
   line so it is never an ellipse. The reading stands above the bars, never under the finger; the
   whole area is the target (`touch-action: pan-y` leaves the page its scroll), a mouse passing over
@@ -348,10 +380,12 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   chooses on press. **A new answer of the same period keeps the bar chosen** — the sources of the
   watch are compared one by one, since a getter of an array is a new array on every answer.
 - **The period and the category are in the address and move by `replace`**; the category chosen is
-  kept for as long as the app is open, and the first one is the largest of the period (Р-8), not the
-  handoff's «Кафе». **Every live category of the owner is offered**, spent in the period or not, and
-  a row of «Куда ушли» on a month older than six opens twelve (adversarial А, d9 Г): a category
-  tapped there was swapped for the largest, in silence, with its own id still in the address. One
+  kept for as long as the app is open, for a way in that names none, and the first one is the
+  largest of the period (Р-8), not the handoff's «Кафе». **A category in the address comes first**:
+  the ring of «Куда ушли» names its largest (MOL-156, owner's decision on adversarial round 2, Д), so
+  a tap on it leaves the one chosen before behind — the ring shows one, and the charts open on it. **Every live category of the owner is offered**, spent in the period or not, and
+  the ring of «Куда ушли» on a month older than six opens twelve (adversarial А, d9 Г): a category
+  sent from there was swapped for the largest, in silence, with its own id still in the address. One
   the answer still lacks — a removed category, a stale link — is named: «Этой категории на графиках
   нет — показаны …». Only
   the person's choice or the address is remembered. **Only the latest read is kept on the phone**

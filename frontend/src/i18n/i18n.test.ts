@@ -117,6 +117,8 @@ describe('словарь: повторяющиеся тексты', () => {
       Настройки: ['nav.settings', 'settings.title'],
       // Таб и его экран — разные роли одного слова, как у «Покупки».
       Деньги: ['nav.money', 'settings.group_money', 'spending.title'],
+      // Заголовок экрана и ссылка на него с карточки «Куда ушли» (MOL-156).
+      Графики: ['spending.charts.title', 'spending.summary.charts'],
       // The settings handoff names its own save action, independently of purchase editing.
       Сохранить: [
         'accounts.sheet.save',
@@ -209,6 +211,8 @@ describe('словарь: повторяющиеся тексты', () => {
         'trip.history.title',
       ],
       Finish: ['trip.finish', 'trip.finish_confirm.ok'],
+      // The screen's title and the way to it from «Where it went» (MOL-156), as in Russian.
+      Charts: ['spending.charts.title', 'spending.summary.charts'],
       // The strip of a trip removed is the strip of a spending removed (MOL-76).
       Undo: ['spending.restore', 'trip.remove.restore'],
       'What to buy': ['advice.title', 'nav.advice'],
@@ -308,6 +312,7 @@ describe('словарь: плюральные формы', () => {
       'verdict.pending_count',
       'spending.unsent',
       'spending.rest_operations',
+      'spending.summary.donut_more',
       'spending.charts.fx_count',
       'spending.charts.fx_uncounted',
       'spending.trip_row_meta',

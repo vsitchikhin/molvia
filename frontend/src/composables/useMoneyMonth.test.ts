@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { parseMoney } from '@molvia/model'
+import { donutSlices, parseMoney } from '@molvia/model'
 import type { JournalKey, MoneyMonthView } from '@molvia/model'
 import { useMoneyMonth } from '@/composables/useMoneyMonth'
 import type { MoneyMonth } from '@/composables/useMoneyMonth'
@@ -58,6 +58,7 @@ function page(days: [string, ReturnType<typeof entry>[]][], cursor: JournalKey |
     rateKind: 'live',
     previousSpent: null,
     byCategory: [],
+    slices: [],
     categories: [{ id: BEAUTY, preset: 'beauty', name: null, colour: null, archived: false }],
     days: days.map(([day, entries]) => ({ day, total: amd('1000'), estimated: false, entries })),
     cursor,
@@ -150,6 +151,31 @@ describe('useMoneyMonth', () => {
     const other = host(pinia)
     await flushPromises()
     expect(other.knownCategories.value.map((one) => one.id)).toEqual([BEAUTY])
+  })
+
+  it('a month kept before the ring reads offline, its categories whole and no ring (MOL-156, review 9)', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    useActorStore().id = ACTOR
+    const byCategory = [{ categoryId: BEAUTY, amount: amd('3000') }]
+    moneyMonth.mockResolvedValue({ ...page([], null), byCategory, slices: donutSlices(byCategory) })
+    host(pinia)
+    await flushPromises()
+    // As the version before the ring kept it: the answer with no `slices` at all.
+    const key = `molvia.money.${ACTOR}`
+    const kept = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<
+      string,
+      { answer: Record<string, unknown> }
+    >
+    delete kept['2026-09']?.answer.slices
+    localStorage.setItem(key, JSON.stringify(kept))
+
+    moneyMonth.mockRejectedValue(new TypeError('network'))
+    const offline = host(pinia)
+    await flushPromises()
+    // The phone adds nothing up (CLAUDE.md): the ring waits for the next read, and the card says so.
+    expect(offline.month.value?.slices).toEqual([])
+    expect(offline.month.value?.byCategory).toEqual(byCategory)
   })
 
   it('С-5: another month on screen still knows today’s rate, from the running month kept', async () => {

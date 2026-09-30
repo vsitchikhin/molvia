@@ -143,4 +143,14 @@ describe('a month on the wire', () => {
     expect(view.categories[0]).toMatchObject({ preset: 'groceries', archived: true })
     expect(() => z.encode(moneyMonthCodec, view)).not.toThrow()
   })
+
+  it('carries the ring of «Куда ушли», and reads an answer older than it as an empty ring (MOL-156)', () => {
+    const view = moneyMonthViewOf(monthOf(spendings(3, () => '2026-09-01')), null, categories)
+    expect(view.slices).toEqual([
+      { categoryId: view.byCategory[0]?.categoryId, amount: view.spent, count: 1, level: 1000 },
+    ])
+    const older: Record<string, unknown> = { ...z.encode(moneyMonthCodec, view) }
+    delete older.slices
+    expect(moneyMonthCodec.parse(older).slices).toEqual([])
+  })
 })

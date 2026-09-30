@@ -112,6 +112,7 @@ the load is I/O-bound, with three orders of magnitude of headroom.
 | PWA               | Vue 3 + Vite + Pinia + vue-router + vite-plugin-pwa     | less ceremony and a smaller bundle than React; the target is a phone at the shelf          |
 | Styling           | SCSS, tokens in `styles/_tokens.scss`                   | no plain CSS anywhere; tokens stay custom properties, so the dark scheme is a runtime swap |
 | Scanner           | `zxing-wasm`, live viewfinder via `getUserMedia`        | we need EAN, not QR                                                                        |
+| Charts            | `d3-shape` for the geometry, components our own         | 3 KB; every charting library measured brought its own touch and scales (MOL-156)           |
 | API               | Fastify + Zod                                           | Zod schemas shared with the frontend and the bot                                           |
 | DB                | PostgreSQL + Drizzle                                    | schema in TS, generated migrations, honest drop into raw SQL                               |
 | Bot               | grammY + `@grammyjs/runner`                             | distribution, auth, rating reminders; the runner is what makes it serve two people at once |

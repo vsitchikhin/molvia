@@ -320,6 +320,39 @@ describe('месяц «Денег» (MOL-73)', () => {
     expect(counted.spent).toEqual({ minor: 894000n + 400000n, currency: 'AMD' })
   })
 
+  it('кольцо «Куда ушли» (MOL-156): восемь категорий — шесть и «Остальные», сходится с месяцем', async () => {
+    const me = await owner()
+    await rates.upsert([official('USD', '390', today)])
+    const presets = SPENDING_PRESETS.slice(0, 8)
+    for (const [index, preset] of presets.entries()) {
+      const amount = String((8 - index) * 1000)
+      await spend(me, {
+        categoryId: await presetId(me, preset),
+        amount: { amount, currency: 'AMD' },
+      })
+    }
+    // Ten dollars by the day's official rate, 3 900 ֏, in the largest: the order stays as typed.
+    await spend(me, {
+      categoryId: await presetId(me, presets[0] ?? ''),
+      amount: { amount: '10', currency: 'USD' },
+    })
+    const counted = await month(me, today.slice(0, 7))
+
+    expect(counted.slices).toHaveLength(7)
+    expect(counted.slices.slice(0, 6).map((slice) => slice.categoryId)).toEqual(
+      counted.byCategory.slice(0, 6).map((row) => row.categoryId),
+    )
+    expect(counted.slices.at(-1)).toMatchObject({
+      categoryId: null,
+      count: 2,
+      amount: { minor: (2000n + 1000n) * 100n, currency: 'AMD' },
+    })
+    expect(counted.slices.reduce((sum, slice) => sum + slice.amount.minor, 0n)).toBe(
+      counted.spent.minor,
+    )
+    expect(counted.slices.reduce((sum, slice) => sum + slice.level, 0)).toBe(1000)
+  })
+
   it('поход, завершённый 31 августа в 23:30 по Еревану, — в августе, а не в сентябре', async () => {
     const me = await owner()
     const place = await insertPlace(db)

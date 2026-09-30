@@ -94,7 +94,7 @@ const MARGIN = 100
 /**
  * The rate of the pair by week (MOL-74, owner's decision В-4, Р-14): a line of the central bank's
  * rate, broken where there was none — a gap, never a zero — and the person's own exchanges as dots
- * on it. SVG drawn by hand, no library (Р-1): stretched to the card, its strokes keep their width.
+ * on it. SVG drawn by hand, no charting library (MOL-156): stretched to the card, its strokes keep their width.
  * The week is chosen as a bar is — under the finger, anywhere on the card — and by the arrows of a
  * native range, which also says the week and its rate to a screen reader.
  */
